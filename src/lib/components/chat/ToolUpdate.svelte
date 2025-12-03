@@ -8,7 +8,6 @@
 	import LucideHammer from "~icons/lucide/hammer";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
-	import CarbonChevronDown from "~icons/carbon/chevron-down";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import BlockWrapper from "./BlockWrapper.svelte";
@@ -99,29 +98,19 @@
 
 	// Icon styling based on state
 	let iconBg = $derived(
-		isExecuting
-			? "bg-purple-100 dark:bg-purple-900/40"
-			: toolError
-				? "bg-red-50 dark:bg-red-900/20"
-				: "bg-gray-50 dark:bg-gray-800"
+		toolError ? "bg-red-50 dark:bg-red-900/20" : "bg-purple-100 dark:bg-purple-900/40"
 	);
 
 	let iconRing = $derived(
-		isExecuting
-			? "ring-purple-200 dark:ring-purple-700"
-			: toolError
-				? "ring-red-200 dark:ring-red-800"
-				: "ring-gray-100 dark:ring-gray-700"
+		toolError ? "ring-red-200 dark:ring-red-800" : "ring-purple-200 dark:ring-purple-500/30"
 	);
 </script>
 
 {#snippet icon()}
 	<LucideHammer
-		class="size-3.5 {isExecuting
-			? 'text-purple-600 dark:text-purple-400'
-			: toolError
-				? 'text-red-500 dark:text-red-400'
-				: 'text-gray-500 dark:text-gray-400'}"
+		class="size-3.5 {toolError
+			? 'text-red-500 dark:text-red-400'
+			: 'text-purple-600 dark:text-purple-400'}"
 	/>
 {/snippet}
 
@@ -193,22 +182,20 @@
 				onclick={() => (isOpen = !isOpen)}
 				aria-label={isOpen ? "Collapse" : "Expand"}
 			>
-				<CarbonChevronDown
-					class="size-4 text-gray-400 transition-transform duration-200 {isOpen
-						? 'rotate-180'
-						: ''}"
+				<CarbonChevronRight
+					class="size-4 text-gray-400 transition-transform duration-200 {isOpen ? 'rotate-90' : ''}"
 				/>
 			</button>
 		</div>
 
 		<!-- Expandable content -->
 		{#if isOpen}
-			<div class="ml-1 mt-2 space-y-3 border-l-2 border-transparent pl-1">
+			<div class="mt-2 space-y-3">
 				{#each tool as update}
 					{#if update.subtype === MessageToolUpdateType.Call}
 						<div class="space-y-1">
 							<div
-								class="pl-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"
+								class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"
 							>
 								Input
 							</div>
@@ -223,7 +210,7 @@
 					{:else if update.subtype === MessageToolUpdateType.Error}
 						<div class="space-y-1">
 							<div
-								class="pl-2 text-[10px] font-semibold uppercase tracking-wider text-red-500 dark:text-red-400"
+								class="text-[10px] font-semibold uppercase tracking-wider text-red-500 dark:text-red-400"
 							>
 								Error
 							</div>
@@ -235,7 +222,7 @@
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Success && update.result.display}
 						<div class="space-y-1">
-							<div class="flex items-center gap-2 pl-2">
+							<div class="flex items-center gap-2">
 								<div
 									class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"
 								>
@@ -258,13 +245,13 @@
 								</svg>
 							</div>
 							<div
-								class="scrollbar-custom rounded-md border border-gray-100 bg-gray-50 p-2 text-gray-800 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-200"
+								class="scrollbar-custom rounded-md border border-gray-100 bg-white p-2 text-gray-800 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-200"
 							>
 								{#each parseToolOutputs(update.result.outputs) as parsedOutput}
 									<div class="space-y-2">
 										{#if parsedOutput.text}
 											<pre
-												class="max-h-60 overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs">{parsedOutput.text}</pre>
+												class="scrollbar-custom max-h-60 overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs">{parsedOutput.text}</pre>
 										{/if}
 
 										{#if parsedOutput.images.length > 0}
@@ -291,7 +278,7 @@
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
 						<div class="space-y-1">
 							<div
-								class="pl-2 text-[10px] font-semibold uppercase tracking-wider text-red-500 dark:text-red-400"
+								class="text-[10px] font-semibold uppercase tracking-wider text-red-500 dark:text-red-400"
 							>
 								Error
 							</div>

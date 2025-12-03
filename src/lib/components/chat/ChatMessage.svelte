@@ -257,9 +257,11 @@
 				{/if}
 				{#each blocks as block, blockIndex (block.type === "tool" ? `${block.uuid}-${blockIndex}` : `text-${blockIndex}`)}
 					{@const nextBlock = blocks[blockIndex + 1]}
-					{@const nextIsLinkable = nextBlock?.type === "tool"}
+					{@const nextBlockHasThink =
+						nextBlock?.type === "text" && THINK_BLOCK_REGEX.test(nextBlock.content)}
+					{@const nextIsLinkable = nextBlock?.type === "tool" || nextBlockHasThink}
 					{#if block.type === "tool"}
-						<div data-exclude-from-copy class="[.prose+&]:mt-3">
+						<div data-exclude-from-copy class="has-[+.prose]:mb-3 [.prose+&]:mt-4">
 							<ToolUpdate tool={block.updates} {loading} hasNext={nextIsLinkable} />
 						</div>
 					{:else if block.type === "text"}

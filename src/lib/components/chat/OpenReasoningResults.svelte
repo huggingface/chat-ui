@@ -36,7 +36,7 @@
 	</svg>
 {/snippet}
 
-<BlockWrapper {icon} {hasNext} {loading}>
+<BlockWrapper {icon} {hasNext} iconBg="bg-gray-100 dark:bg-gray-700" iconRing="ring-gray-200 dark:ring-gray-600">
 	<!-- Collapsed view (clickable to expand) -->
 	<button
 		type="button"

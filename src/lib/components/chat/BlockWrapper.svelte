@@ -20,11 +20,11 @@
 	}: Props = $props();
 </script>
 
-<div class="group flex gap-2.5 [.prose+&]:mt-3 [p+&]:mt-3">
+<div class="group flex gap-2.5 has-[+.prose]:mb-1.5 [.prose+&]:mt-3">
 	<!-- Left column: icon + connector line -->
 	<div class="flex w-6 flex-shrink-0 flex-col items-center">
 		<div
-			class="relative z-10 flex h-6 w-6 items-center justify-center rounded-lg ring-1 transition-all {iconBg} {iconRing}"
+			class="relative z-10 flex h-6 w-6 items-center justify-center rounded-lg ring-1 {iconBg} {iconRing}"
 		>
 			{@render icon()}
 			{#if loading}
@@ -35,13 +35,13 @@
 					xmlns="http://www.w3.org/2000/svg"
 				>
 					<rect
-						x="1"
-						y="1"
-						width="22"
-						height="22"
-						rx="7"
-						class="loading-path stroke-current text-purple-400/60"
-						stroke-width="1.5"
+						x="0.5"
+						y="0.5"
+						width="23"
+						height="23"
+						rx="7.5"
+						class="loading-path stroke-current text-purple-500"
+						stroke-width="1"
 						fill="none"
 					/>
 				</svg>
@@ -68,6 +68,5 @@
 	.loading-path {
 		stroke-dasharray: 60 40;
 		animation: loading 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-		filter: drop-shadow(0 0 2px currentColor);
 	}
 </style>
