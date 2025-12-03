@@ -90,6 +90,9 @@
 	const tween = Spring.of(() => springTarget, { stiffness: 0.2, damping: 0.8 });
 
 	function onTouchStart(e: TouchEvent) {
+		// Ignore touch events when a modal is open (app is inert)
+		if (document.getElementById("app")?.hasAttribute("inert")) return;
+
 		const touch = e.changedTouches[0];
 		touchstart = touch;
 		dragStartTime = Date.now();
