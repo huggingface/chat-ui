@@ -408,7 +408,7 @@
 
 	function handleKeydown(event: KeyboardEvent) {
 		// Stop generation on ESC key when loading
-		if (event.key === "Escape" && loading) {
+		if (event.key === "Escape" && $loading) {
 			event.preventDefault();
 			stopGeneration();
 		}
@@ -499,7 +499,7 @@
 		const navigatingAway =
 			navigation.to?.route.id !== page.route.id || navigation.to?.params?.id !== page.params.id;
 
-		if (loading && navigatingAway) {
+		if ($loading && navigatingAway) {
 			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
 		}
 
