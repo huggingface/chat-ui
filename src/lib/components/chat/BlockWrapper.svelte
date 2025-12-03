@@ -24,7 +24,7 @@
 	<!-- Left column: icon + connector line -->
 	<div class="flex w-[22px] flex-shrink-0 flex-col items-center">
 		<div
-			class="relative z-10 flex h-[22px] w-[22px] items-center justify-center rounded-md ring-1 {iconBg} {iconRing}"
+			class="relative z-0 flex h-[22px] w-[22px] items-center justify-center rounded-md ring-1 {iconBg} {iconRing}"
 		>
 			{@render icon()}
 			{#if loading}
