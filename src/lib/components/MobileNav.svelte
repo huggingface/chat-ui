@@ -98,12 +98,18 @@
 		const drawerWidth = window.innerWidth * (drawerWidthPercentage / 100);
 		const touchOnDrawer = isOpen && touch.clientX < drawerWidth;
 
+		// Check if touch is on an interactive element (don't block taps on buttons/links)
+		const target = e.target as HTMLElement;
+		const isInteractive = target.closest("button, a, input, [role='button']");
+
 		// Potential drag scenarios - never start isDragging until direction is locked
 		// Exception: overlay tap (no scroll content, so no direction conflict)
 		if (!isOpen && touch.clientX < 40) {
 			// Opening gesture - wait for direction lock before starting drag
-			// Prevent Safari's back navigation gesture on iOS
-			e.preventDefault();
+			// Prevent Safari's back navigation gesture on iOS (but not on interactive elements)
+			if (!isInteractive) {
+				e.preventDefault();
+			}
 			potentialDrag = true;
 			dragStartedOpen = false;
 		} else if (isOpen && !touchOnDrawer) {
