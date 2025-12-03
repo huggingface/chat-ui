@@ -103,7 +103,7 @@
 							{#if model.logoUrl}
 								<img
 									alt={model.displayName}
-									class="h-10 w-10 rounded-lg border border-gray-100 bg-gray-50 object-cover dark:border-gray-700 dark:bg-gray-100"
+									class="size-8 rounded-lg border border-gray-100 bg-gray-50 object-cover dark:border-gray-700 dark:bg-gray-100 sm:size-10"
 									src={model.logoUrl}
 								/>
 							{:else}
@@ -118,7 +118,7 @@
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-2">
 								<h3
-									class="truncate font-medium text-gray-900 dark:text-gray-200"
+									class="truncate font-medium text-gray-900 dark:text-gray-200 max-sm:text-xs"
 									class:font-bold={isActive}
 									class:dark:text-white={isActive}
 								>
@@ -152,7 +152,7 @@
 									goto(`${base}/settings/${model.id}`);
 								}}
 							>
-								<LucideSettings class="h-3.5 w-3.5" />
+								<LucideSettings class="size-3 sm:size-3.5" />
 							</button>
 							<div class="flex items-center gap-1.5">
 								{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
@@ -160,7 +160,7 @@
 										title="This model supports tool calling (functions)."
 										class="rounded-md bg-purple-50 p-1.5 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
 									>
-										<LucideHammer class="h-3.5 w-3.5" />
+										<LucideHammer class="size-3 sm:size-3.5" />
 									</div>
 								{/if}
 								{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
@@ -168,7 +168,7 @@
 										title="This model is multimodal and supports image inputs natively."
 										class="rounded-md bg-blue-50 p-1.5 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
 									>
-										<LucideImage class="h-3.5 w-3.5" />
+										<LucideImage class="size-3 sm:size-3.5" />
 									</div>
 								{/if}
 							</div>
