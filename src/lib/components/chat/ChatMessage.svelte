@@ -20,6 +20,7 @@
 	import { requireAuthUser } from "$lib/utils/auth";
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
+	import { MessageUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
 
 	interface Props {
 		message: Message;
@@ -83,6 +84,10 @@
 		const wrapper = document.createElement("div");
 		wrapper.appendChild(range.cloneContents());
 
+		wrapper.querySelectorAll("[data-exclude-from-copy]").forEach((el) => {
+			el.remove();
+		});
+
 		wrapper.querySelectorAll("*").forEach((el) => {
 			el.removeAttribute("style");
 			el.removeAttribute("class");
@@ -110,6 +115,8 @@
 
 	// Zero-config reasoning autodetection: detect <think> blocks in content
 	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/gi;
+	// Non-global version for .test() calls to avoid lastIndex side effects
+	const THINK_BLOCK_TEST_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/i;
 	let hasClientThink = $derived(message.content.split(THINK_BLOCK_REGEX).length > 1);
 
 	// Strip think blocks for clipboard copy (always, regardless of detection)
@@ -117,39 +124,85 @@
 		message.content.replace(THINK_BLOCK_REGEX, "").trim()
 	);
 
-	// Group tool updates (if any) by uuid for display
-	let toolUpdateGroups = $derived.by(() => {
-		const groups: Record<string, import("$lib/types/MessageUpdate").MessageToolUpdate[]> = {};
-		for (const u of message.updates ?? []) {
-			if (!isMessageToolUpdate(u)) continue;
-			(groups[u.uuid] ||= []).push(u);
-		}
-		return groups;
-	});
-	let hasToolUpdates = $derived(Object.keys(toolUpdateGroups).length > 0);
+	type Block =
+		| { type: "text"; content: string }
+		| { type: "tool"; uuid: string; updates: MessageToolUpdate[] };
 
-	// Flatten to ordered array and keep a navigation index (defaults to last)
-	let toolGroups = $derived(Object.values(toolUpdateGroups));
-	let toolNavIndex = $state(0);
-	// Auto-follow newest tool group while streaming until user navigates manually
-	let toolAutoFollowLatest = $state(true);
-	$effect(() => {
-		const len = toolGroups.length;
-		if (len === 0) {
-			toolNavIndex = 0;
-			return;
-		}
-		// Clamp if groups shrink or grow
-		if (toolNavIndex > len - 1) toolNavIndex = len - 1;
-		// While streaming, default to most recent group unless user navigated away
-		if (isLast && loading && toolAutoFollowLatest) toolNavIndex = len - 1;
-	});
+	let blocks = $derived.by(() => {
+		const updates = message.updates ?? [];
+		const res: Block[] = [];
+		const hasTools = updates.some(isMessageToolUpdate);
+		let contentCursor = 0;
+		let sawFinalAnswer = false;
 
-	// When streaming ends, re-enable auto-follow for the next turn
-	$effect(() => {
-		if (!loading) {
-			toolAutoFollowLatest = true;
+		// Fast path: no tool updates at all
+		if (!hasTools && updates.length === 0) {
+			if (message.content) return [{ type: "text" as const, content: message.content }];
+			return [];
 		}
+
+		for (const update of updates) {
+			if (update.type === MessageUpdateType.Stream) {
+				const token =
+					typeof update.token === "string" && update.token.length > 0 ? update.token : null;
+				const len = token !== null ? token.length : (update.len ?? 0);
+				const chunk =
+					token ??
+					(message.content ? message.content.slice(contentCursor, contentCursor + len) : "");
+				contentCursor += len;
+				if (!chunk) continue;
+				const last = res.at(-1);
+				if (last?.type === "text") last.content += chunk;
+				else res.push({ type: "text" as const, content: chunk });
+			} else if (isMessageToolUpdate(update)) {
+				const last = res.at(-1);
+				if (last?.type === "tool" && last.uuid === update.uuid) {
+					last.updates.push(update);
+				} else {
+					res.push({ type: "tool" as const, uuid: update.uuid, updates: [update] });
+				}
+			} else if (update.type === MessageUpdateType.FinalAnswer) {
+				sawFinalAnswer = true;
+				const finalText = update.text ?? "";
+				const currentText = res
+					.filter((b) => b.type === "text")
+					.map((b) => (b as { type: "text"; content: string }).content)
+					.join("");
+
+				let addedText = "";
+				if (finalText.startsWith(currentText)) {
+					addedText = finalText.slice(currentText.length);
+				} else if (!currentText.endsWith(finalText)) {
+					const needsGap = !/\n\n$/.test(currentText) && !/^\n/.test(finalText);
+					addedText = (needsGap ? "\n\n" : "") + finalText;
+				}
+
+				if (addedText) {
+					const last = res.at(-1);
+					if (last?.type === "text") {
+						last.content += addedText;
+					} else {
+						res.push({ type: "text" as const, content: addedText });
+					}
+				}
+			}
+		}
+
+		// If content remains unmatched (e.g., persisted stream markers), append the remainder
+		// Skip when a FinalAnswer already provided the authoritative text.
+		if (!sawFinalAnswer && message.content && contentCursor < message.content.length) {
+			const remaining = message.content.slice(contentCursor);
+			if (remaining.length > 0) {
+				const last = res.at(-1);
+				if (last?.type === "text") last.content += remaining;
+				else res.push({ type: "text" as const, content: remaining });
+			}
+		} else if (!res.some((b) => b.type === "text") && message.content) {
+			// Fallback: no text produced at all
+			res.push({ type: "text" as const, content: message.content });
+		}
+
+		return res;
 	});
 
 	$effect(() => {
@@ -200,63 +253,56 @@
 				</div>
 			{/if}
 
-			{#if hasToolUpdates}
-				{#if toolGroups.length}
-					{@const group = toolGroups[toolNavIndex]}
-					<ToolUpdate
-						tool={group}
-						{loading}
-						index={toolNavIndex}
-						total={toolGroups.length}
-						onprev={() => {
-							toolAutoFollowLatest = false;
-							toolNavIndex = Math.max(0, toolNavIndex - 1);
-						}}
-						onnext={() => {
-							toolNavIndex = Math.min(toolGroups.length - 1, toolNavIndex + 1);
-							// If user moves back to the newest group, resume auto-follow
-							toolAutoFollowLatest = toolNavIndex === toolGroups.length - 1;
-						}}
-					/>
-				{/if}
-			{/if}
-
 			<div bind:this={contentEl} oncopy={handleCopy}>
-				{#if isLast && loading && message.content.length === 0}
+				{#if isLast && loading && blocks.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
+				{#each blocks as block, blockIndex (block.type === "tool" ? `${block.uuid}-${blockIndex}` : `text-${blockIndex}`)}
+					{@const nextBlock = blocks[blockIndex + 1]}
+					{@const nextBlockHasThink =
+						nextBlock?.type === "text" && THINK_BLOCK_TEST_REGEX.test(nextBlock.content)}
+					{@const nextIsLinkable = nextBlock?.type === "tool" || nextBlockHasThink}
+					{#if block.type === "tool"}
+						<div data-exclude-from-copy class="has-[+.prose]:mb-3 [.prose+&]:mt-4">
+							<ToolUpdate tool={block.updates} {loading} hasNext={nextIsLinkable} />
+						</div>
+					{:else if block.type === "text"}
+						{#if isLast && loading && block.content.length === 0}
+							<IconLoading classNames="loading inline ml-2 first:ml-0" />
+						{/if}
 
-				{#if hasClientThink}
-					{#each message.content.split(THINK_BLOCK_REGEX) as part, _i}
-						{#if part && part.startsWith("<think>")}
-							{@const isClosed = part.endsWith("</think>")}
-							{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
-							{@const isInterrupted = !isClosed && !loading}
-							{@const summary =
-								isClosed || isInterrupted
-									? thinkContent.trim().split(/\n+/)[0] || "Reasoning"
-									: "Thinking..."}
+						{#if hasClientThink}
+							{@const parts = block.content.split(THINK_BLOCK_REGEX)}
+							{#each parts as part, partIndex}
+								{@const remainingParts = parts.slice(partIndex + 1)}
+								{@const hasMoreLinkable =
+									remainingParts.some((p) => p && THINK_BLOCK_TEST_REGEX.test(p)) || nextIsLinkable}
+								{#if part && part.startsWith("<think>")}
+									{@const isClosed = part.endsWith("</think>")}
+									{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
 
-							<OpenReasoningResults
-								{summary}
-								content={thinkContent}
-								loading={isLast && loading && !isClosed}
-							/>
-						{:else if part && part.trim().length > 0}
+									<OpenReasoningResults
+										content={thinkContent}
+										loading={isLast && loading && !isClosed}
+										hasNext={hasMoreLinkable}
+									/>
+								{:else if part && part.trim().length > 0}
+									<div
+										class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+									>
+										<MarkdownRenderer content={part} loading={isLast && loading} />
+									</div>
+								{/if}
+							{/each}
+						{:else}
 							<div
 								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
 							>
-								<MarkdownRenderer content={part} loading={isLast && loading} />
+								<MarkdownRenderer content={block.content} loading={isLast && loading} />
 							</div>
 						{/if}
-					{/each}
-				{:else}
-					<div
-						class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
-					>
-						<MarkdownRenderer content={message.content} loading={isLast && loading} />
-					</div>
-				{/if}
+					{/if}
+				{/each}
 			</div>
 		</div>
 

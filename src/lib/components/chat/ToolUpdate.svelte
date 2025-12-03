@@ -6,37 +6,31 @@
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
 	import LucideHammer from "~icons/lucide/hammer";
+	import LucideCheck from "~icons/lucide/check";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
-	import { onDestroy } from "svelte";
-	import { browser } from "$app/environment";
-	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
+	import BlockWrapper from "./BlockWrapper.svelte";
 
 	interface Props {
 		tool: MessageToolUpdate[];
 		loading?: boolean;
-		// Optional navigation props when multiple tool groups exist
-		index?: number;
-		total?: number;
-		onprev?: () => void;
-		onnext?: () => void;
+		hasNext?: boolean;
 	}
 
-	let { tool, loading = false, index, total, onprev, onnext }: Props = $props();
+	let { tool, loading = false, hasNext = false }: Props = $props();
+
+	let isOpen = $state(false);
 
 	let toolFnName = $derived(tool.find(isMessageToolCallUpdate)?.call.name);
 	let toolError = $derived(tool.some(isMessageToolErrorUpdate));
 	let toolDone = $derived(tool.some(isMessageToolResultUpdate));
-	let eta = $derived(tool.find((update) => update.subtype === MessageToolUpdateType.ETA)?.eta);
+	let isExecuting = $derived(!toolDone && !toolError && loading);
+	let toolSuccess = $derived(toolDone && !toolError);
 
 	const availableTools: ToolFront[] = $derived.by(
 		() => (page.data as { tools?: ToolFront[] } | undefined)?.tools ?? []
 	);
-
-	let loadingBarEl: HTMLDivElement | undefined = $state(undefined);
-	let animation: Animation | undefined = $state(undefined);
-	let showingLoadingBar = $state(false);
 
 	type ToolOutput = Record<string, unknown>;
 	type McpImageContent = {
@@ -98,218 +92,169 @@
 			metadata: getMetadataEntries(output),
 		}));
 
-	$effect(() => {
-		if (!toolError && !toolDone && loading && loadingBarEl && eta) {
-			loadingBarEl.classList.remove("hidden");
-			showingLoadingBar = true;
-			animation = loadingBarEl.animate([{ width: "0%" }, { width: "calc(100%+1rem)" }], {
-				duration: (eta ?? 0) * 1000,
-				fill: "forwards",
-			});
-		}
-	});
+	// Icon styling based on state
+	let iconBg = $derived(
+		toolError ? "bg-red-100 dark:bg-red-900/40" : "bg-purple-100 dark:bg-purple-900/40"
+	);
 
-	onDestroy(() => {
-		animation?.cancel();
-	});
-
-	$effect(() => {
-		if ((!loading || toolDone || toolError) && browser && loadingBarEl && showingLoadingBar) {
-			showingLoadingBar = false;
-			loadingBarEl.classList.remove("hidden");
-			animation?.cancel();
-			const fromWidth = getComputedStyle(loadingBarEl).width;
-			animation = loadingBarEl.animate([{ width: fromWidth }, { width: "calc(100%+1rem)" }], {
-				duration: 300,
-				fill: "forwards",
-			});
-			setTimeout(() => loadingBarEl?.classList.add("hidden"), 300);
-		}
-	});
+	let iconRing = $derived(
+		toolError ? "ring-red-200 dark:ring-red-500/30" : "ring-purple-200 dark:ring-purple-500/30"
+	);
 </script>
 
+{#snippet icon()}
+	{#if toolSuccess}
+		<LucideCheck class="size-3.5 text-purple-600 dark:text-purple-400" />
+	{:else}
+		<LucideHammer
+			class="size-3.5 {toolError
+				? 'text-red-500 dark:text-red-400'
+				: 'text-purple-600 dark:text-purple-400'}"
+		/>
+	{/if}
+{/snippet}
+
 {#if toolFnName}
-	<details
-		class="group/tool my-2.5 w-fit max-w-full cursor-pointer rounded-lg border border-gray-200 bg-white px-1 {(total ??
-			0) > 1
-			? ''
-			: 'pr-2'} text-sm shadow-sm first:mt-0 open:mb-3 open:border-purple-500/10 open:bg-purple-600/5 open:shadow-sm dark:border-gray-800 dark:bg-gray-900 open:dark:border-purple-800/40 open:dark:bg-purple-800/10 [&+details]:-mt-2"
-	>
-		<summary
-			class="relative flex select-none list-none items-center gap-1.5 py-1 group-open/tool:text-purple-700 group-open/tool:dark:text-purple-300"
-		>
-			<div
-				bind:this={loadingBarEl}
-				class="absolute -m-1 hidden h-full w-full rounded-lg bg-purple-500/5 transition-all dark:bg-purple-500/10"
-			></div>
-
-			<div
-				class="relative grid size-[22px] place-items-center rounded bg-purple-600/10 dark:bg-purple-600/20"
+	<BlockWrapper {icon} {iconBg} {iconRing} {hasNext} loading={isExecuting}>
+		<!-- Header row -->
+		<div class="flex w-full select-none items-center gap-2">
+			<button
+				type="button"
+				class="flex flex-1 cursor-pointer items-center gap-2 text-left"
+				onclick={() => (isOpen = !isOpen)}
 			>
-				<svg
-					class="absolute inset-0 text-purple-500/40 transition-opacity"
-					class:invisible={toolDone || toolError}
-					width="22"
-					height="22"
-					viewBox="0 0 38 38"
-					fill="none"
-					xmlns="http://www.w3.org/2000/svg"
+				<span
+					class="text-sm font-medium {isExecuting
+						? 'text-purple-700 dark:text-purple-300'
+						: toolError
+							? 'text-red-600 dark:text-red-400'
+							: 'text-gray-700 dark:text-gray-300'}"
 				>
-					<path
-						class="loading-path"
-						d="M8 2.5H30C30 2.5 35.5 2.5 35.5 8V30C35.5 30 35.5 35.5 30 35.5H8C8 35.5 2.5 35.5 2.5 30V8C2.5 8 2.5 2.5 8 2.5Z"
-						pathLength="100"
-						stroke="currentColor"
-						stroke-width="1"
-						stroke-linecap="round"
-						id="shape"
-					/>
-				</svg>
-				<LucideHammer class="size-3.5 text-purple-700 dark:text-purple-500" />
-			</div>
-
-			<span class="relative">
-				{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
-				<span class="font-semibold"
-					>{availableTools.find((entry) => entry.name === toolFnName)?.displayName ??
-						toolFnName}</span
-				>
-			</span>
-
-			{#if (total ?? 0) > 1}
-				<div class="relative ml-auto flex items-center gap-1.5">
-					<div
-						class="flex items-center divide-x rounded-md border border-gray-200 bg-gray-50 dark:divide-gray-700 dark:border-gray-800 dark:bg-gray-800"
+					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
+					<code
+						class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500 opacity-90 dark:bg-gray-800 dark:text-gray-400"
 					>
-						<button
-							type="button"
-							class="btn size-5 text-xs text-gray-500 hover:text-gray-700 focus:ring-0 disabled:opacity-40 dark:text-gray-400 dark:hover:text-gray-200"
-							title="Previous tool"
-							aria-label="Previous tool"
-							disabled={(index ?? 0) <= 0}
-							onclick={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								onprev?.();
-							}}
-						>
-							<CarbonChevronLeft />
-						</button>
+						{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
+					</code>
+				</span>
+			</button>
 
-						<span
-							class="select-none px-1 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400"
-							aria-live="polite"
-						>
-							{(index ?? 0) + 1} <span class="text-gray-300 dark:text-gray-500">/</span>
-							{total}
-						</span>
-						<button
-							type="button"
-							class="btn size-5 text-xs text-gray-500 hover:text-gray-700 focus:ring-0 disabled:opacity-40 dark:text-gray-400 dark:hover:text-gray-200"
-							title="Next tool"
-							aria-label="Next tool"
-							disabled={(index ?? 0) >= (total ?? 1) - 1}
-							onclick={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								onnext?.();
-							}}
-						>
-							<CarbonChevronRight />
-						</button>
-					</div>
-				</div>
-			{/if}
-		</summary>
+			<button
+				type="button"
+				class="cursor-pointer"
+				onclick={() => (isOpen = !isOpen)}
+				aria-label={isOpen ? "Collapse" : "Expand"}
+			>
+				<CarbonChevronRight
+					class="size-4 text-gray-400 transition-transform duration-200 {isOpen ? 'rotate-90' : ''}"
+				/>
+			</button>
+		</div>
 
-		{#each tool as update}
-			{#if update.subtype === MessageToolUpdateType.Call}
-				<div class="mt-1 flex items-center gap-2 opacity-80">
-					<h3 class="text-sm">Parameters</h3>
-					<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20"></div>
-				</div>
-				<ul class="py-1 text-sm">
-					{#each Object.entries(update.call.parameters ?? {}) as [key, value]}
-						{#if value != null}
-							<li>
-								<span class="font-semibold">{key}</span>:
-								<span class="whitespace-pre-wrap">{formatValue(value)}</span>
-							</li>
-						{/if}
-					{/each}
-				</ul>
-			{:else if update.subtype === MessageToolUpdateType.Error}
-				<div class="mt-1 flex items-center gap-2 opacity-80">
-					<h3 class="text-sm">Error</h3>
-					<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20"></div>
-				</div>
-				<p class="text-sm">{update.message}</p>
-			{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Success && update.result.display}
-				<div class="mt-1 flex items-center gap-2 opacity-80">
-					<h3 class="text-sm">Result</h3>
-					<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20"></div>
-				</div>
-				<div class="py-1 text-sm">
-					{#each parseToolOutputs(update.result.outputs) as parsedOutput}
-						<div class="space-y-2 py-2 first:pt-0 last:pb-0">
-							{#if parsedOutput.text}
-								<!-- prettier-ignore -->
-								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{parsedOutput.text}</pre>
-							{/if}
-
-							{#if parsedOutput.images.length > 0}
-								<div class="flex flex-wrap gap-2">
-									{#each parsedOutput.images as image, imageIndex}
-										<img
-											alt={`Tool result image ${imageIndex + 1}`}
-											class="max-h-60 rounded border border-gray-200 dark:border-gray-800"
-											src={`data:${image.mimeType};base64,${image.data}`}
-										/>
-									{/each}
-								</div>
-							{/if}
-
-							{#if parsedOutput.metadata.length > 0}
-								<ul class="space-y-1">
-									{#each parsedOutput.metadata as [key, value]}
-										<li>
-											<span class="font-semibold">{key}</span>:
-											<span class="whitespace-pre-wrap">{formatValue(value)}</span>
-										</li>
-									{/each}
-								</ul>
-							{/if}
+		<!-- Expandable content -->
+		{#if isOpen}
+			<div class="mt-2 space-y-3">
+				{#each tool as update, i (`${update.subtype}-${i}`)}
+					{#if update.subtype === MessageToolUpdateType.Call}
+						<div class="space-y-1">
+							<div
+								class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"
+							>
+								Input
+							</div>
+							<div
+								class="rounded-md border border-gray-100 bg-gray-50 p-2 text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400"
+							>
+								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{formatValue(
+										update.call.parameters
+									)}</pre>
+							</div>
 						</div>
-					{/each}
-				</div>
-			{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
-				<div class="mt-1 flex items-center gap-2 opacity-80">
-					<h3 class="text-sm text-red-600 dark:text-red-400">Error</h3>
-					<div class="h-px flex-1 bg-gradient-to-r from-red-500/20"></div>
-				</div>
-				<p class="whitespace-pre-wrap text-sm text-red-600 dark:text-red-400">
-					{update.result.message}
-				</p>
-			{/if}
-		{/each}
-	</details>
+					{:else if update.subtype === MessageToolUpdateType.Error}
+						<div class="space-y-1">
+							<div
+								class="text-[10px] font-semibold uppercase tracking-wider text-red-500 dark:text-red-400"
+							>
+								Error
+							</div>
+							<div
+								class="rounded-md border border-red-200 bg-red-50 p-2 text-red-600 dark:border-red-500/30 dark:bg-red-900/20 dark:text-red-400"
+							>
+								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{update.message}</pre>
+							</div>
+						</div>
+					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Success && update.result.display}
+						<div class="space-y-1">
+							<div class="flex items-center gap-2">
+								<div
+									class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"
+								>
+									Output
+								</div>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="12"
+									height="12"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									class="text-emerald-500"
+								>
+									<circle cx="12" cy="12" r="10"></circle>
+									<path d="m9 12 2 2 4-4"></path>
+								</svg>
+							</div>
+							<div
+								class="scrollbar-custom rounded-md border border-gray-100 bg-white p-2 text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400"
+							>
+								{#each parseToolOutputs(update.result.outputs) as parsedOutput}
+									<div class="space-y-2">
+										{#if parsedOutput.text}
+											<pre
+												class="scrollbar-custom max-h-60 overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs">{parsedOutput.text}</pre>
+										{/if}
+
+										{#if parsedOutput.images.length > 0}
+											<div class="flex flex-wrap gap-2">
+												{#each parsedOutput.images as image, imageIndex}
+													<img
+														alt={`Tool result image ${imageIndex + 1}`}
+														class="max-h-60 rounded border border-gray-200 dark:border-gray-700"
+														src={`data:${image.mimeType};base64,${image.data}`}
+													/>
+												{/each}
+											</div>
+										{/if}
+
+										{#if parsedOutput.metadata.length > 0}
+											<pre class="whitespace-pre-wrap break-all font-mono text-xs">{formatValue(
+													Object.fromEntries(parsedOutput.metadata)
+												)}</pre>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						</div>
+					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
+						<div class="space-y-1">
+							<div
+								class="text-[10px] font-semibold uppercase tracking-wider text-red-500 dark:text-red-400"
+							>
+								Error
+							</div>
+							<div
+								class="rounded-md border border-red-200 bg-red-50 p-2 text-red-600 dark:border-red-500/30 dark:bg-red-900/20 dark:text-red-400"
+							>
+								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{update.result
+										.message}</pre>
+							</div>
+						</div>
+					{/if}
+				{/each}
+			</div>
+		{/if}
+	</BlockWrapper>
 {/if}
-
-<style>
-	details summary::-webkit-details-marker {
-		display: none;
-	}
-
-	@keyframes loading {
-		to {
-			/* move one full perimeter, normalized via pathLength=100 */
-			stroke-dashoffset: -100;
-		}
-	}
-
-	.loading-path {
-		/* larger traveling gap for clearer motion */
-		stroke-dasharray: 80 20; /* 80% dash, 20% gap */
-		animation: loading 1.6s linear infinite;
-	}
-</style>

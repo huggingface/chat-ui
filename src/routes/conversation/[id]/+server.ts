@@ -11,6 +11,7 @@ import {
 	MessageUpdateType,
 	MessageReasoningUpdateType,
 	type MessageUpdate,
+	type MessageStreamUpdate,
 } from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
@@ -330,9 +331,27 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const metricsLabels = { model: metricsModelId };
 
 	const persistConversation = async () => {
+		const messagesForSave = conv.messages.map((msg) => {
+			const filteredUpdates =
+				msg.updates
+					?.filter(
+						(u) =>
+							!(u.type === MessageUpdateType.Status && u.status === MessageUpdateStatus.KeepAlive)
+					)
+					.map((u) => {
+						if (u.type !== MessageUpdateType.Stream) return u;
+						// Preserve existing len if already compressed, otherwise compute from token
+						const len = u.len ?? (u.token ?? "").length;
+						// store a lightweight marker to preserve ordering without duplicating content
+						return { type: MessageUpdateType.Stream, token: "", len } satisfies MessageStreamUpdate;
+					}) ?? [];
+
+			return { ...msg, updates: filteredUpdates };
+		});
+
 		await collections.conversations.updateOne(
 			{ _id: convId },
-			{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
+			{ $set: { messages: messagesForSave, title: conv.title, updatedAt: new Date() } }
 		);
 	};
 
@@ -470,15 +489,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					}
 				}
 
-				// Append to the persistent message updates if it's not a stream update
+				// Append updates for audit/replay (streams too, to preserve ordering)
 				if (
-					event.type !== MessageUpdateType.Stream &&
 					!(
 						event.type === MessageUpdateType.Status &&
 						event.status === MessageUpdateStatus.KeepAlive
 					)
 				) {
-					messageToWriteTo?.updates?.push(event);
+					messageToWriteTo?.updates?.push(
+						event.type === MessageUpdateType.Stream ? { ...event } : event
+					);
 				}
 
 				// Avoid remote keylogging attack executed by watching packet lengths

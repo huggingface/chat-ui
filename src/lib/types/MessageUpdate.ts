@@ -44,6 +44,8 @@ export interface MessageTitleUpdate {
 export interface MessageStreamUpdate {
 	type: MessageUpdateType.Stream;
 	token: string;
+	/** Length of the original token. Used for compressed/persisted stream markers where token is empty. */
+	len?: number;
 }
 
 // Tool updates (for MCP and function calling)

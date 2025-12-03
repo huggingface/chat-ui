@@ -250,13 +250,27 @@
 					update.token = update.token.replaceAll("\0", "");
 				}
 
-				const isHighFrequencyUpdate =
-					update.type === MessageUpdateType.Stream ||
-					(update.type === MessageUpdateType.Status &&
-						update.status === MessageUpdateStatus.KeepAlive);
+				const isKeepAlive =
+					update.type === MessageUpdateType.Status &&
+					update.status === MessageUpdateStatus.KeepAlive;
 
-				if (!isHighFrequencyUpdate) {
-					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+				if (!isKeepAlive) {
+					if (update.type === MessageUpdateType.Stream) {
+						const existingUpdates = messageToWriteTo.updates ?? [];
+						const lastUpdate = existingUpdates.at(-1);
+						if (lastUpdate?.type === MessageUpdateType.Stream) {
+							// Create fresh objects/arrays so the UI reacts to merged tokens
+							const merged = {
+								...lastUpdate,
+								token: (lastUpdate.token ?? "") + (update.token ?? ""),
+							};
+							messageToWriteTo.updates = [...existingUpdates.slice(0, -1), merged];
+						} else {
+							messageToWriteTo.updates = [...existingUpdates, update];
+						}
+					} else {
+						messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+					}
 				}
 				const currentTime = new Date();
 
@@ -394,7 +408,7 @@
 
 	function handleKeydown(event: KeyboardEvent) {
 		// Stop generation on ESC key when loading
-		if (event.key === "Escape" && loading) {
+		if (event.key === "Escape" && $loading) {
 			event.preventDefault();
 			stopGeneration();
 		}
@@ -485,7 +499,7 @@
 		const navigatingAway =
 			navigation.to?.route.id !== page.route.id || navigation.to?.params?.id !== page.params.id;
 
-		if (loading && navigatingAway) {
+		if ($loading && navigatingAway) {
 			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
 		}
 
@@ -499,7 +513,7 @@
 	});
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 <svelte:head>
 	<title>{title}</title>
