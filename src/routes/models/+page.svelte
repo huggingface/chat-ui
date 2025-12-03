@@ -47,7 +47,9 @@
 	{/if}
 </svelte:head>
 
-<div class="scrollbar-custom h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
+<div
+	class="scrollbar-custom h-full overflow-y-auto bg-gray-50 py-12 max-sm:pt-8 dark:bg-gray-950 md:py-24"
+>
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">Models</h1>
@@ -83,82 +85,41 @@
 		/>
 
 		<div class="mt-6 min-h-[50vh]">
-			<div
-				class="overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
-			>
+			<div class="grid grid-cols-1 gap-6 p-1 md:grid-cols-2">
 				{#each filteredModels as model, index (model.id)}
 					{@const isActive = model.id === $settings.activeModel}
-					{@const isLast = index === filteredModels.length - 1}
 					<a
 						href="{base}/models/{model.id}"
 						aria-label="Model card for {model.displayName}"
-						class="group flex cursor-pointer items-center gap-4 p-4
+						class="group relative rounded-3xl border p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-300
 							{isActive
-							? 'bg-gray-50 dark:bg-gray-800'
-							: 'bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800'}
-							{isLast ? '' : 'border-b border-gray-100 dark:border-gray-800'}"
+							? 'border-gray-900/10 bg-white shadow-lg ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-900 dark:ring-white/10'
+							: 'border-transparent bg-white hover:-translate-y-1 hover:border-gray-200 hover:shadow-xl dark:bg-gray-900 dark:hover:border-gray-800'}"
 					>
-						<!-- Avatar -->
-						<div class="flex-shrink-0">
-							{#if model.logoUrl}
-								<img
-									alt={model.displayName}
-									class="h-10 w-10 rounded-lg border border-gray-100 bg-gray-50 object-cover dark:border-gray-700 dark:bg-gray-100"
-									src={model.logoUrl}
-								/>
-							{:else}
-								<div
-									class="h-10 w-10 rounded-lg border border-gray-100 bg-gray-200 dark:border-gray-700 dark:bg-gray-700"
-									aria-hidden="true"
-								></div>
-							{/if}
-						</div>
-
-						<!-- Content -->
-						<div class="min-w-0 flex-1">
-							<div class="flex items-center gap-2">
-								<h3
-									class="truncate font-medium text-gray-900 dark:text-gray-200"
-									class:font-bold={isActive}
-									class:dark:text-white={isActive}
-								>
-									{model.displayName}
-								</h3>
-								{#if index === 0 && model.isRouter && !isActive}
-									<span
-										class="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-500 dark:border-gray-700 dark:text-gray-400"
-									>
-										Default
-									</span>
+						<!-- Header: Avatar + Icons -->
+						<div class="mb-4 flex items-start justify-between">
+							<!-- Avatar -->
+							<div class="relative">
+								{#if model.logoUrl}
+									<img
+										alt={model.displayName}
+										class="h-12 w-12 rounded-2xl border border-gray-100 bg-white object-cover shadow-sm dark:border-gray-800 dark:bg-gray-800"
+										src={model.logoUrl}
+									/>
+								{:else}
+									<div
+										class="h-12 w-12 rounded-2xl border border-gray-100 bg-gray-200 shadow-sm dark:border-gray-800 dark:bg-gray-700"
+										aria-hidden="true"
+									></div>
 								{/if}
 							</div>
-							<p class="truncate pr-4 text-[13px] text-gray-500 dark:text-gray-400">
-								{model.isRouter
-									? "Routes your messages to the best model for your request."
-									: model.description || "-"}
-							</p>
-						</div>
 
-						<!-- Icons and badges -->
-						<div class="flex flex-shrink-0 items-center gap-1.5">
-							<button
-								type="button"
-								title="Model settings"
-								aria-label="Model settings for {model.displayName}"
-								class="rounded-md border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700"
-								onclick={(e) => {
-									e.preventDefault();
-									e.stopPropagation();
-									goto(`${base}/settings/${model.id}`);
-								}}
-							>
-								<LucideSettings class="h-3.5 w-3.5" />
-							</button>
-							<div class="flex items-center gap-1.5">
+							<!-- Icons -->
+							<div class="flex items-center gap-2">
 								{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
 									<div
 										title="This model supports tool calling (functions)."
-										class="rounded-md bg-purple-50 p-1.5 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
+										class="flex h-8 w-8 items-center justify-center rounded-full bg-purple-50 text-purple-600 transition-colors dark:bg-purple-900/20 dark:text-purple-400"
 									>
 										<LucideHammer class="h-3.5 w-3.5" />
 									</div>
@@ -166,19 +127,53 @@
 								{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
 									<div
 										title="This model is multimodal and supports image inputs natively."
-										class="rounded-md bg-blue-50 p-1.5 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+										class="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 transition-colors dark:bg-blue-900/20 dark:text-blue-400"
 									>
 										<LucideImage class="h-3.5 w-3.5" />
 									</div>
 								{/if}
-							</div>
-							{#if isActive}
-								<span
-									class="rounded-full bg-black px-2.5 py-1 text-xs font-bold text-white shadow-md dark:bg-white dark:text-black"
+								<button
+									type="button"
+									title="Model settings"
+									aria-label="Model settings for {model.displayName}"
+									class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-50 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+									onclick={(e) => {
+										e.preventDefault();
+										e.stopPropagation();
+										goto(`${base}/settings/${model.id}`);
+									}}
 								>
-									Active
-								</span>
-							{/if}
+									<LucideSettings class="h-3.5 w-3.5" />
+								</button>
+								{#if isActive}
+									<span
+										class="ml-2 rounded-full bg-black px-2.5 py-1 text-xs font-bold text-white shadow-lg dark:bg-white dark:text-black"
+									>
+										Active
+									</span>
+								{/if}
+							</div>
+						</div>
+
+						<!-- Content -->
+						<div>
+							<div class="mb-1 flex items-center gap-2">
+								<h3 class="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+									{model.displayName}
+								</h3>
+								{#if index === 0 && model.isRouter && !isActive}
+									<span
+										class="rounded-full border border-gray-200 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:text-gray-400"
+									>
+										Default
+									</span>
+								{/if}
+							</div>
+							<p class="line-clamp-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+								{model.isRouter
+									? "Routes your messages to the best model for your request."
+									: model.description || "-"}
+							</p>
 						</div>
 					</a>
 				{/each}
