@@ -273,7 +273,7 @@
 							disabled={loading}
 							aria-label="Add attachment"
 						>
-							<IconPlus class="text-base" />
+							<IconPlus class="text-base sm:text-sm" />
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Portal>
 							<DropdownMenu.Content
