@@ -9,7 +9,6 @@
 	import LucideCheck from "~icons/lucide/check";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
-	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import BlockWrapper from "./BlockWrapper.svelte";
 
@@ -17,14 +16,9 @@
 		tool: MessageToolUpdate[];
 		loading?: boolean;
 		hasNext?: boolean;
-		// Optional navigation props when multiple tool groups exist
-		index?: number;
-		total?: number;
-		onprev?: () => void;
-		onnext?: () => void;
 	}
 
-	let { tool, loading = false, hasNext = false, index, total, onprev, onnext }: Props = $props();
+	let { tool, loading = false, hasNext = false }: Props = $props();
 
 	let isOpen = $state(false);
 
@@ -145,43 +139,6 @@
 				</span>
 			</button>
 
-			{#if (total ?? 0) > 1}
-				<div class="flex items-center gap-1.5">
-					<div
-						class="flex items-center divide-x rounded-md border border-gray-200 bg-gray-50 dark:divide-gray-700 dark:border-gray-800 dark:bg-gray-800"
-					>
-						<button
-							type="button"
-							class="btn size-5 text-xs text-gray-500 hover:text-gray-700 focus:ring-0 disabled:opacity-40 dark:text-gray-400 dark:hover:text-gray-200"
-							title="Previous tool"
-							aria-label="Previous tool"
-							disabled={(index ?? 0) <= 0}
-							onclick={() => onprev?.()}
-						>
-							<CarbonChevronLeft />
-						</button>
-
-						<span
-							class="select-none px-1 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400"
-							aria-live="polite"
-						>
-							{(index ?? 0) + 1} <span class="text-gray-300 dark:text-gray-500">/</span>
-							{total}
-						</span>
-						<button
-							type="button"
-							class="btn size-5 text-xs text-gray-500 hover:text-gray-700 focus:ring-0 disabled:opacity-40 dark:text-gray-400 dark:hover:text-gray-200"
-							title="Next tool"
-							aria-label="Next tool"
-							disabled={(index ?? 0) >= (total ?? 1) - 1}
-							onclick={() => onnext?.()}
-						>
-							<CarbonChevronRight />
-						</button>
-					</div>
-				</div>
-			{/if}
-
 			<button
 				type="button"
 				class="cursor-pointer"
@@ -197,7 +154,7 @@
 		<!-- Expandable content -->
 		{#if isOpen}
 			<div class="mt-2 space-y-3">
-				{#each tool as update}
+				{#each tool as update, i (`${update.subtype}-${i}`)}
 					{#if update.subtype === MessageToolUpdateType.Call}
 						<div class="space-y-1">
 							<div

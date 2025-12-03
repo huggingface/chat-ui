@@ -115,6 +115,8 @@
 
 	// Zero-config reasoning autodetection: detect <think> blocks in content
 	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/gi;
+	// Non-global version for .test() calls to avoid lastIndex side effects
+	const THINK_BLOCK_TEST_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/i;
 	let hasClientThink = $derived(message.content.split(THINK_BLOCK_REGEX).length > 1);
 
 	// Strip think blocks for clipboard copy (always, regardless of detection)
@@ -258,7 +260,7 @@
 				{#each blocks as block, blockIndex (block.type === "tool" ? `${block.uuid}-${blockIndex}` : `text-${blockIndex}`)}
 					{@const nextBlock = blocks[blockIndex + 1]}
 					{@const nextBlockHasThink =
-						nextBlock?.type === "text" && THINK_BLOCK_REGEX.test(nextBlock.content)}
+						nextBlock?.type === "text" && THINK_BLOCK_TEST_REGEX.test(nextBlock.content)}
 					{@const nextIsLinkable = nextBlock?.type === "tool" || nextBlockHasThink}
 					{#if block.type === "tool"}
 						<div data-exclude-from-copy class="has-[+.prose]:mb-3 [.prose+&]:mt-4">
@@ -274,18 +276,12 @@
 							{#each parts as part, partIndex}
 								{@const remainingParts = parts.slice(partIndex + 1)}
 								{@const hasMoreLinkable =
-									remainingParts.some((p) => p?.startsWith("<think>")) || nextIsLinkable}
+									remainingParts.some((p) => p && THINK_BLOCK_TEST_REGEX.test(p)) || nextIsLinkable}
 								{#if part && part.startsWith("<think>")}
 									{@const isClosed = part.endsWith("</think>")}
 									{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
-									{@const isInterrupted = !isClosed && !loading}
-									{@const summary =
-										isClosed || isInterrupted
-											? thinkContent.trim().split(/\n+/)[0] || "Reasoning"
-											: "Thinking..."}
 
 									<OpenReasoningResults
-										{summary}
 										content={thinkContent}
 										loading={isLast && loading && !isClosed}
 										hasNext={hasMoreLinkable}

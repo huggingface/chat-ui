@@ -3,18 +3,28 @@
 	import BlockWrapper from "./BlockWrapper.svelte";
 
 	interface Props {
-		summary: string;
 		content: string;
 		loading?: boolean;
 		hasNext?: boolean;
 	}
 
 	let { content, loading = false, hasNext = false }: Props = $props();
-	let isOpen = $state(loading);
-	let wasLoading = $state(loading);
+	let isOpen = $state(false);
+	let wasLoading = $state(false);
+	let initialized = $state(false);
 
 	// Track loading transitions to auto-expand/collapse
 	$effect(() => {
+		// Auto-expand on first render if already loading
+		if (!initialized) {
+			initialized = true;
+			if (loading) {
+				isOpen = true;
+				wasLoading = true;
+				return;
+			}
+		}
+
 		if (loading && !wasLoading) {
 			// Loading started - auto-expand
 			isOpen = true;
@@ -36,7 +46,12 @@
 	</svg>
 {/snippet}
 
-<BlockWrapper {icon} {hasNext} iconBg="bg-gray-100 dark:bg-gray-700" iconRing="ring-gray-200 dark:ring-gray-600">
+<BlockWrapper
+	{icon}
+	{hasNext}
+	iconBg="bg-gray-100 dark:bg-gray-700"
+	iconRing="ring-gray-200 dark:ring-gray-600"
+>
 	<!-- Collapsed view (clickable to expand) -->
 	<button
 		type="button"
@@ -51,12 +66,15 @@
 				<MarkdownRenderer {content} {loading} />
 			</div>
 		{:else}
-			<!-- Collapsed: 2-line preview -->
+			<!-- Collapsed: 2-line preview (plain text, strip markdown) -->
 			<div
 				class="line-clamp-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400"
 				class:animate-pulse={loading}
 			>
-				{content}
+				{content
+					.replace(/[#*_`~\[\]]/g, "")
+					.replace(/\n+/g, " ")
+					.trim()}
 			</div>
 		{/if}
 	</button>
