@@ -50,7 +50,7 @@
 <div class="scrollbar-custom h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
-			<h1 class="text-2xl font-bold">Models</h1>
+			<h1 class="text-xl font-bold sm:text-2xl">Models</h1>
 			{#if publicConfig.isHuggingChat}
 				<a
 					href="https://huggingface.co/docs/inference-providers"
