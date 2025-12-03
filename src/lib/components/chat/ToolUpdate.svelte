@@ -100,11 +100,11 @@
 
 	// Icon styling based on state
 	let iconBg = $derived(
-		toolError ? "bg-red-50 dark:bg-red-900/20" : "bg-purple-100 dark:bg-purple-900/40"
+		toolError ? "bg-red-100 dark:bg-red-900/40" : "bg-purple-100 dark:bg-purple-900/40"
 	);
 
 	let iconRing = $derived(
-		toolError ? "ring-red-200 dark:ring-red-800" : "ring-purple-200 dark:ring-purple-500/30"
+		toolError ? "ring-red-200 dark:ring-red-500/30" : "ring-purple-200 dark:ring-purple-500/30"
 	);
 </script>
 
@@ -221,7 +221,7 @@
 								Error
 							</div>
 							<div
-								class="rounded-md border border-red-100 bg-red-50 p-2 text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
+								class="rounded-md border border-red-200 bg-red-50 p-2 text-red-600 dark:border-red-500/30 dark:bg-red-900/20 dark:text-red-400"
 							>
 								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{update.message}</pre>
 							</div>
@@ -289,7 +289,7 @@
 								Error
 							</div>
 							<div
-								class="rounded-md border border-red-100 bg-red-50 p-2 text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
+								class="rounded-md border border-red-200 bg-red-50 p-2 text-red-600 dark:border-red-500/30 dark:bg-red-900/20 dark:text-red-400"
 							>
 								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{update.result
 										.message}</pre>
