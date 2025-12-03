@@ -132,7 +132,7 @@
 				>
 					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
 					<code
-						class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-600 opacity-90 dark:bg-gray-800 dark:text-gray-400"
+						class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500 opacity-90 dark:bg-gray-800 dark:text-gray-400"
 					>
 						{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
 					</code>
@@ -163,7 +163,7 @@
 								Input
 							</div>
 							<div
-								class="rounded-md border border-gray-100 bg-gray-50 p-2 text-gray-800 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-200"
+								class="rounded-md border border-gray-100 bg-gray-50 p-2 text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400"
 							>
 								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{formatValue(
 										update.call.parameters
@@ -208,7 +208,7 @@
 								</svg>
 							</div>
 							<div
-								class="scrollbar-custom rounded-md border border-gray-100 bg-white p-2 text-gray-800 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-200"
+								class="scrollbar-custom rounded-md border border-gray-100 bg-white p-2 text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400"
 							>
 								{#each parseToolOutputs(update.result.outputs) as parsedOutput}
 									<div class="space-y-2">
