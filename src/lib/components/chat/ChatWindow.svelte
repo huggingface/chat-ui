@@ -6,8 +6,10 @@
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 	import CarbonDirectionRight from "~icons/carbon/direction-right-01";
 	import IconArrowUp from "~icons/lucide/arrow-up";
+	import IconMic from "~icons/lucide/mic";
 
 	import ChatInput from "./ChatInput.svelte";
+	import VoiceRecorder from "./VoiceRecorder.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import FileDropzone from "./FileDropzone.svelte";
@@ -24,6 +26,7 @@
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { error } from "$lib/stores/errors";
 	import ModelSwitch from "./ModelSwitch.svelte";
 	import { routerExamples } from "$lib/constants/routerExamples";
 	import { mcpExamples } from "$lib/constants/mcpExamples";
@@ -84,6 +87,14 @@
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
 	let pastedLongContent = $state(false);
+
+	// Voice recording state
+	let isRecording = $state(false);
+	let isTranscribing = $state(false);
+	let transcriptionEnabled = $derived(
+		!!(page.data as { transcriptionEnabled?: boolean }).transcriptionEnabled
+	);
+	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
 
 	const handleSubmit = () => {
 		if (requireAuthUser() || loading || !draft) return;
@@ -374,6 +385,71 @@
 	function startFollowUp(followUp: RouterFollowUp) {
 		triggerPrompt(followUp.prompt);
 	}
+
+	async function handleRecordingConfirm(audioBlob: Blob) {
+		isRecording = false;
+		isTranscribing = true;
+
+		try {
+			const response = await fetch(`${base}/api/transcribe`, {
+				method: "POST",
+				headers: { "Content-Type": audioBlob.type },
+				body: audioBlob,
+			});
+
+			if (!response.ok) {
+				throw new Error(await response.text());
+			}
+
+			const { text } = await response.json();
+			const trimmedText = text?.trim();
+			if (trimmedText) {
+				// Append transcribed text to draft
+				draft = draft.trim() ? `${draft.trim()} ${trimmedText}` : trimmedText;
+			}
+		} catch (err) {
+			console.error("Transcription error:", err);
+			$error = "Transcription failed. Please try again.";
+		} finally {
+			isTranscribing = false;
+		}
+	}
+
+	async function handleRecordingSend(audioBlob: Blob) {
+		isRecording = false;
+		isTranscribing = true;
+
+		try {
+			const response = await fetch(`${base}/api/transcribe`, {
+				method: "POST",
+				headers: { "Content-Type": audioBlob.type },
+				body: audioBlob,
+			});
+
+			if (!response.ok) {
+				throw new Error(await response.text());
+			}
+
+			const { text } = await response.json();
+			const trimmedText = text?.trim();
+			if (trimmedText) {
+				// Set draft and send immediately
+				draft = draft.trim() ? `${draft.trim()} ${trimmedText}` : trimmedText;
+				handleSubmit();
+			}
+		} catch (err) {
+			console.error("Transcription error:", err);
+			$error = "Transcription failed. Please try again.";
+		} finally {
+			isTranscribing = false;
+		}
+	}
+
+	function handleRecordingError(message: string) {
+		console.error("Recording error:", message);
+		isRecording = false;
+		$error = message;
+	}
 </script>
 
 <svelte:window
@@ -531,7 +607,18 @@
 					"max-sm:mb-4": focused && isVirtualKeyboard(),
 				}}
 			>
-				{#if onDrag && isFileUploadEnabled}
+				{#if isRecording || isTranscribing}
+					<VoiceRecorder
+						{isTranscribing}
+						{isTouchDevice}
+						oncancel={() => {
+							isRecording = false;
+						}}
+						onconfirm={handleRecordingConfirm}
+						onsend={handleRecordingSend}
+						onerror={handleRecordingError}
+					/>
+				{:else if onDrag && isFileUploadEnabled}
 					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 				{:else}
 					<div
@@ -563,6 +650,19 @@
 								classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
 							/>
 						{:else}
+							{#if transcriptionEnabled}
+								<button
+									type="button"
+									class="btn absolute bottom-2 right-10 mr-1 size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 dark:border-transparent dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white sm:right-9 sm:size-7"
+									disabled={isReadOnly}
+									onclick={() => {
+										isRecording = true;
+									}}
+									aria-label="Start voice recording"
+								>
+									<IconMic class="size-4" />
+								</button>
+							{/if}
 							<button
 								class="btn absolute bottom-2 right-2 size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black sm:size-7 {!draft ||
 								isReadOnly
