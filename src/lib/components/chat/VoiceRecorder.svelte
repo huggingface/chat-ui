@@ -100,44 +100,52 @@
 		}
 	}
 
-	function stopRecording(): Blob | null {
-		stopVisualization();
+	function stopRecording(): Promise<Blob | null> {
+		return new Promise((resolve) => {
+			stopVisualization();
 
-		if (mediaRecorder && mediaRecorder.state !== "inactive") {
+			// Stop all audio tracks
+			if (mediaStream) {
+				mediaStream.getTracks().forEach((track) => track.stop());
+				mediaStream = null;
+			}
+
+			// Close audio context
+			if (audioContext) {
+				audioContext.close();
+				audioContext = null;
+			}
+			analyser = null;
+
+			if (!mediaRecorder || mediaRecorder.state === "inactive") {
+				mediaRecorder = null;
+				resolve(
+					audioChunks.length > 0
+						? new Blob(audioChunks, { type: audioChunks[0]?.type || "audio/webm" })
+						: null
+				);
+				return;
+			}
+
+			// Wait for final data before resolving
+			mediaRecorder.onstop = () => {
+				const mimeType = audioChunks[0]?.type || "audio/webm";
+				const blob = audioChunks.length > 0 ? new Blob(audioChunks, { type: mimeType }) : null;
+				mediaRecorder = null;
+				resolve(blob);
+			};
+
 			mediaRecorder.stop();
-		}
-
-		// Stop all audio tracks
-		if (mediaStream) {
-			mediaStream.getTracks().forEach((track) => track.stop());
-			mediaStream = null;
-		}
-
-		// Close audio context
-		if (audioContext) {
-			audioContext.close();
-			audioContext = null;
-		}
-
-		analyser = null;
-		mediaRecorder = null;
-
-		if (audioChunks.length === 0) {
-			return null;
-		}
-
-		// Create blob from chunks
-		const mimeType = audioChunks[0]?.type || "audio/webm";
-		return new Blob(audioChunks, { type: mimeType });
+		});
 	}
 
-	function handleCancel() {
-		stopRecording();
+	async function handleCancel() {
+		await stopRecording();
 		oncancel();
 	}
 
-	function handleConfirm() {
-		const audioBlob = stopRecording();
+	async function handleConfirm() {
+		const audioBlob = await stopRecording();
 		if (audioBlob && audioBlob.size > 0) {
 			if (isTouchDevice) {
 				onsend(audioBlob);
@@ -154,6 +162,7 @@
 	});
 
 	onDestroy(() => {
+		// Fire and forget - cleanup happens but we don't wait
 		stopRecording();
 	});
 </script>

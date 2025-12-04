@@ -29,7 +29,10 @@ export async function POST({ request, locals }) {
 		throw error(401, "Authentication required");
 	}
 
-	const contentType = request.headers.get("content-type") || "";
+	const rawContentType = request.headers.get("content-type") || "";
+	// Normalize content-type: Safari sends "audio/webm; codecs=opus" (with space)
+	// but HF API expects "audio/webm;codecs=opus" (no space)
+	const contentType = rawContentType.replace(/;\s+/g, ";");
 	const isAllowed = ALLOWED_CONTENT_TYPES.some((type) => contentType.includes(type));
 
 	if (!isAllowed) {
