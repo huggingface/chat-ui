@@ -13,6 +13,7 @@ export interface FeatureFlags {
 	enableAssistants: boolean;
 	loginEnabled: boolean;
 	isAdmin: boolean;
+	transcriptionEnabled: boolean;
 }
 
 export const misc = new Elysia()
@@ -23,6 +24,7 @@ export const misc = new Elysia()
 			enableAssistants: config.ENABLE_ASSISTANTS === "true",
 			loginEnabled, // login feature is on when OID is configured
 			isAdmin: locals.isAdmin,
+			transcriptionEnabled: !!config.get("TRANSCRIPTION_MODEL"),
 		} satisfies FeatureFlags;
 	})
 	.get("/export", async ({ locals }) => {
