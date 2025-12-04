@@ -2,18 +2,21 @@
 	import { onMount, onDestroy } from "svelte";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import IconArrowUp from "~icons/lucide/arrow-up";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import IconLoading from "$lib/components/icons/IconLoading.svelte";
 	import AudioWaveform from "$lib/components/voice/AudioWaveform.svelte";
 
 	interface Props {
 		isTranscribing: boolean;
+		isTouchDevice: boolean;
 		oncancel: () => void;
 		onconfirm: (audioBlob: Blob) => void;
+		onsend: (audioBlob: Blob) => void;
 		onerror: (message: string) => void;
 	}
 
-	let { isTranscribing, oncancel, onconfirm, onerror }: Props = $props();
+	let { isTranscribing, isTouchDevice, oncancel, onconfirm, onsend, onerror }: Props = $props();
 
 	let mediaRecorder: MediaRecorder | null = $state(null);
 	let audioChunks: Blob[] = $state([]);
@@ -136,7 +139,11 @@
 	function handleConfirm() {
 		const audioBlob = stopRecording();
 		if (audioBlob && audioBlob.size > 0) {
-			onconfirm(audioBlob);
+			if (isTouchDevice) {
+				onsend(audioBlob);
+			} else {
+				onconfirm(audioBlob);
+			}
 		} else {
 			onerror("No audio recorded. Please try again.");
 		}
@@ -173,16 +180,24 @@
 		{/if}
 	</div>
 
-	<!-- Confirm button -->
+	<!-- Confirm/Send button -->
 	<button
 		type="button"
-		class="btn grid size-8 place-items-center rounded-full border bg-white text-black shadow transition-none hover:bg-gray-100 disabled:opacity-50 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500 sm:size-7"
+		class="btn grid size-8 place-items-center rounded-full border shadow transition-none disabled:opacity-50 sm:size-7 {isTouchDevice
+			? 'border-transparent bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200'
+			: 'bg-white text-black hover:bg-gray-100 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500'}"
 		onclick={handleConfirm}
 		disabled={isTranscribing}
-		aria-label={isTranscribing ? "Transcribing..." : "Confirm and transcribe"}
+		aria-label={isTranscribing
+			? "Transcribing..."
+			: isTouchDevice
+				? "Send message"
+				: "Confirm and transcribe"}
 	>
 		{#if isTranscribing}
 			<EosIconsLoading class="size-4" />
+		{:else if isTouchDevice}
+			<IconArrowUp class="size-4" />
 		{:else}
 			<CarbonCheckmark class="size-4" />
 		{/if}

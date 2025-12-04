@@ -93,6 +93,7 @@
 	let transcriptionEnabled = $derived(
 		!!(page.data as { transcriptionEnabled?: boolean }).transcriptionEnabled
 	);
+	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
 
 	const handleSubmit = () => {
 		if (requireAuthUser() || loading || !draft) return;
@@ -413,6 +414,35 @@
 		}
 	}
 
+	async function handleRecordingSend(audioBlob: Blob) {
+		isRecording = false;
+		isTranscribing = true;
+
+		try {
+			const response = await fetch(`${base}/api/transcribe`, {
+				method: "POST",
+				headers: { "Content-Type": audioBlob.type },
+				body: audioBlob,
+			});
+
+			if (!response.ok) {
+				throw new Error(await response.text());
+			}
+
+			const { text } = await response.json();
+			const trimmedText = text?.trim();
+			if (trimmedText) {
+				// Set draft and send immediately
+				draft = draft.trim() ? `${draft.trim()} ${trimmedText}` : trimmedText;
+				handleSubmit();
+			}
+		} catch (err) {
+			console.error("Transcription error:", err);
+		} finally {
+			isTranscribing = false;
+		}
+	}
+
 	function handleRecordingError(message: string) {
 		console.error("Recording error:", message);
 		isRecording = false;
@@ -578,10 +608,12 @@
 				{#if isRecording || isTranscribing}
 					<VoiceRecorder
 						{isTranscribing}
+						{isTouchDevice}
 						oncancel={() => {
 							isRecording = false;
 						}}
 						onconfirm={handleRecordingConfirm}
+						onsend={handleRecordingSend}
 						onerror={handleRecordingError}
 					/>
 				{:else if onDrag && isFileUploadEnabled}
