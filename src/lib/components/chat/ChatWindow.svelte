@@ -619,14 +619,14 @@
 							{#if transcriptionEnabled}
 								<button
 									type="button"
-									class="btn absolute bottom-2 right-10 size-8 self-end rounded-full border bg-white text-gray-500 shadow transition-none hover:bg-gray-50 hover:text-gray-700 dark:border-transparent dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white sm:right-9 sm:size-7"
+									class="btn absolute bottom-2 right-10 mr-1 size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 dark:border-transparent dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white sm:right-9 sm:size-7"
 									disabled={isReadOnly}
 									onclick={() => {
 										isRecording = true;
 									}}
 									aria-label="Start voice recording"
 								>
-									<IconMic class="size-4 sm:size-3.5" />
+									<IconMic class="size-4" />
 								</button>
 							{/if}
 							<button

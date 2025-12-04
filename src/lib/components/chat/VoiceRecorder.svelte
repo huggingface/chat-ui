@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from "svelte";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import EosIconsLoading from "~icons/eos-icons/loading";
 	import IconLoading from "$lib/components/icons/IconLoading.svelte";
 	import AudioWaveform from "$lib/components/voice/AudioWaveform.svelte";
 
@@ -162,10 +163,10 @@
 	</button>
 
 	<!-- Waveform / Loading -->
-	<div class="flex flex-1 items-center overflow-hidden px-2">
+	<div class="flex h-12 flex-1 items-center overflow-hidden pl-2.5 pr-2">
 		{#if isTranscribing}
-			<div class="flex w-full items-center justify-center">
-				<IconLoading classNames="size-6 text-gray-400" />
+			<div class="flex h-full w-full items-center justify-center">
+				<IconLoading classNames="text-gray-400" />
 			</div>
 		{:else}
 			<AudioWaveform {frequencyData} minHeight={4} maxHeight={40} />
@@ -181,7 +182,7 @@
 		aria-label={isTranscribing ? "Transcribing..." : "Confirm and transcribe"}
 	>
 		{#if isTranscribing}
-			<IconLoading classNames="size-4" />
+			<EosIconsLoading class="size-4" />
 		{:else}
 			<CarbonCheckmark class="size-4" />
 		{/if}
