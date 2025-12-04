@@ -1,0 +1,73 @@
+
+
+image: python:3.13
+
+options:
+  docker: true
+  size: 2x
+
+definitions:
+  caches:
+    uv: ~/.cache/uv
+
+  services:
+    docker:
+      memory: 7000
+
+pipelines:
+  branches:
+    default:
+      - step:
+          name: Build and Push Chat-UI
+          caches:
+            - docker
+          script:
+            - curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            - chmod +x /usr/local/bin/docker-compose
+            - apt-get update && apt-get install -y awscli
+            - export DOCKER_BUILDKIT=0
+            - export IMAGE_TAG=$BITBUCKET_COMMIT
+
+            # Write .env.prod with repository variables
+            - |
+              cat > .env.prod << 'EOF'
+              OPENAI_BASE_URL=$OPENAI_BASE_URL
+              OPENAI_API_KEY=$OPENAI_API_KEY
+              AUTOMATIC_LOGIN=$AUTOMATIC_LOGIN
+              OPENID_CONFIG=`$OPENID_CONFIG`
+              USE_USER_TOKEN=$USE_USER_TOKEN
+              APP_BASE=$APP_BASE
+              ALLOW_IFRAME=$ALLOW_IFRAME
+              COOKIE_NAME=$COOKIE_NAME
+              MONGODB_URL=$MONGODB_URL
+              MONGODB_DB_NAME=$MONGODB_DB_NAME
+              MONGODB_DIRECT_CONNECTION=$MONGODB_DIRECT_CONNECTION
+              PUBLIC_APP_NAME=$PUBLIC_APP_NAME
+              PUBLIC_APP_ASSETS=$PUBLIC_APP_ASSETS
+              PUBLIC_APP_DESCRIPTION=$PUBLIC_APP_DESCRIPTION
+              PUBLIC_ORIGIN=$PUBLIC_ORIGIN
+              EOF
+
+            # Build
+            - echo "Building Docker image for chat-ui..."
+            - docker build -f Dockerfile-ci -t chat-ui:$IMAGE_TAG -t chat-ui:latest .
+
+            # Push to AWS ECR
+            - echo "Authenticating with AWS ECR..."
+            - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ECR_REPO_URL
+            - echo "Tagging for AWS chat-ui..."
+            - docker tag chat-ui:$IMAGE_TAG $AWS_ECR_REPO_URL/chat-ui:$IMAGE_TAG
+            - docker tag chat-ui:$IMAGE_TAG $AWS_ECR_REPO_URL/chat-ui:latest
+            - echo "Pushing to AWS ECR..."
+            - docker push $AWS_ECR_REPO_URL/chat-ui:$IMAGE_TAG
+            - docker push $AWS_ECR_REPO_URL/chat-ui:latest
+
+            # Push to Azure ACR
+            - echo "Authenticating with Azure ACR..."
+            - echo $AZURE_ACR_PASSWORD | docker login -u $AZURE_ACR_USERNAME --password-stdin $AZURE_ACR_LOGIN_SERVER
+            - echo "Tagging for Azure chat-ui..."
+            - docker tag chat-ui:$IMAGE_TAG $AZURE_ACR_LOGIN_SERVER/chat-ui:$IMAGE_TAG
+            - docker tag chat-ui:$IMAGE_TAG $AZURE_ACR_LOGIN_SERVER/chat-ui:latest
+            - echo "Pushing to Azure ACR..."
+            - docker push $AZURE_ACR_LOGIN_SERVER/chat-ui:$IMAGE_TAG
+            - docker push $AZURE_ACR_LOGIN_SERVER/chat-ui:latest
