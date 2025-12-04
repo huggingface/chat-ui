@@ -80,6 +80,7 @@ envVars:
   LLM_ROUTER_MULTIMODAL_MODEL: "Qwen/Qwen3-VL-235B-A22B-Instruct"
   LLM_ROUTER_ENABLE_TOOLS: "true"
   LLM_ROUTER_TOOLS_MODEL: "moonshotai/Kimi-K2-Instruct-0905"
+  TRANSCRIPTION_MODEL: "openai/whisper-large-v3-turbo"
   MCP_SERVERS: >
     [{"name": "Web Search (Exa)", "url": "https://mcp.exa.ai/mcp"}, {"name": "Hugging Face", "url": "https://hf.co/mcp?login"}]
   PUBLIC_LLM_ROUTER_DISPLAY_NAME: "Omni"
