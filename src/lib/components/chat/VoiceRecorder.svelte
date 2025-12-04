@@ -162,11 +162,13 @@
 	</button>
 
 	<!-- Waveform / Loading -->
-	<div class="flex flex-1 items-center justify-center">
+	<div class="flex flex-1 items-center overflow-hidden px-3">
 		{#if isTranscribing}
-			<IconLoading classNames="size-6 text-gray-400" />
+			<div class="flex w-full items-center justify-center">
+				<IconLoading classNames="size-6 text-gray-400" />
+			</div>
 		{:else}
-			<AudioWaveform {frequencyData} pillCount={28} minHeight={4} maxHeight={48} />
+			<AudioWaveform {frequencyData} minHeight={4} maxHeight={40} />
 		{/if}
 	</div>
 

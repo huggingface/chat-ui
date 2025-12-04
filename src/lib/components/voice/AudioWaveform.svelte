@@ -1,68 +1,93 @@
 <script lang="ts">
+	import { onMount, onDestroy } from "svelte";
+
 	interface Props {
 		frequencyData: Uint8Array;
-		pillCount?: number;
 		minHeight?: number;
 		maxHeight?: number;
 	}
 
-	let { frequencyData, pillCount = 28, minHeight = 4, maxHeight = 48 }: Props = $props();
+	let { frequencyData, minHeight = 4, maxHeight = 40 }: Props = $props();
 
-	// Track previous heights for smooth interpolation
-	let previousHeights: number[] = $state(Array(pillCount).fill(minHeight));
+	const PILL_WIDTH = 4;
+	const PILL_GAP = 3;
+	const SAMPLE_INTERVAL_MS = 50; // Sample every 50ms (~20 samples/sec)
 
-	// Center-biased weight: loudest at center, decay toward edges
-	function getCenterWeight(index: number, total: number): number {
-		const center = (total - 1) / 2;
-		const distance = Math.abs(index - center) / center;
-		// 60% decay toward edges, keeping 40% at the edges
-		return 1 - distance * 0.6;
+	let containerRef: HTMLDivElement | undefined = $state();
+	let timeline: number[] = $state([]);
+	let pillCount = $state(60); // Default, will be calculated from container width
+	let intervalId: ReturnType<typeof setInterval> | undefined;
+	let smoothedAmplitude = 0;
+
+	// Calculate average amplitude from frequency data
+	function getAmplitude(): number {
+		if (!frequencyData.length) return 0;
+		let sum = 0;
+		for (let i = 0; i < frequencyData.length; i++) {
+			sum += frequencyData[i];
+		}
+		return sum / frequencyData.length / 255; // Normalize to 0-1
 	}
 
-	// Check if audio is active (not silent)
-	let isActive = $derived(frequencyData.some((v) => v > 10));
+	function addSample() {
+		const rawAmplitude = getAmplitude();
+		// Smooth the amplitude for less jittery visualization
+		smoothedAmplitude = smoothedAmplitude * 0.3 + rawAmplitude * 0.7;
 
-	// Compute target heights from frequency data with center-biased distribution
-	let targetHeights = $derived.by(() => {
-		if (!frequencyData.length) return Array(pillCount).fill(minHeight);
+		const height = minHeight + smoothedAmplitude * (maxHeight - minHeight);
 
-		const heights: number[] = [];
-		const binCount = frequencyData.length;
+		// Push new sample, keep only pillCount samples (sliding window)
+		timeline = [...timeline, height].slice(-pillCount);
+	}
 
-		for (let i = 0; i < pillCount; i++) {
-			// Map pill index to frequency bin (use center bins which have more energy)
-			const binIndex = Math.floor((i / pillCount) * binCount);
-			const value = frequencyData[binIndex] ?? 0;
-
-			// Apply center weighting
-			const weight = getCenterWeight(i, pillCount);
-			const normalized = (value / 255) * weight;
-
-			// Scale to height range
-			const height = minHeight + normalized * (maxHeight - minHeight);
-			heights.push(height);
+	function calculatePillCount() {
+		if (containerRef) {
+			const width = containerRef.clientWidth;
+			pillCount = Math.max(20, Math.floor(width / (PILL_WIDTH + PILL_GAP)));
 		}
-		return heights;
+	}
+
+	onMount(() => {
+		calculatePillCount();
+
+		// Initialize timeline with minimum height dots
+		timeline = Array(pillCount).fill(minHeight);
+
+		// Start sampling at fixed intervals
+		intervalId = setInterval(addSample, SAMPLE_INTERVAL_MS);
+
+		// Handle resize
+		const resizeObserver = new ResizeObserver(() => {
+			const oldCount = pillCount;
+			calculatePillCount();
+			// Adjust timeline buffer if container size changed
+			if (pillCount > oldCount) {
+				// Pad with min height on the left
+				timeline = [...Array(pillCount - oldCount).fill(minHeight), ...timeline];
+			} else if (pillCount < oldCount) {
+				timeline = timeline.slice(-pillCount);
+			}
+		});
+
+		if (containerRef) {
+			resizeObserver.observe(containerRef);
+		}
+
+		return () => {
+			resizeObserver.disconnect();
+		};
 	});
 
-	// Smooth interpolation: lerp previous heights toward target
-	$effect(() => {
-		const newHeights = targetHeights.map((target, i) => {
-			const prev = previousHeights[i] ?? minHeight;
-			// Lerp factor of 0.2 for smooth animation
-			return prev + (target - prev) * 0.2;
-		});
-		previousHeights = newHeights;
+	onDestroy(() => {
+		if (intervalId) clearInterval(intervalId);
 	});
 </script>
 
-<div class="flex h-12 items-center justify-center gap-[3px]">
-	{#each previousHeights as height, i (i)}
+<div bind:this={containerRef} class="flex h-12 w-full items-center justify-start gap-[3px]">
+	{#each timeline as height, i (i)}
 		<div
-			class="w-1 rounded-full bg-white transition-[height] duration-100 ease-out"
-			style="height: {Math.max(minHeight, Math.min(maxHeight, height))}px; opacity: {isActive
-				? 1
-				: 0.5};"
+			class="w-1 shrink-0 rounded-full bg-white"
+			style="height: {Math.max(minHeight, Math.round(height))}px;"
 		></div>
 	{/each}
 </div>
