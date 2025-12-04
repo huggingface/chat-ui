@@ -9,8 +9,8 @@
 
 	let { frequencyData, minHeight = 4, maxHeight = 40 }: Props = $props();
 
-	const PILL_WIDTH = 4;
-	const PILL_GAP = 3;
+	const PILL_WIDTH = 2; // w-0.5 = 2px
+	const PILL_GAP = 2;
 	const SAMPLE_INTERVAL_MS = 50; // Sample every 50ms (~20 samples/sec)
 
 	let containerRef: HTMLDivElement | undefined = $state();
@@ -34,7 +34,10 @@
 		// Smooth the amplitude for less jittery visualization
 		smoothedAmplitude = smoothedAmplitude * 0.3 + rawAmplitude * 0.7;
 
-		const height = minHeight + smoothedAmplitude * (maxHeight - minHeight);
+		// Boost amplitude by 1.5x and apply slight curve for better visibility
+		const boostedAmplitude = Math.min(1, Math.pow(smoothedAmplitude * 1.5, 0.85));
+
+		const height = minHeight + boostedAmplitude * (maxHeight - minHeight);
 
 		// Push new sample, keep only pillCount samples (sliding window)
 		timeline = [...timeline, height].slice(-pillCount);
@@ -83,10 +86,10 @@
 	});
 </script>
 
-<div bind:this={containerRef} class="flex h-12 w-full items-center justify-start gap-[3px]">
+<div bind:this={containerRef} class="flex h-12 w-full items-center justify-start gap-[2px]">
 	{#each timeline as height, i (i)}
 		<div
-			class="w-1 shrink-0 rounded-full bg-white"
+			class="w-0.5 shrink-0 rounded-full bg-gray-400 dark:bg-white/60"
 			style="height: {Math.max(minHeight, Math.round(height))}px;"
 		></div>
 	{/each}

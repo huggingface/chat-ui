@@ -400,9 +400,10 @@
 			}
 
 			const { text } = await response.json();
-			if (text) {
+			const trimmedText = text?.trim();
+			if (trimmedText) {
 				// Append transcribed text to draft
-				draft = draft.trim() ? `${draft.trim()} ${text}` : text;
+				draft = draft.trim() ? `${draft.trim()} ${trimmedText}` : trimmedText;
 			}
 		} catch (err) {
 			console.error("Transcription error:", err);

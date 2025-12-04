@@ -150,7 +150,7 @@
 	});
 </script>
 
-<div class="flex h-full w-full items-center justify-between px-3 py-2.5">
+<div class="flex h-full w-full items-center justify-between px-3 py-1.5">
 	<!-- Cancel button -->
 	<button
 		type="button"
@@ -162,7 +162,7 @@
 	</button>
 
 	<!-- Waveform / Loading -->
-	<div class="flex flex-1 items-center overflow-hidden px-3">
+	<div class="flex flex-1 items-center overflow-hidden px-2">
 		{#if isTranscribing}
 			<div class="flex w-full items-center justify-center">
 				<IconLoading classNames="size-6 text-gray-400" />
