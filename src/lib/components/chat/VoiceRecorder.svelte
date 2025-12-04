@@ -170,7 +170,7 @@
 	</button>
 
 	<!-- Waveform / Loading -->
-	<div class="flex h-12 flex-1 items-center overflow-hidden pl-2.5 pr-2">
+	<div class="flex h-12 flex-1 items-center overflow-hidden pl-2.5 pr-1.5">
 		{#if isTranscribing}
 			<div class="flex h-full w-full items-center justify-center">
 				<IconLoading classNames="text-gray-400" />
