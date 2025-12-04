@@ -163,7 +163,7 @@
 								Input
 							</div>
 							<div
-								class="rounded-md border border-gray-100 bg-gray-50 p-2 text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400"
+								class="rounded-md border border-gray-100 bg-white p-2 text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400"
 							>
 								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{formatValue(
 										update.call.parameters

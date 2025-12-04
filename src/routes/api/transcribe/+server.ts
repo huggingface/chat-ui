@@ -64,6 +64,10 @@ export async function POST({ request, locals }) {
 			headers: {
 				Authorization: `Bearer ${token}`,
 				"Content-Type": contentType,
+				// Bill to organization if configured (HuggingChat only)
+				...(config.isHuggingChat && locals?.billingOrganization
+					? { "X-HF-Bill-To": locals.billingOrganization }
+					: {}),
 			},
 			body: audioBuffer,
 			signal: controller.signal,
