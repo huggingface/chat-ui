@@ -25,9 +25,10 @@
 	function startVisualization() {
 		function update() {
 			if (analyser) {
-				analyser.getByteFrequencyData(frequencyData);
-				// Trigger reactivity by reassigning
-				frequencyData = frequencyData;
+				const data = new Uint8Array(analyser.frequencyBinCount);
+				analyser.getByteFrequencyData(data);
+				// Create new array to trigger Svelte reactivity
+				frequencyData = data;
 			}
 			animationFrameId = requestAnimationFrame(update);
 		}
