@@ -72,10 +72,10 @@ pipelines:
             - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ECR_REPO_URL
             - echo "AWS ECR login successful!"
             - echo "Tagging for AWS chat-ui..."
-            - docker tag chat-ui:$IMAGE_TAG $AWS_ECR_REPO_URL/chat-ui:$IMAGE_TAG
-            - docker tag chat-ui:$IMAGE_TAG $AWS_ECR_REPO_URL/chat-ui:latest
+            - docker tag chat-ui:$BITBUCKET_COMMIT $AWS_ECR_REPO_URL/chat-ui:$BITBUCKET_COMMIT
+            - docker tag chat-ui:$BITBUCKET_COMMIT $AWS_ECR_REPO_URL/chat-ui:latest
             - echo "Pushing to AWS ECR..."
-            - docker push $AWS_ECR_REPO_URL/chat-ui:$IMAGE_TAG
+            - docker push $AWS_ECR_REPO_URL/chat-ui:$BITBUCKET_COMMIT
             - docker push $AWS_ECR_REPO_URL/chat-ui:latest
             - echo "AWS ECR push completed!"
 
@@ -83,8 +83,8 @@ pipelines:
             - echo "Authenticating with Azure ACR..."
             - echo $AZURE_ACR_PASSWORD | docker login -u $AZURE_ACR_USERNAME --password-stdin $AZURE_ACR_LOGIN_SERVER
             - echo "Tagging for Azure chat-ui..."
-            - docker tag chat-ui:$IMAGE_TAG $AZURE_ACR_LOGIN_SERVER/chat-ui:$IMAGE_TAG
-            - docker tag chat-ui:$IMAGE_TAG $AZURE_ACR_LOGIN_SERVER/chat-ui:latest
+            - docker tag chat-ui:$BITBUCKET_COMMIT $AZURE_ACR_LOGIN_SERVER/chat-ui:$BITBUCKET_COMMIT
+            - docker tag chat-ui:$BITBUCKET_COMMIT $AZURE_ACR_LOGIN_SERVER/chat-ui:latest
             - echo "Pushing to Azure ACR..."
-            - docker push $AZURE_ACR_LOGIN_SERVER/chat-ui:$IMAGE_TAG
+            - docker push $AZURE_ACR_LOGIN_SERVER/chat-ui:$BITBUCKET_COMMIT
             - docker push $AZURE_ACR_LOGIN_SERVER/chat-ui:latest
