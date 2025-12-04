@@ -26,6 +26,7 @@
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { error } from "$lib/stores/errors";
 	import ModelSwitch from "./ModelSwitch.svelte";
 	import { routerExamples } from "$lib/constants/routerExamples";
 	import { mcpExamples } from "$lib/constants/mcpExamples";
@@ -408,7 +409,7 @@
 			}
 		} catch (err) {
 			console.error("Transcription error:", err);
-			// Could add toast notification here in the future
+			$error = "Transcription failed. Please try again.";
 		} finally {
 			isTranscribing = false;
 		}
@@ -438,6 +439,7 @@
 			}
 		} catch (err) {
 			console.error("Transcription error:", err);
+			$error = "Transcription failed. Please try again.";
 		} finally {
 			isTranscribing = false;
 		}
@@ -446,7 +448,7 @@
 	function handleRecordingError(message: string) {
 		console.error("Recording error:", message);
 		isRecording = false;
-		// Could add toast notification here in the future
+		$error = message;
 	}
 </script>
 
