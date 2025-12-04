@@ -16,7 +16,7 @@ definitions:
 
 pipelines:
   branches:
-    default:
+    my-iframe:
       - step:
           name: Build and Push Chat-UI
           caches:
@@ -54,13 +54,30 @@ pipelines:
 
             # Push to AWS ECR
             - echo "Authenticating with AWS ECR..."
+            - echo "AWS_REGION=$AWS_REGION"
+            - echo "AWS_ECR_REPO_URL=$AWS_ECR_REPO_URL"
+            - |
+              if [ -z "$AWS_REGION" ] || [ -z "$AWS_ECR_REPO_URL" ] || [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+                echo "ERROR: Missing required AWS environment variables"
+                echo "  AWS_REGION: ${AWS_REGION:-NOT SET}"
+                echo "  AWS_ECR_REPO_URL: ${AWS_ECR_REPO_URL:-NOT SET}"
+                echo "  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:+SET}${AWS_ACCESS_KEY_ID:-NOT SET}"
+                echo "  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:+SET}${AWS_SECRET_ACCESS_KEY:-NOT SET}"
+                exit 1
+              fi
+            - echo "All AWS credentials are set. Attempting login..."
+            - aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+            - aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+            - aws configure set region $AWS_REGION
             - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ECR_REPO_URL
+            - echo "AWS ECR login successful!"
             - echo "Tagging for AWS chat-ui..."
             - docker tag chat-ui:$IMAGE_TAG $AWS_ECR_REPO_URL/chat-ui:$IMAGE_TAG
             - docker tag chat-ui:$IMAGE_TAG $AWS_ECR_REPO_URL/chat-ui:latest
             - echo "Pushing to AWS ECR..."
             - docker push $AWS_ECR_REPO_URL/chat-ui:$IMAGE_TAG
             - docker push $AWS_ECR_REPO_URL/chat-ui:latest
+            - echo "AWS ECR push completed!"
 
             # Push to Azure ACR
             - echo "Authenticating with Azure ACR..."
