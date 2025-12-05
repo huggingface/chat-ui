@@ -27,9 +27,6 @@ const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 // Near expiry warning: 10 minutes before expiry
 const NEAR_EXPIRY_MS = 10 * 60 * 1000;
 
-/**
- * Load tokens from localStorage
- */
 function loadTokens(): Map<string, McpOAuthToken> {
 	if (!browser) return new Map();
 
@@ -44,9 +41,6 @@ function loadTokens(): Map<string, McpOAuthToken> {
 	}
 }
 
-/**
- * Save tokens to localStorage
- */
 function saveTokens(tokens: Map<string, McpOAuthToken>) {
 	if (!browser) return;
 
@@ -58,9 +52,6 @@ function saveTokens(tokens: Map<string, McpOAuthToken>) {
 	}
 }
 
-/**
- * Load OAuth configs from localStorage
- */
 function loadConfigs(): Map<string, McpOAuthConfig> {
 	if (!browser) return new Map();
 
@@ -75,9 +66,6 @@ function loadConfigs(): Map<string, McpOAuthConfig> {
 	}
 }
 
-/**
- * Save OAuth configs to localStorage
- */
 function saveConfigs(configs: Map<string, McpOAuthConfig>) {
 	if (!browser) return;
 
@@ -100,9 +88,6 @@ if (browser) {
 	mcpOAuthConfigs.subscribe(saveConfigs);
 }
 
-/**
- * Save OAuth flow state (persisted to survive redirects)
- */
 export function saveFlowState(state: McpOAuthFlowState) {
 	if (!browser) return;
 
@@ -114,9 +99,6 @@ export function saveFlowState(state: McpOAuthFlowState) {
 	}
 }
 
-/**
- * Load OAuth flow state from localStorage
- */
 export function loadFlowState(): McpOAuthFlowState | null {
 	if (!browser) return null;
 
@@ -132,9 +114,6 @@ export function loadFlowState(): McpOAuthFlowState | null {
 	}
 }
 
-/**
- * Clear OAuth flow state
- */
 export function clearFlowState() {
 	if (!browser) return;
 
@@ -146,9 +125,6 @@ export function clearFlowState() {
 	}
 }
 
-/**
- * Set a token for a server
- */
 export function setToken(serverId: string, token: McpOAuthToken) {
 	mcpOAuthTokens.update((tokens) => {
 		tokens.set(serverId, token);
@@ -156,16 +132,10 @@ export function setToken(serverId: string, token: McpOAuthToken) {
 	});
 }
 
-/**
- * Get a token for a server
- */
 export function getToken(serverId: string): McpOAuthToken | undefined {
 	return get(mcpOAuthTokens).get(serverId);
 }
 
-/**
- * Remove a token for a server
- */
 export function removeToken(serverId: string) {
 	mcpOAuthTokens.update((tokens) => {
 		tokens.delete(serverId);
@@ -173,9 +143,6 @@ export function removeToken(serverId: string) {
 	});
 }
 
-/**
- * Set OAuth config for a server
- */
 export function setOAuthConfig(serverId: string, config: McpOAuthConfig) {
 	mcpOAuthConfigs.update((configs) => {
 		configs.set(serverId, config);
@@ -183,16 +150,10 @@ export function setOAuthConfig(serverId: string, config: McpOAuthConfig) {
 	});
 }
 
-/**
- * Get OAuth config for a server
- */
 export function getOAuthConfig(serverId: string): McpOAuthConfig | undefined {
 	return get(mcpOAuthConfigs).get(serverId);
 }
 
-/**
- * Remove OAuth config for a server
- */
 export function removeOAuthConfig(serverId: string) {
 	mcpOAuthConfigs.update((configs) => {
 		configs.delete(serverId);
@@ -200,23 +161,14 @@ export function removeOAuthConfig(serverId: string) {
 	});
 }
 
-/**
- * Check if a token is expired (with buffer)
- */
 export function isTokenExpired(token: McpOAuthToken): boolean {
 	return Date.now() > token.expiresAt - EXPIRY_BUFFER_MS;
 }
 
-/**
- * Check if a token is near expiry (for warning UI)
- */
 export function isTokenNearExpiry(token: McpOAuthToken): boolean {
 	return Date.now() > token.expiresAt - NEAR_EXPIRY_MS;
 }
 
-/**
- * Get token status for a server
- */
 export function getTokenStatus(
 	serverId: string
 ): "none" | "valid" | "expiring" | "expired" | "missing" {
@@ -230,18 +182,12 @@ export function getTokenStatus(
 	return "valid";
 }
 
-/**
- * Clean up tokens and configs for a deleted server
- */
 export function cleanupServerOAuth(serverId: string) {
 	removeToken(serverId);
 	removeOAuthConfig(serverId);
 }
 
-/**
- * Reload tokens and configs from localStorage
- * Used to sync after OAuth popup completes (popup has separate in-memory stores)
- */
+// Sync stores from localStorage after OAuth popup completes
 export function reloadFromStorage() {
 	if (!browser) return;
 

@@ -212,6 +212,7 @@
 
 			const messageUpdatesAbortController = new AbortController();
 
+			const mcpServers = getServersWithAuth();
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				page.params.id,
 				{
@@ -220,8 +221,8 @@
 					messageId,
 					isRetry,
 					files: isRetry ? userMessage?.files : base64Files,
-					selectedMcpServerNames: getServersWithAuth().map((s) => s.name),
-					selectedMcpServers: getServersWithAuth().map((s) => ({
+					selectedMcpServerNames: mcpServers.map((s) => s.name),
+					selectedMcpServers: mcpServers.map((s) => ({
 						name: s.name,
 						url: s.url,
 						headers: s.headers,

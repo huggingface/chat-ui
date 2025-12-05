@@ -2,7 +2,13 @@
 	import { onMount, onDestroy } from "svelte";
 	import type { MCPServer } from "$lib/types/Tool";
 	import { toggleServer, healthCheckServer, deleteCustomServer } from "$lib/stores/mcpServers";
-	import { mcpOAuthTokens, mcpOAuthConfigs, reloadFromStorage } from "$lib/stores/mcpOAuthTokens";
+	import {
+		mcpOAuthTokens,
+		mcpOAuthConfigs,
+		reloadFromStorage,
+		isTokenExpired,
+		isTokenNearExpiry,
+	} from "$lib/stores/mcpOAuthTokens";
 	import { discoverOAuthMetadata, startOAuthFlow } from "$lib/services/mcpOAuthService";
 	import IconCheckmark from "~icons/carbon/checkmark-filled";
 	import IconWarning from "~icons/carbon/warning-filled";
@@ -42,8 +48,8 @@
 
 		const token = tokens.get(server.id);
 		if (!token) return "missing";
-		if (Date.now() > token.expiresAt - 5 * 60 * 1000) return "expired";
-		if (Date.now() > token.expiresAt - 10 * 60 * 1000) return "expiring";
+		if (isTokenExpired(token)) return "expired";
+		if (isTokenNearExpiry(token)) return "expiring";
 		return "valid";
 	});
 
@@ -67,18 +73,23 @@
 		oauthError = null;
 		try {
 			const metadata = await discoverOAuthMetadata(server.url);
-			if (metadata) {
-				oauthPopup = await startOAuthFlow(
-					server.id,
-					server.url,
-					server.name,
-					metadata,
-					window.location.href
-				);
+			if (!metadata) {
+				oauthError = "This server does not support OAuth authentication.";
+				isReauthenticating = false;
+				return;
+			}
+			oauthPopup = await startOAuthFlow(
+				server.id,
+				server.url,
+				server.name,
+				metadata,
+				window.location.href
+			);
 
-				if (oauthPopup) {
-					startPopupPolling();
-				}
+			if (oauthPopup) {
+				startPopupPolling();
+			} else {
+				isReauthenticating = false;
 			}
 		} catch (err) {
 			console.error("Re-authentication failed:", err);

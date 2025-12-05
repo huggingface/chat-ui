@@ -20,6 +20,7 @@
 
 	interface Props {
 		onsubmit: (server: {
+			id?: string;
 			name: string;
 			url: string;
 			headers?: KeyValuePair[];
@@ -74,14 +75,14 @@
 	async function checkServerOAuth() {
 		if (!url.trim()) return;
 
-		const urlValidation = validateMcpServerUrl(url);
-		if (!urlValidation) return;
+		const validUrl = validateMcpServerUrl(url);
+		if (!validUrl) return;
 
 		isCheckingOAuth = true;
 		oauthError = null;
 
 		try {
-			const result = await checkOAuthRequired(url);
+			const result = await checkOAuthRequired(validUrl);
 			oauthRequired = result.required;
 			oauthMetadata = result.metadata ?? null;
 
@@ -140,20 +141,20 @@
 		if (event.origin !== window.location.origin) return;
 
 		if (event.data?.type === "mcp-oauth-complete") {
-			if (event.data.serverId === pendingServerId || pendingServerId) {
-				if (popupPollTimer) {
-					clearInterval(popupPollTimer);
-					popupPollTimer = undefined;
-				}
-				oauthPopup = null;
+			if (event.data.serverId !== pendingServerId) return;
 
-				if (event.data.success) {
-					oauthCompleted = true;
-					oauthError = null;
-					reloadFromStorage();
-				} else {
-					oauthError = event.data.error || "Authentication failed";
-				}
+			if (popupPollTimer) {
+				clearInterval(popupPollTimer);
+				popupPollTimer = undefined;
+			}
+			oauthPopup = null;
+
+			if (event.data.success) {
+				oauthCompleted = true;
+				oauthError = null;
+				reloadFromStorage();
+			} else {
+				oauthError = event.data.error || "Authentication failed";
 			}
 		}
 	}
@@ -231,6 +232,7 @@
 		const filteredHeaders = headers.filter((h) => h.key.trim() && h.value.trim());
 
 		onsubmit({
+			id: pendingServerId ?? undefined,
 			name: name.trim(),
 			url: url.trim(),
 			headers: filteredHeaders.length > 0 ? filteredHeaders : undefined,

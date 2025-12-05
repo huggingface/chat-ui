@@ -74,9 +74,6 @@ export async function discoverOAuthMetadata(
 	}
 }
 
-/**
- * Check if an MCP server requires OAuth authentication
- */
 export async function checkOAuthRequired(serverUrl: string): Promise<OAuthDiscoveryResult> {
 	try {
 		const metadata = await discoverOAuthMetadata(serverUrl);
@@ -132,16 +129,10 @@ export async function registerOAuthClient(
 	return `${window.location.origin}${base}/.well-known/oauth-cimd`;
 }
 
-/**
- * Build the callback URL for OAuth redirects
- */
 export function getCallbackUrl(): string {
 	return `${window.location.origin}${base}${CALLBACK_PATH}`;
 }
 
-/**
- * Open a centered popup window for OAuth
- */
 function openOAuthPopup(url: string, width: number, height: number): Window | null {
 	const left = Math.round(window.screenX + (window.innerWidth - width) / 2);
 	const top = Math.round(window.screenY + (window.innerHeight - height) / 2);
@@ -153,11 +144,7 @@ function openOAuthPopup(url: string, width: number, height: number): Window | nu
 	);
 }
 
-/**
- * Start OAuth flow for an MCP server
- * Opens a popup for better UX (preserves app state), falls back to redirect if popup blocked
- * Returns the popup window reference if opened, null if using redirect fallback
- */
+// Opens popup for OAuth, falls back to redirect if blocked
 export async function startOAuthFlow(
 	serverId: string,
 	serverUrl: string,
@@ -216,10 +203,6 @@ export async function startOAuthFlow(
 	return null;
 }
 
-/**
- * Exchange authorization code for tokens
- * Called from the callback page after OAuth redirect
- */
 export async function exchangeCodeForTokens(
 	code: string,
 	flowState: McpOAuthFlowState
@@ -273,9 +256,6 @@ export async function exchangeCodeForTokens(
 	return token;
 }
 
-/**
- * Refresh an expired OAuth token
- */
 export async function refreshOAuthToken(serverId: string): Promise<McpOAuthToken | null> {
 	const config = getOAuthConfig(serverId);
 	const token = getToken(serverId);
@@ -319,9 +299,6 @@ export async function refreshOAuthToken(serverId: string): Promise<McpOAuthToken
 	}
 }
 
-/**
- * Validate OAuth flow state (called from callback)
- */
 export function validateFlowState(
 	flowState: McpOAuthFlowState | null,
 	state: string
@@ -343,9 +320,7 @@ export function validateFlowState(
 	return { valid: true };
 }
 
-/**
- * Get a valid token for a server, refreshing if necessary
- */
+// Returns token, refreshing if expired
 export async function getValidToken(serverId: string): Promise<McpOAuthToken | null> {
 	const token = getToken(serverId);
 
