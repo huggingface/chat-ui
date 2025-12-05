@@ -25,7 +25,9 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import ModelSwitch from "./ModelSwitch.svelte";
 	import { routerExamples } from "$lib/constants/routerExamples";
+	import { mcpExamples } from "$lib/constants/mcpExamples";
 	import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExamples";
+	import { allBaseServersEnabled, mcpServersLoaded } from "$lib/stores/mcpServers";
 	import { shareModal } from "$lib/stores/shareModal";
 	import CarbonTools from "~icons/carbon/tools";
 
@@ -143,9 +145,16 @@
 	};
 
 	let lastMessage = $derived(browser && (messages.at(-1) as Message));
+	// Scroll signal includes tool updates and thinking blocks to trigger scroll on all content changes
 	let scrollSignal = $derived.by(() => {
 		const last = messages.at(-1) as Message | undefined;
-		return last ? `${last.id}:${last.content.length}:${messages.length}` : `${messages.length}:0`;
+		if (!last) return `${messages.length}:0`;
+
+		// Count tool updates to trigger scroll when new tools are called or complete
+		const toolUpdateCount = last.updates?.length ?? 0;
+
+		// Include content length, tool count, and message count in signal
+		return `${last.id}:${last.content.length}:${messages.length}:${toolUpdateCount}`;
 	});
 	let streamingAssistantMessage = $derived(
 		(() => {
@@ -282,9 +291,13 @@
 	let focused = $state(false);
 
 	let activeRouterExamplePrompt = $state<string | null>(null);
+	// Use MCP examples when all base servers are enabled, otherwise use router examples
+	let activeExamples = $derived<RouterExample[]>(
+		$allBaseServersEnabled ? mcpExamples : routerExamples
+	);
 	let routerFollowUps = $derived<RouterFollowUp[]>(
 		activeRouterExamplePrompt
-			? (routerExamples.find((ex) => ex.prompt === activeRouterExamplePrompt)?.followUps ?? [])
+			? (activeExamples.find((ex) => ex.prompt === activeRouterExamplePrompt)?.followUps ?? [])
 			: []
 	);
 	let routerUserMessages = $derived(messages.filter((msg) => msg.from === "user"));
@@ -310,7 +323,7 @@
 			return;
 		}
 
-		const match = routerExamples.find((ex) => ex.prompt.trim() === firstUserMessage.content.trim());
+		const match = activeExamples.find((ex) => ex.prompt.trim() === firstUserMessage.content.trim());
 		activeRouterExamplePrompt = match ? match.prompt : null;
 	});
 
@@ -432,11 +445,11 @@
 			dark:from-gray-900 dark:via-gray-900/100
 			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		{#if !draft.length && !messages.length && !sources.length && !loading && currentModel.isRouter && routerExamples.length && !hideRouterExamples && !lastIsError}
+		{#if !draft.length && !messages.length && !sources.length && !loading && currentModel.isRouter && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
 			<div
 				class="no-scrollbar mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 dark:text-gray-500"
 			>
-				{#each routerExamples as ex}
+				{#each activeExamples as ex}
 					<button
 						class="flex items-center rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
 						onclick={() => startExample(ex)}>{ex.title}</button

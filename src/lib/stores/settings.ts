@@ -17,6 +17,7 @@ type SettingsStore = {
 	disableStream: boolean;
 	directPaste: boolean;
 	hidePromptExamples: Record<string, boolean>;
+	billingOrganization?: string;
 };
 
 type SettingsStoreWritable = Writable<SettingsStore> & {

@@ -152,6 +152,10 @@ export async function archSelectRoute(
 	const headers: HeadersInit = {
 		Authorization: `Bearer ${getApiToken(locals)}`,
 		"Content-Type": "application/json",
+		// Bill to organization if configured (HuggingChat only)
+		...(config.isHuggingChat && locals?.billingOrganization
+			? { "X-HF-Bill-To": locals.billingOrganization }
+			: {}),
 	};
 	const body = {
 		model: archModel,

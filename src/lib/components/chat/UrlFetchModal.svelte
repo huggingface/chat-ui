@@ -2,6 +2,7 @@
 	import Modal from "../Modal.svelte";
 	import { base } from "$app/paths";
 	import { tick } from "svelte";
+	import { pickSafeMime } from "$lib/utils/mime";
 
 	interface Props {
 		open?: boolean;
@@ -81,23 +82,35 @@
 				const txt = await res.text();
 				throw new Error(txt || `Failed to fetch (${res.status})`);
 			}
+			const forwardedType = res.headers.get("x-forwarded-content-type");
 			const blob = await res.blob();
+			const mimeType = pickSafeMime(forwardedType, blob.type, trimmed);
 			// Optional client-side mime filter (same wildcard semantics as dropzone)
-			if (acceptMimeTypes.length > 0 && blob.type && !matchesAllowed(blob.type, acceptMimeTypes)) {
+			if (acceptMimeTypes.length > 0 && mimeType && !matchesAllowed(mimeType, acceptMimeTypes)) {
 				throw new Error("File type not allowed.");
 			}
 			const disp = res.headers.get("content-disposition");
-			let filename = "attachment";
-			const match = disp?.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-			if (match && match[1]) filename = match[1].replace(/['"]/g, "");
-			else {
+			const filename = (() => {
+				const filenameStar = disp?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+				if (filenameStar) {
+					const cleaned = filenameStar.trim().replace(/['"]/g, "");
+					try {
+						return decodeURIComponent(cleaned);
+					} catch {
+						return cleaned;
+					}
+				}
+				const filenameMatch = disp?.match(/filename="?([^";]+)"?/i)?.[1];
+				if (filenameMatch) return filenameMatch.trim();
 				try {
 					const u = new URL(trimmed);
 					const last = u.pathname.split("/").pop() || "attachment";
-					filename = decodeURIComponent(last);
-				} catch {}
-			}
-			const file = new File([blob], filename, { type: blob.type || "application/octet-stream" });
+					return decodeURIComponent(last);
+				} catch {
+					return "attachment";
+				}
+			})();
+			const file = new File([blob], filename, { type: mimeType });
 			onfiles?.([file]);
 			close();
 		} catch (e) {

@@ -148,6 +148,10 @@ export async function endpointOai(
 					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 					"X-use-cache": "false",
 					...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+					// Bill to organization if configured (HuggingChat only)
+					...(config.isHuggingChat && locals?.billingOrganization
+						? { "X-HF-Bill-To": locals.billingOrganization }
+						: {}),
 				},
 				signal: abortSignal,
 			});
@@ -218,6 +222,10 @@ export async function endpointOai(
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
 							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+							// Bill to organization if configured (HuggingChat only)
+							...(config.isHuggingChat && locals?.billingOrganization
+								? { "X-HF-Bill-To": locals.billingOrganization }
+								: {}),
 						},
 						signal: abortSignal,
 					}
@@ -232,6 +240,10 @@ export async function endpointOai(
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
 							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+							// Bill to organization if configured (HuggingChat only)
+							...(config.isHuggingChat && locals?.billingOrganization
+								? { "X-HF-Bill-To": locals.billingOrganization }
+								: {}),
 						},
 						signal: abortSignal,
 					}
