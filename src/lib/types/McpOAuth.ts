@@ -92,3 +92,15 @@ export interface ClientRegistrationResponse {
 	client_id_issued_at?: number;
 	client_secret_expires_at?: number;
 }
+
+/**
+ * Protected Resource Metadata (RFC 9728)
+ */
+export interface ProtectedResourceMetadata {
+	resource: string;
+	authorization_servers?: string[];
+	scopes_supported?: string[];
+	bearer_methods_supported?: string[];
+	resource_name?: string;
+	resource_documentation?: string;
+}

@@ -28,48 +28,25 @@ const FLOW_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Discover OAuth server metadata from MCP server URL
- * Checks /.well-known/oauth-authorization-server per RFC 8414
+ * Uses server-side proxy to avoid CORS issues with RFC 9728 discovery
  */
 export async function discoverOAuthMetadata(
 	serverUrl: string
 ): Promise<OAuthServerMetadata | null> {
 	try {
-		const url = new URL(serverUrl);
-		// Per MCP spec: discovery at authorization base URL (server URL with path removed)
-		const wellKnownUrl = `${url.origin}/.well-known/oauth-authorization-server`;
-
-		const response = await fetch(wellKnownUrl, {
-			headers: { Accept: "application/json" },
-			// Short timeout for discovery
-			signal: AbortSignal.timeout(10000),
+		const response = await fetch(`${base}/api/mcp/oauth/discover`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ url: serverUrl }),
+			signal: AbortSignal.timeout(20000),
 		});
 
-		if (!response.ok) {
-			// Server doesn't support OAuth discovery - not an error
-			return null;
-		}
+		if (!response.ok) return null;
 
-		const metadata = (await response.json()) as OAuthServerMetadata;
-
-		// Validate required fields per OAuth 2.0 Authorization Server Metadata
-		if (!metadata.authorization_endpoint || !metadata.token_endpoint) {
-			console.warn("OAuth metadata missing required endpoints");
-			return null;
-		}
-
-		// Validate PKCE support (required by MCP OAuth 2.1)
-		if (
-			metadata.code_challenge_methods_supported &&
-			!metadata.code_challenge_methods_supported.includes("S256")
-		) {
-			console.warn("OAuth server does not support required S256 PKCE method");
-			return null;
-		}
-
-		return metadata;
+		const data = await response.json();
+		return data.metadata ?? null;
 	} catch (error) {
-		// Discovery failure is not an error - server may not require OAuth
-		console.debug("OAuth discovery failed (server may not require OAuth):", error);
+		console.debug("OAuth discovery failed:", error);
 		return null;
 	}
 }

@@ -44,7 +44,11 @@
 		const hasToken = tokens.has(server.id);
 		const hasConfig = configs.has(server.id);
 
-		if (!server.oauthEnabled && !hasToken && !hasConfig) return "none";
+		if (!server.oauthEnabled && !hasToken && !hasConfig) {
+			// Health check returned 401 but OAuth wasn't set up - prompt for authentication
+			if (server.authRequired) return "missing";
+			return "none";
+		}
 
 		const token = tokens.get(server.id);
 		if (!token) return "missing";
@@ -269,14 +273,18 @@
 				<div class="flex items-center gap-2 rounded bg-amber-50 px-2 py-1.5 dark:bg-amber-900/20">
 					<IconLocked class="size-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
 					<span class="flex-1 text-xs text-amber-800 dark:text-amber-200">
-						Authentication expired
+						{tokenStatus === "expired" ? "Authentication expired" : "Authentication required"}
 					</span>
 					<button
 						onclick={handleReauthenticate}
 						disabled={isReauthenticating}
 						class="rounded bg-amber-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-500 dark:hover:bg-amber-600"
 					>
-						{isReauthenticating ? "..." : "Re-authenticate"}
+						{isReauthenticating
+							? "..."
+							: tokenStatus === "expired"
+								? "Re-authenticate"
+								: "Authenticate"}
 					</button>
 				</div>
 			</div>
