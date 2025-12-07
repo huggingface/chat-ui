@@ -8,6 +8,15 @@ html,
 body {
 	overscroll-behavior: none;
 	touch-action: pan-x pan-y;
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
+/* Prevent Safari iOS auto-zoom on input focus (requires font-size >= 16px) */
+input,
+textarea,
+select {
+	font-size: 16px;
 }
 
 @layer components {
