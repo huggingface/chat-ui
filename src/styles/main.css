@@ -7,6 +7,7 @@
 html,
 body {
 	overscroll-behavior: none;
+	touch-action: pan-x pan-y;
 }
 
 @layer components {
