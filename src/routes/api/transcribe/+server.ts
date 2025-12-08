@@ -85,7 +85,10 @@ export async function POST({ request, locals }) {
 		const result = await response.json();
 
 		// Whisper API returns { text: "transcribed text" }
-		return json({ text: result.text || "" });
+		// Filter out responses that only contain dots (e.g. "..." returned for silence/unclear audio)
+		const text = (result.text || "").trim();
+		const isOnlyDots = /^\.+$/.test(text);
+		return json({ text: isOnlyDots ? "" : text });
 	} catch (err) {
 		if (err instanceof Error && err.name === "AbortError") {
 			logger.error({ model: transcriptionModel }, "Transcription timeout");
