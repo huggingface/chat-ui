@@ -13,7 +13,7 @@ function keyOf(server: McpServerConfig) {
 	return `${server.url}|${headers}`;
 }
 
-export async function getClient(server: McpServerConfig, signal?: AbortSignal): Promise<Client> {
+export async function getClient(server: McpServerConfig, _signal?: AbortSignal): Promise<Client> {
 	const key = keyOf(server);
 	const existing = pool.get(key);
 	if (existing) return existing;
@@ -21,7 +21,11 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 	let firstError: unknown;
 	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
 	const url = new URL(server.url);
-	const requestInit: RequestInit = { headers: server.headers, signal };
+	// NOTE: Do NOT pass abort signal to the transport. The signal is for individual
+	// tool calls, not for establishing the connection. Passing it here causes the
+	// transport to close when the signal is aborted, but the client remains in the
+	// pool as "valid" - leading to "Connection closed" errors on subsequent reuse.
+	const requestInit: RequestInit = { headers: server.headers };
 	try {
 		try {
 			await client.connect(new StreamableHTTPClientTransport(url, { requestInit }));
