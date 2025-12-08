@@ -1,6 +1,7 @@
 import { useAPIClient, handleResponse } from "$lib/APIClient";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { redirect } from "@sveltejs/kit";
+import { base } from "$app/paths";
 
 export const load = async ({ params, depends, fetch, url }) => {
 	depends(UrlDependency.Conversation);
@@ -13,6 +14,6 @@ export const load = async ({ params, depends, fetch, url }) => {
 			.get({ query: { fromShare: url.searchParams.get("fromShare") ?? undefined } })
 			.then(handleResponse);
 	} catch {
-		redirect(302, "/");
+		redirect(302, `${base}/`);
 	}
 };
