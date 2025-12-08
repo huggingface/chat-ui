@@ -26,8 +26,6 @@ Chat UI speaks to OpenAI-compatible APIs only. The fastest way to get running is
 ```env
 OPENAI_BASE_URL=https://router.huggingface.co/v1
 OPENAI_API_KEY=hf_************************
-# Fill in once you pick a database option below
-MONGODB_URL=
 ```
 
 `OPENAI_API_KEY` can come from any OpenAI-compatible endpoint you plan to call. Pick the combo that matches your setup and drop the values into `.env.local`:
@@ -42,9 +40,7 @@ MONGODB_URL=
 
 Check the root [`.env` template](./.env) for the full list of optional variables you can override.
 
-**Step 2 – Choose where MongoDB lives:** Either provision a managed cluster (for example MongoDB Atlas) or run a local container. Both approaches are described in [Database Options](#database-options). After you have the URI, drop it into `MONGODB_URL` (and, if desired, set `MONGODB_DB_NAME`).
-
-**Step 3 – Install and launch the dev server:**
+**Step 2 – Install and launch the dev server:**
 
 ```bash
 git clone https://github.com/huggingface/chat-ui
@@ -59,6 +55,9 @@ You now have Chat UI running locally. Open the browser and start chatting.
 
 Chat history, users, settings, files, and stats all live in MongoDB. You can point Chat UI at any MongoDB 6/7 deployment.
 
+> [!TIP]
+> For quick local development, you can skip this section. When `MONGODB_URL` is not set, Chat UI falls back to an embedded MongoDB that persists to `./db`.
+
 ### MongoDB Atlas (managed)
 
 1. Create a free cluster at [mongodb.com](https://www.mongodb.com/pricing).
@@ -70,13 +69,13 @@ Atlas keeps MongoDB off your laptop, which is ideal for teams or cloud deploymen
 
 ### Local MongoDB (container)
 
-If you prefer to run MongoDB locally:
+If you prefer to run MongoDB in a container:
 
 ```bash
 docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
 ```
 
-Then set `MONGODB_URL=mongodb://localhost:27017` in `.env.local`. You can also supply `MONGO_STORAGE_PATH` if you want Chat UI’s fallback in-memory server to persist under a specific folder.
+Then set `MONGODB_URL=mongodb://localhost:27017` in `.env.local`.
 
 ## Launch
 
@@ -91,19 +90,18 @@ The dev server listens on `http://localhost:5173` by default. Use `npm run build
 
 ## Optional Docker Image
 
-Prefer containerized setup? You can run everything in one container as long as you supply a MongoDB URI (local or hosted):
+The `chat-ui-db` image bundles MongoDB inside the container:
 
 ```bash
 docker run \
   -p 3000:3000 \
-  -e MONGODB_URL=mongodb://host.docker.internal:27017 \
   -e OPENAI_BASE_URL=https://router.huggingface.co/v1 \
   -e OPENAI_API_KEY=hf_*** \
-  -v db:/data \
+  -v chat-ui-data:/data \
   ghcr.io/huggingface/chat-ui-db:latest
 ```
 
-`host.docker.internal` lets the container reach a MongoDB instance on your host machine; swap it for your Atlas URI if you use the hosted option. All environment variables accepted in `.env.local` can be provided as `-e` flags.
+All environment variables accepted in `.env.local` can be provided as `-e` flags.
 
 ## Extra parameters
 
