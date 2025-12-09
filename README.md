@@ -122,7 +122,7 @@ PUBLIC_APP_DATA_SHARING=
 
 ### Models
 
-This build does not use the `MODELS` env var or GGUF discovery. Configure models via `OPENAI_BASE_URL` only; Chat UI will fetch `${OPENAI_BASE_URL}/models` and populate the list automatically. Authorization uses `OPENAI_API_KEY` (preferred). `HF_TOKEN` remains a legacy alias.
+Models are discovered from `${OPENAI_BASE_URL}/models`, and you can optionally override their metadata via the `MODELS` env var (JSON5). Legacy provider‑specific integrations and GGUF discovery are removed. Authorization uses `OPENAI_API_KEY` (preferred). `HF_TOKEN` remains a legacy alias.
 
 ### LLM Router (Optional)
 
