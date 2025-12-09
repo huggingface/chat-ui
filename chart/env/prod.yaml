@@ -115,7 +115,7 @@ envVars:
       { "id": "deepseek-ai/DeepSeek-V3.1-Terminus", "description": "Refined V3.1 variant optimized for reliability on long contexts, structured outputs, and tool use." },
       { "id": "Qwen/Qwen3-VL-235B-A22B-Thinking", "description": "Deliberative multimodal Qwen that can produce step-wise visual+text reasoning traces for complex tasks." },
       { "id": "zai-org/GLM-4.6-FP8", "description": "FP8-optimized GLM-4.6 for faster/cheaper deployment with near-parity quality on most tasks." },
-      { "id": "zai-org/GLM-4.6V", "description": "106B vision-language model with 128K context and native tool calling for multimodal agents." },
+      { "id": "zai-org/GLM-4.6V", "description": "106B vision-language model with 128K context and native tool calling for multimodal agents.", "parameters": { "max_tokens": 8192 } },
       { "id": "zai-org/GLM-4.6V-Flash", "description": "9B lightweight vision model for fast local inference with tool calling and UI understanding." },
       { "id": "zai-org/GLM-4.6V-FP8", "description": "FP8-quantized GLM-4.6V for efficient multimodal deployment with native tool use." },
       { "id": "Qwen/Qwen3-235B-A22B-Thinking-2507", "description": "Deliberative text-only 235B Qwen variant for transparent, step-by-step reasoning on hard problems." },
