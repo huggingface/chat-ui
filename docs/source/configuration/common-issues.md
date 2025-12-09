@@ -32,6 +32,7 @@ If models aren't appearing in the UI:
 For development, you can skip MongoDB entirely - Chat UI will use an embedded database.
 
 For production, verify:
+
 - `MONGODB_URL` is a valid connection string
 - Your IP is whitelisted (for MongoDB Atlas)
 - The database user has read/write permissions

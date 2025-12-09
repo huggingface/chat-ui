@@ -23,17 +23,17 @@ Create a JSON file defining your routes. Each route specifies:
 
 ```json
 [
-  {
-    "name": "coding",
-    "description": "Programming, debugging, code review",
-    "primary_model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    "fallback_models": ["meta-llama/Llama-3.3-70B-Instruct"]
-  },
-  {
-    "name": "casual_conversation",
-    "description": "General chat, questions, explanations",
-    "primary_model": "meta-llama/Llama-3.3-70B-Instruct"
-  }
+	{
+		"name": "coding",
+		"description": "Programming, debugging, code review",
+		"primary_model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+		"fallback_models": ["meta-llama/Llama-3.3-70B-Instruct"]
+	},
+	{
+		"name": "casual_conversation",
+		"description": "General chat, questions, explanations",
+		"primary_model": "meta-llama/Llama-3.3-70B-Instruct"
+	}
 ]
 ```
 

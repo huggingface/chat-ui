@@ -7,6 +7,7 @@ This document provides a high-level overview of the Chat UI codebase. If you're 
 Chat UI provides a simple interface connecting LLMs to external tools via MCP. The project uses [MongoDB](https://www.mongodb.com/) and [SvelteKit](https://kit.svelte.dev/) with [Tailwind](https://tailwindcss.com/).
 
 Key architectural decisions:
+
 - **OpenAI-compatible only**: All model interactions use the OpenAI API format
 - **MCP for tools**: Tool calling is handled via Model Context Protocol servers
 - **Auto-discovery**: Models are discovered from the `/models` endpoint

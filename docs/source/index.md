@@ -3,6 +3,7 @@
 Open source chat interface with support for tools, multimodal inputs, and intelligent routing across models. The app uses MongoDB and SvelteKit behind the scenes. Try the live version called [HuggingChat on hf.co/chat](https://huggingface.co/chat) or [setup your own instance](./installation/local).
 
 Chat UI connects to any OpenAI-compatible API endpoint, making it work with:
+
 - [Hugging Face Inference Providers](https://huggingface.co/docs/inference-providers)
 - [Ollama](https://ollama.ai)
 - [llama.cpp](https://github.com/ggerganov/llama.cpp)
@@ -28,12 +29,12 @@ OPENAI_API_KEY=hf_************************
 
 You can use any OpenAI-compatible endpoint:
 
-| Provider | `OPENAI_BASE_URL` | `OPENAI_API_KEY` |
-|----------|-------------------|------------------|
-| Hugging Face | `https://router.huggingface.co/v1` | `hf_xxx` |
-| Ollama | `http://127.0.0.1:11434/v1` | `ollama` |
-| llama.cpp | `http://127.0.0.1:8080/v1` | `sk-local` |
-| OpenRouter | `https://openrouter.ai/api/v1` | `sk-or-v1-xxx` |
+| Provider     | `OPENAI_BASE_URL`                  | `OPENAI_API_KEY` |
+| ------------ | ---------------------------------- | ---------------- |
+| Hugging Face | `https://router.huggingface.co/v1` | `hf_xxx`         |
+| Ollama       | `http://127.0.0.1:11434/v1`        | `ollama`         |
+| llama.cpp    | `http://127.0.0.1:8080/v1`         | `sk-local`       |
+| OpenRouter   | `https://openrouter.ai/api/v1`     | `sk-or-v1-xxx`   |
 
 **Step 2 - Install and run:**
 

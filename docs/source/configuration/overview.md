@@ -38,6 +38,7 @@ MODELS=`[
 ```
 
 Override properties:
+
 - `id` - Model identifier (must match an ID from the `/models` endpoint)
 - `name` - Display name in the UI
 - `multimodal` - Enable image uploads

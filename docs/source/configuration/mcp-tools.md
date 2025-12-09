@@ -18,6 +18,7 @@ MCP_SERVERS=[
 ```
 
 Each server entry requires:
+
 - `name` - Display name shown in the UI
 - `url` - MCP server endpoint URL
 - `headers` (optional) - Custom headers for authentication

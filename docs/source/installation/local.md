@@ -22,12 +22,12 @@ That's it! Chat UI will discover available models automatically from your endpoi
 
 Chat UI connects to any OpenAI-compatible API. Set `OPENAI_BASE_URL` to your provider:
 
-| Provider | `OPENAI_BASE_URL` |
-|----------|-------------------|
+| Provider     | `OPENAI_BASE_URL`                  |
+| ------------ | ---------------------------------- |
 | Hugging Face | `https://router.huggingface.co/v1` |
-| Ollama | `http://127.0.0.1:11434/v1` |
-| llama.cpp | `http://127.0.0.1:8080/v1` |
-| OpenRouter | `https://openrouter.ai/api/v1` |
+| Ollama       | `http://127.0.0.1:11434/v1`        |
+| llama.cpp    | `http://127.0.0.1:8080/v1`         |
+| OpenRouter   | `https://openrouter.ai/api/v1`     |
 
 See the [configuration overview](../configuration/overview) for all available options.
 
