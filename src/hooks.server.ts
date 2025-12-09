@@ -145,10 +145,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	if (loginEnabled && !auth.user && !event.url.pathname.startsWith(`${base}/.well-known/`)) {
 		if (config.AUTOMATIC_LOGIN === "true") {
-			// AUTOMATIC_LOGIN: always redirect to OAuth flow (unless already on login or healthcheck pages)
+			// AUTOMATIC_LOGIN: always redirect to OAuth flow (unless already on login, healthcheck, models, or api pages)
 			if (
 				!event.url.pathname.startsWith(`${base}/login`) &&
-				!event.url.pathname.startsWith(`${base}/healthcheck`)
+				!event.url.pathname.startsWith(`${base}/healthcheck`) &&
+				!event.url.pathname.startsWith(`${base}/models`) &&
+				!event.url.pathname.startsWith(`${base}/api`)
 			) {
 				// To get the same CSRF token after callback
 				refreshSessionCookie(event.cookies, auth.secretSessionId);
@@ -164,7 +166,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 				!event.url.pathname.startsWith(`${base}/healthcheck`) &&
 				!event.url.pathname.startsWith(`${base}/r/`) &&
 				!event.url.pathname.startsWith(`${base}/conversation/`) &&
-				!event.url.pathname.startsWith(`${base}/models/`) &&
+				!event.url.pathname.startsWith(`${base}/models`) &&
 				!event.url.pathname.startsWith(`${base}/api`)
 			) {
 				refreshSessionCookie(event.cookies, auth.secretSessionId);
