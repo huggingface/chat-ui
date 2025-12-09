@@ -19,12 +19,11 @@
 		<div
 			class="relative -mx-6 grid h-48 select-none place-items-center bg-gradient-to-t from-black/5 dark:from-white/10"
 		>
-			<video
+			<img
 				class="size-full object-cover"
-				autoplay
-				muted
-				src="https://cdn-uploads.huggingface.co/production/uploads/5f17f0a0925b9863e28ad517/WSOTmErfqlGNZwSqdfrA7.mp4"
-			></video>
+				src="/huggingchat/omni-welcome.gif"
+				alt="Omni AI model router animation"
+			/>
 			<!-- <h2
 				class="flex translate-y-1 items-center text-3xl font-semibold text-gray-900 dark:text-gray-100"
 			>
