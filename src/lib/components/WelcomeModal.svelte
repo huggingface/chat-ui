@@ -21,7 +21,7 @@
 		>
 			<img
 				class="size-full object-cover"
-				src="/huggingchat/omni-welcome.gif"
+				src="{publicConfig.assetPath}/omni-welcome.gif"
 				alt="Omni AI model router animation"
 			/>
 			<!-- <h2
