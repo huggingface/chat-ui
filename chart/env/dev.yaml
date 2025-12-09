@@ -78,6 +78,8 @@ envVars:
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
   MODELS: > 
     [
+      { "id": "dicta-il/DictaLM-3.0-24B-Thinking", "description": "Hebrew-English reasoning model with explicit thinking traces for bilingual QA and logic." },
+      { "id": "EssentialAI/rnj-1-instruct", "description": "8B code and STEM model rivaling larger models on agentic coding, math, and tool use." },
       { "id": "MiniMaxAI/MiniMax-M2", "description": "Compact MoE model tuned for fast coding, agentic workflows, and long-context chat." },
       { "id": "PrimeIntellect/INTELLECT-3-FP8", "description": "FP8 INTELLECT-3 variant for cheaper frontier-level math, code, and general reasoning." },
       { "id": "Qwen/Qwen3-VL-30B-A3B-Instruct", "description": "Flagship Qwen3 vision-language model for high-accuracy image, text, and video reasoning." },
@@ -92,6 +94,7 @@ envVars:
       { "id": "deepseek-ai/DeepSeek-V3.2", "description": "Latest DeepSeek agent model combining strong reasoning, tool-use, and efficient long-context inference." },
       { "id": "moonshotai/Kimi-K2-Thinking", "description": "Reasoning-focused Kimi K2 variant for deep chain-of-thought and large agentic tool flows." },
       { "id": "nvidia/NVIDIA-Nemotron-Nano-12B-v2", "description": "NVIDIA Nano 12B general assistant for coding, chat, and agents with efficient deployment." },
+      { "id": "ServiceNow-AI/Apriel-1.6-15b-Thinker", "description": "15B multimodal reasoning model with efficient thinking for enterprise and coding tasks." },
       { "id": "openai/gpt-oss-safeguard-20b", "description": "Safety-focused gpt-oss variant for content classification, policy enforcement, and LLM output filtering." },
       { "id": "zai-org/GLM-4.5", "description": "Flagship GLM agent model unifying advanced reasoning, coding, and tool-using capabilities." },
       { "id": "zai-org/GLM-4.5V-FP8", "description": "FP8 vision-language GLM-4.5V for efficient multilingual visual QA, understanding, and hybrid reasoning." },    
@@ -102,6 +105,9 @@ envVars:
       { "id": "deepseek-ai/DeepSeek-V3.1-Terminus", "description": "Refined V3.1 variant optimized for reliability on long contexts, structured outputs, and tool use." },
       { "id": "Qwen/Qwen3-VL-235B-A22B-Thinking", "description": "Deliberative multimodal Qwen that can produce step-wise visual+text reasoning traces for complex tasks." },
       { "id": "zai-org/GLM-4.6-FP8", "description": "FP8-optimized GLM-4.6 for faster/cheaper deployment with near-parity quality on most tasks." },
+      { "id": "zai-org/GLM-4.6V", "description": "106B vision-language model with 128K context and native tool calling for multimodal agents." },
+      { "id": "zai-org/GLM-4.6V-Flash", "description": "9B lightweight vision model for fast local inference with tool calling and UI understanding." },
+      { "id": "zai-org/GLM-4.6V-FP8", "description": "FP8-quantized GLM-4.6V for efficient multimodal deployment with native tool use." },
       { "id": "Qwen/Qwen3-235B-A22B-Thinking-2507", "description": "Deliberative text-only 235B Qwen variant for transparent, step-by-step reasoning on hard problems." },
       { "id": "Qwen/Qwen3-Next-80B-A3B-Instruct", "description": "Instruction tuned Qwen for multilingual reasoning, coding, long contexts." },
       { "id": "Qwen/Qwen3-Next-80B-A3B-Thinking", "description": "Thinking mode Qwen that outputs explicit step by step reasoning." },
