@@ -20,7 +20,7 @@
 			class="relative -mx-6 grid h-48 select-none place-items-center bg-gradient-to-t from-black/5 dark:from-white/10"
 		>
 			<img
-				class="size-full object-cover"
+				class="size-full bg-black object-cover"
 				src="{publicConfig.assetPath}/omni-welcome.gif"
 				alt="Omni AI model router animation"
 			/>
