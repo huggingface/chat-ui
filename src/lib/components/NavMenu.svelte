@@ -233,7 +233,7 @@
 <div
 	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:border-transparent dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
-	<div class="flex flex-col gap-0.5">
+	<div class="flex flex-none flex-col gap-0.5">
 		{#if isSearching}
 			<div class="flex items-center justify-center py-4 text-sm text-gray-400">
 				Searching...
