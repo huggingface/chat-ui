@@ -24,8 +24,17 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 				"",
 				async ({ locals, query }) => {
 					const pageSize = CONV_NUM_PER_PAGE;
+
+					// Build filter with auth condition and optional search
+					const filter = {
+						...authCondition(locals),
+						...(query.search && {
+							title: { $regex: query.search, $options: "i" },
+						}),
+					};
+
 					const convs = await collections.conversations
-						.find(authCondition(locals))
+						.find(filter)
 						.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model">>({
 							title: 1,
 							updatedAt: 1,
@@ -51,6 +60,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 				{
 					query: t.Object({
 						p: t.Optional(t.Number()),
+						search: t.Optional(t.String()),
 					}),
 				}
 			)

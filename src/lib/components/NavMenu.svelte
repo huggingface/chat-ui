@@ -15,7 +15,7 @@
 	import IconMoon from "$lib/components/icons/IconMoon.svelte";
 	import { switchTheme, subscribeToTheme } from "$lib/switchTheme";
 	import { isAborted } from "$lib/stores/isAborted";
-	import { onDestroy } from "svelte";
+	import { onDestroy, tick } from "svelte";
 
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
@@ -30,6 +30,7 @@
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { enabledServersCount } from "$lib/stores/mcpServers";
 	import MCPServerManager from "./mcp/MCPServerManager.svelte";
+	import IconSearch from "$lib/components/icons/IconSearch.svelte";
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
@@ -51,6 +52,58 @@
 	}: Props = $props();
 
 	let hasMore = $state(true);
+
+	// Search state
+	let searchQuery = $state("");
+	let searchResults = $state<ConvSidebar[]>([]);
+	let isSearching = $state(false);
+	let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+	const isSearchActive = $derived(searchQuery.trim().length > 0);
+
+	async function performSearch(query: string) {
+		if (!query.trim()) {
+			searchResults = [];
+			isSearching = false;
+			return;
+		}
+
+		isSearching = true;
+		try {
+			const results = await client.conversations
+				.get({ query: { search: query.trim() } })
+				.then(handleResponse)
+				.then((r) => r.conversations)
+				.catch((): ConvSidebar[] => []);
+			searchResults = results;
+		} finally {
+			isSearching = false;
+		}
+	}
+
+	function handleSearchInput(e: Event) {
+		const target = e.target as HTMLInputElement;
+		searchQuery = target.value;
+
+		// Clear previous debounce timer
+		if (searchDebounceTimer) {
+			clearTimeout(searchDebounceTimer);
+		}
+
+		// Debounce search requests
+		searchDebounceTimer = setTimeout(() => {
+			performSearch(searchQuery);
+		}, 300);
+	}
+
+	function clearSearch() {
+		searchQuery = "";
+		searchResults = [];
+		isSearching = false;
+		if (searchDebounceTimer) {
+			clearTimeout(searchDebounceTimer);
+		}
+	}
 
 	function handleNewChatClick(e: MouseEvent) {
 		isAborted.set(true);
@@ -147,22 +200,70 @@
 	</a>
 </div>
 
+<!-- Search input -->
+<div class="px-3 pb-2">
+	<div class="relative">
+		<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+			<IconSearch classNames="size-4 text-gray-400" />
+		</div>
+		<input
+			type="text"
+			placeholder="Search conversations..."
+			value={searchQuery}
+			oninput={handleSearchInput}
+			class="w-full rounded-lg border border-gray-200 bg-white py-1.5 pl-8 pr-8 text-sm placeholder-gray-400 focus:border-gray-300 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:placeholder-gray-500 dark:focus:border-gray-500"
+		/>
+		{#if isSearchActive}
+			<button
+				onclick={clearSearch}
+				class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+				aria-label="Clear search"
+			>
+				<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M18 6L6 18M6 6l12 12" />
+				</svg>
+			</button>
+		{/if}
+	</div>
+</div>
+
 <div
 	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:border-transparent dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
 	<div class="flex flex-col gap-0.5">
-		{#each Object.entries(groupedConversations) as [group, convs]}
-			{#if convs.length}
-				<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
-					{titles[group]}
+		{#if isSearchActive}
+			<!-- Search results -->
+			{#if isSearching}
+				<div class="flex items-center justify-center py-4 text-sm text-gray-400">
+					Searching...
+				</div>
+			{:else if searchResults.length === 0}
+				<div class="flex items-center justify-center py-4 text-sm text-gray-400">
+					No conversations found
+				</div>
+			{:else}
+				<h4 class="mb-1.5 pl-0.5 text-sm text-gray-400 dark:text-gray-500">
+					Search results
 				</h4>
-				{#each convs as conv}
+				{#each searchResults as conv}
 					<NavConversationItem {conv} {oneditConversationTitle} {ondeleteConversation} />
 				{/each}
 			{/if}
-		{/each}
+		{:else}
+			<!-- Regular grouped conversations -->
+			{#each Object.entries(groupedConversations) as [group, convs]}
+				{#if convs.length}
+					<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
+						{titles[group]}
+					</h4>
+					{#each convs as conv}
+						<NavConversationItem {conv} {oneditConversationTitle} {ondeleteConversation} />
+					{/each}
+				{/if}
+			{/each}
+		{/if}
 	</div>
-	{#if hasMore}
+	{#if !isSearchActive && hasMore}
 		<InfiniteScroll onvisible={handleVisible} />
 	{/if}
 </div>
