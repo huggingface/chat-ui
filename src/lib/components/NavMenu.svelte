@@ -61,6 +61,9 @@
 
 	const isSearchActive = $derived(searchQuery.trim().length > 0);
 
+	// The conversations to display (either search results or all conversations)
+	const displayedConversations = $derived(isSearchActive ? searchResults : conversations);
+
 	async function performSearch(query: string) {
 		if (!query.trim()) {
 			searchResults = [];
@@ -126,14 +129,14 @@
 	];
 
 	let groupedConversations = $derived({
-		today: conversations.filter(({ updatedAt }) => updatedAt.getTime() > dateRanges[0]),
-		week: conversations.filter(
+		today: displayedConversations.filter(({ updatedAt }) => updatedAt.getTime() > dateRanges[0]),
+		week: displayedConversations.filter(
 			({ updatedAt }) => updatedAt.getTime() > dateRanges[1] && updatedAt.getTime() < dateRanges[0]
 		),
-		month: conversations.filter(
+		month: displayedConversations.filter(
 			({ updatedAt }) => updatedAt.getTime() > dateRanges[2] && updatedAt.getTime() < dateRanges[1]
 		),
-		older: conversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
+		older: displayedConversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
 	});
 
 	const nModels: number = page.data.models.filter((el: Model) => !el.unlisted).length;
@@ -231,26 +234,15 @@
 	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:border-transparent dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
 	<div class="flex flex-col gap-0.5">
-		{#if isSearchActive}
-			<!-- Search results -->
-			{#if isSearching}
-				<div class="flex items-center justify-center py-4 text-sm text-gray-400">
-					Searching...
-				</div>
-			{:else if searchResults.length === 0}
-				<div class="flex items-center justify-center py-4 text-sm text-gray-400">
-					No conversations found
-				</div>
-			{:else}
-				<h4 class="mb-1.5 pl-0.5 text-sm text-gray-400 dark:text-gray-500">
-					Search results
-				</h4>
-				{#each searchResults as conv}
-					<NavConversationItem {conv} {oneditConversationTitle} {ondeleteConversation} />
-				{/each}
-			{/if}
+		{#if isSearching}
+			<div class="flex items-center justify-center py-4 text-sm text-gray-400">
+				Searching...
+			</div>
+		{:else if isSearchActive && searchResults.length === 0}
+			<div class="flex items-center justify-center py-4 text-sm text-gray-400">
+				No conversations found
+			</div>
 		{:else}
-			<!-- Regular grouped conversations -->
 			{#each Object.entries(groupedConversations) as [group, convs]}
 				{#if convs.length}
 					<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
