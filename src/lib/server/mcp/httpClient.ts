@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { getClient } from "./clientPool";
+import { config } from "$lib/server/config";
 
 export interface McpServerConfig {
 	name: string;
@@ -7,7 +8,7 @@ export interface McpServerConfig {
 	headers?: Record<string, string>;
 }
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = Number(config.MCP_TOOL_TIMEOUT_MS) || 30_000;
 
 export type McpToolTextResponse = {
 	text: string;
