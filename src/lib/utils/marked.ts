@@ -194,7 +194,7 @@ function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): 
 				if (index === 0) return false;
 				const source = webSearchSources[index - 1];
 				if (source) {
-					return `<a href="${source.link}" target="_blank" rel="noreferrer" style="${linkStyle}">${index}</a>`;
+					return `<a href="${escapeHTML(source.link)}" target="_blank" rel="noreferrer" style="${linkStyle}">${index}</a>`;
 				}
 				return "";
 			})
@@ -235,7 +235,7 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 			link: (href, title, text) => {
 				const safeHref = sanitizeHref(href);
 				return safeHref
-					? `<a href="${safeHref}" target="_blank" rel="noreferrer">${text}</a>`
+					? `<a href="${escapeHTML(safeHref)}" target="_blank" rel="noreferrer">${text}</a>`
 					: `<span>${escapeHTML(text ?? "")}</span>`;
 			},
 			html: (html) => escapeHTML(html),
