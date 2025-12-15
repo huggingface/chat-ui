@@ -1,5 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client";
-import { getClient } from "./clientPool";
+import { getClient, evictFromPool } from "./clientPool";
+
+function isConnectionClosedError(err: unknown): boolean {
+	const message = err instanceof Error ? err.message : String(err);
+	return message.includes("-32000") || message.toLowerCase().includes("connection closed");
+}
 
 export interface McpServerConfig {
 	name: string;
@@ -34,20 +39,40 @@ export async function callMcpTool(
 
 	// Get a (possibly pooled) client. The client itself was connected with a signal
 	// that already composes outer cancellation. We still enforce a per-call timeout here.
-	const activeClient = client ?? (await getClient(server, signal));
+	let activeClient = client ?? (await getClient(server, signal));
 
-	// Prefer the SDK's built-in request controls (timeout, signal)
-	const response = await activeClient.callTool(
-		{ name: tool, arguments: normalizedArgs },
-		undefined,
-		{
-			signal,
-			timeout: timeoutMs,
-			// Enable progress tokens so long-running tools keep extending the timeout.
-			onprogress: () => {},
-			resetTimeoutOnProgress: true,
+	const callToolOptions = {
+		signal,
+		timeout: timeoutMs,
+		// Enable progress tokens so long-running tools keep extending the timeout.
+		onprogress: () => {},
+		resetTimeoutOnProgress: true,
+	};
+
+	let response;
+	try {
+		response = await activeClient.callTool(
+			{ name: tool, arguments: normalizedArgs },
+			undefined,
+			callToolOptions
+		);
+	} catch (err) {
+		if (!isConnectionClosedError(err)) {
+			throw err;
 		}
-	);
+
+		// Evict stale client and close it
+		const stale = evictFromPool(server);
+		stale?.close?.().catch(() => {});
+
+		// Retry with fresh client
+		activeClient = await getClient(server, signal);
+		response = await activeClient.callTool(
+			{ name: tool, arguments: normalizedArgs },
+			undefined,
+			callToolOptions
+		);
+	}
 
 	const parts = Array.isArray(response?.content) ? (response.content as Array<unknown>) : [];
 	const textParts = parts

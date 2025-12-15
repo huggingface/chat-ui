@@ -21,6 +21,7 @@ import { hasAuthHeader, isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server
 import { buildImageRefResolver } from "./fileRefs";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
 import { makeImageProcessor } from "$lib/server/endpoints/images";
+import { logger } from "$lib/server/logger";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -45,7 +46,7 @@ export async function* runMcpFlow({
 	// Start from env-configured servers
 	let servers = getMcpServers();
 	try {
-		console.debug(
+		logger.debug(
 			{ baseServers: servers.map((s) => ({ name: s.name, url: s.url })), count: servers.length },
 			"[mcp] base servers loaded"
 		);
@@ -74,7 +75,7 @@ export async function* runMcpFlow({
 			for (const s of custom) byName.set(s.name, s);
 			servers = [...byName.values()];
 			try {
-				console.debug(
+				logger.debug(
 					{
 						customProvidedCount: custom.length,
 						mergedServers: servers.map((s) => ({
@@ -96,7 +97,7 @@ export async function* runMcpFlow({
 			const before = servers.map((s) => s.name);
 			servers = servers.filter((s) => names.includes(s.name));
 			try {
-				console.debug(
+				logger.debug(
 					{ selectedNames: names, before, after: servers.map((s) => s.name) },
 					"[mcp] applied name selection"
 				);
@@ -108,7 +109,7 @@ export async function* runMcpFlow({
 
 	// If selection/merge yielded no servers, bail early with clearer log
 	if (servers.length === 0) {
-		console.warn("[mcp] no MCP servers selected after merge/name filter");
+		logger.warn({}, "[mcp] no MCP servers selected after merge/name filter");
 		return false;
 	}
 
@@ -125,7 +126,7 @@ export async function* runMcpFlow({
 		try {
 			const rejected = before.filter((b) => !servers.includes(b));
 			if (rejected.length > 0) {
-				console.warn(
+				logger.warn(
 					{ rejected: rejected.map((r) => ({ name: r.name, url: r.url })) },
 					"[mcp] rejected servers by URL safety"
 				);
@@ -133,7 +134,7 @@ export async function* runMcpFlow({
 		} catch {}
 	}
 	if (servers.length === 0) {
-		console.warn("[mcp] all selected MCP servers rejected by URL safety guard");
+		logger.warn({}, "[mcp] all selected MCP servers rejected by URL safety guard");
 		return false;
 	}
 
@@ -163,14 +164,14 @@ export async function* runMcpFlow({
 			});
 			if (overlayApplied.length > 0) {
 				try {
-					console.debug({ overlayApplied }, "[mcp] forwarded HF token to servers");
+					logger.debug({ overlayApplied }, "[mcp] forwarded HF token to servers");
 				} catch {}
 			}
 		}
 	} catch {
 		// best-effort overlay; continue if anything goes wrong
 	}
-	console.debug(
+	logger.debug(
 		{ count: servers.length, servers: servers.map((s) => s.name) },
 		"[mcp] servers configured"
 	);
@@ -182,7 +183,7 @@ export async function* runMcpFlow({
 	try {
 		const supportsTools = Boolean((model as unknown as { supportsTools?: boolean }).supportsTools);
 		const toolsEnabled = Boolean(forceTools) || supportsTools;
-		console.debug(
+		logger.debug(
 			{
 				model: model.id ?? model.name,
 				supportsTools,
@@ -192,7 +193,7 @@ export async function* runMcpFlow({
 			"[mcp] tools gate evaluation"
 		);
 		if (!toolsEnabled) {
-			console.info(
+			logger.info(
 				{ model: model.id ?? model.name },
 				"[mcp] tools disabled for model; skipping MCP flow"
 			);
@@ -226,7 +227,7 @@ export async function* runMcpFlow({
 	});
 
 	if (!runMcp) {
-		console.info(
+		logger.info(
 			{ model: targetModel.id ?? targetModel.name, resolvedRoute },
 			"[mcp] runMcp=false (routing chose non-tools candidate)"
 		);
@@ -235,13 +236,13 @@ export async function* runMcpFlow({
 
 	const { tools: oaTools, mapping } = await getOpenAiToolsForMcp(servers, { signal: abortSignal });
 	try {
-		console.info(
+		logger.info(
 			{ toolCount: oaTools.length, toolNames: oaTools.map((t) => t.function.name) },
 			"[mcp] openai tool defs built"
 		);
 	} catch {}
 	if (oaTools.length === 0) {
-		console.warn("[mcp] zero tools available after listing; skipping MCP flow");
+		logger.warn({}, "[mcp] zero tools available after listing; skipping MCP flow");
 		return false;
 	}
 
@@ -273,7 +274,7 @@ export async function* runMcpFlow({
 		});
 
 		const mmEnabled = (forceMultimodal ?? false) || targetModel.multimodal;
-		console.info(
+		logger.info(
 			{
 				targetModel: targetModel.id ?? targetModel.name,
 				mmEnabled,
@@ -390,7 +391,7 @@ export async function* runMcpFlow({
 				route: resolvedRoute,
 				model: candidateModelId,
 			};
-			console.debug(
+			logger.debug(
 				{ route: resolvedRoute, model: candidateModelId },
 				"[mcp] router metadata emitted"
 			);
@@ -425,7 +426,7 @@ export async function* runMcpFlow({
 					model: "",
 					provider: providerHeader as unknown as import("@huggingface/inference").InferenceProvider,
 				};
-				console.debug({ provider: providerHeader }, "[mcp] provider metadata emitted");
+				logger.debug({ provider: providerHeader }, "[mcp] provider metadata emitted");
 			}
 
 			const toolCallState: Record<number, { id?: string; name?: string; arguments: string }> = {};
@@ -461,7 +462,7 @@ export async function* runMcpFlow({
 										.map((k) => Number(k))
 										.sort((a, b) => a - b)[0] ?? 0
 								];
-							console.info(
+							logger.info(
 								{ firstCallName: first?.name, hasId: Boolean(first?.id) },
 								"[mcp] observed streamed tool_call delta"
 							);
@@ -526,7 +527,7 @@ export async function* runMcpFlow({
 					}
 				}
 			}
-			console.info(
+			logger.info(
 				{ sawToolCalls: Object.keys(toolCallState).length > 0, tokens: tokenCount, loop },
 				"[mcp] completion stream closed"
 			);
@@ -536,7 +537,7 @@ export async function* runMcpFlow({
 				const missingId = Object.values(toolCallState).some((c) => c?.name && !c?.id);
 				let calls: NormalizedToolCall[];
 				if (missingId) {
-					console.debug(
+					logger.debug(
 						{ loop },
 						"[mcp] missing tool_call id in stream; retrying non-stream to recover ids"
 					);
@@ -611,7 +612,7 @@ export async function* runMcpFlow({
 						];
 						toolMsgCount = event.summary.toolMessages?.length ?? 0;
 						toolRunCount = event.summary.toolRuns?.length ?? 0;
-						console.info(
+						logger.info(
 							{ toolMsgCount, toolRunCount },
 							"[mcp] tools executed; continuing loop for follow-up completion"
 						);
@@ -635,13 +636,13 @@ export async function* runMcpFlow({
 				text: lastAssistantContent,
 				interrupted: false,
 			};
-			console.info(
+			logger.info(
 				{ length: lastAssistantContent.length, loop },
 				"[mcp] final answer emitted (no tool_calls)"
 			);
 			return true;
 		}
-		console.warn("[mcp] exceeded tool-followup loops; falling back");
+		logger.warn({}, "[mcp] exceeded tool-followup loops; falling back");
 	} catch (err) {
 		const msg = String(err ?? "");
 		const isAbort =
@@ -651,10 +652,10 @@ export async function* runMcpFlow({
 			msg.includes("Request was aborted");
 		if (isAbort) {
 			// Expected on user stop; keep logs quiet and do not treat as error
-			console.debug("[mcp] aborted by user");
+			logger.debug({}, "[mcp] aborted by user");
 			return false;
 		}
-		console.warn({ err: msg }, "[mcp] flow failed, falling back to default endpoint");
+		logger.warn({ err: msg }, "[mcp] flow failed, falling back to default endpoint");
 	} finally {
 		// ensure MCP clients are closed after the turn
 		await drainPool();

@@ -59,3 +59,12 @@ export async function drainPool() {
 		pool.delete(key);
 	}
 }
+
+export function evictFromPool(server: McpServerConfig): Client | undefined {
+	const key = keyOf(server);
+	const client = pool.get(key);
+	if (client) {
+		pool.delete(key);
+	}
+	return client;
+}

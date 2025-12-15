@@ -128,6 +128,8 @@
 		| { type: "text"; content: string }
 		| { type: "tool"; uuid: string; updates: MessageToolUpdate[] };
 
+	type ToolBlock = Extract<Block, { type: "tool" }>;
+
 	let blocks = $derived.by(() => {
 		const updates = message.updates ?? [];
 		const res: Block[] = [];
@@ -155,9 +157,11 @@
 				if (last?.type === "text") last.content += chunk;
 				else res.push({ type: "text" as const, content: chunk });
 			} else if (isMessageToolUpdate(update)) {
-				const last = res.at(-1);
-				if (last?.type === "tool" && last.uuid === update.uuid) {
-					last.updates.push(update);
+				const existingBlock = res.find(
+					(b): b is ToolBlock => b.type === "tool" && b.uuid === update.uuid
+				);
+				if (existingBlock) {
+					existingBlock.updates.push(update);
 				} else {
 					res.push({ type: "tool" as const, uuid: update.uuid, updates: [update] });
 				}
