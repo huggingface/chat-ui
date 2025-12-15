@@ -15,6 +15,7 @@
 	import { onMount, tick } from "svelte";
 	import { loading } from "$lib/stores/loading.js";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
+	import { requireAuthUser } from "$lib/utils/auth";
 
 	let { data } = $props();
 
@@ -52,7 +53,16 @@
 			});
 
 			if (!res.ok) {
-				const errorMessage = (await res.json()).message || ERROR_MESSAGES.default;
+				let errorMessage = ERROR_MESSAGES.default;
+				try {
+					const json = await res.json();
+					errorMessage = json.message || errorMessage;
+				} catch {
+					// Response wasn't JSON (e.g., HTML error page)
+					if (res.status === 401) {
+						errorMessage = "Authentication required";
+					}
+				}
 				error.set(errorMessage);
 				console.error("Error while creating conversation: ", errorMessage);
 				return;
@@ -78,8 +88,17 @@
 
 	onMount(async () => {
 		try {
+			// Check if auth is required before processing any query params
+			const hasQ = page.url.searchParams.has("q");
+			const hasPrompt = page.url.searchParams.has("prompt");
+			const hasAttachments = page.url.searchParams.has("attachments");
+
+			if ((hasQ || hasPrompt || hasAttachments) && requireAuthUser()) {
+				return; // Redirecting to login, will return to this URL after
+			}
+
 			// Handle attachments parameter first
-			if (page.url.searchParams.has("attachments")) {
+			if (hasAttachments) {
 				const result = await loadAttachmentsFromUrls(page.url.searchParams);
 				files = result.files;
 
