@@ -17,6 +17,7 @@ if (dev) {
 
 export const logger = pino({
 	...options,
+	messageKey: "message",
 	level: config.LOG_LEVEL || "info",
 	formatters: {
 		level: (label) => {
