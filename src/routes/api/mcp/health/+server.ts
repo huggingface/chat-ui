@@ -3,6 +3,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { KeyValuePair } from "$lib/types/Tool";
 import { config } from "$lib/server/config";
+import { logger } from "$lib/server/logger";
 import type { RequestHandler } from "./$types";
 import { isValidUrl } from "$lib/server/urlSafety";
 import { isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
@@ -88,16 +89,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		// Try Streamable HTTP transport first
 		try {
-			console.log(`[MCP Health] Trying HTTP transport for ${url}`);
+			logger.info(`[MCP Health] Trying HTTP transport for ${url}`);
 			client = new Client({
 				name: "chat-ui-health-check",
 				version: "1.0.0",
 			});
 
 			const transport = new StreamableHTTPClientTransport(baseUrl, { requestInit });
-			console.log(`[MCP Health] Connecting to ${url}...`);
+			logger.info(`[MCP Health] Connecting to ${url}...`);
 			await client.connect(transport);
-			console.log(`[MCP Health] Connected successfully via HTTP`);
+			logger.info(`[MCP Health] Connected successfully via HTTP`);
 
 			// Connection successful, get tools
 			const toolsResponse = await client.listTools();
@@ -140,7 +141,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		} catch (error) {
 			httpError = error instanceof Error ? error : new Error(String(error));
 			lastError = httpError;
-			console.log("Streamable HTTP failed, trying SSE transport...", lastError.message);
+			logger.info("Streamable HTTP failed, trying SSE transport...", lastError.message);
 
 			// Close failed client
 			try {
@@ -151,16 +152,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 			// Try SSE transport
 			try {
-				console.log(`[MCP Health] Trying SSE transport for ${url}`);
+				logger.info(`[MCP Health] Trying SSE transport for ${url}`);
 				client = new Client({
 					name: "chat-ui-health-check",
 					version: "1.0.0",
 				});
 
 				const sseTransport = new SSEClientTransport(baseUrl, { requestInit });
-				console.log(`[MCP Health] Connecting via SSE...`);
+				logger.info(`[MCP Health] Connecting via SSE...`);
 				await client.connect(sseTransport);
-				console.log(`[MCP Health] Connected successfully via SSE`);
+				logger.info(`[MCP Health] Connected successfully via SSE`);
 
 				// Connection successful, get tools
 				const toolsResponse = await client.listTools();
@@ -210,7 +211,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						{ cause: sseError instanceof Error ? sseError : undefined }
 					);
 				}
-				console.error("Both transports failed. Last error:", lastError);
+				logger.error("Both transports failed. Last error:", lastError);
 			}
 		}
 
@@ -252,7 +253,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		clearTimeout(timeoutId);
 		return res;
 	} catch (error) {
-		console.error("MCP health check failed:", error);
+		logger.error("MCP health check failed:", error);
 
 		// Clean up client if it exists
 		try {
