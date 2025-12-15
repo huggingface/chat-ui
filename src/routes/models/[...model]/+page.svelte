@@ -12,6 +12,7 @@
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { sanitizeUrlParam } from "$lib/utils/urlParams";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
+	import { requireAuthUser } from "$lib/utils/auth";
 
 	let { data } = $props();
 
@@ -64,8 +65,17 @@
 
 	onMount(async () => {
 		try {
+			// Check if auth is required before processing any query params
+			const hasQ = page.url.searchParams.has("q");
+			const hasPrompt = page.url.searchParams.has("prompt");
+			const hasAttachments = page.url.searchParams.has("attachments");
+
+			if ((hasQ || hasPrompt || hasAttachments) && requireAuthUser()) {
+				return; // Redirecting to login, will return to this URL after
+			}
+
 			// Handle attachments parameter first
-			if (page.url.searchParams.has("attachments")) {
+			if (hasAttachments) {
 				const result = await loadAttachmentsFromUrls(page.url.searchParams);
 				files = result.files;
 
