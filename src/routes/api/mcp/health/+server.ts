@@ -89,16 +89,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		// Try Streamable HTTP transport first
 		try {
-			logger.info(`[MCP Health] Trying HTTP transport for ${url}`);
+			logger.info({}, `[MCP Health] Trying HTTP transport for ${url}`);
 			client = new Client({
 				name: "chat-ui-health-check",
 				version: "1.0.0",
 			});
 
 			const transport = new StreamableHTTPClientTransport(baseUrl, { requestInit });
-			logger.info(`[MCP Health] Connecting to ${url}...`);
+			logger.info({}, `[MCP Health] Connecting to ${url}...`);
 			await client.connect(transport);
-			logger.info(`[MCP Health] Connected successfully via HTTP`);
+			logger.info({}, `[MCP Health] Connected successfully via HTTP`);
 
 			// Connection successful, get tools
 			const toolsResponse = await client.listTools();
@@ -141,7 +141,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		} catch (error) {
 			httpError = error instanceof Error ? error : new Error(String(error));
 			lastError = httpError;
-			logger.info("Streamable HTTP failed, trying SSE transport...", lastError.message);
+			logger.warn(lastError.message, "Streamable HTTP failed, trying SSE transport...");
 
 			// Close failed client
 			try {
@@ -152,16 +152,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 			// Try SSE transport
 			try {
-				logger.info(`[MCP Health] Trying SSE transport for ${url}`);
+				logger.info({}, `[MCP Health] Trying SSE transport for ${url}`);
 				client = new Client({
 					name: "chat-ui-health-check",
 					version: "1.0.0",
 				});
 
 				const sseTransport = new SSEClientTransport(baseUrl, { requestInit });
-				logger.info(`[MCP Health] Connecting via SSE...`);
+				logger.info({}, `[MCP Health] Connecting via SSE...`);
 				await client.connect(sseTransport);
-				logger.info(`[MCP Health] Connected successfully via SSE`);
+				logger.info({}, `[MCP Health] Connected successfully via SSE`);
 
 				// Connection successful, get tools
 				const toolsResponse = await client.listTools();
@@ -211,7 +211,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						{ cause: sseError instanceof Error ? sseError : undefined }
 					);
 				}
-				logger.error("Both transports failed. Last error:", lastError);
+				logger.error(lastError, "Both transports failed.");
 			}
 		}
 
@@ -253,7 +253,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		clearTimeout(timeoutId);
 		return res;
 	} catch (error) {
-		logger.error("MCP health check failed:", error);
+		logger.error(error, "MCP health check failed");
 
 		// Clean up client if it exists
 		try {
