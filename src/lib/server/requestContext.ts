@@ -3,6 +3,9 @@ import { randomUUID } from "node:crypto";
 
 export interface RequestContext {
 	requestId: string;
+	url?: string;
+	ip?: string;
+	user?: string;
 }
 
 const asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
@@ -11,11 +14,28 @@ const asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
  * Run a function within a request context.
  * All logs within this context will automatically include the requestId.
  */
-export function runWithRequestContext<T>(fn: () => T, requestId?: string): T {
-	const context: RequestContext = {
-		requestId: requestId ?? randomUUID(),
+export function runWithRequestContext<T>(
+	fn: () => T,
+	context: Partial<RequestContext> & { requestId?: string } = {}
+): T {
+	const fullContext: RequestContext = {
+		requestId: context.requestId ?? randomUUID(),
+		url: context.url,
+		ip: context.ip,
+		user: context.user,
 	};
-	return asyncLocalStorage.run(context, fn);
+	return asyncLocalStorage.run(fullContext, fn);
+}
+
+/**
+ * Update the current request context with additional information.
+ * Useful for adding user information after authentication.
+ */
+export function updateRequestContext(updates: Partial<Omit<RequestContext, "requestId">>): void {
+	const store = asyncLocalStorage.getStore();
+	if (store) {
+		Object.assign(store, updates);
+	}
 }
 
 /**
