@@ -34,6 +34,7 @@ const baseLogger = pino({
 		if (ctx.url) result.url = ctx.url;
 		if (ctx.ip) result.ip = ctx.ip;
 		if (ctx.user) result.user = ctx.user;
+		if (ctx.statusCode) result.statusCode = String(ctx.statusCode);
 		return result;
 	},
 });

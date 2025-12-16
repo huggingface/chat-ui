@@ -6,6 +6,7 @@ export interface RequestContext {
 	url?: string;
 	ip?: string;
 	user?: string;
+	statusCode?: number;
 }
 
 const asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
@@ -23,6 +24,7 @@ export function runWithRequestContext<T>(
 		url: context.url,
 		ip: context.ip,
 		user: context.user,
+		statusCode: context.statusCode,
 	};
 	return asyncLocalStorage.run(fullContext, fn);
 }

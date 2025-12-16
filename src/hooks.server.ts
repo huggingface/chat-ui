@@ -281,6 +281,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 				},
 			});
 
+			// Update request context with status code
+			updateRequestContext({ statusCode: response.status });
+
 			// Add CSP header to disallow framing if ALLOW_IFRAME is not "true"
 			if (config.ALLOW_IFRAME !== "true") {
 				response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
@@ -319,6 +322,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 					response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 				}
 			}
+
+			logger.info("Request completed");
+
 			return response;
 		},
 		{ requestId, url: event.url.pathname, ip: getClientAddressSafe(event) }
