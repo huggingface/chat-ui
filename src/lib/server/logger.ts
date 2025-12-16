@@ -29,12 +29,12 @@ const baseLogger = pino({
 		const ctx = getRequestContext();
 		if (!ctx) return {};
 
-		const result: Record<string, string> = {};
-		if (ctx.requestId) result.requestId = ctx.requestId;
+		const result: Record<string, string | number> = {};
+		if (ctx.requestId) result.request_id = ctx.requestId;
 		if (ctx.url) result.url = ctx.url;
 		if (ctx.ip) result.ip = ctx.ip;
 		if (ctx.user) result.user = ctx.user;
-		if (ctx.statusCode) result.statusCode = String(ctx.statusCode);
+		if (ctx.statusCode) result.status_code = ctx.statusCode;
 		return result;
 	},
 });
