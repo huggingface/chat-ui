@@ -1,6 +1,7 @@
 import pino from "pino";
 import { dev } from "$app/environment";
 import { config } from "$lib/server/config";
+import { getRequestId } from "$lib/server/requestContext";
 
 let options: pino.LoggerOptions = {};
 
@@ -15,7 +16,7 @@ if (dev) {
 	};
 }
 
-export const logger = pino({
+const baseLogger = pino({
 	...options,
 	messageKey: "message",
 	level: config.LOG_LEVEL || "info",
@@ -24,4 +25,10 @@ export const logger = pino({
 			return { level: label };
 		},
 	},
+	mixin() {
+		const requestId = getRequestId();
+		return requestId ? { requestId } : {};
+	},
 });
+
+export const logger = baseLogger;
