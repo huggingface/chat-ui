@@ -1,5 +1,11 @@
 import { config, ready } from "$lib/server/config";
-import type { Handle, HandleServerError, ServerInit, HandleFetch } from "@sveltejs/kit";
+import type {
+	Handle,
+	HandleServerError,
+	ServerInit,
+	HandleFetch,
+	RequestEvent,
+} from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import {
@@ -21,6 +27,14 @@ import { isHostLocalhost } from "$lib/server/isURLLocal";
 import { MetricsServer } from "$lib/server/metrics";
 import { loadMcpServersOnStartup } from "$lib/server/mcp/registry";
 import { runWithRequestContext, updateRequestContext } from "$lib/server/requestContext";
+
+function getClientAddressSafe(event: RequestEvent): string | undefined {
+	try {
+		return event.getClientAddress();
+	} catch {
+		return undefined;
+	}
+}
 
 export const init: ServerInit = async () => {
 	// Wait for config to be fully loaded
@@ -304,7 +318,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 			return response;
 		},
-		{ requestId, url: event.url.pathname, ip: event.getClientAddress() }
+		{ requestId, url: event.url.pathname, ip: getClientAddressSafe(event) }
 	);
 };
 
