@@ -153,7 +153,7 @@ export async function findUser(
 
 					session.oauth = updatedOAuth;
 				} catch (err) {
-					logger.error("Error during token refresh:", err);
+					logger.error(err, "Error during token refresh:");
 					return { user: null, invalidateSession: true };
 				} finally {
 					await releaseLock(lockKey, lockId);
@@ -374,7 +374,7 @@ export async function validateAndParseCsrfToken(
 			return { redirectUrl: data.redirectUrl, next: sanitizeReturnPath(data.next) };
 		}
 	} catch (e) {
-		logger.error(e);
+		logger.error(e, "Error validating and parsing CSRF token");
 	}
 	return null;
 }

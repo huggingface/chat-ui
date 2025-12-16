@@ -23,7 +23,7 @@ export async function* generateTitleForConversation(
 			title,
 		};
 	} catch (cause) {
-		logger.error(Error("Failed whilte generating title for conversation", { cause }));
+		logger.error(cause, "Failed while generating title for conversation");
 	}
 }
 
@@ -74,7 +74,7 @@ Return only the title text.`,
 			return trimmed || firstFive;
 		})
 		.catch((e) => {
-			logger.error(e);
+			logger.error(e, "Error generating title");
 			const firstFive = prompt.split(/\s+/g).slice(0, 5).join(" ");
 			return firstFive;
 		});

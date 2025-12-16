@@ -602,7 +602,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						message: err.message,
 						...(statusCode && { statusCode }),
 					});
-					logger.error(err);
+					logger.error(err, "Error in conversation stream");
 				}
 			} finally {
 				// check if no output was generated

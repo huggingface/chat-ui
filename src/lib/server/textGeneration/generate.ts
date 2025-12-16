@@ -125,7 +125,7 @@ export async function* generate(
 					};
 				} catch (e) {
 					finalAnswer = text;
-					logger.error(e);
+					logger.error(e, "Error generating summary of reasoning");
 				}
 			} else if (modelReasoning && modelReasoning.type === "tokens") {
 				// Remove the reasoning segment from final answer to avoid duplication
@@ -216,7 +216,7 @@ export async function* generate(
 						status = summary;
 					});
 				} catch (e) {
-					logger.error(e);
+					logger.error(e, "Error generating summary of reasoning");
 				}
 			}
 
