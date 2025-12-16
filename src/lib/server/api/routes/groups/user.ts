@@ -197,7 +197,7 @@ export const userGroup = new Elysia()
 						currentBillingOrg: isCurrentOrgValid ? currentBillingOrg : undefined,
 					};
 				} catch (err) {
-					logger.error("Error fetching billing orgs:", err);
+					logger.error(err, "Error fetching billing orgs:");
 					set.status = 500;
 					return { error: "Internal server error" };
 				}

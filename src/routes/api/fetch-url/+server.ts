@@ -40,7 +40,7 @@ export async function GET({ url }) {
 		}).finally(() => clearTimeout(timeoutId));
 
 		if (!response.ok) {
-			logger.error({ targetUrl, response }, `Error fetching URL. Response not ok.`);
+			logger.error({ targetUrl, response }, "Error fetching URL. Response not ok.");
 			throw error(response.status, `Failed to fetch: ${response.statusText}`);
 		}
 
@@ -75,14 +75,14 @@ export async function GET({ url }) {
 	} catch (err) {
 		if (err instanceof Error) {
 			if (err.name === "AbortError") {
-				logger.error(err, `Request timeout`);
+				logger.error(err, "Request timeout");
 				throw error(504, "Request timeout");
 			}
 
-			logger.error(err, `Error fetching URL`);
+			logger.error(err, "Error fetching URL");
 			throw error(500, `Failed to fetch URL: ${err.message}`);
 		}
-		logger.error(err, `Error fetching URL`);
+		logger.error(err, "Error fetching URL");
 		throw error(500, "Failed to fetch URL.");
 	}
 }

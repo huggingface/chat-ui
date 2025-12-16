@@ -36,7 +36,7 @@ export class AbortedGenerations {
 				aborts.map((abort) => [abort.conversationId.toString(), abort.createdAt])
 			);
 		} catch (err) {
-			logger.error(err);
+			logger.error(err, "Error updating aborted generations list");
 		}
 	}
 }

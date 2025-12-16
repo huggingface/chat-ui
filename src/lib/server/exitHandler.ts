@@ -38,7 +38,7 @@ export function initExitHandler() {
 			process.kill(process.pid, "SIGKILL");
 		} else {
 			exitHandler().catch((err) => {
-				logger.error("Exit handler error:", err);
+				logger.error(err, "Error in exit handler on SIGINT:");
 				process.kill(process.pid, "SIGKILL");
 			});
 		}
@@ -51,7 +51,7 @@ export function initExitHandler() {
 			process.kill(process.pid, "SIGKILL");
 		} else {
 			exitHandler().catch((err) => {
-				logger.error("Exit handler error:", err);
+				logger.error(err, "Error in exit handler on SIGTERM:");
 				process.kill(process.pid, "SIGKILL");
 			});
 		}

@@ -19,12 +19,14 @@ async function shouldComputeStats(): Promise<boolean> {
 export async function computeAllStats() {
 	for (const span of ["day", "week", "month"] as const) {
 		computeStats({ dateField: "updatedAt", type: "conversation", span }).catch((e) =>
-			logger.error(e)
+			logger.error(e, "Error computing conversation stats for updatedAt")
 		);
 		computeStats({ dateField: "createdAt", type: "conversation", span }).catch((e) =>
-			logger.error(e)
+			logger.error(e, "Error computing conversation stats for createdAt")
 		);
-		computeStats({ dateField: "createdAt", type: "message", span }).catch((e) => logger.error(e));
+		computeStats({ dateField: "createdAt", type: "message", span }).catch((e) =>
+			logger.error(e, "Error computing message stats for createdAt")
+		);
 	}
 }
 

@@ -92,8 +92,7 @@ export async function checkAndRunMigrations() {
 					result = await migration.up(await Database.getInstance());
 				});
 			} catch (e) {
-				logger.debug(`[MIGRATIONS]  "${migration.name}" failed!`);
-				logger.error(e);
+				logger.error(e, `[MIGRATIONS]  "${migration.name}" failed!`);
 			} finally {
 				await session.endSession();
 			}
