@@ -126,6 +126,7 @@
 			>
 				<input
 					class="w-full truncate bg-transparent text-[15px] text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500 max-sm:text-sm"
+					aria-label="Public share link"
 					readonly
 					value={createdUrl ??
 						`${page.data.publicConfig.PUBLIC_SHARE_PREFIX || `${page.data.publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}`}/r/...`}

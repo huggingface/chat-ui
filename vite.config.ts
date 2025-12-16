@@ -36,7 +36,8 @@ export default defineConfig({
 		allowedHosts: ["xpartners.ommax-intelligence.de"],
 	},
 	optimizeDeps: {
-		include: ["uuid", "sharp", "clsx"],
+		include: ["uuid", "clsx"],
+		exclude: ["sharp"],
 	},
 	test: {
 		workspace: [
