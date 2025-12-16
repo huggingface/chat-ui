@@ -33,9 +33,13 @@ export default defineConfig({
 		// Allow any ngrok-free.app subdomain (dynamic tunnels)
 		// See Vite server.allowedHosts: string[] | true
 		// Using leading dot matches subdomains per Vite's host check logic
-		allowedHosts: process.env.VITE_ALLOWED_HOSTS
-			? process.env.VITE_ALLOWED_HOSTS.split(",").map((h) => h.trim())
-			: undefined,
+		allowedHosts: (() => {
+			const hosts = process.env.VITE_ALLOWED_HOSTS
+				? process.env.VITE_ALLOWED_HOSTS.split(",").map((h) => h.trim())
+				: undefined;
+			console.log("[vite.config] allowedHosts:", hosts);
+			return hosts;
+		})(),
 	},
 	optimizeDeps: {
 		include: ["uuid", "clsx"],
