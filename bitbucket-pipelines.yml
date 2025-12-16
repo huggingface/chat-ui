@@ -46,6 +46,7 @@ pipelines:
               PUBLIC_APP_ASSETS=$PUBLIC_APP_ASSETS
               PUBLIC_APP_DESCRIPTION=$PUBLIC_APP_DESCRIPTION
               PUBLIC_ORIGIN=$PUBLIC_ORIGIN
+              VITE_ALLOWED_HOSTS=$VITE_ALLOWED_HOSTS
               EOF
 
             # Build
