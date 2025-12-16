@@ -125,12 +125,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 				config.checkForUpdates();
 			});
 
-			logger.debug({
-				locals: event.locals,
-				url: event.url.pathname,
-				params: event.params,
-				request: event.request,
-			});
+			logger.debug(
+				{
+					locals: event.locals,
+					url: event.url.pathname,
+					params: event.params,
+					request: event.request,
+				},
+				"Request received"
+			);
 
 			function errorResponse(status: number, message: string) {
 				const sendJson =
