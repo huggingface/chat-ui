@@ -1,13 +1,13 @@
 /**
  * Generates a Google favicon URL for the given server URL
- * @param serverUrl - The MCP server URL (e.g., "https://mcp.exa.ai/mcp")
+ * @param serverUrl - The MCP server URL (e.g., "https://search-mcp.parallel.ai/mcp")
  * @param size - The size of the favicon in pixels (default: 64)
  * @returns The Google favicon service URL
  */
 export function getMcpServerFaviconUrl(serverUrl: string, size: number = 64): string {
 	try {
 		const parsed = new URL(serverUrl);
-		// Extract root domain (e.g., "exa.ai" from "mcp.exa.ai")
+		// Extract root domain (e.g., "parallel.ai" from "search-mcp.parallel.ai")
 		// Google's favicon service needs the root domain, not subdomains
 		const hostnameParts = parsed.hostname.split(".");
 		const rootDomain =

@@ -12,7 +12,7 @@ Base servers are configured by the administrator via environment variables. They
 
 ```ini
 MCP_SERVERS=[
-  {"name": "Web Search (Exa)", "url": "https://mcp.exa.ai/mcp"},
+  {"name": "Web Search", "url": "https://search-mcp.parallel.ai/mcp"},
   {"name": "Hugging Face", "url": "https://hf.co/mcp"}
 ]
 ```

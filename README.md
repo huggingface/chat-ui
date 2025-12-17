@@ -154,7 +154,7 @@ Configure servers (base list for all users):
 ```env
 # JSON array of servers: name, url, optional headers
 MCP_SERVERS=[
-  {"name": "Web Search (Exa)", "url": "https://mcp.exa.ai/mcp"},
+  {"name": "Web Search", "url": "https://search-mcp.parallel.ai/mcp"},
   {"name": "Hugging Face MCP Login", "url": "https://hf.co/mcp?login"}
 ]
 

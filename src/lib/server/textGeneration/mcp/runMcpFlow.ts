@@ -21,7 +21,7 @@ import {
 	hasAuthHeader,
 	isStrictHfMcpLogin,
 	hasNonEmptyToken,
-	isExaMcpServer,
+	isParallelMcpServer,
 } from "$lib/server/mcp/hf";
 import { buildImageRefResolver } from "./fileRefs";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
@@ -177,19 +177,17 @@ export async function* runMcpFlow({
 		// best-effort overlay; continue if anything goes wrong
 	}
 
-	// Inject Exa API key for mcp.exa.ai servers
+	// Inject Parallel API key as Authorization header for search-mcp.parallel.ai servers
 	try {
-		const exaApiKey = config.EXA_API_KEY;
-		if (hasNonEmptyToken(exaApiKey)) {
+		const parallelApiKey = config.PARALLEL_API_KEY;
+		if (hasNonEmptyToken(parallelApiKey)) {
 			servers = servers.map((s) => {
 				try {
-					if (isExaMcpServer(s.url)) {
-						const url = new URL(s.url);
-						if (!url.searchParams.has("exaApiKey")) {
-							url.searchParams.set("exaApiKey", exaApiKey);
-							console.log(url.toString());
-							return { ...s, url: url.toString() };
-						}
+					if (isParallelMcpServer(s.url) && !hasAuthHeader(s.headers)) {
+						return {
+							...s,
+							headers: { ...(s.headers ?? {}), Authorization: `Bearer ${parallelApiKey}` },
+						};
 					}
 				} catch {}
 				return s;
