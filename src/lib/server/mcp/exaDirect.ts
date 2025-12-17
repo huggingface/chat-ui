@@ -31,10 +31,17 @@ export function isExaServer(server: McpServerConfig): boolean {
 }
 
 /**
- * Extract Exa API key from server URL or config
+ * Extract Exa API key from server headers, URL, or config
+ * Priority: headers["x-api-key"] > URL param > EXA_API_KEY env var
  */
 export function getExaApiKey(server: McpServerConfig): string | undefined {
-	// First check URL params (e.g., ?exaApiKey=xxx)
+	// First check headers (preferred - avoids key in URL logs)
+	const headerKey = server.headers?.["x-api-key"];
+	if (headerKey && headerKey.trim().length > 0) {
+		return headerKey;
+	}
+
+	// Check URL params (e.g., ?exaApiKey=xxx) - discouraged but supported
 	try {
 		const url = new URL(server.url);
 		const urlKey = url.searchParams.get("exaApiKey");
@@ -195,11 +202,10 @@ export async function callExaDirectApi(
 
 	// Combine with external signal if provided
 	if (options?.signal) {
-		options.signal.addEventListener("abort", () => controller.abort());
+		options.signal.addEventListener("abort", () => controller.abort(), { once: true });
 	}
 
 	const startTime = Date.now();
-	console.log(`[EXA DIRECT] Calling /search for "${query}" (${tool})`);
 
 	try {
 		const response = await fetch(`${EXA_API_BASE}/search`, {
