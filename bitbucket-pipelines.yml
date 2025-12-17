@@ -30,11 +30,11 @@ pipelines:
 
             # Write .env.prod with repository variables
             - |
-              cat > .env.prod << 'EOF'
+              cat > .env.prod << EOF
               OPENAI_BASE_URL=$OPENAI_BASE_URL
               OPENAI_API_KEY=$OPENAI_API_KEY
               AUTOMATIC_LOGIN=$AUTOMATIC_LOGIN
-              OPENID_CONFIG=`$OPENID_CONFIG`
+              OPENID_CONFIG=$OPENID_CONFIG
               USE_USER_TOKEN=$USE_USER_TOKEN
               APP_BASE=$APP_BASE
               ALLOW_IFRAME=$ALLOW_IFRAME
