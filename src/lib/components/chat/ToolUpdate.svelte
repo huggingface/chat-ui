@@ -230,7 +230,8 @@
 										{/if}
 
 										{#if parsedOutput.metadata.length > 0}
-											<pre class="whitespace-pre-wrap break-all font-mono text-xs">{formatValue(
+											<pre
+												class="scrollbar-custom max-h-60 overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs">{formatValue(
 													Object.fromEntries(parsedOutput.metadata)
 												)}</pre>
 										{/if}
