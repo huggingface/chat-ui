@@ -333,6 +333,13 @@
 					update.type === MessageUpdateType.Status &&
 					update.status === MessageUpdateStatus.Error
 				) {
+					// Check if this is a 401 unauthorized error - trigger re-login
+					if (update.statusCode === 401) {
+						// POST to logout to clear session, then redirect to login
+						await fetch(`${base}/logout`, { method: "POST" }).catch(() => {});
+						window.location.href = `${base}/login`;
+						return;
+					}
 					// Check if this is a 402 payment required error
 					if (update.statusCode === 402) {
 						showSubscribeModal = true;
@@ -367,6 +374,11 @@
 				$error = "Too much traffic, please try again.";
 			} else if (err instanceof Error && err.message.includes("429")) {
 				$error = ERROR_MESSAGES.rateLimited;
+			} else if (err instanceof Error && err.message.includes("401")) {
+				// 401 unauthorized - clear session and redirect to login
+				await fetch(`${base}/logout`, { method: "POST" }).catch(() => {});
+				window.location.href = `${base}/login`;
+				return;
 			} else if (err instanceof Error) {
 				$error = err.message;
 			} else {
