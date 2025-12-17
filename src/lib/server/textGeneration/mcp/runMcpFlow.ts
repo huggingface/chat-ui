@@ -17,7 +17,12 @@ import { resolveRouterTarget } from "./routerResolution";
 import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
 import { drainPool } from "$lib/server/mcp/clientPool";
 import type { TextGenerationContext } from "../types";
-import { hasAuthHeader, isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
+import {
+	hasAuthHeader,
+	isStrictHfMcpLogin,
+	hasNonEmptyToken,
+	isParallelMcpServer,
+} from "$lib/server/mcp/hf";
 import { buildImageRefResolver } from "./fileRefs";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
 import { makeImageProcessor } from "$lib/server/endpoints/images";
@@ -171,6 +176,27 @@ export async function* runMcpFlow({
 	} catch {
 		// best-effort overlay; continue if anything goes wrong
 	}
+
+	// Inject Parallel API key as Authorization header for search-mcp.parallel.ai servers
+	try {
+		const parallelApiKey = config.PARALLEL_API_KEY;
+		if (hasNonEmptyToken(parallelApiKey)) {
+			servers = servers.map((s) => {
+				try {
+					if (isParallelMcpServer(s.url) && !hasAuthHeader(s.headers)) {
+						return {
+							...s,
+							headers: { ...(s.headers ?? {}), Authorization: `Bearer ${parallelApiKey}` },
+						};
+					}
+				} catch {}
+				return s;
+			});
+		}
+	} catch {
+		// best-effort injection; continue if anything goes wrong
+	}
+
 	logger.debug(
 		{ count: servers.length, servers: servers.map((s) => s.name) },
 		"[mcp] servers configured"

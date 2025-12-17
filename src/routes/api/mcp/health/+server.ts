@@ -6,7 +6,11 @@ import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import type { RequestHandler } from "./$types";
 import { isValidUrl } from "$lib/server/urlSafety";
-import { isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
+import {
+	isStrictHfMcpLogin,
+	hasNonEmptyToken,
+	isParallelMcpServer,
+} from "$lib/server/mcp/hf";
 
 interface HealthCheckRequest {
 	url: string;
@@ -73,6 +77,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 		} catch {
 			// best-effort overlay
+		}
+
+		// Inject Parallel API key for search-mcp.parallel.ai
+		try {
+			const parallelApiKey = config.PARALLEL_API_KEY;
+			const hasAuth = typeof headersRecord["Authorization"] === "string";
+			if (!hasAuth && isParallelMcpServer(url) && hasNonEmptyToken(parallelApiKey)) {
+				headersRecord["Authorization"] = `Bearer ${parallelApiKey}`;
+			}
+		} catch {
+			// best-effort injection
 		}
 
 		// Add an abort timeout to outbound requests (align with fetch-url: 30s)

@@ -1,5 +1,5 @@
-# Chat UI 
- 
+# Chat UI
+
 ![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/chat-ui-2026.png)
 
 A chat interface for LLMs. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
@@ -154,7 +154,7 @@ Configure servers (base list for all users):
 ```env
 # JSON array of servers: name, url, optional headers
 MCP_SERVERS=[
-  {"name": "Web Search (Exa)", "url": "https://mcp.exa.ai/mcp"},
+  {"name": "Web Search", "url": "https://search-mcp.parallel.ai/mcp"},
   {"name": "Hugging Face MCP Login", "url": "https://hf.co/mcp?login"}
 ]
 
