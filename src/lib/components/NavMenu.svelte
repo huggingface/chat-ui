@@ -129,43 +129,49 @@
 
 <div
 	class="sticky top-0 flex flex-none touch-none items-center justify-between px-1.5 py-0"
-
+	class:py-3.5={publicConfig.PUBLIC_SHOW_NAV_LOGO === "true"}
+	style={publicConfig.PUBLIC_SHOW_NAV_LOGO === "true" ? "padding-top: 0.875rem;" : ""}
 >
+	{#if publicConfig.PUBLIC_SHOW_NAV_LOGO === "true"}
+		<a
+			class="flex select-none items-center rounded-xl text-lg font-semibold"
+			href="{publicConfig.PUBLIC_ORIGIN}{base}/"
+		>
+			<Logo classNames="dark:invert mr-[2px]" variant="nav" />
+			{publicConfig.PUBLIC_APP_NAV_NAME || publicConfig.PUBLIC_APP_NAME}
+		</a>
+	{:else}
+		<span></span>
+	{/if}
 	<a
-		class="flex select-none items-center rounded-xl text-lg font-semibold py-0"
-		href="{publicConfig.PUBLIC_ORIGIN}{base}/"
+		href={`${base}/`}
+		onclick={handleNewChatClick}
+		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700 sm:text-smd"
+		title="Ctrl/Cmd + Shift + O"
+		style={publicConfig.PUBLIC_SHOW_NAV_LOGO === "true" ? "" : `
+			transform: translateY(7px); margin-bottom: -30px;
+			margin-right: 10px;
+			box-shadow: 0 6px 24px 0 rgba(40,90,105,0.26), 0 5px 8px 0 rgba(255,255,255,0.48) inset, 0 0 12px 0 rgba(255,255,255,0.20);
+			border: 1.5px solid rgba(122, 159, 215, 0.4);
+			background: transparent;
+			backdrop-filter: blur(1px) saturate(80%);
+			-webkit-backdrop-filter: blur(1px) saturate(80%);
+			color: #555;
+			padding: 4px 8px;
+			font-size: 0.8rem;
+			font-weight: 500;
+			overflow: hidden;
+			position: relative;
+			transition: box-shadow 0.18s, background 0.18s;
+		`}
 	>
-
+		New Chat
 	</a>
-       <a
-	       href={`${base}/`}
-	       onclick={handleNewChatClick}
-	       class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700 sm:text-smd"
-	       title="Ctrl/Cmd + Shift + O"
-	       style="
-		       transform: translateY(7px); margin-bottom: -30px;
-			   margin-right: 10px;
-			   box-shadow: 0 6px 24px 0 rgba(40,90,105,0.26), 0 5px 8px 0 rgba(255,255,255,0.48) inset, 0 0 12px 0 rgba(255,255,255,0.20);
-		       border: 1.5px solid rgba(122, 159, 215, 0.4);
-			   background: transparent;
-		       backdrop-filter: blur(1px) saturate(80%);
-		       -webkit-backdrop-filter: blur(1px) saturate(80%);
-			   color: #555;
-			   padding: 4px 8px;
-		       font-size: 0.8rem;
-			   font-weight: 500;
-		       overflow: hidden;
-		       position: relative;
-		       transition: box-shadow 0.18s, background 0.18s;
-	       "
-       >
-	       New Chat
-       </a>
 </div>
 
 <div
 	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:border-transparent dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
-	style="background: linear-gradient(190deg, rgba(30,30,255,0.1) 2%, rgba(0,100,255,0) 6%)"
+	style={publicConfig.PUBLIC_SHOW_NAV_LOGO === "true" ? "" : "background: linear-gradient(190deg, rgba(30,30,255,0.1) 2%, rgba(0,100,255,0) 6%)"}
 >
 <div class="flex flex-col gap-0.5">
 	{#each Object.entries(groupedConversations) as [group, convs]}

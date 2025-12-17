@@ -116,11 +116,15 @@ PUBLIC_APP_NAME=ChatUI
 PUBLIC_APP_ASSETS=chatui
 PUBLIC_APP_DESCRIPTION="Making the community's best AI chat models available to everyone."
 PUBLIC_APP_DATA_SHARING=
+PUBLIC_APP_LOGO_URL=
+PUBLIC_APP_LOGO_STYLE=
 ```
 
 - `PUBLIC_APP_NAME` The name used as a title throughout the app.
 - `PUBLIC_APP_ASSETS` Is used to find logos & favicons in `static/$PUBLIC_APP_ASSETS`, current options are `chatui` and `huggingchat`.
 - `PUBLIC_APP_DATA_SHARING` Can be set to 1 to add a toggle in the user settings that lets your users opt-in to data sharing with models creator.
+- `PUBLIC_APP_LOGO_URL` Optional. A custom logo URL that overrides the default logo from `PUBLIC_APP_ASSETS`. Use this to display your own branding.
+- `PUBLIC_APP_LOGO_STYLE` Optional. Custom inline CSS styles for the logo (e.g., `"width: 48px; height: 48px; object-fit: contain;"`).
 
 ### Models
 
