@@ -3,6 +3,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { McpServerConfig } from "./httpClient";
 import { logger } from "$lib/server/logger";
+import { isExaServer, getExaToolDefinitions } from "./exaDirect";
 // use console.* for lightweight diagnostics in production logs
 
 export type OpenAiTool = {
@@ -65,6 +66,16 @@ async function listServerTools(
 	server: McpServerConfig,
 	opts: { signal?: AbortSignal } = {}
 ): Promise<ListedTool[]> {
+	// Bypass MCP protocol for Exa - return hardcoded tool definitions
+	if (isExaServer(server)) {
+		const tools = getExaToolDefinitions();
+		logger.debug(
+			{ server: server.name, count: tools.length, toolNames: tools.map((t) => t.name) },
+			"[mcp] using direct Exa tool definitions (bypassing MCP)"
+		);
+		return tools;
+	}
+
 	const url = new URL(server.url);
 	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
 	try {
