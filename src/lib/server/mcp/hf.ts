@@ -21,3 +21,12 @@ export const isStrictHfMcpLogin = (urlString: string) => {
 
 export const hasNonEmptyToken = (tok: unknown): tok is string =>
 	typeof tok === "string" && tok.trim().length > 0;
+
+export const isExaMcpServer = (urlString: string): boolean => {
+	try {
+		const u = new URL(urlString);
+		return u.protocol === "https:" && u.hostname.toLowerCase() === "mcp.exa.ai";
+	} catch {
+		return false;
+	}
+};

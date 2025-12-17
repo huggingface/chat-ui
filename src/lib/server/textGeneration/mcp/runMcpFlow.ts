@@ -17,7 +17,12 @@ import { resolveRouterTarget } from "./routerResolution";
 import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
 import { drainPool } from "$lib/server/mcp/clientPool";
 import type { TextGenerationContext } from "../types";
-import { hasAuthHeader, isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
+import {
+	hasAuthHeader,
+	isStrictHfMcpLogin,
+	hasNonEmptyToken,
+	isExaMcpServer,
+} from "$lib/server/mcp/hf";
 import { buildImageRefResolver } from "./fileRefs";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
 import { makeImageProcessor } from "$lib/server/endpoints/images";
@@ -171,6 +176,29 @@ export async function* runMcpFlow({
 	} catch {
 		// best-effort overlay; continue if anything goes wrong
 	}
+
+	// Inject Exa API key for mcp.exa.ai servers
+	try {
+		const exaApiKey = config.EXA_API_KEY;
+		if (hasNonEmptyToken(exaApiKey)) {
+			servers = servers.map((s) => {
+				try {
+					if (isExaMcpServer(s.url)) {
+						const url = new URL(s.url);
+						if (!url.searchParams.has("exaApiKey")) {
+							url.searchParams.set("exaApiKey", exaApiKey);
+							console.log(url.toString());
+							return { ...s, url: url.toString() };
+						}
+					}
+				} catch {}
+				return s;
+			});
+		}
+	} catch {
+		// best-effort injection; continue if anything goes wrong
+	}
+
 	logger.debug(
 		{ count: servers.length, servers: servers.map((s) => s.name) },
 		"[mcp] servers configured"
