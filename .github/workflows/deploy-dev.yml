@@ -1,6 +1,7 @@
 name: Deploy to ephemeral
 on:
   pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
 
 jobs:
   branch-slug:
