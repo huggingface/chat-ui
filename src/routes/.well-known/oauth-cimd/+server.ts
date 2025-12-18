@@ -22,7 +22,9 @@ export const GET = ({ url }) => {
 			client_id: new URL(url, config.PUBLIC_ORIGIN || url.origin).toString(),
 			client_name: config.PUBLIC_APP_NAME,
 			client_uri: `${config.PUBLIC_ORIGIN || url.origin}${base}`,
-			redirect_uris: [new URL("/login/callback", config.PUBLIC_ORIGIN || url.origin).toString()],
+			redirect_uris: [
+				new URL(`${base}/login/callback`, config.PUBLIC_ORIGIN || url.origin).toString(),
+			],
 			token_endpoint_auth_method: "none",
 			scopes: OIDConfig.SCOPES,
 		}),
