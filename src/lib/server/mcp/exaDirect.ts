@@ -140,6 +140,7 @@ interface ExaSearchResponse {
 
 /**
  * Format Exa search results as human-readable text
+ * Prioritizes highlights (concise snippets) over full text to minimize LLM context
  */
 function formatSearchResultsAsText(results: ExaSearchResult[]): string {
 	if (results.length === 0) {
@@ -154,10 +155,11 @@ function formatSearchResultsAsText(results: ExaSearchResult[]): string {
 				parts.push(`   Published: ${result.publishedDate}`);
 			}
 
-			if (result.text) {
-				parts.push(`   ${result.text}`);
-			} else if (result.highlights && result.highlights.length > 0) {
+			// Prefer highlights (concise, query-relevant) over full text
+			if (result.highlights && result.highlights.length > 0) {
 				parts.push(`   ${result.highlights.join(" ... ")}`);
+			} else if (result.text) {
+				parts.push(`   ${result.text}`);
 			}
 
 			return parts.join("\n");
@@ -186,13 +188,22 @@ export async function callExaDirectApi(
 		throw new Error("Missing required parameter: query");
 	}
 
-	// Build request body - pass through all args, ensure query exists and request text content
+	// Build request body - pass through all args, ensure query exists
+	// Use highlights (not full text) to minimize context size sent to LLM
+	// This matches what the MCP server at mcp.exa.ai returns
 	const requestBody: Record<string, unknown> = {
 		...args,
 		query,
-		// Required to get page text content, not just metadata
 		contents: {
-			text: true,
+			// Use highlights for concise, query-relevant snippets (much smaller than full text)
+			highlights: {
+				numSentences: 3,
+				highlightsPerUrl: 2,
+			},
+			// Also get limited text as fallback if highlights are empty
+			text: {
+				maxCharacters: 500,
+			},
 		},
 	};
 
