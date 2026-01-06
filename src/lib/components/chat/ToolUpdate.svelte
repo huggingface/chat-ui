@@ -124,33 +124,33 @@
 	{/if}
 {/snippet}
 
-	{#if toolFnName}
-		<BlockWrapper {icon} {iconBg} {iconRing} {hasNext} loading={isExecuting}>
-			<!-- Header row -->
-			<div class="flex w-full select-none items-center gap-2">
-				<button
-					type="button"
-					class="flex flex-1 cursor-pointer flex-col items-start gap-1 text-left"
-					onclick={() => (isOpen = !isOpen)}
+{#if toolFnName}
+	<BlockWrapper {icon} {iconBg} {iconRing} {hasNext} loading={isExecuting}>
+		<!-- Header row -->
+		<div class="flex w-full select-none items-center gap-2">
+			<button
+				type="button"
+				class="flex flex-1 cursor-pointer flex-col items-start gap-1 text-left"
+				onclick={() => (isOpen = !isOpen)}
+			>
+				<span
+					class="text-sm font-medium {isExecuting
+						? 'text-purple-700 dark:text-purple-300'
+						: toolError
+							? 'text-red-600 dark:text-red-400'
+							: 'text-gray-700 dark:text-gray-300'}"
 				>
-					<span
-						class="text-sm font-medium {isExecuting
-							? 'text-purple-700 dark:text-purple-300'
-							: toolError
-								? 'text-red-600 dark:text-red-400'
-								: 'text-gray-700 dark:text-gray-300'}"
+					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
+					<code
+						class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500 opacity-90 dark:bg-gray-800 dark:text-gray-400"
 					>
-						{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
-						<code
-							class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500 opacity-90 dark:bg-gray-800 dark:text-gray-400"
-						>
-							{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
-						</code>
-					</span>
-					{#if isExecuting && toolProgress}
-						<span class="text-xs text-gray-500 dark:text-gray-400">{progressLabel}</span>
-					{/if}
-				</button>
+						{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
+					</code>
+				</span>
+				{#if isExecuting && toolProgress}
+					<span class="text-xs text-gray-500 dark:text-gray-400">{progressLabel}</span>
+				{/if}
+			</button>
 
 			<button
 				type="button"
