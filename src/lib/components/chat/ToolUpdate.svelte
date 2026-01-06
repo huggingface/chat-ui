@@ -3,8 +3,10 @@
 	import {
 		isMessageToolCallUpdate,
 		isMessageToolErrorUpdate,
+		isMessageToolProgressUpdate,
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
+	import { formatToolProgressLabel } from "$lib/utils/toolProgress";
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideCheck from "~icons/lucide/check";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
@@ -27,6 +29,14 @@
 	let toolDone = $derived(tool.some(isMessageToolResultUpdate));
 	let isExecuting = $derived(!toolDone && !toolError && loading);
 	let toolSuccess = $derived(toolDone && !toolError);
+	let toolProgress = $derived.by(() => {
+		for (let i = tool.length - 1; i >= 0; i -= 1) {
+			const update = tool[i];
+			if (isMessageToolProgressUpdate(update)) return update;
+		}
+		return undefined;
+	});
+	let progressLabel = $derived.by(() => formatToolProgressLabel(toolProgress));
 
 	const availableTools: ToolFront[] = $derived.by(
 		() => (page.data as { tools?: ToolFront[] } | undefined)?.tools ?? []
@@ -114,30 +124,33 @@
 	{/if}
 {/snippet}
 
-{#if toolFnName}
-	<BlockWrapper {icon} {iconBg} {iconRing} {hasNext} loading={isExecuting}>
-		<!-- Header row -->
-		<div class="flex w-full select-none items-center gap-2">
-			<button
-				type="button"
-				class="flex flex-1 cursor-pointer items-center gap-2 text-left"
-				onclick={() => (isOpen = !isOpen)}
-			>
-				<span
-					class="text-sm font-medium {isExecuting
-						? 'text-purple-700 dark:text-purple-300'
-						: toolError
-							? 'text-red-600 dark:text-red-400'
-							: 'text-gray-700 dark:text-gray-300'}"
+	{#if toolFnName}
+		<BlockWrapper {icon} {iconBg} {iconRing} {hasNext} loading={isExecuting}>
+			<!-- Header row -->
+			<div class="flex w-full select-none items-center gap-2">
+				<button
+					type="button"
+					class="flex flex-1 cursor-pointer flex-col items-start gap-1 text-left"
+					onclick={() => (isOpen = !isOpen)}
 				>
-					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
-					<code
-						class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500 opacity-90 dark:bg-gray-800 dark:text-gray-400"
+					<span
+						class="text-sm font-medium {isExecuting
+							? 'text-purple-700 dark:text-purple-300'
+							: toolError
+								? 'text-red-600 dark:text-red-400'
+								: 'text-gray-700 dark:text-gray-300'}"
 					>
-						{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
-					</code>
-				</span>
-			</button>
+						{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
+						<code
+							class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500 opacity-90 dark:bg-gray-800 dark:text-gray-400"
+						>
+							{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
+						</code>
+					</span>
+					{#if isExecuting && toolProgress}
+						<span class="text-xs text-gray-500 dark:text-gray-400">{progressLabel}</span>
+					{/if}
+				</button>
 
 			<button
 				type="button"

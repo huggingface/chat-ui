@@ -23,6 +23,12 @@ export type McpToolTextResponse = {
 	content?: unknown[];
 };
 
+export type McpToolProgress = {
+	progress: number;
+	total?: number;
+	message?: string;
+};
+
 export async function callMcpTool(
 	server: McpServerConfig,
 	tool: string,
@@ -31,7 +37,13 @@ export async function callMcpTool(
 		timeoutMs = DEFAULT_TIMEOUT_MS,
 		signal,
 		client,
-	}: { timeoutMs?: number; signal?: AbortSignal; client?: Client } = {}
+		onProgress,
+	}: {
+		timeoutMs?: number;
+		signal?: AbortSignal;
+		client?: Client;
+		onProgress?: (progress: McpToolProgress) => void;
+	} = {}
 ): Promise<McpToolTextResponse> {
 	// Bypass MCP protocol for Exa - call direct API
 	if (isExaServer(server)) {
@@ -61,7 +73,13 @@ export async function callMcpTool(
 		signal,
 		timeout: timeoutMs,
 		// Enable progress tokens so long-running tools keep extending the timeout.
-		onprogress: () => {},
+		onprogress: (progress: McpToolProgress) => {
+			onProgress?.({
+				progress: progress.progress,
+				total: progress.total,
+				message: progress.message,
+			});
+		},
 		resetTimeoutOnProgress: true,
 	};
 
