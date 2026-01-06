@@ -170,18 +170,23 @@ const katexInlineExtension: TokenizerExtension & RendererExtension = {
 	},
 };
 
-function escapeHTML(content: string) {
-	return content.replace(
-		/[<>&"']/g,
-		(x) =>
-			({
-				"<": "&lt;",
-				">": "&gt;",
-				"&": "&amp;",
-				"'": "&#39;",
-				'"': "&quot;",
-			})[x] || x
-	);
+// =============================================================================
+// HTML Sanitization Utilities
+// =============================================================================
+
+const HTML_ESCAPE_MAP: Record<string, string> = {
+	"<": "&lt;",
+	">": "&gt;",
+	"&": "&amp;",
+	"'": "&#39;",
+	'"': "&quot;",
+};
+
+/**
+ * Escapes HTML special characters to prevent XSS attacks.
+ */
+export function escapeHTML(content: string): string {
+	return content.replace(/[<>&"']/g, (char) => HTML_ESCAPE_MAP[char] || char);
 }
 
 function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): string {
@@ -204,6 +209,9 @@ function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): 
 	});
 }
 
+/**
+ * Sanitizes href attributes, blocking dangerous URL schemes.
+ */
 function sanitizeHref(href?: string | null): string | undefined {
 	if (!href) return undefined;
 	const trimmed = href.trim();
@@ -225,6 +233,147 @@ function highlightCode(text: string, lang?: string): string {
 	return hljs.highlightAuto(text).value;
 }
 
+// =============================================================================
+// Video Tag Sanitization
+//
+// Allows safe <video> embeds while blocking XSS vectors like event handlers
+// (onerror, onload), dangerous URL schemes, and arbitrary attributes.
+// =============================================================================
+
+export type ParsedAttributes = Record<string, string | true>;
+
+/**
+ * Parses HTML attribute strings into a key-value object.
+ * Handles: double-quoted, single-quoted, unquoted, and boolean attributes.
+ */
+export function parseAttributes(raw: string): ParsedAttributes {
+	const attrs: ParsedAttributes = {};
+	const attrRegex = /([^\s=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+	let match: RegExpExecArray | null;
+	while ((match = attrRegex.exec(raw))) {
+		const name = match[1];
+		const value = match[2] ?? match[3] ?? match[4];
+		attrs[name] = value ?? true;
+	}
+	return attrs;
+}
+
+/**
+ * Validates media URLs, allowing only safe schemes.
+ * Returns the sanitized URL or undefined if unsafe.
+ */
+export function isSafeMediaUrl(url?: string): string | undefined {
+	if (!url) return undefined;
+	const trimmed = url.trim();
+	if (trimmed === "") return undefined;
+
+	const lower = trimmed.toLowerCase();
+	const isSafeScheme =
+		lower.startsWith("http://") ||
+		lower.startsWith("https://") ||
+		trimmed.startsWith("/") ||
+		trimmed.startsWith("./") ||
+		trimmed.startsWith("../");
+
+	return isSafeScheme ? trimmed : undefined;
+}
+
+// Whitelist of allowed boolean attributes on <video> tags
+const ALLOWED_VIDEO_BOOLEANS = new Set(["controls", "autoplay", "loop", "muted", "playsinline"]);
+
+/**
+ * Filters video tag attributes, keeping only safe ones.
+ */
+function filterVideoAttributes(attrs: ParsedAttributes): string[] {
+	const result: string[] = [];
+
+	for (const [name, value] of Object.entries(attrs)) {
+		// Boolean attributes (controls, autoplay, etc.)
+		if (ALLOWED_VIDEO_BOOLEANS.has(name)) {
+			if (value === true || value === "" || value === name) {
+				result.push(name);
+			}
+			continue;
+		}
+
+		// Poster URL - must be safe
+		if (name === "poster") {
+			const safePoster = typeof value === "string" ? isSafeMediaUrl(value) : undefined;
+			if (safePoster) {
+				result.push(`poster="${escapeHTML(safePoster)}"`);
+			}
+			continue;
+		}
+
+		// Dimensions - must be positive integers
+		if (name === "width" || name === "height") {
+			const num = typeof value === "string" ? Number.parseInt(value, 10) : NaN;
+			if (Number.isFinite(num) && num > 0) {
+				result.push(`${name}="${num}"`);
+			}
+		}
+		// All other attributes are stripped for security
+	}
+
+	return result;
+}
+
+/**
+ * Extracts and sanitizes <source> elements from video inner HTML.
+ */
+function extractSafeSources(innerHtml: string): string[] {
+	const sourceRegex = /<source\b([^>]*)>/gi;
+	const safeSources: string[] = [];
+
+	let match: RegExpExecArray | null;
+	while ((match = sourceRegex.exec(innerHtml))) {
+		const attrs = parseAttributes(match[1] ?? "");
+
+		// src is required and must be safe
+		const src = isSafeMediaUrl(typeof attrs.src === "string" ? attrs.src : undefined);
+		if (!src) continue;
+
+		// type is optional but must be video/* if present
+		const rawType = typeof attrs.type === "string" ? attrs.type : undefined;
+		const type = rawType?.toLowerCase().startsWith("video/") ? rawType : undefined;
+		const typeAttr = type ? ` type="${escapeHTML(type)}"` : "";
+
+		safeSources.push(`<source src="${escapeHTML(src)}"${typeAttr}>`);
+	}
+
+	return safeSources;
+}
+
+/**
+ * Sanitizes a <video> HTML string, stripping dangerous attributes and URLs.
+ * Returns null if the input is not a valid video tag.
+ */
+export function sanitizeVideoHtml(html: string): string | null {
+	const trimmed = html.trim();
+
+	// Match complete video tags only
+	const videoMatch = /^<video\b([^>]*)>([\s\S]*?)<\/video>$/i.exec(trimmed);
+	if (!videoMatch) return null;
+
+	const rawAttrs = videoMatch[1] ?? "";
+	const innerHtml = videoMatch[2] ?? "";
+
+	// Filter attributes to whitelist
+	const safeAttrs = filterVideoAttributes(parseAttributes(rawAttrs));
+
+	// Extract safe source elements
+	const safeSources = extractSafeSources(innerHtml);
+
+	// Extract and escape fallback text (anything not in a <source> tag)
+	const fallbackText = innerHtml.replace(/<source\b[^>]*>/gi, "").trim();
+	const escapedFallback = fallbackText ? escapeHTML(fallbackText) : "";
+
+	// Reconstruct safe video tag
+	const attrString = safeAttrs.join(" ");
+	const leadingSpace = attrString ? " " : "";
+	return `<video${leadingSpace}${attrString}>${safeSources.join("")}${escapedFallback}</video>`;
+}
+
 function createMarkedInstance(sources: SimpleSource[]): Marked {
 	return new Marked({
 		hooks: {
@@ -238,7 +387,7 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 					? `<a href="${escapeHTML(safeHref)}" target="_blank" rel="noreferrer">${text}</a>`
 					: `<span>${escapeHTML(text ?? "")}</span>`;
 			},
-			html: (html) => escapeHTML(html),
+			html: (html) => sanitizeVideoHtml(html) ?? escapeHTML(html),
 		},
 		gfm: true,
 		breaks: true,
