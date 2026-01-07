@@ -72,7 +72,7 @@
 		"@huggingface/hub": "^2.2.0",
 		"@huggingface/inference": "^4.11.3",
 		"@iconify-json/bi": "^1.1.21",
-		"@modelcontextprotocol/sdk": "^1.21.1",
+		"@modelcontextprotocol/sdk": "^1.25.1",
 		"@resvg/resvg-js": "^2.6.2",
 		"@sinclair/typebox": "^0.34.41",
 		"autoprefixer": "^10.4.14",

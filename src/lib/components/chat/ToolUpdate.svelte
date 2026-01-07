@@ -3,8 +3,10 @@
 	import {
 		isMessageToolCallUpdate,
 		isMessageToolErrorUpdate,
+		isMessageToolProgressUpdate,
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
+	import { formatToolProgressLabel } from "$lib/utils/toolProgress";
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideCheck from "~icons/lucide/check";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
@@ -27,6 +29,14 @@
 	let toolDone = $derived(tool.some(isMessageToolResultUpdate));
 	let isExecuting = $derived(!toolDone && !toolError && loading);
 	let toolSuccess = $derived(toolDone && !toolError);
+	let toolProgress = $derived.by(() => {
+		for (let i = tool.length - 1; i >= 0; i -= 1) {
+			const update = tool[i];
+			if (isMessageToolProgressUpdate(update)) return update;
+		}
+		return undefined;
+	});
+	let progressLabel = $derived.by(() => formatToolProgressLabel(toolProgress));
 
 	const availableTools: ToolFront[] = $derived.by(
 		() => (page.data as { tools?: ToolFront[] } | undefined)?.tools ?? []
@@ -120,7 +130,7 @@
 		<div class="flex w-full select-none items-center gap-2">
 			<button
 				type="button"
-				class="flex flex-1 cursor-pointer items-center gap-2 text-left"
+				class="flex flex-1 cursor-pointer flex-col items-start gap-1 text-left"
 				onclick={() => (isOpen = !isOpen)}
 			>
 				<span
@@ -137,6 +147,9 @@
 						{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
 					</code>
 				</span>
+				{#if isExecuting && toolProgress}
+					<span class="text-xs text-gray-500 dark:text-gray-400">{progressLabel}</span>
+				{/if}
 			</button>
 
 			<button
