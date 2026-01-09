@@ -32,7 +32,8 @@ describe("MarkdownRenderer", () => {
 	it("doesnt render raw html directly", () => {
 		render(MarkdownRenderer, { content: "<button>Click me</button>" });
 		expect(page.getByRole("button").elements).toHaveLength(0);
-		expect(page.getByRole("paragraph")).toHaveTextContent("<button>Click me</button>");
+		// DOMPurify strips disallowed tags but preserves text content
+		expect(page.getByRole("paragraph")).toHaveTextContent("Click me");
 	});
 	it("renders latex", () => {
 		const { baseElement } = render(MarkdownRenderer, { content: "$(oo)^2$" });
