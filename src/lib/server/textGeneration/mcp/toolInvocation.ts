@@ -300,6 +300,9 @@ export async function* executeToolCalls({
 			toolRuns.push({ name, parameters: r.paramsClean, output });
 			// For the LLM follow-up call, we keep only the textual output
 			toolMessages.push({ role: "tool", tool_call_id: id, content: output });
+		} else {
+			// Communicate error to LLM so it doesn't hallucinate success
+			toolMessages.push({ role: "tool", tool_call_id: id, content: `Error: ${r.error}` });
 		}
 	}
 
