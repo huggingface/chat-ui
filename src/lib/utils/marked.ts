@@ -5,6 +5,7 @@ import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
 
 // Lazy-load DOMPurify to avoid crashes in Web Workers (no window/DOM)
 // Web Workers have importScripts but no window
+declare const importScripts: unknown;
 const isWebWorker = typeof importScripts === "function" && typeof window === "undefined";
 const DOMPurify = isWebWorker ? null : (await import("isomorphic-dompurify")).default;
 // Simple type to replace removed WebSearchSource
