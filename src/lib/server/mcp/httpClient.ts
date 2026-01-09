@@ -13,7 +13,7 @@ export interface McpServerConfig {
 	headers?: Record<string, string>;
 }
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 export type McpToolTextResponse = {
 	text: string;
