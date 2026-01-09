@@ -79,9 +79,10 @@ describe("marked html video tag support", () => {
 		expect(html).not.toContain("javascript:");
 	});
 
-	test("strips disallowed html tags", () => {
+	test("escapes disallowed html tags", () => {
 		const html = renderHtml("<script>alert(1)</script>");
 		expect(html).not.toContain("<script>");
+		expect(html).toContain("&lt;script&gt;");
 	});
 
 	test("allows <audio> tags with controls", () => {

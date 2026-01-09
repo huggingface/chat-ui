@@ -2,7 +2,7 @@ import katex from "katex";
 import "katex/dist/contrib/mhchem.mjs";
 import { Marked } from "marked";
 import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
-import DOMPurify from "isomorphic-dompurify";
+import { parseDocument } from "htmlparser2";
 // Simple type to replace removed WebSearchSource
 type SimpleSource = {
 	title?: string;
@@ -57,24 +57,6 @@ const bundledLanguages: [string, LanguageFn][] = [
 
 bundledLanguages.forEach(([name, language]) => hljs.registerLanguage(name, language));
 
-// DOMPurify config for allowing video/audio tags in markdown
-const DOMPURIFY_CONFIG = {
-	ALLOWED_TAGS: ["video", "audio", "source"],
-	ALLOWED_ATTR: [
-		"src",
-		"type",
-		"controls",
-		"autoplay",
-		"loop",
-		"muted",
-		"playsinline",
-		"poster",
-		"width",
-		"height",
-		"preload",
-	],
-};
-
 // Media URL detection
 const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg|mov|m4v)([?#]|$)/i;
 const AUDIO_EXTENSIONS = /\.(mp3|wav|m4a|aac|flac)([?#]|$)/i;
@@ -86,6 +68,34 @@ function isVideoUrl(url: string): boolean {
 function isAudioUrl(url: string): boolean {
 	return AUDIO_EXTENSIONS.test(url);
 }
+
+// Multimedia HTML sanitization (works in Web Workers - no DOM needed)
+const MULTIMEDIA_TAGS = new Set(["video", "source", "audio"]);
+const MULTIMEDIA_ALLOWED_ATTRS = new Set([
+	"src",
+	"type",
+	"controls",
+	"autoplay",
+	"loop",
+	"muted",
+	"playsinline",
+	"poster",
+	"width",
+	"height",
+	"preload",
+]);
+const MULTIMEDIA_BOOLEAN_ATTRS = new Set(["controls", "autoplay", "loop", "muted", "playsinline"]);
+const MULTIMEDIA_URI_ATTRS = new Set(["src", "poster"]);
+const MULTIMEDIA_ALLOWED_URI_PATTERN = /^(?!javascript:|data:text\/html)/i;
+const MULTIMEDIA_HTML_REGEX = /<\/?(video|source|audio)\b/i;
+
+type HtmlNode = {
+	type: string;
+	name?: string;
+	attribs?: Record<string, string>;
+	children?: HtmlNode[];
+	data?: string;
+};
 
 interface katexBlockToken extends Tokens.Generic {
 	type: "katexBlock";
@@ -256,6 +266,82 @@ function highlightCode(text: string, lang?: string): string {
 	return hljs.highlightAuto(text).value;
 }
 
+function sanitizeMediaUrl(value: string): string | undefined {
+	const trimmed = value.trim().replace(/>$/, "");
+	if (!MULTIMEDIA_ALLOWED_URI_PATTERN.test(trimmed)) return undefined;
+	return trimmed;
+}
+
+function serializeMediaAttributes(attribs?: Record<string, string>): string {
+	if (!attribs) return "";
+	const parts: string[] = [];
+	for (const [rawName, rawValue] of Object.entries(attribs)) {
+		const name = rawName.toLowerCase();
+		if (!MULTIMEDIA_ALLOWED_ATTRS.has(name)) continue;
+		if (MULTIMEDIA_BOOLEAN_ATTRS.has(name)) {
+			parts.push(name);
+			continue;
+		}
+		let value = rawValue ?? "";
+		if (MULTIMEDIA_URI_ATTRS.has(name)) {
+			const safeUrl = sanitizeMediaUrl(value);
+			if (!safeUrl) continue;
+			value = safeUrl;
+		}
+		parts.push(`${name}="${escapeHTML(value)}"`);
+	}
+	return parts.length ? ` ${parts.join(" ")}` : "";
+}
+
+function serializeMediaNode(node: HtmlNode, state: { hasDisallowedTag: boolean }): string {
+	if (node.type === "text") {
+		return escapeHTML(node.data ?? "");
+	}
+	if (node.type === "tag" || node.type === "script" || node.type === "style") {
+		const tagName = node.name?.toLowerCase() ?? "";
+		if (!MULTIMEDIA_TAGS.has(tagName)) {
+			state.hasDisallowedTag = true;
+			return "";
+		}
+		const attrs = serializeMediaAttributes(node.attribs);
+		if (tagName === "source") {
+			return `<source${attrs}>`;
+		}
+		const children = (node.children ?? [])
+			.map((child) => serializeMediaNode(child, state))
+			.join("");
+		return `<${tagName}${attrs}>${children}</${tagName}>`;
+	}
+	if (node.type === "comment") {
+		return "";
+	}
+	return "";
+}
+
+/**
+ * Sanitizes HTML to allow only video/audio/source tags with safe attributes.
+ * Uses htmlparser2 which works in Web Workers (no DOM needed).
+ * If any disallowed tags are found, escapes the entire input.
+ */
+function sanitizeHtmlForMultimedia(html: string): string {
+	if (!MULTIMEDIA_HTML_REGEX.test(html)) {
+		return escapeHTML(html);
+	}
+	const document = parseDocument(html, {
+		lowerCaseAttributeNames: true,
+		lowerCaseTags: true,
+		recognizeSelfClosing: true,
+	}) as unknown as { children: HtmlNode[] };
+	const state = { hasDisallowedTag: false };
+	const sanitized = (document.children ?? [])
+		.map((child) => serializeMediaNode(child, state))
+		.join("");
+	if (state.hasDisallowedTag) {
+		return escapeHTML(html);
+	}
+	return sanitized;
+}
+
 function createMarkedInstance(sources: SimpleSource[]): Marked {
 	return new Marked({
 		hooks: {
@@ -285,7 +371,7 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 				}
 				return `<img src="${safeSrc}" alt="${safeAlt}"${safeTitle} />`;
 			},
-			html: (html) => DOMPurify.sanitize(html, DOMPURIFY_CONFIG),
+			html: (html) => sanitizeHtmlForMultimedia(html),
 		},
 		gfm: true,
 		breaks: true,
