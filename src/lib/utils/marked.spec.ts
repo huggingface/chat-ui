@@ -79,6 +79,11 @@ describe("marked html video tag support", () => {
 		expect(html).not.toContain("javascript:");
 	});
 
+	test("strips vbscript: URLs from media sources", () => {
+		const html = renderHtml('<video controls src="vbscript:msgbox(1)"></video>');
+		expect(html).not.toContain("vbscript:");
+	});
+
 	test("escapes disallowed html tags", () => {
 		const html = renderHtml("<script>alert(1)</script>");
 		expect(html).not.toContain("<script>");

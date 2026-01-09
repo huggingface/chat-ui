@@ -2,7 +2,6 @@ import katex from "katex";
 import "katex/dist/contrib/mhchem.mjs";
 import { Marked } from "marked";
 import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
-import { parseDocument } from "htmlparser2";
 // Simple type to replace removed WebSearchSource
 type SimpleSource = {
 	title?: string;
@@ -86,16 +85,7 @@ const MULTIMEDIA_ALLOWED_ATTRS = new Set([
 ]);
 const MULTIMEDIA_BOOLEAN_ATTRS = new Set(["controls", "autoplay", "loop", "muted", "playsinline"]);
 const MULTIMEDIA_URI_ATTRS = new Set(["src", "poster"]);
-const MULTIMEDIA_ALLOWED_URI_PATTERN = /^(?!javascript:|data:text\/html)/i;
 const MULTIMEDIA_HTML_REGEX = /<\/?(video|source|audio)\b/i;
-
-type HtmlNode = {
-	type: string;
-	name?: string;
-	attribs?: Record<string, string>;
-	children?: HtmlNode[];
-	data?: string;
-};
 
 interface katexBlockToken extends Tokens.Generic {
 	type: "katexBlock";
@@ -266,80 +256,94 @@ function highlightCode(text: string, lang?: string): string {
 	return hljs.highlightAuto(text).value;
 }
 
-function sanitizeMediaUrl(value: string): string | undefined {
-	const trimmed = value.trim().replace(/>$/, "");
-	if (!MULTIMEDIA_ALLOWED_URI_PATTERN.test(trimmed)) return undefined;
-	return trimmed;
-}
+/**
+ * Sanitize attributes from a string, keeping only allowed ones.
+ * Works with regex parsing - no DOM needed.
+ */
+function sanitizeMediaAttributes(attrs: string): string {
+	const result: string[] = [];
+	const attrRegex = /([a-z][a-z0-9-]*)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+)))?/gi;
+	let match;
 
-function serializeMediaAttributes(attribs?: Record<string, string>): string {
-	if (!attribs) return "";
-	const parts: string[] = [];
-	for (const [rawName, rawValue] of Object.entries(attribs)) {
-		const name = rawName.toLowerCase();
-		if (!MULTIMEDIA_ALLOWED_ATTRS.has(name)) continue;
-		if (MULTIMEDIA_BOOLEAN_ATTRS.has(name)) {
-			parts.push(name);
+	while ((match = attrRegex.exec(attrs)) !== null) {
+		const [, name, dq, sq, uq] = match;
+		const attrName = name.toLowerCase();
+
+		if (!MULTIMEDIA_ALLOWED_ATTRS.has(attrName)) continue;
+
+		if (MULTIMEDIA_BOOLEAN_ATTRS.has(attrName)) {
+			result.push(attrName);
 			continue;
 		}
-		let value = rawValue ?? "";
-		if (MULTIMEDIA_URI_ATTRS.has(name)) {
-			const safeUrl = sanitizeMediaUrl(value);
-			if (!safeUrl) continue;
-			value = safeUrl;
-		}
-		parts.push(`${name}="${escapeHTML(value)}"`);
-	}
-	return parts.length ? ` ${parts.join(" ")}` : "";
-}
 
-function serializeMediaNode(node: HtmlNode, state: { hasDisallowedTag: boolean }): string {
-	if (node.type === "text") {
-		return escapeHTML(node.data ?? "");
-	}
-	if (node.type === "tag" || node.type === "script" || node.type === "style") {
-		const tagName = node.name?.toLowerCase() ?? "";
-		if (!MULTIMEDIA_TAGS.has(tagName)) {
-			state.hasDisallowedTag = true;
-			return "";
+		const value = dq ?? sq ?? uq ?? "";
+
+		if (MULTIMEDIA_URI_ATTRS.has(attrName)) {
+			const lower = value.trim().toLowerCase();
+			if (
+				lower.startsWith("javascript:") ||
+				lower.startsWith("vbscript:") ||
+				lower.startsWith("data:text/html")
+			) {
+				continue;
+			}
 		}
-		const attrs = serializeMediaAttributes(node.attribs);
-		if (tagName === "source") {
-			return `<source${attrs}>`;
-		}
-		const children = (node.children ?? [])
-			.map((child) => serializeMediaNode(child, state))
-			.join("");
-		return `<${tagName}${attrs}>${children}</${tagName}>`;
+
+		result.push(`${attrName}="${escapeHTML(value)}"`);
 	}
-	if (node.type === "comment") {
-		return "";
-	}
-	return "";
+
+	return result.length ? " " + result.join(" ") : "";
 }
 
 /**
- * Sanitizes HTML to allow only video/audio/source tags with safe attributes.
- * Uses htmlparser2 which works in Web Workers (no DOM needed).
- * If any disallowed tags are found, escapes the entire input.
+ * Regex-based HTML sanitizer for video/audio/source tags.
+ * Works in Web Workers (no DOM needed).
+ * SECURITY: If ANY disallowed tag is detected, escapes the entire input.
  */
-function sanitizeHtmlForMultimedia(html: string): string {
+function sanitizeMediaHtml(html: string): string {
+	// Quick check: if no multimedia tags, just escape
 	if (!MULTIMEDIA_HTML_REGEX.test(html)) {
 		return escapeHTML(html);
 	}
-	const document = parseDocument(html, {
-		lowerCaseAttributeNames: true,
-		lowerCaseTags: true,
-		recognizeSelfClosing: true,
-	}) as unknown as { children: HtmlNode[] };
-	const state = { hasDisallowedTag: false };
-	const sanitized = (document.children ?? [])
-		.map((child) => serializeMediaNode(child, state))
-		.join("");
-	if (state.hasDisallowedTag) {
-		return escapeHTML(html);
+
+	const result: string[] = [];
+	let lastIndex = 0;
+
+	// Match all HTML tags
+	const tagRegex = /<\/?([a-z][a-z0-9]*)\b([^>]*?)>/gi;
+	let match;
+
+	while ((match = tagRegex.exec(html)) !== null) {
+		const [fullMatch, tagName, attrs] = match;
+		const tag = tagName.toLowerCase();
+
+		// Add text before this tag (escaped)
+		if (match.index > lastIndex) {
+			result.push(escapeHTML(html.slice(lastIndex, match.index)));
+		}
+		lastIndex = match.index + fullMatch.length;
+
+		// Check if tag is allowed
+		if (!MULTIMEDIA_TAGS.has(tag)) {
+			// Disallowed tag found - escape entire input
+			return escapeHTML(html);
+		}
+
+		// Sanitize and add the tag
+		if (fullMatch.startsWith("</")) {
+			result.push(`</${tag}>`);
+		} else {
+			const sanitizedAttrs = sanitizeMediaAttributes(attrs);
+			result.push(`<${tag}${sanitizedAttrs}>`);
+		}
 	}
-	return sanitized;
+
+	// Add remaining text (escaped)
+	if (lastIndex < html.length) {
+		result.push(escapeHTML(html.slice(lastIndex)));
+	}
+
+	return result.join("");
 }
 
 function createMarkedInstance(sources: SimpleSource[]): Marked {
@@ -371,7 +375,7 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 				}
 				return `<img src="${safeSrc}" alt="${safeAlt}"${safeTitle} />`;
 			},
-			html: (html) => sanitizeHtmlForMultimedia(html),
+			html: (html) => sanitizeMediaHtml(html),
 		},
 		gfm: true,
 		breaks: true,

@@ -83,7 +83,6 @@
 		"file-type": "^21.0.0",
 		"handlebars": "^4.7.8",
 		"highlight.js": "^11.7.0",
-		"htmlparser2": "^10.0.0",
 		"husky": "^9.0.11",
 		"ip-address": "^9.0.5",
 		"jsdom": "^22.0.0",
