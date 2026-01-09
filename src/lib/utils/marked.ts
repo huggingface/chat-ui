@@ -2,6 +2,7 @@ import katex from "katex";
 import "katex/dist/contrib/mhchem.mjs";
 import { Marked } from "marked";
 import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
+import DOMPurify from "isomorphic-dompurify";
 // Simple type to replace removed WebSearchSource
 type SimpleSource = {
 	title?: string;
@@ -55,6 +56,36 @@ const bundledLanguages: [string, LanguageFn][] = [
 ];
 
 bundledLanguages.forEach(([name, language]) => hljs.registerLanguage(name, language));
+
+// DOMPurify config for allowing video/audio tags in markdown
+const DOMPURIFY_CONFIG = {
+	ALLOWED_TAGS: ["video", "audio", "source"],
+	ALLOWED_ATTR: [
+		"src",
+		"type",
+		"controls",
+		"autoplay",
+		"loop",
+		"muted",
+		"playsinline",
+		"poster",
+		"width",
+		"height",
+		"preload",
+	],
+};
+
+// Media URL detection
+const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg|mov|m4v)([?#]|$)/i;
+const AUDIO_EXTENSIONS = /\.(mp3|wav|m4a|aac|flac)([?#]|$)/i;
+
+function isVideoUrl(url: string): boolean {
+	return VIDEO_EXTENSIONS.test(url);
+}
+
+function isAudioUrl(url: string): boolean {
+	return AUDIO_EXTENSIONS.test(url);
+}
 
 interface katexBlockToken extends Tokens.Generic {
 	type: "katexBlock";
@@ -238,7 +269,23 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 					? `<a href="${escapeHTML(safeHref)}" target="_blank" rel="noreferrer">${text}</a>`
 					: `<span>${escapeHTML(text ?? "")}</span>`;
 			},
-			html: (html) => escapeHTML(html),
+			image: (href, title, text) => {
+				const safeHref = sanitizeHref(href);
+				if (!safeHref) return `<span>${escapeHTML(text ?? "")}</span>`;
+
+				const safeSrc = escapeHTML(safeHref);
+				const safeTitle = title ? ` title="${escapeHTML(title)}"` : "";
+				const safeAlt = escapeHTML(text ?? "");
+
+				if (isVideoUrl(safeHref)) {
+					return `<video controls${safeTitle}><source src="${safeSrc}">${safeAlt}</video>`;
+				}
+				if (isAudioUrl(safeHref)) {
+					return `<audio controls${safeTitle}><source src="${safeSrc}">${safeAlt}</audio>`;
+				}
+				return `<img src="${safeSrc}" alt="${safeAlt}"${safeTitle} />`;
+			},
+			html: (html) => DOMPurify.sanitize(html, DOMPURIFY_CONFIG),
 		},
 		gfm: true,
 		breaks: true,
