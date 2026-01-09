@@ -2,7 +2,11 @@ import katex from "katex";
 import "katex/dist/contrib/mhchem.mjs";
 import { Marked } from "marked";
 import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
-import DOMPurify from "isomorphic-dompurify";
+
+// Lazy-load DOMPurify to avoid crashes in Web Workers (no window/DOM)
+// Web Workers have importScripts but no window
+const isWebWorker = typeof importScripts === "function" && typeof window === "undefined";
+const DOMPurify = isWebWorker ? null : (await import("isomorphic-dompurify")).default;
 // Simple type to replace removed WebSearchSource
 type SimpleSource = {
 	title?: string;
@@ -285,7 +289,13 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 				}
 				return `<img src="${safeSrc}" alt="${safeAlt}"${safeTitle} />`;
 			},
-			html: (html) => DOMPurify.sanitize(html, DOMPURIFY_CONFIG),
+			html: (html) => {
+				// DOMPurify is lazy-loaded and unavailable in Web Workers
+				if (!DOMPurify) {
+					return escapeHTML(html);
+				}
+				return DOMPurify.sanitize(html, DOMPURIFY_CONFIG);
+			},
 		},
 		gfm: true,
 		breaks: true,
