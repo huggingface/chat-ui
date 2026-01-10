@@ -8,7 +8,9 @@ import { writable, derived, get } from "svelte/store";
 import { base } from "$app/paths";
 import { env as publicEnv } from "$env/dynamic/public";
 import { browser } from "$app/environment";
-import type { MCPServer, ServerStatus, MCPTool } from "$lib/types/Tool";
+import type { MCPServer, ServerStatus, MCPTool, KeyValuePair } from "$lib/types/Tool";
+import type { McpOAuthToken } from "$lib/types/McpOAuth";
+import { getToken, isTokenExpired, cleanupServerOAuth } from "$lib/stores/mcpOAuthTokens";
 
 // Namespace storage by app identity to avoid collisions across apps
 function toKeyPart(s: string | undefined): string {
@@ -138,6 +140,51 @@ export const allBaseServersEnabled = derived(
 // is applied server-side when enabled via MCP_FORWARD_HF_USER_TOKEN.
 
 /**
+ * Inject OAuth token into headers as Authorization header
+ */
+function injectOAuthHeader(
+	headers: KeyValuePair[] | undefined,
+	token: McpOAuthToken
+): KeyValuePair[] {
+	const result = headers ? [...headers] : [];
+	const authHeaderIndex = result.findIndex((h) => h.key.toLowerCase() === "authorization");
+	const tokenType = token.tokenType.charAt(0).toUpperCase() + token.tokenType.slice(1);
+	const authHeader = {
+		key: "Authorization",
+		value: `${tokenType} ${token.accessToken}`,
+	};
+
+	if (authHeaderIndex >= 0) {
+		result[authHeaderIndex] = authHeader;
+	} else {
+		result.push(authHeader);
+	}
+	return result;
+}
+
+/**
+ * Get enabled servers with OAuth tokens injected into headers
+ */
+export function getServersWithAuth(): MCPServer[] {
+	const servers = get(enabledServers);
+
+	return servers.map((server) => {
+		const token = getToken(server.id);
+
+		if (server.oauthEnabled || token) {
+			if (!token || isTokenExpired(token)) {
+				return { ...server, authRequired: true };
+			}
+
+			const headers = injectOAuthHeader(server.headers, token);
+			return { ...server, headers, authRequired: false, oauthEnabled: true };
+		}
+
+		return server;
+	});
+}
+
+/**
  * Refresh base servers from API and merge with custom servers
  */
 export async function refreshMcpServers() {
@@ -233,10 +280,12 @@ export function disableAllServers() {
 /**
  * Add a custom MCP server
  */
-export function addCustomServer(server: Omit<MCPServer, "id" | "type" | "status">): string {
+export function addCustomServer(
+	server: Omit<MCPServer, "id" | "type" | "status"> & { id?: string }
+): string {
 	const newServer: MCPServer = {
 		...server,
-		id: crypto.randomUUID(),
+		id: server.id || crypto.randomUUID(),
 		type: "custom",
 		status: "disconnected",
 	};
@@ -280,6 +329,7 @@ export function deleteCustomServer(id: string) {
 		return newSet;
 	});
 
+	cleanupServerOAuth(id);
 	refreshMcpServers();
 }
 
@@ -317,10 +367,16 @@ export async function healthCheckServer(
 	try {
 		updateServerStatus(server.id, "connecting");
 
+		const token = getToken(server.id);
+		const headers =
+			token && !isTokenExpired(token)
+				? injectOAuthHeader(server.headers, token)
+				: (server.headers ?? []);
+
 		const response = await fetch(`${base}/api/mcp/health`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ url: server.url, headers: server.headers }),
+			body: JSON.stringify({ url: server.url, headers }),
 		});
 
 		const result = await response.json();
