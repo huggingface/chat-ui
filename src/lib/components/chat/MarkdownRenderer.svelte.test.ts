@@ -32,6 +32,7 @@ describe("MarkdownRenderer", () => {
 	it("doesnt render raw html directly", () => {
 		render(MarkdownRenderer, { content: "<button>Click me</button>" });
 		expect(page.getByRole("button").elements).toHaveLength(0);
+		// htmlparser2 escapes disallowed tags
 		expect(page.getByRole("paragraph")).toHaveTextContent("<button>Click me</button>");
 	});
 	it("renders latex", () => {

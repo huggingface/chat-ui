@@ -69,7 +69,7 @@ export async function* executeToolCalls({
 	toPrimitive,
 	processToolOutput,
 	abortSignal,
-	toolTimeoutMs = 30_000,
+	toolTimeoutMs = 60_000,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
@@ -300,6 +300,9 @@ export async function* executeToolCalls({
 			toolRuns.push({ name, parameters: r.paramsClean, output });
 			// For the LLM follow-up call, we keep only the textual output
 			toolMessages.push({ role: "tool", tool_call_id: id, content: output });
+		} else {
+			// Communicate error to LLM so it doesn't hallucinate success
+			toolMessages.push({ role: "tool", tool_call_id: id, content: `Error: ${r.error}` });
 		}
 	}
 
