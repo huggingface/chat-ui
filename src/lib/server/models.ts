@@ -177,8 +177,35 @@ export type ModelsRefreshSummary = {
 export type ProcessedModel = InternalProcessedModel;
 
 export let models: ProcessedModel[] = [];
-export let defaultModel!: ProcessedModel;
-export let taskModel!: ProcessedModel;
+
+// Placeholder model for build-time (Capacitor builds don't have server)
+// At runtime, this will be replaced by actual models from the API
+const placeholderModel: ProcessedModel = {
+	id: "placeholder",
+	name: "Loading...",
+	displayName: "Loading...",
+	websiteUrl: "",
+	description: "",
+	logoUrl: "",
+	modelUrl: "",
+	tokenizer: { tokenizerUrl: "", tokenizerConfigUrl: "" },
+	datasetName: "",
+	datasetUrl: "",
+	preprompt: "",
+	prepromptUrl: "",
+	promptExamples: [],
+	parameters: { temperature: 0.7 },
+	unlisted: false,
+	multimodal: false,
+	multimodalAcceptedMimetypes: [],
+	tools: false,
+	endpoints: [],
+	hasInferenceAPI: false,
+	reasoning: false,
+};
+
+export let defaultModel: ProcessedModel = placeholderModel;
+export let taskModel: ProcessedModel = placeholderModel;
 export let validModelIdSchema: z.ZodType<string> = z.string();
 export let lastModelRefresh = new Date(0);
 export let lastModelRefreshDurationMs = 0;
@@ -471,7 +498,11 @@ const rebuildModels = async (): Promise<ModelsRefreshSummary> => {
 	return applyModelState(newModels, startedAt);
 };
 
-await rebuildModels();
+// Skip initialization during Capacitor builds (no server in SPA mode)
+// The models will be fetched at runtime via API calls
+if (!import.meta.env.CAPACITOR) {
+	await rebuildModels();
+}
 
 export const refreshModels = async (): Promise<ModelsRefreshSummary> => {
 	if (inflightRefresh) {

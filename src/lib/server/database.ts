@@ -358,12 +358,47 @@ export class Database {
 
 export let collections: ReturnType<typeof Database.prototype.getCollections>;
 
+// Mock collection factory for Capacitor/static builds
+const createMockCollection = () => ({
+	findOne: async () => null,
+	find: () => ({ toArray: async () => [], sort: () => ({ toArray: async () => [] }) }),
+	countDocuments: async () => 0,
+	insertOne: async () => ({ insertedId: null }),
+	updateOne: async () => ({ modifiedCount: 0 }),
+	deleteOne: async () => ({ deletedCount: 0 }),
+	deleteMany: async () => ({ deletedCount: 0 }),
+	aggregate: () => ({ toArray: async () => [] }),
+	createIndex: async () => "",
+});
+
+const createMockBucket = () => ({
+	find: () => ({ toArray: async () => [] }),
+	openDownloadStream: () => null,
+	openUploadStream: () => null,
+});
+
 export const ready = (async () => {
-	if (!building) {
+	// Skip database connection during Capacitor builds (no server/database in SPA mode)
+	if (!building && !import.meta.env.CAPACITOR) {
 		const db = await Database.getInstance();
 		collections = db.getCollections();
 	} else {
-		collections = {} as unknown as ReturnType<typeof Database.prototype.getCollections>;
+		// Provide mock collections for static builds
+		collections = {
+			conversations: createMockCollection(),
+			sharedConversations: createMockCollection(),
+			abortedGenerations: createMockCollection(),
+			users: createMockCollection(),
+			sessions: createMockCollection(),
+			messageEvents: createMockCollection(),
+			assistants: createMockCollection(),
+			reports: createMockCollection(),
+			semaphores: createMockCollection(),
+			migrationResults: createMockCollection(),
+			tools: createMockCollection(),
+			config: createMockCollection(),
+			bucket: createMockBucket(),
+		} as unknown as ReturnType<typeof Database.prototype.getCollections>;
 	}
 })();
 
