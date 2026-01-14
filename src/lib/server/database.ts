@@ -386,18 +386,22 @@ export const ready = (async () => {
 		// Provide mock collections for static builds
 		collections = {
 			conversations: createMockCollection(),
+			conversationStats: createMockCollection(),
+			assistants: createMockCollection(),
+			assistantStats: createMockCollection(),
+			reports: createMockCollection(),
 			sharedConversations: createMockCollection(),
 			abortedGenerations: createMockCollection(),
+			settings: createMockCollection(),
 			users: createMockCollection(),
 			sessions: createMockCollection(),
 			messageEvents: createMockCollection(),
-			assistants: createMockCollection(),
-			reports: createMockCollection(),
-			semaphores: createMockCollection(),
+			bucket: createMockBucket(),
 			migrationResults: createMockCollection(),
+			semaphores: createMockCollection(),
+			tokenCaches: createMockCollection(),
 			tools: createMockCollection(),
 			config: createMockCollection(),
-			bucket: createMockBucket(),
 		} as unknown as ReturnType<typeof Database.prototype.getCollections>;
 	}
 })();

@@ -31,8 +31,9 @@ export default defineConfig({
 		loadTTFAsArrayBuffer(),
 	],
 	// Define compile-time constants for Capacitor builds
+	// Use boolean directly, not JSON.stringify - stringified booleans are always truthy
 	define: {
-		"import.meta.env.CAPACITOR": JSON.stringify(isCapacitor),
+		"import.meta.env.CAPACITOR": isCapacitor,
 	},
 	// Allow external access via ngrok tunnel host
 	server: {

@@ -188,7 +188,6 @@ const placeholderModel: ProcessedModel = {
 	description: "",
 	logoUrl: "",
 	modelUrl: "",
-	tokenizer: { tokenizerUrl: "", tokenizerConfigUrl: "" },
 	datasetName: "",
 	datasetUrl: "",
 	preprompt: "",
@@ -198,10 +197,15 @@ const placeholderModel: ProcessedModel = {
 	unlisted: false,
 	multimodal: false,
 	multimodalAcceptedMimetypes: [],
-	tools: false,
+	supportsTools: false,
 	endpoints: [],
 	hasInferenceAPI: false,
-	reasoning: false,
+	isRouter: false,
+	// Required methods for ProcessedModel
+	chatPromptRender: () => "",
+	getEndpoint: async () => {
+		throw new Error("Placeholder model cannot create endpoints");
+	},
 };
 
 export let defaultModel: ProcessedModel = placeholderModel;
