@@ -39,7 +39,6 @@ export async function updateUser(params: {
 		picture: avatarUrl,
 		sub: hfUserId,
 		orgs,
-		isPro,
 	} = z
 		.object({
 			preferred_username: z.string().optional(),
@@ -47,7 +46,6 @@ export async function updateUser(params: {
 			picture: z.string().optional(),
 			sub: z.string(),
 			email: z.string().email().optional(),
-			isPro: z.boolean().optional(),
 			orgs: z
 				.array(
 					z.object({
@@ -74,7 +72,6 @@ export async function updateUser(params: {
 		picture?: string;
 		sub: string;
 		name: string;
-		isPro?: boolean;
 		orgs?: Array<{
 			sub: string;
 			name: string;
@@ -137,7 +134,7 @@ export async function updateUser(params: {
 		// update existing user if any
 		await collections.users.updateOne(
 			{ _id: existingUser._id },
-			{ $set: { username, name, avatarUrl, isAdmin, isEarlyAccess, isPro } }
+			{ $set: { username, name, avatarUrl, isAdmin, isEarlyAccess } }
 		);
 
 		// remove previous session if it exists and add new one
@@ -167,7 +164,6 @@ export async function updateUser(params: {
 			hfUserId,
 			isAdmin,
 			isEarlyAccess,
-			isPro,
 		});
 
 		userId = insertedId;
