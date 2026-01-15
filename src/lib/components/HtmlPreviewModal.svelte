@@ -137,6 +137,7 @@
 				title="HTML Preview"
 				class="h-full w-full rounded-lg border border-gray-200 dark:border-gray-700"
 				sandbox="allow-scripts allow-popups"
+				allow="serial"
 				referrerpolicy="no-referrer"
 				{srcdoc}
 			></iframe>
