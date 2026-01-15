@@ -34,6 +34,7 @@ export const userGroup = new Elysia()
 							email: locals.user.email,
 							isAdmin: locals.user.isAdmin ?? false,
 							isEarlyAccess: locals.user.isEarlyAccess ?? false,
+							isPro: locals.user.isPro ?? false,
 						}
 					: null;
 			})

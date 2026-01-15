@@ -11,4 +11,5 @@ export interface User extends Timestamps {
 	hfUserId: string;
 	isAdmin?: boolean;
 	isEarlyAccess?: boolean;
+	isPro?: boolean;
 }
