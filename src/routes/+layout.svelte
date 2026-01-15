@@ -131,8 +131,7 @@
 					isPro.set(userData.isPro ?? false);
 				})
 				.catch(() => {
-					// Fallback to database value on error
-					isPro.set(data.user?.isPro ?? false);
+					// Keep isPro as null on error - don't show any badge if status is unknown
 				});
 		}
 
