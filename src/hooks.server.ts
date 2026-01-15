@@ -171,7 +171,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 			event.locals.sessionId = auth.sessionId;
 
 			if (loginEnabled && !auth.user && !event.url.pathname.startsWith(`${base}/.well-known/`)) {
-				if (config.AUTOMATIC_LOGIN === "true") {
+				// Skip OAuth redirects during static builds (Capacitor fallback generation)
+				if (building) {
+					// Allow the request to proceed without authentication during build
+				} else if (config.AUTOMATIC_LOGIN === "true") {
 					// AUTOMATIC_LOGIN: always redirect to OAuth flow (unless already on login or healthcheck pages)
 					if (
 						!event.url.pathname.startsWith(`${base}/login`) &&

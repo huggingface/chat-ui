@@ -1,10 +1,20 @@
-import adapter from "@sveltejs/adapter-node";
+import adapterNode from "@sveltejs/adapter-node";
+import adapterStatic from "@sveltejs/adapter-static";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import dotenv from "dotenv";
 import { execSync } from "child_process";
 
 dotenv.config({ path: "./.env.local", override: true });
 dotenv.config({ path: "./.env" });
+
+// Use static adapter for Capacitor builds (SPA mode), node adapter for web
+const isCapacitor = process.env.CAPACITOR === "true";
+const adapter = isCapacitor
+	? adapterStatic({
+			fallback: "index.html", // SPA fallback for client-side routing
+			strict: false, // Don't fail on dynamic routes
+		})
+	: adapterNode();
 
 function getCurrentCommitSHA() {
 	try {
@@ -25,7 +35,7 @@ const config = {
 	preprocess: vitePreprocess(),
 
 	kit: {
-		adapter: adapter(),
+		adapter,
 
 		paths: {
 			base: process.env.APP_BASE || "",
@@ -44,6 +54,12 @@ const config = {
 			$api: "./src/lib/server/api",
 			"$api/*": "./src/lib/server/api/*",
 		},
+		// For Capacitor builds, disable prerendering entirely (pure SPA mode)
+		...(isCapacitor && {
+			prerender: {
+				entries: [],
+			},
+		}),
 	},
 };
 

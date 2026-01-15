@@ -19,6 +19,9 @@ function loadTTFAsArrayBuffer() {
 		},
 	};
 }
+
+const isCapacitor = process.env.CAPACITOR === "true";
+
 export default defineConfig({
 	plugins: [
 		sveltekit(),
@@ -27,6 +30,11 @@ export default defineConfig({
 		}),
 		loadTTFAsArrayBuffer(),
 	],
+	// Define compile-time constants for Capacitor builds
+	// Use boolean directly, not JSON.stringify - stringified booleans are always truthy
+	define: {
+		"import.meta.env.CAPACITOR": isCapacitor,
+	},
 	// Allow external access via ngrok tunnel host
 	server: {
 		port: process.env.PORT ? parseInt(process.env.PORT) : 5173,

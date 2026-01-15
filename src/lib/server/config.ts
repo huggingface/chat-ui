@@ -21,13 +21,20 @@ class ConfigManager {
 	async init() {
 		if (this.isInitialized) return;
 
-		if (import.meta.env.MODE === "test") {
+		// Skip initialization in test mode or Capacitor builds
+		if (import.meta.env.MODE === "test" || import.meta.env.CAPACITOR) {
 			this.isInitialized = true;
 			return;
 		}
 
 		const { getCollectionsEarly } = await import("./database");
 		const collections = await getCollectionsEarly();
+
+		// Guard against empty collections (happens during static builds)
+		if (!collections.config || typeof collections.config.find !== "function") {
+			this.isInitialized = true;
+			return;
+		}
 
 		this.configCollection = collections.config;
 		this.semaphoreCollection = collections.semaphores;
@@ -46,6 +53,10 @@ class ConfigManager {
 	}
 
 	async checkForUpdates() {
+		// Skip if config collection is not properly initialized (e.g., during Capacitor builds)
+		if (!this.configCollection || typeof this.configCollection.find !== "function") {
+			return;
+		}
 		if (await this.isConfigStale()) {
 			await this.updateConfig();
 		}
@@ -146,7 +157,8 @@ class ConfigManager {
 const configManager = new ConfigManager();
 
 export const ready = (async () => {
-	if (!building) {
+	// Skip initialization during Capacitor builds (no server/database in SPA mode)
+	if (!building && !import.meta.env.CAPACITOR) {
 		await configManager.init();
 	}
 })();

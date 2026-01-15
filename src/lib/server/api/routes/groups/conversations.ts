@@ -2,10 +2,11 @@ import { Elysia, error, t } from "elysia";
 import { authPlugin } from "$api/authPlugin";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
-import { authCondition } from "$lib/server/auth";
+import { authCondition, loginEnabled } from "$lib/server/auth";
 import { validModelIdSchema } from "$lib/server/models";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import type { Conversation } from "$lib/types/Conversation";
+import { createConversationFromShare } from "$lib/server/conversation";
 
 import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 
@@ -60,6 +61,31 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 				});
 				return res.deletedCount;
 			})
+			// Create a new conversation from a shared conversation (for SPA/Capacitor mode)
+			.post(
+				"/from-share",
+				async ({ locals, body, request }) => {
+					if (!loginEnabled) {
+						return error(400, "Login is not enabled");
+					}
+					if (!locals.user) {
+						return error(401, "Must be logged in to create conversation from share");
+					}
+
+					const conversationId = await createConversationFromShare(
+						body.shareId,
+						locals,
+						request.headers.get("User-Agent") ?? undefined
+					);
+
+					return { conversationId };
+				},
+				{
+					body: t.Object({
+						shareId: t.String({ minLength: 7, maxLength: 7 }),
+					}),
+				}
+			)
 			// search endpoint removed
 			.group(
 				"/:id",
