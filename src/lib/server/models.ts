@@ -378,9 +378,16 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				}
 			}
 
+			// Track which overrides matched existing models
+			const matchedOverrideKeys = new Set<string>();
+
 			modelsRaw = modelsRaw.map((model) => {
 				const override = overrideMap.get(model.id ?? "") ?? overrideMap.get(model.name ?? "");
 				if (!override) return model;
+
+				// Mark this override as matched
+				if (model.id) matchedOverrideKeys.add(model.id);
+				if (model.name) matchedOverrideKeys.add(model.name);
 
 				const { id, name, ...rest } = override;
 				void id;
@@ -391,6 +398,34 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 					...rest,
 				};
 			});
+
+			// Add models from MODELS that didn't match any discovered model (new models)
+			for (const override of overrides) {
+				const overrideId = override.id?.trim() || override.name?.trim();
+				if (!overrideId) continue;
+
+				// Skip if this override already matched an existing model
+				if (matchedOverrideKeys.has(overrideId)) continue;
+				if (override.id && matchedOverrideKeys.has(override.id)) continue;
+				if (override.name && matchedOverrideKeys.has(override.name)) continue;
+
+				// This is a new model - add it
+				// Ensure it has required fields and endpoints
+				if (override.endpoints && override.endpoints.length > 0) {
+					const newModel: ModelConfig = {
+						...override, // Spread all override fields (prepromptUrl, websiteUrl, promptExamples, etc.)
+						id: override.id || override.name || overrideId,
+						name: override.name || override.id || overrideId,
+						multimodal: override.multimodal ?? false,
+						supportsTools: override.supportsTools ?? false,
+						unlisted: override.unlisted ?? false,
+						preprompt: override.preprompt ?? "",
+						systemRoleSupported: override.systemRoleSupported ?? true,
+					};
+					modelsRaw.push(newModel);
+					logger.info({ modelId: newModel.id }, "[models] Added new model from MODELS env");
+				}
+			}
 		}
 
 		const builtModels = await Promise.all(
