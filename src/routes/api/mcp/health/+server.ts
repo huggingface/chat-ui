@@ -6,8 +6,7 @@ import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import type { RequestHandler } from "./$types";
 import { isValidUrl } from "$lib/server/urlSafety";
-import { isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
-import { isExaServer, getExaToolDefinitions } from "$lib/server/mcp/exaDirect";
+import { isStrictHfMcpLogin, hasNonEmptyToken, isExaMcpServer } from "$lib/server/mcp/hf";
 
 interface HealthCheckRequest {
 	url: string;
@@ -51,25 +50,23 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
-		// Bypass MCP protocol for Exa - return hardcoded tool definitions immediately
-		if (isExaServer({ name: "", url, headers: {} })) {
-			const tools = getExaToolDefinitions();
-			const response: HealthCheckResponse = {
-				ready: true,
-				tools: tools.map((tool) => ({
-					name: tool.name,
-					description: tool.description,
-					inputSchema: tool.inputSchema,
-				})),
-				authRequired: false,
-			};
-			return new Response(JSON.stringify(response), {
-				status: 200,
-				headers: { "Content-Type": "application/json" },
-			});
+		// Inject Exa API key for mcp.exa.ai servers via URL param
+		let finalUrl = url;
+		try {
+			const exaApiKey = config.EXA_API_KEY;
+			if (isExaMcpServer(url) && hasNonEmptyToken(exaApiKey)) {
+				const urlObj = new URL(url);
+				if (!urlObj.searchParams.has("exaApiKey")) {
+					urlObj.searchParams.set("exaApiKey", exaApiKey);
+					finalUrl = urlObj.toString();
+					logger.debug({}, "[MCP Health] injected Exa API key");
+				}
+			}
+		} catch {
+			// best-effort injection
 		}
 
-		const baseUrl = new URL(url);
+		const baseUrl = new URL(finalUrl);
 
 		// Minimal header handling
 		const headersRecord: Record<string, string> = headers?.length
