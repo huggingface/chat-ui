@@ -5,7 +5,12 @@
 	"packageManager": "npm@9.5.0",
 	"scripts": {
 		"dev": "vite dev",
+		"dev:xp": "node scripts/useEnv.mjs xp dev",
+		"dev:bkk": "node scripts/useEnv.mjs bkk dev",
+		"dev:select": "node scripts/selectProject.mjs",
 		"build": "vite build",
+		"build:xp": "node scripts/useEnv.mjs xp build",
+		"build:bkk": "node scripts/useEnv.mjs bkk build",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",

@@ -4,7 +4,11 @@ import { promises } from "fs";
 import { defineConfig } from "vitest/config";
 import { config } from "dotenv";
 
-config({ path: "./.env.local" });
+// Load base .env first
+config({ path: "./.env" });
+
+// Vite automatically loads .env.{mode} and .env.{mode}.local based on --mode flag
+// So no manual loading needed here - Vite handles it with dotenv plugin
 
 // used to load fonts server side for thumbnail generation
 function loadTTFAsArrayBuffer() {
