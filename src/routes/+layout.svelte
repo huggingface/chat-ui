@@ -131,8 +131,7 @@
 					isPro.set(userData.isPro ?? false);
 				})
 				.catch(() => {
-					// Fallback to database value on error
-					isPro.set(data.user?.isPro ?? false);
+					isPro.set(false);
 				});
 		}
 
