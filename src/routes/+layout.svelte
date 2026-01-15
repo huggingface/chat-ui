@@ -131,7 +131,7 @@
 					isPro.set(userData.isPro ?? false);
 				})
 				.catch(() => {
-					isPro.set(false);
+					// Keep isPro as null on error - don't show any badge if status is unknown
 				});
 		}
 
