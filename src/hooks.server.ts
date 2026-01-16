@@ -284,8 +284,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 			// Update request context with status code
 			updateRequestContext({ statusCode: response.status });
 
-			// Add CSP header to disallow framing if ALLOW_IFRAME is not "true"
-			if (config.ALLOW_IFRAME !== "true") {
+			// Add CSP header to control iframe embedding
+			if (config.ALLOW_IFRAME === "true") {
+				response.headers.append(
+					"Content-Security-Policy",
+					"frame-ancestors 'self' https://huggingface.co;"
+				);
+			} else {
 				response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
 			}
 
