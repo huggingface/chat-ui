@@ -76,8 +76,16 @@ envVars:
   PUBLIC_LLM_ROUTER_DISPLAY_NAME: "Omni"
   PUBLIC_LLM_ROUTER_LOGO_URL: "https://cdn-uploads.huggingface.co/production/uploads/5f17f0a0925b9863e28ad517/C5V0v1xZXv6M7FXsdJH9b.png"
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
-  MODELS: > 
+  MODELS: >
     [
+      { "id": "zai-org/GLM-4.7", "description": "Flagship GLM MoE for coding, reasoning, and agentic tool use." },
+      { "id": "zai-org/GLM-4.7-FP8", "description": "FP8 GLM-4.7 for efficient inference with strong coding." },
+      { "id": "MiniMaxAI/MiniMax-M2.1", "description": "MoE agent model with multilingual coding and fast outputs." },
+      { "id": "XiaomiMiMo/MiMo-V2-Flash", "description": "Fast MoE reasoning model with speculative decoding for agents." },
+      { "id": "Qwen/Qwen3-VL-32B-Instruct", "description": "Vision-language Qwen for documents, GUI agents, and visual reasoning." },
+      { "id": "allenai/Olmo-3.1-32B-Instruct", "description": "Fully open chat model strong at tool use and dialogue." },
+      { "id": "zai-org/AutoGLM-Phone-9B-Multilingual", "description": "Mobile agent for multilingual Android device automation." },
+      { "id": "utter-project/EuroLLM-22B-Instruct-2512", "description": "European multilingual model for all EU languages and translation." },
       { "id": "dicta-il/DictaLM-3.0-24B-Thinking", "description": "Hebrew-English reasoning model with explicit thinking traces for bilingual QA and logic." },
       { "id": "EssentialAI/rnj-1-instruct", "description": "8B code and STEM model rivaling larger models on agentic coding, math, and tool use." },
       { "id": "MiniMaxAI/MiniMax-M2", "description": "Compact MoE model tuned for fast coding, agentic workflows, and long-context chat." },
