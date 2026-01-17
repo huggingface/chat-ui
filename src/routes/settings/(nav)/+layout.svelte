@@ -8,6 +8,7 @@
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
+	import IconBurger from "$lib/components/icons/IconBurger.svelte";
 	import LucideImage from "~icons/lucide/image";
 	import LucideHammer from "~icons/lucide/hammer";
 	import IconGear from "~icons/bi/gear-fill";
@@ -116,7 +117,19 @@
 		{/if}
 		<h2 class=" left-0 right-0 mx-auto w-fit text-center text-xl font-bold md:hidden">Settings</h2>
 		<button
-			class="btn rounded-lg"
+			class="btn rounded-lg md:hidden"
+			aria-label="Back to model list"
+			onclick={() => {
+				showContent = false;
+				goto(`${base}/settings`);
+			}}
+		>
+			<IconBurger
+				classNames="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white"
+			/>
+		</button>
+		<button
+			class="btn hidden rounded-lg md:block"
 			aria-label="Close settings"
 			onclick={() => {
 				goto(previousPage);
