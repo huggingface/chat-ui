@@ -16,17 +16,21 @@ export const load: PageLoad = async ({ params, depends, fetch, url, parent }) =>
 		if (parentData.loginEnabled && parentData.user) {
 			const leafId = url.searchParams.get("leafId");
 
+			let importedConversationId: string | undefined;
 			try {
 				const result = await client.conversations["import-share"]
 					.post({ shareId: params.id })
 					.then(handleResponse);
-
-				redirect(
-					302,
-					`${base}/conversation/${result.conversationId}?leafId=${leafId ?? ""}&fromShare=${params.id}`
-				);
+				importedConversationId = result.conversationId;
 			} catch {
 				// Import failed, continue to load shared conversation for viewing
+			}
+
+			if (importedConversationId) {
+				redirect(
+					302,
+					`${base}/conversation/${importedConversationId}?leafId=${leafId ?? ""}&fromShare=${params.id}`
+				);
 			}
 		}
 	}

@@ -11,17 +11,21 @@ export const load: PageLoad = async ({ params, url, fetch, parent }) => {
 	if (parentData.loginEnabled && parentData.user && params.id) {
 		const client = useAPIClient({ fetch, origin: url.origin });
 
+		let importedConversationId: string | undefined;
 		try {
 			const result = await client.conversations["import-share"]
 				.post({ shareId: params.id })
 				.then(handleResponse);
-
-			redirect(
-				302,
-				`${base}/conversation/${result.conversationId}?leafId=${leafId ?? ""}&fromShare=${params.id}`
-			);
+			importedConversationId = result.conversationId;
 		} catch {
 			// Fall through to view-only mode on error
+		}
+
+		if (importedConversationId) {
+			redirect(
+				302,
+				`${base}/conversation/${importedConversationId}?leafId=${leafId ?? ""}&fromShare=${params.id}`
+			);
 		}
 	}
 
