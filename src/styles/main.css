@@ -120,12 +120,18 @@ body {
 		@apply font-semibold;
 	}
 
-	/* Citation badge - inline pill for source references */
-	.prose .citation-badge {
-		@apply ml-0.5 inline-flex items-center rounded px-1.5 py-0.5 text-xs font-normal no-underline;
-		@apply bg-gray-100/60 text-gray-400 hover:bg-gray-100 hover:text-gray-500;
-		@apply dark:bg-gray-700/40 dark:text-gray-500 dark:hover:bg-gray-700/60 dark:hover:text-gray-400;
-		vertical-align: baseline;
+	/* Citation superscript link */
+	.prose .citation-link {
+		@apply text-purple-500 no-underline hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300;
+	}
+
+	/* Footnotes container at message end */
+	.sources-footnotes {
+		@apply mt-4 flex flex-wrap gap-2 border-t border-gray-200 pt-3 dark:border-gray-700;
+	}
+
+	.footnote-source {
+		@apply text-xs text-gray-500 no-underline hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300;
 	}
 }
 

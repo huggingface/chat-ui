@@ -228,40 +228,15 @@ function escapeHTML(content: string) {
 function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): string {
 	if (webSearchSources.length === 0) return md;
 
-	// First, remove citation-only lines (lines that contain only [n] patterns and whitespace)
+	// Remove citation-only lines (lines that contain only [n] patterns and whitespace)
 	let result = md.replace(/^[\s]*(\[\d+\][\s]*)+$/gm, "");
 
-	// Match one or more adjacent [n] patterns, optionally followed by punctuation
-	// This groups [1][2][3] into a single replacement
-	result = result.replace(
-		/(\[\d+\])+([.,;:!?])?/g,
-		(match: string, _group: string, punct?: string) => {
-			// Extract all citation numbers from the match
-			const nums = [...match.matchAll(/\[(\d+)\]/g)].map((m) => parseInt(m[1], 10));
-
-			// Deduplicate and filter valid indices
-			const validIndices = [...new Set(nums)].filter((n) => n > 0 && n <= webSearchSources.length);
-			if (validIndices.length === 0) return match;
-
-			// Create badges for each unique source
-			const badges = validIndices.map((index) => {
-				const source = webSearchSources[index - 1];
-				let title = source.title;
-				if (!title) {
-					try {
-						title = new URL(source.link).hostname.replace(/^www\./, "");
-					} catch {
-						title = `[${index}]`;
-					}
-				}
-				return `<a href="${escapeHTML(source.link)}" target="_blank" rel="noreferrer" class="citation-badge">${escapeHTML(title)}</a>`;
-			});
-
-			const badgeStr = badges.join(" ");
-			// Place punctuation before badges: "claim [1][2]." → "claim. <badges>"
-			return punct ? `${punct} ${badgeStr}` : ` ${badgeStr}`;
-		}
-	);
+	// Convert [n] to superscript anchor linking to footnote
+	result = result.replace(/\[(\d+)\]/g, (match, numStr) => {
+		const index = parseInt(numStr, 10);
+		if (index === 0 || index > webSearchSources.length) return match;
+		return `<sup><a href="#footnote-${index}" class="citation-link">${index}</a></sup>`;
+	});
 
 	return result;
 }
