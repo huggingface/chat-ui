@@ -10,12 +10,15 @@ Add descriptions for new models available in the HuggingFace router to chat-ui's
 ## Workflow
 
 1. **Fetch models from router**
+
    ```
    WebFetch https://router.huggingface.co/v1/models
    ```
+
    Extract all model IDs from the response.
 
 2. **Read current configuration**
+
    - Read `chart/env/prod.yaml`
    - Extract model IDs from the `MODELS` JSON array in `envVars`
 
@@ -24,18 +27,21 @@ Add descriptions for new models available in the HuggingFace router to chat-ui's
 
 4. **Research each missing model**
    For each missing model, search the web for its specifications:
+
    - Model architecture (dense, MoE, parameters)
    - Key capabilities (coding, reasoning, vision, multilingual, etc.)
    - Target use cases
 
 5. **Write descriptions**
    Match existing style:
+
    - 8-12 words
    - Sentence fragments (no period needed)
    - No articles ("a", "the") unless necessary
    - Focus on: architecture, specialization, key capability
 
    Examples:
+
    - `"Flagship GLM MoE for coding, reasoning, and agentic tool use."`
    - `"MoE agent model with multilingual coding and fast outputs."`
    - `"Vision-language Qwen for documents, GUI agents, and visual reasoning."`
@@ -43,10 +49,12 @@ Add descriptions for new models available in the HuggingFace router to chat-ui's
 
 6. **Update both files**
    Add new models at the TOP of the MODELS array in:
+
    - `chart/env/prod.yaml`
    - `chart/env/dev.yaml`
 
    Format:
+
    ```json
    { "id": "org/model-name", "description": "Description here." }
    ```

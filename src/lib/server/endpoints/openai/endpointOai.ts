@@ -221,7 +221,9 @@ export async function endpointOai(
 							"X-use-cache": "false",
 							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
 							// Bill to organization if configured
-							...(locals?.billingOrganization ? { "X-HF-Bill-To": locals.billingOrganization } : {}),
+							...(locals?.billingOrganization
+								? { "X-HF-Bill-To": locals.billingOrganization }
+								: {}),
 						},
 						signal: abortSignal,
 					}
@@ -237,7 +239,9 @@ export async function endpointOai(
 							"X-use-cache": "false",
 							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
 							// Bill to organization if configured
-							...(locals?.billingOrganization ? { "X-HF-Bill-To": locals.billingOrganization } : {}),
+							...(locals?.billingOrganization
+								? { "X-HF-Bill-To": locals.billingOrganization }
+								: {}),
 						},
 						signal: abortSignal,
 					}

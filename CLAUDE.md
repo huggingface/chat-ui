@@ -29,6 +29,7 @@ npx vitest --watch path/to/file.spec.ts    # Watch mode for single file
 ### Test Environments
 
 Tests are split into three workspaces (configured in vite.config.ts):
+
 - **Client tests** (`*.svelte.test.ts`): Browser environment with Playwright
 - **SSR tests** (`*.ssr.test.ts`): Node environment for server-side rendering
 - **Server tests** (`*.test.ts`, `*.spec.ts`): Node environment for utilities
@@ -36,6 +37,7 @@ Tests are split into three workspaces (configured in vite.config.ts):
 ## Architecture
 
 ### Stack
+
 - **SvelteKit 2** with Svelte 5 (uses runes: `$state`, `$effect`, `$bindable`)
 - **Elysia** for API routes at `/api/v2`
 - **MongoDB** for persistence (auto-fallback to in-memory with MongoMemoryServer when `MONGODB_URL` not set)
@@ -80,6 +82,7 @@ MCP servers are configured via `MCP_SERVERS` env var. When enabled, tools are ex
 ### LLM Router (Omni)
 
 Smart routing via Arch-Router model. Configured with:
+
 - `LLM_ROUTER_ROUTES_PATH`: JSON file defining routes
 - `LLM_ROUTER_ARCH_BASE_URL`: Router endpoint
 - Shortcuts: multimodal routes bypass router if `LLM_ROUTER_ENABLE_MULTIMODAL=true`
