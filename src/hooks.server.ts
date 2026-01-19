@@ -8,7 +8,13 @@ export const init: ServerInit = async () => {
 };
 
 export const handle: Handle = async (input) => {
-	if (building) return input.resolve(input.event);
+	if (building) {
+		// During static build, still replace %gaId% placeholder with empty string
+		// to prevent the GA script from loading with an invalid ID
+		return input.resolve(input.event, {
+			transformPageChunk: ({ html }) => html.replace("%gaId%", ""),
+		});
+	}
 	const mod = await import("$lib/server/hooks/handle");
 	return mod.handleRequest(input);
 };
