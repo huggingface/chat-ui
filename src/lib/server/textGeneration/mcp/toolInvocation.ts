@@ -34,7 +34,7 @@ export interface ExecuteToolCallsParams {
 	toPrimitive: (value: unknown) => Primitive | undefined;
 	processToolOutput: (text: string) => {
 		annotated: string;
-		sources: { index: number; link: string }[];
+		sources: { index: number; title: string; link: string }[];
 	};
 	abortSignal?: AbortSignal;
 	toolTimeoutMs?: number;
@@ -237,7 +237,7 @@ export async function* executeToolCalls({
 					},
 				}
 			);
-			const { annotated } = processToolOutput(toolResponse.text ?? "");
+			const { annotated, sources } = processToolOutput(toolResponse.text ?? "");
 			logger.debug(
 				{ server: mappingEntry.server, tool: mappingEntry.tool },
 				"[mcp] tool call completed"
@@ -260,6 +260,7 @@ export async function* executeToolCalls({
 					outputs: [
 						{
 							text: annotated ?? "",
+							sources,
 							structured: toolResponse.structured,
 							content: toolResponse.content,
 						} as unknown as Record<string, unknown>,

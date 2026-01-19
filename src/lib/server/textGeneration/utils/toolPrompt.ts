@@ -18,5 +18,6 @@ export function buildToolPreprompt(tools: OpenAiTool[]): string {
 		`If a tool generates an image, video, or audio, you can inline it using ![alt](url) or raw <video>/<audio> HTML tags. Video (.mp4, .webm) and audio (.mp3, .wav) URLs will render as playable media.`,
 		`If a tool needs an image, set its image field ("input_image", "image", or "image_url") to a reference like "image_1", "image_2", etc. (ordered by when the user uploaded them).`,
 		`Default to image references; only use a full http(s) URL when the tool description explicitly asks for one, or reuse a URL a previous tool returned.`,
+		`When citing, place [1], [2] at the END of sections only, never after individual bullet points or mid-paragraph. Do NOT list all sources at the end. Example: after a paragraph about founders, add [1][2] once at the end.`,
 	].join(" ");
 }

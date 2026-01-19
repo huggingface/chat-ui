@@ -20,7 +20,12 @@
 	import { requireAuthUser } from "$lib/utils/auth";
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
-	import { MessageUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
+	import {
+		MessageUpdateType,
+		MessageToolUpdateType,
+		type MessageToolUpdate,
+	} from "$lib/types/MessageUpdate";
+	import { ToolResultStatus } from "$lib/types/Tool";
 
 	interface Props {
 		message: Message;
@@ -209,6 +214,28 @@
 		return res;
 	});
 
+	// Extract sources from tool results for citation badges
+	let sources = $derived.by(() => {
+		const updates = message.updates ?? [];
+		const allSources: { title: string; link: string }[] = [];
+		for (const update of updates) {
+			if (
+				update.type === MessageUpdateType.Tool &&
+				update.subtype === MessageToolUpdateType.Result &&
+				update.result.status === ToolResultStatus.Success
+			) {
+				for (const output of update.result.outputs) {
+					const outputSources = (output as { sources?: { title: string; link: string }[] })
+						?.sources;
+					if (outputSources) {
+						allSources.push(...outputSources);
+					}
+				}
+			}
+		}
+		return allSources;
+	});
+
 	$effect(() => {
 		if (isCopied) {
 			setTimeout(() => {
@@ -294,7 +321,7 @@
 									<div
 										class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
 									>
-										<MarkdownRenderer content={part} loading={isLast && loading} />
+										<MarkdownRenderer content={part} sources={isLast && loading ? [] : sources} loading={isLast && loading} />
 									</div>
 								{/if}
 							{/each}
@@ -302,7 +329,7 @@
 							<div
 								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
 							>
-								<MarkdownRenderer content={block.content} loading={isLast && loading} />
+								<MarkdownRenderer content={block.content} sources={isLast && loading ? [] : sources} loading={isLast && loading} />
 							</div>
 						{/if}
 					{/if}
