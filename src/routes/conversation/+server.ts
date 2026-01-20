@@ -10,6 +10,7 @@ import { v4 } from "uuid";
 import { authCondition } from "$lib/server/auth";
 import { usageLimits } from "$lib/server/usageLimits";
 import { MetricsServer } from "$lib/server/metrics";
+import { generateSearchTokens } from "$lib/utils/searchTokens";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -83,10 +84,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		messages[0].content = values.preprompt;
 	}
 
+	const sanitizedTitle = (title || "New Chat").replace(/<\/?think>/gi, "").trim();
 	const res = await collections.conversations.insertOne({
 		_id: new ObjectId(),
 		// Always store sanitized titles
-		title: (title || "New Chat").replace(/<\/?think>/gi, "").trim(),
+		title: sanitizedTitle,
 		rootMessageId,
 		messages,
 		model: values.model,
@@ -94,6 +96,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		createdAt: new Date(),
 		updatedAt: new Date(),
 		userAgent: request.headers.get("User-Agent") ?? undefined,
+		searchTokens: generateSearchTokens(sanitizedTitle),
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});

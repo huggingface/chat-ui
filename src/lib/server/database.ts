@@ -350,6 +350,10 @@ export class Database {
 				logger.error(e, "Error creating index for conversations by userId and sessionId")
 			);
 
+		conversations
+			.createIndex({ searchTokens: 1 })
+			.catch((e) => logger.error(e, "Error creating index for conversations by searchTokens"));
+
 		config
 			.createIndex({ key: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating index for config by key"));

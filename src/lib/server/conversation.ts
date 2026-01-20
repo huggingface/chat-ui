@@ -3,6 +3,7 @@ import { MetricsServer } from "$lib/server/metrics";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
+import { generateSearchTokens } from "$lib/utils/searchTokens";
 
 /**
  * Create a new conversation from a shared conversation ID.
@@ -33,9 +34,10 @@ export async function createConversationFromShare(
 	}
 
 	// Create new conversation from shared conversation
+	const sanitizedTitle = conversation.title.replace(/<\/?think>/gi, "").trim();
 	const res = await collections.conversations.insertOne({
 		_id: new ObjectId(),
-		title: conversation.title.replace(/<\/?think>/gi, "").trim(),
+		title: sanitizedTitle,
 		rootMessageId: conversation.rootMessageId,
 		messages: conversation.messages,
 		model: conversation.model,
@@ -43,6 +45,7 @@ export async function createConversationFromShare(
 		createdAt: new Date(),
 		updatedAt: new Date(),
 		userAgent,
+		searchTokens: generateSearchTokens(sanitizedTitle),
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		meta: { fromShareId },
 	});

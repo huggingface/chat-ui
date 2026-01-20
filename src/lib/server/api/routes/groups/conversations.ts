@@ -7,6 +7,7 @@ import { validModelIdSchema } from "$lib/server/models";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import type { Conversation } from "$lib/types/Conversation";
 import { createConversationFromShare } from "$lib/server/conversation";
+import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchTokens";
 
 import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 
@@ -51,6 +52,50 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 			{
 				query: t.Object({
 					p: t.Optional(t.Number()),
+				}),
+			}
+		)
+		.get(
+			"/search",
+			async ({ locals, query }) => {
+				const searchQuery = query.q?.trim();
+				if (!searchQuery) {
+					return { conversations: [] };
+				}
+
+				const queryTokens = generateQueryTokens(searchQuery);
+				if (queryTokens.length === 0) {
+					return { conversations: [] };
+				}
+
+				const convs = await collections.conversations
+					.find({
+						...authCondition(locals),
+						$and: queryTokens.map((token) => ({ searchTokens: { $regex: token } })),
+					})
+					.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model">>({
+						title: 1,
+						updatedAt: 1,
+						model: 1,
+					})
+					.sort({ updatedAt: -1 })
+					.limit(20)
+					.toArray();
+
+				const res = convs.map((conv) => ({
+					_id: conv._id,
+					id: conv._id,
+					title: conv.title,
+					updatedAt: conv.updatedAt,
+					model: conv.model,
+					modelId: conv.model,
+				}));
+
+				return { conversations: res };
+			},
+			{
+				query: t.Object({
+					q: t.Optional(t.String()),
 				}),
 			}
 		)
@@ -199,9 +244,14 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 							}
 
 							// Only include defined values in the update (sanitize title)
+							const sanitizedTitle =
+								body.title !== undefined
+									? body.title.replace(/<\/?think>/gi, "").trim()
+									: undefined;
 							const updateValues = {
-								...(body.title !== undefined && {
-									title: body.title.replace(/<\/?think>/gi, "").trim(),
+								...(sanitizedTitle !== undefined && {
+									title: sanitizedTitle,
+									searchTokens: generateSearchTokens(sanitizedTitle),
 								}),
 								...(body.model !== undefined && { model: body.model }),
 							};

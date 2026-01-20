@@ -36,6 +36,56 @@
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
 
+	// Search state
+	let searchQuery = $state("");
+	let searchResults = $state<ConvSidebar[]>([]);
+	let isSearching = $state(false);
+	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+	let searchInputEl: HTMLInputElement | undefined = $state();
+
+	async function performSearch(query: string) {
+		if (!query.trim()) {
+			searchResults = [];
+			isSearching = false;
+			return;
+		}
+
+		isSearching = true;
+		try {
+			const results = await client.conversations.search
+				.get({ query: { q: query } })
+				.then(handleResponse)
+				.then((r) => r.conversations)
+				.catch((): ConvSidebar[] => []);
+			searchResults = results;
+		} finally {
+			isSearching = false;
+		}
+	}
+
+	function handleSearchInput(e: Event) {
+		const target = e.target as HTMLInputElement;
+		searchQuery = target.value;
+
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
+		}
+
+		searchTimeout = setTimeout(() => {
+			performSearch(searchQuery);
+		}, 300);
+	}
+
+	function clearSearch() {
+		searchQuery = "";
+		searchResults = [];
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
+		}
+	}
+
+	const isSearchMode = $derived(searchQuery.trim().length > 0);
+
 	interface Props {
 		conversations: ConvSidebar[];
 		user: LayoutData["user"];
@@ -152,19 +202,77 @@
 <div
 	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:border-transparent dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
+	<!-- Search input -->
+	<div class="relative mb-2">
+		<input
+			bind:this={searchInputEl}
+			type="text"
+			placeholder="Search conversations..."
+			value={searchQuery}
+			oninput={handleSearchInput}
+			class="w-full rounded-lg border border-gray-200 bg-white py-1.5 pl-8 pr-8 text-sm placeholder-gray-400 focus:border-gray-300 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:placeholder-gray-500"
+		/>
+		<svg
+			class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-400"
+			fill="none"
+			stroke="currentColor"
+			viewBox="0 0 24 24"
+		>
+			<path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				stroke-width="2"
+				d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+			/>
+		</svg>
+		{#if searchQuery}
+			<button
+				onclick={clearSearch}
+				class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+				aria-label="Clear search"
+			>
+				<svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M6 18L18 6M6 6l12 12"
+					/>
+				</svg>
+			</button>
+		{/if}
+	</div>
+
 	<div class="flex flex-col gap-0.5">
-		{#each Object.entries(groupedConversations) as [group, convs]}
-			{#if convs.length}
-				<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
-					{titles[group]}
+		{#if isSearchMode}
+			<!-- Search results -->
+			{#if isSearching}
+				<p class="py-2 text-center text-sm text-gray-400">Searching...</p>
+			{:else if searchResults.length === 0}
+				<p class="py-2 text-center text-sm text-gray-400">No conversations found</p>
+			{:else}
+				<h4 class="mb-1.5 pl-0.5 text-sm text-gray-400 dark:text-gray-500">
+					Search Results ({searchResults.length})
 				</h4>
-				{#each convs as conv}
+				{#each searchResults as conv}
 					<NavConversationItem {conv} {oneditConversationTitle} {ondeleteConversation} />
 				{/each}
 			{/if}
-		{/each}
+		{:else}
+			<!-- Normal grouped conversations -->
+			{#each Object.entries(groupedConversations) as [group, convs]}
+				{#if convs.length}
+					<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
+						{titles[group]}
+					</h4>
+					{#each convs as conv}
+						<NavConversationItem {conv} {oneditConversationTitle} {ondeleteConversation} />
+					{/each}
+				{/if}
+			{/each}
+		{/if}
 	</div>
-	{#if hasMore}
+	{#if !isSearchMode && hasMore}
 		<InfiniteScroll onvisible={handleVisible} />
 	{/if}
 </div>

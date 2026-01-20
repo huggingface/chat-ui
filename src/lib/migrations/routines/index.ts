@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 
 import type { Database } from "$lib/server/database";
+import updateSearchConversations from "./11-update-search-conversations";
 
 export interface Migration {
 	_id: ObjectId;
@@ -12,4 +13,4 @@ export interface Migration {
 	runEveryTime?: boolean;
 }
 
-export const migrations: Migration[] = [];
+export const migrations: Migration[] = [updateSearchConversations];
