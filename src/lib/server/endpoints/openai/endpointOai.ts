@@ -130,11 +130,14 @@ export async function endpointOai(
 			});
 
 			const parameters = { ...model.parameters, ...generateSettings };
+			const parsedMaxTokens = Number(config.DEFAULT_MAX_TOKENS);
+			const defaultMaxTokens =
+				Number.isInteger(parsedMaxTokens) && parsedMaxTokens > 0 ? parsedMaxTokens : undefined;
 			const body: CompletionCreateParamsStreaming = {
 				model: model.id ?? model.name,
 				prompt,
 				stream: true,
-				max_tokens: parameters?.max_tokens,
+				max_tokens: parameters?.max_tokens ?? defaultMaxTokens,
 				stop: parameters?.stop,
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
@@ -195,14 +198,18 @@ export async function endpointOai(
 
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
+			const parsedMaxTokens = Number(config.DEFAULT_MAX_TOKENS);
+			const defaultMaxTokens =
+				Number.isInteger(parsedMaxTokens) && parsedMaxTokens > 0 ? parsedMaxTokens : undefined;
+			const effectiveMaxTokens = parameters?.max_tokens ?? defaultMaxTokens;
 			const body = {
 				model: model.id ?? model.name,
 				messages: messagesOpenAI,
 				stream: streamingSupported,
 				// Support two different ways of specifying token limits depending on the model
 				...(useCompletionTokens
-					? { max_completion_tokens: parameters?.max_tokens }
-					: { max_tokens: parameters?.max_tokens }),
+					? { max_completion_tokens: effectiveMaxTokens }
+					: { max_tokens: effectiveMaxTokens }),
 				stop: parameters?.stop,
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
