@@ -67,7 +67,7 @@ envVars:
   LLM_ROUTER_OTHER_ROUTE: "casual_conversation"
   LLM_ROUTER_ARCH_TIMEOUT_MS: "10000"
   LLM_ROUTER_ENABLE_MULTIMODAL: "true"
-  LLM_ROUTER_MULTIMODAL_MODEL: "Qwen/Qwen3-VL-235B-A22B-Instruct"
+  LLM_ROUTER_MULTIMODAL_MODEL: "Qwen/Qwen2.5-VL-72B-Instruct"
   LLM_ROUTER_ENABLE_TOOLS: "true"
   LLM_ROUTER_TOOLS_MODEL: "moonshotai/Kimi-K2-Instruct-0905"
   TRANSCRIPTION_MODEL: "openai/whisper-large-v3-turbo"
@@ -111,7 +111,7 @@ envVars:
       { "id": "deepseek-ai/DeepSeek-V3.2-Exp", "description": "Experimental V3.2 release focused on faster, lower-cost inference with strong general reasoning and tool use." },
       { "id": "zai-org/GLM-4.6", "description": "Next-gen GLM with very long context and solid multilingual reasoning; good for agents and tools." },
       { "id": "Kwaipilot/KAT-Dev", "description": "Developer-oriented assistant tuned for coding, debugging, and lightweight agent workflows." },
-      { "id": "Qwen/Qwen3-VL-235B-A22B-Instruct", "description": "Flagship multimodal Qwen (text+image) instruction model for high-accuracy visual reasoning and detailed explanations." },
+      { "id": "Qwen/Qwen2.5-VL-72B-Instruct", "description": "Flagship multimodal Qwen (text+image) instruction model for high-accuracy visual reasoning and detailed explanations." },
       { "id": "deepseek-ai/DeepSeek-V3.1-Terminus", "description": "Refined V3.1 variant optimized for reliability on long contexts, structured outputs, and tool use." },
       { "id": "Qwen/Qwen3-VL-235B-A22B-Thinking", "description": "Deliberative multimodal Qwen that can produce step-wise visual+text reasoning traces for complex tasks." },
       { "id": "zai-org/GLM-4.6-FP8", "description": "FP8-optimized GLM-4.6 for faster/cheaper deployment with near-parity quality on most tasks." },
