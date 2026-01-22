@@ -38,15 +38,7 @@ const config = {
 		csp: {
 			directives: {
 				"frame-ancestors":
-					process.env.ALLOW_IFRAME === "true"
-						? [
-								"'self'",
-								"https://huggingface.co",
-								...(process.env.NODE_ENV !== "production"
-									? ["http://localhost:*", "http://127.0.0.1:*"]
-									: []),
-							]
-						: ["'none'"],
+					process.env.ALLOW_IFRAME === "true" ? ["'self'", "https://huggingface.co"] : ["'none'"],
 			},
 		},
 		alias: {
