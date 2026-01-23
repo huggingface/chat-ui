@@ -285,14 +285,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 			updateRequestContext({ statusCode: response.status });
 
 			// Add CSP header to control iframe embedding
-			if (config.ALLOW_IFRAME === "true") {
-				const frameAncestors = ["'self'", "https://huggingface.co"];
+			// Always allow huggingface.co; when ALLOW_IFRAME=true, allow all domains
+			if (config.ALLOW_IFRAME !== "true") {
 				response.headers.append(
 					"Content-Security-Policy",
-					`frame-ancestors ${frameAncestors.join(" ")};`
+					"frame-ancestors https://huggingface.co;"
 				);
-			} else {
-				response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
 			}
 
 			if (
