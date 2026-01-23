@@ -68,20 +68,6 @@
 		}
 	}
 
-	async function copyToClipboard(text: string) {
-		if (window.isSecureContext && navigator.clipboard) {
-			await navigator.clipboard.writeText(text);
-		} else {
-			const textArea = document.createElement("textarea");
-			textArea.value = text;
-			document.body.appendChild(textArea);
-			textArea.focus();
-			textArea.select();
-			document.execCommand("copy");
-			document.body.removeChild(textArea);
-		}
-	}
-
 	function handleCopy(event: ClipboardEvent) {
 		if (!contentEl) return;
 
@@ -483,17 +469,16 @@
 					/>
 				{/if}
 				{#if (alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode)}
-					<button
-						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:text-gray-500 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300 lg:-right-2"
-						title="Copy"
-						type="button"
-						onclick={() => {
-							copyToClipboard(message.content.trim());
-						}}
+					<CopyToClipBoardBtn
+						classNames="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:text-gray-500 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300 lg:-right-2"
+						value={message.content.trim()}
+						showTooltip={false}
 					>
-						<CarbonCopy />
-						Copy
-					</button>
+						{#snippet children()}
+							<CarbonCopy />
+							Copy
+						{/snippet}
+					</CopyToClipBoardBtn>
 					<button
 						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:text-gray-500 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300 lg:-right-2"
 						title="Edit"
