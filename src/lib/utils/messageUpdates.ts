@@ -6,6 +6,7 @@ import {
 	type MessageToolCallUpdate,
 	type MessageToolResultUpdate,
 	type MessageToolErrorUpdate,
+	type MessageToolProgressUpdate,
 	MessageUpdateType,
 	MessageToolUpdateType,
 } from "$lib/types/MessageUpdate";
@@ -264,6 +265,11 @@ export const isMessageToolResultUpdate = (
 
 export const isMessageToolErrorUpdate = (update: MessageUpdate): update is MessageToolErrorUpdate =>
 	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Error;
+
+export const isMessageToolProgressUpdate = (
+	update: MessageUpdate
+): update is MessageToolProgressUpdate =>
+	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Progress;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const waitForEvent = (eventTarget: EventTarget, eventName: string) =>

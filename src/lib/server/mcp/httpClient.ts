@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { getClient, evictFromPool } from "./clientPool";
+import { config } from "$lib/server/config";
 
 function isConnectionClosedError(err: unknown): boolean {
 	const message = err instanceof Error ? err.message : String(err);
@@ -12,7 +13,18 @@ export interface McpServerConfig {
 	headers?: Record<string, string>;
 }
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 120_000;
+
+export function getMcpToolTimeoutMs(): number {
+	const envValue = config.MCP_TOOL_TIMEOUT_MS;
+	if (envValue) {
+		const parsed = parseInt(envValue, 10);
+		if (!isNaN(parsed) && parsed > 0) {
+			return parsed;
+		}
+	}
+	return DEFAULT_TIMEOUT_MS;
+}
 
 export type McpToolTextResponse = {
 	text: string;
@@ -20,6 +32,12 @@ export type McpToolTextResponse = {
 	structured?: unknown;
 	/** Raw content blocks returned by the server, if any */
 	content?: unknown[];
+};
+
+export type McpToolProgress = {
+	progress: number;
+	total?: number;
+	message?: string;
 };
 
 export async function callMcpTool(
@@ -30,7 +48,13 @@ export async function callMcpTool(
 		timeoutMs = DEFAULT_TIMEOUT_MS,
 		signal,
 		client,
-	}: { timeoutMs?: number; signal?: AbortSignal; client?: Client } = {}
+		onProgress,
+	}: {
+		timeoutMs?: number;
+		signal?: AbortSignal;
+		client?: Client;
+		onProgress?: (progress: McpToolProgress) => void;
+	} = {}
 ): Promise<McpToolTextResponse> {
 	const normalizedArgs =
 		typeof args === "object" && args !== null && !Array.isArray(args)
@@ -45,7 +69,13 @@ export async function callMcpTool(
 		signal,
 		timeout: timeoutMs,
 		// Enable progress tokens so long-running tools keep extending the timeout.
-		onprogress: () => {},
+		onprogress: (progress: McpToolProgress) => {
+			onProgress?.({
+				progress: progress.progress,
+				total: progress.total,
+				message: progress.message,
+			});
+		},
 		resetTimeoutOnProgress: true,
 	};
 

@@ -6,7 +6,11 @@ import { ToolResultStatus } from "$lib/types/Tool";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import type { McpToolMapping } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
-import { callMcpTool, type McpToolTextResponse } from "$lib/server/mcp/httpClient";
+import {
+	callMcpTool,
+	getMcpToolTimeoutMs,
+	type McpToolTextResponse,
+} from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/sdk/client";
@@ -69,8 +73,9 @@ export async function* executeToolCalls({
 	toPrimitive,
 	processToolOutput,
 	abortSignal,
-	toolTimeoutMs = 30_000,
+	toolTimeoutMs,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
+	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
 	const serverLookup = serverMap(servers);
@@ -173,26 +178,41 @@ export async function* executeToolCalls({
 		};
 	}
 
-	const q = createQueue<TaskResult>();
+	const updatesQueue = createQueue<MessageUpdate>();
+	const results: TaskResult[] = [];
 
 	const tasks = prepared.map(async (p, index) => {
 		const mappingEntry = mapping[p.call.name];
 		if (!mappingEntry) {
-			q.push({
+			const message = `Unknown MCP function: ${p.call.name}`;
+			results.push({
 				index,
-				error: `Unknown MCP function: ${p.call.name}`,
+				error: message,
 				uuid: p.uuid,
 				paramsClean: p.paramsClean,
+			});
+			updatesQueue.push({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Error,
+				uuid: p.uuid,
+				message,
 			});
 			return;
 		}
 		const serverCfg = serverLookup.get(mappingEntry.server);
 		if (!serverCfg) {
-			q.push({
+			const message = `Unknown MCP server: ${mappingEntry.server}`;
+			results.push({
 				index,
-				error: `Unknown MCP server: ${mappingEntry.server}`,
+				error: message,
 				uuid: p.uuid,
 				paramsClean: p.paramsClean,
+			});
+			updatesQueue.push({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Error,
+				uuid: p.uuid,
+				message,
 			});
 			return;
 		}
@@ -209,7 +229,17 @@ export async function* executeToolCalls({
 				{
 					client,
 					signal: abortSignal,
-					timeoutMs: toolTimeoutMs,
+					timeoutMs: effectiveTimeoutMs,
+					onProgress: (progress) => {
+						updatesQueue.push({
+							type: MessageUpdateType.Tool,
+							subtype: MessageToolUpdateType.Progress,
+							uuid: p.uuid,
+							progress: progress.progress,
+							total: progress.total,
+							message: progress.message,
+						});
+					},
 				}
 			);
 			const { annotated } = processToolOutput(toolResponse.text ?? "");
@@ -217,7 +247,7 @@ export async function* executeToolCalls({
 				{ server: mappingEntry.server, tool: mappingEntry.tool },
 				"[mcp] tool call completed"
 			);
-			q.push({
+			results.push({
 				index,
 				output: annotated,
 				structured: toolResponse.structured,
@@ -225,54 +255,44 @@ export async function* executeToolCalls({
 				uuid: p.uuid,
 				paramsClean: p.paramsClean,
 			});
+			updatesQueue.push({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: p.uuid,
+				result: {
+					status: ToolResultStatus.Success,
+					call: { name: p.call.name, parameters: p.paramsClean },
+					outputs: [
+						{
+							text: annotated ?? "",
+							structured: toolResponse.structured,
+							content: toolResponse.content,
+						} as unknown as Record<string, unknown>,
+					],
+					display: true,
+				},
+			});
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			logger.warn(
 				{ server: mappingEntry.server, tool: mappingEntry.tool, err: message },
 				"[mcp] tool call failed"
 			);
-			q.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+			results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+			updatesQueue.push({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Error,
+				uuid: p.uuid,
+				message,
+			});
 		}
 	});
 
 	// kick off and stream as they finish
-	Promise.allSettled(tasks).then(() => q.close());
+	Promise.allSettled(tasks).then(() => updatesQueue.close());
 
-	const results: TaskResult[] = [];
-	for await (const r of q.iterator()) {
-		results.push(r);
-		if (r.error) {
-			yield {
-				type: "update",
-				update: {
-					type: MessageUpdateType.Tool,
-					subtype: MessageToolUpdateType.Error,
-					uuid: r.uuid,
-					message: r.error,
-				},
-			};
-		} else {
-			yield {
-				type: "update",
-				update: {
-					type: MessageUpdateType.Tool,
-					subtype: MessageToolUpdateType.Result,
-					uuid: r.uuid,
-					result: {
-						status: ToolResultStatus.Success,
-						call: { name: prepared[r.index].call.name, parameters: r.paramsClean },
-						outputs: [
-							{
-								text: r.output ?? "",
-								structured: r.structured,
-								content: r.blocks,
-							} as unknown as Record<string, unknown>,
-						],
-						display: true,
-					},
-				},
-			};
-		}
+	for await (const update of updatesQueue.iterator()) {
+		yield { type: "update", update };
 	}
 
 	// Collate outputs in original call order
@@ -285,6 +305,9 @@ export async function* executeToolCalls({
 			toolRuns.push({ name, parameters: r.paramsClean, output });
 			// For the LLM follow-up call, we keep only the textual output
 			toolMessages.push({ role: "tool", tool_call_id: id, content: output });
+		} else {
+			// Communicate error to LLM so it doesn't hallucinate success
+			toolMessages.push({ role: "tool", tool_call_id: id, content: `Error: ${r.error}` });
 		}
 	}
 

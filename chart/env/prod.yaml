@@ -77,17 +77,27 @@ envVars:
   LLM_ROUTER_OTHER_ROUTE: "casual_conversation"
   LLM_ROUTER_ARCH_TIMEOUT_MS: "10000"
   LLM_ROUTER_ENABLE_MULTIMODAL: "true"
-  LLM_ROUTER_MULTIMODAL_MODEL: "Qwen/Qwen3-VL-235B-A22B-Instruct"
+  LLM_ROUTER_MULTIMODAL_MODEL: "zai-org/GLM-4.6V"
   LLM_ROUTER_ENABLE_TOOLS: "true"
   LLM_ROUTER_TOOLS_MODEL: "moonshotai/Kimi-K2-Instruct-0905"
   TRANSCRIPTION_MODEL: "openai/whisper-large-v3-turbo"
   MCP_SERVERS: >
     [{"name": "Web Search (Exa)", "url": "https://mcp.exa.ai/mcp"}, {"name": "Hugging Face", "url": "https://hf.co/mcp?login"}]
+  MCP_TOOL_TIMEOUT_MS: "120000"
   PUBLIC_LLM_ROUTER_DISPLAY_NAME: "Omni"
   PUBLIC_LLM_ROUTER_LOGO_URL: "https://cdn-uploads.huggingface.co/production/uploads/5f17f0a0925b9863e28ad517/C5V0v1xZXv6M7FXsdJH9b.png"
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
-  MODELS: > 
+  MODELS: >
     [
+      { "id": "zai-org/GLM-4.7-Flash", "description": "Fast GLM-4.7 variant optimized for lower latency coding and agents." },
+      { "id": "zai-org/GLM-4.7", "description": "Flagship GLM MoE for coding, reasoning, and agentic tool use." },
+      { "id": "zai-org/GLM-4.7-FP8", "description": "FP8 GLM-4.7 for efficient inference with strong coding." },
+      { "id": "MiniMaxAI/MiniMax-M2.1", "description": "MoE agent model with multilingual coding and fast outputs." },
+      { "id": "XiaomiMiMo/MiMo-V2-Flash", "description": "Fast MoE reasoning model with speculative decoding for agents." },
+      { "id": "Qwen/Qwen3-VL-32B-Instruct", "description": "Vision-language Qwen for documents, GUI agents, and visual reasoning." },
+      { "id": "allenai/Olmo-3.1-32B-Instruct", "description": "Fully open chat model strong at tool use and dialogue." },
+      { "id": "zai-org/AutoGLM-Phone-9B-Multilingual", "description": "Mobile agent for multilingual Android device automation." },
+      { "id": "utter-project/EuroLLM-22B-Instruct-2512", "description": "European multilingual model for all EU languages and translation." },
       { "id": "dicta-il/DictaLM-3.0-24B-Thinking", "description": "Hebrew-English reasoning model with explicit thinking traces for bilingual QA and logic." },
       { "id": "EssentialAI/rnj-1-instruct", "description": "8B code and STEM model rivaling larger models on agentic coding, math, and tool use." },
       { "id": "MiniMaxAI/MiniMax-M2", "description": "Compact MoE model tuned for fast coding, agentic workflows, and long-context chat." },
@@ -111,7 +121,7 @@ envVars:
       { "id": "deepseek-ai/DeepSeek-V3.2-Exp", "description": "Experimental V3.2 release focused on faster, lower-cost inference with strong general reasoning and tool use." },
       { "id": "zai-org/GLM-4.6", "description": "Next-gen GLM with very long context and solid multilingual reasoning; good for agents and tools." },
       { "id": "Kwaipilot/KAT-Dev", "description": "Developer-oriented assistant tuned for coding, debugging, and lightweight agent workflows." },
-      { "id": "Qwen/Qwen3-VL-235B-A22B-Instruct", "description": "Flagship multimodal Qwen (text+image) instruction model for high-accuracy visual reasoning and detailed explanations." },
+      { "id": "Qwen/Qwen2.5-VL-72B-Instruct", "description": "Flagship multimodal Qwen (text+image) instruction model for high-accuracy visual reasoning and detailed explanations." },
       { "id": "deepseek-ai/DeepSeek-V3.1-Terminus", "description": "Refined V3.1 variant optimized for reliability on long contexts, structured outputs, and tool use." },
       { "id": "Qwen/Qwen3-VL-235B-A22B-Thinking", "description": "Deliberative multimodal Qwen that can produce step-wise visual+text reasoning traces for complex tasks." },
       { "id": "zai-org/GLM-4.6-FP8", "description": "FP8-optimized GLM-4.6 for faster/cheaper deployment with near-parity quality on most tasks." },

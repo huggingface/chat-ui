@@ -19,6 +19,7 @@
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
+	import { isPro } from "$lib/stores/isPro";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
 	import { shareModal } from "$lib/stores/shareModal";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
@@ -123,6 +124,17 @@
 	const settings = createSettingsStore(data.settings);
 
 	onMount(async () => {
+		if (publicConfig.isHuggingChat && data.user?.username) {
+			fetch(`https://huggingface.co/api/users/${data.user.username}/overview`)
+				.then((res) => res.json())
+				.then((userData) => {
+					isPro.set(userData.isPro ?? false);
+				})
+				.catch(() => {
+					// Keep isPro as null on error - don't show any badge if status is unknown
+				});
+		}
+
 		if (page.url.searchParams.has("model")) {
 			await settings
 				.instantSet({

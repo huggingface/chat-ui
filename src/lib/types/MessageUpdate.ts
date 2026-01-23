@@ -54,6 +54,7 @@ export enum MessageToolUpdateType {
 	Result = "result",
 	Error = "error",
 	ETA = "eta",
+	Progress = "progress",
 }
 
 interface MessageToolUpdateBase<TSubtype extends MessageToolUpdateType> {
@@ -79,11 +80,19 @@ export interface MessageToolEtaUpdate extends MessageToolUpdateBase<MessageToolU
 	eta: number;
 }
 
+export interface MessageToolProgressUpdate
+	extends MessageToolUpdateBase<MessageToolUpdateType.Progress> {
+	progress: number;
+	total?: number;
+	message?: string;
+}
+
 export type MessageToolUpdate =
 	| MessageToolCallUpdate
 	| MessageToolResultUpdate
 	| MessageToolErrorUpdate
-	| MessageToolEtaUpdate;
+	| MessageToolEtaUpdate
+	| MessageToolProgressUpdate;
 
 export enum MessageReasoningUpdateType {
 	Stream = "stream",
