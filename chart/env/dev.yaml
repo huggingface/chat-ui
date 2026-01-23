@@ -45,7 +45,7 @@ envVars:
 
   ADDRESS_HEADER: "X-Forwarded-For"
   APP_BASE: "/chat"
-  ALLOW_IFRAME: "true"
+  ALLOW_IFRAME: "false"
   COOKIE_SAMESITE: "lax"
   COOKIE_SECURE: "true"
   EXPOSE_API: "true"
