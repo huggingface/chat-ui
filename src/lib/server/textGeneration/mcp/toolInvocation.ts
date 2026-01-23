@@ -6,7 +6,11 @@ import { ToolResultStatus } from "$lib/types/Tool";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import type { McpToolMapping } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
-import { callMcpTool, type McpToolTextResponse } from "$lib/server/mcp/httpClient";
+import {
+	callMcpTool,
+	getMcpToolTimeoutMs,
+	type McpToolTextResponse,
+} from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/sdk/client";
@@ -69,8 +73,9 @@ export async function* executeToolCalls({
 	toPrimitive,
 	processToolOutput,
 	abortSignal,
-	toolTimeoutMs = 60_000,
+	toolTimeoutMs,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
+	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
 	const serverLookup = serverMap(servers);
@@ -224,7 +229,7 @@ export async function* executeToolCalls({
 				{
 					client,
 					signal: abortSignal,
-					timeoutMs: toolTimeoutMs,
+					timeoutMs: effectiveTimeoutMs,
 					onProgress: (progress) => {
 						updatesQueue.push({
 							type: MessageUpdateType.Tool,

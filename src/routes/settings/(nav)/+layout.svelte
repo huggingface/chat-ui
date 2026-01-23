@@ -5,6 +5,7 @@
 	import { page } from "$app/state";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
+	import IconBurger from "$lib/components/icons/IconBurger.svelte";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
@@ -109,8 +110,11 @@
 					goto(`${base}/settings`);
 				}}
 			>
+				<IconBurger
+					classNames="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white sm:hidden"
+				/>
 				<CarbonChevronLeft
-					class="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white"
+					class="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white max-sm:hidden"
 				/>
 			</button>
 		{/if}
