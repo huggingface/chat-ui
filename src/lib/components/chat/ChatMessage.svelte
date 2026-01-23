@@ -68,6 +68,20 @@
 		}
 	}
 
+	async function copyToClipboard(text: string) {
+		if (window.isSecureContext && navigator.clipboard) {
+			await navigator.clipboard.writeText(text);
+		} else {
+			const textArea = document.createElement("textarea");
+			textArea.value = text;
+			document.body.appendChild(textArea);
+			textArea.focus();
+			textArea.select();
+			document.execCommand("copy");
+			document.body.removeChild(textArea);
+		}
+	}
+
 	function handleCopy(event: ClipboardEvent) {
 		if (!contentEl) return;
 
@@ -474,7 +488,7 @@
 						title="Copy"
 						type="button"
 						onclick={() => {
-							navigator.clipboard.writeText(message.content.trim());
+							copyToClipboard(message.content.trim());
 						}}
 					>
 						<CarbonCopy />
