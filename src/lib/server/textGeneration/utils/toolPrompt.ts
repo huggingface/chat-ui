@@ -6,17 +6,19 @@ export function buildToolPreprompt(tools: OpenAiTool[]): string {
 		.map((t) => (t?.function?.name ? String(t.function.name) : ""))
 		.filter((s) => s.length > 0);
 	if (names.length === 0) return "";
-	const currentDate = new Date().toLocaleDateString("en-US", {
+	const now = new Date();
+	const currentDate = now.toLocaleDateString("en-US", {
 		year: "numeric",
 		month: "long",
 		day: "numeric",
 	});
+	const currentYear = now.getFullYear();
 	return [
 		`You have access to these tools: ${names.join(", ")}.`,
 		`Today's date: ${currentDate}.`,
 		`Only use a tool if you cannot answer without it. For simple tasks like writing, editing text, or answering from your knowledge, respond directly without tools.`,
 		// Search query formulation guidelines
-		`SEARCH QUERY FORMULATION: Frame queries as statements describing what you're looking for, ending with a colon (e.g., "Here is information about climate change effects:" rather than "What are climate change effects?"). Use 3-6 precise keywords with exact terminology sources would use. Prefer relative time terms ("latest", "recent", "2024") over vague requests. For multi-part or comparison questions, break them into separate focused searches—do not try to answer complex questions with a single broad query.`,
+		`SEARCH QUERY FORMULATION: Write search queries as descriptive statements ending with a colon—this format yields better results than questions. Examples: "Here is the latest SpaceX Starship test flight results:" or "Claude Opus 4.5 benchmark performance comparison:" or "React 19 new features release date:". Use 3-6 precise keywords. Always include the current year (${currentYear}) or "latest"/"recent" for time-sensitive topics. For comparisons or multi-part questions, make separate searches for each part rather than one broad query.`,
 		// Critical: How to process and use search results
 		`PROCESSING SEARCH RESULTS: Read the ENTIRE search result carefully—important information may appear anywhere, not just at the beginning. Before answering, identify the specific facts from the results that answer the user's question. Use attribution phrases like "According to the search results..." or "The search results indicate..." to ground your response. Only state facts explicitly present in the results—do not add interpretations, characterizations, or inferences beyond what is directly stated. If results conflict, present both perspectives and note the discrepancy. If results are insufficient or don't answer the question, say so clearly (e.g., "The search results don't contain information about X") and consider a follow-up search with refined terms rather than guessing.`,
 		// URL handling
