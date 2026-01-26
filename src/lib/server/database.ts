@@ -350,6 +350,14 @@ export class Database {
 				logger.error(e, "Error creating index for conversations by userId and sessionId")
 			);
 
+		// For stats aggregation jobs that filter by createdAt/updatedAt alone
+		conversations
+			.createIndex({ createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for conversations by createdAt"));
+		conversations
+			.createIndex({ updatedAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for conversations by updatedAt"));
+
 		config
 			.createIndex({ key: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating index for config by key"));
