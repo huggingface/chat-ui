@@ -8,21 +8,17 @@ import endpoints from "../endpoints/endpoints";
 import type { ProcessedModel } from "../models";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
-import { archSelectRoute } from "./arch";
+import { heuristicSelectRoute, MULTIMODAL_ROUTE, AGENTIC_ROUTE } from "./heuristics";
 import { getRoutes, resolveRouteModels } from "./policy";
 import { getApiToken } from "$lib/server/apiToken";
-import { ROUTER_FAILURE } from "./types";
 import {
 	hasActiveToolsSelection,
 	isRouterToolsBypassEnabled,
 	pickToolsCapableModel,
-	ROUTER_TOOLS_ROUTE,
 } from "./toolsRoute";
 import { getConfiguredMultimodalModelId } from "./multimodal";
 
 const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
-
-const ROUTER_MULTIMODAL_ROUTE = "multimodal";
 
 // Cache models at module level to avoid redundant dynamic imports on every request
 let cachedModels: ProcessedModel[] | undefined;
@@ -88,16 +84,6 @@ function extractUpstreamError(error: unknown): { message: string; statusCode?: n
 	return { message: String(error) };
 }
 
-/**
- * Determines if an error is a policy/entitlement error that should be shown to users immediately
- * (vs transient errors that should trigger fallback)
- */
-function isPolicyError(statusCode?: number): boolean {
-	if (!statusCode) return false;
-	// 400: Bad Request, 402: Payment Required, 401: Unauthorized, 403: Forbidden
-	return statusCode === 400 || statusCode === 401 || statusCode === 402 || statusCode === 403;
-}
-
 function stripReasoningBlocks(text: string): string {
 	const stripped = text.replace(REASONING_BLOCK_REGEX, "");
 	return stripped === text ? text : stripped.trim();
@@ -113,7 +99,7 @@ function stripReasoningFromMessage(message: EndpointMessage): EndpointMessage {
 }
 
 /**
- * Create an Endpoint that performs route selection via Arch and then forwards
+ * Create an Endpoint that performs heuristic-based route selection and then forwards
  * to the selected model (with fallbacks) using the OpenAI-compatible endpoint.
  */
 export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<Endpoint> {
@@ -177,6 +163,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			for await (const ev of gen) yield ev;
 		}
 
+		// Multimodal bypass: if enabled and images detected, route to multimodal model
 		if (routerMultimodalEnabled && hasImageInput) {
 			let multimodalCandidate: string | undefined;
 			try {
@@ -193,91 +180,71 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 
 			try {
 				logger.info(
-					{ route: ROUTER_MULTIMODAL_ROUTE, model: multimodalCandidate },
-					"[router] multimodal input detected; bypassing Arch selection"
+					{ route: MULTIMODAL_ROUTE, model: multimodalCandidate },
+					"[router] multimodal input detected; routing to multimodal model"
 				);
 				const ep = await createCandidateEndpoint(multimodalCandidate);
 				const gen = await ep({ ...params });
-				return metadataThenStream(gen, multimodalCandidate, ROUTER_MULTIMODAL_ROUTE);
+				return metadataThenStream(gen, multimodalCandidate, MULTIMODAL_ROUTE);
 			} catch (e) {
 				const { message, statusCode } = extractUpstreamError(e);
 				logger.error(
 					{
-						route: ROUTER_MULTIMODAL_ROUTE,
+						route: MULTIMODAL_ROUTE,
 						model: multimodalCandidate,
 						err: message,
 						...(statusCode && { status: statusCode }),
 					},
-					"[router] multimodal fallback failed"
+					"[router] multimodal model failed"
 				);
 				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 			}
 		}
 
-		async function findToolsCandidateModel(): Promise<ProcessedModel | undefined> {
+		// Tools bypass: if enabled and tools are active, route to tools model
+		if (routerToolsEnabled && hasToolsActive) {
+			let toolsModel: ProcessedModel | undefined;
 			try {
 				const all = await getModels();
-				return pickToolsCapableModel(all);
+				toolsModel = pickToolsCapableModel(all);
 			} catch (e) {
 				logger.warn({ err: String(e) }, "[router] failed to load models for tools lookup");
-				return undefined;
 			}
-		}
 
-		if (routerToolsEnabled && hasToolsActive) {
-			const toolsModel = await findToolsCandidateModel();
 			const toolsCandidate = toolsModel?.id ?? toolsModel?.name;
-			if (!toolsCandidate) {
-				// No tool-capable model found — continue with normal routing instead of hard failing
-			} else {
+			if (toolsCandidate) {
 				try {
 					logger.info(
-						{ route: ROUTER_TOOLS_ROUTE, model: toolsCandidate },
-						"[router] tools active; bypassing Arch selection"
+						{ route: AGENTIC_ROUTE, model: toolsCandidate },
+						"[router] tools active; routing to tools model"
 					);
 					const ep = await createCandidateEndpoint(toolsCandidate);
 					const gen = await ep({ ...params });
-					return metadataThenStream(gen, toolsCandidate, ROUTER_TOOLS_ROUTE);
+					return metadataThenStream(gen, toolsCandidate, AGENTIC_ROUTE);
 				} catch (e) {
 					const { message, statusCode } = extractUpstreamError(e);
 					const logData = {
-						route: ROUTER_TOOLS_ROUTE,
+						route: AGENTIC_ROUTE,
 						model: toolsCandidate,
 						err: message,
 						...(statusCode && { status: statusCode }),
 					};
 					if (statusCode === 402) {
-						logger.warn(logData, "[router] tools fallback failed due to payment required");
+						logger.warn(logData, "[router] tools model failed due to payment required");
 					} else {
-						logger.error(logData, "[router] tools fallback failed");
+						logger.error(logData, "[router] tools model failed");
 					}
 					throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 				}
 			}
+			// No tools-capable model found — continue with default routing
 		}
 
-		const routeSelection = await archSelectRoute(sanitizedMessages, undefined, params.locals);
-
-		// If arch router failed with an error, only hard-fail for policy errors (402/401/403)
-		// For transient errors (5xx, timeouts, network), allow fallback to continue
-		if (routeSelection.routeName === ROUTER_FAILURE && routeSelection.error) {
-			const { message, statusCode } = routeSelection.error;
-
-			if (isPolicyError(statusCode)) {
-				// Policy errors should be surfaced to the user immediately (e.g., subscription required)
-				logger.error(
-					{ err: message, ...(statusCode && { status: statusCode }) },
-					"[router] arch router failed with policy error, propagating to client"
-				);
-				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
-			}
-
-			// Transient errors: log and continue to fallback
-			logger.warn(
-				{ err: message, ...(statusCode && { status: statusCode }) },
-				"[router] arch router failed with transient error, attempting fallback"
-			);
-		}
+		// Heuristic-based route selection (no external API call)
+		const routeSelection = await heuristicSelectRoute(sanitizedMessages, {
+			hasImageInput,
+			hasToolsActive,
+		});
 
 		const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || routerModel.id;
 		const { candidates } = resolveRouteModels(routeSelection.routeName, routes, fallbackModel);

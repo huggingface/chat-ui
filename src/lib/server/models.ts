@@ -406,7 +406,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 			)
 		);
 
-		const archBase = (config.LLM_ROUTER_ARCH_BASE_URL || "").trim();
+		const routerRoutesPath = (config.LLM_ROUTER_ROUTES_PATH || "").trim();
 		const routerLabel = (config.PUBLIC_LLM_ROUTER_DISPLAY_NAME || "Omni").trim() || "Omni";
 		const routerLogo = (config.PUBLIC_LLM_ROUTER_LOGO_URL || "").trim();
 		const routerAliasId = (config.PUBLIC_LLM_ROUTER_ALIAS_ID || "omni").trim() || "omni";
@@ -416,7 +416,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 
 		let decorated = builtModels as ProcessedModel[];
 
-		if (archBase) {
+		if (routerRoutesPath) {
 			// Build a minimal model config for the alias
 			const aliasRaw = {
 				id: routerAliasId,
