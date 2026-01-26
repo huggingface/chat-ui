@@ -7,7 +7,7 @@ import { getRoutes } from "./policy";
 /** Default route when no specific heuristic matches */
 export const DEFAULT_ROUTE = "default";
 export const MULTIMODAL_ROUTE = "multimodal";
-export const MCP_ROUTE = "mcp";
+export const AGENTIC_ROUTE = "agentic";
 
 /**
  * Simple heuristic-based route selection.
@@ -41,10 +41,10 @@ export async function heuristicSelectRoute(
 
 	// Check for MCP servers active
 	if (hasToolsActive) {
-		const mcpExists = routes.some((r) => r.name === MCP_ROUTE);
-		if (mcpExists) {
-			logger.debug({ route: MCP_ROUTE }, "[router] heuristic: MCP servers active");
-			return { routeName: MCP_ROUTE };
+		const agenticExists = routes.some((r) => r.name === AGENTIC_ROUTE);
+		if (agenticExists) {
+			logger.debug({ route: AGENTIC_ROUTE }, "[router] heuristic: MCP servers active");
+			return { routeName: AGENTIC_ROUTE };
 		}
 	}
 

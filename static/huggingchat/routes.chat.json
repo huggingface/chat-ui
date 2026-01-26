@@ -16,7 +16,7 @@
 		"fallback_models": ["meta-llama/Llama-3.2-11B-Vision-Instruct"]
 	},
 	{
-		"name": "mcp",
+		"name": "agentic",
 		"description": "Route for MCP server tool calling.",
 		"primary_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
 		"fallback_models": ["deepseek-ai/DeepSeek-V3.1", "zai-org/GLM-4.6"]
