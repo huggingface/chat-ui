@@ -8,7 +8,7 @@ import endpoints from "../endpoints/endpoints";
 import type { ProcessedModel } from "../models";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
-import { heuristicSelectRoute, MULTIMODAL_ROUTE, AGENTIC_ROUTE } from "./heuristics";
+import { heuristicSelectRoute, MULTIMODAL_ROUTE, MCP_ROUTE } from "./heuristics";
 import { getRoutes, resolveRouteModels } from "./policy";
 import { getApiToken } from "$lib/server/apiToken";
 import {
@@ -215,16 +215,16 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			if (toolsCandidate) {
 				try {
 					logger.info(
-						{ route: AGENTIC_ROUTE, model: toolsCandidate },
+						{ route: MCP_ROUTE, model: toolsCandidate },
 						"[router] tools active; routing to tools model"
 					);
 					const ep = await createCandidateEndpoint(toolsCandidate);
 					const gen = await ep({ ...params });
-					return metadataThenStream(gen, toolsCandidate, AGENTIC_ROUTE);
+					return metadataThenStream(gen, toolsCandidate, MCP_ROUTE);
 				} catch (e) {
 					const { message, statusCode } = extractUpstreamError(e);
 					const logData = {
-						route: AGENTIC_ROUTE,
+						route: MCP_ROUTE,
 						model: toolsCandidate,
 						err: message,
 						...(statusCode && { status: statusCode }),

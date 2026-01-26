@@ -1,9 +1,5 @@
 import { config } from "$lib/server/config";
-import {
-	heuristicSelectRoute,
-	MULTIMODAL_ROUTE,
-	AGENTIC_ROUTE,
-} from "$lib/server/router/heuristics";
+import { heuristicSelectRoute, MULTIMODAL_ROUTE, MCP_ROUTE } from "$lib/server/router/heuristics";
 import { getRoutes, resolveRouteModels } from "$lib/server/router/policy";
 import {
 	hasActiveToolsSelection,
@@ -75,7 +71,7 @@ export async function resolveRouterTarget({
 			if (found) {
 				targetModel = found;
 				candidateModelId = found.id ?? found.name;
-				resolvedRoute = AGENTIC_ROUTE;
+				resolvedRoute = MCP_ROUTE;
 				return { runMcp, targetModel, candidateModelId, resolvedRoute };
 			}
 			// No tools-capable model found; fall back to default routing below
