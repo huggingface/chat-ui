@@ -3,6 +3,10 @@ import type { RouterExample } from "./routerExamples";
 // Examples that showcase MCP tool capabilities (web search, Hugging Face, etc.)
 export const mcpExamples: RouterExample[] = [
 	{
+		title: "Zebra in front of a volcano",
+		prompt: "Zebra in front of a volcano",
+	},
+	{
 		title: "Latest world news",
 		prompt: "What is the latest world news?",
 		followUps: [
