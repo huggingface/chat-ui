@@ -76,9 +76,16 @@ async function* textGenerationWithoutTitle(
 			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
 		}
 		// If mcpResult is "completed" or "aborted", don't fall back
-	} catch {
-		// On any MCP error, fall back to normal generation
-		yield* generate({ ...ctx, messages: processedMessages }, preprompt);
+	} catch (err) {
+		// Don't fall back on abort errors - user intentionally stopped
+		const isAbort =
+			ctx.abortController.signal.aborted ||
+			(err instanceof Error &&
+				(err.name === "AbortError" || err.message.includes("Request was aborted")));
+		if (!isAbort) {
+			// On non-abort MCP error, fall back to normal generation
+			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
+		}
 	}
 	done.abort();
 }
