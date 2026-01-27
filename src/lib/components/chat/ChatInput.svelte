@@ -281,7 +281,7 @@
 									>
 										<div class="flex items-center gap-1">
 											<CarbonDocument class="size-4 opacity-90 dark:opacity-80" />
-											Add text file
+											Add file
 										</div>
 										<div class="ml-auto flex items-center">
 											<CarbonChevronRight class="size-4 opacity-70 dark:opacity-80" />
@@ -311,7 +311,8 @@
 									</DropdownMenu.SubContent>
 								</DropdownMenu.Sub>
 
-								<!-- MCP Servers submenu -->
+								{#if false}
+								<!-- MCP Servers submenu - hidden for now -->
 								<DropdownMenu.Sub>
 									<DropdownMenu.SubTrigger
 										class="flex h-8 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 data-[state=open]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10 dark:data-[state=open]:bg-white/10"
@@ -376,6 +377,7 @@
 										</DropdownMenu.Item>
 									</DropdownMenu.SubContent>
 								</DropdownMenu.Sub>
+								{/if}
 							</DropdownMenu.Content>
 						</DropdownMenu.Portal>
 					</DropdownMenu.Root>

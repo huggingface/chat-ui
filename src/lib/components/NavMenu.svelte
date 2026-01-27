@@ -204,11 +204,15 @@
 				>{user?.username || user?.email}</span
 			>
 
-			<img
-				src="https://huggingface.co/api/users/{user.username}/avatar?redirect=true"
-				class="ml-auto size-4 rounded-full border bg-gray-500 dark:border-white/40"
-				alt=""
-			/>
+			{#if user?.avatarUrl}
+				<img
+					src={user.avatarUrl}
+					class="ml-auto size-4 rounded-full border bg-gray-500 dark:border-white/40"
+					alt=""
+				/>
+			{:else}
+				<div class="ml-auto size-4 rounded-full border bg-gray-500 dark:border-white/40"></div>
+			{/if}
 		</div>
 	{/if}
 	<a

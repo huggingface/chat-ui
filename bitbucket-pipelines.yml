@@ -52,6 +52,9 @@ pipelines:
               PUBLIC_SHOW_NAV_LOGO=$PUBLIC_SHOW_NAV_LOGO
               PUBLIC_ORIGIN=$PUBLIC_ORIGIN
               VITE_ALLOWED_HOSTS=$VITE_ALLOWED_HOSTS
+              COOKIE_SECURE=true
+              COOKIE_SAMESITE=lax
+              HF_ORG_ADMIN=xpartners-admins
               EOF
 
             # Build

@@ -14,7 +14,7 @@ import { config } from "$lib/server/config";
 import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
-import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
+import { TEXT_MIME_ALLOWLIST, BINARY_DOC_ALLOWLIST } from "$lib/constants/mime";
 import type { MessageFile } from "$lib/types/Message";
 import type { EndpointMessage } from "../endpoints";
 // uuid import removed (no tool call ids)
@@ -280,6 +280,17 @@ async function prepareMessages(
 	);
 }
 
+function matchesMimeAllowlist(mime: string, allowlist: readonly string[]): boolean {
+	const normalizedMime = (mime || "").toLowerCase();
+	const [fileType, fileSubtype] = normalizedMime.split("/");
+	return allowlist.some((allowed) => {
+		const [type, subtype] = allowed.toLowerCase().split("/");
+		const typeOk = type === "*" || type === fileType;
+		const subOk = subtype === "*" || subtype === fileSubtype;
+		return typeOk && subOk;
+	});
+}
+
 async function prepareFiles(
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
 	files: MessageFile[],
@@ -288,17 +299,29 @@ async function prepareFiles(
 	imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[];
 	textContent: string;
 }> {
-	// Separate image and text files
+	// Debug: Log all incoming files
+	console.log("[prepareFiles] Processing files:", {
+		totalFiles: files.length,
+		isMultimodal,
+		files: files.map((f) => ({
+			name: f.name,
+			mime: f.mime,
+			base64Length: f.value?.length ?? 0,
+			base64Preview: f.value?.substring(0, 50) + "...",
+		})),
+	});
+
+	// Separate files by type
 	const imageFiles = files.filter((file) => file.mime.startsWith("image/"));
-	const textFiles = files.filter((file) => {
-		const mime = (file.mime || "").toLowerCase();
-		const [fileType, fileSubtype] = mime.split("/");
-		return TEXT_MIME_ALLOWLIST.some((allowed) => {
-			const [type, subtype] = allowed.toLowerCase().split("/");
-			const typeOk = type === "*" || type === fileType;
-			const subOk = subtype === "*" || subtype === fileSubtype;
-			return typeOk && subOk;
-		});
+	const textFiles = files.filter((file) => matchesMimeAllowlist(file.mime, TEXT_MIME_ALLOWLIST));
+	const binaryDocFiles = files.filter((file) =>
+		matchesMimeAllowlist(file.mime, BINARY_DOC_ALLOWLIST)
+	);
+
+	console.log("[prepareFiles] File categorization:", {
+		imageFiles: imageFiles.map((f) => f.name),
+		textFiles: textFiles.map((f) => f.name),
+		binaryDocFiles: binaryDocFiles.map((f) => f.name),
 	});
 
 	// Process images if multimodal is enabled
@@ -314,19 +337,55 @@ async function prepareFiles(
 				detail: "auto",
 			},
 		}));
+		console.log("[prepareFiles] Processed images:", {
+			count: imageParts.length,
+			sizes: processedFiles.map((f) => ({
+				mime: f.mime,
+				base64Length: f.image.toString("base64").length,
+			})),
+		});
 	}
 
-	// Process text files - inject their content
+	// Process plain text files - decode and inject their content
 	let textContent = "";
 	if (textFiles.length > 0) {
 		const textParts = await Promise.all(
 			textFiles.map(async (file) => {
 				const content = Buffer.from(file.value, "base64").toString("utf-8");
+				console.log("[prepareFiles] Decoded text file:", {
+					name: file.name,
+					mime: file.mime,
+					base64Length: file.value.length,
+					decodedLength: content.length,
+					decodedPreview: content.substring(0, 100) + "...",
+				});
 				return `<document name="${file.name}" type="${file.mime}">\n${content}\n</document>`;
 			})
 		);
 		textContent = textParts.join("\n\n");
 	}
+
+	// Process binary documents (PDF, DOCX, etc.) - pass as base64 for backend extraction
+	if (binaryDocFiles.length > 0) {
+		const binaryParts = binaryDocFiles.map((file) => {
+			console.log("[prepareFiles] Processing binary doc:", {
+				name: file.name,
+				mime: file.mime,
+				base64Length: file.value.length,
+				estimatedBytes: Math.round(file.value.length * 0.75),
+			});
+			// Send binary docs with base64 encoding marker so backend knows to extract text
+			return `<document name="${file.name}" type="${file.mime}" encoding="base64">\n${file.value}\n</document>`;
+		});
+		const binaryContent = binaryParts.join("\n\n");
+		textContent = textContent ? textContent + "\n\n" + binaryContent : binaryContent;
+	}
+
+	console.log("[prepareFiles] Final output:", {
+		imagePartsCount: imageParts.length,
+		textContentLength: textContent.length,
+		textContentPreview: textContent.substring(0, 200) + "...",
+	});
 
 	return { imageParts, textContent };
 }

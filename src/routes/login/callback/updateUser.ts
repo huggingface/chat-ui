@@ -100,13 +100,15 @@ export async function updateUser(params: {
 		(config.HF_ORG_EARLY_ACCESS && orgs?.some((org) => org.sub === config.HF_ORG_EARLY_ACCESS)) ||
 		false;
 
-	logger.debug(
+	logger.info(
 		{
 			isAdmin,
 			isEarlyAccess,
 			hfUserId,
+			HF_ORG_ADMIN: config.HF_ORG_ADMIN,
+			orgs_subs: orgs?.map((o) => o.sub),
 		},
-		`Updating user ${hfUserId}`
+		`Admin check for user ${hfUserId}`
 	);
 
 	// check if user already exists
