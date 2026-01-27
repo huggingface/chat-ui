@@ -237,7 +237,7 @@
 	{#if !showNoTools}
 		<div
 			class={[
-				"scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 pt-1.5 text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2",
+				"scrollbar-custom -ml-0.5 flex max-w-[calc(100%-50px)] flex-wrap items-center justify-start gap-3 px-3 pb-3 pt-2 text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2.5",
 			]}
 		>
 			{#if showFileUpload}
@@ -269,11 +269,11 @@
 						}}
 					>
 						<DropdownMenu.Trigger
-							class="btn size-8 rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600/50 dark:text-white dark:hover:enabled:bg-gray-600 sm:size-7"
+							class="btn size-10 rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600/50 dark:text-white dark:hover:enabled:bg-gray-600 sm:size-9"
 							disabled={loading}
 							aria-label="Add attachment"
 						>
-							<IconPlus class="text-base sm:text-sm" />
+							<IconPlus class="text-lg sm:text-base" />
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Portal>
 							<DropdownMenu.Content
@@ -402,7 +402,7 @@
 
 					{#if $enabledServersCount > 0}
 						<div
-							class="ml-1.5 inline-flex h-8 items-center gap-1.5 rounded-full border border-blue-500/10 bg-blue-600/10 pl-2 pr-1 text-xs font-semibold text-blue-700 dark:bg-blue-600/20 dark:text-blue-400 sm:h-7"
+							class="ml-2 inline-flex h-10 items-center gap-2 rounded-full border border-blue-500/10 bg-blue-600/10 pl-2.5 pr-1.5 text-sm font-semibold text-blue-700 dark:bg-blue-600/20 dark:text-blue-400 sm:h-9"
 							class:grayscale={!modelSupportsTools}
 							class:opacity-60={!modelSupportsTools}
 							class:cursor-help={!modelSupportsTools}
@@ -423,7 +423,7 @@
 											<img
 												src={getMcpServerFaviconUrl(server.url)}
 												alt=""
-												class="size-4 rounded bg-white p-px shadow-sm ring-1 ring-black/5 dark:bg-gray-900 dark:ring-white/10"
+												class="size-5 rounded bg-white p-px shadow-sm ring-1 ring-black/5 dark:bg-gray-900 dark:ring-white/10"
 											/>
 										{/each}
 										{#if selectedServers.length > 3}
@@ -436,12 +436,12 @@
 								MCP ({$enabledServersCount})
 							</button>
 							<button
-								class="grid size-5 place-items-center rounded-full bg-blue-600/15 text-blue-700 transition-colors hover:bg-blue-600/25 dark:bg-blue-600/25 dark:text-blue-300 dark:hover:bg-blue-600/35"
+								class="grid size-6 place-items-center rounded-full bg-blue-600/15 text-blue-700 transition-colors hover:bg-blue-600/25 dark:bg-blue-600/25 dark:text-blue-300 dark:hover:bg-blue-600/35"
 								aria-label="Disable all MCP servers"
 								onclick={() => disableAllServers()}
 								type="button"
 							>
-								<CarbonClose class="size-3.5" />
+								<CarbonClose class="size-4" />
 							</button>
 						</div>
 					{/if}
