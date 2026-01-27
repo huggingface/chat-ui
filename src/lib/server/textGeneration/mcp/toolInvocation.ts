@@ -293,7 +293,12 @@ export async function* executeToolCalls({
 		} catch (err) {
 			const errMsg = err instanceof Error ? err.message : String(err);
 			const errName = err instanceof Error ? err.name : "";
-			const isAbortError = abortSignal?.aborted || errName === "AbortError";
+			const isAbortError =
+				abortSignal?.aborted ||
+				errName === "AbortError" ||
+				errName === "APIUserAbortError" ||
+				errMsg === "Request was aborted." ||
+				errMsg === "This operation was aborted";
 			const message = isAbortError ? "Aborted by user" : errMsg;
 
 			if (isAbortError) {
