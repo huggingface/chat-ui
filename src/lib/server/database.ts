@@ -267,6 +267,10 @@ export class Database {
 		users
 			.createIndex({ username: 1 })
 			.catch((e) => logger.error(e, "Error creating index for users by username"));
+		// For stats queries filtering users by creation date
+		users
+			.createIndex({ createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for users by createdAt"));
 		messageEvents
 			.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 1 })
 			.catch((e) => logger.error(e, "Error creating index for messageEvents by expiresAt"));
