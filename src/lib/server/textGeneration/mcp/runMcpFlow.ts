@@ -431,8 +431,30 @@ export async function* runMcpFlow({
 			text: string
 		): {
 			annotated: string;
-			sources: { index: number; link: string }[];
-		} => ({ annotated: text, sources: [] });
+			sources: { index: number; title: string; link: string }[];
+		} => {
+			// Extract URLs from tool output text
+			const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+			const rawUrls = text.match(urlRegex) || [];
+			// Trim trailing punctuation that may have been captured
+			const urls = [...new Set(rawUrls.map((url) => url.replace(/[).,;:!?'"]+$/, "")))];
+
+			const sources = urls.map((url, i) => {
+				let title: string;
+				try {
+					title = new URL(url).hostname.replace(/^www\./, "");
+				} catch {
+					title = url;
+				}
+				return {
+					index: i + 1,
+					title,
+					link: url,
+				};
+			});
+
+			return { annotated: text, sources };
+		};
 
 		let lastAssistantContent = "";
 		let streamedContent = false;

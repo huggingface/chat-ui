@@ -119,6 +119,20 @@ body {
 		font-size: 0.7em; /* 75% */
 		@apply font-semibold;
 	}
+
+	/* Citation superscript link */
+	.prose .citation-link {
+		@apply text-purple-500 no-underline hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300;
+	}
+
+	/* Footnotes container at message end */
+	.sources-footnotes {
+		@apply mt-4 flex flex-wrap gap-2 border-t border-gray-200 pt-3 dark:border-gray-700;
+	}
+
+	.footnote-source {
+		@apply text-xs text-gray-500 no-underline hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300;
+	}
 }
 
 .katex-display {

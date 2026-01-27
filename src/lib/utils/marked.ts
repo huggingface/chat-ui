@@ -226,23 +226,19 @@ function escapeHTML(content: string) {
 }
 
 function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): string {
-	const linkStyle =
-		"color: rgb(59, 130, 246); text-decoration: none; hover:text-decoration: underline;";
-	return md.replace(/\[(\d+)\]/g, (match: string) => {
-		const indices: number[] = (match.match(/\d+/g) || []).map(Number);
-		const links: string = indices
-			.map((index: number) => {
-				if (index === 0) return false;
-				const source = webSearchSources[index - 1];
-				if (source) {
-					return `<a href="${escapeHTML(source.link)}" target="_blank" rel="noreferrer" style="${linkStyle}">${index}</a>`;
-				}
-				return "";
-			})
-			.filter(Boolean)
-			.join(", ");
-		return links ? ` <sup>${links}</sup>` : match;
+	if (webSearchSources.length === 0) return md;
+
+	// Remove citation-only lines (lines that contain only [n] patterns and whitespace)
+	let result = md.replace(/^[\s]*(\[\d+\][\s]*)+$/gm, "");
+
+	// Convert [n] to superscript anchor linking to footnote
+	result = result.replace(/\[(\d+)\]/g, (match, numStr) => {
+		const index = parseInt(numStr, 10);
+		if (index === 0 || index > webSearchSources.length) return match;
+		return `<sup><a href="#footnote-${index}" class="citation-link">${index}</a></sup>`;
 	});
+
+	return result;
 }
 
 function sanitizeHref(href?: string | null): string | undefined {
