@@ -69,11 +69,19 @@ async function computeStats(params: {
 			? [
 					{
 						$project: {
+							// Filter messages by date, then map to only keep the date field
+							// This avoids carrying large message payloads (content, files, etc.) through the pipeline
 							messages: {
-								$filter: {
-									input: "$messages",
+								$map: {
+									input: {
+										$filter: {
+											input: "$messages",
+											as: "msg",
+											cond: { $gte: [`$$msg.${params.dateField}`, minDate] },
+										},
+									},
 									as: "msg",
-									cond: { $gte: [`$$msg.${params.dateField}`, minDate] },
+									in: { [params.dateField]: `$$msg.${params.dateField}` },
 								},
 							},
 							sessionId: 1,
