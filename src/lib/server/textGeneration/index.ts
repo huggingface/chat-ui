@@ -61,6 +61,8 @@ async function* textGenerationWithoutTitle(
 			locals: ctx.locals,
 			preprompt,
 			abortSignal: ctx.abortController.signal,
+			abortController: ctx.abortController,
+			promptedAt: ctx.promptedAt,
 		});
 
 		let step = await mcpGen.next();
@@ -68,11 +70,12 @@ async function* textGenerationWithoutTitle(
 			yield step.value;
 			step = await mcpGen.next();
 		}
-		const didRunMcp = Boolean(step.value);
-		if (!didRunMcp) {
+		const mcpResult = step.value;
+		if (mcpResult === "not_applicable") {
 			// fallback to normal text generation
 			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
 		}
+		// If mcpResult is "completed" or "aborted", don't fall back
 	} catch {
 		// On any MCP error, fall back to normal generation
 		yield* generate({ ...ctx, messages: processedMessages }, preprompt);

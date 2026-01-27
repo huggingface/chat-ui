@@ -393,16 +393,12 @@
 	async function stopGeneration() {
 		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
 			method: "POST",
-		}).then((r) => {
-			if (r.ok) {
-				setTimeout(() => {
-					$isAborted = true;
-					$loading = false;
-				}, 500);
-			} else {
+		}).then(() => {
+			// Small delay to let the stream receive the server's final update before aborting client-side
+			setTimeout(() => {
 				$isAborted = true;
 				$loading = false;
-			}
+			}, 200);
 		});
 	}
 
