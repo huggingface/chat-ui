@@ -19,7 +19,12 @@
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import ToolUpdate from "./ToolUpdate.svelte";
-	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
+	import ToolCallsSummary from "./ToolCallsSummary.svelte";
+	import {
+		isMessageToolUpdate,
+		isMessageToolResultUpdate,
+		isMessageToolErrorUpdate,
+	} from "$lib/utils/messageUpdates";
 	import { MessageUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
 
 	interface Props {
@@ -227,6 +232,28 @@
 			}
 		}
 	});
+
+	// Determine if we should show merged tool summary
+	// Show summary when: we have tool blocks AND text content AND all tools are done
+	let toolBlocks = $derived(blocks.filter((b): b is ToolBlock => b.type === "tool"));
+	let textBlocks = $derived(
+		blocks.filter((b): b is { type: "text"; content: string } => b.type === "text")
+	);
+	let hasTextContent = $derived(textBlocks.some((b) => b.content.trim().length > 0));
+
+	let allToolsDone = $derived.by(() => {
+		if (toolBlocks.length === 0) return true;
+		for (const block of toolBlocks) {
+			const hasDone = block.updates.some(
+				(u) => isMessageToolResultUpdate(u) || isMessageToolErrorUpdate(u)
+			);
+			if (!hasDone) return false;
+		}
+		return true;
+	});
+
+	// Show summary when we have multiple tools OR (single tool AND text content AND tool is done)
+	let showMergedSummary = $derived(toolBlocks.length > 0 && hasTextContent && allToolsDone);
 </script>
 
 {#if message.from === "assistant"}
@@ -261,52 +288,92 @@
 				{#if isLast && loading && blocks.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
-				{#each blocks as block, blockIndex (block.type === "tool" ? `${block.uuid}-${blockIndex}` : `text-${blockIndex}`)}
-					{@const nextBlock = blocks[blockIndex + 1]}
-					{@const nextBlockHasThink =
-						nextBlock?.type === "text" && THINK_BLOCK_TEST_REGEX.test(nextBlock.content)}
-					{@const nextIsLinkable = nextBlock?.type === "tool" || nextBlockHasThink}
-					{#if block.type === "tool"}
-						<div data-exclude-from-copy class="has-[+.prose]:mb-3 [.prose+&]:mt-4">
-							<ToolUpdate tool={block.updates} {loading} hasNext={nextIsLinkable} />
-						</div>
-					{:else if block.type === "text"}
-						{#if isLast && loading && block.content.length === 0}
-							<IconLoading classNames="loading inline ml-2 first:ml-0" />
+
+				{#if showMergedSummary}
+					<!-- Merged tool summary view -->
+					<ToolCallsSummary
+						toolGroups={toolBlocks.map((b) => ({ uuid: b.uuid, updates: b.updates }))}
+					/>
+					{#each textBlocks as block, blockIndex (`text-merged-${blockIndex}`)}
+						{#if block.content.trim().length > 0}
+							{#if hasClientThink}
+								{@const parts = block.content.split(THINK_BLOCK_REGEX)}
+								{#each parts as part}
+									{#if part && part.startsWith("<think>")}
+										{@const isClosed = part.endsWith("</think>")}
+										{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
+										<OpenReasoningResults
+											content={thinkContent}
+											loading={isLast && loading && !isClosed}
+											hasNext={false}
+										/>
+									{:else if part && part.trim().length > 0}
+										<div
+											class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+										>
+											<MarkdownRenderer content={part} loading={isLast && loading} />
+										</div>
+									{/if}
+								{/each}
+							{:else}
+								<div
+									class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+								>
+									<MarkdownRenderer content={block.content} loading={isLast && loading} />
+								</div>
+							{/if}
 						{/if}
-
-						{#if hasClientThink}
-							{@const parts = block.content.split(THINK_BLOCK_REGEX)}
-							{#each parts as part, partIndex}
-								{@const remainingParts = parts.slice(partIndex + 1)}
-								{@const hasMoreLinkable =
-									remainingParts.some((p) => p && THINK_BLOCK_TEST_REGEX.test(p)) || nextIsLinkable}
-								{#if part && part.startsWith("<think>")}
-									{@const isClosed = part.endsWith("</think>")}
-									{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
-
-									<OpenReasoningResults
-										content={thinkContent}
-										loading={isLast && loading && !isClosed}
-										hasNext={hasMoreLinkable}
-									/>
-								{:else if part && part.trim().length > 0}
-									<div
-										class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
-									>
-										<MarkdownRenderer content={part} loading={isLast && loading} />
-									</div>
-								{/if}
-							{/each}
-						{:else}
-							<div
-								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
-							>
-								<MarkdownRenderer content={block.content} loading={isLast && loading} />
+					{/each}
+				{:else}
+					<!-- Standard interleaved view -->
+					{#each blocks as block, blockIndex (block.type === "tool" ? `${block.uuid}-${blockIndex}` : `text-${blockIndex}`)}
+						{@const nextBlock = blocks[blockIndex + 1]}
+						{@const nextBlockHasThink =
+							nextBlock?.type === "text" && THINK_BLOCK_TEST_REGEX.test(nextBlock.content)}
+						{@const nextIsLinkable = nextBlock?.type === "tool" || nextBlockHasThink}
+						{#if block.type === "tool"}
+							<div data-exclude-from-copy class="has-[+.prose]:mb-3 [.prose+&]:mt-4">
+								<ToolUpdate tool={block.updates} {loading} hasNext={nextIsLinkable} />
 							</div>
+						{:else if block.type === "text"}
+							{#if isLast && loading && block.content.length === 0}
+								<IconLoading classNames="loading inline ml-2 first:ml-0" />
+							{/if}
+
+							{#if hasClientThink}
+								{@const parts = block.content.split(THINK_BLOCK_REGEX)}
+								{#each parts as part, partIndex}
+									{@const remainingParts = parts.slice(partIndex + 1)}
+									{@const hasMoreLinkable =
+										remainingParts.some((p) => p && THINK_BLOCK_TEST_REGEX.test(p)) ||
+										nextIsLinkable}
+									{#if part && part.startsWith("<think>")}
+										{@const isClosed = part.endsWith("</think>")}
+										{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
+
+										<OpenReasoningResults
+											content={thinkContent}
+											loading={isLast && loading && !isClosed}
+											hasNext={hasMoreLinkable}
+										/>
+									{:else if part && part.trim().length > 0}
+										<div
+											class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+										>
+											<MarkdownRenderer content={part} loading={isLast && loading} />
+										</div>
+									{/if}
+								{/each}
+							{:else}
+								<div
+									class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+								>
+									<MarkdownRenderer content={block.content} loading={isLast && loading} />
+								</div>
+							{/if}
 						{/if}
-					{/if}
-				{/each}
+					{/each}
+				{/if}
 			</div>
 		</div>
 
