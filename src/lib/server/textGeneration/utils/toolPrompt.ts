@@ -15,8 +15,8 @@ export function buildToolPreprompt(tools: OpenAiTool[]): string {
 	return [
 		`You have access to these tools: ${names.join(", ")}.`,
 		`Today's date: ${currentDate}.`,
-		`IMPORTANT: Do NOT call any tool for tasks you can complete from your own knowledge. This includes: writing code, generating files (HTML, JSON, etc.), creative writing, explanations, math, translations, summaries, and general Q&A.`,
-		`Only call a tool when you genuinely need external, up-to-date, or user-specific information that you do not have.`,
+		`IMPORTANT: Do NOT call any tool for tasks you can complete from your own knowledge. This includes: writing standard code, generating files (HTML, JSON, etc.), creative writing, explanations, math, translations, summaries, and general Q&A.`,
+		`Only call a tool when you genuinely need external, up-to-date, or user-specific information you lack—for example, current API documentation, recent library changes, or real-time data.`,
 		`SEARCH: Use 3-6 precise keywords with the correct year (use actual year for past events, not today's year). For multi-part questions, search each part separately.`,
 		`ANSWER: State only facts explicitly in the results. If info is missing or results conflict, say so. Never fabricate URLs or facts.`,
 		`If a tool generates an image, you can inline it directly: ![alt text](image_url).`,
