@@ -647,24 +647,24 @@
 							<StopGeneratingBtn
 								onClick={() => onstop?.()}
 								showBorder={true}
-								classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
+								classNames="absolute bottom-2.5 right-2.5 size-9 sm:size-8 self-end rounded-full border bg-white text-black shadow transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
 							/>
 						{:else}
 							{#if transcriptionEnabled}
 								<button
 									type="button"
-									class="btn absolute bottom-2 right-10 mr-1.5 size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white sm:right-9 sm:size-7"
+									class="btn absolute bottom-2.5 right-[3.25rem] size-9 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white sm:right-11 sm:size-8"
 									disabled={isReadOnly}
 									onclick={() => {
 										isRecording = true;
 									}}
 									aria-label="Start voice recording"
 								>
-									<IconMic class="size-4" />
+									<IconMic class="size-[1.125rem]" />
 								</button>
 							{/if}
 							<button
-								class="btn absolute bottom-2 right-2 size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black sm:size-7 {!draft ||
+								class="btn absolute bottom-2.5 right-2.5 size-9 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black sm:size-8 {!draft ||
 								isReadOnly
 									? ''
 									: '!bg-black !text-white dark:!bg-white dark:!text-black'}"
@@ -673,7 +673,7 @@
 								aria-label="Send message"
 								name="submit"
 							>
-								<IconArrowUp />
+								<IconArrowUp class="size-[1.125rem]" />
 							</button>
 						{/if}
 					</div>
