@@ -81,7 +81,9 @@ async function* textGenerationWithoutTitle(
 		const isAbort =
 			ctx.abortController.signal.aborted ||
 			(err instanceof Error &&
-				(err.name === "AbortError" || err.message.includes("Request was aborted")));
+				(err.name === "AbortError" ||
+					err.name === "APIUserAbortError" ||
+					err.message.includes("Request was aborted")));
 		if (!isAbort) {
 			// On non-abort MCP error, fall back to normal generation
 			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
