@@ -211,6 +211,8 @@
 				throw new Error("Message to write to not found");
 			}
 
+			const finalFiles = isRetry ? (retryMsgFiles ?? userMessage?.files) : base64Files;
+
 			const messageUpdatesAbortController = new AbortController();
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
@@ -220,7 +222,7 @@
 					inputs: prompt,
 					messageId,
 					isRetry,
-					files: isRetry ? (retryMsgFiles ?? userMessage?.files) : base64Files,
+					files: finalFiles,
 					selectedMcpServerNames: $enabledServers.map((s) => s.name),
 					selectedMcpServers: $enabledServers.map((s) => ({
 						name: s.name,

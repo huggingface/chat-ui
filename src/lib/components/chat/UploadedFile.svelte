@@ -65,12 +65,18 @@
 
 	let isClickable = $derived(isImage(file.mime) || isPlainText(file.mime));
 
+	function fromBase64Utf8(b64: string): string {
+		const binary = atob(b64);
+		const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+		return new TextDecoder("utf-8").decode(bytes);
+	}
+
 	async function getText(): Promise<string> {
 		if (file.type === "hash") {
 			const res = await fetch(urlNotTrailing + "/output/" + file.value);
 			return await res.text();
 		}
-		return atob(file.value);
+		return fromBase64Utf8(file.value);
 	}
 
 	async function copyText() {
@@ -120,7 +126,7 @@
 					class="text-md absolute right-24 top-5 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
 					onclick={copyText}
 				>
-					<CopyToClipBoardBtn value={file.value.trim()} />
+					<CopyToClipBoardBtn value="" />
 				</button>
 
 				<button
@@ -156,7 +162,7 @@
 						class:font-sans={file.mime === "text/plain" ||
 							file.mime === "application/vnd.chatui.clipboard"}
 						class:font-mono={file.mime !== "text/plain" &&
-							file.mime !== "application/vnd.chatui.clipboard"}>{atob(file.value)}</pre>
+							file.mime !== "application/vnd.chatui.clipboard"}>{fromBase64Utf8(file.value)}</pre>
 				{/if}
 			</div>
 		{/if}
