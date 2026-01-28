@@ -300,12 +300,18 @@
 					// Mirror server-side merge behavior so the UI reflects the
 					// final text once tools complete, while preserving any
 					// pre‑tool streamed content when appropriate.
+					const finalText = update.text ?? "";
+					const isInterrupted = update.interrupted === true;
 					const hadTools =
 						messageToWriteTo.updates?.some((u) => u.type === MessageUpdateType.Tool) ?? false;
 
-					if (hadTools) {
+					if (isInterrupted) {
+						// Preserve streamed content on abort. If we never streamed, fall back to finalText.
+						if (!messageToWriteTo.content) {
+							messageToWriteTo.content = finalText;
+						}
+					} else if (hadTools) {
 						const existing = messageToWriteTo.content;
-						const finalText = update.text ?? "";
 						const trimmedExistingSuffix = existing.replace(/\s+$/, "");
 						const trimmedFinalPrefix = finalText.replace(/^\s+/, "");
 						const alreadyStreamed =
@@ -337,7 +343,7 @@
 					} else {
 						// No tools: final answer replaces streamed content so
 						// the provider's final text is authoritative.
-						messageToWriteTo.content = update.text ?? "";
+						messageToWriteTo.content = finalText;
 					}
 				} else if (
 					update.type === MessageUpdateType.Status &&
@@ -393,16 +399,12 @@
 	async function stopGeneration() {
 		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
 			method: "POST",
-		}).then((r) => {
-			if (r.ok) {
-				setTimeout(() => {
-					$isAborted = true;
-					$loading = false;
-				}, 500);
-			} else {
+		}).then(() => {
+			// Small delay to let the stream receive the server's final update before aborting client-side
+			setTimeout(() => {
 				$isAborted = true;
 				$loading = false;
-			}
+			}, 200);
 		});
 	}
 
