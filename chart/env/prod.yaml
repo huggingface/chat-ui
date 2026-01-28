@@ -89,6 +89,7 @@ envVars:
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
   MODELS: >
     [
+      { "id": "moonshotai/Kimi-K2.5", "description": "Native multimodal agent with agent swarms for parallel tool orchestration." },
       { "id": "allenai/Molmo2-8B", "description": "Open vision-language model excelling at video understanding, pointing, and object tracking." },
       { "id": "zai-org/GLM-4.7-Flash", "description": "Fast GLM-4.7 variant optimized for lower latency coding and agents." },
       { "id": "zai-org/GLM-4.7", "description": "Flagship GLM MoE for coding, reasoning, and agentic tool use." },
