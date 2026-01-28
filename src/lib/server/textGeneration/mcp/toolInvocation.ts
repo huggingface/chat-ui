@@ -6,7 +6,11 @@ import { ToolResultStatus } from "$lib/types/Tool";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import type { McpToolMapping } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
-import { callMcpTool, type McpToolTextResponse } from "$lib/server/mcp/httpClient";
+import {
+	callMcpTool,
+	getMcpToolTimeoutMs,
+	type McpToolTextResponse,
+} from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/sdk/client";
@@ -69,8 +73,9 @@ export async function* executeToolCalls({
 	toPrimitive,
 	processToolOutput,
 	abortSignal,
-	toolTimeoutMs = 60_000,
+	toolTimeoutMs,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
+	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
 	const serverLookup = serverMap(servers);
@@ -177,6 +182,24 @@ export async function* executeToolCalls({
 	const results: TaskResult[] = [];
 
 	const tasks = prepared.map(async (p, index) => {
+		// Check abort before starting each tool call
+		if (abortSignal?.aborted) {
+			const message = "Aborted by user";
+			results.push({
+				index,
+				error: message,
+				uuid: p.uuid,
+				paramsClean: p.paramsClean,
+			});
+			updatesQueue.push({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Error,
+				uuid: p.uuid,
+				message,
+			});
+			return;
+		}
+
 		const mappingEntry = mapping[p.call.name];
 		if (!mappingEntry) {
 			const message = `Unknown MCP function: ${p.call.name}`;
@@ -224,7 +247,7 @@ export async function* executeToolCalls({
 				{
 					client,
 					signal: abortSignal,
-					timeoutMs: toolTimeoutMs,
+					timeoutMs: effectiveTimeoutMs,
 					onProgress: (progress) => {
 						updatesQueue.push({
 							type: MessageUpdateType.Tool,
@@ -268,11 +291,27 @@ export async function* executeToolCalls({
 				},
 			});
 		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			logger.warn(
-				{ server: mappingEntry.server, tool: mappingEntry.tool, err: message },
-				"[mcp] tool call failed"
-			);
+			const errMsg = err instanceof Error ? err.message : String(err);
+			const errName = err instanceof Error ? err.name : "";
+			const isAbortError =
+				abortSignal?.aborted ||
+				errName === "AbortError" ||
+				errName === "APIUserAbortError" ||
+				errMsg === "Request was aborted." ||
+				errMsg === "This operation was aborted";
+			const message = isAbortError ? "Aborted by user" : errMsg;
+
+			if (isAbortError) {
+				logger.debug(
+					{ server: mappingEntry.server, tool: mappingEntry.tool },
+					"[mcp] tool call aborted by user"
+				);
+			} else {
+				logger.warn(
+					{ server: mappingEntry.server, tool: mappingEntry.tool, err: message },
+					"[mcp] tool call failed"
+				);
+			}
 			results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
 			updatesQueue.push({
 				type: MessageUpdateType.Tool,

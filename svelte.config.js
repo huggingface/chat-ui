@@ -17,6 +17,7 @@ function getCurrentCommitSHA() {
 
 process.env.PUBLIC_VERSION ??= process.env.npm_package_version;
 process.env.PUBLIC_COMMIT_SHA ??= getCurrentCommitSHA();
+process.env.PUBLIC_APP_ASSETS ??= "chatui";
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -37,7 +38,9 @@ const config = {
 		},
 		csp: {
 			directives: {
-				...(process.env.ALLOW_IFRAME === "true" ? {} : { "frame-ancestors": ["'none'"] }),
+				...(process.env.ALLOW_IFRAME === "true"
+					? {}
+					: { "frame-ancestors": ["https://huggingface.co"] }),
 			},
 		},
 		alias: {

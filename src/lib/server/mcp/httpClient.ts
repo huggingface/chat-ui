@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { getClient, evictFromPool } from "./clientPool";
-import { isExaServer, getExaApiKey, callExaDirectApi } from "./exaDirect";
+import { config } from "$lib/server/config";
 
 function isConnectionClosedError(err: unknown): boolean {
 	const message = err instanceof Error ? err.message : String(err);
@@ -13,7 +13,18 @@ export interface McpServerConfig {
 	headers?: Record<string, string>;
 }
 
-const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_TIMEOUT_MS = 120_000;
+
+export function getMcpToolTimeoutMs(): number {
+	const envValue = config.MCP_TOOL_TIMEOUT_MS;
+	if (envValue) {
+		const parsed = parseInt(envValue, 10);
+		if (!isNaN(parsed) && parsed > 0) {
+			return parsed;
+		}
+	}
+	return DEFAULT_TIMEOUT_MS;
+}
 
 export type McpToolTextResponse = {
 	text: string;
@@ -45,21 +56,6 @@ export async function callMcpTool(
 		onProgress?: (progress: McpToolProgress) => void;
 	} = {}
 ): Promise<McpToolTextResponse> {
-	// Bypass MCP protocol for Exa - call direct API
-	if (isExaServer(server)) {
-		const apiKey = getExaApiKey(server);
-		if (!apiKey) {
-			throw new Error(
-				"Exa API key not found. Set EXA_API_KEY environment variable or add ?exaApiKey= to the server URL."
-			);
-		}
-		const normalizedArgs =
-			typeof args === "object" && args !== null && !Array.isArray(args)
-				? (args as Record<string, unknown>)
-				: {};
-		return callExaDirectApi(tool, normalizedArgs, apiKey, { signal, timeoutMs });
-	}
-
 	const normalizedArgs =
 		typeof args === "object" && args !== null && !Array.isArray(args)
 			? (args as Record<string, unknown>)

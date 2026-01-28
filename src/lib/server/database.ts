@@ -267,6 +267,10 @@ export class Database {
 		users
 			.createIndex({ username: 1 })
 			.catch((e) => logger.error(e, "Error creating index for users by username"));
+		// For stats queries filtering users by creation date
+		users
+			.createIndex({ createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for users by createdAt"));
 		messageEvents
 			.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 1 })
 			.catch((e) => logger.error(e, "Error creating index for messageEvents by expiresAt"));
@@ -349,6 +353,14 @@ export class Database {
 			.catch((e) =>
 				logger.error(e, "Error creating index for conversations by userId and sessionId")
 			);
+
+		// For stats aggregation jobs that filter by createdAt/updatedAt alone
+		conversations
+			.createIndex({ createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for conversations by createdAt"));
+		conversations
+			.createIndex({ updatedAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for conversations by updatedAt"));
 
 		config
 			.createIndex({ key: 1 }, { unique: true })

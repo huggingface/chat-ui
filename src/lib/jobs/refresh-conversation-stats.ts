@@ -63,25 +63,44 @@ async function computeStats(params: {
 				[dateField]: { $gte: minDate },
 			},
 		},
-		{
-			$project: {
-				[dateField]: 1,
-				sessionId: 1,
-				userId: 1,
-			},
-		},
+		// For message stats: use $filter to reduce data before $unwind (optimization)
+		// For conversation stats: simple projection
 		...(params.type === "message"
 			? [
 					{
-						$unwind: "$messages",
-					},
-					{
-						$match: {
-							[dateField]: { $gte: minDate },
+						$project: {
+							// Filter messages by date, then map to only keep the date field
+							// This avoids carrying large message payloads (content, files, etc.) through the pipeline
+							messages: {
+								$map: {
+									input: {
+										$filter: {
+											input: "$messages",
+											as: "msg",
+											cond: { $gte: [`$$msg.${params.dateField}`, minDate] },
+										},
+									},
+									as: "msg",
+									in: { [params.dateField]: `$$msg.${params.dateField}` },
+								},
+							},
+							sessionId: 1,
+							userId: 1,
 						},
 					},
+					{
+						$unwind: "$messages",
+					},
 				]
-			: []),
+			: [
+					{
+						$project: {
+							[dateField]: 1,
+							sessionId: 1,
+							userId: 1,
+						},
+					},
+				]),
 		{
 			$sort: {
 				[dateField]: 1,

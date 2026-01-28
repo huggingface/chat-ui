@@ -10,7 +10,8 @@ export class AbortedGenerations {
 	private abortedGenerations: Record<string, Date> = {};
 
 	private constructor() {
-		const interval = setInterval(() => this.updateList(), 1000);
+		// Poll every 500ms for faster abort detection (reduced from 1000ms)
+		const interval = setInterval(() => this.updateList(), 500);
 		onExit(() => clearInterval(interval));
 
 		this.updateList();
