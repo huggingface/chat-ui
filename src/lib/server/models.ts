@@ -58,6 +58,8 @@ const modelConfig = z.object({
 	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
 	// Aggregated tool-calling capability across providers (HF router)
 	supportsTools: z.boolean().default(false),
+	/** Whether the model supports binary document uploads (PDF, DOCX, etc.) */
+	supportsBinaryDocs: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */
@@ -98,6 +100,8 @@ const listSchema = z
 					})
 					.passthrough()
 					.optional(),
+				// Custom field to enable binary doc uploads (PDF, DOCX, etc.)
+				supports_binary_docs: z.boolean().optional(),
 			})
 		),
 	})
@@ -347,6 +351,8 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 
 			// If any provider supports tools, consider the model as supporting tools
 			const supportsTools = Boolean((m.providers ?? []).some((p) => p?.supports_tools === true));
+			// Binary doc support must be explicitly enabled by the backend
+			const supportsBinaryDocs = m.supports_binary_docs === true;
 			return {
 				id: m.id,
 				name: m.id,
@@ -357,6 +363,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				multimodal: supportsImageInput,
 				multimodalAcceptedMimetypes: supportsImageInput ? ["image/*"] : undefined,
 				supportsTools,
+				supportsBinaryDocs,
 				endpoints: [
 					{
 						type: "openai" as const,

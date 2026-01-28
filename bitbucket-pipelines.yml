@@ -57,6 +57,10 @@ pipelines:
               HF_ORG_ADMIN=xpartners-admins
               EOF
 
+            # cat the file for debugging to verify
+            - echo "Contents of .env.prod:"
+            - cat .env.prod
+
             # Build
             - echo "Building Docker image for chat-ui..."
             - docker build -f Dockerfile-ci -t chat-ui:$IMAGE_TAG -t chat-ui:latest .

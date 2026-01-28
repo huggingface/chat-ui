@@ -265,14 +265,19 @@
 			(currentModel as unknown as { supportsTools?: boolean }).supportsTools) === true
 	);
 
-	// Always allow common text-like files and binary docs; add images only when model is multimodal
+	// Always allow common text-like files; add binary docs only if model supports them; add images if multimodal
 	import { TEXT_MIME_ALLOWLIST, BINARY_DOC_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
+
+	// Check if model supports binary docs (PDF, DOCX, etc.) - must be explicitly enabled by backend
+	let modelSupportsBinaryDocs = $derived(
+		(currentModel as unknown as { supportsBinaryDocs?: boolean }).supportsBinaryDocs === true
+	);
 
 	let activeMimeTypes = $derived(
 		Array.from(
 			new Set([
 				...TEXT_MIME_ALLOWLIST,
-				...BINARY_DOC_ALLOWLIST,
+				...(modelSupportsBinaryDocs ? BINARY_DOC_ALLOWLIST : []),
 				...(modelIsMultimodal
 					? (currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT])
 					: []),

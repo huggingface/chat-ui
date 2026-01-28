@@ -20,4 +20,5 @@ export type Model = Pick<
 	| "unlisted"
 	| "hasInferenceAPI"
 	| "providers"
+	| "supportsBinaryDocs"
 >;

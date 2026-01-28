@@ -4,11 +4,13 @@ import { promises } from "fs";
 import { defineConfig } from "vitest/config";
 import { config } from "dotenv";
 
-// Load base .env first
+// Load .env.local first (overrides), then .env as fallback
+// This ensures env vars are available before config is evaluated
+config({ path: "./.env.local" });
 config({ path: "./.env" });
 
 // Vite automatically loads .env.{mode} and .env.{mode}.local based on --mode flag
-// So no manual loading needed here - Vite handles it with dotenv plugin
+// But we need to load them here first for vars used in vite.config.ts itself
 
 // used to load fonts server side for thumbnail generation
 function loadTTFAsArrayBuffer() {
