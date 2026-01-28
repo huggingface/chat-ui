@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy } from "svelte";
+	import { onDestroy, tick } from "svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
@@ -12,6 +12,7 @@
 	import VoiceRecorder from "./VoiceRecorder.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
+	import Modal from "../Modal.svelte";
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
@@ -60,7 +61,7 @@
 		files?: File[];
 		onmessage?: (content: string) => void;
 		onstop?: () => void;
-		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
+		onretry?: (payload: { id: Message["id"]; content?: string; files?: MessageFile[] }) => void;
 		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
 		draft?: string;
 	}
@@ -334,6 +335,10 @@
 			!loading
 	);
 
+	let editingDraftFileIndex: number | null = $state(null);
+	let editingDraftFileText = $state("");
+	let editDraftFileTextarea: HTMLTextAreaElement | undefined = $state();
+
 	$effect(() => {
 		if (!currentModel.isRouter || !messages.length) {
 			activeRouterExamplePrompt = null;
@@ -356,6 +361,32 @@
 		handleSubmit();
 	}
 
+	function autoResize(el: HTMLTextAreaElement) {
+		el.style.height = "auto";
+		el.style.height = Math.min(el.scrollHeight, window.innerHeight * 0.65) + "px";
+	}
+
+	function saveDraftFileEdit() {
+		if (editingDraftFileIndex === null) return;
+
+		const old = files[editingDraftFileIndex];
+
+		const updated = new File([editingDraftFileText], old.name, {
+			type: old.type,
+		});
+
+		files = files.map((f, i) => (i === editingDraftFileIndex ? updated : f));
+
+		editingDraftFileIndex = null;
+	}
+
+	$effect(() => {
+		if (editingDraftFileIndex !== null) {
+			tick().then(() => {
+				if (editDraftFileTextarea) autoResize(editDraftFileTextarea);
+			});
+		}
+	});
 	async function startExample(example: RouterExample) {
 		if (requireAuthUser()) return;
 		activeRouterExamplePrompt = example.prompt;
@@ -493,6 +524,9 @@
 							bind:editMsdgId
 							onretry={(payload) => onretry?.(payload)}
 							onshowAlternateMsg={(payload) => onshowAlternateMsg?.(payload)}
+							onfileedit={({ messageId, files }) => {
+								messages = messages.map((m) => (m.id === messageId ? { ...m, files } : m));
+							}}
 						/>
 					{/each}
 					{#if isReadOnly}
@@ -572,6 +606,10 @@
 							file={src}
 							onclose={() => {
 								files = files.filter((_, i) => i !== index);
+							}}
+							onedit={(text) => {
+								editingDraftFileIndex = index;
+								editingDraftFileText = text;
 							}}
 						/>
 					{/await}
@@ -749,6 +787,41 @@
 		</div>
 	</div>
 </div>
+
+{#if editingDraftFileIndex !== null}
+	<Modal width="max-w-5xl w-[90vw]" onclose={() => (editingDraftFileIndex = null)}>
+		<div class="relative flex max-h-[95vh] flex-col gap-3 p-4">
+			<h3 class="text-lg font-semibold">Edit file</h3>
+
+			<textarea
+				bind:this={editDraftFileTextarea}
+				bind:value={editingDraftFileText}
+				oninput={(e) => autoResize(e.currentTarget)}
+				class="max-h-[95vh] min-h-[120px] resize-none overflow-y-auto rounded border p-2 text-sm dark:bg-gray-900"
+			></textarea>
+
+			<div class="flex w-full flex-row flex-nowrap items-center justify-center gap-2 pt-2">
+				<button
+					type="button"
+					class="btn rounded-lg bg-gray-200 px-3 py-1.5
+						   text-sm text-gray-600 hover:text-gray-800 focus:ring-0
+						   dark:bg-gray-700 dark:text-gray-300 dark:hover:text-gray-100"
+					onclick={saveDraftFileEdit}
+				>
+					Save
+				</button>
+				<button
+					type="button"
+					class="btn rounded-sm p-2 text-sm text-gray-400 hover:text-gray-500 focus:ring-0
+						   dark:text-gray-400 dark:hover:text-gray-300"
+					onclick={() => (editingDraftFileIndex = null)}
+				>
+					Cancel
+				</button>
+			</div>
+		</div>
+	</Modal>
+{/if}
 
 <style lang="postcss">
 	.paste-glow {
