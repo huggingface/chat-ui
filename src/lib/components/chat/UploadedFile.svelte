@@ -91,7 +91,7 @@
 					<p class="text-sm text-gray-500">
 						If you prefer to inject clipboard content directly in the chat, you can disable this
 						feature in the
-						<a href={`${base}/settings`} class="underline">settings page</a>.
+						<a href={`${base}/settings`} class="underline">Settings</a> page.
 					</p>
 				{/if}
 				<button
