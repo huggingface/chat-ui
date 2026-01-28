@@ -1,6 +1,17 @@
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type OpenAI from "openai";
 import type { Stream } from "openai/streaming";
+import {
+	MessageUpdateType,
+	MessageToolUpdateType,
+	type MessageToolUpdate,
+} from "$lib/types/MessageUpdate";
+
+// Extended output type that can include tool updates from custom backend
+export type TextGenerationStreamOutputWithToolUpdate = TextGenerationStreamOutput & {
+	routerMetadata?: { route?: string; model?: string; provider?: string };
+	toolUpdate?: MessageToolUpdate;
+};
 
 /**
  * Transform a stream of OpenAI.Chat.ChatCompletion into a stream of TextGenerationStreamOutput
@@ -8,7 +19,7 @@ import type { Stream } from "openai/streaming";
 export async function* openAIChatToTextGenerationStream(
 	completionStream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>,
 	getRouterMetadata?: () => { route?: string; model?: string; provider?: string }
-) {
+): AsyncGenerator<TextGenerationStreamOutputWithToolUpdate> {
 	let generatedText = "";
 	let tokenId = 0;
 	let toolBuffer = ""; // legacy hack kept harmless
@@ -18,7 +29,64 @@ export async function* openAIChatToTextGenerationStream(
 	for await (const completion of completionStream) {
 		const retyped = completion as {
 			"x-router-metadata"?: { route: string; model: string; provider?: string };
+			"x-tool-update"?: { type: string; subtype: string; uuid: string; [key: string]: unknown };
 		};
+
+		// Check if this chunk contains a tool update from custom backend
+		if (retyped["x-tool-update"]) {
+			const tu = retyped["x-tool-update"];
+			let toolUpdate: MessageToolUpdate | undefined;
+
+			if (tu.subtype === "call" && tu.call) {
+				toolUpdate = {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Call,
+					uuid: tu.uuid,
+					call: tu.call as { name: string; parameters: Record<string, unknown> },
+				};
+			} else if (tu.subtype === "eta" && tu.eta !== undefined) {
+				toolUpdate = {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.ETA,
+					uuid: tu.uuid,
+					eta: tu.eta as number,
+				};
+			} else if (tu.subtype === "result" && tu.result) {
+				toolUpdate = {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Result,
+					uuid: tu.uuid,
+					result: tu.result as {
+						status: "success" | "error";
+						display?: boolean;
+						outputs?: unknown[];
+						message?: string;
+					},
+				};
+			} else if (tu.subtype === "error") {
+				toolUpdate = {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid: tu.uuid,
+					message: (tu.message as string) || "Tool error",
+				};
+			}
+
+			if (toolUpdate) {
+				yield {
+					token: { id: tokenId++, text: "", logprob: 0, special: true },
+					generated_text: null,
+					details: null,
+					toolUpdate,
+				};
+			}
+
+			// If this chunk has no content, skip further processing
+			if (!completion.choices?.[0]?.delta?.content) {
+				continue;
+			}
+		}
+
 		// Check if this chunk contains router metadata (first chunk from llm-router)
 		if (!metadataYielded && retyped["x-router-metadata"]) {
 			const metadata = retyped["x-router-metadata"];
@@ -36,9 +104,7 @@ export async function* openAIChatToTextGenerationStream(
 					model: metadata.model,
 					provider: metadata.provider,
 				},
-			} as TextGenerationStreamOutput & {
-				routerMetadata: { route: string; model: string; provider?: string };
-			};
+			} as TextGenerationStreamOutputWithToolUpdate;
 			metadataYielded = true;
 			// Skip processing this chunk as content since it's just metadata
 			if (

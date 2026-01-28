@@ -63,6 +63,15 @@ export async function* generate(
 	});
 
 	for await (const output of stream) {
+		// Check if this output contains a tool update from custom backend
+		if ("toolUpdate" in output && output.toolUpdate) {
+			yield output.toolUpdate;
+			// If this was a tool-only chunk with no text, continue
+			if (!output.token.text && !output.generated_text) {
+				continue;
+			}
+		}
+
 		// Check if this output contains router metadata. Emit if either:
 		// 1) route+model are present (router models), or
 		// 2) provider-only is present (non-router models exposing x-inference-provider)

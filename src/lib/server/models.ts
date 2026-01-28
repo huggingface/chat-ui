@@ -64,6 +64,8 @@ const modelConfig = z.object({
 	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */
 	systemRoleSupported: z.boolean().default(true),
+	/** Model to use for title generation, if different from this model */
+	titleModel: z.string().optional(),
 });
 
 type ModelConfig = z.infer<typeof modelConfig>;
@@ -102,6 +104,8 @@ const listSchema = z
 					.optional(),
 				// Custom field to enable binary doc uploads (PDF, DOCX, etc.)
 				supports_binary_docs: z.boolean().optional(),
+				// Custom field for title generation model
+				title_model: z.string().optional(),
 			})
 		),
 	})
@@ -364,6 +368,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				multimodalAcceptedMimetypes: supportsImageInput ? ["image/*"] : undefined,
 				supportsTools,
 				supportsBinaryDocs,
+				titleModel: m.title_model,
 				endpoints: [
 					{
 						type: "openai" as const,

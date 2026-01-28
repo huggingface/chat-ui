@@ -4,6 +4,7 @@ import { logger } from "$lib/server/logger";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { Conversation } from "$lib/types/Conversation";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
+import { models } from "$lib/server/models";
 
 export async function* generateTitleForConversation(
 	conv: Conversation,
@@ -15,7 +16,14 @@ export async function* generateTitleForConversation(
 		if (conv.title !== "New Chat" || !userMessage) return;
 
 		const prompt = userMessage.content;
-		const modelForTitle = config.TASK_MODEL?.trim() ? config.TASK_MODEL : conv.model;
+		const model = models.find((m) => m.id === conv.model);
+		if (!model) {
+			logger.warn(`Model ${conv.model} not found for title generation`);
+			return;
+		}
+		const modelForTitle = config.TASK_MODEL?.trim()
+			? config.TASK_MODEL
+			: (model.titleModel ?? model.id);
 		const title = (await generateTitle(prompt, modelForTitle, locals)) ?? "New Chat";
 
 		yield {

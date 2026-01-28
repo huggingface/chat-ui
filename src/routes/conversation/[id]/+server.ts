@@ -350,6 +350,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			messageToWriteTo.updates ??= [];
 			async function update(event: MessageUpdate) {
+				// DEBUG: Log every update received from textGeneration
+				console.log("[DEBUG] update() received event:", JSON.stringify(event));
 				if (!messageToWriteTo || !conv) {
 					throw Error("No message or conversation to write events to");
 				}
@@ -493,6 +495,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				const enqueueUpdate = async () => {
 					if (clientDetached) return;
 					try {
+						// DEBUG: Log every update sent to the client
+						console.log("[DEBUG] enqueueUpdate() sending event:", JSON.stringify(event));
 						controller.enqueue(JSON.stringify(event) + "\n");
 						if (event.type === MessageUpdateType.FinalAnswer) {
 							controller.enqueue(" ".repeat(4096));
