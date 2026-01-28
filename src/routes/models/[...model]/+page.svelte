@@ -122,6 +122,7 @@
 </script>
 
 <svelte:head>
+	<title>{modelId} - {publicConfig.PUBLIC_APP_NAME}</title>
 	<meta property="og:title" content={modelId + " - " + publicConfig.PUBLIC_APP_NAME} />
 	<meta property="og:type" content="link" />
 	<meta property="og:description" content={`Use ${modelId} with ${publicConfig.PUBLIC_APP_NAME}`} />
