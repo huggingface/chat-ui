@@ -127,6 +127,7 @@ export class Database {
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
+		const sharedConversations = db.collection<SharedConversation>("sharedConversations");
 		const bucket = new GridFSBucket(db, { bucketName: "files" });
 
 		// Collections with secondaryPreferred - heavy reads, can tolerate slight replication lag
@@ -138,9 +139,6 @@ export class Database {
 			readPreference: secondaryPreferred,
 		});
 		const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION, {
-			readPreference: secondaryPreferred,
-		});
-		const sharedConversations = db.collection<SharedConversation>("sharedConversations", {
 			readPreference: secondaryPreferred,
 		});
 		const reports = db.collection<Report>("reports", {
