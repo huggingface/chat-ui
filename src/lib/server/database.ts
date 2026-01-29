@@ -126,6 +126,7 @@ export class Database {
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
+		const migrationResults = db.collection<MigrationResult>("migrationResults");
 		const bucket = new GridFSBucket(db, { bucketName: "files" });
 
 		// Collections with secondaryPreferred - heavy reads, can tolerate slight replication lag
@@ -143,9 +144,6 @@ export class Database {
 			readPreference: secondaryPreferred,
 		});
 		const reports = db.collection<Report>("reports", {
-			readPreference: secondaryPreferred,
-		});
-		const migrationResults = db.collection<MigrationResult>("migrationResults", {
 			readPreference: secondaryPreferred,
 		});
 		const tools = db.collection("tools", {
