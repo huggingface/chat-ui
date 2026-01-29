@@ -62,6 +62,12 @@ export class Database {
 		} else {
 			this.client = new MongoClient(config.MONGODB_URL, {
 				directConnection: config.MONGODB_DIRECT_CONNECTION === "true",
+				readPreference: (config.MONGODB_READ_PREFERENCE as
+					| "primary"
+					| "primaryPreferred"
+					| "secondary"
+					| "secondaryPreferred"
+					| "nearest") || "primary",
 			});
 		}
 
