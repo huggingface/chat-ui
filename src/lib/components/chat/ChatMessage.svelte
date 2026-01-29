@@ -21,6 +21,7 @@
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
 	import { MessageUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
+	import ImageLightbox from "./ImageLightbox.svelte";
 
 	interface Props {
 		message: Message;
@@ -52,6 +53,16 @@
 	let isCopied = $state(false);
 	let messageWidth: number = $state(0);
 	let messageInfoWidth: number = $state(0);
+	let lightboxSrc: string | null = $state(null);
+
+	function handleContentClick(e: MouseEvent) {
+		const target = e.target as HTMLElement;
+		if (target.tagName === "IMG" && target instanceof HTMLImageElement) {
+			e.preventDefault();
+			e.stopPropagation();
+			lightboxSrc = target.src;
+		}
+	}
 
 	$effect(() => {
 		// referenced to appease linter for currently-unused props
@@ -257,7 +268,8 @@
 				</div>
 			{/if}
 
-			<div bind:this={contentEl} oncopy={handleCopy}>
+			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+			<div bind:this={contentEl} oncopy={handleCopy} onclick={handleContentClick}>
 				{#if isLast && loading && blocks.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
@@ -292,7 +304,7 @@
 									/>
 								{:else if part && part.trim().length > 0}
 									<div
-										class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+										class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
 									>
 										<MarkdownRenderer content={part} loading={isLast && loading} />
 									</div>
@@ -300,7 +312,7 @@
 							{/each}
 						{:else}
 							<div
-								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
 							>
 								<MarkdownRenderer content={block.content} loading={isLast && loading} />
 							</div>
@@ -391,6 +403,9 @@
 			</div>
 		{/if}
 	</div>
+	{#if lightboxSrc}
+		<ImageLightbox src={lightboxSrc} onclose={() => (lightboxSrc = null)} />
+	{/if}
 {/if}
 {#if message.from === "user"}
 	<div

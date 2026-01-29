@@ -235,7 +235,7 @@
 												{#each parsedOutput.images as image, imageIndex}
 													<img
 														alt={`Tool result image ${imageIndex + 1}`}
-														class="max-h-60 rounded border border-gray-200 dark:border-gray-700"
+														class="max-h-60 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
 														src={`data:${image.mimeType};base64,${image.data}`}
 													/>
 												{/each}
