@@ -1,4 +1,4 @@
-import { GridFSBucket, MongoClient } from "mongodb";
+import { GridFSBucket, MongoClient, ReadPreference } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
@@ -62,12 +62,6 @@ export class Database {
 		} else {
 			this.client = new MongoClient(config.MONGODB_URL, {
 				directConnection: config.MONGODB_DIRECT_CONNECTION === "true",
-				readPreference: (config.MONGODB_READ_PREFERENCE as
-					| "primary"
-					| "primaryPreferred"
-					| "secondary"
-					| "secondaryPreferred"
-					| "nearest") || "primary",
 			});
 		}
 
@@ -122,23 +116,27 @@ export class Database {
 			config.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : "")
 		);
 
+		// Collections with default readPreference (primary) - critical for read-after-write consistency
 		const conversations = db.collection<Conversation>("conversations");
-		const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION);
-		const assistants = db.collection<Assistant>("assistants");
-		const assistantStats = db.collection<AssistantStats>("assistants.stats");
-		const reports = db.collection<Report>("reports");
-		const sharedConversations = db.collection<SharedConversation>("sharedConversations");
-		const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
 		const settings = db.collection<Settings>("settings");
 		const users = db.collection<User>("users");
 		const sessions = db.collection<Session>("sessions");
 		const messageEvents = db.collection<MessageEvent>("messageEvents");
-		const bucket = new GridFSBucket(db, { bucketName: "files" });
-		const migrationResults = db.collection<MigrationResult>("migrationResults");
+		const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
-		const tools = db.collection("tools");
 		const configCollection = db.collection<ConfigKey>("config");
+		const bucket = new GridFSBucket(db, { bucketName: "files" });
+
+		// Collections with secondaryPreferred - heavy reads, can tolerate slight replication lag
+		const secondaryPreferred = ReadPreference.SECONDARY_PREFERRED;
+		const assistants = db.collection<Assistant>("assistants", { readPreference: secondaryPreferred });
+		const assistantStats = db.collection<AssistantStats>("assistants.stats", { readPreference: secondaryPreferred });
+		const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION, { readPreference: secondaryPreferred });
+		const sharedConversations = db.collection<SharedConversation>("sharedConversations", { readPreference: secondaryPreferred });
+		const reports = db.collection<Report>("reports", { readPreference: secondaryPreferred });
+		const migrationResults = db.collection<MigrationResult>("migrationResults", { readPreference: secondaryPreferred });
+		const tools = db.collection("tools", { readPreference: secondaryPreferred });
 
 		return {
 			conversations,

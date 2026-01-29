@@ -47,7 +47,6 @@ ingressInternal:
     kubernetes.io/ingress.class: "alb"
 
 envVars:
-  MONGODB_READ_PREFERENCE: "secondaryPreferred"
   COUPLE_SESSION_WITH_COOKIE_NAME: "token"
   OPENID_SCOPES: "openid profile inference-api read-mcp read-billing"
   USE_USER_TOKEN: "true"
