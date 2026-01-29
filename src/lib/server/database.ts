@@ -130,13 +130,27 @@ export class Database {
 
 		// Collections with secondaryPreferred - heavy reads, can tolerate slight replication lag
 		const secondaryPreferred = ReadPreference.SECONDARY_PREFERRED;
-		const assistants = db.collection<Assistant>("assistants", { readPreference: secondaryPreferred });
-		const assistantStats = db.collection<AssistantStats>("assistants.stats", { readPreference: secondaryPreferred });
-		const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION, { readPreference: secondaryPreferred });
-		const sharedConversations = db.collection<SharedConversation>("sharedConversations", { readPreference: secondaryPreferred });
-		const reports = db.collection<Report>("reports", { readPreference: secondaryPreferred });
-		const migrationResults = db.collection<MigrationResult>("migrationResults", { readPreference: secondaryPreferred });
-		const tools = db.collection("tools", { readPreference: secondaryPreferred });
+		const assistants = db.collection<Assistant>("assistants", {
+			readPreference: secondaryPreferred,
+		});
+		const assistantStats = db.collection<AssistantStats>("assistants.stats", {
+			readPreference: secondaryPreferred,
+		});
+		const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION, {
+			readPreference: secondaryPreferred,
+		});
+		const sharedConversations = db.collection<SharedConversation>("sharedConversations", {
+			readPreference: secondaryPreferred,
+		});
+		const reports = db.collection<Report>("reports", {
+			readPreference: secondaryPreferred,
+		});
+		const migrationResults = db.collection<MigrationResult>("migrationResults", {
+			readPreference: secondaryPreferred,
+		});
+		const tools = db.collection("tools", {
+			readPreference: secondaryPreferred,
+		});
 
 		return {
 			conversations,
