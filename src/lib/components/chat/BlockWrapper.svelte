@@ -20,7 +20,9 @@
 	}: Props = $props();
 </script>
 
-<div class="group flex gap-2 has-[+.prose]:mb-1.5 [.prose+&]:mt-3">
+<div
+	class="group flex gap-2 has-[+.prose]:mb-1.5 has-[+.prose]:max-sm:mb-0.5 [.prose+&]:mt-3 [.prose+&]:max-sm:mt-1"
+>
 	<!-- Left column: icon + connector line -->
 	<div class="flex w-[22px] flex-shrink-0 flex-col items-center">
 		<div
@@ -53,7 +55,7 @@
 	</div>
 
 	<!-- Right column: content -->
-	<div class="min-w-0 flex-1 pb-2 pt-px">
+	<div class="min-w-0 flex-1 pb-2 pt-px max-sm:pb-1">
 		{@render children()}
 	</div>
 </div>
