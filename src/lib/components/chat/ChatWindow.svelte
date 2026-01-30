@@ -3,7 +3,10 @@
 	import { onDestroy } from "svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
+	import IconCheap from "$lib/components/icons/IconCheap.svelte";
+	import IconFast from "$lib/components/icons/IconFast.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
+	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import CarbonDirectionRight from "~icons/carbon/direction-right-01";
 	import IconArrowUp from "~icons/lucide/arrow-up";
 	import IconMic from "~icons/lucide/mic";
@@ -717,15 +720,28 @@
 							{:else}
 								Model: {currentModel.displayName}
 								{#if hasProviderOverride}
+									{@const hubOrg =
+										PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
 									<span
-										class="ml-1 rounded bg-gray-200 px-1 py-0.5 text-[9px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+										class="ml-1 inline-flex items-center rounded p-0.5 {providerOverride ===
+										'fastest'
+											? 'bg-green-100 text-green-600 dark:bg-green-800/20 dark:text-green-500'
+											: providerOverride === 'cheapest'
+												? 'bg-blue-100 text-blue-600 dark:bg-blue-800/20 dark:text-blue-500'
+												: ''}"
 										title="Provider: {providerOverride}"
 									>
-										{providerOverride === "fastest"
-											? "⚡"
-											: providerOverride === "cheapest"
-												? "💰"
-												: providerOverride}
+										{#if providerOverride === "fastest"}
+											<IconFast classNames="text-sm" />
+										{:else if providerOverride === "cheapest"}
+											<IconCheap classNames="text-sm" />
+										{:else if hubOrg}
+											<img
+												src="https://huggingface.co/api/avatars/{hubOrg}"
+												alt={providerOverride}
+												class="size-3.5 rounded-sm"
+											/>
+										{/if}
 									</span>
 								{/if}
 							{/if}
