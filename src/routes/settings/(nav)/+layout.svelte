@@ -184,28 +184,6 @@
 						{/if}
 					</div>
 
-					{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
-						<span
-							title="Tool calling supported"
-							class="grid size-[21px] flex-none place-items-center rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-500"
-							aria-label="Model supports tools"
-							role="img"
-						>
-							<LucideHammer class="size-3" />
-						</span>
-					{/if}
-
-					{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
-						<span
-							title="Multimodal support (image inputs)"
-							class="grid size-[21px] flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
-							aria-label="Model is multimodal"
-							role="img"
-						>
-							<LucideImage class="size-3" />
-						</span>
-					{/if}
-
 					{#if publicConfig.isHuggingChat && !model.isRouter && $settings.providerOverrides?.[model.id] && $settings.providerOverrides[model.id] !== "auto"}
 						{@const providerOverride = $settings.providerOverrides[model.id]}
 						{@const hubOrg =
@@ -240,6 +218,28 @@
 								/>
 							</span>
 						{/if}
+					{/if}
+
+					{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
+						<span
+							title="Tool calling supported"
+							class="grid size-[21px] flex-none place-items-center rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-500"
+							aria-label="Model supports tools"
+							role="img"
+						>
+							<LucideHammer class="size-3" />
+						</span>
+					{/if}
+
+					{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
+						<span
+							title="Multimodal support (image inputs)"
+							class="grid size-[21px] flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
+							aria-label="Model is multimodal"
+							role="img"
+						>
+							<LucideImage class="size-3" />
+						</span>
 					{/if}
 
 					{#if $settings.customPrompts?.[model.id]}
