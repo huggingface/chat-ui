@@ -14,7 +14,6 @@
 	import { goto } from "$app/navigation";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import Switch from "$lib/components/Switch.svelte";
-	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 
 	const publicConfig = usePublicConfig();
 	const settings = useSettingsStore();
@@ -114,17 +113,12 @@
 		settings.initValue("providerOverrides", page.params.model, "auto");
 	});
 
-	// Build the list of provider options for the dropdown
+	// Provider selection policies for the dropdown
 	const PROVIDER_POLICIES = [
 		{ value: "auto", label: "Auto (your HF preference order)" },
 		{ value: "fastest", label: "Fastest (highest throughput)" },
 		{ value: "cheapest", label: "Cheapest (lowest cost)" },
 	] as const;
-
-	let providerOptions = $derived([
-		...PROVIDER_POLICIES,
-		...providerList.map((p) => ({ value: p.provider, label: p.provider })),
-	]);
 </script>
 
 <div class="flex flex-col items-start">
@@ -330,29 +324,17 @@
 					value={getProviderOverride()}
 					onchange={(e) => setProviderOverride(e.currentTarget.value)}
 				>
-					{#each providerOptions as opt (opt.value)}
-						<option value={opt.value}>{opt.label}</option>
-					{/each}
+					<optgroup label="Selection mode">
+						{#each PROVIDER_POLICIES as opt (opt.value)}
+							<option value={opt.value}>{opt.label}</option>
+						{/each}
+					</optgroup>
+					<optgroup label="Specific provider">
+						{#each providerList as prov (prov.provider)}
+							<option value={prov.provider}>{prov.provider}</option>
+						{/each}
+					</optgroup>
 				</select>
-				<div class="flex flex-wrap gap-1.5">
-					<span class="text-[11px] text-gray-500 dark:text-gray-400">Available:</span>
-					{#each providerList as prov, i (prov.provider || i)}
-						{@const hubOrg = PROVIDERS_HUB_ORGS[prov.provider as keyof typeof PROVIDERS_HUB_ORGS]}
-						<span
-							class="flex items-center gap-1 rounded-md bg-gray-100 py-0.5 pl-1.5 pr-2 text-[11px] text-gray-600 dark:bg-gray-700/60 dark:text-gray-300"
-						>
-							{#if hubOrg}
-								<img
-									src="https://huggingface.co/api/avatars/{hubOrg}"
-									alt="{prov.provider} logo"
-									class="size-2.5 flex-none rounded-sm"
-									onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-								/>
-							{/if}
-							{prov.provider}
-						</span>
-					{/each}
-				</div>
 			</div>
 		{/if}
 		<!-- Tokenizer-based token counting disabled in this build -->
