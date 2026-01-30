@@ -315,7 +315,7 @@
 				<div>
 					<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Providers</div>
 					<p class="text-[12px] text-gray-500 dark:text-gray-400">
-						Choose which inference provider to use with this model. You can also manage provider
+						Choose which Inference Provider to use with this model. You can also manage provider
 						preferences in <a
 							class="underline decoration-gray-400 hover:decoration-gray-700 dark:decoration-gray-500 dark:hover:decoration-gray-300"
 							target="_blank"
