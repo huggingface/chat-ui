@@ -13,10 +13,11 @@ type SettingsStore = {
 	customPrompts: Record<string, string>;
 	multimodalOverrides: Record<string, boolean>;
 	toolsOverrides: Record<string, boolean>;
+	hidePromptExamples: Record<string, boolean>;
+	providerOverrides: Record<string, string>;
 	recentlySaved: boolean;
 	disableStream: boolean;
 	directPaste: boolean;
-	hidePromptExamples: Record<string, boolean>;
 	billingOrganization?: string;
 };
 

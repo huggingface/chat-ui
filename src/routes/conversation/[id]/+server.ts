@@ -556,6 +556,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					forceMultimodal: Boolean(userSettings?.multimodalOverrides?.[model.id]),
 					// Force-enable tools if user settings say so for this model
 					forceTools: Boolean(userSettings?.toolsOverrides?.[model.id]),
+					// Inference provider preference (skip for router models which handle their own routing)
+					provider: model.isRouter ? undefined : userSettings?.providerOverrides?.[model.id],
 					locals,
 					abortController: ctrl,
 				};

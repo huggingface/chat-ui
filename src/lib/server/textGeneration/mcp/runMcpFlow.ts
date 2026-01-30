@@ -31,7 +31,7 @@ import { AbortedGenerations } from "$lib/server/abortedGenerations";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
-	"model" | "conv" | "assistant" | "forceMultimodal" | "forceTools" | "locals"
+	"model" | "conv" | "assistant" | "forceMultimodal" | "forceTools" | "provider" | "locals"
 > & { messages: EndpointMessage[] };
 
 // Return type: "completed" = MCP ran successfully, "not_applicable" = MCP didn't run, "aborted" = user aborted
@@ -44,6 +44,7 @@ export async function* runMcpFlow({
 	assistant,
 	forceMultimodal,
 	forceTools,
+	provider,
 	locals,
 	preprompt,
 	abortSignal,
@@ -392,8 +393,13 @@ export async function* runMcpFlow({
 					? (parameters.stop as string[])
 					: undefined;
 
+		// Build model ID with optional provider suffix (e.g., "model:fastest" or "model:together")
+		const baseModelId = targetModel.id ?? targetModel.name;
+		const modelIdWithProvider =
+			provider && provider !== "auto" ? `${baseModelId}:${provider}` : baseModelId;
+
 		const completionBase: Omit<ChatCompletionCreateParamsStreaming, "messages"> = {
-			model: targetModel.id ?? targetModel.name,
+			model: modelIdWithProvider,
 			stream: true,
 			temperature: typeof parameters?.temperature === "number" ? parameters.temperature : undefined,
 			top_p: typeof parameters?.top_p === "number" ? parameters.top_p : undefined,

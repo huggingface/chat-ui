@@ -49,6 +49,16 @@
 		}));
 	}
 
+	function getProviderOverride() {
+		return $settings.providerOverrides?.[page.params.model] ?? "auto";
+	}
+	function setProviderOverride(v: string) {
+		settings.update((s) => ({
+			...s,
+			providerOverrides: { ...s.providerOverrides, [page.params.model]: v },
+		}));
+	}
+
 	function getCustomPrompt() {
 		return $settings.customPrompts?.[page.params.model] ?? "";
 	}
@@ -98,6 +108,23 @@
 	$effect(() => {
 		settings.initValue("hidePromptExamples", page.params.model, false);
 	});
+
+	// Initialize provider override for this model (default to "auto")
+	$effect(() => {
+		settings.initValue("providerOverrides", page.params.model, "auto");
+	});
+
+	// Build the list of provider options for the dropdown
+	const PROVIDER_POLICIES = [
+		{ value: "auto", label: "Auto (your HF preference order)" },
+		{ value: "fastest", label: "Fastest (highest throughput)" },
+		{ value: "cheapest", label: "Cheapest (lowest cost)" },
+	] as const;
+
+	let providerOptions = $derived([
+		...PROVIDER_POLICIES,
+		...providerList.map((p) => ({ value: p.provider, label: p.provider })),
+	]);
 </script>
 
 <div class="flex flex-col items-start">
@@ -280,42 +307,52 @@
 			</div>
 		</div>
 
-		{#if model.providers?.length}
+		{#if model.providers?.length && !model?.isRouter}
 			<div
-				class="mt-3 flex flex-col gap-2.5 rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+				class="mt-3 flex flex-col gap-2.5 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 			>
 				<div>
 					<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-						Inference Providers
+						Preferred Provider
 					</div>
 					<p class="text-[12px] text-gray-500 dark:text-gray-400">
-						Providers serving this model. You can enable/disable some providers from <a
-							class="underline decoration-gray-400 hover:decoration-gray-700 dark:decoration-gray-500 dark:hover:decoration-gray-500"
+						Choose which inference provider to use. You can also manage provider preferences in <a
+							class="underline decoration-gray-400 hover:decoration-gray-700 dark:decoration-gray-500 dark:hover:decoration-gray-300"
 							target="_blank"
-							href="https://huggingface.co/settings/inference-providers/settings">your settings</a
+							href="https://huggingface.co/settings/inference-providers/settings"
+							>your HF settings</a
 						>.
 					</p>
 				</div>
-				<ul class="mb-0.5 flex flex-wrap gap-2">
+				<select
+					aria-label="Select inference provider"
+					class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+					value={getProviderOverride()}
+					onchange={(e) => setProviderOverride(e.currentTarget.value)}
+				>
+					{#each providerOptions as opt (opt.value)}
+						<option value={opt.value}>{opt.label}</option>
+					{/each}
+				</select>
+				<div class="flex flex-wrap gap-1.5">
+					<span class="text-[11px] text-gray-500 dark:text-gray-400">Available:</span>
 					{#each providerList as prov, i (prov.provider || i)}
 						{@const hubOrg = PROVIDERS_HUB_ORGS[prov.provider as keyof typeof PROVIDERS_HUB_ORGS]}
-						<li>
-							<span
-								class="flex items-center gap-1 rounded-md bg-gray-100 py-0.5 pl-1.5 pr-2 text-xs text-gray-700 dark:bg-gray-700/60 dark:text-gray-200"
-							>
-								{#if hubOrg}
-									<img
-										src="https://huggingface.co/api/avatars/{hubOrg}"
-										alt="{prov.provider} logo"
-										class="size-2.5 flex-none rounded-sm"
-										onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-									/>
-								{/if}
-								{prov.provider}
-							</span>
-						</li>
+						<span
+							class="flex items-center gap-1 rounded-md bg-gray-100 py-0.5 pl-1.5 pr-2 text-[11px] text-gray-600 dark:bg-gray-700/60 dark:text-gray-300"
+						>
+							{#if hubOrg}
+								<img
+									src="https://huggingface.co/api/avatars/{hubOrg}"
+									alt="{prov.provider} logo"
+									class="size-2.5 flex-none rounded-sm"
+									onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+								/>
+							{/if}
+							{prov.provider}
+						</span>
 					{/each}
-				</ul>
+				</div>
 			</div>
 		{/if}
 		<!-- Tokenizer-based token counting disabled in this build -->
