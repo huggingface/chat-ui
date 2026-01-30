@@ -114,3 +114,14 @@ See `.env` for full list of variables including router config, MCP servers, auth
 - Prettier: tabs, 100 char width, Tailwind class sorting
 - Server vs client separation via SvelteKit conventions (`+page.server.ts` vs `+page.ts`)
 - Path alias: `$api` → `src/lib/server/api`
+
+## Feature Development Checklist
+
+When building new features, consider:
+
+1. **HuggingChat vs self-hosted**: Wrap HuggingChat-specific features with `publicConfig.isHuggingChat`
+2. **Settings persistence**: Add new fields to `src/lib/types/Settings.ts`, update API schema in `src/lib/server/api/routes/groups/user.ts`
+3. **Rich dropdowns**: Use `bits-ui` (Select, DropdownMenu) instead of native elements when you need icons/images in options
+4. **Scrollbars**: Use `scrollbar-custom` class for styled scrollbars
+5. **Icons**: Custom icons in `$lib/components/icons/`, use Carbon (`~icons/carbon/*`) or Lucide (`~icons/lucide/*`) for standard icons
+6. **Provider avatars**: Use `PROVIDERS_HUB_ORGS` from `@huggingface/inference` for HF provider avatar URLs
