@@ -739,7 +739,7 @@
 											<img
 												src="https://huggingface.co/api/avatars/{hubOrg}"
 												alt={providerOverride}
-												class="size-3.5 flex-none rounded-sm"
+												class="size-3 flex-none rounded-sm"
 											/>
 										{/if}
 									</span>
