@@ -45,8 +45,25 @@ body {
 		height: 8px;
 	}
 
+	.scrollbar-custom::-webkit-scrollbar-thumb {
+		background-color: rgba(0, 0, 0, 0.1);
+		border-radius: 9999px;
+	}
+
+	.scrollbar-custom::-webkit-scrollbar-thumb:hover {
+		background-color: rgba(0, 0, 0, 0.2);
+	}
+
 	.dark .scrollbar-custom::-webkit-scrollbar {
-		background-color: rgba(17, 17, 17, 0.85);
+		background-color: transparent;
+	}
+
+	.dark .scrollbar-custom::-webkit-scrollbar-thumb {
+		background-color: rgba(255, 255, 255, 0.1);
+	}
+
+	.dark .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+		background-color: rgba(255, 255, 255, 0.2);
 	}
 
 	/* Rounded top/bottom caps for vertical scrollbars (Chrome/Edge/Safari) */
