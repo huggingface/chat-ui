@@ -45,6 +45,10 @@ export const load = async ({ depends, fetch, url }) => {
 			welcomeModalSeenAt: settings.welcomeModalSeenAt
 				? new Date(settings.welcomeModalSeenAt)
 				: null,
+			// Ensure providerOverrides has a default value (may not exist in older DB records)
+			providerOverrides:
+				(settings as unknown as { providerOverrides?: Record<string, string> }).providerOverrides ??
+				{},
 		},
 		publicConfig: getConfigManager(publicConfig),
 		...featureFlags,

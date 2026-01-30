@@ -22,6 +22,7 @@ export async function* generate(
 		assistant,
 		promptedAt,
 		forceMultimodal,
+		provider,
 		locals,
 		abortController,
 	}: GenerateContext,
@@ -60,6 +61,7 @@ export async function* generate(
 		conversationId: conv._id,
 		locals,
 		abortSignal: abortController.signal,
+		provider,
 	});
 
 	for await (const output of stream) {
