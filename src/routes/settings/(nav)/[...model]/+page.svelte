@@ -307,7 +307,7 @@
 			</div>
 		</div>
 
-		{#if model.providers?.length && !model?.isRouter}
+		{#if publicConfig.isHuggingChat && model.providers?.length && !model?.isRouter}
 			<div
 				class="mt-3 flex flex-col gap-2.5 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 			>

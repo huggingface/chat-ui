@@ -1,5 +1,6 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
+import { config } from "$lib/server/config";
 import { models, validModelIdSchema } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import type { Message } from "$lib/types/Message";
@@ -556,8 +557,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					forceMultimodal: Boolean(userSettings?.multimodalOverrides?.[model.id]),
 					// Force-enable tools if user settings say so for this model
 					forceTools: Boolean(userSettings?.toolsOverrides?.[model.id]),
-					// Inference provider preference (skip for router models which handle their own routing)
-					provider: model.isRouter ? undefined : userSettings?.providerOverrides?.[model.id],
+					// Inference provider preference (HuggingChat only, skip for router models)
+					provider:
+						config.isHuggingChat && !model.isRouter
+							? userSettings?.providerOverrides?.[model.id]
+							: undefined,
 					locals,
 					abortController: ctrl,
 				};
