@@ -723,7 +723,7 @@
 									{@const hubOrg =
 										PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
 									<span
-										class="ml-1 inline-flex items-center rounded p-0.5 {providerOverride ===
+										class="ml-1 inline-flex shrink-0 items-center rounded p-0.5 {providerOverride ===
 										'fastest'
 											? 'bg-green-100 text-green-600 dark:bg-green-800/20 dark:text-green-500'
 											: providerOverride === 'cheapest'
@@ -739,7 +739,7 @@
 											<img
 												src="https://huggingface.co/api/avatars/{hubOrg}"
 												alt={providerOverride}
-												class="size-3.5 rounded-sm"
+												class="size-3.5 flex-none rounded-sm"
 											/>
 										{/if}
 									</span>
