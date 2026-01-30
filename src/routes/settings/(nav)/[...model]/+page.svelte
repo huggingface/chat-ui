@@ -313,7 +313,9 @@
 				class="mt-3 flex flex-col items-start gap-2.5 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 			>
 				<div>
-					<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Providers</div>
+					<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+						Inference Providers
+					</div>
 					<p class="text-[12px] text-gray-500 dark:text-gray-400">
 						Choose which Inference Provider to use with this model. You can also manage provider
 						preferences in <a
