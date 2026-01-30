@@ -74,6 +74,7 @@ export const userGroup = new Elysia()
 					customPrompts: settings?.customPrompts ?? {},
 					multimodalOverrides: settings?.multimodalOverrides ?? {},
 					toolsOverrides: settings?.toolsOverrides ?? {},
+					providerOverrides: settings?.providerOverrides ?? {},
 					billingOrganization: settings?.billingOrganization ?? undefined,
 				};
 			})
@@ -90,6 +91,7 @@ export const userGroup = new Elysia()
 						customPrompts: z.record(z.string()).default({}),
 						multimodalOverrides: z.record(z.boolean()).default({}),
 						toolsOverrides: z.record(z.boolean()).default({}),
+						providerOverrides: z.record(z.string()).default({}),
 						disableStream: z.boolean().default(false),
 						directPaste: z.boolean().default(false),
 						hidePromptExamples: z.record(z.boolean()).default({}),

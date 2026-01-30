@@ -16,6 +16,7 @@ export async function POST({ request, locals }) {
 			customPrompts: z.record(z.string()).default({}),
 			multimodalOverrides: z.record(z.boolean()).default({}),
 			toolsOverrides: z.record(z.boolean()).default({}),
+			providerOverrides: z.record(z.string()).default({}),
 			disableStream: z.boolean().default(false),
 			directPaste: z.boolean().default(false),
 			hidePromptExamples: z.record(z.boolean()).default({}),
