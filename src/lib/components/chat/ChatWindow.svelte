@@ -297,6 +297,12 @@
 			(currentModel as unknown as { supportsTools?: boolean }).supportsTools) === true
 	);
 
+	// Get provider override for the current model (HuggingChat only)
+	let providerOverride = $derived($settings.providerOverrides?.[currentModel.id]);
+	let hasProviderOverride = $derived(
+		providerOverride && providerOverride !== "auto" && !currentModel.isRouter
+	);
+
 	// Always allow common text-like files; add images only when model is multimodal
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
 
@@ -710,6 +716,18 @@
 								{currentModel.displayName}
 							{:else}
 								Model: {currentModel.displayName}
+								{#if hasProviderOverride}
+									<span
+										class="ml-1 rounded bg-gray-200 px-1 py-0.5 text-[9px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+										title="Provider: {providerOverride}"
+									>
+										{providerOverride === "fastest"
+											? "⚡"
+											: providerOverride === "cheapest"
+												? "💰"
+												: providerOverride}
+									</span>
+								{/if}
 							{/if}
 							<CarbonCaretDown class="-ml-0.5 text-xxs" />
 						</a>
