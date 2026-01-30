@@ -9,6 +9,9 @@
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideImage from "~icons/lucide/image";
 	import LucideSettings from "~icons/lucide/settings";
+	import IconFast from "$lib/components/icons/IconFast.svelte";
+	import IconCheap from "$lib/components/icons/IconCheap.svelte";
+	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { goto } from "$app/navigation";
 	interface Props {
@@ -141,6 +144,37 @@
 
 						<!-- Icons and badges -->
 						<div class="flex flex-shrink-0 items-center gap-1.5">
+							{#if publicConfig.isHuggingChat && !model.isRouter && $settings.providerOverrides?.[model.id] && $settings.providerOverrides[model.id] !== "auto"}
+								{@const providerOverride = $settings.providerOverrides[model.id]}
+								{@const hubOrg =
+									PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
+								{#if providerOverride === "fastest"}
+									<div
+										title="Provider: Fastest"
+										class="rounded-md bg-green-50 p-1.5 text-green-600 dark:bg-green-900/20 dark:text-green-400"
+									>
+										<IconFast classNames="size-3 sm:size-3.5" />
+									</div>
+								{:else if providerOverride === "cheapest"}
+									<div
+										title="Provider: Cheapest"
+										class="rounded-md bg-blue-50 p-1.5 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+									>
+										<IconCheap classNames="size-3 sm:size-3.5" />
+									</div>
+								{:else if hubOrg}
+									<div
+										title="Provider: {providerOverride}"
+										class="flex size-[26px] items-center justify-center rounded-md bg-gray-100 p-1 dark:bg-gray-800 sm:size-[30px]"
+									>
+										<img
+											src="https://huggingface.co/api/avatars/{hubOrg}"
+											alt={providerOverride}
+											class="size-full rounded"
+										/>
+									</div>
+								{/if}
+							{/if}
 							{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
 								<div
 									title="This model supports tool calling (functions)."
