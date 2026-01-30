@@ -208,7 +208,8 @@
 
 					{#if publicConfig.isHuggingChat && !model.isRouter && $settings.providerOverrides?.[model.id] && $settings.providerOverrides[model.id] !== "auto"}
 						{@const providerOverride = $settings.providerOverrides[model.id]}
-						{@const hubOrg = PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
+						{@const hubOrg =
+							PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
 						{#if providerOverride === "fastest"}
 							<span
 								title="Provider: {providerOverride}"
@@ -230,7 +231,7 @@
 						{:else if hubOrg}
 							<span
 								title="Provider: {providerOverride}"
-								class="flex size-[21px] flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5"
+								class="flex size-[21px] flex-none items-center justify-center rounded-md bg-gray-500/10 p-[0.225rem]"
 							>
 								<img
 									src="https://huggingface.co/api/avatars/{hubOrg}"
