@@ -374,7 +374,7 @@
 					</Select.Trigger>
 					<Select.Portal>
 						<Select.Content
-							class="z-50 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white/95 p-1 shadow-lg backdrop-blur dark:border-gray-700 dark:bg-gray-800/95"
+							class="scrollbar-custom z-50 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white/95 p-1 shadow-lg backdrop-blur dark:border-gray-700 dark:bg-gray-800/95"
 							sideOffset={4}
 						>
 							<Select.Group>
