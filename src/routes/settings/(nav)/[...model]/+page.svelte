@@ -303,7 +303,7 @@
 
 		{#if publicConfig.isHuggingChat && model.providers?.length && !model?.isRouter}
 			<div
-				class="mt-3 flex flex-col gap-2.5 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+				class="mt-3 flex flex-col items-start gap-2.5 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 			>
 				<div>
 					<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Providers</div>
@@ -319,7 +319,7 @@
 				</div>
 				<select
 					aria-label="Select inference provider"
-					class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+					class="w-auto rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
 					value={getProviderOverride()}
 					onchange={(e) => setProviderOverride(e.currentTarget.value)}
 				>
