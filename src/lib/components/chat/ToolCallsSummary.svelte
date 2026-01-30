@@ -19,9 +19,10 @@
 
 	interface Props {
 		toolGroups: ToolGroup[];
+		intermediateTexts?: string[];
 	}
 
-	let { toolGroups }: Props = $props();
+	let { toolGroups, intermediateTexts = [] }: Props = $props();
 
 	let isOpen = $state(false);
 
@@ -155,6 +156,16 @@
 	<!-- Expanded Details -->
 	{#if isOpen}
 		<div class="border-t border-gray-200 dark:border-gray-700">
+			<!-- Intermediate messages (model's thoughts while calling tools) -->
+			{#if intermediateTexts.length > 0}
+				<div
+					class="border-b border-gray-100 bg-gray-50/50 px-3 py-2 dark:border-gray-700/50 dark:bg-gray-800/20"
+				>
+					{#each intermediateTexts as text}
+						<p class="text-sm text-gray-600 dark:text-gray-400">{text}</p>
+					{/each}
+				</div>
+			{/if}
 			<div class="divide-y divide-gray-100 dark:divide-gray-700/50">
 				{#each toolGroups as group (group.uuid)}
 					{@const callUpdate = group.updates.find(isMessageToolCallUpdate)}

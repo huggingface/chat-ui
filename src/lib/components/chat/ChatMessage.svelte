@@ -234,12 +234,38 @@
 	});
 
 	// Determine if we should show merged tool summary
-	// Show summary when: we have tool blocks AND text content AND all tools are done
+	// Show summary when: all tools are done AND there's final answer text AFTER the last tool
 	let toolBlocks = $derived(blocks.filter((b): b is ToolBlock => b.type === "tool"));
-	let textBlocks = $derived(
-		blocks.filter((b): b is { type: "text"; content: string } => b.type === "text")
-	);
-	let hasTextContent = $derived(textBlocks.some((b) => b.content.trim().length > 0));
+
+	// Find the index of the last tool block to separate intermediate vs final text
+	let lastToolIndex = $derived.by(() => {
+		for (let i = blocks.length - 1; i >= 0; i--) {
+			if (blocks[i].type === "tool") return i;
+		}
+		return -1;
+	});
+
+	// Intermediate text: text blocks that appear BEFORE or AT the last tool block index
+	// These are messages the model outputs alongside tool calls
+	let intermediateTextBlocks = $derived.by(() => {
+		if (lastToolIndex === -1) return [];
+		return blocks
+			.slice(0, lastToolIndex + 1)
+			.filter((b): b is { type: "text"; content: string } => b.type === "text");
+	});
+
+	// Final answer text: text blocks that appear AFTER the last tool block
+	let finalAnswerBlocks = $derived.by(() => {
+		if (lastToolIndex === -1) {
+			// No tools, all text is final answer
+			return blocks.filter((b): b is { type: "text"; content: string } => b.type === "text");
+		}
+		return blocks
+			.slice(lastToolIndex + 1)
+			.filter((b): b is { type: "text"; content: string } => b.type === "text");
+	});
+
+	let hasFinalAnswerText = $derived(finalAnswerBlocks.some((b) => b.content.trim().length > 0));
 
 	let allToolsDone = $derived.by(() => {
 		if (toolBlocks.length === 0) return true;
@@ -252,8 +278,11 @@
 		return true;
 	});
 
-	// Show summary when we have multiple tools OR (single tool AND text content AND tool is done)
-	let showMergedSummary = $derived(toolBlocks.length > 0 && hasTextContent && allToolsDone);
+	// Show summary only when:
+	// 1. We have tool blocks
+	// 2. All tools are done
+	// 3. We're streaming final answer (text exists AFTER the last tool)
+	let showMergedSummary = $derived(toolBlocks.length > 0 && allToolsDone && hasFinalAnswerText);
 </script>
 
 {#if message.from === "assistant"}
@@ -293,8 +322,12 @@
 					<!-- Merged tool summary view -->
 					<ToolCallsSummary
 						toolGroups={toolBlocks.map((b) => ({ uuid: b.uuid, updates: b.updates }))}
+						intermediateTexts={intermediateTextBlocks
+							.map((b) => b.content.trim())
+							.filter((t) => t.length > 0)}
 					/>
-					{#each textBlocks as block, blockIndex (`text-merged-${blockIndex}`)}
+					<!-- Only render final answer text (after all tools) -->
+					{#each finalAnswerBlocks as block, blockIndex (`text-final-${blockIndex}`)}
 						{#if block.content.trim().length > 0}
 							{#if hasClientThink}
 								{@const parts = block.content.split(THINK_BLOCK_REGEX)}
