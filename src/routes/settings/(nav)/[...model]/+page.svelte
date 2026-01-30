@@ -4,12 +4,19 @@
 
 	import type { BackendModel } from "$lib/server/models";
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
+	import IconFast from "$lib/components/icons/IconFast.svelte";
+	import IconCheap from "$lib/components/icons/IconCheap.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonCopy from "~icons/carbon/copy";
 	import CarbonChat from "~icons/carbon/chat";
 	import CarbonCode from "~icons/carbon/code";
+	import CarbonChevronDown from "~icons/carbon/chevron-down";
+	import LucideCheck from "~icons/lucide/check";
+	import CarbonMagicWandFilled from "~icons/carbon/magic-wand-filled";
+	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import { Select } from "bits-ui";
 
 	import { goto } from "$app/navigation";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
@@ -317,23 +324,133 @@
 						>.
 					</p>
 				</div>
-				<select
-					aria-label="Select inference provider"
-					class="w-auto rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+				<Select.Root
+					type="single"
 					value={getProviderOverride()}
-					onchange={(e) => setProviderOverride(e.currentTarget.value)}
+					onValueChange={(v) => v && setProviderOverride(v)}
 				>
-					<optgroup label="Selection mode">
-						{#each PROVIDER_POLICIES as opt (opt.value)}
-							<option value={opt.value}>{opt.label}</option>
-						{/each}
-					</optgroup>
-					<optgroup label="Specific provider">
-						{#each providerList as prov (prov.provider)}
-							<option value={prov.provider}>{prov.provider}</option>
-						{/each}
-					</optgroup>
-				</select>
+					<Select.Trigger
+						aria-label="Select inference provider"
+						class="inline-flex w-auto items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+					>
+						{@const currentValue = getProviderOverride()}
+						{@const currentPolicy = PROVIDER_POLICIES.find((p) => p.value === currentValue)}
+						{@const currentProvider = providerList.find((p) => p.provider === currentValue)}
+						<span class="flex items-center gap-2">
+							{#if currentValue === "auto"}
+								<span class="grid size-5 flex-none place-items-center rounded-md bg-gray-500/10">
+									<CarbonMagicWandFilled class="size-3 text-gray-700 dark:text-gray-300" />
+								</span>
+							{:else if currentValue === "fastest"}
+								<span
+									class="grid size-5 flex-none place-items-center rounded-md bg-green-500/10 text-green-600 dark:text-green-500"
+								>
+									<IconFast classNames="size-3" />
+								</span>
+							{:else if currentValue === "cheapest"}
+								<span
+									class="grid size-5 flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
+								>
+									<IconCheap classNames="size-3" />
+								</span>
+							{:else if currentProvider}
+								{@const hubOrg =
+									PROVIDERS_HUB_ORGS[currentValue as keyof typeof PROVIDERS_HUB_ORGS]}
+								{#if hubOrg}
+									<span
+										class="flex size-5 flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5"
+									>
+										<img
+											src="https://huggingface.co/api/avatars/{hubOrg}"
+											alt=""
+											class="size-full rounded"
+										/>
+									</span>
+								{/if}
+							{/if}
+							{currentPolicy?.label ?? currentProvider?.provider ?? currentValue}
+						</span>
+						<CarbonChevronDown class="size-4 text-gray-500" />
+					</Select.Trigger>
+					<Select.Portal>
+						<Select.Content
+							class="z-50 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white/95 p-1 shadow-lg backdrop-blur dark:border-gray-700 dark:bg-gray-800/95"
+							sideOffset={4}
+						>
+							<Select.Group>
+								<Select.GroupHeading
+									class="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400"
+								>
+									Selection mode
+								</Select.GroupHeading>
+								{#each PROVIDER_POLICIES as opt (opt.value)}
+									<Select.Item
+										value={opt.value}
+										class="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-none data-[highlighted]:bg-gray-100 dark:text-gray-200 dark:data-[highlighted]:bg-white/10"
+									>
+										{#if opt.value === "auto"}
+											<span
+												class="grid size-5 flex-none place-items-center rounded-md bg-gray-500/10"
+											>
+												<CarbonMagicWandFilled class="size-3 text-gray-700 dark:text-gray-300" />
+											</span>
+										{:else if opt.value === "fastest"}
+											<span
+												class="grid size-5 flex-none place-items-center rounded-md bg-green-500/10 text-green-600 dark:text-green-500"
+											>
+												<IconFast classNames="size-3" />
+											</span>
+										{:else if opt.value === "cheapest"}
+											<span
+												class="grid size-5 flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
+											>
+												<IconCheap classNames="size-3" />
+											</span>
+										{/if}
+										<span class="flex-1">{opt.label}</span>
+										{#if getProviderOverride() === opt.value}
+											<LucideCheck class="size-4 text-gray-500" />
+										{/if}
+									</Select.Item>
+								{/each}
+							</Select.Group>
+							<div class="my-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+							<Select.Group>
+								<Select.GroupHeading
+									class="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400"
+								>
+									Specific provider
+								</Select.GroupHeading>
+								{#each providerList as prov (prov.provider)}
+									{@const hubOrg =
+										PROVIDERS_HUB_ORGS[prov.provider as keyof typeof PROVIDERS_HUB_ORGS]}
+									<Select.Item
+										value={prov.provider}
+										class="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-none data-[highlighted]:bg-gray-100 dark:text-gray-200 dark:data-[highlighted]:bg-white/10"
+									>
+										{#if hubOrg}
+											<span
+												class="flex size-5 flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5"
+											>
+												<img
+													src="https://huggingface.co/api/avatars/{hubOrg}"
+													alt=""
+													class="size-full rounded"
+												/>
+											</span>
+										{:else}
+											<span class="size-5"></span>
+										{/if}
+										<span class="flex-1">{prov.provider}</span>
+										{#if getProviderOverride() === prov.provider}
+											<LucideCheck class="size-4 text-gray-500" />
+										{/if}
+									</Select.Item>
+								{/each}
+							</Select.Group>
+						</Select.Content>
+					</Select.Portal>
+				</Select.Root>
 			</div>
 		{/if}
 		<!-- Tokenizer-based token counting disabled in this build -->
