@@ -777,7 +777,7 @@
 					</span>
 				{/if}
 				{#if !messages.length && !loading}
-					<span>Generated content may be inaccurate or false.</span>
+					<span class="max-sm:hidden">Generated content may be inaccurate or false.</span>
 				{/if}
 			</div>
 		</div>
