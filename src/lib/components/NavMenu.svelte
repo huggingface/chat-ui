@@ -192,7 +192,7 @@
 				</a>
 			{:else if publicConfig.isHuggingChat && $isPro === true}
 				<span
-					class="ml-auto flex h-[20px] items-center gap-1 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400"
+					class="ml-auto flex items-center gap-1 rounded-md bg-gray-500/5 px-1.5 py-0.5 text-xs text-gray-400 dark:bg-gray-500/20 dark:text-gray-400"
 				>
 					<IconPro />
 					PRO
