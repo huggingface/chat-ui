@@ -17,7 +17,7 @@
 	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
-	import { enabledServers } from "$lib/stores/mcpServers";
+	import { getServersWithAuth } from "$lib/stores/mcpServers";
 	import { browser } from "$app/environment";
 	import {
 		addBackgroundGeneration,
@@ -212,6 +212,7 @@
 
 			const messageUpdatesAbortController = new AbortController();
 
+			const mcpServers = getServersWithAuth();
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				page.params.id,
 				{
@@ -220,8 +221,8 @@
 					messageId,
 					isRetry,
 					files: isRetry ? userMessage?.files : base64Files,
-					selectedMcpServerNames: $enabledServers.map((s) => s.name),
-					selectedMcpServers: $enabledServers.map((s) => ({
+					selectedMcpServerNames: mcpServers.map((s) => s.name),
+					selectedMcpServers: mcpServers.map((s) => ({
 						name: s.name,
 						url: s.url,
 						headers: s.headers,

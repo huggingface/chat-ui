@@ -66,6 +66,8 @@ export interface MCPServer {
 	errorMessage?: string;
 	// Indicates server reports or appears to require OAuth or other auth
 	authRequired?: boolean;
+	// OAuth 2.1 support
+	oauthEnabled?: boolean;
 }
 
 export interface MCPServerApi {

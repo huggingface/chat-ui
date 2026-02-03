@@ -1,6 +1,15 @@
 <script lang="ts">
+	import { onMount, onDestroy } from "svelte";
 	import type { MCPServer } from "$lib/types/Tool";
 	import { toggleServer, healthCheckServer, deleteCustomServer } from "$lib/stores/mcpServers";
+	import {
+		mcpOAuthTokens,
+		mcpOAuthConfigs,
+		reloadFromStorage,
+		isTokenExpired,
+		isTokenNearExpiry,
+	} from "$lib/stores/mcpOAuthTokens";
+	import { discoverOAuthMetadata, startOAuthFlow } from "$lib/services/mcpOAuthService";
 	import IconCheckmark from "~icons/carbon/checkmark-filled";
 	import IconWarning from "~icons/carbon/warning-filled";
 	import IconPending from "~icons/carbon/pending-filled";
@@ -8,6 +17,7 @@
 	import IconTrash from "~icons/carbon/trash-can";
 	import LucideHammer from "~icons/lucide/hammer";
 	import IconSettings from "~icons/carbon/settings";
+	import IconLocked from "~icons/carbon/locked";
 	import Switch from "$lib/components/Switch.svelte";
 	import { getMcpServerFaviconUrl } from "$lib/utils/favicon";
 
@@ -19,10 +29,78 @@
 	let { server, isSelected }: Props = $props();
 
 	let isLoadingHealth = $state(false);
+	let isReauthenticating = $state(false);
+	let oauthPopup = $state<Window | null>(null);
+	let popupPollTimer: ReturnType<typeof setInterval> | undefined;
+	let oauthError = $state<string | null>(null);
 
 	// Show a quick-access link ONLY for the exact HF MCP login endpoint
 	import { isStrictHfMcpLogin as isStrictHfMcpLoginUrl } from "$lib/utils/hf";
 	const isHfMcp = $derived.by(() => isStrictHfMcpLoginUrl(server.url));
+
+	const tokenStatus = $derived.by(() => {
+		const tokens = $mcpOAuthTokens;
+		const configs = $mcpOAuthConfigs;
+		const hasToken = tokens.has(server.id);
+		const hasConfig = configs.has(server.id);
+
+		if (!server.oauthEnabled && !hasToken && !hasConfig) {
+			// Health check returned 401 but OAuth wasn't set up - prompt for authentication
+			if (server.authRequired) return "missing";
+			return "none";
+		}
+
+		const token = tokens.get(server.id);
+		if (!token) return "missing";
+		if (isTokenExpired(token)) return "expired";
+		if (isTokenNearExpiry(token)) return "expiring";
+		return "valid";
+	});
+
+	function startPopupPolling() {
+		if (popupPollTimer) {
+			clearInterval(popupPollTimer);
+		}
+
+		popupPollTimer = setInterval(() => {
+			if (oauthPopup?.closed) {
+				clearInterval(popupPollTimer);
+				popupPollTimer = undefined;
+				oauthPopup = null;
+				isReauthenticating = false;
+			}
+		}, 500);
+	}
+
+	async function handleReauthenticate() {
+		isReauthenticating = true;
+		oauthError = null;
+		try {
+			const metadata = await discoverOAuthMetadata(server.url);
+			if (!metadata) {
+				oauthError = "This server does not support OAuth authentication.";
+				isReauthenticating = false;
+				return;
+			}
+			oauthPopup = await startOAuthFlow(
+				server.id,
+				server.url,
+				server.name,
+				metadata,
+				window.location.href
+			);
+
+			if (oauthPopup) {
+				startPopupPolling();
+			} else {
+				isReauthenticating = false;
+			}
+		} catch (err) {
+			console.error("Re-authentication failed:", err);
+			oauthError = err instanceof Error ? err.message : "Re-authentication failed";
+			isReauthenticating = false;
+		}
+	}
 
 	const statusInfo = $derived.by(() => {
 		switch (server.status) {
@@ -77,6 +155,38 @@
 	function handleDelete() {
 		deleteCustomServer(server.id);
 	}
+
+	function handleOAuthMessage(event: MessageEvent) {
+		if (event.origin !== window.location.origin) return;
+
+		if (event.data?.type === "mcp-oauth-complete" && event.data?.serverId === server.id) {
+			if (popupPollTimer) {
+				clearInterval(popupPollTimer);
+				popupPollTimer = undefined;
+			}
+			oauthPopup = null;
+			isReauthenticating = false;
+
+			if (event.data.success) {
+				oauthError = null;
+				reloadFromStorage(); // Sync tokens from popup's localStorage writes
+				healthCheckServer(server);
+			} else {
+				oauthError = event.data.error || "Authentication failed";
+			}
+		}
+	}
+
+	onMount(() => {
+		window.addEventListener("message", handleOAuthMessage);
+	});
+
+	onDestroy(() => {
+		window.removeEventListener("message", handleOAuthMessage);
+		if (popupPollTimer) {
+			clearInterval(popupPollTimer);
+		}
+	});
 </script>
 
 <div
@@ -142,6 +252,47 @@
 					class="line-clamp-6 break-words rounded bg-red-50 px-2 py-1 text-xs text-red-800 dark:bg-red-900/20 dark:text-red-200"
 				>
 					{server.errorMessage}
+				</div>
+			</div>
+		{/if}
+
+		<!-- OAuth Error -->
+		{#if oauthError}
+			<div class="mb-2">
+				<div
+					class="rounded bg-red-50 px-2 py-1 text-xs text-red-800 dark:bg-red-900/20 dark:text-red-200"
+				>
+					{oauthError}
+				</div>
+			</div>
+		{/if}
+
+		<!-- OAuth Token Status -->
+		{#if tokenStatus === "expired" || tokenStatus === "missing"}
+			<div class="mb-2">
+				<div class="flex items-center gap-2 rounded bg-amber-50 px-2 py-1.5 dark:bg-amber-900/20">
+					<IconLocked class="size-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+					<span class="flex-1 text-xs text-amber-800 dark:text-amber-200">
+						{tokenStatus === "expired" ? "Authentication expired" : "Authentication required"}
+					</span>
+					<button
+						onclick={handleReauthenticate}
+						disabled={isReauthenticating}
+						class="rounded bg-amber-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-500 dark:hover:bg-amber-600"
+					>
+						{isReauthenticating
+							? "..."
+							: tokenStatus === "expired"
+								? "Re-authenticate"
+								: "Authenticate"}
+					</button>
+				</div>
+			</div>
+		{:else if tokenStatus === "expiring"}
+			<div class="mb-2">
+				<div class="flex items-center gap-2 rounded bg-yellow-50 px-2 py-1.5 dark:bg-yellow-900/20">
+					<IconWarning class="size-4 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
+					<span class="text-xs text-yellow-800 dark:text-yellow-200"> Token expires soon </span>
 				</div>
 			</div>
 		{/if}
