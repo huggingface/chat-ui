@@ -2,6 +2,7 @@
 	import Modal from "./Modal.svelte";
 	import { onMount, onDestroy } from "svelte";
 	import CarbonCopy from "~icons/carbon/copy";
+	import CarbonClose from "~icons/carbon/close";
 
 	interface Props {
 		html: string;
@@ -129,28 +130,38 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<Modal width="max-w-[90dvw]" closeButton onclose={() => onclose?.()}>
-	<div class="p-4">
-		<div class="relative h-[90dvh] w-[80dvw]">
-			<iframe
-				bind:this={iframeEl}
-				title="HTML Preview"
-				class="h-full w-full rounded-lg border border-gray-200 dark:border-gray-700"
-				sandbox="allow-scripts allow-popups"
-				referrerpolicy="no-referrer"
-				{srcdoc}
-			></iframe>
+<Modal
+	width="!m-0 !h-full !w-full !max-h-none !max-w-none !rounded-none !overflow-hidden !shadow-none"
+	onclose={() => onclose?.()}
+>
+	<div class="relative h-full w-full">
+		<button
+			class="fixed right-3 top-3 z-[60] grid size-10 place-items-center rounded-full border border-black/20 bg-white/90 text-gray-900 shadow-lg backdrop-blur hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 sm:right-6 sm:top-6"
+			onclick={() => onclose?.()}
+			aria-label="Close preview"
+			title="Close"
+		>
+			<CarbonClose class="size-5" />
+		</button>
 
-			{#if errors.length > 0}
-				<button
-					class="btn absolute bottom-4 right-4 flex items-center gap-2 rounded-full border-2 border-red-500/60 bg-red-800/90 px-4 py-1.5 text-sm text-white shadow-lg"
-					title="Copy error"
-					onclick={() => copy(composeText())}
-				>
-					<CarbonCopy class="text-xs" />
-					<span>{copied ? "Copied" : `Error caught (${errors.length})`}</span>
-				</button>
-			{/if}
-		</div>
+		<iframe
+			bind:this={iframeEl}
+			title="HTML Preview"
+			class="h-full w-full border-0"
+			sandbox="allow-scripts allow-popups"
+			referrerpolicy="no-referrer"
+			{srcdoc}
+		></iframe>
+
+		{#if errors.length > 0}
+			<button
+				class="btn absolute bottom-4 right-4 z-10 flex items-center gap-2 rounded-full border-2 border-red-500/60 bg-red-800/90 px-4 py-1.5 text-sm text-white shadow-lg"
+				title="Copy error"
+				onclick={() => copy(composeText())}
+			>
+				<CarbonCopy class="text-xs" />
+				<span>{copied ? "Copied" : `Error caught (${errors.length})`}</span>
+			</button>
+		{/if}
 	</div>
 </Modal>
