@@ -89,6 +89,7 @@ envVars:
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
   MODELS: >
     [
+      { "id": "Qwen/Qwen3-Coder-Next", "description": "Ultra-sparse coding MoE for repository-scale agents with 256K context." },
       { "id": "moonshotai/Kimi-K2.5", "description": "Native multimodal agent with agent swarms for parallel tool orchestration." },
       { "id": "allenai/Molmo2-8B", "description": "Open vision-language model excelling at video understanding, pointing, and object tracking." },
       { "id": "zai-org/GLM-4.7-Flash", "description": "Fast GLM-4.7 variant optimized for lower latency coding and agents." },
