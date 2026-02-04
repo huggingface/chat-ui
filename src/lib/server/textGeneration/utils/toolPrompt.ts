@@ -18,6 +18,7 @@ export function buildToolPreprompt(tools: OpenAiTool[]): string {
 		`Only use a tool if you cannot answer without it. For simple tasks like writing, editing text, or answering from your knowledge, respond directly without tools.`,
 		`SEARCH: Use 3-6 precise keywords with the correct year (use actual year for past events, not today's year). For multi-part questions, search each part separately.`,
 		`ANSWER: State only facts explicitly in the results. If info is missing or results conflict, say so. Never fabricate URLs or facts.`,
+		`INTERACTIVE APPS: When asked to build an interactive application, game, or visualization without a specific language/framework preference, create a single self-contained HTML file with embedded CSS and JavaScript.`,
 		`If a tool generates an image, you can inline it directly: ![alt text](image_url).`,
 		`If a tool needs an image, set its image field ("input_image", "image", or "image_url") to a reference like "image_1", "image_2", etc. (ordered by when the user uploaded them).`,
 		`Default to image references; only use a full http(s) URL when the tool description explicitly asks for one, or reuse a URL a previous tool returned.`,
