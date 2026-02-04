@@ -143,11 +143,12 @@
 
 		<!-- Close button with visible container -->
 		<button
-			class="fixed right-4 top-4 z-50 flex size-10 items-center justify-center rounded-full bg-gray-900/70 shadow-lg backdrop-blur-sm transition-colors hover:bg-gray-900/90"
+			class="btn fixed right-6 top-4 z-50 flex h-7 items-center gap-1 rounded-lg border border-gray-500/60 bg-gray-800 px-2 text-xs text-white shadow-sm backdrop-blur transition-none hover:border-gray-500 hover:bg-gray-700 active:shadow-inner"
 			title="Close preview (Esc)"
 			onclick={() => onclose?.()}
 		>
-			<CarbonClose class="size-5 text-white" />
+			<CarbonClose class="size-3.5" />
+			Close preview
 		</button>
 
 		{#if errors.length > 0}
