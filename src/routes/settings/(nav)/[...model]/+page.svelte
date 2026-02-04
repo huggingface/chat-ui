@@ -28,7 +28,10 @@
 	// Functional bindings for nested settings (Svelte 5):
 	// Avoid binding directly to $settings.*[modelId]; write via store update
 	function getToolsOverride() {
-		return $settings.toolsOverrides?.[page.params.model] ?? false;
+		return (
+			$settings.toolsOverrides?.[page.params.model] ??
+			Boolean((model as unknown as { supportsTools?: boolean }).supportsTools)
+		);
 	}
 	function setToolsOverride(v: boolean) {
 		settings.update((s) => ({
@@ -37,7 +40,7 @@
 		}));
 	}
 	function getMultimodalOverride() {
-		return $settings.multimodalOverrides?.[page.params.model] ?? false;
+		return $settings.multimodalOverrides?.[page.params.model] ?? Boolean(model?.multimodal);
 	}
 	function setMultimodalOverride(v: boolean) {
 		settings.update((s) => ({
