@@ -195,7 +195,7 @@
 								type="button"
 								title="Model settings"
 								aria-label="Model settings for {model.displayName}"
-								class="rounded-md border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700"
+								class="flex items-center gap-1.5 rounded-md border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 xl:px-2.5"
 								onclick={(e) => {
 									e.preventDefault();
 									e.stopPropagation();
@@ -203,6 +203,7 @@
 								}}
 							>
 								<LucideSettings class="size-3 sm:size-3.5" />
+								<span class="hidden text-xs xl:inline">Settings</span>
 							</button>
 							{#if isActive}
 								<span
