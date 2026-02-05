@@ -52,6 +52,21 @@
 			if (!msgId && browser && localStorage.getItem("leafId")) {
 				msgId = localStorage.getItem("leafId") as string;
 			}
+
+			// If still no msgId, find the most recently updated leaf
+			if (!msgId && messages.length > 0) {
+				// Find all leaves (nodes with no children)
+				const leaves = messages.filter((m) => !m.children?.length);
+				// Sort by updatedAt descending to get the most recent one
+				const latestLeaf = leaves.sort(
+					(a, b) => new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime()
+				)[0];
+
+				if (latestLeaf) {
+					msgId = latestLeaf.id;
+				}
+			}
+
 			initialRun = false;
 		}
 
