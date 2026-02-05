@@ -487,6 +487,11 @@
 					/>
 				{/if}
 				{#if (alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode)}
+					<CopyToClipBoardBtn
+						classNames="hidden group-hover:flex hover:flex rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 hover:text-gray-500 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+						value={message.content.trim()}
+						iconClassNames="text-xs"
+					/>
 					<button
 						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:text-gray-500 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300 lg:-right-2"
 						title="Edit"
@@ -497,7 +502,6 @@
 						}}
 					>
 						<CarbonPen />
-						Edit
 					</button>
 				{/if}
 			</div>
