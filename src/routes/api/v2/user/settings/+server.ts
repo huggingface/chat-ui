@@ -2,11 +2,13 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
+import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { defaultModel, models, validateModel } from "$lib/server/models";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
 import { z } from "zod";
 
 export const GET: RequestHandler = async ({ locals }) => {
+	requireAuth(locals);
 	const settings = await collections.settings.findOne(authCondition(locals));
 
 	if (settings && !validateModel(models).safeParse(settings?.activeModel).success) {
@@ -48,6 +50,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 };
 
 export const POST: RequestHandler = async ({ locals, request }) => {
+	requireAuth(locals);
 	const body = await request.json();
 
 	const { welcomeModalSeen, ...settings } = z
