@@ -65,7 +65,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@aws-sdk/credential-providers": "^3.925.0",
+		"@aws-sdk/credential-providers": "^3.984.0",
 		"@huggingface/hub": "^2.2.0",
 		"@huggingface/inference": "^4.11.3",
 		"@iconify-json/bi": "^1.1.21",
