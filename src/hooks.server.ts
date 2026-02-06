@@ -162,7 +162,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 				}
 			}
 
-			const auth = await authenticateRequest(event.request.headers, event.cookies, event.url);
+			const isApi = event.url.pathname.startsWith(`${base}/api/`);
+			const auth = await authenticateRequest(
+				event.request.headers,
+				event.cookies,
+				event.url,
+				isApi
+			);
 
 			event.locals.sessionId = auth.sessionId;
 
