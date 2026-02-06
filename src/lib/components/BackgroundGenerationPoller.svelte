@@ -65,8 +65,10 @@
 
 			try {
 				const response = await client.conversations({ id }).get({ query: {} });
-				const conversation = handleResponse(response);
-				const messages = conversation?.messages ?? [];
+				const conversation = handleResponse(response) as {
+					messages?: Message[];
+				} | null;
+				const messages: Message[] = conversation?.messages ?? [];
 				const lastAssistant = [...messages]
 					.reverse()
 					.find((message: Message) => message.from === "assistant");

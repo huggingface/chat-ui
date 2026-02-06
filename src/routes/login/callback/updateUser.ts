@@ -125,7 +125,7 @@ export async function updateUser(params: {
 	locals.sessionId = sessionId;
 
 	// Get cookie hash if coupling is enabled
-	const coupledCookieHash = await getCoupledCookieHash({ type: "svelte", value: cookies });
+	const coupledCookieHash = await getCoupledCookieHash(cookies);
 
 	// Prepare OAuth token data for session storage
 	const oauthData = tokenSetToSessionOauth(token);

@@ -162,11 +162,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 				}
 			}
 
-			const auth = await authenticateRequest(
-				{ type: "svelte", value: event.request.headers },
-				{ type: "svelte", value: event.cookies },
-				event.url
-			);
+			const auth = await authenticateRequest(event.request.headers, event.cookies, event.url);
 
 			event.locals.sessionId = auth.sessionId;
 
