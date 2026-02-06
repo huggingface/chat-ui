@@ -1,8 +1,10 @@
 import type { RequestHandler } from "@sveltejs/kit";
 import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
 import { config } from "$lib/server/config";
+import { requireAdmin } from "$lib/server/api/utils/requireAuth";
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ locals }) => {
+	requireAdmin(locals);
 	const { models } = await import("$lib/server/models");
 	return superjsonResponse({
 		OPENAI_BASE_URL: config.OPENAI_BASE_URL,
