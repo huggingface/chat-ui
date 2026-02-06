@@ -18,7 +18,6 @@
 		"prepare": "husky"
 	},
 	"devDependencies": {
-		"@elysiajs/eden": "^1.3.2",
 		"@faker-js/faker": "^8.4.1",
 		"@iconify-json/carbon": "^1.1.16",
 		"@iconify-json/eos-icons": "^1.1.6",
@@ -41,7 +40,6 @@
 		"@typescript-eslint/parser": "^6.x",
 		"bson-objectid": "^2.0.4",
 		"dompurify": "^3.2.4",
-		"elysia": "^1.3.2",
 		"eslint": "^8.28.0",
 		"eslint-config-prettier": "^8.5.0",
 		"eslint-plugin-svelte": "^2.45.1",
@@ -68,13 +66,11 @@
 	"type": "module",
 	"dependencies": {
 		"@aws-sdk/credential-providers": "^3.925.0",
-		"@elysiajs/swagger": "^1.3.0",
 		"@huggingface/hub": "^2.2.0",
 		"@huggingface/inference": "^4.11.3",
 		"@iconify-json/bi": "^1.1.21",
 		"@modelcontextprotocol/sdk": "^1.25.2",
 		"@resvg/resvg-js": "^2.6.2",
-		"@sinclair/typebox": "^0.34.41",
 		"autoprefixer": "^10.4.14",
 		"aws4": "^1.13.2",
 		"bits-ui": "^2.14.2",

@@ -43,10 +43,7 @@ const config = {
 					: { "frame-ancestors": ["https://huggingface.co"] }),
 			},
 		},
-		alias: {
-			$api: "./src/lib/server/api",
-			"$api/*": "./src/lib/server/api/*",
-		},
+		alias: {},
 	},
 };
 

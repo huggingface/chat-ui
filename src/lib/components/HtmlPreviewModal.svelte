@@ -130,7 +130,10 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<Modal width="max-w-none max-h-none w-[100dvw] h-[100dvh] !rounded-none" onclose={() => onclose?.()}>
+<Modal
+	width="max-w-none max-h-none w-[100dvw] h-[100dvh] !rounded-none"
+	onclose={() => onclose?.()}
+>
 	<div class="relative h-[100dvh] w-[100dvw]">
 		<iframe
 			bind:this={iframeEl}

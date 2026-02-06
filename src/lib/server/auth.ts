@@ -17,7 +17,6 @@ import { collections } from "$lib/server/database";
 import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
 import { ObjectId } from "mongodb";
-import type { Cookie } from "elysia";
 import { adminTokenManager } from "./adminToken";
 import type { User } from "$lib/types/User";
 import type { Session } from "$lib/types/Session";
@@ -379,22 +378,15 @@ export async function validateAndParseCsrfToken(
 	return null;
 }
 
-type CookieRecord =
-	| { type: "elysia"; value: Record<string, Cookie<string | undefined>> }
-	| { type: "svelte"; value: Cookies };
-type HeaderRecord =
-	| { type: "elysia"; value: Record<string, string | undefined> }
-	| { type: "svelte"; value: Headers };
+type CookieRecord = Cookies;
+type HeaderRecord = Headers;
 
 export async function getCoupledCookieHash(cookie: CookieRecord): Promise<string | undefined> {
 	if (!config.COUPLE_SESSION_WITH_COOKIE_NAME) {
 		return undefined;
 	}
 
-	const cookieValue =
-		cookie.type === "elysia"
-			? cookie.value[config.COUPLE_SESSION_WITH_COOKIE_NAME]?.value
-			: cookie.value.get(config.COUPLE_SESSION_WITH_COOKIE_NAME);
+	const cookieValue = cookie.get(config.COUPLE_SESSION_WITH_COOKIE_NAME);
 
 	if (!cookieValue) {
 		return "no-cookie";
@@ -409,21 +401,11 @@ export async function authenticateRequest(
 	url: URL,
 	isApi?: boolean
 ): Promise<App.Locals & { secretSessionId: string }> {
-	// once the entire API has been moved to elysia
-	// we can move this function to authPlugin.ts
-	// and get rid of the isApi && type: "svelte" options
-	const token =
-		cookie.type === "elysia"
-			? cookie.value[config.COOKIE_NAME].value
-			: cookie.value.get(config.COOKIE_NAME);
+	const token = cookie.get(config.COOKIE_NAME);
 
 	let email = null;
 	if (config.TRUSTED_EMAIL_HEADER) {
-		if (headers.type === "elysia") {
-			email = headers.value[config.TRUSTED_EMAIL_HEADER];
-		} else {
-			email = headers.value.get(config.TRUSTED_EMAIL_HEADER);
-		}
+		email = headers.get(config.TRUSTED_EMAIL_HEADER);
 	}
 
 	let secretSessionId: string | null = null;
@@ -472,10 +454,7 @@ export async function authenticateRequest(
 	}
 
 	if (isApi) {
-		const authorization =
-			headers.type === "elysia"
-				? headers.value["Authorization"]
-				: headers.value.get("Authorization");
+		const authorization = headers.get("Authorization");
 		if (authorization?.startsWith("Bearer ")) {
 			const token = authorization.slice(7);
 			const hash = await sha256(token);
