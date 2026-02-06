@@ -33,6 +33,9 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 	requireAuth(locals);
 
 	const id = params.id ?? "";
+	if (!ObjectId.isValid(id)) {
+		error(400, "Invalid conversation ID");
+	}
 	const res = await collections.conversations.deleteOne({
 		_id: new ObjectId(id),
 		...authCondition(locals),
@@ -72,6 +75,9 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 	};
 
 	const id = params.id ?? "";
+	if (!ObjectId.isValid(id)) {
+		error(400, "Invalid conversation ID");
+	}
 	const res = await collections.conversations.updateOne(
 		{
 			_id: new ObjectId(id),
