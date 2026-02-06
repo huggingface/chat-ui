@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Message } from "$lib/types/Message";
+	import type { Message, MessageFile } from "$lib/types/Message";
 	import { tick } from "svelte";
 
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
@@ -13,6 +13,7 @@
 	import UploadedFile from "./UploadedFile.svelte";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
+	import Modal from "../Modal.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
 	import MessageAvatar from "./MessageAvatar.svelte";
@@ -32,8 +33,9 @@
 		alternatives?: Message["id"][];
 		editMsdgId?: Message["id"] | null;
 		isLast?: boolean;
-		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
+		onretry?: (payload: { id: Message["id"]; content?: string; files?: MessageFile[] }) => void;
 		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
+		onfileedit?: (payload: { messageId: string; files: MessageFile[] }) => void;
 	}
 
 	let {
@@ -47,6 +49,7 @@
 		isLast = false,
 		onretry,
 		onshowAlternateMsg,
+		onfileedit,
 	}: Props = $props();
 
 	let contentEl: HTMLElement | undefined = $state();
@@ -64,6 +67,50 @@
 		}
 	}
 
+	let editingFileIndex: number | null = $state(null);
+	let editingFileText = $state("");
+	let editFileTextarea: HTMLTextAreaElement | undefined = $state();
+
+	function startFileEdit(index: number, text: string) {
+		editingFileIndex = index;
+		editingFileText = text;
+	}
+
+	function toBase64Utf8(str: string) {
+		return btoa(
+			new TextEncoder().encode(str).reduce((data, byte) => data + String.fromCharCode(byte), "")
+		);
+	}
+
+	function saveFileEdit() {
+		if (editingFileIndex === null) return;
+		if (!message.files) return;
+
+		const updated = {
+			...message.files[editingFileIndex],
+			value: toBase64Utf8(editingFileText),
+			type: "base64" as const,
+		};
+
+		const newFiles = message.files.map((f, j) => (j === editingFileIndex ? updated : f));
+
+		onfileedit?.({ messageId: message.id, files: newFiles });
+		onretry?.({ id: message.id, content: message.content, files: newFiles });
+		editingFileIndex = null;
+	}
+
+	function autoResize(el: HTMLTextAreaElement) {
+		el.style.height = "auto";
+		el.style.height = Math.min(el.scrollHeight, window.innerHeight * 0.65) + "px";
+	}
+
+	$effect(() => {
+		if (editingFileIndex !== null) {
+			tick().then(() => {
+				if (editFileTextarea) autoResize(editFileTextarea);
+			});
+		}
+	});
 	$effect(() => {
 		// referenced to appease linter for currently-unused props
 		void _isAuthor;
@@ -262,8 +309,8 @@
 		>
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
-					{#each message.files as file (file.value)}
-						<UploadedFile {file} canClose={false} />
+					{#each message.files as file, i (file.value)}
+						<UploadedFile {file} canClose={false} onedit={(text) => startFileEdit(i, text)} />
 					{/each}
 				</div>
 			{/if}
@@ -421,8 +468,8 @@
 		<div class="flex w-full flex-col gap-2">
 			{#if message.files?.length}
 				<div class="flex w-fit gap-4 px-5">
-					{#each message.files as file}
-						<UploadedFile {file} canClose={false} />
+					{#each message.files as file, i}
+						<UploadedFile {file} canClose={false} onedit={(text) => startFileEdit(i, text)} />
 					{/each}
 				</div>
 			{/if}
@@ -503,6 +550,41 @@
 			</div>
 		</div>
 	</div>
+{/if}
+
+{#if editingFileIndex !== null}
+	<Modal width="max-w-5xl w-[90vw]" onclose={() => (editingFileIndex = null)}>
+		<div class="relative flex max-h-[95vh] flex-col gap-3 p-4">
+			<h3 class="text-lg font-semibold">Edit file</h3>
+
+			<textarea
+				bind:this={editFileTextarea}
+				bind:value={editingFileText}
+				oninput={(e) => autoResize(e.currentTarget)}
+				class="max-h-[95vh] min-h-[120px] resize-none overflow-y-auto rounded border p-2 text-sm dark:bg-gray-900"
+			></textarea>
+
+			<div class="flex w-full flex-row flex-nowrap items-center justify-center gap-2 pt-2">
+				<button
+					type="submit"
+					class="btn rounded-lg bg-gray-200 px-3 py-1.5
+						   text-sm text-gray-600 hover:text-gray-800 focus:ring-0
+						   dark:bg-gray-700 dark:text-gray-300 dark:hover:text-gray-100"
+					onclick={saveFileEdit}
+				>
+					Send
+				</button>
+				<button
+					type="button"
+					class="btn rounded-sm p-2 text-sm text-gray-400 hover:text-gray-500 focus:ring-0
+						   dark:text-gray-400 dark:hover:text-gray-300"
+					onclick={() => (editingFileIndex = null)}
+				>
+					Cancel
+				</button>
+			</div>
+		</div>
+	</Modal>
 {/if}
 
 <style>
