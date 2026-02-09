@@ -201,13 +201,13 @@
 		{#if publicConfig.isHuggingChat}
 			{#if !model?.isRouter}
 				<a
-					href={"https://huggingface.co/playground?modelId=" + model.name}
+					href={"https://huggingface.co/" + model.name + "?inference_api=true"}
 					target="_blank"
 					rel="noreferrer"
 					class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
 				>
 					<CarbonCode class="mr-1.5 shrink-0 text-xs" />
-					API Playground
+					Use via API
 				</a>
 				<a
 					href={"https://huggingface.co/" + model.name}
