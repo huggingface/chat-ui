@@ -34,7 +34,7 @@ export class AbortedGenerations {
 			const aborts = await collections.abortedGenerations.find({}).sort({ createdAt: 1 }).toArray();
 
 			this.abortedGenerations = Object.fromEntries(
-				aborts.map((abort) => [abort.conversationId.toString(), abort.createdAt])
+				aborts.map((abort) => [abort.conversationId.toString(), abort.updatedAt ?? abort.createdAt])
 			);
 		} catch (err) {
 			logger.error(err, "Error updating aborted generations list");

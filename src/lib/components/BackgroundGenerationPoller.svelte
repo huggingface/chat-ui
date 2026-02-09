@@ -9,8 +9,8 @@
 	} from "$lib/stores/backgroundGenerations";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { UrlDependency } from "$lib/types/UrlDependency";
-	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
 	import type { Message } from "$lib/types/Message";
+	import { isAssistantGenerationTerminal } from "$lib/utils/generationState";
 
 	const POLL_INTERVAL_MS = 1000;
 	const MAX_POLL_DURATION_MS = 3 * 60_000;
@@ -73,15 +73,7 @@
 					.reverse()
 					.find((message: Message) => message.from === "assistant");
 
-				const hasFinalAnswer =
-					lastAssistant?.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer) ??
-					false;
-				const hasError =
-					lastAssistant?.updates?.some(
-						(update) =>
-							update.type === MessageUpdateType.Status &&
-							update.status === MessageUpdateStatus.Error
-					) ?? false;
+				const isTerminal = isAssistantGenerationTerminal(lastAssistant);
 
 				const snapshot = lastAssistant
 					? JSON.stringify({
@@ -104,12 +96,12 @@
 					shouldInvalidateConversation = true;
 				}
 
-				if (lastAssistant && (hasFinalAnswer || hasError)) {
+				if (lastAssistant && isTerminal) {
 					removeBackgroundGeneration(id);
 					assistantSnapshots.delete(id);
 					failureCounts.delete(id);
 					shouldInvalidateConversation = true;
-					log("complete", id, hasFinalAnswer ? "final" : "error");
+					log("complete", id, "terminal");
 					await invalidate(UrlDependency.ConversationList);
 				}
 

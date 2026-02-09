@@ -77,6 +77,7 @@ export async function createTestConversation(
 
 export async function cleanupTestData() {
 	await collections.conversations.deleteMany({});
+	await collections.abortedGenerations.deleteMany({});
 	await collections.users.deleteMany({});
 	await collections.sessions.deleteMany({});
 	await collections.settings.deleteMany({});
