@@ -26,7 +26,7 @@
 		try {
 			creating = true;
 			errorMsg = null;
-			createdUrl = await createShareLink(page.params.id);
+			createdUrl = await createShareLink(page.params.id ?? "");
 		} catch (e) {
 			errorMsg = (e as Error).message || "Could not create link";
 		} finally {

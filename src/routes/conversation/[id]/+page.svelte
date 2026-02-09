@@ -32,6 +32,7 @@
 
 	let { data = $bindable() } = $props();
 
+	let convId = $derived(page.params.id ?? "");
 	let pending = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
@@ -213,7 +214,7 @@
 			const messageUpdatesAbortController = new AbortController();
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
-				page.params.id,
+				convId,
 				{
 					base,
 					inputs: prompt,
@@ -362,7 +363,7 @@
 
 						$titleUpdate = {
 							title: update.title,
-							convId: page.params.id,
+							convId,
 						};
 					}
 				} else if (update.type === MessageUpdateType.File) {
@@ -425,7 +426,7 @@
 
 		const streaming = isConversationStreaming(messages);
 		if (streaming) {
-			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
+			addBackgroundGeneration({ id: convId, startedAt: Date.now() });
 			$loading = true;
 		}
 	});
@@ -481,7 +482,7 @@
 		}
 
 		if (!streaming && browser) {
-			removeBackgroundGeneration(page.params.id);
+			removeBackgroundGeneration(convId);
 		}
 	});
 
