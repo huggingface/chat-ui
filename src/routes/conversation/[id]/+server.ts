@@ -367,11 +367,19 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let finalAnswerReceived = false;
 			let abortedByUser = false;
+			let finishedStatusSent = false;
 
 			messageToWriteTo.updates ??= [];
 			async function update(event: MessageUpdate) {
 				if (!messageToWriteTo || !conv) {
 					throw Error("No message or conversation to write events to");
+				}
+
+				if (
+					event.type === MessageUpdateType.Status &&
+					event.status === MessageUpdateStatus.Finished
+				) {
+					finishedStatusSent = true;
 				}
 
 				// Add token to content or skip if empty
@@ -613,6 +621,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			} finally {
 				// check if no output was generated
 				if (!hasError && !abortedByUser && messageToWriteTo.content === initialMessageContent) {
+					hasError = true;
 					logger.warn(
 						{
 							conversationId: conversationKey,
@@ -630,6 +639,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						message: "No output was generated. Something went wrong.",
 					});
 				}
+			}
+
+			if (!hasError && !finishedStatusSent) {
+				await update({
+					type: MessageUpdateType.Status,
+					status: MessageUpdateStatus.Finished,
+				});
 			}
 
 			await persistConversation();

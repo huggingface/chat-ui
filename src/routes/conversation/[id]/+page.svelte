@@ -29,12 +29,14 @@
 	import SubscribeModal from "$lib/components/SubscribeModal.svelte";
 	import { loading } from "$lib/stores/loading.js";
 	import { requireAuthUser } from "$lib/utils/auth.js";
+	import { isConversationGenerationActive } from "$lib/utils/generationState";
 
 	let { data = $bindable() } = $props();
 
 	let pending = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
+	let stopRequested = $state(false);
 
 	let files: File[] = $state([]);
 
@@ -107,6 +109,7 @@
 		isRetry?: boolean;
 	}): Promise<void> {
 		try {
+			stopRequested = false;
 			$isAborted = false;
 			$loading = true;
 			pending = true;
@@ -397,15 +400,31 @@
 	}
 
 	async function stopGeneration() {
-		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
-			method: "POST",
-		}).then(() => {
-			// Small delay to let the stream receive the server's final update before aborting client-side
-			setTimeout(() => {
-				$isAborted = true;
-				$loading = false;
-			}, 200);
-		});
+		stopRequested = true;
+		$isAborted = true;
+		$loading = false;
+
+		const sendStopRequest = async () => {
+			const response = await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
+				method: "POST",
+			});
+			if (!response.ok) {
+				throw new Error(`Stop request failed: ${response.status}`);
+			}
+		};
+
+		try {
+			await sendStopRequest();
+		} catch (firstErr) {
+			try {
+				await new Promise((resolve) => setTimeout(resolve, 300));
+				await sendStopRequest();
+			} catch (retryErr) {
+				console.error("Failed to stop generation", firstErr, retryErr);
+				stopRequested = false;
+				$error = "Failed to stop generation. Please try again.";
+			}
+		}
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -459,22 +478,14 @@
 	});
 
 	function isConversationStreaming(msgs: Message[]): boolean {
-		const lastAssistant = [...msgs].reverse().find((msg) => msg.from === "assistant");
-		if (!lastAssistant) return false;
-		const hasFinalAnswer =
-			lastAssistant.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer) ??
-			false;
-		const hasError =
-			lastAssistant.updates?.some(
-				(update) =>
-					update.type === MessageUpdateType.Status && update.status === MessageUpdateStatus.Error
-			) ?? false;
-		return !hasFinalAnswer && !hasError;
+		return isConversationGenerationActive(msgs);
 	}
 
 	$effect(() => {
 		const streaming = isConversationStreaming(messages);
-		if (streaming) {
+		if (stopRequested) {
+			$loading = false;
+		} else if (streaming) {
 			$loading = true;
 		} else if (!pending) {
 			$loading = false;
