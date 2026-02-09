@@ -18,14 +18,17 @@ import { uploadFile } from "$lib/server/files/uploadFile";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
-import { addChildren } from "$lib/utils/tree/addChildren.js";
-import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { MetricsServer } from "$lib/server/metrics";
+import {
+	mergeFinalAnswerWithPrefix,
+	mergeRouterMetadata,
+	prepareTurn,
+} from "$lib/conversation/generation";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -230,81 +233,39 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 	let messagesForPrompt: Message[] = [];
 
-	if (isRetry && messageId) {
-		// two cases, if we're retrying a user message with a newPrompt set,
-		// it means we're editing a user message
-		// if we're retrying on an assistant message, newPrompt cannot be set
-		// it means we're retrying the last assistant message for a new answer
-
-		const messageToRetry = conv.messages.find((message) => message.id === messageId);
-
-		if (!messageToRetry) {
-			error(404, "Message not found");
-		}
-
-		if (messageToRetry.from === "user" && newPrompt) {
-			// add a sibling to this message from the user, with the alternative prompt
-			// add a children to that sibling, where we can write to
-			const newUserMessageId = addSibling(
-				conv,
-				{
-					from: "user",
-					content: newPrompt,
-					files: uploadedFiles,
-					createdAt: new Date(),
-					updatedAt: new Date(),
-				},
-				messageId
-			);
-			messageToWriteToId = addChildren(
-				conv,
-				{
-					from: "assistant",
-					content: "",
-					createdAt: new Date(),
-					updatedAt: new Date(),
-				},
-				newUserMessageId
-			);
-			messagesForPrompt = buildSubtree(conv, newUserMessageId);
-		} else if (messageToRetry.from === "assistant") {
-			// we're retrying an assistant message, to generate a new answer
-			// just add a sibling to the assistant answer where we can write to
-			messageToWriteToId = addSibling(
-				conv,
-				{ from: "assistant", content: "", createdAt: new Date(), updatedAt: new Date() },
-				messageId
-			);
-			messagesForPrompt = buildSubtree(conv, messageId);
-			messagesForPrompt.pop(); // don't need the latest assistant message in the prompt since we're retrying it
-		}
-	} else {
-		// just a normal linear conversation, so we add the user message
-		// and the blank assistant message back to back
-		const newUserMessageId = addChildren(
-			conv,
-			{
+	try {
+		const preparedTurn = prepareTurn({
+			tree: conv,
+			messageId,
+			prompt: newPrompt,
+			isRetry,
+			files: uploadedFiles,
+			createUserMessage: ({ prompt, files }) => ({
 				from: "user",
-				content: newPrompt ?? "",
-				files: uploadedFiles,
+				content: prompt,
+				files,
 				createdAt: new Date(),
 				updatedAt: new Date(),
-			},
-			messageId
-		);
-
-		messageToWriteToId = addChildren(
-			conv,
-			{
+			}),
+			createAssistantMessage: () => ({
 				from: "assistant",
 				content: "",
 				createdAt: new Date(),
 				updatedAt: new Date(),
-			},
-			newUserMessageId
-		);
-		// build the prompt from the user message
-		messagesForPrompt = buildSubtree(conv, newUserMessageId);
+			}),
+		});
+
+		messageToWriteToId = preparedTurn.assistantMessageId;
+		messagesForPrompt = buildSubtree(conv, preparedTurn.promptAnchorId);
+		if (preparedTurn.excludeAnchorFromPrompt) {
+			messagesForPrompt.pop();
+		}
+	} catch (e) {
+		if (e instanceof Error && e.message === "Message not found") {
+			error(404, "Message not found");
+		}
+
+		throw e;
 	}
 
 	const messageToWriteTo = conv.messages.find((message) => message.id === messageToWriteToId);
@@ -429,40 +390,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				// Set the final text and the interrupted flag
 				else if (event.type === MessageUpdateType.FinalAnswer) {
 					messageToWriteTo.interrupted = event.interrupted;
-					// Default behavior: replace the streamed text with the provider's final text.
-					// However, when tools (MCP/function calls) were used, providers often stream
-					// some content (e.g., a story) before triggering tools, then return a
-					// different follow‑up message afterwards (e.g., an image caption). Our
-					// previous logic overwrote the pre‑tool content. Preserve it by merging in
-					// the pre‑tool stream when tool updates occurred and the final text does
-					// not already include the streamed prefix.
 					const hadTools = (messageToWriteTo.updates ?? []).some(
 						(u) => u.type === MessageUpdateType.Tool
 					);
-
-					if (hadTools) {
-						const existing = messageToWriteTo.content.slice(initialMessageContent.length);
-						if (existing && existing.length > 0) {
-							// A. If we already streamed the same final text, keep as-is.
-							if (event.text && existing.endsWith(event.text)) {
-								messageToWriteTo.content = initialMessageContent + existing;
-							}
-							// B. If the final text already includes the streamed prefix, use it verbatim.
-							else if (event.text && event.text.startsWith(existing)) {
-								messageToWriteTo.content = initialMessageContent + event.text;
-							}
-							// C. Otherwise, merge with a paragraph break for readability.
-							else {
-								const needsGap = !/\n\n$/.test(existing) && !/^\n/.test(event.text ?? "");
-								messageToWriteTo.content =
-									initialMessageContent + existing + (needsGap ? "\n\n" : "") + (event.text ?? "");
-							}
-						} else {
-							messageToWriteTo.content = initialMessageContent + (event.text ?? "");
-						}
-					} else {
-						messageToWriteTo.content = initialMessageContent + event.text;
-					}
+					messageToWriteTo.content = mergeFinalAnswerWithPrefix({
+						prefixContent: initialMessageContent,
+						currentContent: messageToWriteTo.content,
+						finalText: event.text,
+						interrupted: event.interrupted,
+						hadTools,
+					});
 					finalAnswerReceived = true;
 
 					if (metricsEnabled && metrics) {
@@ -480,21 +417,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 				// Store router metadata (for router models) or provider info (for all models)
 				else if (event.type === MessageUpdateType.RouterMetadata) {
-					// Merge metadata updates to preserve existing fields (router may send route/model first, then provider comes later)
-					if (model?.isRouter) {
-						messageToWriteTo.routerMetadata = {
-							route: event.route || messageToWriteTo.routerMetadata?.route || "",
-							model: event.model || messageToWriteTo.routerMetadata?.model || "",
-							provider: event.provider || messageToWriteTo.routerMetadata?.provider,
-						};
-					}
-					// Store provider-only metadata for non-router models if available
-					else if (event.provider) {
-						messageToWriteTo.routerMetadata = {
-							route: messageToWriteTo.routerMetadata?.route || "",
-							model: messageToWriteTo.routerMetadata?.model || "",
-							provider: event.provider,
-						};
+					if (model?.isRouter || event.provider) {
+						messageToWriteTo.routerMetadata = mergeRouterMetadata(
+							messageToWriteTo.routerMetadata,
+							event
+						);
 					}
 				}
 

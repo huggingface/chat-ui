@@ -43,6 +43,7 @@ jobs:
       - name: "Tests"
         run: |
           npm run test
+          npm run test:conversation-flow:coverage
 
   build-check:
     runs-on:

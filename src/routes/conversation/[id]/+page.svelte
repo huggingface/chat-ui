@@ -9,11 +9,8 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
 	import type { Message } from "$lib/types/Message";
-	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
-	import { addChildren } from "$lib/utils/tree/addChildren";
-	import { addSibling } from "$lib/utils/tree/addSibling";
 	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
@@ -30,6 +27,7 @@
 	import { loading } from "$lib/stores/loading.js";
 	import { requireAuthUser } from "$lib/utils/auth.js";
 	import { isConversationGenerationActive } from "$lib/utils/generationState";
+	import { prepareTurn, processClientUpdate } from "$lib/conversation/generation";
 
 	let { data = $bindable() } = $props();
 
@@ -125,88 +123,39 @@
 				)
 			);
 
-			let messageToWriteToId: Message["id"] | undefined = undefined;
-			// used for building the prompt, subtree of the conversation that goes from the latest message to the root
+				let messageToWriteToId: Message["id"] | undefined = undefined;
+				const tree = { messages, rootMessageId: data.rootMessageId };
 
-			if (isRetry && messageId) {
-				// two cases, if we're retrying a user message with a newPrompt set,
-				// it means we're editing a user message
-				// if we're retrying on an assistant message, newPrompt cannot be set
-				// it means we're retrying the last assistant message for a new answer
-
-				const messageToRetry = messages.find((message) => message.id === messageId);
-
-				if (!messageToRetry) {
-					$error = "Message not found";
-				}
-
-				if (messageToRetry?.from === "user" && prompt) {
-					// add a sibling to this message from the user, with the alternative prompt
-					// add a children to that sibling, where we can write to
-					const newUserMessageId = addSibling(
-						{
-							messages,
-							rootMessageId: data.rootMessageId,
-						},
-						{
+				try {
+					const preparedTurn = prepareTurn({
+						tree,
+						messageId,
+						prompt,
+						isRetry,
+						files: base64Files,
+						createUserMessage: ({ prompt, files, retryTarget }) => ({
 							from: "user",
 							content: prompt,
-							files: messageToRetry.files,
-						},
-						messageId
-					);
-					messageToWriteToId = addChildren(
-						{
-							messages,
-							rootMessageId: data.rootMessageId,
-						},
-						{ from: "assistant", content: "" },
-						newUserMessageId
-					);
-				} else if (messageToRetry?.from === "assistant") {
-					// we're retrying an assistant message, to generate a new answer
-					// just add a sibling to the assistant answer where we can write to
-					messageToWriteToId = addSibling(
-						{
-							messages,
-							rootMessageId: data.rootMessageId,
-						},
-						{ from: "assistant", content: "" },
-						messageId
-					);
-				}
-			} else {
-				// just a normal linear conversation, so we add the user message
-				// and the blank assistant message back to back
-				const newUserMessageId = addChildren(
-					{
-						messages,
-						rootMessageId: data.rootMessageId,
-					},
-					{
-						from: "user",
-						content: prompt ?? "",
-						files: base64Files,
-					},
-					messageId
-				);
+							files: retryTarget?.files ?? files,
+						}),
+						createAssistantMessage: () => ({
+							from: "assistant",
+							content: "",
+						}),
+					});
 
-				if (!data.rootMessageId) {
-					data.rootMessageId = newUserMessageId;
-				}
+					messageToWriteToId = preparedTurn.assistantMessageId;
+					if (!data.rootMessageId && tree.rootMessageId) {
+						data.rootMessageId = tree.rootMessageId;
+					}
+				} catch (prepareError) {
+					if (prepareError instanceof Error && prepareError.message === "Message not found") {
+						$error = "Message not found";
+						return;
+					}
 
-				messageToWriteToId = addChildren(
-					{
-						messages,
-						rootMessageId: data.rootMessageId,
-					},
-					{
-						from: "assistant",
-						content: "",
-					},
-					newUserMessageId
-				);
-			}
+					throw prepareError;
+				}
 
 			const userMessage = messages.find((message) => message.id === messageId);
 			const messageToWriteTo = messages.find((message) => message.id === messageToWriteToId);
@@ -242,146 +191,45 @@
 			// Initialize lastUpdateTime outside the loop to persist between updates
 			let lastUpdateTime = new Date();
 
-			for await (const update of messageUpdatesIterator) {
-				if ($isAborted) {
-					messageUpdatesAbortController.abort();
-					return;
-				}
-
-				// Remove null characters added due to remote keylogging prevention
-				// See server code for more details
-				if (update.type === MessageUpdateType.Stream) {
-					update.token = update.token.replaceAll("\0", "");
-				}
-
-				const isKeepAlive =
-					update.type === MessageUpdateType.Status &&
-					update.status === MessageUpdateStatus.KeepAlive;
-
-				if (!isKeepAlive) {
-					if (update.type === MessageUpdateType.Stream) {
-						const existingUpdates = messageToWriteTo.updates ?? [];
-						const lastUpdate = existingUpdates.at(-1);
-						if (lastUpdate?.type === MessageUpdateType.Stream) {
-							// Create fresh objects/arrays so the UI reacts to merged tokens
-							const merged = {
-								...lastUpdate,
-								token: (lastUpdate.token ?? "") + (update.token ?? ""),
-							};
-							messageToWriteTo.updates = [...existingUpdates.slice(0, -1), merged];
-						} else {
-							messageToWriteTo.updates = [...existingUpdates, update];
-						}
-					} else {
-						messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+				for await (const update of messageUpdatesIterator) {
+					if ($isAborted) {
+						messageUpdatesAbortController.abort();
+						return;
 					}
-				}
-				const currentTime = new Date();
 
-				// If we receive a non-stream update (e.g. tool/status/final answer),
-				// flush any buffered stream tokens so the UI doesn't appear to cut
-				// mid-sentence while tools are running or the final answer arrives.
-				if (
-					update.type !== MessageUpdateType.Stream &&
-					!$settings.disableStream &&
-					buffer.length > 0
-				) {
-					messageToWriteTo.content += buffer;
-					buffer = "";
-					lastUpdateTime = currentTime;
-				}
+					const processedUpdate = processClientUpdate({
+						message: messageToWriteTo,
+						update,
+						disableStream: $settings.disableStream,
+						buffer,
+						lastUpdateTime,
+						maxUpdateTimeMs: updateDebouncer.maxUpdateTime,
+					});
 
-				if (update.type === MessageUpdateType.Stream && !$settings.disableStream) {
-					buffer += update.token;
-					// Check if this is the first update or if enough time has passed
-					if (currentTime.getTime() - lastUpdateTime.getTime() > updateDebouncer.maxUpdateTime) {
-						messageToWriteTo.content += buffer;
-						buffer = "";
-						lastUpdateTime = currentTime;
+					Object.assign(messageToWriteTo, processedUpdate.message);
+					buffer = processedUpdate.buffer;
+					lastUpdateTime = processedUpdate.lastUpdateTime;
+
+					if (processedUpdate.effects.setPendingFalse) {
+						pending = false;
 					}
-					pending = false;
-				} else if (update.type === MessageUpdateType.FinalAnswer) {
-					// Mirror server-side merge behavior so the UI reflects the
-					// final text once tools complete, while preserving any
-					// pre‑tool streamed content when appropriate.
-					const finalText = update.text ?? "";
-					const isInterrupted = update.interrupted === true;
-					const hadTools =
-						messageToWriteTo.updates?.some((u) => u.type === MessageUpdateType.Tool) ?? false;
-
-					if (isInterrupted) {
-						// Preserve streamed content on abort. If we never streamed, fall back to finalText.
-						if (!messageToWriteTo.content) {
-							messageToWriteTo.content = finalText;
-						}
-					} else if (hadTools) {
-						const existing = messageToWriteTo.content;
-						const trimmedExistingSuffix = existing.replace(/\s+$/, "");
-						const trimmedFinalPrefix = finalText.replace(/^\s+/, "");
-						const alreadyStreamed =
-							finalText &&
-							(existing.endsWith(finalText) ||
-								(trimmedFinalPrefix.length > 0 &&
-									trimmedExistingSuffix.endsWith(trimmedFinalPrefix)));
-
-						if (existing && existing.length > 0) {
-							if (alreadyStreamed) {
-								// A. Already streamed the same final text; keep as-is.
-								messageToWriteTo.content = existing;
-							} else if (
-								finalText &&
-								(finalText.startsWith(existing) ||
-									(trimmedExistingSuffix.length > 0 &&
-										trimmedFinalPrefix.startsWith(trimmedExistingSuffix)))
-							) {
-								// B. Final text already includes streamed prefix; use it verbatim.
-								messageToWriteTo.content = finalText;
-							} else {
-								// C. Merge with a paragraph break for readability.
-								const needsGap = !/\n\n$/.test(existing) && !/^\n/.test(finalText ?? "");
-								messageToWriteTo.content = existing + (needsGap ? "\n\n" : "") + finalText;
-							}
-						} else {
-							messageToWriteTo.content = finalText;
-						}
-					} else {
-						// No tools: final answer replaces streamed content so
-						// the provider's final text is authoritative.
-						messageToWriteTo.content = finalText;
-					}
-				} else if (
-					update.type === MessageUpdateType.Status &&
-					update.status === MessageUpdateStatus.Error
-				) {
-					// Check if this is a 402 payment required error
-					if (update.statusCode === 402) {
+					if (processedUpdate.effects.showSubscribeModal) {
 						showSubscribeModal = true;
-					} else {
-						$error = update.message ?? "An error has occurred";
 					}
-				} else if (update.type === MessageUpdateType.Title) {
-					const convInData = conversations.find(({ id }) => id === page.params.id);
-					if (convInData) {
-						convInData.title = update.title;
-
-						$titleUpdate = {
-							title: update.title,
-							convId,
-						};
+					if (processedUpdate.effects.errorMessage) {
+						$error = processedUpdate.effects.errorMessage;
 					}
-				} else if (update.type === MessageUpdateType.File) {
-					messageToWriteTo.files = [
-						...(messageToWriteTo.files ?? []),
-						{ type: "hash", value: update.sha, mime: update.mime, name: update.name },
-					];
-				} else if (update.type === MessageUpdateType.RouterMetadata) {
-					// Update router metadata immediately when received
-					messageToWriteTo.routerMetadata = {
-						route: update.route,
-						model: update.model,
-					};
+					if (processedUpdate.effects.title) {
+						const convInData = conversations.find(({ id }) => id === page.params.id);
+						if (convInData) {
+							convInData.title = processedUpdate.effects.title;
+							$titleUpdate = {
+								title: processedUpdate.effects.title,
+								convId,
+							};
+						}
+					}
 				}
-			}
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
