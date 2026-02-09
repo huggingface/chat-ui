@@ -21,7 +21,7 @@
 	let draft = $state("");
 
 	const settings = useSettingsStore();
-	const modelId = page.params.model;
+	const modelId = page.params.model ?? "";
 	const publicConfig = usePublicConfig();
 
 	async function createConversation(message: string) {
