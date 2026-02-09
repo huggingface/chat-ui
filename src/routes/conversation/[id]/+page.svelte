@@ -421,7 +421,6 @@
 				await sendStopRequest();
 			} catch (retryErr) {
 				console.error("Failed to stop generation", firstErr, retryErr);
-				stopRequested = false;
 				$error = "Failed to stop generation. Please try again.";
 			}
 		}
@@ -442,7 +441,7 @@
 			$pendingMessage = undefined;
 		}
 
-		const streaming = isConversationStreaming(messages);
+		const streaming = isConversationGenerationActive(messages);
 		if (streaming) {
 			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
 			$loading = true;
@@ -477,12 +476,13 @@
 		messages = data.messages;
 	});
 
-	function isConversationStreaming(msgs: Message[]): boolean {
-		return isConversationGenerationActive(msgs);
-	}
+	$effect(() => {
+		page.params.id;
+		stopRequested = false;
+	});
 
 	$effect(() => {
-		const streaming = isConversationStreaming(messages);
+		const streaming = isConversationGenerationActive(messages);
 		if (stopRequested) {
 			$loading = false;
 		} else if (streaming) {
