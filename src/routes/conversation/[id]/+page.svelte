@@ -8,7 +8,7 @@
 	import { base } from "$app/paths";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
-	import type { Message } from "$lib/types/Message";
+	import type { Message, MessageFile } from "$lib/types/Message";
 	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
@@ -40,6 +40,7 @@
 	let stopRequested = $state(false);
 
 	let files: File[] = $state([]);
+	let retryMsgFiles: MessageFile[] | undefined;
 
 	let conversations = $state(data.conversations);
 	$effect(() => {
@@ -214,6 +215,8 @@
 				throw new Error("Message to write to not found");
 			}
 
+			const finalFiles = isRetry ? (retryMsgFiles ?? userMessage?.files) : base64Files;
+
 			const messageUpdatesAbortController = new AbortController();
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
@@ -223,7 +226,7 @@
 					inputs: prompt,
 					messageId,
 					isRetry,
-					files: isRetry ? userMessage?.files : base64Files,
+					files: finalFiles,
 					selectedMcpServerNames: $enabledServers.map((s) => s.name),
 					selectedMcpServers: $enabledServers.map((s) => ({
 						name: s.name,
@@ -453,8 +456,10 @@
 		await writeMessage({ prompt: content });
 	}
 
-	async function onRetry(payload: { id: Message["id"]; content?: string }) {
+	async function onRetry(payload: { id: Message["id"]; content?: string; files?: MessageFile[] }) {
 		if (requireAuthUser()) return;
+
+		retryMsgFiles = payload.files;
 
 		const lastMsgId = payload.id;
 		messagesPath = createMessagesPath(messages, lastMsgId);
@@ -464,6 +469,8 @@
 			messageId: payload.id,
 			isRetry: true,
 		});
+
+		retryMsgFiles = undefined;
 	}
 
 	async function onShowAlternateMsg(payload: { id: Message["id"] }) {

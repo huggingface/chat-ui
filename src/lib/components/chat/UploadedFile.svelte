@@ -2,9 +2,11 @@
 	import { page } from "$app/state";
 	import type { MessageFile } from "$lib/types/Message";
 	import CarbonClose from "~icons/carbon/close";
+	import CarbonPen from "~icons/carbon/pen";
 	import CarbonDocumentBlank from "~icons/carbon/document-blank";
 	import CarbonDownload from "~icons/carbon/download";
 	import CarbonDocument from "~icons/carbon/document";
+	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import Modal from "../Modal.svelte";
 	import AudioPlayer from "../players/AudioPlayer.svelte";
 	import EosIconsLoading from "~icons/eos-icons/loading";
@@ -15,9 +17,10 @@
 		file: MessageFile;
 		canClose?: boolean;
 		onclose?: () => void;
+		onedit?: (text: string) => void;
 	}
 
-	let { file, canClose = true, onclose }: Props = $props();
+	let { file, canClose = true, onclose, onedit }: Props = $props();
 
 	let showModal = $state(false);
 
@@ -61,6 +64,31 @@
 		mime === "application/vnd.chatui.clipboard" || matchesAllowed(mime, TEXT_MIME_ALLOWLIST);
 
 	let isClickable = $derived(isImage(file.mime) || isPlainText(file.mime));
+
+	function fromBase64Utf8(b64: string): string {
+		const binary = atob(b64);
+		const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+		return new TextDecoder("utf-8").decode(bytes);
+	}
+
+	async function getText(): Promise<string> {
+		if (file.type === "hash") {
+			const res = await fetch(urlNotTrailing + "/output/" + file.value);
+			return await res.text();
+		}
+		return fromBase64Utf8(file.value);
+	}
+
+	async function copyText() {
+		const text = await getText();
+		await navigator.clipboard.writeText(text);
+	}
+
+	async function editText() {
+		const text = await getText();
+		onedit?.(text);
+		showModal = false;
+	}
 </script>
 
 {#if showModal && isClickable}
@@ -95,10 +123,25 @@
 					</p>
 				{/if}
 				<button
-					class="absolute right-4 top-4 text-xl text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
-					onclick={() => (showModal = false)}
+					class="text-md absolute right-24 top-5 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
+					onclick={copyText}
 				>
-					<CarbonClose class="text-xl" />
+					<CopyToClipBoardBtn value="" />
+				</button>
+
+				<button
+					class="text-md absolute right-14 top-5 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
+					onclick={editText}
+					title="Edit"
+				>
+					<CarbonPen />
+				</button>
+				<button
+					class="absolute right-4 top-4 text-2xl text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
+					onclick={() => (showModal = false)}
+					title="Close"
+				>
+					<CarbonClose />
 				</button>
 				{#if file.type === "hash"}
 					{#await fetch(urlNotTrailing + "/output/" + file.value).then((res) => res.text())}
@@ -119,7 +162,7 @@
 						class:font-sans={file.mime === "text/plain" ||
 							file.mime === "application/vnd.chatui.clipboard"}
 						class:font-mono={file.mime !== "text/plain" &&
-							file.mime !== "application/vnd.chatui.clipboard"}>{atob(file.value)}</pre>
+							file.mime !== "application/vnd.chatui.clipboard"}>{fromBase64Utf8(file.value)}</pre>
 				{/if}
 			</div>
 		{/if}
