@@ -162,10 +162,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 				}
 			}
 
+			const isApi = event.url.pathname.startsWith(`${base}/api/`);
 			const auth = await authenticateRequest(
-				{ type: "svelte", value: event.request.headers },
-				{ type: "svelte", value: event.cookies },
-				event.url
+				event.request.headers,
+				event.cookies,
+				event.url,
+				isApi
 			);
 
 			event.locals.sessionId = auth.sessionId;

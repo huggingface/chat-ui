@@ -24,57 +24,58 @@
 
 	const publicConfig = usePublicConfig();
 	const settings = useSettingsStore();
+	const modelId = $derived(page.params.model ?? "");
 
 	// Functional bindings for nested settings (Svelte 5):
 	// Avoid binding directly to $settings.*[modelId]; write via store update
 	function getToolsOverride() {
 		return (
-			$settings.toolsOverrides?.[page.params.model] ??
+			$settings.toolsOverrides?.[modelId] ??
 			Boolean((model as unknown as { supportsTools?: boolean }).supportsTools)
 		);
 	}
 	function setToolsOverride(v: boolean) {
 		settings.update((s) => ({
 			...s,
-			toolsOverrides: { ...s.toolsOverrides, [page.params.model]: v },
+			toolsOverrides: { ...s.toolsOverrides, [modelId]: v },
 		}));
 	}
 	function getMultimodalOverride() {
-		return $settings.multimodalOverrides?.[page.params.model] ?? Boolean(model?.multimodal);
+		return $settings.multimodalOverrides?.[modelId] ?? Boolean(model?.multimodal);
 	}
 	function setMultimodalOverride(v: boolean) {
 		settings.update((s) => ({
 			...s,
-			multimodalOverrides: { ...s.multimodalOverrides, [page.params.model]: v },
+			multimodalOverrides: { ...s.multimodalOverrides, [modelId]: v },
 		}));
 	}
 	function getHidePromptExamples() {
-		return $settings.hidePromptExamples?.[page.params.model] ?? false;
+		return $settings.hidePromptExamples?.[modelId] ?? false;
 	}
 	function setHidePromptExamples(v: boolean) {
 		settings.update((s) => ({
 			...s,
-			hidePromptExamples: { ...s.hidePromptExamples, [page.params.model]: v },
+			hidePromptExamples: { ...s.hidePromptExamples, [modelId]: v },
 		}));
 	}
 
 	function getProviderOverride() {
-		return $settings.providerOverrides?.[page.params.model] ?? "auto";
+		return $settings.providerOverrides?.[modelId] ?? "auto";
 	}
 	function setProviderOverride(v: string) {
 		settings.update((s) => ({
 			...s,
-			providerOverrides: { ...s.providerOverrides, [page.params.model]: v },
+			providerOverrides: { ...s.providerOverrides, [modelId]: v },
 		}));
 	}
 
 	function getCustomPrompt() {
-		return $settings.customPrompts?.[page.params.model] ?? "";
+		return $settings.customPrompts?.[modelId] ?? "";
 	}
 	function setCustomPrompt(v: string) {
 		settings.update((s) => ({
 			...s,
-			customPrompts: { ...s.customPrompts, [page.params.model]: v },
+			customPrompts: { ...s.customPrompts, [modelId]: v },
 		}));
 	}
 
@@ -82,23 +83,23 @@
 
 	$effect(() => {
 		const defaultPreprompt =
-			page.data.models.find((el: BackendModel) => el.id === page.params.model)?.preprompt || "";
-		settings.initValue("customPrompts", page.params.model, defaultPreprompt);
+			page.data.models.find((el: BackendModel) => el.id === modelId)?.preprompt || "";
+		settings.initValue("customPrompts", modelId, defaultPreprompt);
 	});
 
 	let hasCustomPreprompt = $derived(
-		$settings.customPrompts[page.params.model] !==
-			page.data.models.find((el: BackendModel) => el.id === page.params.model)?.preprompt
+		$settings.customPrompts[modelId] !==
+			page.data.models.find((el: BackendModel) => el.id === modelId)?.preprompt
 	);
 
-	let model = $derived(page.data.models.find((el: BackendModel) => el.id === page.params.model));
+	let model = $derived(page.data.models.find((el: BackendModel) => el.id === modelId));
 	let providerList: RouterProvider[] = $derived((model?.providers ?? []) as RouterProvider[]);
 
 	// Initialize multimodal override for this model if not set yet
 	$effect(() => {
 		if (model) {
 			// Default to the model's advertised capability
-			settings.initValue("multimodalOverrides", page.params.model, !!model.multimodal);
+			settings.initValue("multimodalOverrides", modelId, !!model.multimodal);
 		}
 	});
 
@@ -107,7 +108,7 @@
 		if (model) {
 			settings.initValue(
 				"toolsOverrides",
-				page.params.model,
+				modelId,
 				Boolean((model as unknown as { supportsTools?: boolean }).supportsTools)
 			);
 		}
@@ -115,12 +116,12 @@
 
 	// Ensure hidePromptExamples has an entry for this model so the switch can bind safely
 	$effect(() => {
-		settings.initValue("hidePromptExamples", page.params.model, false);
+		settings.initValue("hidePromptExamples", modelId, false);
 	});
 
 	// Initialize provider override for this model (default to "auto")
 	$effect(() => {
-		settings.initValue("providerOverrides", page.params.model, "auto");
+		settings.initValue("providerOverrides", modelId, "auto");
 	});
 
 	// Provider selection policies for the dropdown
@@ -152,7 +153,7 @@
 			onclick={(e) => {
 				e.stopPropagation();
 				settings.instantSet({
-					activeModel: page.params.model,
+					activeModel: modelId,
 				});
 				goto(`${base}/`);
 			}}
@@ -200,13 +201,13 @@
 		{#if publicConfig.isHuggingChat}
 			{#if !model?.isRouter}
 				<a
-					href={"https://huggingface.co/playground?modelId=" + model.name}
+					href={"https://huggingface.co/" + model.name + "?inference_api=true"}
 					target="_blank"
 					rel="noreferrer"
 					class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
 				>
 					<CarbonCode class="mr-1.5 shrink-0 text-xs" />
-					API Playground
+					Use via API
 				</a>
 				<a
 					href={"https://huggingface.co/" + model.name}
@@ -245,7 +246,7 @@
 						e.stopPropagation();
 						settings.update((s) => ({
 							...s,
-							customPrompts: { ...s.customPrompts, [page.params.model]: model.preprompt },
+							customPrompts: { ...s.customPrompts, [modelId]: model.preprompt },
 						}));
 					}}
 				>

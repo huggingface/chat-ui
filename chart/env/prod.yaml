@@ -89,6 +89,8 @@ envVars:
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
   MODELS: >
     [
+      { "id": "Qwen/Qwen3-Coder-Next-FP8", "description": "FP8 Qwen3-Coder-Next for efficient inference with repository-scale coding agents." },
+      { "id": "arcee-ai/Trinity-Mini", "description": "Compact US-built MoE for multi-turn agents, tool use, and structured outputs." },
       { "id": "Qwen/Qwen3-Coder-Next", "description": "Ultra-sparse coding MoE for repository-scale agents with 256K context." },
       { "id": "moonshotai/Kimi-K2.5", "description": "Native multimodal agent with agent swarms for parallel tool orchestration." },
       { "id": "allenai/Molmo2-8B", "description": "Open vision-language model excelling at video understanding, pointing, and object tracking." },

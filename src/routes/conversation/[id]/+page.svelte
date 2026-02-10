@@ -29,12 +29,15 @@
 	import SubscribeModal from "$lib/components/SubscribeModal.svelte";
 	import { loading } from "$lib/stores/loading.js";
 	import { requireAuthUser } from "$lib/utils/auth.js";
+	import { isConversationGenerationActive } from "$lib/utils/generationState";
 
 	let { data = $bindable() } = $props();
 
+	let convId = $derived(page.params.id ?? "");
 	let pending = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
+	let stopRequested = $state(false);
 
 	let files: File[] = $state([]);
 
@@ -107,6 +110,7 @@
 		isRetry?: boolean;
 	}): Promise<void> {
 		try {
+			stopRequested = false;
 			$isAborted = false;
 			$loading = true;
 			pending = true;
@@ -213,7 +217,7 @@
 			const messageUpdatesAbortController = new AbortController();
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
-				page.params.id,
+				convId,
 				{
 					base,
 					inputs: prompt,
@@ -362,7 +366,7 @@
 
 						$titleUpdate = {
 							title: update.title,
-							convId: page.params.id,
+							convId,
 						};
 					}
 				} else if (update.type === MessageUpdateType.File) {
@@ -397,15 +401,30 @@
 	}
 
 	async function stopGeneration() {
-		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
-			method: "POST",
-		}).then(() => {
-			// Small delay to let the stream receive the server's final update before aborting client-side
-			setTimeout(() => {
-				$isAborted = true;
-				$loading = false;
-			}, 200);
-		});
+		stopRequested = true;
+		$isAborted = true;
+		$loading = false;
+
+		const sendStopRequest = async () => {
+			const response = await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
+				method: "POST",
+			});
+			if (!response.ok) {
+				throw new Error(`Stop request failed: ${response.status}`);
+			}
+		};
+
+		try {
+			await sendStopRequest();
+		} catch (firstErr) {
+			try {
+				await new Promise((resolve) => setTimeout(resolve, 300));
+				await sendStopRequest();
+			} catch (retryErr) {
+				console.error("Failed to stop generation", firstErr, retryErr);
+				$error = "Failed to stop generation. Please try again.";
+			}
+		}
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -423,9 +442,9 @@
 			$pendingMessage = undefined;
 		}
 
-		const streaming = isConversationStreaming(messages);
+		const streaming = isConversationGenerationActive(messages);
 		if (streaming) {
-			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
+			addBackgroundGeneration({ id: convId, startedAt: Date.now() });
 			$loading = true;
 		}
 	});
@@ -458,30 +477,23 @@
 		messages = data.messages;
 	});
 
-	function isConversationStreaming(msgs: Message[]): boolean {
-		const lastAssistant = [...msgs].reverse().find((msg) => msg.from === "assistant");
-		if (!lastAssistant) return false;
-		const hasFinalAnswer =
-			lastAssistant.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer) ??
-			false;
-		const hasError =
-			lastAssistant.updates?.some(
-				(update) =>
-					update.type === MessageUpdateType.Status && update.status === MessageUpdateStatus.Error
-			) ?? false;
-		return !hasFinalAnswer && !hasError;
-	}
+	$effect(() => {
+		page.params.id;
+		stopRequested = false;
+	});
 
 	$effect(() => {
-		const streaming = isConversationStreaming(messages);
-		if (streaming) {
+		const streaming = isConversationGenerationActive(messages);
+		if (stopRequested) {
+			$loading = false;
+		} else if (streaming) {
 			$loading = true;
 		} else if (!pending) {
 			$loading = false;
 		}
 
 		if (!streaming && browser) {
-			removeBackgroundGeneration(page.params.id);
+			removeBackgroundGeneration(convId);
 		}
 	});
 
