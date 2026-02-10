@@ -24,6 +24,11 @@
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { debounce } from "$lib/utils/debounce";
 
+	// Variant layout components
+	import SettingsLayoutTabbed from "$lib/components/settings/SettingsLayoutTabbed.svelte";
+	import SettingsLayoutGrouped from "$lib/components/settings/SettingsLayoutGrouped.svelte";
+	import SettingsLayoutCompact from "$lib/components/settings/SettingsLayoutCompact.svelte";
+
 	interface Props {
 		data: LayoutData;
 		children?: import("svelte").Snippet;
@@ -35,6 +40,9 @@
 	let showContent: boolean = $state(false);
 
 	let navContainer: HTMLDivElement | undefined = $state();
+
+	// Detect variant from query param: ?variant=a|b|c
+	let variant = $derived(page.url.searchParams.get("variant")?.toLowerCase() ?? "");
 
 	async function scrollSelectedModelIntoView() {
 		await tick();
@@ -62,7 +70,7 @@
 			page.url.pathname === `${base}/settings` &&
 			!page.url.pathname.endsWith("/application")
 		) {
-			goto(`${base}/settings/application`);
+			goto(`${base}/settings/application${variant ? `?variant=${variant}` : ""}`);
 		}
 	}
 
@@ -103,180 +111,197 @@
 	let queryTokens = $derived(normalize(modelFilter).trim().split(/\s+/).filter(Boolean));
 </script>
 
-<div
-	class="mx-auto grid h-full w-full max-w-[1400px] grid-cols-1 grid-rows-[auto,1fr] content-start gap-x-6 overflow-hidden p-4 text-gray-800 dark:text-gray-300 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-4"
->
-	<div class="col-span-1 mb-3 flex items-center justify-between md:col-span-3 md:mb-4">
-		{#if showContent && browser}
+<!-- Variant A: Tabbed Top Navigation -->
+{#if variant === "a"}
+	<SettingsLayoutTabbed {data} {children} {previousPage} />
+
+	<!-- Variant B: Grouped Sidebar with Categories -->
+{:else if variant === "b"}
+	<SettingsLayoutGrouped {data} {children} {previousPage} />
+
+	<!-- Variant C: Search-First Compact Layout -->
+{:else if variant === "c"}
+	<SettingsLayoutCompact {data} {children} {previousPage} />
+
+	<!-- Default: Original layout -->
+{:else}
+	<div
+		class="mx-auto grid h-full w-full max-w-[1400px] grid-cols-1 grid-rows-[auto,1fr] content-start gap-x-6 overflow-hidden p-4 text-gray-800 dark:text-gray-300 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-4"
+	>
+		<div class="col-span-1 mb-3 flex items-center justify-between md:col-span-3 md:mb-4">
+			{#if showContent && browser}
+				<button
+					class="btn rounded-lg md:hidden"
+					aria-label="Back to menu"
+					onclick={() => {
+						showContent = false;
+						goto(`${base}/settings`);
+					}}
+				>
+					<IconBurger
+						classNames="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white sm:hidden"
+					/>
+					<CarbonChevronLeft
+						class="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white max-sm:hidden"
+					/>
+				</button>
+			{/if}
+			<h2 class=" left-0 right-0 mx-auto w-fit text-center text-xl font-bold md:hidden">
+				Settings
+			</h2>
 			<button
-				class="btn rounded-lg md:hidden"
-				aria-label="Back to menu"
+				class="btn rounded-lg"
+				aria-label="Close settings"
 				onclick={() => {
-					showContent = false;
-					goto(`${base}/settings`);
+					goto(previousPage);
 				}}
 			>
-				<IconBurger
-					classNames="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white sm:hidden"
-				/>
-				<CarbonChevronLeft
-					class="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white max-sm:hidden"
+				<CarbonClose
+					class="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white"
 				/>
 			</button>
-		{/if}
-		<h2 class=" left-0 right-0 mx-auto w-fit text-center text-xl font-bold md:hidden">Settings</h2>
-		<button
-			class="btn rounded-lg"
-			aria-label="Close settings"
-			onclick={() => {
-				goto(previousPage);
-			}}
-		>
-			<CarbonClose
-				class="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white"
-			/>
-		</button>
-	</div>
-	{#if !(showContent && browser && !isDesktop(window))}
-		<div
-			class="scrollbar-custom col-span-1 flex flex-col overflow-y-auto whitespace-nowrap rounded-r-xl bg-gradient-to-l from-gray-50 to-10% dark:from-gray-700/40 max-md:-mx-4 max-md:h-full md:pr-6"
-			class:max-md:hidden={showContent && browser}
-			bind:this={navContainer}
-		>
-			<!-- Section Headers -->
-			<h3
-				class="px-3 pb-1 pt-2 text-xs font-semibold tracking-wide text-gray-600 dark:text-gray-400 md:text-left"
+		</div>
+		{#if !(showContent && browser && !isDesktop(window))}
+			<div
+				class="scrollbar-custom col-span-1 flex flex-col overflow-y-auto whitespace-nowrap rounded-r-xl bg-gradient-to-l from-gray-50 to-10% dark:from-gray-700/40 max-md:-mx-4 max-md:h-full md:pr-6"
+				class:max-md:hidden={showContent && browser}
+				bind:this={navContainer}
 			>
-				Models
-			</h3>
+				<!-- Section Headers -->
+				<h3
+					class="px-3 pb-1 pt-2 text-xs font-semibold tracking-wide text-gray-600 dark:text-gray-400 md:text-left"
+				>
+					Models
+				</h3>
 
-			<!-- Filter input -->
-			<div class="px-2 py-2">
-				<input
-					bind:value={modelFilter}
-					type="search"
-					placeholder="Search by name"
-					aria-label="Search models by name or id"
-					class="w-full rounded-full border border-gray-300 bg-white px-4 py-1 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:ring-gray-700"
-				/>
-			</div>
+				<!-- Filter input -->
+				<div class="px-2 py-2">
+					<input
+						bind:value={modelFilter}
+						type="search"
+						placeholder="Search by name"
+						aria-label="Search models by name or id"
+						class="w-full rounded-full border border-gray-300 bg-white px-4 py-1 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:ring-gray-700"
+					/>
+				</div>
 
-			{#each data.models
-				.filter((el) => !el.unlisted)
-				.filter((el) => {
-					const haystack = normalize(`${el.id} ${el.name ?? ""} ${el.displayName ?? ""}`);
-					return queryTokens.every((q) => haystack.includes(q));
-				}) as model}
+				{#each data.models
+					.filter((el) => !el.unlisted)
+					.filter((el) => {
+						const haystack = normalize(`${el.id} ${el.name ?? ""} ${el.displayName ?? ""}`);
+						return queryTokens.every((q) => haystack.includes(q));
+					}) as model}
+					<button
+						type="button"
+						onclick={() => goto(`${base}/settings/${model.id}`)}
+						class="group flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/60 md:rounded-xl md:px-3 {model.id ===
+						page.params.model
+							? '!bg-gray-100 !text-gray-800 dark:!bg-gray-700 dark:!text-gray-200'
+							: ''}"
+						data-model-id={model.id}
+						aria-label="Configure {model.displayName}"
+					>
+						<div class="mr-auto flex items-center gap-1 truncate">
+							<span class="truncate">{model.displayName}</span>
+							{#if model.isRouter}
+								<IconOmni />
+							{/if}
+						</div>
+
+						{#if publicConfig.isHuggingChat && !model.isRouter && $settings.providerOverrides?.[model.id] && $settings.providerOverrides[model.id] !== "auto"}
+							{@const providerOverride = $settings.providerOverrides[model.id]}
+							{@const hubOrg =
+								PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
+							{#if providerOverride === "fastest"}
+								<span
+									title="Provider: {providerOverride}"
+									class="grid size-[21px] flex-none place-items-center rounded-md bg-green-500/10 text-green-600 dark:text-green-500"
+									aria-label="Provider: {providerOverride}"
+									role="img"
+								>
+									<IconFast classNames="size-3" />
+								</span>
+							{:else if providerOverride === "cheapest"}
+								<span
+									title="Provider: {providerOverride}"
+									class="grid size-[21px] flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
+									aria-label="Provider: {providerOverride}"
+									role="img"
+								>
+									<IconCheap classNames="size-3" />
+								</span>
+							{:else if hubOrg}
+								<span
+									title="Provider: {providerOverride}"
+									class="flex size-[21px] flex-none items-center justify-center rounded-md bg-gray-500/10 p-[0.225rem]"
+								>
+									<img
+										src="https://huggingface.co/api/avatars/{hubOrg}"
+										alt={providerOverride}
+										class="size-full rounded"
+									/>
+								</span>
+							{/if}
+						{/if}
+
+						{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
+							<span
+								title="Tool calling supported"
+								class="grid size-[21px] flex-none place-items-center rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-500"
+								aria-label="Model supports tools"
+								role="img"
+							>
+								<LucideHammer class="size-3" />
+							</span>
+						{/if}
+
+						{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
+							<span
+								title="Multimodal support (image inputs)"
+								class="grid size-[21px] flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
+								aria-label="Model is multimodal"
+								role="img"
+							>
+								<LucideImage class="size-3" />
+							</span>
+						{/if}
+
+						{#if $settings.customPrompts?.[model.id]}
+							<CarbonTextLongParagraph
+								class="size-6 rounded-md border border-gray-300 p-1 text-gray-800 dark:border-gray-600 dark:text-gray-200"
+							/>
+						{/if}
+						{#if model.id === $settings.activeModel}
+							<div
+								class="flex h-[21px] items-center rounded-md bg-black/90 px-2 text-[11px] font-semibold leading-none text-white dark:bg-white dark:text-black"
+							>
+								Active
+							</div>
+						{/if}
+					</button>
+				{/each}
+
 				<button
 					type="button"
-					onclick={() => goto(`${base}/settings/${model.id}`)}
-					class="group flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/60 md:rounded-xl md:px-3 {model.id ===
-					page.params.model
+					onclick={() => goto(`${base}/settings/application`)}
+					class="group sticky bottom-0 mt-1 flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 dark:text-gray-300 max-md:order-first md:rounded-xl md:px-3 {page
+						.url.pathname === `${base}/settings/application`
 						? '!bg-gray-100 !text-gray-800 dark:!bg-gray-700 dark:!text-gray-200'
-						: ''}"
-					data-model-id={model.id}
-					aria-label="Configure {model.displayName}"
+						: 'bg-white dark:bg-gray-800'}"
+					aria-label="Configure application settings"
 				>
-					<div class="mr-auto flex items-center gap-1 truncate">
-						<span class="truncate">{model.displayName}</span>
-						{#if model.isRouter}
-							<IconOmni />
-						{/if}
-					</div>
-
-					{#if publicConfig.isHuggingChat && !model.isRouter && $settings.providerOverrides?.[model.id] && $settings.providerOverrides[model.id] !== "auto"}
-						{@const providerOverride = $settings.providerOverrides[model.id]}
-						{@const hubOrg =
-							PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
-						{#if providerOverride === "fastest"}
-							<span
-								title="Provider: {providerOverride}"
-								class="grid size-[21px] flex-none place-items-center rounded-md bg-green-500/10 text-green-600 dark:text-green-500"
-								aria-label="Provider: {providerOverride}"
-								role="img"
-							>
-								<IconFast classNames="size-3" />
-							</span>
-						{:else if providerOverride === "cheapest"}
-							<span
-								title="Provider: {providerOverride}"
-								class="grid size-[21px] flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
-								aria-label="Provider: {providerOverride}"
-								role="img"
-							>
-								<IconCheap classNames="size-3" />
-							</span>
-						{:else if hubOrg}
-							<span
-								title="Provider: {providerOverride}"
-								class="flex size-[21px] flex-none items-center justify-center rounded-md bg-gray-500/10 p-[0.225rem]"
-							>
-								<img
-									src="https://huggingface.co/api/avatars/{hubOrg}"
-									alt={providerOverride}
-									class="size-full rounded"
-								/>
-							</span>
-						{/if}
-					{/if}
-
-					{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
-						<span
-							title="Tool calling supported"
-							class="grid size-[21px] flex-none place-items-center rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-500"
-							aria-label="Model supports tools"
-							role="img"
-						>
-							<LucideHammer class="size-3" />
-						</span>
-					{/if}
-
-					{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
-						<span
-							title="Multimodal support (image inputs)"
-							class="grid size-[21px] flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
-							aria-label="Model is multimodal"
-							role="img"
-						>
-							<LucideImage class="size-3" />
-						</span>
-					{/if}
-
-					{#if $settings.customPrompts?.[model.id]}
-						<CarbonTextLongParagraph
-							class="size-6 rounded-md border border-gray-300 p-1 text-gray-800 dark:border-gray-600 dark:text-gray-200"
-						/>
-					{/if}
-					{#if model.id === $settings.activeModel}
-						<div
-							class="flex h-[21px] items-center rounded-md bg-black/90 px-2 text-[11px] font-semibold leading-none text-white dark:bg-white dark:text-black"
-						>
-							Active
-						</div>
-					{/if}
+					<IconGear class="mr-0.5 text-xxs" />
+					Application Settings
 				</button>
-			{/each}
-
-			<button
-				type="button"
-				onclick={() => goto(`${base}/settings/application`)}
-				class="group sticky bottom-0 mt-1 flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 dark:text-gray-300 max-md:order-first md:rounded-xl md:px-3 {page
-					.url.pathname === `${base}/settings/application`
-					? '!bg-gray-100 !text-gray-800 dark:!bg-gray-700 dark:!text-gray-200'
-					: 'bg-white dark:bg-gray-800'}"
-				aria-label="Configure application settings"
+			</div>
+		{/if}
+		{#if showContent}
+			<div
+				class="scrollbar-custom col-span-1 w-full overflow-y-auto overflow-x-clip px-1 md:col-span-2 md:row-span-2"
+				class:max-md:hidden={!showContent && browser}
 			>
-				<IconGear class="mr-0.5 text-xxs" />
-				Application Settings
-			</button>
-		</div>
-	{/if}
-	{#if showContent}
-		<div
-			class="scrollbar-custom col-span-1 w-full overflow-y-auto overflow-x-clip px-1 md:col-span-2 md:row-span-2"
-			class:max-md:hidden={!showContent && browser}
-		>
-			{@render children?.()}
-		</div>
-	{/if}
-</div>
+				{@render children?.()}
+			</div>
+		{/if}
+	</div>
+{/if}
