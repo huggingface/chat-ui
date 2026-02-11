@@ -79,6 +79,11 @@ envVars:
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
   MODELS: >
     [
+      { "id": "zai-org/GLM-5", "description": "Flagship 745B MoE for agentic reasoning, coding, and creative writing." },
+      { "id": "Qwen/Qwen3-VL-235B-A22B-Instruct", "description": "Flagship Qwen3 vision-language MoE for visual agents, documents, and GUI automation." },
+      { "id": "google/gemma-3n-E4B-it", "description": "Mobile-first multimodal Gemma handling text, images, video, and audio on-device." },
+      { "id": "nvidia/NVIDIA-Nemotron-Nano-9B-v2", "description": "Hybrid Mamba-Transformer with 128K context and controllable reasoning budget." },
+      { "id": "mistralai/Mistral-7B-Instruct-v0.2", "description": "Efficient 7B instruction model with 32K context for dialogue and coding." },
       { "id": "Qwen/Qwen3-Coder-Next-FP8", "description": "FP8 Qwen3-Coder-Next for efficient inference with repository-scale coding agents." },
       { "id": "arcee-ai/Trinity-Mini", "description": "Compact US-built MoE for multi-turn agents, tool use, and structured outputs." },
       { "id": "Qwen/Qwen3-Coder-Next", "description": "Ultra-sparse coding MoE for repository-scale agents with 256K context." },
