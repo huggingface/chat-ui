@@ -42,11 +42,24 @@
 
 <svelte:head>
 	{#if publicConfig.isHuggingChat}
-		<title>HuggingChat - Models</title>
-		<meta property="og:title" content="HuggingChat - Models" />
-		<meta property="og:type" content="link" />
-		<meta property="og:description" content="Browse HuggingChat available models" />
+		<title>{publicConfig.PUBLIC_APP_NAME} - Models</title>
+		<meta property="og:title" content="{publicConfig.PUBLIC_APP_NAME} - Models" />
+		<meta property="og:type" content="website" />
+		<meta
+			property="og:description"
+			content="Browse {publicConfig.PUBLIC_APP_NAME} available models"
+		/>
 		<meta property="og:url" content={page.url.href} />
+		<meta property="og:image" content="{publicConfig.assetPath}/thumbnail.png" />
+		<meta property="og:image:alt" content="{publicConfig.PUBLIC_APP_NAME} preview" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="{publicConfig.PUBLIC_APP_NAME} - Models" />
+		<meta
+			name="twitter:description"
+			content="Browse {publicConfig.PUBLIC_APP_NAME} available models"
+		/>
+		<meta name="twitter:image" content="{publicConfig.assetPath}/thumbnail.png" />
+		<meta name="twitter:image:alt" content="{publicConfig.PUBLIC_APP_NAME} preview" />
 	{/if}
 </svelte:head>
 
