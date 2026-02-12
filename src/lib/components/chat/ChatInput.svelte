@@ -129,8 +129,12 @@
 			textareaElement.focus();
 		}
 
-		// Retry if focus didn't take (e.g., app was still inert from a closing modal)
-		if (typeof document !== "undefined" && document.activeElement !== textareaElement) {
+		// Retry only when focus failed due to #app being inert (modal closing transition)
+		if (
+			typeof document !== "undefined" &&
+			document.activeElement !== textareaElement &&
+			document.getElementById("app")?.hasAttribute("inert")
+		) {
 			setTimeout(() => {
 				if (!textareaElement || textareaElement.disabled || isVirtualKeyboard()) return;
 				if (document.activeElement === textareaElement) return;
