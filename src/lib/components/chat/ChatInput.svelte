@@ -128,6 +128,19 @@
 		} catch {
 			textareaElement.focus();
 		}
+
+		// Retry if focus didn't take (e.g., app was still inert from a closing modal)
+		if (typeof document !== "undefined" && document.activeElement !== textareaElement) {
+			setTimeout(() => {
+				if (!textareaElement || textareaElement.disabled || isVirtualKeyboard()) return;
+				if (document.activeElement === textareaElement) return;
+				try {
+					textareaElement.focus({ preventScroll: true });
+				} catch {
+					textareaElement.focus();
+				}
+			}, 350);
+		}
 	}
 
 	function handleFetchedFiles(newFiles: File[]) {
