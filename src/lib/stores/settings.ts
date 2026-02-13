@@ -18,7 +18,6 @@ type SettingsStore = {
 	providerOverrides: Record<string, string>;
 	recentlySaved: boolean;
 	streamingMode: StreamingMode;
-	disableStream: boolean;
 	directPaste: boolean;
 	billingOrganization?: string;
 };

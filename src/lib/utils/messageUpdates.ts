@@ -99,15 +99,12 @@ export function applyStreamingMode(
 		return smoothStreamUpdates(iterator);
 	}
 
-	// "raw" and "final" both keep source stream intact; the consumer controls display behavior.
+	// "raw" keeps source stream intact.
 	return iterator;
 }
 
-export function resolveStreamingMode(s: {
-	streamingMode?: StreamingMode;
-	disableStream?: boolean;
-}): StreamingMode {
-	return s.streamingMode ?? (s.disableStream ? "final" : "smooth");
+export function resolveStreamingMode(s: { streamingMode?: unknown }): StreamingMode {
+	return s.streamingMode === "raw" || s.streamingMode === "smooth" ? s.streamingMode : "smooth";
 }
 
 async function* endpointStreamToIterator(
