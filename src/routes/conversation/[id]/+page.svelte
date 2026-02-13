@@ -14,7 +14,7 @@
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
-	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
+	import { fetchMessageUpdates, resolveStreamingMode } from "$lib/utils/messageUpdates";
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { enabledServers } from "$lib/stores/mcpServers";
@@ -215,6 +215,8 @@
 			}
 
 			const messageUpdatesAbortController = new AbortController();
+			const streamingMode = resolveStreamingMode($settings);
+			const streamVisible = streamingMode !== "final";
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				convId,
@@ -230,6 +232,7 @@
 						url: s.url,
 						headers: s.headers,
 					})),
+					streamingMode,
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {
@@ -241,6 +244,28 @@
 			let buffer = "";
 			// Initialize lastUpdateTime outside the loop to persist between updates
 			let lastUpdateTime = new Date();
+			let frameFlushScheduled = false;
+
+			const flushBuffer = (currentTime: Date) => {
+				if (buffer.length === 0) return;
+				messageToWriteTo.content += buffer;
+				buffer = "";
+				lastUpdateTime = currentTime;
+			};
+
+			const scheduleFrameFlush = () => {
+				if (frameFlushScheduled) return;
+				frameFlushScheduled = true;
+				const flush = () => {
+					frameFlushScheduled = false;
+					flushBuffer(new Date());
+				};
+				if (typeof requestAnimationFrame === "function") {
+					requestAnimationFrame(flush);
+				} else {
+					setTimeout(flush, 0);
+				}
+			};
 
 			for await (const update of messageUpdatesIterator) {
 				if ($isAborted) {
@@ -281,23 +306,22 @@
 				// If we receive a non-stream update (e.g. tool/status/final answer),
 				// flush any buffered stream tokens so the UI doesn't appear to cut
 				// mid-sentence while tools are running or the final answer arrives.
-				if (
-					update.type !== MessageUpdateType.Stream &&
-					!$settings.disableStream &&
-					buffer.length > 0
-				) {
-					messageToWriteTo.content += buffer;
-					buffer = "";
-					lastUpdateTime = currentTime;
+				if (update.type !== MessageUpdateType.Stream && streamVisible && buffer.length > 0) {
+					flushBuffer(currentTime);
 				}
 
-				if (update.type === MessageUpdateType.Stream && !$settings.disableStream) {
-					buffer += update.token;
-					// Check if this is the first update or if enough time has passed
-					if (currentTime.getTime() - lastUpdateTime.getTime() > updateDebouncer.maxUpdateTime) {
-						messageToWriteTo.content += buffer;
-						buffer = "";
-						lastUpdateTime = currentTime;
+				if (update.type === MessageUpdateType.Stream) {
+					if (streamVisible) {
+						buffer += update.token;
+						if (streamingMode === "smooth") {
+							// Coalesce UI updates to animation frames for smooth mode.
+							scheduleFrameFlush();
+						} else if (
+							currentTime.getTime() - lastUpdateTime.getTime() >
+							updateDebouncer.maxUpdateTime
+						) {
+							flushBuffer(currentTime);
+						}
 					}
 					pending = false;
 				} else if (update.type === MessageUpdateType.FinalAnswer) {
@@ -381,6 +405,10 @@
 						model: update.model,
 					};
 				}
+			}
+
+			if (streamVisible && buffer.length > 0) {
+				flushBuffer(new Date());
 			}
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {

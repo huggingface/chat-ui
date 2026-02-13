@@ -1,6 +1,7 @@
 import { browser } from "$app/environment";
 import { invalidate } from "$app/navigation";
 import { base } from "$app/paths";
+import type { StreamingMode } from "$lib/types/Settings";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { getContext, setContext } from "svelte";
 import { type Writable, writable, get } from "svelte/store";
@@ -16,6 +17,7 @@ type SettingsStore = {
 	hidePromptExamples: Record<string, boolean>;
 	providerOverrides: Record<string, string>;
 	recentlySaved: boolean;
+	streamingMode: StreamingMode;
 	disableStream: boolean;
 	directPaste: boolean;
 	billingOrganization?: string;

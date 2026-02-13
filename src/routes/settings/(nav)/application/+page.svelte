@@ -4,6 +4,7 @@
 	import CarbonLogoGithub from "~icons/carbon/logo-github";
 
 	import { useSettingsStore } from "$lib/stores/settings";
+	import type { StreamingMode } from "$lib/types/Settings";
 	import Switch from "$lib/components/Switch.svelte";
 
 	import { goto } from "$app/navigation";
@@ -26,11 +27,11 @@
 	function setShareWithAuthors(v: boolean) {
 		settings.update((s) => ({ ...s, shareConversationsWithModelAuthors: v }));
 	}
-	function getDisableStream() {
-		return $settings.disableStream;
+	function getStreamingMode() {
+		return $settings.streamingMode;
 	}
-	function setDisableStream(v: boolean) {
-		settings.update((s) => ({ ...s, disableStream: v }));
+	function setStreamingMode(v: StreamingMode) {
+		settings.update((s) => ({ ...s, streamingMode: v, disableStream: v === "final" }));
 	}
 	function getDirectPaste() {
 		return $settings.directPaste;
@@ -185,13 +186,21 @@
 				<div class="flex items-start justify-between py-3">
 					<div>
 						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-							Disable streaming tokens
+							Streaming mode
 						</div>
 						<p class="text-[12px] text-gray-500 dark:text-gray-400">
-							Show responses only when complete.
+							Choose how assistant text appears while generating.
 						</p>
 					</div>
-					<Switch name="disableStream" bind:checked={getDisableStream, setDisableStream} />
+					<select
+						class="rounded-md border border-gray-300 bg-white px-1 py-1 text-xs text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+						value={getStreamingMode()}
+						onchange={(e) => setStreamingMode(e.currentTarget.value as StreamingMode)}
+					>
+						<option value="smooth">Smooth stream</option>
+						<option value="raw">Raw stream</option>
+						<option value="final">Final only</option>
+					</select>
 				</div>
 
 				<div class="flex items-start justify-between py-3">

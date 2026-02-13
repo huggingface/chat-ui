@@ -1,7 +1,6 @@
 import type { MessageFile } from "$lib/types/Message";
 import {
 	type MessageUpdate,
-	type MessageStreamUpdate,
 	type MessageToolUpdate,
 	type MessageToolCallUpdate,
 	type MessageToolResultUpdate,
@@ -10,8 +9,7 @@ import {
 	MessageUpdateType,
 	MessageToolUpdateType,
 } from "$lib/types/MessageUpdate";
-
-import { page } from "$app/state";
+import type { StreamingMode } from "$lib/types/Settings";
 import type { KeyValuePair } from "$lib/types/Tool";
 
 type MessageUpdateRequestOptions = {
@@ -25,7 +23,22 @@ type MessageUpdateRequestOptions = {
 	selectedMcpServerNames?: string[];
 	// Optional: pass selected MCP server configs (for custom client-defined servers)
 	selectedMcpServers?: Array<{ name: string; url: string; headers?: KeyValuePair[] }>;
+	streamingMode?: StreamingMode;
 };
+
+type ChunkDetector = (buffer: string) => string | null;
+
+type SmoothStreamConfig = {
+	minDelayMs?: number;
+	maxDelayMs?: number;
+	minRateCharsPerMs?: number;
+	_internal?: {
+		now?: () => number;
+		sleep?: (ms: number) => Promise<void>;
+		detectChunk?: ChunkDetector;
+	};
+};
+
 export async function fetchMessageUpdates(
 	conversationId: string,
 	opts: MessageUpdateRequestOptions,
@@ -71,13 +84,29 @@ export async function fetchMessageUpdates(
 		throw Error("Body not defined");
 	}
 
-	if (!(page.data.publicConfig.PUBLIC_SMOOTH_UPDATES === "true")) {
-		return endpointStreamToIterator(response, abortController);
+	return applyStreamingMode(
+		endpointStreamToIterator(response, abortController),
+		opts.streamingMode ?? "smooth"
+	);
+}
+
+export function applyStreamingMode(
+	iterator: AsyncGenerator<MessageUpdate>,
+	streamingMode: StreamingMode
+): AsyncGenerator<MessageUpdate> {
+	if (streamingMode === "smooth") {
+		return smoothStreamUpdates(iterator);
 	}
 
-	return smoothAsyncIterator(
-		streamMessageUpdatesToFullWords(endpointStreamToIterator(response, abortController))
-	);
+	// "raw" and "final" both keep source stream intact; the consumer controls display behavior.
+	return iterator;
+}
+
+export function resolveStreamingMode(s: {
+	streamingMode?: StreamingMode;
+	disableStream?: boolean;
+}): StreamingMode {
+	return s.streamingMode ?? (s.disableStream ? "final" : "smooth");
 }
 
 async function* endpointStreamToIterator(
@@ -132,123 +161,129 @@ function parseMessageUpdates(value: string): {
 	return { messageUpdates, remainingText: "" };
 }
 
-/**
- * Emits all the message updates immediately that aren't "stream" type
- * Emits a concatenated "stream" type message update once it detects a full word
- * Example: "what" " don" "'t" => "what" " don't"
- * Only supports latin languages, ignores others
- */
-async function* streamMessageUpdatesToFullWords(
-	iterator: AsyncGenerator<MessageUpdate>
+export async function* smoothStreamUpdates(
+	iterator: AsyncGenerator<MessageUpdate>,
+	{
+		minDelayMs = 5,
+		maxDelayMs = 80,
+		minRateCharsPerMs = 0.3,
+		_internal: { now = () => performance.now(), sleep = defaultSleep, detectChunk } = {},
+	}: SmoothStreamConfig = {}
 ): AsyncGenerator<MessageUpdate> {
-	let bufferedStreamUpdates: MessageStreamUpdate[] = [];
-
-	const endAlphanumeric = /[a-zA-Z0-9À-ž'`]+$/;
-	const beginnningAlphanumeric = /^[a-zA-Z0-9À-ž'`]+/;
-
-	for await (const messageUpdate of iterator) {
-		if (messageUpdate.type !== "stream") {
-			// When a non-stream update (e.g. tool/status/final answer) arrives,
-			// flush any buffered stream tokens so the UI does not appear to
-			// "cut" mid-sentence while tools are running.
-			if (bufferedStreamUpdates.length > 0) {
-				yield {
-					type: MessageUpdateType.Stream,
-					token: bufferedStreamUpdates.map((u) => u.token).join(""),
-				};
-				bufferedStreamUpdates = [];
-			}
-			yield messageUpdate;
-			continue;
-		}
-		bufferedStreamUpdates.push(messageUpdate);
-
-		let lastIndexEmitted = 0;
-		for (let i = 1; i < bufferedStreamUpdates.length; i++) {
-			const prevEndsAlphanumeric = endAlphanumeric.test(bufferedStreamUpdates[i - 1].token);
-			const currBeginsAlphanumeric = beginnningAlphanumeric.test(bufferedStreamUpdates[i].token);
-			const shouldCombine = prevEndsAlphanumeric && currBeginsAlphanumeric;
-			const combinedTooMany = i - lastIndexEmitted >= 5;
-			if (shouldCombine && !combinedTooMany) continue;
-
-			// Combine tokens together and emit
-			yield {
-				type: MessageUpdateType.Stream,
-				token: bufferedStreamUpdates
-					.slice(lastIndexEmitted, i)
-					.map((_) => _.token)
-					.join(""),
-			};
-			lastIndexEmitted = i;
-		}
-		bufferedStreamUpdates = bufferedStreamUpdates.slice(lastIndexEmitted);
-	}
-	for (const messageUpdate of bufferedStreamUpdates) yield messageUpdate;
-}
-
-/**
- * Attempts to smooth out the time between values emitted by an async iterator
- * by waiting for the average time between values to emit the next value
- */
-async function* smoothAsyncIterator<T>(iterator: AsyncGenerator<T>): AsyncGenerator<T> {
+	const chunkDetector = detectChunk ?? createWordChunkDetector();
 	const eventTarget = new EventTarget();
-	let done = false;
-	const valuesBuffer: T[] = [];
-	const valueTimesMS: number[] = [];
+	const outputQueue: Array<{ update: MessageUpdate }> = [];
+	let producerDone = false;
+	let producerError: unknown = null;
+	let pendingBuffer = "";
 
-	const next = async () => {
-		const obj = await iterator.next();
-		if (obj.done) {
-			done = true;
-		} else {
-			valuesBuffer.push(obj.value);
-			valueTimesMS.push(performance.now());
-			next();
-		}
+	const enqueue = (update: MessageUpdate) => {
+		outputQueue.push({ update });
 		eventTarget.dispatchEvent(new Event("next"));
 	};
-	next();
 
-	let timeOfLastEmitMS = performance.now();
-	while (!done || valuesBuffer.length > 0) {
-		// Only consider the last X times between tokens
-		const sampledTimesMS = valueTimesMS.slice(-30);
+	const flushPendingBuffer = () => {
+		if (pendingBuffer.length === 0) return;
+		enqueue({ type: MessageUpdateType.Stream, token: pendingBuffer });
+		pendingBuffer = "";
+	};
 
-		// Get the total time spent in abnormal periods
-		const anomalyThresholdMS = 2000;
-		const anomalyDurationMS = sampledTimesMS
-			.map((time, i, times) => time - times[i - 1])
-			.slice(1)
-			.filter((time) => time > anomalyThresholdMS)
-			.reduce((a, b) => a + b, 0);
+	const producer = (async () => {
+		for await (const messageUpdate of iterator) {
+			if (messageUpdate.type !== MessageUpdateType.Stream) {
+				flushPendingBuffer();
+				enqueue(messageUpdate);
+				continue;
+			}
 
-		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-		const totalTimeMSBetweenValues = sampledTimesMS.at(-1)! - sampledTimesMS[0];
-		const timeMSBetweenValues = totalTimeMSBetweenValues - anomalyDurationMS;
+			if (!messageUpdate.token) continue;
 
-		const averageTimeMSBetweenValues = Math.min(
-			200,
-			timeMSBetweenValues / (sampledTimesMS.length - 1)
-		);
-		const timeSinceLastEmitMS = performance.now() - timeOfLastEmitMS;
+			pendingBuffer += messageUpdate.token;
+			let chunk: string | null;
+			while ((chunk = chunkDetector(pendingBuffer)) !== null) {
+				if (chunk.length === 0) break;
+				enqueue({ type: MessageUpdateType.Stream, token: chunk });
+				pendingBuffer = pendingBuffer.slice(chunk.length);
+			}
+		}
+		flushPendingBuffer();
+	})()
+		.catch((error) => {
+			producerError = error;
+		})
+		.finally(() => {
+			producerDone = true;
+			eventTarget.dispatchEvent(new Event("next"));
+		});
 
-		// Emit after waiting duration or cancel if "next" event is emitted
-		const gotNext = await Promise.race([
-			sleep(Math.max(5, averageTimeMSBetweenValues - timeSinceLastEmitMS)),
-			waitForEvent(eventTarget, "next"),
-		]);
+	// Character-rate targeting consumer
+	let totalCharsEmitted = 0;
+	let firstEmitAt: number | null = null;
 
-		// Go to next iteration so we can re-calculate when to emit
-		if (gotNext) continue;
+	while (!producerDone || outputQueue.length > 0) {
+		if (producerError) throw producerError;
+		if (outputQueue.length === 0) {
+			await waitForEvent(eventTarget, "next");
+			continue;
+		}
 
-		// Nothing in buffer to emit
-		if (valuesBuffer.length === 0) continue;
+		const next = outputQueue.shift();
+		if (!next) continue;
 
-		// Emit
-		timeOfLastEmitMS = performance.now();
-		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-		yield valuesBuffer.shift()!;
+		if (next.update.type === MessageUpdateType.Stream) {
+			const tokenLen = next.update.token.length;
+			totalCharsEmitted += tokenLen;
+
+			if (firstEmitAt === null) firstEmitAt = now();
+
+			const elapsedMs = now() - firstEmitAt;
+			const currentRate = elapsedMs > 0 ? totalCharsEmitted / elapsedMs : 0;
+			const targetRate = Math.max(currentRate, minRateCharsPerMs);
+			const rawDelay = tokenLen / targetRate;
+			const delayMs = Math.round(Math.max(minDelayMs, Math.min(maxDelayMs, rawDelay)));
+
+			if (delayMs > 0) {
+				await sleep(delayMs);
+			}
+		}
+
+		yield next.update;
 	}
+
+	await producer;
+}
+
+function createWordChunkDetector(): ChunkDetector {
+	if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
+		const segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
+		return (buffer: string): string | null => {
+			if (buffer.length === 0) return null;
+			let cursor = 0;
+			let boundary = 0;
+			let sawWordLike = false;
+
+			for (const part of segmenter.segment(buffer)) {
+				cursor += part.segment.length;
+				if (part.isWordLike) {
+					sawWordLike = true;
+					continue;
+				}
+				if (sawWordLike) {
+					boundary = cursor;
+					break;
+				}
+			}
+
+			return boundary > 0 ? buffer.slice(0, boundary) : null;
+		};
+	}
+
+	const wordWithTrailingBoundary = /\S+\s+/m;
+	return (buffer: string): string | null => {
+		const match = wordWithTrailingBoundary.exec(buffer);
+		if (!match) return null;
+		return buffer.slice(0, match.index) + match[0];
+	};
 }
 
 // Tool update type guards for UI rendering
@@ -271,7 +306,8 @@ export const isMessageToolProgressUpdate = (
 ): update is MessageToolProgressUpdate =>
 	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Progress;
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const defaultSleep = (ms: number): Promise<void> =>
+	new Promise((resolve) => setTimeout(resolve, ms));
 const waitForEvent = (eventTarget: EventTarget, eventName: string) =>
 	new Promise<boolean>((resolve) =>
 		eventTarget.addEventListener(eventName, () => resolve(true), { once: true })

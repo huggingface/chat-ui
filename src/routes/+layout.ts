@@ -25,6 +25,8 @@ interface SettingsResponse {
 	welcomeModalSeenAt: Date | null;
 	shareConversationsWithModelAuthors: boolean;
 	activeModel: string;
+	streamingMode: "final" | "raw" | "smooth";
+	/** @deprecated Use streamingMode instead */
 	disableStream: boolean;
 	directPaste: boolean;
 	customPrompts: Record<string, string>;
