@@ -150,6 +150,73 @@ describe("smoothStreamUpdates", () => {
 		).rejects.toThrow("source failed");
 	});
 
+	it("propagates source errors even when no full chunk was emitted yet", async () => {
+		async function* failingSource(): AsyncGenerator<MessageUpdate> {
+			yield { type: MessageUpdateType.Stream, token: "hel" };
+			throw new Error("source failed");
+		}
+
+		await expect(
+			collect(
+				smoothStreamUpdates(failingSource(), {
+					minDelayMs: 0,
+					maxDelayMs: 0,
+					_internal: { detectChunk: (buffer) => /\S+\s+/.exec(buffer)?.[0] ?? null },
+				})
+			)
+		).rejects.toThrow("source failed");
+	});
+
+	it("drains queued stream chunks before throwing source errors", async () => {
+		async function* failingSource(): AsyncGenerator<MessageUpdate> {
+			yield { type: MessageUpdateType.Stream, token: "a " };
+			yield { type: MessageUpdateType.Stream, token: "b " };
+			yield { type: MessageUpdateType.Stream, token: "c " };
+			throw new Error("source failed");
+		}
+
+		const seen: MessageUpdate[] = [];
+		let seenError: Error | null = null;
+		try {
+			for await (const update of smoothStreamUpdates(failingSource(), {
+				minDelayMs: 0,
+				maxDelayMs: 0,
+				_internal: { detectChunk: (buffer) => /\S+\s+/.exec(buffer)?.[0] ?? null },
+			})) {
+				seen.push(update);
+			}
+		} catch (error) {
+			seenError = error as Error;
+		}
+
+		expect(streamText(seen)).toBe("a b c ");
+		expect(seenError?.message).toBe("source failed");
+	});
+
+	it("caps burst tail latency with backlog acceleration", async () => {
+		const source: MessageUpdate[] = [
+			{ type: MessageUpdateType.Stream, token: "word ".repeat(500) },
+		];
+		let nowMs = 0;
+		await collect(
+			smoothStreamUpdates(fromArray(source), {
+				minDelayMs: 5,
+				maxDelayMs: 80,
+				minRateCharsPerMs: 0.3,
+				maxBufferedMs: 400,
+				_internal: {
+					now: () => nowMs,
+					sleep: async (ms: number) => {
+						nowMs += ms;
+					},
+					detectChunk: (buffer) => /\S+\s+/.exec(buffer)?.[0] ?? null,
+				},
+			})
+		);
+
+		expect(nowMs).toBeLessThan(1500);
+	});
+
 	it("skips empty tokens gracefully", async () => {
 		const source: MessageUpdate[] = [
 			{ type: MessageUpdateType.Stream, token: "" },

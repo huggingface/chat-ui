@@ -32,6 +32,7 @@ type SmoothStreamConfig = {
 	minDelayMs?: number;
 	maxDelayMs?: number;
 	minRateCharsPerMs?: number;
+	maxBufferedMs?: number;
 	_internal?: {
 		now?: () => number;
 		sleep?: (ms: number) => Promise<void>;
@@ -167,6 +168,7 @@ export async function* smoothStreamUpdates(
 		minDelayMs = 5,
 		maxDelayMs = 80,
 		minRateCharsPerMs = 0.3,
+		maxBufferedMs = 400,
 		_internal: { now = () => performance.now(), sleep = defaultSleep, detectChunk } = {},
 	}: SmoothStreamConfig = {}
 ): AsyncGenerator<MessageUpdate> {
@@ -176,8 +178,12 @@ export async function* smoothStreamUpdates(
 	let producerDone = false;
 	let producerError: unknown = null;
 	let pendingBuffer = "";
+	let queuedStreamChars = 0;
 
 	const enqueue = (update: MessageUpdate) => {
+		if (update.type === MessageUpdateType.Stream) {
+			queuedStreamChars += update.token.length;
+		}
 		outputQueue.push({ update });
 		eventTarget.dispatchEvent(new Event("next"));
 	};
@@ -221,7 +227,6 @@ export async function* smoothStreamUpdates(
 	let firstEmitAt: number | null = null;
 
 	while (!producerDone || outputQueue.length > 0) {
-		if (producerError) throw producerError;
 		if (outputQueue.length === 0) {
 			await waitForEvent(eventTarget, "next");
 			continue;
@@ -232,15 +237,20 @@ export async function* smoothStreamUpdates(
 
 		if (next.update.type === MessageUpdateType.Stream) {
 			const tokenLen = next.update.token.length;
+			queuedStreamChars = Math.max(0, queuedStreamChars - tokenLen);
 			totalCharsEmitted += tokenLen;
 
 			if (firstEmitAt === null) firstEmitAt = now();
 
 			const elapsedMs = now() - firstEmitAt;
 			const currentRate = elapsedMs > 0 ? totalCharsEmitted / elapsedMs : 0;
-			const targetRate = Math.max(currentRate, minRateCharsPerMs);
+			const backlogChars = tokenLen + queuedStreamChars;
+			const backlogRate = maxBufferedMs > 0 ? backlogChars / maxBufferedMs : 0;
+			const targetRate = Math.max(currentRate, minRateCharsPerMs, backlogRate);
 			const rawDelay = tokenLen / targetRate;
-			const delayMs = Math.round(Math.max(minDelayMs, Math.min(maxDelayMs, rawDelay)));
+			const underBacklogPressure = backlogRate > minRateCharsPerMs;
+			const effectiveMinDelayMs = underBacklogPressure ? 0 : minDelayMs;
+			const delayMs = Math.round(Math.max(effectiveMinDelayMs, Math.min(maxDelayMs, rawDelay)));
 
 			if (delayMs > 0) {
 				await sleep(delayMs);
@@ -251,6 +261,7 @@ export async function* smoothStreamUpdates(
 	}
 
 	await producer;
+	if (producerError) throw producerError;
 }
 
 function createWordChunkDetector(): ChunkDetector {
