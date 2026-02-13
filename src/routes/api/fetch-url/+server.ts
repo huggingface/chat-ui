@@ -1,10 +1,11 @@
 import { error } from "@sveltejs/kit";
 import { logger } from "$lib/server/logger.js";
 import { fetch } from "undici";
-import { isValidUrl } from "$lib/server/urlSafety";
+import { isValidUrl, assertResolvedUrlSafe } from "$lib/server/urlSafety";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const FETCH_TIMEOUT = 30000; // 30 seconds
+const MAX_REDIRECTS = 5;
 const SECURITY_HEADERS: HeadersInit = {
 	// Prevent any active content from executing if someone navigates directly to this endpoint.
 	"Content-Security-Policy":
@@ -28,16 +29,62 @@ export async function GET({ url }) {
 	}
 
 	try {
-		// Fetch with timeout
+		// Resolve DNS and verify the IP is not internal (prevents DNS rebinding)
+		await assertResolvedUrlSafe(targetUrl);
+
+		// Fetch with timeout, following redirects manually to validate each hop
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-		const response = await fetch(targetUrl, {
-			signal: controller.signal,
-			headers: {
-				"User-Agent": "HuggingChat-Attachment-Fetcher/1.0",
-			},
-		}).finally(() => clearTimeout(timeoutId));
+		let currentUrl = targetUrl;
+		let response: Awaited<ReturnType<typeof fetch>>;
+		let redirectCount = 0;
+
+		try {
+			// eslint-disable-next-line no-constant-condition
+			while (true) {
+				response = await fetch(currentUrl, {
+					signal: controller.signal,
+					redirect: "manual",
+					headers: {
+						"User-Agent": "HuggingChat-Attachment-Fetcher/1.0",
+					},
+				});
+
+				if (response.status >= 300 && response.status < 400) {
+					redirectCount++;
+					if (redirectCount > MAX_REDIRECTS) {
+						throw error(502, "Too many redirects");
+					}
+
+					const location = response.headers.get("location");
+					if (!location) {
+						throw error(502, "Redirect without Location header");
+					}
+
+					// Resolve relative redirects against the current URL
+					const redirectUrl = new URL(location, currentUrl).toString();
+
+					if (!isValidUrl(redirectUrl)) {
+						logger.warn(
+							{ redirectUrl, originalUrl: targetUrl },
+							"Redirect to unsafe URL blocked (SSRF)"
+						);
+						throw error(403, "Redirect target is not allowed");
+					}
+
+					// Also verify the resolved IP of the redirect target
+					await assertResolvedUrlSafe(redirectUrl);
+
+					currentUrl = redirectUrl;
+					continue;
+				}
+
+				break;
+			}
+		} finally {
+			clearTimeout(timeoutId);
+		}
 
 		if (!response.ok) {
 			logger.error({ targetUrl, response }, "Error fetching URL. Response not ok.");
