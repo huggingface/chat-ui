@@ -81,6 +81,7 @@
 		"highlight.js": "^11.7.0",
 		"htmlparser2": "^10.0.0",
 		"ip-address": "^9.0.5",
+		"ipaddr.js": "^2.3.0",
 		"jsdom": "^22.0.0",
 		"json5": "^2.2.3",
 		"katex": "^0.16.21",

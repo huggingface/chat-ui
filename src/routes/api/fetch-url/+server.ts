@@ -1,7 +1,7 @@
 import { error } from "@sveltejs/kit";
 import { logger } from "$lib/server/logger.js";
 import { fetch } from "undici";
-import { isValidUrl } from "$lib/server/urlSafety";
+import { isValidUrlWithDNS } from "$lib/server/urlSafety";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const FETCH_TIMEOUT = 30000; // 30 seconds
@@ -22,7 +22,7 @@ export async function GET({ url }) {
 		throw error(400, "Missing 'url' parameter");
 	}
 
-	if (!isValidUrl(targetUrl)) {
+	if (!(await isValidUrlWithDNS(targetUrl))) {
 		logger.warn({ targetUrl }, "Invalid or unsafe URL (only HTTPS is supported)");
 		throw error(400, "Invalid or unsafe URL (only HTTPS is supported)");
 	}
