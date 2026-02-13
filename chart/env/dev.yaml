@@ -79,6 +79,7 @@ envVars:
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
   MODELS: >
     [
+      { "id": "MiniMaxAI/MiniMax-M2.5", "description": "Frontier 230B MoE agent for top-tier coding, tool calling, and fast inference." },
       { "id": "zai-org/GLM-5", "description": "Flagship 745B MoE for agentic reasoning, coding, and creative writing." },
       { "id": "Qwen/Qwen3-VL-235B-A22B-Instruct", "description": "Flagship Qwen3 vision-language MoE for visual agents, documents, and GUI automation." },
       { "id": "google/gemma-3n-E4B-it", "description": "Mobile-first multimodal Gemma handling text, images, video, and audio on-device." },
