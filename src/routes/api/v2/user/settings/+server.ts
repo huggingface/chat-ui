@@ -5,7 +5,25 @@ import { authCondition } from "$lib/server/auth";
 import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { defaultModel, models, validateModel } from "$lib/server/models";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
+import { resolveStreamingMode } from "$lib/utils/messageUpdates";
 import { z } from "zod";
+
+const settingsSchema = z.object({
+	shareConversationsWithModelAuthors: z
+		.boolean()
+		.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
+	welcomeModalSeen: z.boolean().optional(),
+	activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
+	customPrompts: z.record(z.string()).default({}),
+	multimodalOverrides: z.record(z.boolean()).default({}),
+	toolsOverrides: z.record(z.boolean()).default({}),
+	providerOverrides: z.record(z.string()).default({}),
+	streamingMode: z.enum(["final", "raw", "smooth"]).optional(),
+	disableStream: z.boolean().optional(),
+	directPaste: z.boolean().default(false),
+	hidePromptExamples: z.record(z.boolean()).default({}),
+	billingOrganization: z.string().optional(),
+});
 
 export const GET: RequestHandler = async ({ locals }) => {
 	requireAuth(locals);
@@ -29,12 +47,15 @@ export const GET: RequestHandler = async ({ locals }) => {
 		});
 	}
 
+	const streamingMode = resolveStreamingMode(settings ?? {});
+
 	return superjsonResponse({
 		welcomeModalSeen: !!settings?.welcomeModalSeenAt,
 		welcomeModalSeenAt: settings?.welcomeModalSeenAt ?? null,
 
 		activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
-		disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
+		streamingMode,
+		disableStream: streamingMode === "final",
 		directPaste: settings?.directPaste ?? DEFAULT_SETTINGS.directPaste,
 		hidePromptExamples: settings?.hidePromptExamples ?? DEFAULT_SETTINGS.hidePromptExamples,
 		shareConversationsWithModelAuthors:
@@ -53,23 +74,14 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	requireAuth(locals);
 	const body = await request.json();
 
-	const { welcomeModalSeen, ...settings } = z
-		.object({
-			shareConversationsWithModelAuthors: z
-				.boolean()
-				.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
-			welcomeModalSeen: z.boolean().optional(),
-			activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
-			customPrompts: z.record(z.string()).default({}),
-			multimodalOverrides: z.record(z.boolean()).default({}),
-			toolsOverrides: z.record(z.boolean()).default({}),
-			providerOverrides: z.record(z.string()).default({}),
-			disableStream: z.boolean().default(false),
-			directPaste: z.boolean().default(false),
-			hidePromptExamples: z.record(z.boolean()).default({}),
-			billingOrganization: z.string().optional(),
-		})
-		.parse(body) satisfies SettingsEditable;
+	const { welcomeModalSeen, ...parsedSettings } = settingsSchema.parse(body);
+	const streamingMode = resolveStreamingMode(parsedSettings);
+
+	const settings = {
+		...parsedSettings,
+		streamingMode,
+		disableStream: streamingMode === "final",
+	} satisfies SettingsEditable;
 
 	await collections.settings.updateOne(
 		authCondition(locals),

@@ -66,6 +66,7 @@ describe("GET /api/v2/user/settings", () => {
 		expect(data).toMatchObject({
 			welcomeModalSeen: false,
 			welcomeModalSeenAt: null,
+			streamingMode: "smooth",
 			disableStream: false,
 			directPaste: false,
 			shareConversationsWithModelAuthors: true,
@@ -76,14 +77,15 @@ describe("GET /api/v2/user/settings", () => {
 		});
 	});
 
-	it("returns stored settings", async () => {
+	it("returns stored settings with canonical streaming mode", async () => {
 		const { user, locals } = await createTestUser();
 
 		await collections.settings.insertOne({
 			userId: user._id,
 			shareConversationsWithModelAuthors: false,
 			activeModel: "custom-model",
-			disableStream: true,
+			streamingMode: "raw",
+			disableStream: false,
 			directPaste: true,
 			customPrompts: { "my-model": "Be helpful" },
 			multimodalOverrides: {},
@@ -101,9 +103,44 @@ describe("GET /api/v2/user/settings", () => {
 		expect(data).toMatchObject({
 			welcomeModalSeen: true,
 			shareConversationsWithModelAuthors: false,
-			disableStream: true,
+			streamingMode: "raw",
+			disableStream: false,
 			directPaste: true,
 			customPrompts: { "my-model": "Be helpful" },
+		});
+	});
+
+	it("maps legacy disableStream=true to streamingMode=final", async () => {
+		const { user, locals } = await createTestUser();
+
+		const legacySettingsWithoutStreamingMode = {
+			userId: user._id,
+			shareConversationsWithModelAuthors: true,
+			activeModel: "custom-model",
+			disableStream: true,
+			directPaste: false,
+			customPrompts: {},
+			multimodalOverrides: {},
+			toolsOverrides: {},
+			hidePromptExamples: {},
+			providerOverrides: {},
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		};
+
+		// Simulate pre-migration documents that did not include `streamingMode`.
+		await collections.settings.insertOne(
+			legacySettingsWithoutStreamingMode as unknown as Parameters<
+				typeof collections.settings.insertOne
+			>[0]
+		);
+
+		const res = await settingsGET(mockRequestEvent(locals));
+		const data = await parseResponse<Record<string, unknown>>(res);
+
+		expect(data).toMatchObject({
+			streamingMode: "final",
+			disableStream: true,
 		});
 	});
 });
@@ -118,6 +155,41 @@ describe("POST /api/v2/user/settings", () => {
 
 		const body = {
 			shareConversationsWithModelAuthors: false,
+			activeModel: "test-model",
+			customPrompts: {},
+			multimodalOverrides: {},
+			toolsOverrides: {},
+			providerOverrides: {},
+			streamingMode: "raw",
+			directPaste: false,
+			hidePromptExamples: {},
+		};
+
+		const res = await settingsPOST(
+			mockRequestEvent(locals, {
+				request: new Request("http://localhost", {
+					method: "POST",
+					body: JSON.stringify(body),
+					headers: { "Content-Type": "application/json" },
+				}),
+			})
+		);
+
+		expect(res.status).toBe(200);
+
+		const stored = await collections.settings.findOne({ userId: user._id });
+		expect(stored).not.toBeNull();
+		expect(stored?.shareConversationsWithModelAuthors).toBe(false);
+		expect(stored?.streamingMode).toBe("raw");
+		expect(stored?.disableStream).toBe(false);
+		expect(stored?.createdAt).toBeInstanceOf(Date);
+		expect(stored?.updatedAt).toBeInstanceOf(Date);
+	});
+
+	it("accepts legacy disableStream and normalizes to streamingMode", async () => {
+		const { user, locals } = await createTestUser();
+		const body = {
+			shareConversationsWithModelAuthors: true,
 			activeModel: "test-model",
 			customPrompts: {},
 			multimodalOverrides: {},
@@ -142,10 +214,8 @@ describe("POST /api/v2/user/settings", () => {
 
 		const stored = await collections.settings.findOne({ userId: user._id });
 		expect(stored).not.toBeNull();
-		expect(stored?.shareConversationsWithModelAuthors).toBe(false);
+		expect(stored?.streamingMode).toBe("final");
 		expect(stored?.disableStream).toBe(true);
-		expect(stored?.createdAt).toBeInstanceOf(Date);
-		expect(stored?.updatedAt).toBeInstanceOf(Date);
 	});
 
 	it("sets welcomeModalSeenAt when welcomeModalSeen is true", async () => {
@@ -159,7 +229,7 @@ describe("POST /api/v2/user/settings", () => {
 			multimodalOverrides: {},
 			toolsOverrides: {},
 			providerOverrides: {},
-			disableStream: false,
+			streamingMode: "smooth",
 			directPaste: false,
 			hidePromptExamples: {},
 		};
@@ -201,6 +271,7 @@ describe("POST /api/v2/user/settings", () => {
 		expect(stored).not.toBeNull();
 		// Zod defaults should be applied
 		expect(stored?.shareConversationsWithModelAuthors).toBe(true);
+		expect(stored?.streamingMode).toBe("smooth");
 		expect(stored?.disableStream).toBe(false);
 		expect(stored?.directPaste).toBe(false);
 		expect(stored?.customPrompts).toEqual({});
