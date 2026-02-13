@@ -32,6 +32,9 @@
 	import { isPro } from "$lib/stores/isPro";
 	import IconPro from "$lib/components/icons/IconPro.svelte";
 	import MCPServerManager from "./mcp/MCPServerManager.svelte";
+	import CarbonCube from "~icons/carbon/cube";
+	import LucideHammer from "~icons/lucide/hammer";
+	import CarbonSettings from "~icons/carbon/settings";
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
@@ -173,10 +176,15 @@
 >
 	{#if user?.username || user?.email}
 		<div
-			class="group flex items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 first:hover:bg-transparent dark:hover:bg-gray-700 first:dark:hover:bg-transparent"
+			class="group flex h-9 items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 first:hover:bg-transparent dark:hover:bg-gray-700 first:dark:hover:bg-transparent"
 		>
+			<img
+				src="https://huggingface.co/api/users/{user.username}/avatar?redirect=true"
+				class="size-4 rounded-full border bg-gray-500 dark:border-white/40"
+				alt=""
+			/>
 			<span
-				class="flex h-9 flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
+				class="flex flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
 				>{user?.username || user?.email}</span
 			>
 
@@ -198,14 +206,6 @@
 					PRO
 				</span>
 			{/if}
-
-			<img
-				src="https://huggingface.co/api/users/{user.username}/avatar?redirect=true"
-				class="{!(publicConfig.isHuggingChat && $isPro !== null)
-					? 'ml-auto'
-					: ''} size-4 rounded-full border bg-gray-500 dark:border-white/40"
-				alt=""
-			/>
 		</div>
 	{/if}
 	<a
@@ -213,6 +213,7 @@
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		onclick={handleNavItemClick}
 	>
+		<CarbonCube class="size-4" />
 		Models
 		<span
 			class="ml-auto rounded-md bg-gray-500/5 px-1.5 py-0.5 text-xs text-gray-400 dark:bg-gray-500/20 dark:text-gray-400"
@@ -225,6 +226,7 @@
 			onclick={() => (showMcpModal = true)}
 			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
+			<LucideHammer class="size-4" />
 			MCP Servers
 			{#if $enabledServersCount > 0}
 				<span
@@ -242,6 +244,7 @@
 			class="flex h-9 flex-none flex-grow items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 			onclick={handleNavItemClick}
 		>
+			<CarbonSettings class="size-4" />
 			Settings
 		</a>
 		<button
