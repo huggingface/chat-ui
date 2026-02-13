@@ -18,8 +18,7 @@ const settingsSchema = z.object({
 	multimodalOverrides: z.record(z.boolean()).default({}),
 	toolsOverrides: z.record(z.boolean()).default({}),
 	providerOverrides: z.record(z.string()).default({}),
-	streamingMode: z.enum(["final", "raw", "smooth"]).optional(),
-	disableStream: z.boolean().optional(),
+	streamingMode: z.enum(["raw", "smooth"]).optional(),
 	directPaste: z.boolean().default(false),
 	hidePromptExamples: z.record(z.boolean()).default({}),
 	billingOrganization: z.string().optional(),
@@ -55,7 +54,6 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 		activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
 		streamingMode,
-		disableStream: streamingMode === "final",
 		directPaste: settings?.directPaste ?? DEFAULT_SETTINGS.directPaste,
 		hidePromptExamples: settings?.hidePromptExamples ?? DEFAULT_SETTINGS.hidePromptExamples,
 		shareConversationsWithModelAuthors:
@@ -80,7 +78,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	const settings = {
 		...parsedSettings,
 		streamingMode,
-		disableStream: streamingMode === "final",
 	} satisfies SettingsEditable;
 
 	await collections.settings.updateOne(

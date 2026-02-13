@@ -31,7 +31,7 @@
 		return $settings.streamingMode;
 	}
 	function setStreamingMode(v: StreamingMode) {
-		settings.update((s) => ({ ...s, streamingMode: v, disableStream: v === "final" }));
+		settings.update((s) => ({ ...s, streamingMode: v }));
 	}
 	function getDirectPaste() {
 		return $settings.directPaste;
@@ -199,7 +199,6 @@
 					>
 						<option value="smooth">Smooth stream</option>
 						<option value="raw">Raw stream</option>
-						<option value="final">Final only</option>
 					</select>
 				</div>
 

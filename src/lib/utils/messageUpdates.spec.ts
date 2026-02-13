@@ -234,37 +234,29 @@ describe("smoothStreamUpdates", () => {
 });
 
 describe("applyStreamingMode", () => {
-	it("keeps stream unchanged for raw and final modes", async () => {
+	it("keeps stream unchanged for raw mode", async () => {
 		const source: MessageUpdate[] = [
 			{ type: MessageUpdateType.Stream, token: "Hello" },
 			{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished },
 		];
 
 		const raw = await collect(applyStreamingMode(fromArray(source), "raw"));
-		const final = await collect(applyStreamingMode(fromArray(source), "final"));
 
 		expect(raw).toEqual(source);
-		expect(final).toEqual(source);
 	});
 });
 
 describe("resolveStreamingMode", () => {
 	it("returns explicit streamingMode when set", () => {
 		expect(resolveStreamingMode({ streamingMode: "raw" })).toBe("raw");
-		expect(resolveStreamingMode({ streamingMode: "final" })).toBe("final");
 		expect(resolveStreamingMode({ streamingMode: "smooth" })).toBe("smooth");
 	});
 
-	it("falls back to 'final' when disableStream is true", () => {
-		expect(resolveStreamingMode({ disableStream: true })).toBe("final");
-	});
-
-	it("falls back to 'smooth' when disableStream is false or unset", () => {
-		expect(resolveStreamingMode({ disableStream: false })).toBe("smooth");
+	it("defaults to smooth when unset", () => {
 		expect(resolveStreamingMode({})).toBe("smooth");
 	});
 
-	it("explicit streamingMode takes precedence over disableStream", () => {
-		expect(resolveStreamingMode({ streamingMode: "raw", disableStream: true })).toBe("raw");
+	it("maps unsupported legacy values to smooth", () => {
+		expect(resolveStreamingMode({ streamingMode: "final" })).toBe("smooth");
 	});
 });

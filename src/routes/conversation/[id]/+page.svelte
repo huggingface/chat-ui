@@ -216,7 +216,6 @@
 
 			const messageUpdatesAbortController = new AbortController();
 			const streamingMode = resolveStreamingMode($settings);
-			const streamVisible = streamingMode !== "final";
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				convId,
@@ -306,22 +305,20 @@
 				// If we receive a non-stream update (e.g. tool/status/final answer),
 				// flush any buffered stream tokens so the UI doesn't appear to cut
 				// mid-sentence while tools are running or the final answer arrives.
-				if (update.type !== MessageUpdateType.Stream && streamVisible && buffer.length > 0) {
+				if (update.type !== MessageUpdateType.Stream && buffer.length > 0) {
 					flushBuffer(currentTime);
 				}
 
 				if (update.type === MessageUpdateType.Stream) {
-					if (streamVisible) {
-						buffer += update.token;
-						if (streamingMode === "smooth") {
-							// Coalesce UI updates to animation frames for smooth mode.
-							scheduleFrameFlush();
-						} else if (
-							currentTime.getTime() - lastUpdateTime.getTime() >
-							updateDebouncer.maxUpdateTime
-						) {
-							flushBuffer(currentTime);
-						}
+					buffer += update.token;
+					if (streamingMode === "smooth") {
+						// Coalesce UI updates to animation frames for smooth mode.
+						scheduleFrameFlush();
+					} else if (
+						currentTime.getTime() - lastUpdateTime.getTime() >
+						updateDebouncer.maxUpdateTime
+					) {
+						flushBuffer(currentTime);
 					}
 					pending = false;
 				} else if (update.type === MessageUpdateType.FinalAnswer) {
@@ -407,7 +404,7 @@
 				}
 			}
 
-			if (streamVisible && buffer.length > 0) {
+			if (buffer.length > 0) {
 				flushBuffer(new Date());
 			}
 		} catch (err) {
