@@ -32,9 +32,6 @@
 	import { isPro } from "$lib/stores/isPro";
 	import IconPro from "$lib/components/icons/IconPro.svelte";
 	import MCPServerManager from "./mcp/MCPServerManager.svelte";
-	import CarbonCube from "~icons/carbon/cube";
-	import LucideHammer from "~icons/lucide/hammer";
-	import CarbonSettings from "~icons/carbon/settings";
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
@@ -213,7 +210,6 @@
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		onclick={handleNavItemClick}
 	>
-		<CarbonCube class="size-4" />
 		Models
 		<span
 			class="ml-auto rounded-md bg-gray-500/5 px-1.5 py-0.5 text-xs text-gray-400 dark:bg-gray-500/20 dark:text-gray-400"
@@ -226,7 +222,6 @@
 			onclick={() => (showMcpModal = true)}
 			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
-			<LucideHammer class="size-4" />
 			MCP Servers
 			{#if $enabledServersCount > 0}
 				<span
@@ -244,7 +239,6 @@
 			class="flex h-9 flex-none flex-grow items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 			onclick={handleNavItemClick}
 		>
-			<CarbonSettings class="size-4" />
 			Settings
 		</a>
 		<button
