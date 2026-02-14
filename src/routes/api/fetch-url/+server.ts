@@ -1,7 +1,8 @@
 import { error } from "@sveltejs/kit";
 import { logger } from "$lib/server/logger.js";
-import { fetch } from "undici";
-import { isValidUrl, assertResolvedUrlSafe } from "$lib/server/urlSafety";
+import { Agent, fetch } from "undici";
+import { isValidUrl, assertSafeIp } from "$lib/server/urlSafety";
+import dns from "node:dns";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const FETCH_TIMEOUT = 30000; // 30 seconds
@@ -14,6 +15,36 @@ const SECURITY_HEADERS: HeadersInit = {
 	"X-Frame-Options": "DENY",
 	"Referrer-Policy": "no-referrer",
 };
+
+/**
+ * Undici dispatcher that validates resolved IPs at connection time,
+ * preventing TOCTOU DNS rebinding attacks.
+ */
+const ssrfSafeAgent = new Agent({
+	connect: {
+		lookup: (hostname, options, callback) => {
+			dns.lookup(hostname, options, (err, address, family) => {
+				if (err) return callback(err, "", 4);
+				if (typeof address === "string") {
+					try {
+						assertSafeIp(address, hostname);
+					} catch (e) {
+						return callback(e as Error, "", 4);
+					}
+				} else if (Array.isArray(address)) {
+					for (const entry of address) {
+						try {
+							assertSafeIp(entry.address, hostname);
+						} catch (e) {
+							return callback(e as Error, "", 4);
+						}
+					}
+				}
+				return callback(null, address, family);
+			});
+		},
+	},
+});
 
 export async function GET({ url }) {
 	const targetUrl = url.searchParams.get("url");
@@ -28,108 +59,89 @@ export async function GET({ url }) {
 		throw error(400, "Invalid or unsafe URL (only HTTPS is supported)");
 	}
 
+	// Fetch with timeout, following redirects manually to validate each hop
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+	let currentUrl = targetUrl;
+	let response: Awaited<ReturnType<typeof fetch>>;
+	let redirectCount = 0;
+
 	try {
-		// Resolve DNS and verify the IP is not internal (prevents DNS rebinding)
-		await assertResolvedUrlSafe(targetUrl);
+		// eslint-disable-next-line no-constant-condition
+		while (true) {
+			response = await fetch(currentUrl, {
+				signal: controller.signal,
+				redirect: "manual",
+				dispatcher: ssrfSafeAgent,
+				headers: {
+					"User-Agent": "HuggingChat-Attachment-Fetcher/1.0",
+				},
+			});
 
-		// Fetch with timeout, following redirects manually to validate each hop
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-
-		let currentUrl = targetUrl;
-		let response: Awaited<ReturnType<typeof fetch>>;
-		let redirectCount = 0;
-
-		try {
-			// eslint-disable-next-line no-constant-condition
-			while (true) {
-				response = await fetch(currentUrl, {
-					signal: controller.signal,
-					redirect: "manual",
-					headers: {
-						"User-Agent": "HuggingChat-Attachment-Fetcher/1.0",
-					},
-				});
-
-				if (response.status >= 300 && response.status < 400) {
-					redirectCount++;
-					if (redirectCount > MAX_REDIRECTS) {
-						throw error(502, "Too many redirects");
-					}
-
-					const location = response.headers.get("location");
-					if (!location) {
-						throw error(502, "Redirect without Location header");
-					}
-
-					// Resolve relative redirects against the current URL
-					const redirectUrl = new URL(location, currentUrl).toString();
-
-					if (!isValidUrl(redirectUrl)) {
-						logger.warn(
-							{ redirectUrl, originalUrl: targetUrl },
-							"Redirect to unsafe URL blocked (SSRF)"
-						);
-						throw error(403, "Redirect target is not allowed");
-					}
-
-					// Also verify the resolved IP of the redirect target
-					await assertResolvedUrlSafe(redirectUrl);
-
-					currentUrl = redirectUrl;
-					continue;
+			if (response.status >= 300 && response.status < 400) {
+				redirectCount++;
+				if (redirectCount > MAX_REDIRECTS) {
+					throw error(502, "Too many redirects");
 				}
 
-				break;
-			}
-		} finally {
-			clearTimeout(timeoutId);
-		}
+				const location = response.headers.get("location");
+				if (!location) {
+					throw error(502, "Redirect without Location header");
+				}
 
-		if (!response.ok) {
-			logger.error({ targetUrl, response }, "Error fetching URL. Response not ok.");
-			throw error(response.status, `Failed to fetch: ${response.statusText}`);
-		}
+				// Resolve relative redirects against the current URL
+				const redirectUrl = new URL(location, currentUrl).toString();
 
-		// Check content length if available
-		const contentLength = response.headers.get("content-length");
-		if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
-			throw error(413, "File too large (max 10MB)");
-		}
+				if (!isValidUrl(redirectUrl)) {
+					logger.warn(
+						{ redirectUrl, originalUrl: targetUrl },
+						"Redirect to unsafe URL blocked (SSRF)"
+					);
+					throw error(403, "Redirect target is not allowed");
+				}
 
-		// Stream the response back
-		const originalContentType = response.headers.get("content-type") || "application/octet-stream";
-		// Send as text/plain for safety; expose the original type via secondary header
-		const safeContentType = "text/plain; charset=utf-8";
-		const contentDisposition = response.headers.get("content-disposition");
-
-		const headers: HeadersInit = {
-			"Content-Type": safeContentType,
-			"X-Forwarded-Content-Type": originalContentType,
-			"Cache-Control": "public, max-age=3600",
-			...(contentDisposition ? { "Content-Disposition": contentDisposition } : {}),
-			...SECURITY_HEADERS,
-		};
-
-		// Get the body as array buffer to check size
-		const arrayBuffer = await response.arrayBuffer();
-
-		if (arrayBuffer.byteLength > MAX_FILE_SIZE) {
-			throw error(413, "File too large (max 10MB)");
-		}
-
-		return new Response(arrayBuffer, { headers });
-	} catch (err) {
-		if (err instanceof Error) {
-			if (err.name === "AbortError") {
-				logger.error(err, "Request timeout");
-				throw error(504, "Request timeout");
+				currentUrl = redirectUrl;
+				continue;
 			}
 
-			logger.error(err, "Error fetching URL");
-			throw error(500, `Failed to fetch URL: ${err.message}`);
+			break;
 		}
-		logger.error(err, "Error fetching URL");
-		throw error(500, "Failed to fetch URL.");
+	} finally {
+		clearTimeout(timeoutId);
 	}
+
+	if (!response.ok) {
+		logger.error({ targetUrl, response }, "Error fetching URL. Response not ok.");
+		throw error(response.status, `Failed to fetch: ${response.statusText}`);
+	}
+
+	// Check content length if available
+	const contentLength = response.headers.get("content-length");
+	if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
+		throw error(413, "File too large (max 10MB)");
+	}
+
+	// Stream the response back
+	const originalContentType = response.headers.get("content-type") || "application/octet-stream";
+	// Send as text/plain for safety; expose the original type via secondary header
+	const safeContentType = "text/plain; charset=utf-8";
+	const contentDisposition = response.headers.get("content-disposition");
+
+	const headers: HeadersInit = {
+		"Content-Type": safeContentType,
+		"X-Forwarded-Content-Type": originalContentType,
+		"Cache-Control": "public, max-age=3600",
+		...(contentDisposition ? { "Content-Disposition": contentDisposition } : {}),
+		...SECURITY_HEADERS,
+	};
+
+	// Get the body as array buffer to check size
+	const arrayBuffer = await response.arrayBuffer();
+
+	if (arrayBuffer.byteLength > MAX_FILE_SIZE) {
+		throw error(413, "File too large (max 10MB)");
+	}
+
+	return new Response(arrayBuffer, { headers });
 }

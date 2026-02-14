@@ -1,22 +1,39 @@
+import { Address4, Address6 } from "ip-address";
 import { isIP } from "node:net";
-import dns from "node:dns";
-import ipaddr from "ipaddr.js";
 
-const UNSAFE_IP_RANGES = new Set(["unspecified", "loopback", "private", "linkLocal"]);
+const UNSAFE_IPV4_SUBNETS = [
+	"0.0.0.0/8",
+	"10.0.0.0/8",
+	"100.64.0.0/10",
+	"127.0.0.0/8",
+	"169.254.0.0/16",
+	"172.16.0.0/12",
+	"192.168.0.0/16",
+].map((s) => new Address4(s));
 
 function isUnsafeIp(address: string): boolean {
-	const parsed = ipaddr.parse(address);
-	// Handle IPv4-mapped IPv6 addresses (e.g. ::ffff:127.0.0.1)
-	const effective =
-		parsed.kind() === "ipv6" && (parsed as ipaddr.IPv6).isIPv4MappedAddress()
-			? (parsed as ipaddr.IPv6).toIPv4Address()
-			: parsed;
-	return UNSAFE_IP_RANGES.has(effective.range());
+	const family = isIP(address);
+
+	if (family === 4) {
+		const addr = new Address4(address);
+		return UNSAFE_IPV4_SUBNETS.some((subnet) => addr.isInSubnet(subnet));
+	}
+
+	if (family === 6) {
+		const addr = new Address6(address);
+		// Check IPv4-mapped IPv6 addresses (e.g. ::ffff:127.0.0.1)
+		if (addr.is4()) {
+			const v4 = addr.to4();
+			return UNSAFE_IPV4_SUBNETS.some((subnet) => v4.isInSubnet(subnet));
+		}
+		return addr.isLoopback() || addr.isLinkLocal();
+	}
+
+	return true; // Unknown format → block
 }
 
 /**
  * Synchronous URL validation: checks protocol and hostname string.
- * Use `isResolvedUrlSafe` for DNS-resolved IP checks.
  */
 export function isValidUrl(urlString: string): boolean {
 	try {
@@ -29,8 +46,9 @@ export function isValidUrl(urlString: string): boolean {
 			return false;
 		}
 		// If the hostname is a raw IP literal, validate it
-		if (isIP(hostname.replace(/^\[|]$/g, ""))) {
-			return !isUnsafeIp(hostname.replace(/^\[|]$/g, ""));
+		const cleanHostname = hostname.replace(/^\[|]$/g, "");
+		if (isIP(cleanHostname)) {
+			return !isUnsafeIp(cleanHostname);
 		}
 		return true;
 	} catch {
@@ -39,26 +57,12 @@ export function isValidUrl(urlString: string): boolean {
 }
 
 /**
- * Resolve a URL's hostname via DNS and reject internal IPs.
- * Throws if the resolved IP is internal (SSRF protection against DNS rebinding).
+ * Assert that a resolved IP address is safe (not internal/private).
+ * Throws if the IP is internal. Used in undici's custom DNS lookup
+ * to validate IPs at connection time (prevents TOCTOU DNS rebinding).
  */
-export async function assertResolvedUrlSafe(urlString: string): Promise<void> {
-	const { hostname } = new URL(urlString);
-	const cleanHostname = hostname.replace(/^\[|]$/g, "");
-
-	// If already an IP literal, check directly
-	if (isIP(cleanHostname)) {
-		if (isUnsafeIp(cleanHostname)) {
-			throw new Error(`Resolved IP for ${hostname} is internal`);
-		}
-		return;
-	}
-
-	// DNS lookup to get actual IP
-	const addresses = await dns.promises.lookup(cleanHostname, { all: true });
-	for (const { address } of addresses) {
-		if (isUnsafeIp(address)) {
-			throw new Error(`Resolved IP for ${hostname} is internal (${address})`);
-		}
+export function assertSafeIp(address: string, hostname: string): void {
+	if (isUnsafeIp(address)) {
+		throw new Error(`Resolved IP for ${hostname} is internal (${address})`);
 	}
 }
