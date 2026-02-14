@@ -246,11 +246,11 @@
 			>
 		{/if}
 	</div>
-	<div class="flex items-center">
+	<div class="-mr-3 flex items-center">
 		{#if isHuggingChat}
 			<button
 				type="button"
-				class="flex size-8 shrink-0 items-center justify-center text-lg"
+				class="flex size-12 shrink-0 items-center justify-center text-lg"
 				disabled={!canShare}
 				onclick={() => {
 					if (!canShare) return;
@@ -263,7 +263,7 @@
 		{/if}
 		<a
 			href="{base}/"
-			class="flex size-8 shrink-0 items-center justify-center text-lg"
+			class="flex size-12 shrink-0 items-center justify-center text-lg"
 			onclick={(e) => {
 				if (requireAuthUser()) {
 					e.preventDefault();
