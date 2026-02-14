@@ -150,7 +150,7 @@
 </div>
 
 <div
-	class="scrollbar-custom scrollbar-hover flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:border-transparent dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
+	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pb-3 pt-2 text-[.9rem] md:scrollbar-thumb-transparent md:hover:scrollbar-thumb-black/10 dark:border-transparent dark:from-gray-800/30 dark:md:hover:scrollbar-thumb-white/10 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
 	<div class="flex flex-col gap-0.5">
 		{#each Object.entries(groupedConversations) as [group, convs]}
