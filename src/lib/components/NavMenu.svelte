@@ -177,7 +177,7 @@
 		>
 			<img
 				src="https://huggingface.co/api/users/{user.username}/avatar?redirect=true"
-				class="size-4 rounded-full border bg-gray-500 dark:border-white/40"
+				class="size-3.5 rounded-full border bg-gray-500 dark:border-white/40"
 				alt=""
 			/>
 			<span
