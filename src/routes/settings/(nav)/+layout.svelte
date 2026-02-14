@@ -177,7 +177,19 @@
 					data-model-id={model.id}
 					aria-label="Configure {model.displayName}"
 				>
-					<div class="mr-auto flex items-center gap-1 truncate">
+					<div class="mr-auto flex items-center gap-1.5 truncate">
+						{#if model.logoUrl}
+							<img
+								alt=""
+								src={model.logoUrl}
+								class="size-5 flex-none rounded border border-gray-200 bg-gray-50 object-cover dark:border-gray-700 dark:bg-gray-100"
+							/>
+						{:else}
+							<div
+								class="size-5 flex-none rounded border border-gray-200 bg-gray-200 dark:border-gray-700 dark:bg-gray-700"
+								aria-hidden="true"
+							></div>
+						{/if}
 						<span class="truncate">{model.displayName}</span>
 						{#if model.isRouter}
 							<IconOmni />
