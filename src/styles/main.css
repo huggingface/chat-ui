@@ -66,6 +66,36 @@ body {
 		border-bottom: theme("spacing.2") solid transparent; /* 0.5rem */
 	}
 
+	/* Nav scrollbar: hidden by default on desktop, visible on hover */
+	@media (min-width: 768px) {
+		.scrollbar-hover {
+			scrollbar-color: transparent transparent;
+		}
+		.scrollbar-hover:hover {
+			scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+		}
+		.scrollbar-hover::-webkit-scrollbar-thumb {
+			background-color: transparent;
+		}
+		.scrollbar-hover:hover::-webkit-scrollbar-thumb {
+			background-color: rgba(0, 0, 0, 0.1);
+		}
+	}
+	@media (min-width: 768px) {
+		.dark .scrollbar-hover {
+			scrollbar-color: transparent transparent;
+		}
+		.dark .scrollbar-hover:hover {
+			scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+		}
+		.dark .scrollbar-hover::-webkit-scrollbar-thumb {
+			background-color: transparent;
+		}
+		.dark .scrollbar-hover:hover::-webkit-scrollbar-thumb {
+			background-color: rgba(255, 255, 255, 0.1);
+		}
+	}
+
 	/* Rounded left/right caps for horizontal scrollbars */
 	.scrollbar-custom::-webkit-scrollbar-track:horizontal {
 		@apply rounded-full bg-clip-padding;
