@@ -1,0 +1,79 @@
+name: Screenshots
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on:
+      group: aws-general-8-plus
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg INCLUDE_DB=true \
+            -t chat-ui-screenshots:latest .
+
+      - name: Start Docker container
+        run: |
+          export DOTENV_LOCAL=$(<.env.ci)
+          docker run -d --rm --network=host \
+            --name chat-ui-screenshots \
+            -e DOTENV_LOCAL="$DOTENV_LOCAL" \
+            chat-ui-screenshots:latest
+
+      - name: Wait for server to start
+        run: |
+          for i in {1..20}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ | grep -q "200"; then
+              echo "Server is up"
+              exit 0
+            fi
+            echo "Waiting for server... (attempt $i)"
+            sleep 3
+          done
+          echo "Server did not start in time"
+          docker logs chat-ui-screenshots
+          exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Create screenshots directory
+        run: mkdir -p e2e/screenshots
+
+      - name: Take screenshots
+        run: npx playwright test --config playwright.config.ts
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: e2e/screenshots/
+          retention-days: 30
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/test-results/
+          retention-days: 7
+
+      - name: Stop Docker container
+        if: always()
+        run: |
+          docker stop chat-ui-screenshots || true

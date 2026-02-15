@@ -17,3 +17,5 @@ models/*
 !models/add-your-models-here.txt
 .claude/*
 !.claude/skills/
+e2e/screenshots/
+e2e/test-results/
