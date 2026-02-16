@@ -211,8 +211,9 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 		// 2. Don't scroll if user has detached and we're not navigating
 		if (isDetached && !navigating.to) return;
 
-		// 3. Don't scroll if user is actively scrolling
-		if (userScrolling) return;
+		// 3. Don't scroll while actively scrolling only if user detached.
+		// If still attached, keep following generation so we don't lag behind.
+		if (userScrolling && isDetached) return;
 
 		// 4. Early return if already at bottom and no content change (perf optimization for streaming)
 		const currentHeight = node.scrollHeight;
@@ -248,6 +249,17 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 			return;
 		}
 
+		// Avoid entering prolonged "user scrolling" debounce loops while already
+		// attached and scrolling downward. This helps token streaming keep up.
+		if (deltaY > 0 && !isDetached) {
+			if (isAtBottom()) {
+				userScrolling = false;
+				clearUserScrollTimeout();
+				scrollToBottom();
+				return;
+			}
+		}
+
 		scheduleUserScrollEndCheck();
 	};
 
@@ -268,6 +280,16 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 		// User is scrolling down (finger moving up) - check for re-attachment immediately
 		if (deltaY > TOUCH_DETACH_THRESHOLD_PX && isAtBottom()) {
 			isDetached = false;
+			userScrolling = false;
+			clearUserScrollTimeout();
+			scrollToBottom();
+			touchStartY = touchY;
+			return;
+		}
+
+		// Same as wheel: when user is effectively following the stream downward,
+		// avoid long debounce states that block updates.
+		if (deltaY > TOUCH_DETACH_THRESHOLD_PX && !isDetached && isAtBottom()) {
 			userScrolling = false;
 			clearUserScrollTimeout();
 			scrollToBottom();
