@@ -99,7 +99,7 @@ body {
 	}
 
 	.prose code:not(pre code) {
-		@apply rounded-md bg-gray-100 px-[0.4em] py-[0.2em] text-[85%] dark:bg-gray-800;
+		@apply rounded-md bg-gray-200/60 px-[0.4em] py-[0.2em] text-[85%] dark:bg-gray-700;
 	}
 
 	.prose code:not(pre code)::before,
