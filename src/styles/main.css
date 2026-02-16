@@ -98,6 +98,10 @@ body {
 		@apply border-[0.5px] bg-white text-gray-600 dark:border-gray-700 dark:!bg-gray-900 dark:bg-inherit dark:text-inherit;
 	}
 
+	.prose :where(code):not(:where(pre code, [class~="not-prose"], [class~="not-prose"] *)) {
+		@apply rounded-md bg-gray-100 px-1.5 py-0.5 text-[0.85em] font-normal before:content-none after:content-none dark:bg-gray-800;
+	}
+
 	/* Override prose-sm title sizes - 75% of original */
 	.prose-sm :where(h1):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
 		font-size: 1.6em; /* 75% */
