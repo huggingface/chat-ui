@@ -15,7 +15,7 @@ export async function createConversationFromShare(
 	userAgent?: string
 ): Promise<string> {
 	const conversation = await collections.sharedConversations.findOne({
-		_id: fromShareId,
+		_id: { $eq: fromShareId },
 	});
 
 	if (!conversation) {
