@@ -611,6 +611,18 @@ export async function* runMcpFlow({
 				return "aborted";
 			}
 
+			// Auto-close any unclosed <think> block so reasoning from this loop
+			// doesn't swallow content from subsequent iterations.  The client-side
+			// regex matches `<think>` to end-of-string, so an unclosed block would
+			// hide everything that follows.
+			if (thinkOpen) {
+				if (streamedContent) {
+					yield { type: MessageUpdateType.Stream, token: "</think>" };
+				}
+				lastAssistantContent += "</think>";
+				thinkOpen = false;
+			}
+
 			if (Object.keys(toolCallState).length > 0) {
 				// If any streamed call is missing id, perform a quick non-stream retry to recover full tool_calls with ids
 				const missingId = Object.values(toolCallState).some((c) => c?.name && !c?.id);
