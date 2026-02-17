@@ -14,6 +14,7 @@ import {
 import { getClient } from "$lib/server/mcp/clientPool";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/sdk/client";
+import { isBuiltinTool, executeBuiltinTool } from "../builtinTools";
 
 export type Primitive = string | number | boolean;
 
@@ -196,6 +197,35 @@ export async function* executeToolCalls({
 				subtype: MessageToolUpdateType.Error,
 				uuid: p.uuid,
 				message,
+			});
+			return;
+		}
+
+		// Handle built-in tools locally without MCP server dispatch
+		if (isBuiltinTool(p.call.name)) {
+			const builtinResult = executeBuiltinTool(p.call.name, p.argsObj);
+			results.push({
+				index,
+				output: builtinResult.text,
+				structured: builtinResult.structured,
+				uuid: p.uuid,
+				paramsClean: p.paramsClean,
+			});
+			updatesQueue.push({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: p.uuid,
+				result: {
+					status: ToolResultStatus.Success,
+					call: { name: p.call.name, parameters: p.paramsClean },
+					outputs: [
+						{
+							text: builtinResult.text,
+							structured: builtinResult.structured,
+						} as unknown as Record<string, unknown>,
+					],
+					display: true,
+				},
 			});
 			return;
 		}
