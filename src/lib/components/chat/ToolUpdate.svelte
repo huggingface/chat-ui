@@ -13,7 +13,6 @@
 	import { page } from "$app/state";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import BlockWrapper from "./BlockWrapper.svelte";
-	import ToolGallery from "./ToolGallery.svelte";
 
 	interface Props {
 		tool: MessageToolUpdate[];
@@ -111,38 +110,6 @@
 	let iconRing = $derived(
 		toolError ? "ring-red-200 dark:ring-red-500/30" : "ring-purple-200 dark:ring-purple-500/30"
 	);
-
-	interface GalleryData {
-		title?: string;
-		items: Array<{
-			url: string;
-			media_type: "image" | "video" | "audio";
-			title?: string;
-			description?: string;
-			thumbnail_url?: string;
-		}>;
-	}
-
-	let galleryData = $derived.by((): GalleryData | undefined => {
-		for (const update of tool) {
-			if (!isMessageToolResultUpdate(update)) continue;
-			if (update.result.status !== ToolResultStatus.Success) continue;
-			for (const output of update.result.outputs) {
-				const structured = (output as Record<string, unknown>)["structured"];
-				if (
-					typeof structured === "object" &&
-					structured !== null &&
-					(structured as Record<string, unknown>)["type"] === "gallery"
-				) {
-					const data = structured as { title?: string; items?: unknown[] };
-					if (Array.isArray(data.items) && data.items.length > 0) {
-						return data as GalleryData;
-					}
-				}
-			}
-		}
-		return undefined;
-	});
 </script>
 
 {#snippet icon()}
@@ -196,11 +163,6 @@
 				/>
 			</button>
 		</div>
-
-		<!-- Gallery rendered prominently outside accordion -->
-		{#if galleryData}
-			<ToolGallery title={galleryData.title} items={galleryData.items} />
-		{/if}
 
 		<!-- Expandable content -->
 		{#if isOpen}

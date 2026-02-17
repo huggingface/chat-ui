@@ -4,7 +4,6 @@ import { getMcpServers } from "$lib/server/mcp/registry";
 import { isValidUrl } from "$lib/server/urlSafety";
 import { resetMcpToolsCache } from "$lib/server/mcp/tools";
 import { getOpenAiToolsForMcp } from "$lib/server/mcp/tools";
-import { BUILTIN_TOOLS } from "../builtinTools";
 import type {
 	ChatCompletionChunk,
 	ChatCompletionCreateParamsStreaming,
@@ -135,8 +134,8 @@ export async function* runMcpFlow({
 		// ignore selection merge errors and proceed with env servers
 	}
 
-	// If selection/merge yielded no servers AND no built-in tools, bail early
-	if (servers.length === 0 && BUILTIN_TOOLS.length === 0) {
+	// If selection/merge yielded no servers, bail early with clearer log
+	if (servers.length === 0) {
 		logger.warn({}, "[mcp] no MCP servers selected after merge/name filter");
 		return "not_applicable";
 	}
@@ -161,7 +160,7 @@ export async function* runMcpFlow({
 			}
 		} catch {}
 	}
-	if (servers.length === 0 && BUILTIN_TOOLS.length === 0) {
+	if (servers.length === 0) {
 		logger.warn({}, "[mcp] all selected MCP servers rejected by URL safety guard");
 		return "not_applicable";
 	}
@@ -290,18 +289,16 @@ export async function* runMcpFlow({
 	}
 
 	try {
-		const { tools: oaTools, mapping } =
-			servers.length > 0
-				? await getOpenAiToolsForMcp(servers, { signal: abortSignal })
-				: { tools: [], mapping: {} };
-		const allTools = [...oaTools, ...BUILTIN_TOOLS];
+		const { tools: oaTools, mapping } = await getOpenAiToolsForMcp(servers, {
+			signal: abortSignal,
+		});
 		try {
 			logger.info(
-				{ toolCount: allTools.length, toolNames: allTools.map((t) => t.function.name) },
+				{ toolCount: oaTools.length, toolNames: oaTools.map((t) => t.function.name) },
 				"[mcp] openai tool defs built"
 			);
 		} catch {}
-		if (allTools.length === 0) {
+		if (oaTools.length === 0) {
 			logger.warn({}, "[mcp] zero tools available after listing; skipping MCP flow");
 			return "not_applicable";
 		}
@@ -339,7 +336,7 @@ export async function* runMcpFlow({
 				mmEnabled,
 				route: resolvedRoute,
 				candidateModelId,
-				toolCount: allTools.length,
+				toolCount: oaTools.length,
 				hasUserToken: Boolean((locals as unknown as { token?: string })?.token),
 			},
 			"[mcp] starting completion with tools"
@@ -349,7 +346,7 @@ export async function* runMcpFlow({
 			imageProcessor,
 			mmEnabled
 		);
-		const toolPreprompt = buildToolPreprompt(allTools);
+		const toolPreprompt = buildToolPreprompt(oaTools);
 		const prepromptPieces: string[] = [];
 		if (toolPreprompt.trim().length > 0) {
 			prepromptPieces.push(toolPreprompt);
@@ -416,7 +413,7 @@ export async function* runMcpFlow({
 				typeof parameters?.presence_penalty === "number" ? parameters.presence_penalty : undefined,
 			stop: stopSequences,
 			max_tokens: typeof maxTokens === "number" ? maxTokens : undefined,
-			tools: allTools,
+			tools: oaTools,
 			tool_choice: "auto",
 		};
 
