@@ -39,7 +39,6 @@ Tests are split into three workspaces (configured in vite.config.ts):
 ### Stack
 
 - **SvelteKit 2** with Svelte 5 (uses runes: `$state`, `$effect`, `$bindable`)
-- **Elysia** for API routes at `/api/v2`
 - **MongoDB** for persistence (auto-fallback to in-memory with MongoMemoryServer when `MONGODB_URL` not set)
 - **TailwindCSS** for styling
 
@@ -50,7 +49,7 @@ src/
 ├── lib/
 │   ├── components/       # Svelte components (chat/, mcp/, voice/, icons/)
 │   ├── server/
-│   │   ├── api/routes/   # Elysia API endpoints (conversations, user, models, misc, debug)
+│   │   ├── api/utils/       # Shared API helpers (auth, superjson, model/conversation resolvers)
 │   │   ├── textGeneration/  # LLM streaming pipeline
 │   │   ├── mcp/          # Model Context Protocol integration
 │   │   ├── router/       # Smart model routing (Omni)
@@ -63,7 +62,8 @@ src/
 ├── routes/               # SvelteKit file-based routing
 │   ├── conversation/[id]/  # Chat page + streaming endpoint
 │   ├── settings/         # User settings pages
-│   ├── api/v2/[...slugs]/ # Elysia router mount point
+│   ├── api/              # Legacy v1 API endpoints (mcp, transcribe, fetch-url)
+│   ├── api/v2/           # REST API endpoints (+server.ts)
 │   └── r/[id]/           # Shared conversation view
 ```
 
@@ -113,14 +113,13 @@ See `.env` for full list of variables including router config, MCP servers, auth
 - ESLint: no `any`, no non-null assertions
 - Prettier: tabs, 100 char width, Tailwind class sorting
 - Server vs client separation via SvelteKit conventions (`+page.server.ts` vs `+page.ts`)
-- Path alias: `$api` → `src/lib/server/api`
 
 ## Feature Development Checklist
 
 When building new features, consider:
 
 1. **HuggingChat vs self-hosted**: Wrap HuggingChat-specific features with `publicConfig.isHuggingChat`
-2. **Settings persistence**: Add new fields to `src/lib/types/Settings.ts`, update API schema in `src/lib/server/api/routes/groups/user.ts`
+2. **Settings persistence**: Add new fields to `src/lib/types/Settings.ts`, update API endpoint at `src/routes/api/v2/user/settings/+server.ts`
 3. **Rich dropdowns**: Use `bits-ui` (Select, DropdownMenu) instead of native elements when you need icons/images in options
 4. **Scrollbars**: Use `scrollbar-custom` class for styled scrollbars
 5. **Icons**: Custom icons in `$lib/components/icons/`, use Carbon (`~icons/carbon/*`) or Lucide (`~icons/lucide/*`) for standard icons
