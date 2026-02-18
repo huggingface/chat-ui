@@ -36,6 +36,7 @@
 	import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExamples";
 	import { allBaseServersEnabled, mcpServersLoaded } from "$lib/stores/mcpServers";
 	import { shareModal } from "$lib/stores/shareModal";
+	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 	import LucideHammer from "~icons/lucide/hammer";
 
 	import { fly } from "svelte/transition";
@@ -357,6 +358,13 @@
 
 		const match = activeExamples.find((ex) => ex.prompt.trim() === firstUserMessage.content.trim());
 		activeRouterExamplePrompt = match ? match.prompt : null;
+	});
+
+	$effect(() => {
+		if ($pendingChatInput) {
+			draft = $pendingChatInput;
+			pendingChatInput.set(undefined);
+		}
 	});
 
 	function triggerPrompt(prompt: string) {

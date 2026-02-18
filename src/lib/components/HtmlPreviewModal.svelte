@@ -1,8 +1,8 @@
 <script lang="ts">
 	import Modal from "./Modal.svelte";
 	import { onMount, onDestroy } from "svelte";
-	import CarbonCopy from "~icons/carbon/copy";
 	import CarbonClose from "~icons/carbon/close";
+	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 
 	interface Props {
 		html: string;
@@ -82,7 +82,6 @@
 	});
 	onDestroy(() => {
 		window.removeEventListener("message", onMessage);
-		if (copyTimer) clearTimeout(copyTimer);
 	});
 
 	function composeText(): string {
@@ -92,32 +91,6 @@
 			? `it's not working: ${summary} (+${errors.length - 1} more) - can you fix it?`
 			: `it's not working: ${summary} - can you fix it?`;
 	}
-
-	async function copy(text: string) {
-		try {
-			if (navigator.clipboard && window.isSecureContext) {
-				await navigator.clipboard.writeText(text);
-			} else {
-				const ta = document.createElement("textarea");
-				ta.value = text;
-				ta.style.position = "fixed";
-				ta.style.left = "-9999px";
-				document.body.appendChild(ta);
-				ta.focus();
-				ta.select();
-				document.execCommand("copy");
-				document.body.removeChild(ta);
-			}
-			copied = true;
-			clearTimeout(copyTimer);
-			copyTimer = setTimeout(() => (copied = false), 1200);
-		} catch (e) {
-			console.error("Copy failed", e);
-		}
-	}
-
-	let copied = $state(false);
-	let copyTimer: ReturnType<typeof setTimeout>;
 
 	function handleKeydown(event: KeyboardEvent) {
 		// Close preview on ESC key
@@ -157,11 +130,13 @@
 		{#if errors.length > 0}
 			<button
 				class="btn fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border-2 border-red-500/60 bg-red-800/90 px-4 py-1.5 text-sm text-white shadow-lg"
-				title="Copy error"
-				onclick={() => copy(composeText())}
+				title="Send error to chat"
+				onclick={() => {
+					pendingChatInput.set(composeText());
+					onclose?.();
+				}}
 			>
-				<CarbonCopy class="text-xs" />
-				<span>{copied ? "Copied" : `Error caught (${errors.length})`}</span>
+				<span>Error caught ({errors.length})</span>
 			</button>
 		{/if}
 	</div>
