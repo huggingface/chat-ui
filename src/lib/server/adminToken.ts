@@ -2,6 +2,24 @@ import { config } from "$lib/server/config";
 import type { Session } from "$lib/types/Session";
 import { logger } from "./logger";
 import { v4 } from "uuid";
+import { timingSafeEqual } from "crypto";
+
+/**
+ * Constant-time string comparison to prevent timing attacks.
+ */
+function safeCompare(a: string, b: string): boolean {
+	if (typeof a !== "string" || typeof b !== "string") {
+		return false;
+	}
+	const maxLength = Math.max(a.length, b.length);
+	const paddedA = a.padEnd(maxLength, "\0");
+	const paddedB = b.padEnd(maxLength, "\0");
+	try {
+		return timingSafeEqual(Buffer.from(paddedA), Buffer.from(paddedB)) && a.length === b.length;
+	} catch {
+		return false;
+	}
+}
 
 class AdminTokenManager {
 	private token = config.ADMIN_TOKEN || v4();
@@ -19,7 +37,8 @@ class AdminTokenManager {
 
 	public checkToken(token: string, sessionId: Session["sessionId"]) {
 		if (!this.enabled) return false;
-		if (token === this.token) {
+		// Use timing-safe comparison to prevent timing attacks
+		if (safeCompare(token, this.token)) {
 			logger.info(`[ADMIN] Token validated`);
 			this.adminSessions.push(sessionId);
 			this.token = config.ADMIN_TOKEN || v4();

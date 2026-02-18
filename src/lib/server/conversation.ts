@@ -3,6 +3,7 @@ import { MetricsServer } from "$lib/server/metrics";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
+import { sanitizeShareId } from "$lib/server/mongoSanitize";
 
 /**
  * Create a new conversation from a shared conversation ID.
@@ -14,8 +15,14 @@ export async function createConversationFromShare(
 	locals: App.Locals,
 	userAgent?: string
 ): Promise<string> {
+	// Sanitize the share ID to prevent NoSQL injection
+	const safeShareId = sanitizeShareId(fromShareId);
+	if (!safeShareId) {
+		error(400, "Invalid share ID");
+	}
+
 	const conversation = await collections.sharedConversations.findOne({
-		_id: fromShareId,
+		_id: safeShareId,
 	});
 
 	if (!conversation) {
@@ -24,7 +31,7 @@ export async function createConversationFromShare(
 
 	// Check if shared conversation exists already for this user/session
 	const existingConversation = await collections.conversations.findOne({
-		"meta.fromShareId": fromShareId,
+		"meta.fromShareId": safeShareId,
 		...authCondition(locals),
 	});
 
@@ -44,14 +51,14 @@ export async function createConversationFromShare(
 		updatedAt: new Date(),
 		userAgent,
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
-		meta: { fromShareId },
+		meta: { fromShareId: safeShareId },
 	});
 
 	// Copy files from shared conversation bucket entries to the new conversation
 	// Shared files are stored with filenames "${sharedId}-${sha}" and metadata.conversation = sharedId
 	// New conversation expects files to be stored under its own id prefix
 	const newConvId = res.insertedId.toString();
-	const sharedId = fromShareId;
+	const sharedId = safeShareId;
 	const files = await collections.bucket.find({ filename: { $regex: `^${sharedId}-` } }).toArray();
 
 	await Promise.all(
