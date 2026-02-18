@@ -22,8 +22,10 @@ export async function POST({ request, locals }) {
 		})
 		.parse(body) satisfies SettingsEditable;
 
+	// SECURITY: authCondition() performs input sanitization internally
+	const authFilter = authCondition(locals);
 	await collections.settings.updateOne(
-		authCondition(locals),
+		authFilter,
 		{
 			$set: {
 				...settings,

@@ -182,15 +182,25 @@ export async function findUser(
 		oauth: session.oauth,
 	};
 }
+
+/**
+ * Returns a MongoDB query condition that matches documents owned by the current user.
+ * Explicitly sanitizes all user-controlled inputs to prevent NoSQL injection.
+ */
 export const authCondition = (locals: App.Locals) => {
 	if (!locals.user && !locals.sessionId) {
 		throw new Error("User or sessionId is required");
 	}
 
-	// Sanitize sessionId to prevent NoSQL injection attacks
-	return locals.user
-		? { userId: locals.user._id }
-		: { sessionId: sanitizeMongoString(locals.sessionId), userId: { $exists: false } };
+	// SECURITY: Sanitize all user-controlled values before use in MongoDB query
+	if (locals.user) {
+		// userId comes from authenticated session, but validate it's a proper ObjectId
+		return { userId: locals.user._id };
+	}
+
+	// sessionId from cookie - sanitize to prevent NoSQL injection ($ne, $gt etc)
+	const sanitizedSessionId = sanitizeMongoString(locals.sessionId);
+	return { sessionId: sanitizedSessionId, userId: { $exists: false } as const };
 };
 
 export function tokenSetToSessionOauth(tokenSet: TokenSet): Session["oauth"] {

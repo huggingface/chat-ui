@@ -6,10 +6,10 @@ import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 export async function GET({ locals, url }) {
 	const p = parseInt(url.searchParams.get("p") ?? "0");
 	if (locals.user?._id || locals.sessionId) {
+		// SECURITY: authCondition() performs input sanitization internally
+		const authFilter = authCondition(locals);
 		const convs = await collections.conversations
-			.find({
-				...authCondition(locals),
-			})
+			.find(authFilter)
 			.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | never>>({
 				title: 1,
 				updatedAt: 1,
@@ -39,9 +39,9 @@ export async function GET({ locals, url }) {
 
 export async function DELETE({ locals }) {
 	if (locals.user?._id || locals.sessionId) {
-		await collections.conversations.deleteMany({
-			...authCondition(locals),
-		});
+		// SECURITY: authCondition() performs input sanitization internally
+		const authFilter = authCondition(locals);
+		await collections.conversations.deleteMany(authFilter);
 	}
 
 	return new Response();

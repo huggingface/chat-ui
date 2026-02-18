@@ -6,6 +6,7 @@ import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
+import { sanitizeObjectIdString } from "$lib/server/mongoSanitize";
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
@@ -639,11 +640,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 }
 
 export async function DELETE({ locals, params }) {
-	const convId = new ObjectId(params.id);
+	// SECURITY: Sanitize params.id to prevent NoSQL injection
+	const convId = new ObjectId(sanitizeObjectIdString(params.id));
+	// SECURITY: authCondition() performs input sanitization internally
+	const authFilter = authCondition(locals);
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		...authCondition(locals),
+		...authFilter,
 	});
 
 	if (!conv) {
@@ -663,11 +667,14 @@ export async function PATCH({ request, locals, params }) {
 		})
 		.parse(await request.json());
 
-	const convId = new ObjectId(params.id);
+	// SECURITY: Sanitize params.id to prevent NoSQL injection
+	const convId = new ObjectId(sanitizeObjectIdString(params.id));
+	// SECURITY: authCondition() performs input sanitization internally
+	const authFilter = authCondition(locals);
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		...authCondition(locals),
+		...authFilter,
 	});
 
 	if (!conv) {
