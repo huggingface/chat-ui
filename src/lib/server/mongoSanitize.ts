@@ -50,16 +50,23 @@ export function sanitizeObjectIdString(value: unknown): string {
 
 /**
  * Sanitizes a share ID for MongoDB queries.
- * Share IDs should be valid ObjectId strings.
+ * Share IDs can be either:
+ * - 7-character nanoid strings (alphanumeric with _ and -)
+ * - Valid ObjectId strings (for backwards compatibility)
  */
 export function sanitizeShareId(value: unknown): string | undefined {
 	if (typeof value !== "string" || value.length === 0) {
 		return undefined;
 	}
-	if (!ObjectId.isValid(value)) {
-		return undefined;
+	// Accept 7-character nanoid format (used by shared conversations)
+	if (value.length === 7 && /^[A-Za-z0-9_-]+$/.test(value)) {
+		return value;
 	}
-	return value;
+	// Also accept valid ObjectIds for backwards compatibility
+	if (ObjectId.isValid(value)) {
+		return value;
+	}
+	return undefined;
 }
 
 /**
