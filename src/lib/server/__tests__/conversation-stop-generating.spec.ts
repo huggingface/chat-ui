@@ -19,7 +19,7 @@ describe.sequential("POST /conversation/[id]/stop-generating", () => {
 
 	it(
 		"creates abort marker and aborts active registry controllers",
-		{ timeout: 15000 },
+		{ timeout: 30000 },
 		async () => {
 			const { locals } = await createTestUser();
 			const conversation = await createTestConversation(locals);

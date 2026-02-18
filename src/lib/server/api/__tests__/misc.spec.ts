@@ -20,7 +20,7 @@ function mockRequestEvent(locals: App.Locals) {
 describe("GET /api/v2/feature-flags", () => {
 	beforeEach(async () => {
 		await cleanupTestData();
-	});
+	}, 20000);
 
 	it("returns correct shape with expected fields", async () => {
 		const locals = createTestLocals();

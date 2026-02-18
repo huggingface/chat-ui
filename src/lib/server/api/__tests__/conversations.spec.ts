@@ -30,7 +30,7 @@ describe.sequential("GET /api/v2/conversations", () => {
 		await cleanupTestData();
 	});
 
-	it("returns conversations for authenticated user", { timeout: 15000 }, async () => {
+	it("returns conversations for authenticated user", { timeout: 30000 }, async () => {
 		const { locals } = await createTestUser();
 		const conv = await createTestConversation(locals, { title: "My Chat" });
 

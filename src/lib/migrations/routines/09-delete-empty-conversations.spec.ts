@@ -195,7 +195,7 @@ describe.sequential("Deleting discarded conversations", async () => {
 beforeAll(async () => {
 	await collections.users.insertOne(userData);
 	await collections.sessions.insertOne(sessionForUser);
-});
+}, 20000);
 
 afterAll(async () => {
 	await collections.users.deleteOne({

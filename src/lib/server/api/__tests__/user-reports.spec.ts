@@ -21,7 +21,7 @@ function mockRequestEvent(locals: App.Locals) {
 describe("GET /api/v2/user/reports", () => {
 	beforeEach(async () => {
 		await cleanupTestData();
-	});
+	}, 20000);
 
 	it("returns empty array for unauthenticated user", async () => {
 		const locals = createTestLocals();

@@ -29,9 +29,7 @@ const config = {
 	preprocess: vitePreprocess(),
 
 	kit: {
-		adapter: useStatic
-			? adapterStatic({ fallback: "index.html", strict: false })
-			: adapterNode(),
+		adapter: useStatic ? adapterStatic({ fallback: "index.html", strict: false }) : adapterNode(),
 
 		paths: {
 			base: process.env.APP_BASE || "",

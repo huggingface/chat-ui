@@ -74,10 +74,12 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				}
 			}
 
+			const isApi = event.url.pathname.startsWith(`${base}/api/`);
 			const auth = await authenticateRequest(
-				{ type: "svelte", value: event.request.headers },
-				{ type: "svelte", value: event.cookies },
-				event.url
+				event.request.headers,
+				event.cookies,
+				event.url,
+				isApi
 			);
 
 			event.locals.sessionId = auth.sessionId;
@@ -196,9 +198,13 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 			// Update request context with status code
 			updateRequestContext({ statusCode: response.status });
 
-			// Add CSP header to disallow framing if ALLOW_IFRAME is not "true"
+			// Add CSP header to control iframe embedding
+			// Always allow huggingface.co; when ALLOW_IFRAME=true, allow all domains
 			if (config.ALLOW_IFRAME !== "true") {
-				response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
+				response.headers.append(
+					"Content-Security-Policy",
+					"frame-ancestors https://huggingface.co;"
+				);
 			}
 
 			if (

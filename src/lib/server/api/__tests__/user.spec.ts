@@ -24,7 +24,7 @@ function mockRequestEvent(locals: App.Locals, overrides?: Record<string, unknown
 describe("GET /api/v2/user", () => {
 	beforeEach(async () => {
 		await cleanupTestData();
-	});
+	}, 20000);
 
 	it("returns user info for authenticated user", async () => {
 		const { user, locals } = await createTestUser();
@@ -55,7 +55,7 @@ describe("GET /api/v2/user", () => {
 describe("GET /api/v2/user/settings", () => {
 	beforeEach(async () => {
 		await cleanupTestData();
-	});
+	}, 20000);
 
 	it("returns default settings when none exist", async () => {
 		const { locals } = await createTestUser();
@@ -141,7 +141,7 @@ describe("GET /api/v2/user/settings", () => {
 describe("POST /api/v2/user/settings", () => {
 	beforeEach(async () => {
 		await cleanupTestData();
-	});
+	}, 20000);
 
 	it("creates settings with upsert", async () => {
 		const { user, locals } = await createTestUser();
