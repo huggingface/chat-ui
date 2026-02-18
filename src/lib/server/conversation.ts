@@ -3,6 +3,7 @@ import { MetricsServer } from "$lib/server/metrics";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
+import { sanitizeShareId } from "$lib/server/mongoSanitize";
 
 /**
  * Create a new conversation from a shared conversation ID.
@@ -14,8 +15,11 @@ export async function createConversationFromShare(
 	locals: App.Locals,
 	userAgent?: string
 ): Promise<string> {
+	// Sanitize input to prevent NoSQL injection
+	const sanitizedShareId = sanitizeShareId(fromShareId);
+
 	const conversation = await collections.sharedConversations.findOne({
-		_id: { $eq: fromShareId },
+		_id: sanitizedShareId,
 	});
 
 	if (!conversation) {
@@ -24,7 +28,7 @@ export async function createConversationFromShare(
 
 	// Check if shared conversation exists already for this user/session
 	const existingConversation = await collections.conversations.findOne({
-		"meta.fromShareId": { $eq: fromShareId },
+		"meta.fromShareId": sanitizedShareId,
 		...authCondition(locals),
 	});
 
@@ -44,15 +48,19 @@ export async function createConversationFromShare(
 		updatedAt: new Date(),
 		userAgent,
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
-		meta: { fromShareId },
+		meta: { fromShareId: sanitizedShareId },
 	});
 
 	// Copy files from shared conversation bucket entries to the new conversation
 	// Shared files are stored with filenames "${sharedId}-${sha}" and metadata.conversation = sharedId
 	// New conversation expects files to be stored under its own id prefix
 	const newConvId = res.insertedId.toString();
-	const sharedId = fromShareId;
-	const files = await collections.bucket.find({ filename: { $regex: `^${sharedId}-` } }).toArray();
+	const sharedId = sanitizedShareId;
+	// Escape special regex characters in sharedId to prevent regex injection
+	const escapedSharedId = sharedId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const files = await collections.bucket
+		.find({ filename: { $regex: `^${escapedSharedId}-` } })
+		.toArray();
 
 	await Promise.all(
 		files.map(

@@ -6,15 +6,19 @@ import { buildSubtree } from "$lib/utils/tree/buildSubtree";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
+import { sanitizeParamId } from "$lib/server/mongoSanitize";
 
 export async function GET({ params, locals }) {
+	// Sanitize params.id to prevent NoSQL injection
+	const sanitizedId = sanitizeParamId(params.id);
+
 	const conv =
-		params.id.length === 7
+		sanitizedId.length === 7
 			? await collections.sharedConversations.findOne({
-					_id: params.id,
+					_id: sanitizedId,
 				})
 			: await collections.conversations.findOne({
-					_id: new ObjectId(params.id),
+					_id: new ObjectId(sanitizedId),
 					...authCondition(locals),
 				});
 

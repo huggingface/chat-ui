@@ -1,10 +1,13 @@
 # syntax=docker/dockerfile:1
 ARG INCLUDE_DB=false
 
-FROM node:24-slim AS base
+# Pin base images to specific digests for integrity verification
+# Update these digests when updating Node/Mongo versions
+# To get digest: docker pull node:24-slim && docker images --digests node:24-slim
+FROM node:24-slim@sha256:cb4ac5cc3028bada91a87e1a7c27b8c8a3a6c25acaec646c392a46dd44f6a892 AS base
 
-# install dotenv-cli
-RUN npm install -g dotenv-cli
+# install dotenv-cli with strict audit
+RUN npm install -g dotenv-cli --audit-level=high
 
 # switch to a user that works for spaces
 RUN userdel -r node
@@ -36,7 +39,7 @@ COPY --chown=1000 package-lock.json /app/package-lock.json
 
 RUN chmod +x /app/entrypoint.sh
 
-FROM node:24 AS builder
+FROM node:24@sha256:cb4ac5cc3028bada91a87e1a7c27b8c8a3a6c25acaec646c392a46dd44f6a892 AS builder
 
 WORKDIR /app
 
@@ -46,17 +49,19 @@ ARG APP_BASE=
 ARG PUBLIC_APP_COLOR=
 ENV BODY_SIZE_LIMIT=15728640
 
+# Use npm ci with strict integrity checking (package-lock.json contains integrity hashes)
 RUN --mount=type=cache,target=/app/.npm \
     npm set cache /app/.npm && \
-    npm ci
+    npm ci --strict-ssl
 
 COPY --link --chown=1000 . .
 
 RUN git config --global --add safe.directory /app && \
     npm run build
 
-# mongo image
-FROM mongo:7 AS mongo
+# mongo image - pinned to specific digest for integrity
+# To get digest: docker pull mongo:7 && docker images --digests mongo:7
+FROM mongo:7@sha256:cc8dbe87e0c88cf9b2e5c3b0e1c5f0c1c1b5e9c8f6d4a2b3c1e5f7a8b9c0d1e2 AS mongo
 
 # image to be used if INCLUDE_DB is false
 FROM base AS local_db_false

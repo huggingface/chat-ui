@@ -3,9 +3,12 @@ import { base } from "$app/paths";
 import { collections } from "$lib/server/database";
 import { redirect } from "@sveltejs/kit";
 import { config } from "$lib/server/config";
+import { sanitizeMongoString } from "$lib/server/mongoSanitize";
 
 export async function POST({ locals, cookies }) {
-	await collections.sessions.deleteOne({ sessionId: locals.sessionId });
+	// Sanitize sessionId to prevent NoSQL injection
+	const sanitizedSessionId = sanitizeMongoString(locals.sessionId);
+	await collections.sessions.deleteOne({ sessionId: sanitizedSessionId });
 
 	cookies.delete(config.COOKIE_NAME, {
 		path: "/",

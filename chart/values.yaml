@@ -9,8 +9,16 @@ replicas: 3
 domain: huggingface.co
 
 networkPolicy:
-  enabled: false
+  enabled: true  # Enable network policy for security
   allowedBlocks: []
+  # Namespaces allowed to access this service
+  allowFromNamespaces: []
+  # Pod labels allowed to access this service
+  allowFromPodLabels: {}
+  # Allow egress to MongoDB
+  allowToMongoDB: true
+  # CIDR for MongoDB (use 0.0.0.0/0 for any)
+  mongoDBCIDR: "0.0.0.0/0"
 
 service:
   type: NodePort

@@ -6,6 +6,7 @@ import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints"
 import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
 import { makeRouterEndpoint } from "$lib/server/router/endpoint";
+import { validateExternalUrl } from "$lib/server/isURLLocal";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -126,12 +127,30 @@ function getChatPromptRender(_m: ModelConfig): (inputs: ChatTemplateInput) => st
 	};
 }
 
+/**
+ * Safely fetch a preprompt from an external URL with SSRF protection.
+ */
+async function fetchPrepromptSafe(url: string): Promise<string> {
+	try {
+		// Validate URL doesn't point to internal/private IPs (SSRF protection)
+		const validatedUrl = await validateExternalUrl(url);
+		const response = await fetch(validatedUrl.toString());
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+		}
+		return await response.text();
+	} catch (error) {
+		logger.error({ error, url }, "[models] Failed to fetch prepromptUrl");
+		throw error;
+	}
+}
+
 const processModel = async (m: ModelConfig) => ({
 	...m,
 	chatPromptRender: await getChatPromptRender(m),
 	id: m.id || m.name,
 	displayName: m.displayName || m.name,
-	preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
+	preprompt: m.prepromptUrl ? await fetchPrepromptSafe(m.prepromptUrl) : m.preprompt,
 	parameters: { ...m.parameters, stop_sequences: m.parameters?.stop },
 	unlisted: m.unlisted ?? false,
 });

@@ -1,0 +1,69 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "labels.standard" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{ include "labels.standard" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow ingress traffic only from specified sources
+    - from:
+        {{- if .Values.networkPolicy.allowFromNamespaces }}
+        {{- range .Values.networkPolicy.allowFromNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              name: {{ . }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.networkPolicy.allowFromPodLabels }}
+        - podSelector:
+            matchLabels: {{ toYaml .Values.networkPolicy.allowFromPodLabels | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ $.Values.envVars.APP_PORT | default 3000 | int }}
+        {{- if eq "true" $.Values.envVars.METRICS_ENABLED }}
+        - protocol: TCP
+          port: {{ $.Values.envVars.METRICS_PORT | default 5565 | int }}
+        {{- end }}
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow egress to MongoDB (if using external MongoDB)
+    {{- if .Values.networkPolicy.allowToMongoDB }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.mongoDBCIDR | default "0.0.0.0/0" }}
+      ports:
+        - protocol: TCP
+          port: 27017
+    {{- end }}
+    # Allow HTTPS egress for external APIs (HuggingFace, etc.)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+{{- end }}
