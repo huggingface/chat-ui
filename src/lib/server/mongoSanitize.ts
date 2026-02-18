@@ -59,13 +59,13 @@ export function sanitizeObjectIdString(id: unknown): string {
 
 /**
  * Sanitizes a share ID for use in MongoDB queries.
- * Share IDs have a specific format (7 characters).
+ * Share IDs are created with nanoid(7) - 7 characters from alphabet A-Za-z0-9_-
  */
 export function sanitizeShareId(id: unknown): string {
 	const sanitized = sanitizeMongoString(id);
 
-	// Share IDs are typically 7 characters, alphanumeric
-	if (!/^[a-zA-Z0-9]{7}$/i.test(sanitized)) {
+	// Share IDs are 7 characters from nanoid alphabet (includes _ and -)
+	if (!/^[A-Za-z0-9_-]{7}$/.test(sanitized)) {
 		throw new Error("Invalid share ID format");
 	}
 
