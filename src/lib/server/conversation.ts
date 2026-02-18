@@ -24,7 +24,7 @@ export async function createConversationFromShare(
 
 	// Check if shared conversation exists already for this user/session
 	const existingConversation = await collections.conversations.findOne({
-		"meta.fromShareId": fromShareId,
+		"meta.fromShareId": { $eq: fromShareId },
 		...authCondition(locals),
 	});
 
