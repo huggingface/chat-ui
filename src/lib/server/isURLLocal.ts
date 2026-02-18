@@ -11,7 +11,33 @@ const dnsLookup = (hostname: string): Promise<{ address: string; family: number 
 	});
 };
 
+function assertValidHostname(hostname: string): void {
+	if (!hostname || hostname.length > 253) {
+		throw new Error("Invalid hostname");
+	}
+
+	const labels = hostname.split(".");
+
+	for (const label of labels) {
+		if (!label || label.length > 63) {
+			throw new Error("Invalid hostname");
+		}
+
+		if (!/^[A-Za-z0-9-]+$/.test(label)) {
+			throw new Error("Invalid hostname");
+		}
+
+		if (label.startsWith("-") || label.endsWith("-")) {
+			throw new Error("Invalid hostname");
+		}
+	}
+}
+
 export async function isURLLocal(URL: URL): Promise<boolean> {
+	if (!isIP(URL.hostname)) {
+		assertValidHostname(URL.hostname);
+	}
+
 	const { address, family } = await dnsLookup(URL.hostname);
 
 	if (family === 4) {

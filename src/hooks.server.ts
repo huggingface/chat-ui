@@ -1,10 +1,13 @@
 import { building } from "$app/environment";
 import type { Handle, HandleServerError, ServerInit, HandleFetch } from "@sveltejs/kit";
+import { initServer } from "$lib/server/hooks/init";
+import { handleRequest } from "$lib/server/hooks/handle";
+import { handleServerError } from "$lib/server/hooks/error";
+import { handleFetchRequest } from "$lib/server/hooks/fetch";
 
 export const init: ServerInit = async () => {
 	if (building) return;
-	const mod = await import("$lib/server/hooks/init");
-	return mod.initServer();
+	return initServer();
 };
 
 export const handle: Handle = async (input) => {
@@ -15,18 +18,15 @@ export const handle: Handle = async (input) => {
 			transformPageChunk: ({ html }) => html.replace("%gaId%", ""),
 		});
 	}
-	const mod = await import("$lib/server/hooks/handle");
-	return mod.handleRequest(input);
+	return handleRequest(input);
 };
 
 export const handleError: HandleServerError = async (input) => {
 	if (building) throw input.error;
-	const mod = await import("$lib/server/hooks/error");
-	return mod.handleServerError(input);
+	return handleServerError(input);
 };
 
 export const handleFetch: HandleFetch = async (input) => {
 	if (building) return input.fetch(input.request);
-	const mod = await import("$lib/server/hooks/fetch");
-	return mod.handleFetchRequest(input);
+	return handleFetchRequest(input);
 };

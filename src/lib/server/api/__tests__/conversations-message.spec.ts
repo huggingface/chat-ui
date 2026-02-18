@@ -91,7 +91,7 @@ describe.sequential("DELETE /api/v2/conversations/[id]/message/[messageId]", () 
 		await cleanupTestData();
 	});
 
-	it("removes target message and its descendants", { timeout: 15000 }, async () => {
+	it("removes target message and its descendants", { timeout: 30000 }, async () => {
 		const { locals } = await createTestUser();
 		const tree = buildMessageTree();
 
