@@ -45,7 +45,7 @@
 		"@typescript-eslint/parser": "^6.x",
 		"bson-objectid": "^2.0.4",
 		"dompurify": "^3.2.4",
-		"elysia": "^1.4.1",
+		"elysia": "1.4.1",
 		"eslint": "^8.28.0",
 		"eslint-config-prettier": "^8.5.0",
 		"eslint-plugin-svelte": "^2.45.1",
