@@ -28,10 +28,19 @@ import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepa
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
+import { getEnabledNativeTools } from "$lib/server/tools";
+import type { NativeTool } from "$lib/server/tools/types";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
-	"model" | "conv" | "assistant" | "forceMultimodal" | "forceTools" | "provider" | "locals"
+	| "model"
+	| "conv"
+	| "assistant"
+	| "forceMultimodal"
+	| "forceTools"
+	| "provider"
+	| "enableNativeFetch"
+	| "locals"
 > & { messages: EndpointMessage[] };
 
 // Return type: "completed" = MCP ran successfully, "not_applicable" = MCP didn't run, "aborted" = user aborted
@@ -45,6 +54,7 @@ export async function* runMcpFlow({
 	forceMultimodal,
 	forceTools,
 	provider,
+	enableNativeFetch,
 	locals,
 	preprompt,
 	abortSignal,
@@ -70,6 +80,9 @@ export async function* runMcpFlow({
 		}
 		return false;
 	};
+	// Compute enabled native tools early so we can proceed even without MCP servers
+	const enabledNativeTools: NativeTool[] = getEnabledNativeTools({ enableNativeFetch });
+
 	// Start from env-configured servers
 	let servers = getMcpServers();
 	try {
@@ -134,9 +147,9 @@ export async function* runMcpFlow({
 		// ignore selection merge errors and proceed with env servers
 	}
 
-	// If selection/merge yielded no servers, bail early with clearer log
-	if (servers.length === 0) {
-		logger.warn({}, "[mcp] no MCP servers selected after merge/name filter");
+	// If selection/merge yielded no servers and no native tools, bail early
+	if (servers.length === 0 && enabledNativeTools.length === 0) {
+		logger.warn({}, "[mcp] no MCP servers selected after merge/name filter and no native tools");
 		return "not_applicable";
 	}
 
@@ -160,8 +173,11 @@ export async function* runMcpFlow({
 			}
 		} catch {}
 	}
-	if (servers.length === 0) {
-		logger.warn({}, "[mcp] all selected MCP servers rejected by URL safety guard");
+	if (servers.length === 0 && enabledNativeTools.length === 0) {
+		logger.warn(
+			{},
+			"[mcp] all selected MCP servers rejected by URL safety guard and no native tools"
+		);
 		return "not_applicable";
 	}
 
@@ -226,10 +242,14 @@ export async function* runMcpFlow({
 	}
 
 	logger.debug(
-		{ count: servers.length, servers: servers.map((s) => s.name) },
+		{
+			count: servers.length,
+			servers: servers.map((s) => s.name),
+			nativeTools: enabledNativeTools.length,
+		},
 		"[mcp] servers configured"
 	);
-	if (servers.length === 0) {
+	if (servers.length === 0 && enabledNativeTools.length === 0) {
 		return "not_applicable";
 	}
 
@@ -289,16 +309,33 @@ export async function* runMcpFlow({
 	}
 
 	try {
-		const { tools: oaTools, mapping } = await getOpenAiToolsForMcp(servers, {
-			signal: abortSignal,
-		});
+		const { tools: mcpTools, mapping } =
+			servers.length > 0
+				? await getOpenAiToolsForMcp(servers, { signal: abortSignal })
+				: {
+						tools: [] as import("$lib/server/mcp/tools").OpenAiTool[],
+						mapping: {} as Record<string, import("$lib/server/mcp/tools").McpToolMapping>,
+					};
+
+		// Merge native tool definitions (MCP takes precedence on name collision)
+		const mcpToolNames = new Set(mcpTools.map((t) => t.function.name));
+		const nativeDefs = enabledNativeTools
+			.map((t) => t.definition)
+			.filter((d) => !mcpToolNames.has(d.function.name));
+		const allTools = [...mcpTools, ...nativeDefs];
+
 		try {
 			logger.info(
-				{ toolCount: oaTools.length, toolNames: oaTools.map((t) => t.function.name) },
+				{
+					toolCount: allTools.length,
+					mcpCount: mcpTools.length,
+					nativeCount: nativeDefs.length,
+					toolNames: allTools.map((t) => t.function.name),
+				},
 				"[mcp] openai tool defs built"
 			);
 		} catch {}
-		if (oaTools.length === 0) {
+		if (allTools.length === 0) {
 			logger.warn({}, "[mcp] zero tools available after listing; skipping MCP flow");
 			return "not_applicable";
 		}
@@ -336,7 +373,7 @@ export async function* runMcpFlow({
 				mmEnabled,
 				route: resolvedRoute,
 				candidateModelId,
-				toolCount: oaTools.length,
+				toolCount: allTools.length,
 				hasUserToken: Boolean((locals as unknown as { token?: string })?.token),
 			},
 			"[mcp] starting completion with tools"
@@ -346,7 +383,7 @@ export async function* runMcpFlow({
 			imageProcessor,
 			mmEnabled
 		);
-		const toolPreprompt = buildToolPreprompt(oaTools);
+		const toolPreprompt = buildToolPreprompt(allTools);
 		const prepromptPieces: string[] = [];
 		if (toolPreprompt.trim().length > 0) {
 			prepromptPieces.push(toolPreprompt);
@@ -413,7 +450,7 @@ export async function* runMcpFlow({
 				typeof parameters?.presence_penalty === "number" ? parameters.presence_penalty : undefined,
 			stop: stopSequences,
 			max_tokens: typeof maxTokens === "number" ? maxTokens : undefined,
-			tools: oaTools,
+			tools: allTools,
 			tool_choice: "auto",
 		};
 
@@ -689,6 +726,7 @@ export async function* runMcpFlow({
 					toPrimitive,
 					processToolOutput,
 					abortSignal,
+					enabledNativeTools,
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;

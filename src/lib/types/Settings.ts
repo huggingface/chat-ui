@@ -50,6 +50,9 @@ export interface Settings extends Timestamps {
 	streamingMode: StreamingMode;
 	directPaste: boolean;
 
+	/** Enable the built-in web fetch tool (default: true when absent) */
+	enableNativeFetch?: boolean;
+
 	/**
 	 * Organization to bill inference requests to (HuggingChat only).
 	 * Stores the org's preferred_username. If empty/undefined, bills to personal account.

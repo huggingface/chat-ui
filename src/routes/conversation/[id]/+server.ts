@@ -570,6 +570,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						config.isHuggingChat && !model.isRouter
 							? userSettings?.providerOverrides?.[model.id]
 							: undefined,
+					enableNativeFetch: userSettings?.enableNativeFetch,
 					locals,
 					abortController: ctrl,
 				};

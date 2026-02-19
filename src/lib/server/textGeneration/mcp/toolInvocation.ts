@@ -14,6 +14,7 @@ import {
 import { getClient } from "$lib/server/mcp/clientPool";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/sdk/client";
+import type { NativeTool } from "$lib/server/tools/types";
 
 export type Primitive = string | number | boolean;
 
@@ -42,6 +43,7 @@ export interface ExecuteToolCallsParams {
 	};
 	abortSignal?: AbortSignal;
 	toolTimeoutMs?: number;
+	enabledNativeTools?: NativeTool[];
 }
 
 export interface ToolCallExecutionResult {
@@ -74,11 +76,18 @@ export async function* executeToolCalls({
 	processToolOutput,
 	abortSignal,
 	toolTimeoutMs,
+	enabledNativeTools,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
 	const serverLookup = serverMap(servers);
+
+	// Build a lookup for native tools by function name
+	const nativeByName = new Map<string, NativeTool>();
+	for (const nt of enabledNativeTools ?? []) {
+		nativeByName.set(nt.definition.function.name, nt);
+	}
 	// Pre-emit call + ETA updates and prepare tasks
 	type TaskResult = {
 		index: number;
@@ -200,9 +209,61 @@ export async function* executeToolCalls({
 			return;
 		}
 
+		// Check MCP mapping first (takes precedence on name collision), then native tools
 		const mappingEntry = mapping[p.call.name];
+		const nativeTool = !mappingEntry ? nativeByName.get(p.call.name) : undefined;
+		if (nativeTool) {
+			// Dispatch to native tool
+			try {
+				logger.debug({ tool: p.call.name, parameters: p.paramsClean }, "[native] invoking tool");
+				const output = await nativeTool.execute(p.argsObj, { signal: abortSignal });
+				logger.debug({ tool: p.call.name }, "[native] tool call completed");
+				results.push({
+					index,
+					output,
+					uuid: p.uuid,
+					paramsClean: p.paramsClean,
+				});
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Result,
+					uuid: p.uuid,
+					result: {
+						status: ToolResultStatus.Success,
+						call: { name: p.call.name, parameters: p.paramsClean },
+						outputs: [{ text: output } as unknown as Record<string, unknown>],
+						display: true,
+					},
+				});
+			} catch (err) {
+				const errMsg = err instanceof Error ? err.message : String(err);
+				const errName = err instanceof Error ? err.name : "";
+				const isAbortError =
+					abortSignal?.aborted ||
+					errName === "AbortError" ||
+					errName === "APIUserAbortError" ||
+					errMsg === "Request was aborted." ||
+					errMsg === "This operation was aborted";
+				const message = isAbortError ? "Aborted by user" : errMsg;
+
+				if (isAbortError) {
+					logger.debug({ tool: p.call.name }, "[native] tool call aborted by user");
+				} else {
+					logger.warn({ tool: p.call.name, err: message }, "[native] tool call failed");
+				}
+				results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid: p.uuid,
+					message,
+				});
+			}
+			return;
+		}
+
 		if (!mappingEntry) {
-			const message = `Unknown MCP function: ${p.call.name}`;
+			const message = `Unknown tool function: ${p.call.name}`;
 			results.push({
 				index,
 				error: message,

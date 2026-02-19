@@ -20,6 +20,7 @@ const settingsSchema = z.object({
 	providerOverrides: z.record(z.string()).default({}),
 	streamingMode: z.enum(["raw", "smooth"]).optional(),
 	directPaste: z.boolean().default(false),
+	enableNativeFetch: z.boolean().optional(),
 	hidePromptExamples: z.record(z.boolean()).default({}),
 	billingOrganization: z.string().optional(),
 });
@@ -64,6 +65,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		multimodalOverrides: settings?.multimodalOverrides ?? {},
 		toolsOverrides: settings?.toolsOverrides ?? {},
 		providerOverrides: settings?.providerOverrides ?? {},
+		enableNativeFetch: settings?.enableNativeFetch,
 		billingOrganization: settings?.billingOrganization ?? undefined,
 	});
 };

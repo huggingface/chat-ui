@@ -19,6 +19,8 @@ export interface TextGenerationContext {
 	forceTools?: boolean;
 	/** Inference provider preference: "auto", "fastest", "cheapest", or a specific provider name */
 	provider?: string;
+	/** Enable the built-in web fetch tool (default: true when absent) */
+	enableNativeFetch?: boolean;
 	locals: App.Locals | undefined;
 	abortController: AbortController;
 }

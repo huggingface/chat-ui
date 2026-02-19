@@ -59,6 +59,7 @@ async function* textGenerationWithoutTitle(
 			forceMultimodal: ctx.forceMultimodal,
 			forceTools: ctx.forceTools,
 			provider: ctx.provider,
+			enableNativeFetch: ctx.enableNativeFetch,
 			locals: ctx.locals,
 			preprompt,
 			abortSignal: ctx.abortController.signal,

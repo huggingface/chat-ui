@@ -39,6 +39,12 @@
 	function setDirectPaste(v: boolean) {
 		settings.update((s) => ({ ...s, directPaste: v }));
 	}
+	function getWebFetchEnabled() {
+		return $settings.enableNativeFetch !== false;
+	}
+	function setWebFetchEnabled(v: boolean) {
+		settings.update((s) => ({ ...s, enableNativeFetch: v }));
+	}
 
 	const client = useAPIClient();
 
@@ -212,6 +218,18 @@
 						</p>
 					</div>
 					<Switch name="directPaste" bind:checked={getDirectPaste, setDirectPaste} />
+				</div>
+
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+							Web fetch tool
+						</div>
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
+							Allow the assistant to fetch public web pages when needed.
+						</p>
+					</div>
+					<Switch name="enableNativeFetch" bind:checked={getWebFetchEnabled, setWebFetchEnabled} />
 				</div>
 
 				<!-- Theme selector -->

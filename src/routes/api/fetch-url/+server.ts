@@ -1,8 +1,8 @@
 import { error } from "@sveltejs/kit";
 import { logger } from "$lib/server/logger.js";
-import { Agent, fetch } from "undici";
-import { isValidUrl, assertSafeIp } from "$lib/server/urlSafety";
-import dns from "node:dns";
+import { isValidUrl } from "$lib/server/urlSafety";
+import { ssrfSafeAgent } from "$lib/server/fetchSafe";
+import { fetch } from "undici";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const FETCH_TIMEOUT = 30000; // 30 seconds
@@ -15,36 +15,6 @@ const SECURITY_HEADERS: HeadersInit = {
 	"X-Frame-Options": "DENY",
 	"Referrer-Policy": "no-referrer",
 };
-
-/**
- * Undici dispatcher that validates resolved IPs at connection time,
- * preventing TOCTOU DNS rebinding attacks.
- */
-const ssrfSafeAgent = new Agent({
-	connect: {
-		lookup: (hostname, options, callback) => {
-			dns.lookup(hostname, options, (err, address, family) => {
-				if (err) return callback(err, "", 4);
-				if (typeof address === "string") {
-					try {
-						assertSafeIp(address, hostname);
-					} catch (e) {
-						return callback(e as Error, "", 4);
-					}
-				} else if (Array.isArray(address)) {
-					for (const entry of address) {
-						try {
-							assertSafeIp(entry.address, hostname);
-						} catch (e) {
-							return callback(e as Error, "", 4);
-						}
-					}
-				}
-				return callback(null, address, family);
-			});
-		},
-	},
-});
 
 export async function GET({ url }) {
 	const targetUrl = url.searchParams.get("url");

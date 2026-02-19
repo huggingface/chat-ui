@@ -32,6 +32,7 @@ interface SettingsResponse {
 	toolsOverrides: Record<string, boolean>;
 	hidePromptExamples: Record<string, boolean>;
 	providerOverrides: Record<string, string>;
+	enableNativeFetch?: boolean;
 	billingOrganization?: string;
 }
 
