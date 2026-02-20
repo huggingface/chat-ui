@@ -16,10 +16,6 @@ export type RouterExample = {
 
 export const routerExamples: RouterExample[] = [
 	{
-		title: "Image prompt",
-		prompt: "Generate an image of a zebra in front of a volcanic eruption",
-	},
-	{
 		title: "HTML game",
 		prompt: "Code a minimal Flappy Bird game using HTML and Canvas",
 		followUps: [
