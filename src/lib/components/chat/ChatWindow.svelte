@@ -339,13 +339,13 @@
 			activeRouterExamplePrompt &&
 			routerFollowUps.length > 0 &&
 			routerUserMessages.length === 1 &&
-			(currentModel.isRouter || modelSupportsTools) &&
+			(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) &&
 			!hideRouterExamples &&
 			!loading
 	);
 
 	$effect(() => {
-		if (!(currentModel.isRouter || modelSupportsTools) || !messages.length) {
+		if (!(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) || !messages.length) {
 			activeRouterExamplePrompt = null;
 			return;
 		}
