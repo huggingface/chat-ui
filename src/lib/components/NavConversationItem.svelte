@@ -23,12 +23,14 @@
 	let deleteOpen = $state(false);
 	let renameOpen = $state(false);
 	let inlineEditing = $state(false);
+	let inlineCancelled = $state(false);
 	let inlineTitle = $state("");
 	let inputEl: HTMLInputElement | undefined = $state();
 
 	async function startInlineEdit() {
 		if (readOnly || requireAuthUser()) return;
 		inlineTitle = conv.title;
+		inlineCancelled = false;
 		inlineEditing = true;
 		await tick();
 		inputEl?.focus();
@@ -36,6 +38,7 @@
 	}
 
 	function commitInlineEdit() {
+		if (!inlineEditing || inlineCancelled) return;
 		const trimmed = inlineTitle.trim();
 		inlineEditing = false;
 		if (trimmed && trimmed !== conv.title) {
@@ -44,6 +47,7 @@
 	}
 
 	function cancelInlineEdit() {
+		inlineCancelled = true;
 		inlineEditing = false;
 	}
 </script>
