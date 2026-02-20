@@ -25,7 +25,7 @@
 		"@iconify-json/lucide": "^1.2.77",
 		"@sveltejs/adapter-node": "^5.2.12",
 		"@sveltejs/adapter-static": "^3.0.8",
-		"@sveltejs/kit": "^2.50.2",
+		"@sveltejs/kit": "^2.52.2",
 		"@sveltejs/vite-plugin-svelte": "^5.0.3",
 		"@tailwindcss/typography": "^0.5.9",
 		"@types/dompurify": "^3.0.5",
