@@ -23,7 +23,7 @@ jobs:
       group: aws-general-8-plus
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Extract package version
         id: package-version
@@ -84,7 +84,7 @@ jobs:
       group: aws-general-8-plus
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Extract package version
         id: package-version
