@@ -498,7 +498,7 @@
 			{/if}
 
 			{#if messages.length > 0}
-				<div class="flex h-max flex-col gap-8 pb-52">
+				<div class="flex h-max flex-col gap-8 pb-52 xl:gap-12">
 					{#each messages as message, idx (message.id)}
 						<ChatMessage
 							{loading}
