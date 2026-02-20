@@ -56,7 +56,7 @@
 		"prettier-plugin-tailwindcss": "^0.6.11",
 		"sade": "^1.8.1",
 		"superjson": "^2.2.2",
-		"svelte": "^5.33.3",
+		"svelte": "^5.53.0",
 		"svelte-check": "^4.0.0",
 		"tslib": "^2.4.1",
 		"typescript": "^5.5.0",
