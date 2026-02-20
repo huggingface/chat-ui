@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
+	import { tick } from "svelte";
 
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonEdit from "~icons/carbon/edit";
@@ -21,6 +22,30 @@
 
 	let deleteOpen = $state(false);
 	let renameOpen = $state(false);
+	let inlineEditing = $state(false);
+	let inlineTitle = $state("");
+	let inputEl: HTMLInputElement | undefined = $state();
+
+	async function startInlineEdit() {
+		if (readOnly || requireAuthUser()) return;
+		inlineTitle = conv.title;
+		inlineEditing = true;
+		await tick();
+		inputEl?.focus();
+		inputEl?.select();
+	}
+
+	function commitInlineEdit() {
+		const trimmed = inlineTitle.trim();
+		inlineEditing = false;
+		if (trimmed && trimmed !== conv.title) {
+			oneditConversationTitle?.({ id: conv.id.toString(), title: trimmed });
+		}
+	}
+
+	function cancelInlineEdit() {
+		inlineEditing = false;
+	}
 </script>
 
 <a
@@ -29,12 +54,38 @@
 	href="{base}/conversation/{conv.id}"
 	class="group flex h-[2.15rem] flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 max-sm:h-10
 		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}"
+	ondblclick={(e) => {
+		e.preventDefault();
+		startInlineEdit();
+	}}
 >
-	<div class="my-2 min-w-0 flex-1 truncate first-letter:uppercase">
-		<span>{conv.title}</span>
-	</div>
+	{#if inlineEditing}
+		<!-- svelte-ignore a11y_autofocus -->
+		<input
+			bind:this={inputEl}
+			type="text"
+			value={inlineTitle}
+			oninput={(e) => (inlineTitle = (e.currentTarget as HTMLInputElement).value)}
+			onkeydown={(e) => {
+				if (e.key === "Enter") {
+					e.preventDefault();
+					commitInlineEdit();
+				} else if (e.key === "Escape") {
+					e.preventDefault();
+					cancelInlineEdit();
+				}
+			}}
+			onblur={commitInlineEdit}
+			onclick={(e) => e.preventDefault()}
+			class="my-0 h-full min-w-0 flex-1 truncate border-none bg-transparent p-0 text-inherit outline-none first-letter:uppercase focus:ring-0"
+		/>
+	{:else}
+		<div class="my-2 min-w-0 flex-1 truncate first-letter:uppercase">
+			<span>{conv.title}</span>
+		</div>
+	{/if}
 
-	{#if !readOnly}
+	{#if !readOnly && !inlineEditing}
 		<button
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
