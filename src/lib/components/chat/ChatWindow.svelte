@@ -339,13 +339,13 @@
 			activeRouterExamplePrompt &&
 			routerFollowUps.length > 0 &&
 			routerUserMessages.length === 1 &&
-			currentModel.isRouter &&
+			(currentModel.isRouter || modelSupportsTools) &&
 			!hideRouterExamples &&
 			!loading
 	);
 
 	$effect(() => {
-		if (!currentModel.isRouter || !messages.length) {
+		if (!(currentModel.isRouter || modelSupportsTools) || !messages.length) {
 			activeRouterExamplePrompt = null;
 			return;
 		}
@@ -550,7 +550,7 @@
 			dark:from-gray-900 dark:via-gray-900/100
 			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		{#if !draft.length && !messages.length && !sources.length && !loading && currentModel.isRouter && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
+		{#if !draft.length && !messages.length && !sources.length && !loading && (currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
 			<div
 				class="no-scrollbar mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 dark:text-gray-500"
 			>
