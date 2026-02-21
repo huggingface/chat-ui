@@ -2,21 +2,28 @@ import { buildPrompt } from "$lib/buildPrompt";
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
+import { sanitizeParamId, sanitizeShareId } from "$lib/server/mongoSanitize";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
 export async function GET({ params, locals }) {
+	// Handle short share IDs (7 chars) vs full ObjectIds
 	const conv =
 		params.id.length === 7
-			? await collections.sharedConversations.findOne({
-					_id: params.id,
-				})
-			: await collections.conversations.findOne({
-					_id: new ObjectId(params.id),
-					...authCondition(locals),
-				});
+			? await (async () => {
+					const safeId = sanitizeShareId(params.id);
+					if (!safeId) error(400, "Invalid share ID");
+					return collections.sharedConversations.findOne({ _id: safeId });
+				})()
+			: await (async () => {
+					const safeId = sanitizeParamId(params.id);
+					return collections.conversations.findOne({
+						_id: new ObjectId(safeId),
+						...authCondition(locals),
+					});
+				})();
 
 	if (conv === null) {
 		error(404, "Conversation not found");

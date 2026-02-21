@@ -30,8 +30,10 @@ export async function POST({ request, locals }) {
 		streamingMode,
 	} satisfies SettingsEditable;
 
+	// SECURITY: authCondition() performs input sanitization internally
+	const authFilter = authCondition(locals);
 	await collections.settings.updateOne(
-		authCondition(locals),
+		authFilter,
 		{
 			$set: {
 				...settings,

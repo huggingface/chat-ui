@@ -23,6 +23,7 @@ import type { Session } from "$lib/types/Session";
 import { base } from "$app/paths";
 import { acquireLock, isDBLocked, releaseLock } from "$lib/migrations/lock";
 import { Semaphores } from "$lib/types/Semaphore";
+import { sanitizeSessionId } from "$lib/server/mongoSanitize";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -189,9 +190,12 @@ export const authCondition = (locals: App.Locals) => {
 		throw new Error("User or sessionId is required");
 	}
 
+	// Sanitize sessionId to prevent NoSQL injection
+	const safeSessionId = sanitizeSessionId(locals.sessionId);
+
 	return locals.user
 		? { userId: locals.user._id }
-		: { sessionId: locals.sessionId, userId: { $exists: false } };
+		: { sessionId: safeSessionId, userId: { $exists: false } };
 };
 
 export function tokenSetToSessionOauth(tokenSet: TokenSet): Session["oauth"] {
