@@ -19,6 +19,7 @@
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import ToolUpdate from "./ToolUpdate.svelte";
+	import ToolGallery from "./ToolGallery.svelte";
 	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
 	import { MessageUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
 	import ImageLightbox from "./ImageLightbox.svelte";
@@ -130,9 +131,47 @@
 	const THINK_BLOCK_TEST_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/i;
 	let hasClientThink = $derived(message.content.split(THINK_BLOCK_REGEX).length > 1);
 
-	// Strip think blocks for clipboard copy (always, regardless of detection)
+	// Gallery block detection: <gallery title="...">JSON</gallery>
+	const GALLERY_BLOCK_REGEX = /(<gallery(?:\s[^>]*)?>[\s\S]*?(?:<\/gallery>|$))/gi;
+	const GALLERY_BLOCK_TEST_REGEX = /(<gallery(?:\s[^>]*)?>[\s\S]*?(?:<\/gallery>|$))/i;
+	let hasGallery = $derived(GALLERY_BLOCK_TEST_REGEX.test(message.content));
+
+	interface GalleryItem {
+		url: string;
+		media_type: "image" | "video" | "audio";
+		title?: string;
+		description?: string;
+		thumbnail_url?: string;
+	}
+
+	function parseGalleryBlock(raw: string): { title?: string; items: GalleryItem[] } {
+		// Extract title from opening tag: <gallery title="...">
+		const titleMatch = raw.match(/<gallery[^>]*\btitle="([^"]*)"[^>]*>/i);
+		const title = titleMatch?.[1] || undefined;
+		// Extract JSON content between tags
+		const innerMatch = raw.match(/<gallery[^>]*>([\s\S]*?)(?:<\/gallery>|$)/i);
+		const inner = innerMatch?.[1]?.trim() ?? "";
+		try {
+			const parsed = JSON.parse(inner);
+			if (Array.isArray(parsed)) {
+				const items = parsed.filter(
+					(item): item is GalleryItem =>
+						typeof item === "object" &&
+						item !== null &&
+						typeof item.url === "string" &&
+						typeof item.media_type === "string"
+				);
+				return { title, items };
+			}
+		} catch {
+			// JSON parse failed — skip
+		}
+		return { title, items: [] };
+	}
+
+	// Strip think and gallery blocks for clipboard copy
 	let contentWithoutThink = $derived.by(() =>
-		message.content.replace(THINK_BLOCK_REGEX, "").trim()
+		message.content.replace(THINK_BLOCK_REGEX, "").replace(GALLERY_BLOCK_REGEX, "").trim()
 	);
 
 	type Block =
@@ -240,6 +279,32 @@
 	});
 </script>
 
+{#snippet renderTextContent(content: string, isLoading: boolean)}
+	{#if hasGallery}
+		{@const galleryParts = content.split(GALLERY_BLOCK_REGEX)}
+		{#each galleryParts as gpart}
+			{#if gpart && GALLERY_BLOCK_TEST_REGEX.test(gpart)}
+				{@const gallery = parseGalleryBlock(gpart)}
+				{#if gallery.items.length > 0}
+					<ToolGallery title={gallery.title} items={gallery.items} />
+				{/if}
+			{:else if gpart && gpart.trim().length > 0}
+				<div
+					class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+				>
+					<MarkdownRenderer content={gpart} loading={isLoading} />
+				</div>
+			{/if}
+		{/each}
+	{:else}
+		<div
+			class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+		>
+			<MarkdownRenderer {content} loading={isLoading} />
+		</div>
+	{/if}
+{/snippet}
+
 {#if message.from === "assistant"}
 	<div
 		bind:offsetWidth={messageWidth}
@@ -303,19 +368,11 @@
 										hasNext={hasMoreLinkable}
 									/>
 								{:else if part && part.trim().length > 0}
-									<div
-										class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
-									>
-										<MarkdownRenderer content={part} loading={isLast && loading} />
-									</div>
+									{@render renderTextContent(part, isLast && loading)}
 								{/if}
 							{/each}
 						{:else}
-							<div
-								class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
-							>
-								<MarkdownRenderer content={block.content} loading={isLast && loading} />
-							</div>
+							{@render renderTextContent(block.content, isLast && loading)}
 						{/if}
 					{/if}
 				{/each}

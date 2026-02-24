@@ -12,7 +12,7 @@ export function buildToolPreprompt(tools: OpenAiTool[]): string {
 		month: "long",
 		day: "numeric",
 	});
-	return [
+	const lines = [
 		`You have access to these tools: ${names.join(", ")}.`,
 		`Today's date: ${currentDate}.`,
 		`Only use a tool if you cannot answer without it. For simple tasks like writing, editing text, or answering from your knowledge, respond directly without tools.`,
@@ -22,5 +22,7 @@ export function buildToolPreprompt(tools: OpenAiTool[]): string {
 		`If a tool generates an image, you can inline it directly: ![alt text](image_url).`,
 		`If a tool needs an image, set its image field ("input_image", "image", or "image_url") to a reference like "image_1", "image_2", etc. (ordered by when the user uploaded them).`,
 		`Default to image references; only use a full http(s) URL when the tool description explicitly asks for one, or reuse a URL a previous tool returned.`,
-	].join(" ");
+		`GALLERY: When you have multiple media items (images, videos, audio) to present, use the <gallery> component to display them in a visual horizontal gallery. Format: <gallery title="Optional Title">[{"url":"...","media_type":"image|video|audio","title":"...","description":"..."}]</gallery>. For a single image, prefer inline markdown ![alt](url) instead.`,
+	];
+	return lines.join(" ");
 }
