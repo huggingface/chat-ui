@@ -68,7 +68,7 @@
 		{:else}
 			<!-- Collapsed: 2-line preview (plain text, strip markdown) -->
 			<div
-				class="line-clamp-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400"
+				class="line-clamp-2 max-h-[3.25em] text-sm leading-relaxed text-gray-500 dark:text-gray-400"
 				class:animate-pulse={loading}
 			>
 				{content
