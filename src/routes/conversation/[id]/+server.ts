@@ -127,6 +127,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		inputs: newPrompt,
 		id: messageId,
 		is_retry: isRetry,
+		is_deep_research: isDeepResearch,
 		selectedMcpServerNames,
 		selectedMcpServers,
 	} = z
@@ -139,6 +140,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					.transform((s) => s.replace(/\r\n/g, "\n"))
 			),
 			is_retry: z.optional(z.boolean()),
+			is_deep_research: z.optional(z.boolean()),
 			selectedMcpServerNames: z.optional(z.array(z.string())),
 			selectedMcpServers: z
 				.optional(
@@ -570,6 +572,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						config.isHuggingChat && !model.isRouter
 							? userSettings?.providerOverrides?.[model.id]
 							: undefined,
+					deepResearch: Boolean(isDeepResearch),
 					locals,
 					abortController: ctrl,
 				};

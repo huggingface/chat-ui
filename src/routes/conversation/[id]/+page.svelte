@@ -104,10 +104,12 @@
 		prompt,
 		messageId = messagesPath.at(-1)?.id ?? undefined,
 		isRetry = false,
+		deepResearch = false,
 	}: {
 		prompt?: string;
 		messageId?: ReturnType<typeof v4>;
 		isRetry?: boolean;
+		deepResearch?: boolean;
 	}): Promise<void> {
 		try {
 			stopRequested = false;
@@ -224,6 +226,7 @@
 					inputs: prompt,
 					messageId,
 					isRetry,
+					isDeepResearch: deepResearch,
 					files: isRetry ? userMessage?.files : base64Files,
 					selectedMcpServerNames: $enabledServers.map((s) => s.name),
 					selectedMcpServers: $enabledServers.map((s) => ({
@@ -463,7 +466,10 @@
 	onMount(async () => {
 		if ($pendingMessage) {
 			files = $pendingMessage.files;
-			await writeMessage({ prompt: $pendingMessage.content });
+			await writeMessage({
+				prompt: $pendingMessage.content,
+				deepResearch: $pendingMessage.deepResearch,
+			});
 			$pendingMessage = undefined;
 		}
 
@@ -474,8 +480,8 @@
 		}
 	});
 
-	async function onMessage(content: string) {
-		await writeMessage({ prompt: content });
+	async function onMessage(content: string, opts?: { deepResearch?: boolean }) {
+		await writeMessage({ prompt: content, deepResearch: opts?.deepResearch });
 	}
 
 	async function onRetry(payload: { id: Message["id"]; content?: string }) {

@@ -19,6 +19,8 @@ export interface TextGenerationContext {
 	forceTools?: boolean;
 	/** Inference provider preference: "auto", "fastest", "cheapest", or a specific provider name */
 	provider?: string;
+	/** Enable deep research mode: iterative multi-step web research via MCP tools */
+	deepResearch?: boolean;
 	locals: App.Locals | undefined;
 	abortController: AbortController;
 }

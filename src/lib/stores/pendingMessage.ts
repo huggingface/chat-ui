@@ -4,6 +4,7 @@ export const pendingMessage = writable<
 	| {
 			content: string;
 			files: File[];
+			deepResearch?: boolean;
 	  }
 	| undefined
 >();

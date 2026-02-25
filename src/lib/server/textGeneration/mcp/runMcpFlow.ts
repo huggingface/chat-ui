@@ -28,10 +28,21 @@ import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepa
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
+import {
+	buildDeepResearchPrompt,
+	DEEP_RESEARCH_MAX_LOOPS,
+} from "$lib/server/textGeneration/deepResearch";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
-	"model" | "conv" | "assistant" | "forceMultimodal" | "forceTools" | "provider" | "locals"
+	| "model"
+	| "conv"
+	| "assistant"
+	| "forceMultimodal"
+	| "forceTools"
+	| "provider"
+	| "deepResearch"
+	| "locals"
 > & { messages: EndpointMessage[] };
 
 // Return type: "completed" = MCP ran successfully, "not_applicable" = MCP didn't run, "aborted" = user aborted
@@ -45,6 +56,7 @@ export async function* runMcpFlow({
 	forceMultimodal,
 	forceTools,
 	provider,
+	deepResearch,
 	locals,
 	preprompt,
 	abortSignal,
@@ -348,6 +360,11 @@ export async function* runMcpFlow({
 		);
 		const toolPreprompt = buildToolPreprompt(oaTools);
 		const prepromptPieces: string[] = [];
+		// In deep research mode, prepend research-specific instructions
+		if (deepResearch) {
+			const toolNames = oaTools.map((t) => t.function.name);
+			prepromptPieces.push(buildDeepResearchPrompt(toolNames));
+		}
 		if (toolPreprompt.trim().length > 0) {
 			prepromptPieces.push(toolPreprompt);
 		}
@@ -458,7 +475,8 @@ export async function* runMcpFlow({
 			);
 		}
 
-		for (let loop = 0; loop < 10; loop += 1) {
+		const maxLoops = deepResearch ? DEEP_RESEARCH_MAX_LOOPS : 10;
+		for (let loop = 0; loop < maxLoops; loop += 1) {
 			// Check for abort at the start of each loop iteration
 			if (checkAborted()) {
 				logger.info({ loop }, "[mcp] aborting at start of loop iteration");

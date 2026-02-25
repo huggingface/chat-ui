@@ -25,7 +25,7 @@
 
 	const settings = useSettingsStore();
 
-	async function createConversation(message: string) {
+	async function createConversation(message: string, opts?: { deepResearch?: boolean }) {
 		try {
 			$loading = true;
 
@@ -74,6 +74,7 @@
 			pendingMessage.set({
 				content: message,
 				files,
+				deepResearch: opts?.deepResearch,
 			});
 
 			// invalidateAll to update list of conversations
@@ -150,7 +151,7 @@
 
 {#if hasModels}
 	<ChatWindow
-		onmessage={(message) => createConversation(message)}
+		onmessage={(message, opts) => createConversation(message, opts)}
 		loading={$loading}
 		{currentModel}
 		models={data.models}

@@ -30,7 +30,7 @@
 			.join("/")
 	);
 
-	async function createConversation(message: string) {
+	async function createConversation(message: string, opts?: { deepResearch?: boolean }) {
 		try {
 			loading = true;
 
@@ -57,6 +57,7 @@
 			pendingMessage.set({
 				content: message,
 				files,
+				deepResearch: opts?.deepResearch,
 			});
 
 			// invalidateAll to update list of conversations
@@ -152,7 +153,7 @@
 </svelte:head>
 
 <ChatWindow
-	onmessage={(message) => createConversation(message)}
+	onmessage={(message, opts) => createConversation(message, opts)}
 	{loading}
 	currentModel={findCurrentModel(data.models, data.oldModels, modelId)}
 	models={data.models}

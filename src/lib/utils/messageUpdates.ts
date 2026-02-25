@@ -18,6 +18,7 @@ type MessageUpdateRequestOptions = {
 	messageId?: string;
 	isRetry: boolean;
 	isContinue?: boolean;
+	isDeepResearch?: boolean;
 	files?: MessageFile[];
 	// Optional: pass selected MCP server names (client-side selection)
 	selectedMcpServerNames?: string[];
@@ -55,6 +56,7 @@ export async function fetchMessageUpdates(
 		id: opts.messageId,
 		is_retry: opts.isRetry,
 		is_continue: Boolean(opts.isContinue),
+		is_deep_research: Boolean(opts.isDeepResearch),
 		// Will be ignored server-side if unsupported
 		selectedMcpServerNames: opts.selectedMcpServerNames,
 		selectedMcpServers: opts.selectedMcpServers,

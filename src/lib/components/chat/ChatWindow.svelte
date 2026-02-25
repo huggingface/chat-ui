@@ -62,7 +62,7 @@
 		models: Model[];
 		preprompt?: string | undefined;
 		files?: File[];
-		onmessage?: (content: string) => void;
+		onmessage?: (content: string, opts?: { deepResearch?: boolean }) => void;
 		onstop?: () => void;
 		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
 		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
@@ -100,10 +100,14 @@
 	);
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
 
+	// Deep Research mode toggle
+	let deepResearch = $state(false);
+
 	const handleSubmit = () => {
 		if (requireAuthUser() || loading || !draft) return;
-		onmessage?.(draft);
+		onmessage?.(draft, deepResearch ? { deepResearch: true } : undefined);
 		draft = "";
+		deepResearch = false;
 	};
 
 	let lastTarget: EventTarget | null = null;
@@ -345,7 +349,10 @@
 	);
 
 	$effect(() => {
-		if (!(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) || !messages.length) {
+		if (
+			!(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) ||
+			!messages.length
+		) {
 			activeRouterExamplePrompt = null;
 			return;
 		}
@@ -367,8 +374,9 @@
 		}
 	});
 
-	function triggerPrompt(prompt: string) {
+	function triggerPrompt(prompt: string, opts?: { deepResearch?: boolean }) {
 		if (requireAuthUser() || loading) return;
+		if (opts?.deepResearch) deepResearch = true;
 		draft = prompt;
 		handleSubmit();
 	}
@@ -667,6 +675,36 @@
 								classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
 							/>
 						{:else}
+							{#if modelSupportsTools}
+								<button
+									type="button"
+									class="btn absolute bottom-2 size-8 self-end rounded-full border transition-none sm:size-7 {transcriptionEnabled
+										? 'right-[5.25rem] sm:right-[4.75rem]'
+										: 'right-10 sm:right-9'} {deepResearch
+										? 'border-blue-400 bg-blue-100 text-blue-600 dark:border-blue-500 dark:bg-blue-900/50 dark:text-blue-400'
+										: 'bg-white/50 text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white'}"
+									disabled={isReadOnly}
+									onclick={() => {
+										deepResearch = !deepResearch;
+									}}
+									aria-label={deepResearch ? "Disable deep research" : "Enable deep research"}
+									title={deepResearch ? "Deep Research enabled" : "Enable Deep Research"}
+								>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										viewBox="0 0 20 20"
+										fill="currentColor"
+										class="size-4"
+									>
+										<path
+											d="M6.5 3c-1.051 0-2.093.04-3.125.117A1.49 1.49 0 0 0 2 4.607V10.5h9V4.606c0-.771-.59-1.42-1.375-1.489A41.568 41.568 0 0 0 6.5 3ZM2 12v5.5A1.5 1.5 0 0 0 3.5 19h.998a1.5 1.5 0 0 0 1.5-1.5V16h1.005v1.5A1.5 1.5 0 0 0 8.502 19h.998a1.5 1.5 0 0 0 1.5-1.5V12H2Z"
+										/>
+										<path
+											d="M14.5 7.903a41.465 41.465 0 0 0-3.5-.32v8.917h6V9.392c0-.771-.59-1.42-1.375-1.489A41.557 41.557 0 0 0 14.5 7.903ZM13 14.5v1a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5Zm.5-4.5a1 1 0 1 0 0 2h3a1 1 0 1 0 0-2h-3Z"
+										/>
+									</svg>
+								</button>
+							{/if}
 							{#if transcriptionEnabled}
 								<button
 									type="button"
