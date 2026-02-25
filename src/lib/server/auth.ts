@@ -525,7 +525,17 @@ export async function triggerOauthFlow({
 	// const referer = request.headers.get("referer");
 	// let redirectURI = `${(referer ? new URL(referer) : url).origin}${base}/login/callback`;
 
-	let redirectURI = `${url.origin}${base}/login/callback`;
+	let origin = url.origin;
+	const configuredOrigin = (config.PUBLIC_ORIGIN || "").trim();
+	if (configuredOrigin) {
+		try {
+			origin = new URL(configuredOrigin).origin;
+		} catch (err) {
+			logger.warn("Invalid PUBLIC_ORIGIN, falling back to request origin", err);
+		}
+	}
+
+	let redirectURI = `${origin}${base}/login/callback`;
 	// if redirectUri is not local host set it to https
 	if (!redirectURI.includes("localhost")) {
 		redirectURI = redirectURI.replace("http://", "https://");
