@@ -12,7 +12,7 @@ export function buildToolPreprompt(tools: OpenAiTool[]): string {
 		month: "long",
 		day: "numeric",
 	});
-	const isoDate = now.toISOString().split("T")[0];
+	const isoDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 	return [
 		`You have access to these tools: ${names.join(", ")}.`,
 		`Today's date: ${currentDate} (${isoDate}).`,
