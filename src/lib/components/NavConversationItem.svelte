@@ -139,6 +139,7 @@
 	data-sveltekit-noscroll
 	data-sveltekit-preload-data="tap"
 	data-conv-id={conv.id}
+	draggable="false"
 	href="{base}/conversation/{conv.id}"
 	class="group flex h-[2.15rem] flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 transition-all duration-150 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 max-sm:h-10
 		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}
