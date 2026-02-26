@@ -23,16 +23,11 @@
 	class="flex h-[648px] w-[1200px] flex-col items-center justify-center bg-black text-white"
 	style="background-image: url(https://cdn-uploads.huggingface.co/production/uploads/5f17f0a0925b9863e28ad517/L4XVRJ7MsfFDD7ROx_geO.png);"
 >
-	<!-- Chat bubble icon -->
+	<!-- Shared conversation label -->
 	<div
-		style="display: flex; align-items: center; justify-content: center; width: 72px; height: 72px; border-radius: 18px; background: linear-gradient(135deg, rgba(255,210,0,0.25), rgba(255,150,0,0.15)); border: 1px solid rgba(255,210,0,0.3); margin-bottom: 32px;"
+		style="display: flex; align-items: center; justify-content: center; padding: 8px 24px; border-radius: 9999px; background-color: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); margin-bottom: 32px; font-size: 18px; font-weight: 500; color: rgba(255,255,255,0.7); letter-spacing: 0.02em;"
 	>
-		<svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-			<path
-				d="M12 2C6.48 2 2 5.58 2 10c0 2.24 1.12 4.26 2.94 5.7L4 22l4.73-2.84C9.77 19.72 10.86 20 12 20c5.52 0 10-3.58 10-8s-4.48-8-10-8z"
-				fill="rgba(255,210,0,0.9)"
-			/>
-		</svg>
+		Shared conversation
 	</div>
 
 	<!-- Conversation title -->
