@@ -13,7 +13,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	const p = parseInt(url.searchParams.get("p") ?? "0") || 0;
 
 	const convs = await collections.conversations
-		.find(authCondition(locals))
+		.find({ ...authCondition(locals), groupId: { $exists: false } })
 		.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model">>({
 			title: 1,
 			updatedAt: 1,

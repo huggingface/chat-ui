@@ -345,7 +345,10 @@
 	);
 
 	$effect(() => {
-		if (!(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) || !messages.length) {
+		if (
+			!(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) ||
+			!messages.length
+		) {
 			activeRouterExamplePrompt = null;
 			return;
 		}

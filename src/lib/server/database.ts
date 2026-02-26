@@ -22,6 +22,7 @@ import { dirname, join } from "path";
 import { existsSync, mkdirSync } from "fs";
 import { findRepoRoot } from "./findRepoRoot";
 import type { ConfigKey } from "$lib/types/ConfigKey";
+import type { ConversationGroup } from "$lib/types/ConversationGroup";
 import { config } from "$lib/server/config";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
@@ -128,6 +129,7 @@ export class Database {
 		const configCollection = db.collection<ConfigKey>("config");
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
 		const sharedConversations = db.collection<SharedConversation>("sharedConversations");
+		const conversationGroups = db.collection<ConversationGroup>("conversationGroups");
 		const bucket = new GridFSBucket(db, { bucketName: "files" });
 
 		// Collections with secondaryPreferred - heavy reads, can tolerate slight replication lag
@@ -150,6 +152,7 @@ export class Database {
 
 		return {
 			conversations,
+			conversationGroups,
 			conversationStats,
 			assistants,
 			assistantStats,
@@ -176,6 +179,7 @@ export class Database {
 	private initDatabase() {
 		const {
 			conversations,
+			conversationGroups,
 			conversationStats,
 			assistants,
 			assistantStats,
@@ -379,6 +383,16 @@ export class Database {
 		config
 			.createIndex({ key: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating index for config by key"));
+
+		conversationGroups
+			.createIndex({ userId: 1 }, { partialFilterExpression: { userId: { $exists: true } } })
+			.catch((e) => logger.error(e, "Error creating index for conversationGroups by userId"));
+		conversationGroups
+			.createIndex({ sessionId: 1 }, { partialFilterExpression: { sessionId: { $exists: true } } })
+			.catch((e) => logger.error(e, "Error creating index for conversationGroups by sessionId"));
+		conversations
+			.createIndex({ groupId: 1 }, { sparse: true })
+			.catch((e) => logger.error(e, "Error creating index for conversations by groupId"));
 	}
 }
 

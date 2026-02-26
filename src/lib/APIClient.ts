@@ -122,6 +122,20 @@ export function useAPIClient({
 			old: endpoint(fetcher, `${baseUrl}/models/old`),
 			refresh: endpoint(fetcher, `${baseUrl}/models/refresh`),
 		},
+		"conversation-groups": Object.assign(
+			(params: { id: string }) => ({
+				...endpoint(fetcher, `${baseUrl}/conversation-groups/${params.id}`),
+				conversations: endpoint(
+					fetcher,
+					`${baseUrl}/conversation-groups/${params.id}/conversations`
+				),
+				"generate-name": endpoint(
+					fetcher,
+					`${baseUrl}/conversation-groups/${params.id}/generate-name`
+				),
+			}),
+			endpoint(fetcher, `${baseUrl}/conversation-groups`)
+		),
 		"public-config": endpoint(fetcher, `${baseUrl}/public-config`),
 		"feature-flags": endpoint(fetcher, `${baseUrl}/feature-flags`),
 		debug: {

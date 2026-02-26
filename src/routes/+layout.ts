@@ -1,5 +1,6 @@
 import { UrlDependency } from "$lib/types/UrlDependency";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
+import type { ConvGroupSidebar } from "$lib/types/ConvGroupSidebar";
 import { useAPIClient, handleResponse } from "$lib/APIClient";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
 import type { GETModelsResponse, FeatureFlags } from "$lib/server/api/types";
@@ -40,7 +41,7 @@ export const load = async ({ depends, fetch, url }) => {
 
 	const client = useAPIClient({ fetch, origin: url.origin });
 
-	const [settings, models, user, publicConfig, featureFlags, conversationsData] =
+	const [settings, models, user, publicConfig, featureFlags, conversationsData, groupsData] =
 		(await Promise.all([
 			client.user.settings.get().then(handleResponse),
 			client.models.get().then(handleResponse),
@@ -48,6 +49,10 @@ export const load = async ({ depends, fetch, url }) => {
 			client["public-config"].get().then(handleResponse),
 			client["feature-flags"].get().then(handleResponse),
 			client.conversations.get({ query: { p: 0 } }).then(handleResponse),
+			client["conversation-groups"]
+				.get()
+				.then(handleResponse)
+				.catch(() => ({ groups: [] })),
 		])) as [
 			SettingsResponse,
 			GETModelsResponse,
@@ -55,6 +60,7 @@ export const load = async ({ depends, fetch, url }) => {
 			Record<string, unknown>,
 			FeatureFlags,
 			{ conversations: ConversationListItem[]; hasMore: boolean },
+			{ groups: ConvGroupSidebar[] },
 		];
 
 	const defaultModel = models[0];
@@ -73,8 +79,18 @@ export const load = async ({ depends, fetch, url }) => {
 		} satisfies ConvSidebar;
 	});
 
+	const groups: ConvGroupSidebar[] = (groupsData.groups ?? []).map((g) => ({
+		...g,
+		updatedAt: new Date(g.updatedAt),
+		conversations: g.conversations.map((c) => ({
+			...c,
+			updatedAt: new Date(c.updatedAt),
+		})),
+	}));
+
 	return {
 		conversations,
+		groups,
 		models,
 		oldModels: [],
 		user,

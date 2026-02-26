@@ -6,4 +6,5 @@ export interface ConvSidebar {
 	updatedAt: Date;
 	model?: string;
 	avatarUrl?: string | Promise<string | undefined>;
+	groupId?: string;
 }

@@ -2,6 +2,7 @@
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import { tick } from "svelte";
+	import { browser } from "$app/environment";
 
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonEdit from "~icons/carbon/edit";
@@ -10,15 +11,17 @@
 	import EditConversationModal from "$lib/components/EditConversationModal.svelte";
 	import DeleteConversationModal from "$lib/components/DeleteConversationModal.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { dragState, startDrag, setDropTarget } from "$lib/stores/dragState";
 
 	interface Props {
 		conv: ConvSidebar;
 		readOnly?: true;
+		groupId?: string;
 		ondeleteConversation?: (id: string) => void;
 		oneditConversationTitle?: (payload: { id: string; title: string }) => void;
 	}
 
-	let { conv, readOnly, ondeleteConversation, oneditConversationTitle }: Props = $props();
+	let { conv, readOnly, groupId, ondeleteConversation, oneditConversationTitle }: Props = $props();
 
 	let deleteOpen = $state(false);
 	let renameOpen = $state(false);
@@ -26,6 +29,16 @@
 	let inlineCancelled = $state(false);
 	let inlineTitle = $state("");
 	let inputEl: HTMLInputElement | undefined = $state();
+
+	// Drag state
+	let pointerStartPos: { x: number; y: number } | null = null;
+	let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+	let isDragSource = $derived($dragState.isDragging && $dragState.draggedConv?.id === conv.id);
+	let isDropTargetConv = $derived(
+		$dragState.isDragging &&
+			$dragState.dropTarget?.type === "conversation" &&
+			$dragState.dropTarget?.id === conv.id.toString()
+	);
 
 	async function startInlineEdit() {
 		if (readOnly || requireAuthUser()) return;
@@ -50,23 +63,105 @@
 		inlineCancelled = true;
 		inlineEditing = false;
 	}
+
+	function clearLongPress() {
+		if (longPressTimer) {
+			clearTimeout(longPressTimer);
+			longPressTimer = null;
+		}
+	}
+
+	function isMobile() {
+		return browser && window.matchMedia("(max-width: 768px)").matches;
+	}
+
+	function handlePointerDown(e: PointerEvent) {
+		if (readOnly || inlineEditing || e.button !== 0) return;
+		pointerStartPos = { x: e.clientX, y: e.clientY };
+
+		if (isMobile()) {
+			longPressTimer = setTimeout(() => {
+				if (pointerStartPos) {
+					startDrag(conv, pointerStartPos.x, pointerStartPos.y, groupId);
+					if (navigator.vibrate) navigator.vibrate(50);
+				}
+			}, 500);
+		}
+	}
+
+	function handlePointerMove(e: PointerEvent) {
+		if (!pointerStartPos) return;
+
+		const dx = e.clientX - pointerStartPos.x;
+		const dy = e.clientY - pointerStartPos.y;
+		const dist = Math.sqrt(dx * dx + dy * dy);
+
+		if ($dragState.isDragging) {
+			// Already dragging — this is handled by NavMenu's global pointermove
+			return;
+		}
+
+		if (isMobile()) {
+			// Cancel long press if moved too far
+			if (dist > 5) {
+				clearLongPress();
+				pointerStartPos = null;
+			}
+		} else {
+			// Desktop: start drag after 5px movement
+			if (dist > 5) {
+				startDrag(conv, e.clientX, e.clientY, groupId);
+			}
+		}
+	}
+
+	function handlePointerUp() {
+		clearLongPress();
+		pointerStartPos = null;
+	}
+
+	function handlePointerEnter() {
+		if ($dragState.isDragging && $dragState.draggedConv?.id !== conv.id) {
+			// Don't allow dropping onto a conversation in the same group
+			if (groupId && $dragState.sourceGroupId === groupId) return;
+			setDropTarget({ type: "conversation", id: conv.id.toString() });
+		}
+	}
+
+	function handlePointerLeave() {
+		if ($dragState.isDragging && $dragState.dropTarget?.id === conv.id.toString()) {
+			setDropTarget(null);
+		}
+	}
 </script>
 
 <a
 	data-sveltekit-noscroll
 	data-sveltekit-preload-data="tap"
+	data-conv-id={conv.id}
 	href="{base}/conversation/{conv.id}"
-	class="group flex h-[2.15rem] flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 max-sm:h-10
-		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}"
+	class="group flex h-[2.15rem] flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 transition-all duration-150 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 max-sm:h-10
+		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}
+		{isDragSource ? 'pointer-events-none opacity-40' : ''}
+		{isDropTargetConv ? 'bg-blue-50 ring-2 ring-blue-400 dark:bg-blue-900/20' : ''}"
 	onclick={(e) => {
+		if ($dragState.isDragging) {
+			e.preventDefault();
+			return;
+		}
 		if (e.detail >= 2) {
 			e.preventDefault();
 			startInlineEdit();
 		}
 	}}
+	onpointerdown={handlePointerDown}
+	onpointermove={handlePointerMove}
+	onpointerup={handlePointerUp}
+	onpointercancel={handlePointerUp}
+	onpointerenter={handlePointerEnter}
+	onpointerleave={handlePointerLeave}
 >
 	{#if inlineEditing}
-		<!-- svelte-ignore a11y_autofocus -->
 		<input
 			bind:this={inputEl}
 			type="text"
@@ -91,7 +186,7 @@
 		</div>
 	{/if}
 
-	{#if !readOnly && !inlineEditing}
+	{#if !readOnly && !inlineEditing && !$dragState.isDragging}
 		<button
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"

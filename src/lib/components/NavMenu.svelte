@@ -18,8 +18,11 @@
 	import { onDestroy } from "svelte";
 
 	import NavConversationItem from "./NavConversationItem.svelte";
+	import NavConversationGroup from "./NavConversationGroup.svelte";
+	import DragOverlay from "./DragOverlay.svelte";
 	import type { LayoutData } from "../../routes/$types";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
+	import type { ConvGroupSidebar } from "$lib/types/ConvGroupSidebar";
 	import type { Model } from "$lib/types/Model";
 	import { page } from "$app/state";
 	import InfiniteScroll from "./InfiniteScroll.svelte";
@@ -32,24 +35,43 @@
 	import { isPro } from "$lib/stores/isPro";
 	import IconPro from "$lib/components/icons/IconPro.svelte";
 	import MCPServerManager from "./mcp/MCPServerManager.svelte";
+	import { dragState, updateDragPosition, endDrag } from "$lib/stores/dragState";
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
 
+	type SidebarEntry =
+		| { type: "conversation"; conv: ConvSidebar; updatedAt: Date }
+		| { type: "group"; group: ConvGroupSidebar; updatedAt: Date };
+
 	interface Props {
 		conversations: ConvSidebar[];
+		groups?: ConvGroupSidebar[];
 		user: LayoutData["user"];
 		p?: number;
 		ondeleteConversation?: (id: string) => void;
 		oneditConversationTitle?: (payload: { id: string; title: string }) => void;
+		oncreateGroup?: (convIds: string[]) => void;
+		ondeleteGroup?: (id: string) => void;
+		oneditGroupName?: (payload: { id: string; name: string }) => void;
+		ontoggleGroupCollapse?: (payload: { id: string; isCollapsed: boolean }) => void;
+		onaddToGroup?: (payload: { groupId: string; convId: string }) => void;
+		onremoveFromGroup?: (payload: { groupId: string; convId: string }) => void;
 	}
 
 	let {
 		conversations = $bindable(),
+		groups = [],
 		user,
 		p = $bindable(0),
 		ondeleteConversation,
 		oneditConversationTitle,
+		oncreateGroup,
+		ondeleteGroup,
+		oneditGroupName,
+		ontoggleGroupCollapse,
+		onaddToGroup,
+		onremoveFromGroup,
 	}: Props = $props();
 
 	let hasMore = $state(true);
@@ -74,15 +96,39 @@
 		new Date().setMonth(new Date().getMonth() - 1),
 	];
 
-	let groupedConversations = $derived({
-		today: conversations.filter(({ updatedAt }) => updatedAt.getTime() > dateRanges[0]),
-		week: conversations.filter(
-			({ updatedAt }) => updatedAt.getTime() > dateRanges[1] && updatedAt.getTime() < dateRanges[0]
-		),
-		month: conversations.filter(
-			({ updatedAt }) => updatedAt.getTime() > dateRanges[2] && updatedAt.getTime() < dateRanges[1]
-		),
-		older: conversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
+	function getTimeBucket(ts: number): string {
+		if (ts > dateRanges[0]) return "today";
+		if (ts > dateRanges[1]) return "week";
+		if (ts > dateRanges[2]) return "month";
+		return "older";
+	}
+
+	let groupedEntries = $derived.by(() => {
+		const buckets: Record<string, SidebarEntry[]> = {
+			today: [],
+			week: [],
+			month: [],
+			older: [],
+		};
+
+		// Add ungrouped conversations
+		for (const conv of conversations) {
+			const bucket = getTimeBucket(conv.updatedAt.getTime());
+			buckets[bucket].push({ type: "conversation", conv, updatedAt: conv.updatedAt });
+		}
+
+		// Add groups by their effective updatedAt
+		for (const group of groups) {
+			const bucket = getTimeBucket(group.updatedAt.getTime());
+			buckets[bucket].push({ type: "group", group, updatedAt: group.updatedAt });
+		}
+
+		// Sort each bucket by updatedAt desc
+		for (const key of Object.keys(buckets)) {
+			buckets[key].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+		}
+
+		return buckets;
 	});
 
 	const nModels: number = page.data.models.filter((el: Model) => !el.unlisted).length;
@@ -108,8 +154,6 @@
 
 	$effect(() => {
 		if (conversations.length <= CONV_NUM_PER_PAGE) {
-			// reset p to 0 if there's only one page of content
-			// that would be caused by a data loading invalidation
 			p = 0;
 		}
 	});
@@ -127,6 +171,46 @@
 	onDestroy(() => {
 		unsubscribeTheme?.();
 	});
+
+	// Drag coordination: global pointermove and pointerup
+	function handleGlobalPointerMove(e: PointerEvent) {
+		if ($dragState.isDragging) {
+			e.preventDefault();
+			updateDragPosition(e.clientX, e.clientY);
+		}
+	}
+
+	function handleGlobalPointerUp() {
+		if (!$dragState.isDragging) return;
+
+		const { draggedConv, dropTarget, sourceGroupId } = $dragState;
+
+		if (draggedConv && dropTarget) {
+			const convId = draggedConv.id.toString();
+
+			if (dropTarget.type === "conversation") {
+				// Create new group with both conversations
+				if (sourceGroupId) {
+					// First remove from current group, then create new group
+					onremoveFromGroup?.({ groupId: sourceGroupId, convId });
+				}
+				oncreateGroup?.([convId, dropTarget.id]);
+			} else if (dropTarget.type === "group") {
+				if (sourceGroupId && sourceGroupId !== dropTarget.id) {
+					onremoveFromGroup?.({ groupId: sourceGroupId, convId });
+				}
+				onaddToGroup?.({ groupId: dropTarget.id, convId });
+			}
+		} else if (draggedConv && !dropTarget && sourceGroupId) {
+			// Dropped outside any target while from a group → remove from group
+			onremoveFromGroup?.({
+				groupId: sourceGroupId,
+				convId: draggedConv.id.toString(),
+			});
+		}
+
+		endDrag();
+	}
 </script>
 
 <div
@@ -149,17 +233,36 @@
 	</a>
 </div>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:border-transparent dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
+	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:border-transparent dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l
+		{$dragState.isDragging ? 'touch-none' : 'touch-pan-y'}"
+	onpointermove={handleGlobalPointerMove}
+	onpointerup={handleGlobalPointerUp}
 >
 	<div class="flex flex-col gap-0.5">
-		{#each Object.entries(groupedConversations) as [group, convs]}
-			{#if convs.length}
+		{#each Object.entries(groupedEntries) as [timeBucket, entries]}
+			{#if entries.length}
 				<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
-					{titles[group]}
+					{titles[timeBucket]}
 				</h4>
-				{#each convs as conv}
-					<NavConversationItem {conv} {oneditConversationTitle} {ondeleteConversation} />
+				{#each entries as entry}
+					{#if entry.type === "conversation"}
+						<NavConversationItem
+							conv={entry.conv}
+							{oneditConversationTitle}
+							{ondeleteConversation}
+						/>
+					{:else}
+						<NavConversationGroup
+							group={entry.group}
+							{ondeleteConversation}
+							{oneditConversationTitle}
+							ondeleteGroup={(id) => ondeleteGroup?.(id)}
+							oneditGroupName={(payload) => oneditGroupName?.(payload)}
+							ontoggleCollapse={(payload) => ontoggleGroupCollapse?.(payload)}
+						/>
+					{/if}
 				{/each}
 			{/if}
 		{/each}
@@ -262,3 +365,5 @@
 {#if showMcpModal}
 	<MCPServerManager onclose={() => (showMcpModal = false)} />
 {/if}
+
+<DragOverlay />

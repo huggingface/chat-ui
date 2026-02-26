@@ -18,6 +18,7 @@
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
+	import type { ConvGroupSidebar } from "$lib/types/ConvGroupSidebar";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { isPro } from "$lib/stores/isPro";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
@@ -35,6 +36,11 @@
 	let conversations = $state(data.conversations);
 	$effect(() => {
 		data.conversations && untrack(() => (conversations = data.conversations));
+	});
+
+	let groups = $state<ConvGroupSidebar[]>(data.groups ?? []);
+	$effect(() => {
+		if (data.groups) untrack(() => (groups = data.groups ?? []));
 	});
 
 	let isNavCollapsed = $state(false);
@@ -72,6 +78,14 @@
 			.then(async () => {
 				conversations = conversations.filter((conv) => conv.id !== id);
 
+				// Remove from groups and auto-delete empty groups
+				groups = groups
+					.map((g) => ({
+						...g,
+						conversations: g.conversations.filter((c) => c.id.toString() !== id),
+					}))
+					.filter((g) => g.conversations.length > 0);
+
 				if (page.params.id === id) {
 					await goto(`${base}/`, { invalidateAll: true });
 				}
@@ -89,6 +103,162 @@
 			.then(handleResponse)
 			.then(async () => {
 				conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
+				// Also update title in groups
+				groups = groups.map((g) => ({
+					...g,
+					conversations: g.conversations.map((c) => (c.id === id ? { ...c, title } : c)),
+				}));
+			})
+			.catch((err) => {
+				console.error(err);
+				$error = String(err);
+			});
+	}
+
+	async function createGroup(convIds: string[]) {
+		client["conversation-groups"]
+			.post({ conversationIds: convIds })
+			.then(handleResponse)
+			.then(async (res: { group: ConvGroupSidebar }) => {
+				const newGroup = {
+					...res.group,
+					updatedAt: new Date(res.group.updatedAt),
+					conversations: res.group.conversations.map((c) => ({
+						...c,
+						updatedAt: new Date(c.updatedAt),
+					})),
+				};
+				groups = [newGroup, ...groups];
+				// Remove grouped conversations from the ungrouped list
+				const groupedIds = new Set(convIds);
+				conversations = conversations.filter((c) => !groupedIds.has(c.id.toString()));
+
+				// Generate name in background, then update
+				client["conversation-groups"]({ id: newGroup.id })
+					["generate-name"].post()
+					.then(handleResponse)
+					.then((nameRes: { name: string }) => {
+						groups = groups.map((g) => (g.id === newGroup.id ? { ...g, name: nameRes.name } : g));
+					})
+					.catch(() => {
+						// Name generation failed, keep "New Group"
+					});
+			})
+			.catch((err) => {
+				console.error(err);
+				$error = String(err);
+			});
+	}
+
+	async function deleteGroup(id: string) {
+		client["conversation-groups"]({ id })
+			.delete()
+			.then(handleResponse)
+			.then(async () => {
+				const group = groups.find((g) => g.id === id);
+				if (group) {
+					// Move conversations back to ungrouped list
+					const ungroupedConvs = group.conversations.map((c) => ({
+						id: c.id.toString(),
+						title: c.title,
+						updatedAt: c.updatedAt,
+						model: c.model ?? "",
+					}));
+					conversations = [...ungroupedConvs, ...conversations].sort(
+						(a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
+					);
+				}
+				groups = groups.filter((g) => g.id !== id);
+			})
+			.catch((err) => {
+				console.error(err);
+				$error = String(err);
+			});
+	}
+
+	async function editGroupName(id: string, name: string) {
+		client["conversation-groups"]({ id })
+			.patch({ name })
+			.then(handleResponse)
+			.then(() => {
+				groups = groups.map((g) => (g.id === id ? { ...g, name } : g));
+			})
+			.catch((err) => {
+				console.error(err);
+				$error = String(err);
+			});
+	}
+
+	async function toggleGroupCollapse(id: string, isCollapsed: boolean) {
+		groups = groups.map((g) => (g.id === id ? { ...g, isCollapsed } : g));
+		client["conversation-groups"]({ id })
+			.patch({ isCollapsed })
+			.then(handleResponse)
+			.catch((err) => {
+				console.error(err);
+				// Revert on error
+				groups = groups.map((g) => (g.id === id ? { ...g, isCollapsed: !isCollapsed } : g));
+			});
+	}
+
+	async function addToGroup(groupId: string, convId: string) {
+		client["conversation-groups"]({ id: groupId })
+			.conversations.patch({ add: [convId] })
+			.then(handleResponse)
+			.then((res: { group?: ConvGroupSidebar; deleted?: boolean }) => {
+				if (res.group) {
+					const updated = {
+						...res.group,
+						updatedAt: new Date(res.group.updatedAt),
+						conversations: res.group.conversations.map((c) => ({
+							...c,
+							updatedAt: new Date(c.updatedAt),
+						})),
+					};
+					groups = groups.map((g) => (g.id === groupId ? updated : g));
+				}
+				conversations = conversations.filter((c) => c.id.toString() !== convId);
+			})
+			.catch((err) => {
+				console.error(err);
+				$error = String(err);
+			});
+	}
+
+	async function removeFromGroup(groupId: string, convId: string) {
+		client["conversation-groups"]({ id: groupId })
+			.conversations.patch({ remove: [convId] })
+			.then(handleResponse)
+			.then((res: { group?: ConvGroupSidebar; deleted?: boolean }) => {
+				// Find the conversation being removed
+				const group = groups.find((g) => g.id === groupId);
+				const removedConv = group?.conversations.find((c) => c.id.toString() === convId);
+
+				if (res.deleted) {
+					groups = groups.filter((g) => g.id !== groupId);
+				} else if (res.group) {
+					const updated = {
+						...res.group,
+						updatedAt: new Date(res.group.updatedAt),
+						conversations: res.group.conversations.map((c) => ({
+							...c,
+							updatedAt: new Date(c.updatedAt),
+						})),
+					};
+					groups = groups.map((g) => (g.id === groupId ? updated : g));
+				}
+
+				if (removedConv) {
+					conversations = [
+						{
+							id: removedConv.id.toString(),
+							title: removedConv.title,
+							updatedAt: removedConv.updatedAt,
+							model: removedConv.model ?? "",
+						},
+						...conversations,
+					].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+				}
 			})
 			.catch((err) => {
 				console.error(err);
@@ -115,6 +285,18 @@
 
 			if (convIdx != -1) {
 				conversations[convIdx].title = $titleUpdate?.title ?? conversations[convIdx].title;
+			}
+
+			// Also update title in groups
+			const convId = $titleUpdate?.convId;
+			const newTitle = $titleUpdate?.title;
+			if (convId && newTitle) {
+				groups = groups.map((g) => ({
+					...g,
+					conversations: g.conversations.map((c) =>
+						c.id.toString() === convId ? { ...c, title: newTitle } : c
+					),
+				}));
 			}
 
 			$titleUpdate = null;
@@ -183,7 +365,8 @@
 	let mobileNavTitle = $derived(
 		["/models", "/privacy"].includes(page.route.id ?? "")
 			? ""
-			: conversations.find((conv) => conv.id === page.params.id)?.title
+			: (conversations.find((conv) => conv.id === page.params.id)?.title ??
+					groups.flatMap((g) => g.conversations).find((c) => c.id === page.params.id)?.title)
 	);
 
 	// Show the welcome modal once on first app load
@@ -282,9 +465,16 @@
 	<MobileNav title={mobileNavTitle}>
 		<NavMenu
 			{conversations}
+			{groups}
 			user={data.user}
 			ondeleteConversation={(id) => deleteConversation(id)}
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
+			oncreateGroup={(convIds) => createGroup(convIds)}
+			ondeleteGroup={(id) => deleteGroup(id)}
+			oneditGroupName={(payload) => editGroupName(payload.id, payload.name)}
+			ontoggleGroupCollapse={(payload) => toggleGroupCollapse(payload.id, payload.isCollapsed)}
+			onaddToGroup={(payload) => addToGroup(payload.groupId, payload.convId)}
+			onremoveFromGroup={(payload) => removeFromGroup(payload.groupId, payload.convId)}
 		/>
 	</MobileNav>
 	<nav
@@ -292,9 +482,16 @@
 	>
 		<NavMenu
 			{conversations}
+			{groups}
 			user={data.user}
 			ondeleteConversation={(id) => deleteConversation(id)}
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
+			oncreateGroup={(convIds) => createGroup(convIds)}
+			ondeleteGroup={(id) => deleteGroup(id)}
+			oneditGroupName={(payload) => editGroupName(payload.id, payload.name)}
+			ontoggleGroupCollapse={(payload) => toggleGroupCollapse(payload.id, payload.isCollapsed)}
+			onaddToGroup={(payload) => addToGroup(payload.groupId, payload.convId)}
+			onremoveFromGroup={(payload) => removeFromGroup(payload.groupId, payload.convId)}
 		/>
 	</nav>
 	{#if currentError}
