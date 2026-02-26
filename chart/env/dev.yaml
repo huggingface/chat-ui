@@ -79,6 +79,9 @@ envVars:
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
   MODELS: >
     [
+      { "id": "Qwen/Qwen3.5-122B-A10B", "description": "Multimodal MoE excelling at agentic tool use with 1M context and 201 languages." },
+      { "id": "Qwen/Qwen3.5-35B-A3B", "description": "Compact multimodal MoE with hybrid DeltaNet, 1M context, and 201 languages." },
+      { "id": "Qwen/Qwen3.5-27B", "description": "Dense multimodal hybrid with top-tier reasoning density and 1M context." },
       { "id": "Qwen/Qwen3.5-397B-A17B", "description": "Native multimodal MoE with hybrid attention, 1M context, and 201 languages.", "parameters": { "max_tokens": 32768 } },
       { "id": "allenai/Olmo-3.1-32B-Think", "description": "Updated Olmo Think with extended RL for stronger math, code, and instruction following." },
       { "id": "MiniMaxAI/MiniMax-M2.5", "description": "Frontier 230B MoE agent for top-tier coding, tool calling, and fast inference." },
