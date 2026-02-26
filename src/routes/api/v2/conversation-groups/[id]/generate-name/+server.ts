@@ -11,7 +11,11 @@ import type { Conversation } from "$lib/types/Conversation";
 export const POST: RequestHandler = async ({ locals, params }) => {
 	requireAuth(locals);
 
-	const groupId = new ObjectId(params.id);
+	const id = params.id ?? "";
+	if (!ObjectId.isValid(id)) {
+		error(400, "Invalid group ID");
+	}
+	const groupId = new ObjectId(id);
 
 	const group = await collections.conversationGroups.findOne({
 		_id: groupId,

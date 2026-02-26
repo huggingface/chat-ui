@@ -11,12 +11,17 @@ import type { Conversation } from "$lib/types/Conversation";
 const membershipSchema = z.object({
 	add: z.array(z.string()).optional(),
 	remove: z.array(z.string()).optional(),
+	sourceGroupId: z.string().optional(),
 });
 
 export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 	requireAuth(locals);
 
-	const groupId = new ObjectId(params.id);
+	const id = params.id ?? "";
+	if (!ObjectId.isValid(id)) {
+		error(400, "Invalid group ID");
+	}
+	const groupId = new ObjectId(id);
 	const body = membershipSchema.parse(await request.json());
 
 	// Verify group belongs to user
@@ -32,6 +37,9 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 	const auth = authCondition(locals);
 
 	if (body.add?.length) {
+		if (!body.add.every((id) => ObjectId.isValid(id))) {
+			error(400, "Invalid conversation ID");
+		}
 		const addIds = body.add.map((id) => new ObjectId(id));
 
 		// Verify conversations belong to user
@@ -49,7 +57,27 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 		);
 	}
 
+	// Clean up source group if provided (atomic group-to-group transfer)
+	let sourceGroupDeleted = false;
+	if (body.sourceGroupId) {
+		if (!ObjectId.isValid(body.sourceGroupId)) {
+			error(400, "Invalid source group ID");
+		}
+		const sourceOid = new ObjectId(body.sourceGroupId);
+		const sourceRemaining = await collections.conversations.countDocuments({
+			groupId: sourceOid,
+			...auth,
+		});
+		if (sourceRemaining === 0) {
+			await collections.conversationGroups.deleteOne({ _id: sourceOid, ...auth });
+			sourceGroupDeleted = true;
+		}
+	}
+
 	if (body.remove?.length) {
+		if (!body.remove.every((id) => ObjectId.isValid(id))) {
+			error(400, "Invalid conversation ID");
+		}
 		const removeIds = body.remove.map((id) => new ObjectId(id));
 		await collections.conversations.updateMany(
 			{ _id: { $in: removeIds }, groupId, ...auth },
@@ -65,7 +93,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 
 	if (remaining === 0) {
 		await collections.conversationGroups.deleteOne({ _id: groupId });
-		return superjsonResponse({ deleted: true });
+		return superjsonResponse({ deleted: true, sourceGroupDeleted });
 	}
 
 	// Return updated group with conversations
@@ -98,5 +126,6 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 			})),
 			updatedAt: maxUpdatedAt,
 		},
+		sourceGroupDeleted,
 	});
 };

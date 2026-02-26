@@ -15,7 +15,11 @@ const patchSchema = z.object({
 export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 	requireAuth(locals);
 
-	const groupId = new ObjectId(params.id);
+	const id = params.id ?? "";
+	if (!ObjectId.isValid(id)) {
+		error(400, "Invalid group ID");
+	}
+	const groupId = new ObjectId(id);
 	const body = patchSchema.parse(await request.json());
 
 	const update: Record<string, unknown> = {};
@@ -41,7 +45,11 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 export const DELETE: RequestHandler = async ({ locals, params }) => {
 	requireAuth(locals);
 
-	const groupId = new ObjectId(params.id);
+	const id = params.id ?? "";
+	if (!ObjectId.isValid(id)) {
+		error(400, "Invalid group ID");
+	}
+	const groupId = new ObjectId(id);
 
 	// Unset groupId on all conversations in this group
 	await collections.conversations.updateMany(

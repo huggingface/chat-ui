@@ -60,12 +60,16 @@ export const GET: RequestHandler = async ({ locals }) => {
 const createSchema = z.object({
 	conversationIds: z.array(z.string()).min(2),
 	name: z.string().optional(),
+	sourceGroupId: z.string().optional(),
 });
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	requireAuth(locals);
 
 	const body = createSchema.parse(await request.json());
+	if (!body.conversationIds.every((id) => ObjectId.isValid(id))) {
+		error(400, "Invalid conversation ID");
+	}
 	const convObjectIds = body.conversationIds.map((id) => new ObjectId(id));
 
 	// Verify all conversations belong to the user
@@ -91,11 +95,49 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	await collections.conversationGroups.insertOne(groupDoc);
 
-	// Unset groupId from any previous groups and set the new one
+	// Find previous groupIds so we can clean up orphaned groups after reassignment
+	const rawPreviousGroupIds = await collections.conversations.distinct("groupId", {
+		_id: { $in: convObjectIds },
+		groupId: { $exists: true },
+		...authCondition(locals),
+	});
+	const previousGroupIds: ObjectId[] = rawPreviousGroupIds.filter(
+		(id): id is ObjectId => id != null
+	);
+
+	// If sourceGroupId is provided, ensure it's included in the cleanup list
+	if (body.sourceGroupId) {
+		if (!ObjectId.isValid(body.sourceGroupId)) {
+			error(400, "Invalid source group ID");
+		}
+		const sourceOid = new ObjectId(body.sourceGroupId);
+		if (!previousGroupIds.some((id) => id.equals(sourceOid))) {
+			previousGroupIds.push(sourceOid);
+		}
+	}
+
+	// Set the new groupId on all conversations
 	await collections.conversations.updateMany(
 		{ _id: { $in: convObjectIds }, ...authCondition(locals) },
 		{ $set: { groupId: groupDoc._id } }
 	);
+
+	// Clean up any source groups that are now empty
+	const deletedSourceGroupIds: string[] = [];
+	for (const prevGroupId of previousGroupIds) {
+		if (prevGroupId.equals(groupDoc._id)) continue;
+		const remaining = await collections.conversations.countDocuments({
+			groupId: prevGroupId,
+			...authCondition(locals),
+		});
+		if (remaining === 0) {
+			await collections.conversationGroups.deleteOne({
+				_id: prevGroupId,
+				...authCondition(locals),
+			});
+			deletedSourceGroupIds.push(prevGroupId.toString());
+		}
+	}
 
 	// Fetch the conversations for the response
 	const convs = await collections.conversations
@@ -135,5 +177,5 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		});
 	}
 
-	return superjsonResponse({ group }, { status: 201 });
+	return superjsonResponse({ group, deletedSourceGroupIds }, { status: 201 });
 };

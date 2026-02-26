@@ -115,11 +115,11 @@
 			});
 	}
 
-	async function createGroup(convIds: string[]) {
+	async function createGroup(convIds: string[], sourceGroupId?: string) {
 		client["conversation-groups"]
-			.post({ conversationIds: convIds })
+			.post({ conversationIds: convIds, sourceGroupId })
 			.then(handleResponse)
-			.then(async (res: { group: ConvGroupSidebar }) => {
+			.then(async (res: { group: ConvGroupSidebar; deletedSourceGroupIds: string[] }) => {
 				const newGroup = {
 					...res.group,
 					updatedAt: new Date(res.group.updatedAt),
@@ -132,6 +132,12 @@
 				// Remove grouped conversations from the ungrouped list
 				const groupedIds = new Set(convIds);
 				conversations = conversations.filter((c) => !groupedIds.has(c.id.toString()));
+
+				// Remove any source groups that were auto-deleted by the server
+				if (res.deletedSourceGroupIds?.length) {
+					const deletedSet = new Set(res.deletedSourceGroupIds);
+					groups = groups.filter((g) => !deletedSet.has(g.id));
+				}
 
 				// Generate name in background, then update
 				client["conversation-groups"]({ id: newGroup.id })
@@ -201,24 +207,31 @@
 			});
 	}
 
-	async function addToGroup(groupId: string, convId: string) {
+	async function addToGroup(groupId: string, convId: string, sourceGroupId?: string) {
 		client["conversation-groups"]({ id: groupId })
-			.conversations.patch({ add: [convId] })
+			.conversations.patch({ add: [convId], sourceGroupId })
 			.then(handleResponse)
-			.then((res: { group?: ConvGroupSidebar; deleted?: boolean }) => {
-				if (res.group) {
-					const updated = {
-						...res.group,
-						updatedAt: new Date(res.group.updatedAt),
-						conversations: res.group.conversations.map((c) => ({
-							...c,
-							updatedAt: new Date(c.updatedAt),
-						})),
-					};
-					groups = groups.map((g) => (g.id === groupId ? updated : g));
+			.then(
+				(res: { group?: ConvGroupSidebar; deleted?: boolean; sourceGroupDeleted?: boolean }) => {
+					if (res.group) {
+						const updated = {
+							...res.group,
+							updatedAt: new Date(res.group.updatedAt),
+							conversations: res.group.conversations.map((c) => ({
+								...c,
+								updatedAt: new Date(c.updatedAt),
+							})),
+						};
+						groups = groups.map((g) => (g.id === groupId ? updated : g));
+					}
+					conversations = conversations.filter((c) => c.id.toString() !== convId);
+
+					// Remove source group if it was auto-deleted by the server
+					if (res.sourceGroupDeleted && sourceGroupId) {
+						groups = groups.filter((g) => g.id !== sourceGroupId);
+					}
 				}
-				conversations = conversations.filter((c) => c.id.toString() !== convId);
-			})
+			)
 			.catch((err) => {
 				console.error(err);
 				$error = String(err);
@@ -469,11 +482,11 @@
 			user={data.user}
 			ondeleteConversation={(id) => deleteConversation(id)}
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
-			oncreateGroup={(convIds) => createGroup(convIds)}
+			oncreateGroup={(payload) => createGroup(payload.convIds, payload.sourceGroupId)}
 			ondeleteGroup={(id) => deleteGroup(id)}
 			oneditGroupName={(payload) => editGroupName(payload.id, payload.name)}
 			ontoggleGroupCollapse={(payload) => toggleGroupCollapse(payload.id, payload.isCollapsed)}
-			onaddToGroup={(payload) => addToGroup(payload.groupId, payload.convId)}
+			onaddToGroup={(payload) => addToGroup(payload.groupId, payload.convId, payload.sourceGroupId)}
 			onremoveFromGroup={(payload) => removeFromGroup(payload.groupId, payload.convId)}
 		/>
 	</MobileNav>
@@ -486,11 +499,11 @@
 			user={data.user}
 			ondeleteConversation={(id) => deleteConversation(id)}
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
-			oncreateGroup={(convIds) => createGroup(convIds)}
+			oncreateGroup={(payload) => createGroup(payload.convIds, payload.sourceGroupId)}
 			ondeleteGroup={(id) => deleteGroup(id)}
 			oneditGroupName={(payload) => editGroupName(payload.id, payload.name)}
 			ontoggleGroupCollapse={(payload) => toggleGroupCollapse(payload.id, payload.isCollapsed)}
-			onaddToGroup={(payload) => addToGroup(payload.groupId, payload.convId)}
+			onaddToGroup={(payload) => addToGroup(payload.groupId, payload.convId, payload.sourceGroupId)}
 			onremoveFromGroup={(payload) => removeFromGroup(payload.groupId, payload.convId)}
 		/>
 	</nav>

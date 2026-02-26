@@ -51,11 +51,11 @@
 		p?: number;
 		ondeleteConversation?: (id: string) => void;
 		oneditConversationTitle?: (payload: { id: string; title: string }) => void;
-		oncreateGroup?: (convIds: string[]) => void;
+		oncreateGroup?: (payload: { convIds: string[]; sourceGroupId?: string }) => void;
 		ondeleteGroup?: (id: string) => void;
 		oneditGroupName?: (payload: { id: string; name: string }) => void;
 		ontoggleGroupCollapse?: (payload: { id: string; isCollapsed: boolean }) => void;
-		onaddToGroup?: (payload: { groupId: string; convId: string }) => void;
+		onaddToGroup?: (payload: { groupId: string; convId: string; sourceGroupId?: string }) => void;
 		onremoveFromGroup?: (payload: { groupId: string; convId: string }) => void;
 	}
 
@@ -189,17 +189,19 @@
 			const convId = draggedConv.id.toString();
 
 			if (dropTarget.type === "conversation") {
-				// Create new group with both conversations
-				if (sourceGroupId) {
-					// First remove from current group, then create new group
-					onremoveFromGroup?.({ groupId: sourceGroupId, convId });
-				}
-				oncreateGroup?.([convId, dropTarget.id]);
+				// Create new group with both conversations — pass sourceGroupId for atomic cleanup
+				oncreateGroup?.({
+					convIds: [convId, dropTarget.id],
+					sourceGroupId: sourceGroupId ?? undefined,
+				});
 			} else if (dropTarget.type === "group") {
-				if (sourceGroupId && sourceGroupId !== dropTarget.id) {
-					onremoveFromGroup?.({ groupId: sourceGroupId, convId });
-				}
-				onaddToGroup?.({ groupId: dropTarget.id, convId });
+				// Add to existing group — pass sourceGroupId for atomic cleanup
+				onaddToGroup?.({
+					groupId: dropTarget.id,
+					convId,
+					sourceGroupId:
+						sourceGroupId && sourceGroupId !== dropTarget.id ? sourceGroupId : undefined,
+				});
 			}
 		} else if (draggedConv && !dropTarget && sourceGroupId) {
 			// Dropped outside any target while from a group → remove from group
