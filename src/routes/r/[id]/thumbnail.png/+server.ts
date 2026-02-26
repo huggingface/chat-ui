@@ -19,8 +19,12 @@ export const GET: RequestHandler = async ({ params }) => {
 		{ projection: { title: 1, model: 1 } }
 	);
 
-	const title = shared?.title || "Untitled Conversation";
-	const modelName = shared?.model ? (shared.model.split("/").pop() ?? shared.model) : "";
+	if (!shared) {
+		return new Response("Not Found", { status: 404 });
+	}
+
+	const title = shared.title || "Untitled Conversation";
+	const modelName = shared.model ? (shared.model.split("/").pop() ?? shared.model) : "";
 
 	const renderedComponent = render(ConversationThumbnail, {
 		props: {

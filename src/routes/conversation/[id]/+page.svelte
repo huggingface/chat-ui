@@ -554,11 +554,13 @@
 		return rawTitle ? rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1) : rawTitle;
 	});
 
-	let ogImageUrl = $derived(
-		data.shared
-			? `${publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}/r/${page.params.id}/thumbnail.png`
-			: undefined
-	);
+	let ogImageUrl = $derived.by(() => {
+		if (!data.shared) return undefined;
+		// For imported conversations, the share ID is in the fromShare query param;
+		// for direct shared views, the share ID is the 7-char page param.
+		const shareId = page.url.searchParams.get("fromShare") || page.params.id;
+		return `${publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}/r/${shareId}/thumbnail.png`;
+	});
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
