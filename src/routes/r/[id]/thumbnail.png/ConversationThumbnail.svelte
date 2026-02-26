@@ -25,7 +25,7 @@
 >
 	<!-- Shared conversation label -->
 	<div
-		style="display: flex; align-items: center; justify-content: center; padding: 8px 24px; border-radius: 9999px; background-color: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); margin-bottom: 32px; font-size: 18px; font-weight: 500; color: rgba(255,255,255,0.7); letter-spacing: 0.02em;"
+		style="display: flex; align-items: center; justify-content: center; padding: 10px 32px; border-radius: 9999px; background-color: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); margin-bottom: 36px; font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.8); letter-spacing: 0.02em;"
 	>
 		Shared conversation
 	</div>
