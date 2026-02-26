@@ -3,11 +3,10 @@
 
 	interface Props {
 		title: string;
-		modelName?: string;
 		isHuggingChat?: boolean;
 	}
 
-	let { title, modelName = "", isHuggingChat = false }: Props = $props();
+	let { title, isHuggingChat = false }: Props = $props();
 
 	// Satori doesn't reliably support text-overflow: ellipsis,
 	// so we truncate manually for predictable rendering.
@@ -37,21 +36,11 @@
 		{displayTitle}
 	</div>
 
-	<!-- Model name subtitle -->
-	{#if modelName}
-		<div style="font-size: 22px; color: rgba(255,255,255,0.5); margin-top: 20px; font-weight: 500;">
-			{modelName}
-		</div>
-	{/if}
-
 	<!-- HuggingChat branding -->
 	{#if isHuggingChat}
 		<div
-			style="display: flex; align-items: center; margin-top: 32px; font-size: 28px; color: white;"
+			style="display: flex; align-items: center; margin-top: 40px; font-size: 28px; color: white;"
 		>
-			<div style="margin-right: 12px; font-size: 22px; color: rgba(255,255,255,0.7);">
-				Shared on
-			</div>
 			<!-- eslint-disable-next-line -->
 			{@html logo}
 		</div>

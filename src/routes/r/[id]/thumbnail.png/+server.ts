@@ -16,7 +16,7 @@ export const GET: RequestHandler = async ({ params }) => {
 
 	const shared = await collections.sharedConversations.findOne(
 		{ _id: shareId },
-		{ projection: { title: 1, model: 1 } }
+		{ projection: { title: 1 } }
 	);
 
 	if (!shared) {
@@ -24,12 +24,10 @@ export const GET: RequestHandler = async ({ params }) => {
 	}
 
 	const title = shared.title || "Untitled Conversation";
-	const modelName = shared.model ? (shared.model.split("/").pop() ?? shared.model) : "";
 
 	const renderedComponent = render(ConversationThumbnail, {
 		props: {
 			title,
-			modelName,
 			isHuggingChat: config.isHuggingChat,
 		},
 	});
