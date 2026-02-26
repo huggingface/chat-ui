@@ -31,7 +31,7 @@
 
 	<!-- Conversation title -->
 	<div
-		style="font-size: 48px; font-weight: 700; color: white; text-align: center; max-width: 1000px; line-height: 1.25; overflow: hidden; display: flex; align-items: center; justify-content: center;"
+		style="font-size: 58px; font-weight: 700; color: white; text-align: center; max-width: 1050px; line-height: 1.2; overflow: hidden; display: flex; align-items: center; justify-content: center;"
 	>
 		{displayTitle}
 	</div>
