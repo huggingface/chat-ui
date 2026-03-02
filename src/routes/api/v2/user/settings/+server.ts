@@ -20,6 +20,7 @@ const settingsSchema = z.object({
 	providerOverrides: z.record(z.string()).default({}),
 	streamingMode: z.enum(["raw", "smooth"]).optional(),
 	directPaste: z.boolean().default(false),
+	hapticsEnabled: z.boolean().default(true),
 	hidePromptExamples: z.record(z.boolean()).default({}),
 	billingOrganization: z.string().optional(),
 });
@@ -55,6 +56,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
 		streamingMode,
 		directPaste: settings?.directPaste ?? DEFAULT_SETTINGS.directPaste,
+		hapticsEnabled: settings?.hapticsEnabled ?? DEFAULT_SETTINGS.hapticsEnabled,
 		hidePromptExamples: settings?.hidePromptExamples ?? DEFAULT_SETTINGS.hidePromptExamples,
 		shareConversationsWithModelAuthors:
 			settings?.shareConversationsWithModelAuthors ??

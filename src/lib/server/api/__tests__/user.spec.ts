@@ -85,6 +85,7 @@ describe("GET /api/v2/user/settings", () => {
 			activeModel: "custom-model",
 			streamingMode: "raw",
 			directPaste: true,
+			hapticsEnabled: true,
 			customPrompts: { "my-model": "Be helpful" },
 			multimodalOverrides: {},
 			toolsOverrides: {},
