@@ -5,6 +5,7 @@
 	import Portal from "./Portal.svelte";
 	import { browser } from "$app/environment";
 	import CarbonClose from "~icons/carbon/close";
+	import { tap } from "$lib/utils/haptics";
 
 	interface Props {
 		width?: string;
@@ -48,6 +49,7 @@
 	onMount(() => {
 		document.getElementById("app")?.setAttribute("inert", "true");
 		modalEl?.focus();
+		tap();
 		// Ensure Escape closes even if focus isn't within modal
 		window.addEventListener("keydown", handleKeydown, { capture: true });
 	});

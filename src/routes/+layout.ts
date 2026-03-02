@@ -27,6 +27,7 @@ interface SettingsResponse {
 	activeModel: string;
 	streamingMode: "raw" | "smooth";
 	directPaste: boolean;
+	hapticsEnabled: boolean;
 	customPrompts: Record<string, string>;
 	multimodalOverrides: Record<string, boolean>;
 	toolsOverrides: Record<string, boolean>;

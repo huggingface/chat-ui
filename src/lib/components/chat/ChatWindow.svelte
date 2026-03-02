@@ -44,6 +44,7 @@
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { tap, error as hapticError } from "$lib/utils/haptics";
 	import { page } from "$app/state";
 	import {
 		isMessageToolCallUpdate,
@@ -102,6 +103,7 @@
 
 	const handleSubmit = () => {
 		if (requireAuthUser() || loading || !draft) return;
+		tap();
 		onmessage?.(draft);
 		draft = "";
 	};
@@ -345,7 +347,10 @@
 	);
 
 	$effect(() => {
-		if (!(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) || !messages.length) {
+		if (
+			!(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) ||
+			!messages.length
+		) {
 			activeRouterExamplePrompt = null;
 			return;
 		}
@@ -662,7 +667,10 @@
 
 						{#if loading}
 							<StopGeneratingBtn
-								onClick={() => onstop?.()}
+								onClick={() => {
+									hapticError();
+									onstop?.();
+								}}
 								showBorder={true}
 								classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
 							/>

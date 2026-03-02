@@ -51,6 +51,12 @@ export interface Settings extends Timestamps {
 	directPaste: boolean;
 
 	/**
+	 * Whether haptic feedback is enabled on supported touch devices.
+	 * Uses the ios-haptics library for cross-platform vibration.
+	 */
+	hapticsEnabled: boolean;
+
+	/**
 	 * Organization to bill inference requests to (HuggingChat only).
 	 * Stores the org's preferred_username. If empty/undefined, bills to personal account.
 	 */
@@ -69,4 +75,5 @@ export const DEFAULT_SETTINGS = {
 	providerOverrides: {},
 	streamingMode: "smooth",
 	directPaste: false,
+	hapticsEnabled: true,
 } satisfies SettingsEditable;

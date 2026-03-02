@@ -9,6 +9,7 @@
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { loading } from "$lib/stores/loading";
+	import { setHapticsEnabled } from "$lib/utils/haptics";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -122,6 +123,10 @@
 	});
 
 	const settings = createSettingsStore(data.settings);
+
+	$effect(() => {
+		setHapticsEnabled($settings.hapticsEnabled);
+	});
 
 	onMount(async () => {
 		if (publicConfig.isHuggingChat && data.user?.username) {
