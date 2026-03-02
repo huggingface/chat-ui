@@ -50,6 +50,9 @@ export interface Settings extends Timestamps {
 	streamingMode: StreamingMode;
 	directPaste: boolean;
 
+	/** Enable vibration haptic feedback on supported mobile devices. */
+	hapticFeedback: boolean;
+
 	/**
 	 * Organization to bill inference requests to (HuggingChat only).
 	 * Stores the org's preferred_username. If empty/undefined, bills to personal account.
@@ -69,4 +72,5 @@ export const DEFAULT_SETTINGS = {
 	providerOverrides: {},
 	streamingMode: "smooth",
 	directPaste: false,
+	hapticFeedback: false,
 } satisfies SettingsEditable;

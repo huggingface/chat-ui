@@ -24,6 +24,7 @@
 	import { shareModal } from "$lib/stores/shareModal";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { createHapticsContext } from "$lib/utils/haptics.svelte";
 
 	let { data = $bindable(), children } = $props();
 
@@ -51,6 +52,7 @@
 		}
 
 		currentError = $error;
+		haptics.trigger("error");
 
 		errorToastTimeout = setTimeout(() => {
 			$error = undefined;
@@ -122,6 +124,7 @@
 	});
 
 	const settings = createSettingsStore(data.settings);
+	const haptics = createHapticsContext(settings);
 
 	onMount(async () => {
 		if (publicConfig.isHuggingChat && data.user?.username) {

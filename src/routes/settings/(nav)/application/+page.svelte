@@ -39,6 +39,12 @@
 	function setDirectPaste(v: boolean) {
 		settings.update((s) => ({ ...s, directPaste: v }));
 	}
+	function getHapticFeedback() {
+		return $settings.hapticFeedback;
+	}
+	function setHapticFeedback(v: boolean) {
+		settings.update((s) => ({ ...s, hapticFeedback: v }));
+	}
 
 	const client = useAPIClient();
 
@@ -212,6 +218,18 @@
 						</p>
 					</div>
 					<Switch name="directPaste" bind:checked={getDirectPaste, setDirectPaste} />
+				</div>
+
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+							Haptic feedback
+						</div>
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
+							Vibration feedback on interactions (mobile only).
+						</p>
+					</div>
+					<Switch name="hapticFeedback" bind:checked={getHapticFeedback, setHapticFeedback} />
 				</div>
 
 				<!-- Theme selector -->

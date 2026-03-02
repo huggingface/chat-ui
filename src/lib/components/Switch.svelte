@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { useHaptics } from "$lib/utils/haptics.svelte";
+
 	interface Props {
 		checked: boolean;
 		name: string;
@@ -6,8 +8,11 @@
 
 	let { checked = $bindable(), name }: Props = $props();
 
+	const haptics = useHaptics();
+
 	function toggle() {
 		checked = !checked;
+		haptics.trigger("selection");
 	}
 
 	function onKeydown(e: KeyboardEvent) {

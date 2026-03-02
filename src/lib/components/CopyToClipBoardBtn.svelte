@@ -3,6 +3,9 @@
 
 	import CarbonCopy from "~icons/carbon/copy";
 	import Tooltip from "./Tooltip.svelte";
+	import { useHaptics } from "$lib/utils/haptics.svelte";
+
+	const haptics = useHaptics();
 
 	interface Props {
 		classNames?: string;
@@ -51,6 +54,7 @@
 			await copy(value);
 
 			isSuccess = true;
+			haptics.trigger("success");
 			if (timeout) {
 				clearTimeout(timeout);
 			}

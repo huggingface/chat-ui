@@ -19,6 +19,7 @@ type SettingsStore = {
 	recentlySaved: boolean;
 	streamingMode: StreamingMode;
 	directPaste: boolean;
+	hapticFeedback: boolean;
 	billingOrganization?: string;
 };
 

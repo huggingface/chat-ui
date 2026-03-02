@@ -44,6 +44,7 @@
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { useHaptics } from "$lib/utils/haptics.svelte";
 	import { page } from "$app/state";
 	import {
 		isMessageToolCallUpdate,
@@ -102,6 +103,7 @@
 
 	const handleSubmit = () => {
 		if (requireAuthUser() || loading || !draft) return;
+		haptics.trigger("light");
 		onmessage?.(draft);
 		draft = "";
 	};
@@ -289,6 +291,7 @@
 	let scrollDependency = $derived({ signal: scrollSignal, forceReattach });
 
 	const settings = useSettingsStore();
+	const haptics = useHaptics();
 	let hideRouterExamples = $derived($settings.hidePromptExamples?.[currentModel.id] ?? false);
 
 	// Respect per‑model multimodal toggle from settings (force enable)
@@ -345,7 +348,10 @@
 	);
 
 	$effect(() => {
-		if (!(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) || !messages.length) {
+		if (
+			!(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) ||
+			!messages.length
+		) {
 			activeRouterExamplePrompt = null;
 			return;
 		}

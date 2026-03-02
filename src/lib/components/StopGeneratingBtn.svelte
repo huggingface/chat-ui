@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
+	import { useHaptics } from "$lib/utils/haptics.svelte";
 
 	interface Props {
 		classNames?: string;
@@ -8,11 +9,16 @@
 	}
 
 	let { classNames = "", onClick, showBorder = false }: Props = $props();
+
+	const haptics = useHaptics();
 </script>
 
 <button
 	type="button"
-	onclick={onClick}
+	onclick={() => {
+		haptics.trigger("medium");
+		onClick?.();
+	}}
 	class={`btn stop-generating-btn ${showBorder ? "stop-generating-btn--spinning" : ""} ${classNames}`}
 	aria-label="Stop generating"
 >
