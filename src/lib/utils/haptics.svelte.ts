@@ -44,11 +44,9 @@ export function createHapticsContext(
 
 	function trigger(preset: string = "selection") {
 		if (!instance || !get(settingsStore).hapticFeedback) return;
-		try {
-			instance.trigger(preset);
-		} catch {
+		Promise.resolve(instance.trigger(preset)).catch(() => {
 			// Never break the app for haptics
-		}
+		});
 	}
 
 	const ctx: HapticsContext = { trigger, isSupported };
