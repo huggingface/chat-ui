@@ -9,7 +9,7 @@ let enabled = true;
  * Avoids importing at module level so SSR doesn't break.
  */
 async function getInstance(): Promise<WebHaptics | null> {
-	if (!browser) return null;
+	if (!browser || !supportsHaptics()) return null;
 	if (instance) return instance;
 
 	try {
