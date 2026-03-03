@@ -1,5 +1,6 @@
 import { base } from "$app/paths";
 import { page } from "$app/state";
+import { apiOrigin } from "$lib/utils/apiBase";
 
 // Returns a public share URL for a conversation id.
 // If `id` is already a 7-char share id, no network call is made.
@@ -12,7 +13,7 @@ export async function createShareLink(id: string): Promise<string> {
 		return `${prefix}/r/${id}`;
 	}
 
-	const res = await fetch(`${base}/conversation/${id}/share`, {
+	const res = await fetch(`${apiOrigin}${base}/conversation/${id}/share`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 	});

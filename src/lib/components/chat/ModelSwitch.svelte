@@ -2,6 +2,7 @@
 	import { invalidateAll } from "$app/navigation";
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
+	import { apiOrigin } from "$lib/utils/apiBase";
 	import type { Model } from "$lib/types/Model";
 
 	interface Props {
@@ -19,7 +20,7 @@
 		if (!page.params.id) return;
 
 		try {
-			const response = await fetch(`${base}/conversation/${page.params.id}`, {
+			const response = await fetch(`${apiOrigin}${base}/conversation/${page.params.id}`, {
 				method: "PATCH",
 				headers: {
 					"Content-Type": "application/json",

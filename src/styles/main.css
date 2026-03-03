@@ -8,6 +8,9 @@ html,
 body {
 	overscroll-behavior: none;
 	touch-action: pan-x pan-y;
+	/* Safe area insets for native app (iOS notch, home indicator, etc.) */
+	padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+		env(safe-area-inset-left);
 }
 
 @layer components {

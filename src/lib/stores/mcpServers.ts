@@ -9,6 +9,7 @@ import { base } from "$app/paths";
 import { env as publicEnv } from "$env/dynamic/public";
 import { browser } from "$app/environment";
 import type { MCPServer, ServerStatus, MCPTool } from "$lib/types/Tool";
+import { apiOrigin } from "$lib/utils/apiBase";
 
 // Namespace storage by app identity to avoid collisions across apps
 function toKeyPart(s: string | undefined): string {
@@ -142,7 +143,7 @@ export const allBaseServersEnabled = derived(
  */
 export async function refreshMcpServers() {
 	try {
-		const response = await fetch(`${base}/api/mcp/servers`);
+		const response = await fetch(`${apiOrigin}${base}/api/mcp/servers`);
 		if (!response.ok) {
 			throw new Error(`Failed to fetch base servers: ${response.statusText}`);
 		}
@@ -317,7 +318,7 @@ export async function healthCheckServer(
 	try {
 		updateServerStatus(server.id, "connecting");
 
-		const response = await fetch(`${base}/api/mcp/health`, {
+		const response = await fetch(`${apiOrigin}${base}/api/mcp/health`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ url: server.url, headers: server.headers }),

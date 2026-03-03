@@ -2,6 +2,7 @@ import { base } from "$app/paths";
 import { browser } from "$app/environment";
 import superjson from "superjson";
 import ObjectId from "bson-objectid";
+import { apiOrigin } from "$lib/utils/apiBase";
 
 superjson.registerCustom<ObjectId, string>(
 	{
@@ -94,7 +95,7 @@ export function useAPIClient({
 } = {}) {
 	const fetcher = customFetch ?? globalThis.fetch;
 	const baseUrl = browser
-		? `${window.location.origin}${base}/api/v2`
+		? `${apiOrigin || window.location.origin}${base}/api/v2`
 		: `${origin ?? `http://localhost:5173`}${base}/api/v2`;
 
 	return {

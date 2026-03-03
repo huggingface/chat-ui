@@ -26,6 +26,20 @@ function getClientAddressSafe(event: RequestEvent): string | undefined {
 	}
 }
 
+function getAllowedOrigin(requestOrigin: string | null): string | undefined {
+	let allowedOrigin = config.PUBLIC_ORIGIN ? new URL(config.PUBLIC_ORIGIN).origin : undefined;
+
+	if (dev || !requestOrigin || isHostLocalhost(new URL(requestOrigin).hostname)) {
+		allowedOrigin = "*";
+	} else if (requestOrigin.startsWith("capacitor://")) {
+		allowedOrigin = requestOrigin;
+	} else if (allowedOrigin === requestOrigin) {
+		allowedOrigin = requestOrigin;
+	}
+
+	return allowedOrigin;
+}
+
 export async function handleRequest({ event, resolve }: HandleInput): Promise<Response> {
 	// Generate a unique request ID for this request
 	const requestId = crypto.randomUUID();
@@ -33,6 +47,22 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 	// Run the entire request handling within the request context
 	return runWithRequestContext(
 		async () => {
+			// Handle OPTIONS preflight requests for CORS
+			if (event.request.method === "OPTIONS" && event.url.pathname.startsWith(`${base}/api/`)) {
+				const requestOrigin = event.request.headers.get("origin");
+				const allowed = getAllowedOrigin(requestOrigin);
+				return new Response(null, {
+					status: 204,
+					headers: {
+						...(allowed ? { "Access-Control-Allow-Origin": allowed } : {}),
+						"Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+						"Access-Control-Allow-Headers": "Content-Type, Authorization",
+						"Access-Control-Allow-Credentials": "true",
+						"Access-Control-Max-Age": "86400",
+					},
+				});
+			}
+
 			await ready.then(() => {
 				config.checkForUpdates();
 			});
@@ -215,21 +245,8 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 			}
 
 			if (event.url.pathname.startsWith(`${base}/api/`)) {
-				// get origin from the request
 				const requestOrigin = event.request.headers.get("origin");
-
-				// get origin from the config if its defined
-				let allowedOrigin = config.PUBLIC_ORIGIN ? new URL(config.PUBLIC_ORIGIN).origin : undefined;
-
-				if (
-					dev || // if we're in dev mode
-					!requestOrigin || // or the origin is null (SSR)
-					isHostLocalhost(new URL(requestOrigin).hostname) // or the origin is localhost
-				) {
-					allowedOrigin = "*"; // allow all origins
-				} else if (allowedOrigin === requestOrigin) {
-					allowedOrigin = requestOrigin; // echo back the caller
-				}
+				const allowedOrigin = getAllowedOrigin(requestOrigin);
 
 				if (allowedOrigin) {
 					response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
@@ -238,6 +255,7 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 						"GET, POST, PUT, PATCH, DELETE, OPTIONS"
 					);
 					response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+					response.headers.set("Access-Control-Allow-Credentials", "true");
 				}
 			}
 

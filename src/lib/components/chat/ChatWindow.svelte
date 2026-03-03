@@ -19,6 +19,7 @@
 	import RetryBtn from "../RetryBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { base } from "$app/paths";
+	import { apiOrigin } from "$lib/utils/apiBase";
 	import ChatMessage from "./ChatMessage.svelte";
 	import ScrollToBottomBtn from "../ScrollToBottomBtn.svelte";
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
@@ -345,7 +346,10 @@
 	);
 
 	$effect(() => {
-		if (!(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) || !messages.length) {
+		if (
+			!(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) ||
+			!messages.length
+		) {
 			activeRouterExamplePrompt = null;
 			return;
 		}
@@ -381,7 +385,7 @@
 			const loadedFiles: File[] = [];
 			for (const attachment of example.attachments) {
 				try {
-					const response = await fetch(`${base}/${attachment.src}`);
+					const response = await fetch(`${apiOrigin}${base}/${attachment.src}`);
 					if (!response.ok) continue;
 
 					const blob = await response.blob();
@@ -408,7 +412,7 @@
 		isTranscribing = true;
 
 		try {
-			const response = await fetch(`${base}/api/transcribe`, {
+			const response = await fetch(`${apiOrigin}${base}/api/transcribe`, {
 				method: "POST",
 				headers: { "Content-Type": audioBlob.type },
 				body: audioBlob,
@@ -437,7 +441,7 @@
 		isTranscribing = true;
 
 		try {
-			const response = await fetch(`${base}/api/transcribe`, {
+			const response = await fetch(`${apiOrigin}${base}/api/transcribe`, {
 				method: "POST",
 				headers: { "Content-Type": audioBlob.type },
 				body: audioBlob,

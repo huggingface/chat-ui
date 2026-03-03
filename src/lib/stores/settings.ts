@@ -5,6 +5,7 @@ import type { StreamingMode } from "$lib/types/Settings";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { getContext, setContext } from "svelte";
 import { type Writable, writable, get } from "svelte/store";
+import { apiOrigin } from "$lib/utils/apiBase";
 
 type SettingsStore = {
 	shareConversationsWithModelAuthors: boolean;
@@ -51,7 +52,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 			showSavedOnNextSync = true; // User edit, should show "Saved"
 			clearTimeout(timeoutId);
 			timeoutId = setTimeout(async () => {
-				await fetch(`${base}/settings`, {
+				await fetch(`${apiOrigin}${base}/settings`, {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
@@ -109,7 +110,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 		if (browser) {
 			clearTimeout(timeoutId);
 			timeoutId = setTimeout(async () => {
-				await fetch(`${base}/settings`, {
+				await fetch(`${apiOrigin}${base}/settings`, {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
@@ -143,7 +144,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 		}));
 
 		if (browser) {
-			await fetch(`${base}/settings`, {
+			await fetch(`${apiOrigin}${base}/settings`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",

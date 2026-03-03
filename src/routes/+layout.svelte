@@ -9,6 +9,7 @@
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { loading } from "$lib/stores/loading";
+	import { apiOrigin } from "$lib/utils/apiBase";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -152,7 +153,7 @@
 		if (page.url.searchParams.has("token")) {
 			const token = page.url.searchParams.get("token");
 
-			await fetch(`${base}/api/user/validate-token`, {
+			await fetch(`${apiOrigin}${base}/api/user/validate-token`, {
 				method: "POST",
 				body: JSON.stringify({ token }),
 			}).then(() => {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Modal from "../Modal.svelte";
 	import { base } from "$app/paths";
+	import { apiOrigin } from "$lib/utils/apiBase";
 	import { tick } from "svelte";
 	import { pickSafeMime } from "$lib/utils/mime";
 
@@ -76,7 +77,7 @@
 			// Use server proxy directly for one URL to validate size/types before creating File
 			const params = new URLSearchParams({ url: trimmed });
 			if (acceptMimeTypes.length > 0) params.set("accept", acceptMimeTypes.join(","));
-			const proxyUrl = `${base}/api/fetch-url?${params}`;
+			const proxyUrl = `${apiOrigin}${base}/api/fetch-url?${params}`;
 			const res = await fetch(proxyUrl);
 			if (!res.ok) {
 				const txt = await res.text();

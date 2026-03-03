@@ -12,17 +12,17 @@ is still required — the app cannot function as a standalone client-only mobile
 
 ## What's Already Capacitor-Ready
 
-| Area | Status | Detail |
-|------|--------|--------|
-| Static adapter | Ready | `@sveltejs/adapter-static` installed, `npm run build:static` works |
-| SPA routing | Ready | `fallback: "index.html"`, `strict: false` configured |
-| No +page.server.ts | Ready | Zero server-side page load files — all loads are universal |
-| No +layout.server.ts | Ready | Zero server layout files |
-| UI components | Ready | 80+ Svelte components are pure client-side, zero server imports |
-| HTML template | Ready | Viewport already set for mobile (`maximum-scale=1, user-scalable=no`) |
-| Icons/assets | Ready | Multiple icon sizes in `static/`, PWA manifest configured |
-| TypeScript target | Ready | ES2018 — compatible with Capacitor WebViews |
-| Theme detection | Ready | Dark mode via localStorage + `matchMedia` with proper fallback |
+| Area                 | Status | Detail                                                                |
+| -------------------- | ------ | --------------------------------------------------------------------- |
+| Static adapter       | Ready  | `@sveltejs/adapter-static` installed, `npm run build:static` works    |
+| SPA routing          | Ready  | `fallback: "index.html"`, `strict: false` configured                  |
+| No +page.server.ts   | Ready  | Zero server-side page load files — all loads are universal            |
+| No +layout.server.ts | Ready  | Zero server layout files                                              |
+| UI components        | Ready  | 80+ Svelte components are pure client-side, zero server imports       |
+| HTML template        | Ready  | Viewport already set for mobile (`maximum-scale=1, user-scalable=no`) |
+| Icons/assets         | Ready  | Multiple icon sizes in `static/`, PWA manifest configured             |
+| TypeScript target    | Ready  | ES2018 — compatible with Capacitor WebViews                           |
+| Theme detection      | Ready  | Dark mode via localStorage + `matchMedia` with proper fallback        |
 
 ## Architecture
 
@@ -53,8 +53,8 @@ which talks to a remote Node.js backend over HTTPS.
 
 ```typescript
 const baseUrl = browser
-    ? `${window.location.origin}${base}/api/v2`
-    : `${origin ?? "http://localhost:5173"}${base}/api/v2`;
+	? `${window.location.origin}${base}/api/v2`
+	: `${origin ?? "http://localhost:5173"}${base}/api/v2`;
 ```
 
 In Capacitor, `window.location.origin` becomes `capacitor://localhost`, which won't reach
@@ -75,29 +75,29 @@ redirects, token refresh, and session cookies all require server mediation.
 
 ## Browser API Compatibility Issues
 
-| API | Severity | Issue |
-|-----|----------|-------|
-| `window.location.origin` | Critical | Returns `capacitor://localhost` in native context |
-| Relative fetch URLs | Critical | `/conversation/[id]` won't resolve without backend |
-| `document.cookie` | High | May not work in WebView |
-| `MediaRecorder` / `getUserMedia` | High | Needs Capacitor microphone plugin |
-| `ReadableStream.pipeThrough` | High | Some Android WebViews lack support |
-| `localStorage` | Medium | Works but no encryption, cleared on app updates |
-| Hardcoded `huggingface.co` URLs | Medium | Fail offline, can't be overridden |
+| API                              | Severity | Issue                                              |
+| -------------------------------- | -------- | -------------------------------------------------- |
+| `window.location.origin`         | Critical | Returns `capacitor://localhost` in native context  |
+| Relative fetch URLs              | Critical | `/conversation/[id]` won't resolve without backend |
+| `document.cookie`                | High     | May not work in WebView                            |
+| `MediaRecorder` / `getUserMedia` | High     | Needs Capacitor microphone plugin                  |
+| `ReadableStream.pipeThrough`     | High     | Some Android WebViews lack support                 |
+| `localStorage`                   | Medium   | Works but no encryption, cleared on app updates    |
+| Hardcoded `huggingface.co` URLs  | Medium   | Fail offline, can't be overridden                  |
 
 ## Remaining Work
 
-| Task | Effort | Detail |
-|------|--------|--------|
-| Make API base URL configurable | Small | Add `PUBLIC_API_BASE_URL` to `APIClient.ts` |
-| Add CORS for Capacitor origin | Small | Backend must accept `capacitor://localhost` |
-| Handle cookie-less auth | Medium | Bearer token auth or WebView cookie jar |
-| Add `capacitor.config.ts` | Small | Point `webDir` to static build output |
-| Install Capacitor packages | Small | `@capacitor/core`, `@capacitor/cli`, platform packages |
-| iOS safe area CSS | Small | `env(safe-area-inset-*)` for notch/home indicator |
-| Voice recording plugin | Medium | Replace raw `getUserMedia` with Capacitor plugin |
-| Test streaming on Android | Medium | Verify `ReadableStream` + `TextDecoderStream` |
-| Handle deep links for OAuth | Medium | Register URL scheme for login redirect |
+| Task                           | Effort | Detail                                                 |
+| ------------------------------ | ------ | ------------------------------------------------------ |
+| Make API base URL configurable | Small  | Add `PUBLIC_API_BASE_URL` to `APIClient.ts`            |
+| Add CORS for Capacitor origin  | Small  | Backend must accept `capacitor://localhost`            |
+| Handle cookie-less auth        | Medium | Bearer token auth or WebView cookie jar                |
+| Add `capacitor.config.ts`      | Small  | Point `webDir` to static build output                  |
+| Install Capacitor packages     | Small  | `@capacitor/core`, `@capacitor/cli`, platform packages |
+| iOS safe area CSS              | Small  | `env(safe-area-inset-*)` for notch/home indicator      |
+| Voice recording plugin         | Medium | Replace raw `getUserMedia` with Capacitor plugin       |
+| Test streaming on Android      | Medium | Verify `ReadableStream` + `TextDecoderStream`          |
+| Handle deep links for OAuth    | Medium | Register URL scheme for login redirect                 |
 
 ## Prior Art
 

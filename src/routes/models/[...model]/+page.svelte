@@ -2,6 +2,7 @@
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import { goto, replaceState } from "$app/navigation";
+	import { apiOrigin } from "$lib/utils/apiBase";
 	import { onMount, tick } from "svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
@@ -34,7 +35,7 @@
 		try {
 			loading = true;
 
-			const res = await fetch(`${base}/conversation`, {
+			const res = await fetch(`${apiOrigin}${base}/conversation`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",

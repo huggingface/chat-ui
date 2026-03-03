@@ -19,6 +19,7 @@
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { enabledServers } from "$lib/stores/mcpServers";
 	import { browser } from "$app/environment";
+	import { apiOrigin } from "$lib/utils/apiBase";
 	import {
 		addBackgroundGeneration,
 		removeBackgroundGeneration,
@@ -431,9 +432,12 @@
 		$loading = false;
 
 		const sendStopRequest = async () => {
-			const response = await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
-				method: "POST",
-			});
+			const response = await fetch(
+				`${apiOrigin}${base}/conversation/${page.params.id}/stop-generating`,
+				{
+					method: "POST",
+				}
+			);
 			if (!response.ok) {
 				throw new Error(`Stop request failed: ${response.status}`);
 			}
