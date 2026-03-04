@@ -31,32 +31,34 @@ export function supportsHaptics(): boolean {
 	return browser && navigator.maxTouchPoints > 0;
 }
 
+// ── Internals ────────────────────────────────────────────────────────
+
+/** Fire a haptic pattern, swallowing errors so callers can safely fire-and-forget. */
+function fire(pattern: string): void {
+	if (!enabled) return;
+	Promise.resolve(getInstance())
+		.then((h) => h?.trigger(pattern))
+		.catch(() => {});
+}
+
 // ── Semantic haptic actions ──────────────────────────────────────────
 
 /** Light tap — for routine actions (send message, toggle, navigate). */
-export async function tap() {
-	if (!enabled) return;
-	const h = await getInstance();
-	await h?.trigger("light");
+export function tap() {
+	fire("light");
 }
 
 /** Success confirmation — double-tap pattern (copy, share, save). */
-export async function confirm() {
-	if (!enabled) return;
-	const h = await getInstance();
-	await h?.trigger("success");
+export function confirm() {
+	fire("success");
 }
 
 /** Error / destructive warning — three rapid taps (delete, stop generation). */
-export async function error() {
-	if (!enabled) return;
-	const h = await getInstance();
-	await h?.trigger("error");
+export function error() {
+	fire("error");
 }
 
 /** Selection change — subtle tap for pickers and selections. */
-export async function selection() {
-	if (!enabled) return;
-	const h = await getInstance();
-	await h?.trigger("selection");
+export function selection() {
+	fire("selection");
 }
