@@ -16,7 +16,6 @@
 	import { onMount } from "svelte";
 	import { browser } from "$app/environment";
 	import { getThemePreference, setTheme, type ThemePreference } from "$lib/switchTheme";
-	import { supportsHaptics } from "$lib/utils/haptics";
 
 	const publicConfig = usePublicConfig();
 	let settings = useSettingsStore();
@@ -221,19 +220,17 @@
 					<Switch name="directPaste" bind:checked={getDirectPaste, setDirectPaste} />
 				</div>
 
-				{#if supportsHaptics()}
-					<div class="flex items-start justify-between py-3">
-						<div>
-							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-								Haptic feedback
-							</div>
-							<p class="text-[12px] text-gray-500 dark:text-gray-400">
-								Vibrate on taps and actions on supported devices.
-							</p>
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+							Haptic feedback
 						</div>
-						<Switch name="hapticsEnabled" bind:checked={getHapticsEnabled, setHapticsEnabled} />
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
+							Vibrate on taps and actions on supported devices.
+						</p>
 					</div>
-				{/if}
+					<Switch name="hapticsEnabled" bind:checked={getHapticsEnabled, setHapticsEnabled} />
+				</div>
 
 				<!-- Theme selector -->
 				<div class="flex items-start justify-between py-3">
