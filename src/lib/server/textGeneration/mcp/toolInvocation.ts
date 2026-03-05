@@ -92,11 +92,25 @@ function toToolImagePart(block: unknown): ToolImagePart | undefined {
 	}
 
 	// Optional pass-through if tool already returns image_url content block.
-	if (obj.type === "image_url" && typeof obj.url === "string" && obj.url.length > 0) {
+	// Support both:
+	// 1) { type: "image_url", url: "..." }
+	// 2) { type: "image_url", image_url: { url: "..." } } (OpenAI-style)
+	const nestedUrl =
+		typeof obj.image_url === "object" &&
+		obj.image_url !== null &&
+		typeof (obj.image_url as Record<string, unknown>).url === "string"
+			? ((obj.image_url as Record<string, unknown>).url as string)
+			: undefined;
+	const directOrNestedUrl = typeof obj.url === "string" ? obj.url : nestedUrl;
+	if (
+		obj.type === "image_url" &&
+		typeof directOrNestedUrl === "string" &&
+		directOrNestedUrl.length > 0
+	) {
 		return {
 			type: "image_url",
 			image_url: {
-				url: obj.url,
+				url: directOrNestedUrl,
 				detail: "auto",
 			},
 		};
