@@ -12,6 +12,7 @@
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import LucideImage from "~icons/lucide/image";
+	import LucideGift from "~icons/lucide/gift";
 	import LucideHammer from "~icons/lucide/hammer";
 	import IconGear from "~icons/bi/gear-fill";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
@@ -239,6 +240,17 @@
 							role="img"
 						>
 							<LucideImage class="size-3" />
+						</span>
+					{/if}
+
+					{#if (model.providers ?? []).some((p) => p.pricing?.input === 0 && p.pricing?.output === 0)}
+						<span
+							title="Free inference available"
+							class="grid size-[21px] flex-none place-items-center rounded-md bg-yellow-500/10 text-yellow-600 dark:text-yellow-500"
+							aria-label="Free inference"
+							role="img"
+						>
+							<LucideGift class="size-3" />
 						</span>
 					{/if}
 

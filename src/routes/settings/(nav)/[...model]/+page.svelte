@@ -15,6 +15,7 @@
 	import CarbonChevronDown from "~icons/carbon/chevron-down";
 	import LucideCheck from "~icons/lucide/check";
 	import CarbonMagicWandFilled from "~icons/carbon/magic-wand-filled";
+	import LucideGift from "~icons/lucide/gift";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { Select } from "bits-ui";
 
@@ -79,7 +80,10 @@
 		}));
 	}
 
-	type RouterProvider = { provider: string } & Record<string, unknown>;
+	type RouterProvider = {
+		provider: string;
+		pricing?: { input?: number; output?: number };
+	} & Record<string, unknown>;
 
 	$effect(() => {
 		const defaultPreprompt =
@@ -373,9 +377,7 @@
 										/>
 									</span>
 								{/if}
-							{/if}
-							{currentPolicy?.label ?? currentProvider?.provider ?? currentValue}
-						</span>
+							{/if}<span>{currentPolicy?.label ?? currentProvider?.provider ?? currentValue}{#if currentProvider?.pricing?.input === 0 && currentProvider?.pricing?.output === 0}<span class="text-yellow-600 dark:text-yellow-500">&nbsp;(<LucideGift class="inline size-3 align-[-0.1em]" /> free)</span>{/if}</span></span>
 						<CarbonChevronDown class="size-4 text-gray-500" />
 					</Select.Trigger>
 					<Select.Portal>
@@ -447,7 +449,9 @@
 										{:else}
 											<span class="size-5"></span>
 										{/if}
-										<span class="flex-1">{prov.provider}</span>
+										<span class="flex-1"
+											>{prov.provider}{#if prov.pricing?.input === 0 && prov.pricing?.output === 0}<span class="text-yellow-600 dark:text-yellow-500">&nbsp;(<LucideGift class="inline size-3 align-[-0.1em]" /> free)</span>{/if}</span
+										>
 										{#if getProviderOverride() === prov.provider}
 											<LucideCheck class="size-4 text-gray-500" />
 										{/if}

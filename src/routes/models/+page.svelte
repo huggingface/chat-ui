@@ -6,6 +6,7 @@
 	import { page } from "$app/state";
 
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
+	import LucideGift from "~icons/lucide/gift";
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideImage from "~icons/lucide/image";
 	import LucideSettings from "~icons/lucide/settings";
@@ -202,6 +203,14 @@
 									class="rounded-md bg-blue-50 p-1.5 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
 								>
 									<LucideImage class="size-3 sm:size-3.5" />
+								</div>
+							{/if}
+							{#if (model.providers ?? []).some((p) => p.pricing?.input === 0 && p.pricing?.output === 0)}
+								<div
+									title="Free inference available for this model."
+									class="rounded-md bg-yellow-50 p-1.5 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400"
+								>
+									<LucideGift class="size-3 sm:size-3.5" />
 								</div>
 							{/if}
 							<button

@@ -10,7 +10,9 @@ export type GETModelsResponse = Array<{
 	displayName: string;
 	description?: string;
 	logoUrl?: string;
-	providers?: Array<{ provider: string } & Record<string, unknown>>;
+	providers?: Array<
+		{ provider: string; pricing?: { input?: number; output?: number } } & Record<string, unknown>
+	>;
 	promptExamples?: { title: string; prompt: string }[];
 	parameters: BackendModel["parameters"];
 	preprompt?: string;

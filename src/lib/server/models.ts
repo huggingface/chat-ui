@@ -40,7 +40,18 @@ const modelConfig = z.object({
 		)
 		.optional(),
 	endpoints: z.array(endpointSchema).optional(),
-	providers: z.array(z.object({ supports_tools: z.boolean().optional() }).passthrough()).optional(),
+	providers: z
+		.array(
+			z
+				.object({
+					supports_tools: z.boolean().optional(),
+					pricing: z
+						.object({ input: z.number().optional(), output: z.number().optional() })
+						.optional(),
+				})
+				.passthrough()
+		)
+		.optional(),
 	parameters: z
 		.object({
 			temperature: z.number().min(0).max(2).optional(),
@@ -90,7 +101,19 @@ const listSchema = z
 				id: z.string(),
 				description: z.string().optional(),
 				providers: z
-					.array(z.object({ supports_tools: z.boolean().optional() }).passthrough())
+					.array(
+						z
+							.object({
+								supports_tools: z.boolean().optional(),
+								pricing: z
+									.object({
+										input: z.number().optional(),
+										output: z.number().optional(),
+									})
+									.optional(),
+							})
+							.passthrough()
+					)
 					.optional(),
 				architecture: z
 					.object({
