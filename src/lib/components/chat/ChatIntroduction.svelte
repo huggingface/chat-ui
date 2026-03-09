@@ -19,12 +19,12 @@
 	});
 </script>
 
-<div class="my-auto grid items-center justify-center gap-8 text-center">
+<div class="my-auto grid items-center justify-center gap-8 px-6 text-center">
 	<div
-		class="flex -translate-y-16 select-none items-center rounded-xl text-3xl font-semibold md:-translate-y-12 md:text-5xl"
+		class="flex max-w-[min(100%,32rem)] -translate-y-16 select-none flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-xl text-2xl font-semibold sm:text-3xl md:-translate-y-12 md:text-5xl"
 	>
-		<Logo classNames="size-12 md:size-20 dark:invert mr-0.5" />
-		{publicConfig.PUBLIC_APP_NAME}
+		<Logo classNames="mr-0.5 size-10 shrink-0 dark:invert md:size-20" />
+		<span class="min-w-0 break-words">{publicConfig.PUBLIC_APP_NAME}</span>
 	</div>
 	<!-- <div class="lg:col-span-1">
 		<div>
