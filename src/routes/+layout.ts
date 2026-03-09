@@ -1,7 +1,6 @@
 import { UrlDependency } from "$lib/types/UrlDependency";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { useAPIClient, handleResponse } from "$lib/APIClient";
-import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
 
 async function withFallback<T>(promise: Promise<T>, fallback: T): Promise<T> {
@@ -12,6 +11,19 @@ async function withFallback<T>(promise: Promise<T>, fallback: T): Promise<T> {
 	}
 }
 
+const DEFAULT_LAYOUT_SETTINGS = {
+	welcomeModalSeen: false,
+	welcomeModalSeenAt: null,
+	activeModel: "",
+	disableStream: false,
+	directPaste: false,
+	hidePromptExamples: {},
+	shareConversationsWithModelAuthors: true,
+	customPrompts: {},
+	multimodalOverrides: {},
+	toolsOverrides: {},
+};
+
 export const load = async ({ depends, fetch, url }) => {
 	depends(UrlDependency.ConversationList);
 
@@ -19,11 +31,7 @@ export const load = async ({ depends, fetch, url }) => {
 
 	const [settings, models, user, publicConfig, featureFlags, conversationsData] = await Promise.all(
 		[
-			withFallback(client.user.settings.get().then(handleResponse), {
-				...DEFAULT_SETTINGS,
-				welcomeModalSeen: false,
-				welcomeModalSeenAt: null,
-			}),
+			withFallback(client.user.settings.get().then(handleResponse), DEFAULT_LAYOUT_SETTINGS),
 			withFallback(client.models.get().then(handleResponse), []),
 			withFallback(client.user.get().then(handleResponse), null),
 			client["public-config"].get().then(handleResponse),
