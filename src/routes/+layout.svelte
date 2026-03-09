@@ -192,7 +192,7 @@
 		};
 
 		window.addEventListener("keydown", onKeydown, { capture: true });
-		onDestroy(() => window.removeEventListener("keydown", onKeydown, { capture: true }));
+		return () => window.removeEventListener("keydown", onKeydown, { capture: true });
 	});
 
 	let mobileNavTitle = $derived(
