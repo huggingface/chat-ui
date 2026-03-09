@@ -11,7 +11,35 @@
 	import { loading } from "$lib/stores/loading";
 	import { setTheme } from "$lib/switchTheme";
 	onMount(() => {
-	setTheme("light");
+		setTheme("light");
+
+		async function handleParentMessage(event: MessageEvent) {
+			if (!event.data || event.data.type !== "xp:switchModel" || typeof event.data.modelId !== "string") {
+				return;
+			}
+
+			const { modelId } = event.data;
+
+			try {
+				await settings.instantSet({ activeModel: modelId });
+
+				if (page.url.pathname.includes("/conversation/")) {
+					await goto(`${base}/`, { invalidateAll: false });
+				}
+
+				if (event.source) {
+					(event.source as WindowProxy).postMessage(
+						{ type: "xp:switchModelAck", modelId },
+						event.origin || "*"
+					);
+				}
+			} catch (err) {
+				console.error("Could not switch model from parent message", err);
+			}
+		}
+
+		window.addEventListener("message", handleParentMessage);
+		return () => window.removeEventListener("message", handleParentMessage);
 	});
 
 	import Toast from "$lib/components/Toast.svelte";
