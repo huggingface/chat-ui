@@ -47,6 +47,8 @@ const modelConfig = z.object({
 					supports_tools: z.boolean().optional(),
 					pricing: z
 						.object({ input: z.number().optional(), output: z.number().optional() })
+						.passthrough()
+						.nullable()
 						.optional(),
 				})
 				.passthrough()
@@ -110,6 +112,8 @@ const listSchema = z
 										input: z.number().optional(),
 										output: z.number().optional(),
 									})
+									.passthrough()
+									.nullable()
 									.optional(),
 							})
 							.passthrough()
