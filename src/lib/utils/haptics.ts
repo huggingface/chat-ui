@@ -62,3 +62,11 @@ export function error() {
 export function selection() {
 	fire("selection");
 }
+
+/** Stream start burst — multiple short vibrations for a "machine starting up" feel. */
+export function streamStart(): void {
+	if (!enabled || !browser) return;
+	if (typeof navigator.vibrate !== "function") return;
+	// Three quick pulses: two short taps + a slightly longer finish
+	navigator.vibrate([50, 30, 50, 30, 80]);
+}

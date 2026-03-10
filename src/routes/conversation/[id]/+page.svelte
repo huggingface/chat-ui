@@ -28,6 +28,7 @@
 	import { updateDebouncer } from "$lib/utils/updates.js";
 	import SubscribeModal from "$lib/components/SubscribeModal.svelte";
 	import { loading } from "$lib/stores/loading.js";
+	import { streamStart } from "$lib/utils/haptics";
 	import { requireAuthUser } from "$lib/utils/auth.js";
 	import { isConversationGenerationActive } from "$lib/utils/generationState";
 
@@ -319,6 +320,9 @@
 						updateDebouncer.maxUpdateTime
 					) {
 						flushBuffer(currentTime);
+					}
+					if (pending) {
+						streamStart();
 					}
 					pending = false;
 				} else if (update.type === MessageUpdateType.FinalAnswer) {
