@@ -6,6 +6,11 @@ import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints"
 import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
 import { makeRouterEndpoint } from "$lib/server/router/endpoint";
+import { loadClientCertificates } from "$lib/utils/loadClientCerts";
+
+if (config.USE_CLIENT_CERTIFICATE && config.CERT_PATH && config.KEY_PATH) {
+	loadClientCertificates(config.CERT_PATH, config.KEY_PATH);
+}
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
