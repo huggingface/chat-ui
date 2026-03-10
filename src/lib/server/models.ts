@@ -8,7 +8,7 @@ import { logger } from "$lib/server/logger";
 import { makeRouterEndpoint } from "$lib/server/router/endpoint";
 import { loadClientCertificates } from "$lib/utils/loadClientCerts";
 
-if (config.USE_CLIENT_CERTIFICATE && config.CERT_PATH && config.KEY_PATH) {
+if (config.USE_CLIENT_CERTIFICATE === "true" && config.CERT_PATH && config.KEY_PATH) {
 	loadClientCertificates(config.CERT_PATH, config.KEY_PATH);
 }
 
