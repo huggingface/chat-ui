@@ -40,7 +40,7 @@
 		"@typescript-eslint/eslint-plugin": "^6.x",
 		"@typescript-eslint/parser": "^6.x",
 		"bson-objectid": "^2.0.4",
-		"dompurify": "^3.2.4",
+		"dompurify": "^3.3.3",
 		"eslint": "^8.28.0",
 		"eslint-config-prettier": "^8.5.0",
 		"eslint-plugin-svelte": "^2.45.1",
