@@ -15,21 +15,22 @@
 
 	let { content, sources = [], loading = false }: Props = $props();
 
-	let blocks: BlockToken[] = $state(processBlocksSync(content, sources));
+	// Sync-computed blocks used as fallback and for SSR (where effects don't run)
+	let syncBlocks = $derived(processBlocksSync(content, sources));
+	let workerBlocks: BlockToken[] | null = $state(null);
+	let blocks = $derived(workerBlocks ?? syncBlocks);
+
 	let worker: Worker | null = null;
 	let latestRequestId = 0;
 
 	function handleBlocks(result: BlockToken[], requestId: number) {
 		if (requestId !== latestRequestId) return;
-		blocks = result;
+		workerBlocks = result;
 		updateDebouncer.endRender();
 	}
 
 	$effect(() => {
-		if (!browser) {
-			blocks = processBlocksSync(content, sources);
-			return;
-		}
+		if (!browser) return;
 
 		const requestId = ++latestRequestId;
 
@@ -42,7 +43,6 @@
 		(async () => {
 			updateDebouncer.startRender();
 			const processed = await processBlocks(content, sources);
-			// Only apply if this is still the latest request
 			handleBlocks(processed, requestId);
 		})();
 	});
