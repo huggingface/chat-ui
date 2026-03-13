@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { tap } from "$lib/utils/haptics";
+
 	interface Props {
 		checked: boolean;
 		name: string;
@@ -8,6 +10,7 @@
 
 	function toggle() {
 		checked = !checked;
+		tap();
 	}
 
 	function onKeydown(e: KeyboardEvent) {

@@ -4,7 +4,7 @@ import type { Conversation } from "$lib/types/Conversation";
 import { ObjectId } from "mongodb";
 import { deleteConversations } from "./09-delete-empty-conversations";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
-import { collections } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
 
 type Message = Conversation["messages"][number];
 
@@ -190,25 +190,26 @@ describe.sequential("Deleting discarded conversations", async () => {
 
 		expect(result).toBe(10010);
 	});
-});
 
-beforeAll(async () => {
-	await collections.users.insertOne(userData);
-	await collections.sessions.insertOne(sessionForUser);
-}, 20000);
+	beforeAll(async () => {
+		await ready;
+		await collections.users.insertOne(userData);
+		await collections.sessions.insertOne(sessionForUser);
+	}, 20000);
 
-afterAll(async () => {
-	await collections.users.deleteOne({
-		_id: userData._id,
+	afterAll(async () => {
+		await collections.users.deleteOne({
+			_id: userData._id,
+		});
+		await collections.sessions.deleteOne({
+			_id: sessionForUser._id,
+		});
+		await collections.conversations.deleteMany({});
 	});
-	await collections.sessions.deleteOne({
-		_id: sessionForUser._id,
-	});
-	await collections.conversations.deleteMany({});
-});
 
-afterEach(async () => {
-	await collections.conversations.deleteMany({
-		_id: { $in: [conversationBase._id] },
+	afterEach(async () => {
+		await collections.conversations.deleteMany({
+			_id: { $in: [conversationBase._id] },
+		});
 	});
 });

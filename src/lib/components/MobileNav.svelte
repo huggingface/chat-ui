@@ -23,6 +23,7 @@
 	import { shareModal } from "$lib/stores/shareModal";
 	import { loading } from "$lib/stores/loading";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { tap } from "$lib/utils/haptics";
 
 	interface Props {
 		title: string | undefined;
@@ -193,6 +194,7 @@
 			isOpen = finalDirection > 0;
 		}
 
+		tap();
 		resetDragState();
 	}
 
