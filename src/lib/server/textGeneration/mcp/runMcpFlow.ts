@@ -696,15 +696,23 @@ export async function* runMcpFlow({
 					if (event.type === "update") {
 						yield event.update;
 					} else {
-						messagesOpenAI = [
-							...messagesOpenAI,
+						const followupMessages: ChatCompletionMessageParam[] = [
 							assistantToolMessage,
 							...(event.summary.toolMessages ?? []),
 						];
+						// Inject tool-returned images as a user message so the LLM can see them
+						const toolImageCount = event.summary.toolImages?.length ?? 0;
+						if (mmEnabled && toolImageCount > 0) {
+							followupMessages.push({
+								role: "user",
+								content: event.summary.toolImages,
+							});
+						}
+						messagesOpenAI = [...messagesOpenAI, ...followupMessages];
 						toolMsgCount = event.summary.toolMessages?.length ?? 0;
 						toolRunCount = event.summary.toolRuns?.length ?? 0;
 						logger.info(
-							{ toolMsgCount, toolRunCount },
+							{ toolMsgCount, toolRunCount, toolImageCount },
 							"[mcp] tools executed; continuing loop for follow-up completion"
 						);
 					}
