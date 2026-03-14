@@ -176,6 +176,10 @@ export async function findUser(
 				session.oauth = updatedSession.oauth;
 			}
 		}
+	} else if (session.oauth?.token && !session.oauth.refreshToken) {
+		if (new Date() > session.oauth.token.expiresAt) {
+			return { user: null, invalidateSession: true };
+		}
 	}
 
 	return {
