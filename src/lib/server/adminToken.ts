@@ -2,6 +2,14 @@ import { config } from "$lib/server/config";
 import type { Session } from "$lib/types/Session";
 import { logger } from "./logger";
 import { v4 } from "uuid";
+import { timingSafeEqual } from "crypto";
+
+/** Constant-time string comparison to prevent timing attacks on admin token. */
+function safeCompare(a: string, b: string): boolean {
+	const bufA = Buffer.from(a.padEnd(Math.max(a.length, b.length)));
+	const bufB = Buffer.from(b.padEnd(Math.max(a.length, b.length)));
+	return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
 
 class AdminTokenManager {
 	private token = config.ADMIN_TOKEN || v4();
@@ -19,7 +27,7 @@ class AdminTokenManager {
 
 	public checkToken(token: string, sessionId: Session["sessionId"]) {
 		if (!this.enabled) return false;
-		if (token === this.token) {
+		if (safeCompare(token, this.token)) {
 			logger.info(`[ADMIN] Token validated`);
 			this.adminSessions.push(sessionId);
 			this.token = config.ADMIN_TOKEN || v4();
