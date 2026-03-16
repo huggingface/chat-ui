@@ -2,7 +2,7 @@
 	import "../styles/main.css";
 
 	import { onDestroy, onMount, untrack } from "svelte";
-	import { goto } from "$app/navigation";
+	import { goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 
@@ -23,8 +23,18 @@
 			try {
 				await settings.instantSet({ activeModel: modelId });
 
-				if (page.url.pathname.includes("/conversation/")) {
-					await goto(`${base}/`, { invalidateAll: false });
+				// If inside a conversation, switch the model in-place
+				const convMatch = page.url.pathname.match(/\/conversation\/([^/]+)/);
+				if (convMatch) {
+					const convId = convMatch[1];
+					const res = await fetch(`${base}/conversation/${convId}`, {
+						method: "PATCH",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ model: modelId }),
+					});
+					if (res.ok) {
+						await invalidateAll();
+					}
 				}
 
 				if (event.source) {
