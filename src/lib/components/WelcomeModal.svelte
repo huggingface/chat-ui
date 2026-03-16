@@ -31,11 +31,6 @@
 				<Logo classNames="mr-2 size-12 dark:invert" />
 				{publicConfig.PUBLIC_APP_NAME}
 			</h2> -->
-			<div
-				class="absolute bottom-3 right-3 rounded-lg border border-blue-500/20 bg-blue-500/20 px-2 py-0.5 text-sm font-semibold text-blue-500"
-			>
-				Now with MCP!
-			</div>
 		</div>
 
 		<div class="text-gray-700 dark:text-gray-200">
