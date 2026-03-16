@@ -134,12 +134,17 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 		if (!m.endpoints || m.endpoints.length === 0) {
 			throw new Error("No endpoints configured. This build requires OpenAI-compatible endpoints.");
 		}
-		// Only support OpenAI-compatible endpoints in this build
 		const endpoint = m.endpoints[0];
-		if (endpoint.type !== "openai") {
-			throw new Error("Only 'openai' endpoint type is supported in this build");
+		switch (endpoint.type) {
+			case "openai":
+				return await endpoints.openai({ ...endpoint, model: m });
+			case "responses":
+				return await endpoints.responses({ ...endpoint, model: m });
+			default:
+				throw new Error(
+					`Unsupported endpoint type '${(endpoint as { type: string }).type}'. Supported types: ${Object.keys(endpoints).join(", ")}`
+				);
 		}
-		return await endpoints.openai({ ...endpoint, model: m });
 	},
 });
 
@@ -228,11 +233,11 @@ const signatureForModel = (model: ProcessedModel) =>
 		prepromptUrl: model.prepromptUrl,
 		endpoints:
 			model.endpoints?.map((endpoint) => {
-				if (endpoint.type === "openai") {
-					const { type, baseURL } = endpoint;
-					return { type, baseURL };
+				const ep = endpoint as { type: string; baseURL?: string };
+				if (ep.type === "openai" || ep.type === "responses") {
+					return { type: ep.type, baseURL: ep.baseURL };
 				}
-				return { type: endpoint.type };
+				return { type: ep.type };
 			}) ?? null,
 		multimodal: model.multimodal,
 		multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
