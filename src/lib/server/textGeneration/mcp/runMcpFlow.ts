@@ -345,7 +345,7 @@ export async function* runMcpFlow({
 			messages,
 			imageProcessor,
 			mmEnabled,
-			model.acceptedFileMimetypes
+			targetModel.acceptedFileMimetypes
 		);
 		const toolPreprompt = buildToolPreprompt(oaTools);
 		const prepromptPieces: string[] = [];
