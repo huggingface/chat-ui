@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
@@ -7,10 +7,23 @@ RUN npm ci
 COPY . .
 COPY .env.prod .env.local
 
-# use dev env directly, don’t build
-ENV NODE_ENV=development
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+
+COPY --from=builder /app/build /app/build
+COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app/package.json /app/package.json
+COPY --from=builder /app/.env /app/.env
+COPY --from=builder /app/.env.local /app/.env.local
+
+RUN npm install -g dotenv-cli
+
+ENV NODE_ENV=production
 ENV PORT=3000
+ENV BODY_SIZE_LIMIT=15728640
 
 EXPOSE 3000
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+CMD ["sh", "-c", "dotenv -e /app/.env -c -- node --dns-result-order=ipv4first /app/build/index.js -- --host 0.0.0.0 --port 3000"]
