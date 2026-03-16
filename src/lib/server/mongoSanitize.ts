@@ -78,8 +78,8 @@ export function sanitizeShareId(id: unknown): string {
 export function sanitizeParamId(id: unknown): string {
 	const sanitized = sanitizeMongoString(id);
 
-	// Allow either 7-char share IDs or 24-char ObjectIds
-	if (!/^[a-zA-Z0-9]{7}$|^[a-f0-9]{24}$/i.test(sanitized)) {
+	// Allow either 7-char share IDs (nanoid alphabet: A-Za-z0-9_-) or 24-char ObjectIds
+	if (!/^[A-Za-z0-9_-]{7}$|^[a-f0-9]{24}$/i.test(sanitized)) {
 		throw new Error("Invalid ID format");
 	}
 

@@ -351,8 +351,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			messageToWriteTo.updates ??= [];
 			async function update(event: MessageUpdate) {
-				// DEBUG: Log every update received from textGeneration
-				console.log("[DEBUG] update() received event:", JSON.stringify(event));
 				if (!messageToWriteTo || !conv) {
 					throw Error("No message or conversation to write events to");
 				}

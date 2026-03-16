@@ -299,30 +299,12 @@ async function prepareFiles(
 	imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[];
 	textContent: string;
 }> {
-	// Debug: Log all incoming files
-	console.log("[prepareFiles] Processing files:", {
-		totalFiles: files.length,
-		isMultimodal,
-		files: files.map((f) => ({
-			name: f.name,
-			mime: f.mime,
-			base64Length: f.value?.length ?? 0,
-			base64Preview: f.value?.substring(0, 50) + "...",
-		})),
-	});
-
 	// Separate files by type
 	const imageFiles = files.filter((file) => file.mime.startsWith("image/"));
 	const textFiles = files.filter((file) => matchesMimeAllowlist(file.mime, TEXT_MIME_ALLOWLIST));
 	const binaryDocFiles = files.filter((file) =>
 		matchesMimeAllowlist(file.mime, BINARY_DOC_ALLOWLIST)
 	);
-
-	console.log("[prepareFiles] File categorization:", {
-		imageFiles: imageFiles.map((f) => f.name),
-		textFiles: textFiles.map((f) => f.name),
-		binaryDocFiles: binaryDocFiles.map((f) => f.name),
-	});
 
 	// Process images if multimodal is enabled
 	let imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[] = [];
@@ -337,13 +319,6 @@ async function prepareFiles(
 				detail: "auto",
 			},
 		}));
-		console.log("[prepareFiles] Processed images:", {
-			count: imageParts.length,
-			sizes: processedFiles.map((f) => ({
-				mime: f.mime,
-				base64Length: f.image.toString("base64").length,
-			})),
-		});
 	}
 
 	// Process plain text files - decode and inject their content
@@ -352,13 +327,6 @@ async function prepareFiles(
 		const textParts = await Promise.all(
 			textFiles.map(async (file) => {
 				const content = Buffer.from(file.value, "base64").toString("utf-8");
-				console.log("[prepareFiles] Decoded text file:", {
-					name: file.name,
-					mime: file.mime,
-					base64Length: file.value.length,
-					decodedLength: content.length,
-					decodedPreview: content.substring(0, 100) + "...",
-				});
 				return `<document name="${file.name}" type="${file.mime}">\n${content}\n</document>`;
 			})
 		);
@@ -368,24 +336,12 @@ async function prepareFiles(
 	// Process binary documents (PDF, DOCX, etc.) - pass as base64 for backend extraction
 	if (binaryDocFiles.length > 0) {
 		const binaryParts = binaryDocFiles.map((file) => {
-			console.log("[prepareFiles] Processing binary doc:", {
-				name: file.name,
-				mime: file.mime,
-				base64Length: file.value.length,
-				estimatedBytes: Math.round(file.value.length * 0.75),
-			});
 			// Send binary docs with base64 encoding marker so backend knows to extract text
 			return `<document name="${file.name}" type="${file.mime}" encoding="base64">\n${file.value}\n</document>`;
 		});
 		const binaryContent = binaryParts.join("\n\n");
 		textContent = textContent ? textContent + "\n\n" + binaryContent : binaryContent;
 	}
-
-	console.log("[prepareFiles] Final output:", {
-		imagePartsCount: imageParts.length,
-		textContentLength: textContent.length,
-		textContentPreview: textContent.substring(0, 200) + "...",
-	});
 
 	return { imageParts, textContent };
 }
