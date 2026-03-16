@@ -22,6 +22,9 @@ import { dirname, join } from "path";
 import { existsSync, mkdirSync } from "fs";
 import { findRepoRoot } from "./findRepoRoot";
 import type { ConfigKey } from "$lib/types/ConfigKey";
+import type { Project } from "$lib/types/Project";
+import type { ProjectKnowledgeFile } from "$lib/types/ProjectKnowledgeFile";
+import type { ProjectKnowledgeChunk } from "$lib/types/ProjectKnowledgeChunk";
 import { config } from "$lib/server/config";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
@@ -133,6 +136,9 @@ export class Database {
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const tools = db.collection("tools");
 		const configCollection = db.collection<ConfigKey>("config");
+		const projects = db.collection<Project>("projects");
+		const projectKnowledgeFiles = db.collection<ProjectKnowledgeFile>("projectKnowledgeFiles");
+		const projectKnowledgeChunks = db.collection<ProjectKnowledgeChunk>("projectKnowledgeChunks");
 
 		return {
 			conversations,
@@ -152,6 +158,9 @@ export class Database {
 			tokenCaches,
 			tools,
 			config: configCollection,
+			projects,
+			projectKnowledgeFiles,
+			projectKnowledgeChunks,
 		};
 	}
 
@@ -175,6 +184,9 @@ export class Database {
 			semaphores,
 			tokenCaches,
 			config,
+			projects,
+			projectKnowledgeFiles,
+			projectKnowledgeChunks,
 		} = this.getCollections();
 
 		conversations
@@ -288,6 +300,33 @@ export class Database {
 			.catch((e) => logger.error(e));
 
 		config.createIndex({ key: 1 }, { unique: true }).catch((e) => logger.error(e));
+
+		// Projects indexes
+		projects
+			.createIndex(
+				{ userId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { userId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e));
+		projects
+			.createIndex(
+				{ sessionId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { sessionId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e));
+		conversations
+			.createIndex(
+				{ projectId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { projectId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e));
+
+		// Project knowledge indexes
+		projectKnowledgeFiles
+			.createIndex({ projectId: 1, createdAt: -1 })
+			.catch((e) => logger.error(e));
+		projectKnowledgeChunks.createIndex({ projectId: 1 }).catch((e) => logger.error(e));
+		projectKnowledgeChunks.createIndex({ fileId: 1 }).catch((e) => logger.error(e));
 	}
 }
 

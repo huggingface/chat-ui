@@ -29,8 +29,8 @@ export const load = async ({ depends, fetch, url }) => {
 
 	const client = useAPIClient({ fetch, origin: url.origin });
 
-	const [settings, models, user, publicConfig, featureFlags, conversationsData] = await Promise.all(
-		[
+	const [settings, models, user, publicConfig, featureFlags, conversationsData, projectsData] =
+		await Promise.all([
 			withFallback(client.user.settings.get().then(handleResponse), DEFAULT_LAYOUT_SETTINGS),
 			withFallback(client.models.get().then(handleResponse), []),
 			withFallback(client.user.get().then(handleResponse), null),
@@ -44,8 +44,8 @@ export const load = async ({ depends, fetch, url }) => {
 				conversations: [],
 				nConversations: 0,
 			}),
-		]
-	);
+			withFallback(client.projects.get().then(handleResponse), { projects: [] }),
+		]);
 
 	const defaultModel = models[0];
 
@@ -60,12 +60,34 @@ export const load = async ({ depends, fetch, url }) => {
 			title: conv.title,
 			model: conv.model ?? defaultModel,
 			updatedAt: new Date(conv.updatedAt),
+			projectId: conv.projectId?.toString(),
 		} satisfies ConvSidebar;
 	});
+
+	const projects = (projectsData.projects ?? []).map(
+		(p: {
+			_id: { toString(): string };
+			name: string;
+			description?: string;
+			preprompt?: string;
+			modelId?: string;
+			updatedAt: string | Date;
+			conversationCount: number;
+		}) => ({
+			id: p._id.toString(),
+			name: p.name,
+			description: p.description,
+			preprompt: p.preprompt,
+			modelId: p.modelId,
+			updatedAt: new Date(p.updatedAt),
+			conversationCount: p.conversationCount,
+		})
+	);
 
 	return {
 		nConversations,
 		conversations,
+		projects,
 		models,
 		oldModels: [],
 		user,

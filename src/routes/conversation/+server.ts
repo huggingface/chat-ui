@@ -10,6 +10,7 @@ import { v4 } from "uuid";
 import { authCondition } from "$lib/server/auth";
 import { usageLimits } from "$lib/server/usageLimits";
 import { MetricsServer } from "$lib/server/metrics";
+import type { Project } from "$lib/types/Project";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -21,6 +22,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			fromShare: z.string().optional(),
 			model: validateModel(models),
 			preprompt: z.string().optional(),
+			projectId: z.string().optional(),
 		})
 		.safeParse(JSON.parse(body));
 
@@ -33,6 +35,28 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	if (usageLimits?.conversations && convCount > usageLimits?.conversations) {
 		error(429, "You have reached the maximum number of conversations. Delete some to continue.");
+	}
+
+	// If a project is specified, look it up and apply its defaults
+	let project: Project | null = null;
+	if (values.projectId) {
+		project = await collections.projects.findOne({
+			_id: new ObjectId(values.projectId),
+			...authCondition(locals),
+		});
+		if (!project) {
+			error(404, "Project not found");
+		}
+		// Apply project defaults if not explicitly provided
+		if (!values.preprompt && project.preprompt) {
+			values.preprompt = project.preprompt;
+		}
+		if (project.modelId) {
+			const projectModel = models.find((m) => (m.id || m.name) === project!.modelId);
+			if (projectModel && !projectModel.unlisted) {
+				values.model = project.modelId;
+			}
+		}
 	}
 
 	const model = models.find((m) => (m.id || m.name) === values.model);
@@ -96,6 +120,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		userAgent: request.headers.get("User-Agent") ?? undefined,
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
+		...(values.projectId ? { projectId: new ObjectId(values.projectId) } : {}),
 	});
 
 	if (MetricsServer.isEnabled()) {

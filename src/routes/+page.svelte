@@ -12,9 +12,12 @@
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { sanitizeUrlParam } from "$lib/utils/urlParams";
-	import { onMount, tick } from "svelte";
+	import { getContext, onMount, tick } from "svelte";
 	import { loading } from "$lib/stores/loading.js";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
+
+	const activeProject: { id: string | null; project?: { preprompt?: string; modelId?: string } } =
+		getContext("activeProject");
 
 	let { data } = $props();
 
@@ -35,11 +38,17 @@
 			const validModels = data.models.map((model) => model.id);
 
 			let model;
-			if (validModels.includes($settings.activeModel)) {
+			if (activeProject?.project?.modelId && validModels.includes(activeProject.project.modelId)) {
+				model = activeProject.project.modelId;
+			} else if (validModels.includes($settings.activeModel)) {
 				model = $settings.activeModel;
 			} else {
 				model = data.models[0].id;
 			}
+
+			const preprompt =
+				activeProject?.project?.preprompt ?? $settings.customPrompts[$settings.activeModel];
+
 			const res = await fetch(`${base}/conversation`, {
 				method: "POST",
 				headers: {
@@ -47,7 +56,8 @@
 				},
 				body: JSON.stringify({
 					model,
-					preprompt: $settings.customPrompts[$settings.activeModel],
+					preprompt,
+					...(activeProject?.id ? { projectId: activeProject.id } : {}),
 				}),
 			});
 

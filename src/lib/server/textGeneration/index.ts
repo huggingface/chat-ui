@@ -1,4 +1,5 @@
 import { preprocessMessages } from "../endpoints/preprocessMessages";
+import { resolveProjectKnowledge } from "../projectKnowledge/resolveKnowledge";
 
 import { generateTitleForConversation } from "./title";
 import {
@@ -45,7 +46,15 @@ async function* textGenerationWithoutTitle(
 	const { conv, messages } = ctx;
 	const convId = conv._id;
 
-	const preprompt = conv.preprompt;
+	let preprompt = conv.preprompt ?? "";
+
+	if (conv.projectId) {
+		const lastUserMsg = [...messages].reverse().find((m) => m.from === "user");
+		const knowledge = await resolveProjectKnowledge(conv.projectId, lastUserMsg?.content ?? "");
+		if (knowledge) {
+			preprompt = preprompt ? `${preprompt}\n\n${knowledge}` : knowledge;
+		}
+	}
 
 	const processedMessages = await preprocessMessages(messages, convId);
 

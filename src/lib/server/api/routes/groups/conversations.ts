@@ -23,21 +23,32 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 			.get(
 				"",
 				async ({ locals, query }) => {
+					const filter: Record<string, unknown> = {
+						...authCondition(locals),
+					};
+
+					if (query.projectId) {
+						try {
+							filter.projectId = new ObjectId(query.projectId);
+						} catch {
+							throw new Error("Invalid project ID format");
+						}
+					}
+
 					const convs = await collections.conversations
-						.find(authCondition(locals))
-						.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model">>({
+						.find(filter)
+						.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "projectId">>({
 							title: 1,
 							updatedAt: 1,
 							model: 1,
+							projectId: 1,
 						})
 						.sort({ updatedAt: -1 })
 						.skip((query.p ?? 0) * CONV_NUM_PER_PAGE)
 						.limit(CONV_NUM_PER_PAGE)
 						.toArray();
 
-					const nConversations = await collections.conversations.countDocuments(
-						authCondition(locals)
-					);
+					const nConversations = await collections.conversations.countDocuments(filter);
 
 					const res = convs.map((conv) => ({
 						_id: conv._id,
@@ -46,6 +57,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 						updatedAt: conv.updatedAt,
 						model: conv.model,
 						modelId: conv.model, // legacy param iOS
+						projectId: conv.projectId,
 					}));
 
 					return { conversations: res, nConversations };
@@ -53,6 +65,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 				{
 					query: t.Object({
 						p: t.Optional(t.Number()),
+						projectId: t.Optional(t.String()),
 					}),
 				}
 			)
@@ -191,16 +204,28 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 										title: body.title.replace(/<\/?think>/gi, "").trim(),
 									}),
 									...(body.model !== undefined && { model: body.model }),
+									...(body.projectId !== undefined && {
+										projectId: new ObjectId(body.projectId),
+									}),
 								};
+
+								const unsetValues: Record<string, string> = {};
+								if (body.projectId === null) {
+									delete updateValues.projectId;
+									unsetValues.projectId = "";
+								}
+
+								const update: Record<string, unknown> = { $set: updateValues };
+								if (Object.keys(unsetValues).length > 0) {
+									update.$unset = unsetValues;
+								}
 
 								const res = await collections.conversations.updateOne(
 									{
 										_id: new ObjectId(params.id),
 										...authCondition(locals),
 									},
-									{
-										$set: updateValues,
-									}
+									update
 								);
 
 								// Use matchedCount if available (newer drivers), fallback to modifiedCount for compatibility
@@ -223,6 +248,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 										})
 									),
 									model: t.Optional(t.String()),
+									projectId: t.Optional(t.Nullable(t.String())),
 								}),
 							}
 						)

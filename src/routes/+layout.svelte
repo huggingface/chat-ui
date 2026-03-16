@@ -14,7 +14,11 @@
 		setTheme("light");
 
 		async function handleParentMessage(event: MessageEvent) {
-			if (!event.data || event.data.type !== "xp:switchModel" || typeof event.data.modelId !== "string") {
+			if (
+				!event.data ||
+				event.data.type !== "xp:switchModel" ||
+				typeof event.data.modelId !== "string"
+			) {
 				return;
 			}
 
@@ -69,6 +73,17 @@
 
 	setContext("publicConfig", data.publicConfig);
 
+	// Expose active project to child pages
+	const activeProjectStore = {
+		get id() {
+			return activeProjectId;
+		},
+		get project() {
+			return projects.find((p) => p.id === activeProjectId);
+		},
+	};
+	setContext("activeProject", activeProjectStore);
+
 	const publicConfig = data.publicConfig;
 	const client = useAPIClient();
 
@@ -76,6 +91,13 @@
 	$effect(() => {
 		data.conversations && untrack(() => (conversations = data.conversations));
 	});
+
+	let projects = $state(data.projects ?? []);
+	$effect(() => {
+		data.projects && untrack(() => (projects = data.projects ?? []));
+	});
+
+	let activeProjectId: string | null = $state(null);
 
 	let isNavCollapsed = $state(false);
 
@@ -135,7 +157,6 @@
 				$error = String(err);
 			});
 	}
-
 
 	onDestroy(() => {
 		clearTimeout(errorToastTimeout);
@@ -210,7 +231,6 @@
 			? ""
 			: conversations.find((conv) => conv.id === page.params.id)?.title
 	);
-
 </script>
 
 <svelte:head>
@@ -288,6 +308,8 @@
 	<MobileNav title={mobileNavTitle}>
 		<NavMenu
 			{conversations}
+			{projects}
+			bind:activeProjectId
 			user={data.user}
 			ondeleteConversation={(id) => deleteConversation(id)}
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
@@ -298,6 +320,8 @@
 	>
 		<NavMenu
 			{conversations}
+			{projects}
+			bind:activeProjectId
 			user={data.user}
 			ondeleteConversation={(id) => deleteConversation(id)}
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
