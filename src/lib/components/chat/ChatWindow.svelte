@@ -309,7 +309,7 @@
 		providerOverride && providerOverride !== "auto" && !currentModel.isRouter
 	);
 
-	// Always allow common text-like files; add images only when model is multimodal
+	// Always allow common text-like files; add images when multimodal; add declared file types
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
 
 	let activeMimeTypes = $derived(
@@ -319,6 +319,7 @@
 				...(modelIsMultimodal
 					? (currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT])
 					: []),
+				...(currentModel.acceptedFileMimetypes ?? []),
 			])
 		)
 	);
