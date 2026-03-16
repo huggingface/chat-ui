@@ -344,7 +344,8 @@ export async function* runMcpFlow({
 		let messagesOpenAI: ChatCompletionMessageParam[] = await prepareMessagesWithFiles(
 			messages,
 			imageProcessor,
-			mmEnabled
+			mmEnabled,
+			targetModel.acceptedFileMimetypes
 		);
 		const toolPreprompt = buildToolPreprompt(oaTools);
 		const prepromptPieces: string[] = [];
