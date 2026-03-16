@@ -121,11 +121,11 @@ export async function* openAIResponsesToTextGenerationStream(
 			case "response.completed": {
 				const ce = event as ResponseCompletedEvent;
 				const status = ce.response?.status;
-				const isComplete = status === "completed";
+				const isFailed = status === "failed";
 
 				yield {
 					token: { id: tokenId++, text: "", logprob: 0, special: true },
-					generated_text: isComplete ? generatedText : null,
+					generated_text: isFailed ? null : generatedText,
 					details: null,
 				} as TextGenerationStreamOutput;
 				break;
