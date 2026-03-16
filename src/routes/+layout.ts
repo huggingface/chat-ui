@@ -4,6 +4,15 @@ import { useAPIClient, handleResponse } from "$lib/APIClient";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
 import type { GETModelsResponse, FeatureFlags } from "$lib/server/api/types";
 
+async function withFallback<T>(promise: Promise<T>, fallback: T, label?: string): Promise<T> {
+	try {
+		return await promise;
+	} catch (e) {
+		console.warn(`[layout] ${label ?? "API call"} failed, using fallback:`, e);
+		return fallback;
+	}
+}
+
 interface ConversationListItem {
 	_id: { toString(): string };
 	title: string;
@@ -43,12 +52,48 @@ export const load = async ({ depends, fetch, url }) => {
 
 	const [settings, models, user, publicConfig, featureFlags, conversationsData] =
 		(await Promise.all([
-			client.user.settings.get().then(handleResponse),
-			client.models.get().then(handleResponse),
-			client.user.get().then(handleResponse),
+			withFallback(
+				client.user.settings.get().then(handleResponse),
+				{
+					welcomeModalSeen: false,
+					welcomeModalSeenAt: null,
+					shareConversationsWithModelAuthors: true,
+					activeModel: "",
+					streamingMode: "smooth" as const,
+					directPaste: false,
+					hapticsEnabled: false,
+					customPrompts: {},
+					multimodalOverrides: {},
+					toolsOverrides: {},
+					hidePromptExamples: {},
+					providerOverrides: {},
+				},
+				"settings"
+			),
+			withFallback(
+				client.models.get().then(handleResponse),
+				[] as unknown as GETModelsResponse,
+				"models"
+			),
+			withFallback(client.user.get().then(handleResponse), null, "user"),
 			client["public-config"].get().then(handleResponse),
-			client["feature-flags"].get().then(handleResponse),
-			client.conversations.get({ query: { p: 0 } }).then(handleResponse),
+			withFallback(
+				client["feature-flags"].get().then(handleResponse),
+				{
+					enableAssistants: false,
+					loginEnabled: false,
+					isAdmin: false,
+				} as unknown as FeatureFlags,
+				"feature-flags"
+			),
+			withFallback(
+				client.conversations.get({ query: { p: 0 } }).then(handleResponse),
+				{
+					conversations: [] as ConversationListItem[],
+					hasMore: false,
+				},
+				"conversations"
+			),
 		])) as [
 			SettingsResponse,
 			GETModelsResponse,
