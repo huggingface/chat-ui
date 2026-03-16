@@ -6,9 +6,10 @@ import { timingSafeEqual } from "crypto";
 
 /** Constant-time string comparison to prevent timing attacks on admin token. */
 function safeCompare(a: string, b: string): boolean {
-	const bufA = Buffer.from(a.padEnd(Math.max(a.length, b.length)));
-	const bufB = Buffer.from(b.padEnd(Math.max(a.length, b.length)));
-	return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+	if (a.length !== b.length) return false;
+	const bufA = Buffer.from(a);
+	const bufB = Buffer.from(b);
+	return timingSafeEqual(bufA, bufB);
 }
 
 class AdminTokenManager {
