@@ -4,12 +4,16 @@ import { useAPIClient, handleResponse } from "$lib/APIClient";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
 import type { GETModelsResponse, FeatureFlags } from "$lib/server/api/types";
 
-async function withFallback<T>(promise: Promise<T>, fallback: T, label?: string): Promise<T> {
+async function withFallback<T>(
+	promise: Promise<T>,
+	fallback: T,
+	label?: string
+): Promise<{ value: T; isFallback: boolean }> {
 	try {
-		return await promise;
+		return { value: await promise, isFallback: false };
 	} catch (e) {
 		console.warn(`[layout] ${label ?? "API call"} failed, using fallback:`, e);
-		return fallback;
+		return { value: fallback, isFallback: true };
 	}
 }
 
@@ -50,8 +54,8 @@ export const load = async ({ depends, fetch, url }) => {
 
 	const client = useAPIClient({ fetch, origin: url.origin });
 
-	const [settings, models, user, publicConfig, featureFlags, conversationsData] =
-		(await Promise.all([
+	const [settingsResult, modelsResult, userResult, publicConfig, featureFlagsResult, conversationsResult] =
+		await Promise.all([
 			withFallback(
 				client.user.settings.get().then(handleResponse),
 				{
@@ -94,14 +98,14 @@ export const load = async ({ depends, fetch, url }) => {
 				},
 				"conversations"
 			),
-		])) as [
-			SettingsResponse,
-			GETModelsResponse,
-			UserInfo | null,
-			Record<string, unknown>,
-			FeatureFlags,
-			{ conversations: ConversationListItem[]; hasMore: boolean },
-		];
+		]);
+
+	const settings = settingsResult.value as SettingsResponse;
+	const settingsIsFallback = settingsResult.isFallback;
+	const models = modelsResult.value as GETModelsResponse;
+	const user = userResult.value as UserInfo | null;
+	const featureFlags = featureFlagsResult.value as FeatureFlags;
+	const conversationsData = conversationsResult.value as { conversations: ConversationListItem[]; hasMore: boolean };
 
 	const defaultModel = models[0];
 
@@ -130,6 +134,7 @@ export const load = async ({ depends, fetch, url }) => {
 				? new Date(settings.welcomeModalSeenAt)
 				: null,
 		},
+		settingsIsFallback,
 		publicConfig: getConfigManager(publicConfig as Record<`PUBLIC_${string}`, string>),
 		...featureFlags,
 	};
