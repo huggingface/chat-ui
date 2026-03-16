@@ -72,3 +72,50 @@ export function isHostLocalhost(host: string): boolean {
 
 	return false;
 }
+
+/** Check if an IPv4 address falls in any private/reserved range (RFC 1918, loopback, link-local). */
+export function isPrivateIPv4(address: string): boolean {
+	const addr = new Address4(address);
+	const privateRanges = [
+		new Address4("10.0.0.0/8"),
+		new Address4("172.16.0.0/12"),
+		new Address4("192.168.0.0/16"),
+		new Address4("127.0.0.0/8"),
+		new Address4("169.254.0.0/16"),
+		new Address4("0.0.0.0/8"),
+	];
+	return privateRanges.some((range) => addr.isInSubnet(range));
+}
+
+/** Check if an IPv6 address is loopback, link-local, or unique-local. */
+export function isPrivateIPv6(address: string): boolean {
+	const addr = new Address6(address);
+	return addr.isLoopback() || addr.isLinkLocal() || addr.isInSubnet(new Address6("fc00::/7"));
+}
+
+/** Check if a URL resolves to a private/reserved IP address (SSRF protection). */
+export async function isURLPrivate(url: URL): Promise<boolean> {
+	const { address, family } = await dnsLookup(url.hostname);
+	if (family === 4) return isPrivateIPv4(address);
+	if (family === 6) return isPrivateIPv6(address);
+	return false;
+}
+
+/** Validate that a URL is safe for external fetch (protocol + private IP check). */
+export async function validateExternalUrl(
+	url: string,
+	opts?: { allowHttp?: boolean }
+): Promise<URL> {
+	const parsed = new URL(url);
+	const protocol = parsed.protocol.toLowerCase();
+
+	if (protocol !== "https:" && !(opts?.allowHttp && protocol === "http:")) {
+		throw new Error(`Disallowed protocol: ${protocol}`);
+	}
+
+	if (await isURLPrivate(parsed)) {
+		throw new Error("URL resolves to a private/reserved IP address");
+	}
+
+	return parsed;
+}
