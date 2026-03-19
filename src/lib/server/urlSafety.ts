@@ -1,5 +1,7 @@
 import { Address4, Address6 } from "ip-address";
 import { isIP } from "node:net";
+import dns from "node:dns";
+import { Agent, fetch as undiciFetch } from "undici";
 
 const UNSAFE_IPV4_SUBNETS = [
 	"0.0.0.0/8",
@@ -64,4 +66,45 @@ export function assertSafeIp(address: string, hostname: string): void {
 	if (isUnsafeIp(address)) {
 		throw new Error(`Resolved IP for ${hostname} is internal (${address})`);
 	}
+}
+
+/**
+ * Undici agent that validates resolved IPs at connection time,
+ * preventing TOCTOU DNS rebinding attacks.
+ */
+const ssrfSafeAgent = new Agent({
+	connect: {
+		lookup: (hostname, options, callback) => {
+			dns.lookup(hostname, options, (err, address, family) => {
+				if (err) return callback(err, "", 4);
+				if (typeof address === "string") {
+					try {
+						assertSafeIp(address, hostname);
+					} catch (e) {
+						return callback(e as Error, "", 4);
+					}
+				} else if (Array.isArray(address)) {
+					for (const entry of address) {
+						try {
+							assertSafeIp(entry.address, hostname);
+						} catch (e) {
+							return callback(e as Error, "", 4);
+						}
+					}
+				}
+				return callback(null, address, family);
+			});
+		},
+	},
+});
+
+/**
+ * Fetch wrapper that validates resolved IPs at connection time.
+ * Use this for any outbound request where the URL may come from user input.
+ */
+export function ssrfSafeFetch(url: string | URL, init?: RequestInit): Promise<Response> {
+	return undiciFetch(url, {
+		...(init as Record<string, unknown>),
+		dispatcher: ssrfSafeAgent,
+	}) as unknown as Promise<Response>;
 }
