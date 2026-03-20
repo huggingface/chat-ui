@@ -18,6 +18,7 @@
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { enabledServers } from "$lib/stores/mcpServers";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { browser } from "$app/environment";
 	import {
 		addBackgroundGeneration,
@@ -550,9 +551,19 @@
 		$loading = false;
 	});
 
+	const publicConfig = usePublicConfig();
+
 	let title = $derived.by(() => {
 		const rawTitle = conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title;
 		return rawTitle ? rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1) : rawTitle;
+	});
+
+	let ogImageUrl = $derived.by(() => {
+		if (!data.shared) return undefined;
+		// For imported conversations, the share ID is in the fromShare query param;
+		// for direct shared views, the share ID is the 7-char page param.
+		const shareId = page.url.searchParams.get("fromShare") || page.params.id;
+		return `${publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}/r/${shareId}/thumbnail.png`;
 	});
 </script>
 
@@ -560,6 +571,28 @@
 
 <svelte:head>
 	<title>{title}</title>
+	{#if data.shared && ogImageUrl}
+		<meta property="og:title" content="{title} - {publicConfig.PUBLIC_APP_NAME}" />
+		<meta property="og:type" content="website" />
+		<meta
+			property="og:description"
+			content="Check out this conversation on {publicConfig.PUBLIC_APP_NAME}"
+		/>
+		<meta property="og:image" content={ogImageUrl} />
+		<meta property="og:image:alt" content={title} />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="648" />
+		<meta property="og:url" content={page.url.href} />
+		<meta property="og:site_name" content={publicConfig.PUBLIC_APP_NAME} />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="{title} - {publicConfig.PUBLIC_APP_NAME}" />
+		<meta
+			name="twitter:description"
+			content="Check out this conversation on {publicConfig.PUBLIC_APP_NAME}"
+		/>
+		<meta name="twitter:image" content={ogImageUrl} />
+		<meta name="twitter:image:alt" content={title} />
+	{/if}
 </svelte:head>
 
 <ChatWindow
