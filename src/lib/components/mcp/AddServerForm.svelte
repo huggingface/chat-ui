@@ -16,6 +16,7 @@
 		oncancel: () => void;
 		initialName?: string;
 		initialUrl?: string;
+		initialDescription?: string;
 		initialHeaders?: KeyValuePair[];
 		submitLabel?: string;
 	}
@@ -25,6 +26,7 @@
 		oncancel,
 		initialName = "",
 		initialUrl = "",
+		initialDescription = "",
 		initialHeaders = [],
 		submitLabel = "Add Server",
 	}: Props = $props();
@@ -32,11 +34,13 @@
 	let name = $state("");
 	let url = $state("");
 	let headers = $state<KeyValuePair[]>([]);
+	let headersOpen = $state(false);
 
 	$effect.pre(() => {
 		name = initialName;
 		url = initialUrl;
 		headers = initialHeaders.length > 0 ? [...initialHeaders] : [];
+		headersOpen = initialHeaders.length > 0;
 	});
 	let showHeaderValues = $state<Record<number, boolean>>({});
 	let error = $state<string | null>(null);
@@ -80,7 +84,11 @@
 			if (header.key.trim() || header.value.trim()) {
 				const headerError = validateHeader(header.key, header.value);
 				if (headerError) {
-					error = `Header ${i + 1}: ${headerError}`;
+					const key = header.key.trim();
+					error =
+						key && headerError === "Header value is required"
+							? `"${key}" value is required`
+							: headerError;
 					return false;
 				}
 			}
@@ -99,12 +107,20 @@
 		onsubmit({
 			name: name.trim(),
 			url: url.trim(),
-			headers: filteredHeaders.length > 0 ? filteredHeaders : undefined,
+			headers:
+				filteredHeaders.length > 0
+					? filteredHeaders.map(({ key, value }) => ({ key, value }))
+					: undefined,
 		});
 	}
 </script>
 
 <div class="space-y-4">
+	<!-- Description (from registry) -->
+	{#if initialDescription}
+		<p class="mt-0.5 text-sm text-gray-700 dark:text-gray-300">{initialDescription}</p>
+	{/if}
+
 	<!-- Server Name -->
 	<div>
 		<label
@@ -140,51 +156,63 @@
 	</div>
 
 	<!-- HTTP Headers -->
-	<details class="rounded-lg border border-gray-200 dark:border-gray-700">
+	<details
+		class="rounded-lg border border-gray-200 dark:border-gray-700"
+		open={headersOpen}
+		ontoggle={(e) => (headersOpen = (e.currentTarget as HTMLDetailsElement).open)}
+	>
 		<summary class="cursor-pointer px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-			HTTP Headers (Optional)
+			HTTP Headers {#if headers.some((h) => h.description)}<span class="text-red-500">*</span
+				>{:else}(Optional){/if}
 		</summary>
 		<div class="space-y-2 border-t border-gray-200 p-4 dark:border-gray-700">
 			{#if headers.length === 0}
 				<p class="text-sm text-gray-500 dark:text-gray-400">No headers configured</p>
 			{:else}
 				{#each headers as header, i}
-					<div class="flex gap-2">
-						<input
-							bind:value={header.key}
-							placeholder="Header name (e.g., Authorization)"
-							class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-						/>
-						<div class="relative flex-1">
+					<div class="flex flex-col gap-1">
+						<div class="flex gap-2">
 							<input
-								bind:value={header.value}
-								type={showHeaderValues[i] ? "text" : "password"}
-								placeholder="Value"
-								class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+								bind:value={header.key}
+								placeholder="Header name (e.g., Authorization)"
+								class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 							/>
-							{#if isSensitiveHeader(header.key)}
+							<div class="relative flex-1">
+								<input
+									bind:value={header.value}
+									type={showHeaderValues[i] ? "text" : "password"}
+									placeholder="Value"
+									class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+								/>
+								{#if isSensitiveHeader(header.key)}
+									<button
+										type="button"
+										onclick={() => toggleHeaderVisibility(i)}
+										class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+										title={showHeaderValues[i] ? "Hide value" : "Show value"}
+									>
+										{#if showHeaderValues[i]}
+											<IconEyeOff class="size-4" />
+										{:else}
+											<IconEye class="size-4" />
+										{/if}
+									</button>
+								{/if}
+							</div>
+							{#if !header.description}
 								<button
 									type="button"
-									onclick={() => toggleHeaderVisibility(i)}
-									class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-									title={showHeaderValues[i] ? "Hide value" : "Show value"}
+									onclick={() => removeHeader(i)}
+									class="rounded-lg bg-red-100 p-2 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+									title="Remove header"
 								>
-									{#if showHeaderValues[i]}
-										<IconEyeOff class="size-4" />
-									{:else}
-										<IconEye class="size-4" />
-									{/if}
+									<IconTrash class="size-4" />
 								</button>
 							{/if}
 						</div>
-						<button
-							type="button"
-							onclick={() => removeHeader(i)}
-							class="rounded-lg bg-red-100 p-2 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
-							title="Remove header"
-						>
-							<IconTrash class="size-4" />
-						</button>
+						{#if header.description}
+							<p class="pl-1 text-xs text-gray-500 dark:text-gray-400">{header.description}</p>
+						{/if}
 					</div>
 				{/each}
 			{/if}
@@ -198,15 +226,17 @@
 				Add Header
 			</button>
 
-			<p class="text-xs text-gray-500 dark:text-gray-400">
-				Common examples:<br />
-				• Bearer token:
-				<code class="rounded bg-gray-100 px-1 dark:bg-gray-700"
-					>Authorization: Bearer YOUR_TOKEN</code
-				><br />
-				• API key:
-				<code class="rounded bg-gray-100 px-1 dark:bg-gray-700">X-API-Key: YOUR_KEY</code>
-			</p>
+			{#if !headers.some((h) => h.description)}
+				<p class="text-xs text-gray-500 dark:text-gray-400">
+					Common examples:<br />
+					• Bearer token:
+					<code class="rounded bg-gray-100 px-1 dark:bg-gray-700"
+						>Authorization: Bearer YOUR_TOKEN</code
+					><br />
+					• API key:
+					<code class="rounded bg-gray-100 px-1 dark:bg-gray-700">X-API-Key: YOUR_KEY</code>
+				</p>
+			{/if}
 		</div>
 	</details>
 
@@ -221,7 +251,7 @@
 				<p class="mt-1 text-[13px] text-amber-800 dark:text-yellow-100/90">
 					They receive your requests (including conversation context and any headers you add) and
 					can run powerful tools on your behalf. Only add servers you trust and review their source.
-					Never share confidental informations.
+					Never share confidential information.
 				</p>
 			</div>
 		</div>

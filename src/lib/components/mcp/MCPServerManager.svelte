@@ -3,15 +3,17 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import ServerCard from "./ServerCard.svelte";
 	import AddServerForm from "./AddServerForm.svelte";
+	import MCPServerSearch from "./MCPServerSearch.svelte";
 	import {
 		allMcpServers,
 		selectedServerIds,
 		enabledServersCount,
 		addCustomServer,
+		updateCustomServer,
 		refreshMcpServers,
 		healthCheckServer,
 	} from "$lib/stores/mcpServers";
-	import type { KeyValuePair } from "$lib/types/Tool";
+	import type { KeyValuePair, MCPRegistryEntry, MCPServer } from "$lib/types/Tool";
 	import IconAddLarge from "~icons/carbon/add-large";
 	import IconRefresh from "~icons/carbon/renew";
 	import LucideHammer from "~icons/lucide/hammer";
@@ -26,20 +28,71 @@
 	let { onclose }: Props = $props();
 
 	type View = "list" | "add";
+	type AddTab = "search" | "manual";
+
 	let currentView = $state<View>("list");
+	let addTab = $state<AddTab>("search");
 	let isRefreshing = $state(false);
+
+	let prefillName = $state("");
+	let prefillUrl = $state("");
+	let prefillDescription = $state("");
+	let prefillHeaders = $state<KeyValuePair[]>([]);
+	let editingServer = $state<MCPServer | null>(null);
 
 	const baseServers = $derived($allMcpServers.filter((s) => s.type === "base"));
 	const customServers = $derived($allMcpServers.filter((s) => s.type === "custom"));
 	const enabledCount = $derived($enabledServersCount);
 
 	function handleAddServer(serverData: { name: string; url: string; headers?: KeyValuePair[] }) {
-		addCustomServer(serverData);
+		if (editingServer) {
+			updateCustomServer(editingServer.id, serverData);
+		} else {
+			addCustomServer(serverData);
+		}
+		resetAddState();
 		currentView = "list";
 	}
 
+	function resetAddState() {
+		prefillName = "";
+		prefillUrl = "";
+		prefillDescription = "";
+		prefillHeaders = [];
+		editingServer = null;
+		addTab = "search";
+	}
+
 	function handleCancel() {
+		resetAddState();
 		currentView = "list";
+	}
+
+	function handleEditServer(server: MCPServer) {
+		editingServer = server;
+		prefillName = server.name;
+		prefillUrl = server.url;
+		prefillDescription = "";
+		prefillHeaders = server.headers ?? [];
+		addTab = "manual";
+		currentView = "add";
+	}
+
+	function handleRegistryAdd(entry: MCPRegistryEntry) {
+		prefillName = entry.title ?? entry.name;
+		prefillUrl = entry.url;
+		prefillDescription = entry.description;
+		prefillHeaders = (entry.requiredHeaders ?? []).map((h) => ({
+			key: h.name,
+			value: "",
+			description: h.description,
+		}));
+		addTab = "manual";
+	}
+
+	function switchToAdd() {
+		resetAddState();
+		currentView = "add";
 	}
 
 	async function handleRefresh() {
@@ -63,6 +116,8 @@
 			<h2 class="mb-1 text-xl font-semibold text-gray-900 dark:text-gray-200">
 				{#if currentView === "list"}
 					MCP Servers
+				{:else if editingServer}
+					Edit MCP server
 				{:else}
 					Add MCP server
 				{/if}
@@ -70,8 +125,10 @@
 			<p class="text-sm text-gray-600 dark:text-gray-400">
 				{#if currentView === "list"}
 					Manage MCP servers to extend {publicConfig.PUBLIC_APP_NAME} with external tools.
+				{:else if editingServer}
+					Update the configuration for {editingServer.name}.
 				{:else}
-					Add a custom MCP server to {publicConfig.PUBLIC_APP_NAME}.
+					Search the MCP Registry or add a custom server URL.
 				{/if}
 			</p>
 		</div>
@@ -93,7 +150,7 @@
 					<div>
 						<p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
 							{$allMcpServers.length}
-							{$allMcpServers.length === 1 ? "server" : "servers"} configured
+							{$allMcpServers.length > 1 ? "servers" : "server"} configured
 						</p>
 						<p class="text-xs text-gray-600 dark:text-gray-400">
 							{enabledCount} enabled
@@ -102,17 +159,19 @@
 				</div>
 
 				<div class="flex gap-2">
+					{#if $allMcpServers.length > 0}
+						<button
+							onclick={handleRefresh}
+							disabled={isRefreshing}
+							class="btn gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+						>
+							<IconRefresh class="size-4 {isRefreshing ? 'animate-spin' : ''}" />
+							{isRefreshing ? "Refreshing…" : "Refresh"}
+						</button>
+					{/if}
 					<button
-						onclick={handleRefresh}
-						disabled={isRefreshing}
-						class="btn gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-					>
-						<IconRefresh class="size-4 {isRefreshing ? 'animate-spin' : ''}" />
-						{isRefreshing ? "Refreshing…" : "Refresh"}
-					</button>
-					<button
-						onclick={() => (currentView = "add")}
-						class="btn flex items-center gap-0.5 rounded-lg bg-blue-600 py-1.5 pl-2 pr-3 text-sm font-medium text-white hover:bg-blue-600"
+						onclick={switchToAdd}
+						class="btn flex items-center gap-0.5 rounded-lg bg-blue-600 py-1.5 pl-2 pr-3 text-sm font-medium text-white hover:bg-blue-700"
 					>
 						<IconAddLarge class="size-4" />
 						Add Server
@@ -151,8 +210,8 @@
 								Add your own MCP servers with custom tools
 							</p>
 							<button
-								onclick={() => (currentView = "add")}
-								class="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+								onclick={switchToAdd}
+								class="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
 							>
 								<IconAddLarge class="size-4" />
 								Add Your First Server
@@ -161,7 +220,11 @@
 					{:else}
 						<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 							{#each customServers as server (server.id)}
-								<ServerCard {server} isSelected={$selectedServerIds.has(server.id)} />
+								<ServerCard
+									{server}
+									isSelected={$selectedServerIds.has(server.id)}
+									onedit={handleEditServer}
+								/>
 							{/each}
 						</div>
 					{/if}
@@ -179,7 +242,47 @@
 				</div>
 			</div>
 		{:else if currentView === "add"}
-			<AddServerForm onsubmit={handleAddServer} oncancel={handleCancel} />
+			<!-- Tabs -->
+			<div class="mb-4 flex border-b border-gray-200 dark:border-gray-700">
+				<button
+					onclick={() => (addTab = "search")}
+					class="border-b-2 px-4 py-2 text-sm font-medium transition-colors {addTab === 'search'
+						? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+						: 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}"
+				>
+					Search
+				</button>
+				<button
+					onclick={() => (addTab = "manual")}
+					class="border-b-2 px-4 py-2 text-sm font-medium transition-colors {addTab === 'manual'
+						? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+						: 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}"
+				>
+					Add
+				</button>
+			</div>
+
+			{#if addTab === "search"}
+				<MCPServerSearch existingServers={$allMcpServers} onadd={handleRegistryAdd} />
+				<div class="mt-3 flex justify-start">
+					<button
+						onclick={handleCancel}
+						class="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+					>
+						Cancel
+					</button>
+				</div>
+			{:else}
+				<AddServerForm
+					onsubmit={handleAddServer}
+					oncancel={handleCancel}
+					initialName={prefillName}
+					initialUrl={prefillUrl}
+					initialDescription={prefillDescription}
+					initialHeaders={prefillHeaders}
+					submitLabel={editingServer ? "Save Changes" : undefined}
+				/>
+			{/if}
 		{/if}
 	</div>
 </Modal>
