@@ -43,6 +43,7 @@ export interface ToolFront {
 export interface KeyValuePair {
 	key: string;
 	value: string;
+	description?: string;
 }
 
 export type ServerStatus = "connected" | "connecting" | "disconnected" | "error";
@@ -71,4 +72,26 @@ export interface MCPServer {
 export interface MCPServerApi {
 	url: string;
 	headers?: KeyValuePair[];
+}
+
+export interface MCPRegistryIcon {
+	src: string;
+	mimeType?: "image/png" | "image/jpeg" | "image/jpg" | "image/svg+xml" | "image/webp";
+	sizes?: string[];
+	theme?: "light" | "dark";
+}
+
+export interface MCPRegistryHeader {
+	name: string;
+	description?: string;
+	isSecret?: boolean;
+}
+
+export interface MCPRegistryEntry {
+	name: string;
+	title?: string;
+	description: string;
+	url: string;
+	icons?: MCPRegistryIcon[];
+	requiredHeaders?: MCPRegistryHeader[];
 }
