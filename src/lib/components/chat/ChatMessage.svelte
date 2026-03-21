@@ -324,9 +324,7 @@
 
 		{#if message.routerMetadata || (!loading && message.content)}
 			<div
-				class="absolute -bottom-3.5 {message.routerMetadata && messageInfoWidth > messageWidth
-					? 'left-1 pl-1 lg:pl-7'
-					: 'right-1'} flex max-w-[calc(100dvw-40px)] items-center gap-0.5"
+				class="absolute -bottom-3.5 left-4 flex max-w-[calc(100dvw-40px)] items-center gap-1.5 sm:left-[46px]"
 				bind:offsetWidth={messageInfoWidth}
 			>
 				{#if message.routerMetadata && (message.routerMetadata.route || message.routerMetadata.model || message.routerMetadata.provider) && (!isLast || !loading)}
@@ -409,16 +407,16 @@
 {/if}
 {#if message.from === "user"}
 	<div
-		class="group relative {alternatives.length > 1 && editMsdgId === null
+		class="group relative flex {alternatives.length > 1 && editMsdgId === null
 			? 'mb-7'
-			: ''} w-full items-start justify-start gap-4"
+			: ''} w-full flex-col items-end justify-start gap-4"
 		data-message-id={message.id}
 		data-message-type="user"
 		role="presentation"
 		onclick={() => (isTapped = !isTapped)}
 		onkeydown={() => (isTapped = !isTapped)}
 	>
-		<div class="flex w-full flex-col gap-2">
+		<div class="flex w-full max-w-full flex-col items-end gap-2 {editMode ? '' : 'md:max-w-[80%]'}">
 			{#if message.files?.length}
 				<div class="flex w-fit gap-4 px-5">
 					{#each message.files as file}
@@ -427,10 +425,10 @@
 				</div>
 			{/if}
 
-			<div class="flex w-full flex-row flex-nowrap">
+			<div class="flex w-full flex-row flex-nowrap {editMode ? '' : 'justify-end'}">
 				{#if !editMode}
 					<p
-						class="disabled w-full appearance-none whitespace-break-spaces text-wrap break-words bg-inherit px-5 py-3.5 text-gray-500 dark:text-gray-400"
+						class="disabled w-max max-w-full appearance-none whitespace-break-spaces text-wrap break-words bg-inherit px-5 py-3.5 text-gray-500 dark:text-gray-400"
 					>
 						{message.content.trim()}
 					</p>
@@ -477,7 +475,9 @@
 					</form>
 				{/if}
 			</div>
-			<div class="absolute -bottom-4 ml-3.5 flex w-full gap-1.5">
+			<div
+				class="absolute -bottom-4 right-5 flex w-full justify-end gap-1.5 max-md:right-0 max-md:pr-5"
+			>
 				{#if alternatives.length > 1 && editMsdgId === null}
 					<Alternatives
 						{message}
