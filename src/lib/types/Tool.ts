@@ -39,11 +39,15 @@ export interface ToolFront {
 	timeToUseMS?: number;
 }
 
-// MCP Server types
 export interface KeyValuePair {
 	key: string;
 	value: string;
+}
+
+// MCP Server types
+export interface HeaderEntry extends KeyValuePair {
 	description?: string;
+	required?: boolean;
 }
 
 export type ServerStatus = "connected" | "connecting" | "disconnected" | "error";
@@ -59,7 +63,7 @@ export interface MCPServer {
 	name: string;
 	url: string;
 	type: "base" | "custom";
-	headers?: KeyValuePair[];
+	headers?: HeaderEntry[];
 	env?: KeyValuePair[];
 	status?: ServerStatus;
 	isLocked?: boolean;
@@ -71,7 +75,7 @@ export interface MCPServer {
 
 export interface MCPServerApi {
 	url: string;
-	headers?: KeyValuePair[];
+	headers?: HeaderEntry[];
 }
 
 export interface MCPRegistryIcon {
