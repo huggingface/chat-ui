@@ -86,6 +86,7 @@
 			key: h.name,
 			value: "",
 			description: h.description,
+			required: true,
 		}));
 		addTab = "manual";
 	}

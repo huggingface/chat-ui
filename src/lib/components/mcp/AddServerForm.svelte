@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { KeyValuePair } from "$lib/types/Tool";
+	import type { HeaderEntry } from "$lib/types/Tool";
 	import {
 		validateMcpServerUrl,
 		validateHeader,
@@ -12,12 +12,12 @@
 	import IconWarning from "~icons/carbon/warning";
 
 	interface Props {
-		onsubmit: (server: { name: string; url: string; headers?: KeyValuePair[] }) => void;
+		onsubmit: (server: { name: string; url: string; headers?: HeaderEntry[] }) => void;
 		oncancel: () => void;
 		initialName?: string;
 		initialUrl?: string;
 		initialDescription?: string;
-		initialHeaders?: KeyValuePair[];
+		initialHeaders?: HeaderEntry[];
 		submitLabel?: string;
 	}
 
@@ -33,7 +33,7 @@
 
 	let name = $state("");
 	let url = $state("");
-	let headers = $state<KeyValuePair[]>([]);
+	let headers = $state<HeaderEntry[]>([]);
 	let headersOpen = $state(false);
 
 	$effect.pre(() => {
@@ -79,15 +79,20 @@
 		}
 
 		// Validate headers
-		for (let i = 0; i < headers.length; i++) {
-			const header = headers[i];
-			if (header.key.trim() || header.value.trim()) {
-				const headerError = validateHeader(header.key, header.value);
+		for (const header of headers) {
+			const { key, value, required } = header;
+			const keyInput = key.trim();
+			const valueInput = value.trim();
+			if (required && !valueInput) {
+				error = `"${keyInput}" is required`;
+				return false;
+			}
+			if (keyInput || valueInput) {
+				const headerError = validateHeader(key, value);
 				if (headerError) {
-					const key = header.key.trim();
 					error =
-						key && headerError === "Header value is required"
-							? `"${key}" value is required`
+						keyInput && headerError === "Header value is required"
+							? `${keyInput} value is required`
 							: headerError;
 					return false;
 				}
@@ -162,7 +167,7 @@
 		ontoggle={(e) => (headersOpen = (e.currentTarget as HTMLDetailsElement).open)}
 	>
 		<summary class="cursor-pointer px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-			HTTP Headers {#if headers.some((h) => h.description)}<span class="text-red-500">*</span
+			HTTP Headers {#if headers.some((h) => h.required)}<span class="text-red-500">*</span
 				>{:else}(Optional){/if}
 		</summary>
 		<div class="space-y-2 border-t border-gray-200 p-4 dark:border-gray-700">
@@ -199,7 +204,7 @@
 									</button>
 								{/if}
 							</div>
-							{#if !header.description}
+							{#if !header.required}
 								<button
 									type="button"
 									onclick={() => removeHeader(i)}
@@ -226,7 +231,7 @@
 				Add Header
 			</button>
 
-			{#if !headers.some((h) => h.description)}
+			{#if !headers.some((h) => h.required)}
 				<p class="text-xs text-gray-500 dark:text-gray-400">
 					Common examples:<br />
 					• Bearer token:
