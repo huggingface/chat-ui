@@ -36,7 +36,7 @@ ingressInternal:
     kubernetes.io/ingress.class: "alb"
 
 envVars:
-  TEST: "percona-migration-test"
+  TEST: "percona-migration-test-v2"
   COUPLE_SESSION_WITH_COOKIE_NAME: "token"
   OPENID_SCOPES: "openid profile inference-api read-mcp read-billing"
   USE_USER_TOKEN: "true"
