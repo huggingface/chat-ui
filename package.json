@@ -69,6 +69,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@aws-sdk/credential-providers": "^3.1017.0",
 		"@huggingface/hub": "^2.2.0",
 		"@huggingface/inference": "^4.11.3",
 		"@iconify-json/bi": "^1.1.21",
@@ -76,6 +77,7 @@
 		"@resvg/resvg-js": "^2.6.2",
 		"ajv": "^8.18.0",
 		"autoprefixer": "^10.4.14",
+		"aws4": "^1.13.2",
 		"bits-ui": "^2.14.2",
 		"date-fns": "^2.29.3",
 		"devalue": "^5.6.4",
