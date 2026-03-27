@@ -13,6 +13,8 @@ import {
 } from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
+import { isExaMcpServer } from "$lib/server/mcp/hf";
+import { config } from "$lib/server/config";
 import type { Client } from "@modelcontextprotocol/sdk/client";
 
 export type Primitive = string | number | boolean;
@@ -235,6 +237,20 @@ export async function* executeToolCalls({
 			return;
 		}
 		const client = clientMap.get(mappingEntry.server);
+
+		// Inject Exa search performance defaults (only if LLM didn't set them)
+		if (isExaMcpServer(serverCfg.url) && p.argsObj) {
+			const args = p.argsObj as Record<string, unknown>;
+			const searchType = config.EXA_SEARCH_TYPE;
+			const livecrawl = config.EXA_LIVECRAWL;
+			if (searchType && args["type"] === undefined) {
+				args["type"] = searchType;
+			}
+			if (livecrawl && args["livecrawl"] === undefined) {
+				args["livecrawl"] = livecrawl;
+			}
+		}
+
 		try {
 			logger.debug(
 				{ server: mappingEntry.server, tool: mappingEntry.tool, parameters: p.paramsClean },
