@@ -26,6 +26,7 @@ export const GET: RequestHandler = async () => {
 					preprompt: model.preprompt,
 					multimodal: model.multimodal,
 					multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
+					acceptedFileMimetypes: model.acceptedFileMimetypes,
 					supportsTools: (model as unknown as { supportsTools?: boolean }).supportsTools ?? false,
 					unlisted: model.unlisted,
 					hasInferenceAPI: model.hasInferenceAPI,
