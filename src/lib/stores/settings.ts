@@ -36,8 +36,12 @@ export function useSettingsStore() {
 	return getContext<SettingsStoreWritable>("settings");
 }
 
-export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlySaved">) {
+export function createSettingsStore(
+	initialValue: Omit<SettingsStore, "recentlySaved">,
+	opts?: { isFallback?: boolean }
+) {
 	const baseStore = writable({ ...initialValue, recentlySaved: false });
+	let canPersist = !opts?.isFallback;
 
 	let timeoutId: NodeJS.Timeout;
 	let showSavedOnNextSync = false;
@@ -48,7 +52,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 			...settings,
 		}));
 
-		if (browser) {
+		if (browser && canPersist) {
 			showSavedOnNextSync = true; // User edit, should show "Saved"
 			clearTimeout(timeoutId);
 			timeoutId = setTimeout(async () => {
@@ -107,7 +111,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 		}));
 
 		// Save to server (debounced) - note: we don't set showSavedOnNextSync
-		if (browser) {
+		if (browser && canPersist) {
 			clearTimeout(timeoutId);
 			timeoutId = setTimeout(async () => {
 				await fetch(`${base}/settings`, {
@@ -143,7 +147,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 			...settings,
 		}));
 
-		if (browser) {
+		if (browser && canPersist) {
 			await fetch(`${base}/settings`, {
 				method: "POST",
 				headers: {
