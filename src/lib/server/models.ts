@@ -56,6 +56,8 @@ const modelConfig = z.object({
 		.optional(),
 	multimodal: z.boolean().default(false),
 	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
+	/** MIME types the model accepts as file attachments (e.g. ["application/pdf", "image/*"]) */
+	acceptedFileMimetypes: z.array(z.string()).optional(),
 	// Aggregated tool-calling capability across providers (HF router)
 	supportsTools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
