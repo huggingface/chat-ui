@@ -21,7 +21,7 @@ body {
 	}
 
 	.file-hoverable {
-		@apply hover:bg-gray-500/10;
+		@apply transition-colors hover:border-gray-300 hover:bg-gray-100 dark:hover:border-gray-700 dark:hover:bg-gray-800;
 	}
 
 	.base-tool {
