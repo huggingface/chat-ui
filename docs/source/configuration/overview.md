@@ -72,6 +72,20 @@ ENABLE_DATA_EXPORT=true         # Allow users to export their data
 ALLOW_IFRAME=false              # Disallow embedding in iframes (set to true to allow)
 ```
 
+## Text File MIME Allowlist
+
+Control which file MIME types are treated as text uploads:
+
+```ini
+PUBLIC_TEXT_MIME_ALLOWLIST=text/*,application/json,application/xml,application/csv
+```
+
+For TypeScript-heavy setups, you can extend it with common TS/JS MIME variants:
+
+```ini
+PUBLIC_TEXT_MIME_ALLOWLIST=text/*,application/json,application/xml,application/csv,application/typescript,text/typescript,text/x-typescript,application/x-typescript,application/javascript,text/javascript
+```
+
 ## User Authentication
 
 Use OpenID Connect for authentication:
