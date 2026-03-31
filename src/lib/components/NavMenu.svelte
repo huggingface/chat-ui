@@ -172,9 +172,7 @@
 	class="flex touch-none flex-col gap-1 rounded-r-xl border border-l-0 border-gray-100 p-3 text-sm dark:border-transparent md:mt-3 md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
 >
 	{#if user?.username || user?.email}
-		<div
-			class="group flex h-9 items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 first:hover:bg-transparent dark:hover:bg-gray-700 first:dark:hover:bg-transparent"
-		>
+		{#snippet userRow()}
 			<img
 				src="https://huggingface.co/api/users/{user.username}/avatar?redirect=true"
 				class="size-3.5 rounded-full border bg-gray-500 dark:border-white/40"
@@ -191,6 +189,7 @@
 					target="_blank"
 					rel="noopener noreferrer"
 					class="ml-auto flex h-[20px] items-center gap-1 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400"
+					onclick={(e) => e.stopPropagation()}
 				>
 					<IconPro />
 					Get PRO
@@ -203,7 +202,23 @@
 					PRO
 				</span>
 			{/if}
-		</div>
+		{/snippet}
+		{#if publicConfig.isHuggingChat && user?.username}
+			<a
+				href="https://huggingface.co/{user.username}"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="group flex h-9 items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+			>
+				{@render userRow()}
+			</a>
+		{:else}
+			<div
+				class="group flex h-9 items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 first:hover:bg-transparent dark:hover:bg-gray-700 first:dark:hover:bg-transparent"
+			>
+				{@render userRow()}
+			</div>
+		{/if}
 	{/if}
 	<a
 		href="{base}/models"
