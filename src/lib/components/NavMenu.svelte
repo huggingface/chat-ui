@@ -180,10 +180,20 @@
 				class="size-3.5 rounded-full border bg-gray-500 dark:border-white/40"
 				alt=""
 			/>
-			<span
-				class="flex flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
-				>{user?.username || user?.email}</span
-			>
+			{#if publicConfig.isHuggingChat && user?.username}
+				<a
+					href="https://huggingface.co/{user.username}"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="flex flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 hover:underline dark:text-gray-400"
+					>{user.username}</a
+				>
+			{:else}
+				<span
+					class="flex flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
+					>{user?.username || user?.email}</span
+				>
+			{/if}
 
 			{#if publicConfig.isHuggingChat && $isPro === false}
 				<a
