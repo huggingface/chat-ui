@@ -10,6 +10,8 @@
 	// import CarbonDownload from "~icons/carbon/download";
 
 	import CarbonPen from "~icons/carbon/pen";
+	import CarbonCopy from "~icons/carbon/copy";
+	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import UploadedFile from "./UploadedFile.svelte";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
@@ -51,6 +53,8 @@
 
 	let contentEl: HTMLElement | undefined = $state();
 	let isCopied = $state(false);
+	let isUserMsgCopied = $state(false);
+	let userCopyTimeout: ReturnType<typeof setTimeout>;
 	let messageWidth: number = $state(0);
 	let messageInfoWidth: number = $state(0);
 	let lightboxSrc: string | null = $state(null);
@@ -498,6 +502,37 @@
 					>
 						<CarbonPen />
 						Edit
+					</button>
+					<button
+						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs group-hover:flex hover:flex lg:-right-2 {isUserMsgCopied ? 'text-green-500 dark:text-green-400' : 'text-gray-400 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300'} dark:border-gray-700"
+						title="Copy to clipboard"
+						type="button"
+						onclick={() => {
+							if (window.isSecureContext && navigator.clipboard) {
+								navigator.clipboard.writeText(message.content);
+							} else {
+								const textArea = document.createElement("textarea");
+								textArea.value = message.content;
+								document.body.appendChild(textArea);
+								textArea.focus();
+								textArea.select();
+								document.execCommand("copy");
+								document.body.removeChild(textArea);
+							}
+							isUserMsgCopied = true;
+							clearTimeout(userCopyTimeout);
+							userCopyTimeout = setTimeout(() => {
+								isUserMsgCopied = false;
+							}, 1000);
+						}}
+					>
+						{#if isUserMsgCopied}
+							<CarbonCheckmark class="scale-95" />
+							Copied
+						{:else}
+							<CarbonCopy class="scale-95" />
+							Copy
+						{/if}
 					</button>
 				{/if}
 			</div>
