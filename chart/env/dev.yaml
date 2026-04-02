@@ -79,6 +79,8 @@ envVars:
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
   MODELS: >
     [
+      { "id": "google/gemma-4-31B-it", "description": "Dense multimodal Gemma with 256K context, reasoning, and function calling." },
+      { "id": "google/gemma-4-26B-A4B-it", "description": "Efficient multimodal MoE Gemma with 4B active params and 256K context." },
       { "id": "Qwen/Qwen3.5-9B", "description": "Dense multimodal hybrid with 262K context excelling at reasoning on-device." },
       { "id": "CohereLabs/tiny-aya-global", "description": "Tiny multilingual assistant covering 70+ languages for on-device deployment." },
       { "id": "CohereLabs/tiny-aya-earth", "description": "Regional Aya for African languages with culturally tuned on-device inference." },
