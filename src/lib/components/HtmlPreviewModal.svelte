@@ -29,7 +29,8 @@
 			const svgContent = trimmed
 				.replace(/^(<\?xml[^>]*>\s*)/i, "")
 				.replace(/^(<!doctype[^>]*>\s*)/i, "");
-			return `<!doctype html><html><head>${baseTag}${disabledLinkStyles}${errorHook}</head><body>${svgContent}</body></html>`;
+			const svgStyles = `<style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh}svg{max-width:100vw;max-height:100vh}</style>`;
+			return `<!doctype html><html><head>${baseTag}${disabledLinkStyles}${svgStyles}${errorHook}</head><body>${svgContent}</body></html>`;
 		}
 
 		const headMatch = content.match(/<head[^>]*>/i);
