@@ -63,10 +63,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Inject slug/short variables
-        uses: rlespinasse/github-slug-action@v4.5.0
+        uses: rlespinasse/github-slug-action@v5.4.0
 
       - name: Build and Publish Docker Image with DB
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
@@ -124,10 +124,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Inject slug/short variables
-        uses: rlespinasse/github-slug-action@v4.5.0
+        uses: rlespinasse/github-slug-action@v5.4.0
 
       - name: Build and Publish Docker Image without DB
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
