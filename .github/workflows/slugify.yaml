@@ -20,12 +20,14 @@ jobs:
 
     steps:
       - name: Setup Go
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32  # v5.0.2
         with:
           go-version: "1.21"
 
       - name: Generate slug
         id: slugify
+        env:
+          VALUE: ${{ inputs.value }}
         run: |
           # Create working directory
           mkdir -p $HOME/slugify
@@ -62,7 +64,6 @@ jobs:
           go build -o slugify main.go
 
           # Generate slug
-          VALUE="${{ inputs.value }}"
           echo "Input value: $VALUE"
 
           SLUG=$(./slugify "$VALUE")
