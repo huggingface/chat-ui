@@ -266,6 +266,8 @@
 		if (firstMessageId !== prevFirstMessageId) {
 			prevFirstMessageId = firstMessageId;
 			forceReattach++;
+			spacerActive = false;
+			spacerHeight = MIN_SPACER_PX;
 			prevMessageCount = messages.length;
 			return;
 		}
@@ -282,6 +284,7 @@
 
 			if (userJustSentMessage) {
 				forceReattach++;
+				spacerActive = true;
 			}
 		}
 		prevMessageCount = messages.length;
@@ -292,52 +295,44 @@
 
 	// Dynamic bottom spacer for ChatGPT-style scroll (new message appears near top of viewport)
 	const MIN_SPACER_PX = 208; // equivalent to pb-52
+	let spacerEl: HTMLElement | undefined = $state();
+	let messagesEl: HTMLElement | undefined = $state();
 	let spacerHeight = $state(MIN_SPACER_PX);
+	let spacerActive = $state(false);
 
 	function computeSpacerHeight(): number {
-		if (!chatContainer) return MIN_SPACER_PX;
+		if (!chatContainer || !spacerEl) return MIN_SPACER_PX;
 
 		const userMsgs = chatContainer.querySelectorAll('[data-message-type="user"]');
 		const lastUserMsg = userMsgs[userMsgs.length - 1] as HTMLElement | undefined;
 		if (!lastUserMsg) return MIN_SPACER_PX;
 
 		const viewportHeight = chatContainer.clientHeight;
-
-		const allMsgs = chatContainer.querySelectorAll("[data-message-id]");
-		const lastMsg = allMsgs[allMsgs.length - 1] as HTMLElement | undefined;
-		if (!lastMsg) return MIN_SPACER_PX;
-
 		const containerRect = chatContainer.getBoundingClientRect();
-		const userMsgRect = lastUserMsg.getBoundingClientRect();
-		const lastMsgRect = lastMsg.getBoundingClientRect();
+		const scrollTop = chatContainer.scrollTop;
 
-		const userMsgScrollTop = userMsgRect.top - containerRect.top + chatContainer.scrollTop;
-		const lastMsgScrollBottom = lastMsgRect.bottom - containerRect.top + chatContainer.scrollTop;
+		// Use the spacer element's own position as reference — this naturally accounts
+		// for all flex gaps, padding, and layout between the user message and the spacer.
+		const userMsgScrollTop =
+			lastUserMsg.getBoundingClientRect().top - containerRect.top + scrollTop;
+		const spacerScrollTop = spacerEl.getBoundingClientRect().top - containerRect.top + scrollTop;
 
-		const contentHeight = lastMsgScrollBottom - userMsgScrollTop;
+		const contentHeight = spacerScrollTop - userMsgScrollTop;
 		return Math.max(MIN_SPACER_PX, viewportHeight - contentHeight);
 	}
 
 	$effect(() => {
-		void loading;
-		void messages;
+		if (!spacerActive || !loading || !chatContainer || !messagesEl) return;
 
-		let observer: ResizeObserver | undefined;
-
-		if (loading && chatContainer) {
-			const target = chatContainer.firstElementChild;
-			if (target) {
-				observer = new ResizeObserver(() => {
-					spacerHeight = computeSpacerHeight();
-				});
-				observer.observe(target);
-			}
+		// Observe the messages wrapper (has h-max, resizes with content)
+		// instead of the mx-auto container (has h-full, may not resize).
+		const observer = new ResizeObserver(() => {
 			spacerHeight = computeSpacerHeight();
-		} else {
-			spacerHeight = MIN_SPACER_PX;
-		}
+		});
+		observer.observe(messagesEl);
+		spacerHeight = computeSpacerHeight();
 
-		return () => observer?.disconnect();
+		return () => observer.disconnect();
 	});
 
 	const settings = useSettingsStore();
@@ -553,7 +548,7 @@
 			{/if}
 
 			{#if messages.length > 0}
-				<div class="flex h-max flex-col gap-8">
+				<div bind:this={messagesEl} class="flex h-max flex-col gap-8">
 					{#each messages as message, idx (message.id)}
 						<ChatMessage
 							{loading}
@@ -573,7 +568,8 @@
 				</div>
 				<!-- Dynamic bottom spacer: large when streaming new message, shrinks as response grows -->
 				<div
-					class="flex-shrink-0 transition-[height] duration-300 ease-out"
+					bind:this={spacerEl}
+					class="flex-shrink-0"
 					style="height: {spacerHeight}px;"
 				></div>
 			{:else if pending}
