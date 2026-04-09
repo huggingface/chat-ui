@@ -266,7 +266,7 @@
 		if (firstMessageId !== prevFirstMessageId) {
 			prevFirstMessageId = firstMessageId;
 			forceReattach++;
-			spacerActive = false;
+			spacerActive = 0;
 			spacerHeight = MIN_SPACER_PX;
 			prevMessageCount = messages.length;
 			return;
@@ -286,7 +286,7 @@
 				forceReattach++;
 				// Only activate dynamic spacer after the first exchange
 				// (first user+assistant pair scrolls normally)
-				spacerActive = prevMessageCount > 2;
+				spacerActive = prevMessageCount > 2 ? spacerActive + 1 : 0;
 			}
 		}
 		prevMessageCount = messages.length;
@@ -301,7 +301,7 @@
 	let spacerEl: HTMLElement | undefined = $state();
 	let messagesEl: HTMLElement | undefined = $state();
 	let spacerHeight = $state(MIN_SPACER_PX);
-	let spacerActive = $state(false);
+	let spacerActive = $state(0); // 0 = inactive, >0 = active (counter to force effect re-run)
 
 	function computeSpacerHeight(): number {
 		if (!chatContainer || !spacerEl) return MIN_SPACER_PX;
