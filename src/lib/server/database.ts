@@ -11,7 +11,6 @@ import type { Report } from "$lib/types/Report";
 import type { ConversationStats } from "$lib/types/ConversationStats";
 import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
-import type { AssistantStats } from "$lib/types/AssistantStats";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
@@ -135,9 +134,6 @@ export class Database {
 		const assistants = db.collection<Assistant>("assistants", {
 			readPreference: secondaryPreferred,
 		});
-		const assistantStats = db.collection<AssistantStats>("assistants.stats", {
-			readPreference: secondaryPreferred,
-		});
 		const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION, {
 			readPreference: secondaryPreferred,
 		});
@@ -147,12 +143,10 @@ export class Database {
 		const tools = db.collection("tools", {
 			readPreference: secondaryPreferred,
 		});
-
 		return {
 			conversations,
 			conversationStats,
 			assistants,
-			assistantStats,
 			reports,
 			sharedConversations,
 			abortedGenerations,
@@ -178,7 +172,6 @@ export class Database {
 			conversations,
 			conversationStats,
 			assistants,
-			assistantStats,
 			reports,
 			sharedConversations,
 			abortedGenerations,
@@ -319,15 +312,6 @@ export class Database {
 			.catch((e) =>
 				logger.error(e, "Error creating index for assistants by last24HoursUseCount and useCount")
 			);
-		assistantStats
-			// Order of keys is important for the queries
-			.createIndex({ "date.span": 1, "date.at": 1, assistantId: 1 }, { unique: true })
-			.catch((e) =>
-				logger.error(
-					e,
-					"Error creating index for assistantStats by date.span and date.at and assistantId"
-				)
-			);
 		reports
 			.createIndex({ assistantId: 1 })
 			.catch((e) => logger.error(e, "Error creating index for reports by assistantId"));
@@ -348,8 +332,6 @@ export class Database {
 		tokenCaches
 			.createIndex({ tokenHash: 1 })
 			.catch((e) => logger.error(e, "Error creating index for tokenCaches by tokenHash"));
-		// Tools removed: skipping tools indexes
-
 		conversations
 			.createIndex({
 				"messages.from": 1,

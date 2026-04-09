@@ -217,7 +217,7 @@ export function tokenSetToSessionOauth(tokenSet: TokenSet): Session["oauth"] {
 /**
  * Generates a CSRF token using the user sessionId. Note that we don't need a secret because sessionId is enough.
  */
-export async function generateCsrfToken(
+async function generateCsrfToken(
 	sessionId: string,
 	redirectUrl: string,
 	next?: string

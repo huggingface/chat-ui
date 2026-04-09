@@ -54,16 +54,6 @@ export async function isURLLocal(URL: URL): Promise<boolean> {
 	throw Error("Unknown IP family");
 }
 
-export function isURLStringLocal(url: string) {
-	try {
-		const urlObj = new URL(url);
-		return isURLLocal(urlObj);
-	} catch (e) {
-		// assume local if URL parsing fails
-		return true;
-	}
-}
-
 export function isHostLocalhost(host: string): boolean {
 	if (host === "localhost") return true;
 	if (host === "::1" || host === "[::1]") return true;

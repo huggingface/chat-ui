@@ -46,10 +46,3 @@ export function updateRequestContext(updates: Partial<Omit<RequestContext, "requ
 export function getRequestContext(): RequestContext | undefined {
 	return asyncLocalStorage.getStore();
 }
-
-/**
- * Get the current request ID, or undefined if not in a request context.
- */
-export function getRequestId(): string | undefined {
-	return asyncLocalStorage.getStore()?.requestId;
-}

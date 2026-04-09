@@ -66,46 +66,6 @@ function isPrivateOrLocalhost(hostname: string): boolean {
 }
 
 /**
- * Sanitize URL by removing sensitive parts
- * Used for logging and display purposes
- */
-export function sanitizeUrlForDisplay(urlString: string): string {
-	try {
-		const url = new URL(urlString);
-		// Remove username/password if present
-		url.username = "";
-		url.password = "";
-		return url.toString();
-	} catch {
-		return urlString;
-	}
-}
-
-/**
- * Check if URL is safe to connect to
- * Returns an error message if unsafe, null if safe
- */
-export function checkUrlSafety(urlString: string): string | null {
-	const validated = validateMcpServerUrl(urlString);
-	if (!validated) {
-		return "Invalid URL. Please use http:// or https:// URLs only.";
-	}
-
-	try {
-		const url = new URL(validated);
-
-		// Additional safety checks
-		if (!dev && url.protocol === "http:") {
-			return "Non-HTTPS URLs are not recommended in production. Please use https:// for security.";
-		}
-
-		return null; // Safe
-	} catch {
-		return "Invalid URL format.";
-	}
-}
-
-/**
  * Check if a header key is likely to contain sensitive data
  */
 export function isSensitiveHeader(key: string): boolean {
