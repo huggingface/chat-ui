@@ -259,12 +259,14 @@
 	let prevMessageCount = $state(0);
 	let prevFirstMessageId = $state(messages.at(0)?.id);
 	let forceReattach = $state(0);
+	let scrollBehavior: ScrollBehavior = $state("instant");
 	$effect(() => {
 		const firstMessageId = messages.at(0)?.id;
 
 		// Conversation switch: first message ID changed
 		if (firstMessageId !== prevFirstMessageId) {
 			prevFirstMessageId = firstMessageId;
+			scrollBehavior = "instant";
 			forceReattach++;
 			spacerActive = 0;
 			spacerHeight = MIN_SPACER_PX;
@@ -283,6 +285,7 @@
 				last?.content === "";
 
 			if (userJustSentMessage) {
+				scrollBehavior = "smooth";
 				forceReattach++;
 				// Only activate dynamic spacer after the first exchange
 				// (first user+assistant pair scrolls normally)
@@ -293,7 +296,7 @@
 	});
 
 	// Combined scroll dependency for the action
-	let scrollDependency = $derived({ forceReattach });
+	let scrollDependency = $derived({ forceReattach, scrollBehavior });
 
 	// Dynamic bottom spacer for ChatGPT-style scroll (new message appears near top of viewport)
 	const MIN_SPACER_PX = 208; // equivalent to pb-52
