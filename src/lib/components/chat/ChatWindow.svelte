@@ -284,9 +284,9 @@
 
 			if (userJustSentMessage) {
 				forceReattach++;
-				// Only activate dynamic spacer if there are prior messages
-				// (skip for the first message in a conversation)
-				spacerActive = prevMessageCount > 0;
+				// Only activate dynamic spacer after the first exchange
+				// (first user+assistant pair scrolls normally)
+				spacerActive = prevMessageCount > 2;
 			}
 		}
 		prevMessageCount = messages.length;
