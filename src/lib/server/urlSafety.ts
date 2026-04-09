@@ -99,6 +99,7 @@ const ssrfSafeAgent = new Agent({
 });
 
 const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /**
  * Fetch wrapper that validates resolved IPs at connection time
@@ -112,17 +113,18 @@ export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Prom
 	const callerHandlesRedirects = init?.redirect === "manual";
 
 	let currentUrl = url.toString();
+	let currentInit = init;
 	let redirectCount = 0;
 
 	// eslint-disable-next-line no-constant-condition
 	while (true) {
 		const response = (await undiciFetch(currentUrl, {
-			...(init as Record<string, unknown>),
+			...(currentInit as Record<string, unknown>),
 			redirect: "manual",
 			dispatcher: ssrfSafeAgent,
 		})) as unknown as Response;
 
-		if (!callerHandlesRedirects && response.status >= 300 && response.status < 400) {
+		if (!callerHandlesRedirects && REDIRECT_STATUSES.has(response.status)) {
 			redirectCount++;
 			if (redirectCount > MAX_REDIRECTS) {
 				throw new Error("Too many redirects");
@@ -136,6 +138,15 @@ export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Prom
 			const redirectUrl = new URL(location, currentUrl).toString();
 			if (!isValidUrl(redirectUrl)) {
 				throw new Error(`Redirect to unsafe URL blocked (SSRF): ${redirectUrl}`);
+			}
+
+			// Per fetch spec: 301/302/303 switch POST/PUT to GET and drop the body
+			if (
+				[301, 302, 303].includes(response.status) &&
+				init?.method &&
+				/^(POST|PUT)$/i.test(init.method)
+			) {
+				currentInit = { ...init, method: "GET", body: undefined };
 			}
 
 			currentUrl = redirectUrl;
