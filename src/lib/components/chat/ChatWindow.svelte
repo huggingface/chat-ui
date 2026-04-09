@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy } from "svelte";
+	import { onDestroy, tick } from "svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import IconCheap from "$lib/components/icons/IconCheap.svelte";
@@ -322,12 +322,26 @@
 	}
 
 	$effect(() => {
-		if (!spacerActive || !loading || !chatContainer || !messagesEl) return;
+		// Don't gate on `loading` — the spacer must be computed immediately when
+		// spacerActive is set (same tick as forceReattach++) so that the spacer
+		// height is correct BEFORE snapScrollToBottom's scrollToBottom() fires.
+		if (!spacerActive || !chatContainer || !messagesEl) return;
+
+		const container = chatContainer;
 
 		// Observe the messages wrapper (has h-max, resizes with content)
 		// instead of the mx-auto container (has h-full, may not resize).
 		const observer = new ResizeObserver(() => {
 			spacerHeight = computeSpacerHeight();
+			// The mx-auto container has h-full so its ResizeObserver in
+			// snapScrollToBottom may not fire during streaming. Scroll here
+			// to keep up with growing content, but only if user is near bottom.
+			tick().then(() => {
+				const dist = container.scrollHeight - container.scrollTop - container.clientHeight;
+				if (dist < 150) {
+					container.scrollTo({ top: container.scrollHeight });
+				}
+			});
 		});
 		observer.observe(messagesEl);
 		spacerHeight = computeSpacerHeight();
