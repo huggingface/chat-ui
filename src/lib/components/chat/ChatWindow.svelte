@@ -297,6 +297,7 @@
 
 	// Dynamic bottom spacer for ChatGPT-style scroll (new message appears near top of viewport)
 	const MIN_SPACER_PX = 208; // equivalent to pb-52
+	const SPACER_TOP_OFFSET_PX = 80; // breathing room above the user message
 	let spacerEl: HTMLElement | undefined = $state();
 	let messagesEl: HTMLElement | undefined = $state();
 	let spacerHeight = $state(MIN_SPACER_PX);
@@ -320,7 +321,7 @@
 		const spacerScrollTop = spacerEl.getBoundingClientRect().top - containerRect.top + scrollTop;
 
 		const contentHeight = spacerScrollTop - userMsgScrollTop;
-		return Math.max(MIN_SPACER_PX, viewportHeight - contentHeight);
+		return Math.max(MIN_SPACER_PX, viewportHeight - contentHeight - SPACER_TOP_OFFSET_PX);
 	}
 
 	$effect(() => {
