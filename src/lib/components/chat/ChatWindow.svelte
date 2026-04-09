@@ -290,6 +290,56 @@
 	// Combined scroll dependency for the action
 	let scrollDependency = $derived({ forceReattach });
 
+	// Dynamic bottom spacer for ChatGPT-style scroll (new message appears near top of viewport)
+	const MIN_SPACER_PX = 208; // equivalent to pb-52
+	let spacerHeight = $state(MIN_SPACER_PX);
+
+	function computeSpacerHeight(): number {
+		if (!chatContainer) return MIN_SPACER_PX;
+
+		const userMsgs = chatContainer.querySelectorAll('[data-message-type="user"]');
+		const lastUserMsg = userMsgs[userMsgs.length - 1] as HTMLElement | undefined;
+		if (!lastUserMsg) return MIN_SPACER_PX;
+
+		const viewportHeight = chatContainer.clientHeight;
+
+		const allMsgs = chatContainer.querySelectorAll("[data-message-id]");
+		const lastMsg = allMsgs[allMsgs.length - 1] as HTMLElement | undefined;
+		if (!lastMsg) return MIN_SPACER_PX;
+
+		const containerRect = chatContainer.getBoundingClientRect();
+		const userMsgRect = lastUserMsg.getBoundingClientRect();
+		const lastMsgRect = lastMsg.getBoundingClientRect();
+
+		const userMsgScrollTop = userMsgRect.top - containerRect.top + chatContainer.scrollTop;
+		const lastMsgScrollBottom = lastMsgRect.bottom - containerRect.top + chatContainer.scrollTop;
+
+		const contentHeight = lastMsgScrollBottom - userMsgScrollTop;
+		return Math.max(MIN_SPACER_PX, viewportHeight - contentHeight);
+	}
+
+	$effect(() => {
+		void loading;
+		void messages;
+
+		let observer: ResizeObserver | undefined;
+
+		if (loading && chatContainer) {
+			const target = chatContainer.firstElementChild;
+			if (target) {
+				observer = new ResizeObserver(() => {
+					spacerHeight = computeSpacerHeight();
+				});
+				observer.observe(target);
+			}
+			spacerHeight = computeSpacerHeight();
+		} else {
+			spacerHeight = MIN_SPACER_PX;
+		}
+
+		return () => observer?.disconnect();
+	});
+
 	const settings = useSettingsStore();
 	let hideRouterExamples = $derived($settings.hidePromptExamples?.[currentModel.id] ?? false);
 
@@ -503,7 +553,7 @@
 			{/if}
 
 			{#if messages.length > 0}
-				<div class="flex h-max flex-col gap-8 pb-52">
+				<div class="flex h-max flex-col gap-8">
 					{#each messages as message, idx (message.id)}
 						<ChatMessage
 							{loading}
@@ -521,6 +571,11 @@
 						<ModelSwitch {models} {currentModel} />
 					{/if}
 				</div>
+				<!-- Dynamic bottom spacer: large when streaming new message, shrinks as response grows -->
+				<div
+					class="flex-shrink-0 transition-[height] duration-300 ease-out"
+					style="height: {spacerHeight}px;"
+				></div>
 			{:else if pending}
 				<ChatMessage
 					loading={true}
