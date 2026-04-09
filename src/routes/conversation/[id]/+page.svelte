@@ -39,6 +39,7 @@
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
 	let stopRequested = $state(false);
+	let messageUpdatesAbortController = new AbortController();
 
 	let files: File[] = $state([]);
 
@@ -215,7 +216,7 @@
 				throw new Error("Message to write to not found");
 			}
 
-			const messageUpdatesAbortController = new AbortController();
+			messageUpdatesAbortController = new AbortController();
 			const streamingMode = resolveStreamingMode($settings);
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
@@ -433,6 +434,7 @@
 		stopRequested = true;
 		$isAborted = true;
 		$loading = false;
+		messageUpdatesAbortController.abort();
 
 		const sendStopRequest = async () => {
 			const response = await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
@@ -548,6 +550,7 @@
 
 		$isAborted = true;
 		$loading = false;
+		messageUpdatesAbortController.abort();
 	});
 
 	let title = $derived.by(() => {
