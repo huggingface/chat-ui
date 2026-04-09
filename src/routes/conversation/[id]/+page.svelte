@@ -427,6 +427,15 @@
 			$loading = false;
 			pending = false;
 			await invalidateAll();
+			// After invalidateAll(), server data overwrites the local interrupted=true
+			// mutation. Re-apply it so the $effect sees streaming=false and doesn't
+			// re-enable $loading. The server UUIDs are now synced (from invalidateAll).
+			if (stopRequested) {
+				const lastAssistant = messages.findLast((m) => m.from === "assistant");
+				if (lastAssistant && !lastAssistant.interrupted) {
+					lastAssistant.interrupted = true;
+				}
+			}
 		}
 	}
 
