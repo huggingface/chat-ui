@@ -426,13 +426,7 @@
 		} finally {
 			$loading = false;
 			pending = false;
-			// Skip invalidateAll() when aborting — the local state already has
-			// interrupted=true on the assistant message and stale server data
-			// (without interrupted) would overwrite it, causing the $effect to
-			// see streaming=true and potentially re-enable $loading.
-			if (!stopRequested) {
-				await invalidateAll();
-			}
+			await invalidateAll();
 		}
 	}
 
