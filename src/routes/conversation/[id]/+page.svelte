@@ -436,6 +436,14 @@
 		$loading = false;
 		messageUpdatesAbortController.abort();
 
+		// Mark the last assistant message as interrupted locally so
+		// isConversationGenerationActive() immediately returns false,
+		// removing the background poller and preventing $loading re-enable.
+		const lastAssistant = messages.findLast((m) => m.from === "assistant");
+		if (lastAssistant) {
+			lastAssistant.interrupted = true;
+		}
+
 		const sendStopRequest = async () => {
 			const response = await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
 				method: "POST",
