@@ -286,7 +286,7 @@
 				forceReattach++;
 				// Only activate dynamic spacer after the first exchange
 				// (first user+assistant pair scrolls normally)
-				spacerActive = prevMessageCount > 2 ? spacerActive + 1 : 0;
+				spacerActive = prevMessageCount >= 2 ? spacerActive + 1 : 0;
 			}
 		}
 		prevMessageCount = messages.length;
@@ -341,7 +341,9 @@
 			// to keep up with growing content, but only if user is near bottom.
 			tick().then(() => {
 				const dist = container.scrollHeight - container.scrollTop - container.clientHeight;
-				if (dist < 150) {
+				// Use a tight threshold (matching snapScrollToBottom's BOTTOM_THRESHOLD)
+				// to avoid overriding user scroll intent during streaming.
+				if (dist < 50) {
 					container.scrollTo({ top: container.scrollHeight });
 				}
 			});
