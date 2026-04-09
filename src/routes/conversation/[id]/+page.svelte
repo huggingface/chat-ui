@@ -39,6 +39,7 @@
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
 	let stopRequested = $state(false);
+	let stopRequestPromise: Promise<void> | undefined;
 	let messageUpdatesAbortController = new AbortController();
 
 	let files: File[] = $state([]);
@@ -426,16 +427,13 @@
 		} finally {
 			$loading = false;
 			pending = false;
-			await invalidateAll();
-			// After invalidateAll(), server data overwrites the local interrupted=true
-			// mutation. Re-apply it so the $effect sees streaming=false and doesn't
-			// re-enable $loading. The server UUIDs are now synced (from invalidateAll).
-			if (stopRequested) {
-				const lastAssistant = messages.findLast((m) => m.from === "assistant");
-				if (lastAssistant && !lastAssistant.interrupted) {
-					lastAssistant.interrupted = true;
-				}
+			// Wait for the stop request to complete before refreshing data,
+			// so the server has persisted interrupted:true to the database.
+			if (stopRequestPromise) {
+				await stopRequestPromise.catch(() => {});
+				stopRequestPromise = undefined;
 			}
+			await invalidateAll();
 		}
 	}
 
@@ -462,17 +460,24 @@
 			}
 		};
 
-		try {
-			await sendStopRequest();
-		} catch (firstErr) {
+		// Store the promise so writeMessage's finally block can await it
+		// before calling invalidateAll() — ensures the server has persisted
+		// interrupted:true before we fetch fresh data.
+		stopRequestPromise = (async () => {
 			try {
-				await new Promise((resolve) => setTimeout(resolve, 300));
 				await sendStopRequest();
-			} catch (retryErr) {
-				console.error("Failed to stop generation", firstErr, retryErr);
-				$error = "Failed to stop generation. Please try again.";
+			} catch (firstErr) {
+				try {
+					await new Promise((resolve) => setTimeout(resolve, 300));
+					await sendStopRequest();
+				} catch (retryErr) {
+					console.error("Failed to stop generation", firstErr, retryErr);
+					$error = "Failed to stop generation. Please try again.";
+				}
 			}
-		}
+		})();
+
+		await stopRequestPromise;
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
