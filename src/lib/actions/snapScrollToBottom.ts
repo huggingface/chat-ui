@@ -73,11 +73,11 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 
 	const isAtBottom = () => distanceFromBottom() <= BOTTOM_THRESHOLD;
 
-	const scrollToBottom = () => {
+	const scrollToBottom = (behavior: ScrollBehavior = "instant") => {
 		isProgrammaticScroll = true;
 		lastProgrammaticScrollTime = Date.now();
 
-		node.scrollTo({ top: node.scrollHeight });
+		node.scrollTo({ top: node.scrollHeight, behavior });
 
 		if (typeof requestAnimationFrame === "function") {
 			requestAnimationFrame(() => {
@@ -168,7 +168,7 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 			clearUserScrollTimeout();
 
 			await tick();
-			scrollToBottom();
+			scrollToBottom("smooth");
 			return true;
 		}
 
