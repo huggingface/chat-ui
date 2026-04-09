@@ -110,8 +110,31 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
  * followed internally with each hop validated by `isValidUrl`.
  */
 export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Promise<Response> {
-	const callerHandlesRedirects = init?.redirect === "manual";
+	const callerRedirect = init?.redirect ?? "follow";
 
+	if (callerRedirect === "error") {
+		// Honour redirect:"error" — make the request and throw if we get a redirect
+		const response = (await undiciFetch(url.toString(), {
+			...(init as Record<string, unknown>),
+			redirect: "manual",
+			dispatcher: ssrfSafeAgent,
+		})) as unknown as Response;
+		if (REDIRECT_STATUSES.has(response.status)) {
+			throw new TypeError("unexpected redirect");
+		}
+		return response;
+	}
+
+	if (callerRedirect === "manual") {
+		// Caller handles redirects — return as-is
+		return (await undiciFetch(url.toString(), {
+			...(init as Record<string, unknown>),
+			redirect: "manual",
+			dispatcher: ssrfSafeAgent,
+		})) as unknown as Response;
+	}
+
+	// Default: follow redirects with SSRF validation on each hop
 	let currentUrl = url.toString();
 	let currentInit = init;
 	let redirectCount = 0;
@@ -124,7 +147,7 @@ export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Prom
 			dispatcher: ssrfSafeAgent,
 		})) as unknown as Response;
 
-		if (!callerHandlesRedirects && REDIRECT_STATUSES.has(response.status)) {
+		if (REDIRECT_STATUSES.has(response.status)) {
 			redirectCount++;
 			if (redirectCount > MAX_REDIRECTS) {
 				throw new Error("Too many redirects");
@@ -140,11 +163,11 @@ export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Prom
 				throw new Error(`Redirect to unsafe URL blocked (SSRF): ${redirectUrl}`);
 			}
 
-			// Per fetch spec: 301/302/303 switch POST/PUT to GET and drop the body
+			// Per fetch spec: 301/302 rewrite POST→GET; 303 rewrites any non-GET/HEAD→GET
+			const method = (currentInit?.method ?? "GET").toUpperCase();
 			if (
-				[301, 302, 303].includes(response.status) &&
-				init?.method &&
-				/^(POST|PUT)$/i.test(init.method)
+				([301, 302].includes(response.status) && method === "POST") ||
+				(response.status === 303 && method !== "GET" && method !== "HEAD")
 			) {
 				currentInit = { ...init, method: "GET", body: undefined };
 			}
