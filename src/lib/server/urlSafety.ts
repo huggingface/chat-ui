@@ -98,13 +98,50 @@ const ssrfSafeAgent = new Agent({
 	},
 });
 
+const MAX_REDIRECTS = 5;
+
 /**
- * Fetch wrapper that validates resolved IPs at connection time.
- * Use this for any outbound request where the URL may come from user input.
+ * Fetch wrapper that validates resolved IPs at connection time
+ * and validates redirect targets to prevent SSRF via open redirects.
+ *
+ * If the caller sets `redirect: "manual"`, redirects are returned as-is
+ * (the caller is responsible for validation). Otherwise, redirects are
+ * followed internally with each hop validated by `isValidUrl`.
  */
-export function ssrfSafeFetch(url: string | URL, init?: RequestInit): Promise<Response> {
-	return undiciFetch(url, {
-		...(init as Record<string, unknown>),
-		dispatcher: ssrfSafeAgent,
-	}) as unknown as Promise<Response>;
+export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Promise<Response> {
+	const callerHandlesRedirects = init?.redirect === "manual";
+
+	let currentUrl = url.toString();
+	let redirectCount = 0;
+
+	// eslint-disable-next-line no-constant-condition
+	while (true) {
+		const response = (await undiciFetch(currentUrl, {
+			...(init as Record<string, unknown>),
+			redirect: "manual",
+			dispatcher: ssrfSafeAgent,
+		})) as unknown as Response;
+
+		if (!callerHandlesRedirects && response.status >= 300 && response.status < 400) {
+			redirectCount++;
+			if (redirectCount > MAX_REDIRECTS) {
+				throw new Error("Too many redirects");
+			}
+
+			const location = response.headers.get("location");
+			if (!location) {
+				throw new Error("Redirect without Location header");
+			}
+
+			const redirectUrl = new URL(location, currentUrl).toString();
+			if (!isValidUrl(redirectUrl)) {
+				throw new Error(`Redirect to unsafe URL blocked (SSRF): ${redirectUrl}`);
+			}
+
+			currentUrl = redirectUrl;
+			continue;
+		}
+
+		return response;
+	}
 }
