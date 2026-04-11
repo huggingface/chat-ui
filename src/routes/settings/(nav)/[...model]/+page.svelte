@@ -13,6 +13,7 @@
 	import CarbonChat from "~icons/carbon/chat";
 	import CarbonCode from "~icons/carbon/code";
 	import CarbonChevronDown from "~icons/carbon/chevron-down";
+	import CarbonReset from "~icons/carbon/reset";
 	import LucideCheck from "~icons/lucide/check";
 	import CarbonMagicWandFilled from "~icons/carbon/magic-wand-filled";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
@@ -251,12 +252,25 @@
 				depending on your request.
 			</p>
 		{/if}
-		<div class="flex w-full flex-row content-between items-center">
-			<h3 class="mb-1 text-[15px] font-semibold text-gray-800 dark:text-gray-200">System Prompt</h3>
-			<div class="ml-auto flex items-center gap-3">
+		<div class="flex w-full flex-row items-center justify-between">
+			<h3 class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">System Prompt</h3>
+			<div class="flex items-center gap-2">
+				<div
+					class="flex select-none items-center gap-1.5 text-[11px] font-medium text-gray-600 dark:text-gray-400"
+				>
+					<span>Enabled</span>
+					<Switch
+						name="customPromptEnabled"
+						size="sm"
+						bind:checked={getCustomPromptEnabled, setCustomPromptEnabled}
+					/>
+				</div>
 				{#if hasCustomPreprompt}
 					<button
-						class="text-xs underline decoration-gray-300 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
+						type="button"
+						aria-label="Reset system prompt"
+						title="Reset to default"
+						class="grid size-6 place-items-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200"
 						onclick={(e) => {
 							e.stopPropagation();
 							settings.update((s) => ({
@@ -265,13 +279,9 @@
 							}));
 						}}
 					>
-						Reset
+						<CarbonReset class="size-3.5" />
 					</button>
 				{/if}
-				<Switch
-					name="customPromptEnabled"
-					bind:checked={getCustomPromptEnabled, setCustomPromptEnabled}
-				/>
 			</div>
 		</div>
 
