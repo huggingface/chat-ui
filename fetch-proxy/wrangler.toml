@@ -1,0 +1,16 @@
+name = "chat-ui-fetch-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Enable observability (request logs, tail) - free tier includes this.
+[observability]
+enabled = true
+
+# Environment variables. FETCH_PROXY_SECRET must be set as a secret via:
+#   npx wrangler secret put FETCH_PROXY_SECRET
+# Do NOT commit the secret value here.
+[vars]
+# Hard limits for fetched responses. Override per-environment if needed.
+MAX_RESPONSE_BYTES = "10485760"
+FETCH_TIMEOUT_MS = "30000"
+MAX_REDIRECTS = "5"

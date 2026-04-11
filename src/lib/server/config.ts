@@ -160,7 +160,9 @@ type ExtraConfigKeys =
 	| "MCP_SERVERS"
 	| "MCP_FORWARD_HF_USER_TOKEN"
 	| "MCP_TOOL_TIMEOUT_MS"
-	| "EXA_API_KEY";
+	| "EXA_API_KEY"
+	| "FETCH_PROXY_URL"
+	| "FETCH_PROXY_SECRET";
 
 type ConfigProxy = ConfigManager & { [K in ConfigKey | ExtraConfigKeys]: string };
 
