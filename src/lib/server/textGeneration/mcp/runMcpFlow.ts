@@ -31,7 +31,14 @@ import { AbortedGenerations } from "$lib/server/abortedGenerations";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
-	"model" | "conv" | "assistant" | "forceMultimodal" | "forceTools" | "provider" | "locals"
+	| "model"
+	| "conv"
+	| "assistant"
+	| "forceMultimodal"
+	| "forceTools"
+	| "provider"
+	| "reasoningLevel"
+	| "locals"
 > & { messages: EndpointMessage[] };
 
 // Return type: "completed" = MCP ran successfully, "not_applicable" = MCP didn't run, "aborted" = user aborted
@@ -45,6 +52,7 @@ export async function* runMcpFlow({
 	forceMultimodal,
 	forceTools,
 	provider,
+	reasoningLevel,
 	locals,
 	preprompt,
 	abortSignal,
@@ -415,6 +423,9 @@ export async function* runMcpFlow({
 			max_tokens: typeof maxTokens === "number" ? maxTokens : undefined,
 			tools: oaTools,
 			tool_choice: "auto",
+			...(reasoningLevel && reasoningLevel !== "off"
+				? ({ reasoning_effort: reasoningLevel } as Record<string, unknown>)
+				: {}),
 		};
 
 		const toPrimitive = (value: unknown) => {

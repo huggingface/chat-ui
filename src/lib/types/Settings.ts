@@ -43,6 +43,13 @@ export interface Settings extends Timestamps {
 	providerOverrides?: Record<string, string>;
 
 	/**
+	 * Per-model reasoning effort preference (OpenAI-compatible `reasoning_effort`).
+	 * Values: "off" (default, no parameter sent), "low", "medium", or "high".
+	 * Only meaningful for models with `supportsReasoning: true`.
+	 */
+	reasoningLevelOverrides?: Record<string, string>;
+
+	/**
 	 * Preferred assistant output behavior in the chat UI.
 	 * - "raw": show provider-native stream chunks
 	 * - "smooth": show smoothed stream chunks
@@ -73,6 +80,7 @@ export const DEFAULT_SETTINGS = {
 	toolsOverrides: {},
 	hidePromptExamples: {},
 	providerOverrides: {},
+	reasoningLevelOverrides: {},
 	streamingMode: "smooth",
 	directPaste: false,
 	hapticsEnabled: true,

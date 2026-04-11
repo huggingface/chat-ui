@@ -16,6 +16,7 @@ type SettingsStore = {
 	toolsOverrides: Record<string, boolean>;
 	hidePromptExamples: Record<string, boolean>;
 	providerOverrides: Record<string, string>;
+	reasoningLevelOverrides: Record<string, string>;
 	recentlySaved: boolean;
 	streamingMode: StreamingMode;
 	directPaste: boolean;

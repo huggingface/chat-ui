@@ -69,6 +69,16 @@
 		}));
 	}
 
+	function getReasoningLevel() {
+		return $settings.reasoningLevelOverrides?.[modelId] ?? "off";
+	}
+	function setReasoningLevel(v: string) {
+		settings.update((s) => ({
+			...s,
+			reasoningLevelOverrides: { ...s.reasoningLevelOverrides, [modelId]: v },
+		}));
+	}
+
 	function getCustomPrompt() {
 		return $settings.customPrompts?.[modelId] ?? "";
 	}
@@ -123,6 +133,20 @@
 	$effect(() => {
 		settings.initValue("providerOverrides", modelId, "auto");
 	});
+
+	// Initialize reasoning level override for models that support it (default to "off")
+	$effect(() => {
+		if (model && (model as unknown as { supportsReasoning?: boolean }).supportsReasoning) {
+			settings.initValue("reasoningLevelOverrides", modelId, "off");
+		}
+	});
+
+	const REASONING_LEVELS = [
+		{ value: "off", label: "Off" },
+		{ value: "low", label: "Low" },
+		{ value: "medium", label: "Medium" },
+		{ value: "high", label: "High" },
+	] as const;
 
 	// Provider selection policies for the dropdown
 	const PROVIDER_POLICIES = [
@@ -307,6 +331,54 @@
 							name="hidePromptExamples"
 							bind:checked={getHidePromptExamples, setHidePromptExamples}
 						/>
+					</div>
+				{/if}
+
+				{#if (model as unknown as { supportsReasoning?: boolean })?.supportsReasoning}
+					<div class="flex items-start justify-between gap-3 py-3">
+						<div>
+							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+								Reasoning effort
+							</div>
+							<p class="text-[12px] text-gray-500 dark:text-gray-400">
+								Control how much the model thinks before responding. Higher levels can improve
+								accuracy on complex tasks but cost more tokens and latency.
+							</p>
+						</div>
+						<Select.Root
+							type="single"
+							value={getReasoningLevel()}
+							onValueChange={(v) => v && setReasoningLevel(v)}
+						>
+							<Select.Trigger
+								aria-label="Select reasoning effort"
+								class="inline-flex w-auto min-w-[6.5rem] shrink-0 items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[13px] text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+							>
+								{@const currentLevel =
+									REASONING_LEVELS.find((l) => l.value === getReasoningLevel()) ??
+									REASONING_LEVELS[0]}
+								<span>{currentLevel.label}</span>
+								<CarbonChevronDown class="size-4 text-gray-500" />
+							</Select.Trigger>
+							<Select.Portal>
+								<Select.Content
+									class="scrollbar-custom z-50 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white/95 p-1 shadow-lg backdrop-blur dark:border-gray-700 dark:bg-gray-800/95"
+									sideOffset={4}
+								>
+									{#each REASONING_LEVELS as opt (opt.value)}
+										<Select.Item
+											value={opt.value}
+											class="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-none data-[highlighted]:bg-gray-100 dark:text-gray-200 dark:data-[highlighted]:bg-white/10"
+										>
+											<span class="flex-1">{opt.label}</span>
+											{#if getReasoningLevel() === opt.value}
+												<LucideCheck class="size-4 text-gray-500" />
+											{/if}
+										</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Portal>
+						</Select.Root>
 					</div>
 				{/if}
 			</div>

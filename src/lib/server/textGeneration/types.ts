@@ -19,6 +19,8 @@ export interface TextGenerationContext {
 	forceTools?: boolean;
 	/** Inference provider preference: "auto", "fastest", "cheapest", or a specific provider name */
 	provider?: string;
+	/** Reasoning effort preference: "low", "medium", or "high". Undefined means no reasoning_effort sent. */
+	reasoningLevel?: string;
 	locals: App.Locals | undefined;
 	abortController: AbortController;
 }

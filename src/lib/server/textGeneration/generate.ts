@@ -23,6 +23,7 @@ export async function* generate(
 		promptedAt,
 		forceMultimodal,
 		provider,
+		reasoningLevel,
 		locals,
 		abortController,
 	}: GenerateContext,
@@ -62,6 +63,7 @@ export async function* generate(
 		locals,
 		abortSignal: abortController.signal,
 		provider,
+		reasoningLevel,
 	});
 
 	for await (const output of stream) {

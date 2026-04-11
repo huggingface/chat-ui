@@ -123,6 +123,7 @@ export async function endpointOai(
 			locals,
 			abortSignal,
 			provider,
+			reasoningLevel,
 		}) => {
 			const prompt = await buildPrompt({
 				messages,
@@ -145,6 +146,7 @@ export async function endpointOai(
 				top_p: parameters?.top_p,
 				frequency_penalty: parameters?.frequency_penalty,
 				presence_penalty: parameters?.presence_penalty,
+				...(reasoningLevel && reasoningLevel !== "off" ? { reasoning_effort: reasoningLevel } : {}),
 			};
 
 			const openAICompletion = await openai.completions.create(body, {
@@ -171,6 +173,7 @@ export async function endpointOai(
 			locals,
 			abortSignal,
 			provider,
+			reasoningLevel,
 		}) => {
 			// Format messages for the chat API, handling multimodal content if supported
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
@@ -219,6 +222,7 @@ export async function endpointOai(
 				top_p: parameters?.top_p,
 				frequency_penalty: parameters?.frequency_penalty,
 				presence_penalty: parameters?.presence_penalty,
+				...(reasoningLevel && reasoningLevel !== "off" ? { reasoning_effort: reasoningLevel } : {}),
 			};
 
 			// Handle both streaming and non-streaming responses with appropriate processors

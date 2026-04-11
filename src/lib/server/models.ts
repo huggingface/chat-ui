@@ -58,6 +58,9 @@ const modelConfig = z.object({
 	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
 	// Aggregated tool-calling capability across providers (HF router)
 	supportsTools: z.boolean().default(false),
+	// Whether the model supports the OpenAI-compatible `reasoning_effort` parameter
+	// (low/medium/high). When true, the settings UI exposes a reasoning level control.
+	supportsReasoning: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */

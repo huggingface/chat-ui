@@ -17,6 +17,7 @@ export type Model = Pick<
 	| "preprompt"
 	| "multimodal"
 	| "multimodalAcceptedMimetypes"
+	| "supportsReasoning"
 	| "unlisted"
 	| "hasInferenceAPI"
 	| "providers"

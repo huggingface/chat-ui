@@ -570,6 +570,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						config.isHuggingChat && !model.isRouter
 							? userSettings?.providerOverrides?.[model.id]
 							: undefined,
+					// Reasoning effort preference (only meaningful for models that advertise support)
+					reasoningLevel: (model as unknown as { supportsReasoning?: boolean }).supportsReasoning
+						? userSettings?.reasoningLevelOverrides?.[model.id]
+						: undefined,
 					locals,
 					abortController: ctrl,
 				};
