@@ -12,6 +12,7 @@ type SettingsStore = {
 	welcomeModalSeenAt: Date | null;
 	activeModel: string;
 	customPrompts: Record<string, string>;
+	customPromptsEnabled: Record<string, boolean>;
 	multimodalOverrides: Record<string, boolean>;
 	toolsOverrides: Record<string, boolean>;
 	hidePromptExamples: Record<string, boolean>;

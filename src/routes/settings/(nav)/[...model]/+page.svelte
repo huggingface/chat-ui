@@ -13,6 +13,7 @@
 	import CarbonChat from "~icons/carbon/chat";
 	import CarbonCode from "~icons/carbon/code";
 	import CarbonChevronDown from "~icons/carbon/chevron-down";
+	import CarbonReset from "~icons/carbon/reset";
 	import LucideCheck from "~icons/lucide/check";
 	import CarbonMagicWandFilled from "~icons/carbon/magic-wand-filled";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
@@ -78,6 +79,15 @@
 			customPrompts: { ...s.customPrompts, [modelId]: v },
 		}));
 	}
+	function getCustomPromptEnabled() {
+		return $settings.customPromptsEnabled?.[modelId] ?? true;
+	}
+	function setCustomPromptEnabled(v: boolean) {
+		settings.update((s) => ({
+			...s,
+			customPromptsEnabled: { ...s.customPromptsEnabled, [modelId]: v },
+		}));
+	}
 
 	type RouterProvider = { provider: string } & Record<string, unknown>;
 
@@ -117,6 +127,11 @@
 	// Ensure hidePromptExamples has an entry for this model so the switch can bind safely
 	$effect(() => {
 		settings.initValue("hidePromptExamples", modelId, false);
+	});
+
+	// Ensure customPromptsEnabled has an entry for this model (default enabled)
+	$effect(() => {
+		settings.initValue("customPromptsEnabled", modelId, true);
 	});
 
 	// Initialize provider override for this model (default to "auto")
@@ -237,28 +252,45 @@
 				depending on your request.
 			</p>
 		{/if}
-		<div class="flex w-full flex-row content-between">
-			<h3 class="mb-1 text-[15px] font-semibold text-gray-800 dark:text-gray-200">System Prompt</h3>
-			{#if hasCustomPreprompt}
-				<button
-					class="ml-auto text-xs underline decoration-gray-300 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
-					onclick={(e) => {
-						e.stopPropagation();
-						settings.update((s) => ({
-							...s,
-							customPrompts: { ...s.customPrompts, [modelId]: model.preprompt },
-						}));
-					}}
+		<div class="flex w-full flex-row items-center justify-between">
+			<h3 class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">System Prompt</h3>
+			<div class="flex items-center gap-2">
+				<div
+					class="flex select-none items-center gap-1.5 text-[11px] font-medium text-gray-600 dark:text-gray-400"
 				>
-					Reset
-				</button>
-			{/if}
+					<span>Enabled</span>
+					<Switch
+						name="customPromptEnabled"
+						size="sm"
+						bind:checked={getCustomPromptEnabled, setCustomPromptEnabled}
+					/>
+				</div>
+				{#if hasCustomPreprompt}
+					<button
+						type="button"
+						aria-label="Reset system prompt"
+						title="Reset to default"
+						class="grid size-6 place-items-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200"
+						onclick={(e) => {
+							e.stopPropagation();
+							settings.update((s) => ({
+								...s,
+								customPrompts: { ...s.customPrompts, [modelId]: model.preprompt },
+							}));
+						}}
+					>
+						<CarbonReset class="size-3.5" />
+					</button>
+				{/if}
+			</div>
 		</div>
 
 		<textarea
 			aria-label="Custom system prompt"
 			rows="8"
-			class="w-full resize-none rounded-md border border-gray-200 bg-gray-50 p-2 text-[13px] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+			disabled={!getCustomPromptEnabled()}
+			class="scrollbar-custom w-full resize-none rounded-md border border-gray-200 bg-gray-50 p-2 text-[13px] transition-opacity dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+			class:opacity-30={!getCustomPromptEnabled()}
 			bind:value={getCustomPrompt, setCustomPrompt}
 		></textarea>
 		<!-- Capabilities -->
