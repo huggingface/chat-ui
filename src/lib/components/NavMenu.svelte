@@ -173,7 +173,7 @@
 >
 	{#if user?.username || user?.email}
 		<div
-			class="group flex h-9 items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 first:hover:bg-transparent dark:hover:bg-gray-700 first:dark:hover:bg-transparent"
+			class="group flex h-9 items-center gap-1.5 rounded-lg pl-2 pr-2 hover:bg-gray-100 first:hover:bg-transparent sm:h-[2.08rem] dark:hover:bg-gray-700 first:dark:hover:bg-transparent"
 		>
 			<img
 				src="https://huggingface.co/api/users/{user.username}/avatar?redirect=true"
