@@ -29,6 +29,7 @@ interface SettingsResponse {
 	directPaste: boolean;
 	hapticsEnabled: boolean;
 	customPrompts: Record<string, string>;
+	customPromptsEnabled: Record<string, boolean>;
 	multimodalOverrides: Record<string, boolean>;
 	toolsOverrides: Record<string, boolean>;
 	hidePromptExamples: Record<string, boolean>;

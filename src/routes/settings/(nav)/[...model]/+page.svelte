@@ -78,6 +78,15 @@
 			customPrompts: { ...s.customPrompts, [modelId]: v },
 		}));
 	}
+	function getCustomPromptEnabled() {
+		return $settings.customPromptsEnabled?.[modelId] ?? true;
+	}
+	function setCustomPromptEnabled(v: boolean) {
+		settings.update((s) => ({
+			...s,
+			customPromptsEnabled: { ...s.customPromptsEnabled, [modelId]: v },
+		}));
+	}
 
 	type RouterProvider = { provider: string } & Record<string, unknown>;
 
@@ -117,6 +126,11 @@
 	// Ensure hidePromptExamples has an entry for this model so the switch can bind safely
 	$effect(() => {
 		settings.initValue("hidePromptExamples", modelId, false);
+	});
+
+	// Ensure customPromptsEnabled has an entry for this model (default enabled)
+	$effect(() => {
+		settings.initValue("customPromptsEnabled", modelId, true);
 	});
 
 	// Initialize provider override for this model (default to "auto")
@@ -237,30 +251,43 @@
 				depending on your request.
 			</p>
 		{/if}
-		<div class="flex w-full flex-row content-between">
+		<div class="flex w-full flex-row content-between items-center">
 			<h3 class="mb-1 text-[15px] font-semibold text-gray-800 dark:text-gray-200">System Prompt</h3>
-			{#if hasCustomPreprompt}
-				<button
-					class="ml-auto text-xs underline decoration-gray-300 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
-					onclick={(e) => {
-						e.stopPropagation();
-						settings.update((s) => ({
-							...s,
-							customPrompts: { ...s.customPrompts, [modelId]: model.preprompt },
-						}));
-					}}
-				>
-					Reset
-				</button>
-			{/if}
+			<div class="ml-auto flex items-center gap-3">
+				{#if hasCustomPreprompt}
+					<button
+						class="text-xs underline decoration-gray-300 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
+						onclick={(e) => {
+							e.stopPropagation();
+							settings.update((s) => ({
+								...s,
+								customPrompts: { ...s.customPrompts, [modelId]: model.preprompt },
+							}));
+						}}
+					>
+						Reset
+					</button>
+				{/if}
+				<Switch
+					name="customPromptEnabled"
+					bind:checked={getCustomPromptEnabled, setCustomPromptEnabled}
+				/>
+			</div>
 		</div>
 
 		<textarea
 			aria-label="Custom system prompt"
 			rows="8"
-			class="w-full resize-none rounded-md border border-gray-200 bg-gray-50 p-2 text-[13px] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+			disabled={!getCustomPromptEnabled()}
+			class="w-full resize-none rounded-md border border-gray-200 bg-gray-50 p-2 text-[13px] transition-opacity dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+			class:opacity-50={!getCustomPromptEnabled()}
 			bind:value={getCustomPrompt, setCustomPrompt}
 		></textarea>
+		{#if !getCustomPromptEnabled()}
+			<p class="-mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+				System prompt is disabled. Toggle the switch above to re-enable it without losing your text.
+			</p>
+		{/if}
 		<!-- Capabilities -->
 		<div
 			class="mt-3 rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"

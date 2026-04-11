@@ -15,6 +15,7 @@ const settingsSchema = z.object({
 	welcomeModalSeen: z.boolean().optional(),
 	activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 	customPrompts: z.record(z.string()).default({}),
+	customPromptsEnabled: z.record(z.boolean()).default({}),
 	multimodalOverrides: z.record(z.boolean()).default({}),
 	toolsOverrides: z.record(z.boolean()).default({}),
 	providerOverrides: z.record(z.string()).default({}),
@@ -63,6 +64,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 			DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 
 		customPrompts: settings?.customPrompts ?? {},
+		customPromptsEnabled: settings?.customPromptsEnabled ?? {},
 		multimodalOverrides: settings?.multimodalOverrides ?? {},
 		toolsOverrides: settings?.toolsOverrides ?? {},
 		providerOverrides: settings?.providerOverrides ?? {},
