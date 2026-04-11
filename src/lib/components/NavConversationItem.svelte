@@ -56,7 +56,7 @@
 	data-sveltekit-noscroll
 	data-sveltekit-preload-data="tap"
 	href="{base}/conversation/{conv.id}"
-	class="group flex h-[2.08rem] flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 max-sm:h-10
+	class="group flex h-[2.08rem] flex-none items-center gap-1.5 rounded-lg pl-2 pr-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 max-sm:h-10
 		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}"
 	onclick={(e) => {
 		if (e.detail >= 2) {
