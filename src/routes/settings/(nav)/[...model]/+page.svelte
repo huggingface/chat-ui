@@ -289,15 +289,10 @@
 			aria-label="Custom system prompt"
 			rows="8"
 			disabled={!getCustomPromptEnabled()}
-			class="w-full resize-none rounded-md border border-gray-200 bg-gray-50 p-2 text-[13px] transition-opacity dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-			class:opacity-50={!getCustomPromptEnabled()}
+			class="scrollbar-custom w-full resize-none rounded-md border border-gray-200 bg-gray-50 p-2 text-[13px] transition-opacity dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+			class:opacity-30={!getCustomPromptEnabled()}
 			bind:value={getCustomPrompt, setCustomPrompt}
 		></textarea>
-		{#if !getCustomPromptEnabled()}
-			<p class="-mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-				System prompt is disabled. Toggle the switch above to re-enable it without losing your text.
-			</p>
-		{/if}
 		<!-- Capabilities -->
 		<div
 			class="mt-3 rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
