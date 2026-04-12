@@ -235,6 +235,7 @@
 						headers: s.headers,
 					})),
 					streamingMode,
+					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {

@@ -64,6 +64,7 @@ async function* textGenerationWithoutTitle(
 			abortSignal: ctx.abortController.signal,
 			abortController: ctx.abortController,
 			promptedAt: ctx.promptedAt,
+			timezone: ctx.timezone,
 		});
 
 		let step = await mcpGen.next();

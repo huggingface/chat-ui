@@ -21,4 +21,6 @@ export interface TextGenerationContext {
 	provider?: string;
 	locals: App.Locals | undefined;
 	abortController: AbortController;
+	/** IANA timezone of the user's browser, e.g. "America/New_York" */
+	timezone?: string;
 }

@@ -24,6 +24,8 @@ type MessageUpdateRequestOptions = {
 	// Optional: pass selected MCP server configs (for custom client-defined servers)
 	selectedMcpServers?: Array<{ name: string; url: string; headers?: KeyValuePair[] }>;
 	streamingMode?: StreamingMode;
+	// IANA timezone string from the browser (e.g. "America/New_York")
+	timezone?: string;
 };
 
 type ChunkDetector = (buffer: string) => string | null;
@@ -58,6 +60,7 @@ export async function fetchMessageUpdates(
 		// Will be ignored server-side if unsupported
 		selectedMcpServerNames: opts.selectedMcpServerNames,
 		selectedMcpServers: opts.selectedMcpServers,
+		timezone: opts.timezone,
 	});
 
 	opts.files?.forEach((file) => {

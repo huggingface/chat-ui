@@ -129,6 +129,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		is_retry: isRetry,
 		selectedMcpServerNames,
 		selectedMcpServers,
+		timezone,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -153,6 +154,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					)
 				)
 				.default([]),
+			timezone: z.optional(z.string().max(100)),
 			files: z.optional(
 				z.array(
 					z.object({
@@ -572,6 +574,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							: undefined,
 					locals,
 					abortController: ctrl,
+					timezone,
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);
