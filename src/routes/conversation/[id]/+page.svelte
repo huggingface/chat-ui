@@ -226,6 +226,7 @@
 						url: s.url,
 						headers: s.headers,
 					})),
+					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {

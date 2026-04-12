@@ -24,6 +24,8 @@ type MessageUpdateRequestOptions = {
 	selectedMcpServerNames?: string[];
 	// Optional: pass selected MCP server configs (for custom client-defined servers)
 	selectedMcpServers?: Array<{ name: string; url: string; headers?: KeyValuePair[] }>;
+	// User's IANA timezone (e.g. "America/New_York")
+	timezone?: string;
 };
 export async function fetchMessageUpdates(
 	conversationId: string,
@@ -43,6 +45,7 @@ export async function fetchMessageUpdates(
 		// Will be ignored server-side if unsupported
 		selectedMcpServerNames: opts.selectedMcpServerNames,
 		selectedMcpServers: opts.selectedMcpServers,
+		timezone: opts.timezone,
 	});
 
 	opts.files?.forEach((file) => {

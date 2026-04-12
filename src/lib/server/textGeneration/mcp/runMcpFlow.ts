@@ -289,7 +289,8 @@ export async function* runMcpFlow({
 			imageProcessor,
 			mmEnabled
 		);
-		const toolPreprompt = buildToolPreprompt(oaTools);
+		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
+		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone);
 		const prepromptPieces: string[] = [];
 		if (toolPreprompt.trim().length > 0) {
 			prepromptPieces.push(toolPreprompt);
