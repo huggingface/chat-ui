@@ -4,6 +4,19 @@ import { useAPIClient, handleResponse } from "$lib/APIClient";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
 import type { GETModelsResponse, FeatureFlags } from "$lib/server/api/types";
 
+async function withFallback<T>(
+	promise: Promise<T>,
+	fallback: T,
+	label?: string
+): Promise<{ value: T; isFallback: boolean }> {
+	try {
+		return { value: await promise, isFallback: false };
+	} catch (e) {
+		console.warn(`[layout] ${label ?? "API call"} failed, using fallback:`, e);
+		return { value: fallback, isFallback: true };
+	}
+}
+
 interface ConversationListItem {
 	_id: { toString(): string };
 	title: string;
@@ -42,22 +55,58 @@ export const load = async ({ depends, fetch, url }) => {
 
 	const client = useAPIClient({ fetch, origin: url.origin });
 
-	const [settings, models, user, publicConfig, featureFlags, conversationsData] =
-		(await Promise.all([
-			client.user.settings.get().then(handleResponse),
-			client.models.get().then(handleResponse),
-			client.user.get().then(handleResponse),
+	const [settingsResult, modelsResult, userResult, publicConfig, featureFlagsResult, conversationsResult] =
+		await Promise.all([
+			withFallback(
+				client.user.settings.get().then(handleResponse),
+				{
+					welcomeModalSeen: false,
+					welcomeModalSeenAt: null,
+					shareConversationsWithModelAuthors: true,
+					activeModel: "",
+					streamingMode: "smooth" as const,
+					directPaste: false,
+					hapticsEnabled: false,
+					customPrompts: {},
+					multimodalOverrides: {},
+					toolsOverrides: {},
+					hidePromptExamples: {},
+					providerOverrides: {},
+				},
+				"settings"
+			),
+			withFallback(
+				client.models.get().then(handleResponse),
+				[] as unknown as GETModelsResponse,
+				"models"
+			),
+			withFallback(client.user.get().then(handleResponse), null, "user"),
 			client["public-config"].get().then(handleResponse),
-			client["feature-flags"].get().then(handleResponse),
-			client.conversations.get({ query: { p: 0 } }).then(handleResponse),
-		])) as [
-			SettingsResponse,
-			GETModelsResponse,
-			UserInfo | null,
-			Record<string, unknown>,
-			FeatureFlags,
-			{ conversations: ConversationListItem[]; hasMore: boolean },
-		];
+			withFallback(
+				client["feature-flags"].get().then(handleResponse),
+				{
+					enableAssistants: false,
+					loginEnabled: false,
+					isAdmin: false,
+				} as unknown as FeatureFlags,
+				"feature-flags"
+			),
+			withFallback(
+				client.conversations.get({ query: { p: 0 } }).then(handleResponse),
+				{
+					conversations: [] as ConversationListItem[],
+					hasMore: false,
+				},
+				"conversations"
+			),
+		]);
+
+	const settings = settingsResult.value as SettingsResponse;
+	const settingsIsFallback = settingsResult.isFallback;
+	const models = modelsResult.value as GETModelsResponse;
+	const user = userResult.value as UserInfo | null;
+	const featureFlags = featureFlagsResult.value as FeatureFlags;
+	const conversationsData = conversationsResult.value as { conversations: ConversationListItem[]; hasMore: boolean };
 
 	const defaultModel = models[0];
 
@@ -86,6 +135,7 @@ export const load = async ({ depends, fetch, url }) => {
 				? new Date(settings.welcomeModalSeenAt)
 				: null,
 		},
+		settingsIsFallback,
 		publicConfig: getConfigManager(publicConfig as Record<`PUBLIC_${string}`, string>),
 		...featureFlags,
 	};
