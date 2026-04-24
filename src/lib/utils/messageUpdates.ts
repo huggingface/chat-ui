@@ -6,6 +6,8 @@ import {
 	type MessageToolResultUpdate,
 	type MessageToolErrorUpdate,
 	type MessageToolProgressUpdate,
+	type MessageToolApprovalRequestUpdate,
+	type MessageToolApprovalResolvedUpdate,
 	MessageUpdateType,
 	MessageToolUpdateType,
 } from "$lib/types/MessageUpdate";
@@ -313,6 +315,16 @@ export const isMessageToolProgressUpdate = (
 	update: MessageUpdate
 ): update is MessageToolProgressUpdate =>
 	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Progress;
+
+export const isMessageToolApprovalRequestUpdate = (
+	update: MessageUpdate
+): update is MessageToolApprovalRequestUpdate =>
+	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.ApprovalRequest;
+
+export const isMessageToolApprovalResolvedUpdate = (
+	update: MessageUpdate
+): update is MessageToolApprovalResolvedUpdate =>
+	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.ApprovalResolved;
 
 const defaultSleep = (ms: number): Promise<void> =>
 	new Promise((resolve) => setTimeout(resolve, ms));

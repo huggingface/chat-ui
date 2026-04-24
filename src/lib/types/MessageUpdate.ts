@@ -55,6 +55,8 @@ export enum MessageToolUpdateType {
 	Error = "error",
 	ETA = "eta",
 	Progress = "progress",
+	ApprovalRequest = "approvalRequest",
+	ApprovalResolved = "approvalResolved",
 }
 
 interface MessageToolUpdateBase<TSubtype extends MessageToolUpdateType> {
@@ -87,12 +89,29 @@ export interface MessageToolProgressUpdate
 	message?: string;
 }
 
+export interface MessageToolApprovalRequestUpdate
+	extends MessageToolUpdateBase<MessageToolUpdateType.ApprovalRequest> {
+	approvalId: string;
+	serverName: string;
+	toolName: string;
+	toolDescription?: string;
+	args: Record<string, string | number | boolean>;
+}
+
+export interface MessageToolApprovalResolvedUpdate
+	extends MessageToolUpdateBase<MessageToolUpdateType.ApprovalResolved> {
+	approvalId: string;
+	decision: "allow" | "deny" | "always";
+}
+
 export type MessageToolUpdate =
 	| MessageToolCallUpdate
 	| MessageToolResultUpdate
 	| MessageToolErrorUpdate
 	| MessageToolEtaUpdate
-	| MessageToolProgressUpdate;
+	| MessageToolProgressUpdate
+	| MessageToolApprovalRequestUpdate
+	| MessageToolApprovalResolvedUpdate;
 
 export enum MessageReasoningUpdateType {
 	Stream = "stream",

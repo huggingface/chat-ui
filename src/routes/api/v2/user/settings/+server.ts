@@ -69,6 +69,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		toolsOverrides: settings?.toolsOverrides ?? {},
 		providerOverrides: settings?.providerOverrides ?? {},
 		billingOrganization: settings?.billingOrganization ?? undefined,
+		mcpToolPolicies: settings?.mcpToolPolicies ?? [],
 	});
 };
 

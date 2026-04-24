@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { MessageToolUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
 	import {
+		isMessageToolApprovalRequestUpdate,
+		isMessageToolApprovalResolvedUpdate,
 		isMessageToolCallUpdate,
 		isMessageToolErrorUpdate,
 		isMessageToolProgressUpdate,
@@ -9,10 +11,12 @@
 	import { formatToolProgressLabel } from "$lib/utils/toolProgress";
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideCheck from "~icons/lucide/check";
+	import LucideShieldAlert from "~icons/lucide/shield-alert";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import BlockWrapper from "./BlockWrapper.svelte";
+	import { base } from "$app/paths";
 
 	interface Props {
 		tool: MessageToolUpdate[];
@@ -24,10 +28,17 @@
 
 	let isOpen = $state(false);
 
-	let toolFnName = $derived(tool.find(isMessageToolCallUpdate)?.call.name);
+	let approvalRequest = $derived(tool.find(isMessageToolApprovalRequestUpdate));
+	let approvalResolved = $derived(tool.find(isMessageToolApprovalResolvedUpdate));
+	let awaitingApproval = $derived(Boolean(approvalRequest && !approvalResolved));
+	let wasDenied = $derived(approvalResolved?.decision === "deny");
+
+	let toolFnName = $derived(
+		tool.find(isMessageToolCallUpdate)?.call.name ?? approvalRequest?.toolName
+	);
 	let toolError = $derived(tool.some(isMessageToolErrorUpdate));
 	let toolDone = $derived(tool.some(isMessageToolResultUpdate));
-	let isExecuting = $derived(!toolDone && !toolError && loading);
+	let isExecuting = $derived(!toolDone && !toolError && !awaitingApproval && loading);
 	let toolSuccess = $derived(toolDone && !toolError);
 	let toolProgress = $derived.by(() => {
 		for (let i = tool.length - 1; i >= 0; i -= 1) {
@@ -104,16 +115,49 @@
 
 	// Icon styling based on state
 	let iconBg = $derived(
-		toolError ? "bg-red-100 dark:bg-red-900/40" : "bg-purple-100 dark:bg-purple-900/40"
+		awaitingApproval
+			? "bg-amber-100 dark:bg-amber-900/40"
+			: toolError
+				? "bg-red-100 dark:bg-red-900/40"
+				: "bg-purple-100 dark:bg-purple-900/40"
 	);
 
 	let iconRing = $derived(
-		toolError ? "ring-red-200 dark:ring-red-500/30" : "ring-purple-200 dark:ring-purple-500/30"
+		awaitingApproval
+			? "ring-amber-200 dark:ring-amber-500/30"
+			: toolError
+				? "ring-red-200 dark:ring-red-500/30"
+				: "ring-purple-200 dark:ring-purple-500/30"
 	);
+
+	let pendingDecision = $state<"allow" | "deny" | "always" | undefined>(undefined);
+	let approvalError = $state<string | undefined>(undefined);
+
+	async function submitDecision(decision: "allow" | "deny" | "always") {
+		if (!approvalRequest || pendingDecision) return;
+		pendingDecision = decision;
+		approvalError = undefined;
+		try {
+			const res = await fetch(`${base}/api/mcp/approve`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ approvalId: approvalRequest.approvalId, decision }),
+			});
+			if (!res.ok) {
+				approvalError = `Failed to submit decision (${res.status})`;
+				pendingDecision = undefined;
+			}
+		} catch (err) {
+			approvalError = err instanceof Error ? err.message : String(err);
+			pendingDecision = undefined;
+		}
+	}
 </script>
 
 {#snippet icon()}
-	{#if toolSuccess}
+	{#if awaitingApproval}
+		<LucideShieldAlert class="size-3.5 text-amber-600 dark:text-amber-400" />
+	{:else if toolSuccess}
 		<LucideCheck class="size-3.5 text-purple-600 dark:text-purple-400" />
 	{:else}
 		<LucideHammer
@@ -125,7 +169,7 @@
 {/snippet}
 
 {#if toolFnName}
-	<BlockWrapper {icon} {iconBg} {iconRing} {hasNext} loading={isExecuting}>
+	<BlockWrapper {icon} {iconBg} {iconRing} {hasNext} loading={isExecuting || awaitingApproval}>
 		<!-- Header row -->
 		<div class="flex w-full select-none items-center gap-2">
 			<button
@@ -134,18 +178,35 @@
 				onclick={() => (isOpen = !isOpen)}
 			>
 				<span
-					class="text-sm font-medium {isExecuting
-						? 'text-purple-700 dark:text-purple-300'
-						: toolError
-							? 'text-red-600 dark:text-red-400'
-							: 'text-gray-700 dark:text-gray-300'}"
+					class="text-sm font-medium {awaitingApproval
+						? 'text-amber-700 dark:text-amber-300'
+						: isExecuting
+							? 'text-purple-700 dark:text-purple-300'
+							: toolError
+								? 'text-red-600 dark:text-red-400'
+								: 'text-gray-700 dark:text-gray-300'}"
 				>
-					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
+					{#if awaitingApproval}
+						Approve tool
+					{:else if wasDenied}
+						Denied tool
+					{:else if toolError}
+						Error calling tool
+					{:else if toolDone}
+						Called tool
+					{:else}
+						Calling tool
+					{/if}
 					<code
 						class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500 opacity-90 dark:bg-gray-800 dark:text-gray-400"
 					>
 						{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
 					</code>
+					{#if awaitingApproval && approvalRequest?.serverName}
+						<span class="ml-1 text-xs text-amber-700/80 dark:text-amber-400/80">
+							from {approvalRequest.serverName}
+						</span>
+					{/if}
 				</span>
 				{#if isExecuting && toolProgress}
 					<span class="text-xs text-gray-500 dark:text-gray-400">{progressLabel}</span>
@@ -163,6 +224,61 @@
 				/>
 			</button>
 		</div>
+
+		<!-- Approval card (shown while awaiting approval) -->
+		{#if awaitingApproval && approvalRequest}
+			<div class="mt-2 space-y-2">
+				<div class="text-xs text-gray-600 dark:text-gray-400">
+					This tool wants to run with the arguments below. Approving it will let the model invoke it
+					and share the result.
+				</div>
+				{#if Object.keys(approvalRequest.args ?? {}).length > 0}
+					<div class="space-y-1">
+						<div
+							class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"
+						>
+							Arguments
+						</div>
+						<div
+							class="rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900 dark:border-amber-500/30 dark:bg-amber-900/20 dark:text-amber-200"
+						>
+							<pre class="whitespace-pre-wrap break-all font-mono text-xs">{formatValue(
+									approvalRequest.args
+								)}</pre>
+						</div>
+					</div>
+				{/if}
+				<div class="flex flex-wrap gap-2 pt-1">
+					<button
+						type="button"
+						class="rounded-md bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-60 dark:bg-amber-500 dark:hover:bg-amber-600"
+						onclick={() => submitDecision("allow")}
+						disabled={pendingDecision !== undefined}
+					>
+						Allow once
+					</button>
+					<button
+						type="button"
+						class="rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+						onclick={() => submitDecision("always")}
+						disabled={pendingDecision !== undefined}
+					>
+						Always allow this tool
+					</button>
+					<button
+						type="button"
+						class="rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-500/50 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-red-900/30"
+						onclick={() => submitDecision("deny")}
+						disabled={pendingDecision !== undefined}
+					>
+						Deny
+					</button>
+				</div>
+				{#if approvalError}
+					<div class="text-xs text-red-600 dark:text-red-400">{approvalError}</div>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Expandable content -->
 		{#if isOpen}

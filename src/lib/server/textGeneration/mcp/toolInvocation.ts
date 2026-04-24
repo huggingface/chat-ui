@@ -14,6 +14,13 @@ import {
 import { getClient } from "$lib/server/mcp/clientPool";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/sdk/client";
+import { createApproval } from "$lib/server/mcp/approvalRegistry";
+import {
+	getAlwaysAllowedTools,
+	persistAlwaysAllow,
+	policyKey,
+	type SettingsAuthFilter,
+} from "$lib/server/mcp/approvalPolicies";
 
 export type Primitive = string | number | boolean;
 
@@ -42,6 +49,8 @@ export interface ExecuteToolCallsParams {
 	};
 	abortSignal?: AbortSignal;
 	toolTimeoutMs?: number;
+	userKey?: string;
+	approvalAuthFilter?: SettingsAuthFilter;
 }
 
 export interface ToolCallExecutionResult {
@@ -74,12 +83,20 @@ export async function* executeToolCalls({
 	processToolOutput,
 	abortSignal,
 	toolTimeoutMs,
+	userKey,
+	approvalAuthFilter,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
 	const serverLookup = serverMap(servers);
-	// Pre-emit call + ETA updates and prepare tasks
+	// Approval gate: snapshot of always-allowed (serverName::toolName) keys for this batch.
+	// Grows when the user clicks "Always allow" during the batch so concurrent tools for the
+	// same (server, tool) skip the prompt once the first one is approved.
+	const approvalEnabled = Boolean(userKey && approvalAuthFilter);
+	const alwaysAllowed: Set<string> = approvalEnabled
+		? await getAlwaysAllowedTools(approvalAuthFilter as SettingsAuthFilter)
+		: new Set();
 	type TaskResult = {
 		index: number;
 		output?: string;
@@ -104,27 +121,6 @@ export async function* executeToolCalls({
 		attachFileRefsToArgs(argsObj, resolveFileRef);
 		return { call, argsObj, paramsClean, uuid: randomUUID() };
 	});
-
-	for (const p of prepared) {
-		yield {
-			type: "update",
-			update: {
-				type: MessageUpdateType.Tool,
-				subtype: MessageToolUpdateType.Call,
-				uuid: p.uuid,
-				call: { name: p.call.name, parameters: p.paramsClean },
-			},
-		};
-		yield {
-			type: "update",
-			update: {
-				type: MessageUpdateType.Tool,
-				subtype: MessageToolUpdateType.ETA,
-				uuid: p.uuid,
-				eta: 10,
-			},
-		};
-	}
 
 	// Preload clients per distinct server used in this batch
 	const distinctServerNames = Array.from(
@@ -235,6 +231,97 @@ export async function* executeToolCalls({
 			return;
 		}
 		const client = clientMap.get(mappingEntry.server);
+
+		// Approval gate (human-in-the-loop per MCP spec "Tools" § security considerations).
+		// If the user has not already granted "always allow" for this (server, tool), emit an
+		// ApprovalRequest update and await the user's decision via the in-memory registry.
+		if (approvalEnabled) {
+			const key = policyKey(mappingEntry.server, mappingEntry.tool);
+			if (!alwaysAllowed.has(key)) {
+				const { id: approvalId, promise: approvalPromise } = createApproval(
+					userKey as string,
+					abortSignal
+				);
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.ApprovalRequest,
+					uuid: p.uuid,
+					approvalId,
+					serverName: mappingEntry.server,
+					toolName: mappingEntry.tool,
+					args: p.paramsClean,
+				});
+				let decision: "allow" | "deny" | "always";
+				try {
+					decision = await approvalPromise;
+				} catch (err) {
+					const reason = err instanceof Error ? err.message : String(err);
+					const message =
+						reason === "aborted"
+							? "Aborted by user"
+							: reason === "timeout"
+								? "Approval timed out"
+								: `Approval failed: ${reason}`;
+					updatesQueue.push({
+						type: MessageUpdateType.Tool,
+						subtype: MessageToolUpdateType.ApprovalResolved,
+						uuid: p.uuid,
+						approvalId,
+						decision: "deny",
+					});
+					updatesQueue.push({
+						type: MessageUpdateType.Tool,
+						subtype: MessageToolUpdateType.Error,
+						uuid: p.uuid,
+						message,
+					});
+					results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+					return;
+				}
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.ApprovalResolved,
+					uuid: p.uuid,
+					approvalId,
+					decision,
+				});
+				if (decision === "deny") {
+					const message = "Denied by user";
+					updatesQueue.push({
+						type: MessageUpdateType.Tool,
+						subtype: MessageToolUpdateType.Error,
+						uuid: p.uuid,
+						message,
+					});
+					results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+					return;
+				}
+				if (decision === "always") {
+					alwaysAllowed.add(key);
+					await persistAlwaysAllow(
+						approvalAuthFilter as SettingsAuthFilter,
+						mappingEntry.server,
+						mappingEntry.tool
+					);
+				}
+			}
+		}
+
+		// Emit Call + ETA updates only after approval has been granted, so the UI doesn't
+		// show "Calling tool…" while the prompt is still pending.
+		updatesQueue.push({
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Call,
+			uuid: p.uuid,
+			call: { name: p.call.name, parameters: p.paramsClean },
+		});
+		updatesQueue.push({
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.ETA,
+			uuid: p.uuid,
+			eta: 10,
+		});
+
 		try {
 			logger.debug(
 				{ server: mappingEntry.server, tool: mappingEntry.tool, parameters: p.paramsClean },

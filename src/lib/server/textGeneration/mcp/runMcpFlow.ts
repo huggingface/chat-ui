@@ -29,6 +29,8 @@ import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 
+import { authCondition } from "$lib/server/auth";
+
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
 	"model" | "conv" | "assistant" | "forceMultimodal" | "forceTools" | "provider" | "locals"
@@ -56,6 +58,21 @@ export async function* runMcpFlow({
 	abortController?: AbortController;
 	promptedAt?: Date;
 }): AsyncGenerator<MessageUpdate, McpFlowResult, undefined> {
+	// Build the stable user key and DB filter used by the MCP approval gate.
+	// userKey binds a pending approval to the requester so another user/session
+	// can't resolve it by guessing the approvalId.
+	let userKey: string | undefined;
+	let approvalAuthFilter: ReturnType<typeof authCondition> | undefined;
+	try {
+		userKey =
+			(locals?.user?._id?.toString() as string | undefined) ??
+			(locals as unknown as { sessionId?: string })?.sessionId;
+		if (userKey) {
+			approvalAuthFilter = authCondition(locals as App.Locals);
+		}
+	} catch {
+		// locals may not have user/session in some dev paths; gate will be disabled
+	}
 	// Helper to check if generation should be aborted via DB polling
 	// Also triggers the abort controller to cancel active streams/requests
 	const checkAborted = (): boolean => {
@@ -689,6 +706,8 @@ export async function* runMcpFlow({
 					toPrimitive,
 					processToolOutput,
 					abortSignal,
+					userKey,
+					approvalAuthFilter,
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;

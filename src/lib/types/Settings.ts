@@ -67,6 +67,13 @@ export interface Settings extends Timestamps {
 	 * Stores the org's preferred_username. If empty/undefined, bills to personal account.
 	 */
 	billingOrganization?: string;
+
+	/**
+	 * Per-tool MCP approval policies. When a `(serverName, toolName)` pair is present
+	 * with `policy: "allow"`, tool calls from that server/tool skip the approval prompt.
+	 * Populated server-side when the user clicks "Always allow this tool".
+	 */
+	mcpToolPolicies?: Array<{ serverName: string; toolName: string; policy: "allow" }>;
 }
 
 export type SettingsEditable = Omit<Settings, "welcomeModalSeenAt" | "createdAt" | "updatedAt">;
@@ -83,4 +90,5 @@ export const DEFAULT_SETTINGS = {
 	streamingMode: "smooth",
 	directPaste: false,
 	hapticsEnabled: true,
+	mcpToolPolicies: [],
 } satisfies SettingsEditable;
