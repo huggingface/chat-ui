@@ -89,6 +89,8 @@ envVars:
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
   MODELS: >
     [
+      { "id": "deepseek-ai/DeepSeek-V4-Pro", "description": "Frontier 1.6T MoE with 49B active params, hybrid attention, and 1M context." },
+      { "id": "moonshotai/Kimi-K2.6", "description": "Native multimodal 1T MoE for long-horizon coding and 300-sub-agent swarms." },
       { "id": "MiniMaxAI/MiniMax-M2.7", "description": "Self-evolving 230B MoE agent for frontier coding, reasoning, and tool use." },
       { "id": "zai-org/GLM-5.1", "description": "Upgraded 754B MoE for agentic coding, extended reasoning, and tool use.", "parameters": { "max_tokens": 49152 } },
       { "id": "zai-org/GLM-5.1-FP8", "description": "FP8 GLM-5.1 for efficient agentic coding and reasoning inference.", "parameters": { "max_tokens": 49152 } },
