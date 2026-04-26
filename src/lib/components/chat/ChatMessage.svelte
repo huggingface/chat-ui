@@ -415,14 +415,14 @@
 	<div
 		class="group relative {alternatives.length > 1 && editMsdgId === null
 			? 'mb-7'
-			: ''} w-full items-start justify-start gap-4"
+			: ''} flex w-full justify-end gap-4"
 		data-message-id={message.id}
 		data-message-type="user"
 		role="presentation"
 		onclick={() => (isTapped = !isTapped)}
 		onkeydown={() => (isTapped = !isTapped)}
 	>
-		<div class="flex w-full flex-col gap-2">
+		<div class="flex max-w-[85%] flex-col items-end gap-2">
 			{#if message.files?.length}
 				<div class="flex w-fit gap-4 px-5">
 					{#each message.files as file}
@@ -431,10 +431,10 @@
 				</div>
 			{/if}
 
-			<div class="flex w-full flex-row flex-nowrap">
+			<div class="flex w-full flex-row flex-nowrap justify-end">
 				{#if !editMode}
 					<p
-						class="disabled w-full appearance-none whitespace-break-spaces text-wrap break-words bg-inherit px-5 py-3.5 text-gray-500 dark:text-gray-400"
+						class="disabled w-fit max-w-full appearance-none whitespace-break-spaces text-wrap break-words rounded-2xl bg-gray-100 px-5 py-3.5 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 					>
 						{message.content.trim()}
 					</p>
@@ -481,7 +481,7 @@
 					</form>
 				{/if}
 			</div>
-			<div class="absolute -bottom-4 ml-3.5 flex w-full gap-1.5">
+			<div class="absolute -bottom-4 right-3.5 flex gap-1.5">
 				{#if alternatives.length > 1 && editMsdgId === null}
 					<Alternatives
 						{message}
@@ -504,7 +504,9 @@
 						Edit
 					</button>
 					<button
-						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs group-hover:flex hover:flex lg:-right-2 {isUserMsgCopied ? 'text-green-500 dark:text-green-400' : 'text-gray-400 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300'} dark:border-gray-700"
+						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs group-hover:flex hover:flex lg:-right-2 {isUserMsgCopied
+							? 'text-green-500 dark:text-green-400'
+							: 'text-gray-400 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300'} dark:border-gray-700"
 						title="Copy to clipboard"
 						type="button"
 						onclick={async () => {
