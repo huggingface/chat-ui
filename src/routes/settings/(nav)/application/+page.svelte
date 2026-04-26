@@ -96,10 +96,6 @@
 	});
 
 	let themePref = $state<ThemePreference>(browser ? getThemePreference() : "system");
-
-	// Admin: model refresh UI state
-	let refreshing = $state(false);
-	let refreshMessage = $state<string | null>(null);
 </script>
 
 <div class="flex w-full flex-col gap-4">
@@ -131,41 +127,6 @@
 					>{publicConfig.PUBLIC_COMMIT_SHA.slice(0, 7)}</span
 				>
 			</a>
-		</div>
-	{/if}
-	{#if page.data.isAdmin}
-		<div class="flex items-center gap-2">
-			<p
-				class="rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300"
-			>
-				Admin mode
-			</p>
-			<button
-				class="btn rounded-md text-xs"
-				class:underline={!refreshing}
-				type="button"
-				onclick={async () => {
-					try {
-						refreshing = true;
-						refreshMessage = null;
-						const res = await client.models.refresh.post().then(handleResponse);
-						const delta = `+${res.added.length} −${res.removed.length} ~${res.changed.length}`;
-						refreshMessage = `Refreshed in ${res.durationMs} ms • ${delta} • total ${res.total}`;
-						await goto(page.url.pathname, { invalidateAll: true });
-					} catch (e) {
-						console.error(e);
-						$error = "Model refresh failed";
-					} finally {
-						refreshing = false;
-					}
-				}}
-				disabled={refreshing}
-			>
-				{refreshing ? "Refreshing…" : "Refresh models"}
-			</button>
-			{#if refreshMessage}
-				<span class="text-xs text-gray-600 dark:text-gray-400">{refreshMessage}</span>
-			{/if}
 		</div>
 	{/if}
 	<div class="flex h-full flex-col gap-4 max-sm:pt-0">

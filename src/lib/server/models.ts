@@ -165,33 +165,7 @@ const getModelOverrides = (): ModelOverride[] => {
 	}
 };
 
-export type ModelsRefreshSummary = {
-	refreshedAt: Date;
-	durationMs: number;
-	added: string[];
-	removed: string[];
-	changed: string[];
-	total: number;
-};
-
 export type ProcessedModel = InternalProcessedModel;
-
-export let models: ProcessedModel[] = [];
-export let defaultModel!: ProcessedModel;
-export let taskModel!: ProcessedModel;
-export let validModelIdSchema: z.ZodType<string> = z.string();
-export let lastModelRefresh = new Date(0);
-export let lastModelRefreshDurationMs = 0;
-export let lastModelRefreshSummary: ModelsRefreshSummary = {
-	refreshedAt: new Date(0),
-	durationMs: 0,
-	added: [],
-	removed: [],
-	changed: [],
-	total: 0,
-};
-
-let inflightRefresh: Promise<ModelsRefreshSummary> | null = null;
 
 const createValidModelIdSchema = (modelList: ProcessedModel[]): z.ZodType<string> => {
 	if (modelList.length === 0) {
@@ -216,82 +190,6 @@ const resolveTaskModel = (modelList: ProcessedModel[]) => {
 	}
 
 	return modelList[0];
-};
-
-const signatureForModel = (model: ProcessedModel) =>
-	JSON.stringify({
-		description: model.description,
-		displayName: model.displayName,
-		providers: model.providers,
-		parameters: model.parameters,
-		preprompt: model.preprompt,
-		prepromptUrl: model.prepromptUrl,
-		endpoints:
-			model.endpoints?.map((endpoint) => {
-				if (endpoint.type === "openai") {
-					const { type, baseURL } = endpoint;
-					return { type, baseURL };
-				}
-				return { type: endpoint.type };
-			}) ?? null,
-		multimodal: model.multimodal,
-		multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
-		supportsTools: (model as unknown as { supportsTools?: boolean }).supportsTools ?? false,
-		isRouter: model.isRouter,
-		hasInferenceAPI: model.hasInferenceAPI,
-	});
-
-const applyModelState = (newModels: ProcessedModel[], startedAt: number): ModelsRefreshSummary => {
-	if (newModels.length === 0) {
-		throw new Error("Failed to load any models from upstream");
-	}
-
-	const previousIds = new Set(models.map((m) => m.id));
-	const previousSignatures = new Map(models.map((m) => [m.id, signatureForModel(m)]));
-	const refreshedAt = new Date();
-	const durationMs = Date.now() - startedAt;
-
-	models = newModels;
-	defaultModel = models[0];
-	taskModel = resolveTaskModel(models);
-	validModelIdSchema = createValidModelIdSchema(models);
-	lastModelRefresh = refreshedAt;
-	lastModelRefreshDurationMs = durationMs;
-
-	const added = newModels.map((m) => m.id).filter((id) => !previousIds.has(id));
-	const removed = Array.from(previousIds).filter(
-		(id) => !newModels.some((model) => model.id === id)
-	);
-	const changed = newModels
-		.filter((model) => {
-			const previousSignature = previousSignatures.get(model.id);
-			return previousSignature !== undefined && previousSignature !== signatureForModel(model);
-		})
-		.map((model) => model.id);
-
-	const summary: ModelsRefreshSummary = {
-		refreshedAt,
-		durationMs,
-		added,
-		removed,
-		changed,
-		total: models.length,
-	};
-
-	lastModelRefreshSummary = summary;
-
-	logger.info(
-		{
-			total: summary.total,
-			added: summary.added,
-			removed: summary.removed,
-			changed: summary.changed,
-			durationMs: summary.durationMs,
-		},
-		"[models] Model cache refreshed"
-	);
-
-	return summary;
 };
 
 const buildModels = async (): Promise<ProcessedModel[]> => {
@@ -465,25 +363,10 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 	}
 };
 
-const rebuildModels = async (): Promise<ModelsRefreshSummary> => {
-	const startedAt = Date.now();
-	const newModels = await buildModels();
-	return applyModelState(newModels, startedAt);
-};
-
-await rebuildModels();
-
-export const refreshModels = async (): Promise<ModelsRefreshSummary> => {
-	if (inflightRefresh) {
-		return inflightRefresh;
-	}
-
-	inflightRefresh = rebuildModels().finally(() => {
-		inflightRefresh = null;
-	});
-
-	return inflightRefresh;
-};
+export const models: ProcessedModel[] = await buildModels();
+export const defaultModel = models[0];
+export const taskModel = resolveTaskModel(models);
+export const validModelIdSchema = createValidModelIdSchema(models);
 
 export const validateModel = (_models: BackendModel[]) => {
 	// Zod enum function requires 2 parameters
