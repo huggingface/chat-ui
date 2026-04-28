@@ -257,9 +257,10 @@
 
 	// Force scroll to bottom when user sends a new message or switches conversation
 	let prevMessageCount = $state(0);
+	// svelte-ignore state_referenced_locally
 	let prevFirstMessageId = $state(messages.at(0)?.id);
 	let forceReattach = $state(0);
-	let scrollBehavior: ScrollBehavior = $state("instant");
+	let scrollBehavior: "auto" | "instant" | "smooth" = $state("instant");
 	$effect(() => {
 		const firstMessageId = messages.at(0)?.id;
 
