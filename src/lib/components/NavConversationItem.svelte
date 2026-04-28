@@ -6,7 +6,7 @@
 
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonEdit from "~icons/carbon/edit";
-	import CarbonOverflowMenuHorizontal from "~icons/carbon/overflow-menu-horizontal";
+	import LucideEllipsis from "~icons/lucide/ellipsis";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
 	import EditConversationModal from "$lib/components/EditConversationModal.svelte";
@@ -109,7 +109,7 @@
 					aria-label="Conversation actions"
 					title="More options"
 				>
-					<CarbonOverflowMenuHorizontal class="text-xs" />
+					<LucideEllipsis class="text-sm" />
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Portal>
 					<DropdownMenu.Content
