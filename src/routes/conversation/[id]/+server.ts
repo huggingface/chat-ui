@@ -129,6 +129,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		is_retry: isRetry,
 		selectedMcpServerNames,
 		selectedMcpServers,
+		timezone,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -153,6 +154,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					)
 				)
 				.default([]),
+			timezone: z.optional(z.string()),
 			files: z.optional(
 				z.array(
 					z.object({
@@ -181,6 +183,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		};
 	} catch {
 		// ignore attachment errors, pipeline will just use env servers
+	}
+
+	// Attach user timezone so the tool prompt can include localized time
+	if (timezone) {
+		(locals as unknown as Record<string, unknown>).timezone = timezone;
 	}
 
 	const inputFiles = await Promise.all(

@@ -234,6 +234,7 @@
 						url: s.url,
 						headers: s.headers,
 					})),
+					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 					streamingMode,
 				},
 				messageUpdatesAbortController.signal

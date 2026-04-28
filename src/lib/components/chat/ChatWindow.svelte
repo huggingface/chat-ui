@@ -589,11 +589,7 @@
 					{/if}
 				</div>
 				<!-- Dynamic bottom spacer: large when streaming new message, shrinks as response grows -->
-				<div
-					bind:this={spacerEl}
-					class="flex-shrink-0"
-					style="height: {spacerHeight}px;"
-				></div>
+				<div bind:this={spacerEl} class="flex-shrink-0" style="height: {spacerHeight}px;"></div>
 			{:else if pending}
 				<ChatMessage
 					loading={true}
