@@ -504,7 +504,9 @@
 						Edit
 					</button>
 					<button
-						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs group-hover:flex hover:flex lg:-right-2 {isUserMsgCopied ? 'text-green-500 dark:text-green-400' : 'text-gray-400 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300'} dark:border-gray-700"
+						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs group-hover:flex hover:flex lg:-right-2 {isUserMsgCopied
+							? 'text-green-500 dark:text-green-400'
+							: 'text-gray-400 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300'} dark:border-gray-700"
 						title="Copy to clipboard"
 						type="button"
 						onclick={async () => {
