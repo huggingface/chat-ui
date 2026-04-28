@@ -79,7 +79,7 @@ envVars:
   LLM_ROUTER_ENABLE_MULTIMODAL: "true"
   LLM_ROUTER_MULTIMODAL_MODEL: "Qwen/Qwen3.5-397B-A17B"
   LLM_ROUTER_ENABLE_TOOLS: "true"
-  LLM_ROUTER_TOOLS_MODEL: "moonshotai/Kimi-K2-Instruct-0905"
+  LLM_ROUTER_TOOLS_MODEL: "moonshotai/Kimi-K2.6"
   TRANSCRIPTION_MODEL: "openai/whisper-large-v3-turbo"
   MCP_SERVERS: >
     [{"name": "Web Search (Exa)", "url": "https://mcp.exa.ai/mcp?tools=web_search_exa,get_code_context_exa,crawling_exa"}, {"name": "Hugging Face", "url": "https://hf.co/mcp?login"}]

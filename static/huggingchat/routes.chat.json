@@ -3,11 +3,7 @@
 		"name": "job_app_docs",
 		"description": "Create ATS‑ready resumes and cover letters aligned to a job posting.",
 		"primary_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-		"fallback_models": [
-			"deepseek-ai/DeepSeek-V3.1",
-			"moonshotai/Kimi-K2-Instruct-0905",
-			"zai-org/GLM-4.6"
-		]
+		"fallback_models": ["deepseek-ai/DeepSeek-V3.1", "moonshotai/Kimi-K2.6", "zai-org/GLM-4.6"]
 	},
 	{
 		"name": "email_writing",
@@ -19,12 +15,12 @@
 		"name": "social_media_copy",
 		"description": "Write platform‑specific social captions and short posts for engagement.",
 		"primary_model": "deepseek-ai/DeepSeek-V3.1",
-		"fallback_models": ["moonshotai/Kimi-K2-Instruct-0905", "Qwen/Qwen3-235B-A22B-Instruct-2507"]
+		"fallback_models": ["moonshotai/Kimi-K2.6", "Qwen/Qwen3-235B-A22B-Instruct-2507"]
 	},
 	{
 		"name": "editing_rewrite",
 		"description": "Lightly proofread and rephrase text for tone, length, and clarity.",
-		"primary_model": "moonshotai/Kimi-K2-Instruct-0905",
+		"primary_model": "moonshotai/Kimi-K2.6",
 		"fallback_models": ["deepseek-ai/DeepSeek-V3.1", "google/gemma-3-27b-it", "zai-org/GLM-4.6"]
 	},
 	{
@@ -37,7 +33,7 @@
 		"name": "technical_explanation",
 		"description": "Explain complex technical topics step‑by‑step with worked examples.",
 		"primary_model": "deepseek-ai/DeepSeek-R1-0528",
-		"fallback_models": ["Qwen/QwQ-32B", "moonshotai/Kimi-K2-Instruct-0905"]
+		"fallback_models": ["Qwen/QwQ-32B", "moonshotai/Kimi-K2.6"]
 	},
 	{
 		"name": "essay_writing",
@@ -175,26 +171,26 @@
 	{
 		"name": "creative_writing",
 		"description": "Write fiction, poems, jokes, or scripts with style control.",
-		"primary_model": "moonshotai/Kimi-K2-Instruct-0905",
+		"primary_model": "moonshotai/Kimi-K2.6",
 		"fallback_models": ["deepseek-ai/DeepSeek-V3.1", "meta-llama/Llama-3.3-70B-Instruct"]
 	},
 	{
 		"name": "interactive_roleplay",
 		"description": "Run in‑character text adventures and persistent role‑play.",
 		"primary_model": "NousResearch/Hermes-4-70B",
-		"fallback_models": ["moonshotai/Kimi-K2-Instruct-0905", "Qwen/Qwen3-235B-A22B-Instruct-2507"]
+		"fallback_models": ["moonshotai/Kimi-K2.6", "Qwen/Qwen3-235B-A22B-Instruct-2507"]
 	},
 	{
 		"name": "character_impersonation",
 		"description": "Act and imitate fictional character voices or invented personas consistently.",
 		"primary_model": "NousResearch/Hermes-4-70B",
-		"fallback_models": ["moonshotai/Kimi-K2-Instruct-0905", "Qwen/Qwen3-235B-A22B-Instruct-2507"]
+		"fallback_models": ["moonshotai/Kimi-K2.6", "Qwen/Qwen3-235B-A22B-Instruct-2507"]
 	},
 	{
 		"name": "casual_conversation",
 		"description": "Engage in friendly and open‑ended casual chat.",
 		"primary_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-		"fallback_models": ["moonshotai/Kimi-K2-Instruct-0905", "google/gemma-3-27b-it"]
+		"fallback_models": ["moonshotai/Kimi-K2.6", "google/gemma-3-27b-it"]
 	},
 	{
 		"name": "emotional_support",
@@ -221,6 +217,6 @@
 		"name": "spell_checker",
 		"description": "Fix spelling, capitalization, punctuation, and obvious grammar errors.",
 		"primary_model": "CohereLabs/aya-expanse-32b",
-		"fallback_models": ["moonshotai/Kimi-K2-Instruct-0905", "google/gemma-3-27b-it"]
+		"fallback_models": ["moonshotai/Kimi-K2.6", "google/gemma-3-27b-it"]
 	}
 ]
