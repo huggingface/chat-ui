@@ -10,6 +10,8 @@
 	// import CarbonDownload from "~icons/carbon/download";
 
 	import CarbonPen from "~icons/carbon/pen";
+	import CarbonCopy from "~icons/carbon/copy";
+	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import UploadedFile from "./UploadedFile.svelte";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
@@ -21,6 +23,7 @@
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
 	import { MessageUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
+	import ImageLightbox from "./ImageLightbox.svelte";
 
 	interface Props {
 		message: Message;
@@ -50,8 +53,20 @@
 
 	let contentEl: HTMLElement | undefined = $state();
 	let isCopied = $state(false);
+	let isUserMsgCopied = $state(false);
+	let userCopyTimeout: ReturnType<typeof setTimeout>;
 	let messageWidth: number = $state(0);
 	let messageInfoWidth: number = $state(0);
+	let lightboxSrc: string | null = $state(null);
+
+	function handleContentClick(e: MouseEvent) {
+		const target = e.target as HTMLElement;
+		if (target.tagName === "IMG" && target instanceof HTMLImageElement) {
+			e.preventDefault();
+			e.stopPropagation();
+			lightboxSrc = target.src;
+		}
+	}
 
 	$effect(() => {
 		// referenced to appease linter for currently-unused props
@@ -128,6 +143,8 @@
 		| { type: "text"; content: string }
 		| { type: "tool"; uuid: string; updates: MessageToolUpdate[] };
 
+	type ToolBlock = Extract<Block, { type: "tool" }>;
+
 	let blocks = $derived.by(() => {
 		const updates = message.updates ?? [];
 		const res: Block[] = [];
@@ -155,9 +172,11 @@
 				if (last?.type === "text") last.content += chunk;
 				else res.push({ type: "text" as const, content: chunk });
 			} else if (isMessageToolUpdate(update)) {
-				const last = res.at(-1);
-				if (last?.type === "tool" && last.uuid === update.uuid) {
-					last.updates.push(update);
+				const existingBlock = res.find(
+					(b): b is ToolBlock => b.type === "tool" && b.uuid === update.uuid
+				);
+				if (existingBlock) {
+					existingBlock.updates.push(update);
 				} else {
 					res.push({ type: "tool" as const, uuid: update.uuid, updates: [update] });
 				}
@@ -253,7 +272,8 @@
 				</div>
 			{/if}
 
-			<div bind:this={contentEl} oncopy={handleCopy}>
+			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+			<div bind:this={contentEl} oncopy={handleCopy} onclick={handleContentClick}>
 				{#if isLast && loading && blocks.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
@@ -288,7 +308,7 @@
 									/>
 								{:else if part && part.trim().length > 0}
 									<div
-										class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+										class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
 									>
 										<MarkdownRenderer content={part} loading={isLast && loading} />
 									</div>
@@ -296,7 +316,7 @@
 							{/each}
 						{:else}
 							<div
-								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+								class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
 							>
 								<MarkdownRenderer content={block.content} loading={isLast && loading} />
 							</div>
@@ -387,12 +407,15 @@
 			</div>
 		{/if}
 	</div>
+	{#if lightboxSrc}
+		<ImageLightbox src={lightboxSrc} onclose={() => (lightboxSrc = null)} />
+	{/if}
 {/if}
 {#if message.from === "user"}
 	<div
 		class="group relative {alternatives.length > 1 && editMsdgId === null
 			? 'mb-7'
-			: ''} w-full items-start justify-start gap-4 max-sm:text-sm"
+			: ''} w-full items-start justify-start gap-4"
 		data-message-id={message.id}
 		data-message-type="user"
 		role="presentation"
@@ -479,6 +502,41 @@
 					>
 						<CarbonPen />
 						Edit
+					</button>
+					<button
+						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs group-hover:flex hover:flex lg:-right-2 {isUserMsgCopied ? 'text-green-500 dark:text-green-400' : 'text-gray-400 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300'} dark:border-gray-700"
+						title="Copy to clipboard"
+						type="button"
+						onclick={async () => {
+							try {
+								if (window.isSecureContext && navigator.clipboard) {
+									await navigator.clipboard.writeText(message.content);
+								} else {
+									const textArea = document.createElement("textarea");
+									textArea.value = message.content;
+									document.body.appendChild(textArea);
+									textArea.focus();
+									textArea.select();
+									document.execCommand("copy");
+									document.body.removeChild(textArea);
+								}
+								isUserMsgCopied = true;
+								clearTimeout(userCopyTimeout);
+								userCopyTimeout = setTimeout(() => {
+									isUserMsgCopied = false;
+								}, 1000);
+							} catch (err) {
+								console.error("Failed to copy:", err);
+							}
+						}}
+					>
+						{#if isUserMsgCopied}
+							<CarbonCheckmark class="scale-95" />
+							Copied
+						{:else}
+							<CarbonCopy class="scale-95" />
+							Copy
+						{/if}
 					</button>
 				{/if}
 			</div>

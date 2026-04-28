@@ -58,9 +58,12 @@ async function* textGenerationWithoutTitle(
 			assistant: ctx.assistant,
 			forceMultimodal: ctx.forceMultimodal,
 			forceTools: ctx.forceTools,
+			provider: ctx.provider,
 			locals: ctx.locals,
 			preprompt,
 			abortSignal: ctx.abortController.signal,
+			abortController: ctx.abortController,
+			promptedAt: ctx.promptedAt,
 		});
 
 		let step = await mcpGen.next();
@@ -68,14 +71,24 @@ async function* textGenerationWithoutTitle(
 			yield step.value;
 			step = await mcpGen.next();
 		}
-		const didRunMcp = Boolean(step.value);
-		if (!didRunMcp) {
+		const mcpResult = step.value;
+		if (mcpResult === "not_applicable") {
 			// fallback to normal text generation
 			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
 		}
-	} catch {
-		// On any MCP error, fall back to normal generation
-		yield* generate({ ...ctx, messages: processedMessages }, preprompt);
+		// If mcpResult is "completed" or "aborted", don't fall back
+	} catch (err) {
+		// Don't fall back on abort errors - user intentionally stopped
+		const isAbort =
+			ctx.abortController.signal.aborted ||
+			(err instanceof Error &&
+				(err.name === "AbortError" ||
+					err.name === "APIUserAbortError" ||
+					err.message.includes("Request was aborted")));
+		if (!isAbort) {
+			// On non-abort MCP error, fall back to normal generation
+			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
+		}
 	}
 	done.abort();
 }

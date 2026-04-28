@@ -9,6 +9,7 @@
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { loading } from "$lib/stores/loading";
+	import { setHapticsEnabled } from "$lib/utils/haptics";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -19,6 +20,7 @@
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
+	import { isPro } from "$lib/stores/isPro";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
 	import { shareModal } from "$lib/stores/shareModal";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
@@ -122,7 +124,22 @@
 
 	const settings = createSettingsStore(data.settings);
 
+	$effect(() => {
+		setHapticsEnabled($settings.hapticsEnabled);
+	});
+
 	onMount(async () => {
+		if (publicConfig.isHuggingChat && data.user?.username) {
+			fetch(`https://huggingface.co/api/users/${data.user.username}/overview`)
+				.then((res) => res.json())
+				.then((userData) => {
+					isPro.set(userData.isPro ?? false);
+				})
+				.catch(() => {
+					// Keep isPro as null on error - don't show any badge if status is unknown
+				});
+		}
+
 		if (page.url.searchParams.has("model")) {
 			await settings
 				.instantSet({
@@ -184,19 +201,20 @@
 <svelte:head>
 	<title>{publicConfig.PUBLIC_APP_NAME} - Chat with AI models</title>
 	<meta name="description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
-	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:site" content="@huggingface" />
-	<meta name="twitter:title" content="{publicConfig.PUBLIC_APP_NAME} - Chat with AI models" />
-	<meta name="twitter:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
-	<meta
-		name="twitter:image"
-		content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{publicConfig.assetPath}/thumbnail.png"
-	/>
-	<meta name="twitter:image:alt" content="{publicConfig.PUBLIC_APP_NAME} preview" />
 
 	<!-- use those meta tags everywhere except on special listing pages -->
 	<!-- feel free to refacto if there's a better way -->
 	{#if !page.url.pathname.includes("/models/")}
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="{publicConfig.PUBLIC_APP_NAME} - Chat with AI models" />
+		<meta name="twitter:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
+		<meta
+			name="twitter:image"
+			content="{publicConfig.PUBLIC_ORIGIN ||
+				page.url.origin}{publicConfig.assetPath}/thumbnail.png"
+		/>
+		<meta name="twitter:image:alt" content="{publicConfig.PUBLIC_APP_NAME} preview" />
 		<meta property="og:title" content="{publicConfig.PUBLIC_APP_NAME} - Chat with AI models" />
 		<meta property="og:type" content="website" />
 		<meta property="og:url" content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}" />
@@ -241,7 +259,7 @@
 <BackgroundGenerationPoller />
 
 <div
-	class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
+	class="fixed grid h-dvh w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
 		? 'md:grid-cols-[290px,1fr]'
 		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
 >

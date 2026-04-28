@@ -2,6 +2,8 @@ import { defaultModel } from "$lib/server/models";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 
+export type StreamingMode = "raw" | "smooth";
+
 export interface Settings extends Timestamps {
 	userId?: User["_id"];
 	sessionId?: string;
@@ -13,6 +15,12 @@ export interface Settings extends Timestamps {
 
 	// model name and system prompts
 	customPrompts?: Record<string, string>;
+
+	/**
+	 * Per-model toggle to enable/disable the custom system prompt
+	 * without deleting its contents. Defaults to `true` (enabled).
+	 */
+	customPromptsEnabled?: Record<string, boolean>;
 
 	/**
 	 * Per‑model overrides to enable multimodal (image) support
@@ -33,8 +41,26 @@ export interface Settings extends Timestamps {
 	 */
 	hidePromptExamples?: Record<string, boolean>;
 
-	disableStream: boolean;
+	/**
+	 * Per-model inference provider preference.
+	 * Values: "auto" (default), "fastest", "cheapest", or a specific provider name (e.g., "together", "sambanova").
+	 * The value is appended to the model ID when making inference requests (e.g., "model:fastest").
+	 */
+	providerOverrides?: Record<string, string>;
+
+	/**
+	 * Preferred assistant output behavior in the chat UI.
+	 * - "raw": show provider-native stream chunks
+	 * - "smooth": show smoothed stream chunks
+	 */
+	streamingMode: StreamingMode;
 	directPaste: boolean;
+
+	/**
+	 * Whether haptic feedback is enabled on supported touch devices.
+	 * Uses the ios-haptics library for cross-platform vibration.
+	 */
+	hapticsEnabled: boolean;
 
 	/**
 	 * Organization to bill inference requests to (HuggingChat only).
@@ -49,9 +75,12 @@ export const DEFAULT_SETTINGS = {
 	shareConversationsWithModelAuthors: true,
 	activeModel: defaultModel.id,
 	customPrompts: {},
+	customPromptsEnabled: {},
 	multimodalOverrides: {},
 	toolsOverrides: {},
 	hidePromptExamples: {},
-	disableStream: false,
+	providerOverrides: {},
+	streamingMode: "smooth",
 	directPaste: false,
+	hapticsEnabled: true,
 } satisfies SettingsEditable;

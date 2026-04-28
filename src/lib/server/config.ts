@@ -21,7 +21,7 @@ class ConfigManager {
 	async init() {
 		if (this.isInitialized) return;
 
-		if (import.meta.env.MODE === "test") {
+		if (building || import.meta.env.MODE === "test") {
 			this.isInitialized = true;
 			return;
 		}
@@ -158,7 +158,9 @@ type ExtraConfigKeys =
 	| "METRICS_ENABLED"
 	| "METRICS_PORT"
 	| "MCP_SERVERS"
-	| "MCP_FORWARD_HF_USER_TOKEN";
+	| "MCP_FORWARD_HF_USER_TOKEN"
+	| "MCP_TOOL_TIMEOUT_MS"
+	| "EXA_API_KEY";
 
 type ConfigProxy = ConfigManager & { [K in ConfigKey | ExtraConfigKeys]: string };
 

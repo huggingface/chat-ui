@@ -45,8 +45,17 @@ body {
 		height: 8px;
 	}
 
+	.scrollbar-custom::-webkit-scrollbar-thumb {
+		background-color: rgba(0, 0, 0, 0.1);
+		border-radius: 9999px;
+	}
+
 	.dark .scrollbar-custom::-webkit-scrollbar {
 		background-color: rgba(17, 17, 17, 0.85);
+	}
+
+	.dark .scrollbar-custom::-webkit-scrollbar-thumb {
+		background-color: rgba(255, 255, 255, 0.1);
 	}
 
 	/* Rounded top/bottom caps for vertical scrollbars (Chrome/Edge/Safari) */
@@ -87,6 +96,15 @@ body {
 
 	.prose pre {
 		@apply border-[0.5px] bg-white text-gray-600 dark:border-gray-700 dark:!bg-gray-900 dark:bg-inherit dark:text-inherit;
+	}
+
+	.prose code:not(pre code) {
+		@apply rounded-md bg-gray-200/60 px-[0.4em] py-[0.2em] text-[85%] dark:bg-gray-700;
+	}
+
+	.prose code:not(pre code)::before,
+	.prose code:not(pre code)::after {
+		content: none;
 	}
 
 	/* Override prose-sm title sizes - 75% of original */

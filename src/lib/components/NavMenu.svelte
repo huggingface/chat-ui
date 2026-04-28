@@ -29,6 +29,8 @@
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { enabledServersCount } from "$lib/stores/mcpServers";
+	import { isPro } from "$lib/stores/isPro";
+	import IconPro from "$lib/components/icons/IconPro.svelte";
 	import MCPServerManager from "./mcp/MCPServerManager.svelte";
 
 	const publicConfig = usePublicConfig();
@@ -171,23 +173,51 @@
 >
 	{#if user?.username || user?.email}
 		<div
-			class="group flex items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+			class="group flex h-9 items-center gap-1.5 rounded-lg pl-2 pr-2 hover:bg-gray-100 first:hover:bg-transparent sm:h-[2.08rem] dark:hover:bg-gray-700 first:dark:hover:bg-transparent"
 		>
-			<span
-				class="flex h-9 flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
-				>{user?.username || user?.email}</span
-			>
-
 			<img
 				src="https://huggingface.co/api/users/{user.username}/avatar?redirect=true"
-				class="ml-auto size-4 rounded-full border bg-gray-500 dark:border-white/40"
+				class="size-3.5 rounded-full border bg-gray-500 dark:border-white/40"
 				alt=""
 			/>
+			{#if publicConfig.isHuggingChat && user?.username}
+				<a
+					href="https://huggingface.co/{user.username}"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="flex flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 hover:underline dark:text-gray-400"
+					>{user.username}</a
+				>
+			{:else}
+				<span
+					class="flex flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
+					>{user?.username || user?.email}</span
+				>
+			{/if}
+
+			{#if publicConfig.isHuggingChat && $isPro === false}
+				<a
+					href="https://huggingface.co/subscribe/pro?from=HuggingChat"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="ml-auto flex h-[20px] items-center gap-1 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400"
+				>
+					<IconPro />
+					Get PRO
+				</a>
+			{:else if publicConfig.isHuggingChat && $isPro === true}
+				<span
+					class="ml-auto flex h-[20px] items-center gap-1 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400"
+				>
+					<IconPro />
+					PRO
+				</span>
+			{/if}
 		</div>
 	{/if}
 	<a
 		href="{base}/models"
-		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2 pr-2 text-gray-500 hover:bg-gray-100 sm:h-[2.08rem] dark:text-gray-400 dark:hover:bg-gray-700"
 		onclick={handleNavItemClick}
 	>
 		Models
@@ -200,7 +230,7 @@
 	{#if user?.username || user?.email}
 		<button
 			onclick={() => (showMcpModal = true)}
-			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2 pr-2 text-gray-500 hover:bg-gray-100 sm:h-[2.08rem] dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			MCP Servers
 			{#if $enabledServersCount > 0}
@@ -216,7 +246,7 @@
 	<span class="flex gap-1">
 		<a
 			href="{base}/settings/application"
-			class="flex h-9 flex-none flex-grow items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			class="flex h-9 flex-none flex-grow items-center gap-1.5 rounded-lg pl-2 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 			onclick={handleNavItemClick}
 		>
 			Settings

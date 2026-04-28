@@ -6,7 +6,6 @@ export function buildToolPreprompt(tools: OpenAiTool[], timezone?: string): stri
 		.map((t) => (t?.function?.name ? String(t.function.name) : ""))
 		.filter((s) => s.length > 0);
 	if (names.length === 0) return "";
-
 	const now = new Date();
 	const dateTimeOptions: Intl.DateTimeFormatOptions = {
 		year: "numeric",
@@ -18,14 +17,16 @@ export function buildToolPreprompt(tools: OpenAiTool[], timezone?: string): stri
 		...(timezone ? { timeZone: timezone } : {}),
 	};
 	const currentDateTime = now.toLocaleString("en-US", dateTimeOptions);
-
-	// Build a user-location hint from the IANA timezone (e.g. "America/New_York" → "America/New_York")
+	const isoDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 	const locationLine = timezone ? ` User's timezone: ${timezone}.` : "";
-
 	return [
 		`You have access to these tools: ${names.join(", ")}.`,
-		`Current date and time: ${currentDateTime}.${locationLine}`,
-		`Only use a tool if you cannot answer without it. For simple tasks like writing, editing text, or answering from your knowledge, respond directly without tools.`,
+		`Current date and time: ${currentDateTime} (${isoDate}).${locationLine}`,
+		`IMPORTANT: Do NOT call a tool unless the user's request requires capabilities you lack (e.g., real-time data, image generation, code execution) or external information you do not have. For tasks like writing code, creative writing, math, or building apps, respond directly without tools. When in doubt, do not use a tool.`,
+		`PARALLEL TOOL CALLS: When multiple tool calls are needed and they are independent of each other (i.e., one does not need the result of another), call them all at once in a single response instead of one at a time. Only chain tool calls sequentially when a later call depends on an earlier call's output.`,
+		`SEARCH: Use 3-6 precise keywords. For historical events, include the year the event occurred. For recent or current topics, use today's year (${now.getFullYear()}). When a tool accepts date-range parameters (e.g., startPublishedDate, endPublishedDate), always use today's date (${isoDate}) as the end date unless the user specifies otherwise. For multi-part questions, search each part separately.`,
+		`ANSWER: State only facts explicitly in the results. If info is missing or results conflict, say so. Never fabricate URLs or facts.`,
+		`INTERACTIVE APPS: When asked to build an interactive application, game, or visualization without a specific language/framework preference, create a single self-contained HTML file with embedded CSS and JavaScript.`,
 		`If a tool generates an image, you can inline it directly: ![alt text](image_url).`,
 		`If a tool needs an image, set its image field ("input_image", "image", or "image_url") to a reference like "image_1", "image_2", etc. (ordered by when the user uploaded them).`,
 		`Default to image references; only use a full http(s) URL when the tool description explicitly asks for one, or reuse a URL a previous tool returned.`,

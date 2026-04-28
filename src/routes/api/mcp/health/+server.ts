@@ -3,9 +3,10 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { KeyValuePair } from "$lib/types/Tool";
 import { config } from "$lib/server/config";
+import { logger } from "$lib/server/logger";
 import type { RequestHandler } from "./$types";
-import { isValidUrl } from "$lib/server/urlSafety";
-import { isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
+import { isValidUrl, ssrfSafeFetch } from "$lib/server/urlSafety";
+import { isStrictHfMcpLogin, hasNonEmptyToken, isExaMcpServer } from "$lib/server/mcp/hf";
 
 interface HealthCheckRequest {
 	url: string;
@@ -49,7 +50,23 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
-		const baseUrl = new URL(url);
+		// Inject Exa API key for mcp.exa.ai servers via URL param
+		let finalUrl = url;
+		try {
+			const exaApiKey = config.EXA_API_KEY;
+			if (isExaMcpServer(url) && hasNonEmptyToken(exaApiKey)) {
+				const urlObj = new URL(url);
+				if (!urlObj.searchParams.has("exaApiKey")) {
+					urlObj.searchParams.set("exaApiKey", exaApiKey);
+					finalUrl = urlObj.toString();
+					logger.debug({}, "[MCP Health] injected Exa API key");
+				}
+			}
+		} catch {
+			// best-effort injection
+		}
+
+		const baseUrl = new URL(finalUrl);
 
 		// Minimal header handling
 		const headersRecord: Record<string, string> = headers?.length
@@ -88,16 +105,19 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		// Try Streamable HTTP transport first
 		try {
-			console.log(`[MCP Health] Trying HTTP transport for ${url}`);
+			logger.info({}, `[MCP Health] Trying HTTP transport for ${url}`);
 			client = new Client({
 				name: "chat-ui-health-check",
 				version: "1.0.0",
 			});
 
-			const transport = new StreamableHTTPClientTransport(baseUrl, { requestInit });
-			console.log(`[MCP Health] Connecting to ${url}...`);
+			const transport = new StreamableHTTPClientTransport(baseUrl, {
+				requestInit,
+				fetch: ssrfSafeFetch,
+			});
+			logger.info({}, `[MCP Health] Connecting to ${url}...`);
 			await client.connect(transport);
-			console.log(`[MCP Health] Connected successfully via HTTP`);
+			logger.info({}, `[MCP Health] Connected successfully via HTTP`);
 
 			// Connection successful, get tools
 			const toolsResponse = await client.listTools();
@@ -140,7 +160,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		} catch (error) {
 			httpError = error instanceof Error ? error : new Error(String(error));
 			lastError = httpError;
-			console.log("Streamable HTTP failed, trying SSE transport...", lastError.message);
+			logger.warn(lastError.message, "Streamable HTTP failed, trying SSE transport...");
 
 			// Close failed client
 			try {
@@ -151,16 +171,19 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 			// Try SSE transport
 			try {
-				console.log(`[MCP Health] Trying SSE transport for ${url}`);
+				logger.info({}, `[MCP Health] Trying SSE transport for ${url}`);
 				client = new Client({
 					name: "chat-ui-health-check",
 					version: "1.0.0",
 				});
 
-				const sseTransport = new SSEClientTransport(baseUrl, { requestInit });
-				console.log(`[MCP Health] Connecting via SSE...`);
+				const sseTransport = new SSEClientTransport(baseUrl, {
+					requestInit,
+					fetch: ssrfSafeFetch,
+				});
+				logger.info({}, `[MCP Health] Connecting via SSE...`);
 				await client.connect(sseTransport);
-				console.log(`[MCP Health] Connected successfully via SSE`);
+				logger.info({}, `[MCP Health] Connected successfully via SSE`);
 
 				// Connection successful, get tools
 				const toolsResponse = await client.listTools();
@@ -210,7 +233,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						{ cause: sseError instanceof Error ? sseError : undefined }
 					);
 				}
-				console.error("Both transports failed. Last error:", lastError);
+				logger.error(lastError, "Both transports failed.");
 			}
 		}
 
@@ -252,7 +275,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		clearTimeout(timeoutId);
 		return res;
 	} catch (error) {
-		console.error("MCP health check failed:", error);
+		logger.error(error, "MCP health check failed");
 
 		// Clean up client if it exists
 		try {

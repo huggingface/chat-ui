@@ -5,12 +5,19 @@
 	import { page } from "$app/state";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
+	import IconBurger from "$lib/components/icons/IconBurger.svelte";
+	import IconFast from "$lib/components/icons/IconFast.svelte";
+	import IconCheap from "$lib/components/icons/IconCheap.svelte";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import LucideImage from "~icons/lucide/image";
 	import LucideHammer from "~icons/lucide/hammer";
 	import IconGear from "~icons/bi/gear-fill";
+	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+
+	const publicConfig = usePublicConfig();
 
 	import type { LayoutData } from "../$types";
 	import { browser } from "$app/environment";
@@ -109,8 +116,11 @@
 					goto(`${base}/settings`);
 				}}
 			>
+				<IconBurger
+					classNames="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white sm:hidden"
+				/>
 				<CarbonChevronLeft
-					class="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white"
+					class="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white max-sm:hidden"
 				/>
 			</button>
 		{/if}
@@ -173,6 +183,42 @@
 							<IconOmni />
 						{/if}
 					</div>
+
+					{#if publicConfig.isHuggingChat && !model.isRouter && $settings.providerOverrides?.[model.id] && $settings.providerOverrides[model.id] !== "auto"}
+						{@const providerOverride = $settings.providerOverrides[model.id]}
+						{@const hubOrg =
+							PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
+						{#if providerOverride === "fastest"}
+							<span
+								title="Provider: {providerOverride}"
+								class="grid size-[21px] flex-none place-items-center rounded-md bg-green-500/10 text-green-600 dark:text-green-500"
+								aria-label="Provider: {providerOverride}"
+								role="img"
+							>
+								<IconFast classNames="size-3" />
+							</span>
+						{:else if providerOverride === "cheapest"}
+							<span
+								title="Provider: {providerOverride}"
+								class="grid size-[21px] flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
+								aria-label="Provider: {providerOverride}"
+								role="img"
+							>
+								<IconCheap classNames="size-3" />
+							</span>
+						{:else if hubOrg}
+							<span
+								title="Provider: {providerOverride}"
+								class="flex size-[21px] flex-none items-center justify-center rounded-md bg-gray-500/10 p-[0.225rem]"
+							>
+								<img
+									src="https://huggingface.co/api/avatars/{hubOrg}"
+									alt={providerOverride}
+									class="size-full rounded"
+								/>
+							</span>
+						{/if}
+					{/if}
 
 					{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
 						<span

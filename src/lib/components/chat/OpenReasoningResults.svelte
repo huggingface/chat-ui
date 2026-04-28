@@ -55,7 +55,7 @@
 	<!-- Collapsed view (clickable to expand) -->
 	<button
 		type="button"
-		class="group/text w-full cursor-pointer text-left"
+		class="group/text {isOpen ? '' : 'line-clamp-2'} w-full cursor-pointer text-left"
 		onclick={() => (isOpen = !isOpen)}
 	>
 		{#if isOpen}
@@ -68,11 +68,11 @@
 		{:else}
 			<!-- Collapsed: 2-line preview (plain text, strip markdown) -->
 			<div
-				class="line-clamp-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400"
+				class="line-clamp-2 max-h-[3.25em] text-sm leading-relaxed text-gray-500 dark:text-gray-400"
 				class:animate-pulse={loading}
 			>
 				{content
-					.replace(/[#*_`~[\]]/g, "")
+					.replace(/[#*`~[\]]/g, "")
 					.replace(/\n+/g, " ")
 					.trim()}
 			</div>

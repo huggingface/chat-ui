@@ -21,6 +21,8 @@ export interface EndpointParameters {
 	conversationId?: ObjectId;
 	locals: App.Locals | undefined;
 	abortSignal?: AbortSignal;
+	/** Inference provider preference: "auto", "fastest", "cheapest", or a specific provider name */
+	provider?: string;
 }
 
 export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & {

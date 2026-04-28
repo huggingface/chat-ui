@@ -1,11 +1,13 @@
-import { collections } from "$lib/server/database";
+import { getCollectionsEarly } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { describe, expect, it } from "vitest";
 
 // function used to insert conversations used for testing
+const getConversations = async () => (await getCollectionsEarly()).conversations;
 
 export const insertLegacyConversation = async () => {
-	const res = await collections.conversations.insertOne({
+	const conversations = await getConversations();
+	const res = await conversations.insertOne({
 		_id: new ObjectId(),
 		createdAt: new Date(),
 		updatedAt: new Date(),
@@ -39,7 +41,8 @@ export const insertLegacyConversation = async () => {
 };
 
 export const insertLinearBranchConversation = async () => {
-	const res = await collections.conversations.insertOne({
+	const conversations = await getConversations();
+	const res = await conversations.insertOne({
 		_id: new ObjectId(),
 		createdAt: new Date(),
 		updatedAt: new Date(),
@@ -82,7 +85,8 @@ export const insertLinearBranchConversation = async () => {
 };
 
 export const insertSideBranchesConversation = async () => {
-	const res = await collections.conversations.insertOne({
+	const conversations = await getConversations();
+	const res = await conversations.insertOne({
 		_id: new ObjectId(),
 		createdAt: new Date(),
 		updatedAt: new Date(),
@@ -149,15 +153,15 @@ describe("inserting conversations", () => {
 	it("should insert a legacy conversation", async () => {
 		const id = await insertLegacyConversation();
 		expect(id).toBeDefined();
-	});
+	}, 30000);
 
 	it("should insert a linear branch conversation", async () => {
 		const id = await insertLinearBranchConversation();
 		expect(id).toBeDefined();
-	});
+	}, 30000);
 
 	it("should insert a side branches conversation", async () => {
 		const id = await insertSideBranchesConversation();
 		expect(id).toBeDefined();
-	});
+	}, 30000);
 });

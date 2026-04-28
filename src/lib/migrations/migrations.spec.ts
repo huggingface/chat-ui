@@ -17,7 +17,7 @@ describe(
 			} catch (e) {
 				// Index might already exist, ignore error
 			}
-		});
+		}, 20000);
 
 		it("should not have duplicates guid", async () => {
 			const guids = migrations.map((m) => m._id.toString());

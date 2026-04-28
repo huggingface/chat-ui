@@ -240,15 +240,17 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 					return metadataThenStream(gen, toolsCandidate, ROUTER_TOOLS_ROUTE);
 				} catch (e) {
 					const { message, statusCode } = extractUpstreamError(e);
-					logger.error(
-						{
-							route: ROUTER_TOOLS_ROUTE,
-							model: toolsCandidate,
-							err: message,
-							...(statusCode && { status: statusCode }),
-						},
-						"[router] tools fallback failed"
-					);
+					const logData = {
+						route: ROUTER_TOOLS_ROUTE,
+						model: toolsCandidate,
+						err: message,
+						...(statusCode && { status: statusCode }),
+					};
+					if (statusCode === 402) {
+						logger.warn(logData, "[router] tools fallback failed due to payment required");
+					} else {
+						logger.error(logData, "[router] tools fallback failed");
+					}
 					throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 				}
 			}

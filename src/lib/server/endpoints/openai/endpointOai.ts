@@ -122,6 +122,7 @@ export async function endpointOai(
 			conversationId,
 			locals,
 			abortSignal,
+			provider,
 		}) => {
 			const prompt = await buildPrompt({
 				messages,
@@ -129,9 +130,13 @@ export async function endpointOai(
 				model,
 			});
 
+			// Build model ID with optional provider suffix (e.g., "model:fastest" or "model:together")
+			const baseModelId = model.id ?? model.name;
+			const modelId = provider && provider !== "auto" ? `${baseModelId}:${provider}` : baseModelId;
+
 			const parameters = { ...model.parameters, ...generateSettings };
 			const body: CompletionCreateParamsStreaming = {
-				model: model.id ?? model.name,
+				model: modelId,
 				prompt,
 				stream: true,
 				max_tokens: parameters?.max_tokens,
@@ -148,10 +153,8 @@ export async function endpointOai(
 					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 					"X-use-cache": "false",
 					...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
-					// Bill to organization if configured (HuggingChat only)
-					...(config.isHuggingChat && locals?.billingOrganization
-						? { "X-HF-Bill-To": locals.billingOrganization }
-						: {}),
+					// Bill to organization if configured
+					...(locals?.billingOrganization ? { "X-HF-Bill-To": locals.billingOrganization } : {}),
 				},
 				signal: abortSignal,
 			});
@@ -167,6 +170,7 @@ export async function endpointOai(
 			isMultimodal,
 			locals,
 			abortSignal,
+			provider,
 		}) => {
 			// Format messages for the chat API, handling multimodal content if supported
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
@@ -197,8 +201,13 @@ export async function endpointOai(
 
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
+
+			// Build model ID with optional provider suffix (e.g., "model:fastest" or "model:together")
+			const baseModelId = model.id ?? model.name;
+			const modelId = provider && provider !== "auto" ? `${baseModelId}:${provider}` : baseModelId;
+
 			const body = {
-				model: model.id ?? model.name,
+				model: modelId,
 				messages: messagesOpenAI,
 				stream: streamingSupported,
 				// Support two different ways of specifying token limits depending on the model
@@ -222,8 +231,8 @@ export async function endpointOai(
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
 							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
-							// Bill to organization if configured (HuggingChat only)
-							...(config.isHuggingChat && locals?.billingOrganization
+							// Bill to organization if configured
+							...(locals?.billingOrganization
 								? { "X-HF-Bill-To": locals.billingOrganization }
 								: {}),
 						},
@@ -240,8 +249,8 @@ export async function endpointOai(
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
 							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
-							// Bill to organization if configured (HuggingChat only)
-							...(config.isHuggingChat && locals?.billingOrganization
+							// Bill to organization if configured
+							...(locals?.billingOrganization
 								? { "X-HF-Bill-To": locals.billingOrganization }
 								: {}),
 						},

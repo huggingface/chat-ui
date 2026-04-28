@@ -1,10 +1,13 @@
-import adapter from "@sveltejs/adapter-node";
+import adapterNode from "@sveltejs/adapter-node";
+import adapterStatic from "@sveltejs/adapter-static";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import dotenv from "dotenv";
 import { execSync } from "child_process";
 
 dotenv.config({ path: "./.env.local", override: true });
 dotenv.config({ path: "./.env" });
+
+const useStatic = process.env.ADAPTER === "static";
 
 function getCurrentCommitSHA() {
 	try {
@@ -17,6 +20,7 @@ function getCurrentCommitSHA() {
 
 process.env.PUBLIC_VERSION ??= process.env.npm_package_version;
 process.env.PUBLIC_COMMIT_SHA ??= getCurrentCommitSHA();
+process.env.PUBLIC_APP_ASSETS ??= "chatui";
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -25,7 +29,7 @@ const config = {
 	preprocess: vitePreprocess(),
 
 	kit: {
-		adapter: adapter(),
+		adapter: useStatic ? adapterStatic({ fallback: "index.html", strict: false }) : adapterNode(),
 
 		paths: {
 			base: process.env.APP_BASE || "",
@@ -33,17 +37,16 @@ const config = {
 		},
 		csrf: {
 			// handled in hooks.server.ts, because we can have multiple valid origins
-			checkOrigin: false,
+			trustedOrigins: ["*"],
 		},
 		csp: {
 			directives: {
-				...(process.env.ALLOW_IFRAME === "true" ? {} : { "frame-ancestors": ["'none'"] }),
+				...(process.env.ALLOW_IFRAME === "true"
+					? {}
+					: { "frame-ancestors": ["https://huggingface.co"] }),
 			},
 		},
-		alias: {
-			$api: "./src/lib/server/api",
-			"$api/*": "./src/lib/server/api/*",
-		},
+		alias: {},
 	},
 };
 

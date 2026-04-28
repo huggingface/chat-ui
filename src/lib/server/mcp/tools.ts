@@ -2,6 +2,8 @@ import { Client } from "@modelcontextprotocol/sdk/client";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { McpServerConfig } from "./httpClient";
+import { logger } from "$lib/server/logger";
+import { ssrfSafeFetch } from "$lib/server/urlSafety";
 // use console.* for lightweight diagnostics in production logs
 
 export type OpenAiTool = {
@@ -70,11 +72,13 @@ async function listServerTools(
 		try {
 			const transport = new StreamableHTTPClientTransport(url, {
 				requestInit: { headers: server.headers, signal: opts.signal },
+				fetch: ssrfSafeFetch,
 			});
 			await client.connect(transport);
 		} catch {
 			const transport = new SSEClientTransport(url, {
 				requestInit: { headers: server.headers, signal: opts.signal },
+				fetch: ssrfSafeFetch,
 			});
 			await client.connect(transport);
 		}
@@ -82,7 +86,7 @@ async function listServerTools(
 		const response = await client.listTools({});
 		const tools = Array.isArray(response?.tools) ? (response.tools as ListedTool[]) : [];
 		try {
-			console.debug(
+			logger.debug(
 				{
 					server: server.name,
 					url: server.url,
