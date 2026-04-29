@@ -2,7 +2,7 @@
 
 <Tip warning={true}>
 
-The Helm chart is a work in progress and should be considered unstable. Breaking changes may be pushed without migration guides. Contributions welcome!
+The Helm chart is a work in progress and should be considered unstable. Breaking changes may be pushed without migration guides. Contributions welcome !
 
 </Tip>
 
