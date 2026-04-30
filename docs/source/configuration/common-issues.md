@@ -12,7 +12,7 @@ This usually happens when running Chat UI over HTTP without proper cookie config
 COOKIE_SECURE=false
 ```
 
-This automatically sets `COOKIE_SAMESITE` to `lax`, which is the correct value for HTTP deployments. You can still override it explicitly with `COOKIE_SAMESITE=lax` if needed.
+This automatically sets `COOKIE_SAMESITE` to `lax`, which is the correct value for HTTP deployments.
 
 Also ensure `PUBLIC_ORIGIN` matches your actual URL:
 
