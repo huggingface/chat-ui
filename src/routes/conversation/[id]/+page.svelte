@@ -23,7 +23,12 @@
 	import { fetchMessageUpdates, resolveStreamingMode } from "$lib/utils/messageUpdates";
 	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
-	import { enabledServers, mcpServersLoaded } from "$lib/stores/mcpServers";
+	import {
+		enabledServers,
+		mcpServersLoaded,
+		effectiveServerHeaders,
+		refreshAllExpiredTokens,
+	} from "$lib/stores/mcpServers";
 	import { get } from "svelte/store";
 	import { browser } from "$app/environment";
 	import {
@@ -263,6 +268,16 @@
 				});
 			}
 
+			// Just-in-time OAuth token refresh: if any enabled server has a token
+			// that's already expired or expiring within the next 5 minutes, hit our
+			// /api/mcp/oauth/refresh endpoint and replace the token in localStorage
+			// before we serialize the request. Errors are best-effort — the chat
+			// will still send and any genuinely-broken server will surface a clear
+			// reconnect path via tool-error messages.
+			try {
+				await refreshAllExpiredTokens();
+			} catch {}
+
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				convId,
 				{
@@ -276,7 +291,7 @@
 					selectedMcpServers: $enabledServers.map((s) => ({
 						name: s.name,
 						url: s.url,
-						headers: s.headers,
+						headers: effectiveServerHeaders(s),
 					})),
 					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 					streamingMode,

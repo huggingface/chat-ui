@@ -3,6 +3,7 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import ServerCard from "./ServerCard.svelte";
 	import AddServerForm from "./AddServerForm.svelte";
+	import AuthorizeStep from "./AuthorizeStep.svelte";
 	import {
 		allMcpServers,
 		selectedServerIds,
@@ -10,8 +11,13 @@
 		addCustomServer,
 		refreshMcpServers,
 		healthCheckServer,
+		setServerOAuth,
+		setServerTokens,
+		toggleServer,
 	} from "$lib/stores/mcpServers";
-	import type { KeyValuePair } from "$lib/types/Tool";
+	import type { KeyValuePair, MCPClientInformation, MCPOAuthState } from "$lib/types/Tool";
+	import type { DiscoveryResponse, OAuthCallbackPayload } from "$lib/utils/mcpOAuth";
+	import { error } from "$lib/stores/errors";
 	import IconAddLarge from "~icons/carbon/add-large";
 	import IconRefresh from "~icons/carbon/renew";
 	import LucideHammer from "~icons/lucide/hammer";
@@ -25,21 +31,132 @@
 
 	let { onclose }: Props = $props();
 
-	type View = "list" | "add";
+	type View = "list" | "add" | "authorize";
 	let currentView = $state<View>("list");
 	let isRefreshing = $state(false);
+	let pendingAuth = $state<{
+		serverId: string;
+		serverUrl: string;
+		discovery: DiscoveryResponse;
+	} | null>(null);
 
 	const baseServers = $derived($allMcpServers.filter((s) => s.type === "base"));
 	const customServers = $derived($allMcpServers.filter((s) => s.type === "custom"));
 	const enabledCount = $derived($enabledServersCount);
 
-	function handleAddServer(serverData: { name: string; url: string; headers?: KeyValuePair[] }) {
-		addCustomServer(serverData);
+	function handleAddServer(serverData: {
+		name: string;
+		url: string;
+		headers?: KeyValuePair[];
+		discovery?: DiscoveryResponse;
+	}) {
+		// Save a partial oauth state on add (asMetadata + resource) even when DCR
+		// produced no clientInfo — the manual-client-id flow inside AuthorizeStep
+		// will fill it in via handleAuthorized below. Without this, setServerTokens
+		// would refuse to persist tokens later because s.oauth would be undefined.
+		const oauth: MCPOAuthState | undefined =
+			serverData.discovery?.requiresAuth &&
+			serverData.discovery.asMetadata &&
+			serverData.discovery.resource
+				? {
+						resource: serverData.discovery.resource,
+						asMetadata: serverData.discovery.asMetadata,
+						resourceMetadataUrl: serverData.discovery.resourceMetadataUrl,
+						clientInfo: serverData.discovery.clientInfo ?? {
+							client_id: "",
+							redirect_uris: [],
+						},
+						clientWasManuallyEntered: !serverData.discovery.supportsDcr,
+					}
+				: undefined;
+		const id = addCustomServer({
+			name: serverData.name,
+			url: serverData.url,
+			headers: serverData.headers,
+			oauth,
+			authRequired: !!oauth,
+		});
+		// Route to the authorize step only when we built a usable oauth state.
+		// If `requiresAuth` came back true but `asMetadata` / `resource` were
+		// missing (partial discovery), we'd otherwise route to AuthorizeStep and
+		// then `handleAuthorized` would silently bail — leaving the user with a
+		// permanently-broken half-state and no UI signal.
+		if (oauth && serverData.discovery) {
+			pendingAuth = {
+				serverId: id,
+				serverUrl: serverData.url,
+				discovery: serverData.discovery,
+			};
+			currentView = "authorize";
+		} else if (serverData.discovery?.requiresAuth) {
+			// Discovery said "needs auth" but we don't have enough metadata to
+			// drive the dance. Tell the user explicitly instead of silently adding
+			// a broken server.
+			currentView = "list";
+			$error = `${serverData.url} requires authorization but its OAuth metadata could not be loaded. Try Health Check or contact the server admin.`;
+		} else {
+			// Non-OAuth server: just close the form. The user flips the Switch on
+			// the card to enable it (matches pre-PR behavior).
+			currentView = "list";
+		}
+	}
+
+	function handleAuthorized(payload: OAuthCallbackPayload, clientInfo: MCPClientInformation) {
+		if (!pendingAuth || !payload.ok || !payload.tokens) return;
+		const { asMetadata, resource, resourceMetadataUrl, supportsDcr } = pendingAuth.discovery;
+		if (!asMetadata || !resource) return;
+		const serverId = pendingAuth.serverId;
+		// Persist the final clientInfo (auto-registered or manually entered) so
+		// future refresh / revoke calls don't lose it. Then write the tokens.
+		setServerOAuth(serverId, {
+			resource,
+			asMetadata,
+			resourceMetadataUrl,
+			clientInfo,
+			clientWasManuallyEntered: !supportsDcr,
+		});
+		setServerTokens(serverId, payload.tokens);
+		// Auto-enable on first authorization so the user can immediately use the
+		// server. If they were re-authorizing an already-enabled server, leave the
+		// selection state alone — toggling would turn it off.
+		if (!$selectedServerIds.has(serverId)) {
+			toggleServer(serverId);
+		}
+		const server = $allMcpServers.find((s) => s.id === serverId);
+		if (server) healthCheckServer({ ...server });
+		pendingAuth = null;
+		currentView = "list";
+	}
+
+	function handleAuthorizeCancel() {
+		pendingAuth = null;
 		currentView = "list";
 	}
 
 	function handleCancel() {
 		currentView = "list";
+	}
+
+	function handleReauthorizeFromCard(detail: {
+		serverId: string;
+		serverUrl: string;
+		oauth: MCPOAuthState;
+	}) {
+		const discovery: DiscoveryResponse = {
+			requiresAuth: true,
+			resource: detail.oauth.resource,
+			resourceMetadataUrl: detail.oauth.resourceMetadataUrl,
+			asMetadata: detail.oauth.asMetadata,
+			clientInfo: detail.oauth.clientInfo,
+			supportsDcr: !detail.oauth.clientWasManuallyEntered,
+		};
+		setServerOAuth(detail.serverId, detail.oauth);
+		pendingAuth = {
+			serverId: detail.serverId,
+			serverUrl: detail.serverUrl,
+			discovery,
+		};
+		currentView = "authorize";
 	}
 
 	async function handleRefresh() {
@@ -63,6 +180,8 @@
 			<h2 class="mb-1 text-xl font-semibold text-gray-900 dark:text-gray-200">
 				{#if currentView === "list"}
 					MCP Servers
+				{:else if currentView === "authorize"}
+					Authorize MCP server
 				{:else}
 					Add MCP server
 				{/if}
@@ -70,6 +189,9 @@
 			<p class="text-sm text-gray-600 dark:text-gray-400">
 				{#if currentView === "list"}
 					Manage MCP servers to extend {publicConfig.PUBLIC_APP_NAME} with external tools.
+				{:else if currentView === "authorize"}
+					Sign in to {pendingAuth?.serverUrl} so {publicConfig.PUBLIC_APP_NAME} can call its tools on
+					your behalf.
 				{:else}
 					Add a custom MCP server to {publicConfig.PUBLIC_APP_NAME}.
 				{/if}
@@ -161,7 +283,11 @@
 					{:else}
 						<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 							{#each customServers as server (server.id)}
-								<ServerCard {server} isSelected={$selectedServerIds.has(server.id)} />
+								<ServerCard
+									{server}
+									isSelected={$selectedServerIds.has(server.id)}
+									onreauthorize={handleReauthorizeFromCard}
+								/>
 							{/each}
 						</div>
 					{/if}
@@ -180,6 +306,14 @@
 			</div>
 		{:else if currentView === "add"}
 			<AddServerForm onsubmit={handleAddServer} oncancel={handleCancel} />
+		{:else if currentView === "authorize" && pendingAuth}
+			<AuthorizeStep
+				discovery={pendingAuth.discovery}
+				serverUrl={pendingAuth.serverUrl}
+				serverId={pendingAuth.serverId}
+				onauthorized={handleAuthorized}
+				oncancel={handleAuthorizeCancel}
+			/>
 		{/if}
 	</div>
 </Modal>
