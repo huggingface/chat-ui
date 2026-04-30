@@ -5,6 +5,7 @@
 		validateHeader,
 		isSensitiveHeader,
 	} from "$lib/utils/mcpValidation";
+	import { discoverServer, type DiscoveryResponse } from "$lib/utils/mcpOAuth";
 	import IconEye from "~icons/carbon/view";
 	import IconEyeOff from "~icons/carbon/view-off";
 	import IconTrash from "~icons/carbon/trash-can";
@@ -12,7 +13,12 @@
 	import IconWarning from "~icons/carbon/warning";
 
 	interface Props {
-		onsubmit: (server: { name: string; url: string; headers?: KeyValuePair[] }) => void;
+		onsubmit: (server: {
+			name: string;
+			url: string;
+			headers?: KeyValuePair[];
+			discovery?: DiscoveryResponse;
+		}) => void;
 		oncancel: () => void;
 		initialName?: string;
 		initialUrl?: string;
@@ -32,6 +38,8 @@
 	let name = $state("");
 	let url = $state("");
 	let headers = $state<KeyValuePair[]>([]);
+	let probing = $state(false);
+	let discoveryFailed = $state(false);
 
 	$effect.pre(() => {
 		name = initialName;
@@ -40,6 +48,16 @@
 	});
 	let showHeaderValues = $state<Record<number, boolean>>({});
 	let error = $state<string | null>(null);
+
+	// Reset the "skip discovery" escape hatch whenever the user edits the URL.
+	// Otherwise a typo'd URL that failed discovery once would silently bypass
+	// auto-discovery on every subsequent corrected URL too, leaving real
+	// OAuth-protected servers added without an oauth state.
+	$effect(() => {
+		// Track url as a reactive dep
+		void url;
+		discoveryFailed = false;
+	});
 
 	function addHeader() {
 		headers = [...headers, { key: "", value: "" }];
@@ -90,16 +108,40 @@
 		return true;
 	}
 
-	function handleSubmit() {
+	async function handleSubmit() {
 		if (!validate()) return;
 
-		// Filter out empty headers
 		const filteredHeaders = headers.filter((h) => h.key.trim() && h.value.trim());
+		const finalUrl = url.trim();
+
+		// Skip the OAuth probe entirely if the user already provided manual auth
+		// headers — this preserves the existing custom-server flow for API-key
+		// based servers without an extra round trip.
+		const hasManualAuth = filteredHeaders.some((h) => h.key.toLowerCase() === "authorization");
+		let discovery: DiscoveryResponse | undefined;
+		if (!hasManualAuth && !discoveryFailed) {
+			probing = true;
+			try {
+				discovery = await discoverServer(finalUrl);
+			} catch (e) {
+				// Discovery failed (network, broken server, AS down). Surface the
+				// error inline so the user can read it; on next submit we skip
+				// auto-discovery and add the server as-is.
+				probing = false;
+				discoveryFailed = true;
+				const msg = e instanceof Error ? e.message : "Discovery failed";
+				error = `Could not contact server: ${msg}. Submit again to add it without auto-discovery.`;
+				return;
+			} finally {
+				probing = false;
+			}
+		}
 
 		onsubmit({
 			name: name.trim(),
-			url: url.trim(),
+			url: finalUrl,
 			headers: filteredHeaders.length > 0 ? filteredHeaders : undefined,
+			discovery,
 		});
 	}
 </script>
@@ -248,9 +290,10 @@
 		<button
 			type="button"
 			onclick={handleSubmit}
-			class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+			disabled={probing}
+			class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-60"
 		>
-			{submitLabel}
+			{probing ? "Checking…" : submitLabel}
 		</button>
 	</div>
 </div>

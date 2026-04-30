@@ -8,7 +8,20 @@ import { writable, derived, get } from "svelte/store";
 import { base } from "$app/paths";
 import { env as publicEnv } from "$env/dynamic/public";
 import { browser } from "$app/environment";
-import type { MCPServer, ServerStatus, MCPTool } from "$lib/types/Tool";
+import type {
+	KeyValuePair,
+	MCPOAuthState,
+	MCPOAuthTokens,
+	MCPServer,
+	ServerStatus,
+	MCPTool,
+} from "$lib/types/Tool";
+import {
+	isTokenExpiringSoon,
+	OAuthRefreshRejectedError,
+	refreshAccessToken,
+	revokeAccessToken,
+} from "$lib/utils/mcpOAuth";
 
 // Namespace storage by app identity to avoid collisions across apps
 function toKeyPart(s: string | undefined): string {
@@ -309,6 +322,152 @@ export function updateServerStatus(
 }
 
 /**
+ * Build the headers we should actually send when talking to this server. Merges
+ * any user-entered manual headers with an `Authorization: Bearer …` overlay
+ * from `oauth.tokens` if present. Manual headers always win on conflict.
+ */
+export function effectiveServerHeaders(server: MCPServer): KeyValuePair[] {
+	const out: KeyValuePair[] = [];
+	const seen = new Set<string>();
+	for (const h of server.headers ?? []) {
+		out.push(h);
+		seen.add(h.key.toLowerCase());
+	}
+	const access = server.oauth?.tokens?.access_token;
+	if (access && !seen.has("authorization")) {
+		out.push({ key: "Authorization", value: `Bearer ${access}` });
+	}
+	return out;
+}
+
+/**
+ * Set / replace the full OAuth state on a custom server (e.g., after the
+ * Authorize popup flow completes successfully).
+ */
+export function setServerOAuth(id: string, oauth: MCPOAuthState) {
+	allMcpServers.update(($servers) =>
+		$servers.map((s) => (s.id === id ? { ...s, oauth, authRequired: !oauth.tokens } : s))
+	);
+	persistCustomServers();
+}
+
+/**
+ * Replace just the tokens (e.g., after a refresh or a postMessage from the
+ * popup). Preserves the OAuth metadata snapshot so subsequent refreshes still
+ * work without re-discovery.
+ */
+export function setServerTokens(id: string, tokens: MCPOAuthTokens) {
+	allMcpServers.update(($servers) =>
+		$servers.map((s) => {
+			if (s.id !== id || !s.oauth) return s;
+			return {
+				...s,
+				oauth: { ...s.oauth, tokens },
+				authRequired: false,
+			};
+		})
+	);
+	persistCustomServers();
+}
+
+/**
+ * Clear tokens (e.g., on Disconnect). Keeps the rest of the OAuth state so a
+ * one-click re-authorize still works.
+ */
+export function clearServerTokens(id: string) {
+	allMcpServers.update(($servers) =>
+		$servers.map((s) => {
+			if (s.id !== id || !s.oauth) return s;
+			const next = { ...s.oauth };
+			delete next.tokens;
+			return { ...s, oauth: next, authRequired: true };
+		})
+	);
+	persistCustomServers();
+}
+
+/**
+ * Best-effort RFC 7009 revoke + clear. Returns whether the AS confirmed
+ * revocation (false is fine — local state is cleared either way).
+ */
+export async function disconnectServerOAuth(id: string): Promise<boolean> {
+	const server = get(allMcpServers).find((s) => s.id === id);
+	if (!server?.oauth) return false;
+	const { asMetadata, clientInfo, tokens } = server.oauth;
+	clearServerTokens(id);
+	if (!tokens) return false;
+	const tokenToRevoke = tokens.refresh_token ?? tokens.access_token;
+	if (!tokenToRevoke) return false;
+	return revokeAccessToken({
+		asMetadata,
+		clientInfo,
+		token: tokenToRevoke,
+		tokenTypeHint: tokens.refresh_token ? "refresh_token" : "access_token",
+	});
+}
+
+/**
+ * Refresh tokens for a single server if they're expiring soon and we have a
+ * refresh_token. Updates store + localStorage in place. Returns the (possibly
+ * updated) server entry. Throws on hard refresh failure so callers can
+ * surface a "Reconnect" prompt.
+ */
+export async function refreshServerTokensIfNeeded(serverId: string): Promise<MCPServer | null> {
+	const server = get(allMcpServers).find((s) => s.id === serverId);
+	if (!server?.oauth?.tokens) return server ?? null;
+	const { tokens, asMetadata, clientInfo, resource } = server.oauth;
+	if (!tokens.refresh_token) return server;
+	if (!isTokenExpiringSoon(tokens)) return server;
+	let fresh: MCPOAuthTokens;
+	try {
+		fresh = await refreshAccessToken({
+			asMetadata,
+			clientInfo,
+			resource,
+			refreshToken: tokens.refresh_token,
+		});
+	} catch (e) {
+		// Only wipe tokens for definite AS-side rejections (revoked / rotated /
+		// invalid_grant). Transport-layer failures (offline, 5xx, timeout) leave
+		// the refresh_token presumed-valid; preserve it so the next refresh
+		// window can retry instead of silently logging the user out on a
+		// network blip.
+		if (e instanceof OAuthRefreshRejectedError) {
+			clearServerTokens(serverId);
+		}
+		throw e;
+	}
+	// AS may not rotate the refresh_token; preserve the old one if missing.
+	const next: MCPOAuthTokens = {
+		...fresh,
+		refresh_token: fresh.refresh_token ?? tokens.refresh_token,
+	};
+	setServerTokens(serverId, next);
+	return get(allMcpServers).find((s) => s.id === serverId) ?? null;
+}
+
+/**
+ * Refresh every enabled server with an OAuth refresh_token that is expiring
+ * soon. Errors per-server are swallowed (the chat send proceeds; if the server
+ * really is broken, the chat-side 401 path will surface "Reconnect"). Should
+ * be awaited before building the FormData payload for the chat request.
+ */
+export async function refreshAllExpiredTokens(): Promise<void> {
+	const servers = get(enabledServers);
+	const ids = servers
+		.filter((s) => s.oauth?.tokens?.refresh_token && isTokenExpiringSoon(s.oauth.tokens))
+		.map((s) => s.id);
+	if (ids.length === 0) return;
+	await Promise.allSettled(ids.map((id) => refreshServerTokensIfNeeded(id)));
+}
+
+function persistCustomServers() {
+	const all = get(allMcpServers);
+	const customs = all.filter((s) => s.type === "custom");
+	saveCustomServers(customs);
+}
+
+/**
  * Run health check on a server
  */
 export async function healthCheckServer(
@@ -320,7 +479,10 @@ export async function healthCheckServer(
 		const response = await fetch(`${base}/api/mcp/health`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ url: server.url, headers: server.headers }),
+			body: JSON.stringify({
+				url: server.url,
+				headers: effectiveServerHeaders(server),
+			}),
 		});
 
 		const result = await response.json();
@@ -339,7 +501,29 @@ export async function healthCheckServer(
 	}
 }
 
+/**
+ * After a full-page redirect OAuth flow returns, consume any handoff payload
+ * from the URL hash and apply it to the corresponding server entry.
+ */
+async function consumeOAuthRedirectIfAny() {
+	if (!browser) return;
+	const { consumeRedirectHandoff } = await import("$lib/utils/mcpOAuth");
+	const result = consumeRedirectHandoff();
+	if (!result) return;
+	const { payload, serverId } = result;
+	if (!payload.ok || !payload.tokens) return;
+	setServerTokens(serverId, payload.tokens);
+	// Mirror the popup path's behavior: auto-enable a freshly-authorized server
+	// so its tools ship with the next chat without the user having to flip the
+	// switch on the card.
+	if (!get(selectedServerIds).has(serverId)) {
+		toggleServer(serverId);
+	}
+}
+
 // Initialize on module load
 if (browser) {
-	refreshMcpServers();
+	refreshMcpServers().then(() => {
+		consumeOAuthRedirectIfAny();
+	});
 }
