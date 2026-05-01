@@ -82,7 +82,7 @@
 			data-sveltekit-noscroll
 			data-sveltekit-preload-data="tap"
 			href="{base}/conversation/{conv.id}"
-			class="my-2 min-w-0 flex-1 truncate first-letter:uppercase"
+			class="min-w-0 flex-1 truncate py-2 first-letter:uppercase"
 			onclick={(e) => {
 				if (e.detail >= 2) {
 					e.preventDefault();
