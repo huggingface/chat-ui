@@ -15,7 +15,6 @@ import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
-import { cohereSafeEffort } from "$lib/server/textGeneration/reasoningEffort";
 // uuid import removed (no tool call ids)
 
 export const endpointOAIParametersSchema = z.object({
@@ -221,11 +220,7 @@ export async function endpointOai(
 				top_p: parameters?.top_p,
 				frequency_penalty: parameters?.frequency_penalty,
 				presence_penalty: parameters?.presence_penalty,
-				...(reasoningEffort
-					? {
-							reasoning_effort: cohereSafeEffort(provider, reasoningEffort, model.id ?? model.name),
-						}
-					: {}),
+				...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
 			};
 
 			// Handle both streaming and non-streaming responses with appropriate processors

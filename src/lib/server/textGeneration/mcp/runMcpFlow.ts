@@ -28,7 +28,6 @@ import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepa
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
-import { cohereSafeEffort } from "$lib/server/textGeneration/reasoningEffort";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -427,15 +426,7 @@ export async function* runMcpFlow({
 			max_tokens: typeof maxTokens === "number" ? maxTokens : undefined,
 			tools: oaTools,
 			tool_choice: "auto",
-			...(reasoningEffort
-				? {
-						reasoning_effort: cohereSafeEffort(
-							provider,
-							reasoningEffort,
-							targetModel.id ?? targetModel.name
-						),
-					}
-				: {}),
+			...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
 		};
 
 		const toPrimitive = (value: unknown) => {

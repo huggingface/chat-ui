@@ -191,7 +191,7 @@ envVars:
       { "id": "baidu/ERNIE-4.5-300B-A47B-Base-PT", "description": "Large base model foundation for specialized language systems." },
       { "id": "CohereLabs/aya-expanse-32b", "description": "Aya Expanse large comprehensive knowledge and reasoning capabilities." },
       { "id": "CohereLabs/c4ai-command-a-03-2025", "description": "Updated Command assistant improved accuracy and general usefulness." },
-      { "id": "CohereLabs/command-a-reasoning-08-2025", "description": "Command variant optimized for complex multi step logical reasoning." , "supportsReasoning": true },
+      { "id": "CohereLabs/command-a-reasoning-08-2025", "description": "Command variant optimized for complex multi step logical reasoning." },
       { "id": "alpindale/WizardLM-2-8x22B", "description": "Multi expert WizardLM MoE approach for efficient high quality generation." },
       { "id": "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", "description": "Llama distilled from R1 improved reasoning enterprise friendly." , "supportsReasoning": true },
       { "id": "CohereLabs/c4ai-command-r7b-12-2024", "description": "Small Command variant research or regional adaptation focus." },
