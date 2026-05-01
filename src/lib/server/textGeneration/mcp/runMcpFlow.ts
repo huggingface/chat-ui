@@ -701,15 +701,32 @@ export async function* runMcpFlow({
 					if (event.type === "update") {
 						yield event.update;
 					} else {
-						messagesOpenAI = [
-							...messagesOpenAI,
-							assistantToolMessage,
+						const followupMessages: ChatCompletionMessageParam[] = [
 							...(event.summary.toolMessages ?? []),
 						];
+
+						if (mmEnabled && (event.summary.toolImages?.length ?? 0) > 0) {
+							followupMessages.push({
+								role: "user",
+								content: [
+									{
+										type: "text",
+										text: "Use these tool-returned images as context for your next answer.",
+									},
+									...event.summary.toolImages,
+								],
+							});
+						}
+
+						messagesOpenAI = [...messagesOpenAI, assistantToolMessage, ...followupMessages];
 						toolMsgCount = event.summary.toolMessages?.length ?? 0;
 						toolRunCount = event.summary.toolRuns?.length ?? 0;
 						logger.info(
-							{ toolMsgCount, toolRunCount },
+							{
+								toolMsgCount,
+								toolRunCount,
+								toolImageCount: event.summary.toolImages?.length ?? 0,
+							},
 							"[mcp] tools executed; continuing loop for follow-up completion"
 						);
 					}
