@@ -222,7 +222,9 @@ export async function endpointOai(
 				frequency_penalty: parameters?.frequency_penalty,
 				presence_penalty: parameters?.presence_penalty,
 				...(reasoningEffort
-					? { reasoning_effort: cohereSafeEffort(provider, reasoningEffort) }
+					? {
+							reasoning_effort: cohereSafeEffort(provider, reasoningEffort, model.id ?? model.name),
+						}
 					: {}),
 			};
 

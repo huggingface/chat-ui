@@ -427,7 +427,15 @@ export async function* runMcpFlow({
 			max_tokens: typeof maxTokens === "number" ? maxTokens : undefined,
 			tools: oaTools,
 			tool_choice: "auto",
-			...(reasoningEffort ? { reasoning_effort: cohereSafeEffort(provider, reasoningEffort) } : {}),
+			...(reasoningEffort
+				? {
+						reasoning_effort: cohereSafeEffort(
+							provider,
+							reasoningEffort,
+							targetModel.id ?? targetModel.name
+						),
+					}
+				: {}),
 		};
 
 		const toPrimitive = (value: unknown) => {
