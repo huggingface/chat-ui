@@ -21,15 +21,15 @@
 	}
 
 	function setEffort(value: ReasoningEffort | undefined) {
-		settings.update((s) => {
-			const next = { ...(s.reasoningEffortOverrides ?? {}) };
-			if (value === undefined) {
-				delete next[modelId];
-			} else {
-				next[modelId] = value;
-			}
-			return { ...s, reasoningEffortOverrides: next };
-		});
+		const next = { ...($settings.reasoningEffortOverrides ?? {}) };
+		if (value === undefined) {
+			delete next[modelId];
+		} else {
+			next[modelId] = value;
+		}
+		// Persist immediately so the next message picks up the new effort,
+		// avoiding the 300ms debounce in `setSettings`.
+		settings.instantSet({ reasoningEffortOverrides: next });
 	}
 
 	const OPTIONS: { value: ReasoningEffort | undefined; label: string }[] = [
