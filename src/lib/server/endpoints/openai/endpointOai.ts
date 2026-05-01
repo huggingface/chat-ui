@@ -152,7 +152,9 @@ export async function endpointOai(
 				headers: {
 					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 					"X-use-cache": "false",
-					...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+					...(config.USE_USER_TOKEN === "true" && locals?.token
+						? { Authorization: `Bearer ${locals.token}` }
+						: {}),
 					// Bill to organization if configured
 					...(locals?.billingOrganization ? { "X-HF-Bill-To": locals.billingOrganization } : {}),
 				},
@@ -232,7 +234,9 @@ export async function endpointOai(
 						headers: {
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
-							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+							...(config.USE_USER_TOKEN === "true" && locals?.token
+								? { Authorization: `Bearer ${locals.token}` }
+								: {}),
 							// Bill to organization if configured
 							...(locals?.billingOrganization
 								? { "X-HF-Bill-To": locals.billingOrganization }
@@ -250,7 +254,9 @@ export async function endpointOai(
 						headers: {
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
-							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+							...(config.USE_USER_TOKEN === "true" && locals?.token
+								? { Authorization: `Bearer ${locals.token}` }
+								: {}),
 							// Bill to organization if configured
 							...(locals?.billingOrganization
 								? { "X-HF-Bill-To": locals.billingOrganization }

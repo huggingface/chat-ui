@@ -105,24 +105,8 @@
 	let model = $derived(page.data.models.find((el: BackendModel) => el.id === modelId));
 	let providerList: RouterProvider[] = $derived((model?.providers ?? []) as RouterProvider[]);
 
-	// Initialize multimodal override for this model if not set yet
-	$effect(() => {
-		if (model) {
-			// Default to the model's advertised capability
-			settings.initValue("multimodalOverrides", modelId, !!model.multimodal);
-		}
-	});
-
-	// Initialize tools override for this model if not set yet
-	$effect(() => {
-		if (model) {
-			settings.initValue(
-				"toolsOverrides",
-				modelId,
-				Boolean((model as unknown as { supportsTools?: boolean }).supportsTools)
-			);
-		}
-	});
+	// multimodalOverrides/toolsOverrides intentionally have no initValue: getters fall back
+	// to the model's advertised capability, so upstream capability changes flow through.
 
 	// Ensure hidePromptExamples has an entry for this model so the switch can bind safely
 	$effect(() => {
@@ -304,10 +288,18 @@
 							Tool calling (functions)
 						</div>
 						<p class="text-[12px] text-gray-500 dark:text-gray-400">
-							Enable tools and allow the model to call them in chat.
+							{#if publicConfig.isHuggingChat}
+								Determined by the inference provider for this model.
+							{:else}
+								Enable tools and allow the model to call them in chat.
+							{/if}
 						</p>
 					</div>
-					<Switch name="forceTools" bind:checked={getToolsOverride, setToolsOverride} />
+					<Switch
+						name="forceTools"
+						disabled={publicConfig.isHuggingChat}
+						bind:checked={getToolsOverride, setToolsOverride}
+					/>
 				</div>
 
 				<div class="flex items-start justify-between py-3">
@@ -316,11 +308,16 @@
 							Multimodal support (image inputs)
 						</div>
 						<p class="text-[12px] text-gray-500 dark:text-gray-400">
-							Enable image uploads and send images to this model.
+							{#if publicConfig.isHuggingChat}
+								Determined by the inference provider for this model.
+							{:else}
+								Enable image uploads and send images to this model.
+							{/if}
 						</p>
 					</div>
 					<Switch
 						name="forceMultimodal"
+						disabled={publicConfig.isHuggingChat}
 						bind:checked={getMultimodalOverride, setMultimodalOverride}
 					/>
 				</div>
