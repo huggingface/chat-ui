@@ -57,15 +57,15 @@ export const OIDConfig = z
 
 export const loginEnabled = !!OIDConfig.CLIENT_ID;
 
-const sameSite = z
-	.enum(["lax", "none", "strict"])
-	.default(dev || config.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none")
-	.parse(config.COOKIE_SAMESITE === "" ? undefined : config.COOKIE_SAMESITE);
-
-const secure = z
+export const secure = z
 	.boolean()
 	.default(!(dev || config.ALLOW_INSECURE_COOKIES === "true"))
 	.parse(config.COOKIE_SECURE === "" ? undefined : config.COOKIE_SECURE === "true");
+
+export const sameSite = z
+	.enum(["lax", "none", "strict"])
+	.default(!secure || dev || config.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none")
+	.parse(config.COOKIE_SAMESITE === "" ? undefined : config.COOKIE_SAMESITE);
 
 function sanitizeReturnPath(path: string | undefined | null): string | undefined {
 	if (!path) {
@@ -217,7 +217,7 @@ export function tokenSetToSessionOauth(tokenSet: TokenSet): Session["oauth"] {
 /**
  * Generates a CSRF token using the user sessionId. Note that we don't need a secret because sessionId is enough.
  */
-export async function generateCsrfToken(
+async function generateCsrfToken(
 	sessionId: string,
 	redirectUrl: string,
 	next?: string

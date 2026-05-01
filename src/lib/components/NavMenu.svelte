@@ -173,17 +173,27 @@
 >
 	{#if user?.username || user?.email}
 		<div
-			class="group flex h-9 items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 first:hover:bg-transparent dark:hover:bg-gray-700 first:dark:hover:bg-transparent"
+			class="group flex h-9 items-center gap-1.5 rounded-lg pl-2 pr-2 hover:bg-gray-100 first:hover:bg-transparent dark:hover:bg-gray-700 first:dark:hover:bg-transparent sm:h-[2.08rem]"
 		>
 			<img
 				src="https://huggingface.co/api/users/{user.username}/avatar?redirect=true"
 				class="size-3.5 rounded-full border bg-gray-500 dark:border-white/40"
 				alt=""
 			/>
-			<span
-				class="flex flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
-				>{user?.username || user?.email}</span
-			>
+			{#if publicConfig.isHuggingChat && user?.username}
+				<a
+					href="https://huggingface.co/{user.username}"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="flex flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 hover:underline dark:text-gray-400"
+					>{user.username}</a
+				>
+			{:else}
+				<span
+					class="flex flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
+					>{user?.username || user?.email}</span
+				>
+			{/if}
 
 			{#if publicConfig.isHuggingChat && $isPro === false}
 				<a
@@ -207,7 +217,7 @@
 	{/if}
 	<a
 		href="{base}/models"
-		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 sm:h-[2.08rem]"
 		onclick={handleNavItemClick}
 	>
 		Models
@@ -220,7 +230,7 @@
 	{#if user?.username || user?.email}
 		<button
 			onclick={() => (showMcpModal = true)}
-			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 sm:h-[2.08rem]"
 		>
 			MCP Servers
 			{#if $enabledServersCount > 0}
@@ -236,7 +246,7 @@
 	<span class="flex gap-1">
 		<a
 			href="{base}/settings/application"
-			class="flex h-9 flex-none flex-grow items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			class="flex h-9 flex-none flex-grow items-center gap-1.5 rounded-lg pl-2 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 			onclick={handleNavItemClick}
 		>
 			Settings

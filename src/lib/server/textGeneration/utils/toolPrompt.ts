@@ -1,21 +1,27 @@
 import type { OpenAiTool } from "$lib/server/mcp/tools";
 
-export function buildToolPreprompt(tools: OpenAiTool[]): string {
+export function buildToolPreprompt(tools: OpenAiTool[], timezone?: string): string {
 	if (!Array.isArray(tools) || tools.length === 0) return "";
 	const names = tools
 		.map((t) => (t?.function?.name ? String(t.function.name) : ""))
 		.filter((s) => s.length > 0);
 	if (names.length === 0) return "";
 	const now = new Date();
-	const currentDate = now.toLocaleDateString("en-US", {
+	const dateTimeOptions: Intl.DateTimeFormatOptions = {
 		year: "numeric",
 		month: "long",
 		day: "numeric",
-	});
+		weekday: "long",
+		hour: "2-digit",
+		minute: "2-digit",
+		...(timezone ? { timeZone: timezone } : {}),
+	};
+	const currentDateTime = now.toLocaleString("en-US", dateTimeOptions);
 	const isoDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+	const locationLine = timezone ? ` User's timezone: ${timezone}.` : "";
 	return [
 		`You have access to these tools: ${names.join(", ")}.`,
-		`Today's date: ${currentDate} (${isoDate}).`,
+		`Current date and time: ${currentDateTime} (${isoDate}).${locationLine}`,
 		`IMPORTANT: Do NOT call a tool unless the user's request requires capabilities you lack (e.g., real-time data, image generation, code execution) or external information you do not have. For tasks like writing code, creative writing, math, or building apps, respond directly without tools. When in doubt, do not use a tool.`,
 		`PARALLEL TOOL CALLS: When multiple tool calls are needed and they are independent of each other (i.e., one does not need the result of another), call them all at once in a single response instead of one at a time. Only chain tool calls sequentially when a later call depends on an earlier call's output.`,
 		`SEARCH: Use 3-6 precise keywords. For historical events, include the year the event occurred. For recent or current topics, use today's year (${now.getFullYear()}). When a tool accepts date-range parameters (e.g., startPublishedDate, endPublishedDate), always use today's date (${isoDate}) as the end date unless the user specifies otherwise. For multi-part questions, search each part separately.`,

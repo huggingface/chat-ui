@@ -1,18 +1,18 @@
 import type { EndpointMessage } from "../../endpoints/endpoints";
 
-export type FileRefPayload = {
+type FileRefPayload = {
 	name: string;
 	mime: string;
 	base64: string;
 };
 
-export type RefKind = {
+type RefKind = {
 	prefix: string;
 	matches: (mime: string) => boolean;
 	toDataUrl?: (payload: FileRefPayload) => string;
 };
 
-export type ResolvedFileRef = FileRefPayload & { refKind: RefKind };
+type ResolvedFileRef = FileRefPayload & { refKind: RefKind };
 export type FileRefResolver = (ref: string) => ResolvedFileRef | undefined;
 
 const IMAGE_REF_KIND: RefKind = {
@@ -30,7 +30,7 @@ const DEFAULT_REF_KINDS: RefKind[] = [IMAGE_REF_KIND];
  * Currently only images are exposed to end users, but the plumbing supports
  * additional kinds later.
  */
-export function buildFileRefResolver(
+function buildFileRefResolver(
 	messages: EndpointMessage[],
 	refKinds: RefKind[] = DEFAULT_REF_KINDS
 ): FileRefResolver | undefined {

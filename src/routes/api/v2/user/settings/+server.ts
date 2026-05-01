@@ -2,6 +2,7 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
+import { config } from "$lib/server/config";
 import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { defaultModel, models, validateModel } from "$lib/server/models";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
@@ -15,6 +16,7 @@ const settingsSchema = z.object({
 	welcomeModalSeen: z.boolean().optional(),
 	activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 	customPrompts: z.record(z.string()).default({}),
+	customPromptsEnabled: z.record(z.boolean()).default({}),
 	multimodalOverrides: z.record(z.boolean()).default({}),
 	toolsOverrides: z.record(z.boolean()).default({}),
 	providerOverrides: z.record(z.string()).default({}),
@@ -63,8 +65,11 @@ export const GET: RequestHandler = async ({ locals }) => {
 			DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 
 		customPrompts: settings?.customPrompts ?? {},
-		multimodalOverrides: settings?.multimodalOverrides ?? {},
-		toolsOverrides: settings?.toolsOverrides ?? {},
+		customPromptsEnabled: settings?.customPromptsEnabled ?? {},
+		// On HuggingChat, tool/multimodal capability comes from the upstream router,
+		// so we hide any per-user overrides (existing or new) instead of letting them apply.
+		multimodalOverrides: config.isHuggingChat ? {} : (settings?.multimodalOverrides ?? {}),
+		toolsOverrides: config.isHuggingChat ? {} : (settings?.toolsOverrides ?? {}),
 		providerOverrides: settings?.providerOverrides ?? {},
 		billingOrganization: settings?.billingOrganization ?? undefined,
 	});
@@ -76,6 +81,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	const { welcomeModalSeen, ...parsedSettings } = settingsSchema.parse(body);
 	const streamingMode = resolveStreamingMode(parsedSettings);
+
+	if (config.isHuggingChat) {
+		parsedSettings.multimodalOverrides = {};
+		parsedSettings.toolsOverrides = {};
+	}
 
 	const settings = {
 		...parsedSettings,

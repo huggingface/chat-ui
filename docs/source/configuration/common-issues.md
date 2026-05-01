@@ -6,12 +6,13 @@ This usually happens when running Chat UI over HTTP without proper cookie config
 
 **Recommended:** Set up a reverse proxy (NGINX, Caddy) to handle HTTPS.
 
-**Alternative:** If you must run over HTTP, configure cookies:
+**Alternative:** If you must run over HTTP, set the following env var:
 
 ```ini
 COOKIE_SECURE=false
-COOKIE_SAMESITE=lax
 ```
+
+This automatically sets `COOKIE_SAMESITE` to `lax`, which is the correct value for HTTP deployments.
 
 Also ensure `PUBLIC_ORIGIN` matches your actual URL:
 

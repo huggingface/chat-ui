@@ -55,7 +55,7 @@
 	<!-- Collapsed view (clickable to expand) -->
 	<button
 		type="button"
-		class="group/text w-full cursor-pointer text-left"
+		class="group/text {isOpen ? '' : 'line-clamp-2'} w-full cursor-pointer text-left"
 		onclick={() => (isOpen = !isOpen)}
 	>
 		{#if isOpen}
