@@ -79,7 +79,14 @@ envVars:
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
   MODELS: >
     [
+      { "id": "inclusionAI/Ling-2.6-1T", "description": "1T MoE with 50B active params, hybrid MLA-Linear attention, and fast thinking." },
       { "id": "deepseek-ai/DeepSeek-V4-Pro", "description": "Frontier 1.6T MoE with 49B active params, hybrid attention, and 1M context." },
+      { "id": "deepseek-ai/DeepSeek-V4-Flash", "description": "Compact 284B MoE with 13B active params, hybrid attention, and 1M context." },
+      { "id": "deepseek-ai/DeepSeek-V3.2", "description": "Stable 671B MoE with sparse attention for agentic reasoning and long contexts." },
+      { "id": "stepfun-ai/Step-3.5-Flash", "description": "Sparse 197B MoE agent with multi-token prediction and 256K context." },
+      { "id": "Qwen/Qwen3.6-35B-A3B", "description": "Hybrid 35B MoE with 3B active params, DeltaNet attention, and 1M context." },
+      { "id": "zai-org/GLM-4.7-Flash", "description": "Compact 30B MoE for agentic coding with 128K context and tool use." },
+      { "id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B", "description": "Mid-sized distilled Qwen with R1 reasoning for math and logic." },
       { "id": "moonshotai/Kimi-K2.6", "description": "Native multimodal 1T MoE for long-horizon coding and 300-sub-agent swarms." },
       { "id": "MiniMaxAI/MiniMax-M2.7", "description": "Self-evolving 230B MoE agent for frontier coding, reasoning, and tool use." },
       { "id": "zai-org/GLM-5.1", "description": "Upgraded 754B MoE for agentic coding, extended reasoning, and tool use.", "parameters": { "max_tokens": 49152 } },
