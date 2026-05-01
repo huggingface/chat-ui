@@ -34,6 +34,7 @@ interface SettingsResponse {
 	toolsOverrides: Record<string, boolean>;
 	hidePromptExamples: Record<string, boolean>;
 	providerOverrides: Record<string, string>;
+	reasoningEffortOverrides: Record<string, "low" | "medium" | "high">;
 	billingOrganization?: string;
 }
 

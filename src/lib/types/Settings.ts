@@ -3,6 +3,7 @@ import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 
 export type StreamingMode = "raw" | "smooth";
+export type ReasoningEffort = "low" | "medium" | "high";
 
 export interface Settings extends Timestamps {
 	userId?: User["_id"];
@@ -49,6 +50,12 @@ export interface Settings extends Timestamps {
 	providerOverrides?: Record<string, string>;
 
 	/**
+	 * Per-model thinking effort. Sent as `reasoning_effort` to the OpenAI-compatible
+	 * endpoint when set; omitted (provider default) when missing.
+	 */
+	reasoningEffortOverrides?: Record<string, ReasoningEffort>;
+
+	/**
 	 * Preferred assistant output behavior in the chat UI.
 	 * - "raw": show provider-native stream chunks
 	 * - "smooth": show smoothed stream chunks
@@ -80,6 +87,7 @@ export const DEFAULT_SETTINGS = {
 	toolsOverrides: {},
 	hidePromptExamples: {},
 	providerOverrides: {},
+	reasoningEffortOverrides: {},
 	streamingMode: "smooth",
 	directPaste: false,
 	hapticsEnabled: true,

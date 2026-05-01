@@ -58,6 +58,8 @@ const modelConfig = z.object({
 	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
 	// Aggregated tool-calling capability across providers (HF router)
 	supportsTools: z.boolean().default(false),
+	// Reasoning-capable model (accepts `reasoning_effort` parameter)
+	supportsReasoning: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */
@@ -237,6 +239,8 @@ const signatureForModel = (model: ProcessedModel) =>
 		multimodal: model.multimodal,
 		multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
 		supportsTools: (model as unknown as { supportsTools?: boolean }).supportsTools ?? false,
+		supportsReasoning:
+			(model as unknown as { supportsReasoning?: boolean }).supportsReasoning ?? false,
 		isRouter: model.isRouter,
 		hasInferenceAPI: model.hasInferenceAPI,
 	});
