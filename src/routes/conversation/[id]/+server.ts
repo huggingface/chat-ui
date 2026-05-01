@@ -572,10 +572,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					// On HuggingChat capability comes from the upstream router, so any stored
 					// per-user overrides are ignored — existing entries don't keep applying.
 					forceMultimodal:
-						!config.isHuggingChat &&
-						Boolean(userSettings?.multimodalOverrides?.[model.id]),
-					forceTools:
-						!config.isHuggingChat && Boolean(userSettings?.toolsOverrides?.[model.id]),
+						!config.isHuggingChat && Boolean(userSettings?.multimodalOverrides?.[model.id]),
+					forceTools: !config.isHuggingChat && Boolean(userSettings?.toolsOverrides?.[model.id]),
 					// Inference provider preference (HuggingChat only, skip for router models)
 					provider:
 						config.isHuggingChat && !model.isRouter

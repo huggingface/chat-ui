@@ -36,7 +36,7 @@ Add descriptions for new models available in the HuggingFace router to chat-ui's
    - **Whether it's a reasoning model** (see step 5)
 
 5. **Decide if the model is reasoning-capable**
-   A model is "reasoning-capable" for chat-ui purposes if it accepts the OpenAI-style `reasoning_effort: low|medium|high` parameter via the HF router and *meaningfully changes its chain-of-thought depth* in response. Whether that holds depends on **both the model and the providers serving it** — the router is a transparent proxy, so behavior comes from each provider's implementation. Don't decide from the name alone.
+   A model is "reasoning-capable" for chat-ui purposes if it accepts the OpenAI-style `reasoning_effort: low|medium|high` parameter via the HF router and _meaningfully changes its chain-of-thought depth_ in response. Whether that holds depends on **both the model and the providers serving it** — the router is a transparent proxy, so behavior comes from each provider's implementation. Don't decide from the name alone.
 
    **Heuristic shortlist (candidates worth verifying):**
 
@@ -46,7 +46,7 @@ Add descriptions for new models available in the HuggingFace router to chat-ui's
 
    **Skip without further checking:**
 
-   - Generic "good at reasoning" marketing copy — every modern LLM claims this. Only flag when reasoning is the *mode of operation*.
+   - Generic "good at reasoning" marketing copy — every modern LLM claims this. Only flag when reasoning is the _mode of operation_.
    - Non-thinking siblings (`Qwen3-235B-A22B-Instruct-2507` ≠ `Qwen3-235B-A22B-Thinking-2507`).
    - Translation / vision-only / guard / coder-only models with no documented thinking mode.
 
