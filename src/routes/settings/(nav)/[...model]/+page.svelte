@@ -105,24 +105,8 @@
 	let model = $derived(page.data.models.find((el: BackendModel) => el.id === modelId));
 	let providerList: RouterProvider[] = $derived((model?.providers ?? []) as RouterProvider[]);
 
-	// Initialize multimodal override for this model if not set yet
-	$effect(() => {
-		if (model) {
-			// Default to the model's advertised capability
-			settings.initValue("multimodalOverrides", modelId, !!model.multimodal);
-		}
-	});
-
-	// Initialize tools override for this model if not set yet
-	$effect(() => {
-		if (model) {
-			settings.initValue(
-				"toolsOverrides",
-				modelId,
-				Boolean((model as unknown as { supportsTools?: boolean }).supportsTools)
-			);
-		}
-	});
+	// multimodalOverrides/toolsOverrides intentionally have no initValue: getters fall back
+	// to the model's advertised capability, so upstream capability changes flow through.
 
 	// Ensure hidePromptExamples has an entry for this model so the switch can bind safely
 	$effect(() => {
