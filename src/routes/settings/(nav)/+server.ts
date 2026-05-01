@@ -1,6 +1,7 @@
 import { collections } from "$lib/server/database";
 import { z } from "zod";
 import { authCondition } from "$lib/server/auth";
+import { config } from "$lib/server/config";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
 import { resolveStreamingMode } from "$lib/utils/messageUpdates";
 
@@ -27,6 +28,12 @@ export async function POST({ request, locals }) {
 
 	const { welcomeModalSeen, ...parsedSettings } = settingsSchema.parse(body);
 	const streamingMode = resolveStreamingMode(parsedSettings);
+
+	if (config.isHuggingChat) {
+		parsedSettings.multimodalOverrides = {};
+		parsedSettings.toolsOverrides = {};
+	}
+
 	const settings = {
 		...parsedSettings,
 		streamingMode,
