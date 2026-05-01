@@ -288,10 +288,18 @@
 							Tool calling (functions)
 						</div>
 						<p class="text-[12px] text-gray-500 dark:text-gray-400">
-							Enable tools and allow the model to call them in chat.
+							{#if publicConfig.isHuggingChat}
+								Determined by the inference provider for this model.
+							{:else}
+								Enable tools and allow the model to call them in chat.
+							{/if}
 						</p>
 					</div>
-					<Switch name="forceTools" bind:checked={getToolsOverride, setToolsOverride} />
+					<Switch
+						name="forceTools"
+						disabled={publicConfig.isHuggingChat}
+						bind:checked={getToolsOverride, setToolsOverride}
+					/>
 				</div>
 
 				<div class="flex items-start justify-between py-3">
@@ -300,11 +308,16 @@
 							Multimodal support (image inputs)
 						</div>
 						<p class="text-[12px] text-gray-500 dark:text-gray-400">
-							Enable image uploads and send images to this model.
+							{#if publicConfig.isHuggingChat}
+								Determined by the inference provider for this model.
+							{:else}
+								Enable image uploads and send images to this model.
+							{/if}
 						</p>
 					</div>
 					<Switch
 						name="forceMultimodal"
+						disabled={publicConfig.isHuggingChat}
 						bind:checked={getMultimodalOverride, setMultimodalOverride}
 					/>
 				</div>

@@ -568,10 +568,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					promptedAt,
 					ip: getClientAddress(),
 					username: locals.user?.username,
-					// Force-enable multimodal if user settings say so for this model
-					forceMultimodal: Boolean(userSettings?.multimodalOverrides?.[model.id]),
-					// Force-enable tools if user settings say so for this model
-					forceTools: Boolean(userSettings?.toolsOverrides?.[model.id]),
+					// Force-enable multimodal/tools if user settings say so for this model.
+					// On HuggingChat capability comes from the upstream router, so any stored
+					// per-user overrides are ignored — existing entries don't keep applying.
+					forceMultimodal:
+						!config.isHuggingChat &&
+						Boolean(userSettings?.multimodalOverrides?.[model.id]),
+					forceTools:
+						!config.isHuggingChat && Boolean(userSettings?.toolsOverrides?.[model.id]),
 					// Inference provider preference (HuggingChat only, skip for router models)
 					provider:
 						config.isHuggingChat && !model.isRouter
