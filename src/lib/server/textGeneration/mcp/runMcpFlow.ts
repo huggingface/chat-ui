@@ -344,7 +344,8 @@ export async function* runMcpFlow({
 		let messagesOpenAI: ChatCompletionMessageParam[] = await prepareMessagesWithFiles(
 			messages,
 			imageProcessor,
-			mmEnabled
+			mmEnabled,
+			targetModel.acceptedFileMimetypes
 		);
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
 		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone);

@@ -176,7 +176,12 @@ export async function endpointOai(
 		}) => {
 			// Format messages for the chat API, handling multimodal content if supported
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-				await prepareMessagesWithFiles(messages, imageProcessor, isMultimodal ?? model.multimodal);
+				await prepareMessagesWithFiles(
+					messages,
+					imageProcessor,
+					isMultimodal ?? model.multimodal,
+					model.acceptedFileMimetypes
+				);
 
 			// Normalize preprompt and handle empty values
 			const normalizedPreprompt = typeof preprompt === "string" ? preprompt.trim() : "";
