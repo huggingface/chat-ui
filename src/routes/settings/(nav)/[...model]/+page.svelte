@@ -132,7 +132,7 @@
 </script>
 
 <div class="flex flex-col items-start">
-	<div class="mb-4 flex flex-col gap-0.5">
+	<div class="mb-4 flex flex-col gap-px">
 		<h2 class="text-base font-semibold md:text-lg">
 			{model.displayName}
 		</h2>
