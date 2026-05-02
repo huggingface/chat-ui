@@ -23,6 +23,8 @@ export interface EndpointParameters {
 	abortSignal?: AbortSignal;
 	/** Inference provider preference: "auto", "fastest", "cheapest", or a specific provider name */
 	provider?: string;
+	/** Optional thinking-effort, forwarded as OpenAI `reasoning_effort` when set */
+	reasoningEffort?: "low" | "medium" | "high";
 }
 
 export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & {

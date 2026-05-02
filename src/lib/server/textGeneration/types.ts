@@ -19,6 +19,8 @@ export interface TextGenerationContext {
 	forceTools?: boolean;
 	/** Inference provider preference: "auto", "fastest", "cheapest", or a specific provider name */
 	provider?: string;
+	/** Optional thinking-effort override forwarded as `reasoning_effort` to OpenAI-compatible endpoints */
+	reasoningEffort?: "low" | "medium" | "high";
 	locals: App.Locals | undefined;
 	abortController: AbortController;
 }
