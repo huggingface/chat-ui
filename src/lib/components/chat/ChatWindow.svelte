@@ -731,6 +731,7 @@
 								disabled={isReadOnly || lastIsError}
 								{modelIsMultimodal}
 								{modelSupportsTools}
+								{currentModel}
 								bind:focused
 							/>
 						{/if}
