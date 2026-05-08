@@ -110,7 +110,7 @@
 				aria-label={isOpen ? "Collapse" : "Expand"}
 			>
 				<span
-					class="text-smd font-medium transition-colors {toolError
+					class="text-sm font-medium transition-colors {toolError
 						? `group-hover/header:text-red-700 dark:group-hover/header:text-red-300 ${
 								isOpen
 									? 'text-red-700 dark:text-red-300'
@@ -124,12 +124,12 @@
 					class:router-shimmer={isExecuting}
 				>
 					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
-					<code
-						class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500 opacity-90 dark:bg-gray-800 dark:text-gray-400"
-					>
-						{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
-					</code>
 				</span>
+				<code
+					class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500 opacity-90 dark:bg-gray-800 dark:text-gray-400"
+				>
+					{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
+				</code>
 				<CarbonChevronRight
 					class="size-3.5 transition-all duration-200 group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
 						? 'rotate-90 text-gray-600 dark:text-gray-300'

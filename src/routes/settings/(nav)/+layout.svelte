@@ -191,7 +191,7 @@
 						{#if providerOverride === "fastest"}
 							<span
 								title="Provider: {providerOverride}"
-								class="grid size-[21px] flex-none place-items-center rounded-md bg-green-500/10 text-green-600 dark:text-green-500"
+								class="grid size-[21px] flex-none place-items-center rounded-md bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 								aria-label="Provider: {providerOverride}"
 								role="img"
 							>
@@ -200,7 +200,7 @@
 						{:else if providerOverride === "cheapest"}
 							<span
 								title="Provider: {providerOverride}"
-								class="grid size-[21px] flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
+								class="grid size-[21px] flex-none place-items-center rounded-md bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 								aria-label="Provider: {providerOverride}"
 								role="img"
 							>
@@ -223,7 +223,7 @@
 					{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
 						<span
 							title="Tool calling supported"
-							class="grid size-[21px] flex-none place-items-center rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-500"
+							class="grid size-[21px] flex-none place-items-center rounded-md bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 							aria-label="Model supports tools"
 							role="img"
 						>
@@ -234,7 +234,7 @@
 					{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
 						<span
 							title="Multimodal support (image inputs)"
-							class="grid size-[21px] flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
+							class="grid size-[21px] flex-none place-items-center rounded-md bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 							aria-label="Model is multimodal"
 							role="img"
 						>

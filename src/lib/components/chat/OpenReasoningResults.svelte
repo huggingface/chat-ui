@@ -42,7 +42,7 @@
 		aria-label={isOpen ? "Collapse" : "Expand"}
 	>
 		<span
-			class="text-smd font-medium transition-colors group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
+			class="text-sm font-medium transition-colors group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
 				? 'text-gray-600 dark:text-gray-300'
 				: 'text-gray-500 dark:text-gray-400'}"
 			class:router-shimmer={loading}
