@@ -97,7 +97,6 @@
 			images: getImageBlocks(output),
 			metadata: getMetadataEntries(output),
 		}));
-
 </script>
 
 {#if toolFnName}
