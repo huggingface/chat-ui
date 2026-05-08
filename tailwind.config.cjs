@@ -59,6 +59,8 @@ module.exports = {
 						"--tw-prose-invert-pre-code": theme("colors.gray[300]"),
 						"--tw-prose-invert-th-borders": theme("colors.gray[600]"),
 						"--tw-prose-invert-td-borders": theme("colors.gray[700]"),
+						h2: { marginTop: "1em" },
+						h3: { marginTop: "0.8em" },
 					},
 				},
 			}),
