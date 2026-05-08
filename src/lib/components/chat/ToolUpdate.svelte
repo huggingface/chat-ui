@@ -110,19 +110,18 @@
 				aria-label={isOpen ? "Collapse" : "Expand"}
 			>
 				<span
-					class="text-smd font-medium transition-colors {isExecuting
-						? 'text-purple-700 dark:text-purple-300'
-						: toolError
-							? `group-hover/header:text-red-700 dark:group-hover/header:text-red-300 ${
-									isOpen
-										? 'text-red-700 dark:text-red-300'
-										: 'text-red-600 dark:text-red-400'
-								}`
-							: `group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 ${
-									isOpen
-										? 'text-gray-600 dark:text-gray-300'
-										: 'text-gray-400 dark:text-gray-500'
-								}`}"
+					class="text-smd font-medium transition-colors {toolError
+						? `group-hover/header:text-red-700 dark:group-hover/header:text-red-300 ${
+								isOpen
+									? 'text-red-700 dark:text-red-300'
+									: 'text-red-600 dark:text-red-400'
+							}`
+						: `group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 ${
+								isOpen
+									? 'text-gray-600 dark:text-gray-300'
+									: 'text-gray-500 dark:text-gray-400'
+							}`}"
+					class:router-shimmer={isExecuting}
 				>
 					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
 					<code
@@ -149,29 +148,29 @@
 					{#if update.subtype === MessageToolUpdateType.Call}
 						<div class="space-y-1">
 							<div
-								class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"
+								class="text-[10px] font-semibold uppercase text-gray-400 dark:text-gray-500"
 							>
 								Input
 							</div>
 							<pre
-								class="whitespace-pre-wrap break-all rounded-md bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{formatValue(
+								class="whitespace-pre-wrap break-all rounded-lg bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{formatValue(
 									update.call.parameters
 								)}</pre>
 						</div>
 					{:else if update.subtype === MessageToolUpdateType.Error}
 						<div class="space-y-1">
 							<div
-								class="text-[10px] font-semibold uppercase tracking-wider text-red-500 dark:text-red-400"
+								class="text-[10px] font-semibold uppercase text-red-500 dark:text-red-400"
 							>
 								Error
 							</div>
 							<pre
-								class="whitespace-pre-wrap break-all rounded-md bg-red-50 p-2 font-mono text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">{update.message}</pre>
+								class="whitespace-pre-wrap break-all rounded-lg bg-red-50 p-2 font-mono text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">{update.message}</pre>
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Success && update.result.display}
 						<div class="space-y-1">
 							<div
-								class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"
+								class="text-[10px] font-semibold uppercase text-gray-400 dark:text-gray-500"
 							>
 								Output
 							</div>
@@ -179,7 +178,7 @@
 								<div class="space-y-2">
 									{#if parsedOutput.text}
 										<pre
-											class="scrollbar-custom max-h-60 overflow-y-auto whitespace-pre-wrap break-all rounded-md bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{parsedOutput.text}</pre>
+											class="scrollbar-custom max-h-60 overflow-y-auto whitespace-pre-wrap break-all rounded-lg bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{parsedOutput.text}</pre>
 									{/if}
 
 									{#if parsedOutput.images.length > 0}
@@ -196,7 +195,7 @@
 
 									{#if parsedOutput.metadata.length > 0}
 										<pre
-											class="whitespace-pre-wrap break-all rounded-md bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{formatValue(
+											class="whitespace-pre-wrap break-all rounded-lg bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{formatValue(
 												Object.fromEntries(parsedOutput.metadata)
 											)}</pre>
 									{/if}
@@ -206,12 +205,12 @@
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
 						<div class="space-y-1">
 							<div
-								class="text-[10px] font-semibold uppercase tracking-wider text-red-500 dark:text-red-400"
+								class="text-[10px] font-semibold uppercase text-red-500 dark:text-red-400"
 							>
 								Error
 							</div>
 							<pre
-								class="whitespace-pre-wrap break-all rounded-md bg-red-50 p-2 font-mono text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">{update.result
+								class="whitespace-pre-wrap break-all rounded-lg bg-red-50 p-2 font-mono text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">{update.result
 									.message}</pre>
 						</div>
 					{/if}

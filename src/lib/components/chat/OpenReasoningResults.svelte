@@ -44,10 +44,10 @@
 		<span
 			class="text-smd font-medium transition-colors group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
 				? 'text-gray-600 dark:text-gray-300'
-				: 'text-gray-400 dark:text-gray-500'}"
-			class:animate-pulse={loading}
+				: 'text-gray-500 dark:text-gray-400'}"
+			class:router-shimmer={loading}
 		>
-			{loading ? "Thinking..." : "Thinking"}
+			Thinking
 		</span>
 		<CarbonChevronRight
 			class="size-3.5 transition-all duration-200 group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
