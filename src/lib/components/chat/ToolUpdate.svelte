@@ -122,7 +122,7 @@
 					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
 				</span>
 				<code
-					class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500 opacity-90 dark:bg-gray-800 dark:text-gray-400"
+					class="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-xs text-blue-700 opacity-90 dark:bg-blue-900/30 dark:text-blue-300"
 				>
 					{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
 				</code>
