@@ -106,9 +106,7 @@
 						href="{base}/models/{model.id}"
 						aria-label="Model card for {model.displayName}"
 						class="group flex cursor-pointer items-center gap-2 rounded-xl p-3 sm:gap-4 sm:p-4
-							{isActive
-							? 'bg-gray-50 dark:bg-gray-800'
-							: 'hover:bg-gray-50 dark:hover:bg-gray-800'}"
+							{isActive ? 'bg-gray-50 dark:bg-gray-800' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}"
 					>
 						<!-- Avatar -->
 						<div class="flex-shrink-0">

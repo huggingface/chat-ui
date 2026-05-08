@@ -112,14 +112,10 @@
 				<span
 					class="text-sm font-medium transition-colors {toolError
 						? `group-hover/header:text-red-700 dark:group-hover/header:text-red-300 ${
-								isOpen
-									? 'text-red-700 dark:text-red-300'
-									: 'text-red-600 dark:text-red-400'
+								isOpen ? 'text-red-700 dark:text-red-300' : 'text-red-600 dark:text-red-400'
 							}`
 						: `group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 ${
-								isOpen
-									? 'text-gray-600 dark:text-gray-300'
-									: 'text-gray-500 dark:text-gray-400'
+								isOpen ? 'text-gray-600 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400'
 							}`}"
 					class:router-shimmer={isExecuting}
 				>
@@ -147,9 +143,7 @@
 				{#each tool as update, i (`${update.subtype}-${i}`)}
 					{#if update.subtype === MessageToolUpdateType.Call}
 						<div class="space-y-1">
-							<div
-								class="text-[10px] font-semibold uppercase text-gray-400 dark:text-gray-500"
-							>
+							<div class="text-[10px] font-semibold uppercase text-gray-400 dark:text-gray-500">
 								Input
 							</div>
 							<pre
@@ -159,9 +153,7 @@
 						</div>
 					{:else if update.subtype === MessageToolUpdateType.Error}
 						<div class="space-y-1">
-							<div
-								class="text-[10px] font-semibold uppercase text-red-500 dark:text-red-400"
-							>
+							<div class="text-[10px] font-semibold uppercase text-red-500 dark:text-red-400">
 								Error
 							</div>
 							<pre
@@ -169,9 +161,7 @@
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Success && update.result.display}
 						<div class="space-y-1">
-							<div
-								class="text-[10px] font-semibold uppercase text-gray-400 dark:text-gray-500"
-							>
+							<div class="text-[10px] font-semibold uppercase text-gray-400 dark:text-gray-500">
 								Output
 							</div>
 							{#each parseToolOutputs(update.result.outputs) as parsedOutput}
@@ -204,14 +194,12 @@
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
 						<div class="space-y-1">
-							<div
-								class="text-[10px] font-semibold uppercase text-red-500 dark:text-red-400"
-							>
+							<div class="text-[10px] font-semibold uppercase text-red-500 dark:text-red-400">
 								Error
 							</div>
 							<pre
-								class="whitespace-pre-wrap break-all rounded-lg bg-red-50 p-2 font-mono text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">{update.result
-									.message}</pre>
+								class="whitespace-pre-wrap break-all rounded-lg bg-red-50 p-2 font-mono text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">{update
+									.result.message}</pre>
 						</div>
 					{/if}
 				{/each}
