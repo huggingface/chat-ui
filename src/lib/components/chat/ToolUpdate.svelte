@@ -111,7 +111,7 @@
 				aria-label={isOpen ? "Collapse" : "Expand"}
 			>
 				<span
-					class="text-sm font-medium transition-colors {isExecuting
+					class="text-smd font-medium transition-colors {isExecuting
 						? 'text-purple-700 dark:text-purple-300'
 						: toolError
 							? `group-hover/header:text-red-700 dark:group-hover/header:text-red-300 ${
@@ -119,10 +119,10 @@
 										? 'text-red-700 dark:text-red-300'
 										: 'text-red-600 dark:text-red-400'
 								}`
-							: `group-hover/header:text-gray-700 dark:group-hover/header:text-gray-200 ${
+							: `group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 ${
 									isOpen
-										? 'text-gray-700 dark:text-gray-200'
-										: 'text-gray-500 dark:text-gray-400'
+										? 'text-gray-600 dark:text-gray-300'
+										: 'text-gray-400 dark:text-gray-500'
 								}`}"
 				>
 					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool

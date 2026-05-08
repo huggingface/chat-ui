@@ -279,7 +279,7 @@
 					{#if block.type === "tool"}
 						<div
 							data-exclude-from-copy
-							class="[.prose+&]:mt-4 [&:not(:last-child)]:mb-2"
+							class="[.prose+&]:mt-4 [&:not(:last-child)]:mb-1.5 has-[+.prose]:!mb-3"
 						>
 							<ToolUpdate tool={block.updates} {loading} />
 						</div>

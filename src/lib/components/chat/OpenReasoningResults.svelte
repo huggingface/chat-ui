@@ -42,9 +42,9 @@
 		aria-label={isOpen ? "Collapse" : "Expand"}
 	>
 		<span
-			class="text-sm font-medium transition-colors group-hover/header:text-gray-700 dark:group-hover/header:text-gray-200 {isOpen
-				? 'text-gray-700 dark:text-gray-200'
-				: 'text-gray-500 dark:text-gray-400'}"
+			class="text-smd font-medium transition-colors group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
+				? 'text-gray-600 dark:text-gray-300'
+				: 'text-gray-400 dark:text-gray-500'}"
 			class:animate-pulse={loading}
 		>
 			{loading ? "Thinking..." : "Thinking"}
