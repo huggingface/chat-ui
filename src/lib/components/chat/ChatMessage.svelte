@@ -474,7 +474,7 @@
 					</form>
 				{/if}
 			</div>
-			<div class="absolute -bottom-4 ml-3.5 flex w-full gap-1.5">
+			<div class="absolute -bottom-4 ml-3.5 flex w-full items-center gap-1.5">
 				{#if alternatives.length > 1 && editMsdgId === null}
 					<Alternatives
 						{message}
