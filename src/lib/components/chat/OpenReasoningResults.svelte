@@ -58,10 +58,32 @@
 
 	<!-- Expandable content -->
 	{#if isOpen}
-		<div
-			class="prose prose-sm mt-2 max-w-none text-sm leading-relaxed text-gray-500 dark:prose-invert dark:text-gray-400"
-		>
-			<MarkdownRenderer {content} {loading} />
-		</div>
+		{#if loading}
+			<!--
+				Streaming view: fixed-height viewport, content bottom-aligned so newly
+				arriving tokens stay visible while older lines scroll off the top behind
+				a gradient fade. Works for any model output format (no parsing).
+			-->
+			<div class="thinking-viewport mt-2 flex max-h-16 flex-col justify-end overflow-hidden">
+				<div
+					class="prose prose-sm max-w-none text-sm leading-relaxed text-gray-500 dark:prose-invert dark:text-gray-400 [&>:first-child]:mt-0 [&>:last-child]:mb-0"
+				>
+					<MarkdownRenderer {content} {loading} />
+				</div>
+			</div>
+		{:else}
+			<div
+				class="prose prose-sm mt-2 max-w-none text-sm leading-relaxed text-gray-500 dark:prose-invert dark:text-gray-400"
+			>
+				<MarkdownRenderer {content} {loading} />
+			</div>
+		{/if}
 	{/if}
 </BlockWrapper>
+
+<style>
+	.thinking-viewport {
+		-webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 50%);
+		mask-image: linear-gradient(to bottom, transparent 0%, black 50%);
+	}
+</style>
