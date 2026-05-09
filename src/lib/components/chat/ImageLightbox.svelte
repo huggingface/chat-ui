@@ -15,7 +15,7 @@
 	const MAX_SCALE = 5;
 	const TAP_SLOP = 6;
 	const DOUBLE_TAP_MS = 300;
-	const DOUBLE_TAP_DIST = 30;
+	const DOUBLE_TAP_DIST = 25;
 	const DOUBLE_TAP_TARGET_SCALE = 2.5;
 	const RUBBER_BAND = 0.35;
 	const RUBBER_BAND_SCALE = 0.5;
@@ -64,9 +64,14 @@
 	}
 
 	function captureBaseSize() {
-		if (!imgEl || scale === 0) return;
+		if (!imgEl) return;
+		// Measure the image's natural laid-out size by temporarily clearing the transform.
+		// Avoids `rect.width / scale` drift after orientation/resize while zoomed.
+		const savedTransform = imgEl.style.transform;
+		imgEl.style.transform = "none";
 		const rect = imgEl.getBoundingClientRect();
-		baseSize = { w: rect.width / scale, h: rect.height / scale };
+		baseSize = { w: rect.width, h: rect.height };
+		imgEl.style.transform = savedTransform;
 	}
 
 	function getBounds() {
@@ -116,6 +121,14 @@
 	}
 
 	function handlePointerDown(e: PointerEvent) {
+		// Cap at 2 active pointers — ignore extras (PhotoSwipe behavior).
+		if (pointers.size >= 2 && !pointers.has(e.pointerId)) return;
+
+		// Suppress native gestures on touch, except on the close button so its click still fires.
+		if (e.pointerType !== "mouse" && (e.target === imgEl || e.target === overlayEl)) {
+			e.preventDefault();
+		}
+
 		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
 		if (pointers.size === 1) {
@@ -236,14 +249,25 @@
 	}
 
 	function handleWheel(e: WheelEvent) {
+		// Normalize Firefox LINE-mode and the rare PAGE-mode to pixels.
+		let dx = e.deltaX;
+		let dy = e.deltaY;
+		if (e.deltaMode === 1) {
+			dx *= 15;
+			dy *= 15;
+		} else if (e.deltaMode === 2) {
+			dx *= 100;
+			dy *= 100;
+		}
+
 		if (e.ctrlKey) {
 			e.preventDefault();
-			const factor = Math.exp(-e.deltaY * 0.01);
+			const factor = Math.exp(-dy * 0.01);
 			zoomAround({ x: e.clientX, y: e.clientY }, scale * factor);
 		} else if (scale > MIN_SCALE) {
 			e.preventDefault();
-			tx -= e.deltaX;
-			ty -= e.deltaY;
+			tx -= dx;
+			ty -= dy;
 			settleTransform();
 		}
 	}
@@ -265,16 +289,43 @@
 		}
 	}
 
+	function preventDefault(e: Event) {
+		e.preventDefault();
+	}
+
 	onMount(() => {
-		const originalOverflow = document.body.style.overflow;
+		const originalBodyOverflow = document.body.style.overflow;
+		const originalHtmlOverflow = document.documentElement.style.overflow;
 		document.body.style.overflow = "hidden";
+		// iOS Safari needs html-level lock too — body-only leaves the rubber-band bounce
+		// on the page underneath the overlay.
+		document.documentElement.style.overflow = "hidden";
 
 		overlayEl?.addEventListener("wheel", handleWheel, { passive: false });
+
+		// iOS Safari fires proprietary gesture* events that can still trigger native
+		// page-zoom on a fullscreen overlay even with `touch-action: none`. Block them.
+		overlayEl?.addEventListener("gesturestart", preventDefault);
+		overlayEl?.addEventListener("gesturechange", preventDefault);
+		overlayEl?.addEventListener("gestureend", preventDefault);
+
+		// Bind move/up to window so mouse drags that exit the viewport keep tracking
+		// (matches PhotoSwipe / pinch-zoom-element).
+		window.addEventListener("pointermove", handlePointerMove, { passive: false });
+		window.addEventListener("pointerup", handlePointerEnd);
+		window.addEventListener("pointercancel", handlePointerEnd);
 		window.addEventListener("resize", handleResize);
 
 		return () => {
-			document.body.style.overflow = originalOverflow;
+			document.body.style.overflow = originalBodyOverflow;
+			document.documentElement.style.overflow = originalHtmlOverflow;
 			overlayEl?.removeEventListener("wheel", handleWheel);
+			overlayEl?.removeEventListener("gesturestart", preventDefault);
+			overlayEl?.removeEventListener("gesturechange", preventDefault);
+			overlayEl?.removeEventListener("gestureend", preventDefault);
+			window.removeEventListener("pointermove", handlePointerMove);
+			window.removeEventListener("pointerup", handlePointerEnd);
+			window.removeEventListener("pointercancel", handlePointerEnd);
 			window.removeEventListener("resize", handleResize);
 		};
 	});
@@ -288,9 +339,6 @@
 		bind:this={overlayEl}
 		class="lightbox-overlay fixed inset-0 z-50 grid place-items-center overflow-hidden bg-black/90 backdrop-blur-sm"
 		onpointerdown={handlePointerDown}
-		onpointermove={handlePointerMove}
-		onpointerup={handlePointerEnd}
-		onpointercancel={handlePointerEnd}
 	>
 		<!-- Close button -->
 		<button
