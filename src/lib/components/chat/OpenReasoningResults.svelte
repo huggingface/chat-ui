@@ -96,9 +96,9 @@
 		display: inline-block;
 		background-image: linear-gradient(
 			90deg,
-			rgba(0, 0, 0, 0.85) 0%,
-			rgba(0, 0, 0, 0.2) 50%,
-			rgba(0, 0, 0, 0.85) 100%
+			rgba(107, 114, 128, 1) 0%,
+			rgba(107, 114, 128, 0.3) 50%,
+			rgba(107, 114, 128, 1) 100%
 		);
 		background-size: 220% 100%;
 		animation: router-shimmer 2.8s linear infinite;
