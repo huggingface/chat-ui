@@ -45,7 +45,7 @@
 			class="text-sm font-medium transition-colors group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
 				? 'text-gray-600 dark:text-gray-300'
 				: 'text-gray-500 dark:text-gray-400'}"
-			class:router-shimmer={loading}
+			class:thinking-shimmer={loading}
 		>
 			Thinking
 		</span>
@@ -85,5 +85,34 @@
 	.thinking-viewport {
 		-webkit-mask-image: linear-gradient(to bottom, transparent 0, black 48px);
 		mask-image: linear-gradient(to bottom, transparent 0, black 48px);
+	}
+	/*
+	 * Variant of router-shimmer (defined in main.css) — light mode inverted so
+	 * the text reads dark with a brighter spot sweeping across, instead of
+	 * medium-gray with darker edges. Dark mode keeps the same bright-spot
+	 * behavior as router-shimmer.
+	 */
+	.thinking-shimmer {
+		display: inline-block;
+		background-image: linear-gradient(
+			90deg,
+			rgba(0, 0, 0, 0.85) 0%,
+			rgba(0, 0, 0, 0.2) 50%,
+			rgba(0, 0, 0, 0.85) 100%
+		);
+		background-size: 220% 100%;
+		animation: router-shimmer 2.8s linear infinite;
+		background-clip: text;
+		-webkit-background-clip: text;
+		color: transparent;
+		-webkit-text-fill-color: transparent;
+	}
+	:global(.dark) .thinking-shimmer {
+		background-image: linear-gradient(
+			90deg,
+			rgba(255, 255, 255, 0.15) 0%,
+			rgba(255, 255, 255, 0.7) 50%,
+			rgba(255, 255, 255, 0.15) 100%
+		);
 	}
 </style>
