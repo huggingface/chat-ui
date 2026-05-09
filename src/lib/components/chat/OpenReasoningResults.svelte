@@ -83,7 +83,7 @@
 
 <style>
 	.thinking-viewport {
-		-webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 50%);
-		mask-image: linear-gradient(to bottom, transparent 0%, black 50%);
+		-webkit-mask-image: linear-gradient(to bottom, transparent 0, black 48px);
+		mask-image: linear-gradient(to bottom, transparent 0, black 48px);
 	}
 </style>
