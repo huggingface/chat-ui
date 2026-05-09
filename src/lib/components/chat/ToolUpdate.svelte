@@ -7,8 +7,6 @@
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
 	import { formatToolProgressLabel } from "$lib/utils/toolProgress";
-	import LucideHammer from "~icons/lucide/hammer";
-	import LucideCheck from "~icons/lucide/check";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
@@ -17,10 +15,9 @@
 	interface Props {
 		tool: MessageToolUpdate[];
 		loading?: boolean;
-		hasNext?: boolean;
 	}
 
-	let { tool, loading = false, hasNext = false }: Props = $props();
+	let { tool, loading = false }: Props = $props();
 
 	let isOpen = $state(false);
 
@@ -28,7 +25,6 @@
 	let toolError = $derived(tool.some(isMessageToolErrorUpdate));
 	let toolDone = $derived(tool.some(isMessageToolResultUpdate));
 	let isExecuting = $derived(!toolDone && !toolError && loading);
-	let toolSuccess = $derived(toolDone && !toolError);
 	let toolProgress = $derived.by(() => {
 		for (let i = tool.length - 1; i >= 0; i -= 1) {
 			const update = tool[i];
@@ -101,169 +97,109 @@
 			images: getImageBlocks(output),
 			metadata: getMetadataEntries(output),
 		}));
-
-	// Icon styling based on state
-	let iconBg = $derived(
-		toolError ? "bg-red-100 dark:bg-red-900/40" : "bg-purple-100 dark:bg-purple-900/40"
-	);
-
-	let iconRing = $derived(
-		toolError ? "ring-red-200 dark:ring-red-500/30" : "ring-purple-200 dark:ring-purple-500/30"
-	);
 </script>
 
-{#snippet icon()}
-	{#if toolSuccess}
-		<LucideCheck class="size-3.5 text-purple-600 dark:text-purple-400" />
-	{:else}
-		<LucideHammer
-			class="size-3.5 {toolError
-				? 'text-red-500 dark:text-red-400'
-				: 'text-purple-600 dark:text-purple-400'}"
-		/>
-	{/if}
-{/snippet}
-
 {#if toolFnName}
-	<BlockWrapper {icon} {iconBg} {iconRing} {hasNext} loading={isExecuting}>
+	<BlockWrapper>
 		<!-- Header row -->
-		<div class="flex w-full select-none items-center gap-2">
+		<div class="flex w-fit select-none flex-col items-start gap-1">
 			<button
 				type="button"
-				class="flex flex-1 cursor-pointer flex-col items-start gap-1 text-left"
-				onclick={() => (isOpen = !isOpen)}
-			>
-				<span
-					class="text-sm font-medium {isExecuting
-						? 'text-purple-700 dark:text-purple-300'
-						: toolError
-							? 'text-red-600 dark:text-red-400'
-							: 'text-gray-700 dark:text-gray-300'}"
-				>
-					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
-					<code
-						class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500 opacity-90 dark:bg-gray-800 dark:text-gray-400"
-					>
-						{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
-					</code>
-				</span>
-				{#if isExecuting && toolProgress}
-					<span class="text-xs text-gray-500 dark:text-gray-400">{progressLabel}</span>
-				{/if}
-			</button>
-
-			<button
-				type="button"
-				class="cursor-pointer"
+				class="group/header flex w-fit cursor-pointer items-center gap-1 text-left focus:outline-none"
 				onclick={() => (isOpen = !isOpen)}
 				aria-label={isOpen ? "Collapse" : "Expand"}
 			>
+				<span
+					class="text-sm font-medium transition-colors {toolError
+						? `group-hover/header:text-red-700 dark:group-hover/header:text-red-300 ${
+								isOpen ? 'text-red-700 dark:text-red-300' : 'text-red-600 dark:text-red-400'
+							}`
+						: `group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 ${
+								isOpen ? 'text-gray-600 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400'
+							}`}"
+					class:router-shimmer={isExecuting}
+				>
+					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
+				</span>
+				<code
+					class="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-xs text-blue-700 opacity-90 dark:bg-blue-900/30 dark:text-blue-300"
+				>
+					{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
+				</code>
 				<CarbonChevronRight
-					class="size-4 text-gray-400 transition-transform duration-200 {isOpen ? 'rotate-90' : ''}"
+					class="size-3.5 transition-all duration-200 group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
+						? 'rotate-90 text-gray-600 dark:text-gray-300'
+						: 'text-gray-400'}"
 				/>
 			</button>
+			{#if isExecuting && toolProgress}
+				<span class="text-xs text-gray-500 dark:text-gray-400">{progressLabel}</span>
+			{/if}
 		</div>
 
 		<!-- Expandable content -->
 		{#if isOpen}
-			<div class="mt-2 space-y-3">
+			<div class="mb-4 mt-2 space-y-3 text-gray-500 dark:text-gray-400">
 				{#each tool as update, i (`${update.subtype}-${i}`)}
 					{#if update.subtype === MessageToolUpdateType.Call}
 						<div class="space-y-1">
-							<div
-								class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"
-							>
+							<div class="text-[10px] font-semibold uppercase text-gray-400 dark:text-gray-500">
 								Input
 							</div>
-							<div
-								class="rounded-md border border-gray-100 bg-white p-2 text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400"
-							>
-								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{formatValue(
-										update.call.parameters
-									)}</pre>
-							</div>
+							<pre
+								class="whitespace-pre-wrap break-all rounded-lg bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{formatValue(
+									update.call.parameters
+								)}</pre>
 						</div>
 					{:else if update.subtype === MessageToolUpdateType.Error}
 						<div class="space-y-1">
-							<div
-								class="text-[10px] font-semibold uppercase tracking-wider text-red-500 dark:text-red-400"
-							>
+							<div class="text-[10px] font-semibold uppercase text-red-500 dark:text-red-400">
 								Error
 							</div>
-							<div
-								class="rounded-md border border-red-200 bg-red-50 p-2 text-red-600 dark:border-red-500/30 dark:bg-red-900/20 dark:text-red-400"
-							>
-								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{update.message}</pre>
-							</div>
+							<pre
+								class="whitespace-pre-wrap break-all rounded-lg bg-red-50 p-2 font-mono text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">{update.message}</pre>
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Success && update.result.display}
 						<div class="space-y-1">
-							<div class="flex items-center gap-2">
-								<div
-									class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500"
-								>
-									Output
+							<div class="text-[10px] font-semibold uppercase text-gray-400 dark:text-gray-500">
+								Output
+							</div>
+							{#each parseToolOutputs(update.result.outputs) as parsedOutput}
+								<div class="space-y-2">
+									{#if parsedOutput.text}
+										<pre
+											class="scrollbar-custom max-h-60 overflow-y-auto whitespace-pre-wrap break-all rounded-lg bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{parsedOutput.text}</pre>
+									{/if}
+
+									{#if parsedOutput.images.length > 0}
+										<div class="flex flex-wrap gap-2">
+											{#each parsedOutput.images as image, imageIndex}
+												<img
+													alt={`Tool result image ${imageIndex + 1}`}
+													class="max-h-60 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
+													src={`data:${image.mimeType};base64,${image.data}`}
+												/>
+											{/each}
+										</div>
+									{/if}
+
+									{#if parsedOutput.metadata.length > 0}
+										<pre
+											class="whitespace-pre-wrap break-all rounded-lg bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{formatValue(
+												Object.fromEntries(parsedOutput.metadata)
+											)}</pre>
+									{/if}
 								</div>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									width="12"
-									height="12"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									class="text-emerald-500"
-								>
-									<circle cx="12" cy="12" r="10"></circle>
-									<path d="m9 12 2 2 4-4"></path>
-								</svg>
-							</div>
-							<div
-								class="scrollbar-custom rounded-md border border-gray-100 bg-white p-2 text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400"
-							>
-								{#each parseToolOutputs(update.result.outputs) as parsedOutput}
-									<div class="space-y-2">
-										{#if parsedOutput.text}
-											<pre
-												class="scrollbar-custom max-h-60 overflow-y-auto whitespace-pre-wrap break-all font-mono text-xs">{parsedOutput.text}</pre>
-										{/if}
-
-										{#if parsedOutput.images.length > 0}
-											<div class="flex flex-wrap gap-2">
-												{#each parsedOutput.images as image, imageIndex}
-													<img
-														alt={`Tool result image ${imageIndex + 1}`}
-														class="max-h-60 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
-														src={`data:${image.mimeType};base64,${image.data}`}
-													/>
-												{/each}
-											</div>
-										{/if}
-
-										{#if parsedOutput.metadata.length > 0}
-											<pre class="whitespace-pre-wrap break-all font-mono text-xs">{formatValue(
-													Object.fromEntries(parsedOutput.metadata)
-												)}</pre>
-										{/if}
-									</div>
-								{/each}
-							</div>
+							{/each}
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
 						<div class="space-y-1">
-							<div
-								class="text-[10px] font-semibold uppercase tracking-wider text-red-500 dark:text-red-400"
-							>
+							<div class="text-[10px] font-semibold uppercase text-red-500 dark:text-red-400">
 								Error
 							</div>
-							<div
-								class="rounded-md border border-red-200 bg-red-50 p-2 text-red-600 dark:border-red-500/30 dark:bg-red-900/20 dark:text-red-400"
-							>
-								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{update.result
-										.message}</pre>
-							</div>
+							<pre
+								class="whitespace-pre-wrap break-all rounded-lg bg-red-50 p-2 font-mono text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">{update
+									.result.message}</pre>
 						</div>
 					{/if}
 				{/each}

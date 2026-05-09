@@ -130,8 +130,6 @@
 
 	// Zero-config reasoning autodetection: detect <think> blocks in content
 	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/gi;
-	// Non-global version for .test() calls to avoid lastIndex side effects
-	const THINK_BLOCK_TEST_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/i;
 	let hasClientThink = $derived(message.content.split(THINK_BLOCK_REGEX).length > 1);
 
 	// Strip think blocks for clipboard copy (always, regardless of detection)
@@ -278,13 +276,12 @@
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
 				{#each blocks as block, blockIndex (block.type === "tool" ? `${block.uuid}-${blockIndex}` : `text-${blockIndex}`)}
-					{@const nextBlock = blocks[blockIndex + 1]}
-					{@const nextBlockHasThink =
-						nextBlock?.type === "text" && THINK_BLOCK_TEST_REGEX.test(nextBlock.content)}
-					{@const nextIsLinkable = nextBlock?.type === "tool" || nextBlockHasThink}
 					{#if block.type === "tool"}
-						<div data-exclude-from-copy class="has-[+.prose]:mb-3 [.prose+&]:mt-4">
-							<ToolUpdate tool={block.updates} {loading} hasNext={nextIsLinkable} />
+						<div
+							data-exclude-from-copy
+							class="has-[+.prose]:!mb-3 [&:not(:last-child)]:mb-1 [.prose+&]:mt-4"
+						>
+							<ToolUpdate tool={block.updates} {loading} />
 						</div>
 					{:else if block.type === "text"}
 						{#if isLast && loading && block.content.length === 0}
@@ -293,10 +290,7 @@
 
 						{#if hasClientThink}
 							{@const parts = block.content.split(THINK_BLOCK_REGEX)}
-							{#each parts as part, partIndex}
-								{@const remainingParts = parts.slice(partIndex + 1)}
-								{@const hasMoreLinkable =
-									remainingParts.some((p) => p && THINK_BLOCK_TEST_REGEX.test(p)) || nextIsLinkable}
+							{#each parts as part}
 								{#if part && part.startsWith("<think>")}
 									{@const isClosed = part.endsWith("</think>")}
 									{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
@@ -304,7 +298,6 @@
 									<OpenReasoningResults
 										content={thinkContent}
 										loading={isLast && loading && !isClosed}
-										hasNext={hasMoreLinkable}
 									/>
 								{:else if part && part.trim().length > 0}
 									<div
@@ -461,8 +454,8 @@
 								type="submit"
 								class="btn rounded-lg px-3 py-1.5 text-sm
                                 {loading
-									? 'bg-gray-300 text-gray-400 dark:bg-gray-700 dark:text-gray-600'
-									: 'bg-gray-200 text-gray-600 hover:text-gray-800   focus:ring-0 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-gray-200'}
+									? 'bg-gray-200 text-gray-400 dark:bg-gray-800 dark:text-gray-600'
+									: 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 focus:ring-0 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-200'}
 								"
 								disabled={loading}
 							>
@@ -481,7 +474,7 @@
 					</form>
 				{/if}
 			</div>
-			<div class="absolute -bottom-4 ml-3.5 flex w-full gap-1.5">
+			<div class="absolute -bottom-4 ml-3.5 flex w-full items-center gap-1.5">
 				{#if alternatives.length > 1 && editMsdgId === null}
 					<Alternatives
 						{message}
@@ -492,7 +485,7 @@
 				{/if}
 				{#if (alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode)}
 					<button
-						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:text-gray-500 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300 lg:-right-2"
+						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:bg-gray-100 hover:text-gray-500 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300 lg:-right-2"
 						title="Edit"
 						type="button"
 						onclick={() => {
@@ -504,9 +497,9 @@
 						Edit
 					</button>
 					<button
-						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs group-hover:flex hover:flex lg:-right-2 {isUserMsgCopied
+						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs group-hover:flex hover:flex hover:bg-gray-100 dark:hover:bg-gray-800 lg:-right-2 {isUserMsgCopied
 							? 'text-green-500 dark:text-green-400'
-							: 'text-gray-400 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300'} dark:border-gray-700"
+							: 'text-gray-400 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300'}"
 						title="Copy to clipboard"
 						type="button"
 						onclick={async () => {
@@ -533,10 +526,10 @@
 						}}
 					>
 						{#if isUserMsgCopied}
-							<CarbonCheckmark class="scale-95" />
+							<CarbonCheckmark class="scale-[0.85]" />
 							Copied
 						{:else}
-							<CarbonCopy class="scale-95" />
+							<CarbonCopy class="scale-[0.85]" />
 							Copy
 						{/if}
 					</button>
