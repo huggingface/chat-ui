@@ -12,6 +12,11 @@
 	let isOpen = $state(false);
 	let wasLoading = $state(false);
 	let initialized = $state(false);
+	// Reactive size bindings (powered by ResizeObserver under the hood) — used
+	// to apply the fade mask only when the streamed content actually overflows
+	// the viewport, so short reasoning isn't unnecessarily faded at the top.
+	let viewportHeight = $state(0);
+	let contentHeight = $state(0);
 
 	// Track loading transitions to auto-expand/collapse
 	$effect(() => {
@@ -64,8 +69,13 @@
 				arriving tokens stay visible while older lines scroll off the top behind
 				a gradient fade. Works for any model output format (no parsing).
 			-->
-			<div class="thinking-viewport mt-2 flex max-h-80 flex-col justify-end overflow-hidden">
+			<div
+				bind:clientHeight={viewportHeight}
+				class="thinking-viewport mt-2 flex max-h-80 flex-col justify-end overflow-hidden"
+				class:has-overflow={contentHeight > viewportHeight}
+			>
 				<div
+					bind:clientHeight={contentHeight}
 					class="prose prose-sm max-w-none text-sm leading-relaxed text-gray-500 dark:prose-invert dark:text-gray-400 [&>:first-child]:mt-0 [&>:last-child]:mb-0"
 				>
 					<MarkdownRenderer {content} {loading} />
@@ -82,7 +92,7 @@
 </BlockWrapper>
 
 <style>
-	.thinking-viewport {
+	.thinking-viewport.has-overflow {
 		-webkit-mask-image: linear-gradient(to bottom, transparent 0, black 48px);
 		mask-image: linear-gradient(to bottom, transparent 0, black 48px);
 	}
