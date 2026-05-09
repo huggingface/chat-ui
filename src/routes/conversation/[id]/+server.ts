@@ -579,10 +579,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						config.isHuggingChat && !model.isRouter
 							? userSettings?.providerOverrides?.[model.id]
 							: undefined,
-					// Thinking-effort override (only forwarded for reasoning-capable models)
-					reasoningEffort: model.supportsReasoning
-						? userSettings?.reasoningEffortOverrides?.[model.id]
-						: undefined,
+					// Thinking-effort override (only forwarded for reasoning-capable models;
+					// per-user override can force-enable on self-hosted)
+					reasoningEffort:
+						(userSettings?.reasoningOverrides?.[model.id] ?? model.supportsReasoning)
+							? userSettings?.reasoningEffortOverrides?.[model.id]
+							: undefined,
 					locals,
 					abortController: ctrl,
 				};

@@ -866,7 +866,7 @@
 				{#if !messages.length && !loading}
 					<span class="max-sm:hidden">Generated content may be inaccurate or false.</span>
 				{/if}
-				{#if currentModel.supportsReasoning}
+				{#if $settings.reasoningOverrides?.[currentModel.id] ?? currentModel.supportsReasoning}
 					<div class="ml-auto">
 						<ThinkingEffortChip modelId={currentModel.id} />
 					</div>

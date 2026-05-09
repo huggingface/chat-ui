@@ -18,6 +18,7 @@ type SettingsStore = {
 	hidePromptExamples: Record<string, boolean>;
 	providerOverrides: Record<string, string>;
 	reasoningEffortOverrides: Record<string, ReasoningEffort>;
+	reasoningOverrides: Record<string, boolean>;
 	recentlySaved: boolean;
 	streamingMode: StreamingMode;
 	directPaste: boolean;

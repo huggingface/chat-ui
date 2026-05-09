@@ -56,6 +56,12 @@ export interface Settings extends Timestamps {
 	reasoningEffortOverrides?: Record<string, ReasoningEffort>;
 
 	/**
+	 * Per-model override for whether the Reasoning-effort UI should appear and
+	 * `reasoning_effort` should be forwarded. Falls back to `model.supportsReasoning`.
+	 */
+	reasoningOverrides?: Record<string, boolean>;
+
+	/**
 	 * Preferred assistant output behavior in the chat UI.
 	 * - "raw": show provider-native stream chunks
 	 * - "smooth": show smoothed stream chunks
@@ -88,6 +94,7 @@ export const DEFAULT_SETTINGS = {
 	hidePromptExamples: {},
 	providerOverrides: {},
 	reasoningEffortOverrides: {},
+	reasoningOverrides: {},
 	streamingMode: "smooth",
 	directPaste: false,
 	hapticsEnabled: true,

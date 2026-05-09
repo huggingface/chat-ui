@@ -17,6 +17,7 @@ const settingsSchema = z.object({
 	toolsOverrides: z.record(z.boolean()).default({}),
 	providerOverrides: z.record(z.string()).default({}),
 	reasoningEffortOverrides: z.record(z.enum(["low", "medium", "high"])).default({}),
+	reasoningOverrides: z.record(z.boolean()).default({}),
 	streamingMode: z.enum(["raw", "smooth"]).optional(),
 	directPaste: z.boolean().default(false),
 	hapticsEnabled: z.boolean().default(true),
@@ -33,6 +34,7 @@ export async function POST({ request, locals }) {
 	if (config.isHuggingChat) {
 		parsedSettings.multimodalOverrides = {};
 		parsedSettings.toolsOverrides = {};
+		parsedSettings.reasoningOverrides = {};
 	}
 
 	const settings = {

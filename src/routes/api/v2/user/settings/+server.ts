@@ -21,6 +21,7 @@ const settingsSchema = z.object({
 	toolsOverrides: z.record(z.boolean()).default({}),
 	providerOverrides: z.record(z.string()).default({}),
 	reasoningEffortOverrides: z.record(z.enum(["low", "medium", "high"])).default({}),
+	reasoningOverrides: z.record(z.boolean()).default({}),
 	streamingMode: z.enum(["raw", "smooth"]).optional(),
 	directPaste: z.boolean().default(false),
 	hapticsEnabled: z.boolean().default(true),
@@ -73,6 +74,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		toolsOverrides: config.isHuggingChat ? {} : (settings?.toolsOverrides ?? {}),
 		providerOverrides: settings?.providerOverrides ?? {},
 		reasoningEffortOverrides: settings?.reasoningEffortOverrides ?? {},
+		reasoningOverrides: config.isHuggingChat ? {} : (settings?.reasoningOverrides ?? {}),
 		billingOrganization: settings?.billingOrganization ?? undefined,
 	});
 };
@@ -87,6 +89,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	if (config.isHuggingChat) {
 		parsedSettings.multimodalOverrides = {};
 		parsedSettings.toolsOverrides = {};
+		parsedSettings.reasoningOverrides = {};
 	}
 
 	const settings = {
