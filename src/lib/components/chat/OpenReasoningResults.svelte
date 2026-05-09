@@ -71,7 +71,7 @@
 			-->
 			<div
 				bind:clientHeight={viewportHeight}
-				class="thinking-viewport mt-2 flex max-h-80 flex-col justify-end overflow-hidden"
+				class="thinking-viewport mt-2 flex max-h-56 flex-col justify-end overflow-hidden md:max-h-80"
 				class:has-overflow={contentHeight > viewportHeight}
 			>
 				<div
