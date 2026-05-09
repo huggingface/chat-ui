@@ -64,7 +64,7 @@
 				arriving tokens stay visible while older lines scroll off the top behind
 				a gradient fade. Works for any model output format (no parsing).
 			-->
-			<div class="thinking-viewport mt-2 flex max-h-16 flex-col justify-end overflow-hidden">
+			<div class="thinking-viewport mt-2 flex max-h-80 flex-col justify-end overflow-hidden">
 				<div
 					class="prose prose-sm max-w-none text-sm leading-relaxed text-gray-500 dark:prose-invert dark:text-gray-400 [&>:first-child]:mt-0 [&>:last-child]:mb-0"
 				>
