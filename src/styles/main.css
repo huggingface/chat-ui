@@ -79,6 +79,10 @@ body {
 		@apply [-ms-overflow-style:none] [scrollbar-width:none] [&::-ms-scrollbar]:hidden [&::-webkit-scrollbar]:hidden;
 	}
 
+	.prose {
+		font-size: 0.94rem;
+	}
+
 	.prose table {
 		@apply block max-w-full overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
 	}
