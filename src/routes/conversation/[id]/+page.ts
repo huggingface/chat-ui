@@ -3,6 +3,19 @@ import { UrlDependency } from "$lib/types/UrlDependency";
 import { redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import type { PageLoad } from "./$types";
+import type { Message } from "$lib/types/Message";
+
+interface ConversationData {
+	messages: Message[];
+	title: string;
+	model: string;
+	preprompt?: string;
+	rootMessageId?: string;
+	id: string;
+	updatedAt: Date;
+	modelId: string;
+	shared: boolean;
+}
 
 export const load: PageLoad = async ({ params, depends, fetch, url, parent }) => {
 	depends(UrlDependency.Conversation);
@@ -37,10 +50,10 @@ export const load: PageLoad = async ({ params, depends, fetch, url, parent }) =>
 
 	// Load conversation (works for both owned and shared conversations)
 	try {
-		return await client
+		return (await client
 			.conversations({ id: params.id })
 			.get({ query: { fromShare: url.searchParams.get("fromShare") ?? undefined } })
-			.then(handleResponse);
+			.then(handleResponse)) as ConversationData;
 	} catch {
 		redirect(302, `${base}/`);
 	}

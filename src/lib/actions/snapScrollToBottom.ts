@@ -8,8 +8,8 @@ const PROGRAMMATIC_SCROLL_GRACE_MS = 100;
 const TOUCH_DETACH_THRESHOLD_PX = 10;
 
 interface ScrollDependency {
-	signal: unknown;
 	forceReattach?: number;
+	scrollBehavior?: ScrollBehavior;
 }
 
 type MaybeScrollDependency = ScrollDependency | unknown;
@@ -21,6 +21,13 @@ const getForceReattach = (value: MaybeScrollDependency): number => {
 	return 0;
 };
 
+const getScrollBehavior = (value: MaybeScrollDependency): ScrollBehavior => {
+	if (typeof value === "object" && value !== null && "scrollBehavior" in value) {
+		return (value as ScrollDependency).scrollBehavior ?? "instant";
+	}
+	return "instant";
+};
+
 /**
  * Auto-scroll action that snaps to bottom while respecting user scroll intent.
  *
@@ -30,8 +37,8 @@ const getForceReattach = (value: MaybeScrollDependency): number => {
  * 3. Larger threshold to prevent edge-case false detachments
  *
  * @param node element to snap scroll to bottom
- * @param dependency pass in { signal, forceReattach } - signal triggers scroll updates,
- *                   forceReattach (counter) forces re-attachment when incremented
+ * @param dependency pass in { forceReattach } - forceReattach (counter) forces
+ *                   scroll to bottom when incremented (e.g. user sends a new message)
  */
 export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDependency) => {
 	// --- State ----------------------------------------------------------------
@@ -61,9 +68,6 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 	let intersectionObserver: IntersectionObserver | undefined;
 	let sentinel: HTMLDivElement | undefined;
 
-	// Track content height for early-return optimization during streaming
-	let lastScrollHeight = node.scrollHeight;
-
 	// --- Helpers --------------------------------------------------------------
 
 	const clearUserScrollTimeout = () => {
@@ -77,11 +81,11 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 
 	const isAtBottom = () => distanceFromBottom() <= BOTTOM_THRESHOLD;
 
-	const scrollToBottom = () => {
+	const scrollToBottom = (behavior: ScrollBehavior = "instant") => {
 		isProgrammaticScroll = true;
 		lastProgrammaticScrollTime = Date.now();
 
-		node.scrollTo({ top: node.scrollHeight });
+		node.scrollTo({ top: node.scrollHeight, behavior });
 
 		if (typeof requestAnimationFrame === "function") {
 			requestAnimationFrame(() => {
@@ -89,22 +93,6 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 			});
 		} else {
 			isProgrammaticScroll = false;
-		}
-	};
-
-	const settleScrollAfterLayout = async () => {
-		if (typeof requestAnimationFrame !== "function") return;
-
-		const raf = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-
-		await raf();
-		if (!userScrolling && !isDetached) {
-			scrollToBottom();
-		}
-
-		await raf();
-		if (!userScrolling && !isDetached) {
-			scrollToBottom();
 		}
 	};
 
@@ -118,11 +106,6 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 			// If user scrolled back to bottom, re-attach
 			if (isAtBottom()) {
 				isDetached = false;
-			}
-
-			// Re-trigger scroll if still attached, to catch content that arrived during scrolling
-			if (!isDetached) {
-				scrollToBottom();
 			}
 		}, USER_SCROLL_DEBOUNCE_MS);
 	};
@@ -153,8 +136,6 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 				// If sentinel is visible and user isn't actively scrolling, we're at bottom
 				if (entry?.isIntersecting && !userScrolling) {
 					isDetached = false;
-					// Immediately scroll to catch up with any content that arrived while detached
-					scrollToBottom();
 				}
 			},
 			{
@@ -195,7 +176,7 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 			clearUserScrollTimeout();
 
 			await tick();
-			scrollToBottom();
+			scrollToBottom(getScrollBehavior(newDependency));
 			return true;
 		}
 
@@ -203,28 +184,9 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 	};
 
 	async function updateScroll(newDependency?: MaybeScrollDependency) {
-		// 1. Explicit force re-attach
-		if (newDependency && (await handleForceReattach(newDependency))) {
-			return;
+		if (newDependency) {
+			await handleForceReattach(newDependency);
 		}
-
-		// 2. Don't scroll if user has detached and we're not navigating
-		if (isDetached && !navigating.to) return;
-
-		// 3. Don't scroll if user is actively scrolling
-		if (userScrolling) return;
-
-		// 4. Early return if already at bottom and no content change (perf optimization for streaming)
-		const currentHeight = node.scrollHeight;
-		if (isAtBottom() && currentHeight === lastScrollHeight) {
-			return;
-		}
-		lastScrollHeight = currentHeight;
-
-		// 5. Wait for DOM to update, then scroll and settle after layout shifts
-		await tick();
-		scrollToBottom();
-		await settleScrollAfterLayout();
 	}
 
 	// --- Event handlers -------------------------------------------------------

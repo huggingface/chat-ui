@@ -9,7 +9,7 @@ const sanitizeJSONEnv = (val: string, fallback: string) => {
 };
 
 // RATE_LIMIT is the legacy way to define messages per minute limit
-export const usageLimitsSchema = z
+const usageLimitsSchema = z
 	.object({
 		conversations: z.coerce.number().optional(), // how many conversations
 		messages: z.coerce.number().optional(), // how many messages in a conversation

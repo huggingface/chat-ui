@@ -23,6 +23,7 @@
 	import { shareModal } from "$lib/stores/shareModal";
 	import { loading } from "$lib/stores/loading";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { tap } from "$lib/utils/haptics";
 
 	interface Props {
 		title: string | undefined;
@@ -193,6 +194,7 @@
 			isOpen = finalDirection > 0;
 		}
 
+		tap();
 		resetDragState();
 	}
 
@@ -230,7 +232,7 @@
 </script>
 
 <nav
-	class="flex h-12 items-center justify-between rounded-b-xl border-b bg-gray-50 px-3 dark:border-gray-800 dark:bg-gray-800/30 dark:shadow-xl md:hidden"
+	class="mx-4 mt-4 flex h-12 items-center justify-between rounded-b-xl border-b bg-gray-50 px-3 dark:border-gray-800 dark:bg-gray-800/30 dark:shadow-xl max-md:rounded-xl max-md:border md:hidden"
 >
 	<button
 		type="button"
@@ -246,11 +248,11 @@
 			>
 		{/if}
 	</div>
-	<div class="flex items-center">
+	<div class="-mr-3 flex items-center">
 		{#if isHuggingChat}
 			<button
 				type="button"
-				class="flex size-8 shrink-0 items-center justify-center text-lg"
+				class="flex h-12 w-6 shrink-0 items-center justify-center text-lg"
 				disabled={!canShare}
 				onclick={() => {
 					if (!canShare) return;
@@ -263,7 +265,7 @@
 		{/if}
 		<a
 			href="{base}/"
-			class="flex size-8 shrink-0 items-center justify-center text-lg"
+			class="flex size-12 shrink-0 items-center justify-center text-lg"
 			onclick={(e) => {
 				if (requireAuthUser()) {
 					e.preventDefault();

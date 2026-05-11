@@ -504,25 +504,6 @@ const handleIncompleteStrikethrough = (text: string): string => {
 	return text;
 };
 
-// Counts single dollar signs that are not part of double dollar signs and not escaped
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _countSingleDollarSigns = (text: string): number => {
-	return text.split("").reduce((acc, char, index) => {
-		if (char === "$") {
-			const prevChar = text[index - 1];
-			const nextChar = text[index + 1];
-			// Skip if escaped with backslash
-			if (prevChar === "\\") {
-				return acc;
-			}
-			if (prevChar !== "$" && nextChar !== "$") {
-				return acc + 1;
-			}
-		}
-		return acc;
-	}, 0);
-};
-
 // Completes incomplete block KaTeX formatting ($$)
 const handleIncompleteBlockKatex = (text: string): string => {
 	// Count all $$ pairs in the text

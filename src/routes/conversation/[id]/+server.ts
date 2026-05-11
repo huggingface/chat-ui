@@ -1,5 +1,6 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
+import { config } from "$lib/server/config";
 import { models, validModelIdSchema } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import type { Message } from "$lib/types/Message";
@@ -128,6 +129,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		is_retry: isRetry,
 		selectedMcpServerNames,
 		selectedMcpServers,
+		timezone,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -152,6 +154,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					)
 				)
 				.default([]),
+			timezone: z.optional(z.string()),
 			files: z.optional(
 				z.array(
 					z.object({
@@ -180,6 +183,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		};
 	} catch {
 		// ignore attachment errors, pipeline will just use env servers
+	}
+
+	// Attach user timezone so the tool prompt can include localized time
+	if (timezone) {
+		(locals as unknown as Record<string, unknown>).timezone = timezone;
 	}
 
 	const inputFiles = await Promise.all(
@@ -366,11 +374,19 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let finalAnswerReceived = false;
 			let abortedByUser = false;
+			let finishedStatusSent = false;
 
 			messageToWriteTo.updates ??= [];
 			async function update(event: MessageUpdate) {
 				if (!messageToWriteTo || !conv) {
 					throw Error("No message or conversation to write events to");
+				}
+
+				if (
+					event.type === MessageUpdateType.Status &&
+					event.status === MessageUpdateStatus.Finished
+				) {
+					finishedStatusSent = true;
 				}
 
 				// Add token to content or skip if empty
@@ -552,10 +568,23 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					promptedAt,
 					ip: getClientAddress(),
 					username: locals.user?.username,
-					// Force-enable multimodal if user settings say so for this model
-					forceMultimodal: Boolean(userSettings?.multimodalOverrides?.[model.id]),
-					// Force-enable tools if user settings say so for this model
-					forceTools: Boolean(userSettings?.toolsOverrides?.[model.id]),
+					// Force-enable multimodal/tools if user settings say so for this model.
+					// On HuggingChat capability comes from the upstream router, so any stored
+					// per-user overrides are ignored — existing entries don't keep applying.
+					forceMultimodal:
+						!config.isHuggingChat && Boolean(userSettings?.multimodalOverrides?.[model.id]),
+					forceTools: !config.isHuggingChat && Boolean(userSettings?.toolsOverrides?.[model.id]),
+					// Inference provider preference (HuggingChat only, skip for router models)
+					provider:
+						config.isHuggingChat && !model.isRouter
+							? userSettings?.providerOverrides?.[model.id]
+							: undefined,
+					// Thinking-effort override (only forwarded for reasoning-capable models;
+					// per-user override can force-enable on self-hosted)
+					reasoningEffort:
+						(userSettings?.reasoningOverrides?.[model.id] ?? model.supportsReasoning)
+							? userSettings?.reasoningEffortOverrides?.[model.id]
+							: undefined,
 					locals,
 					abortController: ctrl,
 				};
@@ -607,6 +636,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			} finally {
 				// check if no output was generated
 				if (!hasError && !abortedByUser && messageToWriteTo.content === initialMessageContent) {
+					hasError = true;
 					logger.warn(
 						{
 							conversationId: conversationKey,
@@ -624,6 +654,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						message: "No output was generated. Something went wrong.",
 					});
 				}
+			}
+
+			if (!hasError && !finishedStatusSent) {
+				await update({
+					type: MessageUpdateType.Status,
+					status: MessageUpdateStatus.Finished,
+				});
 			}
 
 			await persistConversation();

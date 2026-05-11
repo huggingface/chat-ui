@@ -53,7 +53,7 @@ export async function updateUser(params: {
 						name: z.string(),
 						picture: z.string(),
 						preferred_username: z.string(),
-						isEnterprise: z.boolean(),
+						plan: z.string().optional(),
 					})
 				)
 				.optional(),
@@ -77,7 +77,7 @@ export async function updateUser(params: {
 			name: string;
 			picture: string;
 			preferred_username: string;
-			isEnterprise: boolean;
+			plan?: string;
 		}>;
 	} & Record<string, string>;
 
@@ -125,7 +125,7 @@ export async function updateUser(params: {
 	locals.sessionId = sessionId;
 
 	// Get cookie hash if coupling is enabled
-	const coupledCookieHash = await getCoupledCookieHash({ type: "svelte", value: cookies });
+	const coupledCookieHash = await getCoupledCookieHash(cookies);
 
 	// Prepare OAuth token data for session storage
 	const oauthData = tokenSetToSessionOauth(token);

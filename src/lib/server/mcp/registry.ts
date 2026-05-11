@@ -56,18 +56,6 @@ export function loadMcpServersOnStartup(): McpServerConfig[] {
 	return cachedServers;
 }
 
-export function refreshMcpServersIfChanged(): void {
-	const currentRaw = config.MCP_SERVERS || "[]";
-	if (cachedRaw === null) {
-		setServers(currentRaw);
-		return;
-	}
-
-	if (currentRaw !== cachedRaw) {
-		setServers(currentRaw);
-	}
-}
-
 export function getMcpServers(): McpServerConfig[] {
 	if (cachedRaw === null) {
 		loadMcpServersOnStartup();

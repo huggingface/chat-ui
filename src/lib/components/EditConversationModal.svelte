@@ -11,10 +11,10 @@
 
 	let { open = false, title = "", onclose, onsave }: Props = $props();
 
-	let newTitle = $state(title);
+	let newTitle = $state("");
 	let inputEl: HTMLInputElement | undefined = $state();
 
-	$effect(() => {
+	$effect.pre(() => {
 		// keep local input in sync if parent changes title while open
 		if (open) {
 			newTitle = title;

@@ -14,10 +14,11 @@
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
-	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
+	import { fetchMessageUpdates, resolveStreamingMode } from "$lib/utils/messageUpdates";
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
-	import { enabledServers } from "$lib/stores/mcpServers";
+	import { enabledServers, mcpServersLoaded } from "$lib/stores/mcpServers";
+	import { get } from "svelte/store";
 	import { browser } from "$app/environment";
 	import {
 		addBackgroundGeneration,
@@ -28,13 +29,19 @@
 	import { updateDebouncer } from "$lib/utils/updates.js";
 	import SubscribeModal from "$lib/components/SubscribeModal.svelte";
 	import { loading } from "$lib/stores/loading.js";
+	import { streamStart } from "$lib/utils/haptics";
 	import { requireAuthUser } from "$lib/utils/auth.js";
+	import { isConversationGenerationActive } from "$lib/utils/generationState";
 
 	let { data = $bindable() } = $props();
 
+	let convId = $derived(page.params.id ?? "");
 	let pending = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
+	let stopRequested = $state(false);
+	let stopRequestPromise: Promise<void> | undefined;
+	let messageUpdatesAbortController = new AbortController();
 
 	let files: File[] = $state([]);
 
@@ -107,6 +114,7 @@
 		isRetry?: boolean;
 	}): Promise<void> {
 		try {
+			stopRequested = false;
 			$isAborted = false;
 			$loading = true;
 			pending = true;
@@ -210,10 +218,28 @@
 				throw new Error("Message to write to not found");
 			}
 
-			const messageUpdatesAbortController = new AbortController();
+			messageUpdatesAbortController = new AbortController();
+			const streamingMode = resolveStreamingMode($settings);
+
+			// Wait for the MCP store to hydrate before sending so the server receives
+			// the user's exact selection. Sending [] before the base server list is
+			// fetched filters env servers to nothing; omitting the field would skip
+			// any explicit opt-outs the user saved in localStorage.
+			if (!get(mcpServersLoaded)) {
+				await new Promise<void>((resolve) => {
+					let unsub: (() => void) | undefined;
+					unsub = mcpServersLoaded.subscribe((loaded) => {
+						if (loaded) {
+							// unsub may still be undefined if subscribe fires synchronously
+							unsub?.();
+							resolve();
+						}
+					});
+				});
+			}
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
-				page.params.id,
+				convId,
 				{
 					base,
 					inputs: prompt,
@@ -226,6 +252,8 @@
 						url: s.url,
 						headers: s.headers,
 					})),
+					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+					streamingMode,
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {
@@ -237,6 +265,28 @@
 			let buffer = "";
 			// Initialize lastUpdateTime outside the loop to persist between updates
 			let lastUpdateTime = new Date();
+			let frameFlushScheduled = false;
+
+			const flushBuffer = (currentTime: Date) => {
+				if (buffer.length === 0) return;
+				messageToWriteTo.content += buffer;
+				buffer = "";
+				lastUpdateTime = currentTime;
+			};
+
+			const scheduleFrameFlush = () => {
+				if (frameFlushScheduled) return;
+				frameFlushScheduled = true;
+				const flush = () => {
+					frameFlushScheduled = false;
+					flushBuffer(new Date());
+				};
+				if (typeof requestAnimationFrame === "function") {
+					requestAnimationFrame(flush);
+				} else {
+					setTimeout(flush, 0);
+				}
+			};
 
 			for await (const update of messageUpdatesIterator) {
 				if ($isAborted) {
@@ -277,35 +327,41 @@
 				// If we receive a non-stream update (e.g. tool/status/final answer),
 				// flush any buffered stream tokens so the UI doesn't appear to cut
 				// mid-sentence while tools are running or the final answer arrives.
-				if (
-					update.type !== MessageUpdateType.Stream &&
-					!$settings.disableStream &&
-					buffer.length > 0
-				) {
-					messageToWriteTo.content += buffer;
-					buffer = "";
-					lastUpdateTime = currentTime;
+				if (update.type !== MessageUpdateType.Stream && buffer.length > 0) {
+					flushBuffer(currentTime);
 				}
 
-				if (update.type === MessageUpdateType.Stream && !$settings.disableStream) {
+				if (update.type === MessageUpdateType.Stream) {
 					buffer += update.token;
-					// Check if this is the first update or if enough time has passed
-					if (currentTime.getTime() - lastUpdateTime.getTime() > updateDebouncer.maxUpdateTime) {
-						messageToWriteTo.content += buffer;
-						buffer = "";
-						lastUpdateTime = currentTime;
+					if (streamingMode === "smooth") {
+						// Coalesce UI updates to animation frames for smooth mode.
+						scheduleFrameFlush();
+					} else if (
+						currentTime.getTime() - lastUpdateTime.getTime() >
+						updateDebouncer.maxUpdateTime
+					) {
+						flushBuffer(currentTime);
+					}
+					if (pending) {
+						streamStart();
 					}
 					pending = false;
 				} else if (update.type === MessageUpdateType.FinalAnswer) {
 					// Mirror server-side merge behavior so the UI reflects the
 					// final text once tools complete, while preserving any
 					// pre‑tool streamed content when appropriate.
+					const finalText = update.text ?? "";
+					const isInterrupted = update.interrupted === true;
 					const hadTools =
 						messageToWriteTo.updates?.some((u) => u.type === MessageUpdateType.Tool) ?? false;
 
-					if (hadTools) {
+					if (isInterrupted) {
+						// Preserve streamed content on abort. If we never streamed, fall back to finalText.
+						if (!messageToWriteTo.content) {
+							messageToWriteTo.content = finalText;
+						}
+					} else if (hadTools) {
 						const existing = messageToWriteTo.content;
-						const finalText = update.text ?? "";
 						const trimmedExistingSuffix = existing.replace(/\s+$/, "");
 						const trimmedFinalPrefix = finalText.replace(/^\s+/, "");
 						const alreadyStreamed =
@@ -337,7 +393,7 @@
 					} else {
 						// No tools: final answer replaces streamed content so
 						// the provider's final text is authoritative.
-						messageToWriteTo.content = update.text ?? "";
+						messageToWriteTo.content = finalText;
 					}
 				} else if (
 					update.type === MessageUpdateType.Status &&
@@ -346,6 +402,15 @@
 					// Check if this is a 402 payment required error
 					if (update.statusCode === 402) {
 						showSubscribeModal = true;
+					} else if (
+						update.statusCode === 401 &&
+						typeof update.message === "string" &&
+						/oauth authorization|has been revoked|requested scopes/i.test(update.message)
+					) {
+						// The stored OAuth token was revoked or no longer matches scopes.
+						// Restart the OAuth flow and return to this conversation afterwards.
+						const next = encodeURIComponent(`${base}/conversation/${convId}`);
+						window.location.assign(`${base}/login?next=${next}`);
 					} else {
 						$error = update.message ?? "An error has occurred";
 					}
@@ -356,7 +421,7 @@
 
 						$titleUpdate = {
 							title: update.title,
-							convId: page.params.id,
+							convId,
 						};
 					}
 				} else if (update.type === MessageUpdateType.File) {
@@ -372,6 +437,10 @@
 					};
 				}
 			}
+
+			if (buffer.length > 0) {
+				flushBuffer(new Date());
+			}
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
@@ -386,24 +455,57 @@
 		} finally {
 			$loading = false;
 			pending = false;
+			// Wait for the stop request to complete before refreshing data,
+			// so the server has persisted interrupted:true to the database.
+			if (stopRequestPromise) {
+				await stopRequestPromise.catch(() => {});
+				stopRequestPromise = undefined;
+			}
 			await invalidateAll();
 		}
 	}
 
 	async function stopGeneration() {
-		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
-			method: "POST",
-		}).then((r) => {
-			if (r.ok) {
-				setTimeout(() => {
-					$isAborted = true;
-					$loading = false;
-				}, 500);
-			} else {
-				$isAborted = true;
-				$loading = false;
+		stopRequested = true;
+		$isAborted = true;
+		$loading = false;
+		messageUpdatesAbortController.abort();
+
+		// Mark the last assistant message as interrupted locally so
+		// isConversationGenerationActive() immediately returns false,
+		// removing the background poller and preventing $loading re-enable.
+		const lastAssistant = messages.findLast((m) => m.from === "assistant");
+		if (lastAssistant) {
+			lastAssistant.interrupted = true;
+		}
+
+		const sendStopRequest = async () => {
+			const response = await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
+				method: "POST",
+			});
+			if (!response.ok) {
+				throw new Error(`Stop request failed: ${response.status}`);
 			}
-		});
+		};
+
+		// Store the promise so writeMessage's finally block can await it
+		// before calling invalidateAll() — ensures the server has persisted
+		// interrupted:true before we fetch fresh data.
+		stopRequestPromise = (async () => {
+			try {
+				await sendStopRequest();
+			} catch (firstErr) {
+				try {
+					await new Promise((resolve) => setTimeout(resolve, 300));
+					await sendStopRequest();
+				} catch (retryErr) {
+					console.error("Failed to stop generation", firstErr, retryErr);
+					$error = "Failed to stop generation. Please try again.";
+				}
+			}
+		})();
+
+		await stopRequestPromise;
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -421,9 +523,9 @@
 			$pendingMessage = undefined;
 		}
 
-		const streaming = isConversationStreaming(messages);
+		const streaming = isConversationGenerationActive(messages);
 		if (streaming) {
-			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
+			addBackgroundGeneration({ id: convId, startedAt: Date.now() });
 			$loading = true;
 		}
 	});
@@ -456,30 +558,23 @@
 		messages = data.messages;
 	});
 
-	function isConversationStreaming(msgs: Message[]): boolean {
-		const lastAssistant = [...msgs].reverse().find((msg) => msg.from === "assistant");
-		if (!lastAssistant) return false;
-		const hasFinalAnswer =
-			lastAssistant.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer) ??
-			false;
-		const hasError =
-			lastAssistant.updates?.some(
-				(update) =>
-					update.type === MessageUpdateType.Status && update.status === MessageUpdateStatus.Error
-			) ?? false;
-		return !hasFinalAnswer && !hasError;
-	}
+	$effect(() => {
+		page.params.id;
+		stopRequested = false;
+	});
 
 	$effect(() => {
-		const streaming = isConversationStreaming(messages);
-		if (streaming) {
+		const streaming = isConversationGenerationActive(messages);
+		if (stopRequested) {
+			$loading = false;
+		} else if (streaming) {
 			$loading = true;
 		} else if (!pending) {
 			$loading = false;
 		}
 
 		if (!streaming && browser) {
-			removeBackgroundGeneration(page.params.id);
+			removeBackgroundGeneration(convId);
 		}
 	});
 
@@ -505,6 +600,7 @@
 
 		$isAborted = true;
 		$loading = false;
+		messageUpdatesAbortController.abort();
 	});
 
 	let title = $derived.by(() => {

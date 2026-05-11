@@ -48,7 +48,10 @@
 				},
 				body: JSON.stringify({
 					model,
-					preprompt: $settings.customPrompts[$settings.activeModel],
+					preprompt:
+						($settings.customPromptsEnabled?.[$settings.activeModel] ?? true)
+							? $settings.customPrompts[$settings.activeModel]
+							: "",
 				}),
 			});
 

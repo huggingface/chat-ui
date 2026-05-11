@@ -11,9 +11,13 @@
 
 	let { models, currentModel }: Props = $props();
 
-	let selectedModelId = $state(
-		models.map((m) => m.id).includes(currentModel.id) ? currentModel.id : models[0].id
-	);
+	let selectedModelId = $state("");
+
+	$effect.pre(() => {
+		selectedModelId = models.map((m) => m.id).includes(currentModel.id)
+			? currentModel.id
+			: models[0].id;
+	});
 
 	async function handleModelChange() {
 		if (!page.params.id) return;

@@ -1,4 +1,4 @@
-import { GridFSBucket, MongoClient } from "mongodb";
+import { GridFSBucket, MongoClient, ReadPreference } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
@@ -11,7 +11,6 @@ import type { Report } from "$lib/types/Report";
 import type { ConversationStats } from "$lib/types/ConversationStats";
 import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
-import type { AssistantStats } from "$lib/types/AssistantStats";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
@@ -116,29 +115,38 @@ export class Database {
 			config.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : "")
 		);
 
+		// Collections with default readPreference (primary) - critical for read-after-write consistency
 		const conversations = db.collection<Conversation>("conversations");
-		const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION);
-		const assistants = db.collection<Assistant>("assistants");
-		const assistantStats = db.collection<AssistantStats>("assistants.stats");
-		const reports = db.collection<Report>("reports");
-		const sharedConversations = db.collection<SharedConversation>("sharedConversations");
-		const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
 		const settings = db.collection<Settings>("settings");
 		const users = db.collection<User>("users");
 		const sessions = db.collection<Session>("sessions");
 		const messageEvents = db.collection<MessageEvent>("messageEvents");
-		const bucket = new GridFSBucket(db, { bucketName: "files" });
-		const migrationResults = db.collection<MigrationResult>("migrationResults");
+		const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
-		const tools = db.collection("tools");
 		const configCollection = db.collection<ConfigKey>("config");
+		const migrationResults = db.collection<MigrationResult>("migrationResults");
+		const sharedConversations = db.collection<SharedConversation>("sharedConversations");
+		const bucket = new GridFSBucket(db, { bucketName: "files" });
 
+		// Collections with secondaryPreferred - heavy reads, can tolerate slight replication lag
+		const secondaryPreferred = ReadPreference.SECONDARY_PREFERRED;
+		const assistants = db.collection<Assistant>("assistants", {
+			readPreference: secondaryPreferred,
+		});
+		const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION, {
+			readPreference: secondaryPreferred,
+		});
+		const reports = db.collection<Report>("reports", {
+			readPreference: secondaryPreferred,
+		});
+		const tools = db.collection("tools", {
+			readPreference: secondaryPreferred,
+		});
 		return {
 			conversations,
 			conversationStats,
 			assistants,
-			assistantStats,
 			reports,
 			sharedConversations,
 			abortedGenerations,
@@ -164,7 +172,6 @@ export class Database {
 			conversations,
 			conversationStats,
 			assistants,
-			assistantStats,
 			reports,
 			sharedConversations,
 			abortedGenerations,
@@ -267,6 +274,10 @@ export class Database {
 		users
 			.createIndex({ username: 1 })
 			.catch((e) => logger.error(e, "Error creating index for users by username"));
+		// For stats queries filtering users by creation date
+		users
+			.createIndex({ createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for users by createdAt"));
 		messageEvents
 			.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 1 })
 			.catch((e) => logger.error(e, "Error creating index for messageEvents by expiresAt"));
@@ -301,15 +312,6 @@ export class Database {
 			.catch((e) =>
 				logger.error(e, "Error creating index for assistants by last24HoursUseCount and useCount")
 			);
-		assistantStats
-			// Order of keys is important for the queries
-			.createIndex({ "date.span": 1, "date.at": 1, assistantId: 1 }, { unique: true })
-			.catch((e) =>
-				logger.error(
-					e,
-					"Error creating index for assistantStats by date.span and date.at and assistantId"
-				)
-			);
 		reports
 			.createIndex({ assistantId: 1 })
 			.catch((e) => logger.error(e, "Error creating index for reports by assistantId"));
@@ -330,8 +332,6 @@ export class Database {
 		tokenCaches
 			.createIndex({ tokenHash: 1 })
 			.catch((e) => logger.error(e, "Error creating index for tokenCaches by tokenHash"));
-		// Tools removed: skipping tools indexes
-
 		conversations
 			.createIndex({
 				"messages.from": 1,
@@ -349,6 +349,14 @@ export class Database {
 			.catch((e) =>
 				logger.error(e, "Error creating index for conversations by userId and sessionId")
 			);
+
+		// For stats aggregation jobs that filter by createdAt/updatedAt alone
+		conversations
+			.createIndex({ createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for conversations by createdAt"));
+		conversations
+			.createIndex({ updatedAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for conversations by updatedAt"));
 
 		config
 			.createIndex({ key: 1 }, { unique: true })

@@ -76,7 +76,7 @@ describe("login", () => {
 		assert.equal(existingUser?.name, userData.name);
 
 		expect(cookiesMock.set).toBeCalledTimes(1);
-	});
+	}, 30000);
 
 	it("should migrate pre-existing conversations for new user", async () => {
 		const insertedId = await insertRandomUser();

@@ -45,7 +45,7 @@ export async function POST({ params, locals }) {
 
 	// copy files from `${conversation._id}-` to `${shared._id}-`
 	const files = await collections.bucket
-		.find({ filename: { $regex: `${conversation._id}-` } })
+		.find({ filename: { $regex: `^${conversation._id}-` } })
 		.toArray();
 
 	await Promise.all(

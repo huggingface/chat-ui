@@ -58,6 +58,7 @@ export const GET: RequestHandler = (async ({ params }) => {
 	return new Response(new Uint8Array(png), {
 		headers: {
 			"Content-Type": "image/png",
+			"Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800",
 		},
 	});
 }) satisfies RequestHandler;

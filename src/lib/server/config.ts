@@ -21,7 +21,7 @@ class ConfigManager {
 	async init() {
 		if (this.isInitialized) return;
 
-		if (import.meta.env.MODE === "test") {
+		if (building || import.meta.env.MODE === "test") {
 			this.isInitialized = true;
 			return;
 		}

@@ -21,8 +21,14 @@
 	let draft = $state("");
 
 	const settings = useSettingsStore();
-	const modelId = page.params.model;
+	let modelId = $derived(page.params.model ?? "");
 	const publicConfig = usePublicConfig();
+	let modelPath = $derived(
+		modelId
+			.split("/")
+			.map((segment) => encodeURIComponent(segment))
+			.join("/")
+	);
 
 	async function createConversation(message: string) {
 		try {
@@ -35,7 +41,10 @@
 				},
 				body: JSON.stringify({
 					model: modelId,
-					preprompt: $settings.customPrompts[modelId],
+					preprompt:
+						($settings.customPromptsEnabled?.[modelId] ?? true)
+							? $settings.customPrompts[modelId]
+							: "",
 				}),
 			});
 
@@ -122,15 +131,27 @@
 </script>
 
 <svelte:head>
-	<meta property="og:title" content={modelId + " - " + publicConfig.PUBLIC_APP_NAME} />
-	<meta property="og:type" content="link" />
-	<meta property="og:description" content={`Use ${modelId} with ${publicConfig.PUBLIC_APP_NAME}`} />
+	<title>{modelId} - {publicConfig.PUBLIC_APP_NAME}</title>
+	<meta property="og:title" content="{modelId} - {publicConfig.PUBLIC_APP_NAME}" />
+	<meta property="og:type" content="website" />
+	<meta property="og:description" content="Use {modelId} with {publicConfig.PUBLIC_APP_NAME}" />
 	<meta
 		property="og:image"
-		content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/models/{modelId}/thumbnail.png"
+		content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/models/{modelPath}/thumbnail.png"
 	/>
+	<meta property="og:image:alt" content="{modelId} - {publicConfig.PUBLIC_APP_NAME}" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="648" />
 	<meta property="og:url" content={page.url.href} />
+	<meta property="og:site_name" content={publicConfig.PUBLIC_APP_NAME} />
 	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="{modelId} - {publicConfig.PUBLIC_APP_NAME}" />
+	<meta name="twitter:description" content="Use {modelId} with {publicConfig.PUBLIC_APP_NAME}" />
+	<meta
+		name="twitter:image"
+		content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/models/{modelPath}/thumbnail.png"
+	/>
+	<meta name="twitter:image:alt" content="{modelId} - {publicConfig.PUBLIC_APP_NAME}" />
 </svelte:head>
 
 <ChatWindow

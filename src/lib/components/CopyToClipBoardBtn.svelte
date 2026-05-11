@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from "svelte";
+	import { confirm as hapticConfirm } from "$lib/utils/haptics";
 
 	import CarbonCopy from "~icons/carbon/copy";
 	import Tooltip from "./Tooltip.svelte";
@@ -49,6 +50,7 @@
 	const handleClick = async () => {
 		try {
 			await copy(value);
+			hapticConfirm();
 
 			isSuccess = true;
 			if (timeout) {
