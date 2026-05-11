@@ -19,28 +19,28 @@ A chat interface for LLMs. It is a SvelteKit app and it powers the [HuggingChat 
 
 ## Quickstart
 
-Chat UI speaks to OpenAI-compatible APIs only. The fastest way to get running is with the Hugging Face Inference Providers router plus your personal Hugging Face access token.
+Chat UI talks to any OpenAI-compatible API via `OPENAI_BASE_URL`. The simplest setup runs a small model locally with [llama.cpp](https://github.com/ggml-org/llama.cpp) — no account, no API key, nothing leaves your machine.
 
-**Step 1 – Create `.env.local`:**
+**Step 1 – Start a local model server.**
 
-```env
-OPENAI_BASE_URL=https://router.huggingface.co/v1
-OPENAI_API_KEY=hf_************************
+Install llama.cpp (`brew install llama.cpp`, or grab a [prebuilt release](https://github.com/ggml-org/llama.cpp/releases)), then serve [`Qwen/Qwen3-0.6B`](https://huggingface.co/Qwen/Qwen3-0.6B-GGUF) (~600 MB, runs comfortably on CPU):
+
+```bash
+llama-server -hf Qwen/Qwen3-0.6B-GGUF --jinja
 ```
 
-`OPENAI_API_KEY` can come from any OpenAI-compatible endpoint you plan to call. Pick the combo that matches your setup and drop the values into `.env.local`:
+The `-hf` flag auto-downloads the GGUF from the Hugging Face Hub; `--jinja` enables the model's bundled chat template. llama.cpp now exposes an OpenAI-compatible API on `http://127.0.0.1:8080/v1`.
 
-| Provider                                      | Example `OPENAI_BASE_URL`          | Example key env                                                         |
-| --------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
-| Hugging Face Inference Providers router       | `https://router.huggingface.co/v1` | `OPENAI_API_KEY=hf_xxx` (or `HF_TOKEN` legacy alias)                    |
-| llama.cpp server (`llama.cpp --server --api`) | `http://127.0.0.1:8080/v1`         | `OPENAI_API_KEY=sk-local-demo` (any string works; llama.cpp ignores it) |
-| Ollama (with OpenAI-compatible bridge)        | `http://127.0.0.1:11434/v1`        | `OPENAI_API_KEY=ollama`                                                 |
-| OpenRouter                                    | `https://openrouter.ai/api/v1`     | `OPENAI_API_KEY=sk-or-v1-...`                                           |
-| Poe                                           | `https://api.poe.com/v1`           | `OPENAI_API_KEY=pk_...`                                                 |
+**Step 2 – Point Chat UI at it.** Create `.env.local`:
 
-Check the root [`.env` template](./.env) for the full list of optional variables you can override.
+```env
+OPENAI_BASE_URL=http://127.0.0.1:8080/v1
+OPENAI_API_KEY=sk-local-demo
+```
 
-**Step 2 – Install and launch the dev server:**
+llama.cpp ignores the key, so any non-empty string works.
+
+**Step 3 – Install and launch the dev server:**
 
 ```bash
 git clone https://github.com/huggingface/chat-ui
@@ -49,7 +49,21 @@ npm install
 npm run dev -- --open
 ```
 
-You now have Chat UI running locally. Open the browser and start chatting.
+That's it — Chat UI opens in your browser, auto-discovers the running model, and you can start chatting. Conversation history is persisted to an embedded MongoDB under `./db` (see [Database Options](#database-options) for managed/containerized Mongo).
+
+### Using a different endpoint
+
+`OPENAI_BASE_URL` accepts any OpenAI-compatible API. Common alternatives:
+
+| Provider                                | Example `OPENAI_BASE_URL`          | Example key env                                                         |
+| --------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
+| llama.cpp server (`llama-server`)       | `http://127.0.0.1:8080/v1`         | `OPENAI_API_KEY=sk-local-demo` (any string works; llama.cpp ignores it) |
+| Ollama (with OpenAI-compatible bridge)  | `http://127.0.0.1:11434/v1`        | `OPENAI_API_KEY=ollama`                                                 |
+| Hugging Face Inference Providers router | `https://router.huggingface.co/v1` | `OPENAI_API_KEY=hf_xxx` (or `HF_TOKEN` legacy alias)                    |
+| OpenRouter                              | `https://openrouter.ai/api/v1`     | `OPENAI_API_KEY=sk-or-v1-...`                                           |
+| Poe                                     | `https://api.poe.com/v1`           | `OPENAI_API_KEY=pk_...`                                                 |
+
+Check the root [`.env` template](./.env) for the full list of optional variables you can override.
 
 ## Database Options
 
