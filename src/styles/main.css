@@ -79,7 +79,7 @@ body {
 		@apply [-ms-overflow-style:none] [scrollbar-width:none] [&::-ms-scrollbar]:hidden [&::-webkit-scrollbar]:hidden;
 	}
 
-	.prose {
+	.prose:not(.prose-sm, .prose-lg, .prose-xl, .prose-2xl) {
 		font-size: 0.94rem;
 	}
 
