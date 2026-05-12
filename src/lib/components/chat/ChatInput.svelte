@@ -192,6 +192,7 @@
 			value.trim() !== ""
 		) {
 			event.preventDefault();
+			tick();
 			onsubmit?.();
 		}
 	}

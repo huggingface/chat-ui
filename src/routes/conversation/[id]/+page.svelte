@@ -8,7 +8,7 @@
 	import { base } from "$app/paths";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
-	import type { Message, MessageFile } from "$lib/types/Message";
+	import type { Message } from "$lib/types/Message";
 	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
@@ -118,21 +118,16 @@
 			$isAborted = false;
 			$loading = true;
 			pending = true;
-			// Skip the await entirely when there are no files so the optimistic
-			// addChildren below runs in the same task as the keydown — otherwise
-			// the user bubble can't paint until the next microtask.
-			const base64Files: MessageFile[] = files?.length
-				? await Promise.all(
-						files.map((file) =>
-							file2base64(file).then((value) => ({
-								type: "base64" as const,
-								value,
-								mime: file.type,
-								name: file.name,
-							}))
-						)
-					)
-				: [];
+			const base64Files = await Promise.all(
+				(files ?? []).map((file) =>
+					file2base64(file).then((value) => ({
+						type: "base64" as const,
+						value,
+						mime: file.type,
+						name: file.name,
+					}))
+				)
+			);
 
 			let messageToWriteToId: Message["id"] | undefined = undefined;
 			// used for building the prompt, subtree of the conversation that goes from the latest message to the root
