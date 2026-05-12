@@ -83,6 +83,12 @@ body {
 		@apply block max-w-full overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
 	}
 
+	/* Prevent columns from squishing on narrow viewports; long content wraps instead of dominating. */
+	.prose :is(th, td) {
+		min-width: 6rem;
+		max-width: 16rem;
+	}
+
 	/* .scrollbar-custom {
 		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
 	} */
