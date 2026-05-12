@@ -17,7 +17,7 @@
 		class="flex w-full flex-col gap-8 bg-white bg-gradient-to-b to-transparent px-6 pb-7 dark:bg-black dark:from-white/10 dark:to-white/5"
 	>
 		<div
-			class="relative -mx-6 grid h-48 select-none place-items-center bg-gradient-to-t from-black/5 dark:from-white/10"
+			class="relative -mx-6 grid h-48 select-none place-items-center overflow-hidden rounded-b-xl bg-gradient-to-t from-black/5 dark:from-white/10"
 		>
 			<img
 				class="size-full bg-black object-cover"
