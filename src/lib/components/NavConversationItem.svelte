@@ -56,7 +56,7 @@
 </script>
 
 <div
-	class="group flex h-[2.08rem] flex-none items-center gap-1.5 rounded-lg pl-2 pr-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 max-sm:h-10
+	class="group flex h-8 flex-none items-center gap-1.5 rounded-lg pl-2 pr-1.5 text-base text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 max-sm:h-10 sm:text-sm
 		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}"
 >
 	{#if inlineEditing}

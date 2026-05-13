@@ -83,6 +83,12 @@ body {
 		@apply block max-w-full overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
 	}
 
+	/* Prevent columns from squishing on narrow viewports; long content wraps instead of dominating. */
+	.prose :is(th, td) {
+		min-width: 6rem;
+		max-width: 16rem;
+	}
+
 	/* .scrollbar-custom {
 		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
 	} */
@@ -141,4 +147,40 @@ body {
 
 .katex-display {
 	overflow: auto hidden;
+}
+
+.router-shimmer {
+	display: inline-block;
+	background-image: linear-gradient(
+		90deg,
+		rgba(156, 163, 175, 1) 0%,
+		rgba(156, 163, 175, 0.6) 10%,
+		rgba(156, 163, 175, 0.6) 50%,
+		rgba(156, 163, 175, 0.6) 90%,
+		rgba(156, 163, 175, 1) 100%
+	);
+	background-size: 220% 100%;
+	animation: router-shimmer 2.8s linear infinite;
+	background-clip: text;
+	-webkit-background-clip: text;
+	color: transparent;
+	-webkit-text-fill-color: transparent;
+}
+
+.dark .router-shimmer {
+	background-image: linear-gradient(
+		90deg,
+		rgba(255, 255, 255, 0.15) 0%,
+		rgba(255, 255, 255, 0.7) 50%,
+		rgba(255, 255, 255, 0.15) 100%
+	);
+}
+
+@keyframes router-shimmer {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
 }

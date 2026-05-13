@@ -31,7 +31,14 @@ import { AbortedGenerations } from "$lib/server/abortedGenerations";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
-	"model" | "conv" | "assistant" | "forceMultimodal" | "forceTools" | "provider" | "locals"
+	| "model"
+	| "conv"
+	| "assistant"
+	| "forceMultimodal"
+	| "forceTools"
+	| "provider"
+	| "reasoningEffort"
+	| "locals"
 > & { messages: EndpointMessage[] };
 
 // Return type: "completed" = MCP ran successfully, "not_applicable" = MCP didn't run, "aborted" = user aborted
@@ -45,6 +52,7 @@ export async function* runMcpFlow({
 	forceMultimodal,
 	forceTools,
 	provider,
+	reasoningEffort,
 	locals,
 	preprompt,
 	abortSignal,
@@ -399,7 +407,9 @@ export async function* runMcpFlow({
 		const modelIdWithProvider =
 			provider && provider !== "auto" ? `${baseModelId}:${provider}` : baseModelId;
 
-		const completionBase: Omit<ChatCompletionCreateParamsStreaming, "messages"> = {
+		const completionBase: Omit<ChatCompletionCreateParamsStreaming, "messages"> & {
+			reasoning_effort?: "low" | "medium" | "high";
+		} = {
 			model: modelIdWithProvider,
 			stream: true,
 			temperature: typeof parameters?.temperature === "number" ? parameters.temperature : undefined,
@@ -416,6 +426,7 @@ export async function* runMcpFlow({
 			max_tokens: typeof maxTokens === "number" ? maxTokens : undefined,
 			tools: oaTools,
 			tool_choice: "auto",
+			...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
 		};
 
 		const toPrimitive = (value: unknown) => {

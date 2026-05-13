@@ -20,6 +20,7 @@
 	import file2base64 from "$lib/utils/file2base64";
 	import { base } from "$app/paths";
 	import ChatMessage from "./ChatMessage.svelte";
+	import ThinkingEffortChip from "./ThinkingEffortChip.svelte";
 	import ScrollToBottomBtn from "../ScrollToBottomBtn.svelte";
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
 	import { browser } from "$app/environment";
@@ -864,6 +865,11 @@
 				{/if}
 				{#if !messages.length && !loading}
 					<span class="max-sm:hidden">Generated content may be inaccurate or false.</span>
+				{/if}
+				{#if $settings.reasoningOverrides?.[currentModel.id] ?? currentModel.supportsReasoning}
+					<div class="ml-auto">
+						<ThinkingEffortChip modelId={currentModel.id} />
+					</div>
 				{/if}
 			</div>
 		</div>

@@ -99,20 +99,14 @@
 		/>
 
 		<div class="mt-6 min-h-[50vh]">
-			<div
-				class="overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
-			>
+			<div>
 				{#each filteredModels as model, index (model.id)}
 					{@const isActive = model.id === $settings.activeModel}
-					{@const isLast = index === filteredModels.length - 1}
 					<a
 						href="{base}/models/{model.id}"
 						aria-label="Model card for {model.displayName}"
-						class="group flex cursor-pointer items-center gap-2 p-3 sm:gap-4 sm:p-4
-							{isActive
-							? 'bg-gray-50 dark:bg-gray-800'
-							: 'bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800'}
-							{isLast ? '' : 'border-b border-gray-100 dark:border-gray-800'}"
+						class="group flex cursor-pointer items-center gap-2 rounded-xl p-3 sm:gap-4 sm:p-4
+							{isActive ? 'bg-gray-50 dark:bg-gray-800' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}"
 					>
 						<!-- Avatar -->
 						<div class="flex-shrink-0">
@@ -164,14 +158,14 @@
 								{#if providerOverride === "fastest"}
 									<div
 										title="Provider: Fastest"
-										class="rounded-md bg-green-50 p-1.5 text-green-600 dark:bg-green-900/20 dark:text-green-400"
+										class="rounded-md bg-gray-100 p-1.5 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 									>
 										<IconFast classNames="size-3 sm:size-3.5" />
 									</div>
 								{:else if providerOverride === "cheapest"}
 									<div
 										title="Provider: Cheapest"
-										class="rounded-md bg-blue-50 p-1.5 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+										class="rounded-md bg-gray-100 p-1.5 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 									>
 										<IconCheap classNames="size-3 sm:size-3.5" />
 									</div>
@@ -191,7 +185,7 @@
 							{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
 								<div
 									title="This model supports tool calling (functions)."
-									class="rounded-md bg-purple-50 p-1.5 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
+									class="rounded-md bg-gray-100 p-1.5 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 								>
 									<LucideHammer class="size-3 sm:size-3.5" />
 								</div>
@@ -199,7 +193,7 @@
 							{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
 								<div
 									title="This model is multimodal and supports image inputs natively."
-									class="rounded-md bg-blue-50 p-1.5 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+									class="rounded-md bg-gray-100 p-1.5 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 								>
 									<LucideImage class="size-3 sm:size-3.5" />
 								</div>

@@ -17,7 +17,8 @@
 	import { fetchMessageUpdates, resolveStreamingMode } from "$lib/utils/messageUpdates";
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
-	import { enabledServers } from "$lib/stores/mcpServers";
+	import { enabledServers, mcpServersLoaded } from "$lib/stores/mcpServers";
+	import { get } from "svelte/store";
 	import { browser } from "$app/environment";
 	import {
 		addBackgroundGeneration,
@@ -220,6 +221,23 @@
 			messageUpdatesAbortController = new AbortController();
 			const streamingMode = resolveStreamingMode($settings);
 
+			// Wait for the MCP store to hydrate before sending so the server receives
+			// the user's exact selection. Sending [] before the base server list is
+			// fetched filters env servers to nothing; omitting the field would skip
+			// any explicit opt-outs the user saved in localStorage.
+			if (!get(mcpServersLoaded)) {
+				await new Promise<void>((resolve) => {
+					let unsub: (() => void) | undefined;
+					unsub = mcpServersLoaded.subscribe((loaded) => {
+						if (loaded) {
+							// unsub may still be undefined if subscribe fires synchronously
+							unsub?.();
+							resolve();
+						}
+					});
+				});
+			}
+
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				convId,
 				{
@@ -384,6 +402,15 @@
 					// Check if this is a 402 payment required error
 					if (update.statusCode === 402) {
 						showSubscribeModal = true;
+					} else if (
+						update.statusCode === 401 &&
+						typeof update.message === "string" &&
+						/oauth authorization|has been revoked|requested scopes/i.test(update.message)
+					) {
+						// The stored OAuth token was revoked or no longer matches scopes.
+						// Restart the OAuth flow and return to this conversation afterwards.
+						const next = encodeURIComponent(`${base}/conversation/${convId}`);
+						window.location.assign(`${base}/login?next=${next}`);
 					} else {
 						$error = update.message ?? "An error has occurred";
 					}

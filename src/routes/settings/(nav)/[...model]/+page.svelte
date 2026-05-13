@@ -70,6 +70,16 @@
 		}));
 	}
 
+	function getReasoningOverride() {
+		return $settings.reasoningOverrides?.[modelId] ?? Boolean(model?.supportsReasoning);
+	}
+	function setReasoningOverride(v: boolean) {
+		settings.update((s) => ({
+			...s,
+			reasoningOverrides: { ...s.reasoningOverrides, [modelId]: v },
+		}));
+	}
+
 	function getCustomPrompt() {
 		return $settings.customPrompts?.[modelId] ?? "";
 	}
@@ -319,6 +329,26 @@
 						name="forceMultimodal"
 						disabled={publicConfig.isHuggingChat}
 						bind:checked={getMultimodalOverride, setMultimodalOverride}
+					/>
+				</div>
+
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+							Reasoning effort
+						</div>
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
+							{#if publicConfig.isHuggingChat}
+								Determined by the inference provider for this model.
+							{:else}
+								Show a Low / Medium / High selector in the chat footer for this model.
+							{/if}
+						</p>
+					</div>
+					<Switch
+						name="forceReasoning"
+						disabled={publicConfig.isHuggingChat}
+						bind:checked={getReasoningOverride, setReasoningOverride}
 					/>
 				</div>
 

@@ -333,6 +333,13 @@
 					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Share your feedback on HuggingChat</a
 				>
 				<a
+					href="https://huggingface.co/models/inference"
+					target="_blank"
+					rel="noreferrer"
+					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
+					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Compare Inference Providers</a
+				>
+				<a
 					href="{base}/privacy"
 					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
 					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> About & Privacy</a
