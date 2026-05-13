@@ -4,8 +4,8 @@
 	import { tick } from "svelte";
 	import { DropdownMenu } from "bits-ui";
 
-	import CarbonTrashCan from "~icons/carbon/trash-can";
-	import CarbonEdit from "~icons/carbon/edit";
+	import CarbonTrashCan from "~icons/lucide/trash-2";
+	import CarbonEdit from "~icons/lucide/pencil";
 	import LucideEllipsis from "~icons/lucide/ellipsis";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 

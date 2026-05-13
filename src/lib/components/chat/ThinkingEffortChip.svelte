@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { DropdownMenu } from "bits-ui";
-	import CarbonCaretDown from "~icons/carbon/caret-down";
+	import CarbonCaretDown from "~icons/lucide/chevron-down";
 	import LucideCheck from "~icons/lucide/check";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ReasoningEffort } from "$lib/types/Settings";

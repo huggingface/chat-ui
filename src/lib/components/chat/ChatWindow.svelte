@@ -3,11 +3,11 @@
 	import { onDestroy, tick } from "svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
-	import IconCheap from "$lib/components/icons/IconCheap.svelte";
-	import IconFast from "$lib/components/icons/IconFast.svelte";
-	import CarbonCaretDown from "~icons/carbon/caret-down";
+	import IconCheap from "~icons/lucide/coins";
+	import IconFast from "~icons/lucide/gauge";
+	import CarbonCaretDown from "~icons/lucide/chevron-down";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
-	import CarbonDirectionRight from "~icons/carbon/direction-right-01";
+	import CarbonDirectionRight from "~icons/lucide/corner-down-right";
 	import IconArrowUp from "~icons/lucide/arrow-up";
 	import IconMic from "~icons/lucide/mic";
 
@@ -819,9 +819,9 @@
 										title="Provider: {providerOverride}"
 									>
 										{#if providerOverride === "fastest"}
-											<IconFast classNames="text-sm" />
+											<IconFast class="text-sm" />
 										{:else if providerOverride === "cheapest"}
-											<IconCheap classNames="text-sm" />
+											<IconCheap class="text-sm" />
 										{:else if hubOrg}
 											<img
 												src="https://huggingface.co/api/avatars/{hubOrg}"

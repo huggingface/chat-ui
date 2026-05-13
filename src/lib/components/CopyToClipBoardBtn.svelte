@@ -2,7 +2,7 @@
 	import { onDestroy } from "svelte";
 	import { confirm as hapticConfirm } from "$lib/utils/haptics";
 
-	import CarbonCopy from "~icons/carbon/copy";
+	import CarbonCopy from "~icons/lucide/copy";
 	import Tooltip from "./Tooltip.svelte";
 
 	interface Props {

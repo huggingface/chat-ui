@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Modal from "./Modal.svelte";
 	import { onMount, onDestroy } from "svelte";
-	import CarbonClose from "~icons/carbon/close";
+	import CarbonClose from "~icons/lucide/x";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 
 	interface Props {

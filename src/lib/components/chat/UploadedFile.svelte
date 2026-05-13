@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { page } from "$app/state";
 	import type { MessageFile } from "$lib/types/Message";
-	import CarbonClose from "~icons/carbon/close";
-	import CarbonDocumentBlank from "~icons/carbon/document-blank";
-	import CarbonDownload from "~icons/carbon/download";
-	import CarbonDocument from "~icons/carbon/document";
+	import CarbonClose from "~icons/lucide/x";
+	import CarbonDocumentBlank from "~icons/lucide/file";
+	import CarbonDownload from "~icons/lucide/download";
+	import CarbonDocument from "~icons/lucide/file-text";
 	import Modal from "../Modal.svelte";
 	import AudioPlayer from "../players/AudioPlayer.svelte";
-	import EosIconsLoading from "~icons/eos-icons/loading";
+	import EosIconsLoading from "~icons/lucide/loader-circle";
 	import { base } from "$app/paths";
 	import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
 

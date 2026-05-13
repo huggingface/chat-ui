@@ -2,7 +2,7 @@
 	import { onMount } from "svelte";
 	import Portal from "../Portal.svelte";
 	import PinchZoomImage from "./PinchZoomImage.svelte";
-	import CarbonClose from "~icons/carbon/close";
+	import CarbonClose from "~icons/lucide/x";
 
 	interface Props {
 		src: string;

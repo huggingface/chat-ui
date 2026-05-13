@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Modal from "./Modal.svelte";
-	import CarbonClose from "~icons/carbon/close";
-	import CarbonBlockchain from "~icons/carbon/blockchain";
+	import CarbonClose from "~icons/lucide/x";
+	import CarbonBlockchain from "~icons/lucide/blocks";
 
 	interface Props {
 		preprompt: string;

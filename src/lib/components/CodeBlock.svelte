@@ -2,8 +2,8 @@
 	import CopyToClipBoardBtn from "./CopyToClipBoardBtn.svelte";
 	import DOMPurify from "isomorphic-dompurify";
 	import HtmlPreviewModal from "./HtmlPreviewModal.svelte";
-	import PlayFilledAlt from "~icons/carbon/play-filled-alt";
-	import EosIconsLoading from "~icons/eos-icons/loading";
+	import PlayFilledAlt from "~icons/lucide/play";
+	import EosIconsLoading from "~icons/lucide/loader-circle";
 
 	interface Props {
 		code?: string;

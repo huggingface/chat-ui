@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
+	import CarbonStopFilledAlt from "~icons/lucide/square";
 
 	interface Props {
 		classNames?: string;

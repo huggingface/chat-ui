@@ -12,8 +12,8 @@
 		healthCheckServer,
 	} from "$lib/stores/mcpServers";
 	import type { KeyValuePair } from "$lib/types/Tool";
-	import IconAddLarge from "~icons/carbon/add-large";
-	import IconRefresh from "~icons/carbon/renew";
+	import IconAddLarge from "~icons/lucide/plus";
+	import IconRefresh from "~icons/lucide/refresh-cw";
 	import LucideHammer from "~icons/lucide/hammer";
 	import IconMCP from "$lib/components/icons/IconMCP.svelte";
 

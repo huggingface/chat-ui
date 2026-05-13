@@ -1,7 +1,7 @@
 <script lang="ts">
-	import CarbonTrashCan from "~icons/carbon/trash-can";
-	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
-	import CarbonLogoGithub from "~icons/carbon/logo-github";
+	import CarbonTrashCan from "~icons/lucide/trash-2";
+	import CarbonArrowUpRight from "~icons/lucide/arrow-up-right";
+	import CarbonLogoGithub from "~icons/lucide/github";
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { StreamingMode } from "$lib/types/Settings";

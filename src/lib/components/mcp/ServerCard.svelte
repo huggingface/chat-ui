@@ -1,13 +1,13 @@
 <script lang="ts">
 	import type { MCPServer } from "$lib/types/Tool";
 	import { toggleServer, healthCheckServer, deleteCustomServer } from "$lib/stores/mcpServers";
-	import IconCheckmark from "~icons/carbon/checkmark-filled";
-	import IconWarning from "~icons/carbon/warning-filled";
-	import IconPending from "~icons/carbon/pending-filled";
-	import IconRefresh from "~icons/carbon/renew";
-	import IconTrash from "~icons/carbon/trash-can";
+	import IconCheckmark from "~icons/lucide/circle-check";
+	import IconWarning from "~icons/lucide/triangle-alert";
+	import IconPending from "~icons/lucide/clock";
+	import IconRefresh from "~icons/lucide/refresh-cw";
+	import IconTrash from "~icons/lucide/trash-2";
 	import LucideHammer from "~icons/lucide/hammer";
-	import IconSettings from "~icons/carbon/settings";
+	import IconSettings from "~icons/lucide/settings";
 	import Switch from "$lib/components/Switch.svelte";
 	import { getMcpServerFaviconUrl } from "$lib/utils/favicon";
 

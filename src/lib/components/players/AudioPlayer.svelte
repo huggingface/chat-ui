@@ -1,6 +1,6 @@
 <script lang="ts">
-	import CarbonPause from "~icons/carbon/pause";
-	import CarbonPlay from "~icons/carbon/play";
+	import CarbonPause from "~icons/lucide/pause";
+	import CarbonPlay from "~icons/lucide/play";
 	interface Props {
 		src: string;
 		name: string;

@@ -21,7 +21,7 @@
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { isPro } from "$lib/stores/isPro";
-	import IconShare from "$lib/components/icons/IconShare.svelte";
+	import IconShare from "~icons/lucide/share";
 	import { shareModal } from "$lib/stores/shareModal";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";

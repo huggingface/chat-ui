@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Message } from "$lib/types/Message";
-	import CarbonChevronLeft from "~icons/carbon/chevron-left";
-	import CarbonChevronRight from "~icons/carbon/chevron-right";
+	import CarbonChevronLeft from "~icons/lucide/chevron-left";
+	import CarbonChevronRight from "~icons/lucide/chevron-right";
 
 	interface Props {
 		message: Message;

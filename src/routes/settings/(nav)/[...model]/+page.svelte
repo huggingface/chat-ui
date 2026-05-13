@@ -4,18 +4,18 @@
 
 	import type { BackendModel } from "$lib/server/models";
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
-	import IconFast from "$lib/components/icons/IconFast.svelte";
-	import IconCheap from "$lib/components/icons/IconCheap.svelte";
+	import IconFast from "~icons/lucide/gauge";
+	import IconCheap from "~icons/lucide/coins";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
-	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
-	import CarbonCopy from "~icons/carbon/copy";
-	import CarbonChat from "~icons/carbon/chat";
-	import CarbonCode from "~icons/carbon/code";
-	import CarbonChevronDown from "~icons/carbon/chevron-down";
-	import CarbonReset from "~icons/carbon/reset";
+	import CarbonArrowUpRight from "~icons/lucide/arrow-up-right";
+	import CarbonCopy from "~icons/lucide/copy";
+	import CarbonChat from "~icons/lucide/message-square";
+	import CarbonCode from "~icons/lucide/code";
+	import CarbonChevronDown from "~icons/lucide/chevron-down";
+	import CarbonReset from "~icons/lucide/rotate-ccw";
 	import LucideCheck from "~icons/lucide/check";
-	import CarbonMagicWandFilled from "~icons/carbon/magic-wand-filled";
+	import CarbonMagicWandFilled from "~icons/lucide/wand-sparkles";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { Select } from "bits-ui";
 
@@ -410,13 +410,13 @@
 								<span
 									class="grid size-5 flex-none place-items-center rounded-md bg-green-500/10 text-green-600 dark:text-green-500"
 								>
-									<IconFast classNames="size-3" />
+									<IconFast class="size-3" />
 								</span>
 							{:else if currentValue === "cheapest"}
 								<span
 									class="grid size-5 flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
 								>
-									<IconCheap classNames="size-3" />
+									<IconCheap class="size-3" />
 								</span>
 							{:else if currentProvider}
 								{@const hubOrg =
@@ -463,13 +463,13 @@
 											<span
 												class="grid size-5 flex-none place-items-center rounded-md bg-green-500/10 text-green-600 dark:text-green-500"
 											>
-												<IconFast classNames="size-3" />
+												<IconFast class="size-3" />
 											</span>
 										{:else if opt.value === "cheapest"}
 											<span
 												class="grid size-5 flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
 											>
-												<IconCheap classNames="size-3" />
+												<IconCheap class="size-3" />
 											</span>
 										{/if}
 										<span class="flex-1">{opt.label}</span>

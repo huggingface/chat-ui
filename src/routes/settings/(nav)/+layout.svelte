@@ -5,15 +5,15 @@
 	import { page } from "$app/state";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
-	import IconBurger from "$lib/components/icons/IconBurger.svelte";
-	import IconFast from "$lib/components/icons/IconFast.svelte";
-	import IconCheap from "$lib/components/icons/IconCheap.svelte";
-	import CarbonClose from "~icons/carbon/close";
-	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
-	import CarbonChevronLeft from "~icons/carbon/chevron-left";
+	import IconBurger from "~icons/lucide/menu";
+	import IconFast from "~icons/lucide/gauge";
+	import IconCheap from "~icons/lucide/coins";
+	import CarbonClose from "~icons/lucide/x";
+	import CarbonTextLongParagraph from "~icons/lucide/align-left";
+	import CarbonChevronLeft from "~icons/lucide/chevron-left";
 	import LucideImage from "~icons/lucide/image";
 	import LucideHammer from "~icons/lucide/hammer";
-	import IconGear from "~icons/bi/gear-fill";
+	import IconGear from "~icons/lucide/settings";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
@@ -117,7 +117,7 @@
 				}}
 			>
 				<IconBurger
-					classNames="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white sm:hidden"
+					class="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white sm:hidden"
 				/>
 				<CarbonChevronLeft
 					class="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white max-sm:hidden"
@@ -195,7 +195,7 @@
 								aria-label="Provider: {providerOverride}"
 								role="img"
 							>
-								<IconFast classNames="size-3" />
+								<IconFast class="size-3" />
 							</span>
 						{:else if providerOverride === "cheapest"}
 							<span
@@ -204,7 +204,7 @@
 								aria-label="Provider: {providerOverride}"
 								role="img"
 							>
-								<IconCheap classNames="size-3" />
+								<IconCheap class="size-3" />
 							</span>
 						{:else if hubOrg}
 							<span
