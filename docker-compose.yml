@@ -1,6 +1,19 @@
 # For development only
 # Set MONGODB_URL=mongodb://localhost:27017 in .env.local to use this container
 services:
+  chat-ui:
+    build: .
+    ports:
+      - "8085:3000"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - POLYGLOTTE_SECRET_KEY=production-secure-key-here
+      - HF_TOKEN=${HF_TOKEN:-YOUR_HF_TOKEN_HERE}
+    volumes:
+      - local-persistent-vol:/app/data
+    depends_on:
+      mongo:
+        condition: service_healthy
   mongo:
     image: mongo:8
     hostname: mongodb
@@ -11,7 +24,7 @@ services:
     mem_reservation: "3g"
     healthcheck:
       # need to specify the hostname here because the default is the container name, and we run the app outside of docker
-      test: test $$(mongosh --quiet --eval 'try {rs.status().ok} catch(e) {rs.initiate({_id:"rs0",members:[{_id:0,host:"127.0.0.1:${LOCAL_MONGO_PORT:-27017}"}]}).ok}') -eq 1
+      test: test $$(mongosh --quiet --eval 'try {rs.status().ok} catch(e) {rs.initiate({_id:"rs0",members:[{_id:0,host:"mongodb:27017"}]}).ok}') -eq 1
       interval: 5s
     volumes:
       - mongodb-data:/data/db
@@ -19,3 +32,4 @@ services:
 
 volumes:
   mongodb-data:
+  local-persistent-vol:

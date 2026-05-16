@@ -26,6 +26,8 @@ import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { MetricsServer } from "$lib/server/metrics";
+import { CortexIntegrationEngine } from "$lib/server/cortex";
+import { AlterEgoValidator } from "$lib/server/alterego/validation";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -124,7 +126,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	}
 
 	const {
-		inputs: newPrompt,
+		inputs: rawPrompt,
 		id: messageId,
 		is_retry: isRetry,
 		selectedMcpServerNames,
@@ -167,6 +169,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			),
 		})
 		.parse(JSON.parse(json));
+
+	let newPrompt = rawPrompt;
+	if (newPrompt) {
+		const cortex = new CortexIntegrationEngine();
+		const cortexResult = await cortex.processQuery(newPrompt, {});
+		newPrompt = cortexResult.synthesizedPrompt;
+		console.log("[JUNIOR-CORTEX] Expansion/Contraction triggered");
+	}
 
 	// Attach MCP selection to locals so the text generation pipeline can consume it
 	try {
@@ -590,6 +600,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);
+
+				const alterEgo = new AlterEgoValidator();
+				await alterEgo.validateState(messageToWriteTo.content, "default_pattern");
+				console.log("[JUNIOR-ALTEREGO] Validation complete");
+
 				if (ctrl.signal.aborted) {
 					abortedByUser = true;
 				}

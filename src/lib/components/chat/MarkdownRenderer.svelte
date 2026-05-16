@@ -29,10 +29,13 @@
 		updateDebouncer.endRender();
 	}
 
+	let renderError = $state<string | null>(null);
+
 	$effect(() => {
 		if (!browser) return;
 
 		const requestId = ++latestRequestId;
+		renderError = null;
 
 		if (worker) {
 			updateDebouncer.startRender();
@@ -41,9 +44,15 @@
 		}
 
 		(async () => {
-			updateDebouncer.startRender();
-			const processed = await processBlocks(content, sources);
-			handleBlocks(processed, requestId);
+			try {
+				updateDebouncer.startRender();
+				const processed = await processBlocks(content, sources);
+				handleBlocks(processed, requestId);
+			} catch (err) {
+				console.error("Markdown rendering failed:", err);
+				renderError = "Failed to render markdown content safely.";
+				updateDebouncer.endRender();
+			}
 		})();
 	});
 
@@ -64,6 +73,12 @@
 	});
 </script>
 
-{#each blocks as block, index (loading && index === blocks.length - 1 ? `stream-${index}` : block.id)}
-	<MarkdownBlock tokens={block.tokens} {loading} />
-{/each}
+{#if renderError}
+	<div class="rounded bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-400">
+		{renderError}
+	</div>
+{:else}
+	{#each blocks as block, index (loading && index === blocks.length - 1 ? `stream-${index}` : block.id)}
+		<MarkdownBlock tokens={block.tokens} {loading} />
+	{/each}
+{/if}
