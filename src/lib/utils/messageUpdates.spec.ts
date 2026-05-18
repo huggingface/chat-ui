@@ -49,6 +49,27 @@ describe("smoothStreamUpdates", () => {
 		expect(streamText(updates)).toBe("Hello world!");
 	});
 
+	it("strips transport padding before detecting chunks", async () => {
+		const source: MessageUpdate[] = [
+			{ type: MessageUpdateType.Stream, token: "Hel".padEnd(16, "\0") },
+			{ type: MessageUpdateType.Stream, token: "lo ".padEnd(16, "\0") },
+			{ type: MessageUpdateType.Stream, token: "wor".padEnd(16, "\0") },
+			{ type: MessageUpdateType.Stream, token: "ld!".padEnd(16, "\0") },
+		];
+
+		const updates = await collect(
+			smoothStreamUpdates(fromArray(source), {
+				minDelayMs: 0,
+				maxDelayMs: 0,
+				_internal: { detectChunk: (buffer) => /\S+\s+/.exec(buffer)?.[0] ?? null },
+			})
+		);
+
+		const streamedChunks = updates.filter((u) => u.type === MessageUpdateType.Stream);
+		expect(streamedChunks.map((u) => u.token)).toEqual(["Hello ", "world!"]);
+		expect(streamText(updates)).toBe("Hello world!");
+	});
+
 	it("flushes buffered stream text before non-stream updates", async () => {
 		const source: MessageUpdate[] = [
 			{ type: MessageUpdateType.Stream, token: "hello" },
@@ -63,6 +84,51 @@ describe("smoothStreamUpdates", () => {
 		expect(updates[1]).toMatchObject({ type: MessageUpdateType.Stream });
 		expect(updates[2]).toEqual({ type: MessageUpdateType.Title, title: "done" });
 		expect(streamText(updates)).toBe("hello world");
+	});
+
+	it("does not stall on long unbroken text", async () => {
+		const source: MessageUpdate[] = [{ type: MessageUpdateType.Stream, token: "a".repeat(95) }];
+
+		const updates = await collect(
+			smoothStreamUpdates(fromArray(source), {
+				minDelayMs: 0,
+				maxDelayMs: 0,
+				maxChunkChars: 32,
+			})
+		);
+
+		const streamedChunks = updates.filter((u) => u.type === MessageUpdateType.Stream);
+		expect(streamedChunks.map((u) => u.token.length)).toEqual([32, 32, 31]);
+		expect(streamText(updates)).toBe("a".repeat(95));
+	});
+
+	it("lets control updates catch up to queued stream backlog", async () => {
+		const source: MessageUpdate[] = [
+			{ type: MessageUpdateType.Stream, token: "word ".repeat(40) },
+			{ type: MessageUpdateType.Title, title: "done" },
+		];
+		const delays: number[] = [];
+		let nowMs = 0;
+
+		const updates = await collect(
+			smoothStreamUpdates(fromArray(source), {
+				minDelayMs: 5,
+				maxDelayMs: 80,
+				minRateCharsPerMs: 0.3,
+				_internal: {
+					now: () => nowMs,
+					sleep: async (ms: number) => {
+						delays.push(ms);
+						nowMs += ms;
+					},
+					detectChunk: (buffer) => /\S+\s+/.exec(buffer)?.[0] ?? null,
+				},
+			})
+		);
+
+		expect(updates.at(-1)).toEqual({ type: MessageUpdateType.Title, title: "done" });
+		expect(delays).toEqual([]);
+		expect(streamText(updates)).toBe("word ".repeat(40));
 	});
 
 	it("spreads burst tokens over time", async () => {
@@ -165,6 +231,30 @@ describe("smoothStreamUpdates", () => {
 				})
 			)
 		).rejects.toThrow("source failed");
+	});
+
+	it("flushes partial buffered text before source errors", async () => {
+		async function* failingSource(): AsyncGenerator<MessageUpdate> {
+			yield { type: MessageUpdateType.Stream, token: "hel" };
+			throw new Error("source failed");
+		}
+
+		const seen: MessageUpdate[] = [];
+		let seenError: Error | null = null;
+		try {
+			for await (const update of smoothStreamUpdates(failingSource(), {
+				minDelayMs: 0,
+				maxDelayMs: 0,
+				_internal: { detectChunk: (buffer) => /\S+\s+/.exec(buffer)?.[0] ?? null },
+			})) {
+				seen.push(update);
+			}
+		} catch (error) {
+			seenError = error as Error;
+		}
+
+		expect(streamText(seen)).toBe("hel");
+		expect(seenError?.message).toBe("source failed");
 	});
 
 	it("drains queued stream chunks before throwing source errors", async () => {

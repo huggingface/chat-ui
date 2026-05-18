@@ -294,12 +294,6 @@
 					return;
 				}
 
-				// Remove null characters added due to remote keylogging prevention
-				// See server code for more details
-				if (update.type === MessageUpdateType.Stream) {
-					update.token = update.token.replaceAll("\0", "");
-				}
-
 				const isKeepAlive =
 					update.type === MessageUpdateType.Status &&
 					update.status === MessageUpdateStatus.KeepAlive;
