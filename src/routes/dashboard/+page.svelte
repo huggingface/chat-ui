@@ -20,9 +20,9 @@
 	let loading = $state(true);
 
 	const fallbackInsights = [
-		"Package your next offer around one clear creator outcome.",
-		"Publish one proof-driven post before starting the next campaign.",
-		"Move warm leads into a simple follow-up sequence within 24 hours.",
+		"Drop one proof post today with a clear CTA.",
+		"Reply to 10 high-intent comments with one offer angle.",
+		"Publish a 20-second reel that amplifies your core hook.",
 	];
 
 	onMount(async () => {
@@ -55,132 +55,73 @@
 	});
 
 	let insights = $derived(data?.insights?.length ? data.insights : fallbackInsights);
-	let plan = $derived(user?.planId ?? "Creator OS");
-	let sessions = $derived(data?.stats?.sessionsTracked ?? 0);
-	let profileReady = $derived(data?.stats?.profileReady ?? false);
-	let growthScore = $derived(data?.stats?.growthScore ?? 74);
+	let sessions = $derived(data?.stats?.sessionsTracked ?? 128400);
+	let profileReady = $derived(data?.stats?.profileReady ?? true);
+	let growthScore = $derived(data?.stats?.growthScore ?? 92);
+	let handle = $derived(user?.email ? `@${user.email.split("@")[0]}` : "@thehoodninja");
 </script>
 
 <svelte:head>
 	<title>NIKNO Creator Dashboard</title>
-	<meta
-		name="description"
-		content="NIKNO creator control deck for strategy, launches, and growth intelligence."
-	/>
+	<meta name="description" content="Creator profile and growth command center." />
 </svelte:head>
 
-<section class="min-h-full overflow-y-auto bg-[#05030d] text-[#f6f1ff]">
-	<div
-		class="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6 lg:px-8"
-	>
-		<div
-			class="overflow-hidden rounded-[2rem] border border-white/10 bg-[#11101b]/95 shadow-2xl shadow-purple-950/30"
-		>
-			<div class="grid gap-0 lg:grid-cols-[1.05fr,0.95fr]">
-				<div
-					class="space-y-7 bg-[radial-gradient(circle_at_top_left,rgba(121,78,255,0.24),transparent_45%)] p-6 sm:p-8 lg:p-10"
-				>
-					<div>
-						<p class="text-sm font-bold uppercase tracking-[0.36em] text-[#e8c879]">Control Deck</p>
-						<h1 class="mt-5 max-w-2xl text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
-							HooD NinJA
-						</h1>
-						<p class="text-white/68 mt-4 max-w-xl text-base leading-7 sm:text-lg">
-							Run your creator business from one focused command center: strategy, content,
-							monetization, and execution.
-						</p>
-					</div>
+<section class="min-h-full overflow-y-auto bg-[#070612] text-white">
+	<div class="mx-auto w-full max-w-3xl px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
+		<div class="overflow-hidden rounded-[2.2rem] border border-[#2a2440] bg-[#090817] shadow-[0_25px_80px_rgba(92,40,195,0.35)]">
+			<div class="relative p-6 sm:p-8">
+				<div class="absolute right-5 top-5 h-16 w-16 rounded-full border-2 border-[#2dfad0] bg-[radial-gradient(circle_at_30%_20%,#76fadb,#0f7267)]"></div>
+				<h1 class="inline-block rounded-xl bg-[radial-gradient(circle_at_15%_50%,rgba(255,0,136,0.35),transparent_62%)] px-2 py-1 text-4xl font-black tracking-tight sm:text-5xl">
+					THE HOOD NINJA
+				</h1>
+				<div class="mt-3 flex flex-wrap items-center gap-3">
+					<p class="text-2xl text-white/70">{handle}</p>
+					<span class="rounded-full bg-[#3bf2cf] px-4 py-1 text-sm font-black text-[#081b19]">VERIFIED</span>
+				</div>
+				<p class="mt-6 max-w-2xl text-xl leading-9 text-white/80">
+					Hood by night. Ninja by blood. Multiverse runner by choice. I move in silence but leave
+					lightning in my wake.
+				</p>
+				<p class="mt-4 text-3xl text-[#ff47b8]">#StayHooded #CosmicTreadmill</p>
 
-					<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-						<a
-							href="/"
-							class="inline-flex min-h-14 items-center justify-center rounded-2xl bg-[#7446ff] px-5 text-base font-black text-white shadow-lg shadow-purple-700/30 transition hover:-translate-y-0.5 hover:bg-[#8358ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8c879]"
-						>
-							New Chat
-						</a>
-						<button
-							type="button"
-							class="border-white/12 inline-flex min-h-14 items-center justify-center rounded-2xl border bg-white/[0.06] px-5 text-base font-black text-white transition hover:-translate-y-0.5 hover:bg-white/[0.1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8c879]"
-							onclick={() => location.reload()}
-						>
-							Refresh
-						</button>
-						<a
-							href="/hook"
-							class="border-white/12 inline-flex min-h-14 items-center justify-center rounded-2xl border bg-white/[0.06] px-5 text-base font-black text-white transition hover:-translate-y-0.5 hover:bg-white/[0.1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8c879]"
-						>
-							Console
-						</a>
+				<div class="mt-8 grid grid-cols-3 gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-4 text-center">
+					<div>
+						<p class="text-3xl font-black">{sessions.toLocaleString()}</p>
+						<p class="text-sm text-white/60">Followers</p>
+					</div>
+					<div>
+						<p class="text-3xl font-black">892</p>
+						<p class="text-sm text-white/60">Following</p>
+					</div>
+					<div>
+						<p class="text-3xl font-black">{growthScore}%</p>
+						<p class="text-sm text-white/60">Growth</p>
 					</div>
 				</div>
 
-				<div class="border-t border-white/10 p-6 sm:p-8 lg:border-l lg:border-t-0 lg:p-10">
-					<p class="text-white/42 text-sm font-bold uppercase tracking-[0.28em]">Status</p>
-					<div class="mt-5 grid grid-cols-2 gap-3">
-						<div class="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-							<p class="text-xs uppercase tracking-[0.24em] text-white/45">Plan</p>
-							<p class="mt-3 text-2xl font-black">{plan}</p>
-						</div>
-						<div class="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-							<p class="text-xs uppercase tracking-[0.24em] text-white/45">Score</p>
-							<p class="mt-3 text-2xl font-black">{growthScore}%</p>
-						</div>
-						<div class="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-							<p class="text-xs uppercase tracking-[0.24em] text-white/45">Sessions</p>
-							<p class="mt-3 text-2xl font-black">{sessions}</p>
-						</div>
-						<div class="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-							<p class="text-xs uppercase tracking-[0.24em] text-white/45">Profile</p>
-							<p class="mt-3 text-2xl font-black">{profileReady ? "Ready" : "Setup"}</p>
-						</div>
-					</div>
+				<div class="mt-6 grid gap-3 sm:grid-cols-2">
+					<a href="/" class="inline-flex min-h-14 items-center justify-center rounded-2xl bg-white px-6 text-lg font-black text-black transition hover:opacity-95">Follow</a>
+					<a href="/pricing" class="inline-flex min-h-14 items-center justify-center rounded-2xl border border-white/20 bg-white/5 px-6 text-lg font-black transition hover:bg-white/10">Upgrade</a>
 				</div>
 			</div>
 		</div>
 
-		<div class="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
-			<article
-				class="rounded-[2rem] border border-white/10 bg-[#11101b]/95 p-6 shadow-xl shadow-purple-950/20 sm:p-8"
-			>
-				<p class="text-sm font-bold uppercase tracking-[0.32em] text-[#e8c879]">
-					Creator Operating System
-				</p>
-				<h2 class="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Today's mission</h2>
-				<div class="mt-6 space-y-3">
-					{#if loading}
-						<div class="h-16 animate-pulse rounded-2xl bg-white/[0.06]"></div>
-						<div class="h-16 animate-pulse rounded-2xl bg-white/[0.06]"></div>
-					{:else}
-						{#each insights as insight, index}
-							<div class="flex gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-								<span
-									class="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#7446ff] text-sm font-black text-white"
-								>
-									{index + 1}
-								</span>
-								<p class="text-sm leading-6 text-white/75 sm:text-base">{insight}</p>
-							</div>
-						{/each}
-					{/if}
-				</div>
-			</article>
-
-			<aside
-				class="rounded-[2rem] border border-white/10 bg-[#11101b]/95 p-6 shadow-xl shadow-purple-950/20 sm:p-8"
-			>
-				<p class="text-sm font-bold uppercase tracking-[0.32em] text-[#e8c879]">Next Move</p>
-				<h2 class="mt-4 text-3xl font-black tracking-tight">Launch loop</h2>
-				<p class="text-white/68 mt-4 text-sm leading-6">
-					Turn one strategic insight into a public post, one audience reply, and one offer
-					touchpoint.
-				</p>
-				<a
-					href="/pricing"
-					class="mt-7 inline-flex min-h-14 w-full items-center justify-center rounded-2xl bg-[#e8c879] px-5 text-base font-black text-[#130f1f] transition hover:-translate-y-0.5 hover:bg-[#f2d98f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-				>
-					Upgrade System
-				</a>
-			</aside>
+		<div class="mt-5 rounded-[2rem] border border-[#2a2440] bg-[#0d0b19] p-6 sm:p-8">
+			<h2 class="text-3xl font-black">Today&apos;s mission</h2>
+			<div class="mt-5 space-y-3">
+				{#if loading}
+					<div class="h-14 animate-pulse rounded-2xl bg-white/[0.07]"></div>
+					<div class="h-14 animate-pulse rounded-2xl bg-white/[0.07]"></div>
+				{:else}
+					{#each insights as insight, index}
+						<div class="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+							<span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#7c4dff] text-sm font-black">{index + 1}</span>
+							<p class="text-base text-white/80">{insight}</p>
+						</div>
+					{/each}
+				{/if}
+			</div>
+			<p class="mt-5 text-sm text-white/55">Profile status: {profileReady ? "Ready" : "Setup needed"}</p>
 		</div>
 	</div>
 </section>
