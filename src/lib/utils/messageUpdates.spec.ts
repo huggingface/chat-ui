@@ -131,6 +131,76 @@ describe("smoothStreamUpdates", () => {
 		expect(streamText(updates)).toBe("word ".repeat(40));
 	});
 
+	it("resumes smoothing after a control update catches up", async () => {
+		const source: MessageUpdate[] = [
+			{ type: MessageUpdateType.Stream, token: "word ".repeat(40) },
+			{ type: MessageUpdateType.Title, title: "done" },
+			{ type: MessageUpdateType.Stream, token: "more ".repeat(20) },
+		];
+		const delays: number[] = [];
+		const seen: Array<{ update: MessageUpdate; time: number }> = [];
+		let nowMs = 0;
+
+		for await (const update of smoothStreamUpdates(fromArray(source), {
+			minDelayMs: 5,
+			maxDelayMs: 80,
+			minRateCharsPerMs: 0.3,
+			_internal: {
+				now: () => nowMs,
+				sleep: async (ms: number) => {
+					delays.push(ms);
+					nowMs += ms;
+				},
+				detectChunk: (buffer) => /\S+\s+/.exec(buffer)?.[0] ?? null,
+			},
+		})) {
+			seen.push({ update, time: nowMs });
+		}
+
+		const titleIndex = seen.findIndex((item) => item.update.type === MessageUpdateType.Title);
+		expect(titleIndex).toBeGreaterThan(0);
+		expect(seen[titleIndex]?.time).toBe(0);
+
+		const streamAfterTitle = seen
+			.slice(titleIndex + 1)
+			.filter((item) => item.update.type === MessageUpdateType.Stream);
+		expect(streamAfterTitle.length).toBeGreaterThan(2);
+		expect(streamAfterTitle.at(-1)?.time).toBeGreaterThan(seen[titleIndex]?.time ?? 0);
+		expect(delays.length).toBeGreaterThan(0);
+		expect(delays.every((d) => d >= 5 && d <= 80)).toBe(true);
+		expect(streamText(seen.map((item) => item.update))).toBe(
+			"word ".repeat(40) + "more ".repeat(20)
+		);
+	});
+
+	it("does not include the immediate first stream chunk in pacing rate", async () => {
+		const source: MessageUpdate[] = [{ type: MessageUpdateType.Stream, token: "abcdefghij k " }];
+		const delays: number[] = [];
+		let nowMs = 0;
+		let streamChunks = 0;
+
+		for await (const update of smoothStreamUpdates(fromArray(source), {
+			minDelayMs: 0,
+			maxDelayMs: 80,
+			minRateCharsPerMs: 0.3,
+			_internal: {
+				now: () => nowMs,
+				sleep: async (ms: number) => {
+					delays.push(ms);
+					nowMs += ms;
+				},
+				detectChunk: (buffer) => /\S+\s+/.exec(buffer)?.[0] ?? null,
+			},
+		})) {
+			if (update.type === MessageUpdateType.Stream) {
+				streamChunks += 1;
+				if (streamChunks === 1) nowMs = 1;
+			}
+		}
+
+		expect(delays[0]).toBeGreaterThanOrEqual(6);
+	});
+
 	it("spreads burst tokens over time", async () => {
 		const bigToken = "word ".repeat(40); // 200 chars, 40 words
 		const source: MessageUpdate[] = [{ type: MessageUpdateType.Stream, token: bigToken }];

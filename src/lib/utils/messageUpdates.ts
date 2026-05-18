@@ -223,14 +223,8 @@ export async function* smoothStreamUpdates(
 	const flushPendingBuffer = () => {
 		if (pendingBuffer.length === 0) return;
 
-		while (countCodePoints(pendingBuffer) > chunkCharLimit) {
-			const chunk = takePrefixByCodePoints(pendingBuffer, chunkCharLimit);
+		for (const chunk of splitByCodePointLimit(pendingBuffer, chunkCharLimit)) {
 			enqueue({ type: MessageUpdateType.Stream, token: chunk });
-			pendingBuffer = pendingBuffer.slice(chunk.length);
-		}
-
-		if (pendingBuffer.length > 0) {
-			enqueue({ type: MessageUpdateType.Stream, token: pendingBuffer });
 		}
 		pendingBuffer = "";
 	};
@@ -266,9 +260,17 @@ export async function* smoothStreamUpdates(
 		});
 
 	// Character-rate targeting consumer
-	let totalCharsEmitted = 0;
-	let firstEmitAt: number | null = null;
-	let emittedStreamChunk = false;
+	let pacedCharsEmitted = 0;
+	let pacingStartedAt: number | null = null;
+	let emittedPacedStreamChunk = false;
+	let resetPacingAfterControl = false;
+
+	const resetPacing = () => {
+		pacedCharsEmitted = 0;
+		pacingStartedAt = null;
+		emittedPacedStreamChunk = false;
+		resetPacingAfterControl = false;
+	};
 
 	while (!producerDone || outputQueue.length > 0) {
 		if (outputQueue.length === 0) {
@@ -280,32 +282,40 @@ export async function* smoothStreamUpdates(
 		if (!update) continue;
 		if (update.type !== MessageUpdateType.Stream) {
 			queuedControlUpdates = Math.max(0, queuedControlUpdates - 1);
+			if (resetPacingAfterControl) resetPacing();
 		}
 
 		if (update.type === MessageUpdateType.Stream) {
 			const tokenLen = update.token.length;
 			queuedStreamChars = Math.max(0, queuedStreamChars - tokenLen);
+			const catchingUpToControlUpdate = queuedControlUpdates > 0;
 
-			if (firstEmitAt === null) firstEmitAt = now();
+			if (catchingUpToControlUpdate) {
+				resetPacingAfterControl = true;
+			} else {
+				if (resetPacingAfterControl) resetPacing();
+				if (pacingStartedAt === null) pacingStartedAt = now();
 
-			if (emittedStreamChunk && queuedControlUpdates === 0) {
-				const elapsedMs = now() - firstEmitAt;
-				const currentRate = elapsedMs > 0 ? totalCharsEmitted / elapsedMs : 0;
-				const backlogChars = tokenLen + queuedStreamChars;
-				const backlogRate = maxBufferedMs > 0 ? backlogChars / maxBufferedMs : 0;
-				const targetRate = Math.max(currentRate, minRateCharsPerMs, backlogRate);
-				const rawDelay = tokenLen / targetRate;
-				const underBacklogPressure = backlogRate > minRateCharsPerMs;
-				const effectiveMinDelayMs = underBacklogPressure ? 0 : minDelayMs;
-				const delayMs = Math.round(Math.max(effectiveMinDelayMs, Math.min(maxDelayMs, rawDelay)));
+				if (emittedPacedStreamChunk) {
+					const elapsedMs = now() - pacingStartedAt;
+					const currentRate = elapsedMs > 0 ? pacedCharsEmitted / elapsedMs : 0;
+					const backlogChars = tokenLen + queuedStreamChars;
+					const backlogRate = maxBufferedMs > 0 ? backlogChars / maxBufferedMs : 0;
+					const targetRate = Math.max(currentRate, minRateCharsPerMs, backlogRate);
+					const rawDelay = tokenLen / targetRate;
+					const underBacklogPressure = backlogRate > minRateCharsPerMs;
+					const effectiveMinDelayMs = underBacklogPressure ? 0 : minDelayMs;
+					const delayMs = Math.round(Math.max(effectiveMinDelayMs, Math.min(maxDelayMs, rawDelay)));
 
-				if (delayMs > 0) {
-					await sleep(delayMs);
+					if (delayMs > 0) {
+						await sleep(delayMs);
+					}
+
+					pacedCharsEmitted += tokenLen;
+				} else {
+					emittedPacedStreamChunk = true;
 				}
 			}
-
-			emittedStreamChunk = true;
-			totalCharsEmitted += tokenLen;
 		}
 
 		yield update;
@@ -322,27 +332,54 @@ function takeNextStreamChunk(
 ): string | null {
 	const detectedChunk = chunkDetector(buffer);
 	if (detectedChunk) {
-		if (countCodePoints(detectedChunk) <= maxChunkChars) return detectedChunk;
-		return takePrefixByCodePoints(detectedChunk, maxChunkChars);
+		const { prefix } = takePrefixByCodePoints(detectedChunk, maxChunkChars);
+		return prefix;
 	}
 
-	if (countCodePoints(buffer) < maxChunkChars) return null;
-	return takePrefixByCodePoints(buffer, maxChunkChars);
+	const { prefix, reachedLimit } = takePrefixByCodePoints(buffer, maxChunkChars);
+	return reachedLimit ? prefix : null;
 }
 
-function countCodePoints(value: string): number {
-	return Array.from(value).length;
-}
-
-function takePrefixByCodePoints(value: string, maxChars: number): string {
+function splitByCodePointLimit(value: string, maxChars: number): string[] {
+	const chunks: string[] = [];
+	let start = 0;
 	let end = 0;
 	let count = 0;
+
 	for (const char of value) {
 		end += char.length;
 		count += 1;
-		if (count >= maxChars) break;
+
+		if (count >= maxChars) {
+			chunks.push(value.slice(start, end));
+			start = end;
+			count = 0;
+		}
 	}
-	return value.slice(0, end);
+
+	if (start < value.length) {
+		chunks.push(value.slice(start));
+	}
+
+	return chunks;
+}
+
+function takePrefixByCodePoints(
+	value: string,
+	maxChars: number
+): { prefix: string; reachedLimit: boolean } {
+	let end = 0;
+	let count = 0;
+
+	for (const char of value) {
+		end += char.length;
+		count += 1;
+		if (count >= maxChars) {
+			return { prefix: value.slice(0, end), reachedLimit: true };
+		}
+	}
+
+	return { prefix: value, reachedLimit: false };
 }
 
 function createWordChunkDetector(): ChunkDetector {
