@@ -25,6 +25,7 @@
 	import { shareModal } from "$lib/stores/shareModal";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import Search from "$lib/components/chat/Search.svelte";
 
 	let { data = $bindable(), children } = $props();
 
@@ -257,6 +258,8 @@
 {/if}
 
 <BackgroundGenerationPoller />
+
+<Search />
 
 <div
 	class="fixed grid h-dvh w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed

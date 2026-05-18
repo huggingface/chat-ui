@@ -109,6 +109,7 @@ export function useAPIClient({
 			{
 				...endpoint(fetcher, `${baseUrl}/conversations`),
 				"import-share": endpoint(fetcher, `${baseUrl}/conversations/import-share`),
+				search: endpoint(fetcher, `${baseUrl}/conversations/search`),
 			}
 		),
 		user: {

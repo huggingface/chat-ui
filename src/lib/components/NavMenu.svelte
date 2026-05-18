@@ -32,6 +32,9 @@
 	import { isPro } from "$lib/stores/isPro";
 	import IconPro from "$lib/components/icons/IconPro.svelte";
 	import MCPServerManager from "./mcp/MCPServerManager.svelte";
+	import { toggleSearch } from "./chat/Search.svelte";
+	import { closeMobileNav } from "./MobileNav.svelte";
+	import CarbonSearch from "~icons/carbon/search";
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
@@ -152,6 +155,17 @@
 <div
 	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:border-transparent dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
+	<button
+		class="flex h-8 flex-none items-center gap-1.5 rounded-lg pl-2 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 max-sm:h-10"
+		onclick={() => {
+			closeMobileNav();
+			toggleSearch();
+		}}
+		title="Search chats (Ctrl/Cmd + K)"
+	>
+		<CarbonSearch class="text-xs" />
+		<span class="block">Search chats</span>
+	</button>
 	<div class="flex flex-col gap-px">
 		{#each Object.entries(groupedConversations) as [group, convs]}
 			{#if convs.length}

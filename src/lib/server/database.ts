@@ -215,6 +215,19 @@ export class Database {
 			.catch((e) =>
 				logger.error(e, "Error creating index for conversations by messages createdAt")
 			);
+		// Text index for searching conversation titles and message content.
+		// Cannot be compound with userId/sessionId prefix: anonymous users use
+		// `userId: { $exists: false }` which doesn't satisfy the equality requirement
+		// MongoDB enforces on non-text prefix fields of a compound text index.
+		conversations
+			.createIndex(
+				{
+					title: "text",
+					"messages.content": "text",
+				},
+				{ default_language: "en" }
+			)
+			.catch((e) => logger.error(e, "Error creating text index for conversations search"));
 		// Unique index for stats
 		conversationStats
 			.createIndex(
