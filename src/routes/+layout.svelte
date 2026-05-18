@@ -185,6 +185,9 @@
 		onDestroy(() => window.removeEventListener("keydown", onKeydown, { capture: true }));
 	});
 
+	const creatorRoutes = new Set(["/dashboard", "/elite/dashboard", "/hook", "/pricing"]);
+	let isCreatorRoute = $derived(creatorRoutes.has(page.route.id ?? ""));
+
 	let mobileNavTitle = $derived(
 		["/models", "/privacy"].includes(page.route.id ?? "")
 			? ""
@@ -259,17 +262,19 @@
 <BackgroundGenerationPoller />
 
 <div
-	class="fixed grid h-dvh w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
-		? 'md:grid-cols-[290px,1fr]'
-		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
+	class="fixed grid h-dvh w-screen grid-cols-1 overflow-hidden text-smd transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 {isCreatorRoute
+		? 'grid-rows-[1fr]'
+		: `grid-rows-[auto,1fr] ${!isNavCollapsed ? 'md:grid-cols-[290px,1fr]' : 'md:grid-cols-[0px,1fr]'} md:grid-rows-[1fr]`}"
 >
-	<ExpandNavigation
-		isCollapsed={isNavCollapsed}
-		onClick={() => (isNavCollapsed = !isNavCollapsed)}
-		classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
-			? 'left-[290px]'
-			: 'left-0'} *:transition-transform"
-	/>
+	{#if !isCreatorRoute}
+		<ExpandNavigation
+			isCollapsed={isNavCollapsed}
+			onClick={() => (isNavCollapsed = !isNavCollapsed)}
+			classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
+				? 'left-[290px]'
+				: 'left-0'} *:transition-transform"
+		/>
+	{/if}
 
 	{#if canShare}
 		<button
@@ -284,24 +289,26 @@
 		</button>
 	{/if}
 
-	<MobileNav title={mobileNavTitle}>
-		<NavMenu
-			{conversations}
-			user={data.user}
-			ondeleteConversation={(id) => deleteConversation(id)}
-			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
-		/>
-	</MobileNav>
-	<nav
-		class="grid max-h-dvh grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px] max-md:hidden"
-	>
-		<NavMenu
-			{conversations}
-			user={data.user}
-			ondeleteConversation={(id) => deleteConversation(id)}
-			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
-		/>
-	</nav>
+	{#if !isCreatorRoute}
+		<MobileNav title={mobileNavTitle}>
+			<NavMenu
+				{conversations}
+				user={data.user}
+				ondeleteConversation={(id) => deleteConversation(id)}
+				oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
+			/>
+		</MobileNav>
+		<nav
+			class="grid max-h-dvh grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px] max-md:hidden"
+		>
+			<NavMenu
+				{conversations}
+				user={data.user}
+				ondeleteConversation={(id) => deleteConversation(id)}
+				oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
+			/>
+		</nav>
+	{/if}
 	{#if currentError}
 		<Toast message={currentError} />
 	{/if}
