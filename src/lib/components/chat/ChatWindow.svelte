@@ -164,6 +164,10 @@
 	};
 
 	let lastMessage = $derived(browser && (messages.at(-1) as Message));
+	let showPendingPlaceholder = $derived(
+		pending &&
+			!(lastMessage && lastMessage.from === "assistant" && (lastMessage.content ?? "").length === 0)
+	);
 	let streamingAssistantMessage = $derived(
 		(() => {
 			for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -586,6 +590,19 @@
 							onshowAlternateMsg={(payload) => onshowAlternateMsg?.(payload)}
 						/>
 					{/each}
+					{#if showPendingPlaceholder}
+						<ChatMessage
+							loading={true}
+							message={{
+								id: "pending-placeholder",
+								content: "",
+								from: "assistant",
+								children: [],
+							}}
+							isAuthor={!shared}
+							readOnly={isReadOnly}
+						/>
+					{/if}
 					{#if isReadOnly}
 						<ModelSwitch {models} {currentModel} />
 					{/if}
