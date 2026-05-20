@@ -8,13 +8,14 @@
 </script>
 
 <script lang="ts">
-	import { tick } from "svelte";
+	import { base } from "$app/paths";
+	import { Command } from "bits-ui";
 	import Modal from "./Modal.svelte";
 	import InfiniteScroll from "./InfiniteScroll.svelte";
-	import NavConversationItem from "./NavConversationItem.svelte";
 	import { searchModal } from "$lib/stores/searchModal";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { debounce } from "$lib/utils/debounce";
+	import { highlightMatch } from "$lib/utils/highlightSearch";
 	import type { ConvSearchResult } from "$lib/types/ConvSearchResult";
 	import CarbonSearch from "~icons/carbon/search";
 
@@ -25,7 +26,7 @@
 	let results = $state<ConvSearchResult[]>([]);
 	let hasMore = $state(false);
 	let loading = $state(false);
-	let inputEl: HTMLInputElement | undefined = $state();
+	let selectedValue = $state("");
 	let requestToken = 0;
 
 	const dateRanges = [
@@ -72,6 +73,7 @@
 			hasMore = false;
 			page = 0;
 			loading = false;
+			selectedValue = "";
 			return;
 		}
 
@@ -80,6 +82,7 @@
 		page = 0;
 		results = fetched;
 		hasMore = fetched.length > 0;
+		selectedValue = fetched[0]?.id ? String(fetched[0].id) : "";
 		loading = false;
 	}, 250);
 
@@ -108,12 +111,6 @@
 		runSearch(q, requestToken);
 	});
 
-	$effect(() => {
-		if ($searchModal) {
-			tick().then(() => inputEl?.focus());
-		}
-	});
-
 	function handleResultClick() {
 		searchModal.close();
 	}
@@ -121,15 +118,19 @@
 
 {#if $searchModal}
 	<Modal width="w-[640px]" onclose={() => searchModal.close()}>
-		<div class="flex flex-col">
+		<Command.Root
+			shouldFilter={false}
+			loop
+			bind:value={selectedValue}
+			label="Search conversations"
+			class="flex flex-col"
+		>
 			<div class="flex items-center gap-2 border-b border-gray-100 px-4 py-3 dark:border-gray-700">
 				<CarbonSearch class="text-gray-400" />
-				<input
-					bind:this={inputEl}
+				<Command.Input
 					bind:value={query}
-					type="text"
+					autofocus
 					placeholder="Search chats"
-					autocomplete="off"
 					class="min-w-0 flex-1 border-none bg-transparent p-0 text-base outline-none placeholder:text-gray-400 focus:ring-0 dark:text-gray-100"
 				/>
 				<kbd
@@ -138,7 +139,7 @@
 				>
 			</div>
 
-			<div
+			<Command.List
 				class="scrollbar-custom flex max-h-[60vh] flex-col gap-1 overflow-y-auto px-3 py-3 text-[.9rem]"
 			>
 				{#if query.trim().length < 2}
@@ -146,32 +147,50 @@
 						Type at least 2 characters to search your conversations.
 					</p>
 				{:else if loading && results.length === 0}
-					<p class="px-2 py-6 text-center text-sm text-gray-400">Searching…</p>
+					<Command.Loading class="px-2 py-6 text-center text-sm text-gray-400">
+						Searching…
+					</Command.Loading>
 				{:else if !loading && results.length === 0}
 					<p class="px-2 py-6 text-center text-sm text-gray-400">No matches.</p>
 				{:else}
 					{#each Object.entries(groupedResults) as [group, convs]}
 						{#if convs.length}
-							<h4 class="mb-1 mt-3 pl-0.5 text-xs text-gray-400 first:mt-0 dark:text-gray-500">
-								{titles[group]}
-							</h4>
-							{#each convs as conv (conv.id)}
-								<NavConversationItem
-									{conv}
-									readOnly
-									showDescription
-									description={conv.description}
-									searchInput={conv.matchedText || query}
-									onclick={handleResultClick}
-								/>
-							{/each}
+							<Command.Group>
+								<Command.GroupHeading
+									class="mb-1 mt-3 pl-0.5 text-xs text-gray-400 first:mt-0 dark:text-gray-500"
+								>
+									{titles[group]}
+								</Command.GroupHeading>
+								<Command.GroupItems>
+									{#each convs as conv (conv.id)}
+										<Command.LinkItem
+											href="{base}/conversation/{conv.id}"
+											value={String(conv.id)}
+											data-sveltekit-noscroll
+											data-sveltekit-preload-data="tap"
+											onclick={handleResultClick}
+											class="block rounded-lg px-2 py-1.5 text-gray-700 data-[selected]:bg-gray-100 dark:text-gray-200 dark:data-[selected]:bg-gray-700"
+										>
+											<div class="truncate text-sm first-letter:uppercase">
+												{conv.title}
+											</div>
+											{#if conv.description}
+												<p class="mt-0.5 line-clamp-1 text-xs text-gray-500 dark:text-gray-400">
+													<!-- eslint-disable-next-line svelte/no-at-html-tags -- input is HTML-escaped in highlightMatch() -->
+													{@html highlightMatch(conv.description, conv.matchedText || query)}
+												</p>
+											{/if}
+										</Command.LinkItem>
+									{/each}
+								</Command.GroupItems>
+							</Command.Group>
 						{/if}
 					{/each}
 					{#if hasMore}
 						<InfiniteScroll onvisible={loadMore} />
 					{/if}
 				{/if}
-			</div>
-		</div>
+			</Command.List>
+		</Command.Root>
 	</Modal>
 {/if}
