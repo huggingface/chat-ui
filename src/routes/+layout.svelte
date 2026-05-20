@@ -24,6 +24,8 @@
 	import IconShare from "$lib/components/icons/IconShare.svelte";
 	import { shareModal } from "$lib/stores/shareModal";
 	import { searchModal } from "$lib/stores/searchModal";
+	import { get } from "svelte/store";
+	import SearchConversationsModal from "$lib/components/SearchConversationsModal.svelte";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 
@@ -170,9 +172,14 @@
 		const onKeydown = (e: KeyboardEvent) => {
 			const metaOrCtrl = e.metaKey || e.ctrlKey;
 			const key = e.key?.toLowerCase();
+			const appEl = document.getElementById("app");
+			const inert = appEl?.hasAttribute("inert") ?? false;
 
-			// Search chats (Ctrl/Cmd + K) — toggle so the same shortcut closes the modal
+			// Search chats (Ctrl/Cmd + K) — toggle so the same shortcut closes the modal.
+			// When another modal owns `inert`, skip — opening search on top of it would
+			// strand the inert attribute when the search modal closes.
 			if (metaOrCtrl && !e.shiftKey && key === "k") {
+				if (inert && !get(searchModal)) return;
 				e.preventDefault();
 				if (requireAuthUser()) return;
 				searchModal.toggle();
@@ -180,8 +187,7 @@
 			}
 
 			// Ignore the remaining shortcuts when a modal has focus (app is inert)
-			const appEl = document.getElementById("app");
-			if (appEl?.hasAttribute("inert")) return;
+			if (inert) return;
 
 			// New Chat (Ctrl/Cmd + Shift + O)
 			if (key === "o" && e.shiftKey && metaOrCtrl) {
@@ -268,6 +274,8 @@
 {/if}
 
 <BackgroundGenerationPoller />
+
+<SearchConversationsModal />
 
 <div
 	class="fixed grid h-dvh w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed

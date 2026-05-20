@@ -32,7 +32,6 @@
 	import { isPro } from "$lib/stores/isPro";
 	import IconPro from "$lib/components/icons/IconPro.svelte";
 	import MCPServerManager from "./mcp/MCPServerManager.svelte";
-	import SearchConversationsModal from "./SearchConversationsModal.svelte";
 	import CarbonSearch from "~icons/carbon/search";
 	import { searchModal } from "$lib/stores/searchModal";
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
@@ -298,5 +297,3 @@
 {#if showMcpModal}
 	<MCPServerManager onclose={() => (showMcpModal = false)} />
 {/if}
-
-<SearchConversationsModal />

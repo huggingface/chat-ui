@@ -90,7 +90,11 @@
 		if (!hasMore || loading || !query) return;
 		loading = true;
 		const next = page + 1;
-		const more = await fetchPage(query, next);
+		const startQuery = query;
+		const startToken = requestToken;
+		const more = await fetchPage(startQuery, next);
+		// Drop this page if the user has since started a new search.
+		if (startToken !== requestToken || startQuery !== query) return;
 		if (more.length === 0) {
 			hasMore = false;
 		} else {
