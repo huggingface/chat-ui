@@ -145,6 +145,8 @@
 					<p class="px-2 py-6 text-center text-sm text-gray-400">
 						Type at least 2 characters to search your conversations.
 					</p>
+				{:else if loading && results.length === 0}
+					<p class="px-2 py-6 text-center text-sm text-gray-400">Searching…</p>
 				{:else if !loading && results.length === 0}
 					<p class="px-2 py-6 text-center text-sm text-gray-400">No matches.</p>
 				{:else}
