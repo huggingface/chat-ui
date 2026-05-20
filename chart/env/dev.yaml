@@ -79,6 +79,10 @@ envVars:
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
   MODELS: >
     [
+      { "id": "CohereLabs/command-a-plus-05-2026-bf16", "description": "218B Command A+ MoE with 25B active, multimodal, 128K context, 48 languages." },
+      { "id": "CohereLabs/command-a-plus-05-2026-fp8", "description": "FP8 Command A+ for efficient multimodal inference with tool use and long context." },
+      { "id": "CohereLabs/command-a-plus-05-2026-w4a4", "description": "W4A4 Command A+ for ultra-efficient agent deployment with multimodal and tool use." },
+      { "id": "pearl-ai/Gemma-4-31B-it-pearl", "description": "Community Gemma-4-31B variant integrated with Pearl mining for chain-validated inference." },
       { "id": "inclusionAI/Ling-2.6-1T", "description": "1T MoE with 50B active params, hybrid MLA-Linear attention, and fast thinking." },
       { "id": "deepseek-ai/DeepSeek-V4-Pro", "description": "Frontier 1.6T MoE with 49B active params, hybrid attention, and 1M context.", "supportsReasoning": true },
       { "id": "deepseek-ai/DeepSeek-V4-Flash", "description": "Compact 284B MoE with 13B active params, hybrid attention, and 1M context." },
