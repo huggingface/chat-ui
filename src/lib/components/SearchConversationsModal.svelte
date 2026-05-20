@@ -113,7 +113,7 @@
 </script>
 
 {#if $searchModal}
-	<Modal width="max-w-xl" onclose={() => searchModal.close()}>
+	<Modal width="w-[640px]" onclose={() => searchModal.close()}>
 		<div class="flex flex-col">
 			<div class="flex items-center gap-2 border-b border-gray-100 px-4 py-3 dark:border-gray-700">
 				<CarbonSearch class="text-gray-400" />
