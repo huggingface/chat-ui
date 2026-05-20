@@ -140,7 +140,7 @@
 			</div>
 
 			<Command.List
-				class="scrollbar-custom flex max-h-[60vh] flex-col gap-1 overflow-y-auto px-3 py-3 text-[.9rem]"
+				class="scrollbar-custom flex max-h-[30vh] flex-col gap-1 overflow-y-auto px-3 py-3 text-[.9rem]"
 			>
 				{#if query.trim().length < 2}
 					<p class="px-2 py-6 text-center text-sm text-gray-400">
