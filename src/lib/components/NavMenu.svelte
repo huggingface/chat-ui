@@ -32,14 +32,9 @@
 	import { isPro } from "$lib/stores/isPro";
 	import IconPro from "$lib/components/icons/IconPro.svelte";
 	import MCPServerManager from "./mcp/MCPServerManager.svelte";
-	import CarbonSearch from "~icons/carbon/search";
-	import { searchModal } from "$lib/stores/searchModal";
-	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
-	const isMac =
-		typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
 
 	interface Props {
 		conversations: ConvSidebar[];
@@ -219,26 +214,6 @@
 				</span>
 			{/if}
 		</div>
-	{/if}
-	{#if user?.username || user?.email}
-		<button
-			onclick={() => {
-				if (requireAuthUser()) return;
-				searchModal.open();
-			}}
-			class="group flex h-8 flex-none items-center gap-1.5 rounded-lg pl-2 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 max-sm:h-10"
-		>
-			<CarbonSearch class="size-3.5 opacity-80" />
-			Search chats
-			{#if !isVirtualKeyboard()}
-				<span class="ml-auto hidden text-[10px] text-gray-400 group-hover:inline">
-					<kbd class="rounded border border-gray-200 px-1 py-px dark:border-gray-600"
-						>{isMac ? "⌘" : "Ctrl"}</kbd
-					>
-					<kbd class="rounded border border-gray-200 px-1 py-px dark:border-gray-600">K</kbd>
-				</span>
-			{/if}
-		</button>
 	{/if}
 	<a
 		href="{base}/models"
