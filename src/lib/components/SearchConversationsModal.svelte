@@ -26,6 +26,7 @@
 	let hasMore = $state(false);
 	let loading = $state(false);
 	let inputEl: HTMLInputElement | undefined = $state();
+	let requestToken = 0;
 
 	const dateRanges = [
 		new Date().setDate(new Date().getDate() - 1),
@@ -65,7 +66,7 @@
 		}
 	}
 
-	const runSearch = debounce(async (q: string) => {
+	const runSearch = debounce(async (q: string, token: number) => {
 		if (!q || q.trim().length < 2) {
 			results = [];
 			hasMore = false;
@@ -74,8 +75,8 @@
 			return;
 		}
 
-		loading = true;
 		const fetched = await fetchPage(q, 0);
+		if (token !== requestToken) return; // a newer query superseded this one
 		page = 0;
 		results = fetched;
 		hasMore = fetched.length > 0;
@@ -98,7 +99,13 @@
 
 	$effect(() => {
 		const q = query;
-		runSearch(q);
+		// Flip to "loading" synchronously so the "No matches" state can't flash
+		// during the 250 ms debounce window before the fetch starts.
+		if (q.trim().length >= 2) {
+			loading = true;
+		}
+		requestToken += 1;
+		runSearch(q, requestToken);
 	});
 
 	$effect(() => {
