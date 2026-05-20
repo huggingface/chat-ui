@@ -28,7 +28,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	requireAuth(locals);
 
 	const q = (url.searchParams.get("q") ?? "").trim();
-	const p = parseInt(url.searchParams.get("p") ?? "0") || 0;
+	const p = Math.max(0, parseInt(url.searchParams.get("p") ?? "0") || 0);
 
 	if (q.length < MIN_QUERY_LENGTH) {
 		return superjsonResponse({ conversations: [], hasMore: false });

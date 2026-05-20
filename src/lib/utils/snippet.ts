@@ -26,7 +26,10 @@ export function buildSnippet(text: string, query: string, maxLen = 160): Snippet
 	}
 
 	const matchedText = trimmed.slice(matchIdx, matchIdx + q.length);
-	const before = Math.floor((maxLen - q.length) / 2);
+	// Clamp `before` so a query longer than maxLen can't push the window
+	// forward into the middle of the match (which would render an
+	// un-highlightable snippet client-side).
+	const before = Math.max(0, Math.floor((maxLen - q.length) / 2));
 	const end = Math.min(trimmed.length, Math.max(0, matchIdx - before) + maxLen);
 	const start = Math.max(0, end - maxLen);
 

@@ -46,11 +46,14 @@
 		older: results.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
 	});
 
-	async function fetchPage(q: string, p: number): Promise<ConvSearchResult[]> {
+	async function fetchPage(
+		q: string,
+		p: number
+	): Promise<{ items: ConvSearchResult[]; hasMore: boolean }> {
 		try {
 			const data = await client.conversations.search.get({ query: { q, p } }).then(handleResponse);
-			if (!data) return [];
-			return (data.conversations ?? []).map(
+			if (!data) return { items: [], hasMore: false };
+			const items = (data.conversations ?? []).map(
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				(c: any): ConvSearchResult => ({
 					id: c.id ?? c._id,
@@ -61,9 +64,10 @@
 					matchedText: c.matchedText,
 				})
 			);
+			return { items, hasMore: Boolean(data.hasMore) };
 		} catch (err) {
 			console.error(err);
-			return [];
+			return { items: [], hasMore: false };
 		}
 	}
 
@@ -80,9 +84,9 @@
 		const fetched = await fetchPage(q, 0);
 		if (token !== requestToken) return; // a newer query superseded this one
 		page = 0;
-		results = fetched;
-		hasMore = fetched.length > 0;
-		selectedValue = fetched[0]?.id ? String(fetched[0].id) : "";
+		results = fetched.items;
+		hasMore = fetched.hasMore;
+		selectedValue = fetched.items[0]?.id ? String(fetched.items[0].id) : "";
 		loading = false;
 	}, 250);
 
@@ -92,15 +96,12 @@
 		const next = page + 1;
 		const startQuery = query;
 		const startToken = requestToken;
-		const more = await fetchPage(startQuery, next);
+		const fetched = await fetchPage(startQuery, next);
 		// Drop this page if the user has since started a new search.
 		if (startToken !== requestToken || startQuery !== query) return;
-		if (more.length === 0) {
-			hasMore = false;
-		} else {
-			page = next;
-			results = [...results, ...more];
-		}
+		page = next;
+		results = [...results, ...fetched.items];
+		hasMore = fetched.hasMore;
 		loading = false;
 	}
 
