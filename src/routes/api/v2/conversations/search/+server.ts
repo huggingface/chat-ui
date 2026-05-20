@@ -10,6 +10,10 @@ import { buildSnippet } from "$lib/utils/snippet";
 const MIN_QUERY_LENGTH = 2;
 const MESSAGE_SLICE = 8;
 
+type SearchHit = Pick<Conversation, "_id" | "title" | "updatedAt" | "model"> & {
+	messages: { content: string }[];
+};
+
 export const GET: RequestHandler = async ({ locals, url }) => {
 	requireAuth(locals);
 
@@ -22,25 +26,30 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 
 	const pageSize = CONV_NUM_PER_PAGE;
 
+	// Aggregation pipeline avoids a `messages` + `messages.content` projection
+	// path collision while still trimming to the first MESSAGE_SLICE message
+	// bodies for snippet generation.
 	const convs = await collections.conversations
-		.find({
-			...authCondition(locals),
-			$text: { $search: q },
-		})
-		.project<
-			Pick<Conversation, "_id" | "title" | "updatedAt" | "model"> & {
-				messages: Pick<Conversation["messages"][number], "content">[];
-			}
-		>({
-			title: 1,
-			updatedAt: 1,
-			model: 1,
-			messages: { $slice: MESSAGE_SLICE },
-			"messages.content": 1,
-		})
-		.sort({ updatedAt: -1 })
-		.skip(p * pageSize)
-		.limit(pageSize + 1)
+		.aggregate<SearchHit>([
+			{ $match: { ...authCondition(locals), $text: { $search: q } } },
+			{ $sort: { updatedAt: -1 } },
+			{ $skip: p * pageSize },
+			{ $limit: pageSize + 1 },
+			{
+				$project: {
+					title: 1,
+					updatedAt: 1,
+					model: 1,
+					messages: {
+						$map: {
+							input: { $slice: ["$messages", MESSAGE_SLICE] },
+							as: "m",
+							in: { content: "$$m.content" },
+						},
+					},
+				},
+			},
+		])
 		.toArray();
 
 	const hasMore = convs.length > pageSize;
