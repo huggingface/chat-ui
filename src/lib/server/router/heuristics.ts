@@ -46,22 +46,10 @@ export async function heuristicSelectRoute(
 		}
 	}
 
-	// Default route for general conversation
+	// Default route for general conversation. If the named route doesn't exist in the
+	// policy file, resolveRouteModels falls through to LLM_ROUTER_FALLBACK_MODEL — that's
+	// the right safety net, vs. silently picking an arbitrary specialized routes[0].
 	const defaultRoute = config.LLM_ROUTER_DEFAULT_ROUTE || DEFAULT_ROUTE;
-	const defaultExists = routes.some((r) => r.name === defaultRoute);
-
-	if (defaultExists) {
-		logger.debug({ route: defaultRoute }, "[router] heuristic: using default route");
-		return { routeName: defaultRoute };
-	}
-
-	// Fallback to first available route
-	if (routes.length > 0) {
-		logger.debug({ route: routes[0].name }, "[router] heuristic: fallback to first route");
-		return { routeName: routes[0].name };
-	}
-
-	// No routes configured - this shouldn't happen in normal operation
-	logger.warn("[router] heuristic: no routes configured");
-	return { routeName: DEFAULT_ROUTE };
+	logger.debug({ route: defaultRoute }, "[router] heuristic: using default route");
+	return { routeName: defaultRoute };
 }
