@@ -77,11 +77,13 @@ export async function resolveRouterTarget({
 			// No tools-capable model found; fall back to default routing below
 		}
 
-		// Heuristic-based route selection (no external API call)
+		// Heuristic-based route selection (no external API call). Tools-active is masked by
+		// the bypass flag so disabling tools keeps the agentic route off the heuristic path
+		// too (image input has already returned above and is implicitly false here).
 		const routes = await getRoutes();
 		const { routeName } = await heuristicSelectRoute({
 			hasImageInput,
-			hasToolsActive,
+			hasToolsActive: toolsEnabled && hasToolsActive,
 		});
 		resolvedRoute = routeName;
 

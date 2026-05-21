@@ -240,10 +240,12 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			// No tools-capable model found — continue with default routing
 		}
 
-		// Heuristic-based route selection (no external API call)
+		// Heuristic-based route selection (no external API call). Mask the signals by the
+		// corresponding ENABLE_* flags so disabling a flag keeps that route off the heuristic
+		// path too (not just the bypass shortcut above).
 		const routeSelection = await heuristicSelectRoute({
-			hasImageInput,
-			hasToolsActive,
+			hasImageInput: routerMultimodalEnabled && hasImageInput,
+			hasToolsActive: routerToolsEnabled && hasToolsActive,
 		});
 
 		const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || routerModel.id;
