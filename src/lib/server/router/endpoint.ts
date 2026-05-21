@@ -241,7 +241,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		}
 
 		// Heuristic-based route selection (no external API call)
-		const routeSelection = await heuristicSelectRoute(sanitizedMessages, {
+		const routeSelection = await heuristicSelectRoute({
 			hasImageInput,
 			hasToolsActive,
 		});

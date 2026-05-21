@@ -1,6 +1,5 @@
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
-import type { EndpointMessage } from "../endpoints/endpoints";
 import type { RouteSelection } from "./types";
 import { getRoutes } from "./policy";
 
@@ -20,7 +19,6 @@ export const AGENTIC_ROUTE = "agentic";
  * The actual model selection is handled by the routes.json policy file.
  */
 export async function heuristicSelectRoute(
-	messages: EndpointMessage[],
 	options: {
 		hasImageInput?: boolean;
 		hasToolsActive?: boolean;

@@ -11,14 +11,11 @@ import {
 	pickToolsCapableModel,
 } from "$lib/server/router/toolsRoute";
 import { findConfiguredMultimodalModel } from "$lib/server/router/multimodal";
-import type { EndpointMessage } from "../../endpoints/endpoints";
-import { stripReasoningFromMessageForRouting } from "../utils/routing";
 import type { ProcessedModel } from "../../models";
 import { logger } from "../../logger";
 
 export interface RouterResolutionInput {
 	model: ProcessedModel;
-	messages: EndpointMessage[];
 	hasImageInput: boolean;
 	locals: App.Locals | undefined;
 }
@@ -32,7 +29,6 @@ export interface RouterResolutionResult {
 
 export async function resolveRouterTarget({
 	model,
-	messages,
 	hasImageInput,
 	locals,
 }: RouterResolutionInput): Promise<RouterResolutionResult> {
@@ -83,8 +79,7 @@ export async function resolveRouterTarget({
 
 		// Heuristic-based route selection (no external API call)
 		const routes = await getRoutes();
-		const sanitized = messages.map(stripReasoningFromMessageForRouting);
-		const { routeName } = await heuristicSelectRoute(sanitized, {
+		const { routeName } = await heuristicSelectRoute({
 			hasImageInput,
 			hasToolsActive,
 		});
