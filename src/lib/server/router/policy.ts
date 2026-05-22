@@ -37,12 +37,7 @@ export function resolveRouteModels(
 	routes: Route[],
 	fallbackModel: string
 ): { candidates: string[] } {
-	if (routeName === "arch_router_failure") {
-		return { candidates: [fallbackModel] };
-	}
-	const sel =
-		routes.find((r) => r.name === routeName) ||
-		routes.find((r) => r.name === "casual_conversation");
+	const sel = routes.find((r) => r.name === routeName) || routes.find((r) => r.name === "default");
 	if (!sel) return { candidates: [fallbackModel] };
 	const fallbacks = Array.isArray(sel.fallback_models) ? sel.fallback_models : [];
 	return { candidates: [sel.primary_model, ...fallbacks] };

@@ -282,8 +282,6 @@ export async function* runMcpFlow({
 
 	const { runMcp, targetModel, candidateModelId, resolvedRoute } = await resolveRouterTarget({
 		model,
-		messages,
-		conversationId: conv._id.toString(),
 		hasImageInput,
 		locals,
 	});
