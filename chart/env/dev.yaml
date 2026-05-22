@@ -61,6 +61,10 @@ envVars:
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "https://plausible.io/js/pa-Io_oigECawqdlgpf5qvHb.js"
 
   TASK_MODEL: "meta-llama/Llama-3.1-8B-Instruct"
+  # Tombstone: unread by current code, kept so any old pod still on the pre-#2265
+  # image (which gated Omni on LLM_ROUTER_ARCH_BASE_URL) keeps registering the alias
+  # during rollout. Safe to remove once every replica is on the new image.
+  LLM_ROUTER_ARCH_BASE_URL: "https://router.huggingface.co/v1"
   LLM_ROUTER_ROUTES_PATH: "build/client/chat/huggingchat/routes.chat.json"
   LLM_ROUTER_ENABLE_MULTIMODAL: "true"
   LLM_ROUTER_MULTIMODAL_MODEL: "moonshotai/Kimi-K2.6"
