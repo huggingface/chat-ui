@@ -9,7 +9,7 @@
 	import { formatToolProgressLabel } from "$lib/utils/toolProgress";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
-	import CarbonChevronRight from "~icons/carbon/chevron-right";
+	import CarbonChevronRight from "~icons/lucide/chevron-right";
 	import BlockWrapper from "./BlockWrapper.svelte";
 
 	interface Props {

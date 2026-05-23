@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { requireAuthUser } from "$lib/utils/auth";
-	import CarbonImage from "~icons/carbon/image";
+	import CarbonImage from "~icons/lucide/image";
 
 	interface Props {
-		// import EosIconsLoading from "~icons/eos-icons/loading";
+		// import EosIconsLoading from "~icons/lucide/loader-circle";
 		files: File[];
 		mimeTypes?: string[];
 		onDrag?: boolean;

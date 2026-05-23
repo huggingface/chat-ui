@@ -2,7 +2,7 @@
 	import { base } from "$app/paths";
 	import { afterNavigate, goto } from "$app/navigation";
 	import { useSettingsStore } from "$lib/stores/settings";
-	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonCheckmark from "~icons/lucide/check";
 
 	import Modal from "$lib/components/Modal.svelte";
 

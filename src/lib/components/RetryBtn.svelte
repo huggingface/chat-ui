@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CarbonRotate360 from "~icons/carbon/rotate-360";
+	import CarbonRotate360 from "~icons/lucide/rotate-cw";
 
 	interface Props {
 		classNames?: string;

@@ -6,12 +6,12 @@
 	const publicConfig = usePublicConfig();
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
-	import CarbonRotate360 from "~icons/carbon/rotate-360";
-	// import CarbonDownload from "~icons/carbon/download";
+	import CarbonRotate360 from "~icons/lucide/rotate-cw";
+	// import CarbonDownload from "~icons/lucide/download";
 
-	import CarbonPen from "~icons/carbon/pen";
-	import CarbonCopy from "~icons/carbon/copy";
-	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonPen from "~icons/lucide/pen-tool";
+	import CarbonCopy from "~icons/lucide/copy";
+	import CarbonCheckmark from "~icons/lucide/check";
 	import UploadedFile from "./UploadedFile.svelte";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";

@@ -4,7 +4,7 @@
 	import { fade, fly } from "svelte/transition";
 	import Portal from "./Portal.svelte";
 	import { browser } from "$app/environment";
-	import CarbonClose from "~icons/carbon/close";
+	import CarbonClose from "~icons/lucide/x";
 	import { tap } from "$lib/utils/haptics";
 
 	interface Props {

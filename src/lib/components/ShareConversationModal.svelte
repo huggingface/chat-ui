@@ -2,9 +2,9 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
-	import CarbonLink from "~icons/carbon/link";
-	import CarbonCheckmark from "~icons/carbon/checkmark";
-	import EosIconsLoading from "~icons/eos-icons/loading";
+	import CarbonLink from "~icons/lucide/link";
+	import CarbonCheckmark from "~icons/lucide/check";
+	import EosIconsLoading from "~icons/lucide/loader-circle";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import { onMount } from "svelte";
 	import { createShareLink } from "$lib/createShareLink";

@@ -5,12 +5,12 @@
 
 	import { DropdownMenu } from "bits-ui";
 	import IconPlus from "~icons/lucide/plus";
-	import CarbonImage from "~icons/carbon/image";
-	import CarbonDocument from "~icons/carbon/document";
-	import CarbonUpload from "~icons/carbon/upload";
-	import CarbonLink from "~icons/carbon/link";
-	import CarbonChevronRight from "~icons/carbon/chevron-right";
-	import CarbonClose from "~icons/carbon/close";
+	import CarbonImage from "~icons/lucide/image";
+	import CarbonDocument from "~icons/lucide/file-text";
+	import CarbonUpload from "~icons/lucide/upload";
+	import CarbonLink from "~icons/lucide/link";
+	import CarbonChevronRight from "~icons/lucide/chevron-right";
+	import CarbonClose from "~icons/lucide/x";
 	import UrlFetchModal from "./UrlFetchModal.svelte";
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
 	import MCPServerManager from "$lib/components/mcp/MCPServerManager.svelte";

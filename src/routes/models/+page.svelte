@@ -5,12 +5,12 @@
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 
-	import CarbonHelpFilled from "~icons/carbon/help-filled";
+	import CarbonHelpFilled from "~icons/lucide/circle-help";
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideImage from "~icons/lucide/image";
 	import LucideSettings from "~icons/lucide/settings";
-	import IconFast from "$lib/components/icons/IconFast.svelte";
-	import IconCheap from "$lib/components/icons/IconCheap.svelte";
+	import IconFast from "~icons/lucide/gauge";
+	import IconCheap from "~icons/lucide/coins";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { goto } from "$app/navigation";
@@ -160,14 +160,14 @@
 										title="Provider: Fastest"
 										class="rounded-md bg-gray-100 p-1.5 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 									>
-										<IconFast classNames="size-3 sm:size-3.5" />
+										<IconFast class="size-3 sm:size-3.5" />
 									</div>
 								{:else if providerOverride === "cheapest"}
 									<div
 										title="Provider: Cheapest"
 										class="rounded-md bg-gray-100 p-1.5 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 									>
-										<IconCheap classNames="size-3 sm:size-3.5" />
+										<IconCheap class="size-3 sm:size-3.5" />
 									</div>
 								{:else if hubOrg}
 									<div

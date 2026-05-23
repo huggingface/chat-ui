@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount, onDestroy } from "svelte";
-	import CarbonClose from "~icons/carbon/close";
-	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonClose from "~icons/lucide/x";
+	import CarbonCheckmark from "~icons/lucide/check";
 	import IconArrowUp from "~icons/lucide/arrow-up";
-	import EosIconsLoading from "~icons/eos-icons/loading";
+	import EosIconsLoading from "~icons/lucide/loader-circle";
 	import IconLoading from "$lib/components/icons/IconLoading.svelte";
 	import AudioWaveform from "$lib/components/voice/AudioWaveform.svelte";
 

@@ -11,8 +11,8 @@
 	import { base } from "$app/paths";
 
 	import Logo from "$lib/components/icons/Logo.svelte";
-	import IconSun from "$lib/components/icons/IconSun.svelte";
-	import IconMoon from "$lib/components/icons/IconMoon.svelte";
+	import IconSun from "~icons/lucide/sun";
+	import IconMoon from "~icons/lucide/moon";
 	import { switchTheme, subscribeToTheme } from "$lib/switchTheme";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onDestroy } from "svelte";

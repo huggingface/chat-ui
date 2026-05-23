@@ -5,11 +5,11 @@
 		validateHeader,
 		isSensitiveHeader,
 	} from "$lib/utils/mcpValidation";
-	import IconEye from "~icons/carbon/view";
-	import IconEyeOff from "~icons/carbon/view-off";
-	import IconTrash from "~icons/carbon/trash-can";
-	import IconAdd from "~icons/carbon/add";
-	import IconWarning from "~icons/carbon/warning";
+	import IconEye from "~icons/lucide/eye";
+	import IconEyeOff from "~icons/lucide/eye-off";
+	import IconTrash from "~icons/lucide/trash-2";
+	import IconAdd from "~icons/lucide/plus";
+	import IconWarning from "~icons/lucide/triangle-alert";
 
 	interface Props {
 		onsubmit: (server: { name: string; url: string; headers?: KeyValuePair[] }) => void;

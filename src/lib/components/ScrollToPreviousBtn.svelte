@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { fade } from "svelte/transition";
 	import { onDestroy, untrack } from "svelte";
-	import IconChevron from "./icons/IconChevron.svelte";
+	import IconChevron from "~icons/lucide/chevron-up";
 
 	let visible = $state(false);
 	interface Props {
@@ -72,6 +72,6 @@
 		onclick={scrollToPrevious}
 		class="btn absolute flex h-[41px] w-[41px] rounded-full border bg-white shadow-md transition-all hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:shadow-gray-950 dark:hover:bg-gray-600 {className}"
 	>
-		<IconChevron classNames="rotate-180 mt-[2px]" />
+		<IconChevron class="mt-[2px]" />
 	</button>
 {/if}

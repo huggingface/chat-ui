@@ -1,7 +1,7 @@
 <script lang="ts">
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import BlockWrapper from "./BlockWrapper.svelte";
-	import CarbonChevronRight from "~icons/carbon/chevron-right";
+	import CarbonChevronRight from "~icons/lucide/chevron-right";
 
 	interface Props {
 		content: string;

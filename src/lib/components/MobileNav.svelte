@@ -16,9 +16,9 @@
 	import { onMount, onDestroy } from "svelte";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
-	import IconNew from "$lib/components/icons/IconNew.svelte";
-	import IconShare from "$lib/components/icons/IconShare.svelte";
-	import IconBurger from "$lib/components/icons/IconBurger.svelte";
+	import IconNew from "~icons/lucide/sparkles";
+	import IconShare from "~icons/lucide/share";
+	import IconBurger from "~icons/lucide/menu";
 	import { Spring } from "svelte/motion";
 	import { shareModal } from "$lib/stores/shareModal";
 	import { loading } from "$lib/stores/loading";
@@ -260,7 +260,7 @@
 				}}
 				aria-label="Share conversation"
 			>
-				<IconShare classNames={!canShare ? "opacity-40" : ""} />
+				<IconShare class={!canShare ? "opacity-40" : ""} />
 			</button>
 		{/if}
 		<a
