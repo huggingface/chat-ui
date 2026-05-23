@@ -8,8 +8,11 @@
 	import IconTrash from "~icons/carbon/trash-can";
 	import LucideHammer from "~icons/lucide/hammer";
 	import IconSettings from "~icons/carbon/settings";
+	import IconShare from "$lib/components/icons/IconShare.svelte";
+	import IconCopy from "~icons/carbon/copy";
 	import Switch from "$lib/components/Switch.svelte";
 	import { getMcpServerFaviconUrl } from "$lib/utils/favicon";
+	import { base } from "$app/paths";
 
 	interface Props {
 		server: MCPServer;
@@ -19,6 +22,21 @@
 	let { server, isSelected }: Props = $props();
 
 	let isLoadingHealth = $state(false);
+	let shareCopied = $state(false);
+	let shareCopyTimeout: ReturnType<typeof setTimeout> | undefined;
+
+	async function handleShare() {
+		const params = new URLSearchParams({ name: server.name, url: server.url });
+		const shareUrl = `${window.location.origin}${base}/mcp/share?${params.toString()}`;
+		try {
+			await navigator.clipboard.writeText(shareUrl);
+			shareCopied = true;
+			clearTimeout(shareCopyTimeout);
+			shareCopyTimeout = setTimeout(() => (shareCopied = false), 2000);
+		} catch (err) {
+			console.error("Failed to copy share link:", err);
+		}
+	}
 
 	// Show a quick-access link ONLY for the exact HF MCP login endpoint
 	import { isStrictHfMcpLogin as isStrictHfMcpLoginUrl } from "$lib/utils/hf";
@@ -171,6 +189,20 @@
 			{/if}
 
 			{#if server.type === "custom"}
+				<button
+					onclick={handleShare}
+					class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-[.29rem] text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+					title="Copy a shareable link for this server"
+				>
+					{#if shareCopied}
+						<IconCopy class="size-3" />
+						Copied!
+					{:else}
+						<IconShare classNames="size-3" />
+						Share
+					{/if}
+				</button>
+
 				<button
 					onclick={handleDelete}
 					class="flex items-center gap-1.5 rounded-lg border border-red-500/15 bg-red-50 px-2.5 py-[.29rem] text-xs font-medium text-red-600 hover:bg-red-100 dark:border-red-500/25 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
