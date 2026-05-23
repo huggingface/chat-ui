@@ -576,7 +576,7 @@
 			{/if}
 
 			{#if messages.length > 0}
-				<div bind:this={messagesEl} class="flex h-max flex-col gap-8">
+				<div bind:this={messagesEl} class="flex h-max flex-col gap-8 xl:gap-12">
 					{#each messages as message, idx (message.id)}
 						<ChatMessage
 							{loading}
