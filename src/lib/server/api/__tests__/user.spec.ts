@@ -91,6 +91,7 @@ describe("GET /api/v2/user/settings", () => {
 			toolsOverrides: {},
 			hidePromptExamples: {},
 			providerOverrides: {},
+			useLocalConversations: false,
 			welcomeModalSeenAt: new Date("2024-01-01"),
 			createdAt: new Date(),
 			updatedAt: new Date(),

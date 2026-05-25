@@ -16,6 +16,7 @@
 	import { loading } from "$lib/stores/loading.js";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { put as putLocalConv } from "$lib/stores/localConversations";
 
 	let { data } = $props();
 
@@ -41,6 +42,31 @@
 			} else {
 				model = data.models[0].id;
 			}
+
+			if (
+				publicConfig.PUBLIC_ENABLE_LOCAL_CONVERSATIONS === "true" &&
+				$settings.useLocalConversations
+			) {
+				const id = crypto.randomUUID();
+				const preprompt =
+					($settings.customPromptsEnabled?.[$settings.activeModel] ?? true)
+						? $settings.customPrompts[$settings.activeModel]
+						: "";
+				const now = new Date();
+				await putLocalConv({
+					_id: id,
+					model,
+					title: "New Chat",
+					messages: [],
+					preprompt: preprompt || undefined,
+					createdAt: now,
+					updatedAt: now,
+				});
+				pendingMessage.set({ content: message, files });
+				await goto(`${base}/local/${id}`, { invalidateAll: true });
+				return;
+			}
+
 			const res = await fetch(`${base}/conversation`, {
 				method: "POST",
 				headers: {

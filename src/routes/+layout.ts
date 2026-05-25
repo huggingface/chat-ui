@@ -37,6 +37,7 @@ interface SettingsResponse {
 	reasoningEffortOverrides: Record<string, "low" | "medium" | "high">;
 	reasoningOverrides: Record<string, boolean>;
 	billingOrganization?: string;
+	useLocalConversations: boolean;
 }
 
 export const load = async ({ depends, fetch, url }) => {

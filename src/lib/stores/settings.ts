@@ -24,6 +24,7 @@ type SettingsStore = {
 	directPaste: boolean;
 	hapticsEnabled: boolean;
 	billingOrganization?: string;
+	useLocalConversations: boolean;
 };
 
 type SettingsStoreWritable = Writable<SettingsStore> & {

@@ -23,6 +23,7 @@ const settingsSchema = z.object({
 	hapticsEnabled: z.boolean().default(true),
 	hidePromptExamples: z.record(z.boolean()).default({}),
 	billingOrganization: z.string().optional(),
+	useLocalConversations: z.boolean().default(DEFAULT_SETTINGS.useLocalConversations),
 });
 
 export async function POST({ request, locals }) {

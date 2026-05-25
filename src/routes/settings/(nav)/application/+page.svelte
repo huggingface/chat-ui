@@ -46,6 +46,12 @@
 	function setHapticsEnabled(v: boolean) {
 		settings.update((s) => ({ ...s, hapticsEnabled: v }));
 	}
+	function getUseLocalConversations() {
+		return $settings.useLocalConversations;
+	}
+	function setUseLocalConversations(v: boolean) {
+		settings.update((s) => ({ ...s, useLocalConversations: v }));
+	}
 
 	const client = useAPIClient();
 
@@ -232,6 +238,24 @@
 							</p>
 						</div>
 						<Switch name="hapticsEnabled" bind:checked={getHapticsEnabled, setHapticsEnabled} />
+					</div>
+				{/if}
+
+				{#if publicConfig.PUBLIC_ENABLE_LOCAL_CONVERSATIONS === "true"}
+					<div class="flex items-start justify-between py-3">
+						<div>
+							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+								Store conversations in this browser
+							</div>
+							<p class="text-[12px] text-gray-500 dark:text-gray-400">
+								New chats are saved on this device only. They won't sync across browsers and can't
+								be shared.
+							</p>
+						</div>
+						<Switch
+							name="useLocalConversations"
+							bind:checked={getUseLocalConversations, setUseLocalConversations}
+						/>
 					</div>
 				{/if}
 

@@ -27,6 +27,7 @@ const settingsSchema = z.object({
 	hapticsEnabled: z.boolean().default(true),
 	hidePromptExamples: z.record(z.boolean()).default({}),
 	billingOrganization: z.string().optional(),
+	useLocalConversations: z.boolean().default(DEFAULT_SETTINGS.useLocalConversations),
 });
 
 export const GET: RequestHandler = async ({ locals }) => {
@@ -76,6 +77,8 @@ export const GET: RequestHandler = async ({ locals }) => {
 		reasoningEffortOverrides: settings?.reasoningEffortOverrides ?? {},
 		reasoningOverrides: config.isHuggingChat ? {} : (settings?.reasoningOverrides ?? {}),
 		billingOrganization: settings?.billingOrganization ?? undefined,
+		useLocalConversations:
+			settings?.useLocalConversations ?? DEFAULT_SETTINGS.useLocalConversations,
 	});
 };
 

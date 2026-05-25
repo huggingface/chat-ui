@@ -26,6 +26,17 @@ type MessageUpdateRequestOptions = {
 	// User's IANA timezone (e.g. "America/New_York")
 	timezone?: string;
 	streamingMode?: StreamingMode;
+	/**
+	 * When set, POST a JSON body to `${base}${statelessEndpoint}` instead of
+	 * the default form-data POST to `${base}/conversation/${conversationId}`.
+	 * Used by the local-conversations mode which sends full history per request.
+	 */
+	statelessEndpoint?: string;
+	statelessRequest?: {
+		model: string;
+		messages: Array<{ from: "user" | "assistant" | "system"; content: string }>;
+		preprompt?: string;
+	};
 };
 
 type ChunkDetector = (buffer: string) => string | null;
@@ -50,32 +61,47 @@ export async function fetchMessageUpdates(
 	const abortController = new AbortController();
 	abortSignal.addEventListener("abort", () => abortController.abort());
 
-	const form = new FormData();
+	let response: Response;
+	if (opts.statelessEndpoint && opts.statelessRequest) {
+		response = await fetch(`${opts.base}${opts.statelessEndpoint}`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				...opts.statelessRequest,
+				selectedMcpServerNames: opts.selectedMcpServerNames,
+				selectedMcpServers: opts.selectedMcpServers,
+				timezone: opts.timezone,
+			}),
+			signal: abortController.signal,
+		});
+	} else {
+		const form = new FormData();
 
-	const optsJSON = JSON.stringify({
-		inputs: opts.inputs,
-		id: opts.messageId,
-		is_retry: opts.isRetry,
-		is_continue: Boolean(opts.isContinue),
-		// Will be ignored server-side if unsupported
-		selectedMcpServerNames: opts.selectedMcpServerNames,
-		selectedMcpServers: opts.selectedMcpServers,
-		timezone: opts.timezone,
-	});
+		const optsJSON = JSON.stringify({
+			inputs: opts.inputs,
+			id: opts.messageId,
+			is_retry: opts.isRetry,
+			is_continue: Boolean(opts.isContinue),
+			// Will be ignored server-side if unsupported
+			selectedMcpServerNames: opts.selectedMcpServerNames,
+			selectedMcpServers: opts.selectedMcpServers,
+			timezone: opts.timezone,
+		});
 
-	opts.files?.forEach((file) => {
-		const name = file.type + ";" + file.name;
+		opts.files?.forEach((file) => {
+			const name = file.type + ";" + file.name;
 
-		form.append("files", new File([file.value], name, { type: file.mime }));
-	});
+			form.append("files", new File([file.value], name, { type: file.mime }));
+		});
 
-	form.append("data", optsJSON);
+		form.append("data", optsJSON);
 
-	const response = await fetch(`${opts.base}/conversation/${conversationId}`, {
-		method: "POST",
-		body: form,
-		signal: abortController.signal,
-	});
+		response = await fetch(`${opts.base}/conversation/${conversationId}`, {
+			method: "POST",
+			body: form,
+			signal: abortController.signal,
+		});
+	}
 
 	if (!response.ok) {
 		const errorMessage = await response

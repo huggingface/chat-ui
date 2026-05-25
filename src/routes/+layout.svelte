@@ -10,6 +10,8 @@
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { loading } from "$lib/stores/loading";
 	import { setHapticsEnabled } from "$lib/utils/haptics";
+	import { localConversations, remove as removeLocalConv } from "$lib/stores/localConversations";
+	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -33,9 +35,27 @@
 	const publicConfig = data.publicConfig;
 	const client = useAPIClient();
 
-	let conversations = $state(data.conversations);
+	let serverConversations = $state(data.conversations);
 	$effect(() => {
-		data.conversations && untrack(() => (conversations = data.conversations));
+		data.conversations && untrack(() => (serverConversations = data.conversations));
+	});
+
+	let localModeEnabled = $derived(
+		publicConfig.PUBLIC_ENABLE_LOCAL_CONVERSATIONS === "true" &&
+			Boolean(data.settings?.useLocalConversations)
+	);
+
+	let conversations = $derived.by<ConvSidebar[]>(() => {
+		if (!localModeEnabled) return serverConversations;
+		const local: ConvSidebar[] = $localConversations.map((c) => ({
+			id: `local:${c._id}`,
+			title: c.title,
+			model: c.model,
+			updatedAt: c.updatedAt,
+		}));
+		return [...local, ...serverConversations].sort(
+			(a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
+		);
 	});
 
 	let isNavCollapsed = $state(false);
@@ -66,12 +86,25 @@
 	);
 
 	async function deleteConversation(id: string) {
+		if (typeof id === "string" && id.startsWith("local:")) {
+			const localId = id.slice("local:".length);
+			try {
+				await removeLocalConv(localId);
+				if (page.params.id === localId) {
+					await goto(`${base}/`, { invalidateAll: true });
+				}
+			} catch (err) {
+				console.error(err);
+				$error = String(err);
+			}
+			return;
+		}
 		client
 			.conversations({ id })
 			.delete()
 			.then(handleResponse)
 			.then(async () => {
-				conversations = conversations.filter((conv) => conv.id !== id);
+				serverConversations = serverConversations.filter((conv) => conv.id !== id);
 
 				if (page.params.id === id) {
 					await goto(`${base}/`, { invalidateAll: true });
@@ -84,12 +117,18 @@
 	}
 
 	async function editConversationTitle(id: string, title: string) {
+		if (typeof id === "string" && id.startsWith("local:")) {
+			// Editing titles of local conversations is not supported in v1.
+			return;
+		}
 		client
 			.conversations({ id })
 			.patch({ title })
 			.then(handleResponse)
 			.then(async () => {
-				conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
+				serverConversations = serverConversations.map((conv) =>
+					conv.id === id ? { ...conv, title } : conv
+				);
 			})
 			.catch((err) => {
 				console.error(err);
@@ -112,10 +151,13 @@
 
 	$effect(() => {
 		if ($titleUpdate) {
-			const convIdx = conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
+			// Local convs sync their title through the localConversations store, so
+			// only mutate serverConversations here.
+			const convIdx = serverConversations.findIndex(({ id }) => id === $titleUpdate?.convId);
 
 			if (convIdx != -1) {
-				conversations[convIdx].title = $titleUpdate?.title ?? conversations[convIdx].title;
+				serverConversations[convIdx].title =
+					$titleUpdate?.title ?? serverConversations[convIdx].title;
 			}
 
 			$titleUpdate = null;

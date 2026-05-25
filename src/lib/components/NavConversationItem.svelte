@@ -22,6 +22,14 @@
 
 	let { conv, readOnly, ondeleteConversation, oneditConversationTitle }: Props = $props();
 
+	// Conversations stored in IndexedDB use a "local:<uuid>" id and live at
+	// /local/<uuid> instead of /conversation/<id>.
+	const idStr = $derived(conv.id.toString());
+	const isLocal = $derived(idStr.startsWith("local:"));
+	const routeId = $derived(isLocal ? idStr.slice("local:".length) : idStr);
+	const href = $derived(isLocal ? `${base}/local/${routeId}` : `${base}/conversation/${routeId}`);
+	const isActive = $derived(routeId === page.params.id);
+
 	let deleteOpen = $state(false);
 	let renameOpen = $state(false);
 	let isMenuOpen = $state(false);
@@ -57,7 +65,7 @@
 
 <div
 	class="group flex h-8 flex-none items-center gap-1.5 rounded-lg pl-2 pr-1.5 text-base text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 max-sm:h-10 sm:text-sm
-		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}"
+		{isActive ? 'bg-gray-100 dark:bg-gray-700' : ''}"
 >
 	{#if inlineEditing}
 		<input
@@ -81,7 +89,7 @@
 		<a
 			data-sveltekit-noscroll
 			data-sveltekit-preload-data="tap"
-			href="{base}/conversation/{conv.id}"
+			{href}
 			class="min-w-0 flex-1 truncate py-2 first-letter:uppercase"
 			onclick={(e) => {
 				if (e.detail >= 2) {

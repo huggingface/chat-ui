@@ -80,6 +80,13 @@ export interface Settings extends Timestamps {
 	 * Stores the org's preferred_username. If empty/undefined, bills to personal account.
 	 */
 	billingOrganization?: string;
+
+	/**
+	 * When enabled, new conversations are stored in the browser (IndexedDB)
+	 * instead of the server. Only effective if the operator has enabled the
+	 * feature via PUBLIC_ENABLE_LOCAL_CONVERSATIONS.
+	 */
+	useLocalConversations: boolean;
 }
 
 export type SettingsEditable = Omit<Settings, "welcomeModalSeenAt" | "createdAt" | "updatedAt">;
@@ -98,4 +105,5 @@ export const DEFAULT_SETTINGS = {
 	streamingMode: "smooth",
 	directPaste: false,
 	hapticsEnabled: true,
+	useLocalConversations: false,
 } satisfies SettingsEditable;
