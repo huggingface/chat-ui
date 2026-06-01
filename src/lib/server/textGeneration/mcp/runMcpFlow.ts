@@ -3,7 +3,7 @@ import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate"
 import { getMcpServers } from "$lib/server/mcp/registry";
 import { isValidUrl } from "$lib/server/urlSafety";
 import { resetMcpToolsCache } from "$lib/server/mcp/tools";
-import { getOpenAiToolsForMcp } from "$lib/server/mcp/tools";
+import { getOpenAiToolsForMcp, type OpenAiTool } from "$lib/server/mcp/tools";
 import type {
 	ChatCompletionChunk,
 	ChatCompletionCreateParamsStreaming,
@@ -28,6 +28,13 @@ import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepa
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
+import { CodeDocState } from "../tools/codeDocuments";
+import {
+	EDIT_TOOL_NAME,
+	editToolDefinition,
+	isEditToolEnabled,
+	runEditToolCalls,
+} from "../tools/editTool";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -87,6 +94,17 @@ export async function* runMcpFlow({
 		);
 	} catch {}
 
+	// Determine tool availability up-front so built-in tools (e.g. the edit tool) can run
+	// even when no MCP servers are configured. The edit tool is only offered once the
+	// conversation actually contains a code block it could edit (reconstructed from the
+	// transcript), and is mutated in place as edits are applied during this turn.
+	const supportsTools = Boolean((model as unknown as { supportsTools?: boolean }).supportsTools);
+	const toolsEnabled = Boolean(forceTools) || supportsTools;
+	const codeDocState =
+		toolsEnabled && isEditToolEnabled() ? CodeDocState.fromMessages(messages) : undefined;
+	const builtinTools: OpenAiTool[] = codeDocState?.hasAny() ? [editToolDefinition] : [];
+	const editToolEnabled = builtinTools.length > 0;
+
 	// Merge in request-provided custom servers (if any)
 	try {
 		const reqMcp = (
@@ -143,7 +161,7 @@ export async function* runMcpFlow({
 	}
 
 	// If selection/merge yielded no servers, bail early with clearer log
-	if (servers.length === 0) {
+	if (servers.length === 0 && builtinTools.length === 0) {
 		logger.warn({}, "[mcp] no MCP servers selected after merge/name filter");
 		return "not_applicable";
 	}
@@ -168,7 +186,7 @@ export async function* runMcpFlow({
 			}
 		} catch {}
 	}
-	if (servers.length === 0) {
+	if (servers.length === 0 && builtinTools.length === 0) {
 		logger.warn({}, "[mcp] all selected MCP servers rejected by URL safety guard");
 		return "not_applicable";
 	}
@@ -237,32 +255,27 @@ export async function* runMcpFlow({
 		{ count: servers.length, servers: servers.map((s) => s.name) },
 		"[mcp] servers configured"
 	);
-	if (servers.length === 0) {
+	if (servers.length === 0 && builtinTools.length === 0) {
 		return "not_applicable";
 	}
 
-	// Gate MCP flow based on model tool support (aggregated) with user override
-	try {
-		const supportsTools = Boolean((model as unknown as { supportsTools?: boolean }).supportsTools);
-		const toolsEnabled = Boolean(forceTools) || supportsTools;
-		logger.debug(
-			{
-				model: model.id ?? model.name,
-				supportsTools,
-				forceTools: Boolean(forceTools),
-				toolsEnabled,
-			},
-			"[mcp] tools gate evaluation"
+	// Gate the tools flow based on model tool support (aggregated) with user override.
+	logger.debug(
+		{
+			model: model.id ?? model.name,
+			supportsTools,
+			forceTools: Boolean(forceTools),
+			toolsEnabled,
+			editToolEnabled,
+		},
+		"[mcp] tools gate evaluation"
+	);
+	if (!toolsEnabled) {
+		logger.info(
+			{ model: model.id ?? model.name },
+			"[mcp] tools disabled for model; skipping tools flow"
 		);
-		if (!toolsEnabled) {
-			logger.info(
-				{ model: model.id ?? model.name },
-				"[mcp] tools disabled for model; skipping MCP flow"
-			);
-			return "not_applicable";
-		}
-	} catch {
-		// If anything goes wrong reading the flag, proceed (previous behavior)
+		return "not_applicable";
 	}
 
 	const resolveFileRef = buildImageRefResolver(messages);
@@ -295,17 +308,22 @@ export async function* runMcpFlow({
 	}
 
 	try {
-		const { tools: oaTools, mapping } = await getOpenAiToolsForMcp(servers, {
+		const { tools: mcpTools, mapping } = await getOpenAiToolsForMcp(servers, {
 			signal: abortSignal,
 		});
+		const oaTools: OpenAiTool[] = [...mcpTools, ...builtinTools];
 		try {
 			logger.info(
-				{ toolCount: oaTools.length, toolNames: oaTools.map((t) => t.function.name) },
+				{
+					toolCount: oaTools.length,
+					toolNames: oaTools.map((t) => t.function.name),
+					builtinCount: builtinTools.length,
+				},
 				"[mcp] openai tool defs built"
 			);
 		} catch {}
 		if (oaTools.length === 0) {
-			logger.warn({}, "[mcp] zero tools available after listing; skipping MCP flow");
+			logger.warn({}, "[mcp] zero tools available after listing; skipping tools flow");
 			return "not_applicable";
 		}
 
@@ -694,41 +712,63 @@ export async function* runMcpFlow({
 					tool_calls: toolCalls,
 				};
 
-				const exec = executeToolCalls({
-					calls,
-					mapping,
-					servers,
-					parseArgs,
-					resolveFileRef,
-					toPrimitive,
-					processToolOutput,
-					abortSignal,
-				});
-				let toolMsgCount = 0;
-				let toolRunCount = 0;
-				for await (const event of exec) {
-					if (event.type === "update") {
-						yield event.update;
-					} else {
-						messagesOpenAI = [
-							...messagesOpenAI,
-							assistantToolMessage,
-							...(event.summary.toolMessages ?? []),
-						];
-						toolMsgCount = event.summary.toolMessages?.length ?? 0;
-						toolRunCount = event.summary.toolRuns?.length ?? 0;
-						logger.info(
-							{ toolMsgCount, toolRunCount },
-							"[mcp] tools executed; continuing loop for follow-up completion"
-						);
-					}
+				// Built-in tool calls (e.g. `edit`) are executed locally; the rest go to MCP.
+				const editCalls =
+					editToolEnabled && codeDocState ? calls.filter((c) => c.name === EDIT_TOOL_NAME) : [];
+				const mcpCalls = calls.filter((c) => !(editToolEnabled && c.name === EDIT_TOOL_NAME));
+				const collectedToolMessages: ChatCompletionMessageParam[] = [];
 
-					// Check abort during tool execution
-					if (checkAborted()) {
-						logger.info({ loop, toolMsgCount }, "[mcp] aborting during tool execution");
-						return "aborted";
+				if (editCalls.length > 0 && codeDocState) {
+					for await (const event of runEditToolCalls({
+						calls: editCalls,
+						docState: codeDocState,
+						parseArgs,
+					})) {
+						if (event.type === "update") {
+							yield event.update;
+						} else {
+							collectedToolMessages.push(...(event.summary.toolMessages ?? []));
+						}
+						if (checkAborted()) {
+							logger.info({ loop }, "[mcp] aborting during edit tool execution");
+							return "aborted";
+						}
 					}
 				}
+
+				if (mcpCalls.length > 0) {
+					const exec = executeToolCalls({
+						calls: mcpCalls,
+						mapping,
+						servers,
+						parseArgs,
+						resolveFileRef,
+						toPrimitive,
+						processToolOutput,
+						abortSignal,
+					});
+					for await (const event of exec) {
+						if (event.type === "update") {
+							yield event.update;
+						} else {
+							collectedToolMessages.push(...(event.summary.toolMessages ?? []));
+						}
+						if (checkAborted()) {
+							logger.info({ loop }, "[mcp] aborting during tool execution");
+							return "aborted";
+						}
+					}
+				}
+
+				messagesOpenAI = [...messagesOpenAI, assistantToolMessage, ...collectedToolMessages];
+				logger.info(
+					{
+						editCalls: editCalls.length,
+						mcpCalls: mcpCalls.length,
+						toolMsgCount: collectedToolMessages.length,
+					},
+					"[mcp] tools executed; continuing loop for follow-up completion"
+				);
 
 				// Check abort after all tools complete before continuing loop
 				if (checkAborted()) {

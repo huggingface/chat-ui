@@ -31,6 +31,7 @@ import sql from "highlight.js/lib/languages/sql";
 import plaintext from "highlight.js/lib/languages/plaintext";
 import { parseIncompleteMarkdown } from "./parseIncompleteMarkdown";
 import { parseMarkdownIntoBlocks } from "./parseBlocks";
+import { parseCodeFenceInfo } from "./codeFence";
 
 const bundledLanguages: [string, LanguageFn][] = [
 	["javascript", javascript],
@@ -396,6 +397,7 @@ type CodeToken = {
 	code: string;
 	rawCode: string;
 	isClosed: boolean;
+	filename?: string;
 };
 
 type TextToken = {
@@ -420,12 +422,14 @@ export async function processTokens(content: string, sources: SimpleSource[]): P
 	const processedTokens = await Promise.all(
 		tokens.map(async (token) => {
 			if (token.type === "code") {
+				const { language, filename } = parseCodeFenceInfo(token.lang);
 				return {
 					type: "code" as const,
 					lang: token.lang,
-					code: highlightCode(token.text, token.lang),
+					code: highlightCode(token.text, language),
 					rawCode: token.text,
 					isClosed: isFencedBlockClosed(token.raw ?? ""),
+					filename,
 				};
 			} else {
 				return {
@@ -447,12 +451,14 @@ export function processTokensSync(content: string, sources: SimpleSource[]): Tok
 	const tokens = marked.lexer(processedContent);
 	return tokens.map((token) => {
 		if (token.type === "code") {
+			const { language, filename } = parseCodeFenceInfo(token.lang);
 			return {
 				type: "code" as const,
 				lang: token.lang,
-				code: highlightCode(token.text, token.lang),
+				code: highlightCode(token.text, language),
 				rawCode: token.text,
 				isClosed: isFencedBlockClosed(token.raw ?? ""),
+				filename,
 			};
 		}
 		return { type: "text" as const, html: marked.parse(token.raw) };

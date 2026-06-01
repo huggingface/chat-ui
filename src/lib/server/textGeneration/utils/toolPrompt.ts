@@ -19,7 +19,7 @@ export function buildToolPreprompt(tools: OpenAiTool[], timezone?: string): stri
 	const currentDateTime = now.toLocaleString("en-US", dateTimeOptions);
 	const isoDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 	const locationLine = timezone ? ` User's timezone: ${timezone}.` : "";
-	return [
+	const lines = [
 		`You have access to these tools: ${names.join(", ")}.`,
 		`Current date and time: ${currentDateTime} (${isoDate}).${locationLine}`,
 		`IMPORTANT: Do NOT call a tool unless the user's request requires capabilities you lack (e.g., real-time data, image generation, code execution) or external information you do not have. For tasks like writing code, creative writing, math, or building apps, respond directly without tools. When in doubt, do not use a tool.`,
@@ -30,5 +30,11 @@ export function buildToolPreprompt(tools: OpenAiTool[], timezone?: string): stri
 		`If a tool generates an image, you can inline it directly: ![alt text](image_url).`,
 		`If a tool needs an image, set its image field ("input_image", "image", or "image_url") to a reference like "image_1", "image_2", etc. (ordered by when the user uploaded them).`,
 		`Default to image references; only use a full http(s) URL when the tool description explicitly asks for one, or reuse a URL a previous tool returned.`,
-	].join(" ");
+	];
+	if (names.includes("edit")) {
+		lines.push(
+			`CODE EDITS: When you write code the user may want changed later, start the code fence with the language followed by a short filename, e.g. \`\`\`python app.py. To modify a code block you already produced, call the "edit" tool with that path and one or more {oldText, newText} replacements instead of repeating the whole block; each oldText must match a unique region of that block. The updated code block is shown to the user automatically — after editing, briefly describe what changed and do NOT paste the full updated code yourself.`
+		);
+	}
+	return lines.join(" ");
 }

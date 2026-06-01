@@ -4,14 +4,16 @@
 	import HtmlPreviewModal from "./HtmlPreviewModal.svelte";
 	import PlayFilledAlt from "~icons/carbon/play-filled-alt";
 	import EosIconsLoading from "~icons/eos-icons/loading";
+	import CarbonDocument from "~icons/carbon/document";
 
 	interface Props {
 		code?: string;
 		rawCode?: string;
+		filename?: string;
 		loading?: boolean;
 	}
 
-	let { code = "", rawCode = "", loading = false }: Props = $props();
+	let { code = "", rawCode = "", filename = undefined, loading = false }: Props = $props();
 
 	let previewOpen = $state(false);
 
@@ -32,6 +34,14 @@
 </script>
 
 <div class="group relative my-4 rounded-lg">
+	{#if filename}
+		<div
+			class="flex items-center gap-1.5 rounded-t-lg border-b border-gray-700 bg-gray-800 px-4 py-1.5 font-mono text-xs text-gray-300 dark:border-gray-700/70 dark:bg-gray-900"
+		>
+			<CarbonDocument class="size-3.5 shrink-0 opacity-60" />
+			<span class="truncate">{filename}</span>
+		</div>
+	{/if}
 	<div class="pointer-events-none sticky top-0 w-full">
 		<div
 			class="pointer-events-auto absolute right-2 top-2 flex items-center gap-1.5 md:right-3 md:top-3"
@@ -63,7 +73,10 @@
 			/>
 		</div>
 	</div>
-	<pre class="scrollbar-custom overflow-auto px-5 font-mono transition-[height]"><code
+	<pre
+		class="scrollbar-custom overflow-auto px-5 font-mono transition-[height] {filename
+			? '!rounded-t-none'
+			: ''}"><code
 			><!-- eslint-disable svelte/no-at-html-tags -->{@html DOMPurify.sanitize(code)}</code
 		></pre>
 
