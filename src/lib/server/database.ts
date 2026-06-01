@@ -215,6 +215,14 @@ export class Database {
 			.catch((e) =>
 				logger.error(e, "Error creating index for conversations by messages createdAt")
 			);
+		conversations
+			.createIndex(
+				{ title: "text", "messages.content": "text" },
+				{ name: "conv_text_idx", default_language: "english" }
+			)
+			.catch((e) =>
+				logger.error(e, "Error creating text index for conversations title and messages.content")
+			);
 		// Unique index for stats
 		conversationStats
 			.createIndex(
