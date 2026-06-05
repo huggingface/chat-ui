@@ -11,10 +11,10 @@
 </script>
 
 <div
-	class=" flex h-[648px] w-full flex-col items-center justify-center bg-black text-white"
+	class=" flex h-[648px] w-full flex-col items-center justify-center bg-black px-16 text-center text-white"
 	style="background-image: url(https://cdn-uploads.huggingface.co/production/uploads/5f17f0a0925b9863e28ad517/L4XVRJ7MsfFDD7ROx_geO.png);"
 >
-	<h1 class="mb-8 text-7xl font-bold text-white">
+	<h1 class="mb-8 w-full text-center text-7xl font-bold text-white">
 		{name.split("/")[1]}
 	</h1>
 
