@@ -816,13 +816,14 @@
 									e.preventDefault();
 								}
 							}}
-							class="inline-flex items-center gap-1 hover:underline"
+							class="inline-flex min-w-0 items-center gap-1 hover:underline"
 						>
 							{#if currentModel.isRouter}
 								<IconOmni />
-								{currentModel.displayName}
+								<span class="truncate">{currentModel.displayName}</span>
 							{:else}
-								Model: {currentModel.displayName}
+								<span class="shrink-0">Model:</span>
+								<span class="truncate">{currentModel.displayName}</span>
 								{#if hasProviderOverride}
 									{@const hubOrg =
 										PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
@@ -849,7 +850,7 @@
 									</span>
 								{/if}
 							{/if}
-							<CarbonCaretDown class="-ml-0.5 text-xxs" />
+							<CarbonCaretDown class="-ml-0.5 shrink-0 text-xxs" />
 						</a>
 					{:else if showRouterDetails && streamingRouterMetadata?.route}
 						<div
