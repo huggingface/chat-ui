@@ -171,20 +171,6 @@
 		return out;
 	}
 
-	// While the active group is streaming, show the current step: the latest
-	// thinking block plus every tool after it. This keeps a parallel batch of
-	// tools all visible at once, while still hiding earlier completed steps.
-	function currentStepBlocks(groupBlocks: ProcessBlock[]): ProcessBlock[] {
-		let start = 0;
-		for (let i = groupBlocks.length - 1; i >= 0; i -= 1) {
-			if (groupBlocks[i].type === "think") {
-				start = i;
-				break;
-			}
-		}
-		return groupBlocks.slice(start);
-	}
-
 	let blocks = $derived.by(() => {
 		const updates = message.updates ?? [];
 		const res: Block[] = [];
@@ -289,6 +275,15 @@
 		return units;
 	});
 
+	// Still mid-process (thinking / calling tools, no answer yet) → render the
+	// blocks flat like today. Once the final answer starts streaming the last
+	// block becomes text, so this flips to false and the nested summary takes over.
+	let isProcessStreaming = $derived.by(() => {
+		if (!isLast || !loading) return false;
+		const last = blocks.at(-1);
+		return !!last && (last.type === "think" || last.type === "tool");
+	});
+
 	$effect(() => {
 		if (isCopied) {
 			setTimeout(() => {
@@ -342,48 +337,68 @@
 				{#if isLast && loading && blocks.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
-				{#each renderUnits as unit, unitIndex (unit.kind === "group" ? `group-${unitIndex}` : `text-${unitIndex}`)}
-					{#if unit.kind === "text"}
-						{#if isLast && loading && unit.content.length === 0}
-							<IconLoading classNames="loading inline ml-2 first:ml-0" />
-						{:else if unit.content.trim().length > 0}
+				{#if isProcessStreaming}
+					<!-- Streaming the thinking / tool phase: render every block flat and
+					     inline, exactly like today. Nesting kicks in once the answer starts. -->
+					{#each blocks as block, blockIndex (block.type === "tool" ? `tool-${block.uuid}-${blockIndex}` : `block-${blockIndex}`)}
+						{#if block.type === "text"}
+							{#if block.content.trim().length > 0}
+								<div
+									class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+								>
+									<MarkdownRenderer content={block.content} loading={isLast && loading} />
+								</div>
+							{/if}
+						{:else}
 							<div
-								class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+								data-exclude-from-copy
+								class="has-[+.prose]:!mb-2 [&:not(:last-child)]:mb-1 [.prose+&]:mt-3"
 							>
-								<MarkdownRenderer content={unit.content} loading={isLast && loading} />
+								{#if block.type === "think"}
+									<OpenReasoningResults
+										content={block.content}
+										loading={isLast && loading && !block.closed}
+									/>
+								{:else}
+									<ToolUpdate tool={block.updates} {loading} />
+								{/if}
 							</div>
 						{/if}
-					{:else if unit.kind === "group"}
-						{@const isActive = isLast && loading && unitIndex === renderUnits.length - 1}
-						<div
-							data-exclude-from-copy
-							class="has-[+.prose]:!mb-2 [&:not(:last-child)]:mb-1 [.prose+&]:mt-3"
-						>
-							{#if isActive}
-								<!-- Streaming: show the current step (latest thinking + any parallel
-								     tools after it), not the previously-completed calls -->
-								{#each currentStepBlocks(unit.blocks) as block, i (block.type === "tool" ? `tool-${block.uuid}-${i}` : `think-${i}`)}
-									{#if block.type === "think"}
-										<OpenReasoningResults content={block.content} loading={!block.closed} />
-									{:else}
-										<ToolUpdate tool={block.updates} {loading} />
-									{/if}
-								{/each}
-							{:else if unit.blocks.length > 1}
-								<!-- Done: collapse the whole run into a single summary -->
-								<ToolCallsSummary blocks={unit.blocks} toolCount={unit.toolCount} />
-							{:else}
-								<!-- Done: a lone process block stays standalone -->
-								{@const only = unit.blocks[0]}
-								{#if only.type === "think"}
-									<OpenReasoningResults content={only.content} loading={false} />
-								{:else}
-									<ToolUpdate tool={only.updates} loading={false} />
-								{/if}
+					{/each}
+				{:else}
+					<!-- Answer started or generation finished: nest the process blocks. -->
+					{#each renderUnits as unit, unitIndex (unit.kind === "group" ? `group-${unitIndex}` : `text-${unitIndex}`)}
+						{#if unit.kind === "text"}
+							{#if isLast && loading && unit.content.length === 0}
+								<IconLoading classNames="loading inline ml-2 first:ml-0" />
+							{:else if unit.content.trim().length > 0}
+								<div
+									class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+								>
+									<MarkdownRenderer content={unit.content} loading={isLast && loading} />
+								</div>
 							{/if}
-						</div>
-					{/if}
-				{/each}
+						{:else if unit.kind === "group"}
+							<div
+								data-exclude-from-copy
+								class="has-[+.prose]:!mb-2 [&:not(:last-child)]:mb-1 [.prose+&]:mt-3"
+							>
+								{#if unit.blocks.length > 1}
+									<!-- Collapse the whole run into a single summary -->
+									<ToolCallsSummary blocks={unit.blocks} toolCount={unit.toolCount} />
+								{:else}
+									<!-- A lone process block stays standalone -->
+									{@const only = unit.blocks[0]}
+									{#if only.type === "think"}
+										<OpenReasoningResults content={only.content} loading={false} />
+									{:else}
+										<ToolUpdate tool={only.updates} loading={false} />
+									{/if}
+								{/if}
+							</div>
+						{/if}
+					{/each}
+				{/if}
 			</div>
 		</div>
 
