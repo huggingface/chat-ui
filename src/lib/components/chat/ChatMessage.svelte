@@ -21,6 +21,7 @@
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import ToolUpdate from "./ToolUpdate.svelte";
+	import ToolCallsSummary from "./ToolCallsSummary.svelte";
 	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
 	import { MessageUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
 	import ImageLightbox from "./ImageLightbox.svelte";
@@ -130,7 +131,6 @@
 
 	// Zero-config reasoning autodetection: detect <think> blocks in content
 	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/gi;
-	let hasClientThink = $derived(message.content.split(THINK_BLOCK_REGEX).length > 1);
 
 	// Strip think blocks for clipboard copy (always, regardless of detection)
 	let contentWithoutThink = $derived.by(() =>
@@ -139,9 +139,37 @@
 
 	type Block =
 		| { type: "text"; content: string }
+		| { type: "think"; content: string; closed: boolean }
 		| { type: "tool"; uuid: string; updates: MessageToolUpdate[] };
 
 	type ToolBlock = Extract<Block, { type: "tool" }>;
+	type ProcessBlock = Extract<Block, { type: "think" } | { type: "tool" }>;
+
+	type RenderUnit =
+		| { kind: "text"; content: string }
+		| { kind: "group"; blocks: ProcessBlock[]; toolCount: number };
+
+	// Expand any text block containing <think>…</think> into dedicated think blocks
+	// so reasoning can be grouped/collapsed separately from the answer text.
+	function expandThinkBlocks(input: Block[]): Block[] {
+		const out: Block[] = [];
+		for (const block of input) {
+			if (block.type !== "text") {
+				out.push(block);
+				continue;
+			}
+			for (const part of block.content.split(THINK_BLOCK_REGEX)) {
+				if (!part) continue;
+				if (part.startsWith("<think>")) {
+					const closed = part.endsWith("</think>");
+					out.push({ type: "think", content: part.slice(7, closed ? -8 : undefined), closed });
+				} else if (part.trim().length > 0) {
+					out.push({ type: "text", content: part });
+				}
+			}
+		}
+		return out;
+	}
 
 	let blocks = $derived.by(() => {
 		const updates = message.updates ?? [];
@@ -152,8 +180,9 @@
 
 		// Fast path: no tool updates at all
 		if (!hasTools && updates.length === 0) {
-			if (message.content) return [{ type: "text" as const, content: message.content }];
-			return [];
+			return expandThinkBlocks(
+				message.content ? [{ type: "text" as const, content: message.content }] : []
+			);
 		}
 
 		for (const update of updates) {
@@ -219,7 +248,31 @@
 			res.push({ type: "text" as const, content: message.content });
 		}
 
-		return res;
+		return expandThinkBlocks(res);
+	});
+
+	// Coalesce consecutive process blocks (thinking + tools) into groups so they can
+	// collapse into a single "Called N tools" / "Thought" summary. Text passes through.
+	let renderUnits = $derived.by(() => {
+		const units: RenderUnit[] = [];
+		let current: ProcessBlock[] | null = null;
+		const flush = () => {
+			if (current && current.length) {
+				const toolCount = current.filter((b) => b.type === "tool").length;
+				units.push({ kind: "group", blocks: current, toolCount });
+			}
+			current = null;
+		};
+		for (const block of blocks) {
+			if (block.type === "think" || block.type === "tool") {
+				(current ??= []).push(block);
+			} else {
+				flush();
+				units.push({ kind: "text", content: block.content });
+			}
+		}
+		flush();
+		return units;
 	});
 
 	$effect(() => {
@@ -275,45 +328,44 @@
 				{#if isLast && loading && blocks.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
-				{#each blocks as block, blockIndex (block.type === "tool" ? `${block.uuid}-${blockIndex}` : `text-${blockIndex}`)}
-					{#if block.type === "tool"}
+				{#each renderUnits as unit, unitIndex (unit.kind === "group" ? `group-${unitIndex}` : `text-${unitIndex}`)}
+					{#if unit.kind === "text"}
+						{#if isLast && loading && unit.content.length === 0}
+							<IconLoading classNames="loading inline ml-2 first:ml-0" />
+						{:else if unit.content.trim().length > 0}
+							<div
+								class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
+							>
+								<MarkdownRenderer content={unit.content} loading={isLast && loading} />
+							</div>
+						{/if}
+					{:else if unit.kind === "group"}
+						{@const isActive = isLast && loading && unitIndex === renderUnits.length - 1}
 						<div
 							data-exclude-from-copy
 							class="has-[+.prose]:!mb-2 [&:not(:last-child)]:mb-1 [.prose+&]:mt-3"
 						>
-							<ToolUpdate tool={block.updates} {loading} />
-						</div>
-					{:else if block.type === "text"}
-						{#if isLast && loading && block.content.length === 0}
-							<IconLoading classNames="loading inline ml-2 first:ml-0" />
-						{/if}
-
-						{#if hasClientThink}
-							{@const parts = block.content.split(THINK_BLOCK_REGEX)}
-							{#each parts as part}
-								{#if part && part.startsWith("<think>")}
-									{@const isClosed = part.endsWith("</think>")}
-									{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
-
-									<OpenReasoningResults
-										content={thinkContent}
-										loading={isLast && loading && !isClosed}
-									/>
-								{:else if part && part.trim().length > 0}
-									<div
-										class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
-									>
-										<MarkdownRenderer content={part} loading={isLast && loading} />
-									</div>
+							{#if isActive}
+								<!-- Streaming: show only the current (last) block, not the previous calls -->
+								{@const active = unit.blocks[unit.blocks.length - 1]}
+								{#if active.type === "think"}
+									<OpenReasoningResults content={active.content} loading={!active.closed} />
+								{:else}
+									<ToolUpdate tool={active.updates} {loading} />
 								{/if}
-							{/each}
-						{:else if block.content.trim().length > 0}
-							<div
-								class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
-							>
-								<MarkdownRenderer content={block.content} loading={isLast && loading} />
-							</div>
-						{/if}
+							{:else if unit.blocks.length > 1}
+								<!-- Done: collapse the whole run into a single summary -->
+								<ToolCallsSummary blocks={unit.blocks} toolCount={unit.toolCount} />
+							{:else}
+								<!-- Done: a lone process block stays standalone -->
+								{@const only = unit.blocks[0]}
+								{#if only.type === "think"}
+									<OpenReasoningResults content={only.content} loading={false} />
+								{:else}
+									<ToolUpdate tool={only.updates} loading={false} />
+								{/if}
+							{/if}
+						</div>
 					{/if}
 				{/each}
 			</div>
