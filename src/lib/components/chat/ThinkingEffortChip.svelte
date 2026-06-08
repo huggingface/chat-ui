@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { DropdownMenu } from "bits-ui";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
+	import CarbonCaretUp from "~icons/carbon/caret-up";
 	import LucideCheck from "~icons/lucide/check";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ReasoningEffort } from "$lib/types/Settings";
@@ -15,6 +16,8 @@
 
 	let current = $derived($settings.reasoningEffortOverrides?.[modelId]);
 	let label = $derived(current ? capitalize(current) : "Default");
+
+	let isDropdownOpen = $state(false);
 
 	function capitalize(s: string) {
 		return s.charAt(0).toUpperCase() + s.slice(1);
@@ -40,14 +43,18 @@
 	];
 </script>
 
-<DropdownMenu.Root>
+<DropdownMenu.Root bind:open={isDropdownOpen}>
 	<DropdownMenu.Trigger
 		class="inline-flex items-center gap-1 hover:underline"
 		aria-label="Select thinking effort"
 		title="Thinking effort"
 	>
 		Effort: {label}
-		<CarbonCaretDown class="-ml-0.5 text-xxs" />
+		{#if isDropdownOpen}
+			<CarbonCaretUp class="-ml-0.5 text-xxs" />
+		{:else}
+			<CarbonCaretDown class="-ml-0.5 text-xxs" />
+		{/if}
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Portal>
 		<DropdownMenu.Content
