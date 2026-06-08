@@ -171,6 +171,20 @@
 		return out;
 	}
 
+	// While the active group is streaming, show the current step: the latest
+	// thinking block plus every tool after it. This keeps a parallel batch of
+	// tools all visible at once, while still hiding earlier completed steps.
+	function currentStepBlocks(groupBlocks: ProcessBlock[]): ProcessBlock[] {
+		let start = 0;
+		for (let i = groupBlocks.length - 1; i >= 0; i -= 1) {
+			if (groupBlocks[i].type === "think") {
+				start = i;
+				break;
+			}
+		}
+		return groupBlocks.slice(start);
+	}
+
 	let blocks = $derived.by(() => {
 		const updates = message.updates ?? [];
 		const res: Block[] = [];
@@ -346,13 +360,15 @@
 							class="has-[+.prose]:!mb-2 [&:not(:last-child)]:mb-1 [.prose+&]:mt-3"
 						>
 							{#if isActive}
-								<!-- Streaming: show only the current (last) block, not the previous calls -->
-								{@const active = unit.blocks[unit.blocks.length - 1]}
-								{#if active.type === "think"}
-									<OpenReasoningResults content={active.content} loading={!active.closed} />
-								{:else}
-									<ToolUpdate tool={active.updates} {loading} />
-								{/if}
+								<!-- Streaming: show the current step (latest thinking + any parallel
+								     tools after it), not the previously-completed calls -->
+								{#each currentStepBlocks(unit.blocks) as block, i (block.type === "tool" ? `tool-${block.uuid}-${i}` : `think-${i}`)}
+									{#if block.type === "think"}
+										<OpenReasoningResults content={block.content} loading={!block.closed} />
+									{:else}
+										<ToolUpdate tool={block.updates} {loading} />
+									{/if}
+								{/each}
 							{:else if unit.blocks.length > 1}
 								<!-- Done: collapse the whole run into a single summary -->
 								<ToolCallsSummary blocks={unit.blocks} toolCount={unit.toolCount} />
