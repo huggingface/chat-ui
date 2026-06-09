@@ -10,6 +10,7 @@
 		artifactPanel,
 		ARTIFACT_PANEL_MIN_WIDTH,
 		ARTIFACT_PANEL_MAX_WIDTH,
+		ARTIFACT_PANEL_DEFAULT_WIDTH,
 	} from "$lib/stores/artifactPanel.svelte";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 
@@ -218,9 +219,9 @@
 <svelte:window onmessage={onWindowMessage} onkeydown={handleKeydown} />
 
 {#snippet panelContent()}
-	<!-- header -->
+	<!-- header (z-10 so button tooltips aren't painted over by the body) -->
 	<header
-		class="flex h-12 flex-none items-center gap-2 border-b border-gray-200/70 px-3 dark:border-gray-800"
+		class="relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-200/70 px-3 dark:border-gray-800"
 	>
 		<div class="flex min-w-0 flex-1 items-center gap-2">
 			{#if isStreamingVersion}
@@ -319,18 +320,21 @@
 				></iframe>
 			{/if}
 		{:else}
+			<!-- Same .prose pre styling as chat code blocks so the syntax theme matches
+			     exactly in both modes; !border-0 since the panel provides its own frame -->
 			<div
-				bind:this={codeScrollEl}
-				class="scrollbar-custom h-full overflow-auto bg-gray-800 dark:bg-gray-900"
+				class="prose h-full max-w-none dark:prose-invert prose-pre:my-0 prose-pre:h-full prose-pre:rounded-none"
 			>
 				<!-- eslint-disable svelte/no-at-html-tags -->
-				<pre class="px-5 py-4 font-mono text-xs leading-relaxed text-gray-100"><code
+				<pre
+					bind:this={codeScrollEl}
+					class="scrollbar-custom h-full overflow-auto !border-0 px-5 py-4 font-mono"><code
 						>{@html highlightedCode}</code
 					></pre>
 			</div>
 			{#if isStreamingVersion}
 				<div
-					class="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-gray-800/90 to-transparent dark:from-gray-900/90"
+					class="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white/90 to-transparent dark:from-gray-900/90"
 				></div>
 			{/if}
 		{/if}
@@ -396,11 +400,11 @@
 {#if artifactPanel.open && artifact}
 	{#if isDesktop}
 		<aside
-			class="pointer-events-auto relative z-10 flex h-full max-w-[min(75vw,64rem)] flex-none flex-col overflow-hidden border-l border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
-			style="width: {artifactPanel.widthPx}px; min-width: {ARTIFACT_PANEL_MIN_WIDTH}px; max-width: min(75vw, {ARTIFACT_PANEL_MAX_WIDTH}px);"
+			class="pointer-events-auto relative z-10 flex h-full flex-none flex-col overflow-hidden border-l border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+			style="width: min({artifactPanel.widthPx}px, calc(100dvw - 700px)); min-width: {ARTIFACT_PANEL_MIN_WIDTH}px; max-width: min(60vw, {ARTIFACT_PANEL_MAX_WIDTH}px);"
 			aria-label="Artifact panel"
 		>
-			<!-- resize handle -->
+			<!-- resize handle (drag to resize, double-click to reset) -->
 			<div
 				role="separator"
 				aria-orientation="vertical"
@@ -411,6 +415,7 @@
 				onpointermove={onResizeMove}
 				onpointerup={onResizeEnd}
 				onpointercancel={onResizeEnd}
+				ondblclick={() => artifactPanel.setWidth(ARTIFACT_PANEL_DEFAULT_WIDTH)}
 			></div>
 			{@render panelContent()}
 		</aside>

@@ -7,7 +7,6 @@
 	import CarbonImage from "~icons/carbon/image";
 	import CarbonDocument from "~icons/carbon/document";
 	import CarbonLogoReact from "~icons/carbon/logo-react";
-	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonWarning from "~icons/carbon/warning";
 	import LucideAppWindow from "~icons/lucide/app-window";
 	import LucideWorkflow from "~icons/lucide/workflow";
@@ -84,9 +83,9 @@
 <button
 	type="button"
 	data-exclude-from-copy
-	class="group/artifact my-2 flex w-full max-w-md items-center gap-3 rounded-xl border bg-white px-3.5 py-3 text-left shadow-sm transition-colors
+	class="my-2 flex w-full max-w-md items-center gap-3 rounded-xl border bg-white px-3.5 py-3 text-left shadow-sm
 		{isActive
-		? 'border-blue-300 ring-1 ring-blue-300 dark:border-blue-500/60 dark:ring-blue-500/60'
+		? 'border-blue-300 ring-1 ring-blue-300 dark:border-blue-500/30 dark:ring-blue-500/30'
 		: 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'}
 		{missing ? 'cursor-default opacity-80' : 'cursor-pointer'} dark:bg-gray-800/80"
 	onclick={(e) => {
@@ -125,9 +124,4 @@
 			{subtitle}
 		</p>
 	</div>
-	{#if !missing}
-		<CarbonChevronRight
-			class="flex-none text-sm text-gray-400 transition-transform group-hover/artifact:translate-x-0.5"
-		/>
-	{/if}
 </button>

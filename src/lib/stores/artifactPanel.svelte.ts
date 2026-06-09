@@ -2,7 +2,8 @@ import { browser } from "$app/environment";
 
 const WIDTH_STORAGE_KEY = "artifactPanelWidth";
 export const ARTIFACT_PANEL_MIN_WIDTH = 380;
-export const ARTIFACT_PANEL_MAX_WIDTH = 1024;
+export const ARTIFACT_PANEL_MAX_WIDTH = 896;
+export const ARTIFACT_PANEL_DEFAULT_WIDTH = 560;
 
 function initialWidth(): number {
 	if (browser) {
@@ -11,7 +12,7 @@ function initialWidth(): number {
 			return Math.min(stored, ARTIFACT_PANEL_MAX_WIDTH);
 		}
 	}
-	return 560;
+	return ARTIFACT_PANEL_DEFAULT_WIDTH;
 }
 
 /**
