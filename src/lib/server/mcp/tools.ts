@@ -35,6 +35,77 @@ function sanitizeName(name: string) {
 	return name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
 }
 
+const TYPE_IMPLYING_KEYWORDS = ["enum", "const", "$ref", "anyOf", "oneOf", "allOf", "not"] as const;
+const OBJECT_IMPLYING_KEYWORDS = [
+	"properties",
+	"patternProperties",
+	"additionalProperties",
+	"propertyNames",
+	"required",
+] as const;
+const ARRAY_IMPLYING_KEYWORDS = ["items", "prefixItems", "contains"] as const;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Normalize an MCP tool's JSON Schema so strict OpenAI-compatible providers
+ * (e.g. Fireworks) accept it. Some MCP servers (notably hf.co/mcp's `write_file`)
+ * emit properties like `{ description, default: null }` with no `type`; providers
+ * reject those under tool_choice:"auto", and one bad tool rejects the whole array.
+ * Pure + non-mutating. Only recurses into real schema-bearing keywords, so instance
+ * data (required, enum, defaults) and boolean additionalProperties stay intact.
+ */
+export function sanitizeJsonSchema(schema: Record<string, unknown>): Record<string, unknown> {
+	const out: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(schema)) {
+		if (key === "default" && value === null) continue; // drop contradictory/uninformative null defaults
+		out[key] = value;
+	}
+
+	const recurse = (value: unknown): unknown =>
+		isPlainObject(value) ? sanitizeJsonSchema(value) : value;
+	const recurseMap = (map: Record<string, unknown>): Record<string, unknown> =>
+		Object.fromEntries(Object.entries(map).map(([key, sub]) => [key, recurse(sub)]));
+
+	// Object applicators: { name -> schema } maps, plus the key schema.
+	if (isPlainObject(out.properties)) out.properties = recurseMap(out.properties);
+	if (isPlainObject(out.patternProperties))
+		out.patternProperties = recurseMap(out.patternProperties);
+	if (isPlainObject(out.propertyNames)) out.propertyNames = sanitizeJsonSchema(out.propertyNames);
+	// additionalProperties: schema form recurses; boolean form (true/false) is left untouched.
+	if (isPlainObject(out.additionalProperties)) {
+		out.additionalProperties = sanitizeJsonSchema(out.additionalProperties);
+	}
+
+	// Array applicators: single schema, tuple array, or contains schema.
+	if (isPlainObject(out.items)) out.items = sanitizeJsonSchema(out.items);
+	else if (Array.isArray(out.items)) out.items = out.items.map(recurse);
+	if (Array.isArray(out.prefixItems)) out.prefixItems = out.prefixItems.map(recurse);
+	if (isPlainObject(out.contains)) out.contains = sanitizeJsonSchema(out.contains);
+
+	// Schema combinators.
+	for (const kw of ["anyOf", "oneOf", "allOf"] as const) {
+		const branch = out[kw];
+		if (Array.isArray(branch)) out[kw] = branch.map(recurse);
+	}
+	if (isPlainObject(out.not)) out.not = sanitizeJsonSchema(out.not);
+
+	// Ensure a `type` exists when none is implied. An empty `{}` is left as-is:
+	// it means "match any value" (e.g. hf.co/mcp's `hf_jobs.args` arbitrary map),
+	// so coercing it would wrongly narrow non-string arguments. Object/array
+	// applicator keywords (properties, patternProperties, items, ...) imply the
+	// container type, so a map/array schema is never narrowed to a string.
+	if (out.type === undefined && Object.keys(out).length > 0) {
+		if (OBJECT_IMPLYING_KEYWORDS.some((k) => k in out)) out.type = "object";
+		else if (ARRAY_IMPLYING_KEYWORDS.some((k) => k in out)) out.type = "array";
+		else if (!TYPE_IMPLYING_KEYWORDS.some((k) => k in out)) out.type = "string";
+	}
+
+	return out;
+}
+
 function buildCacheKey(servers: McpServerConfig[]): string {
 	const normalized = servers
 		.map((server) => ({
@@ -153,8 +224,9 @@ export async function getOpenAiToolsForMcp(
 					continue;
 				}
 
-				const parameters =
-					tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : undefined;
+				const parameters = isPlainObject(tool.inputSchema)
+					? sanitizeJsonSchema(tool.inputSchema)
+					: undefined;
 				const description = tool.description ?? tool.annotations?.title;
 				const toolName = tool.name;
 
