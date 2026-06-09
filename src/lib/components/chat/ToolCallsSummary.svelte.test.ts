@@ -18,8 +18,8 @@ describe("ToolCallsSummary", () => {
 			toolCount: 0,
 		});
 
-		// Only the header button is rendered; the 8px-offset child container is absent
-		expect(baseElement.querySelector(".pl-2")).toBeNull();
+		// Only the header button is rendered; the child container is absent
+		expect(baseElement.querySelector(".mt-1")).toBeNull();
 	});
 
 	it("labels the header by tool count", async () => {
@@ -54,8 +54,8 @@ describe("ToolCallsSummary", () => {
 		toggle.click();
 		await new Promise((r) => setTimeout(r, 0));
 
-		// Child container with the 8px (pl-2) left offset now exists
-		expect(baseElement.querySelector(".pl-2")).not.toBeNull();
+		// Child container now exists
+		expect(baseElement.querySelector(".mt-1")).not.toBeNull();
 		// Each child reasoning block contributes its own collapsible "Thinking" header
 		expect(page.getByText("Thinking").elements).toHaveLength(2);
 	});

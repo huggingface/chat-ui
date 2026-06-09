@@ -43,9 +43,9 @@
 		/>
 	</button>
 
-	<!-- Child rows — 8px left offset from the summary header -->
+	<!-- Child rows — aligned flush with the summary header -->
 	{#if isOpen}
-		<div class="mt-1 w-full pl-2">
+		<div class="mt-1 w-full">
 			{#each blocks as block, i (block.type === "tool" ? `tool-${block.uuid}-${i}` : `think-${i}`)}
 				{#if block.type === "think"}
 					<OpenReasoningResults content={block.content} loading={false} />
