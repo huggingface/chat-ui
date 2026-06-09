@@ -351,10 +351,8 @@
 				>
 					<CarbonChevronLeft />
 				</button>
-				<span class="tabular-nums">
-					v{displayVersionNumber}<span class="text-gray-400 dark:text-gray-500">
-						/ {totalVersions}</span
-					>
+				<span class="whitespace-nowrap tabular-nums">
+					{`v${displayVersionNumber} / ${totalVersions}`}
 				</span>
 				<button
 					type="button"

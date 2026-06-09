@@ -195,6 +195,34 @@
 				}
 			}
 		}
+		return collapseConsecutiveArtifactOps(out);
+	}
+
+	// Models sometimes emit several back-to-back operations on the same artifact
+	// (e.g. one update block per find/replace pair). Every op still becomes a
+	// version in the registry, but showing a card per op clutters the chat —
+	// keep only the last card of each consecutive run.
+	function collapseConsecutiveArtifactOps(input: Block[]): Block[] {
+		const out: Block[] = [];
+		for (const block of input) {
+			if (block.type === "artifact") {
+				let i = out.length - 1;
+				while (i >= 0) {
+					const prior = out[i];
+					if (prior.type === "text" && prior.content.trim().length === 0) {
+						i -= 1;
+						continue;
+					}
+					if (prior.type === "artifact" && prior.op.identifier === block.op.identifier) {
+						// Drop the earlier card (and the whitespace between) — this
+						// later op supersedes it.
+						out.splice(i, out.length - i);
+					}
+					break;
+				}
+			}
+			out.push(block);
+		}
 		return out;
 	}
 

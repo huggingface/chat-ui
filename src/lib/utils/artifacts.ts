@@ -76,9 +76,13 @@ export type ArtifactSegment =
 	| { type: "text"; content: string }
 	| { type: "artifact"; op: ArtifactOperation };
 
-const OPEN_TAG_REGEX = /<artifact\b([^>]*)>/i;
-const CLOSE_TAG = "</artifact>";
-const UPDATE_PAIR_REGEX = /<old_str>([\s\S]*?)<\/old_str>\s*<new_str>([\s\S]*?)<\/new_str>/g;
+// Some models double the opening bracket of tags they were taught
+// (`<<artifact …>`, `<<old_str>`), so every opening matcher tolerates a run of
+// `<` and consumes it whole — otherwise the extra bracket leaks into the prose
+// and, worse, `<old_str>…<new_str>` adjacency silently stops matching.
+const OPEN_TAG_REGEX = /<+artifact\b([^>]*)>/i;
+const CLOSE_TAG_REGEX = /<+\/artifact>/i;
+const UPDATE_PAIR_REGEX = /<+old_str>([\s\S]*?)<+\/old_str>\s*<+new_str>([\s\S]*?)<+\/new_str>/g;
 
 function parseAttributes(raw: string): Record<string, string> {
 	const attrs: Record<string, string> = {};
@@ -96,16 +100,19 @@ function parseAttributes(raw: string): Record<string, string> {
  * Used to hide tags that are still streaming in token by token.
  */
 function partialTagStart(text: string, tag: string): number {
-	const lastOpen = text.lastIndexOf("<");
+	let lastOpen = text.lastIndexOf("<");
 	if (lastOpen === -1) return -1;
 	const tail = text.slice(lastOpen);
 	if (tail.length >= tag.length) return -1;
-	return tag.toLowerCase().startsWith(tail.toLowerCase()) ? lastOpen : -1;
+	if (!tag.toLowerCase().startsWith(tail.toLowerCase())) return -1;
+	// Swallow any doubled brackets right before the partial tag
+	while (lastOpen > 0 && text[lastOpen - 1] === "<") lastOpen -= 1;
+	return lastOpen;
 }
 
 /** Strip a trailing, partially-streamed `</artifact` fragment from content. */
 function trimPartialCloseTag(content: string): string {
-	const idx = partialTagStart(content, CLOSE_TAG);
+	const idx = partialTagStart(content, "</artifact>");
 	return idx === -1 ? content : content.slice(0, idx);
 }
 
@@ -163,7 +170,7 @@ export function splitArtifactSegments(text: string): ArtifactSegment[] {
 		const openMatch = OPEN_TAG_REGEX.exec(remaining);
 		if (!openMatch) {
 			// Hide a trailing partially-streamed opening tag (e.g. "<artifact iden…")
-			const partialAttr = remaining.search(/<artifact\b[^>]*$/i);
+			const partialAttr = remaining.search(/<+artifact\b[^>]*$/i);
 			if (partialAttr !== -1) {
 				pushText(remaining.slice(0, partialAttr));
 			} else {
@@ -177,18 +184,18 @@ export function splitArtifactSegments(text: string): ArtifactSegment[] {
 
 		const attrs = parseAttributes(openMatch[1]);
 		const contentStart = openMatch.index + openMatch[0].length;
-		const closeIdx = remaining.toLowerCase().indexOf(CLOSE_TAG, contentStart);
+		const closeMatch = CLOSE_TAG_REGEX.exec(remaining.slice(contentStart));
 
-		if (closeIdx === -1) {
+		if (!closeMatch) {
 			// Still streaming: everything after the opening tag belongs to the artifact
 			const inner = remaining.slice(contentStart);
 			segments.push({ type: "artifact", op: buildOperation(attrs, inner, false) });
 			break;
 		}
 
-		const inner = remaining.slice(contentStart, closeIdx);
+		const inner = remaining.slice(contentStart, contentStart + closeMatch.index);
 		segments.push({ type: "artifact", op: buildOperation(attrs, inner, true) });
-		cursor += closeIdx + CLOSE_TAG.length;
+		cursor += contentStart + closeMatch.index + closeMatch[0].length;
 	}
 
 	return segments;
@@ -200,10 +207,35 @@ export interface ApplyUpdateResult {
 	failed: number;
 }
 
+function escapeRegExp(s: string): string {
+	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
- * Apply find/replace pairs to a base version. Each `old` string must match
- * exactly; only the first occurrence is replaced. Failed pairs are skipped so
- * one bad match doesn't void the rest of the edit.
+ * Locate `needle` in `content`. Exact match first; if that fails, retry with
+ * every whitespace run collapsed to \s+ — models routinely mis-copy
+ * indentation in old_str, and a strict-only match would turn the whole edit
+ * into a silent no-op (observed live with Kimi-K2.6 counting spaces).
+ */
+function findMatch(content: string, needle: string): { start: number; end: number } | null {
+	const exact = content.indexOf(needle);
+	if (exact !== -1) return { start: exact, end: exact + needle.length };
+	const trimmed = needle.trim();
+	if (!trimmed) return null;
+	try {
+		const pattern = new RegExp(escapeRegExp(trimmed).replace(/\s+/g, "\\s+"));
+		const match = pattern.exec(content);
+		if (match) return { start: match.index, end: match.index + match[0].length };
+	} catch {
+		// needle too large/odd for a regex — treat as not found
+	}
+	return null;
+}
+
+/**
+ * Apply find/replace pairs to a base version. Only the first occurrence is
+ * replaced (whitespace-tolerant fallback, see findMatch). Failed pairs are
+ * skipped so one bad match doesn't void the rest of the edit.
  */
 export function applyArtifactUpdate(base: string, pairs: ArtifactUpdatePair[]): ApplyUpdateResult {
 	let content = base;
@@ -214,12 +246,12 @@ export function applyArtifactUpdate(base: string, pairs: ArtifactUpdatePair[]): 
 			failed += 1;
 			continue;
 		}
-		const idx = content.indexOf(pair.old);
-		if (idx === -1) {
+		const match = findMatch(content, pair.old);
+		if (!match) {
 			failed += 1;
 			continue;
 		}
-		content = content.slice(0, idx) + pair.new + content.slice(idx + pair.old.length);
+		content = content.slice(0, match.start) + pair.new + content.slice(match.end);
 		applied += 1;
 	}
 	return { content, applied, failed };
@@ -280,8 +312,14 @@ export function collectArtifacts(
 	for (const message of messages) {
 		if (message.from !== "assistant" || !message.content.includes("<artifact")) continue;
 
+		// Drop <think> reasoning before parsing: models rehearse artifact tags in
+		// there, which must not become phantom versions. Mirrors ChatMessage,
+		// which splits think blocks out before expanding artifact cards, keeping
+		// opIndex numbering consistent between the two.
+		const visibleContent = message.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "");
+
 		let opIndex = 0;
-		for (const segment of splitArtifactSegments(message.content)) {
+		for (const segment of splitArtifactSegments(visibleContent)) {
 			if (segment.type !== "artifact") continue;
 			const op = segment.op;
 			const key = artifactOpKey(message.id, opIndex);
@@ -331,7 +369,10 @@ export function collectArtifacts(
 				op: "update",
 				version: artifact.versions.length + 1,
 				messageId: message.id,
-				failedPairs: result.failed,
+				// A finished update with zero parsed pairs is a no-op the model
+				// didn't intend — surface it as a failed edit instead of silently
+				// showing "Edited" with unchanged content.
+				failedPairs: Math.max(result.failed, op.closed && op.pairs.length === 0 ? 1 : 0),
 			};
 			artifact.versions.push(version);
 			byMessageOp.set(key, { identifier: op.identifier, version: version.version });

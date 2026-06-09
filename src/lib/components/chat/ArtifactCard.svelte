@@ -31,9 +31,16 @@
 
 	let missing = $derived(!ctx || !version);
 	let streaming = $derived(!!version && !version.complete);
-	let isActive = $derived(
-		!!ctx && !!version && ctx.panel.open && ctx.panel.identifier === version.identifier
-	);
+	// Highlight only the card whose version the panel is currently displaying
+	let isActive = $derived.by(() => {
+		if (!ctx || !version || !artifact) return false;
+		if (!ctx.panel.open || ctx.panel.identifier !== version.identifier) return false;
+		const displayed = Math.min(
+			ctx.panel.version ?? artifact.versions.length,
+			artifact.versions.length
+		);
+		return displayed === version.version;
+	});
 
 	const KIND_LABELS: Record<ArtifactKind, string> = {
 		html: "Web app",

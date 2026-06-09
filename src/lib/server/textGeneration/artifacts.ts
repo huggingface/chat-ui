@@ -33,7 +33,8 @@ Editing an artifact you created earlier in the conversation:
 <new_str>replacement text</new_str>
 </artifact>
 
-- Each old_str must match the latest version EXACTLY (including whitespace/indentation) and must be unique within it. Use up to 4 pairs per update.
+- Each old_str must match the latest version EXACTLY (including whitespace/indentation) and must be unique within it.
+- Emit at most ONE update block per reply, with all the pairs (up to 4) inside that single block — never one block per pair.
 - For larger changes, re-emit the full artifact with the SAME identifier (this creates a new version).
 - Reuse the same identifier for every version of one artifact; pick a new identifier only for a genuinely different artifact.
 

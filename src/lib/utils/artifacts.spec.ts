@@ -274,3 +274,188 @@ describe("misc helpers", () => {
 		expect(artifactFileName({ ...base, type: "mermaid" })).toBe("my-app.mmd");
 	});
 });
+
+// Regression: Kimi-K2.6 (and others) sometimes double the opening bracket of
+// every tag they were taught: `<<artifact …>`, `<<old_str>`. The parser must
+// consume the whole bracket run (no stray `<` in prose) and still pair up
+// old/new strings. Seen live in HuggingChat conversation 6a286d5e.
+describe("doubled-bracket tolerance", () => {
+	it("parses <<artifact create blocks without leaking a stray <", () => {
+		const segments = splitArtifactSegments(
+			`</think><<artifact identifier="blue-button" type="html" title="Blue Button">\n<!DOCTYPE html>\n<button>Click Me</button>\n</artifact>`
+		);
+		expect(segments[0]).toEqual({ type: "text", content: "</think>" });
+		const artifact = segments[1];
+		if (artifact.type !== "artifact" || artifact.op.kind !== "create") {
+			throw new Error("expected create artifact");
+		}
+		expect(artifact.op.identifier).toBe("blue-button");
+		expect(artifact.op.content).toBe("<!DOCTYPE html>\n<button>Click Me</button>");
+	});
+
+	it("parses <<old_str>/<<new_str> pairs and doubled closing tags", () => {
+		const segments = splitArtifactSegments(
+			`<<artifact identifier="blue-button" type="update" title="Green Button">
+<<old_str>      background: #2563eb;</old_str>
+<<new_str>      background: #16a34a;<</new_str>
+<</artifact>`
+		);
+		const artifact = segments[0];
+		if (artifact.type !== "artifact" || artifact.op.kind !== "update") {
+			throw new Error("expected update artifact");
+		}
+		expect(artifact.op.closed).toBe(true);
+		expect(artifact.op.pairs).toEqual([
+			{ old: "      background: #2563eb;", new: "      background: #16a34a;" },
+		]);
+	});
+
+	it("applies the green-button edit end to end (three <<-mangled update blocks)", () => {
+		const v1 = `<artifact identifier="blue-button" type="html" title="Blue Button">
+<style>
+      background: #2563eb;
+      box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);
+      background: #1d4ed8;
+</style>
+</artifact>`;
+		const updates = `<<artifact identifier="blue-button" type="update" title="Green Button">
+<<old_str>      background: #2563eb;</old_str>
+<<new_str>      background: #16a34a;</new_str>
+</artifact>
+
+<<artifact identifier="blue-button" type="update" title="Green Button">
+<<old_str>      box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);</old_str>
+<<new_str>      box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.3);</new_str>
+</artifact>
+
+<<artifact identifier="blue-button" type="update" title="Green Button">
+<<old_str>      background: #1d4ed8;</old_str>
+<<new_str>      background: #15803d;</new_str>
+</artifact>`;
+		const registry = collectArtifacts([
+			{ id: "m1", from: "assistant", content: v1 },
+			{ id: "m2", from: "user", content: "make it green" },
+			{ id: "m3", from: "assistant", content: updates },
+		]);
+		const versions = registry.artifacts.get("blue-button")?.versions ?? [];
+		expect(versions).toHaveLength(4);
+		expect(versions[3].content).toContain("background: #16a34a;");
+		expect(versions[3].content).toContain("rgba(22, 163, 74, 0.3)");
+		expect(versions[3].content).toContain("background: #15803d;");
+		expect(versions[3].content).not.toContain("#2563eb");
+		expect(versions.every((v) => !v.failedPairs)).toBe(true);
+	});
+
+	it("hides a partially streamed doubled opening tag", () => {
+		expect(splitArtifactSegments("Sure!\n<<artifa")).toEqual([
+			{ type: "text", content: "Sure!\n" },
+		]);
+	});
+});
+
+describe("zero-pair updates are flagged", () => {
+	it("marks a closed update with no parseable pairs as a failed edit", () => {
+		const registry = collectArtifacts([
+			{
+				id: "m1",
+				from: "assistant",
+				content: `<artifact identifier="app" type="html" title="App">hello</artifact>`,
+			},
+			{
+				id: "m2",
+				from: "assistant",
+				content: `<artifact identifier="app" type="update">garbage without pairs</artifact>`,
+			},
+		]);
+		const v2 = registry.artifacts.get("app")?.versions[1];
+		expect(v2?.content).toBe("hello");
+		expect(v2?.failedPairs).toBe(1);
+	});
+
+	it("does not flag a still-streaming update with no pairs yet", () => {
+		const registry = collectArtifacts([
+			{
+				id: "m1",
+				from: "assistant",
+				content: `<artifact identifier="app" type="html" title="App">hello</artifact>`,
+			},
+			{
+				id: "m2",
+				from: "assistant",
+				content: `<artifact identifier="app" type="update">\n<old_str>hel`,
+			},
+		]);
+		const v2 = registry.artifacts.get("app")?.versions[1];
+		expect(v2?.complete).toBe(false);
+		expect(v2?.failedPairs).toBe(0);
+	});
+});
+
+describe("whitespace-tolerant matching", () => {
+	it("applies a pair whose old_str has wrong indentation", () => {
+		const base = `<div class="timer-content">\n                <div class="timer-label">Ready to focus</div>\n            </div>`;
+		const result = applyArtifactUpdate(base, [
+			{
+				old: `    <div class="timer-label">Ready to focus</div>`,
+				new: `    <div class="timer-label">LET'S GO</div>`,
+			},
+		]);
+		expect(result.applied).toBe(1);
+		expect(result.failed).toBe(0);
+		expect(result.content).toContain("LET'S GO");
+		expect(result.content).not.toContain("Ready to focus");
+	});
+
+	it("tolerates newline drift inside the needle", () => {
+		const base = `a { color: red;\n  font-weight: bold; }`;
+		const result = applyArtifactUpdate(base, [
+			{ old: `color: red; font-weight: bold;`, new: `color: blue;` },
+		]);
+		expect(result.applied).toBe(1);
+		expect(result.content).toBe(`a { color: blue; }`);
+	});
+
+	it("still fails when the text genuinely is not there", () => {
+		const result = applyArtifactUpdate("hello world", [{ old: "goodbye", new: "x" }]);
+		expect(result).toEqual({ content: "hello world", applied: 0, failed: 1 });
+	});
+
+	it("prefers the exact match over a fuzzy one", () => {
+		const base = "x  y\nx y";
+		const result = applyArtifactUpdate(base, [{ old: "x y", new: "Z" }]);
+		expect(result.content).toBe("x  y\nZ");
+	});
+});
+
+describe("think blocks are ignored by the registry", () => {
+	it("does not create versions from artifact tags rehearsed inside <think>", () => {
+		const registry = collectArtifacts([
+			{
+				id: "m1",
+				from: "assistant",
+				content: `<think>I'll draft it first: <artifact identifier="app" type="html" title="Draft">draft</artifact> ok now for real.</think><artifact identifier="app" type="html" title="App">real content</artifact>`,
+			},
+		]);
+		const artifact = registry.artifacts.get("app");
+		expect(artifact?.versions).toHaveLength(1);
+		expect(artifact?.versions[0].content).toBe("real content");
+		expect(registry.byMessageOp.get("m1:0")).toEqual({ identifier: "app", version: 1 });
+	});
+
+	it("ignores old_str/new_str rehearsed in an unclosed streaming think block", () => {
+		const registry = collectArtifacts([
+			{
+				id: "m1",
+				from: "assistant",
+				content: `<artifact identifier="app" type="html" title="App">v1</artifact>`,
+			},
+			{
+				id: "m2",
+				from: "assistant",
+				content: `<think>maybe <artifact identifier="app" type="update"><old_str>v1</old_str><new_str>v2</new_str></artifact> hmm still thinking`,
+			},
+		]);
+		expect(registry.artifacts.get("app")?.versions).toHaveLength(1);
+		expect(registry.streaming).toBeUndefined();
+	});
+});
