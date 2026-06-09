@@ -47,9 +47,10 @@ async function* textGenerationWithoutTitle(
 	const { conv, messages } = ctx;
 	const convId = conv._id;
 
-	// Artifacts are enabled unless explicitly turned off
-	const preprompt =
-		config.ENABLE_ARTIFACTS !== "false" ? injectArtifactsPrompt(conv.preprompt) : conv.preprompt;
+	// Artifacts are on unless disabled instance-wide (ENABLE_ARTIFACTS=false)
+	// or turned off by the user in their global settings.
+	const artifactsEnabled = config.ENABLE_ARTIFACTS !== "false" && (ctx.artifactsEnabled ?? true);
+	const preprompt = artifactsEnabled ? injectArtifactsPrompt(conv.preprompt) : conv.preprompt;
 
 	const processedMessages = await preprocessMessages(messages, convId);
 

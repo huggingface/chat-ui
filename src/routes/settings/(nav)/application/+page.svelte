@@ -40,6 +40,12 @@
 	function setDirectPaste(v: boolean) {
 		settings.update((s) => ({ ...s, directPaste: v }));
 	}
+	function getArtifactsEnabled() {
+		return $settings.artifactsEnabled ?? true;
+	}
+	function setArtifactsEnabled(v: boolean) {
+		settings.update((s) => ({ ...s, artifactsEnabled: v }));
+	}
 	function getHapticsEnabled() {
 		return $settings.hapticsEnabled;
 	}
@@ -207,6 +213,16 @@
 						<option value="smooth">Smooth stream</option>
 						<option value="raw">Raw stream</option>
 					</select>
+				</div>
+
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Artifacts</div>
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
+							Let models create apps, documents and diagrams in a side panel with live preview.
+						</p>
+					</div>
+					<Switch name="artifactsEnabled" bind:checked={getArtifactsEnabled, setArtifactsEnabled} />
 				</div>
 
 				<div class="flex items-start justify-between py-3">

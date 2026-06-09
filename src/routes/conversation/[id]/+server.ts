@@ -585,6 +585,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						(userSettings?.reasoningOverrides?.[model.id] ?? model.supportsReasoning)
 							? userSettings?.reasoningEffortOverrides?.[model.id]
 							: undefined,
+					// Global (not per-model) user toggle for artifacts, enabled by default
+					artifactsEnabled: userSettings?.artifactsEnabled ?? true,
 					locals,
 					abortController: ctrl,
 				};
