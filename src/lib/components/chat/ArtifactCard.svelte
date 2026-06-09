@@ -68,7 +68,7 @@
 				? `Edited, ${version.failedPairs} change${version.failedPairs > 1 ? "s" : ""} didn't apply${versionLabel}`
 				: `Edited${versionLabel}`;
 		}
-		return `${kindLabel}${versionLabel} · Click to open`;
+		return `${kindLabel}${versionLabel}`;
 	});
 
 	function onclick() {

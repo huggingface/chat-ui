@@ -32,6 +32,15 @@ class ArtifactPanelStore {
 	/** Set when the user explicitly picked a tab, so we stop auto-switching */
 	userPinnedTab = $state(false);
 	widthPx = $state(initialWidth());
+	/** Word wrap in the code view (persisted) */
+	codeWrap = $state(browser && localStorage.getItem("artifactPanelCodeWrap") === "true");
+
+	toggleCodeWrap() {
+		this.codeWrap = !this.codeWrap;
+		if (browser) {
+			localStorage.setItem("artifactPanelCodeWrap", String(this.codeWrap));
+		}
+	}
 
 	/** Versions we already auto-opened for, so closing the panel mid-stream sticks */
 	private autoOpenedKeys = new Set<string>();

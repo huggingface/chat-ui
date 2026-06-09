@@ -18,6 +18,7 @@
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonDownload from "~icons/carbon/download";
 	import CarbonMaximize from "~icons/carbon/maximize";
+	import LucideWrapText from "~icons/lucide/wrap-text";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
 	interface Props {
@@ -259,6 +260,19 @@
 
 		<div class="flex flex-none items-center gap-0.5 text-gray-400">
 			{#if version}
+				{#if effectiveTab === "code"}
+					<button
+						type="button"
+						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 {artifactPanel.codeWrap
+							? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+							: ''}"
+						title="{artifactPanel.codeWrap ? 'Disable' : 'Enable'} word wrap"
+						aria-pressed={artifactPanel.codeWrap}
+						onclick={() => artifactPanel.toggleCodeWrap()}
+					>
+						<LucideWrapText />
+					</button>
+				{/if}
 				<CopyToClipBoardBtn
 					value={version.content}
 					classNames="btn rounded-md p-1.5 text-sm hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 focus:ring-0"
@@ -328,9 +342,9 @@
 				<!-- eslint-disable svelte/no-at-html-tags -->
 				<pre
 					bind:this={codeScrollEl}
-					class="scrollbar-custom h-full overflow-auto !border-0 px-5 py-4 font-mono"><code
-						>{@html highlightedCode}</code
-					></pre>
+					class="scrollbar-custom h-full overflow-auto !border-0 px-5 py-4 font-mono {artifactPanel.codeWrap
+						? 'whitespace-pre-wrap break-words'
+						: ''}"><code>{@html highlightedCode}</code></pre>
 			</div>
 			{#if isStreamingVersion}
 				<div
