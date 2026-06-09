@@ -1,8 +1,11 @@
 import { browser } from "$app/environment";
 
 const WIDTH_STORAGE_KEY = "artifactPanelWidth";
-export const ARTIFACT_PANEL_MIN_WIDTH = 380;
-export const ARTIFACT_PANEL_MAX_WIDTH = 896;
+// Loose absolute bounds for the persisted value; the real visual bounds are
+// proportional (each pane keeps at least 20% of the chat/panel split, see
+// ArtifactPanel), so neither side can be dragged into oblivion.
+export const ARTIFACT_PANEL_MIN_WIDTH = 300;
+export const ARTIFACT_PANEL_MAX_WIDTH = 2400;
 export const ARTIFACT_PANEL_DEFAULT_WIDTH = 560;
 
 function initialWidth(): number {

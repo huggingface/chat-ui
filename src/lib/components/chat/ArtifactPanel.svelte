@@ -6,12 +6,7 @@
 	import { artifactFileName, isPreviewableKind } from "$lib/utils/artifacts";
 	import { buildArtifactSrcdoc } from "$lib/utils/previewSrcdoc";
 	import { highlightCode } from "$lib/utils/marked";
-	import {
-		artifactPanel,
-		ARTIFACT_PANEL_MIN_WIDTH,
-		ARTIFACT_PANEL_MAX_WIDTH,
-		ARTIFACT_PANEL_DEFAULT_WIDTH,
-	} from "$lib/stores/artifactPanel.svelte";
+	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_WIDTH } from "$lib/stores/artifactPanel.svelte";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
@@ -197,13 +192,18 @@
 
 	// ----- resize (desktop) -----
 	let resizing = $state(false);
+	let asideEl: HTMLElement | undefined = $state();
 	function onResizeStart(e: PointerEvent) {
 		resizing = true;
 		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 	}
 	function onResizeMove(e: PointerEvent) {
 		if (!resizing) return;
-		artifactPanel.setWidth(window.innerWidth - e.clientX);
+		// Clamp against the live chat/panel split (each pane keeps >= 20%) so the
+		// drag tracks the pointer 1:1 with no dead zone at the bounds.
+		const total = asideEl?.parentElement?.clientWidth ?? window.innerWidth;
+		const raw = window.innerWidth - e.clientX;
+		artifactPanel.setWidth(Math.min(Math.max(raw, Math.max(total * 0.2, 300)), total * 0.8));
 	}
 	function onResizeEnd() {
 		resizing = false;
@@ -400,8 +400,9 @@
 {#if artifactPanel.open && artifact}
 	{#if isDesktop}
 		<aside
+			bind:this={asideEl}
 			class="pointer-events-auto relative z-10 flex h-full flex-none flex-col overflow-hidden border-l border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
-			style="width: min({artifactPanel.widthPx}px, calc(100dvw - 700px)); min-width: {ARTIFACT_PANEL_MIN_WIDTH}px; max-width: min(60vw, {ARTIFACT_PANEL_MAX_WIDTH}px);"
+			style="width: {artifactPanel.widthPx}px; min-width: max(20%, 300px); max-width: 80%;"
 			aria-label="Artifact panel"
 		>
 			<!-- resize handle (drag to resize, double-click to reset) -->
