@@ -36,6 +36,14 @@ function sanitizeName(name: string) {
 }
 
 const TYPE_IMPLYING_KEYWORDS = ["enum", "const", "$ref", "anyOf", "oneOf", "allOf", "not"] as const;
+const OBJECT_IMPLYING_KEYWORDS = [
+	"properties",
+	"patternProperties",
+	"additionalProperties",
+	"propertyNames",
+	"required",
+] as const;
+const ARRAY_IMPLYING_KEYWORDS = ["items", "prefixItems", "contains"] as const;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -56,38 +64,42 @@ export function sanitizeJsonSchema(schema: Record<string, unknown>): Record<stri
 		out[key] = value;
 	}
 
-	if (isPlainObject(out.properties)) {
-		const props: Record<string, unknown> = {};
-		for (const [name, sub] of Object.entries(out.properties)) {
-			props[name] = isPlainObject(sub) ? sanitizeJsonSchema(sub) : sub;
-		}
-		out.properties = props;
-	}
+	const recurse = (value: unknown): unknown =>
+		isPlainObject(value) ? sanitizeJsonSchema(value) : value;
+	const recurseMap = (map: Record<string, unknown>): Record<string, unknown> =>
+		Object.fromEntries(Object.entries(map).map(([key, sub]) => [key, recurse(sub)]));
 
-	if (isPlainObject(out.items)) {
-		out.items = sanitizeJsonSchema(out.items);
-	} else if (Array.isArray(out.items)) {
-		out.items = out.items.map((s) => (isPlainObject(s) ? sanitizeJsonSchema(s) : s));
-	}
-
-	for (const kw of ["anyOf", "oneOf", "allOf"] as const) {
-		const branch = out[kw];
-		if (Array.isArray(branch)) {
-			out[kw] = branch.map((s) => (isPlainObject(s) ? sanitizeJsonSchema(s) : s));
-		}
-	}
-	if (isPlainObject(out.not)) out.not = sanitizeJsonSchema(out.not);
+	// Object applicators: { name -> schema } maps, plus the key schema.
+	if (isPlainObject(out.properties)) out.properties = recurseMap(out.properties);
+	if (isPlainObject(out.patternProperties))
+		out.patternProperties = recurseMap(out.patternProperties);
+	if (isPlainObject(out.propertyNames)) out.propertyNames = sanitizeJsonSchema(out.propertyNames);
+	// additionalProperties: schema form recurses; boolean form (true/false) is left untouched.
 	if (isPlainObject(out.additionalProperties)) {
-		// boolean form (true/false) is left untouched on purpose
 		out.additionalProperties = sanitizeJsonSchema(out.additionalProperties);
 	}
 
+	// Array applicators: single schema, tuple array, or contains schema.
+	if (isPlainObject(out.items)) out.items = sanitizeJsonSchema(out.items);
+	else if (Array.isArray(out.items)) out.items = out.items.map(recurse);
+	if (Array.isArray(out.prefixItems)) out.prefixItems = out.prefixItems.map(recurse);
+	if (isPlainObject(out.contains)) out.contains = sanitizeJsonSchema(out.contains);
+
+	// Schema combinators.
+	for (const kw of ["anyOf", "oneOf", "allOf"] as const) {
+		const branch = out[kw];
+		if (Array.isArray(branch)) out[kw] = branch.map(recurse);
+	}
+	if (isPlainObject(out.not)) out.not = sanitizeJsonSchema(out.not);
+
 	// Ensure a `type` exists when none is implied. An empty `{}` is left as-is:
 	// it means "match any value" (e.g. hf.co/mcp's `hf_jobs.args` arbitrary map),
-	// so coercing it to a string would wrongly narrow non-string arguments.
+	// so coercing it would wrongly narrow non-string arguments. Object/array
+	// applicator keywords (properties, patternProperties, items, ...) imply the
+	// container type, so a map/array schema is never narrowed to a string.
 	if (out.type === undefined && Object.keys(out).length > 0) {
-		if ("properties" in out) out.type = "object";
-		else if ("items" in out) out.type = "array";
+		if (OBJECT_IMPLYING_KEYWORDS.some((k) => k in out)) out.type = "object";
+		else if (ARRAY_IMPLYING_KEYWORDS.some((k) => k in out)) out.type = "array";
 		else if (!TYPE_IMPLYING_KEYWORDS.some((k) => k in out)) out.type = "string";
 	}
 

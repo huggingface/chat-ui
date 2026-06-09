@@ -82,6 +82,22 @@ describe("sanitizeJsonSchema", () => {
 		expect(props.args.additionalProperties).toEqual({});
 	});
 
+	it("infers object (not string) for patternProperties maps and sanitizes their sub-schemas", () => {
+		const out = sanitizeJsonSchema({
+			patternProperties: { "^x-": { default: null, description: "header value" } },
+		});
+		expect(out.type).toBe("object");
+		const pp = out.patternProperties as Record<string, Record<string, unknown>>;
+		expect(pp["^x-"].type).toBe("string");
+		expect("default" in pp["^x-"]).toBe(false);
+	});
+
+	it("infers object for a schema defined only via additionalProperties", () => {
+		const out = sanitizeJsonSchema({ additionalProperties: { type: "string" } });
+		expect(out.type).toBe("object");
+		expect(out.additionalProperties).toEqual({ type: "string" });
+	});
+
 	it("recurses into nested object properties and array items", () => {
 		const out = sanitizeJsonSchema({
 			type: "object",
