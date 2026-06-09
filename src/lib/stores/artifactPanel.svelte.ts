@@ -6,16 +6,18 @@ const WIDTH_STORAGE_KEY = "artifactPanelWidth";
 // ArtifactPanel), so neither side can be dragged into oblivion.
 export const ARTIFACT_PANEL_MIN_WIDTH = 300;
 export const ARTIFACT_PANEL_MAX_WIDTH = 2400;
-export const ARTIFACT_PANEL_DEFAULT_WIDTH = 560;
+/** Default split when the user hasn't resized: the panel takes most of the area */
+export const ARTIFACT_PANEL_DEFAULT_FRACTION = "65%";
 
-function initialWidth(): number {
+/** Stored pixel width from a previous drag, or null to use the default fraction */
+function initialWidth(): number | null {
 	if (browser) {
 		const stored = Number(localStorage.getItem(WIDTH_STORAGE_KEY));
 		if (Number.isFinite(stored) && stored >= ARTIFACT_PANEL_MIN_WIDTH) {
 			return Math.min(stored, ARTIFACT_PANEL_MAX_WIDTH);
 		}
 	}
-	return ARTIFACT_PANEL_DEFAULT_WIDTH;
+	return null;
 }
 
 /**
@@ -72,6 +74,14 @@ class ArtifactPanelStore {
 		this.widthPx = Math.min(ARTIFACT_PANEL_MAX_WIDTH, Math.max(ARTIFACT_PANEL_MIN_WIDTH, px));
 		if (browser) {
 			localStorage.setItem(WIDTH_STORAGE_KEY, String(Math.round(this.widthPx)));
+		}
+	}
+
+	/** Back to the default proportional split */
+	resetWidth() {
+		this.widthPx = null;
+		if (browser) {
+			localStorage.removeItem(WIDTH_STORAGE_KEY);
 		}
 	}
 

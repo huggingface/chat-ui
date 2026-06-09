@@ -6,7 +6,7 @@
 	import { artifactFileName, isPreviewableKind } from "$lib/utils/artifacts";
 	import { buildArtifactSrcdoc } from "$lib/utils/previewSrcdoc";
 	import { highlightCode } from "$lib/utils/marked";
-	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_WIDTH } from "$lib/stores/artifactPanel.svelte";
+	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_FRACTION } from "$lib/stores/artifactPanel.svelte";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
@@ -416,7 +416,9 @@
 		<aside
 			bind:this={asideEl}
 			class="pointer-events-auto relative z-10 flex h-full flex-none flex-col overflow-hidden border-l border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
-			style="width: {artifactPanel.widthPx}px; min-width: max(20%, 300px); max-width: 80%;"
+			style="width: {artifactPanel.widthPx !== null
+				? `${artifactPanel.widthPx}px`
+				: ARTIFACT_PANEL_DEFAULT_FRACTION}; min-width: max(20%, 300px); max-width: 80%;"
 			aria-label="Artifact panel"
 		>
 			<!-- resize handle (drag to resize, double-click to reset) -->
@@ -430,7 +432,7 @@
 				onpointermove={onResizeMove}
 				onpointerup={onResizeEnd}
 				onpointercancel={onResizeEnd}
-				ondblclick={() => artifactPanel.setWidth(ARTIFACT_PANEL_DEFAULT_WIDTH)}
+				ondblclick={() => artifactPanel.resetWidth()}
 			></div>
 			{@render panelContent()}
 		</aside>
