@@ -154,6 +154,7 @@ export const ready = (async () => {
 type ExtraConfigKeys =
 	| "HF_TOKEN"
 	| "OLD_MODELS"
+	| "ENABLE_ARTIFACTS"
 	| "ENABLE_ASSISTANTS"
 	| "METRICS_ENABLED"
 	| "METRICS_PORT"

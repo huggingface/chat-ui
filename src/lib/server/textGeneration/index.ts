@@ -1,6 +1,8 @@
 import { preprocessMessages } from "../endpoints/preprocessMessages";
 
+import { config } from "$lib/server/config";
 import { generateTitleForConversation } from "./title";
+import { injectArtifactsPrompt } from "./artifacts";
 import {
 	type MessageUpdate,
 	MessageUpdateType,
@@ -45,7 +47,9 @@ async function* textGenerationWithoutTitle(
 	const { conv, messages } = ctx;
 	const convId = conv._id;
 
-	const preprompt = conv.preprompt;
+	// Artifacts are enabled unless explicitly turned off
+	const preprompt =
+		config.ENABLE_ARTIFACTS !== "false" ? injectArtifactsPrompt(conv.preprompt) : conv.preprompt;
 
 	const processedMessages = await preprocessMessages(messages, convId);
 
