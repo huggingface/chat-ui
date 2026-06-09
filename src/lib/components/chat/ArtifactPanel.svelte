@@ -324,10 +324,12 @@
 					</div>
 				</div>
 			{:else if srcdoc}
+				<!-- Backing matches the panel theme so opening the preview doesn't flash
+				     white in dark mode while the document paints its own background -->
 				<iframe
 					bind:this={iframeEl}
 					title="Artifact preview"
-					class="h-full w-full bg-white {resizing ? 'pointer-events-none' : ''}"
+					class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
 					sandbox="allow-scripts allow-popups allow-forms"
 					referrerpolicy="no-referrer"
 					{srcdoc}

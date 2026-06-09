@@ -37,7 +37,10 @@ export function buildHtmlSrcdoc(content: string, channel: string): string {
 		const svgContent = trimmed
 			.replace(/^(<\?xml[^>]*>\s*)/i, "")
 			.replace(/^(<!doctype[^>]*>\s*)/i, "");
-		return `<!doctype html><html><head>${baseTag}${disabledLinkStyles}${errorHook}</head><body>${svgContent}</body></html>`;
+		// Explicit white canvas: SVGs are usually drawn for light backgrounds, and
+		// the panel's iframe backing is dark in dark mode
+		const svgBackground = "<style>html { background: #fff; }</style>";
+		return `<!doctype html><html><head>${baseTag}${disabledLinkStyles}${svgBackground}${errorHook}</head><body>${svgContent}</body></html>`;
 	}
 
 	const headMatch = content.match(/<head[^>]*>/i);
