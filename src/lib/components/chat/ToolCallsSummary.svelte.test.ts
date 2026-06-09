@@ -57,6 +57,6 @@ describe("ToolCallsSummary", () => {
 		// Child container with the 8px (pl-2) left offset now exists
 		expect(baseElement.querySelector(".pl-2")).not.toBeNull();
 		// Each child reasoning block contributes its own collapsible "Thinking" header
-		expect(page.getByText("Thinking").elements().length).toBe(2);
+		expect(page.getByText("Thinking").elements).toHaveLength(2);
 	});
 });
