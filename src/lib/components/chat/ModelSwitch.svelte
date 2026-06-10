@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { invalidateAll } from "$app/navigation";
+	import { invalidate } from "$app/navigation";
+	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import type { Model } from "$lib/types/Model";
@@ -35,7 +36,10 @@
 				throw new Error("Failed to update model");
 			}
 
-			await invalidateAll();
+			await Promise.all([
+				invalidate(UrlDependency.Conversation),
+				invalidate(UrlDependency.ConversationList),
+			]);
 		} catch (error) {
 			console.error(error);
 		}

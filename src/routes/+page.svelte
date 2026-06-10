@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { goto, replaceState } from "$app/navigation";
+	import { goto, invalidate, replaceState } from "$app/navigation";
+	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
@@ -79,8 +80,12 @@
 				files,
 			});
 
-			// invalidateAll to update list of conversations
-			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
+			// Invalidate only the sidebar list, not all 6 bootstrap endpoints.
+			// The conversation page load re-runs automatically as a new page.
+			await Promise.all([
+				invalidate(UrlDependency.ConversationList),
+				goto(`${base}/conversation/${conversationId}`),
+			]);
 		} catch (err) {
 			error.set((err as Error).message || ERROR_MESSAGES.default);
 			console.error(err);
