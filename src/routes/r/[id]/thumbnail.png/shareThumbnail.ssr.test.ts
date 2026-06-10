@@ -21,7 +21,6 @@ describe("renderShareThumbnailPng", () => {
 	it("renders a PNG for a normal prompt", async () => {
 		const png = await renderShareThumbnailPng({
 			prompt: renderableThumbnailText("How do I fine-tune a model on my own dataset?", 240),
-			modelName: "moonshotai/Kimi-K2-Thinking",
 			isHuggingChat: true,
 			appName: "HuggingChat",
 		});
@@ -31,7 +30,6 @@ describe("renderShareThumbnailPng", () => {
 	it("renders the generic card when the prompt is empty", async () => {
 		const png = await renderShareThumbnailPng({
 			prompt: "",
-			modelName: "",
 			isHuggingChat: false,
 			appName: "ChatUI",
 		});
@@ -52,7 +50,6 @@ describe("renderShareThumbnailPng", () => {
 		for (const input of inputs) {
 			const png = await renderShareThumbnailPng({
 				prompt: renderableThumbnailText(input, 240),
-				modelName: "openai/gpt-oss-120b",
 				isHuggingChat: true,
 				appName: "HuggingChat",
 			});

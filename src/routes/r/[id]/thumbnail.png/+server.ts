@@ -4,11 +4,7 @@ import { base } from "$app/paths";
 import { collections } from "$lib/server/database";
 import { config } from "$lib/server/config";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
-import {
-	cleanTextForMeta,
-	extractFirstUserPrompt,
-	renderableThumbnailText,
-} from "$lib/utils/sharePreviewText";
+import { extractFirstUserPrompt, renderableThumbnailText } from "$lib/utils/sharePreviewText";
 import { renderShareThumbnailPng } from "./shareThumbnail";
 
 // Social-preview thumbnail for shared conversations. Only shared conversations
@@ -36,7 +32,6 @@ export const GET: RequestHandler = (async ({ params }) => {
 
 	const png = await renderShareThumbnailPng({
 		prompt,
-		modelName: cleanTextForMeta(sharedConversation.model ?? "", 64),
 		isHuggingChat: config.isHuggingChat,
 		appName: config.PUBLIC_APP_NAME,
 	});
