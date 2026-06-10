@@ -12,7 +12,7 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import type { Message } from "$lib/types/Message";
 	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
-	import titleUpdate from "$lib/stores/titleUpdate";
+	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
@@ -38,6 +38,10 @@
 
 	let { data } = $props();
 
+	// Obtain the conversations store during component init (context must be read
+	// synchronously, not inside async callbacks or event handlers).
+	const convsStore = useConversationsStore();
+
 	let convId = $derived(page.params.id ?? "");
 	let pending = $state(false);
 	let initialRun = true;
@@ -47,17 +51,6 @@
 	let messageUpdatesAbortController = new AbortController();
 
 	let files: File[] = $state([]);
-
-	let conversations = $state(untrack(() => data.conversations));
-	// TODO(step-N): this unguarded effect overwrites optimistic mutations in
-	// +layout.svelte whenever any load re-runs (e.g. ConversationList invalidation
-	// mid-stream). The untrack() on the initializer suppresses the
-	// state_referenced_locally warning but does NOT fix the underlying anti-pattern.
-	// Migrate conversations to a layout-level rune context shared downward so that
-	// optimistic mutations and server resyncs are managed in one place.
-	$effect(() => {
-		conversations = data.conversations;
-	});
 
 	function createMessagesPath<T>(messages: TreeNode<T>[], msgId?: TreeId): TreeNode<T>[] {
 		if (initialRun) {
@@ -424,15 +417,8 @@
 						$error = update.message ?? "An error has occurred";
 					}
 				} else if (update.type === MessageUpdateType.Title) {
-					const convInData = conversations.find(({ id }) => id === page.params.id);
-					if (convInData) {
-						convInData.title = update.title;
-
-						$titleUpdate = {
-							title: update.title,
-							convId,
-						};
-					}
+					// Update the sidebar title directly via the store — no side-channel needed.
+					convsStore.update(convId, { title: update.title });
 				} else if (update.type === MessageUpdateType.File) {
 					messageToWriteTo.files = [
 						...(messageToWriteTo.files ?? []),
@@ -659,7 +645,8 @@
 	});
 
 	let title = $derived.by(() => {
-		const rawTitle = conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title;
+		const rawTitle =
+			convsStore.list.find((conv) => conv.id === page.params.id)?.title ?? data.title;
 		return rawTitle ? rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1) : rawTitle;
 	});
 
