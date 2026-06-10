@@ -38,6 +38,12 @@ class ArtifactPanelStore {
 	codeWrap = $state(browser && localStorage.getItem("artifactPanelCodeWrap") === "true");
 	/** Code tab shows the diff vs the previous version (edit versions only) */
 	diffView = $state(true);
+	/**
+	 * Bumped on every explicit open so the panel re-anchors its scroll even
+	 * when the target view didn't change (e.g. clicking the same card again
+	 * after the view streamed pinned to the bottom).
+	 */
+	revealNonce = $state(0);
 
 	toggleCodeWrap() {
 		this.codeWrap = !this.codeWrap;
@@ -61,6 +67,7 @@ class ArtifactPanelStore {
 		this.identifier = identifier;
 		this.version = version;
 		this.open = true;
+		this.revealNonce += 1;
 	}
 
 	/** Open once per streaming version; respects the user closing the panel mid-stream. */

@@ -146,34 +146,85 @@
 		else highlightTimer = setTimeout(run, 150 - elapsed);
 	});
 
-	// Keep the code view pinned to the bottom while content streams in
+	// ----- scroll anchoring -----
+	// The scroll containers are reused across artifact/version switches and
+	// across streaming, so without explicit anchoring the previous view's
+	// position leaks into the next one (e.g. a version that streamed pinned to
+	// the bottom leaves the next view opened at the bottom). Every distinct
+	// view gets a deterministic anchor instead: streaming pins to the bottom,
+	// diffs land on their first change, everything else starts at the top.
+
+	// While streaming, stay pinned to the bottom — but let the user scroll up
+	// to read earlier output without fighting them; re-stick when they return
+	// to the bottom.
+	let stickToBottom = true;
+
+	function onCodeScroll() {
+		if (!codeScrollEl || !isStreamingVersion) return;
+		const distance = codeScrollEl.scrollHeight - codeScrollEl.scrollTop - codeScrollEl.clientHeight;
+		stickToBottom = distance < 60;
+	}
+
 	$effect(() => {
 		void highlightedCode;
-		if (codeScrollEl && isStreamingVersion && effectiveTab === "code") {
+		if (codeScrollEl && isStreamingVersion && effectiveTab === "code" && stickToBottom) {
 			codeScrollEl.scrollTop = codeScrollEl.scrollHeight;
 		}
 	});
 
-	// When a diff is shown, jump to the first changed line so the edit is
-	// visible without hunting for it. Keyed on the rendered HTML string (not
-	// the diff array, whose reference churns with every registry rebuild while
-	// other messages stream), so it only re-runs when the view really changes.
+	// Anchor whenever the displayed view actually changes. The key is built
+	// from stable primitives (not the version/diff objects, whose references
+	// churn with every registry rebuild while other messages stream), plus the
+	// container element itself since tab switches recreate it. `revealNonce`
+	// bumps on every card click, so re-opening the same view also re-anchors.
+	let codeAnchor: { key: string; el: HTMLElement } | undefined;
 	$effect(() => {
+		// Re-run once the rendered HTML is in sync so the anchor measures the
+		// content it's anchoring
 		void highlightedCode;
-		if (!showingDiff || !codeScrollEl) return;
 		const el = codeScrollEl;
-		// rAF: when the panel mounts straight into the code tab, this effect can
-		// run in the same flush that sets highlightedCode, before {@html} has
-		// patched the DOM — after the next paint the diff lines are queryable
-		const raf = requestAnimationFrame(() => {
-			const first = el.querySelector(".diff-line");
-			if (!first) return;
-			const offset =
-				first.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
-			// Leave ~a quarter viewport of context above the change
-			el.scrollTop = offset - el.clientHeight / 4;
+		if (!el || effectiveTab !== "code" || !version) return;
+		const key = `${artifactPanel.identifier}:${version.version}:${showingDiff ? "diff" : "full"}:${artifactPanel.revealNonce}`;
+		if (codeAnchor && codeAnchor.key === key && codeAnchor.el === el) return;
+		codeAnchor = { key, el };
+		const streaming = isStreamingVersion;
+		const diffed = showingDiff;
+		if (streaming) stickToBottom = true;
+		// rAF: this effect can run in the same flush that set highlightedCode,
+		// before {@html} has patched the DOM — measure after the next paint.
+		// Not cancelled on re-run: re-runs for the same view return early above,
+		// and a frame later the latest-scheduled anchor wins anyway.
+		requestAnimationFrame(() => {
+			if (!el.isConnected) return;
+			if (streaming) {
+				el.scrollTop = el.scrollHeight;
+				return;
+			}
+			if (diffed) {
+				const first = el.querySelector(".diff-line");
+				if (first) {
+					const offset =
+						first.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+					// Leave ~a quarter viewport of context above the change
+					el.scrollTop = Math.max(0, offset - el.clientHeight / 4);
+					return;
+				}
+			}
+			el.scrollTop = 0;
 		});
-		return () => cancelAnimationFrame(raf);
+	});
+
+	// The markdown preview reuses its scroll container across versions too;
+	// start each version at the top.
+	let previewScrollEl: HTMLElement | undefined = $state();
+	let previewAnchor: { key: string; el: HTMLElement } | undefined;
+	$effect(() => {
+		const el = previewScrollEl;
+		if (!el || !version) return;
+		const key = `${artifactPanel.identifier}:${version.version}:${artifactPanel.revealNonce}`;
+		if (previewAnchor && previewAnchor.key === key && previewAnchor.el === el) return;
+		previewAnchor = { key, el };
+		el.scrollTop = 0;
 	});
 
 	onDestroy(() => clearTimeout(highlightTimer));
@@ -370,7 +421,7 @@
 			</div>
 		{:else if effectiveTab === "preview"}
 			{#if version.type === "markdown"}
-				<div class="scrollbar-custom h-full overflow-y-auto px-6 py-5">
+				<div bind:this={previewScrollEl} class="scrollbar-custom h-full overflow-y-auto px-6 py-5">
 					<div
 						class="prose prose-sm max-w-none dark:prose-invert prose-headings:font-semibold prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 					>
@@ -399,6 +450,7 @@
 				<!-- eslint-disable svelte/no-at-html-tags -->
 				<pre
 					bind:this={codeScrollEl}
+					onscroll={onCodeScroll}
 					class="scrollbar-custom h-full overflow-auto !border-0 px-5 py-4 font-mono {artifactPanel.codeWrap
 						? 'whitespace-pre-wrap break-words'
 						: ''} {showingDiff ? 'diff-view' : ''}"><code>{@html highlightedCode}</code></pre>
