@@ -352,6 +352,13 @@
 		}
 	});
 
+	// Tailwind's `prose` resets font-size to 1rem while the app shell uses
+	// `text-smd` (0.94rem); re-applying it here keeps answer text — and every
+	// em-scaled child (code, pre, lists, tables, KaTeX) — in line with the rest
+	// of the UI. Single source for both the streaming and final render branches.
+	const proseClasses =
+		"prose max-w-none text-smd dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900";
+
 	let editMode = $derived(editMsdgId === message.id);
 	$effect(() => {
 		if (editMode) {
@@ -403,9 +410,7 @@
 					{#each blocks as block, blockIndex (block.type === "tool" ? `tool-${block.uuid}-${blockIndex}` : `block-${blockIndex}`)}
 						{#if block.type === "text"}
 							{#if block.content.trim().length > 0}
-								<div
-									class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
-								>
+								<div class={proseClasses}>
 									<MarkdownRenderer content={block.content} loading={isLast && loading} />
 								</div>
 							{/if}
@@ -434,9 +439,7 @@
 							{#if isLast && loading && unit.content.length === 0}
 								<IconLoading classNames="loading inline ml-2 first:ml-0" />
 							{:else if unit.content.trim().length > 0}
-								<div
-									class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
-								>
+								<div class={proseClasses}>
 									<MarkdownRenderer content={unit.content} loading={isLast && loading} />
 								</div>
 							{/if}
