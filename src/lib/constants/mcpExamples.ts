@@ -20,8 +20,8 @@ export const mcpExamples: RouterExample[] = [
 				prompt: "Redesign it in a completely different visual style, surprise me",
 			},
 			{
-				title: "Deploy it",
-				prompt: "How can I deploy this website for free?",
+				title: "Add a logo",
+				prompt: "Generate a logo for the website and add it to the header",
 			},
 		],
 	},
