@@ -75,6 +75,12 @@
 		// updates keep flowing into the panel; otherwise pin the version.
 		const isLatest = version.version === artifact.versions.length;
 		ctx.panel.openArtifact(version.identifier, isLatest ? null : version.version);
+		// Edited cards land on the code diff, scrolled to the change, so the
+		// edit itself is what the click reveals
+		if (version.op === "update") {
+			ctx.panel.selectTab("code");
+			ctx.panel.diffView = true;
+		}
 	}
 </script>
 

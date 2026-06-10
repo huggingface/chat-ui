@@ -4,6 +4,7 @@
 
 	import type { ArtifactRegistry, ArtifactVersion } from "$lib/utils/artifacts";
 	import { artifactFileName, isPreviewableKind } from "$lib/utils/artifacts";
+	import { diffLines, diffStats, renderDiffHtml } from "$lib/utils/artifactDiff";
 	import { buildArtifactSrcdoc } from "$lib/utils/previewSrcdoc";
 	import { highlightCode } from "$lib/utils/marked";
 	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_FRACTION } from "$lib/stores/artifactPanel.svelte";
@@ -19,6 +20,7 @@
 	import CarbonDownload from "~icons/carbon/download";
 	import CarbonMaximize from "~icons/carbon/maximize";
 	import LucideWrapText from "~icons/lucide/wrap-text";
+	import LucideDiff from "~icons/lucide/diff";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
 	interface Props {
@@ -43,6 +45,22 @@
 	let effectiveTab = $derived<"preview" | "code">(
 		!previewable || isStreamingVersion ? "code" : artifactPanel.tab
 	);
+
+	// ----- diff view for edit versions -----
+	// Only `update` ops get a diff: they edit the previous version in place, so
+	// the line diff is small and meaningful. Rewrites re-emit everything and
+	// would mostly produce a wall of removed+added lines.
+	let prevVersion = $derived(
+		artifact && version && version.version > 1 ? artifact.versions[version.version - 2] : undefined
+	);
+	let canDiff = $derived(!!version?.complete && version?.op === "update" && !!prevVersion);
+	let showingDiff = $derived(canDiff && artifactPanel.diffView);
+	let diff = $derived(
+		showingDiff && version && prevVersion
+			? diffLines(prevVersion.content, version.content)
+			: undefined
+	);
+	let stats = $derived(diff ? diffStats(diff) : undefined);
 
 	// Close the panel if its artifact disappeared (e.g. branch switch, message
 	// edit). Debounced: the registry can have transient gaps while a finished
@@ -89,10 +107,19 @@
 
 	$effect(() => {
 		if (!artifactPanel.open) return;
+		// A pending throttled run would paint stale content over whatever the
+		// branches below decide to show
+		clearTimeout(highlightTimer);
 		if (!version) {
 			// Don't hold the previous artifact's code while the new target has no
 			// version yet (e.g. its opening tag just streamed in)
 			highlightedCode = "";
+			return;
+		}
+		if (diff) {
+			// Diff view only exists for complete versions, so no throttling needed
+			highlightedCode = DOMPurify.sanitize(renderDiffHtml(diff));
+			lastHighlightAt = Date.now();
 			return;
 		}
 		const content = version.content;
@@ -104,7 +131,6 @@
 			lastHighlightAt = Date.now();
 		};
 
-		clearTimeout(highlightTimer);
 		if (complete) {
 			run();
 			return;
@@ -121,6 +147,20 @@
 		if (codeScrollEl && isStreamingVersion && effectiveTab === "code") {
 			codeScrollEl.scrollTop = codeScrollEl.scrollHeight;
 		}
+	});
+
+	// When a diff is shown, jump to the first changed line so the edit is
+	// visible without hunting for it. Keyed on the rendered HTML string (not
+	// the diff array, whose reference churns with every registry rebuild while
+	// other messages stream), so it only re-runs when the view really changes.
+	$effect(() => {
+		void highlightedCode;
+		if (!showingDiff || !codeScrollEl) return;
+		const first = codeScrollEl.querySelector(".hljs-addition, .hljs-deletion");
+		if (!first) return;
+		const offset = first.getBoundingClientRect().top - codeScrollEl.getBoundingClientRect().top;
+		// Leave ~a quarter viewport of context above the change
+		codeScrollEl.scrollTop += offset - codeScrollEl.clientHeight / 4;
 	});
 
 	onDestroy(() => clearTimeout(highlightTimer));
@@ -224,6 +264,8 @@
 	const tabActive = "bg-white text-gray-800 shadow-sm dark:bg-gray-600 dark:text-gray-100";
 	const tabInactive =
 		"text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200";
+	const codeFloatBtn =
+		"btn rounded-md border border-gray-200/80 bg-white/90 p-1.5 text-xs backdrop-blur-sm hover:bg-gray-100 hover:text-gray-600 dark:border-gray-700/80 dark:bg-gray-900/90 dark:hover:bg-gray-800 dark:hover:text-gray-300";
 </script>
 
 <svelte:window onmessage={onWindowMessage} onkeydown={handleKeydown} />
@@ -345,20 +387,35 @@
 					bind:this={codeScrollEl}
 					class="scrollbar-custom h-full overflow-auto !border-0 px-5 py-4 font-mono {artifactPanel.codeWrap
 						? 'whitespace-pre-wrap break-words'
-						: ''}"><code>{@html highlightedCode}</code></pre>
+						: ''} {showingDiff ? 'diff-view' : ''}"><code>{@html highlightedCode}</code></pre>
 			</div>
-			<!-- Floating so toggling it on/off never reflows the header tab switcher -->
-			<button
-				type="button"
-				class="btn absolute right-3 top-2 z-10 rounded-md border border-gray-200/80 bg-white/90 p-1.5 text-xs backdrop-blur-sm hover:bg-gray-100 hover:text-gray-600 dark:border-gray-700/80 dark:bg-gray-900/90 dark:hover:bg-gray-800 dark:hover:text-gray-300 {artifactPanel.codeWrap
-					? 'text-gray-600 dark:text-gray-300'
-					: 'text-gray-400'}"
-				title="{artifactPanel.codeWrap ? 'Disable' : 'Enable'} word wrap"
-				aria-pressed={artifactPanel.codeWrap}
-				onclick={() => artifactPanel.toggleCodeWrap()}
-			>
-				<LucideWrapText />
-			</button>
+			<!-- Floating so toggling them on/off never reflows the header tab switcher -->
+			<div class="absolute right-3 top-2 z-10 flex items-center gap-1">
+				{#if canDiff}
+					<button
+						type="button"
+						class="{codeFloatBtn} {artifactPanel.diffView
+							? 'text-gray-600 dark:text-gray-300'
+							: 'text-gray-400'}"
+						title={artifactPanel.diffView ? "Show full code" : "Show what changed"}
+						aria-pressed={artifactPanel.diffView}
+						onclick={() => artifactPanel.toggleDiffView()}
+					>
+						<LucideDiff />
+					</button>
+				{/if}
+				<button
+					type="button"
+					class="{codeFloatBtn} {artifactPanel.codeWrap
+						? 'text-gray-600 dark:text-gray-300'
+						: 'text-gray-400'}"
+					title="{artifactPanel.codeWrap ? 'Disable' : 'Enable'} word wrap"
+					aria-pressed={artifactPanel.codeWrap}
+					onclick={() => artifactPanel.toggleCodeWrap()}
+				>
+					<LucideWrapText />
+				</button>
+			</div>
 			{#if isStreamingVersion}
 				<div
 					class="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white/90 to-transparent dark:from-gray-900/90"
@@ -419,6 +476,11 @@
 				<span class="truncate text-amber-600 dark:text-amber-500">
 					{version.failedPairs} edit{version.failedPairs > 1 ? "s" : ""} didn't apply
 				</span>
+			{:else if stats && effectiveTab === "code" && stats.added + stats.removed > 0}
+				<span class="whitespace-nowrap tabular-nums">
+					<span class="text-green-600 dark:text-green-500">+{stats.added}</span>
+					<span class="ml-0.5 text-red-600 dark:text-red-500">−{stats.removed}</span>
+				</span>
 			{/if}
 		</div>
 	</footer>
@@ -469,6 +531,27 @@
 {/if}
 
 <style>
+	/* Full-width tint bands behind changed lines in the diff view; the text
+	   colors come from the hljs theme (highlight-js.css) */
+	pre.diff-view :global(.hljs-addition),
+	pre.diff-view :global(.hljs-deletion) {
+		display: inline-block;
+		min-width: 100%;
+		border-radius: 0.125rem;
+	}
+	pre.diff-view :global(.hljs-addition) {
+		background: rgba(80, 161, 79, 0.1);
+	}
+	pre.diff-view :global(.hljs-deletion) {
+		background: rgba(228, 86, 73, 0.09);
+	}
+	:global(.dark) pre.diff-view :global(.hljs-addition) {
+		background: rgba(152, 195, 121, 0.13);
+	}
+	:global(.dark) pre.diff-view :global(.hljs-deletion) {
+		background: rgba(224, 108, 117, 0.13);
+	}
+
 	.loading-dots::after {
 		content: "";
 		animation: dots-content 0.9s steps(1, end) infinite;
