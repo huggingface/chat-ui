@@ -83,7 +83,7 @@
 <button
 	type="button"
 	data-exclude-from-copy
-	class="my-2 flex w-full max-w-md items-center gap-3 rounded-xl border bg-white px-3.5 py-3 text-left shadow-sm has-[+.prose]:!mb-4 [.prose+&]:!mt-4
+	class="my-2 flex w-full max-w-md items-center gap-3 rounded-xl border bg-white py-3 pl-3.5 pr-6 text-left shadow-sm has-[+.prose]:!mb-4 [.prose+&]:!mt-4
 		{isActive
 		? 'border-blue-300 ring-1 ring-blue-300 dark:border-blue-500/30 dark:ring-blue-500/30'
 		: 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'}
