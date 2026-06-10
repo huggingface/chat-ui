@@ -222,7 +222,7 @@
 {#snippet panelContent()}
 	<!-- header (z-10 so button tooltips aren't painted over by the body) -->
 	<header
-		class="relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-200/70 px-3 dark:border-gray-800"
+		class="relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
 	>
 		<div class="flex min-w-0 flex-1 items-center gap-2">
 			{#if isStreamingVersion}
@@ -358,7 +358,7 @@
 
 	<!-- footer -->
 	<footer
-		class="flex h-10 flex-none items-center justify-between gap-2 border-t border-gray-200/70 px-3 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400"
+		class="flex h-10 flex-none items-center justify-between gap-2 border-t border-gray-100 px-3 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400"
 	>
 		<div class="flex items-center gap-1">
 			{#if totalVersions > 1}
@@ -417,7 +417,7 @@
 	{#if isDesktop}
 		<aside
 			bind:this={asideEl}
-			class="pointer-events-auto relative z-10 flex h-full flex-none flex-col overflow-hidden border-l border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+			class="pointer-events-auto relative z-10 flex h-full flex-none flex-col overflow-hidden border-l border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
 			style="width: {artifactPanel.widthPx !== null
 				? `${artifactPanel.widthPx}px`
 				: ARTIFACT_PANEL_DEFAULT_FRACTION}; min-width: max(20%, 300px); max-width: 80%;"
