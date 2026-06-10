@@ -36,12 +36,18 @@ class ArtifactPanelStore {
 	widthPx = $state(initialWidth());
 	/** Word wrap in the code view (persisted) */
 	codeWrap = $state(browser && localStorage.getItem("artifactPanelCodeWrap") === "true");
+	/** Code tab shows the diff vs the previous version (edit versions only) */
+	diffView = $state(true);
 
 	toggleCodeWrap() {
 		this.codeWrap = !this.codeWrap;
 		if (browser) {
 			localStorage.setItem("artifactPanelCodeWrap", String(this.codeWrap));
 		}
+	}
+
+	toggleDiffView() {
+		this.diffView = !this.diffView;
 	}
 
 	/** Versions we already auto-opened for, so closing the panel mid-stream sticks */
@@ -96,6 +102,7 @@ class ArtifactPanelStore {
 		this.version = null;
 		this.tab = "preview";
 		this.userPinnedTab = false;
+		this.diffView = true;
 		this.autoOpenedKeys.clear();
 	}
 }
