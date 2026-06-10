@@ -22,9 +22,12 @@
 	import { requireAuthUser } from "$lib/utils/auth";
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import ToolCallsSummary from "./ToolCallsSummary.svelte";
+	import ArtifactCard from "./ArtifactCard.svelte";
 	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
 	import { MessageUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
 	import ImageLightbox from "./ImageLightbox.svelte";
+	import { splitArtifactSegments, stripArtifacts } from "$lib/utils/artifacts";
+	import type { ArtifactOperation } from "$lib/utils/artifacts";
 
 	interface Props {
 		message: Message;
@@ -132,22 +135,24 @@
 	// Zero-config reasoning autodetection: detect <think> blocks in content
 	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/gi;
 
-	// Strip think blocks for clipboard copy (always, regardless of detection)
+	// Strip think blocks and artifact tags for clipboard copy (always, regardless of detection)
 	let contentWithoutThink = $derived.by(() =>
-		message.content.replace(THINK_BLOCK_REGEX, "").trim()
+		stripArtifacts(message.content.replace(THINK_BLOCK_REGEX, "")).trim()
 	);
 
 	type Block =
 		| { type: "text"; content: string }
 		| { type: "think"; content: string; closed: boolean }
-		| { type: "tool"; uuid: string; updates: MessageToolUpdate[] };
+		| { type: "tool"; uuid: string; updates: MessageToolUpdate[] }
+		| { type: "artifact"; op: ArtifactOperation; opIndex: number };
 
 	type ToolBlock = Extract<Block, { type: "tool" }>;
 	type ProcessBlock = Extract<Block, { type: "think" } | { type: "tool" }>;
 
 	type RenderUnit =
 		| { kind: "text"; content: string }
-		| { kind: "group"; blocks: ProcessBlock[]; toolCount: number };
+		| { kind: "group"; blocks: ProcessBlock[]; toolCount: number }
+		| { kind: "artifact"; op: ArtifactOperation; opIndex: number };
 
 	// Expand any text block containing <think>…</think> into dedicated think blocks
 	// so reasoning can be grouped/collapsed separately from the answer text.
@@ -171,6 +176,56 @@
 		return out;
 	}
 
+	// Replace inline <artifact> blocks in text with dedicated artifact blocks that
+	// render as cards (content lives in the artifact panel). Streaming-safe:
+	// partially received tags are hidden until complete.
+	function expandArtifactBlocks(input: Block[]): Block[] {
+		const out: Block[] = [];
+		let opIndex = 0;
+		for (const block of input) {
+			if (block.type !== "text") {
+				out.push(block);
+				continue;
+			}
+			for (const segment of splitArtifactSegments(block.content)) {
+				if (segment.type === "artifact") {
+					out.push({ type: "artifact", op: segment.op, opIndex: opIndex++ });
+				} else if (segment.content.length > 0) {
+					out.push({ type: "text", content: segment.content });
+				}
+			}
+		}
+		return collapseConsecutiveArtifactOps(out);
+	}
+
+	// Models sometimes emit several back-to-back operations on the same artifact
+	// (e.g. one update block per find/replace pair). Every op still becomes a
+	// version in the registry, but showing a card per op clutters the chat —
+	// keep only the last card of each consecutive run.
+	function collapseConsecutiveArtifactOps(input: Block[]): Block[] {
+		const out: Block[] = [];
+		for (const block of input) {
+			if (block.type === "artifact") {
+				let i = out.length - 1;
+				while (i >= 0) {
+					const prior = out[i];
+					if (prior.type === "text" && prior.content.trim().length === 0) {
+						i -= 1;
+						continue;
+					}
+					if (prior.type === "artifact" && prior.op.identifier === block.op.identifier) {
+						// Drop the earlier card (and the whitespace between) — this
+						// later op supersedes it.
+						out.splice(i, out.length - i);
+					}
+					break;
+				}
+			}
+			out.push(block);
+		}
+		return out;
+	}
+
 	let blocks = $derived.by(() => {
 		const updates = message.updates ?? [];
 		const res: Block[] = [];
@@ -180,8 +235,10 @@
 
 		// Fast path: no tool updates at all
 		if (!hasTools && updates.length === 0) {
-			return expandThinkBlocks(
-				message.content ? [{ type: "text" as const, content: message.content }] : []
+			return expandArtifactBlocks(
+				expandThinkBlocks(
+					message.content ? [{ type: "text" as const, content: message.content }] : []
+				)
 			);
 		}
 
@@ -248,7 +305,7 @@
 			res.push({ type: "text" as const, content: message.content });
 		}
 
-		return expandThinkBlocks(res);
+		return expandArtifactBlocks(expandThinkBlocks(res));
 	});
 
 	// Coalesce consecutive process blocks (thinking + tools) into groups so they can
@@ -266,6 +323,9 @@
 		for (const block of blocks) {
 			if (block.type === "think" || block.type === "tool") {
 				(current ??= []).push(block);
+			} else if (block.type === "artifact") {
+				flush();
+				units.push({ kind: "artifact", op: block.op, opIndex: block.opIndex });
 			} else {
 				flush();
 				units.push({ kind: "text", content: block.content });
@@ -349,6 +409,8 @@
 									<MarkdownRenderer content={block.content} loading={isLast && loading} />
 								</div>
 							{/if}
+						{:else if block.type === "artifact"}
+							<ArtifactCard op={block.op} messageId={message.id} opIndex={block.opIndex} />
 						{:else}
 							<div
 								data-exclude-from-copy
@@ -367,7 +429,7 @@
 					{/each}
 				{:else}
 					<!-- Answer started or generation finished: nest the process blocks. -->
-					{#each renderUnits as unit, unitIndex (unit.kind === "group" ? `group-${unitIndex}` : `text-${unitIndex}`)}
+					{#each renderUnits as unit, unitIndex (`${unit.kind}-${unitIndex}`)}
 						{#if unit.kind === "text"}
 							{#if isLast && loading && unit.content.length === 0}
 								<IconLoading classNames="loading inline ml-2 first:ml-0" />
@@ -378,6 +440,8 @@
 									<MarkdownRenderer content={unit.content} loading={isLast && loading} />
 								</div>
 							{/if}
+						{:else if unit.kind === "artifact"}
+							<ArtifactCard op={unit.op} messageId={message.id} opIndex={unit.opIndex} />
 						{:else if unit.kind === "group"}
 							<div
 								data-exclude-from-copy

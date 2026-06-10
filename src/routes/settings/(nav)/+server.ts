@@ -15,6 +15,7 @@ const settingsSchema = z.object({
 	customPromptsEnabled: z.record(z.boolean()).default({}),
 	multimodalOverrides: z.record(z.boolean()).default({}),
 	toolsOverrides: z.record(z.boolean()).default({}),
+	artifactsOverrides: z.record(z.boolean()).default({}),
 	providerOverrides: z.record(z.string()).default({}),
 	reasoningEffortOverrides: z.record(z.enum(["low", "medium", "high"])).default({}),
 	reasoningOverrides: z.record(z.boolean()).default({}),

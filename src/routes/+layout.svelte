@@ -8,7 +8,6 @@
 
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
-	import { loading } from "$lib/stores/loading";
 	import { setHapticsEnabled } from "$lib/utils/haptics";
 
 	import Toast from "$lib/components/Toast.svelte";
@@ -21,8 +20,6 @@
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { isPro } from "$lib/stores/isPro";
-	import IconShare from "$lib/components/icons/IconShare.svelte";
-	import { shareModal } from "$lib/stores/shareModal";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 
@@ -58,12 +55,6 @@
 			currentError = undefined;
 		}, 5000);
 	}
-
-	let canShare = $derived(
-		publicConfig.isHuggingChat &&
-			Boolean(page.params?.id) &&
-			page.route.id?.startsWith("/conversation/")
-	);
 
 	async function deleteConversation(id: string) {
 		client
@@ -270,19 +261,6 @@
 			? 'left-[290px]'
 			: 'left-0'} *:transition-transform"
 	/>
-
-	{#if canShare}
-		<button
-			type="button"
-			class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:flex
-				{$loading ? 'cursor-not-allowed opacity-40' : ''}"
-			onclick={() => shareModal.open()}
-			aria-label="Share conversation"
-			disabled={$loading}
-		>
-			<IconShare />
-		</button>
-	{/if}
 
 	<MobileNav title={mobileNavTitle}>
 		<NavMenu

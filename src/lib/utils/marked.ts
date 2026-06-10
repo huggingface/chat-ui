@@ -255,7 +255,7 @@ function sanitizeHref(href?: string | null): string | undefined {
 	return trimmed.replace(/>$/, "");
 }
 
-function highlightCode(text: string, lang?: string): string {
+export function highlightCode(text: string, lang?: string): string {
 	if (lang && hljs.getLanguage(lang)) {
 		try {
 			return hljs.highlight(text, { language: lang, ignoreIllegals: true }).value;

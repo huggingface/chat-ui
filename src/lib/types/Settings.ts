@@ -37,6 +37,13 @@ export interface Settings extends Timestamps {
 	toolsOverrides?: Record<string, boolean>;
 
 	/**
+	 * Per-model artifacts toggle. Overrides the model's `supportsArtifacts`
+	 * config flag in both directions: `true` enables artifacts on an unflagged
+	 * model, `false` disables them on a flagged one.
+	 */
+	artifactsOverrides?: Record<string, boolean>;
+
+	/**
 	 * Per-model toggle to hide Omni prompt suggestions shown near the composer.
 	 * When set to `true`, prompt examples for that model are suppressed.
 	 */
@@ -91,6 +98,7 @@ export const DEFAULT_SETTINGS = {
 	customPromptsEnabled: {},
 	multimodalOverrides: {},
 	toolsOverrides: {},
+	artifactsOverrides: {},
 	hidePromptExamples: {},
 	providerOverrides: {},
 	reasoningEffortOverrides: {},

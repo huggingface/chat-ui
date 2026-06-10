@@ -1,6 +1,7 @@
 import { preprocessMessages } from "../endpoints/preprocessMessages";
 
 import { generateTitleForConversation } from "./title";
+import { injectArtifactsPrompt } from "./artifacts";
 import {
 	type MessageUpdate,
 	MessageUpdateType,
@@ -45,7 +46,12 @@ async function* textGenerationWithoutTitle(
 	const { conv, messages } = ctx;
 	const convId = conv._id;
 
-	const preprompt = conv.preprompt;
+	// Artifacts are opt-in per model (supportsArtifacts in the MODELS overrides),
+	// with a per-model user override from the model settings page
+	const preprompt =
+		(ctx.artifactsOverride ?? ctx.model.supportsArtifacts)
+			? injectArtifactsPrompt(conv.preprompt)
+			: conv.preprompt;
 
 	const processedMessages = await preprocessMessages(messages, convId);
 
