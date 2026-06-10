@@ -34,9 +34,6 @@ function el(
 	return { type, props: { style, children, ...props } };
 }
 
-const LEFT_QUOTE = String.fromCharCode(0x201c);
-const RIGHT_QUOTE = String.fromCharCode(0x201d);
-
 // White HuggingChat logo as a data URI so no network fetch happens at render
 // time. The source svg only declares height="55" against a 575x100 viewBox,
 // which makes its intrinsic size ambiguous (renderers stretch it to 575x55),
@@ -60,8 +57,6 @@ const logoElement = el(
 export interface ShareThumbnailOptions {
 	/** Sanitized prompt text (see renderableThumbnailText); "" renders the generic card */
 	prompt: string;
-	/** Model id shown at the bottom; empty string hides it */
-	modelName: string;
 	isHuggingChat: boolean;
 	/** Branding used when not HuggingChat */
 	appName: string;
@@ -69,7 +64,6 @@ export interface ShareThumbnailOptions {
 
 function shareThumbnailElement({
 	prompt,
-	modelName,
 	isHuggingChat,
 	appName,
 }: ShareThumbnailOptions): SatoriElement {
@@ -87,7 +81,7 @@ function shareThumbnailElement({
 			color: "#ffffff",
 			wordBreak: "break-word",
 		},
-		text + (prompt ? RIGHT_QUOTE : "")
+		text
 	);
 
 	const continueRow = el(
@@ -103,7 +97,7 @@ function shareThumbnailElement({
 
 	const contentColumn = el(
 		"div",
-		{ display: "flex", flexDirection: "column", alignItems: "flex-start", maxWidth: 680 },
+		{ display: "flex", flexDirection: "column", alignItems: "flex-start", maxWidth: 760 },
 		[
 			promptBlock,
 			// Short divider line under the prompt
@@ -115,21 +109,6 @@ function shareThumbnailElement({
 				marginTop: 38,
 			}),
 			continueRow,
-			modelName
-				? el(
-						"div",
-						{
-							fontSize: 22,
-							color: "#d1d5db",
-							marginTop: 28,
-							backgroundColor: "rgba(255, 255, 255, 0.06)",
-							border: "2px solid rgba(255, 255, 255, 0.18)",
-							borderRadius: 999,
-							padding: "8px 24px",
-						},
-						modelName
-					)
-				: el("div", {}),
 		]
 	);
 
@@ -144,24 +123,7 @@ function shareThumbnailElement({
 			backgroundColor: "#000000",
 			backgroundImage: `url(${backgroundDataUri})`,
 		},
-		el("div", { display: "flex", alignItems: "flex-start" }, [
-			// Hanging opening quote, top-aligned with the first prompt line
-			prompt
-				? el(
-						"div",
-						{
-							fontSize: 110,
-							fontWeight: 700,
-							lineHeight: 1,
-							color: "#ffffff",
-							marginRight: 18,
-							marginTop: -14,
-						},
-						LEFT_QUOTE
-					)
-				: el("div", { width: 24 }),
-			contentColumn,
-		])
+		contentColumn
 	);
 }
 
