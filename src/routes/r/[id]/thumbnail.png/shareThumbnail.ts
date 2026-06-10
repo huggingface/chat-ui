@@ -5,6 +5,9 @@ import InterRegular from "$lib/server/fonts/Inter-Regular.ttf";
 import InterSemiBold from "$lib/server/fonts/Inter-SemiBold.ttf";
 import InterBold from "$lib/server/fonts/Inter-Bold.ttf";
 import logo from "../../../../../static/huggingchat/fulltext-logo.svg?raw";
+// Same 1200x648 background the model thumbnails use (ModelThumbnail.svelte
+// loads it from the CDN), vendored and inlined so rendering needs no network
+import backgroundDataUri from "./thumbnail-background.png?inline";
 
 // The element tree is built as plain objects instead of going through
 // satori-html: user-authored prompt text must never be parsed as HTML
@@ -34,13 +37,25 @@ function el(
 const LEFT_QUOTE = String.fromCharCode(0x201c);
 const RIGHT_QUOTE = String.fromCharCode(0x201d);
 
-// White HuggingChat logo as a data URI so no network fetch happens at render time
-const logoDataUri = `data:image/svg+xml;base64,${Buffer.from(logo).toString("base64")}`;
+// White HuggingChat logo as a data URI so no network fetch happens at render
+// time. The source svg only declares height="55" against a 575x100 viewBox,
+// which makes its intrinsic size ambiguous (renderers stretch it to 575x55),
+// so pin the intrinsic size to the viewBox before encoding.
+const LOGO_HEIGHT = 64;
+const LOGO_WIDTH = Math.round((LOGO_HEIGHT * 575) / 100);
+const logoDataUri = `data:image/svg+xml;base64,${Buffer.from(
+	logo.replace(/<svg [^>]*?height="\d+"/, '<svg width="575" height="100"')
+).toString("base64")}`;
+const logoElement = el("img", { width: LOGO_WIDTH, height: LOGO_HEIGHT }, undefined, {
+	src: logoDataUri,
+	width: LOGO_WIDTH,
+	height: LOGO_HEIGHT,
+});
 
 export interface ShareThumbnailOptions {
 	/** Sanitized prompt text (see renderableThumbnailText); "" renders the generic card */
 	prompt: string;
-	/** Model id shown in the footer; empty string hides it */
+	/** Model id shown at the bottom; empty string hides it */
 	modelName: string;
 	isHuggingChat: boolean;
 	/** Branding used when not HuggingChat */
@@ -65,58 +80,70 @@ function shareThumbnailElement({
 					fontWeight: 700,
 					lineHeight: 1.3,
 					color: "#ffffff",
+					textAlign: "center",
 					wordBreak: "break-word",
 				},
 				LEFT_QUOTE + prompt + RIGHT_QUOTE
 			)
 		: el(
 				"div",
-				{ display: "block", fontSize: 64, fontWeight: 700, lineHeight: 1.3, color: "#ffffff" },
+				{
+					display: "block",
+					fontSize: 64,
+					fontWeight: 700,
+					lineHeight: 1.3,
+					color: "#ffffff",
+					textAlign: "center",
+				},
 				"A conversation shared with you"
 			);
 
-	const branding = isHuggingChat
-		? el("img", { height: 48 }, undefined, { src: logoDataUri, width: 276, height: 48 })
-		: el("div", { fontSize: 40, fontWeight: 700, color: "#ffffff" }, appName);
+	// Same construction as the model thumbnails: "Chat with it on <logo>"
+	const brandingRow = el(
+		"div",
+		{ display: "flex", alignItems: "center", marginTop: 56 },
+		isHuggingChat
+			? [
+					el("div", { fontSize: 36, color: "#ffffff", marginRight: 16 }, "Continue the chat on"),
+					logoElement,
+				]
+			: [
+					el("div", { fontSize: 36, color: "#ffffff", marginRight: 16 }, "Continue the chat on"),
+					el("div", { fontSize: 44, fontWeight: 700, color: "#ffffff" }, appName),
+				]
+	);
 
 	return el(
 		"div",
 		{
 			display: "flex",
 			flexDirection: "column",
-			justifyContent: "space-between",
+			alignItems: "center",
+			justifyContent: "center",
 			width: "100%",
 			height: "100%",
-			padding: "64px 80px",
-			backgroundImage: "linear-gradient(125deg, #0f1117 0%, #161a26 55%, #2c2410 130%)",
+			padding: "64px 96px",
+			backgroundColor: "#000000",
+			backgroundImage: `url(${backgroundDataUri})`,
 		},
 		[
-			el(
-				"div",
-				{
-					fontSize: 26,
-					fontWeight: 600,
-					letterSpacing: 4,
-					textTransform: "uppercase",
-					color: "#ffd21e",
-				},
-				"Shared conversation"
-			),
-			el(
-				"div",
-				{ display: "flex", flexGrow: 1, alignItems: "center", padding: "32px 0" },
-				promptBlock
-			),
-			el(
-				"div",
-				{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" },
-				[
-					branding,
-					modelName
-						? el("div", { fontSize: 26, fontWeight: 400, color: "#8b929f" }, modelName)
-						: el("div", {}),
-				]
-			),
+			el("div", { display: "flex", width: "100%", justifyContent: "center" }, promptBlock),
+			brandingRow,
+			// Translucent pill keeps the model id legible over the light streak
+			modelName
+				? el(
+						"div",
+						{
+							fontSize: 26,
+							color: "#d1d5db",
+							marginTop: 48,
+							backgroundColor: "rgba(0, 0, 0, 0.6)",
+							borderRadius: 999,
+							padding: "10px 28px",
+						},
+						modelName
+					)
+				: el("div", {}),
 		]
 	);
 }
