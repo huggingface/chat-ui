@@ -60,6 +60,9 @@ const modelConfig = z.object({
 	supportsTools: z.boolean().default(false),
 	// Reasoning-capable model (accepts `reasoning_effort` parameter)
 	supportsReasoning: z.boolean().default(false),
+	// Opt-in artifacts: when true, the model is instructed to emit <artifact>
+	// blocks rendered in the side panel. Set per model via MODELS overrides.
+	supportsArtifacts: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */

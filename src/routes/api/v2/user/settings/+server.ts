@@ -25,7 +25,6 @@ const settingsSchema = z.object({
 	streamingMode: z.enum(["raw", "smooth"]).optional(),
 	directPaste: z.boolean().default(false),
 	hapticsEnabled: z.boolean().default(true),
-	artifactsEnabled: z.boolean().default(true),
 	hidePromptExamples: z.record(z.boolean()).default({}),
 	billingOrganization: z.string().optional(),
 });
@@ -62,7 +61,6 @@ export const GET: RequestHandler = async ({ locals }) => {
 		streamingMode,
 		directPaste: settings?.directPaste ?? DEFAULT_SETTINGS.directPaste,
 		hapticsEnabled: settings?.hapticsEnabled ?? DEFAULT_SETTINGS.hapticsEnabled,
-		artifactsEnabled: settings?.artifactsEnabled ?? DEFAULT_SETTINGS.artifactsEnabled,
 		hidePromptExamples: settings?.hidePromptExamples ?? DEFAULT_SETTINGS.hidePromptExamples,
 		shareConversationsWithModelAuthors:
 			settings?.shareConversationsWithModelAuthors ??

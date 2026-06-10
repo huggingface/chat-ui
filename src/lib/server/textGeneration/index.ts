@@ -1,6 +1,5 @@
 import { preprocessMessages } from "../endpoints/preprocessMessages";
 
-import { config } from "$lib/server/config";
 import { generateTitleForConversation } from "./title";
 import { injectArtifactsPrompt } from "./artifacts";
 import {
@@ -47,10 +46,10 @@ async function* textGenerationWithoutTitle(
 	const { conv, messages } = ctx;
 	const convId = conv._id;
 
-	// Artifacts are on unless disabled instance-wide (ENABLE_ARTIFACTS=false)
-	// or turned off by the user in their global settings.
-	const artifactsEnabled = config.ENABLE_ARTIFACTS !== "false" && (ctx.artifactsEnabled ?? true);
-	const preprompt = artifactsEnabled ? injectArtifactsPrompt(conv.preprompt) : conv.preprompt;
+	// Artifacts are opt-in per model (supportsArtifacts in the MODELS overrides)
+	const preprompt = ctx.model.supportsArtifacts
+		? injectArtifactsPrompt(conv.preprompt)
+		: conv.preprompt;
 
 	const processedMessages = await preprocessMessages(messages, convId);
 

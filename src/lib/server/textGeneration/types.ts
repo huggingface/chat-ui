@@ -21,8 +21,6 @@ export interface TextGenerationContext {
 	provider?: string;
 	/** Optional thinking-effort override forwarded as `reasoning_effort` to OpenAI-compatible endpoints */
 	reasoningEffort?: "low" | "medium" | "high";
-	/** User-level artifacts toggle (defaults to enabled); combined with the ENABLE_ARTIFACTS env flag */
-	artifactsEnabled?: boolean;
 	locals: App.Locals | undefined;
 	abortController: AbortController;
 }

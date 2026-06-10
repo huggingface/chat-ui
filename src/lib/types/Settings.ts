@@ -76,13 +76,6 @@ export interface Settings extends Timestamps {
 	hapticsEnabled: boolean;
 
 	/**
-	 * Global toggle for artifacts: when enabled (default), models are instructed
-	 * to emit substantial content (apps, documents, diagrams) as artifacts shown
-	 * in a side panel with live preview. Existing artifacts still render when off.
-	 */
-	artifactsEnabled: boolean;
-
-	/**
 	 * Organization to bill inference requests to (HuggingChat only).
 	 * Stores the org's preferred_username. If empty/undefined, bills to personal account.
 	 */
@@ -105,5 +98,4 @@ export const DEFAULT_SETTINGS = {
 	streamingMode: "smooth",
 	directPaste: false,
 	hapticsEnabled: true,
-	artifactsEnabled: true,
 } satisfies SettingsEditable;

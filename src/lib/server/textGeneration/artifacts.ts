@@ -3,7 +3,8 @@
  * self-contained content rendered in chat-ui's side panel with live preview
  * and version history. Parsed client-side by `$lib/utils/artifacts`.
  *
- * Enabled by default; set `ENABLE_ARTIFACTS=false` to opt out.
+ * Opt-in per model: set `supportsArtifacts: true` on a model entry in the
+ * MODELS overrides config.
  */
 export const ARTIFACTS_SYSTEM_PROMPT = `## Artifacts
 
