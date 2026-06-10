@@ -20,8 +20,8 @@ export const mcpExamples: RouterExample[] = [
 				prompt: "Redesign it in a completely different visual style, surprise me",
 			},
 			{
-				title: "Add a logo",
-				prompt: "Generate a logo for the website and add it to the header",
+				title: "Multilingual",
+				prompt: "Add a language switcher that translates the site into French and Japanese",
 			},
 		],
 	},
