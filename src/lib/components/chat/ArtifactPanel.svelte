@@ -260,19 +260,6 @@
 
 		<div class="flex flex-none items-center gap-0.5 text-gray-400">
 			{#if version}
-				{#if effectiveTab === "code"}
-					<button
-						type="button"
-						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 {artifactPanel.codeWrap
-							? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
-							: ''}"
-						title="{artifactPanel.codeWrap ? 'Disable' : 'Enable'} word wrap"
-						aria-pressed={artifactPanel.codeWrap}
-						onclick={() => artifactPanel.toggleCodeWrap()}
-					>
-						<LucideWrapText />
-					</button>
-				{/if}
 				<CopyToClipBoardBtn
 					value={version.content}
 					classNames="btn rounded-md p-1.5 text-sm hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 focus:ring-0"
@@ -348,6 +335,18 @@
 						? 'whitespace-pre-wrap break-words'
 						: ''}"><code>{@html highlightedCode}</code></pre>
 			</div>
+			<!-- Floating so toggling it on/off never reflows the header tab switcher -->
+			<button
+				type="button"
+				class="btn absolute right-3 top-2 z-10 rounded-md border border-gray-200/80 bg-white/90 p-1.5 text-xs backdrop-blur-sm hover:bg-gray-100 hover:text-gray-600 dark:border-gray-700/80 dark:bg-gray-900/90 dark:hover:bg-gray-800 dark:hover:text-gray-300 {artifactPanel.codeWrap
+					? 'text-gray-600 dark:text-gray-300'
+					: 'text-gray-400'}"
+				title="{artifactPanel.codeWrap ? 'Disable' : 'Enable'} word wrap"
+				aria-pressed={artifactPanel.codeWrap}
+				onclick={() => artifactPanel.toggleCodeWrap()}
+			>
+				<LucideWrapText />
+			</button>
 			{#if isStreamingVersion}
 				<div
 					class="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white/90 to-transparent dark:from-gray-900/90"
