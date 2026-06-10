@@ -1,10 +1,12 @@
 import satori from "satori";
-import { Resvg } from "@resvg/resvg-js";
+import { renderAsync } from "@resvg/resvg-js";
 
+import type { SharedConversation } from "$lib/types/SharedConversation";
+import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
+import { extractFirstUserPrompt, renderableThumbnailText } from "$lib/utils/sharePreviewText";
 import InterRegular from "$lib/server/fonts/Inter-Regular.ttf";
-import InterSemiBold from "$lib/server/fonts/Inter-SemiBold.ttf";
 import InterBold from "$lib/server/fonts/Inter-Bold.ttf";
-import logo from "../../../../../static/huggingchat/fulltext-logo.svg?raw";
+import logo from "../../../../static/huggingchat/fulltext-logo.svg?raw";
 // Same 1200x648 background the model thumbnails use (ModelThumbnail.svelte
 // loads it from the CDN), vendored and inlined so rendering needs no network
 import backgroundDataUri from "./thumbnail-background.png?inline";
@@ -130,6 +132,22 @@ function shareThumbnailElement({
 export const SHARE_THUMBNAIL_WIDTH = 1200;
 export const SHARE_THUMBNAIL_HEIGHT = 648;
 
+/**
+ * Thumbnail text for a shared conversation: the first user prompt, falling
+ * back to the title, then to "" (which renders the generic card). Used both
+ * when serving the thumbnail and when pre-rendering it at share time, so the
+ * two paths agree on the cache key.
+ */
+export function shareThumbnailPrompt(
+	shared: Pick<SharedConversation, "messages" | "rootMessageId" | "preprompt" | "title">
+): string {
+	const { messages, rootMessageId } = convertLegacyConversation(shared);
+	return (
+		renderableThumbnailText(extractFirstUserPrompt(messages, rootMessageId), 240) ||
+		renderableThumbnailText(shared.title ?? "", 120)
+	);
+}
+
 export async function renderShareThumbnailPng(options: ShareThumbnailOptions): Promise<Uint8Array> {
 	const element = shareThumbnailElement(options);
 
@@ -140,12 +158,48 @@ export async function renderShareThumbnailPng(options: ShareThumbnailOptions): P
 		height: SHARE_THUMBNAIL_HEIGHT,
 		fonts: [
 			{ name: "Inter", data: InterRegular as unknown as ArrayBuffer, weight: 400 },
-			{ name: "Inter", data: InterSemiBold as unknown as ArrayBuffer, weight: 600 },
 			{ name: "Inter", data: InterBold as unknown as ArrayBuffer, weight: 700 },
 		],
 	});
 
-	const png = new Resvg(svg, { fitTo: { mode: "original" } }).render().asPng();
+	// renderAsync runs the rasterization on the libuv thread pool instead of
+	// blocking the event loop for the ~100-300ms a render takes.
+	const rendered = await renderAsync(svg, { fitTo: { mode: "original" } });
 
-	return new Uint8Array(png);
+	return new Uint8Array(rendered.asPng());
+}
+
+// Shared conversations are immutable, so a rendered thumbnail never goes
+// stale. Caching the promise (rather than the bytes) also deduplicates
+// concurrent renders of the same card while the first one is in flight.
+// ~64 entries x ~150KB PNG keeps this under ~10MB.
+const THUMBNAIL_CACHE_MAX_ENTRIES = 64;
+const thumbnailCache = new Map<string, Promise<Uint8Array>>();
+
+export function getShareThumbnailPng(options: ShareThumbnailOptions): Promise<Uint8Array> {
+	const key = `${options.isHuggingChat}|${options.appName}|${options.prompt}`;
+
+	const cached = thumbnailCache.get(key);
+	if (cached) {
+		// Re-insert to mark as most recently used
+		thumbnailCache.delete(key);
+		thumbnailCache.set(key, cached);
+		return cached;
+	}
+
+	const rendering = renderShareThumbnailPng(options);
+	thumbnailCache.set(key, rendering);
+	rendering.catch(() => {
+		if (thumbnailCache.get(key) === rendering) {
+			thumbnailCache.delete(key);
+		}
+	});
+
+	while (thumbnailCache.size > THUMBNAIL_CACHE_MAX_ENTRIES) {
+		const oldest = thumbnailCache.keys().next().value;
+		if (oldest === undefined) break;
+		thumbnailCache.delete(oldest);
+	}
+
+	return rendering;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	getShareThumbnailPng,
 	renderShareThumbnailPng,
 	SHARE_THUMBNAIL_WIDTH,
 	SHARE_THUMBNAIL_HEIGHT,
@@ -34,6 +35,21 @@ describe("renderShareThumbnailPng", () => {
 			appName: "ChatUI",
 		});
 		expectValidPng(png);
+	});
+
+	it("memoizes renders for identical options", async () => {
+		const options = {
+			prompt: renderableThumbnailText("What is the capital of France?", 240),
+			isHuggingChat: true,
+			appName: "HuggingChat",
+		};
+		// Concurrent requests for the same card share a single render
+		const [first, second] = await Promise.all([
+			getShareThumbnailPng(options),
+			getShareThumbnailPng({ ...options }),
+		]);
+		expect(second).toBe(first);
+		expectValidPng(first);
 	});
 
 	it("renders adversarial prompts without fetching or throwing", async () => {

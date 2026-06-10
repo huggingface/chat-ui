@@ -3,9 +3,10 @@ import { redirect, type RequestHandler } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import { collections } from "$lib/server/database";
 import { config } from "$lib/server/config";
-import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
-import { extractFirstUserPrompt, renderableThumbnailText } from "$lib/utils/sharePreviewText";
-import { renderShareThumbnailPng } from "./shareThumbnail";
+import {
+	getShareThumbnailPng,
+	shareThumbnailPrompt,
+} from "$lib/server/shareThumbnail/shareThumbnail";
 
 // Social-preview thumbnail for shared conversations. Only shared conversations
 // (public-by-design snapshots with 7-char nanoid ids) are ever rendered here;
@@ -23,15 +24,8 @@ export const GET: RequestHandler = (async ({ params }) => {
 		redirect(302, `${base}/`);
 	}
 
-	const { messages, rootMessageId } = convertLegacyConversation(sharedConversation);
-
-	// Prefer the first user prompt; fall back to the title, then to the generic card
-	const prompt =
-		renderableThumbnailText(extractFirstUserPrompt(messages, rootMessageId), 240) ||
-		renderableThumbnailText(sharedConversation.title ?? "", 120);
-
-	const png = await renderShareThumbnailPng({
-		prompt,
+	const png = await getShareThumbnailPng({
+		prompt: shareThumbnailPrompt(sharedConversation),
 		isHuggingChat: config.isHuggingChat,
 		appName: config.PUBLIC_APP_NAME,
 	});
