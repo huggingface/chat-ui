@@ -113,7 +113,7 @@
 		}
 	});
 
-	const settings = createSettingsStore(data.settings);
+	const settings = createSettingsStore(data.settings, { isFallback: data.settingsIsFallback });
 
 	$effect(() => {
 		setHapticsEnabled($settings.hapticsEnabled);
