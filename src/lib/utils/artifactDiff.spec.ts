@@ -82,19 +82,85 @@ describe("diffLines", () => {
 });
 
 describe("renderDiffHtml", () => {
-	it("wraps changed lines in hljs spans with git-style prefixes", () => {
+	it("tints changed lines and keeps context plain", () => {
 		const html = renderDiffHtml([
 			{ type: "context", text: "a" },
 			{ type: "del", text: "b" },
 			{ type: "add", text: "B" },
 		]);
-		expect(html).toBe(
-			`  a\n<span class="hljs-deletion">- b</span>\n<span class="hljs-addition">+ B</span>`
+		const lines = html.split("\n");
+		expect(lines[0]).toBe("  a");
+		expect(lines[1]).toBe(
+			`<span class="diff-line diff-del"><span class="diff-sign">- </span>b</span>`
+		);
+		expect(lines[2]).toBe(
+			`<span class="diff-line diff-add"><span class="diff-sign">+ </span>B</span>`
 		);
 	});
 
 	it("escapes HTML in line content", () => {
-		const html = renderDiffHtml([{ type: "add", text: `<img src="x" & y>` }]);
-		expect(html).toBe(`<span class="hljs-addition">+ &lt;img src="x" &amp; y&gt;</span>`);
+		const html = renderDiffHtml([{ type: "add", text: `<img & y>` }]);
+		expect(html).toContain("&lt;img &amp; y&gt;");
+		expect(html).not.toContain("<img");
+	});
+
+	it("keeps syntax highlighting spans that cross line boundaries", () => {
+		// Fake highlighter wrapping the whole document in one token span
+		const highlight = (text: string) => `<span class="hljs-string">${text}</span>`;
+		const html = renderDiffHtml(
+			[
+				{ type: "context", text: "a" },
+				{ type: "add", text: "b" },
+			],
+			highlight
+		);
+		const lines = html.split("\n");
+		// The span is closed and reopened so each rendered line is self-contained
+		expect(lines[0]).toBe(`  <span class="hljs-string">a</span>`);
+		expect(lines[1]).toBe(
+			`<span class="diff-line diff-add"><span class="diff-sign">+ </span>` +
+				`<span class="hljs-string">b</span></span>`
+		);
+	});
+
+	it("emphasizes only the changed segment of a replaced line", () => {
+		const html = renderDiffHtml(
+			diffLines(`const el = create('div');`, `const el = create('span');`)
+		);
+		const lines = html.split("\n");
+		expect(lines[0]).toContain(`<span class="diff-emph">div</span>`);
+		expect(lines[1]).toContain(`<span class="diff-emph">span</span>`);
+	});
+
+	it("counts entities as single characters when emphasizing", () => {
+		// The "<" before the change escapes to &lt; (one source character)
+		const html = renderDiffHtml(diffLines(`if (a < b) return x;`, `if (a < b) return y;`));
+		const lines = html.split("\n");
+		expect(lines[0]).toContain(`&lt;`);
+		expect(lines[0]).toContain(`<span class="diff-emph">x</span>`);
+		expect(lines[1]).toContain(`<span class="diff-emph">y</span>`);
+	});
+
+	it("splits the emphasis chip around token tags instead of crossing them", () => {
+		const highlight = (text: string) => text.replace(/\+/g, `<span class="hljs-operator">+</span>`);
+		const html = renderDiffHtml(diffLines(`foo = bar1 + x;`, `foo = bar2 + y;`), highlight);
+		const addLine = html.split("\n")[1];
+		// The changed segment crosses the operator token: the chip closes before
+		// the tag and reopens inside it, so nesting stays valid
+		expect(addLine).toContain(`<span class="diff-emph">2 </span>`);
+		expect(addLine).toContain(
+			`<span class="hljs-operator"><span class="diff-emph">+</span></span>`
+		);
+		expect(addLine).toContain(`<span class="diff-emph"> y</span>`);
+	});
+
+	it("skips emphasis when the paired lines share almost nothing", () => {
+		const html = renderDiffHtml([
+			{ type: "del", text: "aaaaaaaaaa" },
+			{ type: "add", text: "zzzzzzzzzz" },
+		]);
+		expect(html).not.toContain("diff-emph");
+		expect(html).toContain("diff-del");
+		expect(html).toContain("diff-add");
 	});
 });

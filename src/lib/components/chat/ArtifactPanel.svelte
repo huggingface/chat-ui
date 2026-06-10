@@ -117,8 +117,13 @@
 			return;
 		}
 		if (diff) {
-			// Diff view only exists for complete versions, so no throttling needed
-			highlightedCode = DOMPurify.sanitize(renderDiffHtml(diff));
+			// Diff view only exists for complete versions, so no throttling needed.
+			// The highlighter runs on the full old/new contents so token colors
+			// survive in the diff (multi-line constructs included).
+			const lang = hljsLanguageFor(version);
+			highlightedCode = DOMPurify.sanitize(
+				renderDiffHtml(diff, (text) => highlightCode(text, lang))
+			);
 			lastHighlightAt = Date.now();
 			return;
 		}
@@ -156,11 +161,19 @@
 	$effect(() => {
 		void highlightedCode;
 		if (!showingDiff || !codeScrollEl) return;
-		const first = codeScrollEl.querySelector(".hljs-addition, .hljs-deletion");
-		if (!first) return;
-		const offset = first.getBoundingClientRect().top - codeScrollEl.getBoundingClientRect().top;
-		// Leave ~a quarter viewport of context above the change
-		codeScrollEl.scrollTop += offset - codeScrollEl.clientHeight / 4;
+		const el = codeScrollEl;
+		// rAF: when the panel mounts straight into the code tab, this effect can
+		// run in the same flush that sets highlightedCode, before {@html} has
+		// patched the DOM — after the next paint the diff lines are queryable
+		const raf = requestAnimationFrame(() => {
+			const first = el.querySelector(".diff-line");
+			if (!first) return;
+			const offset =
+				first.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+			// Leave ~a quarter viewport of context above the change
+			el.scrollTop = offset - el.clientHeight / 4;
+		});
+		return () => cancelAnimationFrame(raf);
 	});
 
 	onDestroy(() => clearTimeout(highlightTimer));
@@ -532,24 +545,50 @@
 {/if}
 
 <style>
-	/* Full-width tint bands behind changed lines in the diff view; the text
-	   colors come from the hljs theme (highlight-js.css) */
-	pre.diff-view :global(.hljs-addition),
-	pre.diff-view :global(.hljs-deletion) {
+	/* Diff view: background-only tint bands behind changed lines, so the hljs
+	   token colors stay intact; the changed segment of a replaced line gets a
+	   stronger emphasis chip. Sign colors match the syntax theme greens/reds. */
+	pre.diff-view :global(.diff-line) {
 		display: inline-block;
 		min-width: 100%;
 		border-radius: 0.125rem;
 	}
-	pre.diff-view :global(.hljs-addition) {
-		background: rgba(80, 161, 79, 0.1);
+	pre.diff-view :global(.diff-add) {
+		background: rgba(80, 161, 79, 0.09);
 	}
-	pre.diff-view :global(.hljs-deletion) {
-		background: rgba(228, 86, 73, 0.09);
+	pre.diff-view :global(.diff-del) {
+		background: rgba(228, 86, 73, 0.08);
 	}
-	:global(.dark) pre.diff-view :global(.hljs-addition) {
-		background: rgba(152, 195, 121, 0.13);
+	pre.diff-view :global(.diff-add > .diff-sign) {
+		color: #50a14f;
 	}
-	:global(.dark) pre.diff-view :global(.hljs-deletion) {
-		background: rgba(224, 108, 117, 0.13);
+	pre.diff-view :global(.diff-del > .diff-sign) {
+		color: #e45649;
+	}
+	pre.diff-view :global(.diff-add .diff-emph) {
+		background: rgba(80, 161, 79, 0.22);
+		border-radius: 0.1875rem;
+	}
+	pre.diff-view :global(.diff-del .diff-emph) {
+		background: rgba(228, 86, 73, 0.2);
+		border-radius: 0.1875rem;
+	}
+	:global(.dark) pre.diff-view :global(.diff-add) {
+		background: rgba(152, 195, 121, 0.1);
+	}
+	:global(.dark) pre.diff-view :global(.diff-del) {
+		background: rgba(224, 108, 117, 0.1);
+	}
+	:global(.dark) pre.diff-view :global(.diff-add > .diff-sign) {
+		color: #98c379;
+	}
+	:global(.dark) pre.diff-view :global(.diff-del > .diff-sign) {
+		color: #e06c75;
+	}
+	:global(.dark) pre.diff-view :global(.diff-add .diff-emph) {
+		background: rgba(152, 195, 121, 0.24);
+	}
+	:global(.dark) pre.diff-view :global(.diff-del .diff-emph) {
+		background: rgba(224, 108, 117, 0.24);
 	}
 </style>

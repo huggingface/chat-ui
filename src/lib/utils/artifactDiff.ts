@@ -4,9 +4,11 @@
  *
  * The whole file is emitted (changed lines marked, unchanged lines as
  * context), not just hunks: the code view stays a scrollable view of the
- * artifact, and the panel auto-scrolls to the first change. Rendering reuses
- * the hljs `addition`/`deletion` classes so the existing syntax theme colors
- * apply in both light and dark mode without a separate diff stylesheet.
+ * artifact, and the panel auto-scrolls to the first change. Rendering keeps
+ * full syntax highlighting: the old and new contents are highlighted
+ * separately, split into lines, and changed lines are tinted via
+ * background-only classes so token colors stay intact (plus a stronger
+ * emphasis chip on the changed segment of replaced lines).
  */
 
 export type DiffLineType = "context" | "add" | "del";
@@ -102,22 +104,217 @@ export function diffStats(lines: DiffLine[]): { added: number; removed: number }
 	return { added, removed };
 }
 
+// ---------- rendering ----------
+
 function escapeHtml(text: string): string {
 	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**
- * Render diff lines as HTML for a `<pre><code>` block. Changed lines carry
- * git-style `+ `/`- ` prefixes (so copied text reads as a diff) and hljs
- * addition/deletion spans; context lines stay plain text.
+ * Split highlighter output into one HTML string per line. hljs emits flat
+ * escaped text plus `<span>` tokens that may legally span newlines (template
+ * literals, comments), so open spans are closed at each line break and
+ * reopened on the next line — every returned line is self-contained HTML.
  */
-export function renderDiffHtml(lines: DiffLine[]): string {
-	return lines
-		.map((line) => {
-			const text = escapeHtml(line.text);
-			if (line.type === "add") return `<span class="hljs-addition">+ ${text}</span>`;
-			if (line.type === "del") return `<span class="hljs-deletion">- ${text}</span>`;
-			return `  ${text}`;
-		})
-		.join("\n");
+function splitHighlightedLines(html: string): string[] {
+	const lines: string[] = [];
+	const stack: string[] = [];
+	let current = "";
+	const tokens = html.match(/<\/?span[^>]*>|\n|[^\n<]+|</g) ?? [];
+	for (const token of tokens) {
+		if (token === "\n") {
+			lines.push(current + "</span>".repeat(stack.length));
+			current = stack.join("");
+		} else if (token.startsWith("<span")) {
+			stack.push(token);
+			current += token;
+		} else if (token.startsWith("</")) {
+			stack.pop();
+			current += token;
+		} else {
+			current += token;
+		}
+	}
+	lines.push(current);
+	return lines;
+}
+
+interface CharRange {
+	start: number;
+	end: number;
+}
+
+/**
+ * Common prefix/suffix trim between a replaced line pair, yielding the
+ * changed segment on each side. Returns null when the lines share too little
+ * for an emphasis chip to mean anything (the whole-line tint is enough).
+ */
+function changedSegments(a: string, b: string): { a: CharRange; b: CharRange } | null {
+	const max = Math.min(a.length, b.length);
+	let prefix = 0;
+	while (prefix < max && a[prefix] === b[prefix]) prefix += 1;
+	let suffix = 0;
+	while (suffix < max - prefix && a[a.length - 1 - suffix] === b[b.length - 1 - suffix]) {
+		suffix += 1;
+	}
+	const aRange = { start: prefix, end: a.length - suffix };
+	const bRange = { start: prefix, end: b.length - suffix };
+	const aFraction = a.length > 0 ? (aRange.end - aRange.start) / a.length : 0;
+	const bFraction = b.length > 0 ? (bRange.end - bRange.start) / b.length : 0;
+	if (aFraction > 0.7 && bFraction > 0.7) return null;
+	return { a: aRange, b: bRange };
+}
+
+/**
+ * Wrap the [start, end) raw-character range of a highlighted line in
+ * `<span class="diff-emph">`. Offsets count source characters, so entities
+ * (one escaped character) count as one; the wrapper never crosses token
+ * tags — it closes and reopens around them instead, keeping nesting valid.
+ */
+function emphasizeRange(html: string, { start, end }: CharRange): string {
+	if (start >= end) return html;
+	const openTag = `<span class="diff-emph">`;
+	let out = "";
+	let raw = 0;
+	let open = false;
+	const close = () => {
+		if (open) {
+			out += "</span>";
+			open = false;
+		}
+	};
+	const tokens = html.match(/<\/?span[^>]*>|&[a-zA-Z][a-zA-Z0-9]*;|&#x?[0-9a-fA-F]+;|[^&<]+|[&<]/g);
+	for (const token of tokens ?? []) {
+		if (token.startsWith("<") && token.length > 1) {
+			close();
+			out += token;
+			continue;
+		}
+		if (token.startsWith("&") && token.length > 1 && token.endsWith(";")) {
+			const inside = raw >= start && raw < end;
+			if (inside && !open) {
+				out += openTag;
+				open = true;
+			} else if (!inside) {
+				close();
+			}
+			out += token;
+			raw += 1;
+			continue;
+		}
+		const from = Math.min(Math.max(start - raw, 0), token.length);
+		const to = Math.min(Math.max(end - raw, 0), token.length);
+		const before = token.slice(0, from);
+		const within = token.slice(from, to);
+		const after = token.slice(to);
+		if (before) {
+			close();
+			out += before;
+		}
+		if (within) {
+			if (!open) {
+				out += openTag;
+				open = true;
+			}
+			out += within;
+		}
+		if (after) {
+			close();
+			out += after;
+		}
+		raw += token.length;
+	}
+	close();
+	return out;
+}
+
+/**
+ * Render diff lines as HTML for a `<pre><code>` block. The old and new
+ * contents are highlighted as whole documents (so multi-line constructs keep
+ * correct colors), then reassembled per line: changed lines are wrapped in
+ * background-tint spans with a colored `+ `/`- ` sign (copied text reads as a
+ * diff), and replaced line pairs get a `diff-emph` chip on the changed
+ * segment. Context lines stay plain highlighted code.
+ */
+export function renderDiffHtml(lines: DiffLine[], highlight?: (text: string) => string): string {
+	const oldRaw: string[] = [];
+	const newRaw: string[] = [];
+	for (const line of lines) {
+		if (line.type !== "add") oldRaw.push(line.text);
+		if (line.type !== "del") newRaw.push(line.text);
+	}
+	const hl = highlight ?? escapeHtml;
+	let oldHtml = splitHighlightedLines(hl(oldRaw.join("\n")));
+	let newHtml = splitHighlightedLines(hl(newRaw.join("\n")));
+	if (oldHtml.length !== oldRaw.length || newHtml.length !== newRaw.length) {
+		// A highlighter that altered line structure would desync the diff; fall
+		// back to plain escaped lines rather than mislabel them
+		oldHtml = oldRaw.map(escapeHtml);
+		newHtml = newRaw.map(escapeHtml);
+	}
+
+	// Pair the k-th deleted line with the k-th added line of each changed block
+	// (deletions always precede additions, see diffLines) for intra-line emphasis
+	const emphOld = new Map<number, CharRange>();
+	const emphNew = new Map<number, CharRange>();
+	{
+		let i = 0;
+		let oi = 0;
+		let ni = 0;
+		while (i < lines.length) {
+			if (lines[i].type === "context") {
+				i += 1;
+				oi += 1;
+				ni += 1;
+				continue;
+			}
+			if (lines[i].type === "add") {
+				i += 1;
+				ni += 1;
+				continue;
+			}
+			const delI = i;
+			const delOi = oi;
+			while (i < lines.length && lines[i].type === "del") {
+				i += 1;
+				oi += 1;
+			}
+			const addI = i;
+			const addNi = ni;
+			while (i < lines.length && lines[i].type === "add") {
+				i += 1;
+				ni += 1;
+			}
+			const pairs = Math.min(addI - delI, i - addI);
+			for (let k = 0; k < pairs; k += 1) {
+				const segments = changedSegments(lines[delI + k].text, lines[addI + k].text);
+				if (segments) {
+					emphOld.set(delOi + k, segments.a);
+					emphNew.set(addNi + k, segments.b);
+				}
+			}
+		}
+	}
+
+	const out: string[] = [];
+	let oi = 0;
+	let ni = 0;
+	for (const line of lines) {
+		if (line.type === "context") {
+			out.push(`  ${newHtml[ni]}`);
+			oi += 1;
+			ni += 1;
+		} else if (line.type === "del") {
+			const range = emphOld.get(oi);
+			const html = range ? emphasizeRange(oldHtml[oi], range) : oldHtml[oi];
+			out.push(`<span class="diff-line diff-del"><span class="diff-sign">- </span>${html}</span>`);
+			oi += 1;
+		} else {
+			const range = emphNew.get(ni);
+			const html = range ? emphasizeRange(newHtml[ni], range) : newHtml[ni];
+			out.push(`<span class="diff-line diff-add"><span class="diff-sign">+ </span>${html}</span>`);
+			ni += 1;
+		}
+	}
+	return out.join("\n");
 }
