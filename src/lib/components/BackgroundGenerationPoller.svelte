@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser, dev } from "$app/environment";
-	import { invalidate } from "$app/navigation";
+	import { safeInvalidate } from "$lib/utils/safeInvalidate";
 
 	import {
 		type BackgroundGeneration,
@@ -55,8 +55,8 @@
 				removeBackgroundGeneration(id);
 				stopPoller(id, "timed out");
 				log("timeout", id);
-				await invalidate(UrlDependency.ConversationList);
-				await invalidate(UrlDependency.Conversation);
+				await safeInvalidate(UrlDependency.ConversationList);
+				await safeInvalidate(UrlDependency.Conversation);
 				return;
 			}
 
@@ -102,11 +102,11 @@
 					failureCounts.delete(id);
 					shouldInvalidateConversation = true;
 					log("complete", id, "terminal");
-					await invalidate(UrlDependency.ConversationList);
+					await safeInvalidate(UrlDependency.ConversationList);
 				}
 
 				if (shouldInvalidateConversation) {
-					await invalidate(UrlDependency.Conversation);
+					await safeInvalidate(UrlDependency.Conversation);
 				}
 
 				failureCounts.delete(id);
@@ -119,7 +119,7 @@
 					assistantSnapshots.delete(id);
 					failureCounts.delete(id);
 					log("failures", id, failures);
-					await invalidate(UrlDependency.ConversationList);
+					await safeInvalidate(UrlDependency.ConversationList);
 				}
 			} finally {
 				inflight.delete(id);

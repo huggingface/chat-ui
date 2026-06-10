@@ -4,8 +4,9 @@
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
-	import { beforeNavigate, invalidate } from "$app/navigation";
+	import { beforeNavigate } from "$app/navigation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
+	import { safeInvalidate } from "$lib/utils/safeInvalidate";
 	import { base } from "$app/paths";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
@@ -468,10 +469,18 @@
 			// (updated title / updatedAt). Avoids the 5 redundant bootstrap
 			// requests (models, settings, user, public-config, feature-flags)
 			// that a full invalidateAll() would trigger.
-			await Promise.all([
-				invalidate(UrlDependency.Conversation),
-				invalidate(UrlDependency.ConversationList),
-			]);
+			// When this finally runs because beforeNavigate aborted the stream
+			// ($isAborted set without stopRequested), invalidating would cancel
+			// that very navigation (e.g. the "New Chat" click that triggered
+			// the abort) before the router even exposes it via `navigating`.
+			// Skip the refresh: the destination page loads its own data.
+			const abortedByNavigation = $isAborted && !stopRequested;
+			if (!abortedByNavigation) {
+				await Promise.all([
+					safeInvalidate(UrlDependency.Conversation),
+					safeInvalidate(UrlDependency.ConversationList),
+				]);
+			}
 		}
 	}
 

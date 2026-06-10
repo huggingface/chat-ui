@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
-	import { goto, invalidate, replaceState } from "$app/navigation";
+	import { goto, replaceState } from "$app/navigation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
+	import { safeInvalidate } from "$lib/utils/safeInvalidate";
 	import { onMount, tick } from "svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
@@ -63,11 +64,13 @@
 				files,
 			});
 
-			// Navigate first: a concurrent invalidate() re-renders this page and
-			// can cancel the navigation, leaving the pending message unsent.
+			// Refresh the sidebar list (only that, not all 6 bootstrap endpoints)
+			// BEFORE navigating. Refreshing after goto() would update layout data
+			// while the first message is streaming, and the conversation page's
+			// `$effect(() => { messages = data.messages })` would wipe the locally
+			// appended messages, blanking the conversation until the stream ends.
+			await safeInvalidate(UrlDependency.ConversationList);
 			await goto(`${base}/conversation/${conversationId}`);
-			// Then refresh only the sidebar list, not all 6 bootstrap endpoints.
-			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
 			error.set(ERROR_MESSAGES.default);
 			console.error(err);

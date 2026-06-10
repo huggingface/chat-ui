@@ -1,5 +1,5 @@
 import { browser } from "$app/environment";
-import { invalidate } from "$app/navigation";
+import { safeInvalidate } from "$lib/utils/safeInvalidate";
 import { base } from "$app/paths";
 import type { ReasoningEffort, StreamingMode } from "$lib/types/Settings";
 import { UrlDependency } from "$lib/types/UrlDependency";
@@ -64,7 +64,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 					body: JSON.stringify(get(baseStore)),
 				});
 
-				invalidate(UrlDependency.ConversationList);
+				safeInvalidate(UrlDependency.ConversationList);
 
 				if (showSavedOnNextSync) {
 					// set savedRecently to true for 3s
@@ -122,7 +122,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 					body: JSON.stringify(get(baseStore)),
 				});
 
-				invalidate(UrlDependency.ConversationList);
+				safeInvalidate(UrlDependency.ConversationList);
 
 				if (showSavedOnNextSync) {
 					baseStore.update((s) => ({
@@ -158,7 +158,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 					...settings,
 				}),
 			});
-			invalidate(UrlDependency.ConversationList);
+			safeInvalidate(UrlDependency.ConversationList);
 		}
 	}
 
