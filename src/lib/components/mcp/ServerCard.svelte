@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { MCPServer } from "$lib/types/Tool";
 	import { toggleServer, healthCheckServer, deleteCustomServer } from "$lib/stores/mcpServers";
+	import IconEdit from "~icons/carbon/edit";
 	import IconCheckmark from "~icons/carbon/checkmark-filled";
 	import IconWarning from "~icons/carbon/warning-filled";
 	import IconPending from "~icons/carbon/pending-filled";
@@ -14,9 +15,10 @@
 	interface Props {
 		server: MCPServer;
 		isSelected: boolean;
+		onedit?: (server: MCPServer) => void;
 	}
 
-	let { server, isSelected }: Props = $props();
+	let { server, isSelected, onedit }: Props = $props();
 
 	let isLoadingHealth = $state(false);
 
@@ -171,6 +173,13 @@
 			{/if}
 
 			{#if server.type === "custom"}
+				<button
+					onclick={() => onedit?.(server)}
+					class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-[.29rem] text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+				>
+					<IconEdit class="size-3" />
+					Edit
+				</button>
 				<button
 					onclick={handleDelete}
 					class="flex items-center gap-1.5 rounded-lg border border-red-500/15 bg-red-50 px-2.5 py-[.29rem] text-xs font-medium text-red-600 hover:bg-red-100 dark:border-red-500/25 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
