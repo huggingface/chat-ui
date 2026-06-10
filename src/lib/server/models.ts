@@ -451,6 +451,17 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				aliasRaw.supportsTools = true;
 			}
 
+			// Apply MODELS overrides to the router alias too, so flags like
+			// supportsArtifacts can be set on it like on any other model
+			const aliasOverride = getModelOverrides().find(
+				(o) => o.id?.trim() === routerAliasId || o.name?.trim() === routerAliasId
+			);
+			if (aliasOverride) {
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				const { id, name, ...rest } = aliasOverride;
+				Object.assign(aliasRaw, rest);
+			}
+
 			const aliasBase = await processModel(aliasRaw);
 			// Create a self-referential ProcessedModel for the router endpoint
 			const aliasModel: ProcessedModel = {
