@@ -8,14 +8,6 @@
  * There is NO module-level mutable $state, so concurrent SSR requests do not
  * share data.
  *
- * Browser singleton: in addition to the context-based facade, a module-level
- * _browserSingleton reference is set the first time createConversationsStore()
- * runs in the browser. This allows non-component modules (e.g. settings.ts)
- * that cannot call getContext() to call refreshConversationsStore() without
- * going through the SvelteKit invalidation bus.  The singleton is guarded by
- * `browser` from $app/environment and is always undefined on the server, so
- * it is SSR-safe.
- *
  * Seeding strategy: +layout.svelte calls init() whenever data.conversations
  * reference changes. The store performs a last-write-wins merge from the
  * server — local optimistic mutations (delete/rename/title) are intentionally
@@ -34,14 +26,6 @@ import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { useAPIClient, handleResponse } from "$lib/APIClient";
 
 export const CONVERSATIONS_CONTEXT_KEY = "conversationsStore";
-
-/**
- * Module-level browser-only singleton. Set once in createConversationsStore()
- * when running in the browser. Always undefined on the server.
- * Allows non-component modules (settings.ts) to call refreshConversationsStore()
- * without getContext().
- */
-let _browserSingleton: ConversationsStore | undefined;
 
 interface ConversationListItem {
 	_id: { toString(): string };
@@ -115,24 +99,10 @@ class ConversationsStore {
 export function createConversationsStore(): ConversationsStore {
 	const store = new ConversationsStore();
 	setContext(CONVERSATIONS_CONTEXT_KEY, store);
-	// Register the browser singleton so non-component modules can call refresh().
-	if (browser) {
-		_browserSingleton = store;
-	}
 	return store;
 }
 
 /** Call in any descendant component to access the store. */
 export function useConversationsStore(): ConversationsStore {
 	return getContext<ConversationsStore>(CONVERSATIONS_CONTEXT_KEY);
-}
-
-/**
- * Refresh the conversations sidebar without going through the SvelteKit
- * invalidation bus.  Safe to call from non-component modules (e.g. settings.ts)
- * that cannot use getContext().  No-op on the server.
- */
-export function refreshConversationsStore(): Promise<void> {
-	if (!browser || !_browserSingleton) return Promise.resolve();
-	return _browserSingleton.refresh();
 }
