@@ -41,16 +41,21 @@ const RIGHT_QUOTE = String.fromCharCode(0x201d);
 // time. The source svg only declares height="55" against a 575x100 viewBox,
 // which makes its intrinsic size ambiguous (renderers stretch it to 575x55),
 // so pin the intrinsic size to the viewBox before encoding.
-const LOGO_HEIGHT = 64;
+const LOGO_HEIGHT = 48;
 const LOGO_WIDTH = Math.round((LOGO_HEIGHT * 575) / 100);
 const logoDataUri = `data:image/svg+xml;base64,${Buffer.from(
 	logo.replace(/<svg [^>]*?height="\d+"/, '<svg width="575" height="100"')
 ).toString("base64")}`;
-const logoElement = el("img", { width: LOGO_WIDTH, height: LOGO_HEIGHT }, undefined, {
-	src: logoDataUri,
-	width: LOGO_WIDTH,
-	height: LOGO_HEIGHT,
-});
+const logoElement = el(
+	"img",
+	{ width: LOGO_WIDTH, height: LOGO_HEIGHT, marginLeft: 14 },
+	undefined,
+	{
+		src: logoDataUri,
+		width: LOGO_WIDTH,
+		height: LOGO_HEIGHT,
+	}
+);
 
 export interface ShareThumbnailOptions {
 	/** Sanitized prompt text (see renderableThumbnailText); "" renders the generic card */
@@ -68,83 +73,95 @@ function shareThumbnailElement({
 	isHuggingChat,
 	appName,
 }: ShareThumbnailOptions): SatoriElement {
-	const fontSize = prompt.length <= 70 ? 64 : prompt.length <= 150 ? 56 : 48;
+	const text = prompt || "A conversation shared with you";
+	const fontSize = text.length <= 45 ? 68 : text.length <= 100 ? 56 : 46;
 
-	const promptBlock = prompt
-		? el(
-				"div",
-				{
-					display: "block",
-					lineClamp: 3,
-					fontSize,
-					fontWeight: 700,
-					lineHeight: 1.3,
-					color: "#ffffff",
-					textAlign: "center",
-					wordBreak: "break-word",
-				},
-				LEFT_QUOTE + prompt + RIGHT_QUOTE
-			)
-		: el(
-				"div",
-				{
-					display: "block",
-					fontSize: 64,
-					fontWeight: 700,
-					lineHeight: 1.3,
-					color: "#ffffff",
-					textAlign: "center",
-				},
-				"A conversation shared with you"
-			);
-
-	// Same construction as the model thumbnails: "Chat with it on <logo>"
-	const brandingRow = el(
+	const promptBlock = el(
 		"div",
-		{ display: "flex", alignItems: "center", marginTop: 56 },
+		{
+			display: "block",
+			lineClamp: 3,
+			fontSize,
+			fontWeight: 700,
+			lineHeight: 1.3,
+			color: "#ffffff",
+			wordBreak: "break-word",
+		},
+		text + (prompt ? RIGHT_QUOTE : "")
+	);
+
+	const continueRow = el(
+		"div",
+		{ display: "flex", alignItems: "center", marginTop: 34 },
 		isHuggingChat
-			? [
-					el("div", { fontSize: 36, color: "#ffffff", marginRight: 16 }, "Continue the chat on"),
-					logoElement,
-				]
+			? [el("div", { fontSize: 30, color: "#d1d5db" }, "Continue the chat on"), logoElement]
 			: [
-					el("div", { fontSize: 36, color: "#ffffff", marginRight: 16 }, "Continue the chat on"),
-					el("div", { fontSize: 44, fontWeight: 700, color: "#ffffff" }, appName),
+					el("div", { fontSize: 30, color: "#d1d5db" }, "Continue the chat on"),
+					el("div", { fontSize: 32, fontWeight: 700, color: "#ffffff", marginLeft: 14 }, appName),
 				]
+	);
+
+	const contentColumn = el(
+		"div",
+		{ display: "flex", flexDirection: "column", alignItems: "flex-start", maxWidth: 680 },
+		[
+			promptBlock,
+			// Short divider line under the prompt
+			el("div", {
+				width: 64,
+				height: 4,
+				borderRadius: 2,
+				backgroundColor: "rgba(255, 255, 255, 0.55)",
+				marginTop: 38,
+			}),
+			continueRow,
+			modelName
+				? el(
+						"div",
+						{
+							fontSize: 22,
+							color: "#d1d5db",
+							marginTop: 28,
+							backgroundColor: "rgba(255, 255, 255, 0.06)",
+							border: "2px solid rgba(255, 255, 255, 0.18)",
+							borderRadius: 999,
+							padding: "8px 24px",
+						},
+						modelName
+					)
+				: el("div", {}),
+		]
 	);
 
 	return el(
 		"div",
 		{
 			display: "flex",
-			flexDirection: "column",
 			alignItems: "center",
-			justifyContent: "center",
 			width: "100%",
 			height: "100%",
-			padding: "64px 96px",
+			padding: "48px 64px",
 			backgroundColor: "#000000",
 			backgroundImage: `url(${backgroundDataUri})`,
 		},
-		[
-			el("div", { display: "flex", width: "100%", justifyContent: "center" }, promptBlock),
-			brandingRow,
-			// Translucent pill keeps the model id legible over the light streak
-			modelName
+		el("div", { display: "flex", alignItems: "flex-start" }, [
+			// Hanging opening quote, top-aligned with the first prompt line
+			prompt
 				? el(
 						"div",
 						{
-							fontSize: 26,
-							color: "#d1d5db",
-							marginTop: 48,
-							backgroundColor: "rgba(0, 0, 0, 0.6)",
-							borderRadius: 999,
-							padding: "10px 28px",
+							fontSize: 110,
+							fontWeight: 700,
+							lineHeight: 1,
+							color: "#ffffff",
+							marginRight: 18,
+							marginTop: -14,
 						},
-						modelName
+						LEFT_QUOTE
 					)
-				: el("div", {}),
-		]
+				: el("div", { width: 24 }),
+			contentColumn,
+		])
 	);
 }
 
