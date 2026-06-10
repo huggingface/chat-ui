@@ -93,4 +93,10 @@ describe("MarkdownRenderer streaming", () => {
 		expect(baseElement.textContent).toContain("Second paragraph.");
 		expect(baseElement.textContent).toContain("Third paragraph.");
 	});
+
+	it("renders a trailing setext heading in completed messages", () => {
+		// Streaming repairs must not apply when loading is false
+		const { baseElement } = render(MarkdownRenderer, { content: "Title\n-" });
+		expect(baseElement.querySelector("h2")?.textContent).toBe("Title");
+	});
 });

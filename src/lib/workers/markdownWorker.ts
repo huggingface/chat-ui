@@ -10,6 +10,7 @@ export type IncomingMessage = {
 	content: string;
 	sources: SimpleSource[];
 	requestId: number;
+	streaming?: boolean;
 };
 
 export type OutgoingMessage = {
@@ -33,8 +34,8 @@ async function processMessage() {
 		isProcessing = true;
 
 		try {
-			const { content, sources, requestId } = nextMessage;
-			const processedBlocks = await processBlocks(content, sources);
+			const { content, sources, requestId, streaming } = nextMessage;
+			const processedBlocks = await processBlocks(content, sources, streaming ?? false);
 			postMessage(
 				JSON.parse(JSON.stringify({ type: "processed", blocks: processedBlocks, requestId }))
 			);
