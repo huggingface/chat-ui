@@ -334,6 +334,21 @@
 		prevMessageCount = messages.length;
 	});
 
+	// Shared conversations containing artifacts usually exist to show one off:
+	// open the most recent artifact on load. Desktop only, since on mobile the
+	// panel is a fullscreen overlay that would hide the conversation entirely.
+	// Declared after the conversation-switch effect so its reset() can never
+	// close the panel after this opens it within the same flush.
+	let autoOpenedSharedArtifact = false;
+	$effect(() => {
+		if (autoOpenedSharedArtifact || !shared) return;
+		const latest = [...artifactRegistry.artifacts.values()].at(-1);
+		if (!latest) return;
+		autoOpenedSharedArtifact = true;
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
+		artifactPanel.openArtifact(latest.identifier, null);
+	});
+
 	// Combined scroll dependency for the action
 	let scrollDependency = $derived({ forceReattach, scrollBehavior });
 
