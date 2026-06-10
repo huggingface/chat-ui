@@ -87,7 +87,7 @@
 <button
 	type="button"
 	data-exclude-from-copy
-	class="my-2 flex w-full max-w-md items-center gap-3 rounded-xl border bg-white py-3 pl-3.5 pr-6 text-left shadow-sm has-[+.prose]:!mb-4 [.prose+&]:!mt-4
+	class="my-2 flex w-full max-w-md items-center gap-2.5 rounded-lg border bg-white py-2 pl-2.5 pr-4 text-left shadow-sm has-[+.prose]:!mb-4 [.prose+&]:!mt-4
 		{isActive
 		? 'border-blue-300 ring-1 ring-blue-300 dark:border-blue-500/30 dark:ring-blue-500/30'
 		: 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'}
@@ -100,24 +100,24 @@
 	aria-label="Open artifact: {title}"
 >
 	<div
-		class="flex size-9 flex-none items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700/70 dark:text-gray-300"
+		class="flex size-8 flex-none items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700/70 dark:text-gray-300"
 	>
 		{#if streaming}
-			<EosIconsLoading class="size-4.5 text-base" />
+			<EosIconsLoading class="size-4 text-sm" />
 		{:else if missing}
-			<CarbonWarning class="text-base text-amber-500" />
+			<CarbonWarning class="text-sm text-amber-500" />
 		{:else if version?.type === "html"}
-			<LucideAppWindow class="text-base" />
+			<LucideAppWindow class="text-sm" />
 		{:else if version?.type === "react"}
-			<CarbonLogoReact class="text-base" />
+			<CarbonLogoReact class="text-sm" />
 		{:else if version?.type === "svg"}
-			<CarbonImage class="text-base" />
+			<CarbonImage class="text-sm" />
 		{:else if version?.type === "markdown"}
-			<CarbonDocument class="text-base" />
+			<CarbonDocument class="text-sm" />
 		{:else if version?.type === "mermaid"}
-			<LucideWorkflow class="text-base" />
+			<LucideWorkflow class="text-sm" />
 		{:else}
-			<CarbonCode class="text-base" />
+			<CarbonCode class="text-sm" />
 		{/if}
 	</div>
 	<div class="min-w-0 flex-1">
