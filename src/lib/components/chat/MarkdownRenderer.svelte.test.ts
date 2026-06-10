@@ -56,3 +56,41 @@ describe("MarkdownRenderer", () => {
 		expect(baseElement.querySelectorAll(".katex")).toHaveLength(1);
 	});
 });
+
+describe("MarkdownRenderer streaming", () => {
+	it("renders an incomplete link as an inert anchor without href", () => {
+		const { baseElement } = render(MarkdownRenderer, {
+			content: "Check [the docs](https://exam",
+			loading: true,
+		});
+		const anchor = baseElement.querySelector("a[data-incomplete-link]");
+		expect(anchor).not.toBeNull();
+		expect(anchor?.getAttribute("href")).toBeNull();
+		expect(anchor?.textContent).toBe("the docs");
+	});
+
+	it("renders incomplete bold as bold while streaming", () => {
+		const { baseElement } = render(MarkdownRenderer, {
+			content: "Some **important tex",
+			loading: true,
+		});
+		const strong = baseElement.querySelector("strong");
+		expect(strong?.textContent).toBe("important tex");
+	});
+
+	it("does not flash a heading while a list item streams in", () => {
+		const { baseElement } = render(MarkdownRenderer, {
+			content: "Shopping list:\n-",
+			loading: true,
+		});
+		expect(baseElement.querySelector("h2")).toBeNull();
+	});
+
+	it("does not merge paragraphs after a <br> into one block", () => {
+		const { baseElement } = render(MarkdownRenderer, {
+			content: "First paragraph.\n\n<br>\n\nSecond paragraph.\n\nThird paragraph.",
+		});
+		expect(baseElement.textContent).toContain("Second paragraph.");
+		expect(baseElement.textContent).toContain("Third paragraph.");
+	});
+});

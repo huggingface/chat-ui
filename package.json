@@ -94,6 +94,7 @@
 		"pino-pretty": "^11.0.0",
 		"postcss": "^8.4.31",
 		"prom-client": "^15.1.3",
+		"remend": "^1.3.0",
 		"satori": "^0.10.11",
 		"satori-html": "^0.3.2",
 		"sharp": "^0.33.4",

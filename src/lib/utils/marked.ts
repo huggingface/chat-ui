@@ -350,6 +350,11 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 		extensions: [katexBlockExtension, katexInlineExtension],
 		renderer: {
 			link: (href, title, text) => {
+				// Placeholder emitted by parseIncompleteMarkdown while a link's URL is
+				// still streaming in: render an inert anchor instead of a dead link.
+				if (href === "streamdown:incomplete-link") {
+					return `<a data-incomplete-link>${text}</a>`;
+				}
 				const safeHref = sanitizeHref(href);
 				return safeHref
 					? `<a href="${escapeHTML(safeHref)}" target="_blank" rel="noreferrer">${text}</a>`
