@@ -12,16 +12,16 @@ export const mcpExamples: RouterExample[] = [
 			"Build a minimalist website with TailwindCSS presenting the current trending models on Hugging Face",
 		followUps: [
 			{
-				title: "Dark mode",
-				prompt: "Add a dark mode toggle to the website",
+				title: "Trending datasets",
+				prompt: "Add a section showing the current trending datasets on Hugging Face",
 			},
 			{
-				title: "Add animations",
-				prompt: "Add subtle entrance and hover animations to the website",
+				title: "Surprise me",
+				prompt: "Redesign it in a completely different visual style, surprise me",
 			},
 			{
-				title: "Mobile friendly",
-				prompt: "Improve the layout so it looks great on mobile screens",
+				title: "Deploy it",
+				prompt: "How can I deploy this website for free?",
 			},
 		],
 	},
