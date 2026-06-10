@@ -13,7 +13,7 @@
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import HtmlPreviewModal from "../HtmlPreviewModal.svelte";
 
-	import CarbonClose from "~icons/carbon/close";
+	import CarbonCloseLarge from "~icons/carbon/close-large";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonDownload from "~icons/carbon/download";
@@ -293,13 +293,16 @@
 					</button>
 				{/if}
 			{/if}
+			<!-- close-large at text-base: the X glyph fills less of its viewBox than the
+			     sibling icons, so it needs the bump to read as the same visual size;
+			     p-1 keeps the button footprint identical to its p-1.5 text-xs siblings -->
 			<button
 				type="button"
-				class="btn ml-0.5 rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+				class="btn ml-0.5 rounded-md p-1 text-base hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 				title="Close panel (Esc)"
 				onclick={() => artifactPanel.close()}
 			>
-				<CarbonClose />
+				<CarbonCloseLarge />
 			</button>
 		</div>
 	</header>
