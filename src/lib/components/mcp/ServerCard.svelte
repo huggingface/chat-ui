@@ -1,15 +1,13 @@
 <script lang="ts">
 	import type { MCPServer } from "$lib/types/Tool";
 	import { toggleServer, healthCheckServer, deleteCustomServer } from "$lib/stores/mcpServers";
-	import IconCheckmark from "~icons/carbon/checkmark-filled";
-	import IconWarning from "~icons/carbon/warning-filled";
-	import IconPending from "~icons/carbon/pending-filled";
 	import IconRefresh from "~icons/carbon/renew";
 	import IconTrash from "~icons/carbon/trash-can";
-	import LucideHammer from "~icons/lucide/hammer";
 	import IconSettings from "~icons/carbon/settings";
 	import Switch from "$lib/components/Switch.svelte";
 	import { getMcpServerFaviconUrl } from "$lib/utils/favicon";
+	// Show a quick-access link ONLY for the exact HF MCP login endpoint
+	import { isStrictHfMcpLogin as isStrictHfMcpLoginUrl } from "$lib/utils/hf";
 
 	interface Props {
 		server: MCPServer;
@@ -19,42 +17,24 @@
 	let { server, isSelected }: Props = $props();
 
 	let isLoadingHealth = $state(false);
+	let showTools = $state(false);
+	let faviconFailed = $state(false);
 
-	// Show a quick-access link ONLY for the exact HF MCP login endpoint
-	import { isStrictHfMcpLogin as isStrictHfMcpLoginUrl } from "$lib/utils/hf";
 	const isHfMcp = $derived.by(() => isStrictHfMcpLoginUrl(server.url));
+
+	const displayUrl = $derived(server.url.replace(/^https?:\/\//, ""));
 
 	const statusInfo = $derived.by(() => {
 		switch (server.status) {
 			case "connected":
-				return {
-					label: "Connected",
-					color: "text-green-600 dark:text-green-400",
-					bgColor: "bg-green-100 dark:bg-green-900/20",
-					icon: IconCheckmark,
-				};
+				return { label: "Connected", dot: "bg-green-500" };
 			case "connecting":
-				return {
-					label: "Connecting...",
-					color: "text-blue-600 dark:text-blue-400",
-					bgColor: "bg-blue-100 dark:bg-blue-900/20",
-					icon: IconPending,
-				};
+				return { label: "Connecting…", dot: "animate-pulse bg-amber-400" };
 			case "error":
-				return {
-					label: "Error",
-					color: "text-red-600 dark:text-red-400",
-					bgColor: "bg-red-100 dark:bg-red-900/20",
-					icon: IconWarning,
-				};
+				return { label: "Connection error", dot: "bg-red-500" };
 			case "disconnected":
 			default:
-				return {
-					label: "Unknown",
-					color: "text-gray-600 dark:text-gray-400",
-					bgColor: "bg-gray-100 dark:bg-gray-700",
-					icon: IconPending,
-				};
+				return { label: "Not checked", dot: "bg-gray-300 dark:bg-gray-600" };
 		}
 	});
 
@@ -79,82 +59,57 @@
 	}
 </script>
 
-<div
-	class="rounded-lg border bg-gradient-to-br transition-colors {isSelected
-		? 'border-blue-600/20 bg-blue-50 from-blue-500/5 to-transparent dark:border-blue-700/60 dark:bg-blue-900/10 dark:from-blue-900/20'
-		: 'border-gray-200 bg-white from-black/5 dark:border-gray-700 dark:bg-gray-800 dark:from-white/5'}"
->
-	<div class="px-4 py-3.5">
-		<!-- Header -->
-		<div class="mb-3 flex items-start justify-between gap-3">
-			<div class="min-w-0 flex-1">
-				<div class="mb-0.5 flex items-center gap-2">
-					<img
-						src={getMcpServerFaviconUrl(server.url)}
-						alt=""
-						class="size-4 flex-shrink-0 rounded"
-					/>
-					<h3 class="truncate font-semibold text-gray-900 dark:text-gray-100">
+<div class="px-3.5 py-3">
+	<div class="flex items-center gap-3">
+		<div class="flex min-w-0 flex-1 items-center gap-2.5 {isSelected ? '' : 'opacity-60'}">
+			{#if faviconFailed}
+				<div
+					class="flex size-5 shrink-0 items-center justify-center rounded bg-gray-100 text-[11px] font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+				>
+					{server.name.charAt(0).toUpperCase()}
+				</div>
+			{:else}
+				<img
+					src={getMcpServerFaviconUrl(server.url)}
+					alt=""
+					class="size-5 shrink-0 rounded"
+					onerror={() => (faviconFailed = true)}
+				/>
+			{/if}
+			<div class="min-w-0">
+				<div class="flex items-center gap-1.5">
+					<h3 class="truncate text-sm font-medium text-gray-800 dark:text-gray-200">
 						{server.name}
 					</h3>
+					<span class="size-1.5 shrink-0 rounded-full {statusInfo.dot}" title={statusInfo.label}
+					></span>
 				</div>
-				<p class="truncate text-sm text-gray-600 dark:text-gray-400">
-					{server.url}
-				</p>
+				<div class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+					<span class="truncate" title={server.url}>{displayUrl}</span>
+					{#if server.tools && server.tools.length > 0}
+						<span class="shrink-0">·</span>
+						<button
+							onclick={() => (showTools = !showTools)}
+							class="shrink-0 underline-offset-2 hover:underline"
+						>
+							{server.tools.length}
+							{server.tools.length === 1 ? "tool" : "tools"}
+						</button>
+					{/if}
+				</div>
 			</div>
-
-			<!-- Enable Switch (function binding per Svelte 5 docs) -->
-			<Switch name={`enable-${server.id}`} bind:checked={() => isSelected, setEnabled} />
 		</div>
 
-		<!-- Status -->
-		{#if server.status}
-			<div class="mb-2 flex items-center gap-2">
-				<span
-					class="inline-flex items-center gap-1 rounded-full {statusInfo.bgColor} py-0.5 pl-1.5 pr-2 text-xs font-medium {statusInfo.color}"
-				>
-					{#if server.status === "connected"}
-						<IconCheckmark class="size-3" />
-					{:else if server.status === "connecting"}
-						<IconPending class="size-3" />
-					{:else if server.status === "error"}
-						<IconWarning class="size-3" />
-					{:else}
-						<IconPending class="size-3" />
-					{/if}
-					{statusInfo.label}
-				</span>
-
-				{#if server.tools && server.tools.length > 0}
-					<span class="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
-						<LucideHammer class="size-3" />
-						{server.tools.length}
-						{server.tools.length === 1 ? "tool" : "tools"}
-					</span>
-				{/if}
-			</div>
-		{/if}
-
-		<!-- Error Message -->
-		{#if server.errorMessage}
-			<div class="mb-2 flex items-center gap-2">
-				<div
-					class="line-clamp-6 break-words rounded bg-red-50 px-2 py-1 text-xs text-red-800 dark:bg-red-900/20 dark:text-red-200"
-				>
-					{server.errorMessage}
-				</div>
-			</div>
-		{/if}
-
 		<!-- Actions -->
-		<div class="flex flex-wrap gap-1">
+		<div class="flex shrink-0 items-center gap-0.5">
 			<button
 				onclick={handleHealthCheck}
 				disabled={isLoadingHealth}
-				class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-[.29rem] text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+				title="Check connection"
+				aria-label="Check connection"
+				class="btn rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 dark:hover:bg-gray-700 dark:hover:text-gray-300"
 			>
-				<IconRefresh class="size-3 {isLoadingHealth ? 'animate-spin' : ''}" />
-				Health Check
+				<IconRefresh class="size-3.5 {isLoadingHealth ? 'animate-spin' : ''}" />
 			</button>
 
 			{#if isHfMcp}
@@ -162,42 +117,49 @@
 					href="https://huggingface.co/settings/mcp"
 					target="_blank"
 					rel="noopener noreferrer"
-					class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-[.29rem] text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+					title="Open Hugging Face MCP settings"
 					aria-label="Open Hugging Face MCP settings"
+					class="btn rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-300"
 				>
-					<IconSettings class="size-3" />
-					Settings
+					<IconSettings class="size-3.5" />
 				</a>
 			{/if}
 
 			{#if server.type === "custom"}
 				<button
 					onclick={handleDelete}
-					class="flex items-center gap-1.5 rounded-lg border border-red-500/15 bg-red-50 px-2.5 py-[.29rem] text-xs font-medium text-red-600 hover:bg-red-100 dark:border-red-500/25 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+					title="Delete server"
+					aria-label="Delete server"
+					class="btn rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
 				>
-					<IconTrash class="size-3" />
-					Delete
+					<IconTrash class="size-3.5" />
 				</button>
 			{/if}
-		</div>
 
-		<!-- Tools List (Expandable) -->
-		{#if server.tools && server.tools.length > 0}
-			<details class="mt-3">
-				<summary class="cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300">
-					Available Tools ({server.tools.length})
-				</summary>
-				<ul class="mt-2 space-y-1 text-xs">
-					{#each server.tools as tool}
-						<li class="text-gray-600 dark:text-gray-400">
-							<span class="font-medium text-gray-900 dark:text-gray-100">{tool.name}</span>
-							{#if tool.description}
-								<span class="text-gray-500 dark:text-gray-500">- {tool.description}</span>
-							{/if}
-						</li>
-					{/each}
-				</ul>
-			</details>
-		{/if}
+			<div class="ml-1.5 flex items-center">
+				<Switch name={`enable-${server.id}`} bind:checked={() => isSelected, setEnabled} />
+			</div>
+		</div>
 	</div>
+
+	<!-- Error Message -->
+	{#if server.errorMessage}
+		<p class="mt-1.5 line-clamp-3 break-words pl-[30px] text-xs text-red-600 dark:text-red-400">
+			{server.errorMessage}
+		</p>
+	{/if}
+
+	<!-- Tools List -->
+	{#if showTools && server.tools && server.tools.length > 0}
+		<div class="mt-2 flex flex-wrap gap-1 pl-[30px]">
+			{#each server.tools as tool (tool.name)}
+				<span
+					title={tool.description}
+					class="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-gray-700/60 dark:text-gray-300"
+				>
+					{tool.name}
+				</span>
+			{/each}
+		</div>
+	{/if}
 </div>
