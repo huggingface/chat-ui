@@ -16,7 +16,7 @@
 	let { content, sources = [], loading = false }: Props = $props();
 
 	// Sync-computed blocks used as fallback and for SSR (where effects don't run)
-	let syncBlocks = $derived(processBlocksSync(content, sources));
+	let syncBlocks = $derived(processBlocksSync(content, sources, loading));
 	let workerBlocks: BlockToken[] | null = $state(null);
 	let blocks = $derived(workerBlocks ?? syncBlocks);
 
@@ -36,13 +36,13 @@
 
 		if (worker) {
 			updateDebouncer.startRender();
-			worker.postMessage({ type: "process", content, sources, requestId });
+			worker.postMessage({ type: "process", content, sources, requestId, streaming: loading });
 			return;
 		}
 
 		(async () => {
 			updateDebouncer.startRender();
-			const processed = await processBlocks(content, sources);
+			const processed = await processBlocks(content, sources, loading);
 			handleBlocks(processed, requestId);
 		})();
 	});
