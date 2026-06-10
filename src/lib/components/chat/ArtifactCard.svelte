@@ -91,7 +91,7 @@
 		{isActive
 		? 'border-blue-300 ring-1 ring-blue-300 dark:border-blue-500/30 dark:ring-blue-500/30'
 		: 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'}
-		{missing ? 'cursor-default opacity-80' : 'cursor-pointer'} dark:bg-gray-800/80"
+		{missing ? 'cursor-default opacity-80' : 'cursor-pointer'} dark:bg-gray-900"
 	onclick={(e) => {
 		e.stopPropagation();
 		openInPanel();
