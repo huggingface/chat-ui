@@ -86,8 +86,9 @@
 					removeBackgroundGeneration(event.id);
 					log("complete", event.id);
 
-					// Invalidate the conversation detail if the user is currently viewing it
-					void safeInvalidate(UrlDependency.ConversationList).then(() => {
+					// Refresh the sidebar via the client-owned store, then invalidate the
+					// conversation detail if the user is currently viewing it.
+					void convsStore.refresh().then(() => {
 						// Only invalidate the conversation detail when it is currently open
 						if (page.params.id === event.id) {
 							return safeInvalidate(UrlDependency.Conversation);
@@ -133,7 +134,7 @@
 			for (const entry of timedOut) {
 				removeBackgroundGeneration(entry.id);
 				log("timeout evict", entry.id);
-				void safeInvalidate(UrlDependency.ConversationList).then(() => {
+				void convsStore.refresh().then(() => {
 					if (page.params.id === entry.id) {
 						return safeInvalidate(UrlDependency.Conversation);
 					}

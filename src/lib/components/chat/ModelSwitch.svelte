@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { safeInvalidate } from "$lib/utils/safeInvalidate";
+	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import type { Model } from "$lib/types/Model";
@@ -11,6 +12,8 @@
 	}
 
 	let { models, currentModel }: Props = $props();
+
+	const convsStore = useConversationsStore();
 
 	let selectedModelId = $state("");
 
@@ -36,10 +39,7 @@
 				throw new Error("Failed to update model");
 			}
 
-			await Promise.all([
-				safeInvalidate(UrlDependency.Conversation),
-				safeInvalidate(UrlDependency.ConversationList),
-			]);
+			await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
 		} catch (error) {
 			console.error(error);
 		}

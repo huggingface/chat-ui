@@ -458,9 +458,9 @@
 			}
 			// Only re-run the loads that actually need fresh data: the
 			// conversation page (new messages) and the sidebar list
-			// (updated title / updatedAt). Avoids the 5 redundant bootstrap
-			// requests (models, settings, user, public-config, feature-flags)
-			// that a full invalidateAll() would trigger.
+			// (updated title / updatedAt via client-owned store refresh).
+			// Avoids the 5 redundant bootstrap requests (models, settings, user,
+			// public-config, feature-flags) that a full invalidateAll() would trigger.
 			// When this finally runs because beforeNavigate aborted the stream
 			// ($isAborted set without stopRequested), invalidating would cancel
 			// that very navigation (e.g. the "New Chat" click that triggered
@@ -468,10 +468,7 @@
 			// Skip the refresh: the destination page loads its own data.
 			const abortedByNavigation = $isAborted && !stopRequested;
 			if (!abortedByNavigation) {
-				await Promise.all([
-					safeInvalidate(UrlDependency.Conversation),
-					safeInvalidate(UrlDependency.ConversationList),
-				]);
+				await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
 			}
 		}
 	}
