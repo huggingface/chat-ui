@@ -461,7 +461,7 @@
 
 		<div class="flex min-w-0 items-center gap-2">
 			{#if isStreamingVersion}
-				<span class="loading-dots text-gray-400">
+				<span class="router-shimmer whitespace-nowrap">
 					{version?.op === "update" ? "Applying edit" : "Generating"}
 				</span>
 			{:else if errors.length > 0}
@@ -551,24 +551,5 @@
 	}
 	:global(.dark) pre.diff-view :global(.hljs-deletion) {
 		background: rgba(224, 108, 117, 0.13);
-	}
-
-	.loading-dots::after {
-		content: "";
-		animation: dots-content 0.9s steps(1, end) infinite;
-	}
-	@keyframes dots-content {
-		0% {
-			content: "";
-		}
-		33% {
-			content: ".";
-		}
-		66% {
-			content: "..";
-		}
-		88% {
-			content: "...";
-		}
 	}
 </style>
