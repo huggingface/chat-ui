@@ -43,6 +43,8 @@
 	import { allBaseServersEnabled, mcpServersLoaded } from "$lib/stores/mcpServers";
 	import { shareModal } from "$lib/stores/shareModal";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
+	import FeatureAnnouncementToast from "../FeatureAnnouncementToast.svelte";
+	import { getActiveAnnouncement } from "$lib/utils/featureAnnouncements";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 	import LucideHammer from "~icons/lucide/hammer";
@@ -103,6 +105,12 @@
 			Boolean(page.params?.id) &&
 			page.route.id?.startsWith("/conversation/")
 	);
+
+	// Feature announcement toast: home screen only, gone as soon as a chat starts.
+	let featureAnnouncement = $derived(
+		getActiveAnnouncement(publicConfig.PUBLIC_FEATURE_ANNOUNCEMENTS)
+	);
+	let showFeatureAnnouncement = $derived(page.route.id === "/" && !messages.length && !loading);
 
 	// Artifacts: fold <artifact> operations from the visible message path into a
 	// versioned registry, shared with the inline cards and the side panel.
@@ -628,6 +636,9 @@
 			>
 				<IconShare />
 			</button>
+		{/if}
+		{#if featureAnnouncement && showFeatureAnnouncement}
+			<FeatureAnnouncementToast announcement={featureAnnouncement} />
 		{/if}
 		<div
 			class="scrollbar-custom h-full overflow-y-auto"
