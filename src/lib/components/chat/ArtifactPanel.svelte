@@ -172,6 +172,17 @@
 		}
 	});
 
+	/** Scroll the code view so the first changed diff line is in view */
+	function scrollToFirstChange(el: HTMLElement): boolean {
+		const first = el.querySelector(".diff-line");
+		if (!first) return false;
+		const offset =
+			first.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+		// Leave ~a quarter viewport of context above the change
+		el.scrollTop = Math.max(0, offset - el.clientHeight / 4);
+		return true;
+	}
+
 	// Anchor whenever the displayed view actually changes. The key is built
 	// from stable primitives (not the version/diff objects, whose references
 	// churn with every registry rebuild while other messages stream), plus the
@@ -200,16 +211,7 @@
 				el.scrollTop = el.scrollHeight;
 				return;
 			}
-			if (diffed) {
-				const first = el.querySelector(".diff-line");
-				if (first) {
-					const offset =
-						first.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
-					// Leave ~a quarter viewport of context above the change
-					el.scrollTop = Math.max(0, offset - el.clientHeight / 4);
-					return;
-				}
-			}
+			if (diffed && scrollToFirstChange(el)) return;
 			el.scrollTop = 0;
 		});
 	});
@@ -543,10 +545,15 @@
 					{version.failedPairs} edit{version.failedPairs > 1 ? "s" : ""} didn't apply
 				</span>
 			{:else if stats && effectiveTab === "code" && stats.added + stats.removed > 0}
-				<span class="whitespace-nowrap tabular-nums">
+				<button
+					type="button"
+					class="btn whitespace-nowrap rounded px-1.5 py-0.5 tabular-nums hover:bg-gray-100 dark:hover:bg-gray-800"
+					title="Jump to first change"
+					onclick={() => codeScrollEl && scrollToFirstChange(codeScrollEl)}
+				>
 					<span class="text-green-600 dark:text-green-500">+{stats.added}</span>
 					<span class="ml-0.5 text-red-600 dark:text-red-500">−{stats.removed}</span>
-				</span>
+				</button>
 			{/if}
 		</div>
 	</footer>
