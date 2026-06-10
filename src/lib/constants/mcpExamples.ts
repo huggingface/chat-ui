@@ -7,6 +7,25 @@ export const mcpExamples: RouterExample[] = [
 		prompt: "Generate an image of a zebra in front of a volcanic eruption",
 	},
 	{
+		title: "Build a website",
+		prompt:
+			"Build a minimalist website with TailwindCSS presenting the current trending models on Hugging Face",
+		followUps: [
+			{
+				title: "Trending datasets",
+				prompt: "Add a section showing the current trending datasets on Hugging Face",
+			},
+			{
+				title: "Surprise me",
+				prompt: "Redesign it in a completely different visual style, surprise me",
+			},
+			{
+				title: "Multilingual",
+				prompt: "Add a language switcher that translates the site into French and Japanese",
+			},
+		],
+	},
+	{
 		title: "Latest world news",
 		prompt: "What is the latest world news?",
 		followUps: [
