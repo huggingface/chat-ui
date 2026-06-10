@@ -42,6 +42,8 @@
 	import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExamples";
 	import { allBaseServersEnabled, mcpServersLoaded } from "$lib/stores/mcpServers";
 	import { shareModal } from "$lib/stores/shareModal";
+	import IconShare from "$lib/components/icons/IconShare.svelte";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 	import LucideHammer from "~icons/lucide/hammer";
 
@@ -94,6 +96,13 @@
 	}: Props = $props();
 
 	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
+
+	const publicConfig = usePublicConfig();
+	let canShare = $derived(
+		publicConfig.isHuggingChat &&
+			Boolean(page.params?.id) &&
+			page.route.id?.startsWith("/conversation/")
+	);
 
 	// Artifacts: fold <artifact> operations from the visible message path into a
 	// versioned registry, shared with the inline cards and the side panel.
@@ -583,13 +592,27 @@
 	}}
 />
 
-<!-- pointer-events-none: the chat column sits at z-[-1] (so the layout's share
-     button paints above it); this wrapper's hit-area would otherwise swallow
-     every click meant for it. Children re-enable pointer events themselves. -->
+<!-- pointer-events-none: the chat column sits at z-[-1]; this wrapper's
+     hit-area would otherwise swallow every click meant for it. Children
+     re-enable pointer events themselves. -->
 <div class="pointer-events-none relative flex min-h-0 min-w-0">
 	<div class="pointer-events-auto relative z-[-1] min-h-0 min-w-0 flex-1">
 		{#if shareModalOpen}
 			<ShareConversationModal open={shareModalOpen} onclose={() => shareModal.close()} />
+		{/if}
+		{#if canShare}
+			<!-- Lives in the chat column (not the layout) so it stays visible when
+			     the artifact panel is open -->
+			<button
+				type="button"
+				class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:z-10 md:flex
+					{loading ? 'cursor-not-allowed opacity-40' : ''}"
+				onclick={() => shareModal.open()}
+				aria-label="Share conversation"
+				disabled={loading}
+			>
+				<IconShare />
+			</button>
 		{/if}
 		<div
 			class="scrollbar-custom h-full overflow-y-auto"
