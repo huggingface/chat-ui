@@ -29,6 +29,8 @@ export const GET: RequestHandler = async () => {
 					supportsTools: (model as unknown as { supportsTools?: boolean }).supportsTools ?? false,
 					supportsReasoning:
 						(model as unknown as { supportsReasoning?: boolean }).supportsReasoning ?? false,
+					supportsArtifacts:
+						(model as unknown as { supportsArtifacts?: boolean }).supportsArtifacts ?? false,
 					unlisted: model.unlisted,
 					hasInferenceAPI: model.hasInferenceAPI,
 					isRouter: model.isRouter,

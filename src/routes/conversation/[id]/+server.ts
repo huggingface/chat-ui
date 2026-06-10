@@ -585,6 +585,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						(userSettings?.reasoningOverrides?.[model.id] ?? model.supportsReasoning)
 							? userSettings?.reasoningEffortOverrides?.[model.id]
 							: undefined,
+					// Artifacts aren't provider-determined, so the per-model user
+					// override applies on HuggingChat too
+					artifactsOverride: userSettings?.artifactsOverrides?.[model.id],
 					locals,
 					abortController: ctrl,
 				};

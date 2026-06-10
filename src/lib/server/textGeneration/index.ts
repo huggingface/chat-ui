@@ -46,10 +46,12 @@ async function* textGenerationWithoutTitle(
 	const { conv, messages } = ctx;
 	const convId = conv._id;
 
-	// Artifacts are opt-in per model (supportsArtifacts in the MODELS overrides)
-	const preprompt = ctx.model.supportsArtifacts
-		? injectArtifactsPrompt(conv.preprompt)
-		: conv.preprompt;
+	// Artifacts are opt-in per model (supportsArtifacts in the MODELS overrides),
+	// with a per-model user override from the model settings page
+	const preprompt =
+		(ctx.artifactsOverride ?? ctx.model.supportsArtifacts)
+			? injectArtifactsPrompt(conv.preprompt)
+			: conv.preprompt;
 
 	const processedMessages = await preprocessMessages(messages, convId);
 

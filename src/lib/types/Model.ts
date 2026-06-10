@@ -22,4 +22,5 @@ export type Model = Pick<
 	| "providers"
 	| "supportsTools"
 	| "supportsReasoning"
+	| "supportsArtifacts"
 >;

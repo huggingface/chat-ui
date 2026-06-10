@@ -80,6 +80,19 @@
 		}));
 	}
 
+	function getArtifactsOverride() {
+		return (
+			$settings.artifactsOverrides?.[modelId] ??
+			Boolean((model as unknown as { supportsArtifacts?: boolean }).supportsArtifacts)
+		);
+	}
+	function setArtifactsOverride(v: boolean) {
+		settings.update((s) => ({
+			...s,
+			artifactsOverrides: { ...s.artifactsOverrides, [modelId]: v },
+		}));
+	}
+
 	function getCustomPrompt() {
 		return $settings.customPrompts?.[modelId] ?? "";
 	}
@@ -349,6 +362,20 @@
 						name="forceReasoning"
 						disabled={publicConfig.isHuggingChat}
 						bind:checked={getReasoningOverride, setReasoningOverride}
+					/>
+				</div>
+
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Artifacts</div>
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
+							Let the model create apps, documents and diagrams in a side panel with live preview.
+						</p>
+					</div>
+					<!-- Not provider-determined, so user-editable even on HuggingChat -->
+					<Switch
+						name="artifactsOverride"
+						bind:checked={getArtifactsOverride, setArtifactsOverride}
 					/>
 				</div>
 
