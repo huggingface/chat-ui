@@ -457,8 +457,9 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				(o) => o.id?.trim() === routerAliasId || o.name?.trim() === routerAliasId
 			);
 			if (aliasOverride) {
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
 				const { id, name, ...rest } = aliasOverride;
+				void id;
+				void name;
 				Object.assign(aliasRaw, rest);
 			}
 

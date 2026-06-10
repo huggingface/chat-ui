@@ -81,10 +81,7 @@
 	}
 
 	function getArtifactsOverride() {
-		return (
-			$settings.artifactsOverrides?.[modelId] ??
-			Boolean((model as unknown as { supportsArtifacts?: boolean }).supportsArtifacts)
-		);
+		return $settings.artifactsOverrides?.[modelId] ?? Boolean(model?.supportsArtifacts);
 	}
 	function setArtifactsOverride(v: boolean) {
 		settings.update((s) => ({

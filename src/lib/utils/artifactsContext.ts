@@ -14,7 +14,7 @@ export interface ArtifactsContext {
 
 const KEY = Symbol("artifacts");
 
-export function setArtifactsContext(ctx: ArtifactsContext) {
+export function setArtifactsContext(ctx: ArtifactsContext): void {
 	setContext(KEY, ctx);
 }
 

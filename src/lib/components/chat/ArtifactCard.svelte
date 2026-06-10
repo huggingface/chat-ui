@@ -50,9 +50,7 @@
 		code: "Code",
 	};
 
-	let title = $derived(
-		version?.title ?? (op.kind === "create" ? op.title : (op.title ?? op.identifier))
-	);
+	let title = $derived(version?.title ?? op.title ?? op.identifier);
 
 	let subtitle = $derived.by(() => {
 		if (missing) return "This edit couldn't be linked to an artifact";
@@ -71,7 +69,7 @@
 		return `${kindLabel}${versionLabel}`;
 	});
 
-	function onclick() {
+	function openInPanel() {
 		if (!ctx || !version || !artifact) return;
 		// Follow the latest version when this card points at it, so streaming
 		// updates keep flowing into the panel; otherwise pin the version.
@@ -90,7 +88,7 @@
 		{missing ? 'cursor-default opacity-80' : 'cursor-pointer'} dark:bg-gray-800/80"
 	onclick={(e) => {
 		e.stopPropagation();
-		onclick();
+		openInPanel();
 	}}
 	disabled={missing}
 	aria-label="Open artifact: {title}"

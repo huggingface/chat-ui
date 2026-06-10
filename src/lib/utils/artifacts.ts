@@ -397,7 +397,6 @@ export function collectArtifacts(
 export function stripArtifacts(text: string): string {
 	if (!text.includes("<artifact")) return text;
 	return splitArtifactSegments(text)
-		.filter((segment) => segment.type === "text")
 		.map((segment) => (segment.type === "text" ? segment.content : ""))
 		.join("")
 		.replace(/\n{3,}/g, "\n\n")
@@ -429,22 +428,23 @@ const CODE_LANGUAGE_EXTENSIONS: Record<string, string> = {
 	html: "html",
 };
 
+function fileExtension(version: ArtifactVersion): string {
+	switch (version.type) {
+		case "html":
+			return "html";
+		case "svg":
+			return "svg";
+		case "markdown":
+			return "md";
+		case "mermaid":
+			return "mmd";
+		case "react":
+			return "jsx";
+		case "code":
+			return CODE_LANGUAGE_EXTENSIONS[version.language?.toLowerCase() ?? ""] ?? "txt";
+	}
+}
+
 export function artifactFileName(version: ArtifactVersion): string {
-	const ext = (() => {
-		switch (version.type) {
-			case "html":
-				return "html";
-			case "svg":
-				return "svg";
-			case "markdown":
-				return "md";
-			case "mermaid":
-				return "mmd";
-			case "react":
-				return "jsx";
-			case "code":
-				return CODE_LANGUAGE_EXTENSIONS[version.language?.toLowerCase() ?? ""] ?? "txt";
-		}
-	})();
-	return `${version.identifier}.${ext}`;
+	return `${version.identifier}.${fileExtension(version)}`;
 }

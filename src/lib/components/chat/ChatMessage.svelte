@@ -429,7 +429,7 @@
 					{/each}
 				{:else}
 					<!-- Answer started or generation finished: nest the process blocks. -->
-					{#each renderUnits as unit, unitIndex (unit.kind === "group" ? `group-${unitIndex}` : unit.kind === "artifact" ? `artifact-${unitIndex}` : `text-${unitIndex}`)}
+					{#each renderUnits as unit, unitIndex (`${unit.kind}-${unitIndex}`)}
 						{#if unit.kind === "text"}
 							{#if isLast && loading && unit.content.length === 0}
 								<IconLoading classNames="loading inline ml-2 first:ml-0" />
