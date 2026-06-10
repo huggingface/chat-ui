@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
-	import { goto, replaceState } from "$app/navigation";
+	import { goto, invalidate, replaceState } from "$app/navigation";
+	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { onMount, tick } from "svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
@@ -62,8 +63,9 @@
 				files,
 			});
 
-			// invalidateAll to update list of conversations
-			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
+			// Invalidate before navigating (same safe pattern as +page.svelte).
+			await invalidate(UrlDependency.ConversationList);
+			await goto(`${base}/conversation/${conversationId}`);
 		} catch (err) {
 			error.set(ERROR_MESSAGES.default);
 			console.error(err);

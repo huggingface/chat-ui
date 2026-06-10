@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { goto, replaceState } from "$app/navigation";
+	import { goto, invalidate, replaceState } from "$app/navigation";
+	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
@@ -79,8 +80,13 @@
 				files,
 			});
 
-			// invalidateAll to update list of conversations
-			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
+			// Invalidate the sidebar list first, while still on the home page.
+			// The navigation then picks up the cached (already-fresh) layout data
+			// without re-running it — so onMount on the conversation page fires
+			// with no concurrent invalidation in-flight, preventing the race where
+			// invalidate() would reset data.messages mid-stream and blank the UI.
+			await invalidate(UrlDependency.ConversationList);
+			await goto(`${base}/conversation/${conversationId}`);
 		} catch (err) {
 			error.set((err as Error).message || ERROR_MESSAGES.default);
 			console.error(err);
