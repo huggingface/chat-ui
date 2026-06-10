@@ -2,7 +2,7 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { isAborted } from "$lib/stores/isAborted";
-	import { onMount } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import { page } from "$app/state";
 	import { beforeNavigate } from "$app/navigation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
@@ -36,7 +36,7 @@
 	import { isConversationGenerationActive } from "$lib/utils/generationState";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
 
-	let { data = $bindable() } = $props();
+	let { data } = $props();
 
 	let convId = $derived(page.params.id ?? "");
 	let pending = $state(false);
@@ -48,7 +48,7 @@
 
 	let files: File[] = $state([]);
 
-	let conversations = $state(data.conversations);
+	let conversations = $state(untrack(() => data.conversations));
 	$effect(() => {
 		conversations = data.conversations;
 	});
@@ -153,7 +153,7 @@
 					const newUserMessageId = addSibling(
 						{
 							messages,
-							rootMessageId: data.rootMessageId,
+							rootMessageId,
 						},
 						{
 							from: "user",
@@ -165,7 +165,7 @@
 					messageToWriteToId = addChildren(
 						{
 							messages,
-							rootMessageId: data.rootMessageId,
+							rootMessageId,
 						},
 						{ from: "assistant", content: "" },
 						newUserMessageId
@@ -176,7 +176,7 @@
 					messageToWriteToId = addSibling(
 						{
 							messages,
-							rootMessageId: data.rootMessageId,
+							rootMessageId,
 						},
 						{ from: "assistant", content: "" },
 						messageId
@@ -188,7 +188,7 @@
 				const newUserMessageId = addChildren(
 					{
 						messages,
-						rootMessageId: data.rootMessageId,
+						rootMessageId,
 					},
 					{
 						from: "user",
@@ -198,14 +198,14 @@
 					messageId
 				);
 
-				if (!data.rootMessageId) {
-					data.rootMessageId = newUserMessageId;
+				if (!rootMessageId) {
+					rootMessageId = newUserMessageId;
 				}
 
 				messageToWriteToId = addChildren(
 					{
 						messages,
-						rootMessageId: data.rootMessageId,
+						rootMessageId,
 					},
 					{
 						from: "assistant",
@@ -572,9 +572,33 @@
 	}
 
 	const settings = useSettingsStore();
-	let messages = $state(data.messages);
+	let messages = $state(untrack(() => data.messages));
+	// Local copy of rootMessageId avoids mutating the load-data prop directly.
+	// It is set when the first message of a new conversation is created, and
+	// re-synced from server data whenever the conversation changes.
+	let rootMessageId = $state(untrack(() => data.rootMessageId));
+
+	// Track which conversation's data was last synced so a sidebar navigation
+	// always resets local state to the target conversation, but a server
+	// load re-running mid-stream (e.g. from BackgroundGenerationPoller or
+	// safeInvalidate) does NOT wipe the in-flight token buffer.
+	//
+	// "pending" is set to true at the top of writeMessage and reset to false
+	// in its finally block BEFORE safeInvalidate fires, so when the load
+	// resolves after streaming the guard is already lifted and we get the
+	// server-confirmed snapshot.
+	let _lastSyncedConvId = untrack(() => convId); // plain variable — no reactive overhead needed
 	$effect(() => {
-		messages = data.messages;
+		const currentConvId = convId; // reactive dep
+		const newMessages = data.messages; // reactive dep
+
+		const convChanged = currentConvId !== _lastSyncedConvId;
+
+		if (convChanged || !pending) {
+			messages = newMessages;
+			rootMessageId = data.rootMessageId;
+			_lastSyncedConvId = currentConvId;
+		}
 	});
 
 	$effect(() => {
@@ -641,12 +665,7 @@
 </svelte:head>
 
 {#if sharePreviewId}
-	<SharePreviewTags
-		shareId={sharePreviewId}
-		{title}
-		messages={data.messages}
-		rootMessageId={data.rootMessageId}
-	/>
+	<SharePreviewTags shareId={sharePreviewId} {title} messages={data.messages} {rootMessageId} />
 {/if}
 
 <ChatWindow
