@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { invalidate } from "$app/navigation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
+	import { safeInvalidate } from "$lib/utils/safeInvalidate";
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import type { Model } from "$lib/types/Model";
@@ -37,8 +37,8 @@
 			}
 
 			await Promise.all([
-				invalidate(UrlDependency.Conversation),
-				invalidate(UrlDependency.ConversationList),
+				safeInvalidate(UrlDependency.Conversation),
+				safeInvalidate(UrlDependency.ConversationList),
 			]);
 		} catch (error) {
 			console.error(error);
