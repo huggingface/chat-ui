@@ -110,7 +110,7 @@ export function buildReactSrcdoc(code: string, channel: string): string {
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js">${END_SCRIPT_TAG}
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js">${END_SCRIPT_TAG}
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js">${END_SCRIPT_TAG}
-<style>html, body { margin: 0; min-height: 100%; }</style>
+<style>html, body { margin: 0; min-height: 100%; background: #fff; }</style>
 </head>
 <body>
 <div id="artifact-root"></div>

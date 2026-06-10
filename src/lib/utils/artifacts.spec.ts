@@ -351,6 +351,26 @@ describe("doubled-bracket tolerance", () => {
 			{ type: "text", content: "Sure!\n" },
 		]);
 	});
+
+	it("collapses a doubled bracket on the content's leading tag (<<svg)", () => {
+		const segments = splitArtifactSegments(
+			`<<artifact identifier="balloon" type="svg" title="Balloon">\n<<svg viewBox="0 0 800 600"><circle r="5"/></svg>\n</artifact>`
+		);
+		const artifact = segments[0];
+		if (artifact.type !== "artifact" || artifact.op.kind !== "create") {
+			throw new Error("expected create artifact");
+		}
+		expect(artifact.op.content).toBe(`<svg viewBox="0 0 800 600"><circle r="5"/></svg>`);
+	});
+
+	it("matches old_str quoting raw <<-mangled output against normalized content", () => {
+		const result = applyArtifactUpdate(`<svg viewBox="0 0 10 10">\n  <circle r="5"/>\n</svg>`, [
+			{ old: `<<svg viewBox="0 0 10 10">`, new: `<svg viewBox="0 0 20 20">` },
+		]);
+		expect(result.applied).toBe(1);
+		expect(result.failed).toBe(0);
+		expect(result.content).toContain(`viewBox="0 0 20 20"`);
+	});
 });
 
 describe("zero-pair updates are flagged", () => {

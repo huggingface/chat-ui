@@ -141,6 +141,10 @@ function buildOperation(attrs: Record<string, string>, inner: string, closed: bo
 	// Tolerate a single leading/trailing newline so models can format tags on their own lines
 	let content = (closed ? inner : trimPartialCloseTag(inner)).replace(/^\r?\n/, "");
 	if (closed) content = content.replace(/\r?\n[ \t]*$/, "");
+	// Some models (Kimi-K2.6) double brackets on the content's leading tag too
+	// ("<<svg ..."), not just on the protocol tags — collapse it so the stray
+	// "<" doesn't render as text in the preview or pollute the code view
+	content = content.replace(/^(\s*)<{2,}(?=[!/a-zA-Z])/, "$1<");
 	return {
 		kind: "create" as const,
 		identifier,
@@ -216,6 +220,8 @@ function escapeRegExp(s: string): string {
  * every whitespace run collapsed to \s+ — models routinely mis-copy
  * indentation in old_str, and a strict-only match would turn the whole edit
  * into a silent no-op (observed live with Kimi-K2.6 counting spaces).
+ * Bracket runs are matched loosely the same way ("<<svg" ≈ "<svg"), since the
+ * stored content is normalized but models quote their own raw output.
  */
 function findMatch(content: string, needle: string): { start: number; end: number } | null {
 	const exact = content.indexOf(needle);
@@ -223,7 +229,9 @@ function findMatch(content: string, needle: string): { start: number; end: numbe
 	const trimmed = needle.trim();
 	if (!trimmed) return null;
 	try {
-		const pattern = new RegExp(escapeRegExp(trimmed).replace(/\s+/g, "\\s+"));
+		const pattern = new RegExp(
+			escapeRegExp(trimmed.replace(/<{2,}/g, "<")).replace(/</g, "<+").replace(/\s+/g, "\\s+")
+		);
 		const match = pattern.exec(content);
 		if (match) return { start: match.index, end: match.index + match[0].length };
 	} catch {

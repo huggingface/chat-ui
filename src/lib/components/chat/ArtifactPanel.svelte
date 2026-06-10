@@ -44,10 +44,13 @@
 		!previewable || isStreamingVersion ? "code" : artifactPanel.tab
 	);
 
-	// Close the panel if its artifact disappeared (e.g. conversation/branch switch)
+	// Close the panel if its artifact disappeared (e.g. branch switch, message
+	// edit). Debounced: the registry can have transient gaps while a finished
+	// generation is invalidated/refetched, and those must not close the panel.
 	$effect(() => {
 		if (artifactPanel.open && artifactPanel.identifier && !artifact) {
-			artifactPanel.close();
+			const timer = setTimeout(() => artifactPanel.close(), 300);
+			return () => clearTimeout(timer);
 		}
 	});
 
@@ -85,7 +88,13 @@
 	}
 
 	$effect(() => {
-		if (!artifactPanel.open || !version) return;
+		if (!artifactPanel.open) return;
+		if (!version) {
+			// Don't hold the previous artifact's code while the new target has no
+			// version yet (e.g. its opening tag just streamed in)
+			highlightedCode = "";
+			return;
+		}
 		const content = version.content;
 		const lang = hljsLanguageFor(version);
 		const complete = version.complete;
