@@ -4,7 +4,7 @@
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount, untrack } from "svelte";
 	import { page } from "$app/state";
-	import { beforeNavigate } from "$app/navigation";
+	import { beforeNavigate, replaceState } from "$app/navigation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { safeInvalidate } from "$lib/utils/safeInvalidate";
 	import { base } from "$app/paths";
@@ -534,6 +534,10 @@
 		if (pendingText) {
 			const nonce = page.state.pendingFilesNonce as string | undefined;
 			files = nonce ? consumePendingFiles(nonce) : [];
+			// Clear the history entry before submitting: returning to it via
+			// Back/Forward re-runs onMount, and a lingering pendingMessage
+			// would resubmit the prompt (without files, whose nonce is spent).
+			replaceState("", {});
 			await writeMessage({ prompt: pendingText });
 		}
 
