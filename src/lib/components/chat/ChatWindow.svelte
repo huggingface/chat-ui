@@ -48,6 +48,7 @@
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 	import LucideHammer from "~icons/lucide/hammer";
+	import LucideSparkles from "~icons/lucide/sparkles";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -726,9 +727,14 @@
 				>
 					{#each activeExamples as ex}
 						<button
-							class="flex items-center rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
-							onclick={() => startExample(ex)}>{ex.title}</button
+							class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
+							onclick={() => startExample(ex)}
 						>
+							{ex.title}
+							{#if ex.artifact}
+								<LucideSparkles class="size-3 flex-none text-blue-600 dark:text-blue-400" />
+							{/if}
+						</button>
 					{/each}
 				</div>
 			{/if}
