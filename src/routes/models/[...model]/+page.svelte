@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
-	import { goto, invalidate, replaceState } from "$app/navigation";
-	import { UrlDependency } from "$lib/types/UrlDependency";
+	import { goto, replaceState } from "$app/navigation";
 	import { onMount, tick } from "svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
@@ -63,11 +62,8 @@
 				files,
 			});
 
-			// Navigate first: a concurrent invalidate() re-renders this page and
-			// can cancel the navigation, leaving the pending message unsent.
-			await goto(`${base}/conversation/${conversationId}`);
-			// Then refresh only the sidebar list, not all 6 bootstrap endpoints.
-			await invalidate(UrlDependency.ConversationList);
+			// invalidateAll to update list of conversations
+			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
 		} catch (err) {
 			error.set(ERROR_MESSAGES.default);
 			console.error(err);

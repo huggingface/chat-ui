@@ -4,8 +4,7 @@
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
-	import { beforeNavigate, invalidate } from "$app/navigation";
-	import { UrlDependency } from "$lib/types/UrlDependency";
+	import { beforeNavigate, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
@@ -463,15 +462,7 @@
 				await stopRequestPromise.catch(() => {});
 				stopRequestPromise = undefined;
 			}
-			// Only re-run the loads that actually need fresh data: the
-			// conversation page (new messages) and the sidebar list
-			// (updated title / updatedAt). Avoids the 5 redundant bootstrap
-			// requests (models, settings, user, public-config, feature-flags)
-			// that a full invalidateAll() would trigger.
-			await Promise.all([
-				invalidate(UrlDependency.Conversation),
-				invalidate(UrlDependency.ConversationList),
-			]);
+			await invalidateAll();
 		}
 	}
 
