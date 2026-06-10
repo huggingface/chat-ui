@@ -99,25 +99,23 @@
 	disabled={missing}
 	aria-label="Open artifact: {title}"
 >
-	<div
-		class="flex size-9 flex-none items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700/70 dark:text-gray-300"
-	>
+	<div class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-800">
 		{#if streaming}
-			<EosIconsLoading class="size-4.5 text-base" />
+			<EosIconsLoading class="text-base text-gray-700 dark:text-gray-300" />
 		{:else if missing}
 			<CarbonWarning class="text-base text-amber-500" />
 		{:else if version?.type === "html"}
-			<LucideAppWindow class="text-base" />
+			<LucideAppWindow class="text-base text-gray-700 dark:text-gray-300" />
 		{:else if version?.type === "react"}
-			<CarbonLogoReact class="text-base" />
+			<CarbonLogoReact class="text-base text-gray-700 dark:text-gray-300" />
 		{:else if version?.type === "svg"}
-			<CarbonImage class="text-base" />
+			<CarbonImage class="text-base text-gray-700 dark:text-gray-300" />
 		{:else if version?.type === "markdown"}
-			<CarbonDocument class="text-base" />
+			<CarbonDocument class="text-base text-gray-700 dark:text-gray-300" />
 		{:else if version?.type === "mermaid"}
-			<LucideWorkflow class="text-base" />
+			<LucideWorkflow class="text-base text-gray-700 dark:text-gray-300" />
 		{:else}
-			<CarbonCode class="text-base" />
+			<CarbonCode class="text-base text-gray-700 dark:text-gray-300" />
 		{/if}
 	</div>
 	<div class="min-w-0 flex-1">
