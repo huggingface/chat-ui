@@ -35,6 +35,7 @@ type SmoothStreamConfig = {
 	maxDelayMs?: number;
 	minRateCharsPerMs?: number;
 	maxBufferedMs?: number;
+	maxChunkChars?: number;
 	_internal?: {
 		now?: () => number;
 		sleep?: (ms: number) => Promise<void>;
@@ -136,8 +137,20 @@ async function* endpointStreamToIterator(
 
 		const { messageUpdates, remainingText } = parseMessageUpdates(prevChunk + value);
 		prevChunk = remainingText;
-		for (const messageUpdate of messageUpdates) yield messageUpdate;
+		for (const messageUpdate of messageUpdates) {
+			const normalized = normalizeStreamUpdate(messageUpdate);
+			if (normalized) yield normalized;
+		}
 	}
+}
+
+function normalizeStreamUpdate(update: MessageUpdate): MessageUpdate | null {
+	if (update.type !== MessageUpdateType.Stream) return update;
+
+	const token = update.token.replaceAll("\0", "");
+	if (!token) return null;
+
+	return token === update.token ? update : { ...update, token };
 }
 
 function parseMessageUpdates(value: string): {
@@ -169,28 +182,50 @@ export async function* smoothStreamUpdates(
 		maxDelayMs = 80,
 		minRateCharsPerMs = 0.3,
 		maxBufferedMs = 400,
-		_internal: { now = () => performance.now(), sleep = defaultSleep, detectChunk } = {},
+		maxChunkChars = 80,
+		_internal: {
+			now = () => globalThis.performance?.now?.() ?? Date.now(),
+			sleep = defaultSleep,
+			detectChunk,
+		} = {},
 	}: SmoothStreamConfig = {}
 ): AsyncGenerator<MessageUpdate> {
 	const chunkDetector = detectChunk ?? createWordChunkDetector();
-	const eventTarget = new EventTarget();
-	const outputQueue: Array<{ update: MessageUpdate }> = [];
+	const chunkCharLimit = Math.max(1, maxChunkChars);
+	const outputQueue: MessageUpdate[] = [];
 	let producerDone = false;
 	let producerError: unknown = null;
 	let pendingBuffer = "";
 	let queuedStreamChars = 0;
+	let queuedControlUpdates = 0;
+	let wakeConsumer: (() => void) | undefined;
+
+	const wake = () => {
+		wakeConsumer?.();
+		wakeConsumer = undefined;
+	};
+
+	const waitForQueue = () =>
+		new Promise<void>((resolve) => {
+			wakeConsumer = resolve;
+		});
 
 	const enqueue = (update: MessageUpdate) => {
 		if (update.type === MessageUpdateType.Stream) {
 			queuedStreamChars += update.token.length;
+		} else {
+			queuedControlUpdates += 1;
 		}
-		outputQueue.push({ update });
-		eventTarget.dispatchEvent(new Event("next"));
+		outputQueue.push(update);
+		wake();
 	};
 
 	const flushPendingBuffer = () => {
 		if (pendingBuffer.length === 0) return;
-		enqueue({ type: MessageUpdateType.Stream, token: pendingBuffer });
+
+		for (const chunk of splitByCodePointLimit(pendingBuffer, chunkCharLimit)) {
+			enqueue({ type: MessageUpdateType.Stream, token: chunk });
+		}
 		pendingBuffer = "";
 	};
 
@@ -202,11 +237,12 @@ export async function* smoothStreamUpdates(
 				continue;
 			}
 
-			if (!messageUpdate.token) continue;
+			const token = messageUpdate.token.replaceAll("\0", "");
+			if (!token) continue;
 
-			pendingBuffer += messageUpdate.token;
+			pendingBuffer += token;
 			let chunk: string | null;
-			while ((chunk = chunkDetector(pendingBuffer)) !== null) {
+			while ((chunk = takeNextStreamChunk(pendingBuffer, chunkDetector, chunkCharLimit)) !== null) {
 				if (chunk.length === 0) break;
 				enqueue({ type: MessageUpdateType.Stream, token: chunk });
 				pendingBuffer = pendingBuffer.slice(chunk.length);
@@ -215,53 +251,135 @@ export async function* smoothStreamUpdates(
 		flushPendingBuffer();
 	})()
 		.catch((error) => {
+			flushPendingBuffer();
 			producerError = error;
 		})
 		.finally(() => {
 			producerDone = true;
-			eventTarget.dispatchEvent(new Event("next"));
+			wake();
 		});
 
 	// Character-rate targeting consumer
-	let totalCharsEmitted = 0;
-	let firstEmitAt: number | null = null;
+	let pacedCharsEmitted = 0;
+	let pacingStartedAt: number | null = null;
+	let emittedPacedStreamChunk = false;
+	let resetPacingAfterControl = false;
+
+	const resetPacing = () => {
+		pacedCharsEmitted = 0;
+		pacingStartedAt = null;
+		emittedPacedStreamChunk = false;
+		resetPacingAfterControl = false;
+	};
 
 	while (!producerDone || outputQueue.length > 0) {
 		if (outputQueue.length === 0) {
-			await waitForEvent(eventTarget, "next");
+			await waitForQueue();
 			continue;
 		}
 
-		const next = outputQueue.shift();
-		if (!next) continue;
+		const update = outputQueue.shift();
+		if (!update) continue;
+		if (update.type !== MessageUpdateType.Stream) {
+			queuedControlUpdates = Math.max(0, queuedControlUpdates - 1);
+			if (resetPacingAfterControl) resetPacing();
+		}
 
-		if (next.update.type === MessageUpdateType.Stream) {
-			const tokenLen = next.update.token.length;
+		if (update.type === MessageUpdateType.Stream) {
+			const tokenLen = update.token.length;
 			queuedStreamChars = Math.max(0, queuedStreamChars - tokenLen);
-			totalCharsEmitted += tokenLen;
+			const catchingUpToControlUpdate = queuedControlUpdates > 0;
 
-			if (firstEmitAt === null) firstEmitAt = now();
+			if (catchingUpToControlUpdate) {
+				resetPacingAfterControl = true;
+			} else {
+				if (resetPacingAfterControl) resetPacing();
+				if (pacingStartedAt === null) pacingStartedAt = now();
 
-			const elapsedMs = now() - firstEmitAt;
-			const currentRate = elapsedMs > 0 ? totalCharsEmitted / elapsedMs : 0;
-			const backlogChars = tokenLen + queuedStreamChars;
-			const backlogRate = maxBufferedMs > 0 ? backlogChars / maxBufferedMs : 0;
-			const targetRate = Math.max(currentRate, minRateCharsPerMs, backlogRate);
-			const rawDelay = tokenLen / targetRate;
-			const underBacklogPressure = backlogRate > minRateCharsPerMs;
-			const effectiveMinDelayMs = underBacklogPressure ? 0 : minDelayMs;
-			const delayMs = Math.round(Math.max(effectiveMinDelayMs, Math.min(maxDelayMs, rawDelay)));
+				if (emittedPacedStreamChunk) {
+					const elapsedMs = now() - pacingStartedAt;
+					const currentRate = elapsedMs > 0 ? pacedCharsEmitted / elapsedMs : 0;
+					const backlogChars = tokenLen + queuedStreamChars;
+					const backlogRate = maxBufferedMs > 0 ? backlogChars / maxBufferedMs : 0;
+					const targetRate = Math.max(currentRate, minRateCharsPerMs, backlogRate);
+					const rawDelay = tokenLen / targetRate;
+					const underBacklogPressure = backlogRate > minRateCharsPerMs;
+					const effectiveMinDelayMs = underBacklogPressure ? 0 : minDelayMs;
+					const delayMs = Math.round(Math.max(effectiveMinDelayMs, Math.min(maxDelayMs, rawDelay)));
 
-			if (delayMs > 0) {
-				await sleep(delayMs);
+					if (delayMs > 0) {
+						await sleep(delayMs);
+					}
+
+					pacedCharsEmitted += tokenLen;
+				} else {
+					emittedPacedStreamChunk = true;
+				}
 			}
 		}
 
-		yield next.update;
+		yield update;
 	}
 
 	await producer;
 	if (producerError) throw producerError;
+}
+
+function takeNextStreamChunk(
+	buffer: string,
+	chunkDetector: ChunkDetector,
+	maxChunkChars: number
+): string | null {
+	const detectedChunk = chunkDetector(buffer);
+	if (detectedChunk) {
+		const { prefix } = takePrefixByCodePoints(detectedChunk, maxChunkChars);
+		return prefix;
+	}
+
+	const { prefix, reachedLimit } = takePrefixByCodePoints(buffer, maxChunkChars);
+	return reachedLimit ? prefix : null;
+}
+
+function splitByCodePointLimit(value: string, maxChars: number): string[] {
+	const chunks: string[] = [];
+	let start = 0;
+	let end = 0;
+	let count = 0;
+
+	for (const char of value) {
+		end += char.length;
+		count += 1;
+
+		if (count >= maxChars) {
+			chunks.push(value.slice(start, end));
+			start = end;
+			count = 0;
+		}
+	}
+
+	if (start < value.length) {
+		chunks.push(value.slice(start));
+	}
+
+	return chunks;
+}
+
+function takePrefixByCodePoints(
+	value: string,
+	maxChars: number
+): { prefix: string; reachedLimit: boolean } {
+	let end = 0;
+	let count = 0;
+
+	for (const char of value) {
+		end += char.length;
+		count += 1;
+		if (count >= maxChars) {
+			return { prefix: value.slice(0, end), reachedLimit: true };
+		}
+	}
+
+	return { prefix: value, reachedLimit: false };
 }
 
 function createWordChunkDetector(): ChunkDetector {
@@ -319,7 +437,3 @@ export const isMessageToolProgressUpdate = (
 
 const defaultSleep = (ms: number): Promise<void> =>
 	new Promise((resolve) => setTimeout(resolve, ms));
-const waitForEvent = (eventTarget: EventTarget, eventName: string) =>
-	new Promise<boolean>((resolve) =>
-		eventTarget.addEventListener(eventName, () => resolve(true), { once: true })
-	);
