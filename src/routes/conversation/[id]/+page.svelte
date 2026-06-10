@@ -32,6 +32,7 @@
 	import { streamStart } from "$lib/utils/haptics";
 	import { requireAuthUser } from "$lib/utils/auth.js";
 	import { isConversationGenerationActive } from "$lib/utils/generationState";
+	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
 
 	let { data = $bindable() } = $props();
 
@@ -607,6 +608,12 @@
 		const rawTitle = conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title;
 		return rawTitle ? rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1) : rawTitle;
 	});
+
+	// Social preview tags for shared conversation snapshots (7-char share ids),
+	// for crawlers that scrape /conversation/{shareId} instead of /r/{shareId}
+	let sharePreviewId = $derived(
+		page.params.id && page.params.id.length === 7 ? page.params.id : undefined
+	);
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -614,6 +621,15 @@
 <svelte:head>
 	<title>{title}</title>
 </svelte:head>
+
+{#if sharePreviewId}
+	<SharePreviewTags
+		shareId={sharePreviewId}
+		{title}
+		messages={data.messages}
+		rootMessageId={data.rootMessageId}
+	/>
+{/if}
 
 <ChatWindow
 	loading={$loading}
