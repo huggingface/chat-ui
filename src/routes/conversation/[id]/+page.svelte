@@ -49,6 +49,12 @@
 	let files: File[] = $state([]);
 
 	let conversations = $state(untrack(() => data.conversations));
+	// TODO(step-N): this unguarded effect overwrites optimistic mutations in
+	// +layout.svelte whenever any load re-runs (e.g. ConversationList invalidation
+	// mid-stream). The untrack() on the initializer suppresses the
+	// state_referenced_locally warning but does NOT fix the underlying anti-pattern.
+	// Migrate conversations to a layout-level rune context shared downward so that
+	// optimistic mutations and server resyncs are managed in one place.
 	$effect(() => {
 		conversations = data.conversations;
 	});
@@ -583,10 +589,16 @@
 	// load re-running mid-stream (e.g. from BackgroundGenerationPoller or
 	// safeInvalidate) does NOT wipe the in-flight token buffer.
 	//
-	// "pending" is set to true at the top of writeMessage and reset to false
-	// in its finally block BEFORE safeInvalidate fires, so when the load
-	// resolves after streaming the guard is already lifted and we get the
-	// server-confirmed snapshot.
+	// Guard window: "pending" is set to true at the START of writeMessage and
+	// is first reset to false when the FIRST STREAMING TOKEN arrives (line ~351
+	// in the stream loop). It is also reset in the finally block. This means
+	// the guard only covers the brief interval between the user submitting a
+	// message and the first token being received. Any safeInvalidate that
+	// resolves AFTER the first token (e.g. from ModelSwitch.svelte) would be
+	// allowed to overwrite the in-flight buffer. In practice this is acceptable
+	// because BackgroundGenerationPoller is inactive during foreground streaming
+	// and ModelSwitch is only shown when a model is unavailable, but callers
+	// must not assume the full streaming window is protected by this guard.
 	let _lastSyncedConvId = untrack(() => convId); // plain variable — no reactive overhead needed
 	$effect(() => {
 		const currentConvId = convId; // reactive dep
@@ -665,7 +677,7 @@
 </svelte:head>
 
 {#if sharePreviewId}
-	<SharePreviewTags shareId={sharePreviewId} {title} messages={data.messages} {rootMessageId} />
+	<SharePreviewTags shareId={sharePreviewId} {title} {messages} {rootMessageId} />
 {/if}
 
 <ChatWindow
