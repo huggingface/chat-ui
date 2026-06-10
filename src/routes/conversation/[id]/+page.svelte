@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
-	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { consumePendingFiles } from "$lib/utils/pendingFiles";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount, untrack } from "svelte";
 	import { page } from "$app/state";
@@ -528,10 +528,16 @@
 	}
 
 	onMount(async () => {
-		if ($pendingMessage) {
-			files = $pendingMessage.files;
-			await writeMessage({ prompt: $pendingMessage.content });
-			$pendingMessage = undefined;
+		// Read the first message from SvelteKit shallow-routing history state.
+		// Text is serialized directly; File objects travel via the pendingFiles
+		// client-side Map, retrieved once by nonce and then discarded.
+		// On a hard refresh page.state is empty, so both values are undefined
+		// and we skip straight to the background-generation check below.
+		const pendingText = page.state.pendingMessage as string | undefined;
+		if (pendingText) {
+			const nonce = page.state.pendingFilesNonce as string | undefined;
+			files = nonce ? consumePendingFiles(nonce) : [];
+			await writeMessage({ prompt: pendingText });
 		}
 
 		const streaming = isConversationGenerationActive(messages);

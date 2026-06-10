@@ -11,7 +11,7 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
-	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { storePendingFiles } from "$lib/utils/pendingFiles";
 	import { sanitizeUrlParam } from "$lib/utils/urlParams";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
 	import { requireAuthUser } from "$lib/utils/auth";
@@ -58,19 +58,21 @@
 
 			const { conversationId } = await res.json();
 
-			// Ugly hack to use a store as temp storage, feel free to improve ^^
-			pendingMessage.set({
-				content: message,
-				files,
-			});
+			// Pass the first message text via SvelteKit history state (JSON-serializable).
+			// File objects are not serializable, so they are stored in a client-side Map
+			// keyed by a random nonce; the nonce travels with the history state and is
+			// consumed once by the conversation page.
+			const pendingFilesNonce = files.length > 0 ? storePendingFiles(files) : undefined;
 
 			// Refresh the sidebar list (only that, not all 6 bootstrap endpoints)
 			// BEFORE navigating. Refreshing after goto() would update layout data
-			// while the first message is streaming, and the conversation page's
-			// `$effect(() => { messages = data.messages })` would wipe the locally
-			// appended messages, blanking the conversation until the stream ends.
+			// while the first message is streaming, causing any data-syncing effects
+			// on the conversation page to overwrite locally appended messages and
+			// blank the conversation until the stream ends.
 			await safeInvalidate(UrlDependency.ConversationList);
-			await goto(`${base}/conversation/${conversationId}`);
+			await goto(`${base}/conversation/${conversationId}`, {
+				state: { pendingMessage: message, pendingFilesNonce },
+			});
 		} catch (err) {
 			error.set(ERROR_MESSAGES.default);
 			console.error(err);
