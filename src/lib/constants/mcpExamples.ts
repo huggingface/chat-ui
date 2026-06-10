@@ -7,21 +7,21 @@ export const mcpExamples: RouterExample[] = [
 		prompt: "Generate an image of a zebra in front of a volcanic eruption",
 	},
 	{
-		title: "Build a website",
+		title: "Celebrate 3M models",
 		prompt:
-			"Build a minimalist website with TailwindCSS presenting the current trending models on Hugging Face",
+			"Build a small celebration card with TailwindCSS for Hugging Face crossing 3 million models, with an animated counter and confetti, in a single compact HTML file",
 		followUps: [
 			{
-				title: "Trending datasets",
-				prompt: "Add a section showing the current trending datasets on Hugging Face",
+				title: "Trending models",
+				prompt: "Add a line showing today's top 3 trending models on Hugging Face",
 			},
 			{
 				title: "Surprise me",
 				prompt: "Redesign it in a completely different visual style, surprise me",
 			},
 			{
-				title: "Multilingual",
-				prompt: "Add a language switcher that translates the site into French and Japanese",
+				title: "Confetti burst",
+				prompt: "Make confetti burst from the card when I click it",
 			},
 		],
 	},
