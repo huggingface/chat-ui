@@ -378,9 +378,10 @@
 			{/if}
 		{:else}
 			<!-- Same .prose pre styling as chat code blocks so the syntax theme matches
-			     exactly in both modes; !border-0 since the panel provides its own frame -->
+			     exactly in both modes; text-smd matches the chat prose root so the code
+			     renders at the same size; !border-0 since the panel provides its own frame -->
 			<div
-				class="prose h-full max-w-none dark:prose-invert prose-pre:my-0 prose-pre:h-full prose-pre:rounded-none"
+				class="prose h-full max-w-none text-smd dark:prose-invert prose-pre:my-0 prose-pre:h-full prose-pre:rounded-none"
 			>
 				<!-- eslint-disable svelte/no-at-html-tags -->
 				<pre

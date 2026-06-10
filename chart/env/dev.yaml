@@ -59,6 +59,8 @@ envVars:
   PUBLIC_APP_DESCRIPTION: "Making the community's best AI chat models available to everyone"
   PUBLIC_ORIGIN: ""
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "https://plausible.io/js/pa-Io_oigECawqdlgpf5qvHb.js"
+  PUBLIC_FEATURE_ANNOUNCEMENTS: >
+    [{"title": "Introducing Artifacts", "description": "Ask for an app, doc, or diagram and watch it render live in a side panel, with version history and targeted edits.", "maxDate": "2026-06-25"}]
 
   TASK_MODEL: "meta-llama/Llama-3.1-8B-Instruct"
   # Tombstone: unread by current code, kept so any old pod still on the pre-#2265
