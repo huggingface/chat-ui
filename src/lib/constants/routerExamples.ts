@@ -12,6 +12,8 @@ export type RouterExample = {
 	prompt: string;
 	followUps?: RouterFollowUp[];
 	attachments?: RouterExampleAttachment[];
+	/** Shows a small artifact icon on the example chip */
+	artifact?: boolean;
 };
 
 export const routerExamples: RouterExample[] = [

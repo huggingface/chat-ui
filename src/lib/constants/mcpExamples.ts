@@ -8,6 +8,7 @@ export const mcpExamples: RouterExample[] = [
 	},
 	{
 		title: "Celebrate 3M models",
+		artifact: true,
 		prompt:
 			"Build a small celebration card with TailwindCSS for Hugging Face crossing 3 million models, with an animated counter and confetti, in a single compact HTML file",
 		followUps: [
