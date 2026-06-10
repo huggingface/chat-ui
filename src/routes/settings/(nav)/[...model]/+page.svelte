@@ -372,7 +372,7 @@
 						>
 							Artifacts
 							<span
-								class="rounded-full bg-gray-100 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+								class="rounded-full bg-gray-100 px-1.5 py-px text-[10px] font-semibold uppercase text-gray-500 dark:bg-gray-700 dark:text-gray-400"
 							>
 								Beta
 							</span>
