@@ -63,12 +63,11 @@
 				files,
 			});
 
-			// Invalidate only the sidebar list, not all 6 bootstrap endpoints.
-			// The conversation page load re-runs automatically as a new page.
-			await Promise.all([
-				invalidate(UrlDependency.ConversationList),
-				goto(`${base}/conversation/${conversationId}`),
-			]);
+			// Navigate first: a concurrent invalidate() re-renders this page and
+			// can cancel the navigation, leaving the pending message unsent.
+			await goto(`${base}/conversation/${conversationId}`);
+			// Then refresh only the sidebar list, not all 6 bootstrap endpoints.
+			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
 			error.set(ERROR_MESSAGES.default);
 			console.error(err);
