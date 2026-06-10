@@ -367,7 +367,16 @@
 
 				<div class="flex items-start justify-between py-3">
 					<div>
-						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Artifacts</div>
+						<div
+							class="flex items-center gap-1.5 text-[13px] font-medium text-gray-800 dark:text-gray-200"
+						>
+							Artifacts
+							<span
+								class="rounded-full bg-gray-100 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+							>
+								Beta
+							</span>
+						</div>
 						<p class="text-[12px] text-gray-500 dark:text-gray-400">
 							Let the model create apps, documents and diagrams in a side panel with live preview.
 						</p>
