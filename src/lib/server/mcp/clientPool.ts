@@ -4,7 +4,34 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { McpServerConfig } from "./httpClient";
 import { ssrfSafeFetch } from "$lib/server/urlSafety";
 
-const pool = new Map<string, Client>();
+type PoolEntry = { client: Client; lastUsedAt: number };
+
+const pool = new Map<string, PoolEntry>();
+
+// Reuse a recently-used client as-is; ping it first if it has been idle longer than this,
+// since proxies / load balancers silently reap idle connections.
+const PING_AFTER_IDLE_MS = 30_000;
+const PING_TIMEOUT_MS = 5_000;
+// Close clients idle longer than this. Must stay well above MCP tool timeouts so the sweeper
+// never closes a client with an in-flight call.
+const IDLE_TTL_MS = 10 * 60_000;
+const SWEEP_INTERVAL_MS = 60_000;
+
+let sweeper: ReturnType<typeof setInterval> | undefined;
+
+function ensureSweeper() {
+	if (sweeper) return;
+	sweeper = setInterval(() => {
+		const now = Date.now();
+		for (const [key, entry] of pool) {
+			if (now - entry.lastUsedAt > IDLE_TTL_MS) {
+				pool.delete(key);
+				entry.client.close?.().catch(() => {});
+			}
+		}
+	}, SWEEP_INTERVAL_MS);
+	sweeper.unref?.();
+}
 
 function keyOf(server: McpServerConfig) {
 	const headers = Object.entries(server.headers ?? {})
@@ -17,7 +44,22 @@ function keyOf(server: McpServerConfig) {
 export async function getClient(server: McpServerConfig, signal?: AbortSignal): Promise<Client> {
 	const key = keyOf(server);
 	const existing = pool.get(key);
-	if (existing) return existing;
+	if (existing) {
+		if (Date.now() - existing.lastUsedAt <= PING_AFTER_IDLE_MS) {
+			existing.lastUsedAt = Date.now();
+			return existing.client;
+		}
+		try {
+			await existing.client.ping({ signal, timeout: PING_TIMEOUT_MS });
+			existing.lastUsedAt = Date.now();
+			return existing.client;
+		} catch (err) {
+			if (signal?.aborted) throw err;
+			// Stale connection; evict it (unless a concurrent caller already replaced it) and reconnect.
+			if (pool.get(key) === existing) pool.delete(key);
+			existing.client.close?.().catch(() => {});
+		}
+	}
 
 	let firstError: unknown;
 	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
@@ -50,14 +92,15 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 		throw err;
 	}
 
-	pool.set(key, client);
+	pool.set(key, { client, lastUsedAt: Date.now() });
+	ensureSweeper();
 	return client;
 }
 
 export async function drainPool() {
-	for (const [key, client] of pool) {
+	for (const [key, entry] of pool) {
 		try {
-			await client.close?.();
+			await entry.client.close?.();
 		} catch {}
 		pool.delete(key);
 	}
@@ -65,9 +108,9 @@ export async function drainPool() {
 
 export function evictFromPool(server: McpServerConfig): Client | undefined {
 	const key = keyOf(server);
-	const client = pool.get(key);
-	if (client) {
+	const entry = pool.get(key);
+	if (entry) {
 		pool.delete(key);
 	}
-	return client;
+	return entry?.client;
 }

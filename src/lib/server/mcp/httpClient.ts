@@ -79,29 +79,33 @@ export async function callMcpTool(
 		resetTimeoutOnProgress: true,
 	};
 
+	// The connection can be closed at any point during a (potentially long-running) call,
+	// e.g. by a proxy idle timeout or a server restart, so retry on a fresh client.
+	const maxReconnectAttempts = 2;
 	let response;
-	try {
-		response = await activeClient.callTool(
-			{ name: tool, arguments: normalizedArgs },
-			undefined,
-			callToolOptions
-		);
-	} catch (err) {
-		if (!isConnectionClosedError(err)) {
-			throw err;
+	for (let attempt = 0; ; attempt++) {
+		try {
+			response = await activeClient.callTool(
+				{ name: tool, arguments: normalizedArgs },
+				undefined,
+				callToolOptions
+			);
+			break;
+		} catch (err) {
+			if (attempt >= maxReconnectAttempts || !isConnectionClosedError(err) || signal?.aborted) {
+				throw err;
+			}
+
+			// Evict stale client and close it
+			const stale = evictFromPool(server);
+			stale?.close?.().catch(() => {});
+
+			// Brief backoff before later retries (the server may be mid-restart)
+			if (attempt > 0) {
+				await new Promise((resolve) => setTimeout(resolve, 1_000 * attempt));
+			}
+			activeClient = await getClient(server, signal);
 		}
-
-		// Evict stale client and close it
-		const stale = evictFromPool(server);
-		stale?.close?.().catch(() => {});
-
-		// Retry with fresh client
-		activeClient = await getClient(server, signal);
-		response = await activeClient.callTool(
-			{ name: tool, arguments: normalizedArgs },
-			undefined,
-			callToolOptions
-		);
 	}
 
 	const parts = Array.isArray(response?.content) ? (response.content as Array<unknown>) : [];

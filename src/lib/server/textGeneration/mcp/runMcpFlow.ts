@@ -15,7 +15,6 @@ import { buildToolPreprompt } from "../utils/toolPrompt";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
 import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
-import { drainPool } from "$lib/server/mcp/clientPool";
 import type { TextGenerationContext } from "../types";
 import {
 	hasAuthHeader,
@@ -773,10 +772,10 @@ export async function* runMcpFlow({
 			return "aborted";
 		}
 		logger.warn({ err: msg }, "[mcp] flow failed, falling back to default endpoint");
-	} finally {
-		// ensure MCP clients are closed after the turn
-		await drainPool();
 	}
+	// Note: pooled MCP clients are shared across concurrent requests, so they must NOT be
+	// closed here — that rejects other turns' in-flight tool calls with "-32000 Connection
+	// closed". Idle clients are reclaimed by the pool's sweeper instead (see clientPool.ts).
 
 	return "not_applicable";
 }
