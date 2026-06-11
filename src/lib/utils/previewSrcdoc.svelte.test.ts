@@ -65,18 +65,26 @@ describe("preview hook script", () => {
 		});
 	});
 
-	it("does not forward javascript: or in-page fragment links", async () => {
+	it("does not forward javascript:, relative, or in-page fragment links", async () => {
 		const channel = "test_blocked";
 		const message = nextMessage(channel);
-		// The js/fragment clicks must produce nothing, so the sentinel link
-		// clicked last must be the first message observed
+		// None of the blocked clicks may produce a message, so the sentinel link
+		// clicked last must be the first message observed. Relative hrefs would
+		// resolve against the app's own origin (srcdoc inherits the parent base
+		// URL) and must stay blocked.
 		renderPreview(
 			`<a id="js" href="javascript:void(0)">js</a>
+			<a id="rel" href="/settings">relative</a>
+			<a id="rel2" href="models/foo">relative 2</a>
+			<a id="proto" href="//example.com/x">protocol-relative</a>
 			<a id="frag" href="#section">frag</a>
 			<div id="section"></div>
 			<a id="sentinel" href="http://example.com/after">ok</a>
 			<script>window.addEventListener('load', function(){
 				document.getElementById('js').click();
+				document.getElementById('rel').click();
+				document.getElementById('rel2').click();
+				document.getElementById('proto').click();
 				document.getElementById('frag').click();
 				document.getElementById('sentinel').click();
 			});</script>`,

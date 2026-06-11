@@ -17,6 +17,12 @@ describe("parseExternalUrl", () => {
 		expect(parseExternalUrl("vbscript:msgbox")).toBeUndefined();
 	});
 
+	it("rejects URLs with embedded credentials", () => {
+		expect(parseExternalUrl("https://user:pass@example.com/path")).toBeUndefined();
+		expect(parseExternalUrl("https://user@example.com/")).toBeUndefined();
+		expect(parseExternalUrl("https://huggingface.co@evil.com/")).toBeUndefined();
+	});
+
 	it("rejects relative and malformed URLs", () => {
 		expect(parseExternalUrl("/models/foo")).toBeUndefined();
 		expect(parseExternalUrl("models/foo")).toBeUndefined();

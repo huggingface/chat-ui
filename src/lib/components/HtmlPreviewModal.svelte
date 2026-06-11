@@ -37,6 +37,10 @@
 		const data = raw as Partial<PreviewMessage>;
 		if (data.channel !== channel) return;
 		if (data.type === "chatui.preview.openLink") {
+			// Only honor link messages backed by a real user gesture (clicks inside
+			// the iframe propagate activation to ancestor frames); artifact scripts
+			// must not be able to pop the confirm without one
+			if (navigator.userActivation && !navigator.userActivation.isActive) return;
 			// The iframe runs untrusted generated code, so re-validate its href here
 			externalLinkUrl = parseExternalUrl(data.detail?.href) ?? null;
 			return;

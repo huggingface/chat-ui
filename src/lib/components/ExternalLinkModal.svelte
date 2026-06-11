@@ -1,19 +1,16 @@
 <script lang="ts">
 	import Modal from "$lib/components/Modal.svelte";
-	import { onMount } from "svelte";
 
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 
 	interface Props {
-		/** Must already be validated by the caller (parseExternalUrl): http(s) only */
+		/** Must already be validated by the caller (parseExternalUrl): http(s) only, no userinfo */
 		url: URL;
 		onclose?: () => void;
 	}
 
 	let { url, onclose }: Props = $props();
-
-	let openButtonEl: HTMLButtonElement | undefined = $state();
 
 	function close() {
 		onclose?.();
@@ -24,11 +21,9 @@
 		close();
 	}
 
-	onMount(() => {
-		setTimeout(() => {
-			openButtonEl?.focus();
-		}, 100);
-	});
+	// Unlike user-initiated confirm dialogs, this one is triggered by untrusted
+	// preview content, so the confirm button is deliberately NOT auto-focused: a
+	// modal popping up mid-typing must not let a stray Enter open the link.
 </script>
 
 <Modal onclose={close} width="w-[90dvh] md:w-[480px]">
@@ -47,11 +42,13 @@
 			the destination.
 		</p>
 
+		<!-- Built from URL components (host has no userinfo ambiguity) so the
+		     rendered string is byte-identical to the URL that window.open gets -->
 		<p
 			class="break-all rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 font-mono text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
 		>
 			{url.protocol}//<span class="font-semibold text-gray-800 dark:text-gray-200">{url.host}</span
-			>{url.href.slice(url.origin.length)}
+			>{url.pathname + url.search + url.hash}
 		</p>
 
 		<div class="flex items-center justify-end gap-2">
@@ -63,7 +60,6 @@
 				Cancel
 			</button>
 			<button
-				bind:this={openButtonEl}
 				type="button"
 				class="inline-flex items-center gap-1.5 rounded-xl border border-gray-900 bg-gray-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-black focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 dark:border-gray-100 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white dark:focus:ring-offset-gray-800"
 				onclick={confirmOpen}
