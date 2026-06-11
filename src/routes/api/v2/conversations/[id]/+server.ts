@@ -6,6 +6,8 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
 import { validModelIdSchema } from "$lib/server/models";
+import { stripReasoningBlocks } from "$lib/server/textGeneration/utils/routing";
+import { getFallbackTitle } from "$lib/server/textGeneration/utils/title";
 
 export const GET: RequestHandler = async ({ locals, params, url }) => {
 	requireAuth(locals);
@@ -69,7 +71,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 
 	const updateValues = {
 		...(title !== undefined && {
-			title: title.replace(/<\/?think>/gi, "").trim(),
+			title: stripReasoningBlocks(title).trim() || getFallbackTitle(),
 		}),
 		...(model !== undefined && { model }),
 	};
