@@ -103,7 +103,7 @@ envVars:
       { "id": "deepseek-ai/DeepSeek-V3.2", "description": "Stable 671B MoE with sparse attention for agentic reasoning and long contexts.", "supportsArtifacts": true },
       { "id": "stepfun-ai/Step-3.5-Flash", "description": "Sparse 197B MoE agent with multi-token prediction and 256K context.", "supportsArtifacts": true },
       { "id": "Qwen/Qwen3.6-35B-A3B", "description": "Hybrid 35B MoE with 3B active params, DeltaNet attention, and 1M context.", "supportsArtifacts": true },
-      { "id": "zai-org/GLM-4.7-Flash", "description": "Compact 30B MoE for agentic coding with 128K context and tool use.", "supportsReasoning": true},
+      { "id": "zai-org/GLM-4.7-Flash", "description": "Compact 30B MoE for agentic coding with 128K context and tool use.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "moonshotai/Kimi-K2.6", "description": "Native multimodal 1T MoE for long-horizon coding and 300-sub-agent swarms.", "supportsArtifacts": true },
       { "id": "MiniMaxAI/MiniMax-M2.7", "description": "Self-evolving 230B MoE agent for frontier coding, reasoning, and tool use." , "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "zai-org/GLM-5.1", "description": "Upgraded 754B MoE for agentic coding, extended reasoning, and tool use.", "parameters": { "max_tokens": 49152 } , "supportsReasoning": true, "supportsArtifacts": true },
