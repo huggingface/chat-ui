@@ -1,4 +1,3 @@
-import { building } from "$app/environment";
 import { config } from "$lib/server/config";
 import type { ChatTemplateInput } from "$lib/types/Template";
 import { z } from "zod";
@@ -491,12 +490,7 @@ const rebuildModels = async (): Promise<ModelsRefreshSummary> => {
 	return applyModelState(newModels, startedAt);
 };
 
-// Skip the initial fetch during `vite build`: SvelteKit's analyse phase imports this
-// module, and hitting the live router from CI builds fails on rate limits (429).
-// The cache is built at server startup instead.
-if (!building) {
-	await rebuildModels();
-}
+await rebuildModels();
 
 export const refreshModels = async (): Promise<ModelsRefreshSummary> => {
 	if (inflightRefresh) {

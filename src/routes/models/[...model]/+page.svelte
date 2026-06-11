@@ -8,16 +8,13 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { useSettingsStore } from "$lib/stores/settings";
-	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
-	import { storePendingFiles } from "$lib/utils/pendingFiles";
+	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { sanitizeUrlParam } from "$lib/utils/urlParams";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
 	import { requireAuthUser } from "$lib/utils/auth";
 
 	let { data } = $props();
-
-	const convsStore = useConversationsStore();
 
 	let loading = $state(false);
 	let files: File[] = $state([]);
@@ -59,25 +56,14 @@
 
 			const { conversationId } = await res.json();
 
-			// Pass the first message text via SvelteKit history state (JSON-serializable).
-			// File objects are not serializable, so they are stored in a client-side Map
-			// keyed by a random nonce; the nonce travels with the history state and is
-			// consumed once by the conversation page.
-			const pendingFilesNonce = files.length > 0 ? storePendingFiles(files) : undefined;
+			// Ugly hack to use a store as temp storage, feel free to improve ^^
+			pendingMessage.set({
+				content: message,
+				files,
+			});
 
-			// Optimistically prepend the new conversation to the sidebar immediately so
-			// it appears before the first message starts streaming. "New Chat" matches
-			// the server-side default title; the real title arrives via a Title stream
-			// update once the LLM generates one.
-			convsStore.prepend({
-				id: conversationId,
-				title: "New Chat",
-				model: modelId,
-				updatedAt: new Date(),
-			});
-			await goto(`${base}/conversation/${conversationId}`, {
-				state: { pendingMessage: message, pendingFilesNonce },
-			});
+			// invalidateAll to update list of conversations
+			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
 		} catch (err) {
 			error.set(ERROR_MESSAGES.default);
 			console.error(err);

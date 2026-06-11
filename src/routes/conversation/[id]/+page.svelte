@@ -1,18 +1,16 @@
 <script lang="ts">
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
-	import { consumePendingFiles } from "$lib/utils/pendingFiles";
+	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { isAborted } from "$lib/stores/isAborted";
-	import { onMount, untrack } from "svelte";
+	import { onMount } from "svelte";
 	import { page } from "$app/state";
-	import { beforeNavigate, replaceState } from "$app/navigation";
-	import { UrlDependency } from "$lib/types/UrlDependency";
-	import { safeInvalidate } from "$lib/utils/safeInvalidate";
+	import { beforeNavigate, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
 	import type { Message } from "$lib/types/Message";
 	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
-	import { useConversationsStore } from "$lib/stores/conversations.svelte";
+	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
@@ -36,11 +34,7 @@
 	import { isConversationGenerationActive } from "$lib/utils/generationState";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
 
-	let { data } = $props();
-
-	// Obtain the conversations store during component init (context must be read
-	// synchronously, not inside async callbacks or event handlers).
-	const convsStore = useConversationsStore();
+	let { data = $bindable() } = $props();
 
 	let convId = $derived(page.params.id ?? "");
 	let pending = $state(false);
@@ -51,6 +45,11 @@
 	let messageUpdatesAbortController = new AbortController();
 
 	let files: File[] = $state([]);
+
+	let conversations = $state(data.conversations);
+	$effect(() => {
+		conversations = data.conversations;
+	});
 
 	function createMessagesPath<T>(messages: TreeNode<T>[], msgId?: TreeId): TreeNode<T>[] {
 		if (initialRun) {
@@ -152,7 +151,7 @@
 					const newUserMessageId = addSibling(
 						{
 							messages,
-							rootMessageId,
+							rootMessageId: data.rootMessageId,
 						},
 						{
 							from: "user",
@@ -164,7 +163,7 @@
 					messageToWriteToId = addChildren(
 						{
 							messages,
-							rootMessageId,
+							rootMessageId: data.rootMessageId,
 						},
 						{ from: "assistant", content: "" },
 						newUserMessageId
@@ -175,7 +174,7 @@
 					messageToWriteToId = addSibling(
 						{
 							messages,
-							rootMessageId,
+							rootMessageId: data.rootMessageId,
 						},
 						{ from: "assistant", content: "" },
 						messageId
@@ -187,7 +186,7 @@
 				const newUserMessageId = addChildren(
 					{
 						messages,
-						rootMessageId,
+						rootMessageId: data.rootMessageId,
 					},
 					{
 						from: "user",
@@ -197,14 +196,14 @@
 					messageId
 				);
 
-				if (!rootMessageId) {
-					rootMessageId = newUserMessageId;
+				if (!data.rootMessageId) {
+					data.rootMessageId = newUserMessageId;
 				}
 
 				messageToWriteToId = addChildren(
 					{
 						messages,
-						rootMessageId,
+						rootMessageId: data.rootMessageId,
 					},
 					{
 						from: "assistant",
@@ -417,8 +416,15 @@
 						$error = update.message ?? "An error has occurred";
 					}
 				} else if (update.type === MessageUpdateType.Title) {
-					// Update the sidebar title directly via the store — no side-channel needed.
-					convsStore.update(convId, { title: update.title });
+					const convInData = conversations.find(({ id }) => id === page.params.id);
+					if (convInData) {
+						convInData.title = update.title;
+
+						$titleUpdate = {
+							title: update.title,
+							convId,
+						};
+					}
 				} else if (update.type === MessageUpdateType.File) {
 					messageToWriteTo.files = [
 						...(messageToWriteTo.files ?? []),
@@ -456,20 +462,7 @@
 				await stopRequestPromise.catch(() => {});
 				stopRequestPromise = undefined;
 			}
-			// Only re-run the loads that actually need fresh data: the
-			// conversation page (new messages) and the sidebar list
-			// (updated title / updatedAt via client-owned store refresh).
-			// Avoids the 5 redundant bootstrap requests (models, settings, user,
-			// public-config, feature-flags) that a full invalidateAll() would trigger.
-			// When this finally runs because beforeNavigate aborted the stream
-			// ($isAborted set without stopRequested), invalidating would cancel
-			// that very navigation (e.g. the "New Chat" click that triggered
-			// the abort) before the router even exposes it via `navigating`.
-			// Skip the refresh: the destination page loads its own data.
-			const abortedByNavigation = $isAborted && !stopRequested;
-			if (!abortedByNavigation) {
-				await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
-			}
+			await invalidateAll();
 		}
 	}
 
@@ -525,20 +518,10 @@
 	}
 
 	onMount(async () => {
-		// Read the first message from SvelteKit shallow-routing history state.
-		// Text is serialized directly; File objects travel via the pendingFiles
-		// client-side Map, retrieved once by nonce and then discarded.
-		// On a hard refresh page.state is empty, so both values are undefined
-		// and we skip straight to the background-generation check below.
-		const pendingText = page.state.pendingMessage as string | undefined;
-		if (pendingText) {
-			const nonce = page.state.pendingFilesNonce as string | undefined;
-			files = nonce ? consumePendingFiles(nonce) : [];
-			// Clear the history entry before submitting: returning to it via
-			// Back/Forward re-runs onMount, and a lingering pendingMessage
-			// would resubmit the prompt (without files, whose nonce is spent).
-			replaceState("", {});
-			await writeMessage({ prompt: pendingText });
+		if ($pendingMessage) {
+			files = $pendingMessage.files;
+			await writeMessage({ prompt: $pendingMessage.content });
+			$pendingMessage = undefined;
 		}
 
 		const streaming = isConversationGenerationActive(messages);
@@ -571,39 +554,9 @@
 	}
 
 	const settings = useSettingsStore();
-	let messages = $state(untrack(() => data.messages));
-	// Local copy of rootMessageId avoids mutating the load-data prop directly.
-	// It is set when the first message of a new conversation is created, and
-	// re-synced from server data whenever the conversation changes.
-	let rootMessageId = $state(untrack(() => data.rootMessageId));
-
-	// Track which conversation's data was last synced so a sidebar navigation
-	// always resets local state to the target conversation, but a server
-	// load re-running mid-stream (e.g. from BackgroundGenerationPoller or
-	// safeInvalidate) does NOT wipe the in-flight token buffer.
-	//
-	// Guard window: "pending" is set to true at the START of writeMessage and
-	// is first reset to false when the FIRST STREAMING TOKEN arrives (line ~351
-	// in the stream loop). It is also reset in the finally block. This means
-	// the guard only covers the brief interval between the user submitting a
-	// message and the first token being received. Any safeInvalidate that
-	// resolves AFTER the first token (e.g. from ModelSwitch.svelte) would be
-	// allowed to overwrite the in-flight buffer. In practice this is acceptable
-	// because BackgroundGenerationPoller is inactive during foreground streaming
-	// and ModelSwitch is only shown when a model is unavailable, but callers
-	// must not assume the full streaming window is protected by this guard.
-	let _lastSyncedConvId = untrack(() => convId); // plain variable — no reactive overhead needed
+	let messages = $state(data.messages);
 	$effect(() => {
-		const currentConvId = convId; // reactive dep
-		const newMessages = data.messages; // reactive dep
-
-		const convChanged = currentConvId !== _lastSyncedConvId;
-
-		if (convChanged || !pending) {
-			messages = newMessages;
-			rootMessageId = data.rootMessageId;
-			_lastSyncedConvId = currentConvId;
-		}
+		messages = data.messages;
 	});
 
 	$effect(() => {
@@ -652,8 +605,7 @@
 	});
 
 	let title = $derived.by(() => {
-		const rawTitle =
-			convsStore.list.find((conv) => conv.id === page.params.id)?.title ?? data.title;
+		const rawTitle = conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title;
 		return rawTitle ? rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1) : rawTitle;
 	});
 
@@ -671,7 +623,12 @@
 </svelte:head>
 
 {#if sharePreviewId}
-	<SharePreviewTags shareId={sharePreviewId} {title} {messages} {rootMessageId} />
+	<SharePreviewTags
+		shareId={sharePreviewId}
+		{title}
+		messages={data.messages}
+		rootMessageId={data.rootMessageId}
+	/>
 {/if}
 
 <ChatWindow

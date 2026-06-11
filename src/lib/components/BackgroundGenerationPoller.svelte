@@ -1,173 +1,168 @@
 <script lang="ts">
 	import { browser, dev } from "$app/environment";
-	import { page } from "$app/state";
-	import { base } from "$app/paths";
-	import { safeInvalidate } from "$lib/utils/safeInvalidate";
+	import { invalidate } from "$app/navigation";
 
 	import {
+		type BackgroundGeneration,
 		backgroundGenerationEntries,
 		removeBackgroundGeneration,
 	} from "$lib/stores/backgroundGenerations";
+	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { UrlDependency } from "$lib/types/UrlDependency";
-	import { useConversationsStore } from "$lib/stores/conversations.svelte";
+	import type { Message } from "$lib/types/Message";
+	import { isAssistantGenerationTerminal } from "$lib/utils/generationState";
 
-	/**
-	 * Maximum time a background generation entry is tracked before we give up
-	 * and invalidate anyway. Mirrors the old 1Hz poller's MAX_POLL_DURATION_MS.
-	 */
-	const MAX_TRACK_DURATION_MS = 3 * 60_000;
+	const POLL_INTERVAL_MS = 1000;
+	const MAX_POLL_DURATION_MS = 3 * 60_000;
 
-	/**
-	 * How long to wait before reconnecting the SSE stream after it closes
-	 * (server-enforced 5-min lifetime causes a normal close; use a brief delay
-	 * so we do not hammer the server if there is a transient error).
-	 */
-	const RECONNECT_DELAY_MS = 1_000;
-
-	const convsStore = useConversationsStore();
+	const client = useAPIClient();
+	const pollers = new Map<string, () => void>();
+	const inflight = new Set<string>();
+	const assistantSnapshots = new Map<string, string>();
+	const failureCounts = new Map<string, number>();
 
 	$effect.root(() => {
-		if (!browser) return;
+		if (!browser) {
+			pollers.clear();
+			return;
+		}
 
 		let destroyed = false;
-		let eventSource: EventSource | null = null;
-		let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 		const log = (...args: unknown[]) => {
-			if (dev) console.log("[BackgroundGenerationPoller]", ...args);
+			if (dev) {
+				console.log("background generation", ...args);
+			}
 		};
 
-		/** Most-recent updatedAt seen across all events; used as reconnect cursor. */
-		let latestCursor = new Date(0).toISOString();
+		const stopPoller = (id: string, reason?: string) => {
+			const stop = pollers.get(id);
+			if (!stop) return;
 
-		function openStream() {
-			if (destroyed || backgroundGenerationEntries.length === 0) return;
-			if (eventSource) return; // already open
+			stop();
+			pollers.delete(id);
+			inflight.delete(id);
+			assistantSnapshots.delete(id);
+			failureCounts.delete(id);
+			log("stop", id, reason);
+		};
 
-			const url = new URL(`${base}/api/v2/conversations/updates`, window.location.href);
-			url.searchParams.set("cursor", latestCursor);
+		const pollOnce = async (id: string) => {
+			if (destroyed || inflight.has(id)) return;
 
-			log("opening SSE stream, cursor:", latestCursor);
-			eventSource = new EventSource(url.toString());
-
-			eventSource.addEventListener("update", (raw) => {
-				if (destroyed) return;
-
-				let event: {
-					id: string;
-					title: string;
-					updatedAt: string;
-					isTerminal: boolean;
-				};
-				try {
-					event = JSON.parse(raw.data) as typeof event;
-				} catch (err) {
-					console.error("[BackgroundGenerationPoller] bad SSE payload", err);
-					return;
-				}
-
-				log("update", event);
-
-				// Advance cursor
-				if (event.updatedAt > latestCursor) {
-					latestCursor = event.updatedAt;
-				}
-
-				// Update sidebar title / updatedAt for this conversation
-				convsStore.update(event.id, {
-					title: event.title,
-					updatedAt: new Date(event.updatedAt),
-				});
-
-				const isTracked = backgroundGenerationEntries.some((e) => e.id === event.id);
-				if (!isTracked) return;
-
-				if (event.isTerminal) {
-					removeBackgroundGeneration(event.id);
-					log("complete", event.id);
-
-					// Refresh the sidebar via the client-owned store, then invalidate the
-					// conversation detail if the user is currently viewing it.
-					void convsStore.refresh().then(() => {
-						// Only invalidate the conversation detail when it is currently open
-						if (page.params.id === event.id) {
-							return safeInvalidate(UrlDependency.Conversation);
-						}
-					});
-				} else {
-					// Non-terminal update: if the affected conversation is open, refresh it
-					if (page.params.id === event.id) {
-						void safeInvalidate(UrlDependency.Conversation);
-					}
-				}
-			});
-
-			eventSource.onerror = () => {
-				if (destroyed) return;
-				log("SSE error / close — scheduling reconnect");
-				closeStream();
-				// Reconnect only if there are still entries to track
-				if (backgroundGenerationEntries.length > 0) {
-					reconnectTimer = setTimeout(() => {
-						reconnectTimer = null;
-						openStream();
-					}, RECONNECT_DELAY_MS);
-				}
-			};
-		}
-
-		function closeStream() {
-			if (eventSource) {
-				eventSource.close();
-				eventSource = null;
-				log("SSE stream closed");
+			const entry = backgroundGenerationEntries.find((candidate) => candidate.id === id);
+			if (entry && Date.now() - entry.startedAt > MAX_POLL_DURATION_MS) {
+				removeBackgroundGeneration(id);
+				stopPoller(id, "timed out");
+				log("timeout", id);
+				await invalidate(UrlDependency.ConversationList);
+				await invalidate(UrlDependency.Conversation);
+				return;
 			}
-		}
 
-		// Timeout guard: entries that have been tracked too long are evicted,
-		// mirroring the old poller's MAX_POLL_DURATION_MS behaviour.
-		function evictTimedOutEntries() {
-			const now = Date.now();
-			const timedOut = backgroundGenerationEntries.filter(
-				(e) => now - e.startedAt > MAX_TRACK_DURATION_MS
-			);
-			for (const entry of timedOut) {
-				removeBackgroundGeneration(entry.id);
-				log("timeout evict", entry.id);
-				void convsStore.refresh().then(() => {
-					if (page.params.id === entry.id) {
-						return safeInvalidate(UrlDependency.Conversation);
+			inflight.add(id);
+			log("poll", id);
+
+			try {
+				const response = await client.conversations({ id }).get({ query: {} });
+				const conversation = handleResponse(response) as {
+					messages?: Message[];
+				} | null;
+				const messages: Message[] = conversation?.messages ?? [];
+				const lastAssistant = [...messages]
+					.reverse()
+					.find((message: Message) => message.from === "assistant");
+
+				const isTerminal = isAssistantGenerationTerminal(lastAssistant);
+
+				const snapshot = lastAssistant
+					? JSON.stringify({
+							id: lastAssistant.id,
+							updatedAt: lastAssistant.updatedAt,
+							contentLength: lastAssistant.content?.length ?? 0,
+							updatesLength: lastAssistant.updates?.length ?? 0,
+						})
+					: "__none__";
+				const previousSnapshot = assistantSnapshots.get(id);
+				let shouldInvalidateConversation = false;
+
+				if (lastAssistant) {
+					assistantSnapshots.set(id, snapshot);
+					if (snapshot !== previousSnapshot) {
+						shouldInvalidateConversation = true;
 					}
-				});
-			}
-		}
+				} else if (assistantSnapshots.has(id)) {
+					assistantSnapshots.delete(id);
+					shouldInvalidateConversation = true;
+				}
 
-		// Evict timed-out entries on an interval even when the SSE stream is quiet.
-		const evictTimer = setInterval(evictTimedOutEntries, 10_000);
+				if (lastAssistant && isTerminal) {
+					removeBackgroundGeneration(id);
+					assistantSnapshots.delete(id);
+					failureCounts.delete(id);
+					shouldInvalidateConversation = true;
+					log("complete", id, "terminal");
+					await invalidate(UrlDependency.ConversationList);
+				}
+
+				if (shouldInvalidateConversation) {
+					await invalidate(UrlDependency.Conversation);
+				}
+
+				failureCounts.delete(id);
+			} catch (err) {
+				console.error("Background generation poll failed", id, err);
+				const failures = (failureCounts.get(id) ?? 0) + 1;
+				failureCounts.set(id, failures);
+				if (failures >= 3) {
+					removeBackgroundGeneration(id);
+					assistantSnapshots.delete(id);
+					failureCounts.delete(id);
+					log("failures", id, failures);
+					await invalidate(UrlDependency.ConversationList);
+				}
+			} finally {
+				inflight.delete(id);
+			}
+		};
+
+		const startPoller = (entry: BackgroundGeneration) => {
+			if (pollers.has(entry.id)) return;
+
+			const intervalId = setInterval(() => {
+				void pollOnce(entry.id);
+			}, POLL_INTERVAL_MS);
+
+			pollers.set(entry.id, () => clearInterval(intervalId));
+			void pollOnce(entry.id);
+			log("start", entry.id);
+		};
 
 		$effect(() => {
-			// Reactive dep: re-evaluate whenever the entries array changes.
-			const hasEntries = backgroundGenerationEntries.length > 0;
+			const entries = backgroundGenerationEntries;
 
 			if (destroyed) return;
 
-			if (hasEntries) {
-				openStream();
-			} else {
-				// No active generations — close the stream to conserve connections.
-				if (reconnectTimer !== null) {
-					clearTimeout(reconnectTimer);
-					reconnectTimer = null;
+			const activeIds = new Set(entries.map((entry) => entry.id));
+
+			for (const id of pollers.keys()) {
+				if (!activeIds.has(id)) {
+					stopPoller(id);
 				}
-				closeStream();
+			}
+
+			for (const entry of entries) {
+				startPoller(entry);
 			}
 		});
 
 		return () => {
 			destroyed = true;
-			clearInterval(evictTimer);
-			if (reconnectTimer !== null) clearTimeout(reconnectTimer);
-			closeStream();
+			for (const stop of pollers.values()) stop();
+			pollers.clear();
+			inflight.clear();
+			assistantSnapshots.clear();
+			failureCounts.clear();
 		};
 	});
 </script>

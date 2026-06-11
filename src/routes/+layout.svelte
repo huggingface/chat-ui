@@ -1,7 +1,7 @@
 <script lang="ts">
 	import "../styles/main.css";
 
-	import { onDestroy, onMount } from "svelte";
+	import { onDestroy, onMount, untrack } from "svelte";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
@@ -13,6 +13,7 @@
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import MobileNav from "$lib/components/MobileNav.svelte";
+	import titleUpdate from "$lib/stores/titleUpdate";
 	import WelcomeModal from "$lib/components/WelcomeModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 	import { setContext } from "svelte";
@@ -21,7 +22,6 @@
 	import { isPro } from "$lib/stores/isPro";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
-	import { createConversationsStore } from "$lib/stores/conversations.svelte";
 
 	let { data = $bindable(), children } = $props();
 
@@ -30,15 +30,9 @@
 	const publicConfig = data.publicConfig;
 	const client = useAPIClient();
 
-	const convsStore = createConversationsStore();
-	// Synchronous seed for SSR: $effect is stripped by the server-side compiler,
-	// so we must call init() immediately to populate the list on first paint.
-	// The $effect below handles client-side resyncs when data.conversations
-	// reference changes after subsequent invalidations.
-	// Last-write-wins from server is acceptable; see conversations.svelte.ts.
-	convsStore.init(data.conversations);
+	let conversations = $state(data.conversations);
 	$effect(() => {
-		convsStore.init(data.conversations);
+		data.conversations && untrack(() => (conversations = data.conversations));
 	});
 
 	let isNavCollapsed = $state(false);
@@ -68,7 +62,7 @@
 			.delete()
 			.then(handleResponse)
 			.then(async () => {
-				convsStore.remove(id);
+				conversations = conversations.filter((conv) => conv.id !== id);
 
 				if (page.params.id === id) {
 					await goto(`${base}/`, { invalidateAll: true });
@@ -86,7 +80,7 @@
 			.patch({ title })
 			.then(handleResponse)
 			.then(async () => {
-				convsStore.update(id, { title });
+				conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
 			})
 			.catch((err) => {
 				console.error(err);
@@ -105,6 +99,18 @@
 
 	$effect(() => {
 		if ($error) onError();
+	});
+
+	$effect(() => {
+		if ($titleUpdate) {
+			const convIdx = conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
+
+			if (convIdx != -1) {
+				conversations[convIdx].title = $titleUpdate?.title ?? conversations[convIdx].title;
+			}
+
+			$titleUpdate = null;
+		}
 	});
 
 	const settings = createSettingsStore(data.settings);
@@ -173,7 +179,7 @@
 	let mobileNavTitle = $derived(
 		["/models", "/privacy"].includes(page.route.id ?? "")
 			? ""
-			: convsStore.list.find((conv) => conv.id === page.params.id)?.title
+			: conversations.find((conv) => conv.id === page.params.id)?.title
 	);
 
 	// Show the welcome modal once on first app load
@@ -265,7 +271,7 @@
 
 	<MobileNav title={mobileNavTitle}>
 		<NavMenu
-			conversations={convsStore.list}
+			{conversations}
 			user={data.user}
 			ondeleteConversation={(id) => deleteConversation(id)}
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
@@ -275,7 +281,7 @@
 		class="grid max-h-dvh grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px] max-md:hidden"
 	>
 		<NavMenu
-			conversations={convsStore.list}
+			{conversations}
 			user={data.user}
 			ondeleteConversation={(id) => deleteConversation(id)}
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}

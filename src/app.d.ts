@@ -23,12 +23,6 @@ declare global {
 		}
 		// interface PageData {}
 		// interface Platform {}
-		interface PageState {
-			/** First message text carried from the home/model page to a new conversation. */
-			pendingMessage?: string;
-			/** Nonce for looking up File[] in the client-side pendingFiles Map. */
-			pendingFilesNonce?: string;
-		}
 	}
 }
 

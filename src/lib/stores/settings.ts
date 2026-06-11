@@ -1,6 +1,8 @@
 import { browser } from "$app/environment";
+import { invalidate } from "$app/navigation";
 import { base } from "$app/paths";
 import type { ReasoningEffort, StreamingMode } from "$lib/types/Settings";
+import { UrlDependency } from "$lib/types/UrlDependency";
 import { getContext, setContext } from "svelte";
 import { type Writable, writable, get } from "svelte/store";
 
@@ -62,6 +64,8 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 					body: JSON.stringify(get(baseStore)),
 				});
 
+				invalidate(UrlDependency.ConversationList);
+
 				if (showSavedOnNextSync) {
 					// set savedRecently to true for 3s
 					baseStore.update((s) => ({
@@ -118,6 +122,8 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 					body: JSON.stringify(get(baseStore)),
 				});
 
+				invalidate(UrlDependency.ConversationList);
+
 				if (showSavedOnNextSync) {
 					baseStore.update((s) => ({
 						...s,
@@ -152,6 +158,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 					...settings,
 				}),
 			});
+			invalidate(UrlDependency.ConversationList);
 		}
 	}
 
