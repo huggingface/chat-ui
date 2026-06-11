@@ -577,32 +577,38 @@
 	// re-synced from server data whenever the conversation changes.
 	let rootMessageId = $state(untrack(() => data.rootMessageId));
 
-	// Track which conversation's data was last synced so a sidebar navigation
-	// always resets local state to the target conversation, but a server
-	// load re-running mid-stream (e.g. from BackgroundGenerationPoller or
-	// safeInvalidate) does NOT wipe the in-flight token buffer.
+	// Resync local message state from server data ONLY when the conversation
+	// changes (sidebar navigation) or the load data itself was refreshed
+	// (post-stream invalidation). Two hard constraints, both learned from
+	// prod incidents:
 	//
-	// Guard window: "pending" is set to true at the START of writeMessage and
-	// is first reset to false when the FIRST STREAMING TOKEN arrives (line ~351
-	// in the stream loop). It is also reset in the finally block. This means
-	// the guard only covers the brief interval between the user submitting a
-	// message and the first token being received. Any safeInvalidate that
-	// resolves AFTER the first token (e.g. from ModelSwitch.svelte) would be
-	// allowed to overwrite the in-flight buffer. In practice this is acceptable
-	// because BackgroundGenerationPoller is inactive during foreground streaming
-	// and ModelSwitch is only shown when a model is unavailable, but callers
-	// must not assume the full streaming window is protected by this guard.
+	// 1. `pending` must NOT be a reactive dependency of this effect. It flips
+	//    false when the first streaming token arrives; reading it tracked made
+	//    that flip re-run the effect and overwrite the locally appended
+	//    user/assistant messages with the stale page-load snapshot, blanking
+	//    the conversation until the stream finished (prod incident 2026-06-11).
+	//    It is therefore only ever read inside untrack().
+	// 2. A sync may only happen when `data.messages` identity actually changed
+	//    (or the conversation changed): re-running this effect for any other
+	//    reason must be a no-op.
+	//
+	// A mid-stream load refresh (pending still true) is intentionally skipped;
+	// the finally block in writeMessage invalidates again after the stream
+	// ends, so the post-completion sync still lands.
 	let _lastSyncedConvId = untrack(() => convId); // plain variable — no reactive overhead needed
+	let _lastSyncedMessages = untrack(() => data.messages); // plain variable — identity tracking only
 	$effect(() => {
 		const currentConvId = convId; // reactive dep
 		const newMessages = data.messages; // reactive dep
 
 		const convChanged = currentConvId !== _lastSyncedConvId;
+		const dataChanged = newMessages !== _lastSyncedMessages;
 
-		if (convChanged || !pending) {
+		if (convChanged || (dataChanged && untrack(() => !pending))) {
 			messages = newMessages;
 			rootMessageId = data.rootMessageId;
 			_lastSyncedConvId = currentConvId;
+			_lastSyncedMessages = newMessages;
 		}
 	});
 
