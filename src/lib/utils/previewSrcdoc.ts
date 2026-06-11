@@ -4,15 +4,19 @@ import type { ArtifactKind } from "./artifacts";
  * Builders for sandboxed iframe `srcdoc` documents used by live previews
  * (artifact panel and the fullscreen HTML preview modal).
  *
- * Every document gets an error hook that forwards uncaught errors and
+ * Every document gets a hook script that forwards uncaught errors and
  * unhandled rejections to the parent via postMessage on a per-preview
- * channel, plus a script that disables link navigation inside the preview.
+ * channel. The same script intercepts link activation: in-page fragment
+ * links scroll within the preview, http(s) links are forwarded to the
+ * parent (which confirms before opening a new tab), everything else is
+ * blocked. Navigating from inside the sandbox would be broken anyway —
+ * the opened tab would inherit the sandbox's opaque origin.
  */
 
 const END_SCRIPT_TAG = "</scr" + "ipt>";
 
-function buildErrorHookScript(channel: string): string {
-	return `\n<script>\n(function(){\n  function send(detail){\n    try{ parent.postMessage({ type: 'chatui.preview.error', channel: '${channel}', detail: detail }, '*'); }catch(e){}\n  }\n  function markDisabled(anchor){\n    if (!anchor || anchor.dataset.chatuiLinkDisabled === 'true') return;\n    anchor.dataset.chatuiLinkDisabled = 'true';\n    var note = 'Link disabled in preview';\n    var title = anchor.getAttribute('title');\n    if (!title) {\n      anchor.setAttribute('title', note);\n    } else if (title.indexOf(note) === -1) {\n      anchor.setAttribute('title', title + ' — ' + note);\n    }\n  }\n  function disableAnchors(scope){\n    try {\n      var root = scope && scope.querySelectorAll ? scope : document;\n      var anchors = root.querySelectorAll ? root.querySelectorAll('a') : [];\n      for (var i = 0; i < anchors.length; i++) {\n        markDisabled(anchors[i]);\n      }\n    } catch (err) {}\n  }\n  function nearestAnchor(node){\n    while (node && node !== document) {\n      if (node.tagName && node.tagName.toLowerCase() === 'a') return node;\n      node = node.parentNode;\n    }\n    return null;\n  }\n  function intercept(ev){\n    var anchor = nearestAnchor(ev.target);\n    if (!anchor) return;\n    markDisabled(anchor);\n    ev.preventDefault();\n    ev.stopPropagation();\n  }\n  disableAnchors();\n  if (document.readyState === 'loading') {\n    document.addEventListener('DOMContentLoaded', function(){ disableAnchors(); });\n  } else {\n    setTimeout(function(){ disableAnchors(); }, 0);\n  }\n  if (window.MutationObserver) {\n    var observer = new MutationObserver(function(mutations){\n      for (var i = 0; i < mutations.length; i++) {\n        var nodes = mutations[i].addedNodes;\n        for (var j = 0; j < nodes.length; j++) {\n          var node = nodes[j];\n          if (!node || node.nodeType !== 1) continue;\n          if (node.tagName && node.tagName.toLowerCase() === 'a') {\n            markDisabled(node);\n          } else {\n            disableAnchors(node);\n          }\n        }\n      }\n    });\n    observer.observe(document.documentElement, { childList: true, subtree: true });\n  }\n  window.addEventListener('click', intercept, true);\n  window.addEventListener('auxclick', intercept, true);\n  window.addEventListener('keydown', function(ev){\n    if (ev.key === 'Enter' || ev.key === ' ') {\n      intercept(ev);\n    }\n  }, true);\n  window.addEventListener('error', function(ev){\n    var msg = ev && ev.message ? ev.message : 'Script error';\n    var stack = ev && ev.error && ev.error.stack ? ev.error.stack : undefined;\n    send({ message: msg, stack: stack });\n  });\n  window.addEventListener('unhandledrejection', function(ev){\n    var r = ev && ev.reason;\n    var msg = (typeof r === 'string') ? r : (r && r.message) ? r.message : 'Unhandled promise rejection';\n    var stack = r && r.stack ? r.stack : undefined;\n    send({ message: msg, stack: stack });\n  });\n})();\n${END_SCRIPT_TAG}`;
+function buildPreviewHookScript(channel: string): string {
+	return `\n<script>\n(function(){\n  function send(type, detail){\n    try{ parent.postMessage({ type: type, channel: '${channel}', detail: detail }, '*'); }catch(e){}\n  }\n  function nearestAnchor(node){\n    while (node && node !== document) {\n      if (node.tagName && node.tagName.toLowerCase() === 'a') return node;\n      node = node.parentNode;\n    }\n    return null;\n  }\n  function anchorHref(anchor){\n    var href = anchor.href;\n    if (typeof href === 'string') return href;\n    if (href && typeof href.baseVal === 'string') {\n      try { return new URL(href.baseVal, document.baseURI).href; } catch (err) { return ''; }\n    }\n    return '';\n  }\n  function scrollToFragment(raw){\n    var id = raw.slice(1);\n    try { id = decodeURIComponent(id); } catch (err) {}\n    var target = id ? document.getElementById(id) : null;\n    if (target && target.scrollIntoView) target.scrollIntoView();\n  }\n  function intercept(ev){\n    var anchor = nearestAnchor(ev.target);\n    if (!anchor) return;\n    ev.preventDefault();\n    ev.stopPropagation();\n    var raw = anchor.getAttribute('href') || anchor.getAttribute('xlink:href') || '';\n    if (raw.charAt(0) === '#') {\n      scrollToFragment(raw);\n      return;\n    }\n    var href = anchorHref(anchor);\n    if (/^https?:/i.test(href)) {\n      send('chatui.preview.openLink', { href: href });\n    }\n  }\n  window.addEventListener('click', intercept, true);\n  window.addEventListener('auxclick', intercept, true);\n  window.addEventListener('keydown', function(ev){\n    if (ev.key === 'Enter' || ev.key === ' ') {\n      intercept(ev);\n    }\n  }, true);\n  window.addEventListener('error', function(ev){\n    var msg = ev && ev.message ? ev.message : 'Script error';\n    var stack = ev && ev.error && ev.error.stack ? ev.error.stack : undefined;\n    send('chatui.preview.error', { message: msg, stack: stack });\n  });\n  window.addEventListener('unhandledrejection', function(ev){\n    var r = ev && ev.reason;\n    var msg = (typeof r === 'string') ? r : (r && r.message) ? r.message : 'Unhandled promise rejection';\n    var stack = r && r.stack ? r.stack : undefined;\n    send('chatui.preview.error', { message: msg, stack: stack });\n  });\n})();\n${END_SCRIPT_TAG}`;
 }
 
 /** JSON-encode a string for embedding inside an inline <script>, escaping `</` so the HTML parser can't terminate the script early. */
@@ -22,16 +26,13 @@ function embedAsJsString(source: string): string {
 
 /**
  * Build a srcdoc for raw HTML or SVG content. Injects <base target="_blank">,
- * link disabling and the error hook into the right spot of the document.
+ * and the preview hook into the right spot of the document.
  */
 export function buildHtmlSrcdoc(content: string, channel: string): string {
 	const trimmed = content.trimStart();
 	const svgPattern = /^(?:<\?xml[^>]*>\s*)?(?:<!doctype\s+svg[^>]*>\s*)?<svg[\s>]/i;
 	const baseTag = '<base target="_blank">';
-	const disabledLinkStyles = `<style>
-		a[data-chatui-link-disabled] {}
-	</style>`;
-	const errorHook = buildErrorHookScript(channel);
+	const previewHook = buildPreviewHookScript(channel);
 
 	if (svgPattern.test(trimmed)) {
 		const svgContent = trimmed
@@ -40,34 +41,28 @@ export function buildHtmlSrcdoc(content: string, channel: string): string {
 		// Explicit white canvas: SVGs are usually drawn for light backgrounds, and
 		// the panel's iframe backing is dark in dark mode
 		const svgBackground = "<style>html { background: #fff; }</style>";
-		return `<!doctype html><html><head>${baseTag}${disabledLinkStyles}${svgBackground}${errorHook}</head><body>${svgContent}</body></html>`;
+		return `<!doctype html><html><head>${baseTag}${svgBackground}${previewHook}</head><body>${svgContent}</body></html>`;
 	}
 
 	const headMatch = content.match(/<head[^>]*>/i);
 	if (headMatch) {
-		return content.replace(headMatch[0], headMatch[0] + baseTag + disabledLinkStyles + errorHook);
+		return content.replace(headMatch[0], headMatch[0] + baseTag + previewHook);
 	}
 	const htmlTagMatch = content.match(/<html[^>]*>/i);
 	if (htmlTagMatch) {
 		return content.replace(
 			htmlTagMatch[0],
-			htmlTagMatch[0] + "\n<head>" + baseTag + disabledLinkStyles + errorHook + "</head>"
+			htmlTagMatch[0] + "\n<head>" + baseTag + previewHook + "</head>"
 		);
 	}
 	const doctypeMatch = content.match(/<!doctype[^>]*>/i);
 	if (doctypeMatch) {
 		const idx = content.indexOf(doctypeMatch[0]) + doctypeMatch[0].length;
 		return (
-			content.slice(0, idx) +
-			"\n<head>" +
-			baseTag +
-			disabledLinkStyles +
-			errorHook +
-			"</head>" +
-			content.slice(idx)
+			content.slice(0, idx) + "\n<head>" + baseTag + previewHook + "</head>" + content.slice(idx)
 		);
 	}
-	return "<head>" + baseTag + disabledLinkStyles + errorHook + "</head>\n" + content;
+	return "<head>" + baseTag + previewHook + "</head>\n" + content;
 }
 
 const REACT_HOOK_PRELUDE = [
@@ -99,13 +94,13 @@ const REACT_HOOK_PRELUDE = [
  * classes work via the Play CDN), and the default export is rendered.
  */
 export function buildReactSrcdoc(code: string, channel: string): string {
-	const errorHook = buildErrorHookScript(channel);
+	const previewHook = buildPreviewHookScript(channel);
 	return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<base target="_blank">${errorHook}
+<base target="_blank">${previewHook}
 <script src="https://cdn.tailwindcss.com">${END_SCRIPT_TAG}
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js">${END_SCRIPT_TAG}
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js">${END_SCRIPT_TAG}
@@ -158,13 +153,13 @@ ${END_SCRIPT_TAG}
 
 /** Build a srcdoc that renders a Mermaid diagram, centered on a light canvas. */
 export function buildMermaidSrcdoc(code: string, channel: string): string {
-	const errorHook = buildErrorHookScript(channel);
+	const previewHook = buildPreviewHookScript(channel);
 	return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<base target="_blank">${errorHook}
+<base target="_blank">${previewHook}
 <style>
 html, body { margin: 0; min-height: 100%; background: #fff; }
 #artifact-root { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; box-sizing: border-box; }
