@@ -17,7 +17,7 @@
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
 	import { fetchMessageUpdates, resolveStreamingMode } from "$lib/utils/messageUpdates";
-	import type { v4 } from "uuid";
+	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { enabledServers, mcpServersLoaded } from "$lib/stores/mcpServers";
 	import { get } from "svelte/store";
@@ -55,6 +55,10 @@
 	// generation starts in this conversation.
 	let stopRequestedFor: string | null = $state(null);
 	let stopRequestPromise: Promise<void> | undefined;
+	// Id of the generation run this tab started, sent with the generation
+	// request and echoed in the stop request so the server can clamp the
+	// persisted text to the stop point of the run it belongs to.
+	let activeGenerationId: string | undefined;
 	// True while writeMessage runs; lets the generation-state effect skip the
 	// snapshot-staleness check for the generation streaming in this very tab.
 	let writeMessageInFlight = false;
@@ -135,6 +139,7 @@
 			// encoding or MCP hydration must abort THIS request, not whichever
 			// stale controller a previous generation left behind.
 			messageUpdatesAbortController = new AbortController();
+			activeGenerationId = v4();
 			const base64Files = await Promise.all(
 				(files ?? []).map((file) =>
 					file2base64(file).then((value) => ({
@@ -261,6 +266,7 @@
 					inputs: prompt,
 					messageId,
 					isRetry,
+					generationId: activeGenerationId,
 					files: isRetry ? userMessage?.files : base64Files,
 					selectedMcpServerNames: $enabledServers.map((s) => s.name),
 					selectedMcpServers: $enabledServers.map((s) => ({
@@ -375,8 +381,15 @@
 						messageToWriteTo.updates?.some((u) => u.type === MessageUpdateType.Tool) ?? false;
 
 					if (isInterrupted) {
-						// Preserve streamed content on abort. If we never streamed, fall back to finalText.
 						if (!messageToWriteTo.content) {
+							// We never streamed anything; fall back to finalText.
+							messageToWriteTo.content = finalText;
+						} else if (finalText && messageToWriteTo.content.startsWith(finalText)) {
+							// The server may have clamped the persisted text back to a
+							// reported stop point (see stop-generating). Adopt it when it
+							// is a prefix of what we streamed so this view matches what
+							// every other view will load; otherwise keep our streamed
+							// content (continue flows receive only the post-prefix text).
 							messageToWriteTo.content = finalText;
 						}
 					} else if (hadTools) {
@@ -468,6 +481,7 @@
 			console.error(err);
 		} finally {
 			writeMessageInFlight = false;
+			activeGenerationId = undefined;
 			$loading = false;
 			pending = false;
 			// Wait for the stop request to complete before refreshing data,
@@ -524,6 +538,17 @@
 	}
 
 	async function stopGeneration() {
+		// Snapshot the stop point first: the generation run this tab started
+		// (if any) and how many characters of the reply are on screen right
+		// now. The server clamps the persisted text back to this so the
+		// interrupted message cannot "grow back" past what the user saw while
+		// the abort marker was in flight.
+		const lastAssistant = messages.findLast((m) => m.from === "assistant");
+		const stopPoint =
+			activeGenerationId !== undefined && lastAssistant
+				? { generationId: activeGenerationId, seenContentLength: lastAssistant.content.length }
+				: undefined;
+
 		stopRequestedFor = convId;
 		$isAborted = true;
 		$loading = false;
@@ -532,7 +557,6 @@
 		// Mark the last assistant message as interrupted locally so
 		// isConversationGenerationActive() immediately returns false,
 		// removing the background poller and preventing $loading re-enable.
-		const lastAssistant = messages.findLast((m) => m.from === "assistant");
 		if (lastAssistant) {
 			lastAssistant.interrupted = true;
 		}
@@ -540,6 +564,10 @@
 		const sendStopRequest = async () => {
 			const response = await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
 				method: "POST",
+				...(stopPoint && {
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(stopPoint),
+				}),
 			});
 			if (!response.ok) {
 				throw new Error(`Stop request failed: ${response.status}`);
