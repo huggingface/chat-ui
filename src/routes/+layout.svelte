@@ -263,14 +263,14 @@
 
 <div
 	class="fixed grid h-dvh w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
-		? 'md:grid-cols-[290px,1fr]'
+		? 'md:grid-cols-[261px,1fr]'
 		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
 >
 	<ExpandNavigation
 		isCollapsed={isNavCollapsed}
 		onClick={() => (isNavCollapsed = !isNavCollapsed)}
 		classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
-			? 'left-[290px]'
+			? 'left-[261px]'
 			: 'left-0'} *:transition-transform"
 	/>
 
@@ -283,7 +283,7 @@
 		/>
 	</MobileNav>
 	<nav
-		class="grid max-h-dvh grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px] max-md:hidden"
+		class="grid max-h-dvh grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[261px] max-md:hidden"
 	>
 		<NavMenu
 			conversations={convsStore.list}
