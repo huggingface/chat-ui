@@ -5,7 +5,6 @@
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
-	import { browser } from "$app/environment";
 
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
@@ -40,16 +39,6 @@
 	// Last-write-wins from server is acceptable; see conversations.svelte.ts.
 	convsStore.init(data.conversations);
 
-	// Pre-populate the MCP server store from the SSR payload so that
-	// mcpServersLoaded is already true when child onMount callbacks run.
-	// This eliminates the gate delay in writeMessage on the first message:
-	// the conversation page no longer has to wait for a separate client-side
-	// fetch before it can fire the generation POST.
-	// The background refreshMcpServers() in mcpServers.ts still runs to pick
-	// up any status or config changes after page load.
-	if (browser) {
-		initWithServers(data.mcpBaseServers ?? []);
-	}
 	$effect(() => {
 		convsStore.init(data.conversations);
 	});
@@ -127,6 +116,15 @@
 	});
 
 	onMount(async () => {
+		// Seed the MCP store from the SSR payload before anything else runs.
+		// onMount never fires during SSR, so this matches the server-rendered HTML
+		// (stores at defaults) and avoids hydration mismatches in NavMenu / ChatWindow.
+		// The layout onMount fires after child onMounts (Svelte 5 order), but that
+		// is fine: writeMessage's mcpServersLoaded gate is an async Promise/subscriber,
+		// so when initWithServers sets mcpServersLoaded=true synchronously here, the
+		// subscriber resolves immediately without any added network latency.
+		initWithServers(data.mcpBaseServers ?? []);
+
 		if (publicConfig.isHuggingChat && data.user?.username) {
 			fetch(`https://huggingface.co/api/users/${data.user.username}/overview`)
 				.then((res) => res.json())
