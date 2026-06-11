@@ -6,12 +6,14 @@
 	import { artifactFileName, isPreviewableKind } from "$lib/utils/artifacts";
 	import { diffLines, diffStats, renderDiffHtml } from "$lib/utils/artifactDiff";
 	import { buildArtifactSrcdoc } from "$lib/utils/previewSrcdoc";
+	import { parseExternalUrl } from "$lib/utils/externalLink";
 	import { highlightCode } from "$lib/utils/marked";
 	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_FRACTION } from "$lib/stores/artifactPanel.svelte";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
+	import ExternalLinkModal from "../ExternalLinkModal.svelte";
 	import HtmlPreviewModal from "../HtmlPreviewModal.svelte";
 
 	import CarbonCloseLarge from "~icons/carbon/close-large";
@@ -235,6 +237,7 @@
 	const previewChannel = `artifact_${Math.random().toString(36).slice(2)}`;
 	let iframeEl: HTMLIFrameElement | undefined = $state();
 	let errors: { message: string; stack?: string }[] = $state([]);
+	let externalLinkUrl = $state<URL | null>(null);
 
 	let srcdoc = $derived.by(() => {
 		if (!version || !version.complete) return undefined;
@@ -251,7 +254,7 @@
 	type PreviewMessage = {
 		type: string;
 		channel: string;
-		detail?: { message?: unknown; stack?: string };
+		detail?: { message?: unknown; stack?: string; href?: unknown };
 	};
 
 	function onWindowMessage(ev: MessageEvent) {
@@ -259,7 +262,17 @@
 		const raw = ev.data as unknown;
 		if (!raw || typeof raw !== "object") return;
 		const data = raw as Partial<PreviewMessage>;
-		if (data.type !== "chatui.preview.error" || data.channel !== previewChannel) return;
+		if (data.channel !== previewChannel) return;
+		if (data.type === "chatui.preview.openLink") {
+			// Only honor link messages backed by a real user gesture (clicks inside
+			// the iframe propagate activation to ancestor frames); artifact scripts
+			// must not be able to pop the confirm without one
+			if (navigator.userActivation && !navigator.userActivation.isActive) return;
+			// The iframe runs untrusted generated code, so re-validate its href here
+			externalLinkUrl = parseExternalUrl(data.detail?.href) ?? null;
+			return;
+		}
+		if (data.type !== "chatui.preview.error") return;
 		const detail = (data.detail ?? {}) as { message?: unknown; stack?: string };
 		errors = [...errors, { message: String(detail.message ?? "Error"), stack: detail.stack }];
 	}
@@ -300,6 +313,9 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
+		// An Escape already consumed by a modal (external-link confirm, fullscreen
+		// preview) must not also close the panel
+		if (e.defaultPrevented) return;
 		if (e.key === "Escape" && artifactPanel.open && !fullscreenOpen && !loading) {
 			e.preventDefault();
 			artifactPanel.close();
@@ -437,7 +453,7 @@
 					bind:this={iframeEl}
 					title="Artifact preview"
 					class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
-					sandbox="allow-scripts allow-popups allow-forms"
+					sandbox="allow-scripts allow-forms"
 					referrerpolicy="no-referrer"
 					{srcdoc}
 				></iframe>
@@ -601,6 +617,10 @@
 		kind={version.type}
 		onclose={() => (fullscreenOpen = false)}
 	/>
+{/if}
+
+{#if externalLinkUrl}
+	<ExternalLinkModal url={externalLinkUrl} onclose={() => (externalLinkUrl = null)} />
 {/if}
 
 <style>
