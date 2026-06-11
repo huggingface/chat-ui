@@ -1,5 +1,48 @@
-import { describe, it, expect } from "vitest";
-import { sanitizeJsonSchema } from "./tools";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { sanitizeJsonSchema, getOpenAiToolsForMcp, resetMcpToolsCache } from "./tools";
+import type { McpServerConfig } from "./httpClient";
+
+// In-memory MCP servers keyed by URL: each listTools call is recorded so tests
+// can assert exactly which servers were (re-)listed vs served from the cache.
+const mcpMock = vi.hoisted(() => ({
+	listToolsCalls: [] as string[],
+	responses: new Map<string, { tools: unknown[] } | Error>(),
+}));
+
+vi.mock("@modelcontextprotocol/sdk/client", () => ({
+	Client: class {
+		private url = "";
+		async connect(transport: { url?: unknown }) {
+			this.url = String(transport.url ?? "");
+		}
+		async listTools() {
+			mcpMock.listToolsCalls.push(this.url);
+			const response = mcpMock.responses.get(this.url);
+			if (!response) return { tools: [] };
+			if (response instanceof Error) throw response;
+			return response;
+		}
+		async close() {}
+	},
+}));
+
+vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
+	StreamableHTTPClientTransport: class {
+		url: unknown;
+		constructor(url: unknown) {
+			this.url = url;
+		}
+	},
+}));
+
+vi.mock("@modelcontextprotocol/sdk/client/sse.js", () => ({
+	SSEClientTransport: class {
+		url: unknown;
+		constructor(url: unknown) {
+			this.url = url;
+		}
+	},
+}));
 
 // The real `write_file` inputSchema served today by hf.co/mcp. The properties
 // `private`, `revision`, `commit_message`, `commit_description` are shaped
@@ -132,5 +175,120 @@ describe("sanitizeJsonSchema", () => {
 		const before = JSON.stringify(writeFileSchema);
 		sanitizeJsonSchema(writeFileSchema);
 		expect(JSON.stringify(writeFileSchema)).toBe(before);
+	});
+});
+
+const SERVER_A: McpServerConfig = { name: "Server A", url: "https://a.example/mcp" };
+const SERVER_B: McpServerConfig = { name: "Server B", url: "https://b.example/mcp" };
+
+const searchTool = {
+	name: "search",
+	description: "Search things",
+	inputSchema: { type: "object", properties: { q: { type: "string" } } },
+};
+const fetchTool = {
+	name: "fetch_page",
+	description: "Fetch a page",
+	inputSchema: { type: "object", properties: { url: { type: "string" } } },
+};
+
+describe("getOpenAiToolsForMcp per-server cache", () => {
+	beforeEach(() => {
+		resetMcpToolsCache();
+		mcpMock.listToolsCalls.length = 0;
+		mcpMock.responses.clear();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it("serves repeat requests from the cache instead of re-listing", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+
+		const first = await getOpenAiToolsForMcp([SERVER_A]);
+		const second = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(mcpMock.listToolsCalls).toEqual([SERVER_A.url]);
+		expect(first.tools.map((t) => t.function.name)).toEqual(["search"]);
+		expect(first.tools[0].function.parameters).toMatchObject({ type: "object" });
+		expect(second.tools.map((t) => t.function.name)).toEqual(["search"]);
+		expect(second.mapping.search).toEqual({
+			fnName: "search",
+			server: "Server A",
+			tool: "search",
+		});
+	});
+
+	it("fetches only servers missing from the cache when the selection grows", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		mcpMock.responses.set(SERVER_B.url, { tools: [fetchTool] });
+
+		await getOpenAiToolsForMcp([SERVER_A]);
+		const merged = await getOpenAiToolsForMcp([SERVER_A, SERVER_B]);
+
+		expect(mcpMock.listToolsCalls).toEqual([SERVER_A.url, SERVER_B.url]);
+		expect(merged.tools.map((t) => t.function.name)).toEqual(["search", "fetch_page"]);
+	});
+
+	it("re-lists a server after its entry expires", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-06-11T12:00:00Z"));
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+
+		await getOpenAiToolsForMcp([SERVER_A]);
+		vi.setSystemTime(new Date("2026-06-11T12:01:01Z")); // past the 60s TTL
+		await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(mcpMock.listToolsCalls).toEqual([SERVER_A.url, SERVER_A.url]);
+	});
+
+	it("does not cache a failed listing and retries it on the next request", async () => {
+		mcpMock.responses.set(SERVER_A.url, new Error("boom"));
+		mcpMock.responses.set(SERVER_B.url, { tools: [fetchTool] });
+
+		const first = await getOpenAiToolsForMcp([SERVER_A, SERVER_B]);
+		expect(first.tools.map((t) => t.function.name)).toEqual(["fetch_page"]);
+
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		const second = await getOpenAiToolsForMcp([SERVER_A, SERVER_B]);
+
+		expect(second.tools.map((t) => t.function.name)).toEqual(["search", "fetch_page"]);
+		// A listed twice (failure not cached), B listed once (success cached)
+		expect(mcpMock.listToolsCalls.filter((u) => u === SERVER_A.url)).toHaveLength(2);
+		expect(mcpMock.listToolsCalls.filter((u) => u === SERVER_B.url)).toHaveLength(1);
+	});
+
+	it("keys entries by headers so per-user auth does not share a cache entry", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		const asUser1 = { ...SERVER_A, headers: { Authorization: "Bearer hf_user1" } };
+		const asUser2 = { ...SERVER_A, headers: { Authorization: "Bearer hf_user2" } };
+
+		await getOpenAiToolsForMcp([asUser1]);
+		await getOpenAiToolsForMcp([asUser2]);
+		await getOpenAiToolsForMcp([asUser1]);
+
+		expect(mcpMock.listToolsCalls).toEqual([SERVER_A.url, SERVER_A.url]);
+	});
+
+	it("hits the cache when only the display name changes, mapping to the new name", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+
+		await getOpenAiToolsForMcp([SERVER_A]);
+		const renamed = await getOpenAiToolsForMcp([{ ...SERVER_A, name: "Renamed" }]);
+
+		expect(mcpMock.listToolsCalls).toEqual([SERVER_A.url]);
+		expect(renamed.mapping.search?.server).toBe("Renamed");
+	});
+
+	it("suffixes colliding tool names with the server name", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		mcpMock.responses.set(SERVER_B.url, { tools: [searchTool] });
+
+		const { tools, mapping } = await getOpenAiToolsForMcp([SERVER_A, SERVER_B]);
+
+		expect(tools.map((t) => t.function.name)).toEqual(["search", "search_Server_B"]);
+		expect(mapping.search.server).toBe("Server A");
+		expect(mapping.search_Server_B.server).toBe("Server B");
 	});
 });

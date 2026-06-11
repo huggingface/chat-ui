@@ -2,7 +2,6 @@ import { config } from "$lib/server/config";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import { getMcpServers } from "$lib/server/mcp/registry";
 import { isValidUrl } from "$lib/server/urlSafety";
-import { resetMcpToolsCache } from "$lib/server/mcp/tools";
 import { getOpenAiToolsForMcp } from "$lib/server/mcp/tools";
 import type {
 	ChatCompletionChunk,
@@ -99,8 +98,6 @@ export async function* runMcpFlow({
 		)?.mcp;
 		const custom = Array.isArray(reqMcp?.selectedServers) ? reqMcp?.selectedServers : [];
 		if (custom.length > 0) {
-			// Invalidate cached tool list when the set of servers changes at request-time
-			resetMcpToolsCache();
 			// Deduplicate by server name (request takes precedence)
 			const byName = new Map<
 				string,
