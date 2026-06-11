@@ -17,7 +17,6 @@
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
-	import MessageAvatar from "./MessageAvatar.svelte";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import ToolUpdate from "./ToolUpdate.svelte";
@@ -374,7 +373,7 @@
 {#if message.from === "assistant"}
 	<div
 		bind:offsetWidth={messageWidth}
-		class="group relative -mb-4 flex w-fit max-w-full items-start justify-start gap-4 pb-4 leading-relaxed max-sm:mb-1 {message.routerMetadata &&
+		class="group relative -mb-4 flex w-fit max-w-full items-start justify-start pb-4 leading-relaxed max-sm:mb-1 {message.routerMetadata &&
 		messageInfoWidth >= messageWidth
 			? 'mb-1'
 			: ''}"
@@ -384,10 +383,6 @@
 		onclick={() => (isTapped = !isTapped)}
 		onkeydown={() => (isTapped = !isTapped)}
 	>
-		<MessageAvatar
-			classNames="mt-5 size-3.5 flex-none select-none rounded-full shadow-lg max-sm:hidden"
-			animating={isLast && loading}
-		/>
 		<div
 			class="relative flex min-w-[60px] flex-col gap-2 break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/80 dark:text-gray-300"
 		>
@@ -472,7 +467,7 @@
 		{#if message.routerMetadata || (!loading && message.content)}
 			<div
 				class="absolute -bottom-3.5 {message.routerMetadata && messageInfoWidth > messageWidth
-					? 'left-1 pl-1 lg:pl-7'
+					? 'left-1 pl-1'
 					: 'right-1'} flex max-w-[calc(100dvw-40px)] items-center gap-0.5"
 				bind:offsetWidth={messageInfoWidth}
 			>
