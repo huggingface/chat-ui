@@ -274,6 +274,8 @@ export interface ArtifactVersion {
 	language?: string;
 	content: string;
 	complete: boolean;
+	/** Generation ended (abort/error) before the closing tag arrived */
+	interrupted?: boolean;
 	op: ArtifactOpLabel;
 	/** 1-based version number within the artifact */
 	version: number;
@@ -309,9 +311,15 @@ export function artifactOpKey(messageId: Message["id"], opIndex: number): string
  * Walk the active conversation path and fold artifact operations into
  * versioned artifacts. Updates apply onto the latest version of the same
  * identifier; re-emitting a known identifier counts as a rewrite.
+ *
+ * `liveMessageId` is the message currently receiving tokens, if any. An
+ * unclosed tag only means "still streaming" there; anywhere else nothing can
+ * append to the content anymore (aborted or errored generation), so the
+ * version is final and flagged `interrupted` instead of spinning forever.
  */
 export function collectArtifacts(
-	messages: Array<Pick<Message, "id" | "from" | "content">>
+	messages: Array<Pick<Message, "id" | "from" | "content">>,
+	liveMessageId?: Message["id"]
 ): ArtifactRegistry {
 	const artifacts = new Map<string, Artifact>();
 	const byMessageOp = new Map<string, ArtifactCardRef>();
@@ -334,6 +342,8 @@ export function collectArtifacts(
 			opIndex += 1;
 
 			let artifact = artifacts.get(op.identifier);
+			const isLive = !op.closed && message.id === liveMessageId;
+			const interrupted = !op.closed && !isLive;
 
 			if (op.kind === "create") {
 				if (!artifact) {
@@ -346,14 +356,15 @@ export function collectArtifacts(
 					title: op.title,
 					language: op.language,
 					content: op.content,
-					complete: op.closed,
+					complete: !isLive,
+					interrupted,
 					op: artifact.versions.length > 0 ? "rewrite" : "create",
 					version: artifact.versions.length + 1,
 					messageId: message.id,
 				};
 				artifact.versions.push(version);
 				byMessageOp.set(key, { identifier: op.identifier, version: version.version });
-				if (!op.closed) {
+				if (isLive) {
 					streaming = { identifier: op.identifier, version: version.version };
 				}
 				continue;
@@ -373,18 +384,19 @@ export function collectArtifacts(
 				title: op.title || base.title,
 				language: base.language,
 				content: result.content,
-				complete: op.closed,
+				complete: !isLive,
+				interrupted,
 				op: "update",
 				version: artifact.versions.length + 1,
 				messageId: message.id,
 				// A finished update with zero parsed pairs is a no-op the model
 				// didn't intend — surface it as a failed edit instead of silently
 				// showing "Edited" with unchanged content.
-				failedPairs: Math.max(result.failed, op.closed && op.pairs.length === 0 ? 1 : 0),
+				failedPairs: Math.max(result.failed, !isLive && op.pairs.length === 0 ? 1 : 0),
 			};
 			artifact.versions.push(version);
 			byMessageOp.set(key, { identifier: op.identifier, version: version.version });
-			if (!op.closed) {
+			if (isLive) {
 				streaming = { identifier: op.identifier, version: version.version };
 			}
 		}

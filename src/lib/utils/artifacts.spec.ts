@@ -201,12 +201,44 @@ describe("collectArtifacts", () => {
 		});
 	});
 
-	it("marks the streaming version", () => {
+	it("marks the streaming version while its message is live", () => {
+		const registry = collectArtifacts(
+			[msg("m1", `<artifact identifier="app" type="html" title="App">stream`)],
+			"m1"
+		);
+		expect(registry.streaming).toEqual({ identifier: "app", version: 1 });
+		expect(registry.artifacts.get("app")?.versions[0].complete).toBe(false);
+	});
+
+	it("finalizes an unclosed artifact whose message is no longer generating", () => {
+		// Aborted/interrupted generations leave the tag unterminated forever; the
+		// version must not read as streaming once nothing can append to it.
 		const registry = collectArtifacts([
 			msg("m1", `<artifact identifier="app" type="html" title="App">stream`),
 		]);
-		expect(registry.streaming).toEqual({ identifier: "app", version: 1 });
-		expect(registry.artifacts.get("app")?.versions[0].complete).toBe(false);
+		expect(registry.streaming).toBeUndefined();
+		expect(registry.artifacts.get("app")?.versions[0]).toMatchObject({
+			complete: true,
+			interrupted: true,
+			content: "stream",
+		});
+	});
+
+	it("finalizes an unclosed artifact in an earlier message even while another is live", () => {
+		const registry = collectArtifacts(
+			[
+				msg("m1", `<artifact identifier="app" type="html" title="App">partial`),
+				msg("m2", "continue", "user"),
+				msg("m3", `<artifact identifier="app" type="html" title="App">fresh`),
+			],
+			"m3"
+		);
+		expect(registry.artifacts.get("app")?.versions[0]).toMatchObject({
+			complete: true,
+			interrupted: true,
+		});
+		expect(registry.artifacts.get("app")?.versions[1].complete).toBe(false);
+		expect(registry.streaming).toEqual({ identifier: "app", version: 2 });
 	});
 
 	it("flags updates that reference unknown artifacts", () => {
@@ -221,6 +253,23 @@ describe("collectArtifacts", () => {
 	});
 
 	it("applies streaming update pairs progressively", () => {
+		const registry = collectArtifacts(
+			[
+				msg("m1", `<artifact identifier="app" type="html" title="App">alpha beta</artifact>`),
+				msg(
+					"m2",
+					`<artifact identifier="app" type="update"><old_str>alpha</old_str><new_str>gamma</new_str><old_str>be`
+				),
+			],
+			"m2"
+		);
+		const version = registry.artifacts.get("app")?.versions[1];
+		expect(version?.content).toBe("gamma beta");
+		expect(version?.complete).toBe(false);
+		expect(registry.streaming).toEqual({ identifier: "app", version: 2 });
+	});
+
+	it("finalizes an interrupted update op", () => {
 		const registry = collectArtifacts([
 			msg("m1", `<artifact identifier="app" type="html" title="App">alpha beta</artifact>`),
 			msg(
@@ -230,8 +279,8 @@ describe("collectArtifacts", () => {
 		]);
 		const version = registry.artifacts.get("app")?.versions[1];
 		expect(version?.content).toBe("gamma beta");
-		expect(version?.complete).toBe(false);
-		expect(registry.streaming).toEqual({ identifier: "app", version: 2 });
+		expect(version).toMatchObject({ complete: true, interrupted: true });
+		expect(registry.streaming).toBeUndefined();
 	});
 
 	it("ignores artifacts in user messages", () => {
@@ -393,18 +442,21 @@ describe("zero-pair updates are flagged", () => {
 	});
 
 	it("does not flag a still-streaming update with no pairs yet", () => {
-		const registry = collectArtifacts([
-			{
-				id: "m1",
-				from: "assistant",
-				content: `<artifact identifier="app" type="html" title="App">hello</artifact>`,
-			},
-			{
-				id: "m2",
-				from: "assistant",
-				content: `<artifact identifier="app" type="update">\n<old_str>hel`,
-			},
-		]);
+		const registry = collectArtifacts(
+			[
+				{
+					id: "m1",
+					from: "assistant",
+					content: `<artifact identifier="app" type="html" title="App">hello</artifact>`,
+				},
+				{
+					id: "m2",
+					from: "assistant",
+					content: `<artifact identifier="app" type="update">\n<old_str>hel`,
+				},
+			],
+			"m2"
+		);
 		const v2 = registry.artifacts.get("app")?.versions[1];
 		expect(v2?.complete).toBe(false);
 		expect(v2?.failedPairs).toBe(0);

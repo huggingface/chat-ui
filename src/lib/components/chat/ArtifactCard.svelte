@@ -61,6 +61,11 @@
 				? `Code · ${version.language}`
 				: KIND_LABELS[version.type];
 		const versionLabel = (artifact?.versions.length ?? 0) > 1 ? ` · v${version.version}` : "";
+		if (version.interrupted) {
+			return version.op === "update"
+				? `Edit interrupted${versionLabel}`
+				: `Interrupted · ${kindLabel}${versionLabel}`;
+		}
 		if (version.op === "update") {
 			return version.failedPairs
 				? `Edited, ${version.failedPairs} change${version.failedPairs > 1 ? "s" : ""} didn't apply${versionLabel}`

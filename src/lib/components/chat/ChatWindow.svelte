@@ -115,7 +115,11 @@
 
 	// Artifacts: fold <artifact> operations from the visible message path into a
 	// versioned registry, shared with the inline cards and the side panel.
-	let artifactRegistry = $derived(collectArtifacts(messages));
+	// Only the message currently receiving tokens can have a streaming artifact;
+	// unclosed tags anywhere else are interrupted generations, not live ones.
+	let artifactRegistry = $derived(
+		collectArtifacts(messages, loading ? messages.at(-1)?.id : undefined)
+	);
 	setArtifactsContext({
 		get registry() {
 			return artifactRegistry;
