@@ -138,6 +138,48 @@ export const allBaseServersEnabled = derived(
 // is applied server-side when enabled via MCP_FORWARD_HF_USER_TOKEN.
 
 /**
+ * Populate the MCP store from a known base-server list without making a network
+ * request. Merges with any custom servers saved in localStorage, applies the
+ * user's disabled-server preferences, and sets mcpServersLoaded synchronously.
+ *
+ * Called from the root layout script block with the server list that arrived in
+ * the SSR payload, so the store is ready before any child onMount fires.
+ * The background refreshMcpServers() call still runs to pick up status changes.
+ */
+export function initWithServers(baseServers: MCPServer[]): void {
+	const customServers = loadCustomServers();
+
+	// Merge base and custom servers
+	const merged = [...baseServers, ...customServers];
+	allMcpServers.set(merged);
+
+	// Load disabled base servers
+	const disabledBaseIds = loadDisabledBaseIds();
+
+	// Auto-enable all base servers that aren't explicitly disabled.
+	// Keep any custom servers that were previously selected and still exist.
+	const validIds = new Set(merged.map((s) => s.id));
+	selectedServerIds.update(($currentIds) => {
+		const newSelection = new Set<string>();
+
+		for (const server of baseServers) {
+			if (!disabledBaseIds.has(server.id)) {
+				newSelection.add(server.id);
+			}
+		}
+
+		for (const id of $currentIds) {
+			if (validIds.has(id) && !id.startsWith("base-")) {
+				newSelection.add(id);
+			}
+		}
+
+		return newSelection;
+	});
+	mcpServersLoaded.set(true);
+}
+
+/**
  * Refresh base servers from API and merge with custom servers
  */
 export async function refreshMcpServers() {
@@ -148,38 +190,7 @@ export async function refreshMcpServers() {
 		}
 
 		const baseServers: MCPServer[] = await response.json();
-		const customServers = loadCustomServers();
-
-		// Merge base and custom servers
-		const merged = [...baseServers, ...customServers];
-		allMcpServers.set(merged);
-
-		// Load disabled base servers
-		const disabledBaseIds = loadDisabledBaseIds();
-
-		// Auto-enable all base servers that aren't explicitly disabled
-		// Plus keep any custom servers that were previously selected
-		const validIds = new Set(merged.map((s) => s.id));
-		selectedServerIds.update(($currentIds) => {
-			const newSelection = new Set<string>();
-
-			// Add all base servers that aren't disabled
-			for (const server of baseServers) {
-				if (!disabledBaseIds.has(server.id)) {
-					newSelection.add(server.id);
-				}
-			}
-
-			// Keep custom servers that were selected and still exist
-			for (const id of $currentIds) {
-				if (validIds.has(id) && !id.startsWith("base-")) {
-					newSelection.add(id);
-				}
-			}
-
-			return newSelection;
-		});
-		mcpServersLoaded.set(true);
+		initWithServers(baseServers);
 	} catch (error) {
 		console.error("Failed to refresh MCP servers:", error);
 		// On error, just use custom servers

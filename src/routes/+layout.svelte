@@ -9,6 +9,7 @@
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { setHapticsEnabled } from "$lib/utils/haptics";
+	import { initWithServers } from "$lib/stores/mcpServers";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -37,6 +38,7 @@
 	// reference changes after subsequent invalidations.
 	// Last-write-wins from server is acceptable; see conversations.svelte.ts.
 	convsStore.init(data.conversations);
+
 	$effect(() => {
 		convsStore.init(data.conversations);
 	});
@@ -114,6 +116,15 @@
 	});
 
 	onMount(async () => {
+		// Seed the MCP store from the SSR payload before anything else runs.
+		// onMount never fires during SSR, so this matches the server-rendered HTML
+		// (stores at defaults) and avoids hydration mismatches in NavMenu / ChatWindow.
+		// The layout onMount fires after child onMounts (Svelte 5 order), but that
+		// is fine: writeMessage's mcpServersLoaded gate is an async Promise/subscriber,
+		// so when initWithServers sets mcpServersLoaded=true synchronously here, the
+		// subscriber resolves immediately without any added network latency.
+		initWithServers(data.mcpBaseServers ?? []);
+
 		if (publicConfig.isHuggingChat && data.user?.username) {
 			fetch(`https://huggingface.co/api/users/${data.user.username}/overview`)
 				.then((res) => res.json())

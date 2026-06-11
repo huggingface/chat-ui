@@ -2,6 +2,7 @@ import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { useAPIClient, handleResponse } from "$lib/APIClient";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
 import type { GETModelsResponse, FeatureFlags } from "$lib/server/api/types";
+import { base } from "$app/paths";
 
 interface ConversationListItem {
 	_id: { toString(): string };
@@ -42,7 +43,13 @@ interface SettingsResponse {
 export const load = async ({ fetch, url }) => {
 	const client = useAPIClient({ fetch, origin: url.origin });
 
-	const [settings, models, user, publicConfig, featureFlags, conversationsData] =
+	// Fetch the MCP base-server list alongside the other layout data.
+	// During SSR, SvelteKit's fetch intercepts same-origin requests and serves
+	// them directly from the handler — no real HTTP round-trip. The result is
+	// inlined in the SSR payload so the client has it before any onMount fires,
+	// allowing +layout.svelte to pre-populate the mcpServers store synchronously
+	// and eliminate the mcpServersLoaded gate delay on first message.
+	const [settings, models, user, publicConfig, featureFlags, conversationsData, mcpBaseServers] =
 		(await Promise.all([
 			client.user.settings.get().then(handleResponse),
 			client.models.get().then(handleResponse),
@@ -50,6 +57,9 @@ export const load = async ({ fetch, url }) => {
 			client["public-config"].get().then(handleResponse),
 			client["feature-flags"].get().then(handleResponse),
 			client.conversations.get({ query: { p: 0 } }).then(handleResponse),
+			fetch(`${url.origin}${base}/api/mcp/servers`)
+				.then((r) => (r.ok ? r.json() : []))
+				.catch(() => []),
 		])) as [
 			SettingsResponse,
 			GETModelsResponse,
@@ -57,6 +67,7 @@ export const load = async ({ fetch, url }) => {
 			Record<string, unknown>,
 			FeatureFlags,
 			{ conversations: ConversationListItem[]; hasMore: boolean },
+			import("$lib/types/Tool").MCPServer[],
 		];
 
 	const defaultModel = models[0];
@@ -87,6 +98,7 @@ export const load = async ({ fetch, url }) => {
 				: null,
 		},
 		publicConfig: getConfigManager(publicConfig as Record<`PUBLIC_${string}`, string>),
+		mcpBaseServers,
 		...featureFlags,
 	};
 };
