@@ -185,12 +185,11 @@
 					href="https://huggingface.co/{user.username}"
 					target="_blank"
 					rel="noopener noreferrer"
-					class="flex flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 hover:underline dark:text-gray-400"
+					class="min-w-0 truncate pr-2 text-gray-500 hover:underline dark:text-gray-400"
 					>{user.username}</a
 				>
 			{:else}
-				<span
-					class="flex flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
+				<span class="min-w-0 truncate pr-2 text-gray-500 dark:text-gray-400"
 					>{user?.username || user?.email}</span
 				>
 			{/if}
@@ -200,14 +199,14 @@
 					href="https://huggingface.co/subscribe/pro?from=HuggingChat"
 					target="_blank"
 					rel="noopener noreferrer"
-					class="ml-auto flex h-[20px] items-center gap-1 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400"
+					class="ml-auto flex h-[20px] shrink-0 items-center gap-1 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400"
 				>
 					<IconPro />
 					Get PRO
 				</a>
 			{:else if publicConfig.isHuggingChat && $isPro === true}
 				<span
-					class="ml-auto flex h-[20px] items-center gap-1 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400"
+					class="ml-auto flex h-[20px] shrink-0 items-center gap-1 px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400"
 				>
 					<IconPro />
 					PRO
