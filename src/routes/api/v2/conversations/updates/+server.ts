@@ -104,7 +104,12 @@ export const GET: RequestHandler = async ({ locals, url, request }) => {
 							"messages.interrupted": 1,
 							"messages.updates": 1,
 						})
-						.sort({ updatedAt: -1 })
+						// Oldest first keeps the cursor replay-safe: events are emitted in
+						// chronological order, so a reconnect with the last received
+						// updatedAt never skips older events from a partially delivered
+						// batch, and limit() truncates the NEWEST records, which remain
+						// beyond the cursor and are picked up on the next tick.
+						.sort({ updatedAt: 1 })
 						.limit(50)
 						.toArray();
 
