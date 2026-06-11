@@ -203,6 +203,7 @@
 													class="max-h-60 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
 													src={imageUrl}
 													loading="lazy"
+													referrerpolicy="no-referrer"
 												/>
 											{/each}
 										</div>
