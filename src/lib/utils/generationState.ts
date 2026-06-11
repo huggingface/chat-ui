@@ -24,3 +24,19 @@ export function isConversationGenerationActive(messages: Message[]): boolean {
 
 	return !isAssistantGenerationTerminal(lastAssistant);
 }
+
+/**
+ * How long a generation may go without any database write before it is
+ * considered dead. Conversation.updatedAt is bumped when a generation starts
+ * (the pre-stream message write) and when it ends (persistConversation), so a
+ * conversation that has stayed non-terminal longer than this belongs to a pod
+ * that crashed before persisting — it will never become terminal on its own
+ * and must not keep the UI in a generating state forever.
+ */
+export const GENERATION_STALE_MS = 10 * 60 * 1000;
+
+export function isGenerationStale(lastWriteAt: Date | string | undefined): boolean {
+	if (!lastWriteAt) return false;
+	const t = new Date(lastWriteAt).getTime();
+	return !Number.isNaN(t) && Date.now() - t > GENERATION_STALE_MS;
+}

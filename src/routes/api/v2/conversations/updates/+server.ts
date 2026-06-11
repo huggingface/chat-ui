@@ -2,7 +2,7 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
-import { isAssistantGenerationTerminal } from "$lib/utils/generationState";
+import { isAssistantGenerationTerminal, isGenerationStale } from "$lib/utils/generationState";
 import type { Message } from "$lib/types/Message";
 
 /**
@@ -119,7 +119,11 @@ export const GET: RequestHandler = async ({ locals, url, request }) => {
 						const lastAssistant = [...conv.messages]
 							.reverse()
 							.find((m) => m.from === "assistant") as Message | undefined;
-						const isTerminal = isAssistantGenerationTerminal(lastAssistant);
+						// Stale non-terminal conversations belong to pods that died
+						// before persisting; report them terminal so clients stop
+						// tracking them instead of spinning forever.
+						const isTerminal =
+							isAssistantGenerationTerminal(lastAssistant) || isGenerationStale(conv.updatedAt);
 
 						const event: ConvUpdate = {
 							id: conv._id.toString(),
