@@ -93,7 +93,8 @@ export type SettingsEditable = Omit<Settings, "welcomeModalSeenAt" | "createdAt"
 // TODO: move this to a constant file along with other constants
 export const DEFAULT_SETTINGS = {
 	shareConversationsWithModelAuthors: true,
-	activeModel: defaultModel.id,
+	// defaultModel is unset during `vite build` (models aren't fetched at build time)
+	activeModel: defaultModel?.id ?? "",
 	customPrompts: {},
 	customPromptsEnabled: {},
 	multimodalOverrides: {},

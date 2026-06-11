@@ -43,8 +43,13 @@ export const GET: RequestHandler = async ({ locals, url, request }) => {
 	// `cursor` is an ISO timestamp; events with updatedAt > cursor are sent.
 	// On the very first connection the client passes cursor=0 (epoch) so all
 	// in-flight conversations are surfaced immediately.
+	// An unparseable cursor yields an Invalid Date whose NaN time BSON-serializes
+	// as epoch while never advancing (NaN comparisons are false), so every tick
+	// would re-emit up to 50 conversations for the stream's whole lifetime.
+	// Treat invalid cursors as epoch instead.
 	const cursorParam = url.searchParams.get("cursor");
-	let cursor = cursorParam ? new Date(cursorParam) : new Date(0);
+	const parsedCursor = cursorParam ? new Date(cursorParam) : null;
+	let cursor = parsedCursor && !isNaN(parsedCursor.getTime()) ? parsedCursor : new Date(0);
 
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -149,7 +154,7 @@ export const GET: RequestHandler = async ({ locals, url, request }) => {
 	return new Response(stream, {
 		headers: {
 			"Content-Type": "text/event-stream",
-			"Cache-Control": "no-cache",
+			"Cache-Control": "no-cache, no-transform",
 			Connection: "keep-alive",
 			// Allow client-side JS to read this response (CORS if needed)
 			"X-Accel-Buffering": "no",

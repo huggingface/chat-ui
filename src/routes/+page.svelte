@@ -83,12 +83,12 @@
 			const pendingFilesNonce = files.length > 0 ? storePendingFiles(files) : undefined;
 
 			// Optimistically prepend the new conversation to the sidebar immediately so
-			// it appears before the first message starts streaming. The title is set to
-			// "" here; it will be updated to the real title via a Title SSE update once
-			// the LLM generates one.
+			// it appears before the first message starts streaming. "New Chat" matches
+			// the server-side default title; the real title arrives via a Title stream
+			// update once the LLM generates one.
 			convsStore.prepend({
 				id: conversationId,
-				title: "",
+				title: "New Chat",
 				model,
 				updatedAt: new Date(),
 			});
