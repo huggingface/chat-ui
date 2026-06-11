@@ -4,7 +4,7 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { McpServerConfig } from "./httpClient";
 import { ssrfSafeFetch } from "$lib/server/urlSafety";
 
-type PoolEntry = { client: Client; lastUsedAt: number };
+type PoolEntry = { client: Client; lastUsedAt: number; activeCalls: number };
 
 const pool = new Map<string, PoolEntry>();
 
@@ -24,7 +24,7 @@ function ensureSweeper() {
 	sweeper = setInterval(() => {
 		const now = Date.now();
 		for (const [key, entry] of pool) {
-			if (now - entry.lastUsedAt > IDLE_TTL_MS) {
+			if (entry.activeCalls === 0 && now - entry.lastUsedAt > IDLE_TTL_MS) {
 				pool.delete(key);
 				entry.client.close?.().catch(() => {});
 			}
@@ -64,7 +64,9 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 	let firstError: unknown;
 	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
 	const url = new URL(server.url);
-	const requestInit: RequestInit = { headers: server.headers, signal };
+	// Pooled clients outlive the request that created them, so never bind the per-request
+	// abort signal to the transport. Per-call cancellation goes through RequestOptions instead.
+	const requestInit: RequestInit = { headers: server.headers };
 	try {
 		try {
 			await client.connect(
@@ -92,9 +94,29 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 		throw err;
 	}
 
-	pool.set(key, { client, lastUsedAt: Date.now() });
+	pool.set(key, { client, lastUsedAt: Date.now(), activeCalls: 0 });
 	ensureSweeper();
 	return client;
+}
+
+/** Mark a pooled client as having an in-flight call so the sweeper won't close it. */
+export function retainClient(client: Client) {
+	for (const entry of pool.values()) {
+		if (entry.client === client) {
+			entry.activeCalls++;
+			return;
+		}
+	}
+}
+
+export function releaseClient(client: Client) {
+	for (const entry of pool.values()) {
+		if (entry.client === client) {
+			entry.activeCalls = Math.max(0, entry.activeCalls - 1);
+			entry.lastUsedAt = Date.now();
+			return;
+		}
+	}
 }
 
 export async function drainPool() {

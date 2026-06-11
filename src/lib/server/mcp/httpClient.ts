@@ -1,5 +1,5 @@
 import { Client } from "@modelcontextprotocol/sdk/client";
-import { getClient, evictFromPool } from "./clientPool";
+import { getClient, evictFromPool, retainClient, releaseClient } from "./clientPool";
 import { config } from "$lib/server/config";
 
 function isConnectionClosedError(err: unknown): boolean {
@@ -61,8 +61,8 @@ export async function callMcpTool(
 			? (args as Record<string, unknown>)
 			: undefined;
 
-	// Get a (possibly pooled) client. The client itself was connected with a signal
-	// that already composes outer cancellation. We still enforce a per-call timeout here.
+	// Get a (possibly pooled) client. Cancellation and timeout are enforced per call
+	// via the request options below, not on the pooled transport itself.
 	let activeClient = client ?? (await getClient(server, signal));
 
 	const callToolOptions = {
@@ -84,8 +84,11 @@ export async function callMcpTool(
 	const maxReconnectAttempts = 2;
 	let response;
 	for (let attempt = 0; ; attempt++) {
+		// Keep a stable reference for retain/release: `activeClient` is reassigned on retry.
+		const currentClient = activeClient;
+		retainClient(currentClient);
 		try {
-			response = await activeClient.callTool(
+			response = await currentClient.callTool(
 				{ name: tool, arguments: normalizedArgs },
 				undefined,
 				callToolOptions
@@ -105,6 +108,8 @@ export async function callMcpTool(
 				await new Promise((resolve) => setTimeout(resolve, 1_000 * attempt));
 			}
 			activeClient = await getClient(server, signal);
+		} finally {
+			releaseClient(currentClient);
 		}
 	}
 
