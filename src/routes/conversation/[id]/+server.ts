@@ -27,6 +27,13 @@ import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { MetricsServer } from "$lib/server/metrics";
 
+// How long a stop marker is protected from the pre-flight cleanup of a new
+// generation. A marker younger than this may still be awaiting observation by
+// a running generation's 300ms watcher (possibly on another pod); deleting it
+// would lose the stop. Aborted generations consume their marker on shutdown,
+// so markers normally live far shorter than this.
+const STOP_MARKER_GRACE_MS = 5_000;
+
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
@@ -75,11 +82,18 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// A new generation invalidates any stale stop marker for this conversation.
 	// The abortedGenerations collection is the cross-pod abort channel:
 	// stop-generating upserts a marker, and the watcher in the stream below
-	// polls it. Clearing it here — before the client could possibly issue a
-	// stop for THIS generation (its fetch has not returned yet) — means any
-	// marker observed later was meant for us, with no wall-clock comparison
-	// between pods needed.
-	await collections.abortedGenerations.deleteOne({ conversationId: convId });
+	// polls it. Clearing stale markers here — before the client could possibly
+	// issue a stop for THIS generation (its fetch has not returned yet) — means
+	// any marker observed later was meant for us, with no wall-clock comparison
+	// between pods needed. Markers younger than the grace window are preserved:
+	// they belong to a stop for a still-winding-down generation in this same
+	// conversation (e.g. issued from another tab), whose watcher must get the
+	// chance to observe them; aborted generations consume their marker on
+	// shutdown, so a fresh marker is never a stale one.
+	await collections.abortedGenerations.deleteOne({
+		conversationId: convId,
+		updatedAt: { $lt: new Date(Date.now() - STOP_MARKER_GRACE_MS) },
+	});
 
 	// register the event for ratelimiting
 	await collections.messageEvents.insertOne({
@@ -708,6 +722,18 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			await persistConversation();
 			clearInterval(abortMarkerWatcher);
 			abortRegistry.unregister(conversationKey, ctrl);
+
+			// Consume the stop marker once the stop has been honored and the
+			// interrupted state persisted. Markers are conversation-scoped, so a
+			// leftover would trip the watcher of the next generation; consuming
+			// here (instead of unconditionally deleting in pre-flight) keeps
+			// markers alive long enough for concurrent in-flight generations to
+			// observe them.
+			if (abortedByUser) {
+				await collections.abortedGenerations
+					.deleteOne({ conversationId: convId })
+					.catch((err) => logger.warn(err, "Failed to consume stop marker"));
+			}
 
 			// used to detect if cancel() is called bc of interrupt or just because the connection closes
 			doneStreaming = true;
