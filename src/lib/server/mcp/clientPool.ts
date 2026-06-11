@@ -19,6 +19,17 @@ const SWEEP_INTERVAL_MS = 60_000;
 
 let sweeper: ReturnType<typeof setInterval> | undefined;
 
+// Dispose of a still-healthy pooled client. Per the MCP Streamable HTTP spec, clients
+// SHOULD explicitly terminate sessions they no longer need (HTTP DELETE) before dropping
+// the connection; servers that don't support it reply 405, which the SDK treats as ok.
+async function disposeClient(client: Client) {
+	const transport = client.transport;
+	if (transport instanceof StreamableHTTPClientTransport) {
+		await transport.terminateSession().catch(() => {});
+	}
+	await client.close?.().catch(() => {});
+}
+
 function ensureSweeper() {
 	if (sweeper) return;
 	sweeper = setInterval(() => {
@@ -26,7 +37,7 @@ function ensureSweeper() {
 		for (const [key, entry] of pool) {
 			if (entry.activeCalls === 0 && now - entry.lastUsedAt > IDLE_TTL_MS) {
 				pool.delete(key);
-				entry.client.close?.().catch(() => {});
+				void disposeClient(entry.client);
 			}
 		}
 	}, SWEEP_INTERVAL_MS);
@@ -121,9 +132,7 @@ export function releaseClient(client: Client) {
 
 export async function drainPool() {
 	for (const [key, entry] of pool) {
-		try {
-			await entry.client.close?.();
-		} catch {}
+		await disposeClient(entry.client);
 		pool.delete(key);
 	}
 }

@@ -1,10 +1,18 @@
 import { Client } from "@modelcontextprotocol/sdk/client";
+import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { getClient, evictFromPool, retainClient, releaseClient } from "./clientPool";
 import { config } from "$lib/server/config";
 
 function isConnectionClosedError(err: unknown): boolean {
 	const message = err instanceof Error ? err.message : String(err);
 	return message.includes("-32000") || message.toLowerCase().includes("connection closed");
+}
+
+// Per the MCP Streamable HTTP spec, a 404 on a request carrying a session ID means the
+// session expired and the client MUST start a new session with a new InitializeRequest —
+// which is exactly what reconnecting with a fresh client does.
+function isSessionExpiredError(err: unknown): boolean {
+	return err instanceof StreamableHTTPError && err.code === 404;
 }
 
 export interface McpServerConfig {
@@ -77,6 +85,8 @@ export async function callMcpTool(
 			});
 		},
 		resetTimeoutOnProgress: true,
+		// The spec requires a maximum total timeout even when progress resets the per-step one.
+		maxTotalTimeout: timeoutMs * 10,
 	};
 
 	// The connection can be closed at any point during a (potentially long-running) call,
@@ -95,7 +105,11 @@ export async function callMcpTool(
 			);
 			break;
 		} catch (err) {
-			if (attempt >= maxReconnectAttempts || !isConnectionClosedError(err) || signal?.aborted) {
+			if (
+				attempt >= maxReconnectAttempts ||
+				signal?.aborted ||
+				!(isConnectionClosedError(err) || isSessionExpiredError(err))
+			) {
 				throw err;
 			}
 
