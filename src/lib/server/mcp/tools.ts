@@ -17,15 +17,26 @@ export interface McpToolMapping {
 	tool: string;
 }
 
-interface CacheEntry {
+// Tool listings are cached per server (url + headers), not per server set, so
+// toggling one server never invalidates the others' entries. Headers are part
+// of the key because they change what a server returns (e.g. the forwarded HF
+// user token yields a per-user tool list on hf.co/mcp); that also means the key
+// space grows with active users, hence the size cap.
+type CachedServerTool = {
+	name: string;
+	description?: string;
+	parameters?: Record<string, unknown>;
+};
+
+interface ServerCacheEntry {
 	fetchedAt: number;
 	ttlMs: number;
-	tools: OpenAiTool[];
-	mapping: Record<string, McpToolMapping>;
+	tools: CachedServerTool[];
 }
 
 const DEFAULT_TTL_MS = 60_000;
-const cache = new Map<string, CacheEntry>();
+const MAX_CACHE_ENTRIES = 1_000;
+const cache = new Map<string, ServerCacheEntry>();
 
 // Per OpenAI tool/function name guidelines most providers enforce:
 //   ^[a-zA-Z0-9_-]{1,64}$
@@ -106,24 +117,27 @@ export function sanitizeJsonSchema(schema: Record<string, unknown>): Record<stri
 	return out;
 }
 
-function buildCacheKey(servers: McpServerConfig[]): string {
-	const normalized = servers
-		.map((server) => ({
-			name: server.name,
-			url: server.url,
-			headers: server.headers
-				? Object.entries(server.headers)
-						.sort(([a], [b]) => a.localeCompare(b))
-						.map(([key, value]) => [key, value])
-				: [],
-		}))
-		.sort((a, b) => {
-			const byName = a.name.localeCompare(b.name);
-			if (byName !== 0) return byName;
-			return a.url.localeCompare(b.url);
-		});
+function serverCacheKey(server: McpServerConfig): string {
+	const headers = server.headers
+		? Object.entries(server.headers).sort(([a], [b]) => a.localeCompare(b))
+		: [];
+	return JSON.stringify([server.url, headers]);
+}
 
-	return JSON.stringify(normalized);
+function evictExpired(now: number) {
+	for (const [key, entry] of cache) {
+		if (now - entry.fetchedAt >= entry.ttlMs) {
+			cache.delete(key);
+		}
+	}
+}
+
+function enforceCacheCap() {
+	if (cache.size <= MAX_CACHE_ENTRIES) return;
+	const oldestFirst = [...cache.entries()].sort((a, b) => a[1].fetchedAt - b[1].fetchedAt);
+	for (const [key] of oldestFirst.slice(0, cache.size - MAX_CACHE_ENTRIES)) {
+		cache.delete(key);
+	}
 }
 
 type ListedTool = {
@@ -177,17 +191,62 @@ async function listServerTools(
 	}
 }
 
+async function fetchServerTools(
+	server: McpServerConfig,
+	opts: { signal?: AbortSignal } = {}
+): Promise<CachedServerTool[]> {
+	const raw = await listServerTools(server, opts);
+	const normalized: CachedServerTool[] = [];
+	for (const tool of raw) {
+		if (typeof tool.name !== "string" || tool.name.trim().length === 0) {
+			continue;
+		}
+		normalized.push({
+			name: tool.name,
+			description: tool.description ?? tool.annotations?.title,
+			parameters: isPlainObject(tool.inputSchema)
+				? sanitizeJsonSchema(tool.inputSchema)
+				: undefined,
+		});
+	}
+	return normalized;
+}
+
 export async function getOpenAiToolsForMcp(
 	servers: McpServerConfig[],
 	{ ttlMs = DEFAULT_TTL_MS, signal }: { ttlMs?: number; signal?: AbortSignal } = {}
 ): Promise<{ tools: OpenAiTool[]; mapping: Record<string, McpToolMapping> }> {
 	const now = Date.now();
-	const cacheKey = buildCacheKey(servers);
-	const cached = cache.get(cacheKey);
-	if (cached && now - cached.fetchedAt < cached.ttlMs) {
-		return { tools: cached.tools, mapping: cached.mapping };
-	}
+	evictExpired(now);
 
+	// Resolve each server's tools from the per-server cache; only cold servers
+	// are fetched, in parallel. A failed listing contributes no tools and caches
+	// nothing, so the next request retries that server.
+	const listed = await Promise.all(
+		servers.map(async (server): Promise<CachedServerTool[]> => {
+			const key = serverCacheKey(server);
+			const cached = cache.get(key);
+			if (cached) {
+				return cached.tools;
+			}
+			try {
+				const tools = await fetchServerTools(server, { signal });
+				cache.set(key, { fetchedAt: now, ttlMs, tools });
+				return tools;
+			} catch (err) {
+				logger.debug(
+					{ server: server.name, url: server.url, err: String(err) },
+					"[mcp] failed to list tools for server"
+				);
+				return [];
+			}
+		})
+	);
+	enforceCacheCap();
+
+	// Function names depend on the request's server combination (collision
+	// suffixes), so definitions and mapping are rebuilt per request from the
+	// cached per-server listings.
 	const tools: OpenAiTool[] = [];
 	const mapping: Record<string, McpToolMapping> = {};
 
@@ -210,59 +269,36 @@ export async function getOpenAiToolsForMcp(
 		seenNames.add(name);
 	};
 
-	// Fetch tools in parallel; tolerate individual failures
-	const tasks = servers.map((server) => listServerTools(server, { signal }));
-	const results = await Promise.allSettled(tasks);
-
-	for (let i = 0; i < results.length; i++) {
-		const server = servers[i];
-		const r = results[i];
-		if (r.status === "fulfilled") {
-			const serverTools = r.value;
-			for (const tool of serverTools) {
-				if (typeof tool.name !== "string" || tool.name.trim().length === 0) {
-					continue;
-				}
-
-				const parameters = isPlainObject(tool.inputSchema)
-					? sanitizeJsonSchema(tool.inputSchema)
-					: undefined;
-				const description = tool.description ?? tool.annotations?.title;
-				const toolName = tool.name;
-
-				// Emit a collision-aware function name.
-				// Prefer the plain tool name; on conflict, suffix with server name.
-				let plainName = sanitizeName(toolName);
-				if (plainName in mapping) {
-					const suffix = sanitizeName(server.name);
-					const candidate = `${plainName}_${suffix}`.slice(0, 64);
-					if (!(candidate in mapping)) {
-						plainName = candidate;
-					} else {
-						let i = 2;
-						let next = `${candidate}_${i}`;
-						while (i < 10 && next in mapping) {
-							i += 1;
-							next = `${candidate}_${i}`;
-						}
-						plainName = next.slice(0, 64);
+	for (const [index, server] of servers.entries()) {
+		for (const tool of listed[index]) {
+			// Emit a collision-aware function name.
+			// Prefer the plain tool name; on conflict, suffix with server name.
+			let plainName = sanitizeName(tool.name);
+			if (plainName in mapping) {
+				const suffix = sanitizeName(server.name);
+				const candidate = `${plainName}_${suffix}`.slice(0, 64);
+				if (!(candidate in mapping)) {
+					plainName = candidate;
+				} else {
+					let n = 2;
+					let next = `${candidate}_${n}`;
+					while (n < 10 && next in mapping) {
+						n += 1;
+						next = `${candidate}_${n}`;
 					}
+					plainName = next.slice(0, 64);
 				}
-
-				pushToolDefinition(plainName, description, parameters);
-				mapping[plainName] = {
-					fnName: plainName,
-					server: server.name,
-					tool: toolName,
-				};
 			}
-		} else {
-			// ignore failure for this server
-			continue;
+
+			pushToolDefinition(plainName, tool.description, tool.parameters);
+			mapping[plainName] = {
+				fnName: plainName,
+				server: server.name,
+				tool: tool.name,
+			};
 		}
 	}
 
-	cache.set(cacheKey, { fetchedAt: now, ttlMs, tools, mapping });
 	return { tools, mapping };
 }
 
