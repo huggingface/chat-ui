@@ -381,8 +381,15 @@
 						messageToWriteTo.updates?.some((u) => u.type === MessageUpdateType.Tool) ?? false;
 
 					if (isInterrupted) {
-						// Preserve streamed content on abort. If we never streamed, fall back to finalText.
 						if (!messageToWriteTo.content) {
+							// We never streamed anything; fall back to finalText.
+							messageToWriteTo.content = finalText;
+						} else if (finalText && messageToWriteTo.content.startsWith(finalText)) {
+							// The server may have clamped the persisted text back to a
+							// reported stop point (see stop-generating). Adopt it when it
+							// is a prefix of what we streamed so this view matches what
+							// every other view will load; otherwise keep our streamed
+							// content (continue flows receive only the post-prefix text).
 							messageToWriteTo.content = finalText;
 						}
 					} else if (hadTools) {
