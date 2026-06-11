@@ -19,6 +19,9 @@ type MessageUpdateRequestOptions = {
 	messageId?: string;
 	isRetry: boolean;
 	isContinue?: boolean;
+	// Client-chosen id for this generation run, echoed back by stop-generating
+	// so the server can match a stop point to the run it belongs to
+	generationId?: string;
 	files?: MessageFile[];
 	// Optional: pass selected MCP server names (client-side selection)
 	selectedMcpServerNames?: string[];
@@ -58,6 +61,7 @@ export async function fetchMessageUpdates(
 		id: opts.messageId,
 		is_retry: opts.isRetry,
 		is_continue: Boolean(opts.isContinue),
+		generationId: opts.generationId,
 		// Will be ignored server-side if unsupported
 		selectedMcpServerNames: opts.selectedMcpServerNames,
 		selectedMcpServers: opts.selectedMcpServers,

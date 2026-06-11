@@ -42,6 +42,52 @@ describe.sequential("POST /conversation/[id]/stop-generating", () => {
 		}
 	);
 
+	it("stores the stop point from the request body on the marker", async () => {
+		const { locals } = await createTestUser();
+		const conversation = await createTestConversation(locals);
+		const generationId = "22222222-2222-4222-8222-222222222222";
+
+		const response = await POST({
+			params: { id: conversation._id.toString() },
+			locals,
+			request: new Request("http://localhost/stop-generating", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ generationId, seenContentLength: 1234 }),
+			}),
+		} as never);
+
+		expect(response.status).toBe(200);
+		const marker = await collections.abortedGenerations.findOne({
+			conversationId: conversation._id,
+		});
+		expect(marker?.generationId).toBe(generationId);
+		expect(marker?.seenContentLength).toBe(1234);
+	});
+
+	it("ignores malformed stop-point bodies but still records the stop", async () => {
+		const { locals } = await createTestUser();
+		const conversation = await createTestConversation(locals);
+
+		const response = await POST({
+			params: { id: conversation._id.toString() },
+			locals,
+			request: new Request("http://localhost/stop-generating", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ generationId: "not-a-uuid", seenContentLength: -5 }),
+			}),
+		} as never);
+
+		expect(response.status).toBe(200);
+		const marker = await collections.abortedGenerations.findOne({
+			conversationId: conversation._id,
+		});
+		expect(marker).not.toBeNull();
+		expect(marker?.generationId).toBeUndefined();
+		expect(marker?.seenContentLength).toBeUndefined();
+	});
+
 	it("updates updatedAt while preserving createdAt on repeated stop", async () => {
 		const { locals } = await createTestUser();
 		const conversation = await createTestConversation(locals);

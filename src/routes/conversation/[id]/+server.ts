@@ -25,6 +25,7 @@ import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
+import { clampStoppedContent } from "$lib/server/stopTruncation";
 import { MetricsServer } from "$lib/server/metrics";
 
 // How long a stop marker is protected from the pre-flight cleanup of a new
@@ -150,12 +151,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		inputs: newPrompt,
 		id: messageId,
 		is_retry: isRetry,
+		generationId,
 		selectedMcpServerNames,
 		selectedMcpServers,
 		timezone,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
+			// client-chosen id for this generation run, echoed back by the stop
+			// request so a stop point can be matched to the run it belongs to
+			generationId: z.string().uuid().optional(),
 			inputs: z.optional(
 				z
 					.string()
@@ -602,6 +607,30 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			let hasError = false;
 			const initialMessageContent = messageToWriteTo.content;
 
+			// Emit the streamed-so-far text as an interrupted final answer. The
+			// stopping client freezes its UI at the Stop click and reports its
+			// stop point on the abort marker, while tokens keep arriving here
+			// until the marker is observed (longer still when the stop request
+			// was delayed or retried). Clamp the text back to the stop point so
+			// the message persists exactly as the user last saw it instead of
+			// "growing back" on the next sync.
+			const emitInterruptedFinalAnswer = async () => {
+				const marker = await collections.abortedGenerations
+					.findOne({ conversationId: convId })
+					.catch(() => null);
+				messageToWriteTo.content = clampStoppedContent({
+					content: messageToWriteTo.content,
+					initialLength: initialMessageContent.length,
+					generationId,
+					marker,
+				});
+				await update({
+					type: MessageUpdateType.FinalAnswer,
+					text: messageToWriteTo.content.slice(initialMessageContent.length),
+					interrupted: true,
+				});
+			};
+
 			try {
 				// Fetch user settings once for all overrides and billing org
 				const userSettings = await collections.settings.findOne(authCondition(locals));
@@ -647,12 +676,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					abortedByUser = true;
 				}
 				if (abortedByUser && !finalAnswerReceived) {
-					const partialText = messageToWriteTo.content.slice(initialMessageContent.length);
-					await update({
-						type: MessageUpdateType.FinalAnswer,
-						text: partialText,
-						interrupted: true,
-					});
+					await emitInterruptedFinalAnswer();
 				}
 			} catch (e) {
 				const err = e as Error;
@@ -667,12 +691,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					abortedByUser = true;
 					logger.info({ conversationId: conversationKey }, "Generation aborted by user");
 					if (!finalAnswerReceived) {
-						const partialText = messageToWriteTo.content.slice(initialMessageContent.length);
-						await update({
-							type: MessageUpdateType.FinalAnswer,
-							text: partialText,
-							interrupted: true,
-						});
+						await emitInterruptedFinalAnswer();
 					}
 				} else {
 					hasError = true;
