@@ -85,18 +85,35 @@
 		);
 	};
 
+	// Some MCP proxies (e.g. hf.co/mcp with the "Skip Gradio Images" account flag)
+	// strip base64 image blocks and leave only an "Image URL: https://..." text
+	// block, so fall back to rendering image URLs found in the text.
+	const IMAGE_URL_REGEX =
+		/https?:\/\/[^\s"'<>)\]]+\.(?:png|jpe?g|webp|gif|avif|svg)(?:\?[^\s"'<>)\]]*)?/gi;
+
+	const getImageUrls = (text: string | undefined): string[] => {
+		if (!text) return [];
+		return [...new Set(text.match(IMAGE_URL_REGEX) ?? [])];
+	};
+
 	interface ParsedToolOutput {
 		text?: string;
 		images: McpImageContent[];
+		imageUrls: string[];
 		metadata: Array<[string, unknown]>;
 	}
 
 	const parseToolOutputs = (outputs: ToolOutput[]): ParsedToolOutput[] =>
-		outputs.map((output) => ({
-			text: getOutputText(output),
-			images: getImageBlocks(output),
-			metadata: getMetadataEntries(output),
-		}));
+		outputs.map((output) => {
+			const text = getOutputText(output);
+			const images = getImageBlocks(output);
+			return {
+				text,
+				images,
+				imageUrls: images.length > 0 ? [] : getImageUrls(text),
+				metadata: getMetadataEntries(output),
+			};
+		});
 </script>
 
 {#if toolFnName}
@@ -171,13 +188,21 @@
 											class="scrollbar-custom max-h-60 overflow-y-auto whitespace-pre-wrap break-all rounded-lg bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{parsedOutput.text}</pre>
 									{/if}
 
-									{#if parsedOutput.images.length > 0}
+									{#if parsedOutput.images.length > 0 || parsedOutput.imageUrls.length > 0}
 										<div class="flex flex-wrap gap-2">
 											{#each parsedOutput.images as image, imageIndex}
 												<img
 													alt={`Tool result image ${imageIndex + 1}`}
 													class="max-h-60 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
 													src={`data:${image.mimeType};base64,${image.data}`}
+												/>
+											{/each}
+											{#each parsedOutput.imageUrls as imageUrl, imageIndex}
+												<img
+													alt={`Tool result image ${imageIndex + 1}`}
+													class="max-h-60 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
+													src={imageUrl}
+													loading="lazy"
 												/>
 											{/each}
 										</div>
