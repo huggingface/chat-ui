@@ -5,10 +5,12 @@
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
+	import { browser } from "$app/environment";
 
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { setHapticsEnabled } from "$lib/utils/haptics";
+	import { initWithServers } from "$lib/stores/mcpServers";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -37,6 +39,17 @@
 	// reference changes after subsequent invalidations.
 	// Last-write-wins from server is acceptable; see conversations.svelte.ts.
 	convsStore.init(data.conversations);
+
+	// Pre-populate the MCP server store from the SSR payload so that
+	// mcpServersLoaded is already true when child onMount callbacks run.
+	// This eliminates the gate delay in writeMessage on the first message:
+	// the conversation page no longer has to wait for a separate client-side
+	// fetch before it can fire the generation POST.
+	// The background refreshMcpServers() in mcpServers.ts still runs to pick
+	// up any status or config changes after page load.
+	if (browser) {
+		initWithServers(data.mcpBaseServers ?? []);
+	}
 	$effect(() => {
 		convsStore.init(data.conversations);
 	});
