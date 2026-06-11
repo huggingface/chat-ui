@@ -28,6 +28,7 @@
 	import ImageLightbox from "./ImageLightbox.svelte";
 	import { splitArtifactSegments, stripArtifacts } from "$lib/utils/artifacts";
 	import type { ArtifactOperation } from "$lib/utils/artifacts";
+	import { artifactPanel } from "$lib/stores/artifactPanel.svelte";
 
 	interface Props {
 		message: Message;
@@ -384,8 +385,12 @@
 		onclick={() => (isTapped = !isTapped)}
 		onkeydown={() => (isTapped = !isTapped)}
 	>
+		<!-- Hidden while the artifact panel is open: the narrowed chat column
+		     reclaims the avatar's width (display:none also drops the flex gap) -->
 		<MessageAvatar
-			classNames="mt-5 size-3.5 flex-none select-none rounded-full shadow-lg max-sm:hidden"
+			classNames="mt-5 size-3.5 flex-none select-none rounded-full shadow-lg max-sm:hidden {artifactPanel.open
+				? 'hidden'
+				: ''}"
 			animating={isLast && loading}
 		/>
 		<div
@@ -472,7 +477,7 @@
 		{#if message.routerMetadata || (!loading && message.content)}
 			<div
 				class="absolute -bottom-3.5 {message.routerMetadata && messageInfoWidth > messageWidth
-					? 'left-1 pl-1 lg:pl-7'
+					? `left-1 pl-1 ${artifactPanel.open ? '' : 'lg:pl-7'}`
 					: 'right-1'} flex max-w-[calc(100dvw-40px)] items-center gap-0.5"
 				bind:offsetWidth={messageInfoWidth}
 			>
