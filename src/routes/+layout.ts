@@ -1,4 +1,3 @@
-import { UrlDependency } from "$lib/types/UrlDependency";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { useAPIClient, handleResponse } from "$lib/APIClient";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
@@ -40,9 +39,7 @@ interface SettingsResponse {
 	billingOrganization?: string;
 }
 
-export const load = async ({ depends, fetch, url }) => {
-	depends(UrlDependency.ConversationList);
-
+export const load = async ({ fetch, url }) => {
 	const client = useAPIClient({ fetch, origin: url.origin });
 
 	const [settings, models, user, publicConfig, featureFlags, conversationsData] =
