@@ -33,7 +33,8 @@
 	import { loading } from "$lib/stores/loading.js";
 	import { streamStart } from "$lib/utils/haptics";
 	import { requireAuthUser } from "$lib/utils/auth.js";
-	import { isConversationGenerationActive } from "$lib/utils/generationState";
+	import { isConversationGenerationActive, isGenerationStale } from "$lib/utils/generationState";
+	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
 
 	let { data } = $props();
@@ -46,8 +47,17 @@
 	let pending = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
-	let stopRequested = $state(false);
+	// Conversation-scoped stop tombstone. A boolean reset on page.params.id
+	// changes resurrects the generating UI: invalidation reassigns page.params,
+	// which clears the flag while the stopped conversation's snapshot is still
+	// non-terminal, flipping $loading back on. Keying the tombstone by
+	// conversation id makes it survive invalidations; it expires when a new
+	// generation starts in this conversation.
+	let stopRequestedFor: string | null = $state(null);
 	let stopRequestPromise: Promise<void> | undefined;
+	// True while writeMessage runs; lets the generation-state effect skip the
+	// snapshot-staleness check for the generation streaming in this very tab.
+	let writeMessageInFlight = false;
 	let messageUpdatesAbortController = new AbortController();
 
 	let files: File[] = $state([]);
@@ -116,10 +126,15 @@
 		isRetry?: boolean;
 	}): Promise<void> {
 		try {
-			stopRequested = false;
+			stopRequestedFor = null;
 			$isAborted = false;
 			$loading = true;
 			pending = true;
+			writeMessageInFlight = true;
+			// Create the controller before any await: a Stop click during file
+			// encoding or MCP hydration must abort THIS request, not whichever
+			// stale controller a previous generation left behind.
+			messageUpdatesAbortController = new AbortController();
 			const base64Files = await Promise.all(
 				(files ?? []).map((file) =>
 					file2base64(file).then((value) => ({
@@ -220,7 +235,6 @@
 				throw new Error("Message to write to not found");
 			}
 
-			messageUpdatesAbortController = new AbortController();
 			const streamingMode = resolveStreamingMode($settings);
 
 			// Wait for the MCP store to hydrate before sending so the server receives
@@ -259,7 +273,10 @@
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {
-				error.set(err.message);
+				// A user abort rejects the fetch; that is not an error worth a toast
+				if (!$isAborted && !(err instanceof DOMException && err.name === "AbortError")) {
+					error.set(err.message);
+				}
 			});
 			if (messageUpdatesIterator === undefined) return;
 
@@ -437,7 +454,9 @@
 				flushBuffer(new Date());
 			}
 		} catch (err) {
-			if (err instanceof Error && err.message.includes("overloaded")) {
+			if ($isAborted || (err instanceof DOMException && err.name === "AbortError")) {
+				// User-initiated abort, not an error
+			} else if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
 			} else if (err instanceof Error && err.message.includes("429")) {
 				$error = ERROR_MESSAGES.rateLimited;
@@ -448,33 +467,64 @@
 			}
 			console.error(err);
 		} finally {
+			writeMessageInFlight = false;
 			$loading = false;
 			pending = false;
 			// Wait for the stop request to complete before refreshing data,
-			// so the server has persisted interrupted:true to the database.
+			// so the abort marker is durably written before we poll for the
+			// terminal state below.
 			if (stopRequestPromise) {
 				await stopRequestPromise.catch(() => {});
 				stopRequestPromise = undefined;
 			}
+			const stoppedHere = stopRequestedFor === convId;
 			// Only re-run the loads that actually need fresh data: the
 			// conversation page (new messages) and the sidebar list
 			// (updated title / updatedAt via client-owned store refresh).
 			// Avoids the 5 redundant bootstrap requests (models, settings, user,
 			// public-config, feature-flags) that a full invalidateAll() would trigger.
 			// When this finally runs because beforeNavigate aborted the stream
-			// ($isAborted set without stopRequested), invalidating would cancel
+			// ($isAborted set without a stop click), invalidating would cancel
 			// that very navigation (e.g. the "New Chat" click that triggered
 			// the abort) before the router even exposes it via `navigating`.
 			// Skip the refresh: the destination page loads its own data.
-			const abortedByNavigation = $isAborted && !stopRequested;
+			const abortedByNavigation = $isAborted && !stoppedHere;
 			if (!abortedByNavigation) {
+				// stop-generating returns as soon as the abort marker is written,
+				// NOT when the generating pod has persisted interrupted:true.
+				// Invalidating right away would load a non-terminal snapshot that
+				// wipes the optimistic interrupted flag and shows a stuck
+				// streaming state. Wait (bounded) for the persisted state to
+				// become terminal before refreshing.
+				if (stoppedHere) {
+					await waitForTerminalPersist(convId);
+				}
 				await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
 			}
 		}
 	}
 
+	// Poll the conversation API until the last assistant message is terminal
+	// (interrupted, final answer, or error persisted), bounded at ~3.2s. Used
+	// after a Stop so the post-stop refresh reads settled data instead of a
+	// mid-abort snapshot.
+	async function waitForTerminalPersist(id: string) {
+		const client = useAPIClient();
+		for (let attempt = 0; attempt < 8; attempt++) {
+			try {
+				const conversation = (await client.conversations({ id }).get().then(handleResponse)) as {
+					messages: Message[];
+				};
+				if (!isConversationGenerationActive(conversation.messages)) return;
+			} catch {
+				return; // cannot verify; fall through to the single refresh
+			}
+			await new Promise((resolve) => setTimeout(resolve, 400));
+		}
+	}
+
 	async function stopGeneration() {
-		stopRequested = true;
+		stopRequestedFor = convId;
 		$isAborted = true;
 		$loading = false;
 		messageUpdatesAbortController.abort();
@@ -497,18 +547,22 @@
 		};
 
 		// Store the promise so writeMessage's finally block can await it
-		// before calling invalidateAll() — ensures the server has persisted
-		// interrupted:true before we fetch fresh data.
+		// before refreshing data. Losing this request entirely means the server
+		// never learns about the stop (the abort marker is what cross-pod
+		// generation watchers act on), so retry with backoff instead of giving
+		// up after a single transient failure.
 		stopRequestPromise = (async () => {
-			try {
-				await sendStopRequest();
-			} catch (firstErr) {
+			const delays = [0, 300, 1000, 3000];
+			for (const [attempt, delay] of delays.entries()) {
+				if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
 				try {
-					await new Promise((resolve) => setTimeout(resolve, 300));
 					await sendStopRequest();
-				} catch (retryErr) {
-					console.error("Failed to stop generation", firstErr, retryErr);
-					$error = "Failed to stop generation. Please try again.";
+					return;
+				} catch (err) {
+					if (attempt === delays.length - 1) {
+						console.error("Failed to stop generation", err);
+						$error = "Failed to stop generation. Please try again.";
+					}
 				}
 			}
 		})();
@@ -541,7 +595,10 @@
 			await writeMessage({ prompt: pendingText });
 		}
 
-		const streaming = isConversationGenerationActive(messages);
+		// Don't resume tracking for stale snapshots: a generation that has gone
+		// this long without a DB write died with its pod and will never finish.
+		const streaming =
+			isConversationGenerationActive(messages) && !isGenerationStale(data.updatedAt);
 		if (streaming) {
 			addBackgroundGeneration({ id: convId, startedAt: Date.now() });
 			$loading = true;
@@ -613,13 +670,14 @@
 	});
 
 	$effect(() => {
-		page.params.id;
-		stopRequested = false;
-	});
-
-	$effect(() => {
-		const streaming = isConversationGenerationActive(messages);
-		if (stopRequested) {
+		const streaming =
+			isConversationGenerationActive(messages) &&
+			// A snapshot that has gone this long without a database write belongs
+			// to a pod that died before persisting a terminal state; never
+			// resurrect the streaming UI for it. Generations streaming in this
+			// tab are exempt — their snapshot timestamp is from page-load time.
+			(untrack(() => writeMessageInFlight) || !isGenerationStale(data.updatedAt));
+		if (stopRequestedFor === convId) {
 			$loading = false;
 		} else if (streaming) {
 			$loading = true;
