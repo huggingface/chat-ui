@@ -64,7 +64,7 @@
 </svelte:head>
 
 <div class="scrollbar-custom h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
-	<div class="mx-auto flex flex-col px-5 pt-42 xl:w-240 2xl:w-5xl">
+	<div class="mx-auto flex flex-col px-5 xl:w-240 2xl:w-5xl">
 		<div class="flex items-center">
 			<h1 class="text-xl font-bold sm:text-2xl">Models</h1>
 			{#if publicConfig.isHuggingChat}

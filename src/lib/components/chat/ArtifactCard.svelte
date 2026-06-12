@@ -108,7 +108,7 @@
 		class="flex size-9 flex-none items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700/70 dark:text-gray-300"
 	>
 		{#if streaming}
-			<EosIconsLoading class="size-4.5 text-base" />
+			<EosIconsLoading class="text-base" />
 		{:else if missing}
 			<CarbonWarning class="text-base text-amber-500" />
 		{:else if version?.type === "html"}
