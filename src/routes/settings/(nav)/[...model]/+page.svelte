@@ -161,7 +161,7 @@
 			</h2>
 
 			{#if model.description}
-				<p class="line-clamp-2 text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-400">
+				<p class="line-clamp-2 whitespace-pre-wrap text-sm text-gray-600 dark:text-gray-400">
 					{model.description}
 				</p>
 			{/if}
@@ -170,7 +170,7 @@
 		<!-- Actions -->
 		<div class="mb-4 flex flex-wrap items-center gap-1.5">
 			<button
-				class="flex w-fit items-center rounded-full bg-black px-3 py-1.5 text-sm text-white! shadow-xs hover:bg-black/90 dark:bg-white/80 dark:text-gray-900! dark:hover:bg-white/90"
+				class="flex w-fit items-center rounded-full bg-black px-3 py-1.5 text-sm !text-white shadow-sm hover:bg-black/90 dark:bg-white/80 dark:!text-gray-900 dark:hover:bg-white/90"
 				name="Activate model"
 				onclick={(e) => {
 					e.stopPropagation();
@@ -254,7 +254,7 @@
 
 		<div class="relative flex w-full flex-col gap-2">
 			{#if model?.isRouter}
-				<p class="mt-2 mb-3 rounded-lg bg-gray-100 px-3 py-2 text-sm dark:bg-white/5">
+				<p class="mb-3 mt-2 rounded-lg bg-gray-100 px-3 py-2 text-sm dark:bg-white/5">
 					<IconOmni classNames="-translate-y-px" />
 					{model.displayName} routes your messages to the best underlying model depending on your request.
 				</p>
@@ -263,7 +263,7 @@
 				<h3 class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">System Prompt</h3>
 				<div class="flex items-center gap-2">
 					<div
-						class="flex items-center gap-1.5 text-[11px] font-medium text-gray-600 select-none dark:text-gray-400"
+						class="flex select-none items-center gap-1.5 text-[11px] font-medium text-gray-600 dark:text-gray-400"
 					>
 						<span>Enabled</span>
 						<Switch
@@ -302,7 +302,7 @@
 			></textarea>
 			<!-- Capabilities -->
 			<div
-				class="mt-3 rounded-xl border border-gray-200 bg-white px-3 shadow-xs dark:border-gray-700 dark:bg-gray-800"
+				class="mt-3 rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 			>
 				<div class="divide-y divide-gray-200 dark:divide-gray-700">
 					<div class="flex items-start justify-between py-3">
@@ -372,7 +372,7 @@
 							>
 								Artifacts
 								<span
-									class="rounded-full bg-gray-100 px-1.5 py-px text-[10px] font-semibold text-gray-500 uppercase dark:bg-gray-700 dark:text-gray-400"
+									class="rounded-full bg-gray-100 px-1.5 py-px text-[10px] font-semibold uppercase text-gray-500 dark:bg-gray-700 dark:text-gray-400"
 								>
 									Beta
 								</span>
@@ -409,7 +409,7 @@
 
 			{#if publicConfig.isHuggingChat && model.providers?.length && !model?.isRouter}
 				<div
-					class="mt-3 flex flex-col items-start gap-2.5 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-xs dark:border-gray-700 dark:bg-gray-800"
+					class="mt-3 flex flex-col items-start gap-2.5 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 				>
 					<div>
 						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
@@ -464,7 +464,7 @@
 											<img
 												src="https://huggingface.co/api/avatars/{hubOrg}"
 												alt=""
-												class="size-full rounded-sm"
+												class="size-full rounded"
 											/>
 										</span>
 									{/if}
@@ -475,7 +475,7 @@
 						</Select.Trigger>
 						<Select.Portal>
 							<Select.Content
-								class="z-50 scrollbar-custom max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white/95 p-1 shadow-lg backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/95"
+								class="scrollbar-custom z-50 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white/95 p-1 shadow-lg backdrop-blur dark:border-gray-700 dark:bg-gray-800/95"
 								sideOffset={4}
 							>
 								<Select.Group>
@@ -487,7 +487,7 @@
 									{#each PROVIDER_POLICIES as opt (opt.value)}
 										<Select.Item
 											value={opt.value}
-											class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-hidden select-none data-highlighted:bg-gray-100 dark:text-gray-200 dark:data-highlighted:bg-white/10"
+											class="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-none data-[highlighted]:bg-gray-100 dark:text-gray-200 dark:data-[highlighted]:bg-white/10"
 										>
 											{#if opt.value === "auto"}
 												<span
@@ -527,7 +527,7 @@
 											PROVIDERS_HUB_ORGS[prov.provider as keyof typeof PROVIDERS_HUB_ORGS]}
 										<Select.Item
 											value={prov.provider}
-											class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-hidden select-none data-highlighted:bg-gray-100 dark:text-gray-200 dark:data-highlighted:bg-white/10"
+											class="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-none data-[highlighted]:bg-gray-100 dark:text-gray-200 dark:data-[highlighted]:bg-white/10"
 										>
 											{#if hubOrg}
 												<span
@@ -536,7 +536,7 @@
 													<img
 														src="https://huggingface.co/api/avatars/{hubOrg}"
 														alt=""
-														class="size-full rounded-sm"
+														class="size-full rounded"
 													/>
 												</span>
 											{:else}

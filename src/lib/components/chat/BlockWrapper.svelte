@@ -8,6 +8,6 @@
 	let { children }: Props = $props();
 </script>
 
-<div class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
+<div class="has-[+.prose]:!mb-2 [&:not(:last-child)]:mb-1 [.prose+&]:mt-3">
 	{@render children()}
 </div>

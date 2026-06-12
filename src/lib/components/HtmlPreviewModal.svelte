@@ -78,8 +78,8 @@
 	}
 </script>
 
-<Modal width="max-w-none max-h-none w-dvw h-dvh rounded-none!" onclose={requestClose}>
-	<div class="relative h-dvh w-dvw">
+<Modal width="max-w-none max-h-none w-[100dvw] h-[100dvh] !rounded-none" onclose={requestClose}>
+	<div class="relative h-[100dvh] w-[100dvw]">
 		<iframe
 			bind:this={iframeEl}
 			title="HTML Preview"
@@ -91,7 +91,7 @@
 
 		<!-- Close button with visible container -->
 		<button
-			class="fixed top-4 right-6 z-50 btn flex h-7 items-center gap-1 rounded-lg border border-gray-500/60 bg-gray-800 px-2 text-xs text-white shadow-xs backdrop-blur-sm transition-none hover:border-gray-500 hover:bg-gray-700 active:shadow-inner"
+			class="btn fixed right-6 top-4 z-50 flex h-7 items-center gap-1 rounded-lg border border-gray-500/60 bg-gray-800 px-2 text-xs text-white shadow-sm backdrop-blur transition-none hover:border-gray-500 hover:bg-gray-700 active:shadow-inner"
 			title="Close preview (Esc)"
 			onclick={() => onclose?.()}
 		>
@@ -101,7 +101,7 @@
 
 		{#if errors.length > 0}
 			<button
-				class="fixed right-4 bottom-4 z-50 btn flex items-center gap-2 rounded-full border-2 border-red-500/60 bg-red-800/90 px-4 py-1.5 text-sm text-white shadow-lg"
+				class="btn fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border-2 border-red-500/60 bg-red-800/90 px-4 py-1.5 text-sm text-white shadow-lg"
 				title="Send error to chat"
 				onclick={() => {
 					pendingChatInput.set(composeText());

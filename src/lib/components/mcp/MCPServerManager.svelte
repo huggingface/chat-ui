@@ -112,7 +112,7 @@
 					</button>
 					<button
 						onclick={() => (currentView = "add")}
-						class="btn flex items-center gap-0.5 rounded-lg bg-blue-600 py-1.5 pr-3 pl-2 text-sm font-medium text-white hover:bg-blue-600"
+						class="btn flex items-center gap-0.5 rounded-lg bg-blue-600 py-1.5 pl-2 pr-3 text-sm font-medium text-white hover:bg-blue-600"
 					>
 						<IconAddLarge class="size-4" />
 						Add Server

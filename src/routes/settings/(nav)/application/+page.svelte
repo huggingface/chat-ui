@@ -103,7 +103,7 @@
 </script>
 
 <div class="flex w-full flex-col gap-4">
-	<h2 class="text-center text-lg font-semibold text-gray-800 md:text-left dark:text-gray-200">
+	<h2 class="text-center text-lg font-semibold text-gray-800 dark:text-gray-200 md:text-left">
 		Application Settings
 	</h2>
 
@@ -112,7 +112,7 @@
 			class="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[12px] text-gray-700 dark:border-gray-700 dark:bg-gray-700/80 dark:text-gray-300"
 		>
 			<span class="font-medium">API Base URL:</span>
-			<code class="ml-1 font-mono text-[12px] break-all text-gray-800 dark:text-gray-100"
+			<code class="ml-1 break-all font-mono text-[12px] text-gray-800 dark:text-gray-100"
 				>{OPENAI_BASE_URL}</code
 			>
 		</div>
@@ -170,7 +170,7 @@
 	{/if}
 	<div class="flex h-full flex-col gap-4 max-sm:pt-0">
 		<div
-			class="rounded-xl border border-gray-200 bg-white px-3 shadow-xs dark:border-gray-700 dark:bg-gray-800"
+			class="rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 		>
 			<div class="divide-y divide-gray-200 dark:divide-gray-700">
 				{#if publicConfig.PUBLIC_APP_DATA_SHARING === "1"}
@@ -263,7 +263,7 @@
 		<!-- Billing section (HuggingChat only) -->
 		{#if publicConfig.isHuggingChat && page.data.user}
 			<div
-				class="rounded-xl border border-gray-200 bg-white px-3 shadow-xs dark:border-gray-700 dark:bg-gray-800"
+				class="rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 			>
 				<div class="divide-y divide-gray-200 dark:divide-gray-700">
 					<!-- Bill usage to -->
@@ -308,7 +308,7 @@
 								? `https://huggingface.co/organizations/${getBillingOrganization()}/settings/inference-providers/overview`
 								: "https://huggingface.co/settings/inference-providers/overview"}
 							target="_blank"
-							class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium whitespace-nowrap text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+							class="whitespace-nowrap rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 						>
 							View Usage
 						</a>

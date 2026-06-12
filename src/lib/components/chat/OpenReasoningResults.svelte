@@ -42,7 +42,7 @@
 	<!-- Header row -->
 	<button
 		type="button"
-		class="group/header flex w-fit cursor-pointer items-center gap-1 text-left select-none focus:outline-hidden"
+		class="group/header flex w-fit cursor-pointer select-none items-center gap-1 text-left focus:outline-none"
 		onclick={() => (isOpen = !isOpen)}
 		aria-label={isOpen ? "Collapse" : "Expand"}
 	>
@@ -76,14 +76,14 @@
 			>
 				<div
 					bind:clientHeight={contentHeight}
-					class="prose prose-sm max-w-none text-sm leading-relaxed text-gray-500 *:first:mt-0 *:last:mb-0 dark:text-gray-400 dark:prose-invert"
+					class="prose prose-sm max-w-none text-sm leading-relaxed text-gray-500 dark:prose-invert dark:text-gray-400 [&>:first-child]:mt-0 [&>:last-child]:mb-0"
 				>
 					<MarkdownRenderer {content} {loading} />
 				</div>
 			</div>
 		{:else}
 			<div
-				class="prose prose-sm mt-2 max-w-none text-sm leading-relaxed text-gray-500 dark:text-gray-400 dark:prose-invert"
+				class="prose prose-sm mt-2 max-w-none text-sm leading-relaxed text-gray-500 dark:prose-invert dark:text-gray-400"
 			>
 				<MarkdownRenderer {content} {loading} />
 			</div>

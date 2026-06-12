@@ -633,7 +633,7 @@
 			     the artifact panel is open -->
 			<button
 				type="button"
-				class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-xs hover:bg-white/60 hover:text-gray-500 md:absolute md:top-5 md:right-6 md:z-10 md:flex dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700
+				class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:z-10 md:flex
 					{loading ? 'cursor-not-allowed opacity-40' : ''}"
 				onclick={() => shareModal.open()}
 				aria-label="Share conversation"
@@ -713,25 +713,25 @@
 				{/if}
 			</div>
 
-			<ScrollToPreviousBtn class="fixed right-4 bottom-48 lg:right-10" scrollNode={chatContainer} />
+			<ScrollToPreviousBtn class="fixed bottom-48 right-4 lg:right-10" scrollNode={chatContainer} />
 
-			<ScrollToBottomBtn class="fixed right-4 bottom-36 lg:right-10" scrollNode={chatContainer} />
+			<ScrollToBottomBtn class="fixed bottom-36 right-4 lg:right-10" scrollNode={chatContainer} />
 		</div>
 
 		<div
 			class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full
-			max-w-3xl flex-col items-center justify-center bg-linear-to-t from-white
-			via-white to-white/0 px-3.5 pt-2 *:pointer-events-auto
-			max-sm:py-0 sm:px-5
-			md:pb-4 xl:max-w-4xl dark:border-gray-800 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0"
+			max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white
+			via-white/100 to-white/0 px-3.5 pt-2 dark:border-gray-800
+			dark:from-gray-900 dark:via-gray-900/100
+			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 		>
 			{#if !draft.length && !messages.length && !sources.length && !loading && (currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
 				<div
-					class="mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 select-none dark:text-gray-500"
+					class="no-scrollbar mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 dark:text-gray-500"
 				>
 					{#each activeExamples as ex}
 						<button
-							class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur-sm hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
+							class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
 							onclick={() => startExample(ex)}
 						>
 							{ex.title}
@@ -744,12 +744,12 @@
 			{/if}
 			{#if shouldShowRouterFollowUps && !lastIsError}
 				<div
-					class="mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 select-none dark:text-gray-500"
+					class="no-scrollbar mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 dark:text-gray-500"
 				>
 					<!-- <span class=" text-gray-500 dark:text-gray-400">Follow ups</span> -->
 					{#each routerFollowUps as followUp}
 						<button
-							class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur-sm hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
+							class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
 							onclick={() => startFollowUp(followUp)}
 						>
 							<CarbonDirectionRight class="scale-y-[-1] text-xs" />
@@ -847,13 +847,13 @@
 										onstop?.();
 									}}
 									showBorder={true}
-									classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow-sm transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
+									classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
 								/>
 							{:else}
 								{#if transcriptionEnabled}
 									<button
 										type="button"
-										class="absolute right-10 bottom-2 mr-1.5 btn size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 sm:right-9 sm:size-7 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white"
+										class="btn absolute bottom-2 right-10 mr-1.5 size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white sm:right-9 sm:size-7"
 										disabled={isReadOnly}
 										onclick={() => {
 											isRecording = true;
@@ -864,10 +864,10 @@
 									</button>
 								{/if}
 								<button
-									class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
+									class="btn absolute bottom-2 right-2 size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black sm:size-7 {!draft ||
 									isReadOnly
 										? ''
-										: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
+										: '!bg-black !text-white dark:!bg-white dark:!text-black'}"
 									disabled={!draft || isReadOnly}
 									type="submit"
 									aria-label="Send message"
@@ -881,13 +881,13 @@
 				</form>
 				<div
 					class={{
-						"mt-1.5 flex h-5 items-center self-stretch px-0.5 text-xs whitespace-nowrap text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
+						"mt-1.5 flex h-5 items-center self-stretch whitespace-nowrap px-0.5 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
 						"max-sm:hidden": focused && isVirtualKeyboard(),
 					}}
 				>
 					{#if models.find((m) => m.id === currentModel.id)}
 						{#if loading && streamingToolCallName}
-							<span class="inline-flex items-center gap-1 text-xs whitespace-nowrap">
+							<span class="inline-flex items-center gap-1 whitespace-nowrap text-xs">
 								<LucideHammer class="size-3" />
 								Calling tool
 								<span class="loading-dots font-medium">
@@ -915,7 +915,7 @@
 										{@const hubOrg =
 											PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
 										<span
-											class="inline-flex shrink-0 items-center rounded-sm p-0.5 {providerOverride ===
+											class="inline-flex shrink-0 items-center rounded p-0.5 {providerOverride ===
 											'fastest'
 												? 'bg-green-100 text-green-600 dark:bg-green-800/20 dark:text-green-500'
 												: providerOverride === 'cheapest'
@@ -931,7 +931,7 @@
 												<img
 													src="https://huggingface.co/api/avatars/{hubOrg}"
 													alt={providerOverride}
-													class="size-3 flex-none rounded-xs"
+													class="size-3 flex-none rounded-sm"
 												/>
 											{/if}
 										</span>
@@ -941,7 +941,7 @@
 							</a>
 						{:else if showRouterDetails && streamingRouterMetadata?.route}
 							<div
-								class="mr-2 flex items-center gap-1.5 text-xs text-[.70rem] leading-none whitespace-nowrap text-gray-400 dark:text-gray-400"
+								class="mr-2 flex items-center gap-1.5 whitespace-nowrap text-[.70rem] text-xs leading-none text-gray-400 dark:text-gray-400"
 							>
 								<IconOmni classNames="text-xs animate-pulse" />
 
@@ -984,7 +984,7 @@
 	<ArtifactPanel registry={artifactRegistry} {loading} />
 </div>
 
-<style>
+<style lang="postcss">
 	.paste-glow {
 		animation: glow 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 		will-change: box-shadow;

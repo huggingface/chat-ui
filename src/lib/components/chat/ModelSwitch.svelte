@@ -55,7 +55,7 @@
 	<div class="flex items-center space-x-2">
 		<select
 			bind:value={selectedModelId}
-			class="rounded-md bg-gray-100 px-2 py-1 max-sm:max-w-32 dark:bg-gray-900"
+			class="rounded-md bg-gray-100 px-2 py-1 dark:bg-gray-900 max-sm:max-w-32"
 		>
 			{#each models as model}
 				<option value={model.id}>{model.name}</option>

@@ -11,23 +11,23 @@
 	let { close }: Props = $props();
 </script>
 
-<Modal closeOnBackdrop={false} onclose={close} width="max-w-[420px]! m-4!">
+<Modal closeOnBackdrop={false} onclose={close} width="!max-w-[420px] !m-4">
 	<div
-		class="flex w-full flex-col gap-8 bg-white bg-linear-to-b to-transparent px-6 pb-7 dark:bg-black dark:from-white/10 dark:to-white/5"
+		class="flex w-full flex-col gap-8 bg-white bg-gradient-to-b to-transparent px-6 pb-7 dark:bg-black dark:from-white/10 dark:to-white/5"
 	>
 		<div
-			class="-mx-6 grid h-48 place-items-center bg-linear-to-t from-black/5 select-none dark:from-white/10"
+			class="-mx-6 grid h-48 select-none place-items-center bg-gradient-to-t from-black/5 dark:from-white/10"
 		>
 			<div class="flex flex-col items-center justify-center gap-2.5 px-8 text-center">
 				<div
 					class="flex size-14 items-center justify-center rounded-full text-3xl {$isPro
-						? 'bg-linear-to-br from-yellow-500/15 via-orange-500/15 to-red-500/15'
-						: 'bg-linear-to-br from-pink-500/15 from-15% via-green-500/15 to-yellow-500/15'}"
+						? 'bg-gradient-to-br from-yellow-500/15 via-orange-500/15 to-red-500/15'
+						: 'bg-gradient-to-br from-pink-500/15 from-15% via-green-500/15 to-yellow-500/15'}"
 				>
 					{#if $isPro}
 						<IconDazzled />
 					{:else}
-						<IconPro classNames="mr-0!" />
+						<IconPro classNames="!mr-0" />
 					{/if}
 				</div>
 				<h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">
@@ -42,7 +42,7 @@
 					You've used all your available credits. Purchase additional credits to continue using
 					HuggingChat.
 				</p>
-				<p class="mt-3 text-[15px] leading-relaxed italic opacity-75">
+				<p class="mt-3 text-[15px] italic leading-relaxed opacity-75">
 					Your credits can be used in other HF services and external apps via Inference Providers.
 				</p>
 			{:else}
@@ -50,7 +50,7 @@
 					You've reached your message limit. Upgrade to Hugging Face PRO to continue using
 					HuggingChat.
 				</p>
-				<p class="mt-3 text-[15px] leading-relaxed italic opacity-75">
+				<p class="mt-3 text-[15px] italic leading-relaxed opacity-75">
 					It's also possible to use your PRO credits in your favorite AI tools.
 				</p>
 			{/if}

@@ -21,11 +21,11 @@
 	);
 </script>
 
-<div class="flex max-w-full flex-col items-start select-none">
+<div class="flex max-w-full select-none flex-col items-start">
 	<!-- Summary header — aligns with the normal answer block -->
 	<button
 		type="button"
-		class="group/header flex max-w-full cursor-pointer items-center gap-1 text-left whitespace-nowrap focus:outline-hidden"
+		class="group/header flex max-w-full cursor-pointer items-center gap-1 whitespace-nowrap text-left focus:outline-none"
 		onclick={() => (isOpen = !isOpen)}
 		aria-label={isOpen ? "Collapse" : "Expand"}
 	>

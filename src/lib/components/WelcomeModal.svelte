@@ -12,12 +12,12 @@
 	let { close }: Props = $props();
 </script>
 
-<Modal closeOnBackdrop={false} onclose={close} width="max-w-[420px]! m-4!">
+<Modal closeOnBackdrop={false} onclose={close} width="!max-w-[420px] !m-4">
 	<div
-		class="flex w-full flex-col gap-8 bg-white bg-linear-to-b to-transparent px-6 pb-7 dark:bg-black dark:from-white/10 dark:to-white/5"
+		class="flex w-full flex-col gap-8 bg-white bg-gradient-to-b to-transparent px-6 pb-7 dark:bg-black dark:from-white/10 dark:to-white/5"
 	>
 		<div
-			class="relative -mx-6 grid h-48 place-items-center overflow-hidden rounded-b-xl bg-linear-to-t from-black/5 select-none dark:from-white/10"
+			class="relative -mx-6 grid h-48 select-none place-items-center overflow-hidden rounded-b-xl bg-gradient-to-t from-black/5 dark:from-white/10"
 		>
 			<img
 				class="size-full bg-black object-cover"
@@ -37,8 +37,8 @@
 				Welcome to {publicConfig.PUBLIC_APP_NAME}, the chat app powered by open source AI models.
 			</p>
 			<p class="mt-3 text-[15px] leading-relaxed">
-				<IconOmni classNames="-translate-y-px" /> Omni automatically picks the best AI model to give you
-				optimal answers depending on your requests.
+				<IconOmni classNames="-translate-y-px" /> Omni automatically picks the best AI model to give
+				you optimal answers depending on your requests.
 			</p>
 			<p class="mt-3 text-[15px] leading-relaxed">
 				You can also choose from any available open source models to chat with directly.

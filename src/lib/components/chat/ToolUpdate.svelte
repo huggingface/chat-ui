@@ -102,10 +102,10 @@
 {#if toolFnName}
 	<BlockWrapper>
 		<!-- Header row -->
-		<div class="flex max-w-full flex-col items-start gap-1 select-none">
+		<div class="flex max-w-full select-none flex-col items-start gap-1">
 			<button
 				type="button"
-				class="group/header flex max-w-full cursor-pointer items-center gap-1 text-left whitespace-nowrap focus:outline-hidden"
+				class="group/header flex max-w-full cursor-pointer items-center gap-1 whitespace-nowrap text-left focus:outline-none"
 				onclick={() => (isOpen = !isOpen)}
 				aria-label={isOpen ? "Collapse" : "Expand"}
 			>
@@ -122,7 +122,7 @@
 					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
 				</span>
 				<code
-					class="min-w-0 truncate rounded-sm bg-blue-50 px-1 py-px font-mono text-xs text-blue-700 opacity-90 dark:bg-blue-900/30 dark:text-blue-300"
+					class="min-w-0 truncate rounded bg-blue-50 px-1 py-px font-mono text-xs text-blue-700 opacity-90 dark:bg-blue-900/30 dark:text-blue-300"
 				>
 					{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
 				</code>
@@ -139,36 +139,36 @@
 
 		<!-- Expandable content -->
 		{#if isOpen}
-			<div class="mt-2 mb-4 space-y-3 text-gray-500 dark:text-gray-400">
+			<div class="mb-4 mt-2 space-y-3 text-gray-500 dark:text-gray-400">
 				{#each tool as update, i (`${update.subtype}-${i}`)}
 					{#if update.subtype === MessageToolUpdateType.Call}
 						<div class="space-y-1">
-							<div class="text-[10px] font-semibold text-gray-400 uppercase dark:text-gray-500">
+							<div class="text-[10px] font-semibold uppercase text-gray-400 dark:text-gray-500">
 								Input
 							</div>
 							<pre
-								class="rounded-lg bg-gray-100 p-2 font-mono text-xs break-all whitespace-pre-wrap dark:bg-gray-800/70">{formatValue(
+								class="whitespace-pre-wrap break-all rounded-lg bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{formatValue(
 									update.call.parameters
 								)}</pre>
 						</div>
 					{:else if update.subtype === MessageToolUpdateType.Error}
 						<div class="space-y-1">
-							<div class="text-[10px] font-semibold text-red-500 uppercase dark:text-red-400">
+							<div class="text-[10px] font-semibold uppercase text-red-500 dark:text-red-400">
 								Error
 							</div>
 							<pre
-								class="rounded-lg bg-red-50 p-2 font-mono text-xs break-all whitespace-pre-wrap text-red-600 dark:bg-red-900/20 dark:text-red-400">{update.message}</pre>
+								class="whitespace-pre-wrap break-all rounded-lg bg-red-50 p-2 font-mono text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">{update.message}</pre>
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Success && update.result.display}
 						<div class="space-y-1">
-							<div class="text-[10px] font-semibold text-gray-400 uppercase dark:text-gray-500">
+							<div class="text-[10px] font-semibold uppercase text-gray-400 dark:text-gray-500">
 								Output
 							</div>
 							{#each parseToolOutputs(update.result.outputs) as parsedOutput}
 								<div class="space-y-2">
 									{#if parsedOutput.text}
 										<pre
-											class="scrollbar-custom max-h-60 overflow-y-auto rounded-lg bg-gray-100 p-2 font-mono text-xs break-all whitespace-pre-wrap dark:bg-gray-800/70">{parsedOutput.text}</pre>
+											class="scrollbar-custom max-h-60 overflow-y-auto whitespace-pre-wrap break-all rounded-lg bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{parsedOutput.text}</pre>
 									{/if}
 
 									{#if parsedOutput.images.length > 0}
@@ -176,7 +176,7 @@
 											{#each parsedOutput.images as image, imageIndex}
 												<img
 													alt={`Tool result image ${imageIndex + 1}`}
-													class="max-h-60 cursor-pointer rounded-sm border border-gray-200 dark:border-gray-700"
+													class="max-h-60 cursor-pointer rounded border border-gray-200 dark:border-gray-700"
 													src={`data:${image.mimeType};base64,${image.data}`}
 												/>
 											{/each}
@@ -185,7 +185,7 @@
 
 									{#if parsedOutput.metadata.length > 0}
 										<pre
-											class="rounded-lg bg-gray-100 p-2 font-mono text-xs break-all whitespace-pre-wrap dark:bg-gray-800/70">{formatValue(
+											class="whitespace-pre-wrap break-all rounded-lg bg-gray-100 p-2 font-mono text-xs dark:bg-gray-800/70">{formatValue(
 												Object.fromEntries(parsedOutput.metadata)
 											)}</pre>
 									{/if}
@@ -194,11 +194,11 @@
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
 						<div class="space-y-1">
-							<div class="text-[10px] font-semibold text-red-500 uppercase dark:text-red-400">
+							<div class="text-[10px] font-semibold uppercase text-red-500 dark:text-red-400">
 								Error
 							</div>
 							<pre
-								class="rounded-lg bg-red-50 p-2 font-mono text-xs break-all whitespace-pre-wrap text-red-600 dark:bg-red-900/20 dark:text-red-400">{update
+								class="whitespace-pre-wrap break-all rounded-lg bg-red-50 p-2 font-mono text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">{update
 									.result.message}</pre>
 						</div>
 					{/if}

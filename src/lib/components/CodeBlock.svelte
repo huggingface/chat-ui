@@ -34,11 +34,11 @@
 <div class="group relative my-4 rounded-lg">
 	<div class="pointer-events-none sticky top-0 w-full">
 		<div
-			class="pointer-events-auto absolute top-2 right-2 flex items-center gap-1.5 md:top-3 md:right-3"
+			class="pointer-events-auto absolute right-2 top-2 flex items-center gap-1.5 md:right-3 md:top-3"
 		>
 			{#if showPreview}
 				<button
-					class="btn h-7 gap-1 rounded-lg border px-2 text-xs shadow-xs backdrop-blur-sm transition-none hover:border-gray-500 active:shadow-inner disabled:cursor-not-allowed disabled:opacity-80 dark:border-gray-600 dark:bg-gray-600/50 dark:hover:border-gray-500"
+					class="btn h-7 gap-1 rounded-lg border px-2 text-xs shadow-sm backdrop-blur transition-none hover:border-gray-500 active:shadow-inner disabled:cursor-not-allowed disabled:opacity-80 dark:border-gray-600 dark:bg-gray-600/50 dark:hover:border-gray-500"
 					disabled={loading}
 					onclick={() => {
 						if (!loading) {
@@ -58,7 +58,7 @@
 			{/if}
 			<CopyToClipBoardBtn
 				iconClassNames="size-3"
-				classNames="btn transition-none rounded-lg border size-7 text-sm shadow-xs dark:bg-gray-600/50 backdrop-blur-sm dark:hover:border-gray-500  active:shadow-inner dark:border-gray-600  hover:border-gray-500"
+				classNames="btn transition-none rounded-lg border size-7 text-sm shadow-sm dark:bg-gray-600/50 backdrop-blur dark:hover:border-gray-500  active:shadow-inner dark:border-gray-600  hover:border-gray-500"
 				value={rawCode}
 			/>
 		</div>

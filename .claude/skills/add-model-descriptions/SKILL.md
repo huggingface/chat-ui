@@ -105,12 +105,7 @@ Add descriptions for new models available in the HuggingFace router to chat-ui's
    Append `"supportsReasoning": true` for reasoning-capable models (step 5) and `"supportsArtifacts": true` for 32B+ models (step 6). A model can carry both:
 
    ```json
-   {
-   	"id": "org/model-name",
-   	"description": "Description here.",
-   	"supportsReasoning": true,
-   	"supportsArtifacts": true
-   }
+   { "id": "org/model-name", "description": "Description here.", "supportsReasoning": true, "supportsArtifacts": true }
    ```
 
    `supportsReasoning` is what makes chat-ui render the Thinking-effort dropdown in the chat footer for that model and forward `reasoning_effort` to the router. `supportsArtifacts` enables the artifacts side panel for the model.
