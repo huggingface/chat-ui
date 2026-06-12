@@ -82,6 +82,7 @@ envVars:
   MODELS: >
     [
       { "id": "omni", "supportsArtifacts": true },
+      { "id": "moonshotai/Kimi-K2.7-Code", "description": "1T MoE coding agent with persistent thinking across long tool workflows." , "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "MiniMaxAI/MiniMax-M3", "description": "Natively multimodal 428B MoE with 1M context for frontier coding and agents." , "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4", "description": "Hybrid Mamba-Transformer 550B MoE with 55B active params for efficient agentic reasoning.", "parameters": { "max_tokens": 49152 }, "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "Qwen/Qwen3.6-27B", "description": "Dense 27B hybrid with DeltaNet attention and 1M context.", "supportsArtifacts": true },
