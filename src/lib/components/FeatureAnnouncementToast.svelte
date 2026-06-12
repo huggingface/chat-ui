@@ -18,14 +18,14 @@
 <aside
 	in:fly={{ y: -8, duration: 400, delay: 300, easing: cubicOut }}
 	out:fade={{ duration: 150 }}
-	class="pointer-events-auto absolute right-4 top-4 z-10 w-[calc(100%-2rem)] max-w-sm sm:right-5 sm:top-5"
+	class="pointer-events-auto absolute top-4 right-4 z-10 w-[calc(100%-2rem)] max-w-sm sm:top-5 sm:right-5"
 	aria-label="Feature announcement"
 >
 	<div
 		class="rounded-2xl border border-gray-200/80 bg-white/85 p-4 shadow-md shadow-black/5 backdrop-blur-md dark:border-gray-700/60 dark:bg-gray-800/85 dark:shadow-black/20"
 	>
 		<div
-			class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400"
+			class="flex items-center gap-1.5 text-xs font-semibold tracking-wider text-blue-600 uppercase dark:text-blue-400"
 		>
 			<IconSparkles class="size-3.5" />
 			New

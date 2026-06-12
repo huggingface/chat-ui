@@ -389,7 +389,7 @@
 			animating={isLast && loading}
 		/>
 		<div
-			class="relative flex min-w-[60px] flex-col gap-2 break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/80 dark:text-gray-300"
+			class="relative flex min-w-[60px] flex-col gap-2 rounded-2xl border border-gray-100 bg-linear-to-br from-gray-50 px-5 py-3.5 wrap-break-word text-gray-600 dark:border-gray-800 dark:from-gray-800/80 dark:text-gray-300 prose-pre:my-2"
 		>
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
@@ -417,10 +417,7 @@
 						{:else if block.type === "artifact"}
 							<ArtifactCard op={block.op} messageId={message.id} opIndex={block.opIndex} />
 						{:else}
-							<div
-								data-exclude-from-copy
-								class="has-[+.prose]:!mb-2 [&:not(:last-child)]:mb-1 [.prose+&]:mt-3"
-							>
+							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
 								{#if block.type === "think"}
 									<OpenReasoningResults
 										content={block.content}
@@ -446,10 +443,7 @@
 						{:else if unit.kind === "artifact"}
 							<ArtifactCard op={unit.op} messageId={message.id} opIndex={unit.opIndex} />
 						{:else if unit.kind === "group"}
-							<div
-								data-exclude-from-copy
-								class="has-[+.prose]:!mb-2 [&:not(:last-child)]:mb-1 [.prose+&]:mt-3"
-							>
+							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
 								{#if unit.blocks.length > 1}
 									<!-- Collapse the whole run into a single summary -->
 									<ToolCallsSummary blocks={unit.blocks} toolCount={unit.toolCount} />
@@ -478,23 +472,25 @@
 			>
 				{#if message.routerMetadata && (message.routerMetadata.route || message.routerMetadata.model || message.routerMetadata.provider) && (!isLast || !loading)}
 					<div
-						class="mr-2 flex items-center gap-1.5 truncate whitespace-nowrap text-[.65rem] text-gray-400 dark:text-gray-400 dark:opacity-50 sm:text-xs"
+						class="mr-2 flex items-center gap-1.5 truncate text-[.65rem] whitespace-nowrap text-gray-400 sm:text-xs dark:text-gray-400 dark:opacity-50"
 					>
 						{#if message.routerMetadata.route && message.routerMetadata.model}
-							<span class="truncate rounded bg-gray-100 px-1 font-mono dark:bg-gray-800 sm:py-px">
+							<span
+								class="truncate rounded-sm bg-gray-100 px-1 font-mono sm:py-px dark:bg-gray-800"
+							>
 								{message.routerMetadata.route}
 							</span>
 							<span class="text-gray-500">with</span>
 							{#if publicConfig.isHuggingChat}
 								<a
 									href="/chat/settings/{message.routerMetadata.model}"
-									class="flex items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 sm:py-px"
+									class="flex items-center gap-1 truncate rounded-sm bg-gray-100 px-1 font-mono hover:text-gray-500 sm:py-px dark:bg-gray-800 dark:hover:text-gray-300"
 								>
 									{message.routerMetadata.model.split("/").pop()}
 								</a>
 							{:else}
 								<span
-									class="truncate rounded bg-gray-100 px-1.5 font-mono dark:bg-gray-800 sm:py-px"
+									class="truncate rounded-sm bg-gray-100 px-1.5 font-mono sm:py-px dark:bg-gray-800"
 								>
 									{message.routerMetadata.model.split("/").pop()}
 								</span>
@@ -506,12 +502,12 @@
 							<a
 								target="_blank"
 								href="https://huggingface.co/{hubOrg}"
-								class="flex items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 max-sm:hidden sm:py-px"
+								class="flex items-center gap-1 truncate rounded-sm bg-gray-100 px-1 font-mono hover:text-gray-500 max-sm:hidden sm:py-px dark:bg-gray-800 dark:hover:text-gray-300"
 							>
 								<img
 									src="https://huggingface.co/api/avatars/{hubOrg}"
 									alt="{message.routerMetadata.provider} logo"
-									class="size-2.5 flex-none rounded-sm"
+									class="size-2.5 flex-none rounded-xs"
 									onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
 								/>
 								{message.routerMetadata.provider}
@@ -524,12 +520,12 @@
 						onClick={() => {
 							isCopied = true;
 						}}
-						classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+						classNames="btn rounded-xs p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 						value={contentWithoutThink}
 						iconClassNames="text-xs"
 					/>
 					<button
-						class="btn rounded-sm p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+						class="btn rounded-xs p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 						title="Retry"
 						type="button"
 						onclick={() => {
@@ -577,7 +573,7 @@
 			<div class="flex w-full flex-row flex-nowrap">
 				{#if !editMode}
 					<p
-						class="disabled w-full appearance-none whitespace-break-spaces text-wrap break-words bg-inherit px-5 py-3.5 text-gray-500 dark:text-gray-400"
+						class="disabled w-full appearance-none bg-inherit px-5 py-3.5 text-wrap wrap-break-word whitespace-break-spaces text-gray-500 dark:text-gray-400"
 					>
 						{message.content.trim()}
 					</p>
@@ -592,7 +588,7 @@
 						}}
 					>
 						<textarea
-							class="w-full whitespace-break-spaces break-words rounded-xl bg-gray-100 px-5 py-3.5 text-gray-500 *:h-max focus:outline-none dark:bg-gray-800 dark:text-gray-400"
+							class="w-full rounded-xl bg-gray-100 px-5 py-3.5 wrap-break-word whitespace-break-spaces text-gray-500 *:h-max focus:outline-hidden dark:bg-gray-800 dark:text-gray-400"
 							rows="5"
 							bind:this={editContentEl}
 							value={message.content.trim()}
@@ -613,7 +609,7 @@
 							</button>
 							<button
 								type="button"
-								class="btn rounded-sm p-2 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+								class="btn rounded-xs p-2 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 								onclick={() => {
 									editMsdgId = null;
 								}}
@@ -635,7 +631,7 @@
 				{/if}
 				{#if (alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode)}
 					<button
-						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:bg-gray-100 hover:text-gray-500 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300 lg:-right-2"
+						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:bg-gray-100 hover:text-gray-500 lg:-right-2 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 						title="Edit"
 						type="button"
 						onclick={() => {
@@ -647,7 +643,7 @@
 						Edit
 					</button>
 					<button
-						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs group-hover:flex hover:flex hover:bg-gray-100 dark:hover:bg-gray-800 lg:-right-2 {isUserMsgCopied
+						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs group-hover:flex hover:flex hover:bg-gray-100 lg:-right-2 dark:hover:bg-gray-800 {isUserMsgCopied
 							? 'text-green-500 dark:text-green-400'
 							: 'text-gray-400 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300'}"
 						title="Copy to clipboard"

@@ -133,7 +133,7 @@
 	class="sticky top-0 flex flex-none touch-none items-center justify-between px-1.5 py-3.5 max-sm:pt-0"
 >
 	<a
-		class="flex select-none items-center rounded-xl text-lg font-semibold"
+		class="flex items-center rounded-xl text-lg font-semibold select-none"
 		href="{publicConfig.PUBLIC_ORIGIN}{base}/"
 	>
 		<Logo classNames="dark:invert mr-[2px]" />
@@ -142,7 +142,7 @@
 	<a
 		href={`${base}/`}
 		onclick={handleNewChatClick}
-		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700 sm:text-smd"
+		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-xs hover:shadow-none sm:text-smd dark:border-gray-600 dark:bg-gray-700"
 		title="Ctrl/Cmd + Shift + O"
 	>
 		New Chat
@@ -150,12 +150,12 @@
 </div>
 
 <div
-	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:border-transparent dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
+	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pt-2 pb-3 text-[.9rem] max-sm:bg-linear-to-t md:bg-linear-to-l dark:border-transparent dark:from-gray-800/30"
 >
 	<div class="flex flex-col gap-px">
 		{#each Object.entries(groupedConversations) as [group, convs]}
 			{#if convs.length}
-				<h4 class="mb-1.5 mt-4 pl-0.5 text-xs text-gray-400 first:mt-0 dark:text-gray-500">
+				<h4 class="mt-4 mb-1.5 pl-0.5 text-xs text-gray-400 first:mt-0 dark:text-gray-500">
 					{titles[group]}
 				</h4>
 				{#each convs as conv}
@@ -169,11 +169,11 @@
 	{/if}
 </div>
 <div
-	class="flex touch-none flex-col gap-px rounded-r-xl border border-l-0 border-gray-100 p-3 text-base dark:border-transparent sm:text-sm md:mt-3 md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
+	class="flex touch-none flex-col gap-px rounded-r-xl border border-l-0 border-gray-100 p-3 text-base sm:text-sm md:mt-3 md:bg-linear-to-l md:from-gray-50 dark:border-transparent md:dark:from-gray-800/30"
 >
 	{#if user?.username || user?.email}
 		<div
-			class="group flex h-8 items-center gap-1.5 rounded-lg pl-2 pr-2 hover:bg-gray-100 first:hover:bg-transparent dark:hover:bg-gray-700 first:dark:hover:bg-transparent max-sm:h-10"
+			class="group flex h-8 items-center gap-1.5 rounded-lg pr-2 pl-2 hover:bg-gray-100 first:hover:bg-transparent max-sm:h-10 dark:hover:bg-gray-700 dark:first:hover:bg-transparent"
 		>
 			<img
 				src="https://huggingface.co/api/users/{user.username}/avatar?redirect=true"
@@ -216,7 +216,7 @@
 	{/if}
 	<a
 		href="{base}/models"
-		class="flex h-8 flex-none items-center gap-1.5 rounded-lg pl-2 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 max-sm:h-10"
+		class="flex h-8 flex-none items-center gap-1.5 rounded-lg pr-2 pl-2 text-gray-500 hover:bg-gray-100 max-sm:h-10 dark:text-gray-400 dark:hover:bg-gray-700"
 		onclick={handleNavItemClick}
 	>
 		Models
@@ -229,7 +229,7 @@
 	{#if user?.username || user?.email}
 		<button
 			onclick={() => (showMcpModal = true)}
-			class="flex h-8 flex-none items-center gap-1.5 rounded-lg pl-2 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 max-sm:h-10"
+			class="flex h-8 flex-none items-center gap-1.5 rounded-lg pr-2 pl-2 text-gray-500 hover:bg-gray-100 max-sm:h-10 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			MCP Servers
 			{#if $enabledServersCount > 0}
@@ -245,7 +245,7 @@
 	<span class="flex gap-px">
 		<a
 			href="{base}/settings/application"
-			class="flex h-8 flex-none flex-grow items-center gap-1.5 rounded-lg pl-2 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 max-sm:h-10"
+			class="flex h-8 flex-none grow items-center gap-1.5 rounded-lg pr-2 pl-2 text-gray-500 hover:bg-gray-100 max-sm:h-10 dark:text-gray-400 dark:hover:bg-gray-700"
 			onclick={handleNavItemClick}
 		>
 			Settings
@@ -255,7 +255,7 @@
 				switchTheme();
 			}}
 			aria-label="Toggle theme"
-			class="flex size-8 min-w-[1.5em] flex-none items-center justify-center rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 max-sm:size-10"
+			class="flex size-8 min-w-[1.5em] flex-none items-center justify-center rounded-lg p-2 text-gray-500 hover:bg-gray-100 max-sm:size-10 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			{#if browser}
 				{#if isDark}

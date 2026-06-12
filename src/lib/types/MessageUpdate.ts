@@ -67,8 +67,7 @@ export interface MessageToolCallUpdate extends MessageToolUpdateBase<MessageTool
 	call: ToolCall;
 }
 
-export interface MessageToolResultUpdate
-	extends MessageToolUpdateBase<MessageToolUpdateType.Result> {
+export interface MessageToolResultUpdate extends MessageToolUpdateBase<MessageToolUpdateType.Result> {
 	result: ToolResult;
 }
 
@@ -80,8 +79,7 @@ export interface MessageToolEtaUpdate extends MessageToolUpdateBase<MessageToolU
 	eta: number;
 }
 
-export interface MessageToolProgressUpdate
-	extends MessageToolUpdateBase<MessageToolUpdateType.Progress> {
+export interface MessageToolProgressUpdate extends MessageToolUpdateBase<MessageToolUpdateType.Progress> {
 	progress: number;
 	total?: number;
 	message?: string;

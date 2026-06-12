@@ -171,7 +171,7 @@
 	<!-- Cancel button -->
 	<button
 		type="button"
-		class="btn grid size-8 place-items-center rounded-full border bg-white text-black shadow transition-none hover:bg-gray-100 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500 sm:size-7"
+		class="btn grid size-8 place-items-center rounded-full border bg-white text-black shadow-sm transition-none hover:bg-gray-100 sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500"
 		onclick={handleCancel}
 		aria-label="Cancel recording"
 	>
@@ -179,7 +179,7 @@
 	</button>
 
 	<!-- Waveform / Loading -->
-	<div class="flex h-12 flex-1 items-center overflow-hidden pl-2.5 pr-1.5">
+	<div class="flex h-12 flex-1 items-center overflow-hidden pr-1.5 pl-2.5">
 		{#if isTranscribing}
 			<div class="flex h-full w-full items-center justify-center">
 				<IconLoading classNames="text-gray-400" />
@@ -192,7 +192,7 @@
 	<!-- Confirm/Send button -->
 	<button
 		type="button"
-		class="btn grid size-8 place-items-center rounded-full border shadow transition-none disabled:opacity-50 sm:size-7 {isTouchDevice
+		class="btn grid size-8 place-items-center rounded-full border shadow-sm transition-none disabled:opacity-50 sm:size-7 {isTouchDevice
 			? 'border-transparent bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200'
 			: 'bg-white text-black hover:bg-gray-100 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500'}"
 		onclick={handleConfirm}
