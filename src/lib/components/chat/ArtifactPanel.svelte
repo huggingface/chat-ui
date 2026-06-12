@@ -343,11 +343,11 @@
 
 	const tabBase =
 		"rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40";
-	const tabActive = "bg-white text-gray-800 shadow-sm dark:bg-gray-600 dark:text-gray-100";
+	const tabActive = "bg-white text-gray-800 shadow-xs dark:bg-gray-600 dark:text-gray-100";
 	const tabInactive =
 		"text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200";
 	const codeFloatBtn =
-		"btn rounded-md border border-gray-200/80 bg-white/90 p-1.5 text-xs backdrop-blur-sm hover:bg-gray-100 hover:text-gray-600 dark:border-gray-700/80 dark:bg-gray-900/90 dark:hover:bg-gray-800 dark:hover:text-gray-300";
+		"btn rounded-md border border-gray-200/80 bg-white/90 p-1.5 text-xs backdrop-blur-xs hover:bg-gray-100 hover:text-gray-600 dark:border-gray-700/80 dark:bg-gray-900/90 dark:hover:bg-gray-800 dark:hover:text-gray-300";
 </script>
 
 <svelte:window onmessage={onWindowMessage} onkeydown={handleKeydown} />
@@ -366,7 +366,7 @@
 			</h2>
 			{#if totalVersions > 1}
 				<span
-					class="flex-none rounded bg-gray-100 px-1 py-px font-mono text-xxs text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+					class="flex-none rounded-sm bg-gray-100 px-1 py-px font-mono text-xxs text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 				>
 					v{displayVersionNumber}
 				</span>
@@ -422,7 +422,7 @@
 			     p-1 keeps the button footprint identical to its p-1.5 text-xs siblings -->
 			<button
 				type="button"
-				class="btn ml-0.5 rounded-md p-1 text-base hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+				class="ml-0.5 btn rounded-md p-1 text-base hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 				title="Close panel (Esc)"
 				onclick={() => artifactPanel.close()}
 			>
@@ -461,7 +461,7 @@
 		{:else}
 			<!-- Same .prose pre styling as chat code blocks so the syntax theme matches
 			     exactly in both modes; text-smd matches the chat prose root so the code
-			     renders at the same size; !border-0 since the panel provides its own frame -->
+			     renders at the same size; border-0! since the panel provides its own frame -->
 			<div
 				class="prose h-full max-w-none text-smd dark:prose-invert prose-pre:my-0 prose-pre:h-full prose-pre:rounded-none"
 			>
@@ -469,12 +469,12 @@
 				<pre
 					bind:this={codeScrollEl}
 					onscroll={onCodeScroll}
-					class="scrollbar-custom h-full overflow-auto !border-0 px-5 py-4 font-mono {artifactPanel.codeWrap
-						? 'whitespace-pre-wrap break-words'
+					class="scrollbar-custom h-full overflow-auto border-0! px-5 py-4 font-mono {artifactPanel.codeWrap
+						? 'wrap-break-word whitespace-pre-wrap'
 						: ''} {showingDiff ? 'diff-view' : ''}"><code>{@html highlightedCode}</code></pre>
 			</div>
 			<!-- Floating so toggling them on/off never reflows the header tab switcher -->
-			<div class="absolute right-3 top-2 z-10 flex items-center gap-1">
+			<div class="absolute top-2 right-3 z-10 flex items-center gap-1">
 				{#if canDiff}
 					<button
 						type="button"
@@ -502,7 +502,7 @@
 			</div>
 			{#if isStreamingVersion}
 				<div
-					class="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white/90 to-transparent dark:from-gray-900/90"
+					class="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t from-white/90 to-transparent dark:from-gray-900/90"
 				></div>
 			{/if}
 		{/if}
@@ -516,7 +516,7 @@
 			{#if totalVersions > 1}
 				<button
 					type="button"
-					class="btn rounded p-1 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-800"
+					class="btn rounded-sm p-1 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-800"
 					disabled={displayVersionNumber <= 1}
 					title="Previous version"
 					onclick={() => gotoVersion(displayVersionNumber - 1)}
@@ -528,7 +528,7 @@
 				</span>
 				<button
 					type="button"
-					class="btn rounded p-1 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-800"
+					class="btn rounded-sm p-1 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-800"
 					disabled={displayVersionNumber >= totalVersions}
 					title="Next version"
 					onclick={() => gotoVersion(displayVersionNumber + 1)}
@@ -563,7 +563,7 @@
 			{:else if stats && effectiveTab === "code" && stats.added + stats.removed > 0}
 				<button
 					type="button"
-					class="btn whitespace-nowrap rounded px-1.5 py-0.5 tabular-nums hover:bg-gray-100 dark:hover:bg-gray-800"
+					class="btn rounded-sm px-1.5 py-0.5 whitespace-nowrap tabular-nums hover:bg-gray-100 dark:hover:bg-gray-800"
 					title="Jump to first change"
 					onclick={() => codeScrollEl && scrollToFirstChange(codeScrollEl)}
 				>

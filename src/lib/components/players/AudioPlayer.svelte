@@ -34,7 +34,7 @@
 </script>
 
 <div
-	class="flex h-14 w-72 items-center gap-4 rounded-2xl border border-gray-200 bg-white p-2.5 text-gray-600 shadow-sm transition-all dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+	class="flex h-14 w-72 items-center gap-4 rounded-2xl border border-gray-200 bg-white p-2.5 text-gray-600 shadow-xs transition-all dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
 >
 	<audio
 		{src}

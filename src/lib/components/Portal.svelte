@@ -19,6 +19,6 @@
 	});
 </script>
 
-<div bind:this={el} class="contents" hidden>
+<div bind:this={el} class="contents">
 	{@render children?.()}
 </div>

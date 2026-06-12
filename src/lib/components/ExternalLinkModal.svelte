@@ -30,7 +30,7 @@
 	<div class="flex w-full flex-col gap-5 p-6">
 		<div class="flex items-start justify-between">
 			<h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Open external link?</h2>
-			<button type="button" class="group outline-none" onclick={close} aria-label="Close">
+			<button type="button" class="group outline-hidden" onclick={close} aria-label="Close">
 				<CarbonClose
 					class="size-5 text-gray-700 group-hover:text-gray-500 dark:text-gray-300 dark:group-hover:text-gray-400"
 				/>
@@ -45,7 +45,7 @@
 		<!-- Built from URL components (host has no userinfo ambiguity) so the
 		     rendered string is byte-identical to the URL that window.open gets -->
 		<p
-			class="break-all rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 font-mono text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
+			class="rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 font-mono text-xs break-all text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
 		>
 			{url.protocol}//<span class="font-semibold text-gray-800 dark:text-gray-200">{url.host}</span
 			>{url.pathname + url.search + url.hash}
@@ -54,14 +54,14 @@
 		<div class="flex items-center justify-end gap-2">
 			<button
 				type="button"
-				class="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow outline-none hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+				class="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm outline-hidden hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
 				onclick={close}
 			>
 				Cancel
 			</button>
 			<button
 				type="button"
-				class="inline-flex items-center gap-1.5 rounded-xl border border-gray-900 bg-gray-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-black focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 dark:border-gray-100 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white dark:focus:ring-offset-gray-800"
+				class="inline-flex items-center gap-1.5 rounded-xl border border-gray-900 bg-gray-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-black focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-hidden dark:border-gray-100 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white dark:focus:ring-offset-gray-800"
 				onclick={confirmOpen}
 			>
 				Open link

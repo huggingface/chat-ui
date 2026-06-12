@@ -37,9 +37,9 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <Portal>
-	<div class="fixed inset-0 z-50 overflow-hidden bg-black/90 backdrop-blur-sm">
+	<div class="fixed inset-0 z-50 overflow-hidden bg-black/90 backdrop-blur-xs">
 		<button
-			class="absolute right-3 top-3 z-10 grid size-8 place-items-center rounded-full border border-white/25 bg-white/20 text-gray-300 hover:bg-white/30 sm:right-6 sm:top-6"
+			class="absolute top-3 right-3 z-10 grid size-8 place-items-center rounded-full border border-white/25 bg-white/20 text-gray-300 hover:bg-white/30 sm:top-6 sm:right-6"
 			onclick={onclose}
 			aria-label="Close"
 		>
