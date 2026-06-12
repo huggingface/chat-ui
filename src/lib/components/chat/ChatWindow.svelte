@@ -650,8 +650,11 @@
 			use:snapScrollToBottom={scrollDependency}
 			bind:this={chatContainer}
 		>
+			<!-- @container: descendants (e.g. the message metadata bar) adapt to the chat
+			     column's width rather than the viewport, so they stay responsive when the
+			     artifact panel narrows the column. -->
 			<div
-				class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl xl:pt-10"
+				class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 @container sm:gap-8 xl:max-w-4xl xl:pt-10"
 			>
 				{#if preprompt && preprompt != currentModel.preprompt}
 					<SystemPromptModal preprompt={preprompt ?? ""} />

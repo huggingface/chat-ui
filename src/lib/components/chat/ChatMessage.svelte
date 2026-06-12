@@ -470,31 +470,33 @@
 		</div>
 
 		{#if message.routerMetadata || (!loading && message.content)}
+			<!-- Sized with container queries (@xl ≈ the old sm viewport breakpoint) so the
+			     bar also compacts when the artifact panel narrows the chat column. -->
 			<div
 				class="absolute -bottom-3.5 {message.routerMetadata && messageInfoWidth > messageWidth
-					? 'left-1 pl-1 lg:pl-7'
-					: 'right-1'} flex max-w-[calc(100dvw-40px)] items-center gap-0.5"
+					? 'left-1 pl-1 @2xl:pl-7'
+					: 'right-1'} flex max-w-[100cqw] items-center gap-0.5"
 				bind:offsetWidth={messageInfoWidth}
 			>
 				{#if message.routerMetadata && (message.routerMetadata.route || message.routerMetadata.model || message.routerMetadata.provider) && (!isLast || !loading)}
 					<div
-						class="mr-2 flex items-center gap-1.5 truncate whitespace-nowrap text-[.65rem] text-gray-400 dark:text-gray-400 dark:opacity-50 sm:text-xs"
+						class="mr-2 flex items-center gap-1.5 truncate whitespace-nowrap text-[.65rem] text-gray-400 @xl:text-xs dark:text-gray-400 dark:opacity-50"
 					>
 						{#if message.routerMetadata.route && message.routerMetadata.model}
-							<span class="truncate rounded bg-gray-100 px-1 font-mono dark:bg-gray-800 sm:py-px">
+							<span class="truncate rounded bg-gray-100 px-1 font-mono @xl:py-px dark:bg-gray-800">
 								{message.routerMetadata.route}
 							</span>
 							<span class="text-gray-500">with</span>
 							{#if publicConfig.isHuggingChat}
 								<a
 									href="/chat/settings/{message.routerMetadata.model}"
-									class="flex items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 sm:py-px"
+									class="flex items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 @xl:py-px dark:bg-gray-800 dark:hover:text-gray-300"
 								>
 									{message.routerMetadata.model.split("/").pop()}
 								</a>
 							{:else}
 								<span
-									class="truncate rounded bg-gray-100 px-1.5 font-mono dark:bg-gray-800 sm:py-px"
+									class="truncate rounded bg-gray-100 px-1.5 font-mono @xl:py-px dark:bg-gray-800"
 								>
 									{message.routerMetadata.model.split("/").pop()}
 								</span>
@@ -502,11 +504,11 @@
 						{/if}
 						{#if message.routerMetadata.provider}
 							{@const hubOrg = PROVIDERS_HUB_ORGS[message.routerMetadata.provider]}
-							<span class="text-gray-500 max-sm:hidden">via</span>
+							<span class="hidden text-gray-500 @xl:inline">via</span>
 							<a
 								target="_blank"
 								href="https://huggingface.co/{hubOrg}"
-								class="flex items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 max-sm:hidden sm:py-px"
+								class="hidden items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 @xl:flex @xl:py-px dark:bg-gray-800 dark:hover:text-gray-300"
 							>
 								<img
 									src="https://huggingface.co/api/avatars/{hubOrg}"
