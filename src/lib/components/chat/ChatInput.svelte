@@ -480,11 +480,15 @@
 </div>
 
 <style>
-	:global(pre),
-	:global(textarea) {
-		font-family: inherit;
-		box-sizing: border-box;
-		line-height: 1.5;
-		font-size: 16px;
+	/* In the base layer so utility classes (font-mono, text-xs, prose) keep
+	   winning over these element selectors, as they did before Tailwind v4 */
+	@layer base {
+		:global(pre),
+		:global(textarea) {
+			font-family: inherit;
+			box-sizing: border-box;
+			line-height: 1.5;
+			font-size: 16px;
+		}
 	}
 </style>

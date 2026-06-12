@@ -195,8 +195,12 @@
 {/if}
 
 <style>
-	:global(input) {
-		font-family: inherit;
+	/* In the base layer so font utilities keep winning over this element
+	   selector, as they did before Tailwind v4 */
+	@layer base {
+		:global(input) {
+			font-family: inherit;
+		}
 	}
 	/* Uses app-level colors and rounded/blur styles via utility classes */
 	/* The Modal itself provides consistent container + scrollbar-custom styling */

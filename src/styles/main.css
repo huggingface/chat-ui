@@ -217,7 +217,9 @@ body {
 }
 
 .prose pre {
-	@apply border-[0.5px] bg-white text-gray-600 dark:border-gray-700 dark:bg-gray-900! dark:bg-inherit dark:text-inherit;
+	/* font-mono restated because the typography plugin makes `pre code` inherit from `pre`,
+	   and base-layer element styles (ChatInput) would otherwise turn `pre` sans-serif */
+	@apply border-[0.5px] bg-white font-mono text-gray-600 dark:border-gray-700 dark:bg-gray-900! dark:bg-inherit dark:text-inherit;
 }
 
 .prose code:not(pre code) {
