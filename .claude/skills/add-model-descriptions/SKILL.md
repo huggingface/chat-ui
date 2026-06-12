@@ -1,11 +1,11 @@
 ---
 name: add-model-descriptions
-description: Add descriptions for new models from the HuggingFace router to chat-ui configuration, and flag reasoning-capable ones. Use when new models are released on the router and need descriptions added to prod.yaml and dev.yaml. Triggers on requests like "add new model descriptions", "update models from router", "sync models", or when explicitly invoking /add-model-descriptions.
+description: Add descriptions for new models from the HuggingFace router to chat-ui configuration, flag reasoning-capable ones, and enable artifacts for models with 32B+ parameters. Use when new models are released on the router and need descriptions added to prod.yaml and dev.yaml. Triggers on requests like "add new model descriptions", "update models from router", "sync models", or when explicitly invoking /add-model-descriptions.
 ---
 
 # Add Model Descriptions
 
-Add descriptions for new models available in the HuggingFace router to chat-ui's `prod.yaml` and `dev.yaml`. Also flag models that support the OpenAI-compatible `reasoning_effort` parameter so chat-ui shows the thinking-effort selector for them.
+Add descriptions for new models available in the HuggingFace router to chat-ui's `prod.yaml` and `dev.yaml`. Also flag models that support the OpenAI-compatible `reasoning_effort` parameter so chat-ui shows the thinking-effort selector for them, and enable artifacts for models with 32B or more total parameters.
 
 ## Workflow
 
@@ -67,7 +67,15 @@ Add descriptions for new models available in the HuggingFace router to chat-ui's
 
    If none of the live providers document reasoning support for the model, don't flag it — even if the name pattern-matches. If documentation is ambiguous, lean toward not flagging and mention it in the commit so it can be revisited.
 
-6. **Write descriptions**
+6. **Decide if the model gets artifacts**
+   Enable artifacts for any new model with **32B or more total parameters** by appending `"supportsArtifacts": true` to its entry. This makes chat-ui instruct the model to emit `<artifact>` blocks rendered in the side panel.
+
+   - Use the **total** parameter count, not active parameters. A `35B-A3B` MoE qualifies (35B total ≥ 32B) even though only 3B are active.
+   - The count is usually in the model name (`Qwen3.6-27B`, `550B-A55B`). When it isn't, use the parameter count found while researching the model in step 4.
+   - This is independent of reasoning capability — a model can have both flags, either one, or neither.
+   - Models under 32B don't get the flag; users can still enable artifacts per-model via settings overrides.
+
+7. **Write descriptions**
    Match existing style:
 
    - 8-12 words
@@ -82,36 +90,36 @@ Add descriptions for new models available in the HuggingFace router to chat-ui's
    - `"Vision-language Qwen for documents, GUI agents, and visual reasoning."`
    - `"Mobile agent for multilingual Android device automation."`
 
-7. **Update both files**
+8. **Update both files**
    Add new models at the TOP of the MODELS array in:
 
    - `chart/env/prod.yaml`
    - `chart/env/dev.yaml`
 
-   Format for non-reasoning models:
+   Base format:
 
    ```json
    { "id": "org/model-name", "description": "Description here." }
    ```
 
-   Format for reasoning-capable models — append `"supportsReasoning": true`:
+   Append `"supportsReasoning": true` for reasoning-capable models (step 5) and `"supportsArtifacts": true` for 32B+ models (step 6). A model can carry both:
 
    ```json
-   { "id": "org/model-name", "description": "Description here.", "supportsReasoning": true }
+   { "id": "org/model-name", "description": "Description here.", "supportsReasoning": true, "supportsArtifacts": true }
    ```
 
-   This flag is what makes chat-ui render the Thinking-effort dropdown in the chat footer for that model and forward `reasoning_effort` to the router.
+   `supportsReasoning` is what makes chat-ui render the Thinking-effort dropdown in the chat footer for that model and forward `reasoning_effort` to the router. `supportsArtifacts` enables the artifacts side panel for the model.
 
-8. **Commit changes**
-   In the commit message, mention how many of the new models are reasoning-capable so it's easy to review.
+9. **Commit changes**
+   In the commit message, mention how many of the new models are reasoning-capable and how many get artifacts so it's easy to review.
    ```
    git add chart/env/prod.yaml chart/env/dev.yaml
-   git commit -m "feat: add descriptions for N new models from router (M reasoning-capable)"
+   git commit -m "feat: add descriptions for N new models from router (M reasoning-capable, K with artifacts)"
    ```
 
 ## Notes
 
-- FP8 variants: describe as "FP8 [base model] for efficient inference with [key capability]". If the base model is reasoning-capable, the FP8 variant is too — flag both.
+- FP8 variants: describe as "FP8 [base model] for efficient inference with [key capability]". If the base model is reasoning-capable, the FP8 variant is too — flag both. Same for artifacts: quantization doesn't change the parameter count, so a 32B+ base means the FP8 variant gets `supportsArtifacts` too.
 - Vision models: mention "vision-language" and key visual tasks. A vision model can still be reasoning-capable (e.g. `Qwen3-VL-*-Thinking`) — judge by the same rules.
 - Agent models: mention "agent" and automation capabilities.
 - Regional models: mention language focus (e.g., "European multilingual", "Southeast Asian").
