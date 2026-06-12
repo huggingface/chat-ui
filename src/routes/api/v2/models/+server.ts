@@ -2,10 +2,9 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
 import type { GETModelsResponse } from "$lib/server/api/types";
 
-// Models are loaded at startup but can also be refreshed at runtime via
-// POST /api/v2/models/refresh. Cache for 60s so repeated invalidations
-// (e.g. from settings saves) don't generate a round-trip; up to 60s of
-// staleness after a refresh is accepted.
+// Models are loaded once at server startup; new models appear on redeploy.
+// Cache for 60s so repeated invalidations (e.g. from settings saves) don't
+// generate a round-trip.
 const MODELS_CACHE_HEADERS = { "Cache-Control": "private, max-age=60" };
 
 export const GET: RequestHandler = async () => {

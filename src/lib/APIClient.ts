@@ -120,13 +120,11 @@ export function useAPIClient({
 		models: {
 			...endpoint(fetcher, `${baseUrl}/models`),
 			old: endpoint(fetcher, `${baseUrl}/models/old`),
-			refresh: endpoint(fetcher, `${baseUrl}/models/refresh`),
 		},
 		"public-config": endpoint(fetcher, `${baseUrl}/public-config`),
 		"feature-flags": endpoint(fetcher, `${baseUrl}/feature-flags`),
 		debug: {
 			config: endpoint(fetcher, `${baseUrl}/debug/config`),
-			refresh: endpoint(fetcher, `${baseUrl}/debug/refresh`),
 		},
 		export: endpoint(fetcher, `${baseUrl}/export`),
 	};
