@@ -262,9 +262,9 @@
 <BackgroundGenerationPoller />
 
 <div
-	class="fixed grid h-dvh w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
-		? 'md:grid-cols-[260px,1fr]'
-		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
+	class="fixed grid h-dvh w-screen grid-cols-1 grid-rows-[auto_1fr] overflow-hidden text-smd {!isNavCollapsed
+		? 'md:grid-cols-[260px_1fr]'
+		: 'md:grid-cols-[0px_1fr]'} transition-[300ms] [transition-property:grid-template-columns] md:grid-rows-[1fr] dark:text-gray-300"
 >
 	<ExpandNavigation
 		isCollapsed={isNavCollapsed}
@@ -283,7 +283,7 @@
 		/>
 	</MobileNav>
 	<nav
-		class="grid max-h-dvh grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[260px] max-md:hidden"
+		class="grid max-h-dvh grid-cols-1 grid-rows-[auto_1fr_auto] overflow-hidden *:w-[260px] max-md:hidden"
 	>
 		<NavMenu
 			conversations={convsStore.list}
@@ -299,7 +299,7 @@
 
 	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
 		<script>
-			(window.plausible =
+			((window.plausible =
 				window.plausible ||
 				function () {
 					(plausible.q = plausible.q || []).push(arguments);
@@ -308,7 +308,7 @@
 					plausible.init ||
 					function (i) {
 						plausible.o = i || {};
-					});
+					}));
 			plausible.init();
 		</script>
 	{/if}

@@ -71,7 +71,7 @@
 			handleBackdropClick(e);
 		}}
 		transition:fade|local={{ easing: cubicOut, duration: 300 }}
-		class="fixed inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm dark:bg-black/50"
+		class="fixed inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-xs dark:bg-black/50"
 	>
 		{#if disableFly}
 			<div
@@ -80,12 +80,12 @@
 				bind:this={modalEl}
 				onkeydown={handleKeydown}
 				class={[
-					"scrollbar-custom relative mx-auto max-h-[95dvh] max-w-[90dvw] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 dark:text-gray-200 dark:ring-1 dark:ring-white/15",
+					"relative mx-auto scrollbar-custom max-h-[95dvh] max-w-[90dvw] overflow-x-hidden overflow-y-auto rounded-2xl bg-white shadow-2xl outline-hidden dark:bg-gray-800 dark:text-gray-200 dark:ring-1 dark:ring-white/15",
 					width,
 				]}
 			>
 				{#if closeButton}
-					<button class="absolute right-4 top-4 z-50" onclick={() => onclose?.()}>
+					<button class="absolute top-4 right-4 z-50" onclick={() => onclose?.()}>
 						<CarbonClose class="size-6 text-gray-700 dark:text-gray-300" />
 					</button>
 				{/if}
@@ -99,12 +99,12 @@
 				onkeydown={handleKeydown}
 				in:fly={{ y: 100 }}
 				class={[
-					"scrollbar-custom relative mx-auto max-h-[95dvh] max-w-[90dvw] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 dark:text-gray-200 dark:ring-1 dark:ring-white/15",
+					"relative mx-auto scrollbar-custom max-h-[95dvh] max-w-[90dvw] overflow-x-hidden overflow-y-auto rounded-2xl bg-white shadow-2xl outline-hidden dark:bg-gray-800 dark:text-gray-200 dark:ring-1 dark:ring-white/15",
 					width,
 				]}
 			>
 				{#if closeButton}
-					<button class="absolute right-4 top-4 z-50" onclick={() => onclose?.()}>
+					<button class="absolute top-4 right-4 z-50" onclick={() => onclose?.()}>
 						<CarbonClose class="size-6 text-gray-700 dark:text-gray-300" />
 					</button>
 				{/if}

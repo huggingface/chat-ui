@@ -64,7 +64,7 @@
 </svelte:head>
 
 <div class="scrollbar-custom h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
-	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
+	<div class="mx-auto flex flex-col px-5 pt-42 xl:w-240 2xl:w-5xl">
 		<div class="flex items-center">
 			<h1 class="text-xl font-bold sm:text-2xl">Models</h1>
 			{#if publicConfig.isHuggingChat}
@@ -94,7 +94,7 @@
 			placeholder="Search by name"
 			aria-label="Search models by name or id"
 			class="mt-4 w-full rounded-3xl border border-gray-300 bg-white px-5 py-2 text-[15px]
-				placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300
+				placeholder:text-gray-400 focus:ring-2 focus:ring-gray-300 focus:outline-hidden
 				dark:border-gray-700 dark:bg-gray-900 dark:focus:ring-gray-700"
 		/>
 
@@ -113,7 +113,7 @@
 							{#if model.logoUrl}
 								<img
 									alt={model.displayName}
-									class="size-8 rounded-lg border border-gray-100 bg-gray-50 object-cover dark:border-gray-700 dark:bg-gray-100 sm:size-10"
+									class="size-8 rounded-lg border border-gray-100 bg-gray-50 object-cover sm:size-10 dark:border-gray-700 dark:bg-gray-100"
 									src={model.logoUrl}
 								/>
 							{:else}
@@ -128,7 +128,7 @@
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-2">
 								<h3
-									class="truncate font-medium text-gray-900 dark:text-gray-200 max-sm:text-xs"
+									class="truncate font-medium text-gray-900 max-sm:text-xs dark:text-gray-200"
 									class:font-bold={isActive}
 									class:dark:text-white={isActive}
 								>
@@ -136,13 +136,13 @@
 								</h3>
 								{#if index === 0 && model.isRouter && !isActive}
 									<span
-										class="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-500 dark:border-gray-700 dark:text-gray-400"
+										class="rounded-sm border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 uppercase dark:border-gray-700 dark:text-gray-400"
 									>
 										Default
 									</span>
 								{/if}
 							</div>
-							<p class="truncate pr-4 text-xs text-gray-500 dark:text-gray-400 sm:text-[13px]">
+							<p class="truncate pr-4 text-xs text-gray-500 sm:text-[13px] dark:text-gray-400">
 								{model.isRouter
 									? "Routes your messages to the best model for your request."
 									: model.description || "-"}
@@ -172,12 +172,12 @@
 								{:else if hubOrg}
 									<div
 										title="Provider: {providerOverride}"
-										class="flex size-[26px] items-center justify-center rounded-md bg-gray-100 p-1 dark:bg-gray-800 sm:size-[30px]"
+										class="flex size-[26px] items-center justify-center rounded-md bg-gray-100 p-1 sm:size-[30px] dark:bg-gray-800"
 									>
 										<img
 											src="https://huggingface.co/api/avatars/{hubOrg}"
 											alt={providerOverride}
-											class="size-full rounded"
+											class="size-full rounded-sm"
 										/>
 									</div>
 								{/if}

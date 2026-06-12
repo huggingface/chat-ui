@@ -22,7 +22,7 @@
 </button>
 
 {#if isOpen}
-	<Modal onclose={() => (isOpen = false)} width="w-full !max-w-xl">
+	<Modal onclose={() => (isOpen = false)} width="w-full max-w-xl!">
 		<div class="flex w-full flex-col gap-5 p-6">
 			<div
 				class="flex items-start justify-between text-xl font-semibold text-gray-800 dark:text-gray-200"
@@ -37,7 +37,7 @@
 			<textarea
 				disabled
 				value={preprompt}
-				class="min-h-[420px] w-full resize-none rounded-lg border bg-gray-50 p-2.5 text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 max-sm:text-sm"
+				class="min-h-[420px] w-full resize-none rounded-lg border bg-gray-50 p-2.5 text-gray-600 max-sm:text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
 			></textarea>
 		</div>
 	</Modal>

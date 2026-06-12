@@ -13,14 +13,14 @@
 <button
 	type="button"
 	onclick={onClick}
-	class={`btn stop-generating-btn ${showBorder ? "stop-generating-btn--spinning" : ""} ${classNames}`}
+	class={`stop-generating-btn btn ${showBorder ? "stop-generating-btn--spinning" : ""} ${classNames}`}
 	aria-label="Stop generating"
 >
 	<span class="sr-only">Stop generating</span>
 	<CarbonStopFilledAlt class="size-3.5 text-gray-500" />
 </button>
 
-<style lang="postcss">
+<style>
 	.stop-generating-btn {
 		position: relative;
 		display: inline-flex;

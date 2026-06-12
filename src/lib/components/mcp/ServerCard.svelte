@@ -80,7 +80,7 @@
 </script>
 
 <div
-	class="rounded-lg border bg-gradient-to-br transition-colors {isSelected
+	class="rounded-lg border bg-linear-to-br transition-colors {isSelected
 		? 'border-blue-600/20 bg-blue-50 from-blue-500/5 to-transparent dark:border-blue-700/60 dark:bg-blue-900/10 dark:from-blue-900/20'
 		: 'border-gray-200 bg-white from-black/5 dark:border-gray-700 dark:bg-gray-800 dark:from-white/5'}"
 >
@@ -92,7 +92,7 @@
 					<img
 						src={getMcpServerFaviconUrl(server.url)}
 						alt=""
-						class="size-4 flex-shrink-0 rounded"
+						class="size-4 flex-shrink-0 rounded-sm"
 					/>
 					<h3 class="truncate font-semibold text-gray-900 dark:text-gray-100">
 						{server.name}
@@ -111,7 +111,7 @@
 		{#if server.status}
 			<div class="mb-2 flex items-center gap-2">
 				<span
-					class="inline-flex items-center gap-1 rounded-full {statusInfo.bgColor} py-0.5 pl-1.5 pr-2 text-xs font-medium {statusInfo.color}"
+					class="inline-flex items-center gap-1 rounded-full {statusInfo.bgColor} py-0.5 pr-2 pl-1.5 text-xs font-medium {statusInfo.color}"
 				>
 					{#if server.status === "connected"}
 						<IconCheckmark class="size-3" />
@@ -139,7 +139,7 @@
 		{#if server.errorMessage}
 			<div class="mb-2 flex items-center gap-2">
 				<div
-					class="line-clamp-6 break-words rounded bg-red-50 px-2 py-1 text-xs text-red-800 dark:bg-red-900/20 dark:text-red-200"
+					class="line-clamp-6 rounded-sm bg-red-50 px-2 py-1 text-xs wrap-break-word text-red-800 dark:bg-red-900/20 dark:text-red-200"
 				>
 					{server.errorMessage}
 				</div>
