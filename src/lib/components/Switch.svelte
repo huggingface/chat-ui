@@ -13,8 +13,8 @@
 	// Explicit class strings per size (Tailwind needs literal class names to scan).
 	const trackClasses = $derived(
 		size === "sm"
-			? "h-3.5 w-6 p-0.5 [&>div]:peer-checked:translate-x-2.5"
-			: "h-5 w-9 p-1 [&>div]:peer-checked:translate-x-3.5"
+			? "h-3.5 w-6 p-0.5 peer-checked:[&>div]:translate-x-2.5"
+			: "h-5 w-9 p-1 peer-checked:[&>div]:translate-x-3.5"
 	);
 	const thumbClasses = $derived(size === "sm" ? "h-2.5 w-2.5" : "h-3.5 w-3.5");
 
