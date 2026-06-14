@@ -1,7 +1,7 @@
 import type { MessageFile } from "$lib/types/Message";
 import type { EndpointMessage } from "$lib/server/endpoints/endpoints";
 import type { OpenAI } from "openai";
-import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
+import { getTextMimeAllowlist } from "$lib/constants/mime";
 import type { makeImageProcessor } from "$lib/server/endpoints/images";
 
 /**
@@ -53,7 +53,7 @@ async function prepareFiles(
 	const textFiles = files.filter((file) => {
 		const mime = (file.mime || "").toLowerCase();
 		const [fileType, fileSubtype] = mime.split("/");
-		return TEXT_MIME_ALLOWLIST.some((allowed) => {
+		return getTextMimeAllowlist().some((allowed) => {
 			const [type, subtype] = allowed.toLowerCase().split("/");
 			const typeOk = type === "*" || type === fileType;
 			const subOk = subtype === "*" || subtype === fileSubtype;

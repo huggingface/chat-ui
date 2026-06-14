@@ -9,7 +9,7 @@
 	import AudioPlayer from "../players/AudioPlayer.svelte";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import { base } from "$app/paths";
-	import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
+	import { getTextMimeAllowlist } from "$lib/constants/mime";
 
 	interface Props {
 		file: MessageFile;
@@ -58,7 +58,7 @@
 	}
 
 	const isPlainText = (mime: string) =>
-		mime === "application/vnd.chatui.clipboard" || matchesAllowed(mime, TEXT_MIME_ALLOWLIST);
+		mime === "application/vnd.chatui.clipboard" || matchesAllowed(mime, getTextMimeAllowlist());
 
 	let isClickable = $derived(isImage(file.mime) || isPlainText(file.mime));
 </script>

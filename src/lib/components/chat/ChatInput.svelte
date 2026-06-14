@@ -12,7 +12,7 @@
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonClose from "~icons/carbon/close";
 	import UrlFetchModal from "./UrlFetchModal.svelte";
-	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
+	import { getTextMimeAllowlist, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
 	import MCPServerManager from "$lib/components/mcp/MCPServerManager.svelte";
 	import IconMCP from "$lib/components/icons/IconMCP.svelte";
 
@@ -91,7 +91,7 @@
 	function openFilePickerText() {
 		const textAccept =
 			mimeTypes.filter((m) => !(m === "image/*" || m.startsWith("image/"))).join(",") ||
-			TEXT_MIME_ALLOWLIST.join(",");
+			getTextMimeAllowlist().join(",");
 		openPickerWithAccept(textAccept);
 	}
 
