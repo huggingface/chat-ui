@@ -1,24 +1,12 @@
 import { browser } from "$app/environment";
 
-const WIDTH_STORAGE_KEY = "artifactPanelWidth";
-// Loose absolute bounds for the persisted value; the real visual bounds are
+// Loose absolute bounds for a resized width; the real visual bounds are
 // proportional (each pane keeps at least 20% of the chat/panel split, see
 // ArtifactPanel), so neither side can be dragged into oblivion.
 export const ARTIFACT_PANEL_MIN_WIDTH = 300;
 export const ARTIFACT_PANEL_MAX_WIDTH = 2400;
 /** Default split when the user hasn't resized: the panel and chat each take half */
 export const ARTIFACT_PANEL_DEFAULT_FRACTION = "50%";
-
-/** Stored pixel width from a previous drag, or null to use the default fraction */
-function initialWidth(): number | null {
-	if (browser) {
-		const stored = Number(localStorage.getItem(WIDTH_STORAGE_KEY));
-		if (Number.isFinite(stored) && stored >= ARTIFACT_PANEL_MIN_WIDTH) {
-			return Math.min(stored, ARTIFACT_PANEL_MAX_WIDTH);
-		}
-	}
-	return null;
-}
 
 /**
  * UI state for the artifact side panel. Artifact content itself is derived
@@ -33,7 +21,12 @@ class ArtifactPanelStore {
 	tab = $state<"preview" | "code">("preview");
 	/** Set when the user explicitly picked a tab, so we stop auto-switching */
 	userPinnedTab = $state(false);
-	widthPx = $state(initialWidth());
+	/**
+	 * Resized pixel width from a drag, or null to use the default 50/50 split.
+	 * Deliberately not persisted: a fresh load or a new conversation always
+	 * starts at the default instead of restoring an earlier drag.
+	 */
+	widthPx = $state<number | null>(null);
 	/** Word wrap in the code view (persisted) */
 	codeWrap = $state(browser && localStorage.getItem("artifactPanelCodeWrap") === "true");
 	/** Code tab shows the diff vs the previous version (edit versions only) */
@@ -85,17 +78,11 @@ class ArtifactPanelStore {
 
 	setWidth(px: number) {
 		this.widthPx = Math.min(ARTIFACT_PANEL_MAX_WIDTH, Math.max(ARTIFACT_PANEL_MIN_WIDTH, px));
-		if (browser) {
-			localStorage.setItem(WIDTH_STORAGE_KEY, String(Math.round(this.widthPx)));
-		}
 	}
 
-	/** Back to the default proportional split */
+	/** Back to the default 50/50 split */
 	resetWidth() {
 		this.widthPx = null;
-		if (browser) {
-			localStorage.removeItem(WIDTH_STORAGE_KEY);
-		}
 	}
 
 	close() {
@@ -110,6 +97,7 @@ class ArtifactPanelStore {
 		this.tab = "preview";
 		this.userPinnedTab = false;
 		this.diffView = true;
+		this.widthPx = null;
 		this.autoOpenedKeys.clear();
 	}
 }
