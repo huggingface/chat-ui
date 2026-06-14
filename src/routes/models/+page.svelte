@@ -113,7 +113,7 @@
 							{#if model.logoUrl}
 								<img
 									alt={model.displayName}
-									class="size-8 rounded-lg border border-gray-100 bg-gray-50 object-cover sm:size-10 dark:border-gray-700 dark:bg-gray-100"
+									class="size-8 rounded-lg border border-gray-100 bg-gray-50 object-cover sm:size-9 dark:border-gray-700 dark:bg-gray-100"
 									src={model.logoUrl}
 								/>
 							{:else}
