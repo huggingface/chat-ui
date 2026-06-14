@@ -177,11 +177,21 @@
 					data-model-id={model.id}
 					aria-label="Configure {model.displayName}"
 				>
-					<div class="mr-auto flex items-center gap-1 truncate">
-						<span class="truncate">{model.displayName}</span>
+					<div class="mr-auto flex items-center gap-1.5 truncate">
 						{#if model.isRouter}
-							<IconOmni />
+							<IconOmni classNames="size-3.5 flex-none" />
+						{:else if model.logoUrl}
+							<img
+								src={model.logoUrl}
+								alt=""
+								class="size-3.5 flex-none rounded-sm border bg-white dark:border-gray-700"
+							/>
+						{:else}
+							<div
+								class="size-3.5 flex-none rounded-sm border border-transparent bg-gray-300 dark:bg-gray-800"
+							></div>
 						{/if}
+						<span class="truncate">{model.displayName}</span>
 					</div>
 
 					{#if publicConfig.isHuggingChat && !model.isRouter && $settings.providerOverrides?.[model.id] && $settings.providerOverrides[model.id] !== "auto"}
