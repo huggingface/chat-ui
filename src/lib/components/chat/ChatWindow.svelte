@@ -916,7 +916,7 @@
 										<img
 											src={currentModel.logoUrl}
 											alt=""
-											class="size-3.5 flex-none rounded-sm border bg-white dark:border-gray-700"
+											class="size-3 flex-none rounded-sm border bg-white dark:border-gray-700"
 										/>
 									{/if}
 									<span class="truncate">{currentModel.displayName}</span>
