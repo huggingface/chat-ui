@@ -6,8 +6,8 @@ const WIDTH_STORAGE_KEY = "artifactPanelWidth";
 // ArtifactPanel), so neither side can be dragged into oblivion.
 export const ARTIFACT_PANEL_MIN_WIDTH = 300;
 export const ARTIFACT_PANEL_MAX_WIDTH = 2400;
-/** Default split when the user hasn't resized: the panel takes most of the area */
-export const ARTIFACT_PANEL_DEFAULT_FRACTION = "70%";
+/** Default split when the user hasn't resized: the panel and chat each take half */
+export const ARTIFACT_PANEL_DEFAULT_FRACTION = "50%";
 
 /** Stored pixel width from a previous drag, or null to use the default fraction */
 function initialWidth(): number | null {
