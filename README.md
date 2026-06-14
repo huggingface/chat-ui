@@ -186,3 +186,61 @@ npm run build
 You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+
+## Production Deployment
+
+A minimal reference setup for running Chat UI in production with the default Node adapter, behind an Nginx reverse proxy.
+
+### Build-time vs runtime environment variables
+
+Most environment variables (model config, auth, MongoDB connection, etc.) can be set at runtime, e.g. via `-e` flags or your orchestrator's secrets/config. A few are **build-time only** because they're baked into the client bundle or read while `svelte.config.js` runs:
+
+- `APP_BASE` — the base path of the app (see [Subpath deployments](#subpath-deployments) below). Must be set before `npm run build` / the Docker build.
+- `PUBLIC_*` variables (e.g. `PUBLIC_APP_NAME`, `PUBLIC_APP_ASSETS`, `PUBLIC_ORIGIN`) — these are inlined into the client bundle at build time. If you need different values per environment, rebuild the image for each one.
+
+Everything else (`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `MONGODB_URL`, `MCP_SERVERS`, etc.) is read at runtime and can be changed without rebuilding.
+
+### Subpath deployments
+
+To serve Chat UI under a path like `/chat` instead of the domain root:
+
+1. Set `APP_BASE=/chat` at **build time** (e.g. `docker build --build-arg APP_BASE=/chat ...` or `APP_BASE=/chat npm run build`).
+2. Set `PUBLIC_ORIGIN` to the full public URL of your deployment, e.g. `https://example.com`, so generated links (shared conversations, OpenGraph tags, etc.) are correct.
+3. Configure your reverse proxy to forward the `/chat` prefix to the container, as shown below.
+
+### Reverse proxy example (Nginx)
+
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+
+    location /chat/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Required for streamed chat responses
+        proxy_buffering off;
+        proxy_read_timeout 1h;
+    }
+}
+```
+
+If you deploy at the domain root instead, leave `APP_BASE` unset and use `location / { ... }` with the same proxy settings.
+
+### Required environment variables
+
+At minimum, a production deployment needs:
+
+```env
+OPENAI_BASE_URL=https://router.huggingface.co/v1
+OPENAI_API_KEY=hf_***
+MONGODB_URL=mongodb://user:pass@host:27017
+PUBLIC_ORIGIN=https://example.com
+```
+
+Without `MONGODB_URL`, Chat UI falls back to an in-memory database that is lost on restart — not suitable for production.
