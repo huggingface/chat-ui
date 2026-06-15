@@ -184,6 +184,8 @@
 							<img
 								src={model.logoUrl}
 								alt=""
+								loading="lazy"
+								decoding="async"
 								class="size-3.5 flex-none rounded-sm border bg-white dark:border-gray-700"
 							/>
 						{:else}
