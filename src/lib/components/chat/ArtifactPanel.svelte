@@ -21,6 +21,7 @@
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonDownload from "~icons/carbon/download";
 	import CarbonMaximize from "~icons/carbon/maximize";
+	import CarbonRenew from "~icons/carbon/renew";
 	import LucideWrapText from "~icons/lucide/wrap-text";
 	import LucideDiff from "~icons/lucide/diff";
 	import EosIconsLoading from "~icons/eos-icons/loading";
@@ -238,6 +239,26 @@
 	let iframeEl: HTMLIFrameElement | undefined = $state();
 	let errors: { message: string; stack?: string }[] = $state([]);
 	let externalLinkUrl = $state<URL | null>(null);
+	// Bumped to force the (persistent) preview iframe to remount and reload.
+	let previewReloadNonce = $state(0);
+	let refreshing = $state(false);
+	let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+	/**
+	 * Reload the live preview from scratch. The iframe stays mounted across tab
+	 * switches (so peeking at the code doesn't restart a running preview), so a
+	 * plain switch back to the preview tab resumes it — this re-keys it instead to
+	 * force a clean reload. The brief spin is the feedback while the code tab is up;
+	 * the reloaded document is shown the next time the preview tab is opened.
+	 */
+	function refreshPreview() {
+		errors = [];
+		previewReloadNonce += 1;
+		refreshing = true;
+		clearTimeout(refreshTimer);
+		refreshTimer = setTimeout(() => (refreshing = false), 600);
+	}
+	onDestroy(() => clearTimeout(refreshTimer));
 
 	let srcdoc = $derived.by(() => {
 		if (!version || !version.complete) return undefined;
@@ -373,6 +394,18 @@
 			{/if}
 		</div>
 
+		{#if effectiveTab === "code" && srcdoc}
+			<button
+				type="button"
+				class="btn flex-none rounded-md p-1.5 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+				title="Reload preview"
+				aria-label="Reload preview"
+				onclick={refreshPreview}
+			>
+				<span class="inline-flex" class:refresh-spin={refreshing}><CarbonRenew /></span>
+			</button>
+		{/if}
+
 		<div class="flex flex-none items-center rounded-lg bg-gray-100 p-0.5 dark:bg-gray-800">
 			<button
 				type="button"
@@ -437,7 +470,28 @@
 			<div class="flex h-full items-center justify-center text-sm text-gray-400">
 				No artifact selected
 			</div>
-		{:else if effectiveTab === "preview"}
+		{:else if srcdoc}
+			<!-- Keep the live preview mounted across tab switches so peeking at the
+			     code doesn't restart a running preview; the Refresh button reloads it
+			     on demand by re-keying it. While the code tab is up it's hidden, not
+			     unmounted. (Markdown has no live preview, so it renders inline below.) -->
+			{#key previewReloadNonce}
+				<!-- Backing matches the panel theme so opening the preview doesn't flash
+				     white in dark mode while the document paints its own background -->
+				<iframe
+					bind:this={iframeEl}
+					title="Artifact preview"
+					class="absolute inset-0 bg-white dark:bg-gray-900 {effectiveTab === 'preview'
+						? ''
+						: 'hidden'} {resizing ? 'pointer-events-none' : ''}"
+					sandbox="allow-scripts allow-forms"
+					referrerpolicy="no-referrer"
+					{srcdoc}
+				></iframe>
+			{/key}
+		{/if}
+
+		{#if version && effectiveTab === "preview"}
 			{#if version.type === "markdown"}
 				<div bind:this={previewScrollEl} class="scrollbar-custom h-full overflow-y-auto px-6 py-5">
 					<div
@@ -446,19 +500,8 @@
 						<MarkdownRenderer content={version.content} />
 					</div>
 				</div>
-			{:else if srcdoc}
-				<!-- Backing matches the panel theme so opening the preview doesn't flash
-				     white in dark mode while the document paints its own background -->
-				<iframe
-					bind:this={iframeEl}
-					title="Artifact preview"
-					class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
-					sandbox="allow-scripts allow-forms"
-					referrerpolicy="no-referrer"
-					{srcdoc}
-				></iframe>
 			{/if}
-		{:else}
+		{:else if version}
 			<!-- Same .prose pre styling as chat code blocks so the syntax theme matches
 			     exactly in both modes; text-smd matches the chat prose root so the code
 			     renders at the same size; border-0! since the panel provides its own frame -->
@@ -624,6 +667,17 @@
 {/if}
 
 <style>
+	/* One-shot spin as click feedback for the Refresh button (the reloaded
+	   preview itself only shows once the preview tab is opened). */
+	.refresh-spin {
+		animation: artifact-refresh-spin 0.6s ease;
+	}
+	@keyframes artifact-refresh-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
 	/* Diff view: background-only tint bands behind changed lines, so the hljs
 	   token colors stay intact; the changed segment of a replaced line gets a
 	   stronger emphasis chip. Sign colors match the syntax theme greens/reds. */
