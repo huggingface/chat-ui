@@ -37,6 +37,10 @@
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
 
+	// IndexedDB persistence for offline fallback
+	import { conversationRepository } from "$lib/repositories/ConversationRepository";
+	import superjson from "superjson";
+
 	let { data } = $props();
 
 	// Obtain the conversations store during component init (context must be read
@@ -694,6 +698,24 @@
 			rootMessageId = data.rootMessageId;
 			_lastSyncedConvId = currentConvId;
 			_lastSyncedMessages = newMessages;
+
+			// Persist the server-confirmed conversation to IndexedDB.
+			// This fires whenever the load function returns fresh data (page
+			// navigation or post-stream invalidation). Optimistic/transient
+			// messages that haven't been acknowledged by the server are never
+			// persisted — they remain only in the local `messages` state.
+			if (browser && currentConvId) {
+				void conversationRepository.setConversationDetail(currentConvId, {
+					title: data.title,
+					model: data.model,
+					updatedAt: data.updatedAt.toISOString(),
+					messages: superjson.stringify(newMessages),
+					preprompt: data.preprompt,
+					rootMessageId: data.rootMessageId,
+					shared: data.shared,
+					modelId: data.modelId,
+				});
+			}
 		}
 	});
 

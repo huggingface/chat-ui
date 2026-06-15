@@ -1,3 +1,4 @@
+import { browser } from "$app/environment";
 import { useAPIClient, handleResponse } from "$lib/APIClient";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { redirect } from "@sveltejs/kit";
@@ -5,6 +6,8 @@ import { base } from "$app/paths";
 import type { PageLoad } from "./$types";
 import type { Message } from "$lib/types/Message";
 import type { DeployedSpace } from "$lib/types/Conversation";
+import { conversationRepository } from "$lib/repositories/ConversationRepository";
+import superjson from "superjson";
 
 interface ConversationData {
 	messages: Message[];
@@ -50,13 +53,55 @@ export const load: PageLoad = async ({ params, depends, fetch, url, parent }) =>
 		}
 	}
 
-	// Load conversation (works for both owned and shared conversations)
+	// Cache-aside: try server first, fall back to IndexedDB on failure.
+	// Server-confirmed data always overwrites local cache entries.
 	try {
-		return (await client
+		const data = (await client
 			.conversations({ id: params.id })
 			.get({ query: { fromShare: url.searchParams.get("fromShare") ?? undefined } })
 			.then(handleResponse)) as ConversationData;
-	} catch {
+
+		// Persist server-confirmed data to IndexedDB for offline fallback.
+		if (browser) {
+			void conversationRepository.setConversationDetail(params.id, {
+				title: data.title,
+				model: data.model,
+				updatedAt: data.updatedAt.toISOString(),
+				messages: superjson.stringify(data.messages),
+				preprompt: data.preprompt,
+				rootMessageId: data.rootMessageId,
+				shared: data.shared,
+				modelId: data.modelId,
+			});
+		}
+
+		return data;
+	} catch (serverErr) {
+		// Network request failed; attempt to serve from IndexedDB cache.
+		if (browser) {
+			try {
+				const cached = await conversationRepository.getConversationDetail(params.id);
+				if (cached) {
+					console.info("[conversation] serving from IndexedDB fallback for", params.id);
+					return {
+						id: cached.id,
+						title: cached.title,
+						model: cached.model,
+						updatedAt: new Date(cached.updatedAt),
+						messages: superjson.parse(cached.messages) as Message[],
+						preprompt: cached.preprompt,
+						rootMessageId: cached.rootMessageId,
+						shared: cached.shared,
+						modelId: cached.modelId,
+					} satisfies ConversationData;
+				}
+			} catch (cacheErr) {
+				console.error("[conversation] IndexedDB fallback also failed", cacheErr);
+			}
+		}
+
+		// No cache available either — redirect home.
+		console.error("[conversation] load failed for", params.id, serverErr);
 		redirect(302, `${base}/`);
 	}
 };
