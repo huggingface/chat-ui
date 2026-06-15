@@ -5,8 +5,8 @@ import { browser } from "$app/environment";
 // ArtifactPanel), so neither side can be dragged into oblivion.
 export const ARTIFACT_PANEL_MIN_WIDTH = 300;
 export const ARTIFACT_PANEL_MAX_WIDTH = 2400;
-/** Default split when the user hasn't resized: the panel and chat each take half */
-export const ARTIFACT_PANEL_DEFAULT_FRACTION = "50%";
+/** Default split when the user hasn't resized: the panel takes 60%, the chat keeps 40% */
+export const ARTIFACT_PANEL_DEFAULT_FRACTION = "60%";
 
 /**
  * UI state for the artifact side panel. Artifact content itself is derived
@@ -22,7 +22,7 @@ class ArtifactPanelStore {
 	/** Set when the user explicitly picked a tab, so we stop auto-switching */
 	userPinnedTab = $state(false);
 	/**
-	 * Resized pixel width from a drag, or null to use the default 50/50 split.
+	 * Resized pixel width from a drag, or null to use the default 40/60 chat/panel split.
 	 * Deliberately not persisted: a fresh load or a new conversation always
 	 * starts at the default instead of restoring an earlier drag.
 	 */
@@ -80,7 +80,7 @@ class ArtifactPanelStore {
 		this.widthPx = Math.min(ARTIFACT_PANEL_MAX_WIDTH, Math.max(ARTIFACT_PANEL_MIN_WIDTH, px));
 	}
 
-	/** Back to the default 50/50 split */
+	/** Back to the default 40/60 chat/panel split */
 	resetWidth() {
 		this.widthPx = null;
 	}
