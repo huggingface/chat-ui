@@ -428,7 +428,7 @@
 								: "Current model doesn’t support tools"}
 						>
 							<button
-								class="inline-flex cursor-pointer items-center gap-1 bg-transparent p-0 leading-none text-current select-none focus:outline-hidden"
+								class="inline-flex cursor-pointer items-center gap-1 bg-transparent p-0 leading-none whitespace-nowrap text-current select-none focus:outline-hidden"
 								type="button"
 								title="Manage MCP Servers"
 								onclick={() => (isMcpManagerOpen = true)}
