@@ -61,8 +61,8 @@
 		"unplugin-icons": "^0.16.1",
 		"vite": "^6.3.5",
 		"vite-node": "^3.0.9",
-		"vitest": "^3.1.4",
-		"vitest-browser-svelte": "^0.1.0",
+		"vitest": "^4.1.9",
+		"vitest-browser-svelte": "^2.1.1",
 		"yazl": "^3.3.1"
 	},
 	"type": "module",
