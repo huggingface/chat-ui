@@ -28,6 +28,24 @@ If models aren't appearing in the UI:
 2. Check that `OPENAI_API_KEY` is valid
 3. Ensure the endpoint returns models at `${OPENAI_BASE_URL}/models`
 
+### `MODELS` variable not parsed correctly
+
+If you customise the model list via the `MODELS` variable and models don't appear, check that you are using the backtick multiline syntax correctly:
+
+```ini
+# Correct — backtick immediately after = on the opening line,
+# closing backtick alone on the last line
+MODELS=`[
+  { "id": "my-model", "name": "My Model" }
+]`
+```
+
+Common mistakes:
+
+- Missing the opening or closing backtick entirely
+- Putting a space between `=` and the opening backtick (`MODELS= \`[` is invalid)
+- Editing `.env` directly instead of `.env.local` (your change gets overwritten on `git pull`)
+
 ## Database connection errors
 
 For development, you can skip MongoDB entirely - Chat UI will use an embedded database.

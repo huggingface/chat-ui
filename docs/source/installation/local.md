@@ -1,12 +1,17 @@
 # Running Locally
 
+> [!IMPORTANT]
+> Always create a `.env.local` file for your own configuration. **Never edit `.env` directly** — it is the default template checked into the repository and will be overwritten when you pull updates. Copy it as a starting point: `cp .env .env.local`
+
 ## Quick Start
 
-1. Create a `.env.local` file with your API credentials:
+1. Create `.env.local` with your API credentials:
 
 ```ini
 OPENAI_BASE_URL=https://router.huggingface.co/v1
-OPENAI_API_KEY=hf_************************
+OPENAI_API_KEY=hf_your_token_here
+# MONGODB_URL is optional for local dev — omit it to use the embedded in-memory DB
+# that persists chat history to the ./db folder automatically
 ```
 
 2. Install and run:
@@ -17,6 +22,51 @@ npm run dev -- --open
 ```
 
 That's it! Chat UI will discover available models automatically from your endpoint.
+
+## Common Setup Patterns
+
+### Pattern 1: Hugging Face router (no MongoDB needed)
+
+The fastest setup: uses the HF inference router and the embedded in-memory database.
+
+```ini
+# .env.local
+OPENAI_BASE_URL=https://router.huggingface.co/v1
+OPENAI_API_KEY=hf_your_token_here
+```
+
+Get your token at [hf.co/settings/tokens](https://huggingface.co/settings/tokens). Chat history persists to `./db` between restarts.
+
+### Pattern 2: Local Ollama instance
+
+First start Ollama (`ollama serve` runs on port 11434 by default), then:
+
+```ini
+# .env.local
+OPENAI_BASE_URL=http://127.0.0.1:11434/v1
+OPENAI_API_KEY=ollama
+```
+
+### Pattern 3: Customising models with the `MODELS` variable
+
+The `MODELS` variable uses **JSON5 syntax wrapped in backticks**. The backticks are required — they allow multiline values in `.env` files. A missing backtick is the most common cause of a blank model list.
+
+```ini
+# .env.local
+OPENAI_BASE_URL=https://router.huggingface.co/v1
+OPENAI_API_KEY=hf_your_token_here
+MODELS=`[
+  {
+    "id": "meta-llama/Llama-3.3-70B-Instruct",
+    "name": "Llama 3.3 70B",
+    "multimodal": false,
+    "supportsTools": true
+  }
+]`
+```
+
+> [!NOTE]
+> The opening backtick goes directly after `MODELS=` on the same line. The closing backtick goes on its own line after the `]`. Both are part of the value syntax, not shell syntax.
 
 ## Configuration
 

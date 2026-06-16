@@ -29,6 +29,20 @@ docker run -p 3000:3000 \
 
 Use `host.docker.internal` to reach MongoDB running on your host machine, or provide your MongoDB Atlas connection string.
 
+## With a Local Ollama Instance
+
+To connect Docker-hosted Chat UI to Ollama running on your host machine, use `host.docker.internal` instead of `localhost` (Linux users: add `--add-host=host.docker.internal:host-gateway`):
+
+```bash
+docker run -p 3000:3000 \
+  -e OPENAI_BASE_URL=http://host.docker.internal:11434/v1 \
+  -e OPENAI_API_KEY=ollama \
+  -v chat-ui-data:/data \
+  ghcr.io/huggingface/chat-ui-db
+```
+
+On Linux, append `--add-host=host.docker.internal:host-gateway` to the command so Docker can resolve the hostname.
+
 ## Using an Environment File
 
 For more configuration options, use `--env-file` to avoid leaking secrets in shell history:
@@ -39,5 +53,8 @@ docker run -p 3000:3000 \
   -v chat-ui-data:/data \
   ghcr.io/huggingface/chat-ui-db
 ```
+
+> [!TIP]
+> Use `--env-file .env.local` rather than multiple `-e` flags. This keeps your tokens out of shell history and makes it easy to reuse the same configuration file you use for local development.
 
 See the [configuration overview](../configuration/overview) for all available environment variables.
