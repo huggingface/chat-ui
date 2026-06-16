@@ -535,6 +535,18 @@
 				>
 					<CarbonChevronRight />
 				</button>
+				{#if displayVersionNumber < totalVersions}
+					<!-- Make it obvious the panel is pinned to an older version, with a
+					     one-click jump back to the latest -->
+					<button
+						type="button"
+						class="ml-1 btn rounded-full bg-gray-100 px-2.5 py-0.5 font-medium whitespace-nowrap text-gray-600 hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-700/70 dark:text-gray-200 dark:hover:bg-gray-700"
+						title="Jump to the latest version"
+						onclick={() => gotoVersion(totalVersions)}
+					>
+						View last version
+					</button>
+				{/if}
 			{:else if version}
 				<span class="capitalize">
 					{version.type === "code" ? (version.language ?? "code") : version.type}
