@@ -28,6 +28,7 @@ const settingsSchema = z.object({
 	hapticsEnabled: z.boolean().default(true),
 	hidePromptExamples: z.record(z.boolean()).default({}),
 	billingOrganization: z.string().optional(),
+	disableKatex: z.boolean().default(false),
 });
 
 export const GET: RequestHandler = async ({ locals }) => {
@@ -79,6 +80,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		reasoningEffortOverrides: settings?.reasoningEffortOverrides ?? {},
 		reasoningOverrides: config.isHuggingChat ? {} : (settings?.reasoningOverrides ?? {}),
 		billingOrganization: settings?.billingOrganization ?? undefined,
+		disableKatex: settings?.disableKatex ?? DEFAULT_SETTINGS.disableKatex,
 	});
 };
 

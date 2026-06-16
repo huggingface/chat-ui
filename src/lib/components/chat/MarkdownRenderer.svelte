@@ -6,6 +6,7 @@
 
 	import { onMount, onDestroy } from "svelte";
 	import { updateDebouncer } from "$lib/utils/updates";
+	import { useSettingsStore } from "$lib/stores/settings";
 
 	interface Props {
 		content: string;
@@ -14,6 +15,9 @@
 	}
 
 	let { content, sources = [], loading = false }: Props = $props();
+
+	const settings = useSettingsStore();
+	let disableKatex = $derived($settings.disableKatex ?? false);
 
 	// Lightweight blocks used for SSR and the initial client render. Full markdown
 	// rendering is deferred to the worker (or async processBlocks) on mount, so the
@@ -38,13 +42,20 @@
 
 		if (worker) {
 			updateDebouncer.startRender();
-			worker.postMessage({ type: "process", content, sources, requestId, streaming: loading });
+			worker.postMessage({
+				type: "process",
+				content,
+				sources,
+				requestId,
+				streaming: loading,
+				disableKatex,
+			});
 			return;
 		}
 
 		(async () => {
 			updateDebouncer.startRender();
-			const processed = await processBlocks(content, sources, loading);
+			const processed = await processBlocks(content, sources, loading, disableKatex);
 			handleBlocks(processed, requestId);
 		})();
 	});

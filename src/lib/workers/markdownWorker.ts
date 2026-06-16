@@ -11,6 +11,7 @@ export type IncomingMessage = {
 	sources: SimpleSource[];
 	requestId: number;
 	streaming?: boolean;
+	disableKatex?: boolean;
 };
 
 export type OutgoingMessage = {
@@ -34,8 +35,13 @@ async function processMessage() {
 		isProcessing = true;
 
 		try {
-			const { content, sources, requestId, streaming } = nextMessage;
-			const processedBlocks = await processBlocks(content, sources, streaming ?? false);
+			const { content, sources, requestId, streaming, disableKatex } = nextMessage;
+			const processedBlocks = await processBlocks(
+				content,
+				sources,
+				streaming ?? false,
+				disableKatex ?? false
+			);
 			postMessage(
 				JSON.parse(JSON.stringify({ type: "processed", blocks: processedBlocks, requestId }))
 			);

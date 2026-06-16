@@ -38,6 +38,7 @@ interface SettingsResponse {
 	reasoningEffortOverrides: Record<string, "low" | "medium" | "high">;
 	reasoningOverrides: Record<string, boolean>;
 	billingOrganization?: string;
+	disableKatex?: boolean;
 }
 
 export const load = async ({ fetch, url }) => {

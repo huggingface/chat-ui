@@ -87,6 +87,12 @@ export interface Settings extends Timestamps {
 	 * Stores the org's preferred_username. If empty/undefined, bills to personal account.
 	 */
 	billingOrganization?: string;
+
+	/**
+	 * When true, KaTeX block and inline extensions are omitted from the markdown
+	 * pipeline so that `$` patterns are never rendered as math.
+	 */
+	disableKatex?: boolean;
 }
 
 export type SettingsEditable = Omit<Settings, "welcomeModalSeenAt" | "createdAt" | "updatedAt">;
@@ -107,4 +113,5 @@ export const DEFAULT_SETTINGS = {
 	streamingMode: "smooth",
 	directPaste: false,
 	hapticsEnabled: true,
+	disableKatex: false,
 } satisfies SettingsEditable;

@@ -46,6 +46,12 @@
 	function setHapticsEnabled(v: boolean) {
 		settings.update((s) => ({ ...s, hapticsEnabled: v }));
 	}
+	function getDisableKatex() {
+		return $settings.disableKatex ?? false;
+	}
+	function setDisableKatex(v: boolean) {
+		settings.update((s) => ({ ...s, disableKatex: v }));
+	}
 
 	const client = useAPIClient();
 
@@ -204,6 +210,19 @@
 						<Switch name="hapticsEnabled" bind:checked={getHapticsEnabled, setHapticsEnabled} />
 					</div>
 				{/if}
+
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+							Disable LaTeX rendering
+						</div>
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
+							Stop rendering <code class="font-mono">$</code> patterns as math. Useful when working
+							with code containing variables like <code class="font-mono">$foo</code>.
+						</p>
+					</div>
+					<Switch name="disableKatex" bind:checked={getDisableKatex, setDisableKatex} />
+				</div>
 
 				<!-- Theme selector -->
 				<div class="flex items-start justify-between py-3">

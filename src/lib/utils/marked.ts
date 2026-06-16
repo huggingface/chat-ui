@@ -368,12 +368,12 @@ function sanitizeHtmlForMultimedia(html: string): string {
 	return sanitized;
 }
 
-function createMarkedInstance(sources: SimpleSource[]): Marked {
+function createMarkedInstance(sources: SimpleSource[], disableKatex = false): Marked {
 	return new Marked({
 		hooks: {
 			postprocess: (html) => addInlineCitations(html, sources),
 		},
-		extensions: [katexBlockExtension, katexInlineExtension],
+		extensions: disableKatex ? [] : [katexBlockExtension, katexInlineExtension],
 		renderer: {
 			link: (href, title, text) => {
 				// Placeholder emitted by parseIncompleteMarkdown while a link's URL is
@@ -441,8 +441,12 @@ function cacheKey(index: number, blockContent: string, sources: SimpleSource[]) 
 	return `${index}-${hashString(blockContent)}|${sourceKey}`;
 }
 
-export async function processTokens(content: string, sources: SimpleSource[]): Promise<Token[]> {
-	const marked = createMarkedInstance(sources);
+export async function processTokens(
+	content: string,
+	sources: SimpleSource[],
+	disableKatex = false
+): Promise<Token[]> {
+	const marked = createMarkedInstance(sources, disableKatex);
 	const tokens = marked.lexer(content);
 
 	const processedTokens = await Promise.all(
@@ -467,8 +471,12 @@ export async function processTokens(content: string, sources: SimpleSource[]): P
 	return processedTokens;
 }
 
-export function processTokensSync(content: string, sources: SimpleSource[]): Token[] {
-	const marked = createMarkedInstance(sources);
+export function processTokensSync(
+	content: string,
+	sources: SimpleSource[],
+	disableKatex = false
+): Token[] {
+	const marked = createMarkedInstance(sources, disableKatex);
 	const tokens = marked.lexer(content);
 	return tokens.map((token) => {
 		if (token.type === "code") {
@@ -517,7 +525,8 @@ function hashString(str: string): string {
 export async function processBlocks(
 	content: string,
 	sources: SimpleSource[] = [],
-	streaming = false
+	streaming = false,
+	disableKatex = false
 ): Promise<BlockToken[]> {
 	const processedContent = streaming ? parseIncompleteMarkdown(content) : content;
 	const blocks = parseMarkdownIntoBlocks(processedContent);
@@ -526,15 +535,15 @@ export async function processBlocks(
 		blocks.map(async (blockContent, index) => {
 			const key = cacheKey(index, blockContent, sources);
 			const cached = blockCache.get(key);
-			if (cached) return cached;
+			if (cached && !disableKatex) return cached;
 
-			const tokens = await processTokens(blockContent, sources);
+			const tokens = await processTokens(blockContent, sources, disableKatex);
 			const block: BlockToken = {
 				id: `${index}-${hashString(blockContent)}`,
 				content: blockContent,
 				tokens,
 			};
-			blockCache.set(key, block);
+			if (!disableKatex) blockCache.set(key, block);
 			return block;
 		})
 	);
@@ -578,7 +587,8 @@ export function fallbackBlocks(content: string): BlockToken[] {
 export function processBlocksSync(
 	content: string,
 	sources: SimpleSource[] = [],
-	streaming = false
+	streaming = false,
+	disableKatex = false
 ): BlockToken[] {
 	const processedContent = streaming ? parseIncompleteMarkdown(content) : content;
 	const blocks = parseMarkdownIntoBlocks(processedContent);
@@ -586,15 +596,15 @@ export function processBlocksSync(
 	return blocks.map((blockContent, index) => {
 		const key = cacheKey(index, blockContent, sources);
 		const cached = blockCache.get(key);
-		if (cached) return cached;
+		if (cached && !disableKatex) return cached;
 
-		const tokens = processTokensSync(blockContent, sources);
+		const tokens = processTokensSync(blockContent, sources, disableKatex);
 		const block: BlockToken = {
 			id: `${index}-${hashString(blockContent)}`,
 			content: blockContent,
 			tokens,
 		};
-		blockCache.set(key, block);
+		if (!disableKatex) blockCache.set(key, block);
 		return block;
 	});
 }
