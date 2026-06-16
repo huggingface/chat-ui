@@ -205,6 +205,20 @@ export async function endpointOai(
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
 
+			// Trim message history to fit within the truncate token budget if set.
+			// Uses a ~4 chars/token heuristic. System message and latest user turn are always kept.
+			if (parameters.truncate) {
+				const maxChars = parameters.truncate * 4;
+				const getContentLength = (m: OpenAI.Chat.Completions.ChatCompletionMessageParam): number =>
+					typeof m.content === "string" ? m.content.length : 0;
+				let totalChars = messagesOpenAI.reduce((sum, m) => sum + getContentLength(m), 0);
+				let i = messagesOpenAI[0]?.role === "system" ? 1 : 0;
+				while (totalChars > maxChars && i < messagesOpenAI.length - 1) {
+					totalChars -= getContentLength(messagesOpenAI[i]);
+					messagesOpenAI.splice(i, 1);
+				}
+			}
+
 			// Build model ID with optional provider suffix (e.g., "model:fastest" or "model:together")
 			const baseModelId = model.id ?? model.name;
 			const modelId = provider && provider !== "auto" ? `${baseModelId}:${provider}` : baseModelId;
