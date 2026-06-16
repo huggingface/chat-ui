@@ -142,7 +142,7 @@
 	<a
 		href={`${base}/`}
 		onclick={handleNewChatClick}
-		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-xs hover:shadow-none sm:text-smd dark:border-gray-600 dark:bg-gray-700"
+		class="flex rounded-lg border bg-white px-2 py-0.5 text-center whitespace-nowrap shadow-xs hover:shadow-none sm:text-smd dark:border-gray-600 dark:bg-gray-700"
 		title="Ctrl/Cmd + Shift + O"
 	>
 		New Chat
