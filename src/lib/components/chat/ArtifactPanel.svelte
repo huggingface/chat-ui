@@ -540,7 +540,7 @@
 					     one-click jump back to the latest -->
 					<button
 						type="button"
-						class="ml-1 btn rounded-full bg-gray-100 px-2.5 py-0.5 font-medium whitespace-nowrap text-gray-600 hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-700/70 dark:text-gray-200 dark:hover:bg-gray-700"
+						class="ml-1 btn rounded-md bg-gray-100 px-2 py-0.5 text-xxs font-medium whitespace-nowrap text-gray-600 hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-700/70 dark:text-gray-200 dark:hover:bg-gray-700"
 						title="Jump to the latest version"
 						onclick={() => gotoVersion(totalVersions)}
 					>
