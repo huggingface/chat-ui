@@ -72,6 +72,23 @@ ENABLE_DATA_EXPORT=true         # Allow users to export their data
 ALLOW_IFRAME=false              # Disallow embedding in iframes (set to true to allow)
 ```
 
+### Feature Announcements
+
+Display a dismissible toast on the home screen (no conversation open) to announce new features:
+
+```ini
+PUBLIC_FEATURE_ANNOUNCEMENTS=[{"title":"Introducing Artifacts","description":"Ask for an app, doc or diagram and watch it render live in a side panel.","link":"https://huggingface.co/blog","maxDate":"2026-12-31"}]
+```
+
+The value is a JSON5 array of announcement objects. Each object supports:
+
+- `title` - Short heading shown in the toast
+- `description` - One-sentence body text
+- `link` _(optional)_ - URL the toast links to
+- `maxDate` _(optional)_ - ISO date after which the announcement is hidden (a date-only value like `"2026-12-31"` is inclusive — hides at end of that day UTC)
+
+The last entry whose `maxDate` has not yet passed is shown. Leave the variable empty (default) to show no announcement.
+
 ## User Authentication
 
 Use OpenID Connect for authentication:
@@ -83,6 +100,34 @@ OPENID_SCOPES="openid profile"
 ```
 
 See [OpenID configuration](./open-id) for details.
+
+### Requiring login on all routes
+
+By default, unauthenticated users can access the home page and shared conversations without logging in. Set `AUTOMATIC_LOGIN=true` to redirect every unauthenticated request to the OAuth flow immediately:
+
+```ini
+AUTOMATIC_LOGIN=false   # default; set to true to require login on all routes
+```
+
+### Using the logged-in user's token for inference
+
+By default, Chat UI uses `OPENAI_API_KEY` for all inference calls. Set `USE_USER_TOKEN=true` to forward the OAuth access token of the logged-in user to the inference endpoint instead. This is useful when the provider bills per-user or enforces per-user rate limits.
+
+```ini
+USE_USER_TOKEN=false   # default; set to true to use the user's OAuth token for inference
+```
+
+Requires a working OpenID Connect setup so that user tokens are available.
+
+### Coupling sessions to an external cookie
+
+If Chat UI is deployed on a sub-path of a domain that also sets its own auth cookie, you can tie Chat UI sessions to that cookie so that sessions are invalidated whenever the external auth state changes:
+
+```ini
+COUPLE_SESSION_WITH_COOKIE_NAME=my-auth-cookie
+```
+
+When set, Chat UI hashes the named cookie's value and stores it with each session. If the cookie value changes (e.g. the user logs out of the parent app), the Chat UI session is automatically destroyed. Leave empty (default) to disable this behaviour.
 
 ## Environment Variable Reference
 
