@@ -17,7 +17,8 @@
 	let { content, sources = [], loading = false }: Props = $props();
 
 	const settings = useSettingsStore();
-	let disableKatex = $derived($settings.disableKatex ?? false);
+	// Guard against missing settings context (e.g. component rendered directly in tests)
+	let disableKatex = $derived(settings ? ($settings.disableKatex ?? false) : false);
 
 	// Lightweight blocks used for SSR and the initial client render. Full markdown
 	// rendering is deferred to the worker (or async processBlocks) on mount, so the
