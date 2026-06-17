@@ -444,17 +444,19 @@
 							<ArtifactCard op={unit.op} messageId={message.id} opIndex={unit.opIndex} />
 						{:else if unit.kind === "group"}
 							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
-								{#if unit.blocks.length > 1}
-									<!-- Collapse the whole run into a single summary -->
+								{#if unit.blocks.length > 1 && unit.toolCount !== 1}
+									<!-- Collapse multi-tool or pure-thinking runs into a single summary -->
 									<ToolCallsSummary blocks={unit.blocks} toolCount={unit.toolCount} />
 								{:else}
-									<!-- A lone process block stays standalone -->
-									{@const only = unit.blocks[0]}
-									{#if only.type === "think"}
-										<OpenReasoningResults content={only.content} loading={false} />
-									{:else}
-										<ToolUpdate tool={only.updates} loading={false} />
-									{/if}
+									<!-- A lone block, or a single tool call (optionally alongside thinking),
+									     stays expanded so the tool that ran is visible without an extra click -->
+									{#each unit.blocks as block, blockIndex (block.type === "tool" ? `tool-${block.uuid}-${blockIndex}` : `think-${blockIndex}`)}
+										{#if block.type === "think"}
+											<OpenReasoningResults content={block.content} loading={false} />
+										{:else}
+											<ToolUpdate tool={block.updates} loading={false} />
+										{/if}
+									{/each}
 								{/if}
 							</div>
 						{/if}
