@@ -193,12 +193,11 @@ A minimal reference setup for running Chat UI in production with the default Nod
 
 ### Build-time vs runtime environment variables
 
-Most environment variables (model config, auth, MongoDB connection, etc.) can be set at runtime, e.g. via `-e` flags or your orchestrator's secrets/config. A few are **build-time only** because they're baked into the client bundle or read while `svelte.config.js` runs:
+Most environment variables (model config, auth, MongoDB connection, `PUBLIC_*` vars, etc.) are read at runtime, e.g. via `-e` flags or your orchestrator's secrets/config. `APP_BASE` is the one **build-time-only** exception, since it's read while `svelte.config.js` runs:
 
 - `APP_BASE` — the base path of the app (see [Subpath deployments](#subpath-deployments) below). Must be set before `npm run build` / the Docker build.
-- `PUBLIC_*` variables (e.g. `PUBLIC_APP_NAME`, `PUBLIC_APP_ASSETS`, `PUBLIC_ORIGIN`) — these are inlined into the client bundle at build time. If you need different values per environment, rebuild the image for each one.
 
-Everything else (`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `MONGODB_URL`, `MCP_SERVERS`, etc.) is read at runtime and can be changed without rebuilding.
+Everything else, including `PUBLIC_*` variables (e.g. `PUBLIC_APP_NAME`, `PUBLIC_APP_ASSETS`, `PUBLIC_ORIGIN`) and server-only vars (`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `MONGODB_URL`, `MCP_SERVERS`, etc.), is read at server startup via SvelteKit's `$env/dynamic/public`/`$env/dynamic/private`. This means the same built image can be reused across environments — just set these vars when starting the container, restarting it to pick up any changes.
 
 ### Subpath deployments
 
