@@ -12,6 +12,9 @@
 	import EditConversationModal from "$lib/components/EditConversationModal.svelte";
 	import DeleteConversationModal from "$lib/components/DeleteConversationModal.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { useIsOnline } from "$lib/stores/isOnline.svelte";
+
+	const isOnline = useIsOnline();
 
 	interface Props {
 		conv: ConvSidebar;
@@ -57,7 +60,7 @@
 
 <div
 	class="group flex h-8 flex-none items-center gap-1.5 rounded-lg pr-1.5 pl-2 text-base text-gray-600 hover:bg-gray-100 max-sm:h-10 sm:text-sm dark:text-gray-300 dark:hover:bg-gray-700
-		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}"
+        {conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}"
 >
 	{#if inlineEditing}
 		<input
@@ -123,14 +126,26 @@
 					>
 						<DropdownMenu.Item
 							class="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-gray-700 select-none focus-visible:outline-hidden data-highlighted:bg-gray-100 sm:h-8 dark:text-gray-200 dark:data-highlighted:bg-white/10"
-							onSelect={() => (renameOpen = true)}
+							disabled={!isOnline.value}
+							onSelect={() => {
+								if (!isOnline.value) return;
+								renameOpen = true;
+							}}
+							data-offline={!isOnline.value || undefined}
+							title={!isOnline.value ? "Rename requires an internet connection" : undefined}
 						>
 							<CarbonEdit class="size-4 opacity-90 dark:opacity-80" />
 							Rename
 						</DropdownMenu.Item>
 						<DropdownMenu.Item
 							class="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-red-500 select-none focus-visible:outline-hidden data-highlighted:bg-red-50 data-highlighted:text-red-600 sm:h-8 dark:text-red-400 dark:data-highlighted:bg-red-500/10 dark:data-highlighted:text-red-400"
-							onSelect={() => (deleteOpen = true)}
+							disabled={!isOnline.value}
+							onSelect={() => {
+								if (!isOnline.value) return;
+								deleteOpen = true;
+							}}
+							data-offline={!isOnline.value || undefined}
+							title={!isOnline.value ? "Delete requires an internet connection" : undefined}
 						>
 							<CarbonTrashCan class="size-4 opacity-90 dark:opacity-80" />
 							Delete

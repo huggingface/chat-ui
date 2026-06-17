@@ -44,7 +44,7 @@
 		if (!currentModelId) return;
 		const buttons = container.querySelectorAll<HTMLButtonElement>("button[data-model-id]");
 		let target: HTMLElement | null = null;
-		for (const btn of buttons) {
+		for (const btn of Array.from(buttons)) {
 			if (btn.dataset.modelId === currentModelId) {
 				target = btn;
 				break;

@@ -24,6 +24,20 @@
 	// Capture URL once at component creation to prevent reactive updates during navigation
 	let urlNotTrailing = page.url.pathname.replace(/\/$/, "");
 
+	// Trigger a fetch to cache attachment blobs in the service worker
+	$effect(() => {
+		if (
+			file.type === "hash" &&
+			"serviceWorker" in navigator &&
+			navigator.serviceWorker.controller
+		) {
+			const url = urlNotTrailing + "/output/" + file.value;
+			fetch(url).catch(() => {
+				// Silent - the SW will cache on success, offline fallback is fine
+			});
+		}
+	});
+
 	function truncateMiddle(text: string, maxLength: number): string {
 		if (text.length <= maxLength) {
 			return text;
