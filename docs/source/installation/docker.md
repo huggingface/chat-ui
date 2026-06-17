@@ -41,7 +41,7 @@ docker run -p 3000:3000 \
   ghcr.io/huggingface/chat-ui-db
 ```
 
-On Linux, append `--add-host=host.docker.internal:host-gateway` to the command so Docker can resolve the hostname.
+On Linux, append `--add-host=host.docker.internal:host-gateway` to the command so Docker can resolve the hostname. Ollama also binds to `127.0.0.1:11434` by default on Linux, so the host-gateway address still won't be reachable until you start it with `OLLAMA_HOST=0.0.0.0:11434 ollama serve` (or set `OLLAMA_HOST` in its service config) to accept connections from outside the host.
 
 ## Using an Environment File
 
@@ -49,12 +49,12 @@ For more configuration options, use `--env-file` to avoid leaking secrets in she
 
 ```bash
 docker run -p 3000:3000 \
-  --env-file .env.local \
+  --env-file .env.docker \
   -v chat-ui-data:/data \
   ghcr.io/huggingface/chat-ui-db
 ```
 
 > [!TIP]
-> Use `--env-file .env.local` rather than multiple `-e` flags. This keeps your tokens out of shell history and makes it easy to reuse the same configuration file you use for local development.
+> Use `--env-file` rather than multiple `-e` flags to keep your tokens out of shell history. Don't point it directly at your local `.env.local`, though: Docker's env-file format treats `#` as a comment only at the start of a line, so placeholder values like `MONGODB_URL=#your mongodb URL here...` are read as literal strings and will override the image's bundled MongoDB URL. Instead, copy it to a dedicated file (e.g. `cp .env.local .env.docker`) and remove or fill in any placeholder lines before using it with `--env-file`.
 
 See the [configuration overview](../configuration/overview) for all available environment variables.
