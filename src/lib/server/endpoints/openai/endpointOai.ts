@@ -15,7 +15,19 @@ import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 // uuid import removed (no tool call ids)
+
+export function getMessageContentLength(message: ChatCompletionMessageParam): number {
+	if (typeof message.content === "string") return message.content.length;
+	if (Array.isArray(message.content)) {
+		return message.content.reduce(
+			(sum, part) => sum + (part.type === "text" ? part.text.length : 0),
+			0
+		);
+	}
+	return 0;
+}
 
 export const endpointOAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -209,12 +221,10 @@ export async function endpointOai(
 			// Uses a ~4 chars/token heuristic. System message and latest user turn are always kept.
 			if (parameters.truncate) {
 				const maxChars = parameters.truncate * 4;
-				const getContentLength = (m: OpenAI.Chat.Completions.ChatCompletionMessageParam): number =>
-					typeof m.content === "string" ? m.content.length : 0;
-				let totalChars = messagesOpenAI.reduce((sum, m) => sum + getContentLength(m), 0);
-				let i = messagesOpenAI[0]?.role === "system" ? 1 : 0;
+				let totalChars = messagesOpenAI.reduce((sum, m) => sum + getMessageContentLength(m), 0);
+				const i = messagesOpenAI[0]?.role === "system" ? 1 : 0;
 				while (totalChars > maxChars && i < messagesOpenAI.length - 1) {
-					totalChars -= getContentLength(messagesOpenAI[i]);
+					totalChars -= getMessageContentLength(messagesOpenAI[i]);
 					messagesOpenAI.splice(i, 1);
 				}
 			}
