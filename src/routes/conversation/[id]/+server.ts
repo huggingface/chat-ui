@@ -27,7 +27,7 @@ import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { clampStoppedContent } from "$lib/server/stopTruncation";
 import { MetricsServer } from "$lib/server/metrics";
-import { sanitizeUtf8 } from "$lib/server/sanitizeString";
+import { sanitizeUtf8, sanitizeUtf8Deep } from "$lib/server/sanitizeString";
 
 // How long a stop marker is protected from the pre-flight cleanup of a new
 // generation. A marker younger than this may still be awaiting observation by
@@ -385,11 +385,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			// Sanitize free-form text fields to avoid BSONError on invalid UTF-8
 			// sequences (e.g. lone surrogates from mis-encoded Windows clipboard input).
+			// filteredUpdates can carry arbitrary nested strings (tool results,
+			// status text, titles, etc.), so it needs the deep variant.
 			return {
 				...msg,
 				content: sanitizeUtf8(msg.content),
 				...(msg.reasoning !== undefined && { reasoning: sanitizeUtf8(msg.reasoning) }),
-				updates: filteredUpdates,
+				updates: sanitizeUtf8Deep(filteredUpdates),
 			};
 		});
 

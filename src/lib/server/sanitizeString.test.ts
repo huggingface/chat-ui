@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeUtf8 } from "./sanitizeString";
+import { sanitizeUtf8, sanitizeUtf8Deep } from "./sanitizeString";
 
 describe("sanitizeUtf8", () => {
 	it("passes through valid ASCII unchanged", () => {
@@ -46,5 +46,41 @@ describe("sanitizeUtf8", () => {
 		const mixed = "hello \uD800 world 😀";
 		const result = sanitizeUtf8(mixed);
 		expect(result).toBe("hello � world 😀");
+	});
+});
+
+describe("sanitizeUtf8Deep", () => {
+	it("sanitizes a lone surrogate buried in a nested array of update objects", () => {
+		const updates = [
+			{ type: "status", status: "started" },
+			{
+				type: "tool",
+				result: { content: "tool output \uD800 with surrogate", nested: ["a", "b\uDFFF"] },
+			},
+			{ type: "finalAnswer", text: "done\uD800" },
+		];
+		const result = sanitizeUtf8Deep(updates);
+		expect(result).toEqual([
+			{ type: "status", status: "started" },
+			{
+				type: "tool",
+				result: { content: "tool output � with surrogate", nested: ["a", "b�"] },
+			},
+			{ type: "finalAnswer", text: "done�" },
+		]);
+	});
+
+	it("passes through non-string primitives and Date instances unchanged", () => {
+		const date = new Date("2024-01-01T00:00:00.000Z");
+		const value = { count: 5, enabled: true, missing: null, when: date };
+		const result = sanitizeUtf8Deep(value);
+		expect(result).toEqual(value);
+		expect(result.when).toBe(date);
+	});
+
+	it("handles plain strings and empty arrays/objects", () => {
+		expect(sanitizeUtf8Deep("test\uD800")).toBe("test�");
+		expect(sanitizeUtf8Deep([])).toEqual([]);
+		expect(sanitizeUtf8Deep({})).toEqual({});
 	});
 });

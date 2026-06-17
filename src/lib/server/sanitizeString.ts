@@ -20,3 +20,26 @@ export function sanitizeUtf8(str: string): string {
 	const bytes = Buffer.from(str, "utf8");
 	return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 }
+
+/**
+ * Recursively applies `sanitizeUtf8` to every string found while walking an
+ * arbitrary value (objects, arrays, nested combinations). Used for
+ * unstructured data (e.g. stream update payloads) where invalid UTF-8 could
+ * be buried at any depth before a MongoDB write.
+ */
+export function sanitizeUtf8Deep<T>(value: T): T {
+	if (typeof value === "string") {
+		return sanitizeUtf8(value) as unknown as T;
+	}
+	if (Array.isArray(value)) {
+		return value.map((item) => sanitizeUtf8Deep(item)) as unknown as T;
+	}
+	if (value !== null && typeof value === "object" && !(value instanceof Date)) {
+		const result: Record<string, unknown> = {};
+		for (const [key, val] of Object.entries(value)) {
+			result[key] = sanitizeUtf8Deep(val);
+		}
+		return result as unknown as T;
+	}
+	return value;
+}
