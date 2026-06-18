@@ -21,6 +21,10 @@ import type { ArtifactKind } from "./artifacts";
 const END_SCRIPT_TAG = "</scr" + "ipt>";
 
 function buildPreviewHookScript(channel: string): string {
+	// Deployed artifacts (a static Space) pass an empty channel: there is no
+	// parent window to postMessage to, so the hook is omitted entirely and the
+	// shipped document is just the artifact itself.
+	if (!channel) return "";
 	return `\n<script>\n(function(){\n  function send(type, detail){\n    try{ parent.postMessage({ type: type, channel: '${channel}', detail: detail }, '*'); }catch(e){}\n  }\n  function nearestAnchor(node){\n    while (node && node !== document) {\n      if (node.tagName && node.tagName.toLowerCase() === 'a') return node;\n      node = node.parentNode;\n    }\n    return null;\n  }\n  function anchorHref(anchor){\n    var href = anchor.href;\n    if (typeof href === 'string') return href;\n    if (href && typeof href.baseVal === 'string') {\n      try { return new URL(href.baseVal, document.baseURI).href; } catch (err) { return ''; }\n    }\n    return '';\n  }\n  function scrollToFragment(raw){\n    var id = raw.slice(1);\n    try { id = decodeURIComponent(id); } catch (err) {}\n    var target = id ? document.getElementById(id) : null;\n    if (target && target.scrollIntoView) target.scrollIntoView();\n  }\n  function intercept(ev){\n    var anchor = nearestAnchor(ev.target);\n    if (!anchor) return;\n    ev.preventDefault();\n    ev.stopPropagation();\n    var raw = anchor.getAttribute('href') || anchor.getAttribute('xlink:href') || '';\n    if (raw.charAt(0) === '#') {\n      scrollToFragment(raw);\n      return;\n    }\n    if (!/^\\s*https?:/i.test(raw)) return;\n    var href = anchorHref(anchor);\n    if (/^https?:/i.test(href)) {\n      send('chatui.preview.openLink', { href: href });\n    }\n  }\n  window.addEventListener('click', intercept, true);\n  window.addEventListener('auxclick', intercept, true);\n  window.addEventListener('keydown', function(ev){\n    if (ev.key === 'Enter' || ev.key === ' ') {\n      intercept(ev);\n    }\n  }, true);\n  window.addEventListener('error', function(ev){\n    var msg = ev && ev.message ? ev.message : 'Script error';\n    var stack = ev && ev.error && ev.error.stack ? ev.error.stack : undefined;\n    send('chatui.preview.error', { message: msg, stack: stack });\n  });\n  window.addEventListener('unhandledrejection', function(ev){\n    var r = ev && ev.reason;\n    var msg = (typeof r === 'string') ? r : (r && r.message) ? r.message : 'Unhandled promise rejection';\n    var stack = r && r.stack ? r.stack : undefined;\n    send('chatui.preview.error', { message: msg, stack: stack });\n  });\n})();\n${END_SCRIPT_TAG}`;
 }
 
@@ -203,5 +207,31 @@ export function buildArtifactSrcdoc(kind: ArtifactKind, content: string, channel
 			return buildMermaidSrcdoc(content, channel);
 		default:
 			return buildHtmlSrcdoc(content, channel);
+	}
+}
+
+/** Kinds that can be shipped as a self-contained static page (an HF Space). */
+export function isDeployableKind(kind: ArtifactKind): boolean {
+	return kind === "html" || kind === "svg" || kind === "react" || kind === "mermaid";
+}
+
+/**
+ * Build the standalone `index.html` shipped to a deployed static Space. Unlike
+ * the preview builders this passes an empty channel, so the postMessage hook is
+ * stripped (a deployed page has no parent window to talk to). Raw HTML is shipped
+ * verbatim — it is already a complete self-contained page and we must not inject
+ * a `<base target="_blank">` that would rewrite its link behaviour. SVG/React/
+ * Mermaid reuse the same wrappers as the preview, minus the hook.
+ */
+export function buildDeployableHtml(kind: ArtifactKind, content: string): string {
+	switch (kind) {
+		case "react":
+			return buildReactSrcdoc(content, "");
+		case "mermaid":
+			return buildMermaidSrcdoc(content, "");
+		case "svg":
+			return buildHtmlSrcdoc(content, "");
+		default:
+			return content;
 	}
 }
