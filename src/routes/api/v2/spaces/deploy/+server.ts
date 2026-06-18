@@ -46,9 +46,14 @@ function slugify(title: string): string {
 }
 
 function buildReadme(title: string): string {
-	const safeTitle = title.replace(/"/g, "'").slice(0, 200);
+	const trimmed = title.slice(0, 200);
+	// YAML is a superset of JSON, so a JSON double-quoted string is a valid YAML
+	// double-quoted scalar with quotes, backslashes, control chars, and unicode
+	// all escaped correctly — avoids a stray `\` or `"` breaking the front matter.
+	const yamlTitle = JSON.stringify(trimmed);
+	const headingTitle = trimmed.replace(/[\r\n]+/g, " ");
 	return `---
-title: "${safeTitle}"
+title: ${yamlTitle}
 emoji: ${pick(SPACE_EMOJIS)}
 colorFrom: ${pick(SPACE_COLORS)}
 colorTo: ${pick(SPACE_COLORS)}
@@ -58,7 +63,7 @@ tags:
   - huggingchat
 ---
 
-# ${safeTitle}
+# ${headingTitle}
 
 Built with [HuggingChat](https://huggingface.co/chat).
 `;
