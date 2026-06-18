@@ -9,6 +9,7 @@ const TOUCH_DETACH_THRESHOLD_PX = 10;
 
 interface ScrollDependency {
 	forceReattach?: number;
+	scrollBehavior?: ScrollBehavior;
 }
 
 type MaybeScrollDependency = ScrollDependency | unknown;
@@ -18,6 +19,13 @@ const getForceReattach = (value: MaybeScrollDependency): number => {
 		return (value as ScrollDependency).forceReattach ?? 0;
 	}
 	return 0;
+};
+
+const getScrollBehavior = (value: MaybeScrollDependency): ScrollBehavior => {
+	if (typeof value === "object" && value !== null && "scrollBehavior" in value) {
+		return (value as ScrollDependency).scrollBehavior ?? "instant";
+	}
+	return "instant";
 };
 
 /**
@@ -73,11 +81,11 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 
 	const isAtBottom = () => distanceFromBottom() <= BOTTOM_THRESHOLD;
 
-	const scrollToBottom = () => {
+	const scrollToBottom = (behavior: ScrollBehavior = "instant") => {
 		isProgrammaticScroll = true;
 		lastProgrammaticScrollTime = Date.now();
 
-		node.scrollTo({ top: node.scrollHeight });
+		node.scrollTo({ top: node.scrollHeight, behavior });
 
 		if (typeof requestAnimationFrame === "function") {
 			requestAnimationFrame(() => {
@@ -168,7 +176,7 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 			clearUserScrollTimeout();
 
 			await tick();
-			scrollToBottom();
+			scrollToBottom(getScrollBehavior(newDependency));
 			return true;
 		}
 

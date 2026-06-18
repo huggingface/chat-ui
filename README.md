@@ -12,7 +12,7 @@ A chat interface for LLMs. It is a SvelteKit app and it powers the [HuggingChat 
 5. [Building](#building)
 
 > [!NOTE]
-> Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol (llama.cpp server, Ollama, OpenRouter, etc. will work by default).
+> Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol (llama.cpp server, Ollama, OpenRouter, etc.) will work by default.
 
 > [!NOTE]
 > The old version is still available on the [legacy branch](https://github.com/huggingface/chat-ui/tree/legacy)
@@ -126,24 +126,22 @@ Models are discovered from `${OPENAI_BASE_URL}/models`, and you can optionally o
 
 ### LLM Router (Optional)
 
-Chat UI can perform server-side smart routing using [katanemo/Arch-Router-1.5B](https://huggingface.co/katanemo/Arch-Router-1.5B) as the routing model without running a separate router service. The UI exposes a virtual model alias called "Omni" (configurable) that, when selected, chooses the best route/model for each message.
+Chat UI can perform server-side smart routing using a local heuristic — no separate router service or selection model is called. The UI exposes a virtual model alias called "Omni" (configurable) that, when selected, chooses the best route/model for each message: image inputs go to a `multimodal` route, MCP-tool-enabled requests go to an `agentic` route, and everything else goes to a `default` route.
 
-- Provide a routes policy JSON via `LLM_ROUTER_ROUTES_PATH`. No sample file ships with this branch, so you must point the variable to a JSON array you create yourself (for example, commit one in your project like `config/routes.chat.json`). Each route entry needs `name`, `description`, `primary_model`, and optional `fallback_models`.
-- Configure the Arch router selection endpoint with `LLM_ROUTER_ARCH_BASE_URL` (OpenAI-compatible `/chat/completions`) and `LLM_ROUTER_ARCH_MODEL` (e.g. `router/omni`). The Arch call reuses `OPENAI_API_KEY` for auth.
-- Map `other` to a concrete route via `LLM_ROUTER_OTHER_ROUTE` (default: `casual_conversation`). If Arch selection fails, calls fall back to `LLM_ROUTER_FALLBACK_MODEL`.
-- Selection timeout can be tuned via `LLM_ROUTER_ARCH_TIMEOUT_MS` (default 10000).
+- Provide a routes policy JSON via `LLM_ROUTER_ROUTES_PATH`. No sample file ships with this branch, so you must point the variable to a JSON array you create yourself (for example, commit one in your project like `config/routes.chat.json`). Each route entry needs `name`, `description`, `primary_model`, and optional `fallback_models`. The router recognizes the route names `default`, `multimodal`, and `agentic`.
+- The default route name is configurable via `LLM_ROUTER_DEFAULT_ROUTE` (default: `default`). If the selected route's models all fail, calls fall back to `LLM_ROUTER_FALLBACK_MODEL`.
 - Omni alias configuration: `PUBLIC_LLM_ROUTER_ALIAS_ID` (default `omni`), `PUBLIC_LLM_ROUTER_DISPLAY_NAME` (default `Omni`), and optional `PUBLIC_LLM_ROUTER_LOGO_URL`.
 
 When you select Omni in the UI, Chat UI will:
 
-- Call the Arch endpoint once (non-streaming) to pick the best route for the last turns.
+- Pick a route locally based on the request signals (image attached, MCP server enabled, or default).
 - Emit RouterMetadata immediately (route and actual model used) so the UI can display it.
-- Stream from the selected model via your configured `OPENAI_BASE_URL`. On errors, it tries route fallbacks.
+- Stream from the selected model via your configured `OPENAI_BASE_URL`. On errors, it tries route fallbacks in order, then `LLM_ROUTER_FALLBACK_MODEL`.
 
 Tool and multimodal shortcuts:
 
-- Multimodal: If `LLM_ROUTER_ENABLE_MULTIMODAL=true` and the user sends an image, the router bypasses Arch and uses the model specified in `LLM_ROUTER_MULTIMODAL_MODEL`. Route name: `multimodal`.
-- Tools: If `LLM_ROUTER_ENABLE_TOOLS=true` and the user has at least one MCP server enabled, the router bypasses Arch and uses `LLM_ROUTER_TOOLS_MODEL`. If that model is missing or misconfigured, it falls back to Arch routing. Route name: `agentic`.
+- Multimodal: If `LLM_ROUTER_ENABLE_MULTIMODAL=true` and the user sends an image, the router bypasses the policy file and uses the model specified in `LLM_ROUTER_MULTIMODAL_MODEL`. Route name: `multimodal`.
+- Tools: If `LLM_ROUTER_ENABLE_TOOLS=true` and the user has at least one MCP server enabled, the router bypasses the policy file and uses `LLM_ROUTER_TOOLS_MODEL`. If that model is missing or misconfigured, it falls back to the heuristic route. Route name: `agentic`.
 
 ### MCP Tools (Optional)
 

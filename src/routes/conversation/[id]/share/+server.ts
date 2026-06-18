@@ -1,10 +1,28 @@
 import { authCondition } from "$lib/server/auth";
+import { config } from "$lib/server/config";
 import { collections } from "$lib/server/database";
+import { logger } from "$lib/server/logger";
+import {
+	getShareThumbnailPng,
+	shareThumbnailPrompt,
+} from "$lib/server/shareThumbnail/shareThumbnail";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import { hashConv } from "$lib/utils/hashConv";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { nanoid } from "nanoid";
+
+// Render the social-preview thumbnail as soon as the share link exists, off
+// the response path: link unfurlers (Slack, iMessage, ...) typically fetch
+// the og:image within seconds of the link being created, and rendering it
+// here means they hit the cache instead of paying for a fresh render.
+function prewarmShareThumbnail(shared: SharedConversation): void {
+	getShareThumbnailPng({
+		prompt: shareThumbnailPrompt(shared),
+		isHuggingChat: config.isHuggingChat,
+		appName: config.PUBLIC_APP_NAME,
+	}).catch((err) => logger.warn({ err }, "Failed to prewarm share thumbnail"));
+}
 
 export async function POST({ params, locals }) {
 	const conversation = await collections.conversations.findOne({
@@ -21,6 +39,7 @@ export async function POST({ params, locals }) {
 	const existingShare = await collections.sharedConversations.findOne({ hash });
 
 	if (existingShare) {
+		prewarmShareThumbnail(existingShare);
 		return new Response(
 			JSON.stringify({
 				shareId: existingShare._id,
@@ -42,6 +61,8 @@ export async function POST({ params, locals }) {
 	};
 
 	await collections.sharedConversations.insertOne(shared);
+
+	prewarmShareThumbnail(shared);
 
 	// copy files from `${conversation._id}-` to `${shared._id}-`
 	const files = await collections.bucket

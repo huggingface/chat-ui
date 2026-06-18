@@ -1,8 +1,58 @@
-@import "./highlight-js.css";
+@import "./highlight-js.css" layer(base);
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@plugin "tailwind-scrollbar" {
+	nocompatible: true;
+}
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+	--color-gray-50: #fafafa;
+	--color-gray-100: #f5f5f5;
+	--color-gray-200: #e5e5e5;
+	--color-gray-300: #d4d4d4;
+	--color-gray-400: #a3a3a3;
+	--color-gray-500: #737373;
+	--color-gray-600: #454545;
+	--color-gray-700: #2e2e2e;
+	--color-gray-800: #1a1a1a;
+	--color-gray-900: #0a0a0a;
+	--color-gray-950: #000000;
+
+	--text-xxs: 0.625rem;
+	--text-smd: 0.94rem;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+	*,
+	::after,
+	::before,
+	::backdrop,
+	::file-selector-button {
+		border-color: var(--color-gray-200, currentcolor);
+	}
+
+	button:not(:disabled),
+	[role="button"]:not(:disabled) {
+		cursor: pointer;
+	}
+
+	::placeholder {
+		color: var(--color-gray-400);
+		opacity: 1;
+	}
+}
 
 html,
 body {
@@ -10,135 +60,244 @@ body {
 	touch-action: pan-x pan-y;
 }
 
-@layer components {
-	.btn {
-		@apply inline-flex flex-shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap outline-none transition-all focus:ring disabled:cursor-default;
-	}
-
-	.active-model {
-		/* Ensure active border wins over defaults/utilities in both themes */
-		@apply !border-black dark:!border-white/60;
-	}
-
-	.file-hoverable {
-		@apply hover:bg-gray-500/10;
-	}
-
-	.base-tool {
-		@apply flex h-[1.6rem] items-center gap-[.2rem] whitespace-nowrap border border-transparent text-xs outline-none transition-all focus:outline-none active:outline-none dark:hover:text-gray-300 sm:hover:text-purple-600;
-	}
-
-	.active-tool {
-		@apply rounded-full !border-purple-200 bg-purple-100 pl-1 pr-2 text-purple-600 hover:text-purple-600 dark:!border-purple-700 dark:bg-purple-600/40 dark:text-purple-200;
-	}
+@utility btn {
+	@apply inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap outline-hidden transition-all select-none focus:ring-3 focus:ring-blue-500/50 disabled:cursor-default;
 }
 
-@layer utilities {
-	/* your existing utilities */
-	.scrollbar-custom {
-		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
-	}
+@utility active-model {
+	/* Ensure active border wins over defaults/utilities in both themes */
+	@apply border-black! dark:border-white/60!;
+}
 
-	.scrollbar-custom::-webkit-scrollbar {
+@utility file-hoverable {
+	@apply hover:bg-gray-500/10;
+}
+
+@utility base-tool {
+	@apply flex h-[1.6rem] items-center gap-[.2rem] border border-transparent text-xs whitespace-nowrap outline-hidden transition-all focus:outline-hidden active:outline-hidden sm:hover:text-purple-600 dark:hover:text-gray-300;
+}
+
+@utility active-tool {
+	@apply rounded-full border-purple-200! bg-purple-100 pr-2 pl-1 text-purple-600 hover:text-purple-600 dark:border-purple-700! dark:bg-purple-600/40 dark:text-purple-200;
+}
+
+@utility scrollbar-custom {
+	@apply scrollbar-thin scrollbar-thumb-black/10 scrollbar-track-transparent scrollbar-thumb-rounded-full dark:scrollbar-thumb-white/10 scrollbar-hover:scrollbar-thumb-black/20 dark:scrollbar-hover:scrollbar-thumb-white/20;
+
+	&::-webkit-scrollbar {
 		background-color: transparent;
 		width: 8px;
 		height: 8px;
 	}
 
-	.scrollbar-custom::-webkit-scrollbar-thumb {
+	&::-webkit-scrollbar-thumb {
 		background-color: rgba(0, 0, 0, 0.1);
 		border-radius: 9999px;
 	}
 
-	.dark .scrollbar-custom::-webkit-scrollbar {
+	.dark &::-webkit-scrollbar {
 		background-color: rgba(17, 17, 17, 0.85);
 	}
 
-	.dark .scrollbar-custom::-webkit-scrollbar-thumb {
+	.dark &::-webkit-scrollbar-thumb {
 		background-color: rgba(255, 255, 255, 0.1);
 	}
 
 	/* Rounded top/bottom caps for vertical scrollbars (Chrome/Edge/Safari) */
-	.scrollbar-custom::-webkit-scrollbar-track {
+	&::-webkit-scrollbar-track {
 		@apply rounded-full bg-clip-padding; /* clip bg to padding so caps look round */
 		/* space for the end caps — tweak with Tailwind spacing */
-		border-top: theme("spacing.2") solid transparent; /* 0.5rem */
-		border-bottom: theme("spacing.2") solid transparent; /* 0.5rem */
+		border-top: --spacing(2) solid transparent; /* 0.5rem */
+		border-bottom: --spacing(2) solid transparent; /* 0.5rem */
 	}
 
 	/* Rounded left/right caps for horizontal scrollbars */
-	.scrollbar-custom::-webkit-scrollbar-track:horizontal {
+	&::-webkit-scrollbar-track:horizontal {
 		@apply rounded-full bg-clip-padding;
-		border-left: theme("spacing.2") solid transparent;
-		border-right: theme("spacing.2") solid transparent;
+		border-left: --spacing(2) solid transparent;
+		border-right: --spacing(2) solid transparent;
 		border-top-width: 0;
 		border-bottom-width: 0;
 	}
+}
 
-	.no-scrollbar {
-		@apply [-ms-overflow-style:none] [scrollbar-width:none] [&::-ms-scrollbar]:hidden [&::-webkit-scrollbar]:hidden;
-	}
+@utility no-scrollbar {
+	@apply [scrollbar-width:none] [-ms-overflow-style:none] [&::-ms-scrollbar]:hidden [&::-webkit-scrollbar]:hidden;
+}
 
-	.prose table {
-		@apply block max-w-full overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
-	}
+/*
+  Typography overrides, previously theme.extend.typography in tailwind.config.cjs plus
+  prose tweaks in @layer utilities. They live OUTSIDE Tailwind's cascade layers on purpose:
+  unlayered rules beat the layered plugin defaults, which restores the v3 cascade where the
+  config values were merged into the generated `.prose` class itself.
+*/
+.prose {
+	--tw-prose-body: var(--color-gray-700);
+	--tw-prose-headings: var(--color-gray-900);
+	--tw-prose-lead: var(--color-gray-600);
+	--tw-prose-links: var(--color-gray-900);
+	--tw-prose-bold: var(--color-gray-900);
+	--tw-prose-counters: var(--color-gray-500);
+	--tw-prose-bullets: var(--color-gray-300);
+	--tw-prose-hr: var(--color-gray-200);
+	--tw-prose-quotes: var(--color-gray-900);
+	--tw-prose-quote-borders: var(--color-gray-200);
+	--tw-prose-captions: var(--color-gray-500);
+	--tw-prose-kbd: var(--color-gray-900);
+	--tw-prose-kbd-shadows: 10 10 10;
+	--tw-prose-code: var(--color-gray-900);
+	--tw-prose-pre-code: var(--color-gray-200);
+	--tw-prose-pre-bg: var(--color-gray-800);
+	--tw-prose-th-borders: var(--color-gray-300);
+	--tw-prose-td-borders: var(--color-gray-200);
+	--tw-prose-invert-body: var(--color-gray-300);
+	--tw-prose-invert-lead: var(--color-gray-400);
+	--tw-prose-invert-counters: var(--color-gray-400);
+	--tw-prose-invert-bullets: var(--color-gray-600);
+	--tw-prose-invert-hr: var(--color-gray-700);
+	--tw-prose-invert-quotes: var(--color-gray-100);
+	--tw-prose-invert-quote-borders: var(--color-gray-700);
+	--tw-prose-invert-captions: var(--color-gray-400);
+	--tw-prose-invert-pre-code: var(--color-gray-300);
+	--tw-prose-invert-th-borders: var(--color-gray-600);
+	--tw-prose-invert-td-borders: var(--color-gray-700);
+}
 
-	/* .scrollbar-custom {
-		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
-	} */
-	.prose hr {
-		@apply my-4;
-	}
+/*
+  The unlayered `.prose` override above would otherwise beat the plugin's layered
+  `prose-invert` remap, so restate it here (after the override) at the same level.
+  This app only uses the `dark:` variant form, but cover the bare class too.
+*/
+.prose-invert,
+.dark\:prose-invert:where(.dark, .dark *) {
+	--tw-prose-body: var(--tw-prose-invert-body);
+	--tw-prose-headings: var(--tw-prose-invert-headings);
+	--tw-prose-lead: var(--tw-prose-invert-lead);
+	--tw-prose-links: var(--tw-prose-invert-links);
+	--tw-prose-bold: var(--tw-prose-invert-bold);
+	--tw-prose-counters: var(--tw-prose-invert-counters);
+	--tw-prose-bullets: var(--tw-prose-invert-bullets);
+	--tw-prose-hr: var(--tw-prose-invert-hr);
+	--tw-prose-quotes: var(--tw-prose-invert-quotes);
+	--tw-prose-quote-borders: var(--tw-prose-invert-quote-borders);
+	--tw-prose-captions: var(--tw-prose-invert-captions);
+	--tw-prose-kbd: var(--tw-prose-invert-kbd);
+	--tw-prose-kbd-shadows: var(--tw-prose-invert-kbd-shadows);
+	--tw-prose-code: var(--tw-prose-invert-code);
+	--tw-prose-pre-code: var(--tw-prose-invert-pre-code);
+	--tw-prose-pre-bg: var(--tw-prose-invert-pre-bg);
+	--tw-prose-th-borders: var(--tw-prose-invert-th-borders);
+	--tw-prose-td-borders: var(--tw-prose-invert-td-borders);
+}
 
-	.prose strong {
-		@apply font-medium;
-	}
+.prose :where(h2):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+	margin-top: 1em;
+}
 
-	.prose pre {
-		@apply border-[0.5px] bg-white text-gray-600 dark:border-gray-700 dark:!bg-gray-900 dark:bg-inherit dark:text-inherit;
-	}
+.prose :where(h3):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+	margin-top: 0.8em;
+}
 
-	.prose code:not(pre code) {
-		@apply rounded-md bg-gray-200/60 px-[0.4em] py-[0.2em] text-[85%] dark:bg-gray-700;
-	}
+.prose table {
+	@apply scrollbar-thin block max-w-full scrollbar-thumb-black/10 scrollbar-track-transparent overflow-x-auto scrollbar-thumb-rounded-full dark:scrollbar-thumb-white/10 scrollbar-hover:scrollbar-thumb-black/20 dark:scrollbar-hover:scrollbar-thumb-white/20;
+}
 
-	.prose code:not(pre code)::before,
-	.prose code:not(pre code)::after {
-		content: none;
-	}
+/* Prevent columns from squishing on narrow viewports; long content wraps instead of dominating. */
+.prose :is(th, td) {
+	min-width: 6rem;
+	max-width: 16rem;
+}
 
-	/* Override prose-sm title sizes - 75% of original */
-	.prose-sm :where(h1):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
-		font-size: 1.6em; /* 75% */
-		@apply font-semibold;
-	}
+.prose hr {
+	@apply my-4;
+}
 
-	.prose-sm :where(h2):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
-		font-size: 1.07em; /* 75% */
-		@apply font-semibold;
-	}
+.prose strong {
+	@apply font-medium;
+}
 
-	.prose-sm :where(h3):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
-		font-size: 0.96em; /* 75% */
-		@apply font-semibold;
-	}
+.prose pre {
+	/* font-mono restated because the typography plugin makes `pre code` inherit from `pre`,
+	   and base-layer element styles (ChatInput) would otherwise turn `pre` sans-serif */
+	@apply border-[0.5px] bg-white font-mono text-gray-600 dark:border-gray-700 dark:bg-gray-900! dark:bg-inherit dark:text-inherit;
+}
 
-	.prose-sm :where(h4):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
-		font-size: 0.8em; /* 75% */
-		@apply font-semibold;
-	}
+.prose code:not(pre code) {
+	@apply rounded-md bg-gray-200/60 px-[0.4em] py-[0.2em] text-[85%] dark:bg-gray-700;
+}
 
-	.prose-sm :where(h5):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
-		font-size: 0.75em; /* 75% */
-		@apply font-semibold;
-	}
+.prose code:not(pre code)::before,
+.prose code:not(pre code)::after {
+	content: none;
+}
 
-	.prose-sm :where(h6):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
-		font-size: 0.7em; /* 75% */
-		@apply font-semibold;
-	}
+/* Override prose-sm title sizes - 75% of original */
+.prose-sm :where(h1):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+	font-size: 1.6em; /* 75% */
+	@apply font-semibold;
+}
+
+.prose-sm :where(h2):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+	font-size: 1.07em; /* 75% */
+	@apply font-semibold;
+}
+
+.prose-sm :where(h3):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+	font-size: 0.96em; /* 75% */
+	@apply font-semibold;
+}
+
+.prose-sm :where(h4):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+	font-size: 0.8em; /* 75% */
+	@apply font-semibold;
+}
+
+.prose-sm :where(h5):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+	font-size: 0.75em; /* 75% */
+	@apply font-semibold;
+}
+
+.prose-sm :where(h6):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+	font-size: 0.7em; /* 75% */
+	@apply font-semibold;
 }
 
 .katex-display {
 	overflow: auto hidden;
+}
+
+.router-shimmer {
+	display: inline-block;
+	background-image: linear-gradient(
+		90deg,
+		rgba(156, 163, 175, 1) 0%,
+		rgba(156, 163, 175, 0.6) 10%,
+		rgba(156, 163, 175, 0.6) 50%,
+		rgba(156, 163, 175, 0.6) 90%,
+		rgba(156, 163, 175, 1) 100%
+	);
+	background-size: 220% 100%;
+	animation: router-shimmer 2.8s linear infinite;
+	background-clip: text;
+	-webkit-background-clip: text;
+	color: transparent;
+	-webkit-text-fill-color: transparent;
+}
+
+.dark .router-shimmer {
+	background-image: linear-gradient(
+		90deg,
+		rgba(255, 255, 255, 0.15) 0%,
+		rgba(255, 255, 255, 0.7) 50%,
+		rgba(255, 255, 255, 0.15) 100%
+	);
+}
+
+@keyframes router-shimmer {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
 }

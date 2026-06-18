@@ -1,3 +1,4 @@
+import { building } from "$app/environment";
 import { config } from "$lib/server/config";
 import type { ChatTemplateInput } from "$lib/types/Template";
 import { z } from "zod";
@@ -58,6 +59,11 @@ const modelConfig = z.object({
 	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
 	// Aggregated tool-calling capability across providers (HF router)
 	supportsTools: z.boolean().default(false),
+	// Reasoning-capable model (accepts `reasoning_effort` parameter)
+	supportsReasoning: z.boolean().default(false),
+	// Opt-in artifacts: when true, the model is instructed to emit <artifact>
+	// blocks rendered in the side panel. Set per model via MODELS overrides.
+	supportsArtifacts: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */
@@ -165,33 +171,12 @@ const getModelOverrides = (): ModelOverride[] => {
 	}
 };
 
-export type ModelsRefreshSummary = {
-	refreshedAt: Date;
-	durationMs: number;
-	added: string[];
-	removed: string[];
-	changed: string[];
-	total: number;
-};
-
 export type ProcessedModel = InternalProcessedModel;
 
 export let models: ProcessedModel[] = [];
 export let defaultModel!: ProcessedModel;
 export let taskModel!: ProcessedModel;
 export let validModelIdSchema: z.ZodType<string> = z.string();
-export let lastModelRefresh = new Date(0);
-export let lastModelRefreshDurationMs = 0;
-export let lastModelRefreshSummary: ModelsRefreshSummary = {
-	refreshedAt: new Date(0),
-	durationMs: 0,
-	added: [],
-	removed: [],
-	changed: [],
-	total: 0,
-};
-
-let inflightRefresh: Promise<ModelsRefreshSummary> | null = null;
 
 const createValidModelIdSchema = (modelList: ProcessedModel[]): z.ZodType<string> => {
 	if (modelList.length === 0) {
@@ -216,82 +201,6 @@ const resolveTaskModel = (modelList: ProcessedModel[]) => {
 	}
 
 	return modelList[0];
-};
-
-const signatureForModel = (model: ProcessedModel) =>
-	JSON.stringify({
-		description: model.description,
-		displayName: model.displayName,
-		providers: model.providers,
-		parameters: model.parameters,
-		preprompt: model.preprompt,
-		prepromptUrl: model.prepromptUrl,
-		endpoints:
-			model.endpoints?.map((endpoint) => {
-				if (endpoint.type === "openai") {
-					const { type, baseURL } = endpoint;
-					return { type, baseURL };
-				}
-				return { type: endpoint.type };
-			}) ?? null,
-		multimodal: model.multimodal,
-		multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
-		supportsTools: (model as unknown as { supportsTools?: boolean }).supportsTools ?? false,
-		isRouter: model.isRouter,
-		hasInferenceAPI: model.hasInferenceAPI,
-	});
-
-const applyModelState = (newModels: ProcessedModel[], startedAt: number): ModelsRefreshSummary => {
-	if (newModels.length === 0) {
-		throw new Error("Failed to load any models from upstream");
-	}
-
-	const previousIds = new Set(models.map((m) => m.id));
-	const previousSignatures = new Map(models.map((m) => [m.id, signatureForModel(m)]));
-	const refreshedAt = new Date();
-	const durationMs = Date.now() - startedAt;
-
-	models = newModels;
-	defaultModel = models[0];
-	taskModel = resolveTaskModel(models);
-	validModelIdSchema = createValidModelIdSchema(models);
-	lastModelRefresh = refreshedAt;
-	lastModelRefreshDurationMs = durationMs;
-
-	const added = newModels.map((m) => m.id).filter((id) => !previousIds.has(id));
-	const removed = Array.from(previousIds).filter(
-		(id) => !newModels.some((model) => model.id === id)
-	);
-	const changed = newModels
-		.filter((model) => {
-			const previousSignature = previousSignatures.get(model.id);
-			return previousSignature !== undefined && previousSignature !== signatureForModel(model);
-		})
-		.map((model) => model.id);
-
-	const summary: ModelsRefreshSummary = {
-		refreshedAt,
-		durationMs,
-		added,
-		removed,
-		changed,
-		total: models.length,
-	};
-
-	lastModelRefreshSummary = summary;
-
-	logger.info(
-		{
-			total: summary.total,
-			added: summary.added,
-			removed: summary.removed,
-			changed: summary.changed,
-			durationMs: summary.durationMs,
-		},
-		"[models] Model cache refreshed"
-	);
-
-	return summary;
 };
 
 const buildModels = async (): Promise<ProcessedModel[]> => {
@@ -406,7 +315,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 			)
 		);
 
-		const archBase = (config.LLM_ROUTER_ARCH_BASE_URL || "").trim();
+		const routerRoutesPath = (config.LLM_ROUTER_ROUTES_PATH || "").trim();
 		const routerLabel = (config.PUBLIC_LLM_ROUTER_DISPLAY_NAME || "Omni").trim() || "Omni";
 		const routerLogo = (config.PUBLIC_LLM_ROUTER_LOGO_URL || "").trim();
 		const routerAliasId = (config.PUBLIC_LLM_ROUTER_ALIAS_ID || "omni").trim() || "omni";
@@ -416,7 +325,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 
 		let decorated = builtModels as ProcessedModel[];
 
-		if (archBase) {
+		if (routerRoutesPath) {
 			// Build a minimal model config for the alias
 			const aliasRaw = {
 				id: routerAliasId,
@@ -444,6 +353,18 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				aliasRaw.supportsTools = true;
 			}
 
+			// Apply MODELS overrides to the router alias too, so flags like
+			// supportsArtifacts can be set on it like on any other model
+			const aliasOverride = getModelOverrides().find(
+				(o) => o.id?.trim() === routerAliasId || o.name?.trim() === routerAliasId
+			);
+			if (aliasOverride) {
+				const { id, name, ...rest } = aliasOverride;
+				void id;
+				void name;
+				Object.assign(aliasRaw, rest);
+			}
+
 			const aliasBase = await processModel(aliasRaw);
 			// Create a self-referential ProcessedModel for the router endpoint
 			const aliasModel: ProcessedModel = {
@@ -465,25 +386,26 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 	}
 };
 
-const rebuildModels = async (): Promise<ModelsRefreshSummary> => {
+// Skip the initial fetch during `vite build`: SvelteKit's analyse phase imports this
+// module, and hitting the live router from CI builds fails on rate limits (429).
+// The model list is built once at server startup; new models appear on redeploy.
+if (!building) {
 	const startedAt = Date.now();
 	const newModels = await buildModels();
-	return applyModelState(newModels, startedAt);
-};
-
-await rebuildModels();
-
-export const refreshModels = async (): Promise<ModelsRefreshSummary> => {
-	if (inflightRefresh) {
-		return inflightRefresh;
+	if (newModels.length === 0) {
+		throw new Error("Failed to load any models from upstream");
 	}
 
-	inflightRefresh = rebuildModels().finally(() => {
-		inflightRefresh = null;
-	});
+	models = newModels;
+	defaultModel = models[0];
+	taskModel = resolveTaskModel(models);
+	validModelIdSchema = createValidModelIdSchema(models);
 
-	return inflightRefresh;
-};
+	logger.info(
+		{ total: models.length, durationMs: Date.now() - startedAt },
+		"[models] Model cache built"
+	);
+}
 
 export const validateModel = (_models: BackendModel[]) => {
 	// Zod enum function requires 2 parameters

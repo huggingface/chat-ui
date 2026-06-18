@@ -16,7 +16,9 @@ export type GETModelsResponse = Array<{
 	preprompt?: string;
 	multimodal: boolean;
 	multimodalAcceptedMimetypes?: string[];
-	supportsTools?: boolean;
+	supportsTools: boolean;
+	supportsReasoning: boolean;
+	supportsArtifacts: boolean;
 	unlisted: boolean;
 	hasInferenceAPI: boolean;
 	isRouter: boolean;

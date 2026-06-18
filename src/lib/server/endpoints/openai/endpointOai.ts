@@ -152,7 +152,9 @@ export async function endpointOai(
 				headers: {
 					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 					"X-use-cache": "false",
-					...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+					...(config.USE_USER_TOKEN === "true" && locals?.token
+						? { Authorization: `Bearer ${locals.token}` }
+						: {}),
 					// Bill to organization if configured
 					...(locals?.billingOrganization ? { "X-HF-Bill-To": locals.billingOrganization } : {}),
 				},
@@ -171,6 +173,7 @@ export async function endpointOai(
 			locals,
 			abortSignal,
 			provider,
+			reasoningEffort,
 		}) => {
 			// Format messages for the chat API, handling multimodal content if supported
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
@@ -219,6 +222,7 @@ export async function endpointOai(
 				top_p: parameters?.top_p,
 				frequency_penalty: parameters?.frequency_penalty,
 				presence_penalty: parameters?.presence_penalty,
+				...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
 			};
 
 			// Handle both streaming and non-streaming responses with appropriate processors
@@ -230,7 +234,9 @@ export async function endpointOai(
 						headers: {
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
-							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+							...(config.USE_USER_TOKEN === "true" && locals?.token
+								? { Authorization: `Bearer ${locals.token}` }
+								: {}),
 							// Bill to organization if configured
 							...(locals?.billingOrganization
 								? { "X-HF-Bill-To": locals.billingOrganization }
@@ -248,7 +254,9 @@ export async function endpointOai(
 						headers: {
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
-							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+							...(config.USE_USER_TOKEN === "true" && locals?.token
+								? { Authorization: `Bearer ${locals.token}` }
+								: {}),
 							// Bill to organization if configured
 							...(locals?.billingOrganization
 								? { "X-HF-Bill-To": locals.billingOrganization }

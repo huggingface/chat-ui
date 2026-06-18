@@ -20,4 +20,7 @@ export type Model = Pick<
 	| "unlisted"
 	| "hasInferenceAPI"
 	| "providers"
+	| "supportsTools"
+	| "supportsReasoning"
+	| "supportsArtifacts"
 >;

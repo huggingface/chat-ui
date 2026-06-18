@@ -1,8 +1,6 @@
 import { browser } from "$app/environment";
-import { invalidate } from "$app/navigation";
 import { base } from "$app/paths";
-import type { StreamingMode } from "$lib/types/Settings";
-import { UrlDependency } from "$lib/types/UrlDependency";
+import type { ReasoningEffort, StreamingMode } from "$lib/types/Settings";
 import { getContext, setContext } from "svelte";
 import { type Writable, writable, get } from "svelte/store";
 
@@ -12,10 +10,14 @@ type SettingsStore = {
 	welcomeModalSeenAt: Date | null;
 	activeModel: string;
 	customPrompts: Record<string, string>;
+	customPromptsEnabled: Record<string, boolean>;
 	multimodalOverrides: Record<string, boolean>;
 	toolsOverrides: Record<string, boolean>;
+	artifactsOverrides: Record<string, boolean>;
 	hidePromptExamples: Record<string, boolean>;
 	providerOverrides: Record<string, string>;
+	reasoningEffortOverrides: Record<string, ReasoningEffort>;
+	reasoningOverrides: Record<string, boolean>;
 	recentlySaved: boolean;
 	streamingMode: StreamingMode;
 	directPaste: boolean;
@@ -59,8 +61,6 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 					},
 					body: JSON.stringify(get(baseStore)),
 				});
-
-				invalidate(UrlDependency.ConversationList);
 
 				if (showSavedOnNextSync) {
 					// set savedRecently to true for 3s
@@ -118,8 +118,6 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 					body: JSON.stringify(get(baseStore)),
 				});
 
-				invalidate(UrlDependency.ConversationList);
-
 				if (showSavedOnNextSync) {
 					baseStore.update((s) => ({
 						...s,
@@ -154,7 +152,6 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 					...settings,
 				}),
 			});
-			invalidate(UrlDependency.ConversationList);
 		}
 	}
 

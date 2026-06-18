@@ -98,13 +98,84 @@ const ssrfSafeAgent = new Agent({
 	},
 });
 
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
 /**
- * Fetch wrapper that validates resolved IPs at connection time.
- * Use this for any outbound request where the URL may come from user input.
+ * Fetch wrapper that validates resolved IPs at connection time
+ * and validates redirect targets to prevent SSRF via open redirects.
+ *
+ * If the caller sets `redirect: "manual"`, redirects are returned as-is
+ * (the caller is responsible for validation). Otherwise, redirects are
+ * followed internally with each hop validated by `isValidUrl`.
  */
-export function ssrfSafeFetch(url: string | URL, init?: RequestInit): Promise<Response> {
-	return undiciFetch(url, {
-		...(init as Record<string, unknown>),
-		dispatcher: ssrfSafeAgent,
-	}) as unknown as Promise<Response>;
+export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Promise<Response> {
+	const callerRedirect = init?.redirect ?? "follow";
+
+	if (callerRedirect === "error") {
+		// Honour redirect:"error" — make the request and throw if we get a redirect
+		const response = (await undiciFetch(url.toString(), {
+			...(init as Record<string, unknown>),
+			redirect: "manual",
+			dispatcher: ssrfSafeAgent,
+		})) as unknown as Response;
+		if (REDIRECT_STATUSES.has(response.status)) {
+			throw new TypeError("unexpected redirect");
+		}
+		return response;
+	}
+
+	if (callerRedirect === "manual") {
+		// Caller handles redirects — return as-is
+		return (await undiciFetch(url.toString(), {
+			...(init as Record<string, unknown>),
+			redirect: "manual",
+			dispatcher: ssrfSafeAgent,
+		})) as unknown as Response;
+	}
+
+	// Default: follow redirects with SSRF validation on each hop
+	let currentUrl = url.toString();
+	let currentInit = init;
+	let redirectCount = 0;
+
+	// eslint-disable-next-line no-constant-condition
+	while (true) {
+		const response = (await undiciFetch(currentUrl, {
+			...(currentInit as Record<string, unknown>),
+			redirect: "manual",
+			dispatcher: ssrfSafeAgent,
+		})) as unknown as Response;
+
+		if (REDIRECT_STATUSES.has(response.status)) {
+			redirectCount++;
+			if (redirectCount > MAX_REDIRECTS) {
+				throw new Error("Too many redirects");
+			}
+
+			const location = response.headers.get("location");
+			if (!location) {
+				throw new Error("Redirect without Location header");
+			}
+
+			const redirectUrl = new URL(location, currentUrl).toString();
+			if (!isValidUrl(redirectUrl)) {
+				throw new Error(`Redirect to unsafe URL blocked (SSRF): ${redirectUrl}`);
+			}
+
+			// Per fetch spec: 301/302 rewrite POST→GET; 303 rewrites any non-GET/HEAD→GET
+			const method = (currentInit?.method ?? "GET").toUpperCase();
+			if (
+				([301, 302].includes(response.status) && method === "POST") ||
+				(response.status === 303 && method !== "GET" && method !== "HEAD")
+			) {
+				currentInit = { ...init, method: "GET", body: undefined };
+			}
+
+			currentUrl = redirectUrl;
+			continue;
+		}
+
+		return response;
+	}
 }

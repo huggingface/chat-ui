@@ -7,6 +7,7 @@ import {
 	type MessageToolErrorUpdate,
 	type MessageToolProgressUpdate,
 	MessageUpdateType,
+	MessageUpdateStatus,
 	MessageToolUpdateType,
 } from "$lib/types/MessageUpdate";
 import type { StreamingMode } from "$lib/types/Settings";
@@ -18,11 +19,16 @@ type MessageUpdateRequestOptions = {
 	messageId?: string;
 	isRetry: boolean;
 	isContinue?: boolean;
+	// Client-chosen id for this generation run, echoed back by stop-generating
+	// so the server can match a stop point to the run it belongs to
+	generationId?: string;
 	files?: MessageFile[];
 	// Optional: pass selected MCP server names (client-side selection)
 	selectedMcpServerNames?: string[];
 	// Optional: pass selected MCP server configs (for custom client-defined servers)
 	selectedMcpServers?: Array<{ name: string; url: string; headers?: KeyValuePair[] }>;
+	// User's IANA timezone (e.g. "America/New_York")
+	timezone?: string;
 	streamingMode?: StreamingMode;
 };
 
@@ -55,9 +61,11 @@ export async function fetchMessageUpdates(
 		id: opts.messageId,
 		is_retry: opts.isRetry,
 		is_continue: Boolean(opts.isContinue),
+		generationId: opts.generationId,
 		// Will be ignored server-side if unsupported
 		selectedMcpServerNames: opts.selectedMcpServerNames,
 		selectedMcpServers: opts.selectedMcpServers,
+		timezone: opts.timezone,
 	});
 
 	opts.files?.forEach((file) => {
@@ -159,6 +167,13 @@ function parseMessageUpdates(value: string): {
 	return { messageUpdates, remainingText: "" };
 }
 
+/** Time constant for the arrival-rate estimate: reacts within ~1s to pace changes. */
+const ARRIVAL_RATE_TAU_MS = 1000;
+/** Pace slightly above the estimated arrival rate so the queue trends empty. */
+const ARRIVAL_RATE_HEADROOM = 1.1;
+/** Boundary-less runs (hashes, base64, CJK without Intl.Segmenter) flush at this size. */
+const MAX_PENDING_CHARS = 64;
+
 export async function* smoothStreamUpdates(
 	iterator: AsyncGenerator<MessageUpdate>,
 	{
@@ -170,19 +185,44 @@ export async function* smoothStreamUpdates(
 	}: SmoothStreamConfig = {}
 ): AsyncGenerator<MessageUpdate> {
 	const chunkDetector = detectChunk ?? createWordChunkDetector();
-	const eventTarget = new EventTarget();
-	const outputQueue: Array<{ update: MessageUpdate }> = [];
+	const queue: Array<{ update: MessageUpdate; arrivedAt: number }> = [];
+	let queuedStreamChars = 0;
 	let producerDone = false;
 	let producerError: unknown = null;
 	let pendingBuffer = "";
-	let queuedStreamChars = 0;
+
+	let wakeConsumer: (() => void) | null = null;
+	const wake = () => {
+		wakeConsumer?.();
+		wakeConsumer = null;
+	};
+	const nextWake = () =>
+		new Promise<void>((resolve) => {
+			wakeConsumer = resolve;
+		});
+
+	// Exponentially-decayed estimate of the source arrival rate (chars/ms).
+	// Pacing the output at the rate text actually arrives keeps the cadence
+	// steady through network burstiness instead of draining fast and freezing.
+	let arrivalAcc = 0;
+	let arrivalAt: number | null = null;
+	const observeArrival = (chars: number) => {
+		const t = now();
+		if (arrivalAt !== null) arrivalAcc *= Math.exp((arrivalAt - t) / ARRIVAL_RATE_TAU_MS);
+		arrivalAcc += chars;
+		arrivalAt = t;
+	};
+	const arrivalRate = () =>
+		arrivalAt === null
+			? 0
+			: (arrivalAcc * Math.exp((arrivalAt - now()) / ARRIVAL_RATE_TAU_MS)) / ARRIVAL_RATE_TAU_MS;
 
 	const enqueue = (update: MessageUpdate) => {
 		if (update.type === MessageUpdateType.Stream) {
 			queuedStreamChars += update.token.length;
 		}
-		outputQueue.push({ update });
-		eventTarget.dispatchEvent(new Event("next"));
+		queue.push({ update, arrivedAt: now() });
+		wake();
 	};
 
 	const flushPendingBuffer = () => {
@@ -191,23 +231,33 @@ export async function* smoothStreamUpdates(
 		pendingBuffer = "";
 	};
 
+	// Updates rendered outside the message text flow (liveness pings, the
+	// conversation title, the routed-model badge). They pass through without
+	// flushing a partially-buffered word; anything else flushes first so text
+	// never appears cut short next to tool/status/final updates.
+	const isOutOfBand = (update: MessageUpdate): boolean =>
+		update.type === MessageUpdateType.Title ||
+		update.type === MessageUpdateType.RouterMetadata ||
+		(update.type === MessageUpdateType.Status && update.status === MessageUpdateStatus.KeepAlive);
+
 	const producer = (async () => {
 		for await (const messageUpdate of iterator) {
 			if (messageUpdate.type !== MessageUpdateType.Stream) {
-				flushPendingBuffer();
+				if (!isOutOfBand(messageUpdate)) flushPendingBuffer();
 				enqueue(messageUpdate);
 				continue;
 			}
 
 			if (!messageUpdate.token) continue;
 
+			observeArrival(messageUpdate.token.length);
 			pendingBuffer += messageUpdate.token;
 			let chunk: string | null;
-			while ((chunk = chunkDetector(pendingBuffer)) !== null) {
-				if (chunk.length === 0) break;
+			while ((chunk = chunkDetector(pendingBuffer)) !== null && chunk.length > 0) {
 				enqueue({ type: MessageUpdateType.Stream, token: chunk });
 				pendingBuffer = pendingBuffer.slice(chunk.length);
 			}
+			if (pendingBuffer.length >= MAX_PENDING_CHARS) flushPendingBuffer();
 		}
 		flushPendingBuffer();
 	})()
@@ -216,49 +266,59 @@ export async function* smoothStreamUpdates(
 		})
 		.finally(() => {
 			producerDone = true;
-			eventTarget.dispatchEvent(new Event("next"));
+			wake();
 		});
 
-	// Character-rate targeting consumer
-	let totalCharsEmitted = 0;
-	let firstEmitAt: number | null = null;
-
-	while (!producerDone || outputQueue.length > 0) {
-		if (outputQueue.length === 0) {
-			await waitForEvent(eventTarget, "next");
-			continue;
-		}
-
-		const next = outputQueue.shift();
-		if (!next) continue;
-
-		if (next.update.type === MessageUpdateType.Stream) {
-			const tokenLen = next.update.token.length;
-			queuedStreamChars = Math.max(0, queuedStreamChars - tokenLen);
-			totalCharsEmitted += tokenLen;
-
-			if (firstEmitAt === null) firstEmitAt = now();
-
-			const elapsedMs = now() - firstEmitAt;
-			const currentRate = elapsedMs > 0 ? totalCharsEmitted / elapsedMs : 0;
-			const backlogChars = tokenLen + queuedStreamChars;
-			const backlogRate = maxBufferedMs > 0 ? backlogChars / maxBufferedMs : 0;
-			const targetRate = Math.max(currentRate, minRateCharsPerMs, backlogRate);
-			const rawDelay = tokenLen / targetRate;
-			const underBacklogPressure = backlogRate > minRateCharsPerMs;
-			const effectiveMinDelayMs = underBacklogPressure ? 0 : minDelayMs;
-			const delayMs = Math.round(Math.max(effectiveMinDelayMs, Math.min(maxDelayMs, rawDelay)));
-
-			if (delayMs > 0) {
-				await sleep(delayMs);
+	// Pacing: after emitting a chunk, reserve `chunkLen / targetRate` ms before
+	// the next chunk may appear. A source slower than the target is never
+	// delayed (its own gaps exceed the reservation, so the first word and every
+	// word of a slow stream render the moment they arrive); a faster source is
+	// spread out evenly. No chunk is ever held more than maxBufferedMs past its
+	// arrival, and the catch-up rate drains a backlog linearly by that deadline
+	// rather than dumping it all at once.
+	let nextEmitAt = 0;
+	try {
+		for (;;) {
+			const entry = queue.shift();
+			if (!entry) {
+				if (producerDone) break;
+				await nextWake();
+				continue;
 			}
+
+			const { update } = entry;
+			if (update.type !== MessageUpdateType.Stream) {
+				yield update;
+				continue;
+			}
+
+			const deadline = maxBufferedMs > 0 ? entry.arrivedAt + maxBufferedMs : Infinity;
+			const waitMs = Math.round(Math.min(nextEmitAt, deadline) - now());
+			if (waitMs > 0) await sleep(waitMs);
+
+			queuedStreamChars -= update.token.length;
+			yield update;
+
+			const catchUpRate = maxBufferedMs > 0 ? queuedStreamChars / Math.max(1, deadline - now()) : 0;
+			const targetRate = Math.max(
+				arrivalRate() * ARRIVAL_RATE_HEADROOM,
+				minRateCharsPerMs,
+				catchUpRate
+			);
+			const effectiveMinDelayMs = catchUpRate > minRateCharsPerMs ? 0 : minDelayMs;
+			const spacingMs = Math.max(
+				effectiveMinDelayMs,
+				Math.min(maxDelayMs, update.token.length / targetRate)
+			);
+			nextEmitAt = now() + spacingMs;
 		}
 
-		yield next.update;
+		await producer;
+		if (producerError) throw producerError;
+	} finally {
+		// Stop pulling from the source if our consumer stops early.
+		void iterator.return(undefined);
 	}
-
-	await producer;
-	if (producerError) throw producerError;
 }
 
 function createWordChunkDetector(): ChunkDetector {
@@ -266,23 +326,23 @@ function createWordChunkDetector(): ChunkDetector {
 		const segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
 		return (buffer: string): string | null => {
 			if (buffer.length === 0) return null;
-			let cursor = 0;
-			let boundary = 0;
-			let sawWordLike = false;
+			let sawWord = false;
 
 			for (const part of segmenter.segment(buffer)) {
-				cursor += part.segment.length;
-				if (part.isWordLike) {
-					sawWordLike = true;
+				if (!sawWord) {
+					sawWord = Boolean(part.isWordLike);
 					continue;
 				}
-				if (sawWordLike) {
-					boundary = cursor;
-					break;
-				}
+				// A new word begins right after the previous one: split before it.
+				// This is what gives word-level cadence to CJK text, which has no
+				// whitespace between words.
+				if (part.isWordLike) return buffer.slice(0, part.index);
+				// Whitespace is always a safe split point: split after it.
+				if (/\s/.test(part.segment)) return buffer.slice(0, part.index + part.segment.length);
+				// Trailing punctuation stays attached to the word before it.
 			}
 
-			return boundary > 0 ? buffer.slice(0, boundary) : null;
+			return null;
 		};
 	}
 
@@ -316,7 +376,3 @@ export const isMessageToolProgressUpdate = (
 
 const defaultSleep = (ms: number): Promise<void> =>
 	new Promise((resolve) => setTimeout(resolve, ms));
-const waitForEvent = (eventTarget: EventTarget, eventName: string) =>
-	new Promise<boolean>((resolve) =>
-		eventTarget.addEventListener(eventName, () => resolve(true), { once: true })
-	);

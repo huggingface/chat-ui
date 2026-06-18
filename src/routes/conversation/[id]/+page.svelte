@@ -1,23 +1,26 @@
 <script lang="ts">
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
-	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { consumePendingFiles } from "$lib/utils/pendingFiles";
 	import { isAborted } from "$lib/stores/isAborted";
-	import { onMount } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import { page } from "$app/state";
-	import { beforeNavigate, invalidateAll } from "$app/navigation";
+	import { beforeNavigate, replaceState } from "$app/navigation";
+	import { UrlDependency } from "$lib/types/UrlDependency";
+	import { safeInvalidate } from "$lib/utils/safeInvalidate";
 	import { base } from "$app/paths";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
 	import type { Message } from "$lib/types/Message";
 	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
-	import titleUpdate from "$lib/stores/titleUpdate";
+	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
 	import { fetchMessageUpdates, resolveStreamingMode } from "$lib/utils/messageUpdates";
-	import type { v4 } from "uuid";
+	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
-	import { enabledServers } from "$lib/stores/mcpServers";
+	import { enabledServers, mcpServersLoaded } from "$lib/stores/mcpServers";
+	import { get } from "svelte/store";
 	import { browser } from "$app/environment";
 	import {
 		addBackgroundGeneration,
@@ -30,22 +33,38 @@
 	import { loading } from "$lib/stores/loading.js";
 	import { streamStart } from "$lib/utils/haptics";
 	import { requireAuthUser } from "$lib/utils/auth.js";
-	import { isConversationGenerationActive } from "$lib/utils/generationState";
+	import { isConversationGenerationActive, isGenerationStale } from "$lib/utils/generationState";
+	import { useAPIClient, handleResponse } from "$lib/APIClient";
+	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
 
-	let { data = $bindable() } = $props();
+	let { data } = $props();
+
+	// Obtain the conversations store during component init (context must be read
+	// synchronously, not inside async callbacks or event handlers).
+	const convsStore = useConversationsStore();
 
 	let convId = $derived(page.params.id ?? "");
 	let pending = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
-	let stopRequested = $state(false);
+	// Conversation-scoped stop tombstone. A boolean reset on page.params.id
+	// changes resurrects the generating UI: invalidation reassigns page.params,
+	// which clears the flag while the stopped conversation's snapshot is still
+	// non-terminal, flipping $loading back on. Keying the tombstone by
+	// conversation id makes it survive invalidations; it expires when a new
+	// generation starts in this conversation.
+	let stopRequestedFor: string | null = $state(null);
+	let stopRequestPromise: Promise<void> | undefined;
+	// Id of the generation run this tab started, sent with the generation
+	// request and echoed in the stop request so the server can clamp the
+	// persisted text to the stop point of the run it belongs to.
+	let activeGenerationId: string | undefined;
+	// True while writeMessage runs; lets the generation-state effect skip the
+	// snapshot-staleness check for the generation streaming in this very tab.
+	let writeMessageInFlight = false;
+	let messageUpdatesAbortController = new AbortController();
 
 	let files: File[] = $state([]);
-
-	let conversations = $state(data.conversations);
-	$effect(() => {
-		conversations = data.conversations;
-	});
 
 	function createMessagesPath<T>(messages: TreeNode<T>[], msgId?: TreeId): TreeNode<T>[] {
 		if (initialRun) {
@@ -111,10 +130,16 @@
 		isRetry?: boolean;
 	}): Promise<void> {
 		try {
-			stopRequested = false;
+			stopRequestedFor = null;
 			$isAborted = false;
 			$loading = true;
 			pending = true;
+			writeMessageInFlight = true;
+			// Create the controller before any await: a Stop click during file
+			// encoding or MCP hydration must abort THIS request, not whichever
+			// stale controller a previous generation left behind.
+			messageUpdatesAbortController = new AbortController();
+			activeGenerationId = v4();
 			const base64Files = await Promise.all(
 				(files ?? []).map((file) =>
 					file2base64(file).then((value) => ({
@@ -147,7 +172,7 @@
 					const newUserMessageId = addSibling(
 						{
 							messages,
-							rootMessageId: data.rootMessageId,
+							rootMessageId,
 						},
 						{
 							from: "user",
@@ -159,7 +184,7 @@
 					messageToWriteToId = addChildren(
 						{
 							messages,
-							rootMessageId: data.rootMessageId,
+							rootMessageId,
 						},
 						{ from: "assistant", content: "" },
 						newUserMessageId
@@ -170,7 +195,7 @@
 					messageToWriteToId = addSibling(
 						{
 							messages,
-							rootMessageId: data.rootMessageId,
+							rootMessageId,
 						},
 						{ from: "assistant", content: "" },
 						messageId
@@ -182,7 +207,7 @@
 				const newUserMessageId = addChildren(
 					{
 						messages,
-						rootMessageId: data.rootMessageId,
+						rootMessageId,
 					},
 					{
 						from: "user",
@@ -192,14 +217,14 @@
 					messageId
 				);
 
-				if (!data.rootMessageId) {
-					data.rootMessageId = newUserMessageId;
+				if (!rootMessageId) {
+					rootMessageId = newUserMessageId;
 				}
 
 				messageToWriteToId = addChildren(
 					{
 						messages,
-						rootMessageId: data.rootMessageId,
+						rootMessageId,
 					},
 					{
 						from: "assistant",
@@ -215,8 +240,24 @@
 				throw new Error("Message to write to not found");
 			}
 
-			const messageUpdatesAbortController = new AbortController();
 			const streamingMode = resolveStreamingMode($settings);
+
+			// Wait for the MCP store to hydrate before sending so the server receives
+			// the user's exact selection. Sending [] before the base server list is
+			// fetched filters env servers to nothing; omitting the field would skip
+			// any explicit opt-outs the user saved in localStorage.
+			if (!get(mcpServersLoaded)) {
+				await new Promise<void>((resolve) => {
+					let unsub: (() => void) | undefined;
+					unsub = mcpServersLoaded.subscribe((loaded) => {
+						if (loaded) {
+							// unsub may still be undefined if subscribe fires synchronously
+							unsub?.();
+							resolve();
+						}
+					});
+				});
+			}
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				convId,
@@ -225,6 +266,7 @@
 					inputs: prompt,
 					messageId,
 					isRetry,
+					generationId: activeGenerationId,
 					files: isRetry ? userMessage?.files : base64Files,
 					selectedMcpServerNames: $enabledServers.map((s) => s.name),
 					selectedMcpServers: $enabledServers.map((s) => ({
@@ -232,11 +274,15 @@
 						url: s.url,
 						headers: s.headers,
 					})),
+					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 					streamingMode,
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {
-				error.set(err.message);
+				// A user abort rejects the fetch; that is not an error worth a toast
+				if (!$isAborted && !(err instanceof DOMException && err.name === "AbortError")) {
+					error.set(err.message);
+				}
 			});
 			if (messageUpdatesIterator === undefined) return;
 
@@ -335,8 +381,15 @@
 						messageToWriteTo.updates?.some((u) => u.type === MessageUpdateType.Tool) ?? false;
 
 					if (isInterrupted) {
-						// Preserve streamed content on abort. If we never streamed, fall back to finalText.
 						if (!messageToWriteTo.content) {
+							// We never streamed anything; fall back to finalText.
+							messageToWriteTo.content = finalText;
+						} else if (finalText && messageToWriteTo.content.startsWith(finalText)) {
+							// The server may have clamped the persisted text back to a
+							// reported stop point (see stop-generating). Adopt it when it
+							// is a prefix of what we streamed so this view matches what
+							// every other view will load; otherwise keep our streamed
+							// content (continue flows receive only the post-prefix text).
 							messageToWriteTo.content = finalText;
 						}
 					} else if (hadTools) {
@@ -381,19 +434,21 @@
 					// Check if this is a 402 payment required error
 					if (update.statusCode === 402) {
 						showSubscribeModal = true;
+					} else if (
+						update.statusCode === 401 &&
+						typeof update.message === "string" &&
+						/oauth authorization|has been revoked|requested scopes/i.test(update.message)
+					) {
+						// The stored OAuth token was revoked or no longer matches scopes.
+						// Restart the OAuth flow and return to this conversation afterwards.
+						const next = encodeURIComponent(`${base}/conversation/${convId}`);
+						window.location.assign(`${base}/login?next=${next}`);
 					} else {
 						$error = update.message ?? "An error has occurred";
 					}
 				} else if (update.type === MessageUpdateType.Title) {
-					const convInData = conversations.find(({ id }) => id === page.params.id);
-					if (convInData) {
-						convInData.title = update.title;
-
-						$titleUpdate = {
-							title: update.title,
-							convId,
-						};
-					}
+					// Update the sidebar title directly via the store — no side-channel needed.
+					convsStore.update(convId, { title: update.title });
 				} else if (update.type === MessageUpdateType.File) {
 					messageToWriteTo.files = [
 						...(messageToWriteTo.files ?? []),
@@ -412,7 +467,9 @@
 				flushBuffer(new Date());
 			}
 		} catch (err) {
-			if (err instanceof Error && err.message.includes("overloaded")) {
+			if ($isAborted || (err instanceof DOMException && err.name === "AbortError")) {
+				// User-initiated abort, not an error
+			} else if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
 			} else if (err instanceof Error && err.message.includes("429")) {
 				$error = ERROR_MESSAGES.rateLimited;
@@ -423,37 +480,122 @@
 			}
 			console.error(err);
 		} finally {
+			writeMessageInFlight = false;
+			activeGenerationId = undefined;
 			$loading = false;
 			pending = false;
-			await invalidateAll();
+			// Wait for the stop request to complete before refreshing data,
+			// so the abort marker is durably written before we poll for the
+			// terminal state below.
+			if (stopRequestPromise) {
+				await stopRequestPromise.catch(() => {});
+				stopRequestPromise = undefined;
+			}
+			const stoppedHere = stopRequestedFor === convId;
+			// Only re-run the loads that actually need fresh data: the
+			// conversation page (new messages) and the sidebar list
+			// (updated title / updatedAt via client-owned store refresh).
+			// Avoids the 5 redundant bootstrap requests (models, settings, user,
+			// public-config, feature-flags) that a full invalidateAll() would trigger.
+			// When this finally runs because beforeNavigate aborted the stream
+			// ($isAborted set without a stop click), invalidating would cancel
+			// that very navigation (e.g. the "New Chat" click that triggered
+			// the abort) before the router even exposes it via `navigating`.
+			// Skip the refresh: the destination page loads its own data.
+			const abortedByNavigation = $isAborted && !stoppedHere;
+			if (!abortedByNavigation) {
+				// stop-generating returns as soon as the abort marker is written,
+				// NOT when the generating pod has persisted interrupted:true.
+				// Invalidating right away would load a non-terminal snapshot that
+				// wipes the optimistic interrupted flag and shows a stuck
+				// streaming state. Wait (bounded) for the persisted state to
+				// become terminal before refreshing.
+				if (stoppedHere) {
+					await waitForTerminalPersist(convId);
+				}
+				await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
+			}
+		}
+	}
+
+	// Poll the conversation API until the last assistant message is terminal
+	// (interrupted, final answer, or error persisted), bounded at ~3.2s. Used
+	// after a Stop so the post-stop refresh reads settled data instead of a
+	// mid-abort snapshot.
+	async function waitForTerminalPersist(id: string) {
+		const client = useAPIClient();
+		for (let attempt = 0; attempt < 8; attempt++) {
+			try {
+				const conversation = (await client.conversations({ id }).get().then(handleResponse)) as {
+					messages: Message[];
+				};
+				if (!isConversationGenerationActive(conversation.messages)) return;
+			} catch {
+				return; // cannot verify; fall through to the single refresh
+			}
+			await new Promise((resolve) => setTimeout(resolve, 400));
 		}
 	}
 
 	async function stopGeneration() {
-		stopRequested = true;
+		// Snapshot the stop point first: the generation run this tab started
+		// (if any) and how many characters of the reply are on screen right
+		// now. The server clamps the persisted text back to this so the
+		// interrupted message cannot "grow back" past what the user saw while
+		// the abort marker was in flight.
+		const lastAssistant = messages.findLast((m) => m.from === "assistant");
+		const stopPoint =
+			activeGenerationId !== undefined && lastAssistant
+				? { generationId: activeGenerationId, seenContentLength: lastAssistant.content.length }
+				: undefined;
+
+		stopRequestedFor = convId;
 		$isAborted = true;
 		$loading = false;
+		messageUpdatesAbortController.abort();
+
+		// Mark the last assistant message as interrupted locally so
+		// isConversationGenerationActive() immediately returns false,
+		// removing the background poller and preventing $loading re-enable.
+		if (lastAssistant) {
+			lastAssistant.interrupted = true;
+		}
 
 		const sendStopRequest = async () => {
 			const response = await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
 				method: "POST",
+				...(stopPoint && {
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(stopPoint),
+				}),
 			});
 			if (!response.ok) {
 				throw new Error(`Stop request failed: ${response.status}`);
 			}
 		};
 
-		try {
-			await sendStopRequest();
-		} catch (firstErr) {
-			try {
-				await new Promise((resolve) => setTimeout(resolve, 300));
-				await sendStopRequest();
-			} catch (retryErr) {
-				console.error("Failed to stop generation", firstErr, retryErr);
-				$error = "Failed to stop generation. Please try again.";
+		// Store the promise so writeMessage's finally block can await it
+		// before refreshing data. Losing this request entirely means the server
+		// never learns about the stop (the abort marker is what cross-pod
+		// generation watchers act on), so retry with backoff instead of giving
+		// up after a single transient failure.
+		stopRequestPromise = (async () => {
+			const delays = [0, 300, 1000, 3000];
+			for (const [attempt, delay] of delays.entries()) {
+				if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+				try {
+					await sendStopRequest();
+					return;
+				} catch (err) {
+					if (attempt === delays.length - 1) {
+						console.error("Failed to stop generation", err);
+						$error = "Failed to stop generation. Please try again.";
+					}
+				}
 			}
-		}
+		})();
+
+		await stopRequestPromise;
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -465,13 +607,26 @@
 	}
 
 	onMount(async () => {
-		if ($pendingMessage) {
-			files = $pendingMessage.files;
-			await writeMessage({ prompt: $pendingMessage.content });
-			$pendingMessage = undefined;
+		// Read the first message from SvelteKit shallow-routing history state.
+		// Text is serialized directly; File objects travel via the pendingFiles
+		// client-side Map, retrieved once by nonce and then discarded.
+		// On a hard refresh page.state is empty, so both values are undefined
+		// and we skip straight to the background-generation check below.
+		const pendingText = page.state.pendingMessage as string | undefined;
+		if (pendingText) {
+			const nonce = page.state.pendingFilesNonce as string | undefined;
+			files = nonce ? consumePendingFiles(nonce) : [];
+			// Clear the history entry before submitting: returning to it via
+			// Back/Forward re-runs onMount, and a lingering pendingMessage
+			// would resubmit the prompt (without files, whose nonce is spent).
+			replaceState("", {});
+			await writeMessage({ prompt: pendingText });
 		}
 
-		const streaming = isConversationGenerationActive(messages);
+		// Don't resume tracking for stale snapshots: a generation that has gone
+		// this long without a DB write died with its pod and will never finish.
+		const streaming =
+			isConversationGenerationActive(messages) && !isGenerationStale(data.updatedAt);
 		if (streaming) {
 			addBackgroundGeneration({ id: convId, startedAt: Date.now() });
 			$loading = true;
@@ -501,19 +656,56 @@
 	}
 
 	const settings = useSettingsStore();
-	let messages = $state(data.messages);
+	let messages = $state(untrack(() => data.messages));
+	// Local copy of rootMessageId avoids mutating the load-data prop directly.
+	// It is set when the first message of a new conversation is created, and
+	// re-synced from server data whenever the conversation changes.
+	let rootMessageId = $state(untrack(() => data.rootMessageId));
+
+	// Resync local message state from server data ONLY when the conversation
+	// changes (sidebar navigation) or the load data itself was refreshed
+	// (post-stream invalidation). Two hard constraints, both learned from
+	// prod incidents:
+	//
+	// 1. `pending` must NOT be a reactive dependency of this effect. It flips
+	//    false when the first streaming token arrives; reading it tracked made
+	//    that flip re-run the effect and overwrite the locally appended
+	//    user/assistant messages with the stale page-load snapshot, blanking
+	//    the conversation until the stream finished (prod incident 2026-06-11).
+	//    It is therefore only ever read inside untrack().
+	// 2. A sync may only happen when `data.messages` identity actually changed
+	//    (or the conversation changed): re-running this effect for any other
+	//    reason must be a no-op.
+	//
+	// A mid-stream load refresh (pending still true) is intentionally skipped;
+	// the finally block in writeMessage invalidates again after the stream
+	// ends, so the post-completion sync still lands.
+	let _lastSyncedConvId = untrack(() => convId); // plain variable — no reactive overhead needed
+	let _lastSyncedMessages = untrack(() => data.messages); // plain variable — identity tracking only
 	$effect(() => {
-		messages = data.messages;
+		const currentConvId = convId; // reactive dep
+		const newMessages = data.messages; // reactive dep
+
+		const convChanged = currentConvId !== _lastSyncedConvId;
+		const dataChanged = newMessages !== _lastSyncedMessages;
+
+		if (convChanged || (dataChanged && untrack(() => !pending))) {
+			messages = newMessages;
+			rootMessageId = data.rootMessageId;
+			_lastSyncedConvId = currentConvId;
+			_lastSyncedMessages = newMessages;
+		}
 	});
 
 	$effect(() => {
-		page.params.id;
-		stopRequested = false;
-	});
-
-	$effect(() => {
-		const streaming = isConversationGenerationActive(messages);
-		if (stopRequested) {
+		const streaming =
+			isConversationGenerationActive(messages) &&
+			// A snapshot that has gone this long without a database write belongs
+			// to a pod that died before persisting a terminal state; never
+			// resurrect the streaming UI for it. Generations streaming in this
+			// tab are exempt — their snapshot timestamp is from page-load time.
+			(untrack(() => writeMessageInFlight) || !isGenerationStale(data.updatedAt));
+		if (stopRequestedFor === convId) {
 			$loading = false;
 		} else if (streaming) {
 			$loading = true;
@@ -548,12 +740,20 @@
 
 		$isAborted = true;
 		$loading = false;
+		messageUpdatesAbortController.abort();
 	});
 
 	let title = $derived.by(() => {
-		const rawTitle = conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title;
+		const rawTitle =
+			convsStore.list.find((conv) => conv.id === page.params.id)?.title ?? data.title;
 		return rawTitle ? rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1) : rawTitle;
 	});
+
+	// Social preview tags for shared conversation snapshots (7-char share ids),
+	// for crawlers that scrape /conversation/{shareId} instead of /r/{shareId}
+	let sharePreviewId = $derived(
+		page.params.id && page.params.id.length === 7 ? page.params.id : undefined
+	);
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -561,6 +761,10 @@
 <svelte:head>
 	<title>{title}</title>
 </svelte:head>
+
+{#if sharePreviewId}
+	<SharePreviewTags shareId={sharePreviewId} {title} {messages} {rootMessageId} />
+{/if}
 
 <ChatWindow
 	loading={$loading}

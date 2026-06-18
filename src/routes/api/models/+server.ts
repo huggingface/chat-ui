@@ -18,6 +18,10 @@ export async function GET() {
 			preprompt: model.preprompt ?? "",
 			multimodal: model.multimodal ?? false,
 			supportsTools: (model as unknown as { supportsTools?: boolean }).supportsTools ?? false,
+			supportsReasoning:
+				(model as unknown as { supportsReasoning?: boolean }).supportsReasoning ?? false,
+			supportsArtifacts:
+				(model as unknown as { supportsArtifacts?: boolean }).supportsArtifacts ?? false,
 			unlisted: model.unlisted ?? false,
 			hasInferenceAPI: model.hasInferenceAPI ?? false,
 		}));

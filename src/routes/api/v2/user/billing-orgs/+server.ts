@@ -34,7 +34,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		const currentBillingOrg = settings?.billingOrganization;
 
 		const billingOrgs = (data.orgs ?? [])
-			.filter((org: { canPay?: boolean }) => org.canPay === true)
+			.filter((org: { canPay?: boolean; plan?: string }) => org.plan || org.canPay === true)
 			.map((org: { sub: string; name: string; preferred_username: string }) => ({
 				sub: org.sub,
 				name: org.name,

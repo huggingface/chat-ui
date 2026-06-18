@@ -1,21 +1,25 @@
 <script lang="ts">
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import BlockWrapper from "./BlockWrapper.svelte";
+	import CarbonChevronRight from "~icons/carbon/chevron-right";
 
 	interface Props {
 		content: string;
 		loading?: boolean;
-		hasNext?: boolean;
 	}
 
-	let { content, loading = false, hasNext = false }: Props = $props();
+	let { content, loading = false }: Props = $props();
 	let isOpen = $state(false);
 	let wasLoading = $state(false);
 	let initialized = $state(false);
+	// Reactive size bindings (powered by ResizeObserver under the hood) — used
+	// to apply the fade mask only when the streamed content actually overflows
+	// the viewport, so short reasoning isn't unnecessarily faded at the top.
+	let viewportHeight = $state(0);
+	let contentHeight = $state(0);
 
 	// Track loading transitions to auto-expand/collapse
 	$effect(() => {
-		// Auto-expand on first render if already loading
 		if (!initialized) {
 			initialized = true;
 			if (loading) {
@@ -26,56 +30,99 @@
 		}
 
 		if (loading && !wasLoading) {
-			// Loading started - auto-expand
 			isOpen = true;
 		} else if (!loading && wasLoading) {
-			// Loading finished - auto-collapse
 			isOpen = false;
 		}
 		wasLoading = loading;
 	});
 </script>
 
-{#snippet icon()}
-	<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32">
-		<path
-			class="stroke-gray-500 dark:stroke-gray-400"
-			style="stroke-width: 1.9; fill: none; stroke-linecap: round; stroke-linejoin: round;"
-			d="M16 6v3.33M16 6c0-2.65 3.25-4.3 5.4-2.62 1.2.95 1.6 2.65.95 4.04a3.63 3.63 0 0 1 4.61.16 3.45 3.45 0 0 1 .46 4.37 5.32 5.32 0 0 1 1.87 4.75c-.22 1.66-1.39 3.6-3.07 4.14M16 6c0-2.65-3.25-4.3-5.4-2.62a3.37 3.37 0 0 0-.95 4.04 3.65 3.65 0 0 0-4.6.16 3.37 3.37 0 0 0-.49 4.27 5.57 5.57 0 0 0-1.85 4.85 5.3 5.3 0 0 0 3.07 4.15M16 9.33v17.34m0-17.34c0 2.18 1.82 4 4 4m6.22 7.5c.67 1.3.56 2.91-.27 4.11a4.05 4.05 0 0 1-4.62 1.5c0 1.53-1.05 2.9-2.66 2.9A2.7 2.7 0 0 1 16 26.66m10.22-5.83a4.05 4.05 0 0 0-3.55-2.17m-16.9 2.18a4.05 4.05 0 0 0 .28 4.1c1 1.44 2.92 2.09 4.59 1.5 0 1.52 1.12 2.88 2.7 2.88A2.7 2.7 0 0 0 16 26.67M5.78 20.85a4.04 4.04 0 0 1 3.55-2.18"
-		/>
-	</svg>
-{/snippet}
-
-<BlockWrapper
-	{icon}
-	{hasNext}
-	iconBg="bg-gray-100 dark:bg-gray-700"
-	iconRing="ring-gray-200 dark:ring-gray-600"
->
-	<!-- Collapsed view (clickable to expand) -->
+<BlockWrapper>
+	<!-- Header row -->
 	<button
 		type="button"
-		class="group/text w-full cursor-pointer text-left"
+		class="group/header flex w-fit cursor-pointer items-center gap-1 text-left select-none focus:outline-hidden"
 		onclick={() => (isOpen = !isOpen)}
+		aria-label={isOpen ? "Collapse" : "Expand"}
 	>
-		{#if isOpen}
-			<!-- Expanded: show full content -->
+		<span
+			class="text-sm font-medium transition-colors group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
+				? 'text-gray-600 dark:text-gray-300'
+				: 'text-gray-500 dark:text-gray-400'}"
+			class:thinking-shimmer={loading}
+		>
+			Thinking
+		</span>
+		<CarbonChevronRight
+			class="size-3.5 transition-all duration-200 group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
+				? 'rotate-90 text-gray-600 dark:text-gray-300'
+				: 'text-gray-400'}"
+		/>
+	</button>
+
+	<!-- Expandable content -->
+	{#if isOpen}
+		{#if loading}
+			<!--
+				Streaming view: fixed-height viewport, content bottom-aligned so newly
+				arriving tokens stay visible while older lines scroll off the top behind
+				a gradient fade. Works for any model output format (no parsing).
+			-->
 			<div
-				class="prose prose-sm max-w-none text-sm leading-relaxed text-gray-500 dark:prose-invert dark:text-gray-400"
+				bind:clientHeight={viewportHeight}
+				class="thinking-viewport mt-2 flex max-h-56 flex-col justify-end overflow-hidden md:max-h-80"
+				class:has-overflow={contentHeight > viewportHeight}
+			>
+				<div
+					bind:clientHeight={contentHeight}
+					class="prose prose-sm max-w-none text-sm leading-relaxed text-gray-500 *:first:mt-0 *:last:mb-0 dark:text-gray-400 dark:prose-invert"
+				>
+					<MarkdownRenderer {content} {loading} />
+				</div>
+			</div>
+		{:else}
+			<div
+				class="prose prose-sm mt-2 max-w-none text-sm leading-relaxed text-gray-500 dark:text-gray-400 dark:prose-invert"
 			>
 				<MarkdownRenderer {content} {loading} />
 			</div>
-		{:else}
-			<!-- Collapsed: 2-line preview (plain text, strip markdown) -->
-			<div
-				class="line-clamp-2 max-h-[3.25em] text-sm leading-relaxed text-gray-500 dark:text-gray-400"
-				class:animate-pulse={loading}
-			>
-				{content
-					.replace(/[#*`~[\]]/g, "")
-					.replace(/\n+/g, " ")
-					.trim()}
-			</div>
 		{/if}
-	</button>
+	{/if}
 </BlockWrapper>
+
+<style>
+	.thinking-viewport.has-overflow {
+		-webkit-mask-image: linear-gradient(to bottom, transparent 0, black 48px);
+		mask-image: linear-gradient(to bottom, transparent 0, black 48px);
+	}
+	/*
+	 * Variant of router-shimmer (defined in main.css) — light mode inverted so
+	 * the text reads dark with a brighter spot sweeping across, instead of
+	 * medium-gray with darker edges. Dark mode keeps the same bright-spot
+	 * behavior as router-shimmer.
+	 */
+	.thinking-shimmer {
+		display: inline-block;
+		background-image: linear-gradient(
+			90deg,
+			rgba(107, 114, 128, 1) 0%,
+			rgba(107, 114, 128, 0.3) 50%,
+			rgba(107, 114, 128, 1) 100%
+		);
+		background-size: 220% 100%;
+		animation: router-shimmer 2.8s linear infinite;
+		background-clip: text;
+		-webkit-background-clip: text;
+		color: transparent;
+		-webkit-text-fill-color: transparent;
+	}
+	:global(.dark) .thinking-shimmer {
+		background-image: linear-gradient(
+			90deg,
+			rgba(255, 255, 255, 0.15) 0%,
+			rgba(255, 255, 255, 0.7) 50%,
+			rgba(255, 255, 255, 0.15) 100%
+		);
+	}
+</style>

@@ -1,11 +1,19 @@
 import { describe, expect, test } from "vitest";
-import { processTokensSync } from "./marked";
+import { processBlocksSync, processTokensSync } from "./marked";
 
 function renderHtml(md: string): string {
 	const tokens = processTokensSync(md, []);
 	const textToken = tokens.find((token) => token.type === "text");
 	if (!textToken || textToken.type !== "text") return "";
 	return typeof textToken.html === "string" ? textToken.html : "";
+}
+
+// Full pipeline render (block splitting + optional streaming repairs), as used by MarkdownRenderer
+function renderBlocksHtml(md: string, streaming: boolean): string {
+	return processBlocksSync(md, [], streaming)
+		.flatMap((block) => block.tokens)
+		.map((token) => (token.type === "text" && typeof token.html === "string" ? token.html : ""))
+		.join("");
 }
 
 describe("marked basic rendering", () => {
@@ -92,5 +100,110 @@ describe("marked html video tag support", () => {
 		expect(html).toContain("<audio");
 		expect(html).toContain("<source");
 		expect(html).toContain('type="audio/mpeg"');
+	});
+});
+
+describe("streaming incomplete markdown", () => {
+	test("incomplete link renders as inert anchor, not a dead clickable link", () => {
+		const html = renderBlocksHtml("Check [the docs](https://exam", true);
+		expect(html).toContain("<a data-incomplete-link>the docs</a>");
+		expect(html).not.toContain("streamdown:incomplete-link");
+		expect(html).not.toContain("target=");
+	});
+
+	test("incomplete link text renders as inert anchor", () => {
+		const html = renderBlocksHtml("Check [the doc", true);
+		expect(html).toContain("<a data-incomplete-link>the doc</a>");
+	});
+
+	test("complete links keep their href", () => {
+		const html = renderBlocksHtml("Check [the docs](https://example.com)", true);
+		expect(html).toContain('<a href="https://example.com" target="_blank" rel="noreferrer">');
+		expect(html).not.toContain("data-incomplete-link");
+	});
+
+	test("incomplete bold renders as bold", () => {
+		const html = renderBlocksHtml("Some **important tex", true);
+		expect(html).toContain("<strong>important tex</strong>");
+	});
+
+	test("incomplete inline code renders as code", () => {
+		const html = renderBlocksHtml("Run `npm insta", true);
+		expect(html).toContain("<code>npm insta</code>");
+	});
+
+	test("partial trailing HTML tag does not flash as raw text", () => {
+		const html = renderBlocksHtml("Some text <video contro", true);
+		expect(html).toContain("Some text");
+		expect(html).not.toContain("video contro");
+	});
+
+	test("lone dash while a list streams in does not flash previous text as heading", () => {
+		const html = renderBlocksHtml("Shopping list:\n-", true);
+		expect(html).not.toContain("<h2>");
+		expect(html).toContain("Shopping list:");
+	});
+
+	test("single tilde ranges do not flash as strikethrough", () => {
+		const html = renderBlocksHtml("Heat to 20~25°C", true);
+		expect(html).not.toContain("<del>");
+		expect(html).toContain("20~25°C");
+	});
+
+	test("comparison operator in list items does not render a blockquote", () => {
+		const html = renderBlocksHtml("- > 25: expensive", true);
+		expect(html).not.toContain("<blockquote>");
+		expect(html).toContain("&gt; 25: expensive");
+	});
+});
+
+describe("completed messages render unmodified markdown", () => {
+	test("a trailing setext heading still renders as a heading", () => {
+		// Regression: remend's setext flash guard must not rewrite completed content
+		const html = renderBlocksHtml("Title\n-", false);
+		expect(html).toContain("<h2>Title</h2>");
+	});
+
+	test("the same trailing setext heading is guarded while streaming", () => {
+		const html = renderBlocksHtml("Title\n-", true);
+		expect(html).not.toContain("<h2>");
+	});
+
+	test("incomplete markers in completed content render literally", () => {
+		const html = renderBlocksHtml("Some **truncated outpu", false);
+		expect(html).toContain("**truncated outpu");
+		expect(html).not.toContain("<strong>");
+	});
+
+	test("incomplete links in completed content render literally", () => {
+		const html = renderBlocksHtml("Check [the docs](https://exam", false);
+		expect(html).not.toContain("data-incomplete-link");
+		// Bracket syntax stays literal text (the bare URL may still be autolinked by GFM)
+		expect(html).toContain("[the docs](");
+	});
+});
+
+describe("processBlocksSync streaming behavior", () => {
+	test("regex character classes in code do not collapse the document into one block", () => {
+		const content = [
+			"Match whitespace:",
+			"",
+			"```js",
+			"const re = /[^\\s>]+/;",
+			"```",
+			"",
+			"And some trailing explanation.",
+		].join("\n");
+		const blocks = processBlocksSync(content, []);
+		expect(blocks.length).toBeGreaterThan(1);
+	});
+
+	test("block ids of completed blocks are stable while streaming and after completion", () => {
+		const full = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.";
+		// Final render: completed message, no streaming repairs
+		const fullIds = processBlocksSync(full, [], false).map((b) => b.id);
+		// Mid-stream render: third paragraph still arriving, repairs active
+		const partialIds = processBlocksSync(`${full.slice(0, -10)}`, [], true).map((b) => b.id);
+		expect(partialIds.slice(0, -1)).toEqual(fullIds.slice(0, partialIds.length - 1));
 	});
 });

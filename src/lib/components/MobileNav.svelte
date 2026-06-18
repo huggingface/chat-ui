@@ -232,7 +232,7 @@
 </script>
 
 <nav
-	class="mx-4 mt-4 flex h-12 items-center justify-between rounded-b-xl border-b bg-gray-50 px-3 dark:border-gray-800 dark:bg-gray-800/30 dark:shadow-xl max-md:rounded-xl max-md:border md:hidden"
+	class="mx-4 mt-4 flex h-12 items-center justify-between rounded-b-xl border-b bg-gray-50 px-3 max-md:rounded-xl max-md:border md:hidden dark:border-gray-800 dark:bg-gray-800/30 dark:shadow-xl"
 >
 	<button
 		type="button"
@@ -293,8 +293,8 @@
 		? dragOffset
 		: tween.current}%); width: {drawerWidthPercentage}%; will-change: transform;"
 	class:shadow-[5px_0_15px_0_rgba(0,0,0,0.3)]={isOpen || isDragging}
-	class="fixed bottom-0 left-0 top-0 z-30 grid max-h-dvh grid-cols-1
-	grid-rows-[auto,1fr,auto,auto] rounded-r-xl bg-white pt-4 dark:bg-gray-900 md:hidden"
+	class="fixed top-0 bottom-0 left-0 z-30 grid max-h-dvh grid-cols-1
+	grid-rows-[auto_1fr_auto_auto] rounded-r-xl bg-white pt-4 md:hidden dark:bg-gray-900"
 >
 	{@render children?.()}
 </nav>

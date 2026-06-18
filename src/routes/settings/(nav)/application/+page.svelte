@@ -96,14 +96,10 @@
 	});
 
 	let themePref = $state<ThemePreference>(browser ? getThemePreference() : "system");
-
-	// Admin: model refresh UI state
-	let refreshing = $state(false);
-	let refreshMessage = $state<string | null>(null);
 </script>
 
 <div class="flex w-full flex-col gap-4">
-	<h2 class="text-center text-lg font-semibold text-gray-800 dark:text-gray-200 md:text-left">
+	<h2 class="text-center text-lg font-semibold text-gray-800 md:text-left dark:text-gray-200">
 		Application Settings
 	</h2>
 
@@ -112,7 +108,7 @@
 			class="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[12px] text-gray-700 dark:border-gray-700 dark:bg-gray-700/80 dark:text-gray-300"
 		>
 			<span class="font-medium">API Base URL:</span>
-			<code class="ml-1 break-all font-mono text-[12px] text-gray-800 dark:text-gray-100"
+			<code class="ml-1 font-mono text-[12px] break-all text-gray-800 dark:text-gray-100"
 				>{OPENAI_BASE_URL}</code
 			>
 		</div>
@@ -140,37 +136,11 @@
 			>
 				Admin mode
 			</p>
-			<button
-				class="btn rounded-md text-xs"
-				class:underline={!refreshing}
-				type="button"
-				onclick={async () => {
-					try {
-						refreshing = true;
-						refreshMessage = null;
-						const res = await client.models.refresh.post().then(handleResponse);
-						const delta = `+${res.added.length} −${res.removed.length} ~${res.changed.length}`;
-						refreshMessage = `Refreshed in ${res.durationMs} ms • ${delta} • total ${res.total}`;
-						await goto(page.url.pathname, { invalidateAll: true });
-					} catch (e) {
-						console.error(e);
-						$error = "Model refresh failed";
-					} finally {
-						refreshing = false;
-					}
-				}}
-				disabled={refreshing}
-			>
-				{refreshing ? "Refreshing…" : "Refresh models"}
-			</button>
-			{#if refreshMessage}
-				<span class="text-xs text-gray-600 dark:text-gray-400">{refreshMessage}</span>
-			{/if}
 		</div>
 	{/if}
 	<div class="flex h-full flex-col gap-4 max-sm:pt-0">
 		<div
-			class="rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+			class="rounded-xl border border-gray-200 bg-white px-3 shadow-xs dark:border-gray-700 dark:bg-gray-800"
 		>
 			<div class="divide-y divide-gray-200 dark:divide-gray-700">
 				{#if publicConfig.PUBLIC_APP_DATA_SHARING === "1"}
@@ -263,7 +233,7 @@
 		<!-- Billing section (HuggingChat only) -->
 		{#if publicConfig.isHuggingChat && page.data.user}
 			<div
-				class="rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+				class="rounded-xl border border-gray-200 bg-white px-3 shadow-xs dark:border-gray-700 dark:bg-gray-800"
 			>
 				<div class="divide-y divide-gray-200 dark:divide-gray-700">
 					<!-- Bill usage to -->
@@ -308,7 +278,7 @@
 								? `https://huggingface.co/organizations/${getBillingOrganization()}/settings/inference-providers/overview`
 								: "https://huggingface.co/settings/inference-providers/overview"}
 							target="_blank"
-							class="whitespace-nowrap rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+							class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium whitespace-nowrap text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 						>
 							View Usage
 						</a>
@@ -331,6 +301,13 @@
 					rel="noreferrer"
 					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
 					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Share your feedback on HuggingChat</a
+				>
+				<a
+					href="https://huggingface.co/models/inference"
+					target="_blank"
+					rel="noreferrer"
+					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
+					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Compare Inference Providers</a
 				>
 				<a
 					href="{base}/privacy"

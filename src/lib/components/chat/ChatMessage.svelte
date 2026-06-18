@@ -21,9 +21,13 @@
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import ToolUpdate from "./ToolUpdate.svelte";
+	import ToolCallsSummary from "./ToolCallsSummary.svelte";
+	import ArtifactCard from "./ArtifactCard.svelte";
 	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
 	import { MessageUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
 	import ImageLightbox from "./ImageLightbox.svelte";
+	import { splitArtifactSegments, stripArtifacts } from "$lib/utils/artifacts";
+	import type { ArtifactOperation } from "$lib/utils/artifacts";
 
 	interface Props {
 		message: Message;
@@ -130,20 +134,97 @@
 
 	// Zero-config reasoning autodetection: detect <think> blocks in content
 	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/gi;
-	// Non-global version for .test() calls to avoid lastIndex side effects
-	const THINK_BLOCK_TEST_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/i;
-	let hasClientThink = $derived(message.content.split(THINK_BLOCK_REGEX).length > 1);
 
-	// Strip think blocks for clipboard copy (always, regardless of detection)
+	// Strip think blocks and artifact tags for clipboard copy (always, regardless of detection)
 	let contentWithoutThink = $derived.by(() =>
-		message.content.replace(THINK_BLOCK_REGEX, "").trim()
+		stripArtifacts(message.content.replace(THINK_BLOCK_REGEX, "")).trim()
 	);
 
 	type Block =
 		| { type: "text"; content: string }
-		| { type: "tool"; uuid: string; updates: MessageToolUpdate[] };
+		| { type: "think"; content: string; closed: boolean }
+		| { type: "tool"; uuid: string; updates: MessageToolUpdate[] }
+		| { type: "artifact"; op: ArtifactOperation; opIndex: number };
 
 	type ToolBlock = Extract<Block, { type: "tool" }>;
+	type ProcessBlock = Extract<Block, { type: "think" } | { type: "tool" }>;
+
+	type RenderUnit =
+		| { kind: "text"; content: string }
+		| { kind: "group"; blocks: ProcessBlock[]; toolCount: number }
+		| { kind: "artifact"; op: ArtifactOperation; opIndex: number };
+
+	// Expand any text block containing <think>…</think> into dedicated think blocks
+	// so reasoning can be grouped/collapsed separately from the answer text.
+	function expandThinkBlocks(input: Block[]): Block[] {
+		const out: Block[] = [];
+		for (const block of input) {
+			if (block.type !== "text") {
+				out.push(block);
+				continue;
+			}
+			for (const part of block.content.split(THINK_BLOCK_REGEX)) {
+				if (!part) continue;
+				if (part.startsWith("<think>")) {
+					const closed = part.endsWith("</think>");
+					out.push({ type: "think", content: part.slice(7, closed ? -8 : undefined), closed });
+				} else if (part.trim().length > 0) {
+					out.push({ type: "text", content: part });
+				}
+			}
+		}
+		return out;
+	}
+
+	// Replace inline <artifact> blocks in text with dedicated artifact blocks that
+	// render as cards (content lives in the artifact panel). Streaming-safe:
+	// partially received tags are hidden until complete.
+	function expandArtifactBlocks(input: Block[]): Block[] {
+		const out: Block[] = [];
+		let opIndex = 0;
+		for (const block of input) {
+			if (block.type !== "text") {
+				out.push(block);
+				continue;
+			}
+			for (const segment of splitArtifactSegments(block.content)) {
+				if (segment.type === "artifact") {
+					out.push({ type: "artifact", op: segment.op, opIndex: opIndex++ });
+				} else if (segment.content.length > 0) {
+					out.push({ type: "text", content: segment.content });
+				}
+			}
+		}
+		return collapseConsecutiveArtifactOps(out);
+	}
+
+	// Models sometimes emit several back-to-back operations on the same artifact
+	// (e.g. one update block per find/replace pair). Every op still becomes a
+	// version in the registry, but showing a card per op clutters the chat —
+	// keep only the last card of each consecutive run.
+	function collapseConsecutiveArtifactOps(input: Block[]): Block[] {
+		const out: Block[] = [];
+		for (const block of input) {
+			if (block.type === "artifact") {
+				let i = out.length - 1;
+				while (i >= 0) {
+					const prior = out[i];
+					if (prior.type === "text" && prior.content.trim().length === 0) {
+						i -= 1;
+						continue;
+					}
+					if (prior.type === "artifact" && prior.op.identifier === block.op.identifier) {
+						// Drop the earlier card (and the whitespace between) — this
+						// later op supersedes it.
+						out.splice(i, out.length - i);
+					}
+					break;
+				}
+			}
+			out.push(block);
+		}
+		return out;
+	}
 
 	let blocks = $derived.by(() => {
 		const updates = message.updates ?? [];
@@ -154,8 +235,11 @@
 
 		// Fast path: no tool updates at all
 		if (!hasTools && updates.length === 0) {
-			if (message.content) return [{ type: "text" as const, content: message.content }];
-			return [];
+			return expandArtifactBlocks(
+				expandThinkBlocks(
+					message.content ? [{ type: "text" as const, content: message.content }] : []
+				)
+			);
 		}
 
 		for (const update of updates) {
@@ -221,7 +305,43 @@
 			res.push({ type: "text" as const, content: message.content });
 		}
 
-		return res;
+		return expandArtifactBlocks(expandThinkBlocks(res));
+	});
+
+	// Coalesce consecutive process blocks (thinking + tools) into groups so they can
+	// collapse into a single "Called N tools" / "Thought" summary. Text passes through.
+	let renderUnits = $derived.by(() => {
+		const units: RenderUnit[] = [];
+		let current: ProcessBlock[] | null = null;
+		const flush = () => {
+			if (current && current.length) {
+				const toolCount = current.filter((b) => b.type === "tool").length;
+				units.push({ kind: "group", blocks: current, toolCount });
+			}
+			current = null;
+		};
+		for (const block of blocks) {
+			if (block.type === "think" || block.type === "tool") {
+				(current ??= []).push(block);
+			} else if (block.type === "artifact") {
+				flush();
+				units.push({ kind: "artifact", op: block.op, opIndex: block.opIndex });
+			} else {
+				flush();
+				units.push({ kind: "text", content: block.content });
+			}
+		}
+		flush();
+		return units;
+	});
+
+	// Still mid-process (thinking / calling tools, no answer yet) → render the
+	// blocks flat like today. Once the final answer starts streaming the last
+	// block becomes text, so this flips to false and the nested summary takes over.
+	let isProcessStreaming = $derived.by(() => {
+		if (!isLast || !loading) return false;
+		const last = blocks.at(-1);
+		return !!last && (last.type === "think" || last.type === "tool");
 	});
 
 	$effect(() => {
@@ -231,6 +351,13 @@
 			}, 1000);
 		}
 	});
+
+	// Tailwind's `prose` resets font-size to 1rem while the app shell uses
+	// `text-smd` (0.94rem); re-applying it here keeps answer text — and every
+	// em-scaled child (code, pre, lists, tables, KaTeX) — in line with the rest
+	// of the UI. Single source for both the streaming and final render branches.
+	const proseClasses =
+		"prose max-w-none text-smd dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900";
 
 	let editMode = $derived(editMsdgId === message.id);
 	$effect(() => {
@@ -262,7 +389,7 @@
 			animating={isLast && loading}
 		/>
 		<div
-			class="relative flex min-w-[60px] flex-col gap-2 break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/80 dark:text-gray-300"
+			class="relative flex min-w-[60px] flex-col gap-2 rounded-2xl border border-gray-100 bg-linear-to-br from-gray-50 px-5 py-3.5 wrap-break-word text-gray-600 dark:border-gray-800 dark:from-gray-800/80 dark:text-gray-300 prose-pre:my-2"
 		>
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
@@ -277,81 +404,93 @@
 				{#if isLast && loading && blocks.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
-				{#each blocks as block, blockIndex (block.type === "tool" ? `${block.uuid}-${blockIndex}` : `text-${blockIndex}`)}
-					{@const nextBlock = blocks[blockIndex + 1]}
-					{@const nextBlockHasThink =
-						nextBlock?.type === "text" && THINK_BLOCK_TEST_REGEX.test(nextBlock.content)}
-					{@const nextIsLinkable = nextBlock?.type === "tool" || nextBlockHasThink}
-					{#if block.type === "tool"}
-						<div data-exclude-from-copy class="has-[+.prose]:mb-3 [.prose+&]:mt-4">
-							<ToolUpdate tool={block.updates} {loading} hasNext={nextIsLinkable} />
-						</div>
-					{:else if block.type === "text"}
-						{#if isLast && loading && block.content.length === 0}
-							<IconLoading classNames="loading inline ml-2 first:ml-0" />
-						{/if}
-
-						{#if hasClientThink}
-							{@const parts = block.content.split(THINK_BLOCK_REGEX)}
-							{#each parts as part, partIndex}
-								{@const remainingParts = parts.slice(partIndex + 1)}
-								{@const hasMoreLinkable =
-									remainingParts.some((p) => p && THINK_BLOCK_TEST_REGEX.test(p)) || nextIsLinkable}
-								{#if part && part.startsWith("<think>")}
-									{@const isClosed = part.endsWith("</think>")}
-									{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
-
-									<OpenReasoningResults
-										content={thinkContent}
-										loading={isLast && loading && !isClosed}
-										hasNext={hasMoreLinkable}
-									/>
-								{:else if part && part.trim().length > 0}
-									<div
-										class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
-									>
-										<MarkdownRenderer content={part} loading={isLast && loading} />
-									</div>
-								{/if}
-							{/each}
+				{#if isProcessStreaming}
+					<!-- Streaming the thinking / tool phase: render every block flat and
+					     inline, exactly like today. Nesting kicks in once the answer starts. -->
+					{#each blocks as block, blockIndex (block.type === "tool" ? `tool-${block.uuid}-${blockIndex}` : `block-${blockIndex}`)}
+						{#if block.type === "text"}
+							{#if block.content.trim().length > 0}
+								<div class={proseClasses}>
+									<MarkdownRenderer content={block.content} loading={isLast && loading} />
+								</div>
+							{/if}
+						{:else if block.type === "artifact"}
+							<ArtifactCard op={block.op} messageId={message.id} opIndex={block.opIndex} />
 						{:else}
-							<div
-								class="prose max-w-none dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900"
-							>
-								<MarkdownRenderer content={block.content} loading={isLast && loading} />
+							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
+								{#if block.type === "think"}
+									<OpenReasoningResults
+										content={block.content}
+										loading={isLast && loading && !block.closed}
+									/>
+								{:else}
+									<ToolUpdate tool={block.updates} {loading} />
+								{/if}
 							</div>
 						{/if}
-					{/if}
-				{/each}
+					{/each}
+				{:else}
+					<!-- Answer started or generation finished: nest the process blocks. -->
+					{#each renderUnits as unit, unitIndex (`${unit.kind}-${unitIndex}`)}
+						{#if unit.kind === "text"}
+							{#if isLast && loading && unit.content.length === 0}
+								<IconLoading classNames="loading inline ml-2 first:ml-0" />
+							{:else if unit.content.trim().length > 0}
+								<div class={proseClasses}>
+									<MarkdownRenderer content={unit.content} loading={isLast && loading} />
+								</div>
+							{/if}
+						{:else if unit.kind === "artifact"}
+							<ArtifactCard op={unit.op} messageId={message.id} opIndex={unit.opIndex} />
+						{:else if unit.kind === "group"}
+							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
+								{#if unit.blocks.length > 1}
+									<!-- Collapse the whole run into a single summary -->
+									<ToolCallsSummary blocks={unit.blocks} toolCount={unit.toolCount} />
+								{:else}
+									<!-- A lone process block stays standalone -->
+									{@const only = unit.blocks[0]}
+									{#if only.type === "think"}
+										<OpenReasoningResults content={only.content} loading={false} />
+									{:else}
+										<ToolUpdate tool={only.updates} loading={false} />
+									{/if}
+								{/if}
+							</div>
+						{/if}
+					{/each}
+				{/if}
 			</div>
 		</div>
 
 		{#if message.routerMetadata || (!loading && message.content)}
 			<div
 				class="absolute -bottom-3.5 {message.routerMetadata && messageInfoWidth > messageWidth
-					? 'left-1 pl-1 lg:pl-7'
-					: 'right-1'} flex max-w-[calc(100dvw-40px)] items-center gap-0.5"
+					? 'left-1 pl-1 @2xl:pl-7'
+					: 'right-1'} flex max-w-[100cqw] items-center gap-0.5"
 				bind:offsetWidth={messageInfoWidth}
 			>
 				{#if message.routerMetadata && (message.routerMetadata.route || message.routerMetadata.model || message.routerMetadata.provider) && (!isLast || !loading)}
 					<div
-						class="mr-2 flex items-center gap-1.5 truncate whitespace-nowrap text-[.65rem] text-gray-400 dark:text-gray-400 sm:text-xs"
+						class="mr-2 flex items-center gap-1.5 truncate text-[.65rem] whitespace-nowrap text-gray-400 @xl:text-xs dark:text-gray-400 dark:opacity-50"
 					>
 						{#if message.routerMetadata.route && message.routerMetadata.model}
-							<span class="truncate rounded bg-gray-100 px-1 font-mono dark:bg-gray-800 sm:py-px">
+							<span
+								class="truncate rounded-sm bg-gray-100 px-1 font-mono @xl:py-px dark:bg-gray-800"
+							>
 								{message.routerMetadata.route}
 							</span>
 							<span class="text-gray-500">with</span>
 							{#if publicConfig.isHuggingChat}
 								<a
 									href="/chat/settings/{message.routerMetadata.model}"
-									class="flex items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 sm:py-px"
+									class="flex items-center gap-1 truncate rounded-sm bg-gray-100 px-1 font-mono hover:text-gray-500 @xl:py-px dark:bg-gray-800 dark:hover:text-gray-300"
 								>
 									{message.routerMetadata.model.split("/").pop()}
 								</a>
 							{:else}
 								<span
-									class="truncate rounded bg-gray-100 px-1.5 font-mono dark:bg-gray-800 sm:py-px"
+									class="truncate rounded-sm bg-gray-100 px-1.5 font-mono @xl:py-px dark:bg-gray-800"
 								>
 									{message.routerMetadata.model.split("/").pop()}
 								</span>
@@ -359,16 +498,16 @@
 						{/if}
 						{#if message.routerMetadata.provider}
 							{@const hubOrg = PROVIDERS_HUB_ORGS[message.routerMetadata.provider]}
-							<span class="text-gray-500 max-sm:hidden">via</span>
+							<span class="text-gray-500 @max-xl:hidden">via</span>
 							<a
 								target="_blank"
 								href="https://huggingface.co/{hubOrg}"
-								class="flex items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 max-sm:hidden sm:py-px"
+								class="flex items-center gap-1 truncate rounded-sm bg-gray-100 px-1 font-mono hover:text-gray-500 @max-xl:hidden @xl:py-px dark:bg-gray-800 dark:hover:text-gray-300"
 							>
 								<img
 									src="https://huggingface.co/api/avatars/{hubOrg}"
 									alt="{message.routerMetadata.provider} logo"
-									class="size-2.5 flex-none rounded-sm"
+									class="size-2.5 flex-none rounded-xs"
 									onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
 								/>
 								{message.routerMetadata.provider}
@@ -381,12 +520,12 @@
 						onClick={() => {
 							isCopied = true;
 						}}
-						classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+						classNames="btn rounded-xs p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 						value={contentWithoutThink}
 						iconClassNames="text-xs"
 					/>
 					<button
-						class="btn rounded-sm p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+						class="btn rounded-xs p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 						title="Retry"
 						type="button"
 						onclick={() => {
@@ -434,7 +573,7 @@
 			<div class="flex w-full flex-row flex-nowrap">
 				{#if !editMode}
 					<p
-						class="disabled w-full appearance-none whitespace-break-spaces text-wrap break-words bg-inherit px-5 py-3.5 text-gray-500 dark:text-gray-400"
+						class="disabled w-full appearance-none bg-inherit px-5 py-3.5 text-wrap wrap-break-word whitespace-break-spaces text-gray-500 dark:text-gray-400"
 					>
 						{message.content.trim()}
 					</p>
@@ -449,7 +588,7 @@
 						}}
 					>
 						<textarea
-							class="w-full whitespace-break-spaces break-words rounded-xl bg-gray-100 px-5 py-3.5 text-gray-500 *:h-max focus:outline-none dark:bg-gray-800 dark:text-gray-400"
+							class="w-full rounded-xl bg-gray-100 px-5 py-3.5 wrap-break-word whitespace-break-spaces text-gray-500 *:h-max focus:outline-hidden dark:bg-gray-800 dark:text-gray-400"
 							rows="5"
 							bind:this={editContentEl}
 							value={message.content.trim()}
@@ -461,8 +600,8 @@
 								type="submit"
 								class="btn rounded-lg px-3 py-1.5 text-sm
                                 {loading
-									? 'bg-gray-300 text-gray-400 dark:bg-gray-700 dark:text-gray-600'
-									: 'bg-gray-200 text-gray-600 hover:text-gray-800   focus:ring-0 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-gray-200'}
+									? 'bg-gray-200 text-gray-400 dark:bg-gray-800 dark:text-gray-600'
+									: 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 focus:ring-0 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-200'}
 								"
 								disabled={loading}
 							>
@@ -470,7 +609,7 @@
 							</button>
 							<button
 								type="button"
-								class="btn rounded-sm p-2 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+								class="btn rounded-xs p-2 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 								onclick={() => {
 									editMsdgId = null;
 								}}
@@ -481,7 +620,7 @@
 					</form>
 				{/if}
 			</div>
-			<div class="absolute -bottom-4 ml-3.5 flex w-full gap-1.5">
+			<div class="absolute -bottom-4 ml-3.5 flex w-full items-center gap-1.5">
 				{#if alternatives.length > 1 && editMsdgId === null}
 					<Alternatives
 						{message}
@@ -492,7 +631,7 @@
 				{/if}
 				{#if (alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode)}
 					<button
-						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:text-gray-500 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300 lg:-right-2"
+						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:bg-gray-100 hover:text-gray-500 lg:-right-2 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 						title="Edit"
 						type="button"
 						onclick={() => {
@@ -504,7 +643,9 @@
 						Edit
 					</button>
 					<button
-						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs group-hover:flex hover:flex lg:-right-2 {isUserMsgCopied ? 'text-green-500 dark:text-green-400' : 'text-gray-400 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300'} dark:border-gray-700"
+						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs group-hover:flex hover:flex hover:bg-gray-100 lg:-right-2 dark:hover:bg-gray-800 {isUserMsgCopied
+							? 'text-green-500 dark:text-green-400'
+							: 'text-gray-400 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300'}"
 						title="Copy to clipboard"
 						type="button"
 						onclick={async () => {
@@ -531,10 +672,10 @@
 						}}
 					>
 						{#if isUserMsgCopied}
-							<CarbonCheckmark class="scale-95" />
+							<CarbonCheckmark class="scale-[0.85]" />
 							Copied
 						{:else}
-							<CarbonCopy class="scale-95" />
+							<CarbonCopy class="scale-[0.85]" />
 							Copy
 						{/if}
 					</button>

@@ -255,7 +255,7 @@ function sanitizeHref(href?: string | null): string | undefined {
 	return trimmed.replace(/>$/, "");
 }
 
-function highlightCode(text: string, lang?: string): string {
+export function highlightCode(text: string, lang?: string): string {
 	if (lang && hljs.getLanguage(lang)) {
 		try {
 			return hljs.highlight(text, { language: lang, ignoreIllegals: true }).value;
@@ -350,6 +350,11 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 		extensions: [katexBlockExtension, katexInlineExtension],
 		renderer: {
 			link: (href, title, text) => {
+				// Placeholder emitted by parseIncompleteMarkdown while a link's URL is
+				// still streaming in: render an inert anchor instead of a dead link.
+				if (href === "streamdown:incomplete-link") {
+					return `<a data-incomplete-link>${text}</a>`;
+				}
 				const safeHref = sanitizeHref(href);
 				return safeHref
 					? `<a href="${escapeHTML(safeHref)}" target="_blank" rel="noreferrer">${text}</a>`
@@ -411,11 +416,8 @@ function cacheKey(index: number, blockContent: string, sources: SimpleSource[]) 
 }
 
 export async function processTokens(content: string, sources: SimpleSource[]): Promise<Token[]> {
-	// Apply incomplete markdown preprocessing for smooth streaming
-	const processedContent = parseIncompleteMarkdown(content);
-
 	const marked = createMarkedInstance(sources);
-	const tokens = marked.lexer(processedContent);
+	const tokens = marked.lexer(content);
 
 	const processedTokens = await Promise.all(
 		tokens.map(async (token) => {
@@ -440,11 +442,8 @@ export async function processTokens(content: string, sources: SimpleSource[]): P
 }
 
 export function processTokensSync(content: string, sources: SimpleSource[]): Token[] {
-	// Apply incomplete markdown preprocessing for smooth streaming
-	const processedContent = parseIncompleteMarkdown(content);
-
 	const marked = createMarkedInstance(sources);
-	const tokens = marked.lexer(processedContent);
+	const tokens = marked.lexer(content);
 	return tokens.map((token) => {
 		if (token.type === "code") {
 			return {
@@ -483,12 +482,19 @@ function hashString(str: string): string {
 /**
  * Process markdown content into blocks with stable IDs for efficient memoization.
  * Each block is processed independently and assigned a content-based hash ID.
+ *
+ * `streaming` applies incomplete-markdown repairs (remend) to the content before
+ * splitting, like upstream streamdown does in streaming mode. It must be false for
+ * completed messages so valid final markdown (e.g. a trailing setext heading) is
+ * not rewritten by the streaming flash guards.
  */
 export async function processBlocks(
 	content: string,
-	sources: SimpleSource[] = []
+	sources: SimpleSource[] = [],
+	streaming = false
 ): Promise<BlockToken[]> {
-	const blocks = parseMarkdownIntoBlocks(content);
+	const processedContent = streaming ? parseIncompleteMarkdown(content) : content;
+	const blocks = parseMarkdownIntoBlocks(processedContent);
 
 	return await Promise.all(
 		blocks.map(async (blockContent, index) => {
@@ -511,8 +517,13 @@ export async function processBlocks(
 /**
  * Synchronous version of processBlocks for SSR
  */
-export function processBlocksSync(content: string, sources: SimpleSource[] = []): BlockToken[] {
-	const blocks = parseMarkdownIntoBlocks(content);
+export function processBlocksSync(
+	content: string,
+	sources: SimpleSource[] = [],
+	streaming = false
+): BlockToken[] {
+	const processedContent = streaming ? parseIncompleteMarkdown(content) : content;
+	const blocks = parseMarkdownIntoBlocks(processedContent);
 
 	return blocks.map((blockContent, index) => {
 		const key = cacheKey(index, blockContent, sources);

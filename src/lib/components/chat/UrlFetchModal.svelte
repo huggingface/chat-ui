@@ -157,7 +157,7 @@
 						bind:value={urlValue}
 						type="url"
 						placeholder="https://example.com/file.txt"
-						class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-[15px] text-gray-800 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:ring-gray-700"
+						class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-[15px] text-gray-800 outline-hidden placeholder:text-gray-400 focus:ring-2 focus:ring-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:ring-gray-700"
 						aria-invalid={errorMsg ? "true" : "false"}
 						onkeydown={(e) => {
 							if (e.key === "Enter") {
@@ -176,7 +176,7 @@
 				<div class="flex items-center justify-end gap-2">
 					<button
 						type="button"
-						class="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+						class="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
 						onclick={close}
 					>
 						Cancel
@@ -194,9 +194,13 @@
 	</Modal>
 {/if}
 
-<style lang="postcss">
-	:global(input) {
-		font-family: inherit;
+<style>
+	/* In the base layer so font utilities keep winning over this element
+	   selector, as they did before Tailwind v4 */
+	@layer base {
+		:global(input) {
+			font-family: inherit;
+		}
 	}
 	/* Uses app-level colors and rounded/blur styles via utility classes */
 	/* The Modal itself provides consistent container + scrollbar-custom styling */

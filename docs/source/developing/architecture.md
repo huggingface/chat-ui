@@ -32,7 +32,7 @@ Implements MCP client functionality for tool discovery and execution. See [MCP T
 
 ### `llmRouter`
 
-Intelligent routing logic that selects the best model for each request. Uses the Arch router model for classification. See [LLM Router](../configuration/llm-router) for details.
+Intelligent routing logic that selects the best model for each request using local heuristics (image input → multimodal route, active MCP tools → agentic route, else default). See [LLM Router](../configuration/llm-router) for details.
 
 ### `migrations`
 

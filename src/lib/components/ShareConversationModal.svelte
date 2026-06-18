@@ -122,10 +122,10 @@
 
 			<!-- URL row -->
 			<div
-				class="flex h-12 items-center gap-2 whitespace-nowrap rounded-2xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-800"
+				class="flex h-12 items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-2.5 whitespace-nowrap dark:border-gray-700 dark:bg-gray-800"
 			>
 				<input
-					class="w-full truncate bg-transparent text-[15px] text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500 max-sm:text-sm"
+					class="w-full truncate bg-transparent text-[15px] text-gray-700 outline-hidden placeholder:text-gray-400 max-sm:text-sm dark:text-gray-200 dark:placeholder:text-gray-500"
 					readonly
 					value={createdUrl ??
 						`${page.data.publicConfig.PUBLIC_SHARE_PREFIX || `${page.data.publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}`}/r/...`}
@@ -133,7 +133,7 @@
 
 				{#if createdUrl}
 					<CopyToClipBoardBtn
-						classNames="inline-flex items-center rounded-xl -mr-1 border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow enabled:hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:enabled:hover:bg-gray-600"
+						classNames="inline-flex items-center rounded-xl -mr-1 border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm enabled:hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:enabled:hover:bg-gray-600"
 						showTooltip={false}
 						value={withLeafId(createdUrl) ?? createdUrl}
 						onClick={() => {
@@ -162,7 +162,7 @@
 					</CopyToClipBoardBtn>
 				{:else}
 					<button
-						class="-mr-1 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+						class="-mr-1 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
 						type="button"
 						disabled={creating}
 						onclick={handleCreate}

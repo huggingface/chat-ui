@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { invalidateAll } from "$app/navigation";
+	import { UrlDependency } from "$lib/types/UrlDependency";
+	import { safeInvalidate } from "$lib/utils/safeInvalidate";
+	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import type { Model } from "$lib/types/Model";
@@ -10,6 +12,8 @@
 	}
 
 	let { models, currentModel }: Props = $props();
+
+	const convsStore = useConversationsStore();
 
 	let selectedModelId = $state("");
 
@@ -35,7 +39,7 @@
 				throw new Error("Failed to update model");
 			}
 
-			await invalidateAll();
+			await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
 		} catch (error) {
 			console.error(error);
 		}
@@ -51,7 +55,7 @@
 	<div class="flex items-center space-x-2">
 		<select
 			bind:value={selectedModelId}
-			class="rounded-md bg-gray-100 px-2 py-1 dark:bg-gray-900 max-sm:max-w-32"
+			class="rounded-md bg-gray-100 px-2 py-1 max-sm:max-w-32 dark:bg-gray-900"
 		>
 			{#each models as model}
 				<option value={model.id}>{model.name}</option>

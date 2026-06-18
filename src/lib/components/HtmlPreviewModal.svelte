@@ -1,70 +1,33 @@
 <script lang="ts">
 	import Modal from "./Modal.svelte";
+	import ExternalLinkModal from "./ExternalLinkModal.svelte";
 	import { onMount, onDestroy } from "svelte";
 	import CarbonClose from "~icons/carbon/close";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
+	import { buildArtifactSrcdoc } from "$lib/utils/previewSrcdoc";
+	import { parseExternalUrl } from "$lib/utils/externalLink";
+	import type { ArtifactKind } from "$lib/utils/artifacts";
 
 	interface Props {
 		html: string;
+		/** How to render the content; html also covers raw SVG documents */
+		kind?: ArtifactKind;
 		onclose?: () => void;
 	}
 
-	let { html, onclose }: Props = $props();
+	let { html, kind = "html", onclose }: Props = $props();
 
 	let iframeEl: HTMLIFrameElement | undefined = $state();
 	let channel = $state(`preview_${Math.random().toString(36).slice(2)}`);
 	let errors: { message: string; stack?: string }[] = $state([]);
+	let externalLinkUrl = $state<URL | null>(null);
 
-	function buildSrcdoc(content: string, channel: string): string {
-		const trimmed = content.trimStart();
-		const svgPattern = /^(?:<\?xml[^>]*>\s*)?(?:<!doctype\s+svg[^>]*>\s*)?<svg[\s>]/i;
-		const baseTag = '<base target="_blank">';
-		const disabledLinkStyles = `<style>
-			a[data-chatui-link-disabled] {}
-		</style>`;
-		const endScriptTag = "</scr" + "ipt>";
-		const errorHook = `\n<script>\n(function(){\n  function send(detail){\n    try{ parent.postMessage({ type: 'chatui.preview.error', channel: '${channel}', detail: detail }, '*'); }catch(e){}\n  }\n  function markDisabled(anchor){\n    if (!anchor || anchor.dataset.chatuiLinkDisabled === 'true') return;\n    anchor.dataset.chatuiLinkDisabled = 'true';\n    var note = 'Link disabled in preview';\n    var title = anchor.getAttribute('title');\n    if (!title) {\n      anchor.setAttribute('title', note);\n    } else if (title.indexOf(note) === -1) {\n      anchor.setAttribute('title', title + ' — ' + note);\n    }\n  }\n  function disableAnchors(scope){\n    try {\n      var root = scope && scope.querySelectorAll ? scope : document;\n      var anchors = root.querySelectorAll ? root.querySelectorAll('a') : [];\n      for (var i = 0; i < anchors.length; i++) {\n        markDisabled(anchors[i]);\n      }\n    } catch (err) {}\n  }\n  function nearestAnchor(node){\n    while (node && node !== document) {\n      if (node.tagName && node.tagName.toLowerCase() === 'a') return node;\n      node = node.parentNode;\n    }\n    return null;\n  }\n  function intercept(ev){\n    var anchor = nearestAnchor(ev.target);\n    if (!anchor) return;\n    markDisabled(anchor);\n    ev.preventDefault();\n    ev.stopPropagation();\n  }\n  disableAnchors();\n  if (document.readyState === 'loading') {\n    document.addEventListener('DOMContentLoaded', function(){ disableAnchors(); });\n  } else {\n    setTimeout(function(){ disableAnchors(); }, 0);\n  }\n  if (window.MutationObserver) {\n    var observer = new MutationObserver(function(mutations){\n      for (var i = 0; i < mutations.length; i++) {\n        var nodes = mutations[i].addedNodes;\n        for (var j = 0; j < nodes.length; j++) {\n          var node = nodes[j];\n          if (!node || node.nodeType !== 1) continue;\n          if (node.tagName && node.tagName.toLowerCase() === 'a') {\n            markDisabled(node);\n          } else {\n            disableAnchors(node);\n          }\n        }\n      }\n    });\n    observer.observe(document.documentElement, { childList: true, subtree: true });\n  }\n  window.addEventListener('click', intercept, true);\n  window.addEventListener('auxclick', intercept, true);\n  window.addEventListener('keydown', function(ev){\n    if (ev.key === 'Enter' || ev.key === ' ') {\n      intercept(ev);\n    }\n  }, true);\n  window.addEventListener('error', function(ev){\n    var msg = ev && ev.message ? ev.message : 'Script error';\n    var stack = ev && ev.error && ev.error.stack ? ev.error.stack : undefined;\n    send({ message: msg, stack: stack });\n  });\n  window.addEventListener('unhandledrejection', function(ev){\n    var r = ev && ev.reason;\n    var msg = (typeof r === 'string') ? r : (r && r.message) ? r.message : 'Unhandled promise rejection';\n    var stack = r && r.stack ? r.stack : undefined;\n    send({ message: msg, stack: stack });\n  });\n})();\n${endScriptTag}`;
-
-		if (svgPattern.test(trimmed)) {
-			const svgContent = trimmed
-				.replace(/^(<\?xml[^>]*>\s*)/i, "")
-				.replace(/^(<!doctype[^>]*>\s*)/i, "");
-			return `<!doctype html><html><head>${baseTag}${disabledLinkStyles}${errorHook}</head><body>${svgContent}</body></html>`;
-		}
-
-		const headMatch = content.match(/<head[^>]*>/i);
-		if (headMatch) {
-			return content.replace(headMatch[0], headMatch[0] + baseTag + disabledLinkStyles + errorHook);
-		}
-		const htmlTagMatch = content.match(/<html[^>]*>/i);
-		if (htmlTagMatch) {
-			return content.replace(
-				htmlTagMatch[0],
-				htmlTagMatch[0] + "\n<head>" + baseTag + disabledLinkStyles + errorHook + "</head>"
-			);
-		}
-		const doctypeMatch = content.match(/<!doctype[^>]*>/i);
-		if (doctypeMatch) {
-			const idx = content.indexOf(doctypeMatch[0]) + doctypeMatch[0].length;
-			return (
-				content.slice(0, idx) +
-				"\n<head>" +
-				baseTag +
-				disabledLinkStyles +
-				errorHook +
-				"</head>" +
-				content.slice(idx)
-			);
-		}
-		return "<head>" + baseTag + disabledLinkStyles + errorHook + "</head>\n" + content;
-	}
-
-	let srcdoc = $derived(buildSrcdoc(html, channel));
+	let srcdoc = $derived(buildArtifactSrcdoc(kind, html, channel));
 
 	type PreviewMessage = {
 		type: string;
 		channel: string;
-		detail?: { message?: unknown; stack?: string };
+		detail?: { message?: unknown; stack?: string; href?: unknown };
 	};
 
 	function onMessage(ev: MessageEvent) {
@@ -72,7 +35,17 @@
 		const raw = ev.data as unknown;
 		if (!raw || typeof raw !== "object") return;
 		const data = raw as Partial<PreviewMessage>;
-		if (data.type !== "chatui.preview.error" || data.channel !== channel) return;
+		if (data.channel !== channel) return;
+		if (data.type === "chatui.preview.openLink") {
+			// Only honor link messages backed by a real user gesture (clicks inside
+			// the iframe propagate activation to ancestor frames); artifact scripts
+			// must not be able to pop the confirm without one
+			if (navigator.userActivation && !navigator.userActivation.isActive) return;
+			// The iframe runs untrusted generated code, so re-validate its href here
+			externalLinkUrl = parseExternalUrl(data.detail?.href) ?? null;
+			return;
+		}
+		if (data.type !== "chatui.preview.error") return;
 		const detail = (data.detail ?? {}) as { message?: unknown; stack?: string };
 		errors = [...errors, { message: String(detail.message ?? "Error"), stack: detail.stack }];
 	}
@@ -92,34 +65,33 @@
 			: `it's not working: ${summary} - can you fix it?`;
 	}
 
-	function handleKeydown(event: KeyboardEvent) {
-		// Close preview on ESC key
-		if (event.key === "Escape") {
-			event.preventDefault();
-			onclose?.();
+	// Esc/backdrop while the external-link confirm is open dismisses just the
+	// confirm; the fullscreen preview itself stays up. (Esc reaches this Modal's
+	// handler first because it registered its window listener before the nested
+	// confirm modal's.)
+	function requestClose() {
+		if (externalLinkUrl) {
+			externalLinkUrl = null;
+			return;
 		}
+		onclose?.();
 	}
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
-
-<Modal
-	width="max-w-none max-h-none w-[100dvw] h-[100dvh] !rounded-none"
-	onclose={() => onclose?.()}
->
-	<div class="relative h-[100dvh] w-[100dvw]">
+<Modal width="max-w-none max-h-none w-dvw h-dvh rounded-none!" onclose={requestClose}>
+	<div class="relative h-dvh w-dvw">
 		<iframe
 			bind:this={iframeEl}
 			title="HTML Preview"
 			class="h-full w-full"
-			sandbox="allow-scripts allow-popups"
+			sandbox="allow-scripts"
 			referrerpolicy="no-referrer"
 			{srcdoc}
 		></iframe>
 
 		<!-- Close button with visible container -->
 		<button
-			class="btn fixed right-6 top-4 z-50 flex h-7 items-center gap-1 rounded-lg border border-gray-500/60 bg-gray-800 px-2 text-xs text-white shadow-sm backdrop-blur transition-none hover:border-gray-500 hover:bg-gray-700 active:shadow-inner"
+			class="fixed top-4 right-6 z-50 btn flex h-7 items-center gap-1 rounded-lg border border-gray-500/60 bg-gray-800 px-2 text-xs text-white shadow-xs backdrop-blur-sm transition-none hover:border-gray-500 hover:bg-gray-700 active:shadow-inner"
 			title="Close preview (Esc)"
 			onclick={() => onclose?.()}
 		>
@@ -129,7 +101,7 @@
 
 		{#if errors.length > 0}
 			<button
-				class="btn fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border-2 border-red-500/60 bg-red-800/90 px-4 py-1.5 text-sm text-white shadow-lg"
+				class="fixed right-4 bottom-4 z-50 btn flex items-center gap-2 rounded-full border-2 border-red-500/60 bg-red-800/90 px-4 py-1.5 text-sm text-white shadow-lg"
 				title="Send error to chat"
 				onclick={() => {
 					pendingChatInput.set(composeText());
@@ -141,3 +113,7 @@
 		{/if}
 	</div>
 </Modal>
+
+{#if externalLinkUrl}
+	<ExternalLinkModal url={externalLinkUrl} onclose={() => (externalLinkUrl = null)} />
+{/if}

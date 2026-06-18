@@ -95,7 +95,7 @@
 					</p>
 				{/if}
 				<button
-					class="absolute right-4 top-4 text-xl text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
+					class="absolute top-4 right-4 text-xl text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
 					onclick={() => (showModal = false)}
 				>
 					<CarbonClose class="text-xl" />
@@ -107,7 +107,7 @@
 						</div>
 					{:then result}
 						<pre
-							class="w-full whitespace-pre-wrap break-words pt-0 text-xs"
+							class="w-full pt-0 text-xs wrap-break-word whitespace-pre-wrap"
 							class:font-sans={file.mime === "text/plain" ||
 								file.mime === "application/vnd.chatui.clipboard"}
 							class:font-mono={file.mime !== "text/plain" &&
@@ -115,7 +115,7 @@
 					{/await}
 				{:else}
 					<pre
-						class="w-full whitespace-pre-wrap break-words pt-0 text-xs"
+						class="w-full pt-0 text-xs wrap-break-word whitespace-pre-wrap"
 						class:font-sans={file.mime === "text/plain" ||
 							file.mime === "application/vnd.chatui.clipboard"}
 						class:font-mono={file.mime !== "text/plain" &&
@@ -140,7 +140,7 @@
 	role="button"
 	tabindex="0"
 >
-	<div class="group relative flex items-center rounded-xl shadow-sm">
+	<div class="group relative flex items-center rounded-xl shadow-xs">
 		{#if isImage(file.mime)}
 			<div class="h-36 overflow-hidden rounded-xl">
 				<img
@@ -160,7 +160,7 @@
 			/>
 		{:else if isVideo(file.mime)}
 			<div
-				class="border-1 w-72 overflow-clip rounded-xl border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+				class="w-72 overflow-clip rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
 			>
 				<!-- svelte-ignore a11y_media_has_caption -->
 				<video
@@ -172,7 +172,7 @@
 			</div>
 		{:else if isPlainText(file.mime)}
 			<div
-				class="flex h-14 w-64 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900 2xl:w-72"
+				class="flex h-14 w-64 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 2xl:w-72 dark:border-gray-800 dark:bg-gray-900"
 				class:file-hoverable={isClickable}
 			>
 				<div
@@ -201,7 +201,7 @@
 				>
 					<CarbonDocumentBlank class="text-base text-gray-700 dark:text-gray-300" />
 				</div>
-				<dl class="flex flex-grow flex-col truncate leading-tight">
+				<dl class="flex grow flex-col truncate leading-tight">
 					<dd class="text-sm">
 						{truncateMiddle(file.name, 28)}
 					</dd>
@@ -238,7 +238,7 @@
 		<!-- add a button on top that removes the image -->
 		{#if canClose}
 			<button
-				class="absolute -right-2 -top-2 z-10 grid size-6 place-items-center rounded-full border bg-black group-hover:visible dark:border-gray-700"
+				class="absolute -top-2 -right-2 z-10 grid size-6 place-items-center rounded-full border bg-black group-hover:visible dark:border-gray-700"
 				class:invisible={navigator.maxTouchPoints === 0}
 				onclick={(e) => {
 					e.preventDefault();
