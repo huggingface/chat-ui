@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { processBlocks, processBlocksSync, type BlockToken } from "$lib/utils/marked";
+	import { fallbackBlocks, processBlocks, type BlockToken } from "$lib/utils/marked";
 	import MarkdownWorker from "$lib/workers/markdownWorker?worker";
 	import MarkdownBlock from "./MarkdownBlock.svelte";
 	import { browser } from "$app/environment";
@@ -15,10 +15,12 @@
 
 	let { content, sources = [], loading = false }: Props = $props();
 
-	// Sync-computed blocks used as fallback and for SSR (where effects don't run)
-	let syncBlocks = $derived(processBlocksSync(content, sources, loading));
+	// Lightweight blocks used for SSR and the initial client render. Full markdown
+	// rendering is deferred to the worker (or async processBlocks) on mount, so the
+	// heavy synchronous pipeline never runs on the server event loop. See fallbackBlocks.
+	let fallback = $derived(fallbackBlocks(content));
 	let workerBlocks: BlockToken[] | null = $state(null);
-	let blocks = $derived(workerBlocks ?? syncBlocks);
+	let blocks = $derived(workerBlocks ?? fallback);
 
 	let worker: Worker | null = null;
 	let latestRequestId = 0;
