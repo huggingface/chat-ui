@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { processBlocksSync, processTokensSync } from "./marked";
+import { fallbackBlocks, highlightCode, processBlocksSync, processTokensSync } from "./marked";
 
 function renderHtml(md: string): string {
 	const tokens = processTokensSync(md, []);
@@ -205,5 +205,75 @@ describe("processBlocksSync streaming behavior", () => {
 		// Mid-stream render: third paragraph still arriving, repairs active
 		const partialIds = processBlocksSync(`${full.slice(0, -10)}`, [], true).map((b) => b.id);
 		expect(partialIds.slice(0, -1)).toEqual(fullIds.slice(0, partialIds.length - 1));
+	});
+});
+
+describe("event-loop guards for oversized inputs (SSR)", () => {
+	test("small code with a known language is highlighted normally", () => {
+		const html = highlightCode("const x = 1;", "javascript");
+		expect(html).toContain('class="hljs');
+	});
+
+	test("very large code blocks are not highlighted (escaped plain text)", () => {
+		const huge = "<x>".repeat(20_000); // 60k chars, > MAX_HIGHLIGHT_LENGTH
+		const html = highlightCode(huge, "javascript");
+		expect(html).not.toContain('class="hljs');
+		expect(html).toContain("&lt;x&gt;");
+	});
+
+	test("medium unlabeled code blocks skip expensive auto-detection (escaped plain text)", () => {
+		const medium = "<y>".repeat(2_000); // 6k chars, > MAX_AUTO_HIGHLIGHT_LENGTH, no language
+		const html = highlightCode(medium);
+		expect(html).not.toContain('class="hljs');
+		expect(html).toContain("&lt;y&gt;");
+	});
+
+	test("huge katex blocks are not rendered with katex (escaped raw)", () => {
+		const huge = `$$${"a".repeat(11_000)}$$`; // > MAX_KATEX_LENGTH
+		const html = processTokensSync(huge, [])
+			.map((token) => (token.type === "text" && typeof token.html === "string" ? token.html : ""))
+			.join("");
+		expect(html).not.toContain("katex");
+	});
+});
+
+describe("fallbackBlocks (SSR / initial render)", () => {
+	test("does not run highlight.js, katex or produce code tokens", () => {
+		const content = [
+			"# Title",
+			"",
+			"Some **text** with math $x^2$ and a code block:",
+			"",
+			"```python",
+			"print('hello')",
+			"```",
+		].join("\n");
+		const blocks = fallbackBlocks(content);
+		expect(blocks).toHaveLength(1);
+		const tokens = blocks[0].tokens;
+		// Single text token, no code tokens (CodeBlock => DOMPurify/jsdom on the server)
+		expect(tokens).toHaveLength(1);
+		expect(tokens[0].type).toBe("text");
+		const html =
+			tokens[0].type === "text" && typeof tokens[0].html === "string" ? tokens[0].html : "";
+		expect(html).not.toContain("hljs");
+		expect(html).not.toContain("katex");
+	});
+
+	test("escapes html so raw markdown content is inert", () => {
+		const blocks = fallbackBlocks("<img src=x onerror=alert(1)>");
+		const html =
+			blocks[0].tokens[0].type === "text" && typeof blocks[0].tokens[0].html === "string"
+				? blocks[0].tokens[0].html
+				: "";
+		expect(html).not.toContain("<img");
+		expect(html).toContain("&lt;img");
+	});
+
+	test("is deterministic (stable id and html) for identical content", () => {
+		const a = fallbackBlocks("hello world");
+		const b = fallbackBlocks("hello world");
+		expect(a[0].id).toBe(b[0].id);
+		expect(a[0].tokens).toEqual(b[0].tokens);
 	});
 });

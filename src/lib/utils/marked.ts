@@ -57,6 +57,18 @@ const bundledLanguages: [string, LanguageFn][] = [
 
 bundledLanguages.forEach(([name, language]) => hljs.registerLanguage(name, language));
 
+// highlight.js and KaTeX run synchronously and can block their thread for a long time
+// on large or pathological inputs (e.g. a model dumping a huge unlabeled code block or
+// a giant math expression). SSR no longer runs this pipeline (see fallbackBlocks), but
+// these caps still protect the markdown worker and the async processBlocks fallback.
+// Output is unchanged for normal content and only degrades gracefully (escaped text)
+// past these sizes.
+const MAX_HIGHLIGHT_LENGTH = 50_000;
+// Auto-detection tries every registered language, so it is far more expensive than
+// single-language highlighting and gets a tighter cap.
+const MAX_AUTO_HIGHLIGHT_LENGTH = 5_000;
+const MAX_KATEX_LENGTH = 10_000;
+
 // Media URL detection
 const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg|mov|m4v)([?#]|$)/i;
 const AUDIO_EXTENSIONS = /\.(mp3|wav|m4a|aac|flac)([?#]|$)/i;
@@ -111,6 +123,16 @@ interface katexInlineToken extends Tokens.Generic {
 	displayMode: false;
 }
 
+function renderKatex(token: katexBlockToken | katexInlineToken): string {
+	if (token.text.length > MAX_KATEX_LENGTH) {
+		return escapeHTML(token.raw);
+	}
+	return katex.renderToString(token.text, {
+		throwOnError: false,
+		displayMode: token.displayMode,
+	});
+}
+
 export const katexBlockExtension: TokenizerExtension & RendererExtension = {
 	name: "katexBlock",
 	level: "block",
@@ -152,10 +174,7 @@ export const katexBlockExtension: TokenizerExtension & RendererExtension = {
 
 	renderer(token) {
 		if (token.type === "katexBlock") {
-			return katex.renderToString(token.text, {
-				throwOnError: false,
-				displayMode: token.displayMode,
-			});
+			return renderKatex(token as katexBlockToken);
 		}
 		return undefined;
 	},
@@ -202,10 +221,7 @@ const katexInlineExtension: TokenizerExtension & RendererExtension = {
 
 	renderer(token) {
 		if (token.type === "katexInline") {
-			return katex.renderToString(token.text, {
-				throwOnError: false,
-				displayMode: token.displayMode,
-			});
+			return renderKatex(token as katexInlineToken);
 		}
 		return undefined;
 	},
@@ -256,12 +272,22 @@ function sanitizeHref(href?: string | null): string | undefined {
 }
 
 export function highlightCode(text: string, lang?: string): string {
+	// Very large blocks would block the event loop for too long; render them as
+	// escaped plain text instead.
+	if (text.length > MAX_HIGHLIGHT_LENGTH) {
+		return escapeHTML(text);
+	}
 	if (lang && hljs.getLanguage(lang)) {
 		try {
 			return hljs.highlight(text, { language: lang, ignoreIllegals: true }).value;
 		} catch {
 			// fall through to auto-detect
 		}
+	}
+	// Auto-detection runs every grammar over the input and is the most expensive path;
+	// skip it for larger blocks rather than stalling the event loop.
+	if (text.length > MAX_AUTO_HIGHLIGHT_LENGTH) {
+		return escapeHTML(text);
 	}
 	return hljs.highlightAuto(text).value;
 }
@@ -515,7 +541,39 @@ export async function processBlocks(
 }
 
 /**
- * Synchronous version of processBlocks for SSR
+ * Cheap, allocation-light blocks used for SSR and the initial client render.
+ *
+ * Rich markdown rendering (marked + highlight.js + KaTeX + DOMPurify/jsdom) is
+ * intentionally NOT run here: it executes synchronously on the single Node event loop
+ * during SSR and, summed across every message of a conversation, can block the loop
+ * long enough to fail liveness/readiness health checks (observed event-loop stalls up
+ * to ~1.5s). The browser upgrades each message to fully rendered markdown via the
+ * markdown worker (or async processBlocks fallback) on mount.
+ *
+ * The output is deterministic and identical on server and client, so hydration is not
+ * affected; only the first paint shows lightly-formatted text before the worker result
+ * arrives.
+ */
+export function fallbackBlocks(content: string): BlockToken[] {
+	// Static id: it is only used as the {#each} key for this single throwaway block and
+	// has no semantic meaning, so there is no need to hash the (potentially large) content.
+	return [
+		{
+			id: "fallback",
+			content,
+			tokens: [
+				{
+					type: "text",
+					html: `<div style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(content)}</div>`,
+				},
+			],
+		},
+	];
+}
+
+/**
+ * Synchronous version of processBlocks. Kept for non-SSR callers and tests; it is no
+ * longer used on the SSR render path (see fallbackBlocks).
  */
 export function processBlocksSync(
 	content: string,
