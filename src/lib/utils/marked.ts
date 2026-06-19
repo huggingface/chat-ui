@@ -123,6 +123,16 @@ interface katexInlineToken extends Tokens.Generic {
 	displayMode: false;
 }
 
+function renderKatex(token: katexBlockToken | katexInlineToken): string {
+	if (token.text.length > MAX_KATEX_LENGTH) {
+		return escapeHTML(token.raw);
+	}
+	return katex.renderToString(token.text, {
+		throwOnError: false,
+		displayMode: token.displayMode,
+	});
+}
+
 export const katexBlockExtension: TokenizerExtension & RendererExtension = {
 	name: "katexBlock",
 	level: "block",
@@ -164,13 +174,7 @@ export const katexBlockExtension: TokenizerExtension & RendererExtension = {
 
 	renderer(token) {
 		if (token.type === "katexBlock") {
-			if (token.text.length > MAX_KATEX_LENGTH) {
-				return escapeHTML(token.raw);
-			}
-			return katex.renderToString(token.text, {
-				throwOnError: false,
-				displayMode: token.displayMode,
-			});
+			return renderKatex(token as katexBlockToken);
 		}
 		return undefined;
 	},
@@ -217,13 +221,7 @@ const katexInlineExtension: TokenizerExtension & RendererExtension = {
 
 	renderer(token) {
 		if (token.type === "katexInline") {
-			if (token.text.length > MAX_KATEX_LENGTH) {
-				return escapeHTML(token.raw);
-			}
-			return katex.renderToString(token.text, {
-				throwOnError: false,
-				displayMode: token.displayMode,
-			});
+			return renderKatex(token as katexInlineToken);
 		}
 		return undefined;
 	},
@@ -557,9 +555,11 @@ export async function processBlocks(
  * arrives.
  */
 export function fallbackBlocks(content: string): BlockToken[] {
+	// Static id: it is only used as the {#each} key for this single throwaway block and
+	// has no semantic meaning, so there is no need to hash the (potentially large) content.
 	return [
 		{
-			id: `fallback-${hashString(content)}`,
+			id: "fallback",
 			content,
 			tokens: [
 				{
