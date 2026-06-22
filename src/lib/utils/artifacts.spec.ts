@@ -252,6 +252,60 @@ describe("collectArtifacts", () => {
 		expect(registry.byMessageOp.get("m1:0")).toEqual({ identifier: "ghost", version: -1 });
 	});
 
+	it("links a renamed-identifier update to the existing artifact", () => {
+		const registry = collectArtifacts([
+			msg(
+				"m1",
+				`<artifact identifier="green-button" type="html" title="Green Button">a green btn</artifact>`
+			),
+			msg(
+				"m2",
+				`<artifact identifier="blue-button" type="update" title="Blue Button"><old_str>green</old_str><new_str>blue</new_str></artifact>`
+			),
+		]);
+		// The update linked to the existing artifact instead of orphaning into a dead card
+		expect(registry.artifacts.size).toBe(1);
+		const versions = registry.artifacts.get("green-button")?.versions;
+		expect(versions).toHaveLength(2);
+		expect(versions?.[1]).toMatchObject({
+			identifier: "green-button",
+			op: "update",
+			title: "Blue Button",
+			content: "a blue btn",
+		});
+		expect(registry.byMessageOp.get("m2:0")).toEqual({ identifier: "green-button", version: 2 });
+	});
+
+	it("links a case-drifted identifier update to the existing artifact", () => {
+		const registry = collectArtifacts([
+			msg("m1", `<artifact identifier="app" type="html" title="App">alpha beta</artifact>`),
+			msg(
+				"m2",
+				`<artifact identifier="App" type="update"><old_str>alpha</old_str><new_str>gamma</new_str></artifact>`
+			),
+		]);
+		expect(registry.artifacts.size).toBe(1);
+		expect(registry.artifacts.get("app")?.versions).toHaveLength(2);
+		expect(registry.artifacts.get("app")?.versions[1]?.content).toBe("gamma beta");
+	});
+
+	it("links an orphan update to the most-recently-created artifact when several exist", () => {
+		const registry = collectArtifacts([
+			msg("m1", `<artifact identifier="first" type="html" title="First">one</artifact>`),
+			msg("m2", `<artifact identifier="second" type="html" title="Second">two</artifact>`),
+			msg(
+				"m3",
+				`<artifact identifier="ghost" type="update"><old_str>two</old_str><new_str>three</new_str></artifact>`
+			),
+		]);
+		// No "ghost" artifact created; the update attached to the most recent ("second")
+		expect(registry.artifacts.has("ghost")).toBe(false);
+		expect(registry.artifacts.get("first")?.versions).toHaveLength(1);
+		expect(registry.artifacts.get("second")?.versions).toHaveLength(2);
+		expect(registry.artifacts.get("second")?.versions[1]?.content).toBe("three");
+		expect(registry.byMessageOp.get("m3:0")).toEqual({ identifier: "second", version: 2 });
+	});
+
 	it("applies streaming update pairs progressively", () => {
 		const registry = collectArtifacts(
 			[

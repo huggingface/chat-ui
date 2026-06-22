@@ -371,15 +371,26 @@ export function collectArtifacts(
 			}
 
 			// update op
+			// Models sometimes rename the identifier when editing (e.g. green-button ->
+			// blue-button) or drift its case/whitespace, which would orphan the update as a
+			// dead "couldn't be linked" card. An update is by definition an edit to existing
+			// content, so when the id doesn't match an existing artifact, link to the
+			// most-recently-created one (the Map preserves insertion order). Only leave a
+			// disabled card when there's genuinely nothing to link to.
+			if (!artifact && artifacts.size > 0) {
+				artifact = [...artifacts.values()].at(-1);
+			}
 			const base = artifact?.versions.at(-1);
 			if (!artifact || !base) {
-				// Update referencing an unknown artifact: surface a disabled card
 				byMessageOp.set(key, { identifier: op.identifier, version: -1 });
 				continue;
 			}
 			const result = applyArtifactUpdate(base.content, op.pairs);
+			// Use the resolved artifact's identifier (not op.identifier, which may be the
+			// renamed/mismatched one) so the new version attaches to the right artifact and
+			// the card resolves it.
 			const version: ArtifactVersion = {
-				identifier: op.identifier,
+				identifier: artifact.identifier,
 				type: base.type,
 				title: op.title || base.title,
 				language: base.language,
@@ -395,9 +406,9 @@ export function collectArtifacts(
 				failedPairs: Math.max(result.failed, !isLive && op.pairs.length === 0 ? 1 : 0),
 			};
 			artifact.versions.push(version);
-			byMessageOp.set(key, { identifier: op.identifier, version: version.version });
+			byMessageOp.set(key, { identifier: artifact.identifier, version: version.version });
 			if (isLive) {
-				streaming = { identifier: op.identifier, version: version.version };
+				streaming = { identifier: artifact.identifier, version: version.version };
 			}
 		}
 	}
