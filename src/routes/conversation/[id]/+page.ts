@@ -4,6 +4,7 @@ import { redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import type { PageLoad } from "./$types";
 import type { Message } from "$lib/types/Message";
+import type { DeployedSpace } from "$lib/types/Conversation";
 
 interface ConversationData {
 	messages: Message[];
@@ -15,6 +16,7 @@ interface ConversationData {
 	updatedAt: Date;
 	modelId: string;
 	shared: boolean;
+	deployedSpaces?: Record<string, DeployedSpace>;
 }
 
 export const load: PageLoad = async ({ params, depends, fetch, url, parent }) => {

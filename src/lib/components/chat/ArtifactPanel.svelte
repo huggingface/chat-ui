@@ -5,21 +5,25 @@
 	import type { ArtifactRegistry, ArtifactVersion } from "$lib/utils/artifacts";
 	import { artifactFileName, isPreviewableKind } from "$lib/utils/artifacts";
 	import { diffLines, diffStats, renderDiffHtml } from "$lib/utils/artifactDiff";
-	import { buildArtifactSrcdoc } from "$lib/utils/previewSrcdoc";
+	import { buildArtifactSrcdoc, isDeployableKind } from "$lib/utils/previewSrcdoc";
 	import { parseExternalUrl } from "$lib/utils/externalLink";
 	import { highlightCode } from "$lib/utils/marked";
 	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_FRACTION } from "$lib/stores/artifactPanel.svelte";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { page } from "$app/state";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import ExternalLinkModal from "../ExternalLinkModal.svelte";
 	import HtmlPreviewModal from "../HtmlPreviewModal.svelte";
+	import DeployToSpaceModal from "./DeployToSpaceModal.svelte";
 
 	import CarbonCloseLarge from "~icons/carbon/close-large";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonDownload from "~icons/carbon/download";
+	import CarbonRocket from "~icons/carbon/rocket";
 	import CarbonMaximize from "~icons/carbon/maximize";
 	import LucideWrapText from "~icons/lucide/wrap-text";
 	import LucideDiff from "~icons/lucide/diff";
@@ -312,6 +316,46 @@
 		artifactPanel.version = clamped >= totalVersions ? null : clamped;
 	}
 
+	// ----- deploy to a Hugging Face Space (HuggingChat only) -----
+	const publicConfig = usePublicConfig();
+	let conversationId = $derived(page.params?.id);
+	let deployModalOpen = $state(false);
+	// Deployments made this session, overlaid on the ones loaded with the page so
+	// the button flips to "Update" right after a successful first deploy. Keyed by
+	// conversation id first: ArtifactPanel is not remounted when only the route
+	// param changes, so a flat map would let a stale entry from one conversation
+	// mask another conversation's artifact that happens to share an identifier
+	// (e.g. the "untitled-artifact" fallback).
+	let sessionDeployments = $state<Record<string, Record<string, { repoId: string; url: string }>>>(
+		{}
+	);
+	let loadedDeployments = $derived(
+		(page.data as { deployedSpaces?: Record<string, { repoId: string }> })?.deployedSpaces ?? {}
+	);
+	let currentDeployment = $derived.by(() => {
+		const id = artifact?.identifier;
+		if (!id) return undefined;
+		const session = conversationId ? sessionDeployments[conversationId]?.[id] : undefined;
+		if (session) return session;
+		const loaded = loadedDeployments[id];
+		return loaded
+			? { repoId: loaded.repoId, url: `https://huggingface.co/spaces/${loaded.repoId}` }
+			: undefined;
+	});
+	function recordDeployment(deployment: { repoId: string; url: string }) {
+		const cid = conversationId;
+		const id = artifact?.identifier;
+		if (!cid || !id) return;
+		sessionDeployments[cid] = { ...(sessionDeployments[cid] ?? {}), [id]: deployment };
+	}
+	let canDeploy = $derived(
+		publicConfig.isHuggingChat &&
+			!!conversationId &&
+			!!version &&
+			version.complete &&
+			isDeployableKind(version.type)
+	);
+
 	function handleKeydown(e: KeyboardEvent) {
 		// An Escape already consumed by a modal (external-link confirm, fullscreen
 		// preview) must not also close the panel
@@ -406,6 +450,16 @@
 				>
 					<CarbonDownload />
 				</button>
+				{#if canDeploy}
+					<button
+						type="button"
+						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+						title={currentDeployment ? "Update Space" : "Deploy to Space"}
+						onclick={() => (deployModalOpen = true)}
+					>
+						<CarbonRocket />
+					</button>
+				{/if}
 				{#if fullscreenSupported}
 					<button
 						type="button"
@@ -621,6 +675,19 @@
 
 {#if externalLinkUrl}
 	<ExternalLinkModal url={externalLinkUrl} onclose={() => (externalLinkUrl = null)} />
+{/if}
+
+{#if deployModalOpen && version && artifact && conversationId}
+	<DeployToSpaceModal
+		{conversationId}
+		artifactIdentifier={artifact.identifier}
+		title={version.title}
+		kind={version.type}
+		content={version.content}
+		existing={currentDeployment}
+		onclose={() => (deployModalOpen = false)}
+		ondeployed={recordDeployment}
+	/>
 {/if}
 
 <style>
