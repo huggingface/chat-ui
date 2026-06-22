@@ -216,23 +216,45 @@ function escapeRegExp(s: string): string {
 }
 
 /**
+ * Collapse curly quotes and en/em dashes to their ASCII forms so an old_str that
+ * uses (or omits) them still matches content stored the other way. Every
+ * substitution is 1:1, so length is preserved and an offset found in the
+ * normalized string maps straight back to the raw string (this is what lets
+ * findMatch search the normalized text but slice the raw content). Unicode
+ * spaces (NBSP etc.) need no handling here — they are already covered by the
+ * whitespace-tolerant regex below, since JS `\\s` matches them.
+ */
+function normalizeTypography(s: string): string {
+	return s
+		.replace(/[‘’‚‛′]/g, "'")
+		.replace(/[“”„‟″]/g, '"')
+		.replace(/[‐‑‒–—―−]/g, "-");
+}
+
+/**
  * Locate `needle` in `content`. Exact match first; if that fails, retry with
  * every whitespace run collapsed to \s+ — models routinely mis-copy
  * indentation in old_str, and a strict-only match would turn the whole edit
  * into a silent no-op (observed live with Kimi-K2.6 counting spaces).
  * Bracket runs are matched loosely the same way ("<<svg" ≈ "<svg"), since the
- * stored content is normalized but models quote their own raw output.
+ * stored content is normalized but models quote their own raw output. Both
+ * sides are also typography-normalized (curly quotes, en/em dashes) before
+ * matching.
  */
 function findMatch(content: string, needle: string): { start: number; end: number } | null {
-	const exact = content.indexOf(needle);
-	if (exact !== -1) return { start: exact, end: exact + needle.length };
-	const trimmed = needle.trim();
+	// Substitutions are 1:1, so offsets in the normalized strings index the raw
+	// `content` directly — no offset remapping needed.
+	const nContent = normalizeTypography(content);
+	const nNeedle = normalizeTypography(needle);
+	const exact = nContent.indexOf(nNeedle);
+	if (exact !== -1) return { start: exact, end: exact + nNeedle.length };
+	const trimmed = nNeedle.trim();
 	if (!trimmed) return null;
 	try {
 		const pattern = new RegExp(
 			escapeRegExp(trimmed.replace(/<{2,}/g, "<")).replace(/</g, "<+").replace(/\s+/g, "\\s+")
 		);
-		const match = pattern.exec(content);
+		const match = pattern.exec(nContent);
 		if (match) return { start: match.index, end: match.index + match[0].length };
 	} catch {
 		// needle too large/odd for a regex — treat as not found

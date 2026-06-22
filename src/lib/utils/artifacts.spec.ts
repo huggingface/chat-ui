@@ -149,6 +149,30 @@ describe("applyArtifactUpdate", () => {
 		]);
 		expect(result.content).toBe("v3");
 	});
+
+	it("matches across smart quotes in content, preserving surrounding text", () => {
+		// content has curly double quotes; old_str uses straight quotes
+		const content = `const greeting = “Hello”; // tag`;
+		const result = applyArtifactUpdate(content, [{ old: `"Hello"`, new: `"Goodbye"` }]);
+		expect(result).toMatchObject({ applied: 1, failed: 0 });
+		expect(result.content).toBe(`const greeting = "Goodbye"; // tag`);
+	});
+
+	it("matches when old_str uses smart quotes and content is straight", () => {
+		const result = applyArtifactUpdate(`x = "v"`, [{ old: `x = “v”`, new: `x = "w"` }]);
+		expect(result).toMatchObject({ applied: 1, failed: 0, content: `x = "w"` });
+	});
+
+	it("matches an em-dash in content against a hyphen in old_str", () => {
+		const result = applyArtifactUpdate(`a — b`, [{ old: `a - b`, new: `a + b` }]);
+		expect(result).toMatchObject({ applied: 1, failed: 0, content: `a + b` });
+	});
+
+	it("matches an NBSP in content against a normal space (whitespace tolerance)", () => {
+		const nbsp = String.fromCharCode(0xa0);
+		const result = applyArtifactUpdate(`foo${nbsp}bar`, [{ old: `foo bar`, new: `foo baz` }]);
+		expect(result).toMatchObject({ applied: 1, failed: 0, content: `foo baz` });
+	});
 });
 
 describe("collectArtifacts", () => {
