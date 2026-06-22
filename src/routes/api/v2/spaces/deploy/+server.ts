@@ -124,26 +124,28 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		error(404, "Conversation not found");
 	}
 
-	const files = [
-		{
-			path: "index.html",
-			content: new Blob([buildDeployableHtml(body.kind, body.content)], { type: "text/html" }),
-		},
-		{
-			path: "README.md",
-			content: new Blob([buildReadme(body.title)], { type: "text/markdown" }),
-		},
-	];
+	const indexFile = {
+		path: "index.html",
+		content: new Blob([buildDeployableHtml(body.kind, body.content)], { type: "text/html" }),
+	};
+	// The README carries the Space's emoji, gradient colors, and title. It is
+	// written once at creation and deliberately left untouched on update, so
+	// re-deploying an existing artifact only changes the content — it doesn't
+	// reshuffle the Space's emoji/colors every time.
+	const readmeFile = {
+		path: "README.md",
+		content: new Blob([buildReadme(body.title)], { type: "text/markdown" }),
+	};
 
 	const existing = conversation.deployedSpaces?.[body.artifactIdentifier];
 
-	// Re-deploy: push a new commit to the Space we created earlier.
+	// Re-deploy: push a new commit to the Space we created earlier, content only.
 	if (existing) {
 		try {
 			await uploadFiles({
 				repo: { type: "space", name: existing.repoId },
 				accessToken,
-				files,
+				files: [indexFile],
 				commitTitle: "Update from HuggingChat",
 			});
 			return superjsonResponse({
@@ -217,7 +219,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		await uploadFiles({
 			repo: { type: "space", name: repoId },
 			accessToken,
-			files,
+			files: [indexFile, readmeFile],
 			commitTitle: "Deploy from HuggingChat",
 		});
 	} catch (err) {
