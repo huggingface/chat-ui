@@ -30,8 +30,19 @@ const bodySchema = z.object({
 const SPACE_EMOJIS = ["🚀", "✨", "🎨", "🤗", "💡", "🧩", "🌈", "⚡️", "🪄", "🔮", "🛸", "🎯"];
 const SPACE_COLORS = ["red", "yellow", "green", "blue", "indigo", "purple", "pink", "gray"];
 
-function pick<T>(arr: readonly T[]): T {
-	return arr[Math.floor(Math.random() * arr.length)];
+// Deterministic pick, seeded per artifact, so a Space keeps the same emoji and
+// gradient across re-deploys. A random pick would reshuffle them on every update
+// (the README is re-uploaded each deploy).
+function hashString(s: string): number {
+	let h = 0;
+	for (let i = 0; i < s.length; i++) {
+		h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+	}
+	return Math.abs(h);
+}
+
+function pick<T>(arr: readonly T[], seed: string): T {
+	return arr[hashString(seed) % arr.length];
 }
 
 function slugify(title: string): string {
@@ -45,7 +56,7 @@ function slugify(title: string): string {
 	return slug || "huggingchat-artifact";
 }
 
-function buildReadme(title: string): string {
+function buildReadme(title: string, seed: string): string {
 	const trimmed = title.slice(0, 200);
 	// YAML is a superset of JSON, so a JSON double-quoted string is a valid YAML
 	// double-quoted scalar with quotes, backslashes, control chars, and unicode
@@ -54,9 +65,9 @@ function buildReadme(title: string): string {
 	const headingTitle = trimmed.replace(/[\r\n]+/g, " ");
 	return `---
 title: ${yamlTitle}
-emoji: ${pick(SPACE_EMOJIS)}
-colorFrom: ${pick(SPACE_COLORS)}
-colorTo: ${pick(SPACE_COLORS)}
+emoji: ${pick(SPACE_EMOJIS, `${seed}:emoji`)}
+colorFrom: ${pick(SPACE_COLORS, `${seed}:from`)}
+colorTo: ${pick(SPACE_COLORS, `${seed}:to`)}
 sdk: static
 pinned: false
 tags:
@@ -124,28 +135,31 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		error(404, "Conversation not found");
 	}
 
-	const indexFile = {
-		path: "index.html",
-		content: new Blob([buildDeployableHtml(body.kind, body.content)], { type: "text/html" }),
-	};
-	// The README carries the Space's emoji, gradient colors, and title. It is
-	// written once at creation and deliberately left untouched on update, so
-	// re-deploying an existing artifact only changes the content — it doesn't
-	// reshuffle the Space's emoji/colors every time.
-	const readmeFile = {
-		path: "README.md",
-		content: new Blob([buildReadme(body.title)], { type: "text/markdown" }),
-	};
+	// README emoji/colors are seeded per artifact so they stay identical across
+	// re-deploys; index.html + README are uploaded on every deploy (create and
+	// update), so a Space recovered from a failed first upload still gets its
+	// README/config, and re-deploying never reshuffles the Space's appearance.
+	const readmeSeed = `${body.conversationId}:${body.artifactIdentifier}`;
+	const files = [
+		{
+			path: "index.html",
+			content: new Blob([buildDeployableHtml(body.kind, body.content)], { type: "text/html" }),
+		},
+		{
+			path: "README.md",
+			content: new Blob([buildReadme(body.title, readmeSeed)], { type: "text/markdown" }),
+		},
+	];
 
 	const existing = conversation.deployedSpaces?.[body.artifactIdentifier];
 
-	// Re-deploy: push a new commit to the Space we created earlier, content only.
+	// Re-deploy: push a new commit to the Space we created earlier.
 	if (existing) {
 		try {
 			await uploadFiles({
 				repo: { type: "space", name: existing.repoId },
 				accessToken,
-				files: [indexFile],
+				files,
 				commitTitle: "Update from HuggingChat",
 			});
 			return superjsonResponse({
@@ -219,7 +233,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		await uploadFiles({
 			repo: { type: "space", name: repoId },
 			accessToken,
-			files: [indexFile, readmeFile],
+			files,
 			commitTitle: "Deploy from HuggingChat",
 		});
 	} catch (err) {
