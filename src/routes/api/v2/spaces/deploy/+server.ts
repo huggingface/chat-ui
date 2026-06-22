@@ -30,8 +30,20 @@ const bodySchema = z.object({
 const SPACE_EMOJIS = ["🚀", "✨", "🎨", "🤗", "💡", "🧩", "🌈", "⚡️", "🪄", "🔮", "🛸", "🎯"];
 const SPACE_COLORS = ["red", "yellow", "green", "blue", "indigo", "purple", "pink", "gray"];
 
-function pick<T>(arr: readonly T[]): T {
-	return arr[Math.floor(Math.random() * arr.length)];
+// Derive a stable array index from a string seed (a small deterministic hash).
+function seededIndex(seed: string, length: number): number {
+	let hash = 0;
+	for (let i = 0; i < seed.length; i++) {
+		hash = (Math.imul(hash, 31) + seed.charCodeAt(i)) | 0;
+	}
+	return Math.abs(hash) % length;
+}
+
+// Pick an array element deterministically from a seed. Re-deploying an existing
+// Space reuses the same seed, so its emoji/colors stay put instead of being
+// reshuffled on every update.
+function pickStable<T>(arr: readonly T[], seed: string): T {
+	return arr[seededIndex(seed, arr.length)];
 }
 
 function slugify(title: string): string {
@@ -45,7 +57,10 @@ function slugify(title: string): string {
 	return slug || "huggingchat-artifact";
 }
 
-function buildReadme(title: string): string {
+// `seed` is a stable per-Space key (conversation + artifact identifier) so the
+// emoji/colors are derived once and reused on every re-deploy, rather than being
+// randomized each time an existing Space is updated.
+function buildReadme(title: string, seed: string): string {
 	const trimmed = title.slice(0, 200);
 	// YAML is a superset of JSON, so a JSON double-quoted string is a valid YAML
 	// double-quoted scalar with quotes, backslashes, control chars, and unicode
@@ -54,9 +69,9 @@ function buildReadme(title: string): string {
 	const headingTitle = trimmed.replace(/[\r\n]+/g, " ");
 	return `---
 title: ${yamlTitle}
-emoji: ${pick(SPACE_EMOJIS)}
-colorFrom: ${pick(SPACE_COLORS)}
-colorTo: ${pick(SPACE_COLORS)}
+emoji: ${pickStable(SPACE_EMOJIS, `${seed}:emoji`)}
+colorFrom: ${pickStable(SPACE_COLORS, `${seed}:from`)}
+colorTo: ${pickStable(SPACE_COLORS, `${seed}:to`)}
 sdk: static
 pinned: false
 tags:
@@ -131,7 +146,10 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		},
 		{
 			path: "README.md",
-			content: new Blob([buildReadme(body.title)], { type: "text/markdown" }),
+			content: new Blob(
+				[buildReadme(body.title, `${body.conversationId}:${body.artifactIdentifier}`)],
+				{ type: "text/markdown" }
+			),
 		},
 	];
 
