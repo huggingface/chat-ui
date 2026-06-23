@@ -149,6 +149,30 @@ describe("applyArtifactUpdate", () => {
 		]);
 		expect(result.content).toBe("v3");
 	});
+
+	it("matches across smart quotes in content, preserving surrounding text", () => {
+		// content has curly double quotes; old_str uses straight quotes
+		const content = `const greeting = “Hello”; // tag`;
+		const result = applyArtifactUpdate(content, [{ old: `"Hello"`, new: `"Goodbye"` }]);
+		expect(result).toMatchObject({ applied: 1, failed: 0 });
+		expect(result.content).toBe(`const greeting = "Goodbye"; // tag`);
+	});
+
+	it("matches when old_str uses smart quotes and content is straight", () => {
+		const result = applyArtifactUpdate(`x = "v"`, [{ old: `x = “v”`, new: `x = "w"` }]);
+		expect(result).toMatchObject({ applied: 1, failed: 0, content: `x = "w"` });
+	});
+
+	it("matches an em-dash in content against a hyphen in old_str", () => {
+		const result = applyArtifactUpdate(`a — b`, [{ old: `a - b`, new: `a + b` }]);
+		expect(result).toMatchObject({ applied: 1, failed: 0, content: `a + b` });
+	});
+
+	it("matches an NBSP in content against a normal space (whitespace tolerance)", () => {
+		const nbsp = String.fromCharCode(0xa0);
+		const result = applyArtifactUpdate(`foo${nbsp}bar`, [{ old: `foo bar`, new: `foo baz` }]);
+		expect(result).toMatchObject({ applied: 1, failed: 0, content: `foo baz` });
+	});
 });
 
 describe("collectArtifacts", () => {
@@ -250,6 +274,76 @@ describe("collectArtifacts", () => {
 		]);
 		expect(registry.artifacts.size).toBe(0);
 		expect(registry.byMessageOp.get("m1:0")).toEqual({ identifier: "ghost", version: -1 });
+	});
+
+	it("links a renamed-identifier update to the existing artifact", () => {
+		const registry = collectArtifacts([
+			msg(
+				"m1",
+				`<artifact identifier="green-button" type="html" title="Green Button">a green btn</artifact>`
+			),
+			msg(
+				"m2",
+				`<artifact identifier="blue-button" type="update" title="Blue Button"><old_str>green</old_str><new_str>blue</new_str></artifact>`
+			),
+		]);
+		// The update linked to the existing artifact instead of orphaning into a dead card
+		expect(registry.artifacts.size).toBe(1);
+		const versions = registry.artifacts.get("green-button")?.versions;
+		expect(versions).toHaveLength(2);
+		expect(versions?.[1]).toMatchObject({
+			identifier: "green-button",
+			op: "update",
+			title: "Blue Button",
+			content: "a blue btn",
+		});
+		expect(registry.byMessageOp.get("m2:0")).toEqual({ identifier: "green-button", version: 2 });
+	});
+
+	it("links a case-drifted identifier update to the existing artifact", () => {
+		const registry = collectArtifacts([
+			msg("m1", `<artifact identifier="app" type="html" title="App">alpha beta</artifact>`),
+			msg(
+				"m2",
+				`<artifact identifier="App" type="update"><old_str>alpha</old_str><new_str>gamma</new_str></artifact>`
+			),
+		]);
+		expect(registry.artifacts.size).toBe(1);
+		expect(registry.artifacts.get("app")?.versions).toHaveLength(2);
+		expect(registry.artifacts.get("app")?.versions[1]?.content).toBe("gamma beta");
+	});
+
+	it("links an orphan update to the most-recently-created artifact when several exist", () => {
+		const registry = collectArtifacts([
+			msg("m1", `<artifact identifier="first" type="html" title="First">one</artifact>`),
+			msg("m2", `<artifact identifier="second" type="html" title="Second">two</artifact>`),
+			msg(
+				"m3",
+				`<artifact identifier="ghost" type="update"><old_str>two</old_str><new_str>three</new_str></artifact>`
+			),
+		]);
+		// No "ghost" artifact created; the update attached to the most recent ("second")
+		expect(registry.artifacts.has("ghost")).toBe(false);
+		expect(registry.artifacts.get("first")?.versions).toHaveLength(1);
+		expect(registry.artifacts.get("second")?.versions).toHaveLength(2);
+		expect(registry.artifacts.get("second")?.versions[1]?.content).toBe("three");
+		expect(registry.byMessageOp.get("m3:0")).toEqual({ identifier: "second", version: 2 });
+	});
+
+	it("prefers a normalized identifier match over the latest artifact for drifted ids", () => {
+		const registry = collectArtifacts([
+			msg("m1", `<artifact identifier="app" type="html" title="App">alpha</artifact>`),
+			msg("m2", `<artifact identifier="chart" type="html" title="Chart">bravo</artifact>`),
+			msg(
+				"m3",
+				`<artifact identifier="App" type="update"><old_str>alpha</old_str><new_str>gamma</new_str></artifact>`
+			),
+		]);
+		// "App" drifts from "app" by case, so it links there — not the latest ("chart")
+		expect(registry.artifacts.get("app")?.versions).toHaveLength(2);
+		expect(registry.artifacts.get("app")?.versions[1]?.content).toBe("gamma");
+		expect(registry.artifacts.get("chart")?.versions).toHaveLength(1);
+		expect(registry.byMessageOp.get("m3:0")).toEqual({ identifier: "app", version: 2 });
 	});
 
 	it("applies streaming update pairs progressively", () => {

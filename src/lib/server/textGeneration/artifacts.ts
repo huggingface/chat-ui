@@ -36,10 +36,11 @@ Editing an artifact you created earlier in the conversation:
 <new_str>replacement text</new_str>
 </artifact>
 
-- Each old_str must match the latest version EXACTLY (including whitespace/indentation) and must be unique within it.
+- Each old_str must match the latest version EXACTLY (including whitespace/indentation) and must be unique within it. Copy it verbatim from the latest version; do not retype, reformat, or re-indent it.
 - Emit at most ONE update block per reply, with all the pairs (up to 4) inside that single block — never one block per pair.
 - For larger changes, re-emit the full artifact with the SAME identifier (this creates a new version).
-- Reuse the same identifier for every version of one artifact; pick a new identifier only for a genuinely different artifact.
+- Keep the identifier BYTE-IDENTICAL across every version, even when the title or content changes (renaming a green button to blue keeps the same identifier). Use a new identifier only for a genuinely different artifact.
+- Do not call tools while creating or editing an artifact; emit the artifact in your reply first, then use tools in a later turn if needed.
 
 Around the tags, briefly tell the user in plain text what you built or changed.`;
 

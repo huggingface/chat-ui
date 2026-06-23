@@ -216,23 +216,45 @@ function escapeRegExp(s: string): string {
 }
 
 /**
+ * Collapse curly quotes and en/em dashes to their ASCII forms so an old_str that
+ * uses (or omits) them still matches content stored the other way. Every
+ * substitution is 1:1, so length is preserved and an offset found in the
+ * normalized string maps straight back to the raw string (this is what lets
+ * findMatch search the normalized text but slice the raw content). Unicode
+ * spaces (NBSP etc.) need no handling here — they are already covered by the
+ * whitespace-tolerant regex below, since JS `\\s` matches them.
+ */
+function normalizeTypography(s: string): string {
+	return s
+		.replace(/[‘’‚‛′]/g, "'")
+		.replace(/[“”„‟″]/g, '"')
+		.replace(/[‐‑‒–—―−]/g, "-");
+}
+
+/**
  * Locate `needle` in `content`. Exact match first; if that fails, retry with
  * every whitespace run collapsed to \s+ — models routinely mis-copy
  * indentation in old_str, and a strict-only match would turn the whole edit
  * into a silent no-op (observed live with Kimi-K2.6 counting spaces).
  * Bracket runs are matched loosely the same way ("<<svg" ≈ "<svg"), since the
- * stored content is normalized but models quote their own raw output.
+ * stored content is normalized but models quote their own raw output. Both
+ * sides are also typography-normalized (curly quotes, en/em dashes) before
+ * matching.
  */
 function findMatch(content: string, needle: string): { start: number; end: number } | null {
-	const exact = content.indexOf(needle);
-	if (exact !== -1) return { start: exact, end: exact + needle.length };
-	const trimmed = needle.trim();
+	// Substitutions are 1:1, so offsets in the normalized strings index the raw
+	// `content` directly — no offset remapping needed.
+	const nContent = normalizeTypography(content);
+	const nNeedle = normalizeTypography(needle);
+	const exact = nContent.indexOf(nNeedle);
+	if (exact !== -1) return { start: exact, end: exact + nNeedle.length };
+	const trimmed = nNeedle.trim();
 	if (!trimmed) return null;
 	try {
 		const pattern = new RegExp(
 			escapeRegExp(trimmed.replace(/<{2,}/g, "<")).replace(/</g, "<+").replace(/\s+/g, "\\s+")
 		);
-		const match = pattern.exec(content);
+		const match = pattern.exec(nContent);
 		if (match) return { start: match.index, end: match.index + match[0].length };
 	} catch {
 		// needle too large/odd for a regex — treat as not found
@@ -307,6 +329,11 @@ export function artifactOpKey(messageId: Message["id"], opIndex: number): string
 	return `${messageId}:${opIndex}`;
 }
 
+/** Case/whitespace-insensitive identifier key, for tolerant update linking. */
+function normalizeIdentifier(id: string): string {
+	return id.trim().toLowerCase();
+}
+
 /**
  * Walk the active conversation path and fold artifact operations into
  * versioned artifacts. Updates apply onto the latest version of the same
@@ -371,15 +398,32 @@ export function collectArtifacts(
 			}
 
 			// update op
+			// Models sometimes rename the identifier when editing (e.g. green-button ->
+			// blue-button) or drift its case/whitespace, which would orphan the update as a
+			// dead "couldn't be linked" card. When the id doesn't match an existing artifact,
+			// first try a normalized (case/whitespace-insensitive) match so a drifted id hits
+			// the artifact it meant; otherwise fall back to the most-recently-created one (an
+			// update is by definition an edit to existing content, and the Map preserves
+			// insertion order). Only leave a disabled card when there's nothing to link to.
+			if (!artifact && artifacts.size > 0) {
+				const wanted = normalizeIdentifier(op.identifier);
+				const normalizedMatches = [...artifacts.values()].filter(
+					(a) => normalizeIdentifier(a.identifier) === wanted
+				);
+				artifact =
+					normalizedMatches.length === 1 ? normalizedMatches[0] : [...artifacts.values()].at(-1);
+			}
 			const base = artifact?.versions.at(-1);
 			if (!artifact || !base) {
-				// Update referencing an unknown artifact: surface a disabled card
 				byMessageOp.set(key, { identifier: op.identifier, version: -1 });
 				continue;
 			}
 			const result = applyArtifactUpdate(base.content, op.pairs);
+			// Use the resolved artifact's identifier (not op.identifier, which may be the
+			// renamed/mismatched one) so the new version attaches to the right artifact and
+			// the card resolves it.
 			const version: ArtifactVersion = {
-				identifier: op.identifier,
+				identifier: artifact.identifier,
 				type: base.type,
 				title: op.title || base.title,
 				language: base.language,
@@ -395,9 +439,9 @@ export function collectArtifacts(
 				failedPairs: Math.max(result.failed, !isLive && op.pairs.length === 0 ? 1 : 0),
 			};
 			artifact.versions.push(version);
-			byMessageOp.set(key, { identifier: op.identifier, version: version.version });
+			byMessageOp.set(key, { identifier: artifact.identifier, version: version.version });
 			if (isLive) {
-				streaming = { identifier: op.identifier, version: version.version };
+				streaming = { identifier: artifact.identifier, version: version.version };
 			}
 		}
 	}
