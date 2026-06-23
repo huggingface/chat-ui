@@ -36,8 +36,16 @@ Editing an artifact you created earlier in the conversation:
 <new_str>replacement text</new_str>
 </artifact>
 
+For example, to recolor a button in an existing "signup-form" artifact, emit exactly:
+
+<artifact identifier="signup-form" type="update">
+<old_str>background: #16a34a;</old_str>
+<new_str>background: #2563eb;</new_str>
+</artifact>
+
 - Each old_str must match the latest version EXACTLY (including whitespace/indentation) and must be unique within it. Copy it verbatim from the latest version; do not retype, reformat, or re-indent it. To change the title, set title="New Title" on the artifact update tag — never put the artifact's opening tag inside an old_str.
 - Close each tag with its OWN matching tag: old_str with </old_str>, new_str with </new_str>. Do not swap them or omit a closing tag.
+- Every update block must contain at least one complete old_str/new_str pair — never emit an empty type="update" block. If you can't produce exact old_str text, re-emit the full artifact instead (same identifier).
 - Emit at most ONE update block per reply, with all the pairs (up to 4) inside that single block — never one block per pair.
 - For larger changes, re-emit the full artifact with the SAME identifier (this creates a new version).
 - Keep the identifier BYTE-IDENTICAL across every version, even when the title or content changes (renaming a green button to blue keeps the same identifier). Use a new identifier only for a genuinely different artifact.
