@@ -121,6 +121,44 @@ describe("splitArtifactSegments", () => {
 		expect(artifact.op.closed).toBe(false);
 	});
 
+	// Real models (GLM-5.2, Kimi-K2.6) routinely swap the closing tags under token
+	// pressure; the parser must still recover the pair. See artifact-real-eval.
+	it("parses an update pair when old_str is closed by </new_str> (swapped)", () => {
+		const segments = splitArtifactSegments(
+			`<artifact identifier="x" type="update"><old_str>A</new_str><new_str>B</new_str></artifact>`
+		);
+		const artifact = segments[0];
+		if (artifact.type !== "artifact" || artifact.op.kind !== "update") {
+			throw new Error("expected update artifact");
+		}
+		expect(artifact.op.pairs).toEqual([{ old: "A", new: "B" }]);
+	});
+
+	it("parses an update pair when new_str is closed by </old_str> (swapped)", () => {
+		const segments = splitArtifactSegments(
+			`<artifact identifier="x" type="update"><old_str>A</old_str><new_str>B</old_str></artifact>`
+		);
+		const artifact = segments[0];
+		if (artifact.type !== "artifact" || artifact.op.kind !== "update") {
+			throw new Error("expected update artifact");
+		}
+		expect(artifact.op.pairs).toEqual([{ old: "A", new: "B" }]);
+	});
+
+	it("parses multiple pairs with mixed swapped closers", () => {
+		const segments = splitArtifactSegments(
+			`<artifact identifier="x" type="update"><old_str>A</new_str><new_str>B</new_str><old_str>C</old_str><new_str>D</old_str></artifact>`
+		);
+		const artifact = segments[0];
+		if (artifact.type !== "artifact" || artifact.op.kind !== "update") {
+			throw new Error("expected update artifact");
+		}
+		expect(artifact.op.pairs).toEqual([
+			{ old: "A", new: "B" },
+			{ old: "C", new: "D" },
+		]);
+	});
+
 	it("handles multiple artifacts in one message", () => {
 		const segments = splitArtifactSegments(`${HTML_ARTIFACT}\nand\n${HTML_ARTIFACT}`);
 		const kinds = segments.map((s) => s.type);
