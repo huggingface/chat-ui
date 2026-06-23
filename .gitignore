@@ -13,6 +13,8 @@ SECRET_CONFIG
 !.env
 gcp-*.json
 db
+# Output of scripts/artifact-real-eval.ts (real-model eval transcripts)
+eval-output/
 models/*
 !models/add-your-models-here.txt
 .claude/*

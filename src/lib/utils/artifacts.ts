@@ -82,7 +82,14 @@ export type ArtifactSegment =
 // and, worse, `<old_str>…<new_str>` adjacency silently stops matching.
 const OPEN_TAG_REGEX = /<+artifact\b([^>]*)>/i;
 const CLOSE_TAG_REGEX = /<+\/artifact>/i;
-const UPDATE_PAIR_REGEX = /<+old_str>([\s\S]*?)<+\/old_str>\s*<+new_str>([\s\S]*?)<+\/new_str>/g;
+// Accept either closer for each half: models under token pressure routinely swap
+// them (`<old_str>A</new_str>` or `<new_str>B</old_str>`), which a strict
+// `</old_str>`-then-`</new_str>` matcher silently drops. Observed live with both
+// GLM-5.2 and Kimi-K2.6. Capture groups/positions are unchanged, so downstream
+// (applyArtifactUpdate/findMatch) is unaffected; the lazy quantifier still stops
+// at the first closer, so well-formed pairs parse identically.
+const UPDATE_PAIR_REGEX =
+	/<+old_str>([\s\S]*?)<+\/(?:old|new)_str>\s*<+new_str>([\s\S]*?)<+\/(?:new|old)_str>/g;
 
 function parseAttributes(raw: string): Record<string, string> {
 	const attrs: Record<string, string> = {};
