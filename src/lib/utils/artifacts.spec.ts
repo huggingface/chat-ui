@@ -330,6 +330,22 @@ describe("collectArtifacts", () => {
 		expect(registry.byMessageOp.get("m3:0")).toEqual({ identifier: "second", version: 2 });
 	});
 
+	it("prefers a normalized identifier match over the latest artifact for drifted ids", () => {
+		const registry = collectArtifacts([
+			msg("m1", `<artifact identifier="app" type="html" title="App">alpha</artifact>`),
+			msg("m2", `<artifact identifier="chart" type="html" title="Chart">bravo</artifact>`),
+			msg(
+				"m3",
+				`<artifact identifier="App" type="update"><old_str>alpha</old_str><new_str>gamma</new_str></artifact>`
+			),
+		]);
+		// "App" drifts from "app" by case, so it links there — not the latest ("chart")
+		expect(registry.artifacts.get("app")?.versions).toHaveLength(2);
+		expect(registry.artifacts.get("app")?.versions[1]?.content).toBe("gamma");
+		expect(registry.artifacts.get("chart")?.versions).toHaveLength(1);
+		expect(registry.byMessageOp.get("m3:0")).toEqual({ identifier: "app", version: 2 });
+	});
+
 	it("applies streaming update pairs progressively", () => {
 		const registry = collectArtifacts(
 			[

@@ -329,6 +329,11 @@ export function artifactOpKey(messageId: Message["id"], opIndex: number): string
 	return `${messageId}:${opIndex}`;
 }
 
+/** Case/whitespace-insensitive identifier key, for tolerant update linking. */
+function normalizeIdentifier(id: string): string {
+	return id.trim().toLowerCase();
+}
+
 /**
  * Walk the active conversation path and fold artifact operations into
  * versioned artifacts. Updates apply onto the latest version of the same
@@ -395,12 +400,18 @@ export function collectArtifacts(
 			// update op
 			// Models sometimes rename the identifier when editing (e.g. green-button ->
 			// blue-button) or drift its case/whitespace, which would orphan the update as a
-			// dead "couldn't be linked" card. An update is by definition an edit to existing
-			// content, so when the id doesn't match an existing artifact, link to the
-			// most-recently-created one (the Map preserves insertion order). Only leave a
-			// disabled card when there's genuinely nothing to link to.
+			// dead "couldn't be linked" card. When the id doesn't match an existing artifact,
+			// first try a normalized (case/whitespace-insensitive) match so a drifted id hits
+			// the artifact it meant; otherwise fall back to the most-recently-created one (an
+			// update is by definition an edit to existing content, and the Map preserves
+			// insertion order). Only leave a disabled card when there's nothing to link to.
 			if (!artifact && artifacts.size > 0) {
-				artifact = [...artifacts.values()].at(-1);
+				const wanted = normalizeIdentifier(op.identifier);
+				const normalizedMatches = [...artifacts.values()].filter(
+					(a) => normalizeIdentifier(a.identifier) === wanted
+				);
+				artifact =
+					normalizedMatches.length === 1 ? normalizedMatches[0] : [...artifacts.values()].at(-1);
 			}
 			const base = artifact?.versions.at(-1);
 			if (!artifact || !base) {
