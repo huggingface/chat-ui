@@ -14,6 +14,10 @@
 	let { code = "", rawCode = "", loading = false }: Props = $props();
 
 	let previewOpen = $state(false);
+	let preEl = $state<HTMLPreElement | null>(null);
+	// Pause auto-scroll once the user scrolls up to read earlier lines, so we
+	// don't fight them while tokens keep streaming in.
+	let userScrolled = $state(false);
 
 	function hasStrictHtml5Doctype(input: string): boolean {
 		if (!input) return false;
@@ -29,6 +33,20 @@
 	}
 
 	let showPreview = $derived(hasStrictHtml5Doctype(rawCode) || isSvgDocument(rawCode));
+
+	function handleScroll() {
+		if (!preEl) return;
+		const distanceFromBottom = preEl.scrollHeight - preEl.scrollTop - preEl.clientHeight;
+		userScrolled = distanceFromBottom > 10;
+	}
+
+	$effect(() => {
+		// Re-run on every streamed chunk by reading code.
+		code;
+		if (loading && preEl && !userScrolled) {
+			preEl.scrollTop = preEl.scrollHeight;
+		}
+	});
 </script>
 
 <div class="group relative my-4 rounded-lg">
@@ -63,7 +81,11 @@
 			/>
 		</div>
 	</div>
-	<pre class="scrollbar-custom overflow-auto px-5 font-mono transition-[height]"><code
+	<pre
+		bind:this={preEl}
+		onscroll={handleScroll}
+		class="scrollbar-custom overflow-auto px-5 font-mono transition-[height]"
+		class:max-h-96={loading}><code
 			><!-- eslint-disable svelte/no-at-html-tags -->{@html DOMPurify.sanitize(code)}</code
 		></pre>
 
