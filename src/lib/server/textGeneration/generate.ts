@@ -109,6 +109,18 @@ export async function* generate(
 				text = text.slice(0, text.length - stopToken.length);
 			}
 
+			// `finish_reason: "length"` means the model hit its max_tokens budget mid-generation
+			// (e.g. exhausted the budget while still reasoning, never reaching the answer). The
+			// provider marks the final token as a normal stop, so flag it explicitly as interrupted
+			// and log it instead of silently saving a truncated answer as if it were complete.
+			if ((output as { truncated?: boolean }).truncated) {
+				interrupted = true;
+				logger.warn(
+					{ conversationId: conv._id.toString(), model: model.id, length: text.length },
+					"Generation truncated: model hit max_tokens (finish_reason=length) before completing"
+				);
+			}
+
 			let finalAnswer = text;
 			if (modelReasoning && modelReasoning.type === "regex" && modelReasoning.regex) {
 				const regex = new RegExp(modelReasoning.regex);
