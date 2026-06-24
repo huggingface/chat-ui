@@ -376,12 +376,6 @@
 	function computeSpacerHeight(): number {
 		if (!chatContainer || !spacerEl) return MIN_SPACER_PX;
 
-		// Mobile/touch: skip the ChatGPT-style pin (user message scrolled to the top).
-		// On iOS, WebKit suppresses programmatic scrolls during touch/momentum, so the
-		// pin resolves as a jarring jump up when streaming ends. Keeping the spacer at
-		// its minimum means the view just scrolls to the bottom and follows the stream.
-		if (!window.matchMedia("(min-width: 768px)").matches) return MIN_SPACER_PX;
-
 		const userMsgs = chatContainer.querySelectorAll('[data-message-type="user"]');
 		const lastUserMsg = userMsgs[userMsgs.length - 1] as HTMLElement | undefined;
 		if (!lastUserMsg) return MIN_SPACER_PX;
