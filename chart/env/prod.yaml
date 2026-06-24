@@ -161,7 +161,7 @@ envVars:
       { "id": "moonshotai/Kimi-K2-Instruct-0905", "description": "Instruction MoE strong coding and multi step reasoning, long context." },
       { "id": "openai/gpt-oss-20b", "description": "Efficient open model for reasoning and tool use, runs locally." , "supportsReasoning": true },
       { "id": "swiss-ai/Apertus-8B-Instruct-2509", "description": "Open, multilingual, trained on compliant data transparent global assistant." },
-      { "id": "openai/gpt-oss-120b", "description": "High performing open model suitable for large scale applications." , "supportsReasoning": true, "supportsArtifacts": true, "parameters": { "max_tokens": 98304 } },
+      { "id": "openai/gpt-oss-120b", "description": "High performing open model suitable for large scale applications." , "supportsReasoning": true, "supportsArtifacts": true, "parameters": { "max_tokens": 65536 } },
       { "id": "Qwen/Qwen3-Coder-30B-A3B-Instruct", "description": "Code specialized Qwen long context strong generation and function calling." },
       { "id": "meta-llama/Llama-3.1-8B-Instruct", "description": "Instruction tuned Llama efficient conversational assistant with improved alignment." },
       { "id": "deepseek-ai/DeepSeek-R1", "description": "MoE reasoning model excels at math, logic, coding with steps."},
