@@ -39,6 +39,21 @@ describe("openAIChatToTextGenerationStream truncation handling", () => {
 		expect(final?.generated_text).toContain("<think>");
 	});
 
+	it("emits a terminal truncated output even when no content was produced", async () => {
+		// Hidden-reasoning models can burn the whole budget without surfacing any tokens,
+		// then terminate with finish_reason "length". The adapter must still yield a terminal
+		// output (generated_text "" rather than null) carrying truncated:true so the pipeline
+		// can finalize/flag it instead of silently dropping the empty completion.
+		const chunks = [{ choices: [{ index: 0, delta: {}, finish_reason: "length" }] }];
+
+		const outputs = await collect(openAIChatToTextGenerationStream(mockStream(chunks)));
+		const final = outputs.find((o) => o.generated_text !== null);
+
+		expect(final).toBeDefined();
+		expect(final?.generated_text).toBe("");
+		expect(final?.truncated).toBe(true);
+	});
+
 	it("does not flag truncated on a normal finish_reason 'stop'", async () => {
 		const chunks = [
 			{ choices: [{ index: 0, delta: { content: "Hello" } }] },
