@@ -23,6 +23,11 @@ export type ToolRun = {
 	output: string;
 };
 
+export type ToolImagePart = {
+	type: "image_url";
+	image_url: { url: string; detail: "auto" };
+};
+
 export interface NormalizedToolCall {
 	id: string;
 	name: string;
@@ -47,6 +52,7 @@ export interface ExecuteToolCallsParams {
 export interface ToolCallExecutionResult {
 	toolMessages: ChatCompletionMessageParam[];
 	toolRuns: ToolRun[];
+	toolImages: ToolImagePart[];
 	finalAnswer?: { text: string; interrupted: boolean };
 }
 
@@ -64,6 +70,55 @@ const serverMap = (servers: McpServerConfig[]): Map<string, McpServerConfig> => 
 	return map;
 };
 
+function toToolImagePart(block: unknown): ToolImagePart | undefined {
+	if (!block || typeof block !== "object") return undefined;
+	const obj = block as Record<string, unknown>;
+
+	// MCP image block shape: { type: "image", data: "<base64>", mimeType: "image/png" }
+	if (
+		obj.type === "image" &&
+		typeof obj.data === "string" &&
+		typeof obj.mimeType === "string" &&
+		obj.data.length > 0 &&
+		obj.mimeType.length > 0
+	) {
+		return {
+			type: "image_url",
+			image_url: {
+				url: `data:${obj.mimeType};base64,${obj.data}`,
+				detail: "auto",
+			},
+		};
+	}
+
+	// Optional pass-through if tool already returns image_url content block.
+	// Support both:
+	// 1) { type: "image_url", url: "..." }
+	// 2) { type: "image_url", image_url: { url: "..." } } (OpenAI-style)
+	const nestedUrl =
+		typeof obj.image_url === "object" &&
+		obj.image_url !== null &&
+		typeof (obj.image_url as Record<string, unknown>).url === "string"
+			? ((obj.image_url as Record<string, unknown>).url as string)
+			: undefined;
+	const directOrNestedUrl = typeof obj.url === "string" ? obj.url : nestedUrl;
+	if (
+		obj.type === "image_url" &&
+		typeof directOrNestedUrl === "string" &&
+		directOrNestedUrl.length > 0
+	) {
+		return {
+			type: "image_url",
+			image_url: {
+				url: directOrNestedUrl,
+				detail: "auto",
+			},
+		};
+	}
+
+	return undefined;
+}
+
 export async function* executeToolCalls({
 	calls,
 	mapping,
@@ -78,6 +133,7 @@ export async function* executeToolCalls({
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
+	const toolImages: ToolImagePart[] = [];
 	const serverLookup = serverMap(servers);
 	// Pre-emit call + ETA updates and prepare tasks
 	type TaskResult = {
@@ -335,7 +391,12 @@ export async function* executeToolCalls({
 		const name = prepared[r.index].call.name;
 		const id = prepared[r.index].call.id;
 		if (!r.error) {
-			const output = r.output ?? "";
+			const imageParts = (r.blocks ?? []).map(toToolImagePart).filter(Boolean) as ToolImagePart[];
+			toolImages.push(...imageParts);
+			let output = r.output ?? "";
+			if (!output && imageParts.length > 0) {
+				output = `Tool returned ${imageParts.length} image(s).`;
+			}
 			toolRuns.push({ name, parameters: r.paramsClean, output });
 			// For the LLM follow-up call, we keep only the textual output
 			toolMessages.push({ role: "tool", tool_call_id: id, content: output });
@@ -345,5 +406,5 @@ export async function* executeToolCalls({
 		}
 	}
 
-	yield { type: "complete", summary: { toolMessages, toolRuns } };
+	yield { type: "complete", summary: { toolMessages, toolRuns, toolImages } };
 }
