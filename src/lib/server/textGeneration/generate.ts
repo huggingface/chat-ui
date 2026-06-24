@@ -86,8 +86,11 @@ export async function* generate(
 				continue;
 			}
 		}
-		// text generation completed
-		if (output.generated_text) {
+		// text generation completed. Use `!= null` (not truthiness) so a terminal output
+		// with empty text is still finalized: a model can hit finish_reason "length" before
+		// emitting any visible content (hidden-reasoning models, tiny budgets), and that
+		// truncation must still be flagged + logged rather than silently dropped.
+		if (output.generated_text != null) {
 			// If an abort happened just before final output, stop here and let
 			// the caller emit an interrupted final answer with partial text.
 			const abortTime = AbortedGenerations.getInstance().getAbortTime(conv._id.toString());
