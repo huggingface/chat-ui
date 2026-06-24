@@ -23,6 +23,7 @@
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { createConversationsStore } from "$lib/stores/conversations.svelte";
+	import { promptFromLinkParams } from "$lib/utils/urlParams";
 
 	let { data = $bindable(), children } = $props();
 
@@ -199,6 +200,12 @@
 		page.route.id === "/r/[id]" ||
 			(page.route.id === "/conversation/[id]" && page.params.id?.length === 7)
 	);
+
+	// Home-page ?q= / ?prompt= deep links emit their own prompt-specific tags
+	// (see PromptPreviewTags.svelte), so skip the generic ones there too
+	let isPromptDeepLink = $derived(
+		page.route.id === "/" && Boolean(promptFromLinkParams(page.url.searchParams))
+	);
 </script>
 
 <svelte:head>
@@ -208,7 +215,7 @@
 
 	<!-- use those meta tags everywhere except on special listing pages -->
 	<!-- feel free to refacto if there's a better way -->
-	{#if !page.url.pathname.includes("/models/") && !isSharedConversationView}
+	{#if !page.url.pathname.includes("/models/") && !isSharedConversationView && !isPromptDeepLink}
 		<meta name="twitter:card" content="summary_large_image" />
 		<meta name="twitter:title" content="{publicConfig.PUBLIC_APP_NAME} - Chat with AI models" />
 		<meta name="twitter:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />

@@ -12,7 +12,8 @@
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
-	import { sanitizeUrlParam } from "$lib/utils/urlParams";
+	import { sanitizeUrlParam, promptFromLinkParams } from "$lib/utils/urlParams";
+	import PromptPreviewTags from "$lib/components/PromptPreviewTags.svelte";
 	import { onMount, tick } from "svelte";
 	import { loading } from "$lib/stores/loading.js";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
@@ -159,11 +160,20 @@
 	});
 
 	let currentModel = $derived(findCurrentModel(data.models, data.oldModels, $settings.activeModel));
+
+	// Social-preview text for ?q= / ?prompt= deep links. Server-rendered so link
+	// unfurlers (which don't run the onMount that consumes these params) see the
+	// prompt-specific card; the layout suppresses its generic tags in this case.
+	let previewPrompt = $derived(promptFromLinkParams(page.url.searchParams));
 </script>
 
 <svelte:head>
 	<title>{publicConfig.PUBLIC_APP_NAME}</title>
 </svelte:head>
+
+{#if previewPrompt}
+	<PromptPreviewTags prompt={previewPrompt} />
+{/if}
 
 {#if hasModels}
 	<ChatWindow
