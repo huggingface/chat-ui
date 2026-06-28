@@ -337,7 +337,11 @@
 				last?.content === "";
 
 			if (userJustSentMessage) {
-				scrollBehavior = "smooth";
+				// Touch devices (iOS): a smooth programmatic scroll is suppressed during
+				// touch/momentum and only animates once the gesture/stream settle — i.e. the
+				// view visibly scrolls up right as the reply finishes. An instant scroll snaps
+				// to the bottom (revealing the freshly inflated spacer) immediately on send.
+				scrollBehavior = window.matchMedia("(pointer: coarse)").matches ? "instant" : "smooth";
 				forceReattach++;
 				// Only activate dynamic spacer after the first exchange
 				// (first user+assistant pair scrolls normally)
