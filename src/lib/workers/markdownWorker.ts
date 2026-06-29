@@ -3,7 +3,7 @@ type SimpleSource = {
 	title?: string;
 	link: string;
 };
-import { processBlocks, type BlockToken } from "$lib/utils/marked";
+import { processBlocks, fallbackBlocks, type BlockToken } from "$lib/utils/marked";
 
 export type IncomingMessage = {
 	type: "process";
@@ -19,44 +19,39 @@ export type OutgoingMessage = {
 	requestId: number;
 };
 
-// Flag to track if the worker is currently processing a message
-let isProcessing = false;
-
-// Buffer to store the latest incoming message
-let latestMessage: IncomingMessage | null = null;
-
-// Helper function to safely handle the latest message
-async function processMessage() {
-	if (latestMessage) {
-		const nextMessage = latestMessage;
-
-		latestMessage = null;
-		isProcessing = true;
-
-		try {
-			const { content, sources, requestId, streaming } = nextMessage;
-			const processedBlocks = await processBlocks(content, sources, streaming ?? false);
-			postMessage(
-				JSON.parse(JSON.stringify({ type: "processed", blocks: processedBlocks, requestId }))
-			);
-		} finally {
-			isProcessing = false;
-
-			// After processing, check if a new message was buffered
-			await new Promise((resolve) => setTimeout(resolve, 100));
-			processMessage();
-		}
-	}
-}
-
-onmessage = (event) => {
-	if (event.data.type !== "process") {
+// Stateless request/response. All flow control (one job at a time per worker, per-client
+// coalescing) lives in the shared pool (markdownWorkerPool.ts), so the worker just
+// processes whatever it is handed and replies once. The pool never posts a second job to
+// a busy worker, hence no internal queue/buffer here.
+onmessage = async (event) => {
+	const data = event.data as IncomingMessage;
+	if (data.type !== "process") {
 		return;
 	}
 
-	latestMessage = event.data as IncomingMessage;
+	const { content, sources, requestId, streaming } = data;
 
-	if (!isProcessing && latestMessage) {
-		processMessage();
+	let blocks: BlockToken[];
+	try {
+		blocks = await processBlocks(content, sources ?? [], streaming ?? false);
+	} catch {
+		// Never strand the pool: it waits for a reply to free this worker, so on failure
+		// degrade to the lightweight fallback rendering instead of going silent.
+		blocks = fallbackBlocks(content);
+	}
+
+	try {
+		postMessage(
+			JSON.parse(JSON.stringify({ type: "processed", blocks, requestId })) as OutgoingMessage
+		);
+	} catch {
+		// A block somehow isn't JSON/structured-clone safe. Reply with the fallback so the
+		// pool always gets a reply and the shared worker is never left wedged. fallbackBlocks
+		// output is plain data and always serializes.
+		postMessage({
+			type: "processed",
+			blocks: fallbackBlocks(content),
+			requestId,
+		} as OutgoingMessage);
 	}
 };

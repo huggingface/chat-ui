@@ -436,6 +436,21 @@ type TextToken = {
 
 const blockCache = new Map<string, BlockToken>();
 
+// The markdown worker pool keeps a small number of long-lived workers alive for the whole
+// session, so their blockCache no longer dies with a per-message worker. Bound it (Map
+// preserves insertion order, so deleting the first key evicts the oldest entry) to keep
+// memory flat across very long / many conversations. Comfortably larger than any single
+// conversation, so normal usage still gets full cache hits.
+const BLOCK_CACHE_MAX = 2000;
+
+function rememberBlock(key: string, block: BlockToken) {
+	blockCache.set(key, block);
+	if (blockCache.size > BLOCK_CACHE_MAX) {
+		const oldest = blockCache.keys().next().value;
+		if (oldest !== undefined) blockCache.delete(oldest);
+	}
+}
+
 function cacheKey(index: number, blockContent: string, sources: SimpleSource[]) {
 	const sourceKey = sources.map((s) => s.link).join("|");
 	return `${index}-${hashString(blockContent)}|${sourceKey}`;
@@ -534,7 +549,7 @@ export async function processBlocks(
 				content: blockContent,
 				tokens,
 			};
-			blockCache.set(key, block);
+			rememberBlock(key, block);
 			return block;
 		})
 	);
@@ -594,7 +609,7 @@ export function processBlocksSync(
 			content: blockContent,
 			tokens,
 		};
-		blockCache.set(key, block);
+		rememberBlock(key, block);
 		return block;
 	});
 }
