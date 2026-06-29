@@ -40,7 +40,18 @@ onmessage = async (event) => {
 		blocks = fallbackBlocks(content);
 	}
 
-	postMessage(
-		JSON.parse(JSON.stringify({ type: "processed", blocks, requestId })) as OutgoingMessage
-	);
+	try {
+		postMessage(
+			JSON.parse(JSON.stringify({ type: "processed", blocks, requestId })) as OutgoingMessage
+		);
+	} catch {
+		// A block somehow isn't JSON/structured-clone safe. Reply with the fallback so the
+		// pool always gets a reply and the shared worker is never left wedged. fallbackBlocks
+		// output is plain data and always serializes.
+		postMessage({
+			type: "processed",
+			blocks: fallbackBlocks(content),
+			requestId,
+		} as OutgoingMessage);
+	}
 };
