@@ -374,7 +374,7 @@
 {#if message.from === "assistant"}
 	<div
 		bind:offsetWidth={messageWidth}
-		class="group relative -mb-4 flex w-fit max-w-full items-start justify-start gap-4 pb-4 leading-relaxed max-sm:mb-1 {message.routerMetadata &&
+		class="message-cv group relative -mb-4 flex w-fit max-w-full items-start justify-start gap-4 pb-4 leading-relaxed max-sm:mb-1 {message.routerMetadata &&
 		messageInfoWidth >= messageWidth
 			? 'mb-1'
 			: ''}"
@@ -552,7 +552,7 @@
 {/if}
 {#if message.from === "user"}
 	<div
-		class="group relative {alternatives.length > 1 && editMsdgId === null
+		class="message-cv group relative {alternatives.length > 1 && editMsdgId === null
 			? 'mb-7'
 			: ''} w-full items-start justify-start gap-4"
 		data-message-id={message.id}
@@ -686,6 +686,25 @@
 {/if}
 
 <style>
+	/* Long conversations render every message at once (no virtualization). On
+	   mobile WebKit each tab's renderer has a hard ~2 GB memory ceiling, and a
+	   few hundred messages worth of laid-out DOM + paint backing stores blows
+	   past it, so iOS Safari jetsam-kills the tab ("A problem repeatedly
+	   occurred"). content-visibility:auto lets the engine skip layout and paint
+	   for off-screen messages, keeping peak memory bounded. contain-intrinsic-size
+	   gives skipped messages a stable placeholder height so the scrollbar and
+	   scroll position stay sensible. content-visibility implies paint containment,
+	   which would clip the copy/retry/edit controls that sit just below each
+	   message (they overflow by up to ~44px); overflow-clip-margin extends the
+	   clip region so those controls keep painting. Browsers without
+	   content-visibility support simply ignore these rules (progressive
+	   enhancement). */
+	.message-cv {
+		content-visibility: auto;
+		contain-intrinsic-size: auto 200px;
+		overflow-clip-margin: 3rem;
+	}
+
 	@keyframes loading {
 		to {
 			stroke-dashoffset: 122.9;
