@@ -96,27 +96,6 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 		}
 	};
 
-	const nextFrame = () =>
-		new Promise<void>((resolve) => {
-			if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => resolve());
-			else resolve();
-		});
-
-	// content-visibility:auto messages start at their contain-intrinsic-size
-	// estimate, so a single scrollToBottom can land short of the true bottom: as
-	// the bottom messages scroll into view they render at full height and grow
-	// scrollHeight. Re-scroll across a few frames to converge, stopping early once
-	// we reach the bottom or the user takes over. Bounded so it can never loop
-	// indefinitely.
-	const scrollToBottomConverged = async (behavior: ScrollBehavior = "instant") => {
-		scrollToBottom(behavior);
-		for (let i = 0; i < 5; i++) {
-			await nextFrame();
-			if (isDetached || userScrolling || isAtBottom()) return;
-			scrollToBottom("instant");
-		}
-	};
-
 	const scheduleUserScrollEndCheck = () => {
 		userScrolling = true;
 		clearUserScrollTimeout();
@@ -197,16 +176,7 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 			clearUserScrollTimeout();
 
 			await tick();
-			const behavior = getScrollBehavior(newDependency);
-			// Conversation switch/load uses "instant" and renders content-visibility
-			// messages from their size estimate; converge to the real bottom. The
-			// "smooth" path (new user message) is handled by ChatWindow's spacer
-			// observer, so keep its single smooth scroll.
-			if (behavior === "instant") {
-				await scrollToBottomConverged(behavior);
-			} else {
-				scrollToBottom(behavior);
-			}
+			scrollToBottom(getScrollBehavior(newDependency));
 			return true;
 		}
 
@@ -314,7 +284,7 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 	if (dependency) {
 		void (async () => {
 			await tick();
-			await scrollToBottomConverged();
+			scrollToBottom();
 		})();
 	}
 
