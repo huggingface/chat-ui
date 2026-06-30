@@ -27,7 +27,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Inject slug/short variables
-        uses: rlespinasse/github-slug-action@v4.5.0
+        run: echo "GITHUB_EVENT_PULL_REQUEST_HEAD_SHA_SHORT=$(echo ${{ github.event.pull_request.head.sha }} | cut -c 1-7)" >> $GITHUB_ENV
 
       - name: Set GITHUB_SHA_SHORT from PR
         if: env.GITHUB_EVENT_PULL_REQUEST_HEAD_SHA_SHORT != null
