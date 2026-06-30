@@ -65,7 +65,7 @@ export function getThemePreference(): ThemePreference {
 export function setTheme(preference: ThemePreference) {
 	try {
 		localStorage.theme = preference;
-	} catch (_err) {
+	} catch {
 		void 0; // ignore write errors
 	}
 
@@ -88,7 +88,7 @@ export function setTheme(preference: ThemePreference) {
 	if (existing) {
 		try {
 			mql.removeEventListener("change", existing);
-		} catch (_err) {
+		} catch {
 			// older Safari compatibility
 			const legacy = (
 				mql as unknown as {
@@ -102,7 +102,7 @@ export function setTheme(preference: ThemePreference) {
 	if (preference === "system") {
 		try {
 			mql.addEventListener("change", listener);
-		} catch (_err) {
+		} catch {
 			// older Safari compatibility
 			const legacy = (
 				mql as unknown as {

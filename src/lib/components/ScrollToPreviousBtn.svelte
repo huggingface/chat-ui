@@ -49,7 +49,7 @@
 	onDestroy(destroy);
 
 	$effect(() => {
-		scrollNode &&
+		if (scrollNode) {
 			untrack(() => {
 				if (scrollNode) {
 					destroy();
@@ -63,6 +63,7 @@
 					scrollNode.addEventListener("scroll", updateVisibility);
 				}
 			});
+		}
 	});
 </script>
 

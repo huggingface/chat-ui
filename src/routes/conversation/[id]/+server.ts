@@ -588,7 +588,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						if (event.type === MessageUpdateType.FinalAnswer) {
 							controller.enqueue(" ".repeat(4096));
 						}
-					} catch (err) {
+					} catch {
 						clientDetached = true;
 						logger.info(
 							{ conversationId: convId.toString() },

@@ -36,7 +36,7 @@ export function validateMcpServerUrl(urlString: string): string | null {
 		}
 
 		return url.toString();
-	} catch (error) {
+	} catch {
 		// Invalid URL
 		return null;
 	}

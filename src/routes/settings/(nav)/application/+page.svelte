@@ -69,7 +69,7 @@
 		try {
 			const cfg = await client.debug.config.get().then(handleResponse);
 			OPENAI_BASE_URL = (cfg as { OPENAI_BASE_URL?: string }).OPENAI_BASE_URL || null;
-		} catch (e) {
+		} catch {
 			// ignore if debug endpoint is unavailable
 		}
 
@@ -319,7 +319,7 @@
 				onclick={async (e) => {
 					e.preventDefault();
 
-					confirm("Are you sure you want to delete all conversations?") &&
+					if (confirm("Are you sure you want to delete all conversations?")) {
 						client.conversations
 							.delete()
 							.then(async () => {
@@ -329,6 +329,7 @@
 								console.error(err);
 								$error = err.message;
 							});
+					};
 				}}
 				type="submit"
 				class="flex items-center underline decoration-red-200 underline-offset-2 hover:decoration-red-500 dark:decoration-red-900 dark:hover:decoration-red-700"

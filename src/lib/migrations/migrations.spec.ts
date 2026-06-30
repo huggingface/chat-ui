@@ -14,7 +14,7 @@ describe(
 			await ready;
 			try {
 				await collections.semaphores.createIndex({ key: 1 }, { unique: true });
-			} catch (e) {
+			} catch {
 				// Index might already exist, ignore error
 			}
 		}, 20000);

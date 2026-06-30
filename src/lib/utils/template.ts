@@ -24,7 +24,7 @@ export function compileTemplate<T>(
 	try {
 		// Try to compile with Jinja
 		jinjaTemplate = new Template(input);
-	} catch (e) {
+	} catch {
 		// logger.error(e, "Could not compile with Jinja");
 		// Could not compile with Jinja
 		jinjaTemplate = undefined;

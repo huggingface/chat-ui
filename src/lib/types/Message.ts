@@ -1,11 +1,10 @@
 import type { InferenceProvider } from "@huggingface/inference";
 import type { MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
-import type { v4 } from "uuid";
 
 export type Message = Partial<Timestamps> & {
 	from: "user" | "assistant" | "system";
-	id: ReturnType<typeof v4>;
+	id: string;
 	content: string;
 	updates?: MessageUpdate[];
 
