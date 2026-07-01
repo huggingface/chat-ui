@@ -507,8 +507,12 @@
 
 	$effect(() => {
 		if ($pendingChatInput) {
-			draft = $pendingChatInput;
+			const { text, submit } = $pendingChatInput;
 			pendingChatInput.set(undefined);
+			draft = text;
+			// If handleSubmit bails (auth, generation in flight), the text stays
+			// in the input so nothing is lost
+			if (submit) handleSubmit();
 		}
 	});
 

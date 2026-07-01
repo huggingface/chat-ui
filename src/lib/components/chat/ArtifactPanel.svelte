@@ -284,11 +284,13 @@
 	function askToFixErrors() {
 		const lines = errors.map((e, i) => `${i + 1}. ${e.message}${e.stack ? `\n${e.stack}` : ""}`);
 		const summary = lines[0] ?? "Unknown error";
-		pendingChatInput.set(
-			errors.length > 1
-				? `it's not working: ${summary} (+${errors.length - 1} more) - can you fix it?`
-				: `it's not working: ${summary} - can you fix it?`
-		);
+		pendingChatInput.set({
+			text:
+				errors.length > 1
+					? `it's not working: ${summary} (+${errors.length - 1} more) - can you fix it?`
+					: `it's not working: ${summary} - can you fix it?`,
+			submit: true,
+		});
 	}
 
 	// ----- actions -----
@@ -605,7 +607,7 @@
 				<button
 					type="button"
 					class="btn flex items-center gap-1.5 rounded-full border border-red-300/60 bg-red-50 px-2.5 py-0.5 text-red-600 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
-					title="Send the error to the chat input"
+					title="Send the error to the chat"
 					onclick={askToFixErrors}
 				>
 					{errors.length} error{errors.length > 1 ? "s" : ""} — ask to fix
