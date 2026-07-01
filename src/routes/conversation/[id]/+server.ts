@@ -27,6 +27,8 @@ import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { clampStoppedContent } from "$lib/server/stopTruncation";
 import { MetricsServer } from "$lib/server/metrics";
+import { stripReasoningBlocks } from "$lib/server/textGeneration/utils/routing";
+import { getFallbackTitle } from "$lib/server/textGeneration/utils/title";
 
 // How long a stop marker is protected from the pre-flight cleanup of a new
 // generation. A marker younger than this may still be awaiting observation by
@@ -479,9 +481,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 				// Set the title
 				else if (event.type === MessageUpdateType.Title) {
-					// Always strip <think> markers from titles when saving
-					const sanitizedTitle = event.title.replace(/<\/?think>/gi, "").trim();
-					conv.title = sanitizedTitle;
+					// Always strip <think> reasoning blocks from titles when saving.
+					// If stripping leaves nothing (e.g. a model that emitted only a
+					// reasoning trace), keep the existing title rather than blanking it.
+					const sanitizedTitle = stripReasoningBlocks(event.title).trim();
+					conv.title = sanitizedTitle || conv.title;
 					await collections.conversations.updateOne(
 						{ _id: convId },
 						{ $set: { title: conv?.title, updatedAt: new Date() } }
@@ -818,7 +822,7 @@ export async function PATCH({ request, locals, params }) {
 	// Only include defined values in the update, with title sanitized
 	const updateValues = {
 		...(values.title !== undefined && {
-			title: values.title.replace(/<\/?think>/gi, "").trim(),
+			title: stripReasoningBlocks(values.title).trim() || getFallbackTitle(),
 		}),
 		...(values.model !== undefined && { model: values.model }),
 	};

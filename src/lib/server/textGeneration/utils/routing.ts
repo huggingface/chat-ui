@@ -1,6 +1,7 @@
 import type { EndpointMessage } from "../../endpoints/endpoints";
 
-const ROUTER_REASONING_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
+// Case-insensitive so capitalized variants (<THINK>, <Think>) are stripped too.
+const ROUTER_REASONING_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/gi;
 
 export function stripReasoningBlocks(text: string): string {
 	const stripped = text.replace(ROUTER_REASONING_REGEX, "");
