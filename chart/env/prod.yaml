@@ -112,7 +112,7 @@ envVars:
       { "id": "MiniMaxAI/MiniMax-M2.7", "description": "Self-evolving 230B MoE agent for frontier coding, reasoning, and tool use." , "supportsReasoning": true, "supportsArtifacts": true, "parameters": { "max_tokens": 98304 } },
       { "id": "zai-org/GLM-5.1", "description": "Upgraded 754B MoE for agentic coding, extended reasoning, and tool use.", "parameters": { "max_tokens": 98304 } , "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "zai-org/GLM-5.1-FP8", "description": "FP8 GLM-5.1 for efficient agentic coding and reasoning inference.", "parameters": { "max_tokens": 98304 } , "supportsReasoning": true, "supportsArtifacts": true },
-      { "id": "google/gemma-4-31B-it", "description": "Dense multimodal Gemma with 256K context, reasoning, and function calling."},
+      { "id": "google/gemma-4-31B-it", "description": "Dense multimodal Gemma with 256K context, reasoning, and function calling.", "supportsArtifacts": true},
       { "id": "google/gemma-4-26B-A4B-it", "description": "Efficient multimodal MoE Gemma with 4B active params and 256K context."},
       { "id": "Qwen/Qwen3.5-9B", "description": "Dense multimodal hybrid with 262K context excelling at reasoning on-device."},
       { "id": "CohereLabs/tiny-aya-global", "description": "Tiny multilingual assistant covering 70+ languages for on-device deployment." },
