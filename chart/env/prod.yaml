@@ -92,6 +92,16 @@ envVars:
   MODELS: >
     [
       { "id": "omni", "supportsArtifacts": true },
+      { "id": "XiaomiMiMo/MiMo-V2.5-Pro", "description": "1T MoE with 42B active params, hybrid attention, and 1M context.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "moonshotai/Kimi-K2-Thinking", "description": "Trillion-param MoE thinking agent for deep reasoning and sustained tool chains.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16", "description": "BF16 hybrid Mamba-Transformer 550B MoE with 55B active params for agentic reasoning.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "stepfun-ai/Step-3.7-Flash", "description": "Vision-language 198B MoE with 11B active params, reasoning modes, and 256K context.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "deepreinforce-ai/Ornith-1.0-35B", "description": "RL-tuned 35B MoE coding agent with thinking mode and 262K context.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "deepreinforce-ai/Ornith-1.0-35B-FP8", "description": "FP8 Ornith 35B MoE for efficient agentic coding with thinking mode.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "google/gemma-3-12b-it", "description": "Dense 12B multimodal Gemma with 128K context and multilingual support." },
+      { "id": "google/gemma-3-4b-it", "description": "Compact 4B multimodal Gemma with 128K context for lightweight tasks." },
+      { "id": "microsoft/phi-4", "description": "Dense 14B model with strong math, reasoning, and coding density." },
+      { "id": "speakleash/Bielik-11B-v3.0-Instruct", "description": "Polish-language 11B instruction model for chat, writing, and comprehension." },
       { "id": "zai-org/GLM-5.2", "description": "Flagship 744B MoE for agentic engineering with 1M context and thinking modes.", "parameters": { "max_tokens": 98304 }, "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "zai-org/GLM-5.2-FP8", "description": "FP8 GLM-5.2 for efficient agentic engineering and extended reasoning.", "parameters": { "max_tokens": 98304 }, "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "moonshotai/Kimi-K2.7-Code", "description": "1T MoE coding agent with persistent thinking across long tool workflows." , "supportsReasoning": true, "supportsArtifacts": true, "parameters": { "max_tokens": 98304 } },
