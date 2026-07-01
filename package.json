@@ -68,7 +68,7 @@
 	"type": "module",
 	"dependencies": {
 		"@huggingface/hub": "^2.2.0",
-		"@huggingface/inference": "^4.11.3",
+		"@huggingface/inference": "^4.13.21",
 		"@iconify-json/bi": "^1.1.21",
 		"@modelcontextprotocol/sdk": "^1.26.0",
 		"@resvg/resvg-js": "^2.6.2",
