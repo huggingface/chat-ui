@@ -1,9 +1,9 @@
 ---
-name: add-model-descriptions
-description: Sync chat-ui's model config with the HuggingFace router — add descriptions for new models, flag reasoning-capable ones, enable artifacts for models with 32B+ parameters, and prune deprecated models the router no longer serves. Use when models are released or removed on the router and prod.yaml/dev.yaml need syncing. Triggers on requests like "add new model descriptions", "update models from router", "sync models", "remove deprecated models", "prune models no longer on the router", or when explicitly invoking /add-model-descriptions.
+name: sync-models
+description: Sync chat-ui's model config with the HuggingFace router — add descriptions for new models, flag reasoning-capable ones, enable artifacts for models with 32B+ parameters, and prune deprecated models the router no longer serves. Use when models are released or removed on the router and prod.yaml/dev.yaml need syncing. Triggers on requests like "add new model descriptions", "update models from router", "sync models", "remove deprecated models", "prune models no longer on the router", or when explicitly invoking /sync-models.
 ---
 
-# Add Model Descriptions
+# Sync Models
 
 Add descriptions for new models available in the HuggingFace router to chat-ui's `prod.yaml` and `dev.yaml`. Also flag models that support the OpenAI-compatible `reasoning_effort` parameter so chat-ui shows the thinking-effort selector for them, and enable artifacts for models with 32B or more total parameters. Finally, **prune deprecated models** — entries in the config whose ids the router no longer returns.
 
