@@ -43,7 +43,7 @@
 				rel={isExternal ? "noopener noreferrer" : undefined}
 				class="mt-2.5 inline-flex items-center gap-0.5 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
 			>
-				Learn more
+				{announcement.cta ?? "Learn more"}
 				{#if isExternal}
 					<IconArrowUpRight class="size-3.5" />
 				{:else}
