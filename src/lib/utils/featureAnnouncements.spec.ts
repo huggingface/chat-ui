@@ -35,7 +35,20 @@ describe("getActiveAnnouncement", () => {
 			title: "Introducing Artifacts",
 			description: "Apps, docs and diagrams rendered live in a side panel.",
 			link: "https://hf.co/blog",
+			cta: undefined,
 		});
+	});
+
+	it("keeps a trimmed cta label when provided", () => {
+		const raw = JSON.stringify([
+			announcement({ link: "/models/google/gemma-4-31B-it", cta: "  Go to the model  " }),
+		]);
+		expect(getActiveAnnouncement(raw, NOW)?.cta).toBe("Go to the model");
+	});
+
+	it("leaves cta undefined when missing or blank", () => {
+		const raw = JSON.stringify([announcement({ cta: "   " })]);
+		expect(getActiveAnnouncement(raw, NOW)?.cta).toBeUndefined();
 	});
 
 	it("takes the last valid entry", () => {

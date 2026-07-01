@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { fade, fly } from "svelte/transition";
 	import { cubicOut } from "svelte/easing";
+	import { base } from "$app/paths";
 	import IconSparkles from "~icons/lucide/sparkles";
 	import IconArrowRight from "~icons/lucide/arrow-right";
 	import IconArrowUpRight from "~icons/lucide/arrow-up-right";
@@ -13,6 +14,11 @@
 	let { announcement }: Props = $props();
 
 	let isExternal = $derived(Boolean(announcement.link && !announcement.link.startsWith("/")));
+	// App-relative links need the SvelteKit base (e.g. "/chat") prefixed, the same
+	// way the rest of the app builds internal links; external URLs are left as-is.
+	let href = $derived(
+		announcement.link && (isExternal ? announcement.link : `${base}${announcement.link}`)
+	);
 </script>
 
 <aside
@@ -36,14 +42,14 @@
 		<p class="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
 			{announcement.description}
 		</p>
-		{#if announcement.link}
+		{#if href}
 			<a
-				href={announcement.link}
+				{href}
 				target={isExternal ? "_blank" : undefined}
 				rel={isExternal ? "noopener noreferrer" : undefined}
 				class="mt-2.5 inline-flex items-center gap-0.5 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
 			>
-				Learn more
+				{announcement.cta ?? "Learn more"}
 				{#if isExternal}
 					<IconArrowUpRight class="size-3.5" />
 				{:else}

@@ -4,6 +4,7 @@ export interface FeatureAnnouncement {
 	title: string;
 	description: string;
 	link?: string;
+	cta?: string;
 }
 
 // Values pasted from docker env files sometimes keep their backtick wrapping
@@ -72,7 +73,7 @@ export function getActiveAnnouncement(
 	for (let i = parsed.length - 1; i >= 0; i--) {
 		const entry = parsed[i];
 		if (typeof entry !== "object" || entry === null) continue;
-		const { title, description, link, maxDate } = entry as Record<string, unknown>;
+		const { title, description, link, cta, maxDate } = entry as Record<string, unknown>;
 
 		const cleanTitle = asTrimmedString(title);
 		const cleanDescription = asTrimmedString(description);
@@ -81,7 +82,12 @@ export function getActiveAnnouncement(
 		const expiry = parseMaxDate(maxDate);
 		if (expiry === null || (expiry && expiry.getTime() < now.getTime())) continue;
 
-		return { title: cleanTitle, description: cleanDescription, link: sanitizeLink(link) };
+		return {
+			title: cleanTitle,
+			description: cleanDescription,
+			link: sanitizeLink(link),
+			cta: asTrimmedString(cta),
+		};
 	}
 
 	return undefined;
