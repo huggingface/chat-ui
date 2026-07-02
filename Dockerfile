@@ -31,6 +31,7 @@ USER user
 
 COPY --chown=1000 .env /app/.env
 COPY --chown=1000 entrypoint.sh /app/entrypoint.sh
+COPY --chown=1000 server.mjs /app/server.mjs
 COPY --chown=1000 package.json /app/package.json
 COPY --chown=1000 package-lock.json /app/package-lock.json
 
