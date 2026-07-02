@@ -26,8 +26,6 @@ export const GET: RequestHandler = async () => {
 					providers: model.providers as unknown as Array<
 						{ provider: string } & Record<string, unknown>
 					>,
-					promptExamples: model.promptExamples,
-					parameters: model.parameters,
 					preprompt: model.preprompt,
 					multimodal: model.multimodal,
 					multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,

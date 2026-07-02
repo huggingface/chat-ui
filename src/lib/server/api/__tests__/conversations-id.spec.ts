@@ -2,6 +2,13 @@ import { describe, expect, it, afterEach } from "vitest";
 import { ObjectId } from "mongodb";
 import superjson from "superjson";
 import { collections } from "$lib/server/database";
+import type { Message } from "$lib/types/Message";
+import {
+	MessageUpdateType,
+	MessageUpdateStatus,
+	MessageReasoningUpdateType,
+	MessageToolUpdateType,
+} from "$lib/types/MessageUpdate";
 import {
 	createTestLocals,
 	createTestUser,
@@ -112,6 +119,126 @@ describe.sequential("GET /api/v2/conversations/[id]", () => {
 		} catch (e: unknown) {
 			expect((e as { status: number }).status).toBe(400);
 		}
+	});
+
+	it("trims unread payload from tool-less messages", { timeout: 15000 }, async () => {
+		const { locals } = await createTestUser();
+		const content = "Hello world response";
+		const conv = await createTestConversation(locals, {
+			messages: [
+				{
+					id: crypto.randomUUID(),
+					from: "assistant",
+					content,
+					reasoning: "chain of thought",
+					updates: [
+						{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+						{ type: MessageUpdateType.Stream, token: "", len: 12 },
+						{ type: MessageUpdateType.Stream, token: "", len: 8 },
+						{
+							type: MessageUpdateType.Reasoning,
+							subtype: MessageReasoningUpdateType.Stream,
+							token: "chain of thought",
+						},
+						{
+							type: MessageUpdateType.Reasoning,
+							subtype: MessageReasoningUpdateType.Status,
+							status: "Done in 2s",
+						},
+						{ type: MessageUpdateType.FinalAnswer, text: content, interrupted: false },
+						{ type: MessageUpdateType.Title, title: "A title" },
+					],
+					ancestors: [],
+					children: [],
+				},
+			],
+		});
+
+		const res = await GET({
+			locals,
+			params: { id: conv._id.toString() },
+			url: mockUrl(),
+		} as never);
+
+		const data = await parseResponse<{ messages: Message[] }>(res);
+		const message = data.messages.find((m) => m.from === "assistant");
+		expect(message).toBeDefined();
+		if (!message) return;
+		const updates = message.updates ?? [];
+
+		// content is authoritative and untouched
+		expect(message.content).toBe(content);
+		// server-side reasoning accumulator and raw reasoning tokens are not shipped
+		expect(message.reasoning).toBeUndefined();
+		expect(
+			updates.some(
+				(u) =>
+					u.type === MessageUpdateType.Reasoning && u.subtype === MessageReasoningUpdateType.Stream
+			)
+		).toBe(false);
+		// tool-less messages drop stream markers and the FinalAnswer text duplicate
+		expect(updates.some((u) => u.type === MessageUpdateType.Stream)).toBe(false);
+		const finalAnswer = updates.find((u) => u.type === MessageUpdateType.FinalAnswer);
+		expect(finalAnswer).toMatchObject({ text: "", interrupted: false });
+		// generation-state signals survive
+		expect(updates.some((u) => u.type === MessageUpdateType.Status)).toBe(true);
+		expect(updates.some((u) => u.type === MessageUpdateType.Title)).toBe(true);
+	});
+
+	it("keeps stream markers and FinalAnswer text for messages with tool calls", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, {
+			messages: [
+				{
+					id: crypto.randomUUID(),
+					from: "assistant",
+					content: "text before tool. text after tool.",
+					updates: [
+						{ type: MessageUpdateType.Stream, token: "", len: 17 },
+						{
+							type: MessageUpdateType.Tool,
+							subtype: MessageToolUpdateType.Call,
+							uuid: "tool-1",
+							call: { name: "search", parameters: {} },
+						},
+						{
+							type: MessageUpdateType.Reasoning,
+							subtype: MessageReasoningUpdateType.Stream,
+							token: "thinking",
+						},
+						{
+							type: MessageUpdateType.FinalAnswer,
+							text: "text after tool.",
+							interrupted: false,
+						},
+					],
+					ancestors: [],
+					children: [],
+				},
+			],
+		});
+
+		const res = await GET({
+			locals,
+			params: { id: conv._id.toString() },
+			url: mockUrl(),
+		} as never);
+
+		const data = await parseResponse<{ messages: Message[] }>(res);
+		const updates = data.messages.find((m) => m.from === "assistant")?.updates ?? [];
+
+		// tool messages need markers + final text to interleave text between tool blocks
+		expect(updates.some((u) => u.type === MessageUpdateType.Stream)).toBe(true);
+		const finalAnswer = updates.find((u) => u.type === MessageUpdateType.FinalAnswer);
+		expect(finalAnswer).toMatchObject({ text: "text after tool." });
+		expect(updates.some((u) => u.type === MessageUpdateType.Tool)).toBe(true);
+		// raw reasoning tokens are dropped regardless of tools
+		expect(
+			updates.some(
+				(u) =>
+					u.type === MessageUpdateType.Reasoning && u.subtype === MessageReasoningUpdateType.Stream
+			)
+		).toBe(false);
 	});
 });
 

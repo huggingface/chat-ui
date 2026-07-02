@@ -1,5 +1,3 @@
-import type { BackendModel } from "$lib/server/models";
-
 export type GETModelsResponse = Array<{
 	id: string;
 	name: string;
@@ -11,8 +9,6 @@ export type GETModelsResponse = Array<{
 	description?: string;
 	logoUrl?: string;
 	providers?: Array<{ provider: string } & Record<string, unknown>>;
-	promptExamples?: { title: string; prompt: string }[];
-	parameters: BackendModel["parameters"];
 	preprompt?: string;
 	multimodal: boolean;
 	multimodalAcceptedMimetypes?: string[];

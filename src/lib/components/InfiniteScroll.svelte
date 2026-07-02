@@ -1,48 +1,45 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	interface Props {
-		onvisible?: () => void;
+		onvisible?: () => void | Promise<void>;
 	}
 
 	let { onvisible }: Props = $props();
 
 	let loader: HTMLDivElement | undefined = $state();
 	let observer: IntersectionObserver;
-	let intervalId: ReturnType<typeof setInterval> | undefined;
 
 	onMount(() => {
 		if (!loader) {
 			return;
 		}
 
-		observer = new IntersectionObserver((entries) => {
-			entries.forEach((entry) => {
-				if (entry.isIntersecting) {
-					// Clear any existing interval
-					if (intervalId) {
-						clearInterval(intervalId);
-					}
-					// Start new interval that dispatches every 250ms
-					intervalId = setInterval(() => {
-						onvisible?.();
-					}, 250);
-				} else {
-					// Clear interval when not intersecting
-					if (intervalId) {
-						clearInterval(intervalId);
-						intervalId = undefined;
-					}
+		let busy = false;
+
+		observer = new IntersectionObserver(async (entries) => {
+			if (busy || !entries.some((entry) => entry.isIntersecting)) {
+				return;
+			}
+			busy = true;
+			try {
+				await onvisible?.();
+			} finally {
+				busy = false;
+				// Re-observe so the observer delivers a fresh entry against the
+				// updated layout: if the sentinel is still visible after the new
+				// content rendered, this triggers the next load; otherwise it
+				// re-arms for the next scroll into view.
+				if (loader) {
+					observer.unobserve(loader);
+					observer.observe(loader);
 				}
-			});
+			}
 		});
 
 		observer.observe(loader);
 
 		return () => {
 			observer.disconnect();
-			if (intervalId) {
-				clearInterval(intervalId);
-			}
 		};
 	});
 </script>

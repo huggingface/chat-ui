@@ -236,26 +236,17 @@ export function cancelMarkdownClient(clientId: number): void {
 		if (i !== -1) queue.splice(i, 1);
 	}
 
-	// If a render is already running for this client, abort it: the component is gone, so
-	// terminate its worker (truly stopping the obsolete parse, rather than letting it hold
-	// a scarce pool slot) and free the slot. A fresh worker is created lazily on the next
-	// pump for whatever view is now active. At most one in-flight job per client (renders
-	// are serialized per client), so this terminates at most one worker.
-	let abortedWorker: Worker | undefined;
+	// If a render is already running for this client, just flag it: onWorkerMessage
+	// discards the stale result and recycles the worker to the idle pool. Terminating
+	// the worker here would make the next conversation pay a full respawn (bundle
+	// re-eval + katex/hljs init, ~50-200ms) on every switch away from a mid-render
+	// view, which costs far more than letting the in-flight parse run out. At most
+	// one in-flight job per client (renders are serialized per client).
 	for (const entry of inFlight.values()) {
 		if (entry.clientId === clientId) {
 			entry.cancelled = true;
-			abortedWorker = entry.worker;
 			break;
 		}
-	}
-	if (abortedWorker) {
-		abortedWorker.onmessage = null;
-		abortedWorker.onerror = null;
-		abortedWorker.onmessageerror = null;
-		dropWorker(abortedWorker);
-		abortedWorker.terminate();
-		pump();
 	}
 }
 

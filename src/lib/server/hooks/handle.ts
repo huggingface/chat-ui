@@ -161,10 +161,14 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				// if the request is a POST request or login-related we refresh the cookie
 				refreshSessionCookie(event.cookies, auth.secretSessionId);
 
-				await collections.sessions.updateOne(
-					{ sessionId: auth.sessionId },
-					{ $set: { updatedAt: new Date(), expiresAt: addWeeks(new Date(), 2) } }
-				);
+				// Rolling-expiry extension is best-effort: don't hold up the request
+				// on a MongoDB round-trip for it.
+				collections.sessions
+					.updateOne(
+						{ sessionId: auth.sessionId },
+						{ $set: { updatedAt: new Date(), expiresAt: addWeeks(new Date(), 2) } }
+					)
+					.catch((err) => logger.error(err, "Failed to extend session expiry"));
 			}
 
 			if (

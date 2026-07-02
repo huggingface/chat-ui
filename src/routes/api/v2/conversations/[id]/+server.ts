@@ -6,6 +6,36 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
 import { validModelIdSchema } from "$lib/server/models";
+import type { Message } from "$lib/types/Message";
+import { MessageUpdateType, MessageReasoningUpdateType } from "$lib/types/MessageUpdate";
+
+/**
+ * Drop persisted message data the client never reads before sending it over
+ * the wire: the server-side `reasoning` accumulator, raw reasoning stream
+ * tokens, and — for tool-less messages — the per-token stream markers and the
+ * FinalAnswer text (a duplicate of `message.content`). ChatMessage rebuilds
+ * tool-less messages from `message.content` alone, while messages with tool
+ * calls need the stream markers and FinalAnswer text to interleave text
+ * between tool blocks, so their updates are kept.
+ *
+ * Read-path only: MongoDB keeps the full document (the legacy
+ * /api/conversation/[id] endpoint still exposes complete updates).
+ */
+function trimMessageForResponse(message: Message): Message {
+	const trimmed = { ...message };
+	delete trimmed.reasoning;
+	const updates = trimmed.updates;
+	if (!updates?.length) return trimmed;
+	const hasTool = updates.some((u) => u.type === MessageUpdateType.Tool);
+	trimmed.updates = updates
+		.filter(
+			(u) =>
+				!(u.type === MessageUpdateType.Reasoning && u.subtype === MessageReasoningUpdateType.Stream)
+		)
+		.filter((u) => hasTool || u.type !== MessageUpdateType.Stream)
+		.map((u) => (!hasTool && u.type === MessageUpdateType.FinalAnswer ? { ...u, text: "" } : u));
+	return trimmed;
+}
 
 export const GET: RequestHandler = async ({ locals, params, url }) => {
 	requireAuth(locals);
@@ -17,7 +47,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 	);
 
 	return superjsonResponse({
-		messages: conversation.messages,
+		messages: conversation.messages.map(trimMessageForResponse),
 		title: conversation.title,
 		model: conversation.model,
 		preprompt: conversation.preprompt,
