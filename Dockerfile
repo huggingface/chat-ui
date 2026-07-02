@@ -89,5 +89,6 @@ ENV BODY_SIZE_LIMIT=15728640
 #import the build & dependencies
 COPY --from=builder --chown=1000 /app/build /app/build
 COPY --from=builder --chown=1000 /app/node_modules /app/node_modules
+COPY --from=builder --chown=1000 /app/server.js /app/server.js
 
 CMD ["/bin/bash", "-c", "/app/entrypoint.sh"]
