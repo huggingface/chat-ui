@@ -35,6 +35,17 @@
 	let closeEl: HTMLButtonElement | undefined = $state();
 	let openEl: HTMLButtonElement | undefined = $state();
 
+	// The drawer's content (a second full NavMenu) is expensive to SSR and
+	// hydrate, and most page views never open the drawer. Mount it on first
+	// open (or swipe) and keep it mounted afterward so the slide animation
+	// and inner scroll position survive subsequent open/close cycles.
+	let hasOpenedDrawer = $state(false);
+	$effect(() => {
+		if (isOpen || isDragging) {
+			hasOpenedDrawer = true;
+		}
+	});
+
 	const isHuggingChat = $derived(Boolean(page.data?.publicConfig?.isHuggingChat));
 	const canShare = $derived(
 		isHuggingChat &&
@@ -296,5 +307,7 @@
 	class="fixed top-0 bottom-0 left-0 z-30 grid max-h-dvh grid-cols-1
 	grid-rows-[auto_1fr_auto_auto] rounded-r-xl bg-white pt-4 md:hidden dark:bg-gray-900"
 >
-	{@render children?.()}
+	{#if hasOpenedDrawer}
+		{@render children?.()}
+	{/if}
 </nav>
