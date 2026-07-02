@@ -17,7 +17,7 @@ describe("buildToolPreprompt", () => {
 		const prompt = buildToolPreprompt([tool("web_search_exa"), tool("crawling_exa")]);
 		expect(prompt).toContain("web_search_exa, crawling_exa");
 		expect(prompt).toContain("GROUNDING:");
-		expect(prompt).toContain("ONLY source of facts");
+		expect(prompt).toContain("only source of facts");
 		expect(prompt).toContain("Never fabricate URLs, citations, or facts");
 	});
 
