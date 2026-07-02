@@ -64,16 +64,28 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 		if (!hasLoginRetryCookie(cookies)) {
 			setLoginRetryCookie(cookies);
 
-			// Best-effort recovery of the return path from the (unverified) state payload;
-			// it is re-sanitized to an in-app absolute path before use.
-			let next: string | undefined;
+			// Best-effort recovery of the return path and redirect URI from the (unverified)
+			// state payload; the path is re-sanitized and the redirect URI is checked against
+			// ALTERNATIVE_REDIRECT_URLS both here and again in triggerOauthFlow before use.
+			const retryParams = new URLSearchParams();
 			try {
-				next = sanitizeReturnPath(JSON.parse(csrfToken)?.data?.next);
+				const data = JSON.parse(csrfToken)?.data;
+				const next = sanitizeReturnPath(data?.next);
+				if (next) {
+					retryParams.set("next", next);
+				}
+				if (
+					typeof data?.redirectUrl === "string" &&
+					config.ALTERNATIVE_REDIRECT_URLS.includes(data.redirectUrl)
+				) {
+					retryParams.set("callback", data.redirectUrl);
+				}
 			} catch {
-				next = undefined;
+				// Malformed state: retry without a return path or alternate redirect URI.
 			}
 
-			return redirect(302, `${base}/login${next ? `?next=${encodeURIComponent(next)}` : ""}`);
+			const retryQuery = retryParams.toString();
+			return redirect(302, `${base}/login${retryQuery ? `?${retryQuery}` : ""}`);
 		}
 
 		throw error(
