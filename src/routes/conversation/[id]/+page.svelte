@@ -11,7 +11,11 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
 	import type { Message } from "$lib/types/Message";
-	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
+	import {
+		MessageUpdateStatus,
+		MessageUpdateType,
+		type MessageUpdate,
+	} from "$lib/types/MessageUpdate";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
@@ -292,11 +296,26 @@
 			let lastUpdateTime = new Date();
 			let frameFlushScheduled = false;
 
+			// Local authoritative copy of message.updates during streaming.
+			// Assigning the reactive field on every network chunk (~100/s on fast
+			// providers) re-triggers the full markdown block derivation per chunk;
+			// buffering here keeps `.updates` on the same flush cadence as
+			// `.content`. All readers inside this loop must use the buffer, not
+			// the $state field, or they would see stale data between flushes.
+			let updatesBuffer: MessageUpdate[] = messageToWriteTo.updates ?? [];
+			let updatesDirty = false;
+
 			const flushBuffer = (currentTime: Date) => {
-				if (buffer.length === 0) return;
-				messageToWriteTo.content += buffer;
-				buffer = "";
-				lastUpdateTime = currentTime;
+				if (buffer.length === 0 && !updatesDirty) return;
+				if (buffer.length > 0) {
+					messageToWriteTo.content += buffer;
+					buffer = "";
+					lastUpdateTime = currentTime;
+				}
+				if (updatesDirty) {
+					messageToWriteTo.updates = updatesBuffer;
+					updatesDirty = false;
+				}
 			};
 
 			const scheduleFrameFlush = () => {
@@ -315,6 +334,10 @@
 
 			for await (const update of messageUpdatesIterator) {
 				if ($isAborted) {
+					// Commit anything still sitting in the content/updates buffers:
+					// the navigation-abort path skips the post-stream refresh, so a
+					// dropped buffer here would be lost from the UI for good.
+					flushBuffer(new Date());
 					messageUpdatesAbortController.abort();
 					return;
 				}
@@ -331,28 +354,29 @@
 
 				if (!isKeepAlive) {
 					if (update.type === MessageUpdateType.Stream) {
-						const existingUpdates = messageToWriteTo.updates ?? [];
-						const lastUpdate = existingUpdates.at(-1);
+						const lastUpdate = updatesBuffer.at(-1);
 						if (lastUpdate?.type === MessageUpdateType.Stream) {
 							// Create fresh objects/arrays so the UI reacts to merged tokens
 							const merged = {
 								...lastUpdate,
 								token: (lastUpdate.token ?? "") + (update.token ?? ""),
 							};
-							messageToWriteTo.updates = [...existingUpdates.slice(0, -1), merged];
+							updatesBuffer = [...updatesBuffer.slice(0, -1), merged];
 						} else {
-							messageToWriteTo.updates = [...existingUpdates, update];
+							updatesBuffer = [...updatesBuffer, update];
 						}
 					} else {
-						messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+						updatesBuffer = [...updatesBuffer, update];
 					}
+					updatesDirty = true;
 				}
 				const currentTime = new Date();
 
 				// If we receive a non-stream update (e.g. tool/status/final answer),
-				// flush any buffered stream tokens so the UI doesn't appear to cut
-				// mid-sentence while tools are running or the final answer arrives.
-				if (update.type !== MessageUpdateType.Stream && buffer.length > 0) {
+				// flush buffered stream tokens and pending updates so the UI doesn't
+				// appear to cut mid-sentence while tools are running or the final
+				// answer arrives.
+				if (update.type !== MessageUpdateType.Stream) {
 					flushBuffer(currentTime);
 				}
 
@@ -377,8 +401,7 @@
 					// pre‑tool streamed content when appropriate.
 					const finalText = update.text ?? "";
 					const isInterrupted = update.interrupted === true;
-					const hadTools =
-						messageToWriteTo.updates?.some((u) => u.type === MessageUpdateType.Tool) ?? false;
+					const hadTools = updatesBuffer.some((u) => u.type === MessageUpdateType.Tool);
 
 					if (isInterrupted) {
 						if (!messageToWriteTo.content) {
@@ -463,9 +486,7 @@
 				}
 			}
 
-			if (buffer.length > 0) {
-				flushBuffer(new Date());
-			}
+			flushBuffer(new Date());
 		} catch (err) {
 			if ($isAborted || (err instanceof DOMException && err.name === "AbortError")) {
 				// User-initiated abort, not an error
