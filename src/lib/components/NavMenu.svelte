@@ -158,7 +158,7 @@
 				<h4 class="mt-4 mb-1.5 pl-0.5 text-xs text-gray-400 first:mt-0 dark:text-gray-500">
 					{titles[group]}
 				</h4>
-				{#each convs as conv}
+				{#each convs as conv (String(conv.id))}
 					<NavConversationItem {conv} {oneditConversationTitle} {ondeleteConversation} />
 				{/each}
 			{/if}
