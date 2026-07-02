@@ -10,7 +10,7 @@ import type {
 	ChatCompletionMessageToolCall,
 } from "openai/resources/chat/completions";
 import type { Stream } from "openai/streaming";
-import { buildToolPreprompt } from "../utils/toolPrompt";
+import { buildToolPreprompt, buildToolResultsReminder } from "../utils/toolPrompt";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
 import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
@@ -706,11 +706,19 @@ export async function* runMcpFlow({
 					if (event.type === "update") {
 						yield event.update;
 					} else {
-						messagesOpenAI = [
-							...messagesOpenAI,
-							assistantToolMessage,
-							...(event.summary.toolMessages ?? []),
-						];
+						const toolMessages = [...(event.summary.toolMessages ?? [])];
+						// Re-state grounding right next to fresh retrieval results: small
+						// models drift back to parametric memory when the instruction only
+						// lives at the top of the context.
+						const reminder = buildToolResultsReminder(calls.map((c) => c.name));
+						const lastToolMessage = toolMessages[toolMessages.length - 1];
+						if (reminder && lastToolMessage && typeof lastToolMessage.content === "string") {
+							toolMessages[toolMessages.length - 1] = {
+								...lastToolMessage,
+								content: `${lastToolMessage.content}\n\n${reminder}`,
+							};
+						}
+						messagesOpenAI = [...messagesOpenAI, assistantToolMessage, ...toolMessages];
 						toolMsgCount = event.summary.toolMessages?.length ?? 0;
 						toolRunCount = event.summary.toolRuns?.length ?? 0;
 						logger.info(
