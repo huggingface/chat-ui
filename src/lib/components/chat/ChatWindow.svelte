@@ -18,6 +18,8 @@
 
 	import ChatInput from "./ChatInput.svelte";
 	import VoiceRecorder from "./VoiceRecorder.svelte";
+	import VoiceModeOverlay from "$lib/components/voice/VoiceModeOverlay.svelte";
+	import IconVoiceMode from "~icons/lucide/audio-lines";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import FileDropzone from "./FileDropzone.svelte";
@@ -79,6 +81,12 @@
 		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
 		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
 		draft?: string;
+		/** Voice mode: overlay visibility, owned by the page so it can be opened on navigation */
+		voiceModeOpen?: boolean;
+		/** Voice mode: send a spoken message (server pins the voice provider) */
+		onvoicemessage?: (content: string) => void;
+		/** Voice mode: intercept the button (home page creates a conversation first) */
+		onvoicemodestart?: () => void;
 	}
 
 	let {
@@ -96,6 +104,9 @@
 		onstop,
 		onretry,
 		onshowAlternateMsg,
+		voiceModeOpen = $bindable(false),
+		onvoicemessage,
+		onvoicemodestart,
 	}: Props = $props();
 
 	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
@@ -146,6 +157,25 @@
 		!!(page.data as { transcriptionEnabled?: boolean }).transcriptionEnabled
 	);
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
+
+	// Voice mode (spoken conversations): needs server-side STT+TTS and a model
+	// flagged supportsVoice (the voice model served by the voice provider)
+	let voiceModeAvailable = $derived(
+		!!(page.data as { voiceChatEnabled?: boolean }).voiceChatEnabled &&
+			!!currentModel.supportsVoice &&
+			!shared &&
+			!isReadOnly
+	);
+
+	function startVoiceMode() {
+		if (requireAuthUser()) return;
+		tap();
+		if (onvoicemodestart) {
+			onvoicemodestart();
+		} else {
+			voiceModeOpen = true;
+		}
+	}
 
 	const handleSubmit = () => {
 		if (requireAuthUser() || loading || !draft) return;
@@ -871,18 +901,31 @@
 										<IconMic class="size-4" />
 									</button>
 								{/if}
-								<button
-									class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
-									isReadOnly
-										? ''
-										: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
-									disabled={!draft || isReadOnly}
-									type="submit"
-									aria-label="Send message"
-									name="submit"
-								>
-									<IconArrowUp />
-								</button>
+								{#if voiceModeAvailable && !draft}
+									<!-- Empty input: offer a voice conversation instead of a dead send button -->
+									<button
+										class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border border-transparent bg-black text-white shadow transition-none hover:bg-gray-800 sm:size-7 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+										type="button"
+										onclick={startVoiceMode}
+										aria-label="Start voice conversation"
+										title="Voice mode"
+									>
+										<IconVoiceMode class="size-4" />
+									</button>
+								{:else}
+									<button
+										class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
+										isReadOnly
+											? ''
+											: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
+										disabled={!draft || isReadOnly}
+										type="submit"
+										aria-label="Send message"
+										name="submit"
+									>
+										<IconArrowUp />
+									</button>
+								{/if}
 							{/if}
 						</div>
 					{/if}
@@ -998,6 +1041,17 @@
 
 	<ArtifactPanel registry={artifactRegistry} {loading} />
 </div>
+
+{#if voiceModeOpen}
+	<VoiceModeOverlay
+		{messages}
+		{loading}
+		model={currentModel}
+		onsend={(content) => onvoicemessage?.(content)}
+		onstop={() => onstop?.()}
+		onclose={() => (voiceModeOpen = false)}
+	/>
+{/if}
 
 <style>
 	.paste-glow {

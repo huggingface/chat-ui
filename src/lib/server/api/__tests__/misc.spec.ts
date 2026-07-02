@@ -32,10 +32,12 @@ describe("GET /api/v2/feature-flags", () => {
 		expect(data).toHaveProperty("loginEnabled");
 		expect(data).toHaveProperty("isAdmin");
 		expect(data).toHaveProperty("transcriptionEnabled");
+		expect(data).toHaveProperty("voiceChatEnabled");
 		expect(typeof data.enableAssistants).toBe("boolean");
 		expect(typeof data.loginEnabled).toBe("boolean");
 		expect(typeof data.isAdmin).toBe("boolean");
 		expect(typeof data.transcriptionEnabled).toBe("boolean");
+		expect(typeof data.voiceChatEnabled).toBe("boolean");
 	});
 
 	it("reflects isAdmin from locals for non-admin user", async () => {

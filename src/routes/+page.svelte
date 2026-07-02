@@ -28,7 +28,7 @@
 
 	const settings = useSettingsStore();
 
-	async function createConversation(message: string) {
+	async function createConversation(message: string, { voiceMode = false } = {}) {
 		try {
 			$loading = true;
 
@@ -93,7 +93,11 @@
 				updatedAt: new Date(),
 			});
 			await goto(`${base}/conversation/${conversationId}`, {
-				state: { pendingMessage: message, pendingFilesNonce },
+				// A voice conversation starts empty: the first turn is spoken, so the
+				// conversation page opens the voice overlay instead of sending text.
+				state: voiceMode
+					? { pendingVoiceMode: true }
+					: { pendingMessage: message, pendingFilesNonce },
 			});
 		} catch (err) {
 			error.set((err as Error).message || ERROR_MESSAGES.default);
@@ -168,6 +172,7 @@
 {#if hasModels}
 	<ChatWindow
 		onmessage={(message) => createConversation(message)}
+		onvoicemodestart={() => createConversation("", { voiceMode: true })}
 		loading={$loading}
 		{currentModel}
 		models={data.models}

@@ -65,6 +65,9 @@
 	let messageUpdatesAbortController = new AbortController();
 
 	let files: File[] = $state([]);
+	// Voice mode overlay; opened locally by the ChatWindow button, or on
+	// navigation from the home page (pendingVoiceMode history state).
+	let voiceModeOpen = $state(false);
 
 	function createMessagesPath<T>(messages: TreeNode<T>[], msgId?: TreeId): TreeNode<T>[] {
 		if (initialRun) {
@@ -124,10 +127,12 @@
 		prompt,
 		messageId = messagesPath.at(-1)?.id ?? undefined,
 		isRetry = false,
+		voiceMode = false,
 	}: {
 		prompt?: string;
 		messageId?: ReturnType<typeof v4>;
 		isRetry?: boolean;
+		voiceMode?: boolean;
 	}): Promise<void> {
 		try {
 			stopRequestedFor = null;
@@ -276,6 +281,7 @@
 					})),
 					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 					streamingMode,
+					voiceMode,
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {
@@ -613,6 +619,7 @@
 		// On a hard refresh page.state is empty, so both values are undefined
 		// and we skip straight to the background-generation check below.
 		const pendingText = page.state.pendingMessage as string | undefined;
+		const pendingVoiceMode = Boolean(page.state.pendingVoiceMode);
 		if (pendingText) {
 			const nonce = page.state.pendingFilesNonce as string | undefined;
 			files = nonce ? consumePendingFiles(nonce) : [];
@@ -621,6 +628,11 @@
 			// would resubmit the prompt (without files, whose nonce is spent).
 			replaceState("", {});
 			await writeMessage({ prompt: pendingText });
+		} else if (pendingVoiceMode) {
+			// Voice conversation started from the home page: the conversation
+			// was created empty, open the overlay to capture the first turn.
+			replaceState("", {});
+			voiceModeOpen = true;
 		}
 
 		// Don't resume tracking for stale snapshots: a generation that has gone
@@ -635,6 +647,10 @@
 
 	async function onMessage(content: string) {
 		await writeMessage({ prompt: content });
+	}
+
+	async function onVoiceMessage(content: string) {
+		await writeMessage({ prompt: content, voiceMode: true });
 	}
 
 	async function onRetry(payload: { id: Message["id"]; content?: string }) {
@@ -774,7 +790,9 @@
 	shared={data.shared}
 	preprompt={data.preprompt}
 	bind:files
+	bind:voiceModeOpen
 	onmessage={onMessage}
+	onvoicemessage={onVoiceMessage}
 	onretry={onRetry}
 	onshowAlternateMsg={onShowAlternateMsg}
 	onstop={stopGeneration}

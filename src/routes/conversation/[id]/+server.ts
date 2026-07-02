@@ -1,6 +1,7 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { config } from "$lib/server/config";
+import { getVoiceChatProvider } from "$lib/server/voice";
 import { models, validModelIdSchema } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import type { Message } from "$lib/types/Message";
@@ -155,6 +156,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		selectedMcpServerNames,
 		selectedMcpServers,
 		timezone,
+		voiceMode,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -183,6 +185,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				)
 				.default([]),
 			timezone: z.optional(z.string()),
+			// Spoken conversation turn: pins generation to the voice provider and
+			// swaps in the voice system prompt. Ignored for models without voice.
+			voiceMode: z.optional(z.boolean()),
 			files: z.optional(
 				z.array(
 					z.object({
@@ -195,6 +200,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			),
 		})
 		.parse(JSON.parse(json));
+
+	// Voice mode is only honored for models flagged supportsVoice (the voice
+	// model served by the voice provider); silently fall back to a normal
+	// generation otherwise so stale clients can't pin arbitrary providers.
+	const voiceModeActive = Boolean(voiceMode && model.supportsVoice && !model.isRouter);
 
 	// Attach MCP selection to locals so the text generation pipeline can consume it
 	try {
@@ -653,9 +663,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					forceMultimodal:
 						!config.isHuggingChat && Boolean(userSettings?.multimodalOverrides?.[model.id]),
 					forceTools: !config.isHuggingChat && Boolean(userSettings?.toolsOverrides?.[model.id]),
-					// Inference provider preference (HuggingChat only, skip for router models)
-					provider:
-						config.isHuggingChat && !model.isRouter
+					// Inference provider preference (HuggingChat only, skip for router models).
+					// Voice turns are pinned to the voice provider (Cerebras by default),
+					// the only provider fast enough for a real-time spoken exchange.
+					provider: voiceModeActive
+						? getVoiceChatProvider()
+						: config.isHuggingChat && !model.isRouter
 							? userSettings?.providerOverrides?.[model.id]
 							: undefined,
 					// Thinking-effort override (only forwarded for reasoning-capable models;
@@ -667,6 +680,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					// Artifacts aren't provider-determined, so the per-model user
 					// override applies on HuggingChat too
 					artifactsOverride: userSettings?.artifactsOverrides?.[model.id],
+					voiceMode: voiceModeActive,
 					locals,
 					abortController: ctrl,
 				};

@@ -30,6 +30,9 @@ type MessageUpdateRequestOptions = {
 	// User's IANA timezone (e.g. "America/New_York")
 	timezone?: string;
 	streamingMode?: StreamingMode;
+	// Spoken conversation turn (voice mode): the server pins the generation to
+	// the voice provider and swaps in the voice system prompt
+	voiceMode?: boolean;
 };
 
 type ChunkDetector = (buffer: string) => string | null;
@@ -66,6 +69,7 @@ export async function fetchMessageUpdates(
 		selectedMcpServerNames: opts.selectedMcpServerNames,
 		selectedMcpServers: opts.selectedMcpServers,
 		timezone: opts.timezone,
+		voiceMode: opts.voiceMode,
 	});
 
 	opts.files?.forEach((file) => {

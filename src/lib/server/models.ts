@@ -7,6 +7,7 @@ import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints"
 import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
 import { makeRouterEndpoint } from "$lib/server/router/endpoint";
+import { getVoiceChatModelId, getVoiceChatProvider } from "$lib/server/voice";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -41,7 +42,13 @@ const modelConfig = z.object({
 		)
 		.optional(),
 	endpoints: z.array(endpointSchema).optional(),
-	providers: z.array(z.object({ supports_tools: z.boolean().optional() }).passthrough()).optional(),
+	providers: z
+		.array(
+			z
+				.object({ provider: z.string().optional(), supports_tools: z.boolean().optional() })
+				.passthrough()
+		)
+		.optional(),
 	parameters: z
 		.object({
 			temperature: z.number().min(0).max(2).optional(),
@@ -64,6 +71,10 @@ const modelConfig = z.object({
 	// Opt-in artifacts: when true, the model is instructed to emit <artifact>
 	// blocks rendered in the side panel. Set per model via MODELS overrides.
 	supportsArtifacts: z.boolean().default(false),
+	// Voice mode (spoken conversations): auto-enabled for VOICE_CHAT_MODEL when
+	// VOICE_CHAT_PROVIDER serves it (Gemma 4 31B on Cerebras by default), can be
+	// forced per model via MODELS overrides for self-hosted setups.
+	supportsVoice: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */
@@ -96,7 +107,11 @@ const listSchema = z
 				id: z.string(),
 				description: z.string().optional(),
 				providers: z
-					.array(z.object({ supports_tools: z.boolean().optional() }).passthrough())
+					.array(
+						z
+							.object({ provider: z.string().optional(), supports_tools: z.boolean().optional() })
+							.passthrough()
+					)
 					.optional(),
 				architecture: z
 					.object({
@@ -241,6 +256,9 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 		const parsed = listSchema.parse(json);
 		logger.info({ count: parsed.data.length }, "[models] Parsed models count");
 
+		const voiceChatModelId = getVoiceChatModelId();
+		const voiceChatProvider = getVoiceChatProvider();
+
 		let modelsRaw = parsed.data.map((m) => {
 			let logoUrl: string | undefined = undefined;
 			if (isHFRouter && m.id.includes("/")) {
@@ -256,6 +274,16 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 
 			// If any provider supports tools, consider the model as supporting tools
 			const supportsTools = Boolean((m.providers ?? []).some((p) => p?.supports_tools === true));
+
+			// Voice mode is restricted to the configured voice model, and only when
+			// the configured provider (Cerebras by default) actually serves it —
+			// voice generations are pinned to that provider.
+			const supportsVoice =
+				m.id === voiceChatModelId &&
+				(m.providers ?? []).some(
+					(p) => typeof p.provider === "string" && p.provider.toLowerCase() === voiceChatProvider
+				);
+
 			return {
 				id: m.id,
 				name: m.id,
@@ -266,6 +294,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				multimodal: supportsImageInput,
 				multimodalAcceptedMimetypes: supportsImageInput ? ["image/*"] : undefined,
 				supportsTools,
+				supportsVoice,
 				endpoints: [
 					{
 						type: "openai" as const,

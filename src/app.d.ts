@@ -28,6 +28,8 @@ declare global {
 			pendingMessage?: string;
 			/** Nonce for looking up File[] in the client-side pendingFiles Map. */
 			pendingFilesNonce?: string;
+			/** Open the voice mode overlay after navigating to a fresh conversation. */
+			pendingVoiceMode?: boolean;
 		}
 	}
 }

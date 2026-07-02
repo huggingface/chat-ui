@@ -23,6 +23,8 @@ export interface TextGenerationContext {
 	reasoningEffort?: "low" | "medium" | "high";
 	/** Per-model user override for artifacts; wins over the model's supportsArtifacts flag in both directions */
 	artifactsOverride?: boolean;
+	/** Spoken conversation: replies are read aloud by TTS, so the system prompt asks for short plain-prose answers */
+	voiceMode?: boolean;
 	locals: App.Locals | undefined;
 	abortController: AbortController;
 }

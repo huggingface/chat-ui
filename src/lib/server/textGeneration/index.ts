@@ -2,6 +2,7 @@ import { preprocessMessages } from "../endpoints/preprocessMessages";
 
 import { generateTitleForConversation } from "./title";
 import { injectArtifactsPrompt } from "./artifacts";
+import { injectVoiceModePrompt } from "$lib/server/voice";
 import {
 	type MessageUpdate,
 	MessageUpdateType,
@@ -47,9 +48,12 @@ async function* textGenerationWithoutTitle(
 	const convId = conv._id;
 
 	// Artifacts are opt-in per model (supportsArtifacts in the MODELS overrides),
-	// with a per-model user override from the model settings page
-	const preprompt =
-		(ctx.artifactsOverride ?? ctx.model.supportsArtifacts)
+	// with a per-model user override from the model settings page.
+	// Voice mode replaces the artifacts prompt entirely: artifacts can't be
+	// spoken, and TTS needs short plain-prose replies.
+	const preprompt = ctx.voiceMode
+		? injectVoiceModePrompt(conv.preprompt)
+		: (ctx.artifactsOverride ?? ctx.model.supportsArtifacts)
 			? injectArtifactsPrompt(conv.preprompt)
 			: conv.preprompt;
 

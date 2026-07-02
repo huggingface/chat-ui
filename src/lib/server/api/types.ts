@@ -19,6 +19,7 @@ export type GETModelsResponse = Array<{
 	supportsTools: boolean;
 	supportsReasoning: boolean;
 	supportsArtifacts: boolean;
+	supportsVoice: boolean;
 	unlisted: boolean;
 	hasInferenceAPI: boolean;
 	isRouter: boolean;
@@ -36,4 +37,7 @@ export interface FeatureFlags {
 	loginEnabled: boolean;
 	isAdmin: boolean;
 	transcriptionEnabled: boolean;
+	voiceChatEnabled: boolean;
+	/** Inference provider voice generations are pinned to (e.g. "cerebras") */
+	voiceChatProvider: string;
 }
