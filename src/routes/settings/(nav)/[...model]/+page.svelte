@@ -21,10 +21,12 @@
 
 	import { goto } from "$app/navigation";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import Switch from "$lib/components/Switch.svelte";
 
 	const publicConfig = usePublicConfig();
 	const settings = useSettingsStore();
+	const client = useAPIClient();
 	const modelId = $derived(page.params.model ?? "");
 
 	// Functional bindings for nested settings (Svelte 5):
@@ -123,7 +125,36 @@
 	);
 
 	let model = $derived(page.data.models.find((el: BackendModel) => el.id === modelId));
-	let providerList: RouterProvider[] = $derived((model?.providers ?? []) as RouterProvider[]);
+
+	// Providers are excluded from the models list payload (they are ~60KB
+	// across all models and this page is their only reader); fetch them for
+	// the current model on demand from the per-model detail endpoint.
+	let providerList: RouterProvider[] = $state([]);
+	let providersLoading = $state(false);
+	$effect(() => {
+		providerList = [];
+		if (!publicConfig.isHuggingChat || !model || model.isRouter) {
+			providersLoading = false;
+			return;
+		}
+		const requestedId = modelId;
+		providersLoading = true;
+		client
+			.models({ id: requestedId })
+			.get()
+			.then(handleResponse)
+			.then((detail: { providers?: RouterProvider[] } | null) => {
+				if (requestedId !== modelId) return; // stale response for a previous model
+				providerList = detail?.providers ?? [];
+			})
+			.catch(() => {
+				// No providers section is rendered on failure; the selection-mode
+				// options (auto/fastest/cheapest) still work via settings.
+			})
+			.finally(() => {
+				if (requestedId === modelId) providersLoading = false;
+			});
+	});
 
 	// multimodalOverrides/toolsOverrides intentionally have no initValue: getters fall back
 	// to the model's advertised capability, so upstream capability changes flow through.
@@ -407,7 +438,7 @@
 				</div>
 			</div>
 
-			{#if publicConfig.isHuggingChat && model.providers?.length && !model?.isRouter}
+			{#if publicConfig.isHuggingChat && !model?.isRouter && (providersLoading || providerList.length > 0)}
 				<div
 					class="mt-3 flex flex-col items-start gap-2.5 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-xs dark:border-gray-700 dark:bg-gray-800"
 				>

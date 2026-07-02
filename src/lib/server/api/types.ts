@@ -1,5 +1,8 @@
 import type { BackendModel } from "$lib/server/models";
 
+// List shape: intentionally excludes `providers` (~60KB across all models) and
+// `parameters` — no list consumer reads them, and the whole list is SSR-inlined
+// into every page. They are served by the per-model detail endpoint instead.
 export type GETModelsResponse = Array<{
 	id: string;
 	name: string;
@@ -10,9 +13,7 @@ export type GETModelsResponse = Array<{
 	displayName: string;
 	description?: string;
 	logoUrl?: string;
-	providers?: Array<{ provider: string } & Record<string, unknown>>;
 	promptExamples?: { title: string; prompt: string }[];
-	parameters: BackendModel["parameters"];
 	preprompt?: string;
 	multimodal: boolean;
 	multimodalAcceptedMimetypes?: string[];
@@ -23,6 +24,11 @@ export type GETModelsResponse = Array<{
 	hasInferenceAPI: boolean;
 	isRouter: boolean;
 }>;
+
+export type GETModelResponse = GETModelsResponse[number] & {
+	providers?: Array<{ provider: string } & Record<string, unknown>>;
+	parameters: BackendModel["parameters"];
+};
 
 export type GETOldModelsResponse = Array<{
 	id: string;
