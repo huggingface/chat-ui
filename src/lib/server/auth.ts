@@ -67,7 +67,7 @@ export const sameSite = z
 	.default(!secure || dev || config.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none")
 	.parse(config.COOKIE_SAMESITE === "" ? undefined : config.COOKIE_SAMESITE);
 
-function sanitizeReturnPath(path: string | undefined | null): string | undefined {
+export function sanitizeReturnPath(path: string | undefined | null): string | undefined {
 	if (!path) {
 		return undefined;
 	}
@@ -78,6 +78,32 @@ function sanitizeReturnPath(path: string | undefined | null): string | undefined
 		return undefined;
 	}
 	return path;
+}
+
+/**
+ * One-shot guard used when restarting the OAuth flow after a callback that was started
+ * in another browser (e.g. "Open in Safari" from an in-app browser). Prevents redirect loops.
+ */
+const loginRetryCookieName = "hfChat-loginRetry";
+
+export function hasLoginRetryCookie(cookies: Cookies): boolean {
+	return cookies.get(loginRetryCookieName) === "1";
+}
+
+export function setLoginRetryCookie(cookies: Cookies) {
+	cookies.set(loginRetryCookieName, "1", {
+		path: "/",
+		// `strict` would keep this cookie from being sent on the cross-site IdP -> callback
+		// navigation, which is exactly where the loop guard must be observable
+		sameSite: sameSite === "strict" ? "lax" : sameSite,
+		secure,
+		httpOnly: true,
+		maxAge: 5 * 60,
+	});
+}
+
+export function clearLoginRetryCookie(cookies: Cookies) {
+	cookies.delete(loginRetryCookieName, { path: "/" });
 }
 
 export function refreshSessionCookie(cookies: Cookies, sessionId: string) {

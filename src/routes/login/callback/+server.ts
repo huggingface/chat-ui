@@ -1,5 +1,12 @@
 import { error, redirect } from "@sveltejs/kit";
-import { getOIDCUserData, validateAndParseCsrfToken } from "$lib/server/auth";
+import {
+	clearLoginRetryCookie,
+	getOIDCUserData,
+	hasLoginRetryCookie,
+	sanitizeReturnPath,
+	setLoginRetryCookie,
+	validateAndParseCsrfToken,
+} from "$lib/server/auth";
 import { z } from "zod";
 import { base } from "$app/paths";
 import { config } from "$lib/server/config";
@@ -47,14 +54,32 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 	const csrfToken = Buffer.from(state, "base64").toString("utf-8");
 
 	const validatedToken = await validateAndParseCsrfToken(csrfToken, locals.sessionId);
-
-	if (!validatedToken) {
-		throw error(403, "Invalid or expired CSRF token");
-	}
-
 	const codeVerifier = cookies.get("hfChat-codeVerifier");
-	if (!codeVerifier) {
-		throw error(403, "Code verifier cookie not found");
+
+	if (!validatedToken || !codeVerifier) {
+		// The `state` token and PKCE code verifier are bound to the browser that started the
+		// login flow, so either check can fail on its own; when the callback lands in a
+		// different browser (e.g. "Open in Safari" from an in-app browser) both do. Restart
+		// the flow once in this browser instead of dead-ending on a 403.
+		if (!hasLoginRetryCookie(cookies)) {
+			setLoginRetryCookie(cookies);
+
+			// Best-effort recovery of the return path from the (unverified) state payload;
+			// it is re-sanitized to an in-app absolute path before use.
+			let next: string | undefined;
+			try {
+				next = sanitizeReturnPath(JSON.parse(csrfToken)?.data?.next);
+			} catch {
+				next = undefined;
+			}
+
+			return redirect(302, `${base}/login${next ? `?next=${encodeURIComponent(next)}` : ""}`);
+		}
+
+		throw error(
+			403,
+			validatedToken ? "Code verifier cookie not found" : "Invalid or expired CSRF token"
+		);
 	}
 
 	const { userData, token } = await getOIDCUserData(
@@ -92,6 +117,8 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 		userAgent: request.headers.get("user-agent") ?? undefined,
 		ip: getClientAddress(),
 	});
+
+	clearLoginRetryCookie(cookies);
 
 	// Prefer returning the user to their original in-app path when provided.
 	// `validatedToken.next` is sanitized server-side to avoid protocol-relative redirects.
