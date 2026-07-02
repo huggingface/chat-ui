@@ -32,17 +32,3 @@ export function buildToolPreprompt(tools: OpenAiTool[], timezone?: string): stri
 		`Default to image references; only use a full http(s) URL when the tool description explicitly asks for one, or reuse a URL a previous tool returned.`,
 	].join(" ");
 }
-
-const RETRIEVAL_TOOL_RE = /search|crawl|fetch|browse|scrape|wiki|news|web|url|page|read/i;
-
-/**
- * A short grounding reminder appended right after retrieval-style tool results.
- * Small models tend to forget system-prompt instructions once the context grows,
- * so re-stating the rule adjacent to the results is far more effective than the
- * preprompt alone. Returns an empty string when no executed tool looks like a
- * retrieval tool (e.g., image generation), where the reminder would be noise.
- */
-export function buildToolResultsReminder(toolNames: string[]): string {
-	if (!toolNames.some((name) => RETRIEVAL_TOOL_RE.test(name))) return "";
-	return "[Reminder from system: answer strictly from the tool results above. Do not add facts from your own knowledge that the results do not contain — if something is missing, search again or say you could not verify it. Cite the result URLs for key facts.]";
-}
