@@ -48,33 +48,36 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	}
 
 	// check if the user has access to the conversation
-	const convBeforeCheck = await collections.conversations.findOne({
+	let conv = await collections.conversations.findOne({
 		_id: convId,
 		...authCondition(locals),
 	});
 
-	if (convBeforeCheck && !convBeforeCheck.rootMessageId) {
+	if (conv && !conv.rootMessageId) {
 		const res = await collections.conversations.updateOne(
 			{
 				_id: convId,
 			},
 			{
-				$set: {
-					...convBeforeCheck,
-					...convertLegacyConversation(convBeforeCheck),
-				},
+				$set: { ...conv, ...convertLegacyConversation(conv) },
 			}
 		);
 
 		if (!res.acknowledged) {
 			error(500, "Failed to convert conversation");
 		}
-	}
 
-	const conv = await collections.conversations.findOne({
-		_id: convId,
-		...authCondition(locals),
-	});
+		// Re-read what actually persisted rather than trusting our in-memory
+		// conversion: concurrent requests converting the same legacy conversation
+		// each mint different synthetic root/message ids, and only one $set wins.
+		// Appending to a losing tree would corrupt the conversation. The re-fetch
+		// stays inside this branch so the common (already-converted) path keeps
+		// its single findOne.
+		conv = await collections.conversations.findOne({
+			_id: convId,
+			...authCondition(locals),
+		});
+	}
 
 	if (!conv) {
 		error(404, "Conversation not found");
@@ -91,33 +94,37 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// conversation (e.g. issued from another tab), whose watcher must get the
 	// chance to observe them; aborted generations consume their marker on
 	// shutdown, so a fresh marker is never a stale one.
-	await collections.abortedGenerations.deleteOne({
-		conversationId: convId,
-		updatedAt: { $lt: new Date(Date.now() - STOP_MARKER_GRACE_MS) },
-	});
-
-	// register the event for ratelimiting
-	await collections.messageEvents.insertOne({
-		type: "message",
-		userId,
-		createdAt: new Date(),
-		expiresAt: new Date(Date.now() + 60_000),
-		ip: getClientAddress(),
-	});
+	await Promise.all([
+		collections.abortedGenerations.deleteOne({
+			conversationId: convId,
+			updatedAt: { $lt: new Date(Date.now() - STOP_MARKER_GRACE_MS) },
+		}),
+		// register the event for ratelimiting; must complete before the counts
+		// below so the current message is included in its own rate-limit window
+		collections.messageEvents.insertOne({
+			type: "message",
+			userId,
+			createdAt: new Date(),
+			expiresAt: new Date(Date.now() + 60_000),
+			ip: getClientAddress(),
+		}),
+	]);
 
 	if (usageLimits?.messagesPerMinute) {
 		// check if the user is rate limited
 		const nEvents = Math.max(
-			await collections.messageEvents.countDocuments({
-				userId,
-				type: "message",
-				expiresAt: { $gt: new Date() },
-			}),
-			await collections.messageEvents.countDocuments({
-				ip: getClientAddress(),
-				type: "message",
-				expiresAt: { $gt: new Date() },
-			})
+			...(await Promise.all([
+				collections.messageEvents.countDocuments({
+					userId,
+					type: "message",
+					expiresAt: { $gt: new Date() },
+				}),
+				collections.messageEvents.countDocuments({
+					ip: getClientAddress(),
+					type: "message",
+					expiresAt: { $gt: new Date() },
+				}),
+			]))
 		);
 		if (nEvents > usageLimits.messagesPerMinute) {
 			error(429, ERROR_MESSAGES.rateLimited);
