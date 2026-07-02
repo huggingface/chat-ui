@@ -73,10 +73,16 @@ const server = polka()
 // lifecycle variables must be implemented separately").
 const path = process.env.SOCKET_PATH;
 const host = process.env.HOST ?? "0.0.0.0";
-const port = process.env.PORT ?? (path ? undefined : "3000");
+const port = process.env.PORT ?? "3000";
 const shutdownTimeout = parseInt(process.env.SHUTDOWN_TIMEOUT ?? "30", 10);
 
-server.listen({ path, host, port }, () => {
+// Node treats any listen-options object carrying host/port as a TCP listen
+// (empirically, `{ path, host, port: undefined }` binds a random TCP port and
+// never creates the socket), so the socket path must be the only key present
+// when it is configured.
+const listenOptions = path ? { path } : { host, port };
+
+server.listen(listenOptions, () => {
 	console.log(`Listening on ${path || `http://${host}:${port}`}`);
 });
 
