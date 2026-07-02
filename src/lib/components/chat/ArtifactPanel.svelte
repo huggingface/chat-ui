@@ -7,7 +7,7 @@
 	import { diffLines, diffStats, renderDiffHtml } from "$lib/utils/artifactDiff";
 	import { buildArtifactSrcdoc, isDeployableKind } from "$lib/utils/previewSrcdoc";
 	import { parseExternalUrl } from "$lib/utils/externalLink";
-	import { highlightCode } from "$lib/utils/marked";
+	import { escapeHTML } from "$lib/utils/markedLight";
 	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_FRACTION } from "$lib/stores/artifactPanel.svelte";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
@@ -111,8 +111,27 @@
 		}
 	}
 
+	// The highlighter lives in the KaTeX/highlight.js chunk, which is kept out
+	// of the entry bundle (see markedLight.ts). Load it the first time the
+	// panel opens; until it resolves, code renders as escaped plain text and
+	// the effect below re-runs automatically once the real highlighter lands.
+	let highlightCode: ((text: string, lang?: string) => string) | undefined = $state();
+	$effect(() => {
+		if (!artifactPanel.open || highlightCode) return;
+		import("$lib/utils/marked")
+			.then((markedModule) => {
+				highlightCode = markedModule.highlightCode;
+			})
+			.catch(() => {
+				// Chunk failed to load (offline, deploy rotation): keep escaped text
+				// permanently rather than retrying on every effect re-run.
+				highlightCode = (text: string) => escapeHTML(text);
+			});
+	});
+
 	$effect(() => {
 		if (!artifactPanel.open) return;
+		const highlight = highlightCode ?? ((text: string) => escapeHTML(text));
 		// A pending throttled run would paint stale content over whatever the
 		// branches below decide to show
 		clearTimeout(highlightTimer);
@@ -127,9 +146,7 @@
 			// The highlighter runs on the full old/new contents so token colors
 			// survive in the diff (multi-line constructs included).
 			const lang = hljsLanguageFor(version);
-			highlightedCode = DOMPurify.sanitize(
-				renderDiffHtml(diff, (text) => highlightCode(text, lang))
-			);
+			highlightedCode = DOMPurify.sanitize(renderDiffHtml(diff, (text) => highlight(text, lang)));
 			lastHighlightAt = Date.now();
 			return;
 		}
@@ -138,7 +155,7 @@
 		const complete = version.complete;
 
 		const run = () => {
-			highlightedCode = DOMPurify.sanitize(highlightCode(content, lang));
+			highlightedCode = DOMPurify.sanitize(highlight(content, lang));
 			lastHighlightAt = Date.now();
 		};
 

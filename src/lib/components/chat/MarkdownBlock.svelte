@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Token } from "$lib/utils/marked";
+	import type { Token } from "$lib/utils/markedLight";
 	import CodeBlock from "../CodeBlock.svelte";
 
 	interface Props {

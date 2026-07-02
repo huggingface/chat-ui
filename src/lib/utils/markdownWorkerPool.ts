@@ -1,6 +1,20 @@
 import { browser } from "$app/environment";
 import MarkdownWorker from "$lib/workers/markdownWorker?worker";
-import { fallbackBlocks, processBlocks, type BlockToken } from "$lib/utils/marked";
+import { fallbackBlocks, type BlockToken } from "$lib/utils/markedLight";
+
+// The rich pipeline (KaTeX + highlight.js, ~700KB decoded) normally lives only
+// inside the worker's own chunk. The main thread needs it solely when workers
+// are unavailable (no Worker support, strict CSP, repeated worker deaths), so
+// it is loaded on demand and memoized — never in the entry bundle.
+let richModulePromise: Promise<typeof import("$lib/utils/marked")> | undefined;
+const loadRichModule = () =>
+	(richModulePromise ??= import("$lib/utils/marked").catch((err) => {
+		// Never memoize a rejected import: a transient chunk-load failure (deploy
+		// rotation, flaky network) would otherwise disable rich markdown for the
+		// rest of the session. Clearing lets the next render retry.
+		richModulePromise = undefined;
+		throw err;
+	}));
 
 type Source = { title?: string; link: string };
 type ResultCallback = (blocks: BlockToken[], requestId: number) => void;
@@ -72,11 +86,13 @@ function runOnMainThread(job: {
 	requestId: number;
 	onResult: ResultCallback;
 }) {
-	void processBlocks(job.content, job.sources, job.streaming)
+	void loadRichModule()
+		.then((markedModule) => markedModule.processBlocks(job.content, job.sources, job.streaming))
 		.then((blocks) => job.onResult(blocks, job.requestId))
-		// Symmetry with the worker path ("never go silent"): on a parse error still
-		// resolve the render with the lightweight fallback instead of leaking an
-		// unhandled rejection and stranding the renderer on escaped plaintext.
+		// Symmetry with the worker path ("never go silent"): on a parse error (or a
+		// failed chunk load) still resolve the render with the lightweight fallback
+		// instead of leaking an unhandled rejection and stranding the renderer on
+		// escaped plaintext.
 		.catch(() => job.onResult(fallbackBlocks(job.content), job.requestId));
 }
 

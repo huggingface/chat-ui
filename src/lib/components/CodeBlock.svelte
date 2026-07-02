@@ -15,6 +15,20 @@
 
 	let previewOpen = $state(false);
 
+	// `code` always comes from our own highlighter (hljs or escapeHTML in
+	// marked.ts), which only emits escaped text inside hljs <span> wrappers.
+	// While the fence is still streaming (`loading`), the block re-renders on
+	// every flush, and re-sanitizing the whole growing block each time is the
+	// main-thread hot path of code streaming. Skip DOMPurify during that
+	// window only while the html verifiably matches the highlighter's output
+	// alphabet (raw `<` may open nothing but a span tag): any other markup —
+	// which our highlighter cannot produce — falls back to a full sanitize.
+	// Every completed block still gets sanitized as defense in depth.
+	const NON_HIGHLIGHTER_TAG = /<(?!\/?span[\s>])/i;
+	let sanitizedCode = $derived(
+		loading && !NON_HIGHLIGHTER_TAG.test(code) ? code : DOMPurify.sanitize(code)
+	);
+
 	function hasStrictHtml5Doctype(input: string): boolean {
 		if (!input) return false;
 		const withoutBOM = input.replace(/^\uFEFF/, "");
@@ -64,7 +78,7 @@
 		</div>
 	</div>
 	<pre class="scrollbar-custom overflow-auto px-5 font-mono transition-[height]"><code
-			><!-- eslint-disable svelte/no-at-html-tags -->{@html DOMPurify.sanitize(code)}</code
+			><!-- eslint-disable svelte/no-at-html-tags -->{@html sanitizedCode}</code
 		></pre>
 
 	{#if previewOpen}
