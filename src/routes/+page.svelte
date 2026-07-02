@@ -9,6 +9,8 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { storePendingFiles } from "$lib/utils/pendingFiles";
+	import superjson from "superjson";
+	import { setCachedConversation, type ConversationData } from "$lib/utils/conversationCache";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
@@ -74,7 +76,18 @@
 				return;
 			}
 
-			const { conversationId } = await res.json();
+			const { conversationId, conversation } = await res.json();
+
+			// The create response embeds the conversation payload; seed the client
+			// cache with it so the conversation page load skips its GET and the
+			// first generation request starts one round-trip sooner.
+			if (typeof conversation === "string") {
+				try {
+					setCachedConversation(conversationId, superjson.parse<ConversationData>(conversation));
+				} catch {
+					// Malformed seed: the page load falls back to a normal fetch.
+				}
+			}
 
 			// Pass the first message text via SvelteKit history state (JSON-serializable).
 			// File objects are not serializable, so they are stored in a client-side Map

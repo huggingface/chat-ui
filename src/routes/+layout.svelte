@@ -14,6 +14,7 @@
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
+	import NavigationLoadingBar from "$lib/components/NavigationLoadingBar.svelte";
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import WelcomeModal from "$lib/components/WelcomeModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
@@ -24,6 +25,7 @@
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { createConversationsStore } from "$lib/stores/conversations.svelte";
+	import { invalidateCachedConversation } from "$lib/utils/conversationCache";
 
 	let { data = $bindable(), children } = $props();
 
@@ -72,6 +74,9 @@
 			.then(handleResponse)
 			.then(async () => {
 				convsStore.remove(id);
+				// Drop any cached copy so a back-navigation to the deleted
+				// conversation cannot render it from cache.
+				invalidateCachedConversation(id);
 
 				if (page.params.id === id) {
 					await goto(`${base}/`, { invalidateAll: true });
@@ -261,6 +266,8 @@
 {/if}
 
 <BackgroundGenerationPoller />
+
+<NavigationLoadingBar />
 
 <div
 	class="fixed grid h-dvh w-screen grid-cols-1 grid-rows-[auto_1fr] overflow-hidden text-smd {!isNavCollapsed
