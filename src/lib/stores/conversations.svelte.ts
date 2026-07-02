@@ -24,6 +24,7 @@ import { browser } from "$app/environment";
 import { getContext, setContext } from "svelte";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { useAPIClient, handleResponse } from "$lib/APIClient";
+import { conversationRepository } from "$lib/repositories/ConversationRepository";
 
 export const CONVERSATIONS_CONTEXT_KEY = "conversationsStore";
 
@@ -44,6 +45,8 @@ class ConversationsStore {
 	/** Replace the entire list (called from layout when data.conversations changes). */
 	init(conversations: ConvSidebar[]): void {
 		this.#list = conversations;
+		// Persist the server-confirmed list to IndexedDB for offline fallback.
+		void conversationRepository.setConversations(conversations);
 	}
 
 	/**
@@ -88,9 +91,19 @@ class ConversationsStore {
 				updatedAt: new Date(conv.updatedAt),
 			}));
 			this.#list = freshList;
+			// Persist the server-confirmed list to IndexedDB.
+			void conversationRepository.setConversations(freshList);
 		} catch (err) {
 			// Non-fatal: keep the existing list rather than blanking the sidebar.
 			console.error("[conversationsStore] refresh failed", err);
+		}
+	}
+
+	/** Clear all locally cached data (called on user logout). */
+	async clearCache(): Promise<void> {
+		this.#list = [];
+		if (browser) {
+			await conversationRepository.clearAll();
 		}
 	}
 }

@@ -63,6 +63,9 @@
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
 	import type { ToolFront } from "$lib/types/Tool";
+	import { useIsOnline } from "$lib/stores/isOnline.svelte";
+
+	const isOnline = useIsOnline();
 
 	interface Props {
 		messages?: Message[];
@@ -636,11 +639,11 @@
 		{/if}
 		{#if canShare}
 			<!-- Lives in the chat column (not the layout) so it stays visible when
-			     the artifact panel is open -->
+                 the artifact panel is open -->
 			<button
 				type="button"
 				class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-xs hover:bg-white/60 hover:text-gray-500 md:absolute md:top-5 md:right-6 md:z-10 md:flex dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700
-					{loading ? 'cursor-not-allowed opacity-40' : ''}"
+                    {loading ? 'cursor-not-allowed opacity-40' : ''}"
 				onclick={() => shareModal.open()}
 				aria-label="Share conversation"
 				disabled={loading}
@@ -657,7 +660,7 @@
 			bind:this={chatContainer}
 		>
 			<!-- @container: descendants (e.g. the per-message router-metadata row) adapt
-			     to the actual column width, which shrinks when the artifact panel is open -->
+                 to the actual column width, which shrinks when the artifact panel is open -->
 			<div
 				class="@container mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl xl:pt-10"
 			>
@@ -728,10 +731,10 @@
 
 		<div
 			class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full
-			max-w-3xl flex-col items-center justify-center bg-linear-to-t from-white
-			via-white to-white/0 px-3.5 pt-2 *:pointer-events-auto
-			max-sm:py-0 sm:px-5
-			md:pb-4 xl:max-w-4xl dark:border-gray-800 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0"
+            max-w-3xl flex-col items-center justify-center bg-linear-to-t from-white
+            via-white to-white/0 px-3.5 pt-2 *:pointer-events-auto
+            max-sm:py-0 sm:px-5
+            md:pb-4 xl:max-w-4xl dark:border-gray-800 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0"
 		>
 			{#if !draft.length && !messages.length && !sources.length && !loading && (currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
 				<div
@@ -862,7 +865,10 @@
 									<button
 										type="button"
 										class="absolute right-10 bottom-2 mr-1.5 btn size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 sm:right-9 sm:size-7 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white"
-										disabled={isReadOnly}
+										disabled={isReadOnly || !isOnline.value}
+										title={!isOnline.value
+											? "Voice recording requires an internet connection"
+											: undefined}
 										onclick={() => {
 											isRecording = true;
 										}}
@@ -873,10 +879,12 @@
 								{/if}
 								<button
 									class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
-									isReadOnly
+									isReadOnly ||
+									!isOnline.value
 										? ''
 										: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
-									disabled={!draft || isReadOnly}
+									disabled={!draft || isReadOnly || !isOnline.value}
+									title={!isOnline.value ? "You need to be online to send messages" : undefined}
 									type="submit"
 									aria-label="Send message"
 									name="submit"

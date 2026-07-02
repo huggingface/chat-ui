@@ -32,9 +32,11 @@
 	import { isPro } from "$lib/stores/isPro";
 	import IconPro from "$lib/components/icons/IconPro.svelte";
 	import MCPServerManager from "./mcp/MCPServerManager.svelte";
+	import { useIsOnline } from "$lib/stores/isOnline.svelte";
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
+	const isOnline = useIsOnline();
 
 	interface Props {
 		conversations: ConvSidebar[];
@@ -143,7 +145,9 @@
 		href={`${base}/`}
 		onclick={handleNewChatClick}
 		class="flex rounded-lg border bg-white px-2 py-0.5 text-center whitespace-nowrap shadow-xs hover:shadow-none sm:text-smd dark:border-gray-600 dark:bg-gray-700"
-		title="Ctrl/Cmd + Shift + O"
+		class:pointer-events-none={!isOnline.value}
+		class:opacity-50={!isOnline.value}
+		title={!isOnline.value ? "New chat requires an internet connection" : "Ctrl/Cmd + Shift + O"}
 	>
 		New Chat
 	</a>
