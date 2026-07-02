@@ -40,8 +40,20 @@ function revalidateInBackground(
 	fromShare: string | undefined,
 	served: ConversationData
 ) {
-	void fetchConversation(client, id, fromShare)
-		.then((fresh) => {
+	void client
+		.conversations({ id })
+		.get({ query: { fromShare } })
+		.then((response) => {
+			// The conversation is gone or this session can no longer read it
+			// (deleted in another tab, revoked access, expired session): drop the
+			// entry and re-run the load so the page takes its real error path
+			// (redirect home) instead of keeping the stale view on screen.
+			if (response.status === 401 || response.status === 403 || response.status === 404) {
+				invalidateCachedConversation(id);
+				return safeInvalidate(UrlDependency.Conversation);
+			}
+			// Throws on remaining errors (5xx etc.), handled as transient below.
+			const fresh = handleResponse(response) as ConversationData;
 			if (conversationFingerprint(fresh) === conversationFingerprint(served)) return;
 			setCachedConversation(id, fresh);
 			// safeInvalidate, not invalidate: a raw invalidate() fired from this
@@ -50,11 +62,10 @@ function revalidateInBackground(
 			return safeInvalidate(UrlDependency.Conversation);
 		})
 		.catch(() => {
-			// Could be a transient network failure just as well as a deleted or
-			// inaccessible conversation — we cannot tell them apart here. Only
-			// drop the cache entry; the next real navigation refetches and takes
-			// the genuine error path. Forcing a reload here would bounce the user
-			// to the homepage on a mere network blip.
+			// Transient failure (network blip, server error): only drop the cache
+			// entry; the next real navigation refetches and takes the genuine
+			// error path. Forcing a reload here would bounce the user to the
+			// homepage on a mere network hiccup.
 			invalidateCachedConversation(id);
 		});
 }
