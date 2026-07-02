@@ -18,7 +18,7 @@ export async function acquireLock(key: Semaphores | string): Promise<ObjectId | 
 		});
 
 		return insert.acknowledged ? id : false; // true if the document was inserted
-	} catch (e) {
+	} catch {
 		// unique index violation, so there must already be a lock
 		return false;
 	}

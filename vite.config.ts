@@ -41,7 +41,7 @@ export default defineConfig({
 		include: ["uuid", "sharp", "clsx"],
 	},
 	test: {
-		workspace: [
+		projects: [
 			...(process.env.VITEST_BROWSER === "true"
 				? [
 						{

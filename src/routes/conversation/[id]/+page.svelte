@@ -126,7 +126,7 @@
 		isRetry = false,
 	}: {
 		prompt?: string;
-		messageId?: ReturnType<typeof v4>;
+		messageId?: string;
 		isRetry?: boolean;
 	}): Promise<void> {
 		try {

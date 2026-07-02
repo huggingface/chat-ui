@@ -44,7 +44,7 @@
 		if (page.params.id && page.params.id.length === 7) {
 			try {
 				createdUrl = await createShareLink(page.params.id);
-			} catch (e) {
+			} catch {
 				// ignore
 			}
 		}
@@ -58,7 +58,7 @@
 			const u = new URL(url);
 			u.searchParams.set("leafId", leafId);
 			return u.toString();
-		} catch (e) {
+		} catch {
 			return url;
 		}
 	}
