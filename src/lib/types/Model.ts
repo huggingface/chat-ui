@@ -1,5 +1,8 @@
 import type { BackendModel } from "$lib/server/models";
 
+// Client-side model shape, mirroring the models LIST payload
+// (GETModelsResponse): `providers` and `parameters` are intentionally absent —
+// they are heavyweight and only served by the per-model detail endpoint.
 export type Model = Pick<
 	BackendModel,
 	| "id"
@@ -9,7 +12,6 @@ export type Model = Pick<
 	| "websiteUrl"
 	| "datasetName"
 	| "promptExamples"
-	| "parameters"
 	| "description"
 	| "logoUrl"
 	| "modelUrl"
@@ -19,7 +21,6 @@ export type Model = Pick<
 	| "multimodalAcceptedMimetypes"
 	| "unlisted"
 	| "hasInferenceAPI"
-	| "providers"
 	| "supportsTools"
 	| "supportsReasoning"
 	| "supportsArtifacts"
