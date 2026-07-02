@@ -984,7 +984,9 @@
 						</span>
 					{/if}
 					{#if !messages.length && !loading}
-						<span class="max-sm:hidden">Generated content may be inaccurate or false.</span>
+						<span class="max-sm:hidden"
+							>{publicConfig.PUBLIC_CAVEAT || "Generated content may be inaccurate or false."}</span
+						>
 					{/if}
 					{#if $settings.reasoningOverrides?.[currentModel.id] ?? currentModel.supportsReasoning}
 						<div class="ml-auto">
