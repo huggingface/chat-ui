@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { fallbackBlocks, type BlockToken } from "$lib/utils/marked";
+	import { fallbackBlocks, type BlockToken } from "$lib/utils/markedLight";
 	import {
 		acquireMarkdownClientId,
 		cancelMarkdownClient,
