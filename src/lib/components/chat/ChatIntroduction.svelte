@@ -21,9 +21,9 @@
 
 <div class="my-auto grid items-center justify-center gap-8 text-center">
 	<div
-		class="flex -translate-y-16 items-center rounded-xl text-3xl font-semibold select-none md:-translate-y-12 md:text-5xl"
+		class="flex -translate-y-16 items-center rounded-xl text-[1.6rem] font-semibold select-none md:-translate-y-12 md:text-[2.55rem]"
 	>
-		<Logo classNames="size-12 md:size-20 dark:invert mr-0.5" />
+		<Logo classNames="size-[2.55rem] md:size-[4.25rem] dark:invert mr-0.5" />
 		{publicConfig.PUBLIC_APP_NAME}
 	</div>
 	<!-- <div class="lg:col-span-1">
