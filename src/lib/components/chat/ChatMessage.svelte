@@ -344,6 +344,28 @@
 		return !!last && (last.type === "think" || last.type === "tool");
 	});
 
+	// Safari has no scroll anchoring: when the process phase ends, the expanded
+	// streaming think/tool blocks are torn down and replaced by their collapsed
+	// nested summaries in a single flush. Content above the answer shrinks by a
+	// few hundred px and the viewport visibly jumps. Compensate the scroll
+	// container in the same pre-paint flush so what the reader sees stays still.
+	let wasProcessStreaming = false;
+	$effect(() => {
+		const streaming = isProcessStreaming;
+		if (wasProcessStreaming && !streaming && contentEl) {
+			const el = contentEl;
+			const scroller = el.closest(".overflow-y-auto");
+			const before = el.getBoundingClientRect();
+			if (scroller && before.top < scroller.getBoundingClientRect().bottom) {
+				void tick().then(() => {
+					const delta = before.height - el.getBoundingClientRect().height;
+					if (delta > 0) scroller.scrollTop -= delta;
+				});
+			}
+		}
+		wasProcessStreaming = streaming;
+	});
+
 	$effect(() => {
 		if (isCopied) {
 			setTimeout(() => {

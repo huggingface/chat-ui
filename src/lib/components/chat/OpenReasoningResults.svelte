@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { slide } from "svelte/transition";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import BlockWrapper from "./BlockWrapper.svelte";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
@@ -10,6 +11,11 @@
 
 	let { content, loading = false }: Props = $props();
 	let isOpen = $state(false);
+	// Distinguishes a user tap from the auto-open during generation: the
+	// uncapped static prose renders only for manual opens. During the automatic
+	// open -> collapse cycle we stay in the capped streaming viewport, so the
+	// moment `loading` flips false never paints a full-height flash frame.
+	let openedManually = $state(false);
 	let wasLoading = $state(false);
 	let initialized = $state(false);
 	// Reactive size bindings (powered by ResizeObserver under the hood) — used
@@ -30,8 +36,10 @@
 		}
 
 		if (loading && !wasLoading) {
+			openedManually = false;
 			isOpen = true;
 		} else if (!loading && wasLoading) {
+			openedManually = false;
 			isOpen = false;
 		}
 		wasLoading = loading;
@@ -43,7 +51,10 @@
 	<button
 		type="button"
 		class="group/header flex w-fit cursor-pointer items-center gap-1 text-left select-none focus:outline-hidden"
-		onclick={() => (isOpen = !isOpen)}
+		onclick={() => {
+			openedManually = !isOpen;
+			isOpen = !isOpen;
+		}}
 		aria-label={isOpen ? "Collapse" : "Expand"}
 	>
 		<span
@@ -61,33 +72,39 @@
 		/>
 	</button>
 
-	<!-- Expandable content -->
+	<!-- Expandable content. The slide keeps open/close gradual: an instant
+	     collapse removes a couple hundred px in one frame, which Safari (no
+	     scroll anchoring) renders as a hard jump right as the answer starts
+	     streaming; animated, the spacer and snapScrollToBottom track it frame
+	     by frame. -->
 	{#if isOpen}
-		{#if loading}
-			<!--
+		<div transition:slide={{ duration: 180 }}>
+			{#if loading || !openedManually}
+				<!--
 				Streaming view: fixed-height viewport, content bottom-aligned so newly
 				arriving tokens stay visible while older lines scroll off the top behind
 				a gradient fade. Works for any model output format (no parsing).
 			-->
-			<div
-				bind:clientHeight={viewportHeight}
-				class="thinking-viewport mt-2 flex max-h-56 flex-col justify-end overflow-hidden md:max-h-80"
-				class:has-overflow={contentHeight > viewportHeight}
-			>
 				<div
-					bind:clientHeight={contentHeight}
-					class="prose prose-sm max-w-none text-sm leading-relaxed text-gray-500 *:first:mt-0 *:last:mb-0 dark:text-gray-400 dark:prose-invert"
+					bind:clientHeight={viewportHeight}
+					class="thinking-viewport mt-2 flex max-h-56 flex-col justify-end overflow-hidden md:max-h-80"
+					class:has-overflow={contentHeight > viewportHeight}
+				>
+					<div
+						bind:clientHeight={contentHeight}
+						class="prose prose-sm max-w-none text-sm leading-relaxed text-gray-500 *:first:mt-0 *:last:mb-0 dark:text-gray-400 dark:prose-invert"
+					>
+						<MarkdownRenderer {content} {loading} />
+					</div>
+				</div>
+			{:else}
+				<div
+					class="prose prose-sm mt-2 max-w-none text-sm leading-relaxed text-gray-500 dark:text-gray-400 dark:prose-invert"
 				>
 					<MarkdownRenderer {content} {loading} />
 				</div>
-			</div>
-		{:else}
-			<div
-				class="prose prose-sm mt-2 max-w-none text-sm leading-relaxed text-gray-500 dark:text-gray-400 dark:prose-invert"
-			>
-				<MarkdownRenderer {content} {loading} />
-			</div>
-		{/if}
+			{/if}
+		</div>
 	{/if}
 </BlockWrapper>
 
