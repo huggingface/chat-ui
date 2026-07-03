@@ -150,7 +150,9 @@ body {
 	--tw-prose-pre-bg: var(--color-gray-800);
 	--tw-prose-th-borders: var(--color-gray-300);
 	--tw-prose-td-borders: var(--color-gray-200);
-	--tw-prose-invert-body: var(--color-gray-300);
+	/* gray-300 reads too bright for body text on dark backgrounds, but gray-400 is
+	   too dim — split the difference (~#bcbcbc). */
+	--tw-prose-invert-body: color-mix(in srgb, var(--color-gray-300) 50%, var(--color-gray-400));
 	--tw-prose-invert-lead: var(--color-gray-400);
 	--tw-prose-invert-counters: var(--color-gray-400);
 	--tw-prose-invert-bullets: var(--color-gray-600);
