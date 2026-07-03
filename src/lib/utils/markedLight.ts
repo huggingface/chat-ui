@@ -26,6 +26,24 @@ export type BlockToken = {
 	tokens: Token[];
 };
 
+// Matches any `<` that opens something other than the exact markup our
+// highlighter can emit: `</span>`, `<span>`, or `<span class="...">` (double
+// quotes, single space, no other attributes). Anything else - including a
+// span with any additional or differently quoted attribute - is not
+// highlighter output and must be sanitized.
+const NON_HIGHLIGHTER_TAG = /<(?!\/span>|span(?: class="[^"]*")?>)/i;
+
+/**
+ * True when `html` contains only markup the markdown highlighter itself can
+ * produce (escaped text plus hljs-style span/class wrappers). Used to decide
+ * when a streaming code block may skip DOMPurify: the check enforces the
+ * highlighter's output alphabet directly instead of relying on the implicit
+ * contract that highlightCode() never emits attributes.
+ */
+export function isTrustedHighlighterHtml(html: string): boolean {
+	return !NON_HIGHLIGHTER_TAG.test(html);
+}
+
 export function escapeHTML(content: string) {
 	return content.replace(
 		/[<>&"']/g,

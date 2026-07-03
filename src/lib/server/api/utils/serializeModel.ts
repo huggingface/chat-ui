@@ -36,9 +36,17 @@ export function serializeModelSummary(model: ProcessedModel): GETModelsResponse[
 // heavyweight fields (providers is ~60KB across all models) that only the
 // per-model settings page needs, fetched on demand.
 export function serializeModelDetail(model: ProcessedModel): GETModelResponse {
+	// `providers` is an upstream-router passthrough; the only field any client
+	// reads is the provider name. Map it down explicitly so arbitrary upstream
+	// fields (whatever a self-hosted router attaches) never cross the API
+	// boundary.
+	const providers = (model.providers as unknown as Array<{ provider?: unknown }> | undefined)
+		?.filter((entry): entry is { provider: string } => typeof entry?.provider === "string")
+		.map((entry) => ({ provider: entry.provider }));
+
 	return {
 		...serializeModelSummary(model),
-		providers: model.providers as unknown as Array<{ provider: string } & Record<string, unknown>>,
+		providers,
 		parameters: model.parameters,
 	};
 }
