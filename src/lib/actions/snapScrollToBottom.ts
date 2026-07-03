@@ -6,6 +6,12 @@ const BOTTOM_THRESHOLD = 50;
 const USER_SCROLL_DEBOUNCE_MS = 150;
 const PROGRAMMATIC_SCROLL_GRACE_MS = 100;
 const TOUCH_DETACH_THRESHOLD_PX = 10;
+// How long after a programmatic scroll a phantom (non-user) scroll on touch
+// devices is still treated as a stale async application and corrected.
+const STALE_SCROLL_WINDOW_MS = 2000;
+// Momentum scroll events keep arriving well after the touch-debounce expires;
+// an up-scroll this soon after touch contact is still the user's flick.
+const TOUCH_MOMENTUM_WINDOW_MS = 2500;
 
 interface ScrollDependency {
 	forceReattach?: number;
@@ -43,6 +49,11 @@ const getScrollBehavior = (value: MaybeScrollDependency): ScrollBehavior => {
 export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDependency) => {
 	// --- State ----------------------------------------------------------------
 
+	// Scrollbar drags only exist on fine-pointer devices; on touch devices all
+	// genuine user scrolling raises touch events first.
+	const isCoarsePointer =
+		typeof window !== "undefined" && window.matchMedia("(any-pointer: coarse)").matches;
+
 	// Track whether user has intentionally scrolled away from bottom
 	let isDetached = false;
 
@@ -59,9 +70,14 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 
 	// Track previous scroll position to detect scrollbar drags
 	let prevScrollTop = node.scrollTop;
+	// Track previous scroll height: a scrollTop drop that coincides with a
+	// scrollHeight change is a layout shift (e.g. the thinking block collapsing),
+	// not a user scroll-up.
+	let prevScrollHeight = node.scrollHeight;
 
 	// Touch handling state
 	let touchStartY = 0;
+	let lastTouchTime = 0;
 
 	// Observers and sentinel
 	let resizeObserver: ResizeObserver | undefined;
@@ -90,6 +106,14 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 		if (typeof requestAnimationFrame === "function") {
 			requestAnimationFrame(() => {
 				isProgrammaticScroll = false;
+				// iOS Safari applies rapid successive scrollTo calls asynchronously and
+				// can land them out of order: a clamp computed against a transient short
+				// layout (e.g. the thinking block collapsing mid-stream) may stomp a
+				// later, correct scroll. Verify after paint and correct once.
+				if (!isDetached && !userScrolling && distanceFromBottom() > BOTTOM_THRESHOLD) {
+					lastProgrammaticScrollTime = Date.now();
+					node.scrollTo({ top: node.scrollHeight });
+				}
 			});
 		} else {
 			isProgrammaticScroll = false;
@@ -215,10 +239,12 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 
 	// Detect user scroll intent via touch events (mobile)
 	const handleTouchStart = (event: TouchEvent) => {
+		lastTouchTime = Date.now();
 		touchStartY = event.touches[0]?.clientY ?? 0;
 	};
 
 	const handleTouchMove = (event: TouchEvent) => {
+		lastTouchTime = Date.now();
 		const touchY = event.touches[0]?.clientY ?? 0;
 		const deltaY = touchStartY - touchY;
 
@@ -251,10 +277,31 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 		// If not from wheel/touch, this is likely a scrollbar drag
 		if (!userScrolling) {
 			const scrollingUp = node.scrollTop < prevScrollTop;
+			// A scrollTop drop that coincides with a scrollHeight change is a layout
+			// shift, not user intent.
+			const heightChanged = node.scrollHeight !== prevScrollHeight;
 
-			// Always allow detach (scrolling up) - don't ignore user intent
-			if (scrollingUp) {
+			// A scrollTop drop here is only a user signal on fine-pointer devices
+			// (scrollbar drag). On touch devices every real user scroll arrives via
+			// the touch handlers; what lands here instead is iOS Safari applying
+			// stale queued scrolls (e.g. a clamp computed while the thinking-block
+			// collapse briefly shortened the layout), sometimes 100ms+ late.
+			if (scrollingUp && !inGracePeriod && !heightChanged && !isCoarsePointer) {
 				isDetached = true;
+			} else if (isCoarsePointer && scrollingUp && now - lastTouchTime < TOUCH_MOMENTUM_WINDOW_MS) {
+				// Momentum tail of a user flick (arrives after the touch debounce
+				// cleared userScrolling): honor it as user intent.
+				isDetached = true;
+			} else if (
+				isCoarsePointer &&
+				!isDetached &&
+				scrollingUp &&
+				!isAtBottom() &&
+				now - lastProgrammaticScrollTime < STALE_SCROLL_WINDOW_MS
+			) {
+				// Phantom scroll (stale async application, no touch anywhere near):
+				// it stranded us off-bottom while following, so correct it.
+				scrollToBottom();
 			}
 
 			// Only re-attach when at bottom if NOT in grace period
@@ -267,6 +314,7 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: MaybeScrollDep
 		}
 
 		prevScrollTop = node.scrollTop;
+		prevScrollHeight = node.scrollHeight;
 	};
 
 	// --- Setup ----------------------------------------------------------------
