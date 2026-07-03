@@ -266,6 +266,16 @@ body {
 	overflow: auto hidden;
 }
 
+/* Long inline math (wrapped by renderKatex in marked.ts) scrolls in place instead of
+   overflowing the message horizontally. */
+.katex-inline-overflow {
+	display: inline-block;
+	max-width: 100%;
+	overflow-x: auto;
+	overflow-y: hidden;
+	vertical-align: middle;
+}
+
 .router-shimmer {
 	display: inline-block;
 	background-image: linear-gradient(

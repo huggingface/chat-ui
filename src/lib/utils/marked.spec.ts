@@ -208,6 +208,43 @@ describe("processBlocksSync streaming behavior", () => {
 	});
 });
 
+describe("inline katex currency guard", () => {
+	test("dollar amounts in prose are not parsed as math", () => {
+		const html = renderHtml(
+			"The US has committed over $300 million and deployed 900 military personnel for rescue efforts, plus a $200 million reconstruction fund."
+		);
+		expect(html).not.toContain("katex");
+		expect(html).toContain("$300 million");
+		expect(html).toContain("$200 million");
+	});
+
+	test("two prices in one sentence are not glued into math", () => {
+		const html = renderHtml("It costs $5 for adults and $10 for kids.");
+		expect(html).not.toContain("katex");
+		expect(html).toContain("$5 for adults and $10");
+	});
+
+	test("regular inline math still renders", () => {
+		expect(renderHtml("Euler: $e^{i\\pi} + 1 = 0$")).toContain("katex");
+		expect(renderHtml("$x^2$")).toContain("katex");
+	});
+
+	test("inline math with internal spaces still renders when delimiters hug content", () => {
+		expect(renderHtml("$a + b = c$")).toContain("katex");
+	});
+
+	test("very long inline math is wrapped in a scrollable container", () => {
+		const long = `$${"x_1 + ".repeat(30)}x_2$`; // > KATEX_INLINE_OVERFLOW_THRESHOLD
+		const html = renderHtml(long);
+		expect(html).toContain('class="katex-inline-overflow"');
+		expect(html).toContain("katex");
+	});
+
+	test("short inline math is not wrapped", () => {
+		expect(renderHtml("$x^2$")).not.toContain("katex-inline-overflow");
+	});
+});
+
 describe("event-loop guards for oversized inputs (SSR)", () => {
 	test("small code with a known language is highlighted normally", () => {
 		const html = highlightCode("const x = 1;", "javascript");

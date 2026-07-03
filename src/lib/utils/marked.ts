@@ -76,6 +76,11 @@ const MAX_HIGHLIGHT_LENGTH = 50_000;
 // single-language highlighting and gets a tighter cap.
 const MAX_AUTO_HIGHLIGHT_LENGTH = 5_000;
 const MAX_KATEX_LENGTH = 10_000;
+// Inline math longer than this gets a scrollable wrapper (see .katex-inline-overflow in
+// main.css) so it can't push the layout wider than the message. Only long expressions
+// are wrapped because a scroll container can't sit on the text baseline like normal
+// inline math.
+const KATEX_INLINE_OVERFLOW_THRESHOLD = 100;
 
 // Media URL detection
 const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg|mov|m4v)([?#]|$)/i;
@@ -135,10 +140,14 @@ function renderKatex(token: katexBlockToken | katexInlineToken): string {
 	if (token.text.length > MAX_KATEX_LENGTH) {
 		return escapeHTML(token.raw);
 	}
-	return katex.renderToString(token.text, {
+	const html = katex.renderToString(token.text, {
 		throwOnError: false,
 		displayMode: token.displayMode,
 	});
+	if (!token.displayMode && token.text.length > KATEX_INLINE_OVERFLOW_THRESHOLD) {
+		return `<span class="katex-inline-overflow">${html}</span>`;
+	}
+	return html;
 }
 
 export const katexBlockExtension: TokenizerExtension & RendererExtension = {
@@ -199,7 +208,11 @@ const katexInlineExtension: TokenizerExtension & RendererExtension = {
 
 	tokenizer(src: string): katexInlineToken | undefined {
 		// 1) $...$
-		const rule1 = /^\$([^$]+?)\$/;
+		// Currency guard (pandoc/remark-math style): the opening $ must be followed by a
+		// non-space, the closing $ must be preceded by a non-space and not followed by a
+		// digit. Otherwise prose like "$300 million ... a $200 million fund" gets glued
+		// into one giant math span that overflows the message bubble.
+		const rule1 = /^\$(?=\S)([^$]*?[^\s$])\$(?!\d)/;
 		const match1 = rule1.exec(src);
 		if (match1) {
 			const token: katexInlineToken = {
