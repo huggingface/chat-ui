@@ -25,7 +25,6 @@
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { createConversationsStore } from "$lib/stores/conversations.svelte";
-	import { invalidateCachedConversation } from "$lib/utils/conversationCache";
 
 	let { data = $bindable(), children } = $props();
 
@@ -74,9 +73,6 @@
 			.then(handleResponse)
 			.then(async () => {
 				convsStore.remove(id);
-				// Drop any cached copy so a back-navigation to the deleted
-				// conversation cannot render it from cache.
-				invalidateCachedConversation(id);
 
 				if (page.params.id === id) {
 					await goto(`${base}/`, { invalidateAll: true });

@@ -3,72 +3,8 @@ import { UrlDependency } from "$lib/types/UrlDependency";
 import { redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import { browser } from "$app/environment";
-import { safeInvalidate } from "$lib/utils/safeInvalidate";
 import type { PageLoad } from "./$types";
-import {
-	CONVERSATION_CACHE_FRESH_MS,
-	conversationFingerprint,
-	getCachedConversation,
-	invalidateCachedConversation,
-	setCachedConversation,
-	type ConversationData,
-} from "$lib/utils/conversationCache";
-
-// Id of the conversation the previous load() call served. A repeat load for
-// the same id means invalidate(UrlDependency.Conversation) ran (stream
-// finished, model switch, background poller) and fresh data is expected; only
-// a load for a different id is a navigation that may be served from cache.
-let lastLoadedId: string | undefined;
-
-async function fetchConversation(
-	client: ReturnType<typeof useAPIClient>,
-	id: string,
-	fromShare: string | undefined
-): Promise<ConversationData> {
-	return (await client
-		.conversations({ id })
-		.get({ query: { fromShare } })
-		.then(handleResponse)) as ConversationData;
-}
-
-// Serve-stale-then-revalidate: fetch fresh data off the critical path and, if
-// it differs from what the cache (and thus the page) currently shows, refresh
-// the cache and re-run the load — which then hits the updated, fresh entry.
-function revalidateInBackground(
-	client: ReturnType<typeof useAPIClient>,
-	id: string,
-	fromShare: string | undefined,
-	served: ConversationData
-) {
-	void client
-		.conversations({ id })
-		.get({ query: { fromShare } })
-		.then((response) => {
-			// The conversation is gone or this session can no longer read it
-			// (deleted in another tab, revoked access, expired session): drop the
-			// entry and re-run the load so the page takes its real error path
-			// (redirect home) instead of keeping the stale view on screen.
-			if (response.status === 401 || response.status === 403 || response.status === 404) {
-				invalidateCachedConversation(id);
-				return safeInvalidate(UrlDependency.Conversation);
-			}
-			// Throws on remaining errors (5xx etc.), handled as transient below.
-			const fresh = handleResponse(response) as ConversationData;
-			if (conversationFingerprint(fresh) === conversationFingerprint(served)) return;
-			setCachedConversation(id, fresh);
-			// safeInvalidate, not invalidate: a raw invalidate() fired from this
-			// background task can cancel an in-flight navigation the user just
-			// started (see safeInvalidate.ts).
-			return safeInvalidate(UrlDependency.Conversation);
-		})
-		.catch(() => {
-			// Transient failure (network blip, server error): only drop the cache
-			// entry; the next real navigation refetches and takes the genuine
-			// error path. Forcing a reload here would bounce the user to the
-			// homepage on a mere network hiccup.
-			invalidateCachedConversation(id);
-		});
-}
+import { takePendingConversation, type ConversationData } from "$lib/utils/pendingConversation";
 
 export const load: PageLoad = async ({ params, depends, fetch, url, parent }) => {
 	depends(UrlDependency.Conversation);
@@ -102,28 +38,24 @@ export const load: PageLoad = async ({ params, depends, fetch, url, parent }) =>
 	}
 
 	const fromShare = url.searchParams.get("fromShare") ?? undefined;
-	const isNavigation = lastLoadedId !== params.id;
-	lastLoadedId = params.id;
 
-	// Share views bypass the cache entirely: their payload depends on the
-	// fromShare parameter, not just the conversation id.
-	if (browser && isNavigation && !fromShare) {
-		const cached = getCachedConversation(params.id);
-		if (cached) {
-			if (Date.now() - cached.fetchedAt > CONVERSATION_CACHE_FRESH_MS) {
-				revalidateInBackground(client, params.id, fromShare, cached.data);
-			}
-			return cached.data;
+	// A conversation created by this tab hands its payload over via a one-shot
+	// seed (see pendingConversation.ts), consumed here so the first load after
+	// create skips the network round trip. Every other load, including every
+	// invalidate() re-run, fetches fresh data.
+	if (browser && !fromShare) {
+		const seeded = takePendingConversation(params.id);
+		if (seeded) {
+			return seeded;
 		}
 	}
 
 	// Load conversation (works for both owned and shared conversations)
 	try {
-		const data = await fetchConversation(client, params.id, fromShare);
-		if (browser && !fromShare) {
-			setCachedConversation(params.id, data);
-		}
-		return data;
+		return (await client
+			.conversations({ id: params.id })
+			.get({ query: { fromShare } })
+			.then(handleResponse)) as ConversationData;
 	} catch {
 		redirect(302, `${base}/`);
 	}
