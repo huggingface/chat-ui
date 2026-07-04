@@ -9,6 +9,7 @@
 	import { parseExternalUrl } from "$lib/utils/externalLink";
 	import { escapeHTML } from "$lib/utils/markedLight";
 	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_FRACTION } from "$lib/stores/artifactPanel.svelte";
+	import { StickToBottomController } from "$lib/utils/scroll/stickToBottom";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { page } from "$app/state";
@@ -177,22 +178,29 @@
 	// view gets a deterministic anchor instead: streaming pins to the bottom,
 	// diffs land on their first change, everything else starts at the top.
 
-	// While streaming, stay pinned to the bottom — but let the user scroll up
-	// to read earlier output without fighting them; re-stick when they return
-	// to the bottom.
-	let stickToBottom = true;
-
-	function onCodeScroll() {
-		if (!codeScrollEl || !isStreamingVersion) return;
-		const distance = codeScrollEl.scrollHeight - codeScrollEl.scrollTop - codeScrollEl.clientHeight;
-		stickToBottom = distance < 60;
-	}
-
+	// While streaming, the code view stays pinned to the bottom through a
+	// StickToBottomController in instant mode (code arrives in chunky highlight
+	// repaints, where a glide adds motion without information). The controller
+	// owns detach/re-attach, so a user scrolling up to read earlier output is
+	// never fought mid-gesture, re-attaching catches up immediately, and
+	// content reflows (word-wrap toggle, panel resize) re-pin only while
+	// actually following.
+	let codeStick: StickToBottomController | null = null;
 	$effect(() => {
-		void highlightedCode;
-		if (codeScrollEl && isStreamingVersion && effectiveTab === "code" && stickToBottom) {
-			codeScrollEl.scrollTop = codeScrollEl.scrollHeight;
-		}
+		const el = codeScrollEl;
+		if (!el) return;
+		const controller = new StickToBottomController(el, {
+			followMode: "instant",
+			content: () => (el.firstElementChild as HTMLElement | null) ?? undefined,
+		});
+		// The anchor effect below decides each view's initial position; nothing
+		// follows until a streaming view pins explicitly.
+		controller.unpin();
+		codeStick = controller;
+		return () => {
+			controller.destroy();
+			if (codeStick === controller) codeStick = null;
+		};
 	});
 
 	/** Scroll the code view so the first changed diff line is in view */
@@ -202,7 +210,7 @@
 		const offset =
 			first.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
 		// Leave ~a quarter viewport of context above the change
-		el.scrollTop = Math.max(0, offset - el.clientHeight / 4);
+		codeStick?.scrollTo(Math.max(0, offset - el.clientHeight / 4));
 		return true;
 	}
 
@@ -223,7 +231,6 @@
 		codeAnchor = { key, el };
 		const streaming = isStreamingVersion;
 		const diffed = showingDiff;
-		if (streaming) stickToBottom = true;
 		// rAF: this effect can run in the same flush that set highlightedCode,
 		// before {@html} has patched the DOM — measure after the next paint.
 		// Not cancelled on re-run: re-runs for the same view return early above,
@@ -231,11 +238,11 @@
 		requestAnimationFrame(() => {
 			if (!el.isConnected) return;
 			if (streaming) {
-				el.scrollTop = el.scrollHeight;
+				codeStick?.jumpToBottom();
 				return;
 			}
 			if (diffed && scrollToFirstChange(el)) return;
-			el.scrollTop = 0;
+			codeStick?.scrollTo(0);
 		});
 	});
 
@@ -539,7 +546,6 @@
 				<!-- eslint-disable svelte/no-at-html-tags -->
 				<pre
 					bind:this={codeScrollEl}
-					onscroll={onCodeScroll}
 					class="scrollbar-custom h-full overflow-auto border-0! px-5 py-4 font-mono {artifactPanel.codeWrap
 						? 'wrap-break-word whitespace-pre-wrap'
 						: ''} {showingDiff ? 'diff-view' : ''}"><code>{@html highlightedCode}</code></pre>

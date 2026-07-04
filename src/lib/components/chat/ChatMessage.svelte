@@ -365,7 +365,12 @@
 			tick();
 			if (editContentEl) {
 				editContentEl.value = message.content;
-				editContentEl?.focus();
+				// preventScroll: a bare focus() makes the browser reveal-scroll
+				// the chat container, which the scroll controller would have to
+				// classify as user input (and could misread as a re-pin). The
+				// textarea replaces the message the user just clicked, so it is
+				// already in view.
+				editContentEl?.focus({ preventScroll: true });
 			}
 		}
 	});
@@ -660,8 +665,11 @@
 								} else {
 									const textArea = document.createElement("textarea");
 									textArea.value = message.content;
+									// Off-screen + preventScroll so the legacy copy path
+									// (insecure contexts) can't scroll-jump or shift layout.
+									textArea.style.cssText = "position: fixed; opacity: 0;";
 									document.body.appendChild(textArea);
-									textArea.focus();
+									textArea.focus({ preventScroll: true });
 									textArea.select();
 									document.execCommand("copy");
 									document.body.removeChild(textArea);
