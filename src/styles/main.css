@@ -121,6 +121,24 @@ body {
 	}
 }
 
+/* Keeps the scrollbar gutter but hides thumb & track until the element is hovered.
+   Only applies on devices with a mouse-like pointer; touch devices keep the default
+   always-visible behavior since they have no hover. Combine with scrollbar-custom. */
+@utility scrollbar-on-hover {
+	@media (hover: hover) and (pointer: fine) {
+		&:not(:hover) {
+			scrollbar-color: transparent transparent;
+		}
+
+		&:not(:hover)::-webkit-scrollbar,
+		&:not(:hover)::-webkit-scrollbar-thumb,
+		.dark &:not(:hover)::-webkit-scrollbar,
+		.dark &:not(:hover)::-webkit-scrollbar-thumb {
+			background-color: transparent;
+		}
+	}
+}
+
 @utility no-scrollbar {
 	@apply [scrollbar-width:none] [-ms-overflow-style:none] [&::-ms-scrollbar]:hidden [&::-webkit-scrollbar]:hidden;
 }
