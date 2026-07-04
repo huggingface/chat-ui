@@ -44,8 +44,12 @@
 	}
 
 	.stop-generating-btn--spinning::after {
-		border: 2px solid transparent;
-		border-top-color: var(--stop-generating-ring-color);
+		background: conic-gradient(
+			from 0deg,
+			transparent 0deg 240deg,
+			var(--stop-generating-ring-color) 240deg 360deg
+		);
+		mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
 		animation: stop-generating-rotate 1.2s linear infinite;
 	}
 

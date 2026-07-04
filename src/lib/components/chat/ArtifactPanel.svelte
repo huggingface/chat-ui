@@ -571,6 +571,11 @@
 					<LucideWrapText />
 				</button>
 			</div>
+			{#if isStreamingVersion}
+				<div
+					class="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t from-white/90 to-transparent dark:from-gray-900/90"
+				></div>
+			{/if}
 		{/if}
 	</div>
 
