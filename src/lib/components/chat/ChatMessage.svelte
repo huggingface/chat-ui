@@ -389,7 +389,7 @@
 			animating={isLast && loading}
 		/>
 		<div
-			class="relative flex min-w-[60px] flex-col gap-2 rounded-2xl border border-gray-100 bg-gray-50 px-5 py-3.5 wrap-break-word text-gray-600 dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-300 prose-pre:my-2"
+			class="relative flex min-w-[60px] flex-col gap-2 rounded-2xl border border-gray-100 bg-gray-50 px-5 py-3.5 wrap-break-word text-gray-600 dark:border-gray-800 dark:bg-gray-800/30 dark:text-gray-300 prose-pre:my-2"
 		>
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
