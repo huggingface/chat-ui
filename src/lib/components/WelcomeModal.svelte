@@ -13,11 +13,9 @@
 </script>
 
 <Modal closeOnBackdrop={false} onclose={close} width="max-w-[420px]! m-4!">
-	<div
-		class="flex w-full flex-col gap-8 bg-white bg-linear-to-b to-transparent px-6 pb-7 dark:bg-black dark:from-white/10 dark:to-white/5"
-	>
+	<div class="flex w-full flex-col gap-8 bg-white px-6 pb-7 dark:bg-gray-900">
 		<div
-			class="relative -mx-6 grid h-48 place-items-center overflow-hidden rounded-b-xl bg-linear-to-t from-black/5 select-none dark:from-white/10"
+			class="relative -mx-6 grid h-48 place-items-center overflow-hidden rounded-b-xl bg-black/5 select-none dark:bg-white/10"
 		>
 			<img
 				class="size-full bg-black object-cover"

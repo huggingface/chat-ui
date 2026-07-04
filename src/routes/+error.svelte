@@ -3,7 +3,7 @@
 </script>
 
 <div
-	class="flex items-center justify-center bg-linear-to-t from-gray-200 text-gray-800 dark:from-gray-700 dark:text-gray-300"
+	class="flex items-center justify-center bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
 >
 	<div
 		class="align-center -mt-24 flex flex-col justify-center rounded-xl border bg-white px-8 pt-4 pb-2 text-center dark:border-gray-700 dark:bg-gray-800"

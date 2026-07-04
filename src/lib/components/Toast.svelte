@@ -13,7 +13,7 @@
 <Portal>
 	<div
 		transition:fade|global={{ duration: 300 }}
-		class="pointer-events-none fixed top-12 right-0 z-50 bg-linear-to-bl from-red-500/20 via-red-500/0 to-red-500/0 pt-2 pr-2 pb-36 pl-36 max-sm:text-sm md:top-0 md:pt-5 md:pr-8"
+		class="pointer-events-none fixed top-12 right-0 z-50 pt-2 pr-2 pb-36 pl-36 max-sm:text-sm md:top-0 md:pt-5 md:pr-8"
 	>
 		<div
 			class="pointer-events-auto flex items-center rounded-full bg-white/90 px-3 py-1 shadow-xs dark:bg-gray-900/80"

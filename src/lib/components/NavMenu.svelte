@@ -150,7 +150,7 @@
 </div>
 
 <div
-	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pt-2 pb-3 text-[.9rem] max-sm:bg-linear-to-t md:bg-linear-to-l dark:border-transparent dark:from-gray-800/30"
+	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 bg-gray-50 px-3 pt-2 pb-3 text-[.9rem] dark:border-transparent dark:bg-gray-800/30"
 >
 	<div class="flex flex-col gap-px">
 		{#each Object.entries(groupedConversations) as [group, convs]}
@@ -169,7 +169,7 @@
 	{/if}
 </div>
 <div
-	class="flex touch-none flex-col gap-px rounded-r-xl border border-l-0 border-gray-100 p-3 text-base sm:text-sm md:mt-3 md:bg-linear-to-l md:from-gray-50 dark:border-transparent md:dark:from-gray-800/30"
+	class="flex touch-none flex-col gap-px rounded-r-xl border border-l-0 border-gray-100 p-3 text-base sm:text-sm md:mt-3 md:bg-gray-50 dark:border-transparent md:dark:bg-gray-800/30"
 >
 	{#if user?.username || user?.email}
 		<div

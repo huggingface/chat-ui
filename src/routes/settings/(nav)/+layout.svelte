@@ -139,7 +139,7 @@
 	</div>
 	{#if !(showContent && browser && !isDesktop(window))}
 		<div
-			class="col-span-1 scrollbar-custom flex flex-col overflow-y-auto rounded-r-xl bg-linear-to-l from-gray-50 to-10% whitespace-nowrap max-md:-mx-4 max-md:h-full md:pr-6 dark:from-gray-700/40"
+			class="col-span-1 scrollbar-custom flex flex-col overflow-y-auto rounded-r-xl bg-gray-50 whitespace-nowrap max-md:-mx-4 max-md:h-full md:pr-6 dark:bg-gray-700/40"
 			class:max-md:hidden={showContent && browser}
 			bind:this={navContainer}
 		>

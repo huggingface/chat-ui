@@ -12,17 +12,13 @@
 </script>
 
 <Modal closeOnBackdrop={false} onclose={close} width="max-w-[420px]! m-4!">
-	<div
-		class="flex w-full flex-col gap-8 bg-white bg-linear-to-b to-transparent px-6 pb-7 dark:bg-black dark:from-white/10 dark:to-white/5"
-	>
-		<div
-			class="-mx-6 grid h-48 place-items-center bg-linear-to-t from-black/5 select-none dark:from-white/10"
-		>
+	<div class="flex w-full flex-col gap-8 bg-white px-6 pb-7 dark:bg-gray-900">
+		<div class="-mx-6 grid h-48 place-items-center bg-black/5 select-none dark:bg-white/10">
 			<div class="flex flex-col items-center justify-center gap-2.5 px-8 text-center">
 				<div
 					class="flex size-14 items-center justify-center rounded-full text-3xl {$isPro
-						? 'bg-linear-to-br from-yellow-500/15 via-orange-500/15 to-red-500/15'
-						: 'bg-linear-to-br from-pink-500/15 from-15% via-green-500/15 to-yellow-500/15'}"
+						? 'bg-orange-500/15'
+						: 'bg-green-500/15'}"
 				>
 					{#if $isPro}
 						<IconDazzled />

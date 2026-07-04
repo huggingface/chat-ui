@@ -268,36 +268,20 @@ body {
 
 .router-shimmer {
 	display: inline-block;
-	background-image: linear-gradient(
-		90deg,
-		rgba(156, 163, 175, 1) 0%,
-		rgba(156, 163, 175, 0.6) 10%,
-		rgba(156, 163, 175, 0.6) 50%,
-		rgba(156, 163, 175, 0.6) 90%,
-		rgba(156, 163, 175, 1) 100%
-	);
-	background-size: 220% 100%;
-	animation: router-shimmer 2.8s linear infinite;
-	background-clip: text;
-	-webkit-background-clip: text;
-	color: transparent;
-	-webkit-text-fill-color: transparent;
+	color: rgb(156, 163, 175);
+	animation: router-shimmer 2.8s ease-in-out infinite;
 }
 
 .dark .router-shimmer {
-	background-image: linear-gradient(
-		90deg,
-		rgba(255, 255, 255, 0.15) 0%,
-		rgba(255, 255, 255, 0.7) 50%,
-		rgba(255, 255, 255, 0.15) 100%
-	);
+	color: rgba(255, 255, 255, 0.7);
 }
 
 @keyframes router-shimmer {
-	0% {
-		background-position: 200% 0;
-	}
+	0%,
 	100% {
-		background-position: -200% 0;
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.45;
 	}
 }

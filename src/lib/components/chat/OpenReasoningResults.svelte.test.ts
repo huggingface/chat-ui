@@ -18,14 +18,9 @@ describe("OpenReasoningResults", () => {
 
 		const viewport = baseElement.querySelector(".thinking-viewport") as HTMLElement | null;
 		if (!viewport) throw new Error("expected .thinking-viewport to be rendered");
-		// Scoped <style> block applies the gradient fade mask
-		const style = getComputedStyle(viewport);
-		const hasMask =
-			style.maskImage?.includes("linear-gradient") ||
-			(style as unknown as { webkitMaskImage?: string }).webkitMaskImage?.includes(
-				"linear-gradient"
-			);
-		expect(hasMask).toBe(true);
+		// Fixed-height viewport clips overflowing content off the top
+		expect(viewport.className).toContain("overflow-hidden");
+		expect(viewport.className).toContain("max-h-");
 
 		// Full content is in the DOM (CSS clipping handles the visual cropping)
 		expect(page.getByText("Paragraph 20:", { exact: false })).toBeInTheDocument();

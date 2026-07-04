@@ -728,10 +728,9 @@
 
 		<div
 			class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full
-			max-w-3xl flex-col items-center justify-center bg-linear-to-t from-white
-			via-white to-white/0 px-3.5 pt-2 *:pointer-events-auto
+			max-w-3xl flex-col items-center justify-center bg-white px-3.5 pt-2 *:pointer-events-auto
 			max-sm:py-0 sm:px-5
-			md:pb-4 xl:max-w-4xl dark:border-gray-800 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0"
+			md:pb-4 xl:max-w-4xl dark:border-gray-800 dark:bg-gray-900"
 		>
 			{#if !draft.length && !messages.length && !sources.length && !loading && (currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
 				<div
@@ -1027,37 +1026,21 @@
 
 	.router-shimmer {
 		display: inline-block;
-		background-image: linear-gradient(
-			90deg,
-			rgba(156, 163, 175, 1) 0%,
-			rgba(156, 163, 175, 0.6) 10%,
-			rgba(156, 163, 175, 0.6) 50%,
-			rgba(156, 163, 175, 0.6) 90%,
-			rgba(156, 163, 175, 1) 100%
-		);
-		background-size: 220% 100%;
-		animation: router-shimmer 2.8s linear infinite;
-		background-clip: text;
-		-webkit-background-clip: text;
-		color: transparent;
-		-webkit-text-fill-color: transparent;
+		color: rgb(156, 163, 175);
+		animation: router-shimmer 2.8s ease-in-out infinite;
 	}
 
 	:global(.dark) .router-shimmer {
-		background-image: linear-gradient(
-			90deg,
-			rgba(255, 255, 255, 0.15) 0%,
-			rgba(255, 255, 255, 0.7) 50%,
-			rgba(255, 255, 255, 0.15) 100%
-		);
+		color: rgba(255, 255, 255, 0.7);
 	}
 
 	@keyframes router-shimmer {
-		0% {
-			background-position: 200% 0;
-		}
+		0%,
 		100% {
-			background-position: -200% 0;
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.45;
 		}
 	}
 
