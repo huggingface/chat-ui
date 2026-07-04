@@ -153,13 +153,20 @@ body {
 	/* gray-300 reads too bright for body text on dark backgrounds, but gray-400 is
 	   too dim — split the difference (~#bcbcbc). */
 	--tw-prose-invert-body: color-mix(in srgb, var(--color-gray-300) 50%, var(--color-gray-400));
+	/* The plugin defaults headings/links/bold/code/kbd to pure white in dark mode,
+	   which glows against the dimmed body — cap the emphasis tier at gray-200. */
+	--tw-prose-invert-headings: var(--color-gray-200);
 	--tw-prose-invert-lead: var(--color-gray-400);
+	--tw-prose-invert-links: var(--color-gray-200);
+	--tw-prose-invert-bold: var(--color-gray-200);
 	--tw-prose-invert-counters: var(--color-gray-400);
 	--tw-prose-invert-bullets: var(--color-gray-600);
 	--tw-prose-invert-hr: var(--color-gray-700);
-	--tw-prose-invert-quotes: var(--color-gray-100);
+	--tw-prose-invert-quotes: var(--color-gray-200);
 	--tw-prose-invert-quote-borders: var(--color-gray-700);
 	--tw-prose-invert-captions: var(--color-gray-400);
+	--tw-prose-invert-kbd: var(--color-gray-200);
+	--tw-prose-invert-code: var(--color-gray-200);
 	--tw-prose-invert-pre-code: var(--color-gray-300);
 	--tw-prose-invert-th-borders: var(--color-gray-600);
 	--tw-prose-invert-td-borders: var(--color-gray-700);
