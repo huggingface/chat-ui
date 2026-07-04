@@ -20,8 +20,11 @@ interface ChatFixture {
 	chat: ReturnType<typeof createChatScroll>;
 	messages: { id: string; from: "user" | "assistant" }[];
 	sync: (lastMessageEmpty?: boolean, conversationKey?: string) => void;
-	/** Mount a (user, empty assistant) pair — what a send/edit produces. */
-	mountPair: (userHeight?: number) => { user: HTMLDivElement; assistant: HTMLDivElement };
+	/** Mount a (user, assistant) pair — what a send/edit produces. */
+	mountPair: (
+		userHeight?: number,
+		opts?: { empty?: boolean }
+	) => { user: HTMLDivElement; assistant: HTMLDivElement };
 	/** Swap the trailing assistant for a fresh empty sibling — a regenerate. */
 	swapAssistant: () => HTMLDivElement;
 	viewportTop: () => number;
@@ -62,13 +65,15 @@ function createChat({ turns = 3, viewportHeight = 400 } = {}): ChatFixture {
 		sync(lastMessageEmpty = false, conversationKey = "c1") {
 			chat.sync({ conversationKey, messages: [...messages], lastMessageEmpty });
 		},
-		mountPair(userHeight = 40) {
+		mountPair(userHeight = 40, { empty = true } = {}) {
 			const userId = `u${++n}`;
 			const assistantId = `a${n}`;
+			// Non-empty pairs stay short enough that the computed spacer remains
+			// above its floor — the assertions distinguish floor from anchor.
 			const user = fixture.addBlock(userHeight, { user: true, id: userId });
-			const assistant = fixture.addBlock(0, { id: assistantId });
+			const assistant = fixture.addBlock(empty ? 0 : 60, { id: assistantId });
 			messages.push({ id: userId, from: "user" }, { id: assistantId, from: "assistant" });
-			api.sync(true);
+			api.sync(empty);
 			return { user, assistant };
 		},
 		swapAssistant() {
@@ -241,6 +246,40 @@ describe("retry & branch intents", () => {
 		expect(chat.chat.state.pinned).toBe(false);
 		// Kept in place, clamped only if the shorter branch forces it.
 		expect(chat.fixture.scrollTop()).toBe(Math.min(300, chat.fixture.maxScrollTop()));
+	});
+
+	it("a branch switch can never consume an armed intent, even onto an empty errored sibling", async () => {
+		const chat = createChat({ turns: 4 });
+		chat.chat.armSend();
+		// Branch arrow lands on a sibling whose leaf is an assistant stopped
+		// before its first token: unknown id + empty content — structurally
+		// identical to a fresh pair, distinguishable only by the switch signal.
+		chat.chat.notifyBranchSwitch();
+		chat.fixture.removeLast();
+		chat.messages.pop();
+		const siblingId = "errored-sibling";
+		chat.fixture.addBlock(0, { id: siblingId });
+		chat.messages.push({ id: siblingId, from: "assistant" });
+		chat.sync(true);
+		await frames(3);
+		expect(parseFloat(chat.fixture.spacer.style.height)).toBe(MIN_SPACER_FALLBACK_PX);
+		// The real pair still anchors when it mounts (the programmatic unpin
+		// from the branch switch must not have revoked the pin).
+		chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "real pair anchors" });
+		expect(chat.chat.state.pinned).toBe(true);
+		expect(parseFloat(chat.fixture.spacer.style.height)).toBeGreaterThan(MIN_SPACER_FALLBACK_PX);
+	});
+
+	it("send still anchors when the first token lands in the same flush as the pair", async () => {
+		const chat = createChat();
+		chat.chat.armSend();
+		// The pair mounts already carrying content (non-empty), but the exact
+		// +2 growth identifies it as the awaited send.
+		chat.mountPair(40, { empty: false });
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
+		expect(chat.chat.state.pinned).toBe(true);
+		expect(parseFloat(chat.fixture.spacer.style.height)).toBeGreaterThan(MIN_SPACER_FALLBACK_PX);
 	});
 
 	it("an expired intent never fires", async () => {

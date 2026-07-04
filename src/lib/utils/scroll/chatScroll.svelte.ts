@@ -25,9 +25,9 @@ import {
  * HIDE — so the boundary never flickers while reading near the threshold. */
 const BUTTONS_SHOW_PX = 200;
 const BUTTONS_HIDE_PX = 60;
-/** Landing offset for scroll-to-previous — same breathing room as the send
- * anchor, instead of the old flush-against-the-edge scrollIntoView. */
-const PREVIOUS_TOP_OFFSET_PX = 50;
+/** Landing offset for scroll-to-previous — the same breathing room as the
+ * send anchor, instead of the old flush-against-the-edge scrollIntoView. */
+const PREVIOUS_TOP_OFFSET_PX = SPACER_TOP_OFFSET_PX;
 /**
  * An armed send/retry intent that hasn't seen its DOM change within this
  * window is stale and must not fire later. Generous because the send pipeline
@@ -43,6 +43,9 @@ interface Intent {
 	armedAt: number;
 	/** Visible message ids at arm time — the awaited pair must be new. */
 	knownIds: ReadonlySet<string>;
+	/** Visible message count at arm time — send/edit mounts exactly +2, which
+	 * identifies the pair even when the first token lands in the same flush. */
+	countAtArm: number;
 	/** Set when the user detaches between arm and consume: keep the spacer
 	 * geometry but never yank them back to the bottom. */
 	skipPin: boolean;
@@ -74,6 +77,10 @@ export class ChatScroll {
 	showJumpToBottom = $derived(this.buttonsVisible);
 	showJumpToPrevious = $derived(this.buttonsVisible && this.state.scrolledUp);
 
+	/** Half of the measured scrollbar gutter, for the composer's alignment
+	 * padding (see measureGutter). Bound into a CSS variable by ChatWindow. */
+	gutterHalfPx = $state(0);
+
 	private controller: StickToBottomController | null = null;
 	private container: HTMLElement | null = null;
 	private spacerEl: HTMLElement | null = null;
@@ -82,6 +89,16 @@ export class ChatScroll {
 	private intent: Intent | null = null;
 	/** True while a send anchor is active for the current turn. */
 	private spacerActive = false;
+	/** The anchored user message element, resolved once per turn — updateSpacer
+	 * runs on every streaming frame and must not rescan the whole subtree. */
+	private anchorEl: Element | null = null;
+	/** Set by notifyBranchSwitch so the branch switch's own structural change
+	 * can never consume an armed send/retry intent (e.g. by landing on an
+	 * empty errored sibling, which is structurally identical to a fresh pair). */
+	private pendingBranchSwitch = false;
+	/** True while an unpin is programmatic (branch switch), so applyState does
+	 * not read it as the user revoking an armed intent's pin. */
+	private suppressSkipPin = false;
 	private composerHeight: number | undefined;
 	private gutterPx = -1;
 
@@ -94,14 +111,21 @@ export class ChatScroll {
 	// --- wiring -------------------------------------------------------------------
 
 	/** `use:` action for the scroll container. */
-	attach = (node: HTMLElement, params?: { content?: () => HTMLElement | null | undefined }) => {
+	attach = (
+		node: HTMLElement,
+		params?: {
+			content?: () => HTMLElement | null | undefined;
+			ignoreTouchZonePx?: number;
+		}
+	) => {
 		this.container = node;
 		this.contentEl = params?.content ?? null;
 		this.controller = new StickToBottomController(node, {
 			content: () => this.contentEl?.() ?? undefined,
+			ignoreTouchZonePx: params?.ignoreTouchZonePx,
 			onStateChange: (s) => this.applyState(s),
-			onContentResize: () => {
-				this.measureGutter();
+			onContentResize: (containerResized) => {
+				if (containerResized) this.measureGutter();
 				this.updateSpacer();
 			},
 		});
@@ -166,21 +190,38 @@ export class ChatScroll {
 	/** User submitted a message (send, or edit-with-content: both mount a fresh
 	 * (user, assistant) pair that should anchor near the viewport top). */
 	armSend() {
-		this.intent = { kind: "send", armedAt: Date.now(), knownIds: this.knownIds, skipPin: false };
+		this.intent = {
+			kind: "send",
+			armedAt: Date.now(),
+			knownIds: this.knownIds,
+			countAtArm: this.lastMessageCount,
+			skipPin: false,
+		};
 	}
 
 	/** User regenerated an assistant message: prepare the spacer so the old
 	 * reply's collapse doesn't clamp-jump the view, but never yank a user who
 	 * regenerates from a scrolled-up position. */
 	armRetry() {
-		this.intent = { kind: "retry", armedAt: Date.now(), knownIds: this.knownIds, skipPin: false };
+		this.intent = {
+			kind: "retry",
+			armedAt: Date.now(),
+			knownIds: this.knownIds,
+			countAtArm: this.lastMessageCount,
+			skipPin: false,
+		};
 	}
 
 	/** Branch/alternative switch: the compared message must stay put. Content
 	 * above the branch point is untouched, so simply disengaging the follow
-	 * keeps it stationary; the controller's clamp rule handles shorter branches. */
+	 * keeps it stationary; the controller's clamp rule handles shorter branches.
+	 * The unpin is programmatic — it must not revoke an in-flight send's pin —
+	 * and the switch's own structural change must not consume that intent. */
 	notifyBranchSwitch() {
+		this.pendingBranchSwitch = true;
+		this.suppressSkipPin = true;
 		this.controller?.unpin();
+		this.suppressSkipPin = false;
 	}
 
 	/**
@@ -206,23 +247,29 @@ export class ChatScroll {
 		this.trackStructure(messages);
 		if (!structureChanged) return;
 
+		// A branch switch produces exactly one structural change; it can never
+		// be the awaited pair (even when its leaf is an empty errored sibling,
+		// which is structurally indistinguishable from a fresh one).
+		const wasBranchSwitch = this.pendingBranchSwitch;
+		this.pendingBranchSwitch = false;
+
 		const intent = this.intent;
-		if (!intent) return;
+		if (!intent || wasBranchSwitch) return;
 		if (Date.now() - intent.armedAt > INTENT_TTL_MS) {
 			this.intent = null;
 			return;
 		}
 
 		// The awaited change and nothing else: a trailing assistant message that
-		// did not exist when the intent was armed and hasn't received content
-		// yet. Retry flows reassign the visible path to the OLD branch's leaf
-		// one flush before the tree mutation, and a branch arrow can land on a
-		// completed sibling — both must leave the intent armed for the real
-		// pair, and both fail these checks (known id / non-empty content).
+		// did not exist when the intent was armed, and that is either still
+		// empty or part of an exact +2 growth (send/edit pair — robust against
+		// the first token landing in the same flush as the mount). Retry flows
+		// reassign the visible path to the OLD branch's leaf one flush before
+		// the tree mutation; that leaf is a known id and is skipped.
 		if (
 			lastMessage?.from !== "assistant" ||
 			intent.knownIds.has(lastMessage.id) ||
-			!snapshot.lastMessageEmpty
+			(!snapshot.lastMessageEmpty && messages.length !== intent.countAtArm + 2)
 		) {
 			return;
 		}
@@ -250,6 +297,8 @@ export class ChatScroll {
 	reset() {
 		this.intent = null;
 		this.spacerActive = false;
+		this.anchorEl = null;
+		this.pendingBranchSwitch = false;
 		if (this.spacerEl) this.spacerEl.style.height = `${this.minSpacer()}px`;
 		this.controller?.jumpToBottom();
 	}
@@ -310,6 +359,7 @@ export class ChatScroll {
 
 	private activateSpacer() {
 		this.spacerActive = true;
+		this.anchorEl = null; // re-resolve for the new turn
 		this.updateSpacer();
 	}
 
@@ -319,8 +369,15 @@ export class ChatScroll {
 	private updateSpacer() {
 		if (!this.spacerActive || !this.container || !this.spacerEl) return;
 
-		const userMessages = this.container.querySelectorAll('[data-message-type="user"]');
-		const anchor = userMessages[userMessages.length - 1];
+		// Resolve the anchored user message once per turn — this runs every
+		// streaming frame, and a full [data-message-type] subtree scan per
+		// frame is real jank in long conversations. Re-resolve only if the
+		// element left the DOM (branch switch mid-turn).
+		if (!this.anchorEl?.isConnected) {
+			const userMessages = this.container.querySelectorAll('[data-message-type="user"]');
+			this.anchorEl = userMessages[userMessages.length - 1] ?? null;
+		}
+		const anchor = this.anchorEl;
 		if (!anchor) return;
 
 		const anchorToSpacer =
@@ -343,8 +400,8 @@ export class ChatScroll {
 	 * `scrollbar-gutter: stable both-edges` narrows the scroller's content box
 	 * by the (platform-dependent) gutter width, while the composer overlay is a
 	 * sibling centering in the full column — publish the measured half-gutter
-	 * as a CSS variable the composer adds to its own padding, so message text
-	 * and composer text stay aligned on classic-scrollbar platforms and
+	 * reactively (ChatWindow binds it into a CSS variable on markup it owns)
+	 * so message text and composer text stay aligned on classic-scrollbar and
 	 * overlay-scrollbar platforms alike.
 	 */
 	private measureGutter() {
@@ -353,23 +410,20 @@ export class ChatScroll {
 		const gutter = container.offsetWidth - container.clientWidth;
 		if (gutter === this.gutterPx) return;
 		this.gutterPx = gutter;
-		container.parentElement?.style.setProperty("--scrollbar-gutter", `${gutter / 2}px`);
+		this.gutterHalfPx = gutter / 2;
 	}
 
 	// --- internals ----------------------------------------------------------------------
 
 	private applyState(s: StickToBottomState) {
-		// A user detaching while a send/retry is in flight (reading up during a
-		// slow upload, or mid-fill) revokes that intent's permission to pin.
-		if (this.intent && this.state.pinned && !s.pinned) {
+		// A USER detaching while a send/retry is in flight (reading up during a
+		// slow upload, or mid-fill) revokes that intent's permission to pin;
+		// programmatic unpins (branch switch) don't speak for the user.
+		if (this.intent && this.state.pinned && !s.pinned && !this.suppressSkipPin) {
 			this.intent.skipPin = true;
 		}
 
-		this.state.pinned = s.pinned;
-		this.state.atBottom = s.atBottom;
-		this.state.nearBottom = s.nearBottom;
-		this.state.scrolledUp = s.scrolledUp;
-		this.state.distanceFromBottom = s.distanceFromBottom;
+		Object.assign(this.state, s);
 
 		if (s.pinned || s.distanceFromBottom <= BUTTONS_HIDE_PX) {
 			this.buttonsVisible = false;

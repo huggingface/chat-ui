@@ -39,13 +39,21 @@ export interface StickToBottomOptions {
 	/**
 	 * Runs at the start of every content/container resize pass, before the
 	 * controller re-pins — the hook where the chat spacer recomputes so the
-	 * follow targets post-spacer geometry.
+	 * follow targets post-spacer geometry. `containerResized` is true when the
+	 * container's own box changed (or on programmatic recompute()), letting
+	 * callers skip container-box measurements on pure content growth.
 	 */
-	onContentResize?: () => void;
+	onContentResize?: (containerResized: boolean) => void;
 	/** 'spring' glides toward the bottom; 'instant' hard-pins every growth. */
 	followMode?: "spring" | "instant";
 	nearBottomPx?: number;
 	scrolledUpPx?: number;
+	/**
+	 * Touches starting within this many px of the left edge are ignored — for
+	 * hosts where an edge-swipe gesture (e.g. a nav drawer) claims that strip
+	 * and preventDefaults the touch, so it never scrolls anything.
+	 */
+	ignoreTouchZonePx?: number;
 	/** Test seam; defaults to matchMedia('(prefers-reduced-motion: reduce)'). */
 	reducedMotion?: () => boolean;
 }
@@ -78,7 +86,7 @@ interface Animation {
 export class StickToBottomController {
 	private container: HTMLElement;
 	private opts: Required<
-		Pick<StickToBottomOptions, "followMode" | "nearBottomPx" | "scrolledUpPx">
+		Pick<StickToBottomOptions, "followMode" | "nearBottomPx" | "scrolledUpPx" | "ignoreTouchZonePx">
 	> &
 		StickToBottomOptions;
 
@@ -95,7 +103,6 @@ export class StickToBottomController {
 	private lastTop: number;
 	private lastScrollHeight: number;
 	private lastMax: number;
-	private lastDistance: number;
 	private upwardDrift = 0;
 
 	private anim: Animation | null = null;
@@ -107,24 +114,19 @@ export class StickToBottomController {
 		null;
 	private destroyed = false;
 
-	/** Touches starting in this left-edge strip belong to the mobile nav's
-	 * drawer swipe (which preventDefaults them — they never scroll anything)
-	 * and must not be read as scroll intent. */
-	private static readonly EDGE_SWIPE_ZONE_PX = 40;
-
 	constructor(container: HTMLElement, options: StickToBottomOptions = {}) {
 		this.container = container;
 		this.opts = {
 			followMode: "spring",
 			nearBottomPx: 60,
 			scrolledUpPx: 200,
+			ignoreTouchZonePx: 0,
 			...options,
 		};
 
 		this.lastTop = this.clampedTop();
 		this.lastScrollHeight = container.scrollHeight;
 		this.lastMax = this.maxScrollTop();
-		this.lastDistance = this.distanceFromBottom();
 		this.applyOverflowAnchor();
 
 		container.addEventListener("scroll", this.onScroll, { passive: true });
@@ -171,6 +173,12 @@ export class StickToBottomController {
 		);
 	}
 
+	/** Animated moves degrade to instant jumps for reduced-motion users and in
+	 * hidden tabs (where rAF is throttled and a glide would replay on return). */
+	private shouldSkipAnimation(): boolean {
+		return this.prefersReducedMotion() || (typeof document !== "undefined" && document.hidden);
+	}
+
 	// --- state ------------------------------------------------------------------
 
 	getState(): StickToBottomState {
@@ -181,23 +189,23 @@ export class StickToBottomController {
 		return this.state.pinned;
 	}
 
-	private recomputeState() {
-		const distance = this.distanceFromBottom();
+	private recomputeState(forceNotify = false, geometry?: { top: number; distance: number }) {
+		const distance = geometry?.distance ?? this.distanceFromBottom();
+		const top = geometry?.top ?? this.clampedTop();
 		const next: StickToBottomState = {
 			pinned: this.state.pinned,
 			atBottom: distance <= AT_BOTTOM_EPS,
 			nearBottom: distance <= this.opts.nearBottomPx,
-			scrolledUp: this.clampedTop() > this.opts.scrolledUpPx,
+			scrolledUp: top > this.opts.scrolledUpPx,
 			distanceFromBottom: distance,
 		};
 		const changed =
-			next.pinned !== this.state.pinned ||
 			next.atBottom !== this.state.atBottom ||
 			next.nearBottom !== this.state.nearBottom ||
 			next.scrolledUp !== this.state.scrolledUp ||
 			next.distanceFromBottom !== this.state.distanceFromBottom;
 		this.state = next;
-		if (changed) this.opts.onStateChange?.(this.getState());
+		if (changed || forceNotify) this.opts.onStateChange?.(this.getState());
 	}
 
 	private setPinned(pinned: boolean) {
@@ -207,10 +215,9 @@ export class StickToBottomController {
 		}
 		this.state = { ...this.state, pinned };
 		this.applyOverflowAnchor();
-		this.recomputeState();
-		// recomputeState only notifies on change; pinned changed, so if the rest
-		// of the geometry happened to be identical we still must notify.
-		this.opts.onStateChange?.(this.getState());
+		// recomputeState compares everything except pinned (which we just
+		// changed), so force exactly one notification for the transition.
+		this.recomputeState(true);
 	}
 
 	/**
@@ -252,7 +259,6 @@ export class StickToBottomController {
 		this.lastTop = Math.min(Math.max(after, 0), max);
 		this.lastMax = max;
 		this.lastScrollHeight = this.container.scrollHeight;
-		this.lastDistance = max - this.lastTop;
 	}
 
 	/** Match a scroll event's position against pending writes; consume on hit. */
@@ -281,7 +287,7 @@ export class StickToBottomController {
 	/** Animated to bottom + pinned. Button click, fine-pointer send. */
 	animateToBottom() {
 		this.setPinned(true);
-		if (this.prefersReducedMotion() || (typeof document !== "undefined" && document.hidden)) {
+		if (this.shouldSkipAnimation()) {
 			this.jumpToBottom();
 			return;
 		}
@@ -305,7 +311,7 @@ export class StickToBottomController {
 	/** Animated move that does NOT engage following (e.g. scroll-to-previous). */
 	animateTo(top: number) {
 		this.unpin();
-		if (this.prefersReducedMotion() || (typeof document !== "undefined" && document.hidden)) {
+		if (this.shouldSkipAnimation()) {
 			this.write(top);
 			this.recomputeState();
 			return;
@@ -389,11 +395,7 @@ export class StickToBottomController {
 	/** Pinned + content grew: glide (spring) or snap (instant/reduced-motion/hidden). */
 	private follow() {
 		if (!this.state.pinned) return;
-		if (
-			this.opts.followMode === "instant" ||
-			this.prefersReducedMotion() ||
-			(typeof document !== "undefined" && document.hidden)
-		) {
+		if (this.opts.followMode === "instant" || this.shouldSkipAnimation()) {
 			this.stopAnimation();
 			this.write(this.maxScrollTop());
 			return;
@@ -404,12 +406,14 @@ export class StickToBottomController {
 	// --- event handlers ---------------------------------------------------------------
 
 	private onScroll = () => {
-		const top = this.clampedTop();
+		// One geometry snapshot per event; every derived value below reuses it.
 		const scrollHeight = this.container.scrollHeight;
-		const max = this.maxScrollTop();
+		const max = Math.max(0, scrollHeight - this.container.clientHeight);
+		const rawTop = this.container.scrollTop;
+		const top = Math.min(Math.max(rawTop, 0), max);
 		const distance = max - top;
 
-		const ours = this.consumeWrite(this.container.scrollTop);
+		const ours = this.consumeWrite(rawTop);
 		// Any delivered event supersedes older writes (per-element scroll events
 		// are coalesced to the latest position each frame) — clearing here keeps
 		// stale ≈bottom entries from swallowing a later real user scroll that
@@ -431,9 +435,16 @@ export class StickToBottomController {
 			!ours &&
 			!clamped &&
 			scrollHeight !== this.lastScrollHeight &&
-			Math.abs(distance - this.lastDistance) <= AT_BOTTOM_EPS;
+			Math.abs(distance - (this.lastMax - this.lastTop)) <= AT_BOTTOM_EPS;
 
-		if (!ours && !clamped && !anchorAdjust) {
+		if (clamped && !this.state.pinned) {
+			// A clamp by definition lands the view at the (new) exact bottom;
+			// there is nothing below to read, so following is the only sensible
+			// continuation (the old sentinel behaved the same way). Without this,
+			// a reasoning-collapse or keyboard-close clamp would leave a detached
+			// user sitting at the bottom while the stream runs below the fold.
+			this.setPinned(true);
+		} else if (!ours && !clamped && !anchorAdjust) {
 			// User input, by construction.
 			if (top < this.lastTop) {
 				this.upwardDrift += this.lastTop - top;
@@ -454,14 +465,16 @@ export class StickToBottomController {
 		this.lastTop = top;
 		this.lastScrollHeight = scrollHeight;
 		this.lastMax = max;
-		this.lastDistance = distance;
-		this.recomputeState();
+		this.recomputeState(false, { top, distance });
 	};
 
-	private onResize = () => {
+	private onResize = (entries?: ResizeObserverEntry[]) => {
 		if (this.destroyed) return;
+		// The gutter (and other container-box-dependent measurements) can only
+		// change when the container itself resized, not on every content frame.
+		const containerResized = !entries || entries.some((e) => e.target === this.container);
 		this.syncContentObserver();
-		this.opts.onContentResize?.();
+		this.opts.onContentResize?.(containerResized);
 		this.follow();
 		// Deliberately do NOT refresh the attribution baselines (lastTop &co)
 		// here: a scroll event can still be in flight for a position change
@@ -522,27 +535,45 @@ export class StickToBottomController {
 		// carry small vertical jitter that must not read as scroll intent.
 		if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
 		const deltaY = this.normalizeWheelDelta(event);
-		if (deltaY === 0 || !this.canScroll()) return;
-		if (this.innerScrollableConsumes(event.target, deltaY)) return;
+		if (deltaY === 0) return;
 
+		// Cheap state checks come first: wheel events arrive at trackpad rates
+		// during streaming (when layout is dirty every frame), and the ancestor
+		// walk below forces a reflow — skip it whenever nothing could change.
 		if (deltaY < 0) {
+			if (!this.state.pinned && !this.anim) return;
+			if (!this.canScroll()) return;
+			if (this.innerScrollableConsumes(event.target, deltaY)) return;
 			// Fast path so a running follow animation halts the same frame the
 			// user pushes back, instead of waiting for the scroll event.
 			this.unpin();
-		} else if (!this.state.pinned && this.distanceFromBottom() <= this.opts.nearBottomPx) {
+		} else {
+			if (this.state.pinned || !this.canScroll()) return;
+			if (this.distanceFromBottom() > this.opts.nearBottomPx) return;
+			if (this.innerScrollableConsumes(event.target, deltaY)) return;
 			this.setPinned(true);
 			this.follow();
 		}
 	};
 
 	private onTouchStart = (event: TouchEvent) => {
+		// A second finger means pinch-zoom, not scrolling — drop the gesture
+		// entirely (its fingers spreading must not read as scroll intent).
+		if (event.touches.length > 1) {
+			this.touch = null;
+			return;
+		}
 		const t = event.touches[0];
 		if (!t) return;
-		if (t.clientX < StickToBottomController.EDGE_SWIPE_ZONE_PX) return;
+		if (t.clientX < this.opts.ignoreTouchZonePx) return;
 		this.touch = { id: t.identifier, y: t.clientY, target: event.target, intent: false };
 	};
 
 	private onTouchMove = (event: TouchEvent) => {
+		if (event.touches.length > 1) {
+			this.touch = null;
+			return;
+		}
 		if (!this.touch || !this.canScroll()) return;
 		let t: Touch | undefined;
 		for (let i = 0; i < event.touches.length; i++) {
@@ -577,10 +608,16 @@ export class StickToBottomController {
 	};
 
 	private onKeyDown = (event: KeyboardEvent) => {
+		// A widget that consumed the key (dropdown menu, select) will not
+		// scroll the container — no intent to read.
+		if (event.defaultPrevented) return;
 		const target = event.target;
 		if (
 			target instanceof HTMLElement &&
-			(target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+			(target.tagName === "INPUT" ||
+				target.tagName === "TEXTAREA" ||
+				target.tagName === "SELECT" ||
+				target.isContentEditable)
 		) {
 			return;
 		}

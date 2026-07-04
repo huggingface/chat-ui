@@ -30,6 +30,8 @@
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
 	import { browser } from "$app/environment";
 	import { createChatScroll } from "$lib/utils/scroll/chatScroll.svelte";
+	import { MIN_SPACER_FALLBACK_PX } from "$lib/utils/scroll/spacer";
+	import { NAV_EDGE_SWIPE_ZONE_PX } from "$lib/constants/gestures";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ShareConversationModal from "../ShareConversationModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
@@ -306,6 +308,7 @@
 
 	const chatScroll = createChatScroll();
 	let messagesEl: HTMLElement | undefined = $state();
+	let pendingEl: HTMLElement | undefined = $state();
 	let composerHeight = $state<number | undefined>(undefined);
 
 	// Structural sync: conversation identity + message-list shape. Reads only
@@ -333,9 +336,11 @@
 	});
 
 	// The growing content element mounts after the container when a
-	// conversation gains its first messages — re-point the size observer.
+	// conversation gains its first messages (or the pending placeholder
+	// renders before any message exists) — re-point the size observer.
 	$effect(() => {
 		void messagesEl;
+		void pendingEl;
 		chatScroll.notifyContentChanged();
 	});
 
@@ -558,7 +563,13 @@
      hit-area would otherwise swallow every click meant for it. Children
      re-enable pointer events themselves. -->
 <div class="pointer-events-none relative flex min-h-0 min-w-0">
-	<div class="pointer-events-auto relative z-[-1] min-h-0 min-w-0 flex-1">
+	<!-- --scrollbar-gutter: measured half-gutter of the scroll container, added
+	     to the composer overlay's padding so its text stays aligned with the
+	     message column on classic-scrollbar platforms. -->
+	<div
+		class="pointer-events-auto relative z-[-1] min-h-0 min-w-0 flex-1"
+		style="--scrollbar-gutter: {chatScroll.gutterHalfPx}px"
+	>
 		{#if shareModalOpen}
 			<ShareConversationModal open={shareModalOpen} onclose={() => shareModal.close()} />
 		{/if}
@@ -586,7 +597,10 @@
 			class="scrollbar-custom h-full [scrollbar-gutter:stable_both-edges] overflow-y-auto overscroll-contain"
 			tabindex="0"
 			aria-label="Conversation messages"
-			use:chatScroll.attach={{ content: () => messagesEl }}
+			use:chatScroll.attach={{
+				content: () => messagesEl ?? pendingEl,
+				ignoreTouchZonePx: NAV_EDGE_SWIPE_ZONE_PX,
+			}}
 		>
 			<!-- @container: descendants (e.g. the per-message router-metadata row) adapt
 			     to the actual column width, which shrinks when the artifact panel is open -->
@@ -642,20 +656,29 @@
 					<!-- Send-anchor spacer: inflated at send so the sent message lands near
 					     the viewport top, shrinking 1:1 as the reply grows (constant
 					     scrollHeight = zero motion), floored at composer clearance.
-					     Height is owned imperatively by chatScroll. -->
-					<div use:chatScroll.attachSpacer class="flex-shrink-0"></div>
+					     chatScroll owns the height after hydration; the template value
+					     provides the composer clearance in server-rendered markup. -->
+					<div
+						use:chatScroll.attachSpacer
+						class="flex-shrink-0"
+						style="height: {MIN_SPACER_FALLBACK_PX}px"
+					></div>
 				{:else if pending}
-					<ChatMessage
-						loading={true}
-						message={{
-							id: "0-0-0-0-0",
-							content: "",
-							from: "assistant",
-							children: [],
-						}}
-						isAuthor={!shared}
-						readOnly={isReadOnly}
-					/>
+					<!-- Outside messagesEl, so it gets its own wrapper for the scroll
+					     controller's size observer (an h-full column never resizes). -->
+					<div bind:this={pendingEl} class="flex h-max flex-col">
+						<ChatMessage
+							loading={true}
+							message={{
+								id: "0-0-0-0-0",
+								content: "",
+								from: "assistant",
+								children: [],
+							}}
+							isAuthor={!shared}
+							readOnly={isReadOnly}
+						/>
+					</div>
 				{:else}
 					<ChatIntroduction
 						{currentModel}

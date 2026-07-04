@@ -190,10 +190,18 @@ export function pressKey(container: HTMLElement, key: string) {
 	if (key === "End") container.scrollTop = container.scrollHeight;
 }
 
-function touchEvent(type: string, target: Element, id: number, clientY: number): TouchEvent {
-	const touch = new Touch({ identifier: id, target, clientX: 50, clientY });
+function touchEvent(
+	type: string,
+	target: Element,
+	id: number,
+	clientY: number,
+	clientX = 50,
+	extraTouches: Touch[] = []
+): TouchEvent {
+	const touch = new Touch({ identifier: id, target, clientX, clientY });
+	const touches = type === "touchend" || type === "touchcancel" ? [] : [touch, ...extraTouches];
 	return new TouchEvent(type, {
-		touches: type === "touchend" || type === "touchcancel" ? [] : [touch],
+		touches,
 		changedTouches: [touch],
 		bubbles: true,
 		cancelable: true,
@@ -208,21 +216,47 @@ export async function touchDrag(
 		fromY,
 		toY,
 		steps = 5,
+		x = 50,
 		target,
 		noScroll = false,
-	}: { fromY: number; toY: number; steps?: number; target?: Element; noScroll?: boolean }
+	}: {
+		fromY: number;
+		toY: number;
+		steps?: number;
+		x?: number;
+		target?: Element;
+		noScroll?: boolean;
+	}
 ) {
 	const el = target ?? container;
 	const id = Math.floor(Math.random() * 1e6);
-	el.dispatchEvent(touchEvent("touchstart", el, id, fromY));
+	el.dispatchEvent(touchEvent("touchstart", el, id, fromY, x));
 	for (let i = 1; i <= steps; i++) {
 		const y = fromY + ((toY - fromY) * i) / steps;
 		const prev = fromY + ((toY - fromY) * (i - 1)) / steps;
-		el.dispatchEvent(touchEvent("touchmove", el, id, y));
+		el.dispatchEvent(touchEvent("touchmove", el, id, y, x));
 		if (!noScroll) container.scrollTop -= y - prev;
 		await frame();
 	}
-	el.dispatchEvent(touchEvent("touchend", el, id, toY));
+	el.dispatchEvent(touchEvent("touchend", el, id, toY, x));
+}
+
+/** A two-finger gesture (pinch-zoom): both fingers move, nothing scrolls. */
+export async function pinch(container: HTMLElement, { spread = 80, steps = 4 } = {}) {
+	const a = Math.floor(Math.random() * 1e6);
+	const b = a + 1;
+	const centerY = 200;
+	const second = (offset: number) =>
+		new Touch({ identifier: b, target: container, clientX: 60, clientY: centerY + offset });
+	container.dispatchEvent(touchEvent("touchstart", container, a, centerY - 10, 50, [second(10)]));
+	for (let i = 1; i <= steps; i++) {
+		const offset = 10 + (spread * i) / steps;
+		container.dispatchEvent(
+			touchEvent("touchmove", container, a, centerY - offset, 50, [second(offset)])
+		);
+		await frame();
+	}
+	container.dispatchEvent(touchEvent("touchend", container, a, centerY - 10 - spread));
 }
 
 // --- layout shift probe ---------------------------------------------------------------

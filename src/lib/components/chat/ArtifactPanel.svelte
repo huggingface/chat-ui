@@ -190,6 +190,9 @@
 		const el = codeScrollEl;
 		if (!el) return;
 		const controller = new StickToBottomController(el, {
+			// The <code> child (kept block-level in the template so the size
+			// observer actually fires) is what grows with streamed content —
+			// the <pre> itself is h-full and never resizes.
 			followMode: "instant",
 			content: () => (el.firstElementChild as HTMLElement | null) ?? undefined,
 		});
@@ -544,11 +547,17 @@
 				class="prose h-full max-w-none text-smd dark:prose-invert prose-pre:my-0 prose-pre:h-full prose-pre:rounded-none"
 			>
 				<!-- eslint-disable svelte/no-at-html-tags -->
+				<!-- The code element MUST be block-level: the scroll controller's
+				     ResizeObserver watches it, and observers never fire for
+				     non-replaced inline elements — with the default inline display
+				     the streaming follow silently dies after the first pin. -->
 				<pre
 					bind:this={codeScrollEl}
 					class="scrollbar-custom h-full overflow-auto border-0! px-5 py-4 font-mono {artifactPanel.codeWrap
 						? 'wrap-break-word whitespace-pre-wrap'
-						: ''} {showingDiff ? 'diff-view' : ''}"><code>{@html highlightedCode}</code></pre>
+						: ''} {showingDiff ? 'diff-view' : ''}"><code class="block"
+						>{@html highlightedCode}</code
+					></pre>
 			</div>
 			<!-- Floating so toggling them on/off never reflows the header tab switcher -->
 			<div class="absolute top-2 right-3 z-10 flex items-center gap-1">

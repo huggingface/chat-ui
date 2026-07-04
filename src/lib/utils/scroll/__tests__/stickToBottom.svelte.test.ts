@@ -7,6 +7,7 @@ import {
 	frames,
 	mulberry32,
 	nextTask,
+	pinch,
 	pressKey,
 	startClsProbe,
 	stream,
@@ -151,6 +152,34 @@ describe("gestures that must NOT change pin state", () => {
 		expect(controller.pinned).toBe(true);
 	});
 
+	it("a two-finger touch pinch is not scroll intent", async () => {
+		const { fixture, controller } = setup();
+		await pinch(fixture.container, { spread: 100 });
+		expect(controller.pinned).toBe(true);
+	});
+
+	it("touches starting in a configured edge-swipe zone are ignored", async () => {
+		const { fixture, controller } = setup({}, { ignoreTouchZonePx: 40 });
+		await touchDrag(fixture.container, { fromY: 100, toY: 260, x: 30, noScroll: true });
+		expect(controller.pinned).toBe(true);
+		// Outside the zone the same gesture detaches.
+		await touchDrag(fixture.container, { fromY: 100, toY: 260, x: 60 });
+		expect(controller.pinned).toBe(false);
+	});
+
+	it("keydown already consumed by a widget (defaultPrevented) is ignored", async () => {
+		const { fixture, controller } = setup();
+		fixture.container.addEventListener("keydown", (e) => e.preventDefault(), {
+			capture: true,
+			once: true,
+		});
+		fixture.container.dispatchEvent(
+			new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true })
+		);
+		await frame();
+		expect(controller.pinned).toBe(true);
+	});
+
 	it("dominantly horizontal trackpad pans are ignored", async () => {
 		const { fixture, controller } = setup();
 		wheel(fixture.container, -4, { deltaX: -90, noScroll: true });
@@ -183,22 +212,38 @@ describe("gestures that must NOT change pin state", () => {
 		await waitFor(() => fixture.distance() <= ARRIVED, { label: "stays at bottom" });
 	});
 
-	it("content shrink while unpinned (branch switch) neither re-pins nor teleports", async () => {
+	it("shrink far below a detached reader leaves them stationary and unpinned", async () => {
+		const { fixture, controller } = setup();
+		fixture.addBlock(1200);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle" });
+		await nextTask(); // input from task context, like real input
+		// Read far above the end: the coming shrink cannot clamp this position.
+		dragScrollbarTo(fixture.container, 100);
+		await frame();
+		expect(controller.pinned).toBe(false);
+		fixture.removeLast();
+		await frames(3);
+		expect(controller.pinned).toBe(false);
+		expect(fixture.scrollTop()).toBe(100);
+	});
+
+	it("shrink that clamps the view to the bottom resumes following (sentinel parity)", async () => {
 		const { fixture, controller } = setup();
 		fixture.addBlock(800);
 		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle" });
 		wheel(fixture.container, -50);
 		await frame();
 		expect(controller.pinned).toBe(false);
-		// Shrink below the current scroll position -> browser clamps.
+		// Shrink below the current scroll position -> the browser clamps the
+		// view to the new exact bottom. There is nothing below to read, so the
+		// controller re-engages (a reasoning-collapse or keyboard-close clamp
+		// must not leave the stream running below the fold).
 		fixture.removeLast();
 		await frames(3);
-		expect(controller.pinned).toBe(false);
-		// Clamped exactly to the new maximum, no forced jump to "bottom + follow".
 		expect(fixture.scrollTop()).toBe(fixture.maxScrollTop());
+		expect(controller.pinned).toBe(true);
 		fixture.growLast(400);
-		await frames(3);
-		expect(controller.pinned).toBe(false);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "follows after clamp" });
 	});
 
 	it("a native scroll-anchoring adjustment while detached is not read as user input", async () => {
