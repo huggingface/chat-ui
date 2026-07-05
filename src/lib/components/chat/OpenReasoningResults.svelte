@@ -27,8 +27,13 @@
 	let viewportHeight = $state(0);
 	let contentHeight = $state(0);
 
-	// Track loading transitions to auto-expand/collapse
-	$effect(() => {
+	// Track loading transitions to auto-expand/collapse. Runs PRE-render:
+	// when loading flips false, the collapse must be decided before the
+	// template re-renders, so the slide-out starts from the still-capped
+	// streaming viewport — a post-render effect would let the uncapped
+	// settled prose mount first and a long thought would bounce to its full
+	// height for a frame before collapsing.
+	$effect.pre(() => {
 		if (!initialized) {
 			initialized = true;
 			if (loading) {
@@ -73,7 +78,10 @@
 	<!-- Expandable content -->
 	{#if isOpen}
 		<div transition:slide={{ duration: collapseDuration, easing: cubicOut }}>
-			{#if loading}
+			<!-- `|| !isOpen`: while the slide-out is running, any re-render must
+			     keep the capped streaming shape — switching to the uncapped
+			     settled prose mid-outro would grow the collapsing box. -->
+			{#if loading || !isOpen}
 				<!--
 					Streaming view: fixed-height viewport, content bottom-aligned so newly
 					arriving tokens stay visible while older lines scroll off the top behind
