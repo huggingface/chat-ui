@@ -31,8 +31,11 @@
 
 		const textArea = document.createElement("textarea");
 		textArea.value = text;
+		// Off-screen + preventScroll: a statically-positioned textarea at the
+		// end of body plus a bare focus() scroll-jumps the page to reveal it.
+		textArea.style.cssText = "position: fixed; opacity: 0;";
 		document.body.appendChild(textArea);
-		textArea.focus();
+		textArea.focus({ preventScroll: true });
 		textArea.select();
 		document.execCommand("copy");
 		document.body.removeChild(textArea);

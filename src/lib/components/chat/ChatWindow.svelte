@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy, tick } from "svelte";
+	import { onDestroy, untrack } from "svelte";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
@@ -29,7 +29,9 @@
 	import ScrollToBottomBtn from "../ScrollToBottomBtn.svelte";
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
 	import { browser } from "$app/environment";
-	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
+	import { createChatScroll } from "$lib/utils/scroll/chatScroll.svelte";
+	import { MIN_SPACER_FALLBACK_PX } from "$lib/utils/scroll/spacer";
+	import { NAV_EDGE_SWIPE_ZONE_PX } from "$lib/constants/gestures";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ShareConversationModal from "../ShareConversationModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
@@ -150,6 +152,7 @@
 	const handleSubmit = () => {
 		if (requireAuthUser() || loading || !draft) return;
 		tap();
+		chatScroll.armSend();
 		onmessage?.(draft);
 		draft = "";
 	};
@@ -303,54 +306,46 @@
 		}
 	});
 
-	let chatContainer: HTMLElement | undefined = $state();
+	const chatScroll = createChatScroll();
+	let messagesEl: HTMLElement | undefined = $state();
+	let pendingEl: HTMLElement | undefined = $state();
+	let composerHeight = $state<number | undefined>(undefined);
 
-	// Force scroll to bottom when user sends a new message or switches conversation
-	let prevMessageCount = $state(0);
-	// svelte-ignore state_referenced_locally
-	let prevFirstMessageId = $state(messages.at(0)?.id);
-	let forceReattach = $state(0);
-	let scrollBehavior: "auto" | "instant" | "smooth" = $state("instant");
+	// Structural sync: conversation identity + message-list shape. Reads only
+	// ids/from (content is read untracked), so token flushes never re-run it;
+	// the meaning of each change comes from explicit intents armed at the
+	// send/retry/branch call sites.
 	$effect(() => {
-		const firstMessageId = messages.at(0)?.id;
+		chatScroll.sync({
+			conversationKey: page.params?.id,
+			messages: messages.map((m) => ({ id: m.id, from: m.from })),
+			lastMessageEmpty: untrack(() => (messages.at(-1)?.content ?? "") === ""),
+		});
+	});
 
-		// Conversation switch: first message ID changed
-		if (firstMessageId !== prevFirstMessageId) {
-			prevFirstMessageId = firstMessageId;
-			scrollBehavior = "instant";
-			forceReattach++;
-			spacerActive = 0;
-			spacerHeight = MIN_SPACER_PX;
-			prevMessageCount = messages.length;
+	// Conversation switch also resets the artifact panel. This used to
+	// piggyback on a first-message-id heuristic that misfired when the first
+	// message was edited; the route param is the real signal.
+	let prevConversationKey = page.params?.id;
+	$effect(() => {
+		const key = page.params?.id;
+		if (key !== prevConversationKey) {
+			prevConversationKey = key;
 			artifactPanel.reset();
-			return;
 		}
+	});
 
-		// New user message: user message + empty assistant message added together
-		if (messages.length > prevMessageCount) {
-			const last = messages.at(-1);
-			const secondLast = messages.at(-2);
-			const userJustSentMessage =
-				messages.length === prevMessageCount + 2 &&
-				secondLast?.from === "user" &&
-				last?.from === "assistant" &&
-				last?.content === "";
+	// The growing content element mounts after the container when a
+	// conversation gains its first messages (or the pending placeholder
+	// renders before any message exists) — re-point the size observer.
+	$effect(() => {
+		void messagesEl;
+		void pendingEl;
+		chatScroll.notifyContentChanged();
+	});
 
-			if (userJustSentMessage) {
-				// Touch devices (iOS): a smooth programmatic scroll is suppressed during
-				// touch/momentum and only animates once the gesture/stream settle — i.e. the
-				// view visibly scrolls up right as the reply finishes. An instant scroll snaps
-				// to the bottom (revealing the freshly inflated spacer) immediately on send.
-				// `any-pointer: coarse` so hybrid devices (touch laptop, iPad + trackpad) that
-				// can still touch-scroll snap instantly even when the primary pointer is fine.
-				scrollBehavior = window.matchMedia("(any-pointer: coarse)").matches ? "instant" : "smooth";
-				forceReattach++;
-				// Only activate dynamic spacer after the first exchange
-				// (first user+assistant pair scrolls normally)
-				spacerActive = prevMessageCount >= 2 ? spacerActive + 1 : 0;
-			}
-		}
-		prevMessageCount = messages.length;
+	$effect(() => {
+		chatScroll.setComposerHeight(composerHeight);
 	});
 
 	// Shared conversations containing artifacts usually exist to show one off:
@@ -366,68 +361,6 @@
 		autoOpenedSharedArtifact = true;
 		if (!window.matchMedia("(min-width: 768px)").matches) return;
 		artifactPanel.openArtifact(latest.identifier, null);
-	});
-
-	// Combined scroll dependency for the action
-	let scrollDependency = $derived({ forceReattach, scrollBehavior });
-
-	// Dynamic bottom spacer for ChatGPT-style scroll (new message appears near top of viewport)
-	const MIN_SPACER_PX = 208; // equivalent to pb-52
-	const SPACER_TOP_OFFSET_PX = 50; // breathing room above the user message
-	let spacerEl: HTMLElement | undefined = $state();
-	let messagesEl: HTMLElement | undefined = $state();
-	let spacerHeight = $state(MIN_SPACER_PX);
-	let spacerActive = $state(0); // 0 = inactive, >0 = active (counter to force effect re-run)
-
-	function computeSpacerHeight(): number {
-		if (!chatContainer || !spacerEl) return MIN_SPACER_PX;
-
-		const userMsgs = chatContainer.querySelectorAll('[data-message-type="user"]');
-		const lastUserMsg = userMsgs[userMsgs.length - 1] as HTMLElement | undefined;
-		if (!lastUserMsg) return MIN_SPACER_PX;
-
-		const viewportHeight = chatContainer.clientHeight;
-		const containerRect = chatContainer.getBoundingClientRect();
-		const scrollTop = chatContainer.scrollTop;
-
-		// Use the spacer element's own position as reference — this naturally accounts
-		// for all flex gaps, padding, and layout between the user message and the spacer.
-		const userMsgScrollTop =
-			lastUserMsg.getBoundingClientRect().top - containerRect.top + scrollTop;
-		const spacerScrollTop = spacerEl.getBoundingClientRect().top - containerRect.top + scrollTop;
-
-		const contentHeight = spacerScrollTop - userMsgScrollTop;
-		return Math.max(MIN_SPACER_PX, viewportHeight - contentHeight - SPACER_TOP_OFFSET_PX);
-	}
-
-	$effect(() => {
-		// Don't gate on `loading` — the spacer must be computed immediately when
-		// spacerActive is set (same tick as forceReattach++) so that the spacer
-		// height is correct BEFORE snapScrollToBottom's scrollToBottom() fires.
-		if (!spacerActive || !chatContainer || !messagesEl) return;
-
-		const container = chatContainer;
-
-		// Observe the messages wrapper (has h-max, resizes with content)
-		// instead of the mx-auto container (has h-full, may not resize).
-		const observer = new ResizeObserver(() => {
-			spacerHeight = computeSpacerHeight();
-			// The mx-auto container has h-full so its ResizeObserver in
-			// snapScrollToBottom may not fire during streaming. Scroll here
-			// to keep up with growing content, but only if user is near bottom.
-			tick().then(() => {
-				const dist = container.scrollHeight - container.scrollTop - container.clientHeight;
-				// Use a tight threshold (matching snapScrollToBottom's BOTTOM_THRESHOLD)
-				// to avoid overriding user scroll intent during streaming.
-				if (dist < 50) {
-					container.scrollTo({ top: container.scrollHeight });
-				}
-			});
-		});
-		observer.observe(messagesEl);
-		spacerHeight = computeSpacerHeight();
-
-		return () => observer.disconnect();
 	});
 
 	const settings = useSettingsStore();
@@ -630,7 +563,13 @@
      hit-area would otherwise swallow every click meant for it. Children
      re-enable pointer events themselves. -->
 <div class="pointer-events-none relative flex min-h-0 min-w-0">
-	<div class="pointer-events-auto relative z-[-1] min-h-0 min-w-0 flex-1">
+	<!-- --scrollbar-gutter: measured half-gutter of the scroll container, added
+	     to the composer overlay's padding so its text stays aligned with the
+	     message column on classic-scrollbar platforms. -->
+	<div
+		class="pointer-events-auto relative z-[-1] min-h-0 min-w-0 flex-1"
+		style="--scrollbar-gutter: {chatScroll.gutterHalfPx}px"
+	>
 		{#if shareModalOpen}
 			<ShareConversationModal open={shareModalOpen} onclose={() => shareModal.close()} />
 		{/if}
@@ -651,10 +590,17 @@
 		{#if featureAnnouncement && showFeatureAnnouncement}
 			<FeatureAnnouncementToast announcement={featureAnnouncement} />
 		{/if}
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<!-- tabindex: the document never scrolls in this app, so without it
+		     keyboard-only users cannot scroll the conversation at all. -->
 		<div
-			class="scrollbar-custom h-full overflow-y-auto"
-			use:snapScrollToBottom={scrollDependency}
-			bind:this={chatContainer}
+			class="scrollbar-custom h-full [scrollbar-gutter:stable_both-edges] overflow-y-auto overscroll-contain"
+			tabindex="0"
+			aria-label="Conversation messages"
+			use:chatScroll.attach={{
+				content: () => messagesEl ?? pendingEl,
+				ignoreTouchZonePx: NAV_EDGE_SWIPE_ZONE_PX,
+			}}
 		>
 			<!-- @container: descendants (e.g. the per-message router-metadata row) adapt
 			     to the actual column width, which shrinks when the artifact panel is open -->
@@ -676,8 +622,18 @@
 								readOnly={isReadOnly}
 								isLast={idx === messages.length - 1}
 								bind:editMsdgId
-								onretry={(payload) => onretry?.(payload)}
-								onshowAlternateMsg={(payload) => onshowAlternateMsg?.(payload)}
+								onretry={(payload) => {
+									// Edit-with-content mounts a fresh pair like a send and
+									// anchors it; a plain regenerate must never yank a user
+									// who triggered it from a scrolled-up position.
+									if (payload.content !== undefined) chatScroll.armSend();
+									else chatScroll.armRetry();
+									onretry?.(payload);
+								}}
+								onshowAlternateMsg={(payload) => {
+									chatScroll.notifyBranchSwitch();
+									onshowAlternateMsg?.(payload);
+								}}
 							/>
 						{/each}
 						{#if showPendingPlaceholder}
@@ -697,20 +653,32 @@
 							<ModelSwitch {models} {currentModel} />
 						{/if}
 					</div>
-					<!-- Dynamic bottom spacer: large when streaming new message, shrinks as response grows -->
-					<div bind:this={spacerEl} class="flex-shrink-0" style="height: {spacerHeight}px;"></div>
+					<!-- Send-anchor spacer: inflated at send so the sent message lands near
+					     the viewport top, shrinking 1:1 as the reply grows (constant
+					     scrollHeight = zero motion), floored at composer clearance.
+					     chatScroll owns the height after hydration; the template value
+					     provides the composer clearance in server-rendered markup. -->
+					<div
+						use:chatScroll.attachSpacer
+						class="flex-shrink-0"
+						style="height: {MIN_SPACER_FALLBACK_PX}px"
+					></div>
 				{:else if pending}
-					<ChatMessage
-						loading={true}
-						message={{
-							id: "0-0-0-0-0",
-							content: "",
-							from: "assistant",
-							children: [],
-						}}
-						isAuthor={!shared}
-						readOnly={isReadOnly}
-					/>
+					<!-- Outside messagesEl, so it gets its own wrapper for the scroll
+					     controller's size observer (an h-full column never resizes). -->
+					<div bind:this={pendingEl} class="flex h-max flex-col">
+						<ChatMessage
+							loading={true}
+							message={{
+								id: "0-0-0-0-0",
+								content: "",
+								from: "assistant",
+								children: [],
+							}}
+							isAuthor={!shared}
+							readOnly={isReadOnly}
+						/>
+					</div>
 				{:else}
 					<ChatIntroduction
 						{currentModel}
@@ -721,16 +689,28 @@
 				{/if}
 			</div>
 
-			<ScrollToPreviousBtn class="fixed right-4 bottom-48 lg:right-10" scrollNode={chatContainer} />
+			<ScrollToPreviousBtn
+				class="fixed right-4 bottom-48 lg:right-10"
+				visible={chatScroll.showJumpToPrevious}
+				onclick={() => chatScroll.scrollToPreviousMessage()}
+			/>
 
-			<ScrollToBottomBtn class="fixed right-4 bottom-36 lg:right-10" scrollNode={chatContainer} />
+			<ScrollToBottomBtn
+				class="fixed right-4 bottom-36 lg:right-10"
+				visible={chatScroll.showJumpToBottom}
+				onclick={() => chatScroll.scrollToBottom()}
+			/>
 		</div>
 
+		<!-- --scrollbar-gutter (measured by chatScroll) keeps the composer text
+		     aligned with the message column, whose content box is narrowed by
+		     the scroller's scrollbar-gutter on classic-scrollbar platforms. -->
 		<div
+			bind:clientHeight={composerHeight}
 			class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full
 			max-w-3xl flex-col items-center justify-center bg-linear-to-t from-white
-			via-white to-white/0 px-3.5 pt-2 *:pointer-events-auto
-			max-sm:py-0 sm:px-5
+			via-white to-white/0 px-[calc(0.875rem+var(--scrollbar-gutter,0px))] pt-2 *:pointer-events-auto
+			max-sm:py-0 sm:px-[calc(1.25rem+var(--scrollbar-gutter,0px))]
 			md:pb-4 xl:max-w-4xl dark:border-gray-800 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0"
 		>
 			{#if !draft.length && !messages.length && !sources.length && !loading && (currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
@@ -791,6 +771,7 @@
 							classNames="ml-auto"
 							onClick={() => {
 								if (lastMessage && lastMessage.ancestors) {
+									chatScroll.armRetry();
 									onretry?.({
 										id: lastMessage.id,
 									});

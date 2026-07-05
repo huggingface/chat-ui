@@ -18,6 +18,7 @@
 	import { page } from "$app/state";
 	import IconNew from "$lib/components/icons/IconNew.svelte";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
+	import { NAV_EDGE_SWIPE_ZONE_PX } from "$lib/constants/gestures";
 	import IconBurger from "$lib/components/icons/IconBurger.svelte";
 	import { Spring } from "svelte/motion";
 	import { shareModal } from "$lib/stores/shareModal";
@@ -119,7 +120,7 @@
 
 		// Potential drag scenarios - never start isDragging until direction is locked
 		// Exception: overlay tap (no scroll content, so no direction conflict)
-		if (!isOpen && touch.clientX < 40) {
+		if (!isOpen && touch.clientX < NAV_EDGE_SWIPE_ZONE_PX) {
 			// Opening gesture - wait for direction lock before starting drag
 			// Prevent Safari's back navigation gesture on iOS (but not on interactive elements)
 			if (!isInteractive) {
