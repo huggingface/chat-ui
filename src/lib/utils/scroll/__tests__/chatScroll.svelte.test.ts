@@ -6,6 +6,7 @@ import {
 	dragScrollbarTo,
 	frame,
 	frames,
+	nextTask,
 	startClsProbe,
 	waitFor,
 	wheel,
@@ -356,6 +357,91 @@ describe("floating buttons", () => {
 			label: "previous user message reaches the anchor offset",
 		});
 		expect(chat.chat.state.pinned).toBe(false);
+	});
+});
+
+describe("thinking-block collapse (layout-shift regressions)", () => {
+	it("a large in-turn collapse keeps everything below it viewport-stable (no spacer re-inflation)", async () => {
+		const chat = createChat({ turns: 3, viewportHeight: 600 });
+		chat.chat.armSend();
+		const { assistant: thinking } = chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "send anchored" });
+
+		// Thinking streams: the block grows well past the fill slack, so the
+		// spacer floors and real following takes over.
+		for (let i = 0; i < 16; i++) {
+			thinking.style.height = `${parseFloat(thinking.style.height) + 20}px`;
+			await frame();
+		}
+		const answer = chat.fixture.addBlock(24, { id: "answer" });
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "settled while pinned" });
+
+		const before = topOf(answer, chat);
+		// Answer starts: the reasoning block collapses ~300px in one frame. The
+		// spacer must NOT re-inflate (monotonic within the turn) — the shrink
+		// clamps instead, which keeps the content below the collapse stable.
+		thinking.style.height = "28px";
+		await frames(3);
+		const after = topOf(answer, chat);
+		expect(Math.abs(after - before)).toBeLessThanOrEqual(2);
+		expect(chat.chat.state.pinned).toBe(true);
+	});
+
+	it("manual anchoring (Safari: no overflow-anchor) keeps a detached reader stable through an above-viewport collapse", async () => {
+		// Simulate Safari: native anchoring can never engage, whatever the
+		// controller sets (inline style loses to !important).
+		const style = document.createElement("style");
+		style.textContent = ".sim-safari { overflow-anchor: none !important; }";
+		document.head.appendChild(style);
+
+		const fixture = createFixture({ viewportHeight: 400, blocks: [] });
+		fixture.container.classList.add("sim-safari");
+		const chat = createChatScroll({ forceManualAnchoring: true });
+		const earlier = fixture.addBlock(400, { id: "earlier" }); // reasoning of an earlier part
+		const reading = fixture.addBlock(300, { user: true, id: "reading" });
+		fixture.addBlock(900, { id: "tail" });
+		const spacerAction = chat.attachSpacer(fixture.spacer);
+		const containerAction = chat.attach(fixture.container, { content: () => fixture.content });
+		chat.sync({
+			conversationKey: "c1",
+			messages: [{ id: "reading", from: "user" }],
+			lastMessageEmpty: false,
+		});
+		active.push({
+			fixture,
+			chat,
+			messages: [],
+			sync: () => {},
+			mountPair: () => ({
+				user: document.createElement("div"),
+				assistant: document.createElement("div"),
+			}),
+			swapAssistant: () => document.createElement("div"),
+			viewportTop: () => fixture.container.getBoundingClientRect().top,
+			destroy() {
+				containerAction.destroy();
+				spacerAction.destroy();
+				fixture.destroy();
+				style.remove();
+			},
+		});
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle" });
+		await nextTask();
+
+		// Scroll up to read the middle block (detached).
+		const containerTop = fixture.container.getBoundingClientRect().top;
+		const target = reading.getBoundingClientRect().top - containerTop + fixture.container.scrollTop;
+		dragScrollbarTo(fixture.container, target);
+		await frames(2);
+		expect(chat.state.pinned).toBe(false);
+		const before = reading.getBoundingClientRect().top - containerTop;
+
+		// The earlier thinking block collapses ABOVE the viewport: without
+		// compensation this shifts the reading position by the full 350px.
+		earlier.style.height = "50px";
+		await frames(3);
+		const after = reading.getBoundingClientRect().top - containerTop;
+		expect(Math.abs(after - before)).toBeLessThanOrEqual(2);
 	});
 });
 
