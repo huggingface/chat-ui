@@ -443,6 +443,69 @@ describe("thinking-block collapse (layout-shift regressions)", () => {
 		const after = reading.getBoundingClientRect().top - containerTop;
 		expect(Math.abs(after - before)).toBeLessThanOrEqual(2);
 	});
+
+	it("manual anchoring tracks a descendant INSIDE a long message, not just the wrapper", async () => {
+		// Reading the middle of one long assistant message whose own thinking
+		// block collapses above the reading position: the wrapper's top never
+		// moves, so a wrapper-level anchor would read delta 0 and let the text
+		// jump — the anchor must be the descendant at the viewport top.
+		const style = document.createElement("style");
+		style.textContent = ".sim-safari { overflow-anchor: none !important; }";
+		document.head.appendChild(style);
+
+		const fixture = createFixture({ viewportHeight: 400, blocks: [] });
+		fixture.container.classList.add("sim-safari");
+		const chat = createChatScroll({ forceManualAnchoring: true });
+
+		const mkInner = (height: number) => {
+			const el = document.createElement("div");
+			el.style.cssText = `height: ${height}px; flex-shrink: 0; background: #eef;`;
+			return el;
+		};
+		const message = document.createElement("div");
+		message.style.cssText = "display: flex; flex-direction: column; flex-shrink: 0;";
+		message.dataset.messageId = "long-message";
+		const thinking = mkInner(400);
+		const reading = mkInner(300);
+		message.append(thinking, reading, mkInner(900));
+		fixture.content.appendChild(message);
+
+		const spacerAction = chat.attachSpacer(fixture.spacer);
+		const containerAction = chat.attach(fixture.container, { content: () => fixture.content });
+		chat.sync({ conversationKey: "c1", messages: [], lastMessageEmpty: false });
+		active.push({
+			fixture,
+			chat,
+			messages: [],
+			sync: () => {},
+			mountPair: () => ({
+				user: document.createElement("div"),
+				assistant: document.createElement("div"),
+			}),
+			swapAssistant: () => document.createElement("div"),
+			viewportTop: () => fixture.container.getBoundingClientRect().top,
+			destroy() {
+				containerAction.destroy();
+				spacerAction.destroy();
+				fixture.destroy();
+				style.remove();
+			},
+		});
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle" });
+		await nextTask();
+
+		const containerTop = fixture.container.getBoundingClientRect().top;
+		const target = reading.getBoundingClientRect().top - containerTop + fixture.container.scrollTop;
+		dragScrollbarTo(fixture.container, target);
+		await frames(2);
+		expect(chat.state.pinned).toBe(false);
+		const before = reading.getBoundingClientRect().top - containerTop;
+
+		thinking.style.height = "50px"; // collapse INSIDE the same message
+		await frames(3);
+		const after = reading.getBoundingClientRect().top - containerTop;
+		expect(Math.abs(after - before)).toBeLessThanOrEqual(2);
+	});
 });
 
 describe("composer clearance", () => {

@@ -174,9 +174,10 @@ export class ChatScroll {
 		};
 	};
 
-	/** Record the message element at the viewport top (binary search over the
-	 * content children: they are in document order). Only while detached —
-	 * pinned following owns the bottom edge instead. */
+	/** Record the element at the viewport top (binary search over the content
+	 * children — they are in document order — then a descent into the
+	 * straddling message). Only while detached — pinned following owns the
+	 * bottom edge instead. */
 	private trackReadAnchor = () => {
 		if (!this.manualAnchoring) return;
 		if (this.state.pinned || !this.container) {
@@ -202,9 +203,30 @@ export class ChatScroll {
 				lo = mid + 1;
 			}
 		}
-		const el = children[found];
+		// Descend into the straddling message: anchoring the outer wrapper
+		// misses changes INSIDE it — a thinking block collapsing above the
+		// reading position within the same long message leaves the wrapper's
+		// top unchanged while the visible paragraph moves. Native anchoring
+		// anchors deep descendants; do the same. Linear scans here (unlike the
+		// top level) because in-message children are few and can be positioned
+		// out of flow, which breaks the binary search's ordering assumption.
+		let el: Element = children[found];
+		for (let depth = 0; depth < 8; depth++) {
+			const inner = this.firstChildBelow(el, containerTop);
+			if (!inner) break;
+			el = inner;
+		}
 		this.readAnchor = { el, offset: el.getBoundingClientRect().top - containerTop };
 	};
+
+	private firstChildBelow(parent: Element, containerTop: number): Element | null {
+		const kids = parent.children;
+		for (let i = 0; i < kids.length; i++) {
+			const rect = kids[i].getBoundingClientRect();
+			if (rect.height > 0 && rect.bottom > containerTop + 1) return kids[i];
+		}
+		return null;
+	}
 
 	/** After a content resize while detached, restore the tracked element's
 	 * viewport position — Safari's stand-in for native scroll anchoring. The
