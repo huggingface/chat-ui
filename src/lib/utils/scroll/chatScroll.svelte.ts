@@ -117,7 +117,10 @@ export class ChatScroll {
 	 * position after content resizes: the same job Chrome's anchoring does.
 	 */
 	private manualAnchoring: boolean;
-	private readAnchor: { el: Element; offset: number } | null = null;
+	/** Viewport-top anchor as a deepest-first ancestor chain: markdown worker
+	 * swaps and streaming re-renders REPLACE deep nodes, so compensation falls
+	 * back to the nearest still-connected ancestor instead of going silent. */
+	private readAnchor: { el: Element; offset: number }[] | null = null;
 
 	constructor(options: { forceManualAnchoring?: boolean } = {}) {
 		this.manualAnchoring =
@@ -216,7 +219,14 @@ export class ChatScroll {
 			if (!inner) break;
 			el = inner;
 		}
-		this.readAnchor = { el, offset: el.getBoundingClientRect().top - containerTop };
+		// Store the whole ancestor chain (deepest first, up to the content
+		// root): if a re-render replaces the deep node, its ancestors still
+		// carry enough position to compensate cross-message shifts.
+		const chain: { el: Element; offset: number }[] = [];
+		for (let node: Element | null = el; node && node !== content; node = node.parentElement) {
+			chain.push({ el: node, offset: node.getBoundingClientRect().top - containerTop });
+		}
+		this.readAnchor = chain;
 	};
 
 	private firstChildBelow(parent: Element, containerTop: number): Element | null {
@@ -234,17 +244,23 @@ export class ChatScroll {
 	 * matches the anchoring signature the scroll handler already recognizes). */
 	private compensateReadAnchor() {
 		if (!this.manualAnchoring || this.state.pinned || !this.container) return;
-		const anchor = this.readAnchor;
-		if (!anchor?.el.isConnected) return;
-		const containerTop = this.container.getBoundingClientRect().top;
-		const delta = anchor.el.getBoundingClientRect().top - containerTop - anchor.offset;
-		if (Math.abs(delta) < 1) return;
-		this.controller?.adjustBy(delta);
-		// The write may have been clamped; re-measure the offset we now hold.
-		this.readAnchor = {
-			el: anchor.el,
-			offset: anchor.el.getBoundingClientRect().top - containerTop,
-		};
+		const chain = this.readAnchor;
+		if (!chain?.length) return;
+		// The deep anchor may have been replaced by this very resize (markdown
+		// worker swap, streaming re-render) — fall back to the nearest ancestor
+		// that survived, which still compensates every shift originating above
+		// it. Intra-ancestor changes from the replacing pass itself are
+		// unrecoverable (the old node's geometry died with it).
+		const entry = chain.find((e) => e.el.isConnected);
+		if (entry) {
+			const containerTop = this.container.getBoundingClientRect().top;
+			const delta = entry.el.getBoundingClientRect().top - containerTop - entry.offset;
+			if (Math.abs(delta) >= 1) this.controller?.adjustBy(delta);
+		}
+		// Always re-resolve a fresh deep anchor for the NEXT pass (the write may
+		// have been clamped, and a replaced node must not leave a stale chain —
+		// that would silence compensation until the next user scroll).
+		this.trackReadAnchor();
 	}
 
 	/** `use:` action for the send-anchor spacer element. */

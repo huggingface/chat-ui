@@ -506,6 +506,78 @@ describe("thinking-block collapse (layout-shift regressions)", () => {
 		const after = reading.getBoundingClientRect().top - containerTop;
 		expect(Math.abs(after - before)).toBeLessThanOrEqual(2);
 	});
+
+	it("manual anchoring survives the anchored node being replaced (markdown re-render)", async () => {
+		const style = document.createElement("style");
+		style.textContent = ".sim-safari { overflow-anchor: none !important; }";
+		document.head.appendChild(style);
+
+		const fixture = createFixture({ viewportHeight: 400, blocks: [] });
+		fixture.container.classList.add("sim-safari");
+		const chat = createChatScroll({ forceManualAnchoring: true });
+
+		const mkInner = (height: number) => {
+			const el = document.createElement("div");
+			el.style.cssText = `height: ${height}px; flex-shrink: 0; background: #efe;`;
+			return el;
+		};
+		const earlier = fixture.addBlock(400, { id: "earlier" });
+		const message = document.createElement("div");
+		message.style.cssText = "display: flex; flex-direction: column; flex-shrink: 0;";
+		message.dataset.messageId = "rendered-message";
+		let reading = mkInner(300);
+		message.append(reading, mkInner(900));
+		fixture.content.appendChild(message);
+
+		const spacerAction = chat.attachSpacer(fixture.spacer);
+		const containerAction = chat.attach(fixture.container, { content: () => fixture.content });
+		chat.sync({ conversationKey: "c1", messages: [], lastMessageEmpty: false });
+		active.push({
+			fixture,
+			chat,
+			messages: [],
+			sync: () => {},
+			mountPair: () => ({
+				user: document.createElement("div"),
+				assistant: document.createElement("div"),
+			}),
+			swapAssistant: () => document.createElement("div"),
+			viewportTop: () => fixture.container.getBoundingClientRect().top,
+			destroy() {
+				containerAction.destroy();
+				spacerAction.destroy();
+				fixture.destroy();
+				style.remove();
+			},
+		});
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle" });
+		await nextTask();
+
+		const containerTop = fixture.container.getBoundingClientRect().top;
+		const target = reading.getBoundingClientRect().top - containerTop + fixture.container.scrollTop;
+		dragScrollbarTo(fixture.container, target);
+		await frames(2);
+		expect(chat.state.pinned).toBe(false);
+		const before = reading.getBoundingClientRect().top - containerTop;
+
+		// A worker markdown swap REPLACES the anchored paragraph in the same
+		// pass as an above-viewport shrink: the dead node must not silence
+		// compensation (fall back to the surviving message wrapper).
+		const replacement = mkInner(300);
+		reading.replaceWith(replacement);
+		reading = replacement;
+		earlier.style.height = "50px";
+		await frames(3);
+		let position = reading.getBoundingClientRect().top - containerTop;
+		expect(Math.abs(position - before)).toBeLessThanOrEqual(2);
+
+		// And the anchor was re-resolved onto live nodes: a LATER above-viewport
+		// change is compensated too (a stale chain would let this one jump).
+		earlier.style.height = "10px";
+		await frames(3);
+		position = reading.getBoundingClientRect().top - containerTop;
+		expect(Math.abs(position - before)).toBeLessThanOrEqual(2);
+	});
 });
 
 describe("composer clearance", () => {
