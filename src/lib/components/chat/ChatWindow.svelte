@@ -10,9 +10,9 @@
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import IconCheap from "$lib/components/icons/IconCheap.svelte";
 	import IconFast from "$lib/components/icons/IconFast.svelte";
-	import CarbonCaretDown from "~icons/carbon/caret-down";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import CarbonDirectionRight from "~icons/carbon/direction-right-01";
+	import IconSettings from "~icons/lucide/settings-2";
 	import IconArrowUp from "~icons/lucide/arrow-up";
 	import IconMic from "~icons/lucide/mic";
 
@@ -933,7 +933,7 @@
 										</span>
 									{/if}
 								{/if}
-								<CarbonCaretDown class="-ml-0.5 shrink-0 text-xxs" />
+								<IconSettings class="mr-1.5 -ml-0.5 shrink-0 pr-0.5 pl-0 text-xxs" />
 							</a>
 						{:else if showRouterDetails && streamingRouterMetadata?.route}
 							<div
