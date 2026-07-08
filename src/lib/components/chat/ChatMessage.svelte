@@ -410,62 +410,57 @@
 				{#if isLast && loading && blocks.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
-				{#if isProcessStreaming}
-					<!-- Streaming the thinking / tool phase: render every block flat and
-					     inline, exactly like today. Nesting kicks in once the answer starts. -->
-					{#each blocks as block, blockIndex (block.type === "tool" ? `tool-${block.uuid}-${blockIndex}` : `block-${blockIndex}`)}
-						{#if block.type === "text"}
-							{#if block.content.trim().length > 0}
-								<div class={proseClasses}>
-									<MarkdownRenderer content={block.content} loading={isLast && loading} />
-								</div>
-							{/if}
-						{:else if block.type === "artifact"}
-							<ArtifactCard op={block.op} messageId={message.id} opIndex={block.opIndex} />
-						{:else}
-							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
-								{#if block.type === "think"}
-									<OpenReasoningResults
-										content={block.content}
-										loading={isLast && loading && !block.closed}
-									/>
-								{:else}
-									<ToolUpdate tool={block.updates} {loading} />
-								{/if}
+				<!-- One template for the streaming and settled phases: the trailing
+				     process group renders live while thinking/tools stream and settles
+				     in place when the answer starts. A single branch per unit shape
+				     keeps component instances alive across that flip — a lone thinking
+				     block ANIMATES its collapse instead of being remounted ~300px
+				     shorter in one frame (the layout jump this replaces). -->
+				{#each renderUnits as unit, unitIndex (`${unit.kind}-${unitIndex}`)}
+					{#if unit.kind === "text"}
+						{#if isLast && loading && unit.content.length === 0}
+							<IconLoading classNames="loading inline ml-2 first:ml-0" />
+						{:else if unit.content.trim().length > 0}
+							<div class={proseClasses}>
+								<MarkdownRenderer content={unit.content} loading={isLast && loading} />
 							</div>
 						{/if}
-					{/each}
-				{:else}
-					<!-- Answer started or generation finished: nest the process blocks. -->
-					{#each renderUnits as unit, unitIndex (`${unit.kind}-${unitIndex}`)}
-						{#if unit.kind === "text"}
-							{#if isLast && loading && unit.content.length === 0}
-								<IconLoading classNames="loading inline ml-2 first:ml-0" />
-							{:else if unit.content.trim().length > 0}
-								<div class={proseClasses}>
-									<MarkdownRenderer content={unit.content} loading={isLast && loading} />
-								</div>
-							{/if}
-						{:else if unit.kind === "artifact"}
-							<ArtifactCard op={unit.op} messageId={message.id} opIndex={unit.opIndex} />
-						{:else if unit.kind === "group"}
-							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
-								{#if unit.blocks.length > 1}
-									<!-- Collapse the whole run into a single summary -->
-									<ToolCallsSummary blocks={unit.blocks} toolCount={unit.toolCount} />
-								{:else}
-									<!-- A lone process block stays standalone -->
-									{@const only = unit.blocks[0]}
-									{#if only.type === "think"}
-										<OpenReasoningResults content={only.content} loading={false} />
-									{:else}
-										<ToolUpdate tool={only.updates} loading={false} />
-									{/if}
+					{:else if unit.kind === "artifact"}
+						<ArtifactCard op={unit.op} messageId={message.id} opIndex={unit.opIndex} />
+					{:else if unit.kind === "group"}
+						{@const isLiveGroup = isProcessStreaming && unitIndex === renderUnits.length - 1}
+						<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
+							{#if unit.blocks.length === 1 && unit.blocks[0].type === "think"}
+								<OpenReasoningResults
+									content={unit.blocks[0].content}
+									loading={isLiveGroup && isLast && loading && !unit.blocks[0].closed}
+								/>
+							{:else if isLiveGroup}
+								<!-- Live multi-block run (thinking + tools): flat and inline -->
+								{#each unit.blocks as block, blockIndex (block.type === "tool" ? `tool-${block.uuid}` : `think-${blockIndex}`)}
+									<div class="not-last:mb-1">
+										{#if block.type === "think"}
+											<OpenReasoningResults
+												content={block.content}
+												loading={isLast && loading && !block.closed}
+											/>
+										{:else}
+											<ToolUpdate tool={block.updates} {loading} />
+										{/if}
+									</div>
+								{/each}
+							{:else if unit.blocks.length > 1}
+								<!-- Collapse the whole settled run into a single summary -->
+								<ToolCallsSummary blocks={unit.blocks} toolCount={unit.toolCount} />
+							{:else}
+								{@const only = unit.blocks[0]}
+								{#if only.type === "tool"}
+									<ToolUpdate tool={only.updates} loading={false} />
 								{/if}
-							</div>
-						{/if}
-					{/each}
-				{/if}
+							{/if}
+						</div>
+					{/if}
+				{/each}
 			</div>
 		</div>
 

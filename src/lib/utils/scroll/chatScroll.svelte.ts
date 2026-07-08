@@ -108,6 +108,26 @@ export class ChatScroll {
 	private knownIds: ReadonlySet<string> = new Set();
 	private initialized = false;
 
+	/**
+	 * Safari has no native scroll anchoring (`overflow-anchor` unsupported), so
+	 * content changes above the viewport — a thinking block collapsing, a late
+	 * image, a markdown swap — shove a detached reader's text by the full
+	 * height delta. Where native anchoring is unavailable, track the message
+	 * element at the viewport top while detached and manually restore its
+	 * position after content resizes: the same job Chrome's anchoring does.
+	 */
+	private manualAnchoring: boolean;
+	/** Viewport-top anchor as a deepest-first ancestor chain: markdown worker
+	 * swaps and streaming re-renders REPLACE deep nodes, so compensation falls
+	 * back to the nearest still-connected ancestor instead of going silent. */
+	private readAnchor: { el: Element; offset: number }[] | null = null;
+
+	constructor(options: { forceManualAnchoring?: boolean } = {}) {
+		this.manualAnchoring =
+			options.forceManualAnchoring ??
+			(typeof CSS !== "undefined" && !CSS.supports("overflow-anchor", "auto"));
+	}
+
 	// --- wiring -------------------------------------------------------------------
 
 	/** `use:` action for the scroll container. */
@@ -126,10 +146,14 @@ export class ChatScroll {
 			onStateChange: (s) => this.applyState(s),
 			onContentResize: (containerResized) => {
 				if (containerResized) this.measureGutter();
+				this.compensateReadAnchor();
 				this.updateSpacer();
 			},
 		});
 		this.measureGutter();
+		if (this.manualAnchoring) {
+			node.addEventListener("scroll", this.trackReadAnchor, { passive: true });
+		}
 		// Land at the bottom before first paint; being pinned makes the
 		// ResizeObserver absorb the async markdown/image height changes that
 		// used to leave the view off-bottom on load.
@@ -145,12 +169,99 @@ export class ChatScroll {
 		return {
 			destroy: () => {
 				visualViewport?.removeEventListener("resize", onViewportResize);
+				node.removeEventListener("scroll", this.trackReadAnchor);
 				this.controller?.destroy();
 				this.controller = null;
 				this.container = null;
 			},
 		};
 	};
+
+	/** Record the element at the viewport top (binary search over the content
+	 * children — they are in document order — then a descent into the
+	 * straddling message). Only while detached — pinned following owns the
+	 * bottom edge instead. */
+	private trackReadAnchor = () => {
+		if (!this.manualAnchoring) return;
+		if (this.state.pinned || !this.container) {
+			this.readAnchor = null;
+			return;
+		}
+		const content = this.contentEl?.();
+		const children = content?.children;
+		if (!children || children.length === 0) {
+			this.readAnchor = null;
+			return;
+		}
+		const containerTop = this.container.getBoundingClientRect().top;
+		let lo = 0;
+		let hi = children.length - 1;
+		let found = children.length - 1;
+		while (lo <= hi) {
+			const mid = (lo + hi) >> 1;
+			if (children[mid].getBoundingClientRect().bottom > containerTop + 1) {
+				found = mid;
+				hi = mid - 1;
+			} else {
+				lo = mid + 1;
+			}
+		}
+		// Descend into the straddling message: anchoring the outer wrapper
+		// misses changes INSIDE it — a thinking block collapsing above the
+		// reading position within the same long message leaves the wrapper's
+		// top unchanged while the visible paragraph moves. Native anchoring
+		// anchors deep descendants; do the same. Linear scans here (unlike the
+		// top level) because in-message children are few and can be positioned
+		// out of flow, which breaks the binary search's ordering assumption.
+		let el: Element = children[found];
+		for (let depth = 0; depth < 8; depth++) {
+			const inner = this.firstChildBelow(el, containerTop);
+			if (!inner) break;
+			el = inner;
+		}
+		// Store the whole ancestor chain (deepest first, up to the content
+		// root): if a re-render replaces the deep node, its ancestors still
+		// carry enough position to compensate cross-message shifts.
+		const chain: { el: Element; offset: number }[] = [];
+		for (let node: Element | null = el; node && node !== content; node = node.parentElement) {
+			chain.push({ el: node, offset: node.getBoundingClientRect().top - containerTop });
+		}
+		this.readAnchor = chain;
+	};
+
+	private firstChildBelow(parent: Element, containerTop: number): Element | null {
+		const kids = parent.children;
+		for (let i = 0; i < kids.length; i++) {
+			const rect = kids[i].getBoundingClientRect();
+			if (rect.height > 0 && rect.bottom > containerTop + 1) return kids[i];
+		}
+		return null;
+	}
+
+	/** After a content resize while detached, restore the tracked element's
+	 * viewport position — Safari's stand-in for native scroll anchoring. The
+	 * adjustment goes through the controller, so attribution stays sound (it
+	 * matches the anchoring signature the scroll handler already recognizes). */
+	private compensateReadAnchor() {
+		if (!this.manualAnchoring || this.state.pinned || !this.container) return;
+		const chain = this.readAnchor;
+		if (!chain?.length) return;
+		// The deep anchor may have been replaced by this very resize (markdown
+		// worker swap, streaming re-render) — fall back to the nearest ancestor
+		// that survived, which still compensates every shift originating above
+		// it. Intra-ancestor changes from the replacing pass itself are
+		// unrecoverable (the old node's geometry died with it).
+		const entry = chain.find((e) => e.el.isConnected);
+		if (entry) {
+			const containerTop = this.container.getBoundingClientRect().top;
+			const delta = entry.el.getBoundingClientRect().top - containerTop - entry.offset;
+			if (Math.abs(delta) >= 1) this.controller?.adjustBy(delta);
+		}
+		// Always re-resolve a fresh deep anchor for the NEXT pass (the write may
+		// have been clamped, and a replaced node must not leave a stale chain —
+		// that would silence compensation until the next user scroll).
+		this.trackReadAnchor();
+	}
 
 	/** `use:` action for the send-anchor spacer element. */
 	attachSpacer = (node: HTMLElement) => {
@@ -360,13 +471,14 @@ export class ChatScroll {
 	private activateSpacer() {
 		this.spacerActive = true;
 		this.anchorEl = null; // re-resolve for the new turn
-		this.updateSpacer();
+		// A new turn may inflate the spacer fresh; within the turn it only shrinks.
+		this.updateSpacer(true);
 	}
 
 	/** Size the spacer so the anchored user message sits near the viewport top;
 	 * runs on every content resize while a turn's anchor is active, shrinking
 	 * 1:1 with reply growth to keep scrollHeight constant (zero motion). */
-	private updateSpacer() {
+	private updateSpacer(allowGrow = false) {
 		if (!this.spacerActive || !this.container || !this.spacerEl) return;
 
 		// Resolve the anchored user message once per turn — this runs every
@@ -383,7 +495,7 @@ export class ChatScroll {
 		const anchorToSpacer =
 			this.spacerEl.getBoundingClientRect().top - anchor.getBoundingClientRect().top;
 
-		const height = computeSpacerHeight({
+		const computed = computeSpacerHeight({
 			viewportHeight: this.container.clientHeight,
 			anchorToSpacer,
 			minSpacer: this.minSpacer(),
@@ -391,6 +503,15 @@ export class ChatScroll {
 		});
 
 		const current = parseFloat(this.spacerEl.style.height) || MIN_SPACER_FALLBACK_PX;
+		// Monotonic within a turn: the spacer only shrinks as the reply grows.
+		// Re-inflating on content SHRINK (a thinking block collapsing at
+		// answer-start) would re-anchor the sent message and visibly scroll the
+		// view mid-read; letting the shrink clamp instead keeps everything
+		// below the collapse viewport-stable (the controller's clamp rule owns
+		// that case). Fresh turns (allowGrow) inflate freely, and the floor
+		// still wins so a growing composer can never occlude the reply.
+		const ceiling = allowGrow ? Infinity : current;
+		const height = Math.max(Math.min(computed, ceiling), this.minSpacer());
 		if (Math.abs(current - height) >= 1) {
 			this.spacerEl.style.height = `${height}px`;
 		}
@@ -433,6 +554,6 @@ export class ChatScroll {
 	}
 }
 
-export function createChatScroll(): ChatScroll {
-	return new ChatScroll();
+export function createChatScroll(options?: { forceManualAnchoring?: boolean }): ChatScroll {
+	return new ChatScroll(options);
 }
