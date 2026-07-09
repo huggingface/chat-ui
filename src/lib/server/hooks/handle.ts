@@ -106,6 +106,7 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 						!event.url.pathname.startsWith(`${base}/r/`) &&
 						!event.url.pathname.startsWith(`${base}/conversation/`) &&
 						!event.url.pathname.startsWith(`${base}/models/`) &&
+						event.url.pathname !== `${base}/thumbnail.png` &&
 						!event.url.pathname.startsWith(`${base}/api`)
 					) {
 						refreshSessionCookie(event.cookies, auth.secretSessionId);
