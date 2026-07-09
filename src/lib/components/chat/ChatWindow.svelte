@@ -150,7 +150,7 @@
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
 
 	const handleSubmit = () => {
-		if (requireAuthUser() || loading || !draft) return;
+		if (requireAuthUser() || loading || isReadOnly || !draft) return;
 		tap();
 		chatScroll.armSend();
 		onmessage?.(draft);
@@ -440,8 +440,15 @@
 
 	$effect(() => {
 		if ($pendingChatInput) {
-			draft = $pendingChatInput;
+			const { text, submit } = $pendingChatInput;
 			pendingChatInput.set(undefined);
+			draft = text;
+			// Submitting consumes the composer attachments, so files the user
+			// staged for another message must not be swept along by an
+			// auto-send: fall back to prefill and let them press send. Same if
+			// handleSubmit bails (auth, read-only, generation in flight) — the
+			// text stays in the input so nothing is lost.
+			if (submit && !files.length) handleSubmit();
 		}
 	});
 
