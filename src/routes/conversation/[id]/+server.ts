@@ -15,6 +15,7 @@ import {
 	type MessageStreamUpdate,
 } from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";
+import { isAllowedUploadMime } from "$lib/server/files/validateUploadMime";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
@@ -256,6 +257,15 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				const blob = Buffer.from(file.value, "base64");
 				return new File([blob], file.name, { type: file.mime });
 			}) ?? [];
+
+	// Validate the client-declared mime as defense-in-depth; content-level truth is the
+	// file-type sniff inside uploadFile. Hash files re-reference already-stored uploads.
+	const disallowedFile = b64Files.find(
+		(file) => !isAllowedUploadMime(file.type, model.multimodalAcceptedMimetypes)
+	);
+	if (disallowedFile) {
+		error(415, `File type "${disallowedFile.type || "unknown"}" is not supported.`);
+	}
 
 	// check sizes
 	// todo: make configurable

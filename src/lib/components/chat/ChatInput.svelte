@@ -12,7 +12,11 @@
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonClose from "~icons/carbon/close";
 	import UrlFetchModal from "./UrlFetchModal.svelte";
-	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
+	import {
+		TEXT_MIME_ALLOWLIST,
+		DOCUMENT_MIME_ALLOWLIST,
+		IMAGE_MIME_ALLOWLIST_DEFAULT,
+	} from "$lib/constants/mime";
 	import MCPServerManager from "$lib/components/mcp/MCPServerManager.svelte";
 	import IconMCP from "$lib/components/icons/IconMCP.svelte";
 
@@ -91,7 +95,7 @@
 	function openFilePickerText() {
 		const textAccept =
 			mimeTypes.filter((m) => !(m === "image/*" || m.startsWith("image/"))).join(",") ||
-			TEXT_MIME_ALLOWLIST.join(",");
+			[...TEXT_MIME_ALLOWLIST, ...DOCUMENT_MIME_ALLOWLIST].join(",");
 		openPickerWithAccept(textAccept);
 	}
 
@@ -318,7 +322,7 @@
 									>
 										<div class="flex items-center gap-1">
 											<CarbonDocument class="size-4 opacity-90 dark:opacity-80" />
-											Add text file
+											Add file
 										</div>
 										<div class="ml-auto flex items-center">
 											<CarbonChevronRight class="size-4 opacity-70 dark:opacity-80" />

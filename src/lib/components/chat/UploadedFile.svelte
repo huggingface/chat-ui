@@ -5,11 +5,13 @@
 	import CarbonDocumentBlank from "~icons/carbon/document-blank";
 	import CarbonDownload from "~icons/carbon/download";
 	import CarbonDocument from "~icons/carbon/document";
+	import CarbonDocumentPdf from "~icons/carbon/document-pdf";
 	import Modal from "../Modal.svelte";
 	import AudioPlayer from "../players/AudioPlayer.svelte";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import { base } from "$app/paths";
-	import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
+	import { TEXT_MIME_ALLOWLIST, DOCUMENT_MIME_ALLOWLIST } from "$lib/constants/mime";
+	import { mimeMatchesAllowlist } from "$lib/utils/mime";
 
 	interface Props {
 		file: MessageFile;
@@ -44,21 +46,10 @@
 	const isVideo = (mime: string) =>
 		mime.startsWith("video/") || mime === "mp4" || mime === "x-mpeg";
 
-	function matchesAllowed(contentType: string, allowed: readonly string[]): boolean {
-		const ct = contentType.split(";")[0]?.trim().toLowerCase();
-		if (!ct) return false;
-		const [ctType, ctSubtype] = ct.split("/");
-		for (const a of allowed) {
-			const [aType, aSubtype] = a.toLowerCase().split("/");
-			const typeOk = aType === "*" || aType === ctType;
-			const subOk = aSubtype === "*" || aSubtype === ctSubtype;
-			if (typeOk && subOk) return true;
-		}
-		return false;
-	}
-
 	const isPlainText = (mime: string) =>
-		mime === "application/vnd.chatui.clipboard" || matchesAllowed(mime, TEXT_MIME_ALLOWLIST);
+		mime === "application/vnd.chatui.clipboard" || mimeMatchesAllowlist(mime, TEXT_MIME_ALLOWLIST);
+
+	const isDocument = (mime: string) => mimeMatchesAllowlist(mime, DOCUMENT_MIME_ALLOWLIST);
 
 	let isClickable = $derived(isImage(file.mime) || isPlainText(file.mime));
 </script>
@@ -189,6 +180,23 @@
 					{:else}
 						<dt class="text-xs text-gray-400">{file.mime}</dt>
 					{/if}
+				</dl>
+			</div>
+		{:else if isDocument(file.mime)}
+			<div
+				class="flex h-14 w-64 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 2xl:w-72 dark:border-gray-800 dark:bg-gray-900"
+				class:file-hoverable={isClickable}
+			>
+				<div
+					class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-800"
+				>
+					<CarbonDocumentPdf class="text-base text-gray-700 dark:text-gray-300" />
+				</div>
+				<dl class="flex flex-col items-start truncate leading-tight">
+					<dd class="text-sm">
+						{truncateMiddle(file.name, 28)}
+					</dd>
+					<dt class="text-xs text-gray-400">PDF</dt>
 				</dl>
 			</div>
 		{:else if file.mime === "application/octet-stream"}

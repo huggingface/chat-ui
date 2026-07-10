@@ -1,6 +1,6 @@
 # Research: Supporting More Upload File Types (starting with PDF)
 
-_Status: research write-up — no implementation yet. Scope agreed: PDF first, with an architecture that makes adding further types (docx, etc.) easy later._
+_Status: v1 implemented (server-side text extraction via `unpdf`, Option 1 below). Scope: PDF first, with an architecture that makes adding further types (docx, etc.) easy later._
 
 ## Problem statement
 

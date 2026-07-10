@@ -16,9 +16,14 @@ export async function preprocessMessages(
 async function downloadFiles(messages: Message[], convId: ObjectId): Promise<EndpointMessage[]> {
 	return Promise.all(
 		messages.map<Promise<EndpointMessage>>((message) =>
-			Promise.all((message.files ?? []).map((file) => downloadFile(file.value, convId))).then(
-				(files) => ({ ...message, files })
-			)
+			Promise.all(
+				(message.files ?? []).map(async (file) => {
+					// Keep the sniffed mime from storage, but restore the original filename —
+					// the stored filename is the GridFS hash key, not what the user uploaded.
+					const downloaded = await downloadFile(file.value, convId);
+					return { ...downloaded, name: file.name || downloaded.name };
+				})
+			).then((files) => ({ ...message, files }))
 		)
 	);
 }
