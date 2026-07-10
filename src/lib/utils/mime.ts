@@ -27,6 +27,17 @@ const EXTENSION_TO_MIME: Record<string, string> = {
 	md: "text/markdown",
 };
 
+export function mimeMatchesAllowlist(mime: string, allowlist: readonly string[]): boolean {
+	const normalized = (mime || "").toLowerCase().split(";")[0].trim();
+	const [fileType, fileSubtype] = normalized.split("/");
+	return allowlist.some((allowed) => {
+		const [type, subtype] = allowed.toLowerCase().split("/");
+		const typeOk = type === "*" || type === fileType;
+		const subOk = subtype === "*" || subtype === fileSubtype;
+		return typeOk && subOk;
+	});
+}
+
 export function guessMimeFromUrl(url: string): string | undefined {
 	try {
 		const pathname = new URL(url).pathname;
