@@ -6,6 +6,7 @@ import {
 	dragScrollbarTo,
 	frame,
 	frames,
+	nextTask,
 	startClsProbe,
 	waitFor,
 	wheel,
@@ -429,6 +430,177 @@ describe("in-turn content shrink (thinking-block collapse)", () => {
 		});
 		expect(parseFloat(chat.fixture.spacer.style.height)).toBeGreaterThan(spacerBefore);
 		expect(chat.chat.state.pinned).toBe(true);
+	});
+});
+
+describe("manual scroll anchoring (Safari: no overflow-anchor)", () => {
+	/** Simulated-Safari chat: native anchoring forced off (inline style loses
+	 * to !important), manual anchoring forced on. WebKit itself cannot launch
+	 * in this container; the missing native anchoring is the only engine
+	 * difference relevant to this bug class. */
+	function createManualChat(build: (fixture: Fixture) => void): ChatFixture {
+		const style = document.createElement("style");
+		style.textContent = ".sim-safari { overflow-anchor: none !important; }";
+		document.head.appendChild(style);
+
+		const fixture = createFixture({ viewportHeight: 400, blocks: [] });
+		fixture.container.classList.add("sim-safari");
+		const chat = createChatScroll({ forceManualAnchoring: true });
+		build(fixture);
+		const spacerAction = chat.attachSpacer(fixture.spacer);
+		const containerAction = chat.attach(fixture.container, { content: () => fixture.content });
+		chat.sync({ conversationKey: "c1", messages: [], lastMessageEmpty: false });
+		const api: ChatFixture = {
+			fixture,
+			chat,
+			messages: [],
+			sync: () => {},
+			mountPair: () => ({
+				user: document.createElement("div"),
+				assistant: document.createElement("div"),
+			}),
+			swapAssistant: () => document.createElement("div"),
+			viewportTop: () => fixture.container.getBoundingClientRect().top,
+			destroy() {
+				containerAction.destroy();
+				spacerAction.destroy();
+				fixture.destroy();
+				style.remove();
+			},
+		};
+		active.push(api);
+		return api;
+	}
+
+	/** Scroll up until `el` sits at the viewport top, and let the scroll event
+	 * process so the read anchor is captured from a settled position. */
+	async function readAt(chat: ChatFixture, el: Element) {
+		const target = el.getBoundingClientRect().top - chat.viewportTop() + chat.fixture.scrollTop();
+		dragScrollbarTo(chat.fixture.container, target);
+		await frames(2);
+		await nextTask();
+		expect(chat.chat.state.pinned).toBe(false);
+	}
+
+	it("keeps a detached reader stable through an above-viewport collapse", async () => {
+		let earlier!: HTMLDivElement;
+		let reading!: HTMLDivElement;
+		const chat = createManualChat((fixture) => {
+			earlier = fixture.addBlock(400, { id: "earlier" }); // reasoning of an earlier turn
+			reading = fixture.addBlock(300, { user: true, id: "reading" });
+			fixture.addBlock(900, { id: "tail" });
+		});
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "settle" });
+		await nextTask();
+
+		await readAt(chat, reading);
+		const before = topOf(reading, chat);
+
+		// The earlier thinking block collapses ABOVE the viewport: without
+		// compensation this shifts the reading position by the full 350px.
+		earlier.style.height = "50px";
+		await frames(3);
+		expect(Math.abs(topOf(reading, chat) - before)).toBeLessThanOrEqual(2);
+	});
+
+	it("tracks a descendant INSIDE a long message, not just the wrapper", async () => {
+		// Reading the middle of one long assistant message whose own thinking
+		// block collapses above the reading position: the wrapper's top never
+		// moves, so a wrapper-level anchor would read delta 0 and let the text
+		// jump — the anchor must be the descendant at the viewport top.
+		const mkInner = (height: number) => {
+			const el = document.createElement("div");
+			el.style.cssText = `height: ${height}px; flex-shrink: 0; background: #eef;`;
+			return el;
+		};
+		let thinking!: HTMLDivElement;
+		let reading!: HTMLDivElement;
+		const chat = createManualChat((fixture) => {
+			const message = document.createElement("div");
+			message.style.cssText = "display: flex; flex-direction: column; flex-shrink: 0;";
+			message.dataset.messageId = "long-message";
+			thinking = mkInner(400);
+			reading = mkInner(300);
+			message.append(thinking, reading, mkInner(900));
+			fixture.content.appendChild(message);
+		});
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "settle" });
+		await nextTask();
+
+		await readAt(chat, reading);
+		const before = topOf(reading, chat);
+
+		thinking.style.height = "50px"; // collapse INSIDE the same message
+		await frames(3);
+		expect(Math.abs(topOf(reading, chat) - before)).toBeLessThanOrEqual(2);
+	});
+
+	it("survives the anchored node being replaced (markdown re-render)", async () => {
+		const mkInner = (height: number) => {
+			const el = document.createElement("div");
+			el.style.cssText = `height: ${height}px; flex-shrink: 0; background: #efe;`;
+			return el;
+		};
+		let earlier!: HTMLDivElement;
+		let reading!: HTMLDivElement;
+		const chat = createManualChat((fixture) => {
+			earlier = fixture.addBlock(400, { id: "earlier" });
+			const message = document.createElement("div");
+			message.style.cssText = "display: flex; flex-direction: column; flex-shrink: 0;";
+			message.dataset.messageId = "rendered-message";
+			reading = mkInner(300);
+			message.append(reading, mkInner(900));
+			fixture.content.appendChild(message);
+		});
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "settle" });
+		await nextTask();
+
+		await readAt(chat, reading);
+		const containerTop = chat.viewportTop();
+		const before = reading.getBoundingClientRect().top - containerTop;
+
+		// A worker markdown swap REPLACES the anchored paragraph in the same
+		// pass as an above-viewport shrink: the dead node must not silence
+		// compensation (fall back to the surviving message wrapper).
+		const replacement = mkInner(300);
+		reading.replaceWith(replacement);
+		reading = replacement;
+		earlier.style.height = "50px";
+		await frames(3);
+		let position = reading.getBoundingClientRect().top - containerTop;
+		expect(Math.abs(position - before)).toBeLessThanOrEqual(2);
+
+		// And the anchor was re-resolved onto live nodes: a LATER above-viewport
+		// change is compensated too (a stale chain would let this one jump).
+		earlier.style.height = "10px";
+		await frames(3);
+		position = reading.getBoundingClientRect().top - containerTop;
+		expect(Math.abs(position - before)).toBeLessThanOrEqual(2);
+	});
+
+	it("never cancels a user scroll pending in the same pass as a shrink", async () => {
+		let earlier!: HTMLDivElement;
+		let reading!: HTMLDivElement;
+		const chat = createManualChat((fixture) => {
+			earlier = fixture.addBlock(400, { id: "earlier" });
+			reading = fixture.addBlock(300, { user: true, id: "reading" });
+			fixture.addBlock(900, { id: "tail" });
+		});
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "settle" });
+		await nextTask();
+		await readAt(chat, reading);
+
+		// A user scroll AND an above-viewport shrink land in the same task —
+		// the resize pass can run BEFORE the scroll event is processed, so the
+		// captured anchor is stale (it includes the unprocessed movement).
+		// Compensating from it would yank the view away from where the user
+		// just scrolled; the pass must be skipped instead.
+		const userTarget = chat.fixture.scrollTop() - 120;
+		dragScrollbarTo(chat.fixture.container, userTarget);
+		earlier.style.height = "250px";
+		await frames(3);
+		expect(Math.abs(chat.fixture.scrollTop() - userTarget)).toBeLessThanOrEqual(2);
+		expect(chat.chat.state.pinned).toBe(false);
 	});
 });
 

@@ -329,6 +329,18 @@ export class StickToBottomController {
 		this.recomputeState();
 	}
 
+	/**
+	 * Attribution-safe relative adjustment that changes neither pin state nor
+	 * animation — for host-level scroll-anchoring compensation on engines
+	 * without native `overflow-anchor` (Safari), where above-viewport content
+	 * changes would otherwise shove a detached reader's text.
+	 */
+	adjustBy(delta: number) {
+		if (this.destroyed || this.anim) return;
+		this.write(this.clampedTop() + delta);
+		this.recomputeState();
+	}
+
 	/** Re-read geometry and re-follow if pinned; safe to call any time. */
 	recompute() {
 		this.onResize();

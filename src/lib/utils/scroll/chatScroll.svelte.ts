@@ -115,6 +115,29 @@ export class ChatScroll {
 	private knownIds: ReadonlySet<string> = new Set();
 	private initialized = false;
 
+	/**
+	 * Safari has no native scroll anchoring (`overflow-anchor` unsupported), so
+	 * content changes above the viewport — a thinking block collapsing, a late
+	 * image, a markdown swap — shove a detached reader's text by the full
+	 * height delta. Where native anchoring is unavailable, track the element at
+	 * the viewport top while detached and manually restore its position after
+	 * content resizes: the same job Chrome's anchoring does.
+	 */
+	private manualAnchoring: boolean;
+	/** Viewport-top anchor as a deepest-first ancestor chain (markdown worker
+	 * swaps and streaming re-renders REPLACE deep nodes, so compensation falls
+	 * back to the nearest still-connected ancestor instead of going silent),
+	 * plus the scrollTop it was captured at: a mismatch at compensation time
+	 * means a user scroll is pending in the same pass, and compensating from
+	 * the stale capture would cancel their movement. */
+	private readAnchor: { chain: { el: Element; offset: number }[]; top: number } | null = null;
+
+	constructor(options: { forceManualAnchoring?: boolean } = {}) {
+		this.manualAnchoring =
+			options.forceManualAnchoring ??
+			(typeof CSS !== "undefined" && !CSS.supports("overflow-anchor", "auto"));
+	}
+
 	// --- wiring -------------------------------------------------------------------
 
 	/** `use:` action for the scroll container. */
@@ -133,6 +156,7 @@ export class ChatScroll {
 			onStateChange: (s) => this.applyState(s),
 			onContentResize: (containerResized) => {
 				if (containerResized) this.measureGutter();
+				this.compensateReadAnchor();
 				// Container resizes (keyboard close, window resize, panel toggle)
 				// re-derive the anchor geometry in full; pure content resizes are
 				// one-way within a turn (see updateSpacer).
@@ -140,6 +164,9 @@ export class ChatScroll {
 			},
 		});
 		this.measureGutter();
+		if (this.manualAnchoring) {
+			node.addEventListener("scroll", this.trackReadAnchor, { passive: true });
+		}
 		// Land at the bottom before first paint; being pinned makes the
 		// ResizeObserver absorb the async markdown/image height changes that
 		// used to leave the view off-bottom on load.
@@ -155,12 +182,109 @@ export class ChatScroll {
 		return {
 			destroy: () => {
 				visualViewport?.removeEventListener("resize", onViewportResize);
+				node.removeEventListener("scroll", this.trackReadAnchor);
 				this.controller?.destroy();
 				this.controller = null;
 				this.container = null;
 			},
 		};
 	};
+
+	/** Record the element at the viewport top (binary search over the content
+	 * children — they are in document order — then a descent into the
+	 * straddling message). Only while detached — pinned following owns the
+	 * bottom edge instead. */
+	private trackReadAnchor = () => {
+		if (!this.manualAnchoring) return;
+		if (this.state.pinned || !this.container) {
+			this.readAnchor = null;
+			return;
+		}
+		const content = this.contentEl?.();
+		const children = content?.children;
+		if (!content || !children || children.length === 0) {
+			this.readAnchor = null;
+			return;
+		}
+		const containerTop = this.container.getBoundingClientRect().top;
+		let lo = 0;
+		let hi = children.length - 1;
+		let found = children.length - 1;
+		while (lo <= hi) {
+			const mid = (lo + hi) >> 1;
+			if (children[mid].getBoundingClientRect().bottom > containerTop + 1) {
+				found = mid;
+				hi = mid - 1;
+			} else {
+				lo = mid + 1;
+			}
+		}
+		// Descend into the straddling message: anchoring the outer wrapper
+		// misses changes INSIDE it — a thinking block collapsing above the
+		// reading position within the same long message leaves the wrapper's
+		// top unchanged while the visible paragraph moves. Native anchoring
+		// anchors deep descendants; do the same. Linear scans here (unlike the
+		// top level) because in-message children are few and can be positioned
+		// out of flow, which breaks the binary search's ordering assumption.
+		let el: Element = children[found];
+		for (let depth = 0; depth < 8; depth++) {
+			const inner = this.firstChildBelow(el, containerTop);
+			if (!inner) break;
+			el = inner;
+		}
+		// Store the whole ancestor chain (deepest first, up to the content
+		// root): if a re-render replaces the deep node, its ancestors still
+		// carry enough position to compensate cross-message shifts.
+		const chain: { el: Element; offset: number }[] = [];
+		for (let node: Element | null = el; node && node !== content; node = node.parentElement) {
+			chain.push({ el: node, offset: node.getBoundingClientRect().top - containerTop });
+		}
+		this.readAnchor = { chain, top: this.container.scrollTop };
+	};
+
+	private firstChildBelow(parent: Element, containerTop: number): Element | null {
+		const kids = parent.children;
+		for (let i = 0; i < kids.length; i++) {
+			const rect = kids[i].getBoundingClientRect();
+			if (rect.height > 0 && rect.bottom > containerTop + 1) return kids[i];
+		}
+		return null;
+	}
+
+	/** After a content resize while detached, restore the tracked element's
+	 * viewport position — Safari's stand-in for native scroll anchoring. The
+	 * adjustment goes through the controller, so attribution stays sound (its
+	 * write is consumed like any of ours). */
+	private compensateReadAnchor() {
+		if (!this.manualAnchoring || this.state.pinned || !this.container) return;
+		const anchor = this.readAnchor;
+		if (!anchor?.chain.length) return;
+		// A scrollTop that moved since capture means a user scroll (or clamp)
+		// is pending in this very pass — resize delivery is not ordered after
+		// scroll events. The captured offsets then include that unprocessed
+		// movement, and "compensating" would cancel the user's scroll. Skip
+		// this pass (one uncompensated frame is invisible; fighting the user's
+		// finger is not) and re-capture below.
+		const stale = Math.abs(this.container.scrollTop - anchor.top) > 1;
+		if (!stale) {
+			// The deep anchor may have been replaced by this very resize
+			// (markdown worker swap, streaming re-render) — fall back to the
+			// nearest ancestor that survived, which still compensates every
+			// shift originating above it. Intra-ancestor changes from the
+			// replacing pass itself are unrecoverable (the old node's geometry
+			// died with it).
+			const entry = anchor.chain.find((e) => e.el.isConnected);
+			if (entry) {
+				const containerTop = this.container.getBoundingClientRect().top;
+				const delta = entry.el.getBoundingClientRect().top - containerTop - entry.offset;
+				if (Math.abs(delta) >= 1) this.controller?.adjustBy(delta);
+			}
+		}
+		// Always re-resolve a fresh anchor for the NEXT pass (the write may
+		// have been clamped, and a replaced node must not leave a stale chain —
+		// that would silence compensation until the next user scroll).
+		this.trackReadAnchor();
+	}
 
 	/** `use:` action for the send-anchor spacer element. */
 	attachSpacer = (node: HTMLElement) => {
@@ -466,6 +590,6 @@ export class ChatScroll {
 	}
 }
 
-export function createChatScroll(): ChatScroll {
-	return new ChatScroll();
+export function createChatScroll(options?: { forceManualAnchoring?: boolean }): ChatScroll {
+	return new ChatScroll(options);
 }
