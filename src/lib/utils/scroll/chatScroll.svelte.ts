@@ -89,6 +89,13 @@ export class ChatScroll {
 	private intent: Intent | null = null;
 	/** True while a send anchor is active for the current turn. */
 	private spacerActive = false;
+	/** True while a response is streaming (mirrors ChatWindow's loading prop) —
+	 * the window in which the spacer is one-way (shrink-only), because a reader
+	 * follows the live edge BELOW any collapsing block and re-anchoring would
+	 * yank the text they're reading. Outside it, re-inflation is what keeps a
+	 * post-turn collapse (manual toggle, end-of-stream auto-collapse) perfectly
+	 * still: constant scrollHeight means nothing moves at all. */
+	private streaming = false;
 	/** The anchored user message element, resolved once per turn — updateSpacer
 	 * runs on every streaming frame and must not rescan the whole subtree. */
 	private anchorEl: Element | null = null;
@@ -126,7 +133,10 @@ export class ChatScroll {
 			onStateChange: (s) => this.applyState(s),
 			onContentResize: (containerResized) => {
 				if (containerResized) this.measureGutter();
-				this.updateSpacer();
+				// Container resizes (keyboard close, window resize, panel toggle)
+				// re-derive the anchor geometry in full; pure content resizes are
+				// one-way within a turn (see updateSpacer).
+				this.updateSpacer(containerResized);
 			},
 		});
 		this.measureGutter();
@@ -167,6 +177,14 @@ export class ChatScroll {
 	 * conversation gaining its first messages) — re-check the observer then. */
 	notifyContentChanged() {
 		this.controller?.recompute();
+	}
+
+	/** Mirror of ChatWindow's loading prop. Only a flag flip: no recompute here,
+	 * so the transition itself can never cause motion (an end-of-stream
+	 * recompute could re-inflate a floored spacer and glide the view — the
+	 * #2381 class of bug). The next real resize simply sees the new regime. */
+	setStreaming(streaming: boolean) {
+		this.streaming = streaming;
 	}
 
 	setComposerHeight(height: number | undefined) {
@@ -360,13 +378,14 @@ export class ChatScroll {
 	private activateSpacer() {
 		this.spacerActive = true;
 		this.anchorEl = null; // re-resolve for the new turn
-		this.updateSpacer();
+		// A fresh turn inflates the spacer freely; within the turn it only shrinks.
+		this.updateSpacer(true);
 	}
 
 	/** Size the spacer so the anchored user message sits near the viewport top;
 	 * runs on every content resize while a turn's anchor is active, shrinking
 	 * 1:1 with reply growth to keep scrollHeight constant (zero motion). */
-	private updateSpacer() {
+	private updateSpacer(allowGrow = false) {
 		if (!this.spacerActive || !this.container || !this.spacerEl) return;
 
 		// Resolve the anchored user message once per turn — this runs every
@@ -383,7 +402,7 @@ export class ChatScroll {
 		const anchorToSpacer =
 			this.spacerEl.getBoundingClientRect().top - anchor.getBoundingClientRect().top;
 
-		const height = computeSpacerHeight({
+		const computed = computeSpacerHeight({
 			viewportHeight: this.container.clientHeight,
 			anchorToSpacer,
 			minSpacer: this.minSpacer(),
@@ -391,6 +410,20 @@ export class ChatScroll {
 		});
 
 		const current = parseFloat(this.spacerEl.style.height) || MIN_SPACER_FALLBACK_PX;
+		// One-way handoff while the stream is live: on pure content changes the
+		// spacer only shrinks as the reply grows. Re-inflating on a content
+		// SHRINK (a thinking block collapsing at answer-start) would re-anchor
+		// the sent message and yank the text a reader is following at the live
+		// edge — the shrink rides the controller's clamp rule instead, keeping
+		// everything below the collapse viewport-stable. Growth is still allowed
+		// at turn start, on container resizes (keyboard close, window resize,
+		// panel toggle — the viewport changed, so freezing the stale height
+		// would misplace the anchor), and once the stream has settled (there a
+		// re-inflation is what absorbs a manual or end-of-stream collapse with
+		// zero motion: constant scrollHeight). The composer-clearance floor
+		// always wins so a growing composer can never occlude the reply.
+		const ceiling = allowGrow || !this.streaming ? Infinity : current;
+		const height = Math.max(Math.min(computed, ceiling), this.minSpacer());
 		if (Math.abs(current - height) >= 1) {
 			this.spacerEl.style.height = `${height}px`;
 		}

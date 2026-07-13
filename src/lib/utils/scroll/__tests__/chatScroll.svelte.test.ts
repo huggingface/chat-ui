@@ -359,6 +359,79 @@ describe("floating buttons", () => {
 	});
 });
 
+describe("in-turn content shrink (thinking-block collapse)", () => {
+	it("a large mid-stream collapse keeps everything below it viewport-stable (no spacer re-inflation)", async () => {
+		const chat = createChat({ turns: 3, viewportHeight: 600 });
+		chat.chat.setStreaming(true);
+		chat.chat.armSend();
+		const { assistant: thinking } = chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "send anchored" });
+
+		// Thinking streams: the block grows well past the fill slack, so the
+		// spacer floors and real following takes over.
+		for (let i = 0; i < 16; i++) {
+			thinking.style.height = `${parseFloat(thinking.style.height) + 20}px`;
+			await frame();
+		}
+		const answer = chat.fixture.addBlock(24, { id: "answer" });
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "settled while pinned" });
+
+		const before = topOf(answer, chat);
+		// Answer starts: the reasoning block collapses ~300px in one frame. The
+		// spacer must NOT re-inflate (one-way while streaming) — the shrink
+		// clamps instead, which keeps the content below the collapse stable.
+		thinking.style.height = "28px";
+		await frames(3);
+		const after = topOf(answer, chat);
+		expect(Math.abs(after - before)).toBeLessThanOrEqual(2);
+		expect(chat.chat.state.pinned).toBe(true);
+	});
+
+	it("a post-stream collapse re-inflates the spacer instead: constant scrollHeight, zero motion", async () => {
+		const chat = createChat({ turns: 3, viewportHeight: 600 });
+		chat.chat.setStreaming(true);
+		chat.chat.armSend();
+		const { assistant: thinking } = chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "send anchored" });
+		// Streams within the fill slack (the capped thinking viewport in the
+		// app), so the spacer shrinks 1:1 and never floors.
+		thinking.style.height = "240px";
+		await frames(3);
+
+		// Stream ends; the trailing think block auto-collapses in the same
+		// breath (think-only reply). Re-inflation absorbs the shrink exactly.
+		chat.chat.setStreaming(false);
+		const scrollTopBefore = chat.fixture.scrollTop();
+		const headerBefore = topOf(thinking, chat);
+		thinking.style.height = "28px";
+		await frames(3);
+		expect(chat.fixture.scrollTop()).toBe(scrollTopBefore);
+		expect(topOf(thinking, chat)).toBe(headerBefore);
+	});
+
+	it("a container resize mid-turn re-derives the anchor geometry (mobile keyboard close)", async () => {
+		const chat = createChat({ turns: 3, viewportHeight: 400 });
+		chat.chat.setStreaming(true);
+		chat.chat.armSend();
+		const { user, assistant } = chat.mountPair();
+		await waitFor(() => Math.abs(topOf(user, chat) - ANCHOR_OFFSET) <= 2, { label: "anchored" });
+		// A short reply streams in while the anchor holds.
+		assistant.style.height = "40px";
+		await frames(3);
+		const spacerBefore = parseFloat(chat.fixture.spacer.style.height);
+
+		// The virtual keyboard closes: the container gets ~40% taller. The
+		// spacer must re-inflate for the new viewport even mid-stream (a frozen
+		// spacer would leave the anchored message stranded mid-screen).
+		chat.fixture.container.style.height = "560px";
+		await waitFor(() => Math.abs(topOf(user, chat) - ANCHOR_OFFSET) <= 2, {
+			label: "re-anchored after viewport growth",
+		});
+		expect(parseFloat(chat.fixture.spacer.style.height)).toBeGreaterThan(spacerBefore);
+		expect(chat.chat.state.pinned).toBe(true);
+	});
+});
+
 describe("composer clearance", () => {
 	it("grows the spacer floor under a tall composer and shrinks it back", async () => {
 		const chat = createChat();
