@@ -27,6 +27,7 @@ No LLM key is needed: point the app at a local OpenAI-compatible mock.
    pinned build number is missing, symlink the nearest build).
 
 Gotchas:
+
 - A **welcome modal** ("Start chatting") blocks the first visit — click it away.
 - Wait ~600ms after load before typing (model list/settings hydration), and
   fall back to clicking `button[aria-label="Send message"]` if Enter races.
