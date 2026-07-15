@@ -348,13 +348,6 @@
 		chatScroll.setComposerHeight(composerHeight);
 	});
 
-	// While a response streams, the send-anchor spacer is one-way (shrink-only)
-	// so a mid-stream collapse can never re-anchor the view; once settled it may
-	// re-inflate again, which absorbs post-turn collapses with zero motion.
-	$effect(() => {
-		chatScroll.setStreaming(loading);
-	});
-
 	// Shared conversations containing artifacts usually exist to show one off:
 	// open the most recent artifact on load. Desktop only, since on mobile the
 	// panel is a fullscreen overlay that would hide the conversation entirely.

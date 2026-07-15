@@ -329,18 +329,6 @@ export class StickToBottomController {
 		this.recomputeState();
 	}
 
-	/**
-	 * Attribution-safe relative adjustment that changes neither pin state nor
-	 * animation — for host-level scroll-anchoring compensation on engines
-	 * without native `overflow-anchor` (Safari), where above-viewport content
-	 * changes would otherwise shove a detached reader's text.
-	 */
-	adjustBy(delta: number) {
-		if (this.destroyed || this.anim) return;
-		this.write(this.clampedTop() + delta);
-		this.recomputeState();
-	}
-
 	/** Re-read geometry and re-follow if pinned; safe to call any time. */
 	recompute() {
 		this.onResize();
@@ -404,21 +392,10 @@ export class StickToBottomController {
 		this.rafId = requestAnimationFrame(this.tick);
 	};
 
-	/**
-	 * Pinned + content grew: glide (spring) or snap (instant/reduced-motion/
-	 * hidden). `snap` forces the instant path for passes where the browser has
-	 * ALREADY clamp-jumped scrollTop (content shrank / container grew while at
-	 * the bottom): restoring the bottom in the same frame is invisible
-	 * (pre-paint) and merges with the clamp into one scroll event that matches
-	 * our write. A spring here would first paint the clamped position — a
-	 * visible bounce — and when a host callback re-inflates scrollHeight in the
-	 * same pass (the chat spacer), the clamp's scroll event loses its
-	 * `max < lastMax` signature and would be misread as user input, unpinning
-	 * mid-glide.
-	 */
-	private follow(snap = false) {
+	/** Pinned + content grew: glide (spring) or snap (instant/reduced-motion/hidden). */
+	private follow() {
 		if (!this.state.pinned) return;
-		if (this.opts.followMode === "instant" || snap || this.shouldSkipAnimation()) {
+		if (this.opts.followMode === "instant" || this.shouldSkipAnimation()) {
 			this.stopAnimation();
 			this.write(this.maxScrollTop());
 			return;
@@ -496,20 +473,9 @@ export class StickToBottomController {
 		// The gutter (and other container-box-dependent measurements) can only
 		// change when the container itself resized, not on every content frame.
 		const containerResized = !entries || entries.some((e) => e.target === this.container);
-		// Clamp signature, sampled BEFORE the host callback mutates layout (a
-		// spacer re-inflation can immediately restore maxScrollTop and hide it):
-		// scrollTop sits exactly at max after moving UP without a write of ours.
-		// Only this signature may force an instant re-pin — a mere resize must
-		// not, because a user scroll can be pending in the same pass (delivery
-		// order is not guaranteed) and an eager write would overwrite the
-		// user's position and then swallow their coalesced scroll event as ours.
-		const preTop = this.container.scrollTop;
-		const clampJumped =
-			Math.abs(preTop - this.maxScrollTop()) <= WRITE_MATCH_EPS &&
-			preTop < this.lastTop - WRITE_MATCH_EPS;
 		this.syncContentObserver();
 		this.opts.onContentResize?.(containerResized);
-		this.follow(clampJumped);
+		this.follow();
 		// Deliberately do NOT refresh the attribution baselines (lastTop &co)
 		// here: a scroll event can still be in flight for a position change
 		// that happened before this resize (ResizeObserver delivery can precede
