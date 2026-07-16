@@ -599,10 +599,13 @@
 		{/if}
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<!-- tabindex: the document never scrolls in this app, so without it
-		     keyboard-only users cannot scroll the conversation at all. -->
+		     keyboard-only users cannot scroll the conversation at all. Only a
+		     tab stop while content actually overflows — when there is nothing
+		     to scroll (home screen, short conversation) it would be a giant
+		     pointless focus target. -->
 		<div
 			class="scrollbar-custom h-full [scrollbar-gutter:stable_both-edges] overflow-y-auto overscroll-contain"
-			tabindex="0"
+			tabindex={chatScroll.state.scrollable ? 0 : undefined}
 			aria-label="Conversation messages"
 			use:chatScroll.attach={{
 				content: () => messagesEl ?? pendingEl,

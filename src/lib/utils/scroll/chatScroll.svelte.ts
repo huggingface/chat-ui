@@ -66,6 +66,7 @@ export class ChatScroll {
 		atBottom: true,
 		nearBottom: true,
 		scrolledUp: false,
+		scrollable: false,
 		distanceFromBottom: 0,
 	});
 

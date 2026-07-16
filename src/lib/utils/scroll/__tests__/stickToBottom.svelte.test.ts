@@ -385,6 +385,28 @@ describe("state reporting", () => {
 		await frames(3);
 		expect(controller.getState().distanceFromBottom).toBeGreaterThan(distanceBefore + 400);
 	});
+
+	it("publishes scrollable only while content overflows (drives the conversation tab stop)", async () => {
+		const scrollableStates: boolean[] = [];
+		const { fixture, controller } = setup(
+			{ blocks: [{ height: 100, user: true }] },
+			{ onStateChange: (s) => scrollableStates.push(s.scrollable) }
+		);
+		await frames(2); // initial ResizeObserver pass
+		expect(controller.getState().scrollable).toBe(false);
+
+		fixture.growLast(600);
+		await waitFor(() => controller.getState().scrollable, { label: "scrollable after growth" });
+		// The transition must be NOTIFIED, not just readable — the reactive
+		// tabindex binding only sees published state.
+		expect(scrollableStates.at(-1)).toBe(true);
+
+		fixture.setLastHeight(100);
+		await waitFor(() => !controller.getState().scrollable, {
+			label: "not scrollable after shrink",
+		});
+		expect(scrollableStates.at(-1)).toBe(false);
+	});
 });
 
 describe("lifecycle", () => {

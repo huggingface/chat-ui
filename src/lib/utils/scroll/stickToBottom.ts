@@ -25,6 +25,8 @@ export interface StickToBottomState {
 	nearBottom: boolean;
 	/** Scrolled more than `scrolledUpPx` away from the top. */
 	scrolledUp: boolean;
+	/** Content overflows the container — there is something to scroll. */
+	scrollable: boolean;
 	distanceFromBottom: number;
 }
 
@@ -95,6 +97,7 @@ export class StickToBottomController {
 		atBottom: true,
 		nearBottom: true,
 		scrolledUp: false,
+		scrollable: false,
 		distanceFromBottom: 0,
 	};
 
@@ -189,20 +192,26 @@ export class StickToBottomController {
 		return this.state.pinned;
 	}
 
-	private recomputeState(forceNotify = false, geometry?: { top: number; distance: number }) {
+	private recomputeState(
+		forceNotify = false,
+		geometry?: { top: number; distance: number; scrollable: boolean }
+	) {
 		const distance = geometry?.distance ?? this.distanceFromBottom();
 		const top = geometry?.top ?? this.clampedTop();
+		const scrollable = geometry?.scrollable ?? this.canScroll();
 		const next: StickToBottomState = {
 			pinned: this.state.pinned,
 			atBottom: distance <= AT_BOTTOM_EPS,
 			nearBottom: distance <= this.opts.nearBottomPx,
 			scrolledUp: top > this.opts.scrolledUpPx,
+			scrollable,
 			distanceFromBottom: distance,
 		};
 		const changed =
 			next.atBottom !== this.state.atBottom ||
 			next.nearBottom !== this.state.nearBottom ||
 			next.scrolledUp !== this.state.scrolledUp ||
+			next.scrollable !== this.state.scrollable ||
 			next.distanceFromBottom !== this.state.distanceFromBottom;
 		this.state = next;
 		if (changed || forceNotify) this.opts.onStateChange?.(this.getState());
@@ -488,7 +497,8 @@ export class StickToBottomController {
 		this.lastTop = top;
 		this.lastScrollHeight = scrollHeight;
 		this.lastMax = max;
-		this.recomputeState(false, { top, distance });
+		// max > 1 ⇔ canScroll(), from the snapshot already taken above.
+		this.recomputeState(false, { top, distance, scrollable: max > 1 });
 	};
 
 	private onResize = (entries?: ResizeObserverEntry[]) => {
