@@ -17,14 +17,16 @@ export function addSibling<T>(conv: Tree<T>, message: NewNode<T>, siblingId: Tre
 
 	const messageId = v4();
 
+	const siblingAncestors = sibling.ancestors ?? [];
+
 	conv.messages.push({
 		...message,
 		id: messageId,
-		ancestors: sibling.ancestors,
+		ancestors: siblingAncestors,
 		children: [],
 	} as TreeNode<T>);
 
-	const nearestAncestorId = sibling.ancestors[sibling.ancestors.length - 1];
+	const nearestAncestorId = siblingAncestors[siblingAncestors.length - 1];
 	const nearestAncestor = conv.messages.find((m) => m.id === nearestAncestorId);
 
 	if (nearestAncestor) {

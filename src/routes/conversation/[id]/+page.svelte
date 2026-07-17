@@ -115,6 +115,17 @@
 
 	function createMessagesAlternatives<T>(messages: TreeNode<T>[]): TreeId[][] {
 		const alternatives = [];
+
+		// Root-level messages have no parent to record them in a `children` array,
+		// so without this they'd be created but never appear in any alternatives
+		// group, making them unreachable from the branch switcher UI.
+		const rootMessageIds = messages
+			.filter((message) => !message.ancestors || message.ancestors.length === 0)
+			.map((message) => message.id);
+		if (rootMessageIds.length > 1) {
+			alternatives.push(rootMessageIds);
+		}
+
 		for (const message of messages) {
 			if (message.children?.length) {
 				alternatives.push(message.children);
