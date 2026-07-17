@@ -92,9 +92,10 @@ envVars:
   MODELS: >
     [
       { "id": "omni", "supportsArtifacts": true },
-      { "id": "CohereLabs/command-a-plus-05-2026-bf16", "description": "Enterprise 218B MoE with 25B active params, vision, and agentic reasoning.", "supportsReasoning": true, "supportsArtifacts": true },
-      { "id": "CohereLabs/command-a-plus-05-2026-fp8", "description": "FP8 Command A+ for efficient enterprise agents, vision, and reasoning.", "supportsReasoning": true, "supportsArtifacts": true },
-      { "id": "CohereLabs/command-a-plus-05-2026-w4a4", "description": "W4A4 Command A+ for ultra-compact deployment with vision and reasoning.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "thinkingmachines/Inkling", "description": "Multimodal 975B MoE with 41B active params and adjustable reasoning effort.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "prism-ml/Ternary-Bonsai-27B-AWQ-4bit", "description": "AWQ 4-bit ternary Qwen3.6 27B with vision for single-GPU serving." },
+      { "id": "prism-ml/Ternary-Bonsai-27B-gguf", "description": "Ternary GGUF Qwen3.6 27B for on-device reasoning at 1.7 bits." },
+      { "id": "CohereLabs/tiny-aya-fire", "description": "Regional Aya for South Asian languages with efficient on-device inference." },
       { "id": "XiaomiMiMo/MiMo-V2.5-Pro", "description": "1T MoE with 42B active params, hybrid attention, and 1M context.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16", "description": "BF16 hybrid Mamba-Transformer 550B MoE with 55B active params for agentic reasoning.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "stepfun-ai/Step-3.7-Flash", "description": "Vision-language 198B MoE with 11B active params, reasoning modes, and 256K context.", "supportsReasoning": true, "supportsArtifacts": true },
@@ -157,7 +158,6 @@ envVars:
       { "id": "zai-org/GLM-4.6", "description": "Next-gen GLM with very long context and solid multilingual reasoning; good for agents and tools."},
       { "id": "deepseek-ai/DeepSeek-V3.1-Terminus", "description": "Refined V3.1 variant optimized for reliability on long contexts, structured outputs, and tool use."},
       { "id": "Qwen/Qwen3-VL-235B-A22B-Thinking", "description": "Deliberative multimodal Qwen that can produce step-wise visual+text reasoning traces for complex tasks."},
-      { "id": "zai-org/GLM-4.6-FP8", "description": "FP8-optimized GLM-4.6 for faster/cheaper deployment with near-parity quality on most tasks."},
       { "id": "zai-org/GLM-4.6V", "description": "106B vision-language model with 128K context and native tool calling for multimodal agents.", "parameters": { "max_tokens": 8192 }},
       { "id": "zai-org/GLM-4.6V-Flash", "description": "9B lightweight vision model for fast local inference with tool calling and UI understanding."},
       { "id": "zai-org/GLM-4.6V-FP8", "description": "FP8-quantized GLM-4.6V for efficient multimodal deployment with native tool use."},
