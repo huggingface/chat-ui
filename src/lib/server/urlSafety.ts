@@ -5,6 +5,7 @@ import { Agent, fetch as undiciFetch } from "undici";
 
 const UNSAFE_IPV4_SUBNETS = [
 	"0.0.0.0/8",
+	"10.0.0.0/8",
 	"100.64.0.0/10",
 	"127.0.0.0/8",
 	"169.254.0.0/16",
