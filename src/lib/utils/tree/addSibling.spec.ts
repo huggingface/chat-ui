@@ -47,16 +47,20 @@ describe("addSibling", async () => {
 		);
 	});
 
-	// TODO: This behaviour should be fixed, we do not need to fail on the root message.
-	it("should fail if the sibling message is the root message", async () => {
+	it("should add a sibling when the target is the root message", async () => {
 		const convId = await insertSideBranchesConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 		if (!conv.rootMessageId) throw new Error("Root message not found");
 
-		expect(() => addSibling(conv, newMessage, conv.rootMessageId as Message["id"])).toThrow(
-			"The sibling message is the root message, therefore we can't add a sibling"
-		);
+		const rootMessage = conv.messages.find((m) => m.id === conv.rootMessageId);
+		if (!rootMessage) throw new Error("Root message not found in messages array");
+
+		const siblingId = addSibling(conv, newMessage, conv.rootMessageId as Message["id"]);
+
+		const sibling = conv.messages.find((m) => m.id === siblingId);
+		expect(sibling).toBeDefined();
+		expect(sibling?.ancestors).toEqual(rootMessage.ancestors);
 	});
 
 	it("should add a sibling to a message", async () => {
