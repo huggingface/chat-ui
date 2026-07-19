@@ -1,6 +1,7 @@
 <script lang="ts">
 	import CopyToClipBoardBtn from "./CopyToClipBoardBtn.svelte";
 	import DOMPurify from "isomorphic-dompurify";
+	import { isTrustedHighlighterHtml } from "$lib/utils/markedLight";
 	import HtmlPreviewModal from "./HtmlPreviewModal.svelte";
 	import PlayFilledAlt from "~icons/carbon/play-filled-alt";
 	import EosIconsLoading from "~icons/eos-icons/loading";
@@ -21,12 +22,11 @@
 	// every flush, and re-sanitizing the whole growing block each time is the
 	// main-thread hot path of code streaming. Skip DOMPurify during that
 	// window only while the html verifiably matches the highlighter's output
-	// alphabet (raw `<` may open nothing but a span tag): any other markup —
-	// which our highlighter cannot produce — falls back to a full sanitize.
-	// Every completed block still gets sanitized as defense in depth.
-	const NON_HIGHLIGHTER_TAG = /<(?!\/?span[\s>])/i;
+	// alphabet (bare spans or spans with a lone class attribute); anything
+	// else falls back to a full sanitize. Every completed block still gets
+	// sanitized as defense in depth.
 	let sanitizedCode = $derived(
-		loading && !NON_HIGHLIGHTER_TAG.test(code) ? code : DOMPurify.sanitize(code)
+		loading && isTrustedHighlighterHtml(code) ? code : DOMPurify.sanitize(code)
 	);
 
 	function hasStrictHtml5Doctype(input: string): boolean {
