@@ -12,7 +12,15 @@ export interface ArtifactsContext {
 	panel: typeof artifactPanel;
 }
 
-const KEY = Symbol("artifacts");
+/**
+ * Exported so tests can seed this context without mounting the whole ChatWindow.
+ * `setArtifactsContext` is init-only like every `setContext`, so a test harness that
+ * wants to render an ArtifactCard in isolation needs the key itself. Not intended for
+ * application code — use the accessors below.
+ */
+export const ARTIFACTS_CONTEXT_KEY = Symbol("artifacts");
+
+const KEY = ARTIFACTS_CONTEXT_KEY;
 
 export function setArtifactsContext(ctx: ArtifactsContext): void {
 	setContext(KEY, ctx);
