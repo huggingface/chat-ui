@@ -31,7 +31,7 @@ export const GET: RequestHandler = (async ({ params }) => {
 	});
 
 	// Shared conversations are immutable snapshots, so long cache lifetimes are safe
-	return new Response(png, {
+	return new Response(new Uint8Array(png), {
 		headers: {
 			"Content-Type": "image/png",
 			"Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800",
