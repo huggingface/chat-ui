@@ -56,7 +56,13 @@ describe("ToolCallsSummary", () => {
 
 		// Child container now exists
 		expect(baseElement.querySelector(".mt-1")).not.toBeNull();
-		// Each child reasoning block contributes its own collapsible "Thinking" header
-		expect(page.getByText("Thinking").elements).toHaveLength(2);
+		// Each child reasoning block contributes its own collapsible "Thinking" header.
+		// `elements` is a method — calling it is what returns the matched nodes. The previous
+		// form read the function object, so `toHaveLength(2)` asserted its arity.
+		expect(page.getByText("Thinking").elements()).toHaveLength(2);
+
+		// Children mount collapsed (`OpenReasoningResults` is rendered with `loading={false}`),
+		// so the reasoning bodies stay out of the DOM until their own header is clicked.
+		expect(page.getByText("Reasoning A").elements()).toHaveLength(0);
 	});
 });

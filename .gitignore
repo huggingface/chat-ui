@@ -15,6 +15,8 @@ gcp-*.json
 db
 # Output of scripts/artifact-real-eval.ts (real-model eval transcripts)
 eval-output/
+# Output of `npm run test:coverage`
+coverage/
 models/*
 !models/add-your-models-here.txt
 .claude/*

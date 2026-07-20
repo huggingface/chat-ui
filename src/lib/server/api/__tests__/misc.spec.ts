@@ -59,14 +59,56 @@ describe("GET /api/v2/feature-flags", () => {
 });
 
 describe("GET /api/v2/public-config", () => {
-	it("returns an object", async () => {
-		const locals = createTestLocals();
+	// This endpoint is a disclosure boundary: it is served to every unauthenticated client,
+	// so the only assertion that matters is which keys come back. The previous test asserted
+	// `typeof data === "object"`, which `{}` satisfies — it could not fail.
 
-		const res = await publicConfigGET(mockRequestEvent(locals));
+	it("exposes only PUBLIC_-prefixed keys", async () => {
+		const res = await publicConfigGET(mockRequestEvent(createTestLocals()));
 		const data = await parseResponse<Record<string, unknown>>(res);
 
-		expect(data).toBeDefined();
-		expect(typeof data).toBe("object");
-		expect(data).not.toBeNull();
+		const keys = Object.keys(data);
+		expect(keys.length).toBeGreaterThan(0);
+
+		const leaked = keys.filter((key) => !key.startsWith("PUBLIC_"));
+		expect(leaked).toEqual([]);
+	});
+
+	it("never leaks server-only secrets", async () => {
+		const res = await publicConfigGET(mockRequestEvent(createTestLocals()));
+		const data = await parseResponse<Record<string, unknown>>(res);
+
+		// Spot-check the highest-consequence private keys by name. These are all present in
+		// the `.env` the test harness loads, so their absence here is meaningful.
+		for (const secret of [
+			"OPENAI_API_KEY",
+			"HF_TOKEN",
+			"MONGODB_URL",
+			"OPENID_CLIENT_SECRET",
+			"ADMIN_API_SECRET",
+			"ADMIN_TOKEN",
+			"EXA_API_KEY",
+			"PARQUET_EXPORT_HF_TOKEN",
+		]) {
+			expect(data).not.toHaveProperty(secret);
+		}
+
+		// And nothing whose value looks like a token should have made it through.
+		const suspicious = Object.entries(data).filter(
+			([, value]) => typeof value === "string" && /^(hf_|sk-)/.test(value)
+		);
+		expect(suspicious).toEqual([]);
+	});
+
+	it("serves known public config with a private cache header", async () => {
+		const res = await publicConfigGET(mockRequestEvent(createTestLocals()));
+		const data = await parseResponse<Record<string, unknown>>(res);
+
+		expect(data).toHaveProperty("PUBLIC_APP_NAME");
+		expect(typeof data.PUBLIC_APP_NAME).toBe("string");
+
+		// Public config is per-user (it can carry DB overlays), so it must not be shared by
+		// intermediary caches.
+		expect(res.headers.get("Cache-Control")).toBe("private, max-age=60");
 	});
 });

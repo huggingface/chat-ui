@@ -41,27 +41,41 @@ export default defineConfig({
 		include: ["uuid", "sharp", "clsx"],
 	},
 	test: {
+		coverage: {
+			provider: "v8",
+			// Report-only: no thresholds until a baseline exists. Once one does, thresholds
+			// should only ever ratchet upward.
+			reporter: ["text-summary", "html", "json-summary"],
+			reportsDirectory: "./coverage",
+			include: ["src/**/*.{ts,svelte}"],
+			exclude: [
+				"src/**/*.{test,spec}.{js,ts}",
+				"src/**/__tests__/**",
+				"src/**/__fixtures__/**",
+				"src/**/*.d.ts",
+				// Type-only modules compile away to nothing meaningful.
+				"src/lib/types/**",
+			],
+		},
 		workspace: [
-			...(process.env.VITEST_BROWSER === "true"
-				? [
-						{
-							// Client-side tests (Svelte components), opt-in due flaky browser harness in CI/local
-							extends: "./vite.config.ts",
-							test: {
-								name: "client",
-								environment: "browser",
-								browser: {
-									enabled: true,
-									provider: "playwright",
-									instances: [{ browser: "chromium", headless: true }],
-								},
-								include: ["src/**/*.svelte.{test,spec}.{js,ts}"],
-								exclude: ["src/lib/server/**", "src/**/*.ssr.{test,spec}.{js,ts}"],
-								setupFiles: ["./scripts/setups/vitest-setup-client.ts"],
-							},
-						},
-					]
-				: []),
+			{
+				// Client-side tests (Svelte components + anything needing real layout/DOM).
+				// Runs a real Chromium via Playwright, so `npx playwright install chromium`
+				// is a prerequisite. Selected with `--project=client`.
+				extends: "./vite.config.ts",
+				test: {
+					name: "client",
+					environment: "browser",
+					browser: {
+						enabled: true,
+						provider: "playwright",
+						instances: [{ browser: "chromium", headless: true }],
+					},
+					include: ["src/**/*.svelte.{test,spec}.{js,ts}"],
+					exclude: ["src/lib/server/**", "src/**/*.ssr.{test,spec}.{js,ts}"],
+					setupFiles: ["./scripts/setups/vitest-setup-client.ts"],
+				},
+			},
 			{
 				// SSR tests (Server-side rendering)
 				extends: "./vite.config.ts",

@@ -37,12 +37,29 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-      - run: |
-          npm ci
-          npx playwright install
-      - name: "Tests"
-        run: |
-          npm run test
+
+      # The server workspace spawns a MongoMemoryServer per test file. On a cold runner
+      # those spawns race each other downloading and locking the same mongod binary, which
+      # kills whole suites at collection time with an "unlock file ... not locked by this
+      # process" error. Caching the binary removes that failure mode.
+      - name: Cache mongodb-memory-server binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
+      - run: npm ci
+
+      # Only chromium is used (see the `client` workspace in vite.config.ts). The previous
+      # bare `npx playwright install` pulled all three engines — ~400MB — for a workspace
+      # that was gated off and never ran.
+      - run: npx playwright install --with-deps chromium
+
+      - name: "Tests (node)"
+        run: npm run test
+
+      - name: "Tests (browser)"
+        run: npm run test:client
 
   build-check:
     runs-on:
