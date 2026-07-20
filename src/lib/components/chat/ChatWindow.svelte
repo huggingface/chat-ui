@@ -690,13 +690,13 @@
 			</div>
 
 			<ScrollToPreviousBtn
-				class="fixed right-4 bottom-48 lg:right-10"
+				class="fixed right-4 bottom-48 lg:right-10 {loading ? 'max-md:hidden' : ''}"
 				visible={chatScroll.showJumpToPrevious}
 				onclick={() => chatScroll.scrollToPreviousMessage()}
 			/>
 
 			<ScrollToBottomBtn
-				class="fixed right-4 bottom-36 lg:right-10"
+				class="fixed right-4 bottom-36 lg:right-10 {loading ? 'max-md:hidden' : ''}"
 				visible={chatScroll.showJumpToBottom}
 				onclick={() => chatScroll.scrollToBottom()}
 			/>
