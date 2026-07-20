@@ -14,16 +14,10 @@ class ConfigManager {
 	private keysFromDB: Partial<Record<ConfigKey, string>> = {};
 	private isInitialized = false;
 
-	// These need explicit initialisers. tsconfig targets ES2018, so
-	// `useDefineForClassFields` is off and a declaration-only field is erased rather than
-	// defined — the property never exists on the instance. The `config` Proxy below falls
-	// back to `ConfigManager.get()` for any prop not `in` the target, which returns `""`
-	// for unknown keys. So an unassigned field reads as an empty string, `?.` fails to
-	// short-circuit on it, and `this.configCollection?.find({})` throws.
-	//
-	// Reachable whenever `init()` early-returns without assigning them (test mode and
-	// `building`), which makes every `config.checkForUpdates()` — called per-request from
-	// the handle hook — an unhandled rejection.
+	// The `= undefined` is load-bearing: under ES2018 `useDefineForClassFields` is off, so a
+	// declaration-only field is erased and never becomes an own property. The Proxy below
+	// then falls through to `get()`, and these would read as `""` rather than undefined,
+	// defeating every `?.` on them.
 	private configCollection: Collection<ConfigKeyType> | undefined = undefined;
 	private semaphoreCollection: Collection<Semaphore> | undefined = undefined;
 	private lastConfigUpdate: Date | undefined = undefined;

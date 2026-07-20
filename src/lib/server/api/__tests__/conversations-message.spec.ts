@@ -1,8 +1,8 @@
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, beforeAll } from "vitest";
 import { ObjectId } from "mongodb";
 import { v4 } from "uuid";
 import superjson from "superjson";
-import { collections } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
 import type { Message } from "$lib/types/Message";
 import {
 	createTestLocals,
@@ -85,6 +85,11 @@ function buildMessageTree(): {
 		unrelatedId,
 	};
 }
+
+// `collections` is undefined until the database IIFE resolves.
+beforeAll(async () => {
+	await ready;
+});
 
 describe.sequential("DELETE /api/v2/conversations/[id]/message/[messageId]", () => {
 	afterEach(async () => {

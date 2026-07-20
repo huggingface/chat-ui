@@ -1,6 +1,6 @@
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, beforeAll } from "vitest";
 import superjson from "superjson";
-import { collections } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
 import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 import {
 	createTestLocals,
@@ -8,6 +8,7 @@ import {
 	createTestConversation,
 	cleanupTestData,
 } from "./testHelpers";
+import { testRequest } from "$lib/server/__tests__/testRequest";
 
 import { GET, DELETE } from "../../../../routes/api/v2/conversations/+server";
 
@@ -15,15 +16,14 @@ async function parseResponse<T = unknown>(res: Response): Promise<T> {
 	return superjson.parse(await res.text()) as T;
 }
 
-function mockUrl(params?: Record<string, string>): URL {
-	const url = new URL("http://localhost:5173/api/v2/conversations");
-	if (params) {
-		for (const [key, value] of Object.entries(params)) {
-			url.searchParams.set(key, value);
-		}
-	}
-	return url;
+function conversationsPath(params?: Record<string, string>): string {
+	const query = params ? `?${new URLSearchParams(params)}` : "";
+	return `/api/v2/conversations${query}`;
 }
+
+beforeAll(async () => {
+	await ready;
+}, 30000);
 
 describe.sequential("GET /api/v2/conversations", () => {
 	afterEach(async () => {
@@ -34,10 +34,7 @@ describe.sequential("GET /api/v2/conversations", () => {
 		const { locals } = await createTestUser();
 		const conv = await createTestConversation(locals, { title: "My Chat" });
 
-		const res = await GET({
-			locals,
-			url: mockUrl(),
-		} as never);
+		const res = await testRequest(GET, { path: conversationsPath(), locals });
 
 		expect(res.status).toBe(200);
 		const data = await parseResponse<{
@@ -53,10 +50,7 @@ describe.sequential("GET /api/v2/conversations", () => {
 	it("returns empty array for user with no conversations", async () => {
 		const { locals } = await createTestUser();
 
-		const res = await GET({
-			locals,
-			url: mockUrl(),
-		} as never);
+		const res = await testRequest(GET, { path: conversationsPath(), locals });
 
 		expect(res.status).toBe(200);
 		const data = await parseResponse<{ conversations: unknown[]; hasMore: boolean }>(res);
@@ -75,10 +69,7 @@ describe.sequential("GET /api/v2/conversations", () => {
 			});
 		}
 
-		const resPage0 = await GET({
-			locals,
-			url: mockUrl({ p: "0" }),
-		} as never);
+		const resPage0 = await testRequest(GET, { path: conversationsPath({ p: "0" }), locals });
 
 		const dataPage0 = await parseResponse<{
 			conversations: Array<{ title: string }>;
@@ -87,10 +78,7 @@ describe.sequential("GET /api/v2/conversations", () => {
 		expect(dataPage0.conversations).toHaveLength(CONV_NUM_PER_PAGE);
 		expect(dataPage0.hasMore).toBe(true);
 
-		const resPage1 = await GET({
-			locals,
-			url: mockUrl({ p: "1" }),
-		} as never);
+		const resPage1 = await testRequest(GET, { path: conversationsPath({ p: "1" }), locals });
 
 		const dataPage1 = await parseResponse<{
 			conversations: Array<{ title: string }>;
@@ -110,10 +98,7 @@ describe.sequential("GET /api/v2/conversations", () => {
 			});
 		}
 
-		const res = await GET({
-			locals,
-			url: mockUrl(),
-		} as never);
+		const res = await testRequest(GET, { path: conversationsPath(), locals });
 
 		const data = await parseResponse<{ conversations: unknown[]; hasMore: boolean }>(res);
 		expect(data.conversations).toHaveLength(CONV_NUM_PER_PAGE);
@@ -136,10 +121,7 @@ describe.sequential("GET /api/v2/conversations", () => {
 			updatedAt: new Date("2024-03-01"),
 		});
 
-		const res = await GET({
-			locals,
-			url: mockUrl(),
-		} as never);
+		const res = await testRequest(GET, { path: conversationsPath(), locals });
 
 		const data = await parseResponse<{ conversations: Array<{ title: string }> }>(res);
 		expect(data.conversations[0].title).toBe("Newest");
@@ -147,18 +129,12 @@ describe.sequential("GET /api/v2/conversations", () => {
 		expect(data.conversations[2].title).toBe("Oldest");
 	});
 
-	it("throws 401 for unauthenticated request", async () => {
+	it("returns 401 for unauthenticated request", async () => {
 		const locals = createTestLocals({ sessionId: undefined, user: undefined });
 
-		try {
-			await GET({
-				locals,
-				url: mockUrl(),
-			} as never);
-			expect.fail("Should have thrown");
-		} catch (e: unknown) {
-			expect((e as { status: number }).status).toBe(401);
-		}
+		const res = await testRequest(GET, { path: conversationsPath(), locals });
+
+		expect(res.status).toBe(401);
 	});
 
 	it("does not return other users' conversations", async () => {
@@ -168,14 +144,24 @@ describe.sequential("GET /api/v2/conversations", () => {
 		await createTestConversation(localsA, { title: "User A Chat" });
 		await createTestConversation(localsB, { title: "User B Chat" });
 
-		const res = await GET({
-			locals: localsA,
-			url: mockUrl(),
-		} as never);
+		const res = await testRequest(GET, { path: conversationsPath(), locals: localsA });
 
 		const data = await parseResponse<{ conversations: Array<{ title: string }> }>(res);
 		expect(data.conversations).toHaveLength(1);
 		expect(data.conversations[0].title).toBe("User A Chat");
+	});
+
+	it("scopes results to the session resolved from a real cookie", async () => {
+		const { locals, cookie } = await createTestUser();
+		await createTestConversation(locals, { title: "Cookie Chat" });
+		const { locals: other } = await createTestUser();
+		await createTestConversation(other, { title: "Someone Else" });
+
+		const res = await testRequest(GET, { path: conversationsPath(), headers: { cookie } });
+
+		const data = await parseResponse<{ conversations: Array<{ title: string }> }>(res);
+		expect(data.conversations).toHaveLength(1);
+		expect(data.conversations[0].title).toBe("Cookie Chat");
 	});
 });
 
@@ -191,7 +177,11 @@ describe.sequential("DELETE /api/v2/conversations", () => {
 		await createTestConversation(locals, { title: "Chat 2" });
 		await createTestConversation(locals, { title: "Chat 3" });
 
-		const res = await DELETE({ locals } as never);
+		const res = await testRequest(DELETE, {
+			path: conversationsPath(),
+			method: "DELETE",
+			locals,
+		});
 		expect(res.status).toBe(200);
 
 		const data = await parseResponse<number>(res);
@@ -201,15 +191,16 @@ describe.sequential("DELETE /api/v2/conversations", () => {
 		expect(remaining).toBe(0);
 	});
 
-	it("throws 401 for unauthenticated request", async () => {
+	it("returns 401 for unauthenticated request", async () => {
 		const locals = createTestLocals({ sessionId: undefined, user: undefined });
 
-		try {
-			await DELETE({ locals } as never);
-			expect.fail("Should have thrown");
-		} catch (e: unknown) {
-			expect((e as { status: number }).status).toBe(401);
-		}
+		const res = await testRequest(DELETE, {
+			path: conversationsPath(),
+			method: "DELETE",
+			locals,
+		});
+
+		expect(res.status).toBe(401);
 	});
 
 	it("does not remove other users' conversations", async () => {
@@ -219,7 +210,11 @@ describe.sequential("DELETE /api/v2/conversations", () => {
 		await createTestConversation(localsA, { title: "User A Chat" });
 		await createTestConversation(localsB, { title: "User B Chat" });
 
-		const res = await DELETE({ locals: localsA } as never);
+		const res = await testRequest(DELETE, {
+			path: conversationsPath(),
+			method: "DELETE",
+			locals: localsA,
+		});
 		const data = await parseResponse<number>(res);
 		expect(data).toBe(1);
 

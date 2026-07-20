@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import superjson from "superjson";
+import { collections, ready } from "$lib/server/database";
 import { createTestLocals, createTestUser, cleanupTestData } from "./testHelpers";
+import { testRequest } from "$lib/server/__tests__/testRequest";
 import { GET as featureFlagsGET } from "../../../../routes/api/v2/feature-flags/+server";
 import { GET as publicConfigGET } from "../../../../routes/api/v2/public-config/+server";
 import type { FeatureFlags } from "$lib/server/api/types";
@@ -9,23 +11,16 @@ async function parseResponse<T = unknown>(res: Response): Promise<T> {
 	return superjson.parse(await res.text()) as T;
 }
 
-function mockRequestEvent(locals: App.Locals) {
-	return {
-		locals,
-		url: new URL("http://localhost"),
-		request: new Request("http://localhost"),
-	} as Parameters<typeof featureFlagsGET>[0];
-}
-
 describe("GET /api/v2/feature-flags", () => {
 	beforeEach(async () => {
+		await ready;
 		await cleanupTestData();
 	}, 20000);
 
 	it("returns correct shape with expected fields", async () => {
 		const locals = createTestLocals();
 
-		const res = await featureFlagsGET(mockRequestEvent(locals));
+		const res = await testRequest(featureFlagsGET, { path: "/api/v2/feature-flags", locals });
 		const data = await parseResponse<FeatureFlags>(res);
 
 		expect(data).toHaveProperty("enableAssistants");
@@ -41,7 +36,7 @@ describe("GET /api/v2/feature-flags", () => {
 	it("reflects isAdmin from locals for non-admin user", async () => {
 		const locals = createTestLocals({ isAdmin: false });
 
-		const res = await featureFlagsGET(mockRequestEvent(locals));
+		const res = await testRequest(featureFlagsGET, { path: "/api/v2/feature-flags", locals });
 		const data = await parseResponse<FeatureFlags>(res);
 
 		expect(data.isAdmin).toBe(false);
@@ -51,16 +46,45 @@ describe("GET /api/v2/feature-flags", () => {
 		const { locals } = await createTestUser();
 		locals.isAdmin = true;
 
-		const res = await featureFlagsGET(mockRequestEvent(locals));
+		const res = await testRequest(featureFlagsGET, { path: "/api/v2/feature-flags", locals });
 		const data = await parseResponse<FeatureFlags>(res);
 
 		expect(data.isAdmin).toBe(true);
 	});
+
+	it("derives isAdmin from the persisted user under real cookie auth", async () => {
+		const { user, cookie } = await createTestUser();
+		await collections.users.updateOne({ _id: user._id }, { $set: { isAdmin: true } });
+
+		const res = await testRequest(featureFlagsGET, {
+			path: "/api/v2/feature-flags",
+			headers: { cookie },
+		});
+		const data = await parseResponse<FeatureFlags>(res);
+
+		expect(data.isAdmin).toBe(true);
+	});
+
+	it("serves CORS headers on /api/** when the request carries no Origin", async () => {
+		const res = await testRequest(featureFlagsGET, {
+			path: "/api/v2/feature-flags",
+			locals: createTestLocals(),
+		});
+
+		expect(res.headers.get("access-control-allow-origin")).toBe("*");
+		expect(res.headers.get("access-control-allow-methods")).toBe(
+			"GET, POST, PUT, PATCH, DELETE, OPTIONS"
+		);
+		expect(res.headers.get("access-control-allow-headers")).toBe("Content-Type, Authorization");
+	});
 });
+
+const publicConfigRequest = () =>
+	testRequest(publicConfigGET, { path: "/api/v2/public-config", locals: createTestLocals() });
 
 describe("GET /api/v2/public-config", () => {
 	it("exposes only PUBLIC_-prefixed keys", async () => {
-		const res = await publicConfigGET(mockRequestEvent(createTestLocals()));
+		const res = await publicConfigRequest();
 		const data = await parseResponse<Record<string, unknown>>(res);
 
 		const keys = Object.keys(data);
@@ -71,7 +95,7 @@ describe("GET /api/v2/public-config", () => {
 	});
 
 	it("never leaks server-only secrets", async () => {
-		const res = await publicConfigGET(mockRequestEvent(createTestLocals()));
+		const res = await publicConfigRequest();
 		const data = await parseResponse<Record<string, unknown>>(res);
 
 		for (const secret of [
@@ -94,7 +118,7 @@ describe("GET /api/v2/public-config", () => {
 	});
 
 	it("serves known public config with a private cache header", async () => {
-		const res = await publicConfigGET(mockRequestEvent(createTestLocals()));
+		const res = await publicConfigRequest();
 		const data = await parseResponse<Record<string, unknown>>(res);
 
 		expect(data).toHaveProperty("PUBLIC_APP_NAME");

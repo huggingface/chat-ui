@@ -1,6 +1,6 @@
-import { collections } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
 import { ObjectId } from "mongodb";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import {
 	insertLegacyConversation,
@@ -8,6 +8,11 @@ import {
 	insertSideBranchesConversation,
 } from "./treeHelpers.spec";
 import { buildSubtree } from "./buildSubtree";
+
+// `collections` is undefined until the database IIFE resolves.
+beforeAll(async () => {
+	await ready;
+});
 
 describe("buildSubtree", () => {
 	it("a subtree in a legacy conversation should be just a slice", async () => {

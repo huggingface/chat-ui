@@ -1,6 +1,6 @@
-import { collections } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
 import { ObjectId } from "mongodb";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { insertLegacyConversation, insertSideBranchesConversation } from "./treeHelpers.spec";
 import { addChildren } from "./addChildren";
@@ -12,6 +12,11 @@ const newMessage: Omit<Message, "id"> = {
 };
 
 Object.freeze(newMessage);
+
+// `collections` is undefined until the database IIFE resolves.
+beforeAll(async () => {
+	await ready;
+});
 
 describe("addChildren", async () => {
 	it("should let you append on legacy conversations", async () => {
