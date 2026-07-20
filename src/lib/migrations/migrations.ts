@@ -12,7 +12,9 @@ export async function checkAndRunMigrations() {
 	}
 
 	// check if all migrations have already been run
-	const migrationResults = await (await Database.getInstance())
+	const migrationResults = await (
+		await Database.getInstance()
+	)
 		.getCollections()
 		.migrationResults.find()
 		.toArray();

@@ -1,4 +1,5 @@
 import { afterEach, assert, beforeAll, describe, expect, it } from "vitest";
+import { ObjectId } from "mongodb";
 import { migrations } from "./routines";
 import { acquireLock, isDBLocked, refreshLock, releaseLock } from "./lock";
 import { Semaphores } from "$lib/types/Semaphore";
@@ -50,20 +51,34 @@ describe(
 
 		it("should refresh the lock", async () => {
 			const lockId = await acquireLock(Semaphores.TEST_MIGRATION);
-
 			assert(lockId);
 
-			// get the updatedAt time
+			const before = await collections.semaphores.findOne({ _id: lockId });
+			assert(before);
 
-			const updatedAtInitially = (await collections.semaphores.findOne({}))?.updatedAt;
+			await new Promise((r) => setTimeout(r, 5));
 
-			await refreshLock(Semaphores.TEST_MIGRATION, lockId);
+			expect(await refreshLock(Semaphores.TEST_MIGRATION, lockId)).toBe(true);
 
-			const updatedAtAfterRefresh = (await collections.semaphores.findOne({}))?.updatedAt;
+			const after = await collections.semaphores.findOne({ _id: lockId });
+			assert(after);
 
-			expect(updatedAtInitially).toBeDefined();
-			expect(updatedAtAfterRefresh).toBeDefined();
-			expect(updatedAtInitially).not.toBe(updatedAtAfterRefresh);
+			expect(after.updatedAt.getTime()).toBeGreaterThan(before.updatedAt.getTime());
+			expect(after.deleteAt.getTime()).toBeGreaterThan(before.deleteAt.getTime());
+		});
+
+		it("should not refresh a lock held by someone else", async () => {
+			const lockId = await acquireLock(Semaphores.TEST_MIGRATION);
+			assert(lockId);
+
+			const before = await collections.semaphores.findOne({ _id: lockId });
+			assert(before);
+
+			expect(await refreshLock(Semaphores.TEST_MIGRATION, new ObjectId())).toBe(false);
+
+			const after = await collections.semaphores.findOne({ _id: lockId });
+			assert(after);
+			expect(after.updatedAt.getTime()).toBe(before.updatedAt.getTime());
 		});
 
 		afterEach(async () => {

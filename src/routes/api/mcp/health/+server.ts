@@ -160,7 +160,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		} catch (error) {
 			httpError = error instanceof Error ? error : new Error(String(error));
 			lastError = httpError;
-			logger.warn(lastError.message, "Streamable HTTP failed, trying SSE transport...");
+			logger.warn({ err: lastError }, "Streamable HTTP failed, trying SSE transport...");
 
 			// Close failed client
 			try {

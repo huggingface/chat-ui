@@ -5,8 +5,7 @@ import { page } from "@vitest/browser/context";
 import { describe, expect, it } from "vitest";
 
 type ProcessBlock =
-	| { type: "think"; content: string; closed: boolean }
-	| { type: "tool"; uuid: string; updates: [] };
+	{ type: "think"; content: string; closed: boolean } | { type: "tool"; uuid: string; updates: [] };
 
 const thinkBlock = (content: string): ProcessBlock => ({ type: "think", content, closed: true });
 const toolBlock = (uuid: string): ProcessBlock => ({ type: "tool", uuid, updates: [] });
@@ -18,7 +17,6 @@ describe("ToolCallsSummary", () => {
 			toolCount: 0,
 		});
 
-		// Only the header button is rendered; the child container is absent
 		expect(baseElement.querySelector(".mt-1")).toBeNull();
 	});
 
@@ -54,9 +52,8 @@ describe("ToolCallsSummary", () => {
 		toggle.click();
 		await new Promise((r) => setTimeout(r, 0));
 
-		// Child container now exists
 		expect(baseElement.querySelector(".mt-1")).not.toBeNull();
-		// Each child reasoning block contributes its own collapsible "Thinking" header
-		expect(page.getByText("Thinking").elements).toHaveLength(2);
+		expect(page.getByText("Thinking").elements()).toHaveLength(2);
+		expect(page.getByText("Reasoning A").elements()).toHaveLength(0);
 	});
 });

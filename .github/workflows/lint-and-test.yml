@@ -18,11 +18,9 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-      - run: |
-          npm install ci
+      - run: npm  ci
       - name: "Checking lint/format errors"
-        run: |
-          npm run lint
+        run: npm run lint
       - name: "Checking type errors"
         run: |
           npm run check
@@ -37,12 +35,26 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-      - run: |
-          npm ci
-          npx playwright install
-      - name: "Tests"
-        run: |
-          npm run test
+
+      # The server workspace spawns a MongoMemoryServer per test file. On a cold runner
+      # those spawns race each other downloading and locking the same mongod binary, which
+      # kills whole suites at collection time with an "unlock file ... not locked by this
+      # process" error. Caching the binary removes that failure mode.
+      - name: Cache mongodb-memory-server binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: "Tests (node)"
+        run: npm run test
+
+      - name: "Tests (browser)"
+        run: npm run test:client
 
   build-check:
     runs-on:
