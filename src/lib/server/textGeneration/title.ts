@@ -4,6 +4,9 @@ import { logger } from "$lib/server/logger";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { Conversation } from "$lib/types/Conversation";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
+import { models, taskModel } from "$lib/server/models";
+import { stripReasoningBlocks } from "$lib/server/textGeneration/utils/routing";
+import { getFallbackTitle } from "$lib/server/textGeneration/utils/title";
 
 export async function* generateTitleForConversation(
 	conv: Conversation,
@@ -16,7 +19,7 @@ export async function* generateTitleForConversation(
 
 		const prompt = userMessage.content;
 		const modelForTitle = config.TASK_MODEL?.trim() ? config.TASK_MODEL : conv.model;
-		const title = (await generateTitle(prompt, modelForTitle, locals)) ?? "New Chat";
+		const title = (await generateTitle(prompt, modelForTitle, locals)) ?? getFallbackTitle();
 
 		yield {
 			type: MessageUpdateType.Title,
@@ -39,9 +42,16 @@ async function generateTitle(
 
 	// Tools removed: no tool-based title path
 
+	// Reasoning models tend to spend the whole token budget on a <think> trace
+	// (which then leaks into the title). Ask them to think as little as possible,
+	// and fund a larger budget so they can still emit an actual title afterwards.
+	const model = modelId ? (models.find((m) => m.id === modelId) ?? taskModel) : taskModel;
+	const isReasoning = model.supportsReasoning;
+
 	return await getReturnFromGenerator(
 		generateFromDefaultEndpoint({
 			messages: [{ from: "user", content: `User message: "${prompt}"` }],
+			reasoningEffort: isReasoning ? "low" : undefined,
 			preprompt: `You are a chat thread titling assistant.
 Goal: Produce a very short, descriptive title (2–4 words) that names the topic of the user's first message.
 
@@ -60,7 +70,9 @@ User: "请解释Transformer是如何工作的" -> Transformer 工作原理
 User: "tell me more about you" -> About the assistant
 Return only the title text.`,
 			generateSettings: {
-				max_tokens: 24,
+				// Reasoning models need headroom to finish thinking *and* emit a title;
+				// non-reasoning models stay tight to keep titles short and cheap.
+				max_tokens: isReasoning ? 256 : 24,
 				temperature: 0,
 			},
 			modelId,
@@ -69,7 +81,9 @@ Return only the title text.`,
 	)
 		.then((summary) => {
 			const firstFive = prompt.split(/\s+/g).slice(0, 5).join(" ");
-			const trimmed = String(summary ?? "").trim();
+			// Strip any leaked <think> reasoning (including unclosed/truncated blocks)
+			// before trimming; an empty result falls back to the first five words.
+			const trimmed = stripReasoningBlocks(String(summary ?? "")).trim();
 			// Fallback: if empty, return first five words only (no emoji)
 			return trimmed || firstFive;
 		})

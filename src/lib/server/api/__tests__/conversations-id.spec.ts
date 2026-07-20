@@ -194,7 +194,7 @@ describe.sequential("PATCH /api/v2/conversations/[id]", () => {
 		expect(updated?.title).toBe("New Title");
 	});
 
-	it("strips <think> tags from title", async () => {
+	it("strips entire <think> reasoning blocks from title", async () => {
 		const { locals } = await createTestUser();
 		const conv = await createTestConversation(locals, { title: "Old Title" });
 
@@ -211,7 +211,48 @@ describe.sequential("PATCH /api/v2/conversations/[id]", () => {
 		expect(res.status).toBe(200);
 
 		const updated = await collections.conversations.findOne({ _id: conv._id });
-		expect(updated?.title).toBe("hiddenVisible Title");
+		expect(updated?.title).toBe("Visible Title");
+	});
+
+	it("strips capitalized <THINK> reasoning blocks from title", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { title: "Old Title" });
+
+		const res = await PATCH({
+			locals,
+			params: { id: conv._id.toString() },
+			request: new Request("http://localhost", {
+				method: "PATCH",
+				body: JSON.stringify({ title: "<THINK>hidden</THINK>Visible Title" }),
+				headers: { "Content-Type": "application/json" },
+			}),
+		} as never);
+
+		expect(res.status).toBe(200);
+
+		const updated = await collections.conversations.findOne({ _id: conv._id });
+		expect(updated?.title).toBe("Visible Title");
+	});
+
+	it("falls back to New Chat when stripping leaves an empty title", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { title: "Old Title" });
+
+		// An unclosed/truncated reasoning trace with no actual title after it
+		const res = await PATCH({
+			locals,
+			params: { id: conv._id.toString() },
+			request: new Request("http://localhost", {
+				method: "PATCH",
+				body: JSON.stringify({ title: "<think>Got it, let's see. The user asked" }),
+				headers: { "Content-Type": "application/json" },
+			}),
+		} as never);
+
+		expect(res.status).toBe(200);
+
+		const updated = await collections.conversations.findOne({ _id: conv._id });
+		expect(updated?.title).toBe("New Chat");
 	});
 
 	it("rejects empty title", async () => {

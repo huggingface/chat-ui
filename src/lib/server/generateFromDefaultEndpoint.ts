@@ -7,6 +7,7 @@ export async function* generateFromDefaultEndpoint({
 	preprompt,
 	generateSettings,
 	modelId,
+	reasoningEffort,
 	locals,
 }: {
 	messages: EndpointMessage[];
@@ -14,13 +15,21 @@ export async function* generateFromDefaultEndpoint({
 	generateSettings?: Record<string, unknown>;
 	/** Optional: use this model instead of the default task model */
 	modelId?: string;
+	/** Optional: forwarded as `reasoning_effort` to reasoning-capable endpoints */
+	reasoningEffort?: "low" | "medium" | "high";
 	locals: App.Locals | undefined;
 }): AsyncGenerator<MessageUpdate, string, undefined> {
 	try {
 		// Choose endpoint based on provided modelId, else fall back to taskModel
 		const model = modelId ? (models.find((m) => m.id === modelId) ?? taskModel) : taskModel;
 		const endpoint = await model.getEndpoint();
-		const tokenStream = await endpoint({ messages, preprompt, generateSettings, locals });
+		const tokenStream = await endpoint({
+			messages,
+			preprompt,
+			generateSettings,
+			reasoningEffort,
+			locals,
+		});
 
 		for await (const output of tokenStream) {
 			// if not generated_text is here it means the generation is not done
