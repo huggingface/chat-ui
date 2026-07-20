@@ -1,18 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 
-/*
- * `isURLLocal` resolves hostnames with `dns.lookup`. Left unmocked, this suite reached live
- * DNS — including the third-party wildcard resolvers `nip.io` and `sslip.io` — so it failed
- * offline and in network-restricted runners, and its verdict depended on records outside
- * this repo.
- *
- * Mocking the resolver keeps the part that actually matters under test (the loopback /
- * link-local subnet decision) and additionally makes address families and ranges reachable
- * that public DNS cannot conveniently produce: IPv6 link-local, a non-loopback private
- * range, and an unknown address family.
- *
- * Hostname *validation* runs before any lookup, so those cases need no mock at all.
- */
 const RESOLUTIONS: Record<string, { address: string; family: number }> = {
 	// Loopback
 	localhost: { address: "127.0.0.1", family: 4 },
