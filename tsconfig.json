@@ -1,6 +1,9 @@
 {
 	"extends": "./.svelte-kit/tsconfig.json",
 	"compilerOptions": {
+		// tests/ runs under node --experimental-strip-types, which requires explicit .ts
+		// extensions. Safe because the generated config sets noEmit.
+		"allowImportingTsExtensions": true,
 		"allowJs": true,
 		"checkJs": true,
 		"esModuleInterop": true,
