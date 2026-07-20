@@ -50,9 +50,6 @@ jobs:
 
       - run: npm ci
 
-      # Only chromium is used (see the `client` workspace in vite.config.ts). The previous
-      # bare `npx playwright install` pulled all three engines — ~400MB — for a workspace
-      # that was gated off and never ran.
       - run: npx playwright install --with-deps chromium
 
       - name: "Tests (node)"

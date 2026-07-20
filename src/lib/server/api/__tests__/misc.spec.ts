@@ -59,10 +59,6 @@ describe("GET /api/v2/feature-flags", () => {
 });
 
 describe("GET /api/v2/public-config", () => {
-	// This endpoint is a disclosure boundary: it is served to every unauthenticated client,
-	// so the only assertion that matters is which keys come back. The previous test asserted
-	// `typeof data === "object"`, which `{}` satisfies — it could not fail.
-
 	it("exposes only PUBLIC_-prefixed keys", async () => {
 		const res = await publicConfigGET(mockRequestEvent(createTestLocals()));
 		const data = await parseResponse<Record<string, unknown>>(res);
@@ -78,8 +74,6 @@ describe("GET /api/v2/public-config", () => {
 		const res = await publicConfigGET(mockRequestEvent(createTestLocals()));
 		const data = await parseResponse<Record<string, unknown>>(res);
 
-		// Spot-check the highest-consequence private keys by name. These are all present in
-		// the `.env` the test harness loads, so their absence here is meaningful.
 		for (const secret of [
 			"OPENAI_API_KEY",
 			"HF_TOKEN",
@@ -93,7 +87,6 @@ describe("GET /api/v2/public-config", () => {
 			expect(data).not.toHaveProperty(secret);
 		}
 
-		// And nothing whose value looks like a token should have made it through.
 		const suspicious = Object.entries(data).filter(
 			([, value]) => typeof value === "string" && /^(hf_|sk-)/.test(value)
 		);
@@ -107,8 +100,6 @@ describe("GET /api/v2/public-config", () => {
 		expect(data).toHaveProperty("PUBLIC_APP_NAME");
 		expect(typeof data.PUBLIC_APP_NAME).toBe("string");
 
-		// Public config is per-user (it can carry DB overlays), so it must not be shared by
-		// intermediary caches.
 		expect(res.headers.get("Cache-Control")).toBe("private, max-age=60");
 	});
 });

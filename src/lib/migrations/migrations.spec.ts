@@ -56,7 +56,6 @@ describe(
 			const before = await collections.semaphores.findOne({ _id: lockId });
 			assert(before);
 
-			// `updatedAt`/`deleteAt` are millisecond-precision, so guarantee a distinct tick.
 			await new Promise((r) => setTimeout(r, 5));
 
 			expect(await refreshLock(Semaphores.TEST_MIGRATION, lockId)).toBe(true);
@@ -64,11 +63,7 @@ describe(
 			const after = await collections.semaphores.findOne({ _id: lockId });
 			assert(after);
 
-			// Compare timestamps, not object identity. Two Date instances read from separate
-			// queries are never `toBe`-equal, so the previous `.not.toBe()` form passed
-			// unconditionally and never exercised refreshLock at all.
 			expect(after.updatedAt.getTime()).toBeGreaterThan(before.updatedAt.getTime());
-			// The whole point of refreshing is extending the TTL.
 			expect(after.deleteAt.getTime()).toBeGreaterThan(before.deleteAt.getTime());
 		});
 
