@@ -12,12 +12,13 @@ export interface ArtifactsContext {
 	panel: typeof artifactPanel;
 }
 
-const KEY = Symbol("artifacts");
+/** Exported for test harnesses that seed this context without mounting ChatWindow. */
+export const ARTIFACTS_CONTEXT_KEY = Symbol("artifacts");
 
 export function setArtifactsContext(ctx: ArtifactsContext): void {
-	setContext(KEY, ctx);
+	setContext(ARTIFACTS_CONTEXT_KEY, ctx);
 }
 
 export function getArtifactsContext(): ArtifactsContext | undefined {
-	return getContext<ArtifactsContext | undefined>(KEY);
+	return getContext<ArtifactsContext | undefined>(ARTIFACTS_CONTEXT_KEY);
 }

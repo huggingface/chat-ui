@@ -1,8 +1,10 @@
 /*
  * Setup for the `client` (real-browser) workspace.
  *
- * Load the application stylesheet. Component tests run in a real Chromium, so any assertion
- * about layout or computed style depends on the same CSS the app ships — most importantly
- * the Tailwind utilities that establish size constraints.
+ * The stylesheet is load-bearing: without it Tailwind size utilities are inert, so anything
+ * asserting layout or computed style silently measures an unconstrained element.
+ *
+ * `appMocks` is imported for its `vi.mock` side effects, which stand in for the `$app/*` modules.
  */
 import "../../src/styles/main.css";
+import "../../src/lib/components/__tests__/appMocks";
