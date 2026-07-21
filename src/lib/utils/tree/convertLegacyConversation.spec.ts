@@ -1,9 +1,14 @@
-import { collections } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
 import { ObjectId } from "mongodb";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { convertLegacyConversation } from "./convertLegacyConversation";
 import { insertLegacyConversation } from "./treeHelpers.spec";
+
+// `collections` is undefined until the database IIFE resolves.
+beforeAll(async () => {
+	await ready;
+});
 
 describe("convertLegacyConversation", () => {
 	it("should convert a legacy conversation", async () => {

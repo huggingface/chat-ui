@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ObjectId } from "mongodb";
 
-import { collections } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import {
 	cleanupTestData,
@@ -10,6 +10,11 @@ import {
 	createTestUser,
 } from "$lib/server/api/__tests__/testHelpers";
 import { POST } from "../../../routes/conversation/[id]/stop-generating/+server";
+
+// `collections` is undefined until the database IIFE resolves.
+beforeAll(async () => {
+	await ready;
+});
 
 describe.sequential("POST /conversation/[id]/stop-generating", () => {
 	afterEach(async () => {

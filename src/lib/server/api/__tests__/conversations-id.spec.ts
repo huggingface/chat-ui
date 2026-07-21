@@ -1,7 +1,7 @@
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, beforeAll } from "vitest";
 import { ObjectId } from "mongodb";
 import superjson from "superjson";
-import { collections } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
 import {
 	createTestLocals,
 	createTestUser,
@@ -18,6 +18,11 @@ async function parseResponse<T = unknown>(res: Response): Promise<T> {
 function mockUrl(): URL {
 	return new URL("http://localhost:5173/api/v2/conversations/some-id");
 }
+
+// `collections` is undefined until the database IIFE resolves.
+beforeAll(async () => {
+	await ready;
+});
 
 describe.sequential("GET /api/v2/conversations/[id]", () => {
 	afterEach(async () => {

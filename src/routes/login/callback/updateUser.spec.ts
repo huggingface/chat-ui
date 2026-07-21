@@ -1,6 +1,6 @@
-import { assert, it, describe, afterEach, vi, expect } from "vitest";
+import { assert, it, describe, afterEach, beforeAll, vi, expect } from "vitest";
 import type { Cookies } from "@sveltejs/kit";
-import { collections } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
 import { updateUser } from "./updateUser";
 import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
@@ -33,6 +33,11 @@ const token = {
 const cookiesMock: Cookies = {
 	set: vi.fn(),
 };
+
+// `collections` is undefined until the database IIFE resolves.
+beforeAll(async () => {
+	await ready;
+});
 
 const insertRandomUser = async () => {
 	const res = await collections.users.insertOne({

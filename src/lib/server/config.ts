@@ -14,9 +14,13 @@ class ConfigManager {
 	private keysFromDB: Partial<Record<ConfigKey, string>> = {};
 	private isInitialized = false;
 
-	private configCollection: Collection<ConfigKeyType> | undefined;
-	private semaphoreCollection: Collection<Semaphore> | undefined;
-	private lastConfigUpdate: Date | undefined;
+	// The `= undefined` is load-bearing: under ES2018 `useDefineForClassFields` is off, so a
+	// declaration-only field is erased and never becomes an own property. The Proxy below
+	// then falls through to `get()`, and these would read as `""` rather than undefined,
+	// defeating every `?.` on them.
+	private configCollection: Collection<ConfigKeyType> | undefined = undefined;
+	private semaphoreCollection: Collection<Semaphore> | undefined = undefined;
+	private lastConfigUpdate: Date | undefined = undefined;
 
 	async init() {
 		if (this.isInitialized) return;

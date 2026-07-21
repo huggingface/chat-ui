@@ -1,5 +1,7 @@
 import { ObjectId } from "mongodb";
-import { collections } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
+import { config } from "$lib/server/config";
+import { sha256 } from "$lib/utils/sha256";
 import type { User } from "$lib/types/User";
 import type { Session } from "$lib/types/Session";
 import type { Conversation } from "$lib/types/Conversation";
@@ -14,13 +16,25 @@ export function createTestLocals(overrides?: Partial<App.Locals>): App.Locals {
 	};
 }
 
-export async function createTestUser(): Promise<{
+export interface TestUser {
 	user: User;
 	session: Session;
 	locals: App.Locals;
-}> {
+	/**
+	 * The raw session secret. `authenticateRequest()` reads this from the cookie and looks
+	 * the session up by its sha256, so it is *not* `session.sessionId`.
+	 */
+	secretSessionId: string;
+	/** Ready-made `Cookie` header value, for driving real authentication. */
+	cookie: string;
+}
+
+export async function createTestUser(): Promise<TestUser> {
+	await ready;
+
 	const userId = new ObjectId();
-	const sessionId = `test-session-${userId.toString()}`;
+	const secretSessionId = crypto.randomUUID();
+	const sessionId = await sha256(secretSessionId);
 
 	const user: User = {
 		_id: userId,
@@ -53,6 +67,8 @@ export async function createTestUser(): Promise<{
 			isAdmin: false,
 			token: undefined,
 		},
+		secretSessionId,
+		cookie: `${config.COOKIE_NAME}=${secretSessionId}`,
 	};
 }
 
@@ -60,6 +76,8 @@ export async function createTestConversation(
 	locals: App.Locals,
 	overrides?: Partial<Conversation>
 ): Promise<Conversation> {
+	await ready;
+
 	const conv: Conversation = {
 		_id: new ObjectId(),
 		title: "Test Conversation",
@@ -75,12 +93,34 @@ export async function createTestConversation(
 	return conv;
 }
 
+/** Wipes every collection the app writes to. Anything added to `getCollections()` belongs here. */
 export async function cleanupTestData() {
-	await collections.conversations.deleteMany({});
-	await collections.abortedGenerations.deleteMany({});
-	await collections.users.deleteMany({});
-	await collections.sessions.deleteMany({});
-	await collections.settings.deleteMany({});
-	await collections.sharedConversations.deleteMany({});
-	await collections.reports.deleteMany({});
+	await ready;
+
+	await Promise.all([
+		collections.conversations.deleteMany({}),
+		collections.conversationStats.deleteMany({}),
+		collections.abortedGenerations.deleteMany({}),
+		collections.users.deleteMany({}),
+		collections.sessions.deleteMany({}),
+		collections.settings.deleteMany({}),
+		collections.sharedConversations.deleteMany({}),
+		collections.reports.deleteMany({}),
+		collections.assistants.deleteMany({}),
+		collections.messageEvents.deleteMany({}),
+		collections.semaphores.deleteMany({}),
+		collections.migrationResults.deleteMany({}),
+		collections.tokenCaches.deleteMany({}),
+		collections.tools.deleteMany({}),
+		cleanupGridFS(),
+	]);
+}
+
+/**
+ * Deletes files rather than calling `bucket.drop()`, which would take the bucket's indexes
+ * with it and rejects outright when the namespace was never created.
+ */
+async function cleanupGridFS() {
+	const files = await collections.bucket.find({}).toArray();
+	await Promise.all(files.map((file) => collections.bucket.delete(file._id)));
 }

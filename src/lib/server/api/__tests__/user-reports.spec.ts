@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { ObjectId } from "mongodb";
 import superjson from "superjson";
-import { collections } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
 import { createTestLocals, createTestUser, cleanupTestData } from "./testHelpers";
 import { GET } from "../../../../routes/api/v2/user/reports/+server";
 import type { Report } from "$lib/types/Report";
@@ -17,6 +17,11 @@ function mockRequestEvent(locals: App.Locals) {
 		request: new Request("http://localhost"),
 	} as Parameters<typeof GET>[0];
 }
+
+// `collections` is undefined until the database IIFE resolves.
+beforeAll(async () => {
+	await ready;
+});
 
 describe("GET /api/v2/user/reports", () => {
 	beforeEach(async () => {
