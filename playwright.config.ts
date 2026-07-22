@@ -122,6 +122,8 @@ export default defineConfig({
 				// Deterministic surface: no DB-driven config, no router, no ambient MCP servers.
 				ENABLE_CONFIG_MANAGER: "false",
 				MCP_SERVERS: "[]",
+				// Without this the SSRF guard drops every loopback MCP URL a spec passes.
+				MCP_ALLOW_INSECURE_URLS: "true",
 				LLM_ROUTER_ROUTES_PATH: "",
 				LLM_ROUTER_ARCH_BASE_URL: "",
 				ALLOW_IFRAME: "true",

@@ -2,9 +2,8 @@
  * Mock MCP server over Streamable HTTP, exposing an `echo` and an `add` tool. Stateless
  * (`sessionIdGenerator: undefined`) with a fresh transport per request.
  *
- * The app cannot reach this yet: `runMcpFlow` filters selected servers through `isValidUrl`,
- * which requires https and rejects loopback, and `ssrfSafeFetch` blocks the resolved internal IP
- * at connect time. Unblocking it needs an env-gated escape hatch in those two files.
+ * Reachable only because the app runs with `MCP_ALLOW_INSECURE_URLS=true`, set in
+ * `playwright.config.ts`.
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";

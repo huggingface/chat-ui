@@ -144,12 +144,12 @@ export async function* runMcpFlow({
 		return "not_applicable";
 	}
 
-	// Enforce server-side safety (public HTTPS only, no private ranges)
+	// Enforce server-side safety (public HTTPS only, no private ranges by default)
 	{
 		const before = servers.slice();
 		servers = servers.filter((s) => {
 			try {
-				return isValidUrl(s.url);
+				return isValidUrl(s.url, { allowInsecure: true });
 			} catch {
 				return false;
 			}

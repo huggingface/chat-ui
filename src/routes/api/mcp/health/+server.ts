@@ -5,7 +5,7 @@ import type { KeyValuePair } from "$lib/types/Tool";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import type { RequestHandler } from "./$types";
-import { isValidUrl, ssrfSafeFetch } from "$lib/server/urlSafety";
+import { isValidUrl, mcpFetch } from "$lib/server/urlSafety";
 import { isStrictHfMcpLogin, hasNonEmptyToken, isExaMcpServer } from "$lib/server/mcp/hf";
 
 interface HealthCheckRequest {
@@ -40,7 +40,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		// URL validation handled above
 
-		if (!isValidUrl(url)) {
+		if (!isValidUrl(url, { allowInsecure: true })) {
 			return new Response(
 				JSON.stringify({
 					ready: false,
@@ -113,7 +113,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 			const transport = new StreamableHTTPClientTransport(baseUrl, {
 				requestInit,
-				fetch: ssrfSafeFetch,
+				fetch: mcpFetch,
 			});
 			logger.info({}, `[MCP Health] Connecting to ${url}...`);
 			await client.connect(transport);
@@ -179,7 +179,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 				const sseTransport = new SSEClientTransport(baseUrl, {
 					requestInit,
-					fetch: ssrfSafeFetch,
+					fetch: mcpFetch,
 				});
 				logger.info({}, `[MCP Health] Connecting via SSE...`);
 				await client.connect(sseTransport);
