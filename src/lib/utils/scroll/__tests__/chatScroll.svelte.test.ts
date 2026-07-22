@@ -351,7 +351,20 @@ describe("follow behavior", () => {
 		await frames(2);
 		// Mid-glide: the spring is still closing the gap.
 		expect(chat.fixture.distance()).toBeGreaterThan(100);
-		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "glides to the bottom" });
+		// Wait for the spring to fully settle, not just cross the arrival
+		// threshold — it keeps crawling the last couple px after distance()
+		// first dips under ARRIVED, and that residual motion belongs to the
+		// glide, not to the flip below.
+		let last = -1;
+		await waitFor(
+			() => {
+				const top = chat.fixture.scrollTop();
+				const settled = top === last && chat.fixture.distance() <= ARRIVED;
+				last = top;
+				return settled;
+			},
+			{ label: "spring settles at the bottom" }
+		);
 		chat.chat.setStreaming(false);
 		const scrollTop = chat.fixture.scrollTop();
 		await frames(3);
