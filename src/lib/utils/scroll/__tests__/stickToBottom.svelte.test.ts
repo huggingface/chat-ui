@@ -327,6 +327,21 @@ describe("re-attach", () => {
 		await touchDrag(fixture.container, { fromY: 200, toY: 150 });
 		expect(controller.pinned).toBe(true);
 	});
+
+	it("re-attach glides the remaining gap even in instant follow mode", async () => {
+		const { fixture, controller } = setup({}, { followMode: "instant" });
+		wheel(fixture.container, -300);
+		await frame();
+		expect(controller.pinned).toBe(false);
+		// Scroll back down to just inside the near-bottom zone: re-pins and
+		// closes the last stretch with the spring — instant mode is for content
+		// growth, not for the user's own return to the bottom.
+		dragScrollbarTo(fixture.container, fixture.maxScrollTop() - 50);
+		await frames(2);
+		expect(controller.pinned).toBe(true);
+		expect(fixture.distance()).toBeGreaterThan(ARRIVED); // still gliding, no snap
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "glide closes the gap" });
+	});
 });
 
 describe("commands", () => {

@@ -320,8 +320,9 @@ export class StickToBottomController {
 
 	/** Swap how pinned follows track content growth: 'spring' glides (streaming
 	 * replies), 'instant' snaps (settling content, where a glide is motion
-	 * without information). Takes effect on the next growth — never moves the
-	 * view by itself, and never interrupts an animation already in flight. */
+	 * without information). Growth follows only — a user re-attaching at the
+	 * bottom glides in either mode. Takes effect on the next growth — never
+	 * moves the view by itself, and never interrupts an animation in flight. */
 	setFollowMode(mode: "spring" | "instant") {
 		this.followMode = mode;
 	}
@@ -410,8 +411,13 @@ export class StickToBottomController {
 		this.rafId = requestAnimationFrame(this.tick);
 	};
 
-	/** Pinned + content grew: glide (spring) or snap (instant/reduced-motion/hidden). */
-	private follow() {
+	/**
+	 * Pinned + the view must catch up to the bottom: glide (spring) or snap
+	 * (instant/reduced-motion/hidden). The instant follow mode only applies to
+	 * content growth — a user re-attaching at the bottom glides the remaining
+	 * gap closed regardless of mode, so coming back never feels like a teleport.
+	 */
+	private follow(reason: "growth" | "reattach" = "growth") {
 		if (!this.state.pinned) return;
 		if (this.shouldSkipAnimation()) {
 			// Hidden tabs must not wait on a throttled rAF; reduced-motion keeps
@@ -427,7 +433,7 @@ export class StickToBottomController {
 		// as ours by the coalesced event — silently swallowing the unpin. Scroll
 		// events run before rAF callbacks, so one tick of deferral lets the
 		// user's unpin cancel the write instead.
-		if (this.followMode === "instant") {
+		if (this.followMode === "instant" && reason === "growth") {
 			// A leftover glide (mode just flipped, or an animateToBottom) is
 			// replaced: instant mode owes the bottom on the very next tick.
 			if (!this.anim?.snap) this.startAnimation(() => this.maxScrollTop(), { snap: true });
@@ -490,7 +496,7 @@ export class StickToBottomController {
 					// User came back to the bottom zone: re-engage and glide the
 					// remaining gap closed (spring, so no re-attach snap).
 					this.setPinned(true);
-					this.follow();
+					this.follow("reattach");
 				}
 			}
 		}
@@ -585,7 +591,7 @@ export class StickToBottomController {
 			if (this.distanceFromBottom() > this.opts.nearBottomPx) return;
 			if (this.innerScrollableConsumes(event.target, deltaY)) return;
 			this.setPinned(true);
-			this.follow();
+			this.follow("reattach");
 		}
 	};
 
@@ -627,7 +633,7 @@ export class StickToBottomController {
 			!this.innerScrollableConsumes(this.touch.target, 1)
 		) {
 			this.setPinned(true);
-			this.follow();
+			this.follow("reattach");
 		}
 		this.touch.y = t.clientY;
 	};
