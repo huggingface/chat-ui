@@ -73,7 +73,8 @@ export interface ArtifactUpdateOp {
 export type ArtifactOperation = ArtifactCreateOp | ArtifactUpdateOp;
 
 export type ArtifactSegment =
-	{ type: "text"; content: string } | { type: "artifact"; op: ArtifactOperation };
+	| { type: "text"; content: string }
+	| { type: "artifact"; op: ArtifactOperation };
 
 // Some models double the opening bracket of tags they were taught
 // (`<<artifact …>`, `<<old_str>`), so every opening matcher tolerates a run of
