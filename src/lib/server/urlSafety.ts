@@ -35,9 +35,57 @@ function isUnsafeIp(address: string): boolean {
 }
 
 /**
+ * The only addresses the MCP escape hatch opens up: this machine and the local network.
+ *
+ * Deliberately narrower than the inverse of `UNSAFE_IPV4_SUBNETS`. Link-local (169.254.0.0/16)
+ * is excluded because it carries the cloud metadata service — never a legitimate local MCP
+ * server, and the highest-value SSRF target there is. So are 0.0.0.0/8 and CGNAT.
+ */
+const LOCAL_MCP_IPV4_SUBNETS = ["10.0.0.0/8", "127.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"].map(
+	(s) => new Address4(s)
+);
+
+function isLocalMcpIp(address: string): boolean {
+	const family = isIP(address);
+
+	if (family === 4) {
+		const addr = new Address4(address);
+		return LOCAL_MCP_IPV4_SUBNETS.some((subnet) => addr.isInSubnet(subnet));
+	}
+
+	if (family === 6) {
+		const addr = new Address6(address);
+		if (addr.is4()) {
+			const v4 = addr.to4();
+			return LOCAL_MCP_IPV4_SUBNETS.some((subnet) => v4.isInSubnet(subnet));
+		}
+		return addr.isLoopback();
+	}
+
+	return false;
+}
+
+/**
+ * Hostname the escape hatch is willing to relax for: `localhost`, or a loopback / private-LAN
+ * IP literal. Any other name — including one that resolves to an internal address — stays on
+ * the strict path, so the flag cannot be used to reach a public host over plaintext or to
+ * launder an internal address through DNS.
+ */
+function isLocalMcpHost(hostname: string): boolean {
+	if (hostname === "localhost") {
+		return true;
+	}
+	const cleanHostname = hostname.replace(/^\[|]$/g, "");
+	return isIP(cleanHostname) !== 0 && isLocalMcpIp(cleanHostname);
+}
+
+/**
  * Escape hatch for pointing chat-ui at an MCP server on the local machine — a server under
- * development, or the mock the e2e harness runs on loopback over plain http. Both the protocol
- * check and the private-range checks are relaxed for MCP when it is on.
+ * development, or the mock the e2e harness runs on loopback over plain http.
+ *
+ * It relaxes the protocol and private-range checks for MCP, but only for the hosts
+ * `isLocalMcpHost` accepts. It is not a global off switch for SSRF protection: a public
+ * hostname keeps every check it has today, whether or not this is set.
  *
  * Read straight from the process environment rather than through `$lib/server/config`, so that a
  * database-backed config row can never switch SSRF protection off on a running deployment.
@@ -62,13 +110,16 @@ export function isValidUrl(
 	urlString: string,
 	{ allowInsecure = false }: UrlSafetyOptions = {}
 ): boolean {
-	const insecure = allowInsecure && insecureMcpUrlsAllowed();
 	try {
 		const url = new URL(urlString.trim());
+		const hostname = url.hostname.toLowerCase();
+		// Scoped to local targets, so the flag buys exactly "reach the MCP server on my machine"
+		// and nothing else: a public host still needs https and still gets the DNS check below.
+		const insecure = allowInsecure && insecureMcpUrlsAllowed() && isLocalMcpHost(hostname);
+
 		if (url.protocol !== "https:" && !(insecure && url.protocol === "http:")) {
 			return false;
 		}
-		const hostname = url.hostname.toLowerCase();
 		if (hostname === "localhost") {
 			return insecure;
 		}
@@ -97,41 +148,54 @@ export function assertSafeIp(address: string, hostname: string): void {
 /**
  * Undici agent that validates resolved IPs at connection time,
  * preventing TOCTOU DNS rebinding attacks.
+ *
+ * `exempt` names the hostnames allowed to resolve internally anyway; by default none are.
  */
-const ssrfSafeAgent = new Agent({
-	connect: {
-		lookup: (hostname, options, callback) => {
-			dns.lookup(hostname, options, (err, address, family) => {
-				if (err) return callback(err, "", 4);
-				if (typeof address === "string") {
-					try {
-						assertSafeIp(address, hostname);
-					} catch (e) {
-						return callback(e as Error, "", 4);
-					}
-				} else if (Array.isArray(address)) {
-					for (const entry of address) {
+function createSsrfAgent(exempt: (hostname: string) => boolean = () => false): Agent {
+	return new Agent({
+		connect: {
+			lookup: (hostname, options, callback) => {
+				dns.lookup(hostname, options, (err, address, family) => {
+					if (err) return callback(err, "", 4);
+					if (exempt(hostname.toLowerCase())) return callback(null, address, family);
+					if (typeof address === "string") {
 						try {
-							assertSafeIp(entry.address, hostname);
+							assertSafeIp(address, hostname);
 						} catch (e) {
 							return callback(e as Error, "", 4);
 						}
+					} else if (Array.isArray(address)) {
+						for (const entry of address) {
+							try {
+								assertSafeIp(entry.address, hostname);
+							} catch (e) {
+								return callback(e as Error, "", 4);
+							}
+						}
 					}
-				}
-				return callback(null, address, family);
-			});
+					return callback(null, address, family);
+				});
+			},
 		},
-	},
-});
+	});
+}
+
+const ssrfSafeAgent = createSsrfAgent();
 
 /**
- * Agent for the MCP escape hatch: no `lookup` hook, so internal addresses resolve normally.
+ * Agent for the MCP escape hatch. It keeps the connect-time DNS check — dropping it would let
+ * any hostname resolve to an internal address while the flag is on — and exempts only
+ * `localhost`, which would otherwise still be blocked by its own loopback resolution.
+ *
+ * Loopback and private-LAN IP literals need no exemption: undici calls `lookup` only for names
+ * that require DNS, so a literal never reaches this hook.
+ *
  * Built lazily and only ever selected when `MCP_ALLOW_INSECURE_URLS=true`.
  */
-let insecureAgent: Agent | undefined;
-function getInsecureAgent(): Agent {
-	insecureAgent ??= new Agent();
-	return insecureAgent;
+let localMcpAgent: Agent | undefined;
+function getLocalMcpAgent(): Agent {
+	localMcpAgent ??= createSsrfAgent((hostname) => hostname === "localhost");
+	return localMcpAgent;
 }
 
 const MAX_REDIRECTS = 5;
@@ -154,7 +218,7 @@ async function guardedFetch(
 	options: UrlSafetyOptions
 ): Promise<Response> {
 	const dispatcher =
-		options.allowInsecure && insecureMcpUrlsAllowed() ? getInsecureAgent() : ssrfSafeAgent;
+		options.allowInsecure && insecureMcpUrlsAllowed() ? getLocalMcpAgent() : ssrfSafeAgent;
 	const callerRedirect = init?.redirect ?? "follow";
 
 	if (callerRedirect === "error") {
@@ -231,8 +295,8 @@ export function ssrfSafeFetch(url: string | URL, init?: RequestInit): Promise<Re
 
 /**
  * `ssrfSafeFetch` for MCP transports. Identical to it unless `MCP_ALLOW_INSECURE_URLS=true`,
- * in which case connections to loopback and private ranges are permitted so chat-ui can talk
- * to an MCP server running on the local machine.
+ * in which case chat-ui may talk to an MCP server on loopback or the local network. Public
+ * hostnames keep both the https requirement and the connect-time DNS check either way.
  */
 export function mcpFetch(url: string | URL, init?: RequestInit): Promise<Response> {
 	return guardedFetch(url, init, { allowInsecure: true });

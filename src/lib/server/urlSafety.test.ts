@@ -65,6 +65,32 @@ describe("isValidUrl with the MCP_ALLOW_INSECURE_URLS escape hatch", () => {
 		expect(isValidUrl("http://localhost:8789/mcp", { allowInsecure: true })).toBe(true);
 		expect(isValidUrl("https://192.168.1.1", { allowInsecure: true })).toBe(true);
 		expect(isValidUrl("http://[::1]:8789/mcp", { allowInsecure: true })).toBe(true);
+		expect(isValidUrl("http://10.0.0.1:8789/mcp", { allowInsecure: true })).toBe(true);
+		expect(isValidUrl("http://172.16.0.1:8789/mcp", { allowInsecure: true })).toBe(true);
+	});
+
+	// The flag means "reach my local MCP server", not "turn SSRF protection off".
+	it("keeps public hosts on the strict path when set", () => {
+		env.MCP_ALLOW_INSECURE_URLS = "true";
+		expect(isValidUrl("http://example.com/mcp", { allowInsecure: true })).toBe(false);
+		expect(isValidUrl("http://mcp.exa.ai/mcp", { allowInsecure: true })).toBe(false);
+		// Still reachable the normal way — the flag neither adds nor removes anything here.
+		expect(isValidUrl("https://example.com/mcp", { allowInsecure: true })).toBe(true);
+	});
+
+	it("keeps link-local blocked when set, over either scheme", () => {
+		env.MCP_ALLOW_INSECURE_URLS = "true";
+		// The cloud metadata service — never a local MCP server, always an SSRF target.
+		expect(isValidUrl("http://169.254.169.254/latest/meta-data/", { allowInsecure: true })).toBe(
+			false
+		);
+		expect(isValidUrl("https://169.254.170.23/v1/credentials", { allowInsecure: true })).toBe(
+			false
+		);
+		expect(isValidUrl("http://[fe80::1]/mcp", { allowInsecure: true })).toBe(false);
+		// 0.0.0.0/8 and CGNAT are outside the local-network exception too.
+		expect(isValidUrl("http://0.0.0.0:8789/mcp", { allowInsecure: true })).toBe(false);
+		expect(isValidUrl("http://100.64.0.1:8789/mcp", { allowInsecure: true })).toBe(false);
 	});
 
 	it("leaves callers that do not opt in strict even when set", () => {
