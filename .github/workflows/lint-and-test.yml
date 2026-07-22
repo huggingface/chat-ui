@@ -56,6 +56,45 @@ jobs:
       - name: "Tests (browser)"
         run: npm run test:client
 
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          # Newer than the other jobs on purpose: the e2e servers under tests/ are
+          # TypeScript run directly by node via --experimental-strip-types, which
+          # needs Node >= 22.6.
+          node-version: "22"
+          cache: "npm"
+
+      # The harness starts its own MongoMemoryServer (see startTestDatabase in
+      # tests/fixtures.ts). Same cache key as the unit-test job so they share the
+      # downloaded mongod binary.
+      - name: Cache mongodb-memory-server binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
+      - run: npm ci
+
+      # WebKit is not optional — the worst regression cluster in this repo is
+      # Safari-specific scroll and layout behaviour.
+      - run: npx playwright install --with-deps chromium webkit
+
+      - name: "Tests (e2e)"
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
   build-check:
     runs-on:
       group: aws-general-8-plus

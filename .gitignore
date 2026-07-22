@@ -21,3 +21,8 @@ models/*
 !models/add-your-models-here.txt
 .claude/*
 !.claude/skills/
+# Playwright e2e output
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
