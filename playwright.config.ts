@@ -122,6 +122,9 @@ export default defineConfig({
 				// Deterministic surface: no DB-driven config, no router, no ambient MCP servers.
 				ENABLE_CONFIG_MANAGER: "false",
 				MCP_SERVERS: "[]",
+				// Lets the app reach `tests/mock-mcp.ts` on loopback over plain http. Without it
+				// every MCP URL a spec passes is dropped by the SSRF guard before a tool ever runs.
+				MCP_ALLOW_INSECURE_URLS: "true",
 				LLM_ROUTER_ROUTES_PATH: "",
 				LLM_ROUTER_ARCH_BASE_URL: "",
 				ALLOW_IFRAME: "true",

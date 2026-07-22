@@ -2,7 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { McpServerConfig } from "./httpClient";
-import { ssrfSafeFetch } from "$lib/server/urlSafety";
+import { mcpFetch } from "$lib/server/urlSafety";
 
 type PoolEntry = { client: Client; lastUsedAt: number; activeCalls: number };
 
@@ -81,13 +81,13 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 	try {
 		try {
 			await client.connect(
-				new StreamableHTTPClientTransport(url, { requestInit, fetch: ssrfSafeFetch })
+				new StreamableHTTPClientTransport(url, { requestInit, fetch: mcpFetch })
 			);
 		} catch (httpErr) {
 			// Remember the original HTTP transport error so we can surface it if the fallback also fails.
 			// Today we always show the SSE message, which is misleading when the real failure was HTTP (e.g. 500).
 			firstError = httpErr;
-			await client.connect(new SSEClientTransport(url, { requestInit, fetch: ssrfSafeFetch }));
+			await client.connect(new SSEClientTransport(url, { requestInit, fetch: mcpFetch }));
 		}
 	} catch (err) {
 		try {

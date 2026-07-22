@@ -2,6 +2,7 @@ import { Address4, Address6 } from "ip-address";
 import { isIP } from "node:net";
 import dns from "node:dns";
 import { Agent, fetch as undiciFetch } from "undici";
+import { env } from "$env/dynamic/private";
 
 const UNSAFE_IPV4_SUBNETS = [
 	"0.0.0.0/8",
@@ -34,22 +35,47 @@ function isUnsafeIp(address: string): boolean {
 }
 
 /**
+ * Escape hatch for pointing chat-ui at an MCP server on the local machine — a server under
+ * development, or the mock the e2e harness runs on loopback over plain http. Both the protocol
+ * check and the private-range checks are relaxed for MCP when it is on.
+ *
+ * Read straight from the process environment rather than through `$lib/server/config`, so that a
+ * database-backed config row can never switch SSRF protection off on a running deployment.
+ */
+function insecureMcpUrlsAllowed(): boolean {
+	return env.MCP_ALLOW_INSECURE_URLS === "true";
+}
+
+export interface UrlSafetyOptions {
+	/**
+	 * Opt this call into the MCP escape hatch. Inert on its own — it relaxes nothing unless
+	 * `MCP_ALLOW_INSECURE_URLS=true` is also set, so callers that pass it stay strict in
+	 * production. Only the MCP code paths pass it; every other caller is unaffected by the flag.
+	 */
+	allowInsecure?: boolean;
+}
+
+/**
  * Synchronous URL validation: checks protocol and hostname string.
  */
-export function isValidUrl(urlString: string): boolean {
+export function isValidUrl(
+	urlString: string,
+	{ allowInsecure = false }: UrlSafetyOptions = {}
+): boolean {
+	const insecure = allowInsecure && insecureMcpUrlsAllowed();
 	try {
 		const url = new URL(urlString.trim());
-		if (url.protocol !== "https:") {
+		if (url.protocol !== "https:" && !(insecure && url.protocol === "http:")) {
 			return false;
 		}
 		const hostname = url.hostname.toLowerCase();
 		if (hostname === "localhost") {
-			return false;
+			return insecure;
 		}
 		// If the hostname is a raw IP literal, validate it
 		const cleanHostname = hostname.replace(/^\[|]$/g, "");
 		if (isIP(cleanHostname)) {
-			return !isUnsafeIp(cleanHostname);
+			return insecure || !isUnsafeIp(cleanHostname);
 		}
 		return true;
 	} catch {
@@ -98,6 +124,16 @@ const ssrfSafeAgent = new Agent({
 	},
 });
 
+/**
+ * Agent for the MCP escape hatch: no `lookup` hook, so internal addresses resolve normally.
+ * Built lazily and only ever selected when `MCP_ALLOW_INSECURE_URLS=true`.
+ */
+let insecureAgent: Agent | undefined;
+function getInsecureAgent(): Agent {
+	insecureAgent ??= new Agent();
+	return insecureAgent;
+}
+
 const MAX_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
@@ -108,8 +144,17 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
  * If the caller sets `redirect: "manual"`, redirects are returned as-is
  * (the caller is responsible for validation). Otherwise, redirects are
  * followed internally with each hop validated by `isValidUrl`.
+ *
+ * `options` carries the MCP escape hatch through to both the dispatcher choice and every
+ * redirect hop, so a relaxation applies consistently to the whole request chain or not at all.
  */
-export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Promise<Response> {
+async function guardedFetch(
+	url: string | URL,
+	init: RequestInit | undefined,
+	options: UrlSafetyOptions
+): Promise<Response> {
+	const dispatcher =
+		options.allowInsecure && insecureMcpUrlsAllowed() ? getInsecureAgent() : ssrfSafeAgent;
 	const callerRedirect = init?.redirect ?? "follow";
 
 	if (callerRedirect === "error") {
@@ -117,7 +162,7 @@ export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Prom
 		const response = (await undiciFetch(url.toString(), {
 			...(init as Record<string, unknown>),
 			redirect: "manual",
-			dispatcher: ssrfSafeAgent,
+			dispatcher,
 		})) as unknown as Response;
 		if (REDIRECT_STATUSES.has(response.status)) {
 			throw new TypeError("unexpected redirect");
@@ -130,7 +175,7 @@ export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Prom
 		return (await undiciFetch(url.toString(), {
 			...(init as Record<string, unknown>),
 			redirect: "manual",
-			dispatcher: ssrfSafeAgent,
+			dispatcher,
 		})) as unknown as Response;
 	}
 
@@ -144,7 +189,7 @@ export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Prom
 		const response = (await undiciFetch(currentUrl, {
 			...(currentInit as Record<string, unknown>),
 			redirect: "manual",
-			dispatcher: ssrfSafeAgent,
+			dispatcher,
 		})) as unknown as Response;
 
 		if (REDIRECT_STATUSES.has(response.status)) {
@@ -159,7 +204,7 @@ export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Prom
 			}
 
 			const redirectUrl = new URL(location, currentUrl).toString();
-			if (!isValidUrl(redirectUrl)) {
+			if (!isValidUrl(redirectUrl, options)) {
 				throw new Error(`Redirect to unsafe URL blocked (SSRF): ${redirectUrl}`);
 			}
 
@@ -178,4 +223,17 @@ export async function ssrfSafeFetch(url: string | URL, init?: RequestInit): Prom
 
 		return response;
 	}
+}
+
+export function ssrfSafeFetch(url: string | URL, init?: RequestInit): Promise<Response> {
+	return guardedFetch(url, init, {});
+}
+
+/**
+ * `ssrfSafeFetch` for MCP transports. Identical to it unless `MCP_ALLOW_INSECURE_URLS=true`,
+ * in which case connections to loopback and private ranges are permitted so chat-ui can talk
+ * to an MCP server running on the local machine.
+ */
+export function mcpFetch(url: string | URL, init?: RequestInit): Promise<Response> {
+	return guardedFetch(url, init, { allowInsecure: true });
 }

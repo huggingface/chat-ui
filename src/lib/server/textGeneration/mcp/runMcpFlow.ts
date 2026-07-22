@@ -144,12 +144,13 @@ export async function* runMcpFlow({
 		return "not_applicable";
 	}
 
-	// Enforce server-side safety (public HTTPS only, no private ranges)
+	// Enforce server-side safety (public HTTPS only, no private ranges — unless
+	// MCP_ALLOW_INSECURE_URLS=true, which allows a local MCP server over plain http)
 	{
 		const before = servers.slice();
 		servers = servers.filter((s) => {
 			try {
-				return isValidUrl(s.url);
+				return isValidUrl(s.url, { allowInsecure: true });
 			} catch {
 				return false;
 			}
