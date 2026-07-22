@@ -2,9 +2,8 @@
  * Mock MCP server over Streamable HTTP, exposing an `echo` and an `add` tool. Stateless
  * (`sessionIdGenerator: undefined`) with a fresh transport per request.
  *
- * Reachable only because the app runs with `MCP_ALLOW_INSECURE_URLS=true` (set in the app `env`
- * block of `playwright.config.ts`). Without it `runMcpFlow` drops this server — `isValidUrl`
- * requires https and rejects loopback — and the connect-time IP check blocks it in turn.
+ * Reachable only because the app runs with `MCP_ALLOW_INSECURE_URLS=true`, set in
+ * `playwright.config.ts`.
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";

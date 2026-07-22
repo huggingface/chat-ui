@@ -69,18 +69,16 @@ describe("isValidUrl with the MCP_ALLOW_INSECURE_URLS escape hatch", () => {
 		expect(isValidUrl("http://172.16.0.1:8789/mcp", { allowInsecure: true })).toBe(true);
 	});
 
-	// The flag means "reach my local MCP server", not "turn SSRF protection off".
 	it("keeps public hosts on the strict path when set", () => {
 		env.MCP_ALLOW_INSECURE_URLS = "true";
 		expect(isValidUrl("http://example.com/mcp", { allowInsecure: true })).toBe(false);
 		expect(isValidUrl("http://mcp.exa.ai/mcp", { allowInsecure: true })).toBe(false);
-		// Still reachable the normal way — the flag neither adds nor removes anything here.
+		// Unchanged by the flag, not granted by it.
 		expect(isValidUrl("https://example.com/mcp", { allowInsecure: true })).toBe(true);
 	});
 
-	it("keeps link-local blocked when set, over either scheme", () => {
+	it("keeps link-local, 0.0.0.0/8 and CGNAT blocked when set, over either scheme", () => {
 		env.MCP_ALLOW_INSECURE_URLS = "true";
-		// The cloud metadata service — never a local MCP server, always an SSRF target.
 		expect(isValidUrl("http://169.254.169.254/latest/meta-data/", { allowInsecure: true })).toBe(
 			false
 		);
@@ -88,7 +86,6 @@ describe("isValidUrl with the MCP_ALLOW_INSECURE_URLS escape hatch", () => {
 			false
 		);
 		expect(isValidUrl("http://[fe80::1]/mcp", { allowInsecure: true })).toBe(false);
-		// 0.0.0.0/8 and CGNAT are outside the local-network exception too.
 		expect(isValidUrl("http://0.0.0.0:8789/mcp", { allowInsecure: true })).toBe(false);
 		expect(isValidUrl("http://100.64.0.1:8789/mcp", { allowInsecure: true })).toBe(false);
 	});
