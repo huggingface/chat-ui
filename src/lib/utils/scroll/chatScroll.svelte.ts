@@ -11,11 +11,14 @@
  * style, not template state), and exposes reactive state for the floating
  * scroll buttons so they carry no listeners of their own.
  *
- * Follow behavior is driven by generation state (setStreaming): pinned follows
- * glide (spring) only while a reply is streaming into this conversation, and
- * snap (instant) otherwise — so the async content inflation after a
- * conversation load/switch (markdown, images, syntax highlighting) lands the
- * view at the bottom with no visible scrolling.
+ * Follow behavior: pinned follows snap (instant) from conversation load/switch
+ * until a reply starts streaming, so the async content inflation of a settling
+ * conversation (markdown, images, syntax highlighting) never plays as animated
+ * scrolling; once a reply streams, follows glide (spring). Only the START of a
+ * stream flips the mode — the end of one deliberately leaves spring engaged,
+ * because loading turns false in the same task as the reply's final content
+ * mutation, and flipping there would snap the last chunk's growth instead of
+ * gliding it. Instant returns at the next reset/attach.
  */
 
 import type { Message } from "$lib/types/Message";
@@ -179,15 +182,19 @@ export class ChatScroll {
 	}
 
 	/**
-	 * Generation state, mirrored from the page's loading flag. While a reply
-	 * streams, pinned follows glide (spring) so token bursts read as motion;
-	 * while idle they snap instantly, so content settling after a conversation
-	 * load/switch never plays as an animated scroll to the bottom.
+	 * Generation state, mirrored from the page's loading flag. Only the ON edge
+	 * changes the follow mode: a starting reply engages the spring glide.
+	 * Flipping to instant on the OFF edge would race the final chunk — loading
+	 * turns false in the same task that mutates the reply's last content, so
+	 * the mode would flip before that growth's ResizeObserver delivery and
+	 * snap the end of the stream. Instant mode returns at the next
+	 * conversation switch/load (reset/attach), the only places settling
+	 * needs it.
 	 */
 	setStreaming(streaming: boolean) {
 		if (streaming === this.streaming) return;
 		this.streaming = streaming;
-		this.controller?.setFollowMode(streaming ? "spring" : "instant");
+		if (streaming) this.controller?.setFollowMode("spring");
 	}
 
 	setComposerHeight(height: number | undefined) {
@@ -321,6 +328,11 @@ export class ChatScroll {
 		this.anchorEl = null;
 		this.pendingBranchSwitch = false;
 		if (this.spacerEl) this.spacerEl.style.height = `${this.minSpacer()}px`;
+		// Settling starts over: snap follows until this conversation streams.
+		// (If the switched-to conversation has a generation running, the
+		// loading effect re-engages spring right after — beforeNavigate
+		// guarantees the OFF edge, so the ON edge always fires here.)
+		this.controller?.setFollowMode("instant");
 		this.controller?.jumpToBottom();
 	}
 

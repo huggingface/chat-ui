@@ -344,7 +344,7 @@ describe("follow behavior", () => {
 		});
 	});
 
-	it("streaming growth glides, and the end-of-stream flip never moves the view", async () => {
+	it("streaming growth glides, and the end-of-stream flip keeps gliding", async () => {
 		const chat = createChat();
 		chat.chat.setStreaming(true);
 		chat.fixture.growLast(700);
@@ -368,7 +368,28 @@ describe("follow behavior", () => {
 		chat.chat.setStreaming(false);
 		const scrollTop = chat.fixture.scrollTop();
 		await frames(3);
+		// The flip alone never moves the view…
 		expect(chat.fixture.scrollTop()).toBe(scrollTop);
+		// …and growth after it still glides: the reply's final chunk can land
+		// in the same task that turns loading off, so flipping to instant here
+		// would snap the end of the stream. Instant only returns on switch.
+		chat.fixture.growLast(600);
+		await frames(2);
+		expect(chat.fixture.distance()).toBeGreaterThan(100);
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "still glides" });
+	});
+
+	it("a switch after a streamed turn restores the no-glide settle", async () => {
+		const chat = createChat();
+		chat.chat.setStreaming(true);
+		chat.chat.setStreaming(false); // a stream came and went — spring stayed engaged
+		chat.sync(false, "c2");
+		await frame();
+		chat.fixture.growLast(700);
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, {
+			maxFrames: 6,
+			label: "snaps to the bottom",
+		});
 	});
 });
 
