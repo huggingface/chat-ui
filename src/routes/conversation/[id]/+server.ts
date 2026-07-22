@@ -568,12 +568,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 
 				// Append updates for audit/replay (streams too, to preserve ordering)
-				if (
-					!(
-						event.type === MessageUpdateType.Status &&
-						event.status === MessageUpdateStatus.KeepAlive
-					)
-				) {
+				if (!(
+					event.type === MessageUpdateType.Status && event.status === MessageUpdateStatus.KeepAlive
+				)) {
 					messageToWriteTo?.updates?.push(
 						event.type === MessageUpdateType.Stream ? { ...event } : event
 					);
