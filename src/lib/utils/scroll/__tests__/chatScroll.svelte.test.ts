@@ -105,6 +105,7 @@ describe("send anchoring", () => {
 	it("anchors the sent message ~50px below the viewport top", async () => {
 		const chat = createChat();
 		chat.chat.armSend();
+		chat.chat.setStreaming(true); // writeMessage flips loading before the pair mounts
 		const { user } = chat.mountPair();
 		await waitFor(() => Math.abs(topOf(user, chat) - ANCHOR_OFFSET) <= 2, {
 			label: "user message glides to the anchor offset",
@@ -115,6 +116,7 @@ describe("send anchoring", () => {
 	it("fill phase: constant scrollHeight, zero scroll movement, zero layout shift", async () => {
 		const chat = createChat();
 		chat.chat.armSend();
+		chat.chat.setStreaming(true);
 		const { user, assistant } = chat.mountPair();
 		await waitFor(() => Math.abs(topOf(user, chat) - ANCHOR_OFFSET) <= 2, { label: "anchored" });
 		await frames(3); // let everything paint before probing
@@ -137,6 +139,7 @@ describe("send anchoring", () => {
 	it("hands off seamlessly from fill to follow when the reply outgrows the viewport", async () => {
 		const chat = createChat();
 		chat.chat.armSend();
+		chat.chat.setStreaming(true);
 		const { assistant } = chat.mountPair();
 		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
 		let maxFrameJump = 0;
@@ -165,9 +168,11 @@ describe("send anchoring", () => {
 	it("spacer stays inflated after the stream ends (no end-of-turn jump)", async () => {
 		const chat = createChat();
 		chat.chat.armSend();
+		chat.chat.setStreaming(true);
 		const { assistant } = chat.mountPair();
 		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
 		assistant.style.height = "60px"; // short reply, stream over
+		chat.chat.setStreaming(false);
 		await frames(4);
 		const height = parseFloat(chat.fixture.spacer.style.height);
 		expect(height).toBeGreaterThan(MIN_SPACER_FALLBACK_PX);
@@ -310,6 +315,47 @@ describe("conversation switch", () => {
 		expect(chat.chat.state.pinned).toBe(true);
 		expect(chat.fixture.distance()).toBeLessThanOrEqual(ARRIVED);
 		expect(parseFloat(chat.fixture.spacer.style.height)).toBe(MIN_SPACER_FALLBACK_PX);
+	});
+
+	it("content settling after a switch lands at the bottom with no glide", async () => {
+		const chat = createChat({ turns: 5 });
+		chat.sync(false, "c2");
+		await frame();
+		// The switched-to conversation keeps inflating after the reset (async
+		// markdown, images, code highlighting) — every growth must land at the
+		// bottom immediately instead of playing a visible scroll animation.
+		// Snap = ResizeObserver delivery + one tick (a few frames); a spring
+		// from 700px away cannot get within 2px in 6 ticks in any rAF regime.
+		chat.fixture.growLast(700);
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, {
+			maxFrames: 6,
+			label: "snaps to the bottom",
+		});
+	});
+});
+
+describe("follow behavior", () => {
+	it("idle content growth (late images, initial load) snaps to the bottom", async () => {
+		const chat = createChat();
+		chat.fixture.growLast(700);
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, {
+			maxFrames: 6, // snap arrives in a few frames; a spring cannot
+			label: "snaps to the bottom",
+		});
+	});
+
+	it("streaming growth glides, and the end-of-stream flip never moves the view", async () => {
+		const chat = createChat();
+		chat.chat.setStreaming(true);
+		chat.fixture.growLast(700);
+		await frames(2);
+		// Mid-glide: the spring is still closing the gap.
+		expect(chat.fixture.distance()).toBeGreaterThan(100);
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "glides to the bottom" });
+		chat.chat.setStreaming(false);
+		const scrollTop = chat.fixture.scrollTop();
+		await frames(3);
+		expect(chat.fixture.scrollTop()).toBe(scrollTop);
 	});
 });
 

@@ -10,6 +10,12 @@
  * Also owns the send-anchor spacer element imperatively (measurement-driven
  * style, not template state), and exposes reactive state for the floating
  * scroll buttons so they carry no listeners of their own.
+ *
+ * Follow behavior is driven by generation state (setStreaming): pinned follows
+ * glide (spring) only while a reply is streaming into this conversation, and
+ * snap (instant) otherwise — so the async content inflation after a
+ * conversation load/switch (markdown, images, syntax highlighting) lands the
+ * view at the bottom with no visible scrolling.
  */
 
 import type { Message } from "$lib/types/Message";
@@ -101,6 +107,8 @@ export class ChatScroll {
 	private suppressSkipPin = false;
 	private composerHeight: number | undefined;
 	private gutterPx = -1;
+	/** True while a reply is streaming into this conversation (see setStreaming). */
+	private streaming = false;
 
 	private lastConversationKey: string | undefined;
 	private lastMessageCount = 0;
@@ -123,6 +131,7 @@ export class ChatScroll {
 		this.controller = new StickToBottomController(node, {
 			content: () => this.contentEl?.() ?? undefined,
 			ignoreTouchZonePx: params?.ignoreTouchZonePx,
+			followMode: this.streaming ? "spring" : "instant",
 			onStateChange: (s) => this.applyState(s),
 			onContentResize: (containerResized) => {
 				if (containerResized) this.measureGutter();
@@ -167,6 +176,18 @@ export class ChatScroll {
 	 * conversation gaining its first messages) — re-check the observer then. */
 	notifyContentChanged() {
 		this.controller?.recompute();
+	}
+
+	/**
+	 * Generation state, mirrored from the page's loading flag. While a reply
+	 * streams, pinned follows glide (spring) so token bursts read as motion;
+	 * while idle they snap instantly, so content settling after a conversation
+	 * load/switch never plays as an animated scroll to the bottom.
+	 */
+	setStreaming(streaming: boolean) {
+		if (streaming === this.streaming) return;
+		this.streaming = streaming;
+		this.controller?.setFollowMode(streaming ? "spring" : "instant");
 	}
 
 	setComposerHeight(height: number | undefined) {

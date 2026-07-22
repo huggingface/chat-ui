@@ -75,9 +75,34 @@ describe("mount & basic follow", () => {
 
 	it("instant follow mode pins hard on every growth", async () => {
 		const { fixture } = setup({}, { followMode: "instant" });
+		// Snap = ResizeObserver delivery + one tick (a few frames); a spring from
+		// 700px away cannot get within 2px in 6 ticks in any rAF regime.
 		fixture.growLast(700);
-		await frames(2); // ResizeObserver delivery
-		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
+		await waitFor(() => fixture.distance() <= ARRIVED, {
+			maxFrames: 6,
+			label: "snaps to the bottom",
+		});
+	});
+
+	it("setFollowMode swaps behavior at runtime without moving the view", async () => {
+		const { fixture, controller } = setup({}, { followMode: "instant" });
+		// The swap itself is inert — no write, no motion.
+		controller.setFollowMode("spring");
+		const top = fixture.scrollTop();
+		await frames(2);
+		expect(fixture.scrollTop()).toBe(top);
+		// Growth now glides instead of snapping…
+		fixture.growLast(700);
+		await frames(2);
+		expect(fixture.distance()).toBeGreaterThan(100);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "spring reaches bottom" });
+		// …and swapping back makes the next growth snap again.
+		controller.setFollowMode("instant");
+		fixture.growLast(700);
+		await waitFor(() => fixture.distance() <= ARRIVED, {
+			maxFrames: 6,
+			label: "snaps to the bottom",
+		});
 	});
 
 	it("re-pins to the live bottom when the container itself resizes", async () => {
