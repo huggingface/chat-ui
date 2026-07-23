@@ -124,6 +124,9 @@ export default defineConfig({
 				MCP_SERVERS: "[]",
 				// Without this the SSRF guard drops every loopback MCP URL a spec passes.
 				MCP_ALLOW_INSECURE_URLS: "true",
+				// P1 of the resumable-task work. On here so the suite exercises the path
+				// we are moving to; the legacy persist path is what ships with it off.
+				ENABLE_GENERATION_EVENTS: "true",
 				LLM_ROUTER_ROUTES_PATH: "",
 				LLM_ROUTER_ARCH_BASE_URL: "",
 				ALLOW_IFRAME: "true",

@@ -25,8 +25,14 @@ import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
+import {
+	createGenerationWriter,
+	generationEventsEnabled,
+	type GenerationWriter,
+} from "$lib/server/generation/writer";
 import { clampStoppedContent } from "$lib/server/stopTruncation";
 import { MetricsServer } from "$lib/server/metrics";
+import { randomUUID } from "$lib/utils/randomUuid";
 
 // How long a stop marker is protected from the pre-flight cleanup of a new
 // generation. A marker younger than this may still be awaiting observation by
@@ -357,6 +363,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		error(500, "Failed to create prompt");
 	}
 
+	// The stamp is what tells a reader a log exists, so only set it when events are on.
+	const effectiveGenerationId = generationId ?? randomUUID();
+	if (generationEventsEnabled()) {
+		messageToWriteTo.generationId = effectiveGenerationId;
+	}
+
 	// update the conversation with the new messages
 	await collections.conversations.updateOne(
 		{ _id: convId },
@@ -373,7 +385,17 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const metricsModelId = model.id ?? model.name ?? conv.model;
 	const metricsLabels = { model: metricsModelId };
 
+	let generationWriter: GenerationWriter | undefined;
+
 	const persistConversation = async () => {
+		// This rewrites the whole messages array, so stamp materializedSeq from the same
+		// synchronous instant as the content below, or a reader resumes from a stale point
+		// and replays text the message already contains. Guarded on the flag, not just the
+		// writer: with events off the writer's seq is 0, and stamping it would claim a log
+		// exists when none does.
+		if (generationEventsEnabled() && generationWriter && messageToWriteTo) {
+			messageToWriteTo.materializedSeq = generationWriter.currentSeq();
+		}
 		const messagesForSave = conv.messages.map((msg) => {
 			const filteredUpdates =
 				msg.updates
@@ -433,6 +455,19 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						// transient DB error; the next tick retries
 					});
 			}, 300);
+
+			const writer = await createGenerationWriter({
+				generationId: effectiveGenerationId,
+				conversationId: convId,
+				messageId: messageToWriteTo.id,
+				userId: locals.user?._id,
+				sessionId: locals.sessionId,
+				snapshot: () => ({
+					content: messageToWriteTo.content,
+					reasoning: messageToWriteTo.reasoning,
+				}),
+			});
+			generationWriter = writer;
 
 			let finalAnswerReceived = false;
 			let abortedByUser = false;
@@ -576,6 +611,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					);
 				}
 
+				// Before the padding below rewrites `event`: the log stores what was
+				// actually generated, not the padded wire form.
+				writer.push(event);
+
 				// Avoid remote keylogging attack executed by watching packet lengths
 				// by padding the text with null chars to a fixed length
 				// https://cdn.arstechnica.net/wp-content/uploads/2024/03/LLM-Side-Channel.pdf
@@ -603,7 +642,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 				await enqueueUpdate();
 
-				if (clientDetached) {
+				// Legacy path only: the writer materialises on its own cadence, attached
+				// or not. This branch is why an attached run used to write nothing.
+				if (!generationEventsEnabled() && clientDetached) {
 					await persistConversation();
 				}
 			}
@@ -743,6 +784,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}
 
 			await persistConversation();
+			await writer.finish({
+				status: hasError ? "error" : abortedByUser ? "interrupted" : "completed",
+			});
 			clearInterval(abortMarkerWatcher);
 			abortRegistry.unregister(conversationKey, ctrl);
 
