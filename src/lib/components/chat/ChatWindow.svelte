@@ -348,6 +348,13 @@
 		chatScroll.setComposerHeight(composerHeight);
 	});
 
+	// Follow behavior tracks generation state: glide while a reply streams,
+	// snap while idle — a conversation switch must land at the bottom with no
+	// animated scrolling while its async content (markdown, images) settles.
+	$effect(() => {
+		chatScroll.setStreaming(loading);
+	});
+
 	// Shared conversations containing artifacts usually exist to show one off:
 	// open the most recent artifact on load. Desktop only, since on mobile the
 	// panel is a fullscreen overlay that would hide the conversation entirely.

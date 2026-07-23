@@ -10,6 +10,15 @@
  * Also owns the send-anchor spacer element imperatively (measurement-driven
  * style, not template state), and exposes reactive state for the floating
  * scroll buttons so they carry no listeners of their own.
+ *
+ * Follow behavior: pinned follows snap (instant) from conversation load/switch
+ * until a reply starts streaming, so the async content inflation of a settling
+ * conversation (markdown, images, syntax highlighting) never plays as animated
+ * scrolling; once a reply streams, follows glide (spring). Only the START of a
+ * stream flips the mode — the end of one deliberately leaves spring engaged,
+ * because loading turns false in the same task as the reply's final content
+ * mutation, and flipping there would snap the last chunk's growth instead of
+ * gliding it. Instant returns at the next reset/attach.
  */
 
 import type { Message } from "$lib/types/Message";
@@ -101,6 +110,8 @@ export class ChatScroll {
 	private suppressSkipPin = false;
 	private composerHeight: number | undefined;
 	private gutterPx = -1;
+	/** True while a reply is streaming into this conversation (see setStreaming). */
+	private streaming = false;
 
 	private lastConversationKey: string | undefined;
 	private lastMessageCount = 0;
@@ -123,6 +134,7 @@ export class ChatScroll {
 		this.controller = new StickToBottomController(node, {
 			content: () => this.contentEl?.() ?? undefined,
 			ignoreTouchZonePx: params?.ignoreTouchZonePx,
+			followMode: this.streaming ? "spring" : "instant",
 			onStateChange: (s) => this.applyState(s),
 			onContentResize: (containerResized) => {
 				if (containerResized) this.measureGutter();
@@ -167,6 +179,22 @@ export class ChatScroll {
 	 * conversation gaining its first messages) — re-check the observer then. */
 	notifyContentChanged() {
 		this.controller?.recompute();
+	}
+
+	/**
+	 * Generation state, mirrored from the page's loading flag. Only the ON edge
+	 * changes the follow mode: a starting reply engages the spring glide.
+	 * Flipping to instant on the OFF edge would race the final chunk — loading
+	 * turns false in the same task that mutates the reply's last content, so
+	 * the mode would flip before that growth's ResizeObserver delivery and
+	 * snap the end of the stream. Instant mode returns at the next
+	 * conversation switch/load (reset/attach), the only places settling
+	 * needs it.
+	 */
+	setStreaming(streaming: boolean) {
+		if (streaming === this.streaming) return;
+		this.streaming = streaming;
+		if (streaming) this.controller?.setFollowMode("spring");
 	}
 
 	setComposerHeight(height: number | undefined) {
@@ -300,6 +328,11 @@ export class ChatScroll {
 		this.anchorEl = null;
 		this.pendingBranchSwitch = false;
 		if (this.spacerEl) this.spacerEl.style.height = `${this.minSpacer()}px`;
+		// Settling starts over: snap follows until this conversation streams.
+		// (If the switched-to conversation has a generation running, the
+		// loading effect re-engages spring right after — beforeNavigate
+		// guarantees the OFF edge, so the ON edge always fires here.)
+		this.controller?.setFollowMode("instant");
 		this.controller?.jumpToBottom();
 	}
 

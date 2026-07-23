@@ -19,6 +19,9 @@ function expectValidPng(png: Uint8Array) {
 }
 
 describe("renderShareThumbnailPng", () => {
+	// The file's first render pays the one-time font/satori/resvg init, which
+	// can exceed the 5s default on a cold CI runner — same allowance as the
+	// adversarial-prompts test below.
 	it("renders a PNG for a normal prompt", async () => {
 		const png = await renderShareThumbnailPng({
 			prompt: renderableThumbnailText("How do I fine-tune a model on my own dataset?", 240),
@@ -26,7 +29,7 @@ describe("renderShareThumbnailPng", () => {
 			appName: "HuggingChat",
 		});
 		expectValidPng(png);
-	});
+	}, 30000);
 
 	it("renders the generic card when the prompt is empty", async () => {
 		const png = await renderShareThumbnailPng({

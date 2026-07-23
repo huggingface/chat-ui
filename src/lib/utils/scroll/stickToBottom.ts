@@ -44,7 +44,8 @@ export interface StickToBottomOptions {
 	 * callers skip container-box measurements on pure content growth.
 	 */
 	onContentResize?: (containerResized: boolean) => void;
-	/** 'spring' glides toward the bottom; 'instant' hard-pins every growth. */
+	/** 'spring' glides toward the bottom; 'instant' hard-pins every growth.
+	 * Initial value — swappable at runtime via setFollowMode(). */
 	followMode?: "spring" | "instant";
 	nearBottomPx?: number;
 	scrolledUpPx?: number;
@@ -81,6 +82,11 @@ interface Animation {
 	/** Live target — re-read every frame so streaming growth retargets the spring. */
 	target: () => number;
 	lastTime: number;
+	/** Write the full remaining distance on the first tick instead of springing.
+	 * Instant follows still go through a tick (not a synchronous write) so a
+	 * same-frame user scroll — whose scroll event dispatches before rAF
+	 * callbacks — is classified first and its unpin cancels the write. */
+	snap?: boolean;
 }
 
 export class StickToBottomController {
@@ -97,6 +103,9 @@ export class StickToBottomController {
 		scrolledUp: false,
 		distanceFromBottom: 0,
 	};
+
+	/** Current follow behavior; starts from opts.followMode (see setFollowMode). */
+	private followMode: "spring" | "instant";
 
 	/** scrollTop values we wrote and whose scroll events haven't arrived yet. */
 	private pendingWrites: number[] = [];
@@ -123,6 +132,7 @@ export class StickToBottomController {
 			ignoreTouchZonePx: 0,
 			...options,
 		};
+		this.followMode = this.opts.followMode;
 
 		this.lastTop = this.clampedTop();
 		this.lastScrollHeight = container.scrollHeight;
@@ -308,6 +318,15 @@ export class StickToBottomController {
 		this.setPinned(false);
 	}
 
+	/** Swap how pinned follows track content growth: 'spring' glides (streaming
+	 * replies), 'instant' snaps (settling content, where a glide is motion
+	 * without information). Growth follows only — a user re-attaching at the
+	 * bottom glides in either mode. Takes effect on the next growth — never
+	 * moves the view by itself, and never interrupts an animation in flight. */
+	setFollowMode(mode: "spring" | "instant") {
+		this.followMode = mode;
+	}
+
 	/** Animated move that does NOT engage following (e.g. scroll-to-previous). */
 	animateTo(top: number) {
 		this.unpin();
@@ -352,8 +371,8 @@ export class StickToBottomController {
 
 	// --- animation ------------------------------------------------------------------
 
-	private startAnimation(target: () => number) {
-		this.anim = { target, lastTime: performance.now() };
+	private startAnimation(target: () => number, opts?: { snap?: boolean }) {
+		this.anim = { target, lastTime: performance.now(), snap: opts?.snap };
 		if (this.rafId === null) this.rafId = requestAnimationFrame(this.tick);
 	}
 
@@ -376,7 +395,7 @@ export class StickToBottomController {
 		const top = this.clampedTop();
 		const delta = target - top;
 
-		if (Math.abs(delta) <= SPRING_SNAP_PX) {
+		if (this.anim.snap || Math.abs(delta) <= SPRING_SNAP_PX) {
 			this.write(target);
 			this.anim = null;
 			this.recomputeState();
@@ -392,15 +411,35 @@ export class StickToBottomController {
 		this.rafId = requestAnimationFrame(this.tick);
 	};
 
-	/** Pinned + content grew: glide (spring) or snap (instant/reduced-motion/hidden). */
-	private follow() {
+	/**
+	 * Pinned + the view must catch up to the bottom: glide (spring) or snap
+	 * (instant/reduced-motion/hidden). The instant follow mode only applies to
+	 * content growth — a user re-attaching at the bottom glides the remaining
+	 * gap closed regardless of mode, so coming back never feels like a teleport.
+	 */
+	private follow(reason: "growth" | "reattach" = "growth") {
 		if (!this.state.pinned) return;
-		if (this.opts.followMode === "instant" || this.shouldSkipAnimation()) {
+		if (this.shouldSkipAnimation()) {
+			// Hidden tabs must not wait on a throttled rAF; reduced-motion keeps
+			// its long-standing synchronous write.
 			this.stopAnimation();
 			this.write(this.maxScrollTop());
 			return;
 		}
-		if (!this.anim) this.startAnimation(() => this.maxScrollTop());
+		// Instant follows snap on the next tick rather than writing synchronously:
+		// this often runs inside a ResizeObserver callback, and a user scroll from
+		// the same frame may not have dispatched its scroll event yet. A
+		// synchronous write would land after the user's movement and be matched
+		// as ours by the coalesced event — silently swallowing the unpin. Scroll
+		// events run before rAF callbacks, so one tick of deferral lets the
+		// user's unpin cancel the write instead.
+		if (this.followMode === "instant" && reason === "growth") {
+			// A leftover glide (mode just flipped, or an animateToBottom) is
+			// replaced: instant mode owes the bottom on the very next tick.
+			if (!this.anim?.snap) this.startAnimation(() => this.maxScrollTop(), { snap: true });
+		} else if (!this.anim) {
+			this.startAnimation(() => this.maxScrollTop());
+		}
 	}
 
 	// --- event handlers ---------------------------------------------------------------
@@ -457,7 +496,7 @@ export class StickToBottomController {
 					// User came back to the bottom zone: re-engage and glide the
 					// remaining gap closed (spring, so no re-attach snap).
 					this.setPinned(true);
-					this.follow();
+					this.follow("reattach");
 				}
 			}
 		}
@@ -552,7 +591,7 @@ export class StickToBottomController {
 			if (this.distanceFromBottom() > this.opts.nearBottomPx) return;
 			if (this.innerScrollableConsumes(event.target, deltaY)) return;
 			this.setPinned(true);
-			this.follow();
+			this.follow("reattach");
 		}
 	};
 
@@ -594,7 +633,7 @@ export class StickToBottomController {
 			!this.innerScrollableConsumes(this.touch.target, 1)
 		) {
 			this.setPinned(true);
-			this.follow();
+			this.follow("reattach");
 		}
 		this.touch.y = t.clientY;
 	};
