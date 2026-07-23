@@ -24,10 +24,9 @@ function isStreamToken(e: MessageUpdate): e is MessageStreamUpdate | MessageReas
 }
 
 // If `event` continues the same stream as `tail`, return the two concatenated into
-// one event; otherwise null. Reasoning models emit thousands of reasoning tokens, so
-// batching them (like text) is what keeps this off the per-token flush path and out of
-// the write amplification this file exists to remove. Text and reasoning never merge
-// into each other — they render on separate channels.
+// one event; otherwise null. Coalescing consecutive tokens keeps the event log compact
+// (one event per burst, not per token) so replay stays cheap. Text and reasoning never
+// merge into each other — they render on separate channels.
 export function mergedStreamToken(
 	tail: MessageUpdate | undefined,
 	event: MessageUpdate
@@ -38,7 +37,7 @@ export function mergedStreamToken(
 	return { ...tail, token: tail.token + event.token };
 }
 
-const STREAM_FLUSH_MS = 200;
+const FLUSH_INTERVAL_MS = 200;
 const HEARTBEAT_MS = 10_000;
 const MATERIALIZE_MS = 3_000;
 
@@ -206,23 +205,21 @@ export async function createGenerationWriter(
 				return;
 			}
 
-			if (isStreamToken(event)) {
-				const last = pending.at(-1);
-				// Merge into the unflushed tail rather than minting a seq per token, so a
-				// replay up to any seq reconstructs the text exactly.
-				const merged = mergedStreamToken(last?.event, event);
-				if (last && merged) {
-					last.event = merged;
-				} else {
-					pending.push(nextEvent(event));
-				}
-				scheduleFlush(STREAM_FLUSH_MS);
-				return;
+			// Buffer every event and flush on a timer. Consecutive same-kind stream
+			// tokens coalesce; everything else keeps its own event. Pacing writes by the
+			// clock rather than per event means no update type — text, reasoning, or some
+			// future high-frequency one — can reintroduce per-event write amplification
+			// just by joining the pipeline. Order is preserved regardless of flush timing:
+			// `seq` is assigned here, and `materialize()` drains pending before it advances
+			// `materializedSeq`, so a reader never resumes past an unwritten event.
+			const last = pending.at(-1);
+			const merged = mergedStreamToken(last?.event, event);
+			if (last && merged) {
+				last.event = merged;
+			} else {
+				pending.push(nextEvent(event));
 			}
-
-			pending.push(nextEvent(event));
-			// Flush now, not on a timer: these are ordered against the text around them.
-			void flush();
+			scheduleFlush(FLUSH_INTERVAL_MS);
 		},
 
 		async finish({ status, error }) {
