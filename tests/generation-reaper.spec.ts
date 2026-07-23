@@ -204,12 +204,3 @@ test("a live, heartbeating run survives past the stale threshold", async ({
 	const gen = await db.collection("generations").findOne({ generationId: state.generationId });
 	expect(gen?.status, "the run should end completed, not interrupted").toBe("completed");
 });
-
-test("feature-flags exposes resumableGenerations", async ({ page }) => {
-	const res = await page.request.get(`${E2E_APP_URL}/api/v2/feature-flags`);
-	expect(res.ok()).toBe(true);
-	// superjson envelope: the flag lives under json.
-	const body = await res.text();
-	expect(body).toContain("resumableGenerations");
-	expect(body).toContain("true");
-});

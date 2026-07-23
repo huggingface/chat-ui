@@ -1,7 +1,6 @@
 import type { RequestHandler } from "./$types";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
-import { generationEventsEnabled } from "$lib/server/generation/writer";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
@@ -22,8 +21,6 @@ const MAX_LIFETIME_MS = 5 * 60_000;
 const REPLAY_BATCH = 500;
 
 export const GET: RequestHandler = async ({ params, locals, url, request }) => {
-	if (!generationEventsEnabled()) error(404, "Not found");
-
 	const convId = new ObjectId(z.string().parse(params.id));
 
 	const conv = await collections.conversations.findOne(

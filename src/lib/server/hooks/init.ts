@@ -5,7 +5,6 @@ import { checkAndRunMigrations } from "$lib/migrations/migrations";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 import { loadMcpServersOnStartup } from "$lib/server/mcp/registry";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
-import { generationEventsEnabled } from "$lib/server/generation/writer";
 import { GenerationReaper } from "$lib/server/generation/reaper";
 import { adminTokenManager } from "$lib/server/adminToken";
 import { MetricsServer } from "$lib/server/metrics";
@@ -44,10 +43,8 @@ export async function initServer(): Promise<void> {
 	// Init AbortedGenerations refresh process
 	AbortedGenerations.getInstance();
 
-	// Finalize generations whose pod died mid-run. Pointless unless runs are recorded.
-	if (generationEventsEnabled()) {
-		GenerationReaper.getInstance();
-	}
+	// Finalize generations whose pod died mid-run.
+	GenerationReaper.getInstance();
 
 	// Warm up the share-thumbnail renderer: the first satori render in a fresh
 	// process pays ~1s of font parsing + layout engine init, which would
