@@ -22,7 +22,6 @@
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { isPro } from "$lib/stores/isPro";
-	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { createConversationsStore } from "$lib/stores/conversations.svelte";
 
@@ -260,8 +259,6 @@
 {#if showWelcome}
 	<WelcomeModal close={closeWelcomeModal} />
 {/if}
-
-<BackgroundGenerationPoller />
 
 <NavigationLoadingBar />
 

@@ -10,12 +10,10 @@ export interface MergeFinalAnswerParams {
 }
 
 /**
- * Compute an assistant message's content when a FinalAnswer arrives, mirroring the
- * server so every view agrees on the final text. Pulled out of the streaming loop
- * because the branching here — reconciling streamed content with the provider's
- * final text across the interrupted, tool-using, and plain cases — is where subtle
- * content bugs live, and it is far easier to pin down in isolation than inside the
- * component. Both the streaming path and the reattach path route through this.
+ * Content for an assistant message when a FinalAnswer arrives, mirroring the server so
+ * every view agrees. Isolated (and unit-tested) because this reconciliation of streamed
+ * content with the provider's final text is where subtle content bugs live; both the
+ * streaming and reattach paths route through it.
  */
 export function mergeFinalAnswerContent({
 	existing,
@@ -24,19 +22,17 @@ export function mergeFinalAnswerContent({
 	isInterrupted,
 }: MergeFinalAnswerParams): string {
 	if (isInterrupted) {
-		// Nothing streamed: fall back to the final text.
 		if (!existing) return finalText;
-		// The server may have clamped the persisted text back to a reported stop point.
-		// Adopt it only when it is a prefix of what we streamed, so this view matches
-		// what every other view will load; otherwise keep our streamed content (continue
-		// flows receive only the post-prefix text).
+		// The server may have clamped the persisted text back to the stop point. Adopt it
+		// only when it is a prefix of ours, so this view matches what others will load;
+		// otherwise keep our streamed content (continue flows send only post-prefix text).
 		if (finalText && existing.startsWith(finalText)) return finalText;
 		return existing;
 	}
 
 	if (hadTools) {
 		// Providers often stream content, run tools, then return a different follow-up
-		// message. Preserve the pre-tool stream instead of letting the final text clobber it.
+		// message; preserve the pre-tool stream instead of letting the final text clobber it.
 		const trimmedExistingSuffix = existing.replace(/\s+$/, "");
 		const trimmedFinalPrefix = finalText.replace(/^\s+/, "");
 		const alreadyStreamed =
