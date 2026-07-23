@@ -19,19 +19,22 @@ export function unregisterActiveRun(generationId: string): void {
 	activeRuns.delete(generationId);
 }
 
-// Marks the message interrupted, not just the generation status: the message flag
-// is what every existing reader already treats as terminal. The status guard keeps
-// this idempotent and safe across pods — only a still-running run is touched, so the
-// first caller (any pod's reaper, or the owner's shutdown) wins.
+// The message flag — not just the generation status — is what every existing reader
+// treats as terminal, so both must move together. Flip the generation first, guarded on
+// `status: "running"`, so only one caller (a reaper on any pod, or the owner's shutdown)
+// wins the claim; mark the message only on that win.
 export async function markGenerationInterrupted(
 	generationId: string,
 	run: ActiveRun
 ): Promise<void> {
 	const now = new Date();
-	await collections.generations.updateOne(
+	const claim = await collections.generations.updateOne(
 		{ generationId, status: "running" },
 		{ $set: { status: "interrupted", endedAt: now, updatedAt: now } }
 	);
+	// Lost the claim: the run completed or errored elsewhere first. Marking the message now
+	// would flag a finished answer as stopped, so leave it untouched.
+	if (claim.matchedCount === 0) return;
 	await collections.conversations.updateOne(
 		{
 			_id: run.conversationId,
