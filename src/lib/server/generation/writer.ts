@@ -9,8 +9,34 @@ import type { User } from "$lib/types/User";
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
+	MessageReasoningUpdateType,
 	type MessageUpdate,
+	type MessageStreamUpdate,
+	type MessageReasoningStreamUpdate,
 } from "$lib/types/MessageUpdate";
+
+// Text and reasoning are the only per-token streams; both carry a `token`.
+function isStreamToken(e: MessageUpdate): e is MessageStreamUpdate | MessageReasoningStreamUpdate {
+	return (
+		e.type === MessageUpdateType.Stream ||
+		(e.type === MessageUpdateType.Reasoning && e.subtype === MessageReasoningUpdateType.Stream)
+	);
+}
+
+// If `event` continues the same stream as `tail`, return the two concatenated into
+// one event; otherwise null. Reasoning models emit thousands of reasoning tokens, so
+// batching them (like text) is what keeps this off the per-token flush path and out of
+// the write amplification this file exists to remove. Text and reasoning never merge
+// into each other — they render on separate channels.
+export function mergedStreamToken(
+	tail: MessageUpdate | undefined,
+	event: MessageUpdate
+): MessageStreamUpdate | MessageReasoningStreamUpdate | null {
+	if (!tail || !isStreamToken(tail) || !isStreamToken(event) || tail.type !== event.type) {
+		return null;
+	}
+	return { ...tail, token: tail.token + event.token };
+}
 
 const STREAM_FLUSH_MS = 200;
 const HEARTBEAT_MS = 10_000;
@@ -98,6 +124,14 @@ export async function createGenerationWriter(
 		return chain;
 	};
 
+	const nextEvent = (event: MessageUpdate): GenerationEvent => ({
+		_id: new ObjectId(),
+		generationId,
+		seq: ++seq,
+		event,
+		createdAt: new Date(),
+	});
+
 	const flush = (): Promise<void> => {
 		if (flushTimer) {
 			clearTimeout(flushTimer);
@@ -172,33 +206,21 @@ export async function createGenerationWriter(
 				return;
 			}
 
-			if (event.type === MessageUpdateType.Stream) {
+			if (isStreamToken(event)) {
 				const last = pending.at(-1);
 				// Merge into the unflushed tail rather than minting a seq per token, so a
-				// replay up to any seq reconstructs `content` exactly.
-				if (last && last.event.type === MessageUpdateType.Stream) {
-					last.event = { ...last.event, token: last.event.token + event.token };
-					scheduleFlush(STREAM_FLUSH_MS);
-					return;
+				// replay up to any seq reconstructs the text exactly.
+				const merged = mergedStreamToken(last?.event, event);
+				if (last && merged) {
+					last.event = merged;
+				} else {
+					pending.push(nextEvent(event));
 				}
-				pending.push({
-					_id: new ObjectId(),
-					generationId,
-					seq: ++seq,
-					event,
-					createdAt: new Date(),
-				});
 				scheduleFlush(STREAM_FLUSH_MS);
 				return;
 			}
 
-			pending.push({
-				_id: new ObjectId(),
-				generationId,
-				seq: ++seq,
-				event,
-				createdAt: new Date(),
-			});
+			pending.push(nextEvent(event));
 			// Flush now, not on a timer: these are ordered against the text around them.
 			void flush();
 		},
