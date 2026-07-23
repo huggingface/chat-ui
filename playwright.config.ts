@@ -127,6 +127,12 @@ export default defineConfig({
 				// P1 of the resumable-task work. On here so the suite exercises the path
 				// we are moving to; the legacy persist path is what ships with it off.
 				ENABLE_GENERATION_EVENTS: "true",
+				// Scaled down together (production is 60000 / 90000 / 10000) so a reaper
+				// test sees a dead run finalized within its lifetime, while a live run
+				// heartbeating every second stays comfortably under the 5s stale threshold.
+				GENERATION_REAP_INTERVAL_MS: "1000",
+				GENERATION_REAP_AFTER_MS: "5000",
+				GENERATION_HEARTBEAT_MS: "1000",
 				LLM_ROUTER_ROUTES_PATH: "",
 				LLM_ROUTER_ARCH_BASE_URL: "",
 				ALLOW_IFRAME: "true",

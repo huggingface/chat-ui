@@ -124,9 +124,11 @@
 			}
 		}
 
-		// Timeout guard: entries that have been tracked too long are evicted,
-		// mirroring the old poller's MAX_POLL_DURATION_MS behaviour.
+		// A guess at when a run died, for when the server can't tell us. Once the
+		// reaper guarantees a terminal signal, this timeout only does harm — it would
+		// drop a healthy 30-minute run after 3 minutes.
 		function evictTimedOutEntries() {
+			if (page.data.resumableGenerations) return;
 			const now = Date.now();
 			const timedOut = backgroundGenerationEntries.filter(
 				(e) => now - e.startedAt > MAX_TRACK_DURATION_MS

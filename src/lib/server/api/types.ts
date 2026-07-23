@@ -42,4 +42,6 @@ export interface FeatureFlags {
 	loginEnabled: boolean;
 	isAdmin: boolean;
 	transcriptionEnabled: boolean;
+	/** Runs are recorded and reaped server-side, so the client can trust the terminal signal rather than a local timeout. */
+	resumableGenerations: boolean;
 }

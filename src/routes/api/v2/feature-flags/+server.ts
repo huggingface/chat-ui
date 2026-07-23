@@ -10,5 +10,6 @@ export const GET: RequestHandler = async ({ locals }) => {
 		loginEnabled,
 		isAdmin: locals.isAdmin,
 		transcriptionEnabled: !!config.get("TRANSCRIPTION_MODEL"),
+		resumableGenerations: config.ENABLE_GENERATION_EVENTS === "true",
 	} satisfies FeatureFlags);
 };
