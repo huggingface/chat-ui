@@ -21,6 +21,7 @@
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
 	import { fetchMessageUpdates, resolveStreamingMode } from "$lib/utils/messageUpdates";
+	import { mergeFinalAnswerContent } from "$lib/utils/mergeFinalAnswer";
 	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { enabledServers, mcpServersLoaded } from "$lib/stores/mcpServers";
@@ -396,60 +397,14 @@
 					}
 					pending = false;
 				} else if (update.type === MessageUpdateType.FinalAnswer) {
-					// Mirror server-side merge behavior so the UI reflects the
-					// final text once tools complete, while preserving any
-					// pre‑tool streamed content when appropriate.
-					const finalText = update.text ?? "";
-					const isInterrupted = update.interrupted === true;
-					const hadTools = updatesBuffer.some((u) => u.type === MessageUpdateType.Tool);
-
-					if (isInterrupted) {
-						if (!messageToWriteTo.content) {
-							// We never streamed anything; fall back to finalText.
-							messageToWriteTo.content = finalText;
-						} else if (finalText && messageToWriteTo.content.startsWith(finalText)) {
-							// The server may have clamped the persisted text back to a
-							// reported stop point (see stop-generating). Adopt it when it
-							// is a prefix of what we streamed so this view matches what
-							// every other view will load; otherwise keep our streamed
-							// content (continue flows receive only the post-prefix text).
-							messageToWriteTo.content = finalText;
-						}
-					} else if (hadTools) {
-						const existing = messageToWriteTo.content;
-						const trimmedExistingSuffix = existing.replace(/\s+$/, "");
-						const trimmedFinalPrefix = finalText.replace(/^\s+/, "");
-						const alreadyStreamed =
-							finalText &&
-							(existing.endsWith(finalText) ||
-								(trimmedFinalPrefix.length > 0 &&
-									trimmedExistingSuffix.endsWith(trimmedFinalPrefix)));
-
-						if (existing && existing.length > 0) {
-							if (alreadyStreamed) {
-								// A. Already streamed the same final text; keep as-is.
-								messageToWriteTo.content = existing;
-							} else if (
-								finalText &&
-								(finalText.startsWith(existing) ||
-									(trimmedExistingSuffix.length > 0 &&
-										trimmedFinalPrefix.startsWith(trimmedExistingSuffix)))
-							) {
-								// B. Final text already includes streamed prefix; use it verbatim.
-								messageToWriteTo.content = finalText;
-							} else {
-								// C. Merge with a paragraph break for readability.
-								const needsGap = !/\n\n$/.test(existing) && !/^\n/.test(finalText ?? "");
-								messageToWriteTo.content = existing + (needsGap ? "\n\n" : "") + finalText;
-							}
-						} else {
-							messageToWriteTo.content = finalText;
-						}
-					} else {
-						// No tools: final answer replaces streamed content so
-						// the provider's final text is authoritative.
-						messageToWriteTo.content = finalText;
-					}
+					// Mirror server-side merge behavior so the UI reflects the final text
+					// once tools complete, while preserving pre-tool streamed content.
+					messageToWriteTo.content = mergeFinalAnswerContent({
+						existing: messageToWriteTo.content,
+						finalText: update.text ?? "",
+						hadTools: updatesBuffer.some((u) => u.type === MessageUpdateType.Tool),
+						isInterrupted: update.interrupted === true,
+					});
 				} else if (
 					update.type === MessageUpdateType.Status &&
 					update.status === MessageUpdateStatus.Error
