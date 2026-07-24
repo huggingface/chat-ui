@@ -76,12 +76,17 @@ export class Database {
 			process.exit(1);
 		}
 
-		// Disconnect DB on exit
-		onExit(async () => {
-			logger.info("Closing database connection");
-			await this.client?.close(true);
-			await this.mongoServer?.stop();
-		});
+		// Disconnect DB on exit. Registered `last` so other exit handlers (e.g. the
+		// reaper finalizing in-flight generations) finish their writes before the
+		// client is force-closed.
+		onExit(
+			async () => {
+				logger.info("Closing database connection");
+				await this.client?.close(true);
+				await this.mongoServer?.stop();
+			},
+			{ last: true }
+		);
 	}
 
 	public static async getInstance(): Promise<Database> {
