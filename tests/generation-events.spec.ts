@@ -5,8 +5,6 @@
  * client stayed attached to its own POST stream, the generation wrote *nothing* to the database
  * for its entire duration. A long run was therefore invisible to any second tab or device, and
  * lost entirely if the pod died — and the longer the run, the more it lost.
- *
- * Requires `ENABLE_GENERATION_EVENTS=true`, set in `playwright.config.ts`.
  */
 import { test, expect, E2E_APP_URL, SESSION_COOKIE_NAME } from "./fixtures.ts";
 import { ObjectId, type Db } from "mongodb";

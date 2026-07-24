@@ -14,6 +14,7 @@ import {
 	type MessageStreamUpdate,
 	type MessageReasoningStreamUpdate,
 } from "$lib/types/MessageUpdate";
+import { registerActiveRun, unregisterActiveRun } from "./finalize";
 
 // Text and reasoning are the only per-token streams; both carry a `token`.
 function isStreamToken(e: MessageUpdate): e is MessageStreamUpdate | MessageReasoningStreamUpdate {
@@ -38,11 +39,17 @@ export function mergedStreamToken(
 }
 
 const FLUSH_INTERVAL_MS = 200;
-const HEARTBEAT_MS = 10_000;
 const MATERIALIZE_MS = 3_000;
 
-export function generationEventsEnabled(): boolean {
-	return config.ENABLE_GENERATION_EVENTS === "true";
+// Must stay well below the reaper's stale threshold (see reaper.ts), or a live run
+// gets reaped between beats. Configurable only so tests can scale both down together.
+export function heartbeatMs(): number {
+	const raw = config.GENERATION_HEARTBEAT_MS;
+	if (raw) {
+		const parsed = parseInt(raw, 10);
+		if (!isNaN(parsed) && parsed > 0) return parsed;
+	}
+	return 10_000;
 }
 
 export interface GenerationSnapshot {
@@ -76,7 +83,7 @@ export interface CreateGenerationWriterParams {
 	snapshot: () => GenerationSnapshot;
 }
 
-/** A no-op rather than null, so callers never branch on whether the feature is enabled. */
+/** Returned only when a run fails to register, so callers never branch on a null writer. */
 const NOOP_WRITER: GenerationWriter = {
 	push: () => {},
 	currentSeq: () => 0,
@@ -86,8 +93,6 @@ const NOOP_WRITER: GenerationWriter = {
 export async function createGenerationWriter(
 	params: CreateGenerationWriterParams
 ): Promise<GenerationWriter> {
-	if (!generationEventsEnabled()) return NOOP_WRITER;
-
 	const { generationId, conversationId, messageId, userId, sessionId, snapshot } = params;
 	const now = new Date();
 
@@ -112,6 +117,8 @@ export async function createGenerationWriter(
 		logger.error({ err, generationId }, "[generation] failed to register run; events disabled");
 		return NOOP_WRITER;
 	}
+
+	registerActiveRun(generationId, { conversationId, messageId });
 
 	let seq = 0;
 	let pending: GenerationEvent[] = [];
@@ -196,7 +203,7 @@ export async function createGenerationWriter(
 				{ $set: { lastHeartbeatAt: new Date(), seq, updatedAt: new Date() } }
 			);
 		});
-	}, HEARTBEAT_MS);
+	}, heartbeatMs());
 	heartbeatTimer.unref?.();
 
 	const materializeTimer = setInterval(() => {
@@ -238,6 +245,7 @@ export async function createGenerationWriter(
 		async finish({ status, error }) {
 			if (finished) return;
 			finished = true;
+			unregisterActiveRun(generationId);
 			clearInterval(heartbeatTimer);
 			clearInterval(materializeTimer);
 			if (flushTimer) {
