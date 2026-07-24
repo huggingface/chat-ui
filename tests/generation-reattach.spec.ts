@@ -309,6 +309,77 @@ test("rejects a conversation the caller does not own", async ({ db, session }) =
 	expect(status).toBe(404);
 });
 
+test("preserves text at a compressed-marker reattach boundary", async ({ db, session, page }) => {
+	test.setTimeout(30_000);
+	const now = new Date();
+	const systemId = randomUUID();
+	const userId = randomUUID();
+	const assistantId = randomUUID();
+	const generationId = randomUUID();
+	const conversationId = new ObjectId();
+	const prefix = "north of Greenland";
+	const boundary = "'s";
+	const continuation = " fractured coast ";
+
+	await db.collection("conversations").insertOne({
+		_id: conversationId,
+		sessionId: session.sessionId,
+		model: "test-org/test-model",
+		title: "compressed marker boundary",
+		rootMessageId: systemId,
+		messages: [
+			{ id: systemId, from: "system", content: "", ancestors: [], children: [userId] },
+			{
+				id: userId,
+				from: "user",
+				content: "continue",
+				ancestors: [systemId],
+				children: [assistantId],
+			},
+			{
+				id: assistantId,
+				from: "assistant",
+				content: prefix + boundary,
+				generationId,
+				materializedSeq: 2,
+				updates: [
+					{ type: "stream", token: "", len: prefix.length },
+					{ type: "stream", token: "", len: boundary.length },
+				],
+				ancestors: [systemId, userId],
+				children: [],
+			},
+		],
+		createdAt: now,
+		updatedAt: now,
+	} as never);
+	await db.collection("generations").insertOne({
+		_id: new ObjectId(),
+		generationId,
+		conversationId,
+		messageId: assistantId,
+		sessionId: session.sessionId,
+		status: "running",
+		seq: 3,
+		lastHeartbeatAt: now,
+		startedAt: now,
+		createdAt: now,
+		updatedAt: now,
+	} as never);
+	await db.collection("generationEvents").insertOne({
+		_id: new ObjectId(),
+		generationId,
+		seq: 3,
+		event: { type: "stream", token: continuation },
+		createdAt: now,
+	} as never);
+
+	await page.goto(`/conversation/${conversationId.toString()}`);
+	await expect(page.locator('[data-message-role="assistant"]').last()).toContainText(
+		prefix + boundary + continuation.trimEnd()
+	);
+});
+
 test("tails a live generation to completion (writer → endpoint)", async ({
 	api,
 	session,
