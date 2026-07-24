@@ -2,7 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { McpServerConfig } from "./httpClient";
-import { mcpFetch } from "$lib/server/urlSafety";
+import { mcpFetchForServer } from "./fetch";
 
 type PoolEntry = { client: Client; lastUsedAt: number; activeCalls: number };
 
@@ -49,7 +49,7 @@ function keyOf(server: McpServerConfig) {
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([k, v]) => `${k}:${v}`)
 		.join("|\u0000|");
-	return `${server.url}|${headers}`;
+	return `${server.url}|${server.oauthConnectionId ?? ""}|${headers}`;
 }
 
 export async function getClient(server: McpServerConfig, signal?: AbortSignal): Promise<Client> {
@@ -78,16 +78,15 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 	// Pooled clients outlive the request that created them, so never bind the per-request
 	// abort signal to the transport. Per-call cancellation goes through RequestOptions instead.
 	const requestInit: RequestInit = { headers: server.headers };
+	const fetch = mcpFetchForServer(server);
 	try {
 		try {
-			await client.connect(
-				new StreamableHTTPClientTransport(url, { requestInit, fetch: mcpFetch })
-			);
+			await client.connect(new StreamableHTTPClientTransport(url, { requestInit, fetch }));
 		} catch (httpErr) {
 			// Remember the original HTTP transport error so we can surface it if the fallback also fails.
 			// Today we always show the SSE message, which is misleading when the real failure was HTTP (e.g. 500).
 			firstError = httpErr;
-			await client.connect(new SSEClientTransport(url, { requestInit, fetch: mcpFetch }));
+			await client.connect(new SSEClientTransport(url, { requestInit, fetch }));
 		}
 	} catch (err) {
 		try {

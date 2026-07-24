@@ -205,6 +205,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							headers: z
 								.optional(z.array(z.object({ key: z.string(), value: z.string() })))
 								.default([]),
+							oauthConnectionId: z.string().optional(),
 						})
 					)
 				)
@@ -234,6 +235,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					s.headers && s.headers.length > 0
 						? Object.fromEntries(s.headers.map((h) => [h.key, h.value]))
 						: undefined,
+				oauthConnectionId: s.oauthConnectionId,
 			})),
 		};
 	} catch {

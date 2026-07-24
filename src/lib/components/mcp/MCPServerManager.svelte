@@ -3,6 +3,7 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import ServerCard from "./ServerCard.svelte";
 	import AddServerForm from "./AddServerForm.svelte";
+	import AuthorizeStep from "./AuthorizeStep.svelte";
 	import {
 		allMcpServers,
 		selectedServerIds,
@@ -10,8 +11,12 @@
 		addCustomServer,
 		refreshMcpServers,
 		healthCheckServer,
+		setServerOAuth,
+		toggleServer,
 	} from "$lib/stores/mcpServers";
-	import type { KeyValuePair } from "$lib/types/Tool";
+	import type { KeyValuePair, MCPOAuthState } from "$lib/types/Tool";
+	import type { DiscoveryResponse, OAuthCallbackPayload } from "$lib/utils/mcpOAuth";
+	import { error } from "$lib/stores/errors";
 	import IconAddLarge from "~icons/carbon/add-large";
 	import IconRefresh from "~icons/carbon/renew";
 	import LucideHammer from "~icons/lucide/hammer";
@@ -25,21 +30,97 @@
 
 	let { onclose }: Props = $props();
 
-	type View = "list" | "add";
+	type View = "list" | "add" | "authorize";
 	let currentView = $state<View>("list");
 	let isRefreshing = $state(false);
+	let pendingAuth = $state<{
+		serverId: string;
+		serverUrl: string;
+		discovery: DiscoveryResponse;
+	} | null>(null);
 
 	const baseServers = $derived($allMcpServers.filter((s) => s.type === "base"));
 	const customServers = $derived($allMcpServers.filter((s) => s.type === "custom"));
 	const enabledCount = $derived($enabledServersCount);
 
-	function handleAddServer(serverData: { name: string; url: string; headers?: KeyValuePair[] }) {
-		addCustomServer(serverData);
+	function handleAddServer(serverData: {
+		name: string;
+		url: string;
+		headers?: KeyValuePair[];
+		discovery?: DiscoveryResponse;
+	}) {
+		const oauth: MCPOAuthState | undefined =
+			serverData.discovery?.requiresAuth && serverData.discovery.connection
+				? serverData.discovery.connection
+				: undefined;
+		const id = addCustomServer({
+			name: serverData.name,
+			url: serverData.url,
+			headers: serverData.headers,
+			oauth,
+			authRequired: !!oauth,
+		});
+		if (oauth && serverData.discovery) {
+			pendingAuth = {
+				serverId: id,
+				serverUrl: serverData.url,
+				discovery: serverData.discovery,
+			};
+			currentView = "authorize";
+		} else if (serverData.discovery?.requiresAuth) {
+			// Discovery said "needs auth" but we don't have enough metadata to
+			// drive the dance. Tell the user explicitly instead of silently adding
+			// a broken server.
+			currentView = "list";
+			$error = `${serverData.url} requires authorization but its OAuth metadata could not be loaded. Try Health Check or contact the server admin.`;
+		} else {
+			// Non-OAuth server: just close the form. The user flips the Switch on
+			// the card to enable it (matches pre-PR behavior).
+			currentView = "list";
+		}
+	}
+
+	function handleAuthorized(payload: OAuthCallbackPayload) {
+		if (!pendingAuth || !payload.ok || !payload.connection) return;
+		const serverId = pendingAuth.serverId;
+		setServerOAuth(serverId, payload.connection);
+		// Auto-enable on first authorization so the user can immediately use the
+		// server. If they were re-authorizing an already-enabled server, leave the
+		// selection state alone — toggling would turn it off.
+		if (!$selectedServerIds.has(serverId)) {
+			toggleServer(serverId);
+		}
+		const server = $allMcpServers.find((s) => s.id === serverId);
+		if (server) healthCheckServer({ ...server });
+		pendingAuth = null;
+		currentView = "list";
+	}
+
+	function handleAuthorizeCancel() {
+		pendingAuth = null;
 		currentView = "list";
 	}
 
 	function handleCancel() {
 		currentView = "list";
+	}
+
+	function handleReauthorizeFromCard(detail: {
+		serverId: string;
+		serverUrl: string;
+		oauth: MCPOAuthState;
+	}) {
+		const discovery: DiscoveryResponse = {
+			requiresAuth: true,
+			connection: detail.oauth,
+		};
+		setServerOAuth(detail.serverId, detail.oauth);
+		pendingAuth = {
+			serverId: detail.serverId,
+			serverUrl: detail.serverUrl,
+			discovery,
+		};
+		currentView = "authorize";
 	}
 
 	async function handleRefresh() {
@@ -63,6 +144,8 @@
 			<h2 class="mb-1 text-xl font-semibold text-gray-900 dark:text-gray-200">
 				{#if currentView === "list"}
 					MCP Servers
+				{:else if currentView === "authorize"}
+					Authorize MCP server
 				{:else}
 					Add MCP server
 				{/if}
@@ -70,6 +153,9 @@
 			<p class="text-sm text-gray-600 dark:text-gray-400">
 				{#if currentView === "list"}
 					Manage MCP servers to extend {publicConfig.PUBLIC_APP_NAME} with external tools.
+				{:else if currentView === "authorize"}
+					Sign in to {pendingAuth?.serverUrl} so {publicConfig.PUBLIC_APP_NAME} can call its tools on
+					your behalf.
 				{:else}
 					Add a custom MCP server to {publicConfig.PUBLIC_APP_NAME}.
 				{/if}
@@ -161,7 +247,11 @@
 					{:else}
 						<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 							{#each customServers as server (server.id)}
-								<ServerCard {server} isSelected={$selectedServerIds.has(server.id)} />
+								<ServerCard
+									{server}
+									isSelected={$selectedServerIds.has(server.id)}
+									onreauthorize={handleReauthorizeFromCard}
+								/>
 							{/each}
 						</div>
 					{/if}
@@ -180,6 +270,14 @@
 			</div>
 		{:else if currentView === "add"}
 			<AddServerForm onsubmit={handleAddServer} oncancel={handleCancel} />
+		{:else if currentView === "authorize" && pendingAuth}
+			<AuthorizeStep
+				discovery={pendingAuth.discovery}
+				serverUrl={pendingAuth.serverUrl}
+				serverId={pendingAuth.serverId}
+				onauthorized={handleAuthorized}
+				oncancel={handleAuthorizeCancel}
+			/>
 		{/if}
 	</div>
 </Modal>

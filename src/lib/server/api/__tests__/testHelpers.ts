@@ -112,6 +112,7 @@ export async function cleanupTestData() {
 		collections.migrationResults.deleteMany({}),
 		collections.tokenCaches.deleteMany({}),
 		collections.tools.deleteMany({}),
+		collections.mcpOAuthConnections.deleteMany({}),
 		cleanupGridFS(),
 	]);
 }

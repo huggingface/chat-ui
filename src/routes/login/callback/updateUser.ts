@@ -15,6 +15,7 @@ import { addWeeks } from "date-fns";
 import { OIDConfig } from "$lib/server/auth";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
+import { migrateOAuthConnectionsToUser } from "$lib/server/mcp/oauth/connections";
 
 export async function updateUser(params: {
 	userData: UserinfoResponse;
@@ -201,8 +202,14 @@ export async function updateUser(params: {
 		}
 	}
 
+	if (!userId) {
+		error(500, "Could not resolve the authenticated user");
+	}
+
 	// refresh session cookie
 	refreshSessionCookie(cookies, secretSessionId);
+
+	await migrateOAuthConnectionsToUser(previousSessionId, userId);
 
 	// migrate pre-existing conversations
 	await collections.conversations.updateMany(
