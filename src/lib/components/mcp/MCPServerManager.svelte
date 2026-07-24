@@ -12,10 +12,9 @@
 		refreshMcpServers,
 		healthCheckServer,
 		setServerOAuth,
-		setServerTokens,
 		toggleServer,
 	} from "$lib/stores/mcpServers";
-	import type { KeyValuePair, MCPClientInformation, MCPOAuthState } from "$lib/types/Tool";
+	import type { KeyValuePair, MCPOAuthState } from "$lib/types/Tool";
 	import type { DiscoveryResponse, OAuthCallbackPayload } from "$lib/utils/mcpOAuth";
 	import { error } from "$lib/stores/errors";
 	import IconAddLarge from "~icons/carbon/add-large";
@@ -50,21 +49,9 @@
 		headers?: KeyValuePair[];
 		discovery?: DiscoveryResponse;
 	}) {
-		// Save a partial oauth state on add (asMetadata + resource) even when DCR
-		// produced no clientInfo — the manual-client-id flow inside AuthorizeStep
-		// will fill it in via handleAuthorized below. Without this, setServerTokens
-		// would refuse to persist tokens later because s.oauth would be undefined.
 		const oauth: MCPOAuthState | undefined =
-			serverData.discovery?.requiresAuth &&
-			serverData.discovery.asMetadata &&
-			serverData.discovery.resource
-				? {
-						resource: serverData.discovery.resource,
-						asMetadata: serverData.discovery.asMetadata,
-						resourceMetadataUrl: serverData.discovery.resourceMetadataUrl,
-						clientInfo: serverData.discovery.clientInfo,
-						clientWasManuallyEntered: !serverData.discovery.supportsDcr,
-					}
+			serverData.discovery?.requiresAuth && serverData.discovery.connection
+				? serverData.discovery.connection
 				: undefined;
 		const id = addCustomServer({
 			name: serverData.name,
@@ -73,11 +60,6 @@
 			oauth,
 			authRequired: !!oauth,
 		});
-		// Route to the authorize step only when we built a usable oauth state.
-		// If `requiresAuth` came back true but `asMetadata` / `resource` were
-		// missing (partial discovery), we'd otherwise route to AuthorizeStep and
-		// then `handleAuthorized` would silently bail — leaving the user with a
-		// permanently-broken half-state and no UI signal.
 		if (oauth && serverData.discovery) {
 			pendingAuth = {
 				serverId: id,
@@ -98,21 +80,10 @@
 		}
 	}
 
-	function handleAuthorized(payload: OAuthCallbackPayload, clientInfo: MCPClientInformation) {
-		if (!pendingAuth || !payload.ok || !payload.tokens) return;
-		const { asMetadata, resource, resourceMetadataUrl, supportsDcr } = pendingAuth.discovery;
-		if (!asMetadata || !resource) return;
+	function handleAuthorized(payload: OAuthCallbackPayload) {
+		if (!pendingAuth || !payload.ok || !payload.connection) return;
 		const serverId = pendingAuth.serverId;
-		// Persist the final clientInfo (auto-registered or manually entered) so
-		// future refresh / revoke calls don't lose it. Then write the tokens.
-		setServerOAuth(serverId, {
-			resource,
-			asMetadata,
-			resourceMetadataUrl,
-			clientInfo,
-			clientWasManuallyEntered: !supportsDcr,
-		});
-		setServerTokens(serverId, payload.tokens);
+		setServerOAuth(serverId, payload.connection);
 		// Auto-enable on first authorization so the user can immediately use the
 		// server. If they were re-authorizing an already-enabled server, leave the
 		// selection state alone — toggling would turn it off.
@@ -141,11 +112,7 @@
 	}) {
 		const discovery: DiscoveryResponse = {
 			requiresAuth: true,
-			resource: detail.oauth.resource,
-			resourceMetadataUrl: detail.oauth.resourceMetadataUrl,
-			asMetadata: detail.oauth.asMetadata,
-			clientInfo: detail.oauth.clientInfo,
-			supportsDcr: !detail.oauth.clientWasManuallyEntered,
+			connection: detail.oauth,
 		};
 		setServerOAuth(detail.serverId, detail.oauth);
 		pendingAuth = {

@@ -16,14 +16,14 @@
 		discovery: DiscoveryResponse;
 		serverUrl: string;
 		serverId: string; // required so the redirect fallback can route back
-		onauthorized: (payload: OAuthCallbackPayload, clientInfo: MCPClientInformation) => void;
+		onauthorized: (payload: OAuthCallbackPayload) => void;
 		oncancel: () => void;
 	}
 
 	let { discovery, serverUrl, serverId, onauthorized, oncancel }: Props = $props();
 
 	let phase = $state<"idle" | "starting" | "popup" | "manual" | "error" | "done">(
-		untrack(() => (discovery.clientInfo ? "idle" : "manual"))
+		untrack(() => (discovery.connection?.manualClientRequired ? "manual" : "idle"))
 	);
 	let errorMessage = $state<string | null>(null);
 	let manualClientId = $state("");
@@ -31,7 +31,7 @@
 	let popupBlocked = $state(false);
 
 	const issuerHost = $derived.by(() => {
-		const issuer = discovery.asMetadata?.issuer;
+		const issuer = discovery.connection?.issuer;
 		if (!issuer) return "";
 		try {
 			return new URL(issuer).host;
@@ -41,7 +41,7 @@
 	});
 
 	function buildClientInfo(): MCPClientInformation | null {
-		if (discovery.clientInfo) return discovery.clientInfo;
+		if (!discovery.connection?.manualClientRequired) return null;
 		if (!manualClientId.trim()) {
 			errorMessage = "Client ID is required";
 			return null;
@@ -56,16 +56,15 @@
 	async function handleAuthorize() {
 		errorMessage = null;
 		const clientInfo = buildClientInfo();
-		if (!clientInfo || !discovery.asMetadata || !discovery.resource) {
+		if (!discovery.connection || (discovery.connection.manualClientRequired && !clientInfo)) {
 			phase = phase === "manual" ? "manual" : "error";
 			return;
 		}
 		phase = "starting";
 		try {
 			const { authUrl, flowId } = await startAuthFlow({
-				resource: discovery.resource,
-				asMetadata: discovery.asMetadata,
-				clientInfo,
+				connectionId: discovery.connection.connectionId,
+				clientInfo: clientInfo ?? undefined,
 				popupMode: true,
 			});
 
@@ -78,7 +77,7 @@
 					return;
 				}
 				phase = "done";
-				onauthorized({ ...payload, resource: payload.resource ?? discovery.resource }, clientInfo);
+				onauthorized(payload);
 			} catch (e) {
 				const code = e instanceof Error ? e.message : String(e);
 				if (code === "popup-blocked") {
@@ -90,9 +89,8 @@
 							? window.location.pathname + window.location.search
 							: undefined;
 					const restart = await startAuthFlow({
-						resource: discovery.resource,
-						asMetadata: discovery.asMetadata,
-						clientInfo,
+						connectionId: discovery.connection.connectionId,
+						clientInfo: clientInfo ?? undefined,
 						popupMode: false,
 						redirectNext: next,
 					});
@@ -129,7 +127,7 @@
 				It is hosted at <code class="rounded bg-white/60 px-1 dark:bg-black/30">{serverUrl}</code>
 				and uses
 				<strong>{issuerHost}</strong>
-				to sign you in. You'll be redirected to grant access; tokens are stored in this browser only.
+				to sign you in. You'll be redirected to grant access; credentials stay on the server.
 			</p>
 		</div>
 	</div>

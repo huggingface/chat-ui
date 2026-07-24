@@ -45,20 +45,20 @@
 
 	const oauthAuthorized = $derived(
 		Boolean(
-			server.oauth?.tokens?.access_token &&
-			(!server.oauth.tokens.expires_at || server.oauth.tokens.expires_at > now)
+			server.oauth?.status === "authorized" &&
+			(!server.oauth.expiresAt || server.oauth.expiresAt > now)
 		)
 	);
 	const oauthNeedsAuth = $derived(Boolean(server.oauth) && !oauthAuthorized);
 	const issuerHost = $derived.by(() => {
 		try {
-			return server.oauth?.asMetadata?.issuer ? new URL(server.oauth.asMetadata.issuer).host : "";
+			return server.oauth?.issuer ? new URL(server.oauth.issuer).host : "";
 		} catch {
-			return server.oauth?.asMetadata?.issuer ?? "";
+			return server.oauth?.issuer ?? "";
 		}
 	});
 	const expiresInLabel = $derived.by(() => {
-		const exp = server.oauth?.tokens?.expires_at;
+		const exp = server.oauth?.expiresAt;
 		if (!exp) return null;
 		const ms = exp - now;
 		if (ms <= 0) return "expired";
@@ -130,7 +130,8 @@
 		}
 	}
 
-	function handleDelete() {
+	async function handleDelete() {
+		if (server.oauth) await disconnectServerOAuth(server.id, false);
 		deleteCustomServer(server.id);
 	}
 </script>

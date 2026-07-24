@@ -2,37 +2,28 @@
  * Client-side OAuth helpers for MCP servers.
  *
  * The dance is server-orchestrated (because most authorization-server endpoints
- * lack CORS), but tokens land in the browser via either:
+ * lack CORS), and the browser receives only a non-secret connection status via:
  *  - a popup window that postMessages back to the opener, or
  *  - a full-page redirect that drops a base64 handoff blob in `location.hash`
  *    on return.
  *
- * The browser then persists tokens alongside the custom MCP server entry in
- * localStorage (see `mcpServers.ts`).
+ * OAuth tokens, dynamic-registration credentials, discovery metadata, PKCE
+ * verifiers, and CSRF state remain in the server-side connection store.
  */
 
 import { base } from "$app/paths";
-import type {
-	MCPAuthorizationServerMetadata,
-	MCPClientInformation,
-	MCPOAuthTokens,
-} from "$lib/types/Tool";
+import type { MCPClientInformation, MCPOAuthState } from "$lib/types/Tool";
 
 export interface DiscoveryResponse {
 	requiresAuth: boolean;
-	resource?: string;
-	resourceMetadataUrl?: string;
-	asMetadata?: MCPAuthorizationServerMetadata;
-	clientInfo?: MCPClientInformation;
-	supportsDcr?: boolean;
+	connection?: MCPOAuthState;
 	probeStatus?: number;
 }
 
 export interface OAuthCallbackPayload {
 	ok: boolean;
 	flowId: string;
-	tokens?: MCPOAuthTokens;
-	resource?: string;
+	connection?: MCPOAuthState;
 	error?: string;
 }
 
@@ -46,14 +37,14 @@ function isOAuthCallbackPayload(value: unknown): value is OAuthCallbackPayload {
 		return false;
 	}
 	if (payload.error !== undefined && typeof payload.error !== "string") return false;
-	if (payload.resource !== undefined && typeof payload.resource !== "string") return false;
-	if (payload.tokens !== undefined) {
-		if (!payload.tokens || typeof payload.tokens !== "object") return false;
-		const tokens = payload.tokens as Record<string, unknown>;
+	if (payload.connection !== undefined) {
+		if (!payload.connection || typeof payload.connection !== "object") return false;
+		const connection = payload.connection as Record<string, unknown>;
 		if (
-			typeof tokens.access_token !== "string" ||
-			typeof tokens.token_type !== "string" ||
-			tokens.token_type.toLowerCase() !== "bearer"
+			typeof connection.connectionId !== "string" ||
+			!connection.connectionId ||
+			typeof connection.issuer !== "string" ||
+			(connection.status !== "authorized" && connection.status !== "authorization_required")
 		) {
 			return false;
 		}
@@ -75,9 +66,8 @@ export async function discoverServer(url: string): Promise<DiscoveryResponse> {
 }
 
 export async function startAuthFlow(args: {
-	resource: string;
-	asMetadata: MCPAuthorizationServerMetadata;
-	clientInfo: MCPClientInformation;
+	connectionId: string;
+	clientInfo?: MCPClientInformation;
 	popupMode: boolean;
 	redirectNext?: string;
 	scope?: string;
@@ -94,68 +84,30 @@ export async function startAuthFlow(args: {
 	return (await res.json()) as { authUrl: string; flowId: string };
 }
 
-/**
- * Thrown when the authorization server itself rejected the refresh_token
- * (RFC 6749 `invalid_grant` / revoked / rotated). The caller should wipe the
- * stored tokens and prompt the user to re-authorize. Distinct from generic
- * `Error`s, which represent transport-layer failures (offline, 5xx, timeout)
- * where the refresh_token is presumed still valid and tokens should be kept.
- */
-export class OAuthRefreshRejectedError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = "OAuthRefreshRejectedError";
-	}
-}
-
-export async function refreshAccessToken(args: {
-	asMetadata: MCPAuthorizationServerMetadata;
-	clientInfo: MCPClientInformation;
-	resource: string;
-	refreshToken: string;
-}): Promise<MCPOAuthTokens> {
+export async function refreshOAuthConnection(connectionId: string): Promise<MCPOAuthState> {
 	const res = await fetch(`${base}/api/mcp/oauth/refresh`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			asMetadata: args.asMetadata,
-			clientInfo: args.clientInfo,
-			resource: args.resource,
-			refresh_token: args.refreshToken,
-		}),
+		body: JSON.stringify({ connectionId }),
 	});
 	if (!res.ok) {
 		const text = await res.text().catch(() => "");
-		const message = text || `Refresh failed (${res.status})`;
-		// 401 from /api/mcp/oauth/refresh means the AS rejected the refresh_token.
-		// Anything else (502 transport / 5xx) is treated as transient by callers.
-		if (res.status === 401) throw new OAuthRefreshRejectedError(message);
-		throw new Error(message);
+		throw new Error(text || `Refresh failed (${res.status})`);
 	}
-	const body = (await res.json()) as { tokens: MCPOAuthTokens };
-	return body.tokens;
+	const body = (await res.json()) as { connection: MCPOAuthState };
+	return body.connection;
 }
 
-export async function revokeAccessToken(args: {
-	asMetadata: MCPAuthorizationServerMetadata;
-	clientInfo: MCPClientInformation;
-	token: string;
-	tokenTypeHint?: "access_token" | "refresh_token";
-}): Promise<boolean> {
+export async function disconnectOAuthConnection(connectionId: string): Promise<boolean> {
 	try {
 		const res = await fetch(`${base}/api/mcp/oauth/revoke`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				asMetadata: args.asMetadata,
-				clientInfo: args.clientInfo,
-				token: args.token,
-				token_type_hint: args.tokenTypeHint,
-			}),
+			body: JSON.stringify({ connectionId }),
 		});
 		if (!res.ok) return false;
-		const body = (await res.json()) as { revoked: boolean };
-		return Boolean(body.revoked);
+		const body = (await res.json()) as { disconnected: boolean };
+		return Boolean(body.disconnected);
 	} catch {
 		return false;
 	}
@@ -328,14 +280,4 @@ export function consumeRedirectHandoff(): {
 	if (!pending) return null;
 	if (pending.flowId !== payload.flowId) return null;
 	return { payload, serverId: pending.serverId };
-}
-
-export function isTokenExpiringSoon(tokens: MCPOAuthTokens, marginMs = 5 * 60 * 1000): boolean {
-	if (!tokens.expires_at) return false;
-	return Date.now() + marginMs >= tokens.expires_at;
-}
-
-export function isTokenExpired(tokens: MCPOAuthTokens): boolean {
-	if (!tokens.expires_at) return false;
-	return Date.now() >= tokens.expires_at;
 }

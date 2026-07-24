@@ -1,16 +1,21 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import type { KeyValuePair } from "$lib/types/Tool";
+import type { KeyValuePair, MCPOAuthState } from "$lib/types/Tool";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import type { RequestHandler } from "./$types";
 import { isValidUrl, mcpFetch } from "$lib/server/urlSafety";
 import { isStrictHfMcpLogin, hasNonEmptyToken, isExaMcpServer } from "$lib/server/mcp/hf";
+import {
+	OAuthAuthorizationRequiredError,
+	resolveOAuthAccessToken,
+} from "$lib/server/mcp/oauth/connections";
 
 interface HealthCheckRequest {
 	url: string;
 	headers?: KeyValuePair[];
+	oauthConnectionId?: string;
 }
 
 interface HealthCheckResponse {
@@ -22,6 +27,7 @@ interface HealthCheckResponse {
 	}>;
 	error?: string;
 	authRequired?: boolean;
+	oauth?: MCPOAuthState;
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -29,7 +35,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	try {
 		const body: HealthCheckRequest = await request.json();
-		const { url, headers } = body;
+		const { url, headers, oauthConnectionId } = body;
 
 		if (!url) {
 			return new Response(JSON.stringify({ ready: false, error: "URL is required" }), {
@@ -72,6 +78,21 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const headersRecord: Record<string, string> = headers?.length
 			? Object.fromEntries(headers.map((h) => [h.key, h.value]))
 			: {};
+		let oauthState: MCPOAuthState | undefined;
+		if (oauthConnectionId) {
+			if (Object.keys(headersRecord).some((key) => key.toLowerCase() === "authorization")) {
+				return new Response(
+					JSON.stringify({
+						ready: false,
+						error: "Use either an OAuth connection or a manual Authorization header",
+					}),
+					{ status: 400, headers: { "Content-Type": "application/json" } }
+				);
+			}
+			const resolved = await resolveOAuthAccessToken(locals, oauthConnectionId, url);
+			headersRecord["Authorization"] = `Bearer ${resolved.accessToken}`;
+			oauthState = resolved.state;
+		}
 		if (!headersRecord["Accept"]) {
 			headersRecord["Accept"] = "application/json, text/event-stream";
 		}
@@ -134,6 +155,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						inputSchema: tool.inputSchema,
 					})),
 					authRequired: false,
+					oauth: oauthState,
 				};
 
 				const res = new Response(JSON.stringify(response), {
@@ -148,6 +170,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						ready: false,
 						error: "Connected but no tools available",
 						authRequired: false,
+						oauth: oauthState,
 					} as HealthCheckResponse),
 					{
 						status: 503,
@@ -200,6 +223,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 							inputSchema: tool.inputSchema,
 						})),
 						authRequired: false,
+						oauth: oauthState,
 					};
 
 					const res = new Response(JSON.stringify(response), {
@@ -214,6 +238,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 							ready: false,
 							error: "Connected but no tools available",
 							authRequired: false,
+							oauth: oauthState,
 						} as HealthCheckResponse),
 						{
 							status: 503,
@@ -287,6 +312,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const response: HealthCheckResponse = {
 			ready: false,
 			error: error instanceof Error ? error.message : "Unknown error",
+			authRequired: error instanceof OAuthAuthorizationRequiredError,
 		};
 
 		const res = new Response(JSON.stringify(response), {

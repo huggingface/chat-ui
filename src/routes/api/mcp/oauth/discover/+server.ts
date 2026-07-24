@@ -5,12 +5,13 @@ import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import { discoverServerOAuth } from "$lib/server/mcp/oauth/discover";
 import { oauthCallbackUri } from "$lib/server/mcp/oauth/redirect";
+import { createOAuthConnection, publicOAuthState } from "$lib/server/mcp/oauth/connections";
 
 const Body = z.object({
 	url: z.string().url(),
 });
 
-export const POST: RequestHandler = async ({ request, url }) => {
+export const POST: RequestHandler = async ({ request, url, locals }) => {
 	let parsed: z.infer<typeof Body>;
 	try {
 		parsed = Body.parse(await request.json());
@@ -31,13 +32,23 @@ export const POST: RequestHandler = async ({ request, url }) => {
 			appName: config.PUBLIC_APP_NAME || "chat-ui",
 		});
 
-		return json({
-			requiresAuth: result.requiresAuth,
+		if (!result.requiresAuth || !result.resource || !result.asMetadata) {
+			return json({
+				requiresAuth: false,
+				probeStatus: result.probeStatus,
+			});
+		}
+
+		const connection = await createOAuthConnection(locals, {
+			serverUrl: parsed.url,
 			resource: result.resource,
 			resourceMetadataUrl: result.resourceMetadataUrl,
 			asMetadata: result.asMetadata,
 			clientInfo: result.clientInfo,
-			supportsDcr: result.supportsDcr,
+		});
+		return json({
+			requiresAuth: true,
+			connection: publicOAuthState(connection),
 			probeStatus: result.probeStatus,
 		});
 	} catch (e) {

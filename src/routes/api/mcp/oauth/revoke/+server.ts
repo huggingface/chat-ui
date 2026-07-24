@@ -1,20 +1,13 @@
 import { z } from "zod";
 import { error, json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import { tryRevokeToken } from "$lib/server/mcp/oauth/exchange";
-import {
-	parseAuthorizationServerMetadata,
-	parseClientInformation,
-} from "$lib/server/mcp/oauth/validation";
+import { deleteOAuthConnection } from "$lib/server/mcp/oauth/connections";
 
 const Body = z.object({
-	asMetadata: z.record(z.string(), z.unknown()),
-	clientInfo: z.record(z.string(), z.unknown()),
-	token: z.string().min(1),
-	token_type_hint: z.enum(["access_token", "refresh_token"]).optional(),
+	connectionId: z.string().min(1),
 });
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
 	let parsed: z.infer<typeof Body>;
 	try {
 		parsed = Body.parse(await request.json());
@@ -22,20 +15,10 @@ export const POST: RequestHandler = async ({ request }) => {
 		return error(400, e instanceof Error ? e.message : "Invalid request body");
 	}
 
-	let asMetadata;
-	let clientInfo;
 	try {
-		asMetadata = parseAuthorizationServerMetadata(parsed.asMetadata);
-		clientInfo = parseClientInformation(parsed.clientInfo);
+		const result = await deleteOAuthConnection(locals, parsed.connectionId);
+		return json({ disconnected: true, revoked: result.revoked });
 	} catch (e) {
-		return error(400, e instanceof Error ? e.message : "Invalid OAuth configuration");
+		return error(404, e instanceof Error ? e.message : "OAuth connection was not found");
 	}
-
-	const ok = await tryRevokeToken({
-		asMetadata,
-		clientInfo,
-		token: parsed.token,
-		tokenTypeHint: parsed.token_type_hint,
-	});
-	return json({ revoked: ok });
 };

@@ -1,12 +1,14 @@
-import { base } from "$app/paths";
 import type { RequestHandler } from "./$types";
 import { logger } from "$lib/server/logger";
 import { exchangeCodeForTokens, tokensWithExpiresAt } from "$lib/server/mcp/oauth/exchange";
-import { FLOW_COOKIE_NAME, verifyFlowCookie } from "$lib/server/mcp/oauth/state";
-import { config } from "$lib/server/config";
-import { dev } from "$app/environment";
 import { randomBytes } from "crypto";
 import { oauthCallbackUri, safeLocalReturnPath } from "$lib/server/mcp/oauth/redirect";
+import {
+	consumeAuthorizationFlow,
+	publicOAuthState,
+	storeAuthorizationTokens,
+} from "$lib/server/mcp/oauth/connections";
+import type { MCPOAuthState } from "$lib/types/Tool";
 import type {
 	AuthorizationServerMetadata,
 	OAuthClientInformationFull,
@@ -15,13 +17,9 @@ import type {
 interface PopupResultMessage {
 	ok: boolean;
 	flowId: string;
-	tokens?: unknown;
-	resource?: string;
+	connection?: MCPOAuthState;
 	error?: string;
 }
-
-const sameSite = "lax" as const;
-const secure = !(dev || config.ALLOW_INSECURE_COOKIES === "true");
 
 /**
  * Encode a value as JSON safe to embed inside an inline `<script>` tag. Escapes
@@ -101,57 +99,28 @@ function redirectResponseWithHash(redirectNext: string, message: PopupResultMess
 	});
 }
 
-export const GET: RequestHandler = async ({ url, cookies, locals }) => {
+export const GET: RequestHandler = async ({ url, locals }) => {
 	const code = url.searchParams.get("code");
 	const state = url.searchParams.get("state");
 	const errorParam = url.searchParams.get("error");
 	const errorDescription = url.searchParams.get("error_description");
-
-	// Locate only the cookie cryptographically bound to the returned state.
-	// Never fall back to an unrelated flow when state is missing or mismatched.
-	const flowCookies = cookies.getAll().filter((c) => c.name.startsWith(`${FLOW_COOKIE_NAME}-`));
-	let cookieFlowId: string | undefined;
-	let flowState = null as ReturnType<typeof verifyFlowCookie>;
-	for (const c of flowCookies) {
-		const candidate = verifyFlowCookie(c.value, locals.sessionId);
-		const candidateFlowId = c.name.slice(`${FLOW_COOKIE_NAME}-`.length);
-		if (candidate && candidate.flowId === candidateFlowId && candidate.expectedState === state) {
-			cookieFlowId = candidateFlowId;
-			flowState = candidate;
-			break;
-		}
-	}
 
 	let callbackUri: string;
 	try {
 		callbackUri = oauthCallbackUri(url);
 	} catch {
 		callbackUri = url.origin + url.pathname;
-		flowState = null;
-		cookieFlowId = undefined;
-	}
-	if (flowState?.redirectUri !== callbackUri) {
-		flowState = null;
-		cookieFlowId = undefined;
 	}
 
 	const origin = new URL(callbackUri).origin;
-	const popupMode = flowState?.popupMode ?? true;
-	const redirectNext = flowState?.redirectNext;
-
-	const expireFlowCookie = () => {
-		if (!cookieFlowId) return;
-		cookies.set(`${FLOW_COOKIE_NAME}-${cookieFlowId}`, "", {
-			path: `${base}/api/mcp/oauth`,
-			httpOnly: true,
-			sameSite,
-			secure,
-			maxAge: 0,
-		});
-	};
+	const connection = state
+		? await consumeAuthorizationFlow(locals, state, callbackUri).catch(() => null)
+		: null;
+	const flow = connection?.flow;
+	const popupMode = flow?.popupMode ?? true;
+	const redirectNext = flow?.redirectNext;
 
 	const respond = (message: PopupResultMessage) => {
-		expireFlowCookie();
 		if (!popupMode && redirectNext) {
 			return redirectResponseWithHash(redirectNext, message);
 		}
@@ -161,12 +130,12 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	if (errorParam) {
 		return respond({
 			ok: false,
-			flowId: flowState?.flowId ?? "",
+			flowId: flow?.id ?? "",
 			error: `${errorParam}${errorDescription ? `: ${errorDescription}` : ""}`,
 		});
 	}
 
-	if (!flowState) {
+	if (!connection || !flow) {
 		return respond({
 			ok: false,
 			flowId: "",
@@ -177,38 +146,38 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	if (!code || !state) {
 		return respond({
 			ok: false,
-			flowId: flowState.flowId,
+			flowId: flow.id,
 			error: "Missing code/state in callback",
 		});
 	}
 
-	if (state !== flowState.expectedState) {
+	if (state !== flow.expectedState) {
 		return respond({
 			ok: false,
-			flowId: flowState.flowId,
+			flowId: flow.id,
 			error: "State mismatch (CSRF protection)",
 		});
 	}
 
 	try {
 		const tokens = await exchangeCodeForTokens({
-			asMetadata: flowState.asMetadata as unknown as AuthorizationServerMetadata,
-			clientInfo: flowState.clientInfo as unknown as OAuthClientInformationFull,
-			redirectUri: flowState.redirectUri,
-			resource: flowState.resource,
+			asMetadata: connection.asMetadata as unknown as AuthorizationServerMetadata,
+			clientInfo: connection.clientInfo as unknown as OAuthClientInformationFull,
+			redirectUri: flow.redirectUri,
+			resource: connection.resource,
 			code,
-			codeVerifier: flowState.verifier,
+			codeVerifier: flow.verifier,
 		});
+		const updated = await storeAuthorizationTokens(locals, connection, tokensWithExpiresAt(tokens));
 		return respond({
 			ok: true,
-			flowId: flowState.flowId,
-			tokens: tokensWithExpiresAt(tokens),
-			resource: flowState.resource,
+			flowId: flow.id,
+			connection: publicOAuthState(updated),
 		});
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : "Token exchange failed";
-		logger.warn({ err: msg, flowId: flowState.flowId }, "[mcp-oauth] code exchange failed");
-		return respond({ ok: false, flowId: flowState.flowId, error: msg });
+		logger.warn({ err: msg, flowId: flow.id }, "[mcp-oauth] code exchange failed");
+		return respond({ ok: false, flowId: flow.id, error: "Token exchange failed" });
 	}
 };
 
