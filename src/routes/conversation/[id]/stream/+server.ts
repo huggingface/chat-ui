@@ -77,12 +77,20 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 						.sort({ seq: 1 })
 						.limit(REPLAY_BATCH)
 						.toArray();
+					let sawGap = false;
 					for (const e of batch) {
+						// An unordered multi-document insert is not atomically visible.
+						// Do not advance past a sequence that may appear on the next poll,
+						// or it can never be emitted to this connection.
+						if (e.seq !== cursor + 1) {
+							sawGap = true;
+							break;
+						}
 						sendUpdate(e.seq, e.event);
 						cursor = e.seq;
 						emitted++;
 					}
-					if (batch.length < REPLAY_BATCH) break;
+					if (sawGap || batch.length < REPLAY_BATCH) break;
 				}
 				return emitted;
 			};

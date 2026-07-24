@@ -199,6 +199,69 @@ test("resumes from fromSeq, replaying only later events", async ({ db, session }
 	expect(updates(frames).map((f) => f.id)).toEqual(["3", "4", "5"]);
 });
 
+test("waits for a temporarily invisible sequence before advancing the cursor", async ({
+	db,
+	session,
+}) => {
+	test.setTimeout(30_000);
+	const { convId, generationId } = await seedRun(db, session.sessionId, {
+		tokenCount: 0,
+		status: "running",
+	});
+	const now = new Date();
+
+	// Model an unordered insert becoming visible non-atomically: seq 3 can be
+	// observed while seq 2 is still absent.
+	await db.collection("generationEvents").insertMany([
+		{
+			_id: new ObjectId(),
+			generationId,
+			seq: 1,
+			event: { type: "stream", token: "one " },
+			createdAt: now,
+		},
+		{
+			_id: new ObjectId(),
+			generationId,
+			seq: 3,
+			event: { type: "stream", token: "three " },
+			createdAt: now,
+		},
+	] as never[]);
+	await db.collection("generations").updateOne({ generationId }, { $set: { seq: 3 } });
+
+	const collecting = collectFrames({
+		convId,
+		secret: session.secret,
+		query: `generationId=${generationId}&fromSeq=0`,
+		until: (f) => f.event === "end",
+	});
+
+	// Let the initial drain observe 1 and 3, then make the missing event visible.
+	await new Promise((resolve) => setTimeout(resolve, 100));
+	await db.collection("generationEvents").insertOne({
+		_id: new ObjectId(),
+		generationId,
+		seq: 2,
+		event: { type: "stream", token: "two " },
+		createdAt: new Date(),
+	} as never);
+	await db
+		.collection("generations")
+		.updateOne(
+			{ generationId },
+			{ $set: { status: "completed", endedAt: new Date(), updatedAt: new Date() } }
+		);
+
+	const { frames } = await collecting;
+	expect(updates(frames).map((f) => f.id)).toEqual(["1", "2", "3"]);
+	expect(
+		updates(frames)
+			.map((f) => JSON.parse(f.data ?? "{}").token)
+			.join("")
+	).toBe("one two three ");
+});
+
 test("an interrupted run ends with status interrupted", async ({ db, session }) => {
 	test.setTimeout(30_000);
 	const { convId, generationId } = await seedRun(db, session.sessionId, {
@@ -244,6 +307,77 @@ test("rejects a conversation the caller does not own", async ({ db, session }) =
 		timeoutMs: 5_000,
 	});
 	expect(status).toBe(404);
+});
+
+test("preserves text at a compressed-marker reattach boundary", async ({ db, session, page }) => {
+	test.setTimeout(30_000);
+	const now = new Date();
+	const systemId = randomUUID();
+	const userId = randomUUID();
+	const assistantId = randomUUID();
+	const generationId = randomUUID();
+	const conversationId = new ObjectId();
+	const prefix = "north of Greenland";
+	const boundary = "'s";
+	const continuation = " fractured coast ";
+
+	await db.collection("conversations").insertOne({
+		_id: conversationId,
+		sessionId: session.sessionId,
+		model: "test-org/test-model",
+		title: "compressed marker boundary",
+		rootMessageId: systemId,
+		messages: [
+			{ id: systemId, from: "system", content: "", ancestors: [], children: [userId] },
+			{
+				id: userId,
+				from: "user",
+				content: "continue",
+				ancestors: [systemId],
+				children: [assistantId],
+			},
+			{
+				id: assistantId,
+				from: "assistant",
+				content: prefix + boundary,
+				generationId,
+				materializedSeq: 2,
+				updates: [
+					{ type: "stream", token: "", len: prefix.length },
+					{ type: "stream", token: "", len: boundary.length },
+				],
+				ancestors: [systemId, userId],
+				children: [],
+			},
+		],
+		createdAt: now,
+		updatedAt: now,
+	} as never);
+	await db.collection("generations").insertOne({
+		_id: new ObjectId(),
+		generationId,
+		conversationId,
+		messageId: assistantId,
+		sessionId: session.sessionId,
+		status: "running",
+		seq: 3,
+		lastHeartbeatAt: now,
+		startedAt: now,
+		createdAt: now,
+		updatedAt: now,
+	} as never);
+	await db.collection("generationEvents").insertOne({
+		_id: new ObjectId(),
+		generationId,
+		seq: 3,
+		event: { type: "stream", token: continuation },
+		createdAt: now,
+	} as never);
+
+	await page.goto(`/conversation/${conversationId.toString()}`);
+	await expect(page.locator('[data-message-role="assistant"]').last()).toContainText(
+		prefix + boundary + continuation.trimEnd()
+	);
 });
 
 test("tails a live generation to completion (writer → endpoint)", async ({

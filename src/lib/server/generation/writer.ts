@@ -68,6 +68,8 @@ export interface GenerationWriter {
 	 * A caller writing the message out by some other route must read this
 	 * synchronously alongside the content it is about to persist, or the two
 	 * disagree and a reader replays text it already has — see `materialize`.
+	 * Capturing the cursor seals its pending tail so later tokens cannot extend
+	 * an event the persisted snapshot claims to cover.
 	 */
 	currentSeq(): number;
 	finish(outcome: { status: GenerationStatus; error?: string }): Promise<void>;
@@ -212,7 +214,14 @@ export async function createGenerationWriter(
 	materializeTimer.unref?.();
 
 	return {
-		currentSeq: () => seq,
+		currentSeq: () => {
+			const at = seq;
+			// `flush` synchronously moves pending events out of the coalescing buffer
+			// before it queues the database write. A subsequent token therefore gets
+			// a new sequence rather than changing an event covered by `at`.
+			void flush();
+			return at;
+		},
 
 		push(event: MessageUpdate) {
 			if (finished) return;
