@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { error, json } from "@sveltejs/kit";
-import { base } from "$app/paths";
 import type { RequestHandler } from "./$types";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import { discoverServerOAuth } from "$lib/server/mcp/oauth/discover";
+import { oauthCallbackUri } from "$lib/server/mcp/oauth/redirect";
 
 const Body = z.object({
 	url: z.string().url(),
@@ -18,8 +18,12 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		return error(400, e instanceof Error ? e.message : "Invalid request body");
 	}
 
-	const origin = config.PUBLIC_ORIGIN || url.origin;
-	const redirectUri = `${origin}${base}/api/mcp/oauth/callback`;
+	let redirectUri: string;
+	try {
+		redirectUri = oauthCallbackUri(url);
+	} catch (e) {
+		return error(500, e instanceof Error ? e.message : "Invalid OAuth callback configuration");
+	}
 
 	try {
 		const result = await discoverServerOAuth(parsed.url, {

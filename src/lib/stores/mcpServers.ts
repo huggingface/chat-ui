@@ -406,7 +406,7 @@ export async function disconnectServerOAuth(id: string): Promise<boolean> {
 	if (!server?.oauth) return false;
 	const { asMetadata, clientInfo, tokens } = server.oauth;
 	clearServerTokens(id);
-	if (!tokens) return false;
+	if (!tokens || !clientInfo) return false;
 	const tokenToRevoke = tokens.refresh_token ?? tokens.access_token;
 	if (!tokenToRevoke) return false;
 	return revokeAccessToken({
@@ -427,6 +427,10 @@ export async function refreshServerTokensIfNeeded(serverId: string): Promise<MCP
 	const server = get(allMcpServers).find((s) => s.id === serverId);
 	if (!server?.oauth?.tokens) return server ?? null;
 	const { tokens, asMetadata, clientInfo, resource } = server.oauth;
+	if (!clientInfo) {
+		clearServerTokens(serverId);
+		throw new OAuthRefreshRejectedError("OAuth client registration is missing");
+	}
 	if (!tokens.refresh_token) return server;
 	if (!isTokenExpiringSoon(tokens)) return server;
 	let fresh: MCPOAuthTokens;

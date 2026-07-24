@@ -11,18 +11,16 @@ describe("canonicalizeMcpUri", () => {
 		);
 	});
 
-	it("strips fragments", () => {
-		expect(canonicalizeMcpUri("https://mcp.example.com/mcp#tools")).toBe(
-			"https://mcp.example.com/mcp"
-		);
+	it("rejects fragments", () => {
+		expect(() => canonicalizeMcpUri("https://mcp.example.com/mcp#tools")).toThrow(/fragment/);
 	});
 
 	it("normalizes trailing slash on bare host", () => {
 		expect(canonicalizeMcpUri("https://mcp.example.com/")).toBe("https://mcp.example.com");
 	});
 
-	it("strips trailing slash on a path", () => {
-		expect(canonicalizeMcpUri("https://mcp.example.com/mcp/")).toBe("https://mcp.example.com/mcp");
+	it("preserves a semantically significant trailing slash on a path", () => {
+		expect(canonicalizeMcpUri("https://mcp.example.com/mcp/")).toBe("https://mcp.example.com/mcp/");
 	});
 
 	it("lowercases scheme and host", () => {
@@ -38,5 +36,13 @@ describe("canonicalizeMcpUri", () => {
 	it("rejects non-HTTP(S) schemes", () => {
 		expect(() => canonicalizeMcpUri("javascript:alert(1)")).toThrow();
 		expect(() => canonicalizeMcpUri("ftp://example.com")).toThrow();
+	});
+
+	it("rejects URL credentials", () => {
+		const url = new URL("https://mcp.example.com/mcp");
+		url.username = "user";
+		url.password = "pass";
+
+		expect(() => canonicalizeMcpUri(url.toString())).toThrow(/credentials/);
 	});
 });

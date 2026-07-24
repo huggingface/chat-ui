@@ -5,6 +5,8 @@ import { exchangeCodeForTokens, tokensWithExpiresAt } from "$lib/server/mcp/oaut
 import { FLOW_COOKIE_NAME, verifyFlowCookie } from "$lib/server/mcp/oauth/state";
 import { config } from "$lib/server/config";
 import { dev } from "$app/environment";
+import { randomBytes } from "crypto";
+import { oauthCallbackUri, safeLocalReturnPath } from "$lib/server/mcp/oauth/redirect";
 import type {
 	AuthorizationServerMetadata,
 	OAuthClientInformationFull,
@@ -18,26 +20,8 @@ interface PopupResultMessage {
 	error?: string;
 }
 
-const sameSite = config.ALLOW_INSECURE_COOKIES === "true" || dev ? "lax" : ("none" as const);
+const sameSite = "lax" as const;
 const secure = !(dev || config.ALLOW_INSECURE_COOKIES === "true");
-
-function htmlEscape(s: string): string {
-	return s.replace(/[&<>"']/g, (c) => {
-		switch (c) {
-			case "&":
-				return "&amp;";
-			case "<":
-				return "&lt;";
-			case ">":
-				return "&gt;";
-			case '"':
-				return "&quot;";
-			case "'":
-				return "&#39;";
-		}
-		return c;
-	});
-}
 
 /**
  * Encode a value as JSON safe to embed inside an inline `<script>` tag. Escapes
@@ -56,6 +40,7 @@ function jsonForInlineScript(value: unknown): string {
 
 function popupResponse(origin: string, message: PopupResultMessage): Response {
 	const json = jsonForInlineScript(message);
+	const nonce = randomBytes(18).toString("base64");
 	const body = `<!doctype html>
 <html lang="en">
 <head>
@@ -74,7 +59,7 @@ function popupResponse(origin: string, message: PopupResultMessage): Response {
     <h1>${message.ok ? "Authorization complete" : "Authorization failed"}</h1>
     <p>You can close this window.</p>
   </div>
-  <script>
+  <script nonce="${nonce}">
     (function () {
       var msg = ${json};
       try {
@@ -96,22 +81,15 @@ function popupResponse(origin: string, message: PopupResultMessage): Response {
 			"Cache-Control": "no-store",
 			"X-Content-Type-Options": "nosniff",
 			"Referrer-Policy": "no-referrer",
-			// Hardening: tighten CSP so the inline bootstrap is the only script that runs.
 			"Content-Security-Policy":
-				"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; frame-ancestors 'none';",
+				`default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; ` +
+				"img-src 'none'; connect-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none';",
 		},
 	});
 }
 
-function safeReturnPath(input: string | undefined): string {
-	if (!input || typeof input !== "string") return "/";
-	if (input.startsWith("//")) return "/";
-	if (!input.startsWith("/")) return "/";
-	return input;
-}
-
 function redirectResponseWithHash(redirectNext: string, message: PopupResultMessage): Response {
-	const safePath = safeReturnPath(redirectNext);
+	const safePath = safeLocalReturnPath(redirectNext);
 	const handoff = Buffer.from(JSON.stringify(message), "utf8").toString("base64url");
 	const fragment = `#__mcp_oauth_handoff=${handoff}`;
 	return new Response(null, {
@@ -123,40 +101,41 @@ function redirectResponseWithHash(redirectNext: string, message: PopupResultMess
 	});
 }
 
-export const GET: RequestHandler = async ({ url, cookies }) => {
+export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	const code = url.searchParams.get("code");
 	const state = url.searchParams.get("state");
 	const errorParam = url.searchParams.get("error");
 	const errorDescription = url.searchParams.get("error_description");
 
-	// Find the most recent flow cookie. We do this with cookies.getAll() so we
-	// don't depend on a specific flowId being present in the URL — the AS
-	// callback only carries `code` and `state`.
+	// Locate only the cookie cryptographically bound to the returned state.
+	// Never fall back to an unrelated flow when state is missing or mismatched.
 	const flowCookies = cookies.getAll().filter((c) => c.name.startsWith(`${FLOW_COOKIE_NAME}-`));
 	let cookieFlowId: string | undefined;
 	let flowState = null as ReturnType<typeof verifyFlowCookie>;
 	for (const c of flowCookies) {
-		const candidate = verifyFlowCookie(c.value);
-		if (candidate && candidate.expectedState === state) {
-			cookieFlowId = c.name.slice(`${FLOW_COOKIE_NAME}-`.length);
+		const candidate = verifyFlowCookie(c.value, locals.sessionId);
+		const candidateFlowId = c.name.slice(`${FLOW_COOKIE_NAME}-`.length);
+		if (candidate && candidate.flowId === candidateFlowId && candidate.expectedState === state) {
+			cookieFlowId = candidateFlowId;
 			flowState = candidate;
 			break;
 		}
 	}
-	// Fallback for the error path (state mismatch / no state at all): take the
-	// first valid cookie so we know how to render (popup vs redirect).
-	if (!flowState) {
-		for (const c of flowCookies) {
-			const candidate = verifyFlowCookie(c.value);
-			if (candidate) {
-				cookieFlowId = c.name.slice(`${FLOW_COOKIE_NAME}-`.length);
-				flowState = candidate;
-				break;
-			}
-		}
+
+	let callbackUri: string;
+	try {
+		callbackUri = oauthCallbackUri(url);
+	} catch {
+		callbackUri = url.origin + url.pathname;
+		flowState = null;
+		cookieFlowId = undefined;
+	}
+	if (flowState?.redirectUri !== callbackUri) {
+		flowState = null;
+		cookieFlowId = undefined;
 	}
 
-	const origin = config.PUBLIC_ORIGIN || url.origin;
+	const origin = new URL(callbackUri).origin;
 	const popupMode = flowState?.popupMode ?? true;
 	const redirectNext = flowState?.redirectNext;
 
@@ -183,7 +162,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 		return respond({
 			ok: false,
 			flowId: flowState?.flowId ?? "",
-			error: htmlEscape(`${errorParam}${errorDescription ? `: ${errorDescription}` : ""}`),
+			error: `${errorParam}${errorDescription ? `: ${errorDescription}` : ""}`,
 		});
 	}
 

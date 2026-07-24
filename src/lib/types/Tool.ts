@@ -96,7 +96,7 @@ export interface MCPOAuthState {
 	resource: string;
 	asMetadata: MCPAuthorizationServerMetadata;
 	resourceMetadataUrl?: string;
-	clientInfo: MCPClientInformation;
+	clientInfo?: MCPClientInformation;
 	clientWasManuallyEntered?: boolean;
 	tokens?: MCPOAuthTokens;
 }

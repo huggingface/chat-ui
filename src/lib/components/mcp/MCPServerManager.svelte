@@ -62,10 +62,7 @@
 						resource: serverData.discovery.resource,
 						asMetadata: serverData.discovery.asMetadata,
 						resourceMetadataUrl: serverData.discovery.resourceMetadataUrl,
-						clientInfo: serverData.discovery.clientInfo ?? {
-							client_id: "",
-							redirect_uris: [],
-						},
+						clientInfo: serverData.discovery.clientInfo,
 						clientWasManuallyEntered: !serverData.discovery.supportsDcr,
 					}
 				: undefined;

@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { error, json } from "@sveltejs/kit";
-import { base } from "$app/paths";
 import { randomUUID } from "crypto";
 import type { RequestHandler } from "./$types";
-import { config } from "$lib/server/config";
 import { dev } from "$app/environment";
+import { base } from "$app/paths";
+import { config } from "$lib/server/config";
 import { buildAuthorizationUrl } from "$lib/server/mcp/oauth/exchange";
 import {
 	FLOW_COOKIE_NAME,
@@ -12,10 +12,12 @@ import {
 	newFlowId,
 	signFlowCookie,
 } from "$lib/server/mcp/oauth/state";
-import type {
-	AuthorizationServerMetadata,
-	OAuthClientInformationFull,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+import { oauthCallbackUri, safeLocalReturnPath } from "$lib/server/mcp/oauth/redirect";
+import {
+	assertSafeOAuthUrl,
+	parseAuthorizationServerMetadata,
+	parseClientInformation,
+} from "$lib/server/mcp/oauth/validation";
 
 const Body = z.object({
 	resource: z.string().url(),
@@ -26,10 +28,10 @@ const Body = z.object({
 	scope: z.string().optional(),
 });
 
-const sameSite = config.ALLOW_INSECURE_COOKIES === "true" || dev ? "lax" : ("none" as const);
+const sameSite = "lax" as const;
 const secure = !(dev || config.ALLOW_INSECURE_COOKIES === "true");
 
-export const POST: RequestHandler = async ({ request, url, cookies }) => {
+export const POST: RequestHandler = async ({ request, url, cookies, locals }) => {
 	let parsed: z.infer<typeof Body>;
 	try {
 		parsed = Body.parse(await request.json());
@@ -37,18 +39,22 @@ export const POST: RequestHandler = async ({ request, url, cookies }) => {
 		return error(400, e instanceof Error ? e.message : "Invalid request body");
 	}
 
-	const asMetadata = parsed.asMetadata as unknown as AuthorizationServerMetadata;
-	const clientInfo = parsed.clientInfo as unknown as OAuthClientInformationFull;
-
-	if (!asMetadata.issuer || !asMetadata.authorization_endpoint || !asMetadata.token_endpoint) {
-		return error(400, "Invalid authorization server metadata");
+	let asMetadata;
+	let clientInfo;
+	let redirectUri: string;
+	try {
+		asMetadata = parseAuthorizationServerMetadata(parsed.asMetadata);
+		clientInfo = parseClientInformation(parsed.clientInfo);
+		assertSafeOAuthUrl(parsed.resource, "MCP resource");
+		redirectUri = oauthCallbackUri(url);
+		if (clientInfo.redirect_uris.length > 0 && !clientInfo.redirect_uris.includes(redirectUri)) {
+			return error(400, "OAuth client is not registered for the canonical redirect URI");
+		}
+		clientInfo = { ...clientInfo, redirect_uris: [redirectUri] };
+	} catch (e) {
+		return error(400, e instanceof Error ? e.message : "Invalid OAuth configuration");
 	}
-	if (!clientInfo.client_id) {
-		return error(400, "Missing client_id in clientInfo");
-	}
 
-	const origin = config.PUBLIC_ORIGIN || url.origin;
-	const redirectUri = `${origin}${base}/api/mcp/oauth/callback`;
 	const flowId = newFlowId();
 	const expectedState = randomUUID();
 
@@ -69,18 +75,26 @@ export const POST: RequestHandler = async ({ request, url, cookies }) => {
 		return error(502, e instanceof Error ? e.message : "Failed to build authorization URL");
 	}
 
-	const cookieValue = signFlowCookie({
-		flowId,
-		verifier: codeVerifier,
-		expectedState,
-		asMetadata,
-		clientInfo,
-		resource: parsed.resource,
-		redirectUri,
-		popupMode: parsed.popupMode,
-		redirectNext: parsed.redirectNext,
-		expiresAt: Date.now() + FLOW_TTL_MS,
-	});
+	let cookieValue: string;
+	try {
+		cookieValue = signFlowCookie(
+			{
+				flowId,
+				verifier: codeVerifier,
+				expectedState,
+				asMetadata,
+				clientInfo,
+				resource: parsed.resource,
+				redirectUri,
+				popupMode: parsed.popupMode,
+				redirectNext: parsed.redirectNext ? safeLocalReturnPath(parsed.redirectNext) : undefined,
+				expiresAt: Date.now() + FLOW_TTL_MS,
+			},
+			locals.sessionId
+		);
+	} catch (e) {
+		return error(400, e instanceof Error ? e.message : "Invalid OAuth flow state");
+	}
 
 	cookies.set(`${FLOW_COOKIE_NAME}-${flowId}`, cookieValue, {
 		path: `${base}/api/mcp/oauth`,

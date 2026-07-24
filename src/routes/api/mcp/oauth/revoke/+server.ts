@@ -2,10 +2,10 @@ import { z } from "zod";
 import { error, json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { tryRevokeToken } from "$lib/server/mcp/oauth/exchange";
-import type {
-	AuthorizationServerMetadata,
-	OAuthClientInformationFull,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+import {
+	parseAuthorizationServerMetadata,
+	parseClientInformation,
+} from "$lib/server/mcp/oauth/validation";
 
 const Body = z.object({
 	asMetadata: z.record(z.string(), z.unknown()),
@@ -22,8 +22,14 @@ export const POST: RequestHandler = async ({ request }) => {
 		return error(400, e instanceof Error ? e.message : "Invalid request body");
 	}
 
-	const asMetadata = parsed.asMetadata as unknown as AuthorizationServerMetadata;
-	const clientInfo = parsed.clientInfo as unknown as OAuthClientInformationFull;
+	let asMetadata;
+	let clientInfo;
+	try {
+		asMetadata = parseAuthorizationServerMetadata(parsed.asMetadata);
+		clientInfo = parseClientInformation(parsed.clientInfo);
+	} catch (e) {
+		return error(400, e instanceof Error ? e.message : "Invalid OAuth configuration");
+	}
 
 	const ok = await tryRevokeToken({
 		asMetadata,

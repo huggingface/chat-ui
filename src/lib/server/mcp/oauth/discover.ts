@@ -12,6 +12,13 @@ import type {
 import { isValidUrl, ssrfSafeFetch } from "$lib/server/urlSafety";
 import { logger } from "$lib/server/logger";
 import { canonicalizeMcpUri } from "./canonical";
+import {
+	assertIssuerMatches,
+	assertProtectedResourceMatches,
+	assertSafeOAuthUrl,
+	parseAuthorizationServerMetadata,
+	parseClientInformation,
+} from "./validation";
 
 export interface DiscoveryResult {
 	requiresAuth: boolean;
@@ -101,12 +108,16 @@ export async function discoverServerOAuth(
 	} catch {}
 
 	const resource = canonicalizeMcpUri(serverUrl);
+	if (resourceMetadataUrl) {
+		assertSafeOAuthUrl(resourceMetadataUrl, "Protected resource metadata URL");
+	}
 
 	const resourceMetadata = await discoverOAuthProtectedResourceMetadata(
 		serverUrl,
 		resourceMetadataUrl ? { resourceMetadataUrl } : undefined,
 		ssrfSafeFetch as unknown as typeof fetch
 	);
+	assertProtectedResourceMatches(resource, resourceMetadata);
 
 	const asUrl = resourceMetadata.authorization_servers?.[0];
 	if (!asUrl) {
@@ -114,14 +125,17 @@ export async function discoverServerOAuth(
 			"MCP server's protected-resource metadata does not list any authorization_servers"
 		);
 	}
+	assertSafeOAuthUrl(asUrl, "Advertised authorization server");
 
-	const asMetadata = await discoverAuthorizationServerMetadata(asUrl, {
+	const discoveredMetadata = await discoverAuthorizationServerMetadata(asUrl, {
 		fetchFn: ssrfSafeFetch as unknown as typeof fetch,
 		protocolVersion: PROTOCOL_VERSION,
 	});
-	if (!asMetadata) {
+	if (!discoveredMetadata) {
 		throw new Error(`Could not load authorization server metadata for ${asUrl}`);
 	}
+	const asMetadata = parseAuthorizationServerMetadata(discoveredMetadata);
+	assertIssuerMatches(asUrl, asMetadata);
 
 	let clientInfo: OAuthClientInformationFull | undefined;
 	const supportsDcr = Boolean(asMetadata.registration_endpoint);
@@ -134,20 +148,25 @@ export async function discoverServerOAuth(
 					return serverUrl;
 				}
 			})();
-			clientInfo = await registerClient(asUrl, {
-				metadata: asMetadata,
-				clientMetadata: {
-					redirect_uris: [options.redirectUri],
-					token_endpoint_auth_method: "none",
-					grant_types: ["authorization_code", "refresh_token"],
-					response_types: ["code"],
-					client_name: `${options.appName} – ${hostname}`,
-					scope: asMetadata.scopes_supported?.join(" "),
-					logo_uri: undefined,
-					tos_uri: undefined,
-				},
-				fetchFn: ssrfSafeFetch as unknown as typeof fetch,
-			});
+			clientInfo = parseClientInformation(
+				await registerClient(asUrl, {
+					metadata: asMetadata,
+					clientMetadata: {
+						redirect_uris: [options.redirectUri],
+						token_endpoint_auth_method: "none",
+						grant_types: ["authorization_code", "refresh_token"],
+						response_types: ["code"],
+						client_name: `${options.appName} – ${hostname}`,
+						scope: asMetadata.scopes_supported?.join(" "),
+						logo_uri: undefined,
+						tos_uri: undefined,
+					},
+					fetchFn: ssrfSafeFetch as unknown as typeof fetch,
+				})
+			);
+			if (!clientInfo.redirect_uris.includes(options.redirectUri)) {
+				throw new Error("Dynamic client registration returned an unexpected redirect URI");
+			}
 		} catch (err) {
 			logger.warn(
 				{ err: String(err), asUrl: asUrl.toString() },

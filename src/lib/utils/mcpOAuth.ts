@@ -37,6 +37,29 @@ export interface OAuthCallbackPayload {
 }
 
 const POPUP_FEATURES = "popup=yes,width=600,height=750,noopener=no,noreferrer=no";
+const FLOW_TIMEOUT_MS = 10 * 60 * 1000;
+
+function isOAuthCallbackPayload(value: unknown): value is OAuthCallbackPayload {
+	if (!value || typeof value !== "object") return false;
+	const payload = value as Record<string, unknown>;
+	if (typeof payload.ok !== "boolean" || typeof payload.flowId !== "string" || !payload.flowId) {
+		return false;
+	}
+	if (payload.error !== undefined && typeof payload.error !== "string") return false;
+	if (payload.resource !== undefined && typeof payload.resource !== "string") return false;
+	if (payload.tokens !== undefined) {
+		if (!payload.tokens || typeof payload.tokens !== "object") return false;
+		const tokens = payload.tokens as Record<string, unknown>;
+		if (
+			typeof tokens.access_token !== "string" ||
+			typeof tokens.token_type !== "string" ||
+			tokens.token_type.toLowerCase() !== "bearer"
+		) {
+			return false;
+		}
+	}
+	return true;
+}
 
 export async function discoverServer(url: string): Promise<DiscoveryResponse> {
 	const res = await fetch(`${base}/api/mcp/oauth/discover`, {
@@ -163,14 +186,22 @@ export function openAuthPopup(authUrl: string, flowId: string): Promise<OAuthCal
 
 		const cleanup = () => {
 			window.removeEventListener("message", onMessage);
-			clearInterval(pollHandle);
+			window.clearInterval(pollHandle);
+			window.clearTimeout(timeoutHandle);
 		};
 
 		const onMessage = (event: MessageEvent) => {
 			if (event.origin !== targetOrigin) return;
+			if (event.source !== popup) return;
 			const data = event.data as { type?: string; payload?: OAuthCallbackPayload } | null;
-			if (!data || data.type !== "mcp-oauth-result" || !data.payload) return;
-			if (data.payload.flowId && data.payload.flowId !== flowId) return;
+			if (
+				!data ||
+				data.type !== "mcp-oauth-result" ||
+				!isOAuthCallbackPayload(data.payload) ||
+				data.payload.flowId !== flowId
+			) {
+				return;
+			}
 			if (settled) return;
 			settled = true;
 			cleanup();
@@ -191,18 +222,15 @@ export function openAuthPopup(authUrl: string, flowId: string): Promise<OAuthCal
 		window.addEventListener("message", onMessage);
 
 		// Hard timeout in case nothing ever happens (e.g. AS hangs)
-		window.setTimeout(
-			() => {
-				if (settled) return;
-				settled = true;
-				cleanup();
-				try {
-					popup?.close();
-				} catch {}
-				reject(new Error("timeout"));
-			},
-			10 * 60 * 1000
-		);
+		const timeoutHandle = window.setTimeout(() => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			try {
+				popup?.close();
+			} catch {}
+			reject(new Error("timeout"));
+		}, FLOW_TIMEOUT_MS);
 	});
 }
 
@@ -235,8 +263,22 @@ export function readPendingFullPage(): PendingFullPage | null {
 	try {
 		const raw = sessionStorage.getItem(SESSION_KEY_PENDING);
 		if (!raw) return null;
-		return JSON.parse(raw) as PendingFullPage;
+		const parsed = JSON.parse(raw) as Partial<PendingFullPage>;
+		if (
+			typeof parsed.flowId !== "string" ||
+			!parsed.flowId ||
+			typeof parsed.serverId !== "string" ||
+			!parsed.serverId ||
+			typeof parsed.startedAt !== "number" ||
+			parsed.startedAt > Date.now() ||
+			Date.now() - parsed.startedAt > FLOW_TIMEOUT_MS
+		) {
+			clearPendingFullPage();
+			return null;
+		}
+		return parsed as PendingFullPage;
 	} catch {
+		clearPendingFullPage();
 		return null;
 	}
 }
@@ -261,14 +303,6 @@ export function consumeRedirectHandoff(): {
 	const m = hash.match(/[#&]__mcp_oauth_handoff=([^&]+)/);
 	if (!m) return null;
 
-	let payload: OAuthCallbackPayload;
-	try {
-		const json = atob(m[1].replace(/-/g, "+").replace(/_/g, "/"));
-		payload = JSON.parse(json) as OAuthCallbackPayload;
-	} catch {
-		return null;
-	}
-
 	const newHash = hash
 		.replace(/(^|[#&])__mcp_oauth_handoff=[^&]+/, "$1")
 		.replace(/^#&/, "#")
@@ -278,10 +312,21 @@ export function consumeRedirectHandoff(): {
 		window.history.replaceState({}, "", newUrl);
 	} catch {}
 
+	let payload: OAuthCallbackPayload;
+	try {
+		const encoded = m[1].replace(/-/g, "+").replace(/_/g, "/");
+		const padded = encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "=");
+		const decoded = JSON.parse(atob(padded)) as unknown;
+		if (!isOAuthCallbackPayload(decoded)) return null;
+		payload = decoded;
+	} catch {
+		return null;
+	}
+
 	const pending = readPendingFullPage();
 	clearPendingFullPage();
 	if (!pending) return null;
-	if (payload.flowId && pending.flowId !== payload.flowId) return null;
+	if (pending.flowId !== payload.flowId) return null;
 	return { payload, serverId: pending.serverId };
 }
 
