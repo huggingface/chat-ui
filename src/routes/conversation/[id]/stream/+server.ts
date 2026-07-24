@@ -89,15 +89,17 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 
 			const sleep = () =>
 				new Promise<void>((resolve) => {
-					const t = setTimeout(resolve, TAIL_INTERVAL_MS);
-					signal.addEventListener(
-						"abort",
-						() => {
-							clearTimeout(t);
-							resolve();
-						},
-						{ once: true }
-					);
+					// Remove the listener when the timer wins, or one accumulates per tick for
+					// the whole connection (only {once} cleans up, and only on abort).
+					const onAbort = () => {
+						clearTimeout(t);
+						resolve();
+					};
+					const t = setTimeout(() => {
+						signal.removeEventListener("abort", onAbort);
+						resolve();
+					}, TAIL_INTERVAL_MS);
+					signal.addEventListener("abort", onAbort, { once: true });
 				});
 
 			try {
