@@ -41,6 +41,24 @@ import { randomUUID } from "$lib/utils/randomUuid";
 // so markers normally live far shorter than this.
 const STOP_MARKER_GRACE_MS = 5_000;
 
+// Shape a message's updates for storage: drop keepalives and replace each stream token
+// with a length marker (content is stored separately), preserving ordering without
+// duplicating text. Shared by the full save and the writer's incremental materialise so
+// both persist the same thing under materializedSeq.
+function compressUpdatesForStorage(updates: Message["updates"]): Message["updates"] {
+	return (
+		updates
+			?.filter(
+				(u) => !(u.type === MessageUpdateType.Status && u.status === MessageUpdateStatus.KeepAlive)
+			)
+			.map((u) => {
+				if (u.type !== MessageUpdateType.Stream) return u;
+				const len = u.len ?? (u.token ?? "").length;
+				return { type: MessageUpdateType.Stream, token: "", len } satisfies MessageStreamUpdate;
+			}) ?? []
+	);
+}
+
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
@@ -396,23 +414,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		if (generationEventsEnabled() && generationWriter && messageToWriteTo) {
 			messageToWriteTo.materializedSeq = generationWriter.currentSeq();
 		}
-		const messagesForSave = conv.messages.map((msg) => {
-			const filteredUpdates =
-				msg.updates
-					?.filter(
-						(u) =>
-							!(u.type === MessageUpdateType.Status && u.status === MessageUpdateStatus.KeepAlive)
-					)
-					.map((u) => {
-						if (u.type !== MessageUpdateType.Stream) return u;
-						// Preserve existing len if already compressed, otherwise compute from token
-						const len = u.len ?? (u.token ?? "").length;
-						// store a lightweight marker to preserve ordering without duplicating content
-						return { type: MessageUpdateType.Stream, token: "", len } satisfies MessageStreamUpdate;
-					}) ?? [];
-
-			return { ...msg, updates: filteredUpdates };
-		});
+		const messagesForSave = conv.messages.map((msg) => ({
+			...msg,
+			updates: compressUpdatesForStorage(msg.updates),
+		}));
 
 		await collections.conversations.updateOne(
 			{ _id: convId },
@@ -465,6 +470,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				snapshot: () => ({
 					content: messageToWriteTo.content,
 					reasoning: messageToWriteTo.reasoning,
+					files: messageToWriteTo.files,
+					routerMetadata: messageToWriteTo.routerMetadata,
+					updates: compressUpdatesForStorage(messageToWriteTo.updates),
 				}),
 			});
 			generationWriter = writer;

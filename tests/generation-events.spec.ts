@@ -22,6 +22,7 @@ interface AssistantState {
 	content: string;
 	generationId?: string;
 	materializedSeq?: number;
+	updates?: MessageUpdate[];
 }
 
 async function readAssistant(db: Db, conversationId: string): Promise<AssistantState> {
@@ -32,6 +33,7 @@ async function readAssistant(db: Db, conversationId: string): Promise<AssistantS
 		content: last?.content ?? "",
 		generationId: last?.generationId,
 		materializedSeq: last?.materializedSeq,
+		updates: last?.updates,
 	};
 }
 
@@ -147,6 +149,46 @@ test("materializedSeq describes exactly the content that was written", async ({
 			`replaying events up to seq ${state.materializedSeq} must reproduce the stored content exactly`
 		).toBe(state.content);
 	}
+
+	await gen.drained;
+});
+
+test("materialize persists the updates under the cursor, not only content", async ({
+	api,
+	db,
+	session,
+	mockOpenAI,
+}) => {
+	test.setTimeout(90_000);
+	const { conversationId, rootMessageId } = await api.createConversation();
+	await mockOpenAI.setScenario(conversationId, {
+		content: Array.from({ length: 40 }, (_, i) => `w${i} `),
+		chunkDelayMs: 400,
+		finishReason: "stop",
+	});
+
+	const gen = await startAttachedGeneration({
+		conversationId,
+		parentId: rootMessageId,
+		secret: session.secret,
+		content: "updates under cursor",
+	});
+
+	// Mid-run the persisted message must already carry the updates covered by
+	// materializedSeq — not an empty array. A reattaching viewer loads this array and
+	// resumes strictly after the cursor, so anything missing here (tool/file/router
+	// events ≤ the cursor) would be dropped for them and lost if the run then died.
+	let sawUpdates = false;
+	for (let i = 0; i < 8; i++) {
+		await new Promise((r) => setTimeout(r, 1500));
+		if (gen.isDone()) break;
+		const state = await readAssistant(db, conversationId);
+		if ((state.materializedSeq ?? 0) > 0 && (state.updates?.length ?? 0) > 0) {
+			sawUpdates = true;
+			break;
+		}
+	}
+	expect(sawUpdates, "materialize must persist the updates array mid-run").toBe(true);
 
 	await gen.drained;
 });

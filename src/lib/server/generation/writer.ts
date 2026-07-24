@@ -48,6 +48,10 @@ export function generationEventsEnabled(): boolean {
 export interface GenerationSnapshot {
 	content: string;
 	reasoning?: string;
+	files?: Message["files"];
+	routerMetadata?: Message["routerMetadata"];
+	/** Compressed for storage (keepalives dropped, stream tokens → length markers). */
+	updates?: MessageUpdate[];
 }
 
 export interface GenerationWriter {
@@ -157,16 +161,25 @@ export async function createGenerationWriter(
 		// await here would let more tokens land in `content` while `seq` stayed put,
 		// and a reader resuming from that seq would replay text it already had.
 		const at = seq;
-		const { content, reasoning } = snapshot();
+		const snap = snapshot();
 		const flushed = flush();
 		return enqueue(async () => {
 			await flushed;
+			// Persist every field the seq covers, not just content/reasoning: materializedSeq
+			// is the reattach cursor, so any tool/file/router event at or below it that is not
+			// written here would be skipped by a resuming reader and lost if the run dies before
+			// the final full save.
 			await collections.conversations.updateOne(
 				{ _id: conversationId, "messages.id": messageId },
 				{
 					$set: {
-						"messages.$.content": content,
-						...(reasoning !== undefined ? { "messages.$.reasoning": reasoning } : {}),
+						"messages.$.content": snap.content,
+						...(snap.reasoning !== undefined ? { "messages.$.reasoning": snap.reasoning } : {}),
+						...(snap.files !== undefined ? { "messages.$.files": snap.files } : {}),
+						...(snap.routerMetadata !== undefined
+							? { "messages.$.routerMetadata": snap.routerMetadata }
+							: {}),
+						...(snap.updates !== undefined ? { "messages.$.updates": snap.updates } : {}),
 						"messages.$.materializedSeq": at,
 						"messages.$.updatedAt": new Date(),
 						updatedAt: new Date(),
