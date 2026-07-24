@@ -13,6 +13,8 @@
 	import { initWithServers } from "$lib/stores/mcpServers";
 
 	import Toast from "$lib/components/Toast.svelte";
+	import NotificationToasts from "$lib/components/NotificationToasts.svelte";
+	import GenerationLiveWatcher from "$lib/components/GenerationLiveWatcher.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import NavigationLoadingBar from "$lib/components/NavigationLoadingBar.svelte";
 	import MobileNav from "$lib/components/MobileNav.svelte";
@@ -22,9 +24,10 @@
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { isPro } from "$lib/stores/isPro";
-	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { createConversationsStore } from "$lib/stores/conversations.svelte";
+	import { createActiveGenerationsStore } from "$lib/stores/activeGenerations.svelte";
+	import { createNotificationsStore } from "$lib/stores/notifications.svelte";
 
 	let { data = $bindable(), children } = $props();
 
@@ -34,6 +37,9 @@
 	const client = useAPIClient();
 
 	const convsStore = createConversationsStore();
+	// Cross-conversation generation liveness: the watcher (mounted below) feeds both.
+	createActiveGenerationsStore();
+	createNotificationsStore();
 	// Synchronous seed for SSR: $effect is stripped by the server-side compiler,
 	// so we must call init() immediately to populate the list on first paint.
 	// The $effect below handles client-side resyncs when data.conversations
@@ -261,8 +267,6 @@
 	<WelcomeModal close={closeWelcomeModal} />
 {/if}
 
-<BackgroundGenerationPoller />
-
 <NavigationLoadingBar />
 
 <div
@@ -299,6 +303,8 @@
 	{#if currentError}
 		<Toast message={currentError} />
 	{/if}
+	<GenerationLiveWatcher />
+	<NotificationToasts />
 	{@render children?.()}
 
 	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
