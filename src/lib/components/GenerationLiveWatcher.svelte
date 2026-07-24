@@ -3,6 +3,7 @@
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import { onMount } from "svelte";
+	import { get } from "svelte/store";
 	import { loading } from "$lib/stores/loading";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { useActiveGenerationsStore } from "$lib/stores/activeGenerations.svelte";
@@ -23,10 +24,16 @@
 		status: GenerationStatus;
 	}
 
+	// While a run this tab started is still registering, keep looking this often; its DB
+	// record can lag $loading, which won't re-fire to reopen us.
+	const REOPEN_WHILE_LOADING_MS = 2_000;
+
 	let source: EventSource | null = null;
+	let reopenTimer: ReturnType<typeof setTimeout> | undefined;
 
 	function open() {
 		if (!browser || source) return;
+		clearTimeout(reopenTimer);
 		const es = new EventSource(`${base}/api/v2/generations/live`);
 		source = es;
 
@@ -58,12 +65,19 @@
 			}
 		});
 
-		// `idle` means nothing is running: close so we neither hold nor auto-reconnect an
-		// idle connection. A plain close (lifetime cap) does reconnect.
-		es.addEventListener("idle", close);
+		es.addEventListener("idle", onIdle);
+	}
+
+	// `idle` means nothing is running: close so we neither hold nor auto-reconnect an idle
+	// connection (a plain lifetime-cap close does reconnect). But if this tab has a run
+	// starting, keep looking until its record appears rather than stranding it untracked.
+	function onIdle() {
+		close();
+		if (get(loading)) reopenTimer = setTimeout(open, REOPEN_WHILE_LOADING_MS);
 	}
 
 	function close() {
+		clearTimeout(reopenTimer);
 		source?.close();
 		source = null;
 	}
