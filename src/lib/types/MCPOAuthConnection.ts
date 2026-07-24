@@ -28,6 +28,18 @@ export interface MCPOAuthConnection extends Timestamps {
 	asMetadata: MCPAuthorizationServerMetadata;
 	clientInfo?: MCPClientInformation;
 	clientWasManuallyEntered?: boolean;
+	registrationMethod?: "client_metadata_document" | "dynamic" | "manual";
+	requestedScope?: string;
+	scopeChallenge?: {
+		scope: string;
+		attempts: number;
+		updatedAt: Date;
+	};
+	lastScopeChallenge?: {
+		scope: string;
+		attempts: number;
+		updatedAt: Date;
+	};
 	tokens?: MCPOAuthTokens;
 	flow?: MCPOAuthAuthorizationFlow;
 	status: "authorization_required" | "authorized";

@@ -11,6 +11,7 @@ import type {
 import { OAuthError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import { ssrfSafeFetch } from "$lib/server/urlSafety";
 import {
+	assertPkceS256Supported,
 	assertSafeOAuthUrl,
 	parseAuthorizationServerMetadata,
 	parseClientInformation,
@@ -25,6 +26,7 @@ export async function buildAuthorizationUrl(args: {
 	scope?: string;
 }): Promise<{ authorizationUrl: URL; codeVerifier: string }> {
 	const metadata = parseAuthorizationServerMetadata(args.asMetadata);
+	assertPkceS256Supported(metadata);
 	const clientInformation = parseClientInformation(args.clientInfo);
 	assertSafeOAuthUrl(args.resource, "MCP resource");
 	return startAuthorization(metadata.issuer, {
@@ -32,7 +34,7 @@ export async function buildAuthorizationUrl(args: {
 		clientInformation,
 		redirectUrl: args.redirectUri,
 		state: args.state,
-		scope: args.scope ?? args.asMetadata.scopes_supported?.join(" "),
+		scope: args.scope,
 		resource: new URL(args.resource),
 	});
 }

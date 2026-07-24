@@ -4,7 +4,7 @@ import type { RequestHandler } from "./$types";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import { discoverServerOAuth } from "$lib/server/mcp/oauth/discover";
-import { oauthCallbackUri } from "$lib/server/mcp/oauth/redirect";
+import { oauthCallbackUri, oauthClientMetadataUri } from "$lib/server/mcp/oauth/redirect";
 import { createOAuthConnection, publicOAuthState } from "$lib/server/mcp/oauth/connections";
 
 const Body = z.object({
@@ -29,6 +29,7 @@ export const POST: RequestHandler = async ({ request, url, locals }) => {
 	try {
 		const result = await discoverServerOAuth(parsed.url, {
 			redirectUri,
+			clientMetadataUri: oauthClientMetadataUri(url),
 			appName: config.PUBLIC_APP_NAME || "chat-ui",
 		});
 
@@ -45,6 +46,8 @@ export const POST: RequestHandler = async ({ request, url, locals }) => {
 			resourceMetadataUrl: result.resourceMetadataUrl,
 			asMetadata: result.asMetadata,
 			clientInfo: result.clientInfo,
+			registrationMethod: result.registrationMethod,
+			requestedScope: result.requestedScope,
 		});
 		return json({
 			requiresAuth: true,

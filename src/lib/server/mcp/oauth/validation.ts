@@ -61,6 +61,12 @@ export function parseClientInformation(input: unknown): OAuthClientInformationFu
 	return client;
 }
 
+export function assertPkceS256Supported(metadata: AuthorizationServerMetadata): void {
+	if (!metadata.code_challenge_methods_supported?.includes("S256")) {
+		throw new Error("Authorization server metadata must advertise PKCE S256 support");
+	}
+}
+
 function comparableUrl(value: string | URL): string {
 	return new URL(value.toString()).href;
 }

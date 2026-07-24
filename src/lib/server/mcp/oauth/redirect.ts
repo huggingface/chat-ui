@@ -26,6 +26,11 @@ export function oauthCallbackUri(requestUrl: URL): string {
 	return `${originUrl.origin}${base}/api/mcp/oauth/callback`;
 }
 
+export function oauthClientMetadataUri(requestUrl: URL): string {
+	const callback = new URL(oauthCallbackUri(requestUrl));
+	return `${callback.origin}${base}/api/mcp/oauth/client-metadata`;
+}
+
 export function safeLocalReturnPath(input: string | undefined): string {
 	if (!input) return "/";
 	try {

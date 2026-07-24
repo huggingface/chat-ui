@@ -14,11 +14,14 @@ import { logger } from "$lib/server/logger";
 import { canonicalizeMcpUri } from "./canonical";
 import {
 	assertIssuerMatches,
+	assertPkceS256Supported,
 	assertProtectedResourceMatches,
 	assertSafeOAuthUrl,
 	parseAuthorizationServerMetadata,
 	parseClientInformation,
 } from "./validation";
+import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
+import { selectInitialOAuthScope } from "./scope";
 
 export interface DiscoveryResult {
 	requiresAuth: boolean;
@@ -28,20 +31,43 @@ export interface DiscoveryResult {
 	resourceMetadata?: OAuthProtectedResourceMetadata;
 	asMetadata?: AuthorizationServerMetadata;
 	clientInfo?: OAuthClientInformationFull;
-	supportsDcr?: boolean;
+	registrationMethod?: "client_metadata_document" | "dynamic";
+	requestedScope?: string;
 	// Set when requiresAuth=false but the probe succeeded; informational.
 	probeStatus?: number;
 }
 
 const PROBE_TIMEOUT_MS = 15_000;
-const PROTOCOL_VERSION = "2025-06-18";
+export const MCP_OAUTH_PROTOCOL_VERSION = LATEST_PROTOCOL_VERSION;
+
+export function buildClientMetadataDocumentClient(
+	metadata: { client_id_metadata_document_supported?: boolean },
+	options: { clientMetadataUri: string; redirectUri: string; appName: string }
+): OAuthClientInformationFull | undefined {
+	const clientMetadataUri = new URL(options.clientMetadataUri);
+	if (
+		metadata.client_id_metadata_document_supported !== true ||
+		clientMetadataUri.protocol !== "https:" ||
+		clientMetadataUri.pathname === "/"
+	) {
+		return undefined;
+	}
+	return parseClientInformation({
+		client_id: clientMetadataUri.href,
+		redirect_uris: [options.redirectUri],
+		token_endpoint_auth_method: "none",
+		grant_types: ["authorization_code", "refresh_token"],
+		response_types: ["code"],
+		client_name: options.appName,
+	});
+}
 
 const probeBody = JSON.stringify({
 	jsonrpc: "2.0",
 	id: "chat-ui-mcp-probe",
 	method: "initialize",
 	params: {
-		protocolVersion: PROTOCOL_VERSION,
+		protocolVersion: MCP_OAUTH_PROTOCOL_VERSION,
 		capabilities: {},
 		clientInfo: { name: "chat-ui-mcp-probe", version: "0.1.0" },
 	},
@@ -54,7 +80,7 @@ async function probeMcpServer(url: string, signal: AbortSignal): Promise<Respons
 		headers: {
 			"Content-Type": "application/json",
 			Accept: "application/json, text/event-stream",
-			"MCP-Protocol-Version": PROTOCOL_VERSION,
+			"MCP-Protocol-Version": MCP_OAUTH_PROTOCOL_VERSION,
 		},
 		body: probeBody,
 	});
@@ -69,8 +95,8 @@ async function probeMcpServer(url: string, signal: AbortSignal): Promise<Respons
  *   3. Fetch the Protected Resource Metadata (RFC 9728) and pick the first
  *      `authorization_servers[]` entry.
  *   4. Fetch the Authorization Server Metadata (RFC 8414, with OIDC fallback).
- *   5. If the AS exposes `registration_endpoint`, do RFC 7591 Dynamic Client
- *      Registration so the user doesn't have to paste a client ID.
+ *   5. Prefer a Client ID Metadata Document when advertised, then fall back to
+ *      RFC 7591 Dynamic Client Registration, then manual client information.
  *
  * Throws on hard failures (network errors, unparseable metadata). Returns
  * `requiresAuth: false` if the probe succeeded with 2xx — meaning the server
@@ -78,7 +104,7 @@ async function probeMcpServer(url: string, signal: AbortSignal): Promise<Respons
  */
 export async function discoverServerOAuth(
 	serverUrl: string,
-	options: { redirectUri: string; appName: string }
+	options: { redirectUri: string; clientMetadataUri: string; appName: string }
 ): Promise<DiscoveryResult> {
 	if (!isValidUrl(serverUrl)) {
 		throw new Error("Server URL is not a public HTTPS URL");
@@ -102,7 +128,7 @@ export async function discoverServerOAuth(
 		return { requiresAuth: false, probeStatus: probe.status };
 	}
 
-	const { resourceMetadataUrl } = extractWWWAuthenticateParams(probe);
+	const { resourceMetadataUrl, scope: challengeScope } = extractWWWAuthenticateParams(probe);
 	try {
 		await probe.body?.cancel();
 	} catch {}
@@ -129,17 +155,24 @@ export async function discoverServerOAuth(
 
 	const discoveredMetadata = await discoverAuthorizationServerMetadata(asUrl, {
 		fetchFn: ssrfSafeFetch as unknown as typeof fetch,
-		protocolVersion: PROTOCOL_VERSION,
+		protocolVersion: MCP_OAUTH_PROTOCOL_VERSION,
 	});
 	if (!discoveredMetadata) {
 		throw new Error(`Could not load authorization server metadata for ${asUrl}`);
 	}
 	const asMetadata = parseAuthorizationServerMetadata(discoveredMetadata);
 	assertIssuerMatches(asUrl, asMetadata);
+	assertPkceS256Supported(asMetadata);
 
 	let clientInfo: OAuthClientInformationFull | undefined;
+	let registrationMethod: DiscoveryResult["registrationMethod"];
+	const requestedScope = selectInitialOAuthScope(challengeScope, resourceMetadata.scopes_supported);
+	clientInfo = buildClientMetadataDocumentClient(asMetadata, options);
+	if (clientInfo) {
+		registrationMethod = "client_metadata_document";
+	}
 	const supportsDcr = Boolean(asMetadata.registration_endpoint);
-	if (supportsDcr) {
+	if (!clientInfo && supportsDcr) {
 		try {
 			const hostname = (() => {
 				try {
@@ -157,16 +190,18 @@ export async function discoverServerOAuth(
 						grant_types: ["authorization_code", "refresh_token"],
 						response_types: ["code"],
 						client_name: `${options.appName} – ${hostname}`,
-						scope: asMetadata.scopes_supported?.join(" "),
+						scope: requestedScope,
 						logo_uri: undefined,
 						tos_uri: undefined,
 					},
+					scope: requestedScope,
 					fetchFn: ssrfSafeFetch as unknown as typeof fetch,
 				})
 			);
 			if (!clientInfo.redirect_uris.includes(options.redirectUri)) {
 				throw new Error("Dynamic client registration returned an unexpected redirect URI");
 			}
+			registrationMethod = "dynamic";
 		} catch (err) {
 			logger.warn(
 				{ err: String(err), asUrl: asUrl.toString() },
@@ -182,6 +217,7 @@ export async function discoverServerOAuth(
 		resourceMetadata,
 		asMetadata,
 		clientInfo,
-		supportsDcr,
+		registrationMethod,
+		requestedScope,
 	};
 }

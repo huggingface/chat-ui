@@ -13,6 +13,8 @@ import type {
 	AuthorizationServerMetadata,
 	OAuthClientInformationFull,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
+import { extractWWWAuthenticateParams } from "@modelcontextprotocol/sdk/client/auth.js";
+import { mergeOAuthScopes, normalizeOAuthScope } from "./scope";
 import {
 	isRefreshGrantRejected,
 	refreshTokens,
@@ -66,8 +68,10 @@ export function publicOAuthState(connection: MCPOAuthConnection): MCPOAuthState 
 	return {
 		connectionId: connection._id.toString(),
 		issuer: connection.asMetadata.issuer,
-		status: connection.tokens ? "authorized" : "authorization_required",
-		scope: connection.tokens?.scope,
+		status:
+			connection.tokens && !connection.scopeChallenge ? "authorized" : "authorization_required",
+		scope:
+			connection.scopeChallenge?.scope ?? connection.tokens?.scope ?? connection.requestedScope,
 		expiresAt: connection.tokens?.expires_at,
 		manualClientRequired: !connection.clientInfo,
 		clientWasManuallyEntered: connection.clientWasManuallyEntered,
@@ -82,6 +86,8 @@ export async function createOAuthConnection(
 		resourceMetadataUrl?: string;
 		asMetadata: MCPAuthorizationServerMetadata;
 		clientInfo?: MCPClientInformation;
+		registrationMethod?: MCPOAuthConnection["registrationMethod"];
+		requestedScope?: string;
 	}
 ): Promise<MCPOAuthConnection> {
 	const now = new Date();
@@ -93,6 +99,8 @@ export async function createOAuthConnection(
 		resourceMetadataUrl: input.resourceMetadataUrl,
 		asMetadata: input.asMetadata,
 		clientInfo: input.clientInfo,
+		registrationMethod: input.registrationMethod,
+		requestedScope: input.requestedScope,
 		status: "authorization_required",
 		version: 0,
 		createdAt: now,
@@ -156,6 +164,11 @@ export async function saveAuthorizationFlow(
 		clientWasManuallyEntered: boolean;
 	}
 ): Promise<MCPOAuthConnection> {
+	if (connection.scopeChallenge && connection.scopeChallenge.attempts > 2) {
+		throw new OAuthAuthorizationRequiredError(
+			"MCP scope upgrade failed after the maximum number of attempts"
+		);
+	}
 	const updated = await collections.mcpOAuthConnections.findOneAndUpdate(
 		{
 			...connectionFilter(locals, connection._id.toString()),
@@ -165,6 +178,9 @@ export async function saveAuthorizationFlow(
 			$set: {
 				clientInfo: input.clientInfo,
 				clientWasManuallyEntered: input.clientWasManuallyEntered,
+				registrationMethod: input.clientWasManuallyEntered
+					? "manual"
+					: connection.registrationMethod,
 				flow: input.flow,
 				status: "authorization_required",
 				updatedAt: new Date(),
@@ -218,10 +234,15 @@ export async function storeAuthorizationTokens(
 			$set: {
 				tokens,
 				status: "authorized",
+				requestedScope: tokens.scope ?? connection.requestedScope,
+				...(connection.scopeChallenge ? { lastScopeChallenge: connection.scopeChallenge } : {}),
 				...(sessionOwned ? { deleteAt: new Date(Date.now() + ANONYMOUS_CONNECTION_TTL_MS) } : {}),
 				updatedAt: new Date(),
 			},
-			...(sessionOwned ? {} : { $unset: { deleteAt: "" } }),
+			$unset: {
+				scopeChallenge: "",
+				...(sessionOwned ? {} : { deleteAt: "" }),
+			},
 			$inc: { version: 1 },
 		},
 		{ returnDocument: "after", includeResultMetadata: false }
@@ -334,6 +355,11 @@ export async function resolveOAuthAccessToken(
 	if (connection.serverUrl !== canonicalizeMcpUri(expectedServerUrl)) {
 		throw new OAuthConnectionAccessError("OAuth connection is bound to a different MCP resource");
 	}
+	if (connection.scopeChallenge) {
+		throw new OAuthAuthorizationRequiredError(
+			`Additional MCP authorization is required for scope: ${connection.scopeChallenge.scope}`
+		);
+	}
 	if (!connection.tokens) throw new OAuthAuthorizationRequiredError();
 	if (tokenNeedsRefresh(connection.tokens)) {
 		connection = await refreshConnection(locals, connection);
@@ -345,6 +371,63 @@ export async function resolveOAuthAccessToken(
 		accessToken: connection.tokens.access_token,
 		state: publicOAuthState(connection),
 	};
+}
+
+export async function recordInsufficientScope(
+	locals: App.Locals,
+	connectionId: string,
+	expectedServerUrl: string,
+	scope: string
+): Promise<MCPOAuthState> {
+	const connection = await getOAuthConnection(locals, connectionId);
+	if (connection.serverUrl !== canonicalizeMcpUri(expectedServerUrl)) {
+		throw new OAuthConnectionAccessError("OAuth connection is bound to a different MCP resource");
+	}
+	const requiredScope = mergeOAuthScopes(
+		connection.tokens?.scope,
+		connection.requestedScope,
+		normalizeOAuthScope(scope)
+	);
+	if (!requiredScope) throw new Error("Insufficient-scope response did not include a valid scope");
+	const previous =
+		connection.scopeChallenge?.scope === requiredScope
+			? connection.scopeChallenge
+			: connection.lastScopeChallenge?.scope === requiredScope
+				? connection.lastScopeChallenge
+				: undefined;
+	const attempts = connection.scopeChallenge
+		? connection.scopeChallenge.attempts
+		: (previous?.attempts ?? 0) + 1;
+	const updated = await collections.mcpOAuthConnections.findOneAndUpdate(
+		{
+			...connectionFilter(locals, connectionId),
+			version: connection.version,
+		},
+		{
+			$set: {
+				scopeChallenge: { scope: requiredScope, attempts, updatedAt: new Date() },
+				requestedScope: requiredScope,
+				status: "authorization_required",
+				updatedAt: new Date(),
+			},
+			$inc: { version: 1 },
+		},
+		{ returnDocument: "after", includeResultMetadata: false }
+	);
+	if (!updated) throw new Error("OAuth connection changed while recording a scope challenge");
+	return publicOAuthState(updated);
+}
+
+export async function captureInsufficientScopeResponse(
+	locals: App.Locals,
+	connectionId: string,
+	expectedServerUrl: string,
+	response: Response
+): Promise<MCPOAuthState | undefined> {
+	if (response.status !== 403) return undefined;
+	const challenge = extractWWWAuthenticateParams(response);
+	if (challenge.error !== "insufficient_scope" || !challenge.scope) return undefined;
+	return recordInsufficientScope(locals, connectionId, expectedServerUrl, challenge.scope);
 }
 
 export async function deleteOAuthConnection(

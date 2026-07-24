@@ -11,6 +11,7 @@ import {
 	getOAuthConnection,
 	migrateOAuthConnectionsToUser,
 	publicOAuthState,
+	recordInsufficientScope,
 	saveAuthorizationFlow,
 	storeAuthorizationTokens,
 } from "./connections";
@@ -211,5 +212,70 @@ describe.sequential("server-side MCP OAuth connections", () => {
 		const persisted = await collections.mcpOAuthConnections.findOne({ _id: stale._id });
 		expect(persisted?.tokens?.access_token).toBe("winner-access");
 		expect(persisted?.tokens?.refresh_token).toBe("winner-refresh");
+	});
+
+	it("records bounded runtime scope upgrades without counting duplicate responses", async () => {
+		const locals = createTestLocals();
+		const connection = await createConnection(locals);
+		await recordInsufficientScope(
+			locals,
+			connection._id.toString(),
+			connection.serverUrl,
+			"tools:write"
+		);
+		await recordInsufficientScope(
+			locals,
+			connection._id.toString(),
+			connection.serverUrl,
+			"tools:write"
+		);
+		let challenged = await getOAuthConnection(locals, connection._id.toString());
+		expect(challenged.scopeChallenge).toEqual(
+			expect.objectContaining({ scope: "tools:write", attempts: 1 })
+		);
+
+		challenged = await storeAuthorizationTokens(locals, challenged, {
+			access_token: "step-up-one",
+			token_type: "Bearer",
+			scope: "tools:write",
+		});
+		expect(challenged.scopeChallenge).toBeUndefined();
+
+		await recordInsufficientScope(
+			locals,
+			connection._id.toString(),
+			connection.serverUrl,
+			"tools:write"
+		);
+		challenged = await getOAuthConnection(locals, connection._id.toString());
+		expect(challenged.scopeChallenge?.attempts).toBe(2);
+		challenged = await storeAuthorizationTokens(locals, challenged, {
+			access_token: "step-up-two",
+			token_type: "Bearer",
+			scope: "tools:write",
+		});
+
+		await recordInsufficientScope(
+			locals,
+			connection._id.toString(),
+			connection.serverUrl,
+			"tools:write"
+		);
+		challenged = await getOAuthConnection(locals, connection._id.toString());
+		expect(challenged.scopeChallenge?.attempts).toBe(3);
+		await expect(
+			saveAuthorizationFlow(locals, challenged, {
+				clientInfo,
+				clientWasManuallyEntered: false,
+				flow: {
+					id: crypto.randomUUID(),
+					expectedState: crypto.randomUUID(),
+					verifier: "abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz",
+					redirectUri: clientInfo.redirect_uris[0],
+					popupMode: true,
+					expiresAt: new Date(Date.now() + 60_000),
+				},
+			})
+		).rejects.toThrow(/maximum/);
 	});
 });

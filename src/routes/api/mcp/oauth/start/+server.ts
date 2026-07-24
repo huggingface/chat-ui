@@ -17,7 +17,6 @@ const Body = z.object({
 	clientInfo: z.record(z.string(), z.unknown()).optional(),
 	popupMode: z.boolean().default(true),
 	redirectNext: z.string().optional(),
-	scope: z.string().optional(),
 });
 
 const FLOW_TTL_MS = 10 * 60 * 1000;
@@ -36,6 +35,9 @@ export const POST: RequestHandler = async ({ request, url, locals }) => {
 	let redirectUri: string;
 	try {
 		connection = await getOAuthConnection(locals, parsed.connectionId);
+		if (connection.scopeChallenge && connection.scopeChallenge.attempts > 2) {
+			return error(409, "MCP scope upgrade failed after the maximum number of attempts");
+		}
 		redirectUri = oauthCallbackUri(url);
 		if (connection.clientInfo) {
 			clientInfo = parseClientInformation(connection.clientInfo);
@@ -66,7 +68,7 @@ export const POST: RequestHandler = async ({ request, url, locals }) => {
 			redirectUri,
 			resource: connection.resource,
 			state: expectedState,
-			scope: parsed.scope,
+			scope: connection.scopeChallenge?.scope ?? connection.requestedScope,
 		});
 		authorizationUrl = built.authorizationUrl;
 		codeVerifier = built.codeVerifier;

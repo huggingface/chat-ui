@@ -26,7 +26,11 @@ import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepa
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
-import { resolveOAuthAccessToken } from "$lib/server/mcp/oauth/connections";
+import {
+	captureInsufficientScopeResponse,
+	resolveOAuthAccessToken,
+} from "$lib/server/mcp/oauth/connections";
+import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -104,10 +108,7 @@ export async function* runMcpFlow({
 		const custom = Array.isArray(reqMcp?.selectedServers) ? reqMcp?.selectedServers : [];
 		if (custom.length > 0) {
 			// Deduplicate by server name (request takes precedence)
-			const byName = new Map<
-				string,
-				{ name: string; url: string; headers?: Record<string, string> }
-			>();
+			const byName = new Map<string, McpServerConfig>();
 			for (const s of servers) byName.set(s.name, s);
 			for (const s of custom) {
 				if (!s.oauthConnectionId) {
@@ -115,6 +116,7 @@ export async function* runMcpFlow({
 					continue;
 				}
 				try {
+					const connectionId = s.oauthConnectionId;
 					if (!locals) throw new Error("MCP OAuth requires request ownership context");
 					if (hasAuthHeader(s.headers)) {
 						throw new Error("Use either an OAuth connection or a manual Authorization header");
@@ -126,6 +128,10 @@ export async function* runMcpFlow({
 						headers: {
 							...(s.headers ?? {}),
 							Authorization: `Bearer ${resolved.accessToken}`,
+						},
+						oauthConnectionId: connectionId,
+						oauthChallengeHandler: async (response) => {
+							await captureInsufficientScopeResponse(locals, connectionId, s.url, response);
 						},
 					});
 				} catch (error) {

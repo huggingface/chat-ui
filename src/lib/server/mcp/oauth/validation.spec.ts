@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	assertIssuerMatches,
+	assertPkceS256Supported,
 	assertProtectedResourceMatches,
 	assertSafeOAuthUrl,
 	parseAuthorizationServerMetadata,
@@ -53,6 +54,22 @@ describe("OAuth metadata validation", () => {
 		expect(() => parseClientInformation({ client_id: "", redirect_uris: [] })).toThrow(
 			/must not be empty/
 		);
+	});
+
+	it("requires authorization servers to advertise PKCE S256", () => {
+		expect(() =>
+			assertPkceS256Supported({
+				...metadata,
+				code_challenge_methods_supported: ["S256"],
+			})
+		).not.toThrow();
+		expect(() => assertPkceS256Supported(metadata)).toThrow(/PKCE S256/);
+		expect(() =>
+			assertPkceS256Supported({
+				...metadata,
+				code_challenge_methods_supported: ["plain"],
+			})
+		).toThrow(/PKCE S256/);
 	});
 });
 

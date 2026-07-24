@@ -441,6 +441,7 @@ export async function healthCheckServer(
 			updateServerStatus(server.id, "connected", undefined, result.tools, false);
 			return { ready: true, tools: result.tools };
 		} else {
+			if (result.oauth) setServerOAuth(server.id, result.oauth);
 			updateServerStatus(server.id, "error", result.error, undefined, Boolean(result.authRequired));
 			return { ready: false, error: result.error };
 		}
