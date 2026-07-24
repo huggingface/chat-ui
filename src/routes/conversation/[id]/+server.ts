@@ -25,11 +25,7 @@ import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
-import {
-	createGenerationWriter,
-	generationEventsEnabled,
-	type GenerationWriter,
-} from "$lib/server/generation/writer";
+import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
 import { clampStoppedContent } from "$lib/server/stopTruncation";
 import { MetricsServer } from "$lib/server/metrics";
 import { randomUUID } from "$lib/utils/randomUuid";
@@ -381,11 +377,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		error(500, "Failed to create prompt");
 	}
 
-	// The stamp is what tells a reader a log exists, so only set it when events are on.
+	// The stamp is what tells a reader a log exists; every run records one.
 	const effectiveGenerationId = generationId ?? randomUUID();
-	if (generationEventsEnabled()) {
-		messageToWriteTo.generationId = effectiveGenerationId;
-	}
+	messageToWriteTo.generationId = effectiveGenerationId;
 
 	// update the conversation with the new messages
 	await collections.conversations.updateOne(
@@ -408,10 +402,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const persistConversation = async () => {
 		// This rewrites the whole messages array, so stamp materializedSeq from the same
 		// synchronous instant as the content below, or a reader resumes from a stale point
-		// and replays text the message already contains. Guarded on the flag, not just the
-		// writer: with events off the writer's seq is 0, and stamping it would claim a log
-		// exists when none does.
-		if (generationEventsEnabled() && generationWriter && messageToWriteTo) {
+		// and replays text the message already contains.
+		if (generationWriter && messageToWriteTo) {
 			messageToWriteTo.materializedSeq = generationWriter.currentSeq();
 		}
 		const messagesForSave = conv.messages.map((msg) => ({
@@ -649,12 +641,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				};
 
 				await enqueueUpdate();
-
-				// Legacy path only: the writer materialises on its own cadence, attached
-				// or not. This branch is why an attached run used to write nothing.
-				if (!generationEventsEnabled() && clientDetached) {
-					await persistConversation();
-				}
 			}
 
 			let hasError = false;

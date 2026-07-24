@@ -41,10 +41,6 @@ export function mergedStreamToken(
 const FLUSH_INTERVAL_MS = 200;
 const MATERIALIZE_MS = 3_000;
 
-export function generationEventsEnabled(): boolean {
-	return config.ENABLE_GENERATION_EVENTS === "true";
-}
-
 // Must stay well below the reaper's stale threshold (see reaper.ts), or a live run
 // gets reaped between beats. Configurable only so tests can scale both down together.
 export function heartbeatMs(): number {
@@ -87,7 +83,7 @@ export interface CreateGenerationWriterParams {
 	snapshot: () => GenerationSnapshot;
 }
 
-/** A no-op rather than null, so callers never branch on whether the feature is enabled. */
+/** Returned only when a run fails to register, so callers never branch on a null writer. */
 const NOOP_WRITER: GenerationWriter = {
 	push: () => {},
 	currentSeq: () => 0,
@@ -97,8 +93,6 @@ const NOOP_WRITER: GenerationWriter = {
 export async function createGenerationWriter(
 	params: CreateGenerationWriterParams
 ): Promise<GenerationWriter> {
-	if (!generationEventsEnabled()) return NOOP_WRITER;
-
 	const { generationId, conversationId, messageId, userId, sessionId, snapshot } = params;
 	const now = new Date();
 
