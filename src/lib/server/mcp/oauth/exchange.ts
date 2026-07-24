@@ -8,7 +8,14 @@ import type {
 	OAuthClientInformationFull,
 	OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
+import { OAuthError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import { ssrfSafeFetch } from "$lib/server/urlSafety";
+import {
+	assertPkceS256Supported,
+	assertSafeOAuthUrl,
+	parseAuthorizationServerMetadata,
+	parseClientInformation,
+} from "./validation";
 
 export async function buildAuthorizationUrl(args: {
 	asMetadata: AuthorizationServerMetadata;
@@ -18,12 +25,16 @@ export async function buildAuthorizationUrl(args: {
 	state: string;
 	scope?: string;
 }): Promise<{ authorizationUrl: URL; codeVerifier: string }> {
-	return startAuthorization(args.asMetadata.issuer, {
-		metadata: args.asMetadata,
-		clientInformation: args.clientInfo,
+	const metadata = parseAuthorizationServerMetadata(args.asMetadata);
+	assertPkceS256Supported(metadata);
+	const clientInformation = parseClientInformation(args.clientInfo);
+	assertSafeOAuthUrl(args.resource, "MCP resource");
+	return startAuthorization(metadata.issuer, {
+		metadata,
+		clientInformation,
 		redirectUrl: args.redirectUri,
 		state: args.state,
-		scope: args.scope ?? args.asMetadata.scopes_supported?.join(" "),
+		scope: args.scope,
 		resource: new URL(args.resource),
 	});
 }
@@ -36,15 +47,20 @@ export async function exchangeCodeForTokens(args: {
 	code: string;
 	codeVerifier: string;
 }): Promise<OAuthTokens> {
-	return exchangeAuthorization(args.asMetadata.issuer, {
-		metadata: args.asMetadata,
-		clientInformation: args.clientInfo,
+	const metadata = parseAuthorizationServerMetadata(args.asMetadata);
+	const clientInformation = parseClientInformation(args.clientInfo);
+	assertSafeOAuthUrl(args.resource, "MCP resource");
+	const tokens = await exchangeAuthorization(metadata.issuer, {
+		metadata,
+		clientInformation,
 		authorizationCode: args.code,
 		codeVerifier: args.codeVerifier,
 		redirectUri: args.redirectUri,
 		resource: new URL(args.resource),
 		fetchFn: ssrfSafeFetch as unknown as typeof fetch,
 	});
+	assertBearerTokens(tokens);
+	return tokens;
 }
 
 export async function refreshTokens(args: {
@@ -53,13 +69,18 @@ export async function refreshTokens(args: {
 	resource: string;
 	refreshToken: string;
 }): Promise<OAuthTokens> {
-	return refreshAuthorization(args.asMetadata.issuer, {
-		metadata: args.asMetadata,
-		clientInformation: args.clientInfo,
+	const metadata = parseAuthorizationServerMetadata(args.asMetadata);
+	const clientInformation = parseClientInformation(args.clientInfo);
+	assertSafeOAuthUrl(args.resource, "MCP resource");
+	const tokens = await refreshAuthorization(metadata.issuer, {
+		metadata,
+		clientInformation,
 		refreshToken: args.refreshToken,
 		resource: new URL(args.resource),
 		fetchFn: ssrfSafeFetch as unknown as typeof fetch,
 	});
+	assertBearerTokens(tokens);
+	return tokens;
 }
 
 /**
@@ -73,18 +94,27 @@ export async function tryRevokeToken(args: {
 	token: string;
 	tokenTypeHint?: "access_token" | "refresh_token";
 }): Promise<boolean> {
-	const endpoint = (args.asMetadata as unknown as Record<string, unknown>).revocation_endpoint;
+	let metadata: AuthorizationServerMetadata;
+	let clientInformation: OAuthClientInformationFull;
+	try {
+		metadata = parseAuthorizationServerMetadata(args.asMetadata);
+		clientInformation = parseClientInformation(args.clientInfo);
+	} catch {
+		return false;
+	}
+	const endpoint = (metadata as unknown as Record<string, unknown>).revocation_endpoint;
 	if (!endpoint || typeof endpoint !== "string") return false;
 
 	const body = new URLSearchParams();
 	body.set("token", args.token);
 	if (args.tokenTypeHint) body.set("token_type_hint", args.tokenTypeHint);
-	body.set("client_id", args.clientInfo.client_id);
-	if (args.clientInfo.client_secret) {
-		body.set("client_secret", args.clientInfo.client_secret);
+	body.set("client_id", clientInformation.client_id);
+	if (clientInformation.client_secret) {
+		body.set("client_secret", clientInformation.client_secret);
 	}
 
 	try {
+		assertSafeOAuthUrl(endpoint, "Revocation endpoint");
 		const res = await ssrfSafeFetch(endpoint, {
 			method: "POST",
 			headers: {
@@ -102,7 +132,18 @@ export async function tryRevokeToken(args: {
 	}
 }
 
+export function assertBearerTokens(tokens: OAuthTokens): void {
+	if (tokens.token_type.toLowerCase() !== "bearer") {
+		throw new Error(`Unsupported OAuth token type: ${tokens.token_type}`);
+	}
+}
+
+export function isRefreshGrantRejected(error: unknown): boolean {
+	return error instanceof OAuthError && error.errorCode === "invalid_grant";
+}
+
 export function tokensWithExpiresAt(tokens: OAuthTokens): OAuthTokens & { expires_at?: number } {
+	assertBearerTokens(tokens);
 	if (typeof tokens.expires_in === "number" && tokens.expires_in > 0) {
 		return { ...tokens, expires_at: Date.now() + tokens.expires_in * 1000 };
 	}

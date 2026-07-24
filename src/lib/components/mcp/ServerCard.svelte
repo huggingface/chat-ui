@@ -45,20 +45,20 @@
 
 	const oauthAuthorized = $derived(
 		Boolean(
-			server.oauth?.tokens?.access_token &&
-				(!server.oauth.tokens.expires_at || server.oauth.tokens.expires_at > now)
+			server.oauth?.status === "authorized" &&
+			(!server.oauth.expiresAt || server.oauth.expiresAt > now)
 		)
 	);
 	const oauthNeedsAuth = $derived(Boolean(server.oauth) && !oauthAuthorized);
 	const issuerHost = $derived.by(() => {
 		try {
-			return server.oauth?.asMetadata?.issuer ? new URL(server.oauth.asMetadata.issuer).host : "";
+			return server.oauth?.issuer ? new URL(server.oauth.issuer).host : "";
 		} catch {
-			return server.oauth?.asMetadata?.issuer ?? "";
+			return server.oauth?.issuer ?? "";
 		}
 	});
 	const expiresInLabel = $derived.by(() => {
-		const exp = server.oauth?.tokens?.expires_at;
+		const exp = server.oauth?.expiresAt;
 		if (!exp) return null;
 		const ms = exp - now;
 		if (ms <= 0) return "expired";
@@ -130,7 +130,8 @@
 		}
 	}
 
-	function handleDelete() {
+	async function handleDelete() {
+		if (server.oauth) await disconnectServerOAuth(server.id, false);
 		deleteCustomServer(server.id);
 	}
 </script>
@@ -183,7 +184,7 @@
 
 				{#if oauthAuthorized}
 					<span
-						class="inline-flex items-center gap-1 rounded-full bg-green-100 py-0.5 pl-1.5 pr-2 text-xs font-medium text-green-600 dark:bg-green-900/20 dark:text-green-400"
+						class="inline-flex items-center gap-1 rounded-full bg-green-100 py-0.5 pr-2 pl-1.5 text-xs font-medium text-green-600 dark:bg-green-900/20 dark:text-green-400"
 						title={issuerHost ? `OAuth via ${issuerHost}` : "OAuth-authorized"}
 					>
 						<LucideShieldCheck class="size-3" />
@@ -191,7 +192,7 @@
 					</span>
 				{:else if oauthNeedsAuth}
 					<span
-						class="inline-flex items-center gap-1 rounded-full bg-amber-50 py-0.5 pl-1.5 pr-2 text-xs font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+						class="inline-flex items-center gap-1 rounded-full bg-amber-50 py-0.5 pr-2 pl-1.5 text-xs font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
 					>
 						<IconLock class="size-3" />
 						Authorization required

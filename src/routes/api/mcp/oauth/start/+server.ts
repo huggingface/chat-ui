@@ -1,35 +1,27 @@
 import { z } from "zod";
 import { error, json } from "@sveltejs/kit";
-import { base } from "$app/paths";
 import { randomUUID } from "crypto";
 import type { RequestHandler } from "./$types";
-import { config } from "$lib/server/config";
-import { dev } from "$app/environment";
 import { buildAuthorizationUrl } from "$lib/server/mcp/oauth/exchange";
-import {
-	FLOW_COOKIE_NAME,
-	FLOW_TTL_MS,
-	newFlowId,
-	signFlowCookie,
-} from "$lib/server/mcp/oauth/state";
+import { oauthCallbackUri, safeLocalReturnPath } from "$lib/server/mcp/oauth/redirect";
+import { parseClientInformation } from "$lib/server/mcp/oauth/validation";
+import { getOAuthConnection, saveAuthorizationFlow } from "$lib/server/mcp/oauth/connections";
+import type { MCPClientInformation } from "$lib/types/Tool";
 import type {
 	AuthorizationServerMetadata,
 	OAuthClientInformationFull,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 
 const Body = z.object({
-	resource: z.string().url(),
-	asMetadata: z.record(z.string(), z.unknown()),
-	clientInfo: z.record(z.string(), z.unknown()),
+	connectionId: z.string().min(1),
+	clientInfo: z.record(z.string(), z.unknown()).optional(),
 	popupMode: z.boolean().default(true),
 	redirectNext: z.string().optional(),
-	scope: z.string().optional(),
 });
 
-const sameSite = config.ALLOW_INSECURE_COOKIES === "true" || dev ? "lax" : ("none" as const);
-const secure = !(dev || config.ALLOW_INSECURE_COOKIES === "true");
+const FLOW_TTL_MS = 10 * 60 * 1000;
 
-export const POST: RequestHandler = async ({ request, url, cookies }) => {
+export const POST: RequestHandler = async ({ request, url, locals }) => {
 	let parsed: z.infer<typeof Body>;
 	try {
 		parsed = Body.parse(await request.json());
@@ -37,31 +29,46 @@ export const POST: RequestHandler = async ({ request, url, cookies }) => {
 		return error(400, e instanceof Error ? e.message : "Invalid request body");
 	}
 
-	const asMetadata = parsed.asMetadata as unknown as AuthorizationServerMetadata;
-	const clientInfo = parsed.clientInfo as unknown as OAuthClientInformationFull;
-
-	if (!asMetadata.issuer || !asMetadata.authorization_endpoint || !asMetadata.token_endpoint) {
-		return error(400, "Invalid authorization server metadata");
+	let connection;
+	let clientInfo: MCPClientInformation;
+	let clientWasManuallyEntered: boolean;
+	let redirectUri: string;
+	try {
+		connection = await getOAuthConnection(locals, parsed.connectionId);
+		if (connection.scopeChallenge && connection.scopeChallenge.attempts > 2) {
+			return error(409, "MCP scope upgrade failed after the maximum number of attempts");
+		}
+		redirectUri = oauthCallbackUri(url);
+		if (connection.clientInfo) {
+			clientInfo = parseClientInformation(connection.clientInfo);
+			clientWasManuallyEntered = Boolean(connection.clientWasManuallyEntered);
+		} else if (parsed.clientInfo) {
+			clientInfo = parseClientInformation(parsed.clientInfo);
+			clientWasManuallyEntered = true;
+		} else {
+			return error(400, "OAuth client information is required");
+		}
+		if (clientInfo.redirect_uris.length > 0 && !clientInfo.redirect_uris.includes(redirectUri)) {
+			return error(400, "OAuth client is not registered for the canonical redirect URI");
+		}
+		clientInfo = { ...clientInfo, redirect_uris: [redirectUri] };
+	} catch (e) {
+		return error(400, e instanceof Error ? e.message : "Invalid OAuth configuration");
 	}
-	if (!clientInfo.client_id) {
-		return error(400, "Missing client_id in clientInfo");
-	}
 
-	const origin = config.PUBLIC_ORIGIN || url.origin;
-	const redirectUri = `${origin}${base}/api/mcp/oauth/callback`;
-	const flowId = newFlowId();
+	const flowId = randomUUID();
 	const expectedState = randomUUID();
 
 	let authorizationUrl: URL;
 	let codeVerifier: string;
 	try {
 		const built = await buildAuthorizationUrl({
-			asMetadata,
-			clientInfo,
+			asMetadata: connection.asMetadata as AuthorizationServerMetadata,
+			clientInfo: clientInfo as OAuthClientInformationFull,
 			redirectUri,
-			resource: parsed.resource,
+			resource: connection.resource,
 			state: expectedState,
-			scope: parsed.scope,
+			scope: connection.scopeChallenge?.scope ?? connection.requestedScope,
 		});
 		authorizationUrl = built.authorizationUrl;
 		codeVerifier = built.codeVerifier;
@@ -69,26 +76,23 @@ export const POST: RequestHandler = async ({ request, url, cookies }) => {
 		return error(502, e instanceof Error ? e.message : "Failed to build authorization URL");
 	}
 
-	const cookieValue = signFlowCookie({
-		flowId,
-		verifier: codeVerifier,
-		expectedState,
-		asMetadata,
-		clientInfo,
-		resource: parsed.resource,
-		redirectUri,
-		popupMode: parsed.popupMode,
-		redirectNext: parsed.redirectNext,
-		expiresAt: Date.now() + FLOW_TTL_MS,
-	});
-
-	cookies.set(`${FLOW_COOKIE_NAME}-${flowId}`, cookieValue, {
-		path: `${base}/api/mcp/oauth`,
-		httpOnly: true,
-		sameSite,
-		secure,
-		maxAge: Math.floor(FLOW_TTL_MS / 1000),
-	});
+	try {
+		await saveAuthorizationFlow(locals, connection, {
+			clientInfo,
+			clientWasManuallyEntered,
+			flow: {
+				id: flowId,
+				expectedState,
+				verifier: codeVerifier,
+				redirectUri,
+				popupMode: parsed.popupMode,
+				redirectNext: parsed.redirectNext ? safeLocalReturnPath(parsed.redirectNext) : undefined,
+				expiresAt: new Date(Date.now() + FLOW_TTL_MS),
+			},
+		});
+	} catch (e) {
+		return error(409, e instanceof Error ? e.message : "Could not save OAuth flow state");
+	}
 
 	return json({ authUrl: authorizationUrl.toString(), flowId });
 };

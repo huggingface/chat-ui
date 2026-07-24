@@ -2,41 +2,55 @@
  * Client-side OAuth helpers for MCP servers.
  *
  * The dance is server-orchestrated (because most authorization-server endpoints
- * lack CORS), but tokens land in the browser via either:
+ * lack CORS), and the browser receives only a non-secret connection status via:
  *  - a popup window that postMessages back to the opener, or
  *  - a full-page redirect that drops a base64 handoff blob in `location.hash`
  *    on return.
  *
- * The browser then persists tokens alongside the custom MCP server entry in
- * localStorage (see `mcpServers.ts`).
+ * OAuth tokens, dynamic-registration credentials, discovery metadata, PKCE
+ * verifiers, and CSRF state remain in the server-side connection store.
  */
 
 import { base } from "$app/paths";
-import type {
-	MCPAuthorizationServerMetadata,
-	MCPClientInformation,
-	MCPOAuthTokens,
-} from "$lib/types/Tool";
+import type { MCPClientInformation, MCPOAuthState } from "$lib/types/Tool";
 
 export interface DiscoveryResponse {
 	requiresAuth: boolean;
-	resource?: string;
-	resourceMetadataUrl?: string;
-	asMetadata?: MCPAuthorizationServerMetadata;
-	clientInfo?: MCPClientInformation;
-	supportsDcr?: boolean;
+	connection?: MCPOAuthState;
 	probeStatus?: number;
 }
 
 export interface OAuthCallbackPayload {
 	ok: boolean;
 	flowId: string;
-	tokens?: MCPOAuthTokens;
-	resource?: string;
+	connection?: MCPOAuthState;
 	error?: string;
 }
 
 const POPUP_FEATURES = "popup=yes,width=600,height=750,noopener=no,noreferrer=no";
+const FLOW_TIMEOUT_MS = 10 * 60 * 1000;
+
+function isOAuthCallbackPayload(value: unknown): value is OAuthCallbackPayload {
+	if (!value || typeof value !== "object") return false;
+	const payload = value as Record<string, unknown>;
+	if (typeof payload.ok !== "boolean" || typeof payload.flowId !== "string" || !payload.flowId) {
+		return false;
+	}
+	if (payload.error !== undefined && typeof payload.error !== "string") return false;
+	if (payload.connection !== undefined) {
+		if (!payload.connection || typeof payload.connection !== "object") return false;
+		const connection = payload.connection as Record<string, unknown>;
+		if (
+			typeof connection.connectionId !== "string" ||
+			!connection.connectionId ||
+			typeof connection.issuer !== "string" ||
+			(connection.status !== "authorized" && connection.status !== "authorization_required")
+		) {
+			return false;
+		}
+	}
+	return true;
+}
 
 export async function discoverServer(url: string): Promise<DiscoveryResponse> {
 	const res = await fetch(`${base}/api/mcp/oauth/discover`, {
@@ -52,9 +66,8 @@ export async function discoverServer(url: string): Promise<DiscoveryResponse> {
 }
 
 export async function startAuthFlow(args: {
-	resource: string;
-	asMetadata: MCPAuthorizationServerMetadata;
-	clientInfo: MCPClientInformation;
+	connectionId: string;
+	clientInfo?: MCPClientInformation;
 	popupMode: boolean;
 	redirectNext?: string;
 	scope?: string;
@@ -71,68 +84,30 @@ export async function startAuthFlow(args: {
 	return (await res.json()) as { authUrl: string; flowId: string };
 }
 
-/**
- * Thrown when the authorization server itself rejected the refresh_token
- * (RFC 6749 `invalid_grant` / revoked / rotated). The caller should wipe the
- * stored tokens and prompt the user to re-authorize. Distinct from generic
- * `Error`s, which represent transport-layer failures (offline, 5xx, timeout)
- * where the refresh_token is presumed still valid and tokens should be kept.
- */
-export class OAuthRefreshRejectedError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = "OAuthRefreshRejectedError";
-	}
-}
-
-export async function refreshAccessToken(args: {
-	asMetadata: MCPAuthorizationServerMetadata;
-	clientInfo: MCPClientInformation;
-	resource: string;
-	refreshToken: string;
-}): Promise<MCPOAuthTokens> {
+export async function refreshOAuthConnection(connectionId: string): Promise<MCPOAuthState> {
 	const res = await fetch(`${base}/api/mcp/oauth/refresh`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			asMetadata: args.asMetadata,
-			clientInfo: args.clientInfo,
-			resource: args.resource,
-			refresh_token: args.refreshToken,
-		}),
+		body: JSON.stringify({ connectionId }),
 	});
 	if (!res.ok) {
 		const text = await res.text().catch(() => "");
-		const message = text || `Refresh failed (${res.status})`;
-		// 401 from /api/mcp/oauth/refresh means the AS rejected the refresh_token.
-		// Anything else (502 transport / 5xx) is treated as transient by callers.
-		if (res.status === 401) throw new OAuthRefreshRejectedError(message);
-		throw new Error(message);
+		throw new Error(text || `Refresh failed (${res.status})`);
 	}
-	const body = (await res.json()) as { tokens: MCPOAuthTokens };
-	return body.tokens;
+	const body = (await res.json()) as { connection: MCPOAuthState };
+	return body.connection;
 }
 
-export async function revokeAccessToken(args: {
-	asMetadata: MCPAuthorizationServerMetadata;
-	clientInfo: MCPClientInformation;
-	token: string;
-	tokenTypeHint?: "access_token" | "refresh_token";
-}): Promise<boolean> {
+export async function disconnectOAuthConnection(connectionId: string): Promise<boolean> {
 	try {
 		const res = await fetch(`${base}/api/mcp/oauth/revoke`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				asMetadata: args.asMetadata,
-				clientInfo: args.clientInfo,
-				token: args.token,
-				token_type_hint: args.tokenTypeHint,
-			}),
+			body: JSON.stringify({ connectionId }),
 		});
 		if (!res.ok) return false;
-		const body = (await res.json()) as { revoked: boolean };
-		return Boolean(body.revoked);
+		const body = (await res.json()) as { disconnected: boolean };
+		return Boolean(body.disconnected);
 	} catch {
 		return false;
 	}
@@ -163,14 +138,22 @@ export function openAuthPopup(authUrl: string, flowId: string): Promise<OAuthCal
 
 		const cleanup = () => {
 			window.removeEventListener("message", onMessage);
-			clearInterval(pollHandle);
+			window.clearInterval(pollHandle);
+			window.clearTimeout(timeoutHandle);
 		};
 
 		const onMessage = (event: MessageEvent) => {
 			if (event.origin !== targetOrigin) return;
+			if (event.source !== popup) return;
 			const data = event.data as { type?: string; payload?: OAuthCallbackPayload } | null;
-			if (!data || data.type !== "mcp-oauth-result" || !data.payload) return;
-			if (data.payload.flowId && data.payload.flowId !== flowId) return;
+			if (
+				!data ||
+				data.type !== "mcp-oauth-result" ||
+				!isOAuthCallbackPayload(data.payload) ||
+				data.payload.flowId !== flowId
+			) {
+				return;
+			}
 			if (settled) return;
 			settled = true;
 			cleanup();
@@ -191,18 +174,15 @@ export function openAuthPopup(authUrl: string, flowId: string): Promise<OAuthCal
 		window.addEventListener("message", onMessage);
 
 		// Hard timeout in case nothing ever happens (e.g. AS hangs)
-		window.setTimeout(
-			() => {
-				if (settled) return;
-				settled = true;
-				cleanup();
-				try {
-					popup?.close();
-				} catch {}
-				reject(new Error("timeout"));
-			},
-			10 * 60 * 1000
-		);
+		const timeoutHandle = window.setTimeout(() => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			try {
+				popup?.close();
+			} catch {}
+			reject(new Error("timeout"));
+		}, FLOW_TIMEOUT_MS);
 	});
 }
 
@@ -235,8 +215,22 @@ export function readPendingFullPage(): PendingFullPage | null {
 	try {
 		const raw = sessionStorage.getItem(SESSION_KEY_PENDING);
 		if (!raw) return null;
-		return JSON.parse(raw) as PendingFullPage;
+		const parsed = JSON.parse(raw) as Partial<PendingFullPage>;
+		if (
+			typeof parsed.flowId !== "string" ||
+			!parsed.flowId ||
+			typeof parsed.serverId !== "string" ||
+			!parsed.serverId ||
+			typeof parsed.startedAt !== "number" ||
+			parsed.startedAt > Date.now() ||
+			Date.now() - parsed.startedAt > FLOW_TIMEOUT_MS
+		) {
+			clearPendingFullPage();
+			return null;
+		}
+		return parsed as PendingFullPage;
 	} catch {
+		clearPendingFullPage();
 		return null;
 	}
 }
@@ -261,14 +255,6 @@ export function consumeRedirectHandoff(): {
 	const m = hash.match(/[#&]__mcp_oauth_handoff=([^&]+)/);
 	if (!m) return null;
 
-	let payload: OAuthCallbackPayload;
-	try {
-		const json = atob(m[1].replace(/-/g, "+").replace(/_/g, "/"));
-		payload = JSON.parse(json) as OAuthCallbackPayload;
-	} catch {
-		return null;
-	}
-
 	const newHash = hash
 		.replace(/(^|[#&])__mcp_oauth_handoff=[^&]+/, "$1")
 		.replace(/^#&/, "#")
@@ -278,19 +264,20 @@ export function consumeRedirectHandoff(): {
 		window.history.replaceState({}, "", newUrl);
 	} catch {}
 
+	let payload: OAuthCallbackPayload;
+	try {
+		const encoded = m[1].replace(/-/g, "+").replace(/_/g, "/");
+		const padded = encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "=");
+		const decoded = JSON.parse(atob(padded)) as unknown;
+		if (!isOAuthCallbackPayload(decoded)) return null;
+		payload = decoded;
+	} catch {
+		return null;
+	}
+
 	const pending = readPendingFullPage();
 	clearPendingFullPage();
 	if (!pending) return null;
-	if (payload.flowId && pending.flowId !== payload.flowId) return null;
+	if (pending.flowId !== payload.flowId) return null;
 	return { payload, serverId: pending.serverId };
-}
-
-export function isTokenExpiringSoon(tokens: MCPOAuthTokens, marginMs = 5 * 60 * 1000): boolean {
-	if (!tokens.expires_at) return false;
-	return Date.now() + marginMs >= tokens.expires_at;
-}
-
-export function isTokenExpired(tokens: MCPOAuthTokens): boolean {
-	if (!tokens.expires_at) return false;
-	return Date.now() >= tokens.expires_at;
 }

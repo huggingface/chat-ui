@@ -53,15 +53,13 @@ export interface MCPTool {
 	inputSchema?: unknown;
 }
 
-// OAuth tokens stored alongside an MCP custom server. Uses the same shape as
-// the SDK's OAuthTokens response (RFC 6749), with an absolute `expires_at`
-// computed from `expires_in` at issuance time so the client can decide when to
-// refresh without trusting a relative-time field across page reloads.
+// Server-only OAuth token shape. Never serialize this through MCP browser APIs.
 export interface MCPOAuthTokens {
 	access_token: string;
 	token_type: string;
 	refresh_token?: string;
 	scope?: string;
+	expires_in?: number;
 	expires_at?: number;
 	id_token?: string;
 }
@@ -92,13 +90,18 @@ export interface MCPClientInformation {
 	[key: string]: unknown;
 }
 
+/**
+ * Non-secret browser projection of an MCP OAuth connection. The opaque
+ * connectionId is owner-checked on every server-side use.
+ */
 export interface MCPOAuthState {
-	resource: string;
-	asMetadata: MCPAuthorizationServerMetadata;
-	resourceMetadataUrl?: string;
-	clientInfo: MCPClientInformation;
+	connectionId: string;
+	issuer: string;
+	status: "authorization_required" | "authorized";
+	scope?: string;
+	expiresAt?: number;
+	manualClientRequired?: boolean;
 	clientWasManuallyEntered?: boolean;
-	tokens?: MCPOAuthTokens;
 }
 
 export interface MCPServer {
@@ -114,13 +117,12 @@ export interface MCPServer {
 	errorMessage?: string;
 	// Indicates server reports or appears to require OAuth or other auth
 	authRequired?: boolean;
-	// Populated once the server is recognized as OAuth-protected. `oauth.tokens`
-	// being set means the server is authorized; absence means it still needs the
-	// "Authorize" step.
+	// Public status for an owner-scoped server-side OAuth connection.
 	oauth?: MCPOAuthState;
 }
 
 export interface MCPServerApi {
 	url: string;
 	headers?: KeyValuePair[];
+	oauthConnectionId?: string;
 }
