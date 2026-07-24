@@ -306,6 +306,42 @@ describe("smoothStreamUpdates", () => {
 		expect(streamText(updates)).toBe(blob);
 	});
 
+	it("preserves long text across reattach-style backlogs and bursts", async () => {
+		const text =
+			Array.from(
+				{ length: 2_500 },
+				(_, i) =>
+					`passage-${i} over the murderous reefs stretching westward Some keepers brought dogs `
+			).join("") + "the end";
+		const sizes = [4_096, 1, 127, 8_192, 7, 509, 2_048, 3, 997];
+		const events: TimedEvent[] = [];
+		let offset = 0;
+		let sizeIndex = 0;
+		let burstChars = 0;
+		let at = 0;
+
+		while (offset < text.length) {
+			const size = sizes[sizeIndex++ % sizes.length];
+			const token = text.slice(offset, offset + size);
+			events.push({
+				at,
+				update: { type: MessageUpdateType.Stream, token },
+			});
+			offset += token.length;
+			burstChars += token.length;
+			if (burstChars >= 8_000) {
+				at += 250;
+				burstChars = 0;
+			}
+		}
+
+		const clock = createVirtualClock();
+		const emitted = await collectTimed(events, clock);
+
+		expect(text.length).toBeGreaterThan(20_000);
+		expect(emitted.map((event) => event.token).join("")).toBe(text);
+	});
+
 	it("closes the source iterator when the consumer stops early", async () => {
 		let closed = false;
 		async function* source(): AsyncGenerator<MessageUpdate> {

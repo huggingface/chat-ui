@@ -199,6 +199,69 @@ test("resumes from fromSeq, replaying only later events", async ({ db, session }
 	expect(updates(frames).map((f) => f.id)).toEqual(["3", "4", "5"]);
 });
 
+test("waits for a temporarily invisible sequence before advancing the cursor", async ({
+	db,
+	session,
+}) => {
+	test.setTimeout(30_000);
+	const { convId, generationId } = await seedRun(db, session.sessionId, {
+		tokenCount: 0,
+		status: "running",
+	});
+	const now = new Date();
+
+	// Model an unordered insert becoming visible non-atomically: seq 3 can be
+	// observed while seq 2 is still absent.
+	await db.collection("generationEvents").insertMany([
+		{
+			_id: new ObjectId(),
+			generationId,
+			seq: 1,
+			event: { type: "stream", token: "one " },
+			createdAt: now,
+		},
+		{
+			_id: new ObjectId(),
+			generationId,
+			seq: 3,
+			event: { type: "stream", token: "three " },
+			createdAt: now,
+		},
+	] as never[]);
+	await db.collection("generations").updateOne({ generationId }, { $set: { seq: 3 } });
+
+	const collecting = collectFrames({
+		convId,
+		secret: session.secret,
+		query: `generationId=${generationId}&fromSeq=0`,
+		until: (f) => f.event === "end",
+	});
+
+	// Let the initial drain observe 1 and 3, then make the missing event visible.
+	await new Promise((resolve) => setTimeout(resolve, 100));
+	await db.collection("generationEvents").insertOne({
+		_id: new ObjectId(),
+		generationId,
+		seq: 2,
+		event: { type: "stream", token: "two " },
+		createdAt: new Date(),
+	} as never);
+	await db
+		.collection("generations")
+		.updateOne(
+			{ generationId },
+			{ $set: { status: "completed", endedAt: new Date(), updatedAt: new Date() } }
+		);
+
+	const { frames } = await collecting;
+	expect(updates(frames).map((f) => f.id)).toEqual(["1", "2", "3"]);
+	expect(
+		updates(frames)
+			.map((f) => JSON.parse(f.data ?? "{}").token)
+			.join("")
+	).toBe("one two three ");
+});
+
 test("an interrupted run ends with status interrupted", async ({ db, session }) => {
 	test.setTimeout(30_000);
 	const { convId, generationId } = await seedRun(db, session.sessionId, {
