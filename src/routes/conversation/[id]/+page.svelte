@@ -11,25 +11,22 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
 	import type { Message } from "$lib/types/Message";
-	import {
-		MessageUpdateStatus,
-		MessageUpdateType,
-		type MessageUpdate,
-	} from "$lib/types/MessageUpdate";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
-	import { fetchMessageUpdates, resolveStreamingMode } from "$lib/utils/messageUpdates";
+	import {
+		fetchMessageUpdates,
+		resolveStreamingMode,
+		applyStreamingMode,
+	} from "$lib/utils/messageUpdates";
+	import { consumeMessageUpdates } from "$lib/utils/consumeMessageUpdates";
 	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { enabledServers, mcpServersLoaded, effectiveServerHeaders } from "$lib/stores/mcpServers";
 	import { get } from "svelte/store";
 	import { browser } from "$app/environment";
-	import {
-		addBackgroundGeneration,
-		removeBackgroundGeneration,
-	} from "$lib/stores/backgroundGenerations";
+	import { reattachStream } from "$lib/utils/reattachStream";
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
@@ -37,7 +34,10 @@
 	import { loading } from "$lib/stores/loading.js";
 	import { streamStart } from "$lib/utils/haptics";
 	import { requireAuthUser } from "$lib/utils/auth.js";
-	import { isConversationGenerationActive, isGenerationStale } from "$lib/utils/generationState";
+	import {
+		isConversationGenerationActive,
+		isAssistantGenerationTerminal,
+	} from "$lib/utils/generationState";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
 
@@ -67,6 +67,9 @@
 	// snapshot-staleness check for the generation streaming in this very tab.
 	let writeMessageInFlight = false;
 	let messageUpdatesAbortController = new AbortController();
+	// Active reattach to a run this tab did not start. Aborted on navigation, stop, and
+	// conversation change.
+	let reattachController: AbortController | undefined;
 
 	let files: File[] = $state([]);
 
@@ -292,170 +295,18 @@
 			if (messageUpdatesIterator === undefined) return;
 
 			files = [];
-			let buffer = "";
-			// Initialize lastUpdateTime outside the loop to persist between updates
-			let lastUpdateTime = new Date();
-			let frameFlushScheduled = false;
 
-			// Local authoritative copy of message.updates during streaming.
-			// Assigning the reactive field on every network chunk (~100/s on fast
-			// providers) re-triggers the full markdown block derivation per chunk;
-			// buffering here keeps `.updates` on the same flush cadence as
-			// `.content`. All readers inside this loop must use the buffer, not
-			// the $state field, or they would see stale data between flushes.
-			let updatesBuffer: MessageUpdate[] = messageToWriteTo.updates ?? [];
-			let updatesDirty = false;
-
-			const flushBuffer = (currentTime: Date) => {
-				if (buffer.length === 0 && !updatesDirty) return;
-				if (buffer.length > 0) {
-					messageToWriteTo.content += buffer;
-					buffer = "";
-					lastUpdateTime = currentTime;
-				}
-				if (updatesDirty) {
-					messageToWriteTo.updates = updatesBuffer;
-					updatesDirty = false;
-				}
-			};
-
-			const scheduleFrameFlush = () => {
-				if (frameFlushScheduled) return;
-				frameFlushScheduled = true;
-				const flush = () => {
-					frameFlushScheduled = false;
-					flushBuffer(new Date());
-				};
-				if (typeof requestAnimationFrame === "function") {
-					requestAnimationFrame(flush);
-				} else {
-					setTimeout(flush, 0);
-				}
-			};
-
-			for await (const update of messageUpdatesIterator) {
-				if ($isAborted) {
-					// Commit anything still sitting in the content/updates buffers:
-					// the navigation-abort path skips the post-stream refresh, so a
-					// dropped buffer here would be lost from the UI for good.
-					flushBuffer(new Date());
-					messageUpdatesAbortController.abort();
-					return;
-				}
-
-				// Remove null characters added due to remote keylogging prevention
-				// See server code for more details
-				if (update.type === MessageUpdateType.Stream) {
-					update.token = update.token.replaceAll("\0", "");
-				}
-
-				const isKeepAlive =
-					update.type === MessageUpdateType.Status &&
-					update.status === MessageUpdateStatus.KeepAlive;
-
-				if (!isKeepAlive) {
-					if (update.type === MessageUpdateType.Stream) {
-						const lastUpdate = updatesBuffer.at(-1);
-						if (lastUpdate?.type === MessageUpdateType.Stream) {
-							// Create fresh objects/arrays so the UI reacts to merged tokens
-							const merged = {
-								...lastUpdate,
-								token: (lastUpdate.token ?? "") + (update.token ?? ""),
-							};
-							updatesBuffer = [...updatesBuffer.slice(0, -1), merged];
-						} else {
-							updatesBuffer = [...updatesBuffer, update];
-						}
-					} else {
-						updatesBuffer = [...updatesBuffer, update];
-					}
-					updatesDirty = true;
-				}
-				const currentTime = new Date();
-
-				// If we receive a non-stream update (e.g. tool/status/final answer),
-				// flush buffered stream tokens and pending updates so the UI doesn't
-				// appear to cut mid-sentence while tools are running or the final
-				// answer arrives.
-				if (update.type !== MessageUpdateType.Stream) {
-					flushBuffer(currentTime);
-				}
-
-				if (update.type === MessageUpdateType.Stream) {
-					buffer += update.token;
-					if (streamingMode === "smooth") {
-						// Coalesce UI updates to animation frames for smooth mode.
-						scheduleFrameFlush();
-					} else if (
-						currentTime.getTime() - lastUpdateTime.getTime() >
-						updateDebouncer.maxUpdateTime
-					) {
-						flushBuffer(currentTime);
-					}
-					if (pending) {
-						streamStart();
-					}
+			await consumeMessageUpdates(messageUpdatesIterator, messageToWriteTo, {
+				streamingMode,
+				maxUpdateTime: updateDebouncer.maxUpdateTime,
+				isAborted: () => $isAborted,
+				onAbort: () => messageUpdatesAbortController.abort(),
+				onStreamStart: () => {
+					if (pending) streamStart();
 					pending = false;
-				} else if (update.type === MessageUpdateType.FinalAnswer) {
-					// Mirror server-side merge behavior so the UI reflects the
-					// final text once tools complete, while preserving any
-					// pre‑tool streamed content when appropriate.
-					const finalText = update.text ?? "";
-					const isInterrupted = update.interrupted === true;
-					const hadTools = updatesBuffer.some((u) => u.type === MessageUpdateType.Tool);
-
-					if (isInterrupted) {
-						if (!messageToWriteTo.content) {
-							// We never streamed anything; fall back to finalText.
-							messageToWriteTo.content = finalText;
-						} else if (finalText && messageToWriteTo.content.startsWith(finalText)) {
-							// The server may have clamped the persisted text back to a
-							// reported stop point (see stop-generating). Adopt it when it
-							// is a prefix of what we streamed so this view matches what
-							// every other view will load; otherwise keep our streamed
-							// content (continue flows receive only the post-prefix text).
-							messageToWriteTo.content = finalText;
-						}
-					} else if (hadTools) {
-						const existing = messageToWriteTo.content;
-						const trimmedExistingSuffix = existing.replace(/\s+$/, "");
-						const trimmedFinalPrefix = finalText.replace(/^\s+/, "");
-						const alreadyStreamed =
-							finalText &&
-							(existing.endsWith(finalText) ||
-								(trimmedFinalPrefix.length > 0 &&
-									trimmedExistingSuffix.endsWith(trimmedFinalPrefix)));
-
-						if (existing && existing.length > 0) {
-							if (alreadyStreamed) {
-								// A. Already streamed the same final text; keep as-is.
-								messageToWriteTo.content = existing;
-							} else if (
-								finalText &&
-								(finalText.startsWith(existing) ||
-									(trimmedExistingSuffix.length > 0 &&
-										trimmedFinalPrefix.startsWith(trimmedExistingSuffix)))
-							) {
-								// B. Final text already includes streamed prefix; use it verbatim.
-								messageToWriteTo.content = finalText;
-							} else {
-								// C. Merge with a paragraph break for readability.
-								const needsGap = !/\n\n$/.test(existing) && !/^\n/.test(finalText ?? "");
-								messageToWriteTo.content = existing + (needsGap ? "\n\n" : "") + finalText;
-							}
-						} else {
-							messageToWriteTo.content = finalText;
-						}
-					} else {
-						// No tools: final answer replaces streamed content so
-						// the provider's final text is authoritative.
-						messageToWriteTo.content = finalText;
-					}
-				} else if (
-					update.type === MessageUpdateType.Status &&
-					update.status === MessageUpdateStatus.Error
-				) {
-					// Check if this is a 402 payment required error
+				},
+				onTitle: (title) => convsStore.update(convId, { title }),
+				onError: (update) => {
 					if (update.statusCode === 402) {
 						showSubscribeModal = true;
 					} else if (
@@ -470,24 +321,8 @@
 					} else {
 						$error = update.message ?? "An error has occurred";
 					}
-				} else if (update.type === MessageUpdateType.Title) {
-					// Update the sidebar title directly via the store — no side-channel needed.
-					convsStore.update(convId, { title: update.title });
-				} else if (update.type === MessageUpdateType.File) {
-					messageToWriteTo.files = [
-						...(messageToWriteTo.files ?? []),
-						{ type: "hash", value: update.sha, mime: update.mime, name: update.name },
-					];
-				} else if (update.type === MessageUpdateType.RouterMetadata) {
-					// Update router metadata immediately when received
-					messageToWriteTo.routerMetadata = {
-						route: update.route,
-						model: update.model,
-					};
-				}
-			}
-
-			flushBuffer(new Date());
+				},
+			});
 		} catch (err) {
 			if ($isAborted || (err instanceof DOMException && err.name === "AbortError")) {
 				// User-initiated abort, not an error
@@ -540,6 +375,58 @@
 		}
 	}
 
+	// Stream a run this tab did not start (a returning tab, a second device, a run still
+	// in flight at load) into its message via the shared consumer. Resumes at the message's
+	// materialized cursor so no content is replayed twice.
+	async function reattachToRun() {
+		if (!browser || writeMessageInFlight || reattachController) return;
+		const lastAssistant = messages.findLast((m) => m.from === "assistant");
+		if (
+			!lastAssistant ||
+			!lastAssistant.generationId ||
+			isAssistantGenerationTerminal(lastAssistant)
+		) {
+			return;
+		}
+
+		const controller = new AbortController();
+		reattachController = controller;
+		const runConvId = convId;
+		const streamingMode = resolveStreamingMode($settings);
+
+		const url = new URL(`${base}/conversation/${runConvId}/stream`, window.location.href);
+		url.searchParams.set("generationId", lastAssistant.generationId);
+		url.searchParams.set("fromSeq", String(lastAssistant.materializedSeq ?? 0));
+
+		try {
+			await consumeMessageUpdates(
+				applyStreamingMode(reattachStream(url.toString(), controller.signal), streamingMode),
+				lastAssistant,
+				{
+					streamingMode,
+					maxUpdateTime: updateDebouncer.maxUpdateTime,
+					isAborted: () => controller.signal.aborted,
+					onAbort: () => controller.abort(),
+					onStreamStart: () => {},
+					onTitle: (title) => convsStore.update(runConvId, { title }),
+					onError: (update) => {
+						$error = update.message ?? "An error has occurred";
+					},
+				}
+			);
+		} catch (err) {
+			console.error(err);
+		} finally {
+			const aborted = controller.signal.aborted;
+			if (reattachController === controller) reattachController = undefined;
+			// Reconcile with the canonical message once the run ends. Skip on abort
+			// (navigation/stop refresh themselves) or if we have moved conversations.
+			if (!aborted && convId === runConvId) {
+				await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
+			}
+		}
+	}
+
 	// Poll the conversation API until the last assistant message is terminal
 	// (interrupted, final answer, or error persisted), bounded at ~3.2s. Used
 	// after a Stop so the post-stop refresh reads settled data instead of a
@@ -575,10 +462,12 @@
 		$isAborted = true;
 		$loading = false;
 		messageUpdatesAbortController.abort();
+		reattachController?.abort();
+		reattachController = undefined;
 
 		// Mark the last assistant message as interrupted locally so
 		// isConversationGenerationActive() immediately returns false,
-		// removing the background poller and preventing $loading re-enable.
+		// preventing $loading from re-enabling.
 		if (lastAssistant) {
 			lastAssistant.interrupted = true;
 		}
@@ -645,14 +534,8 @@
 			await writeMessage({ prompt: pendingText });
 		}
 
-		// Don't resume tracking for stale snapshots: a generation that has gone
-		// this long without a DB write died with its pod and will never finish.
-		const streaming =
-			isConversationGenerationActive(messages) && !isGenerationStale(data.updatedAt);
-		if (streaming) {
-			addBackgroundGeneration({ id: convId, startedAt: Date.now() });
-			$loading = true;
-		}
+		// Resume a generation still in flight for this conversation on load.
+		reattachToRun();
 	});
 
 	async function onMessage(content: string) {
@@ -716,27 +599,25 @@
 			rootMessageId = data.rootMessageId;
 			_lastSyncedConvId = currentConvId;
 			_lastSyncedMessages = newMessages;
+			// Drop the reattach for the previous conversation/snapshot and resume if the
+			// current one is in flight. In untrack() so it adds no reactive dependencies.
+			untrack(() => {
+				reattachController?.abort();
+				reattachController = undefined;
+				reattachToRun();
+			});
 		}
 	});
 
 	$effect(() => {
-		const streaming =
-			isConversationGenerationActive(messages) &&
-			// A snapshot that has gone this long without a database write belongs
-			// to a pod that died before persisting a terminal state; never
-			// resurrect the streaming UI for it. Generations streaming in this
-			// tab are exempt — their snapshot timestamp is from page-load time.
-			(untrack(() => writeMessageInFlight) || !isGenerationStale(data.updatedAt));
+		// No staleness heuristic: the reaper marks a dead run terminal, flipping this false.
+		const streaming = isConversationGenerationActive(messages);
 		if (stopRequestedFor === convId) {
 			$loading = false;
 		} else if (streaming) {
 			$loading = true;
 		} else if (!pending) {
 			$loading = false;
-		}
-
-		if (!streaming && browser) {
-			removeBackgroundGeneration(convId);
 		}
 	});
 
@@ -750,19 +631,16 @@
 		}
 	});
 
-	beforeNavigate((navigation) => {
+	beforeNavigate(() => {
 		if (!page.params.id) return;
 
-		const navigatingAway =
-			navigation.to?.route.id !== page.route.id || navigation.to?.params?.id !== page.params.id;
-
-		if ($loading && navigatingAway) {
-			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
-		}
-
+		// Stop consuming here; the generation keeps running server-side and this or
+		// another tab reattaches to it on the next visit.
 		$isAborted = true;
 		$loading = false;
 		messageUpdatesAbortController.abort();
+		reattachController?.abort();
+		reattachController = undefined;
 	});
 
 	let title = $derived.by(() => {

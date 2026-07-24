@@ -25,8 +25,10 @@ import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
+import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
 import { clampStoppedContent } from "$lib/server/stopTruncation";
 import { MetricsServer } from "$lib/server/metrics";
+import { randomUUID } from "$lib/utils/randomUuid";
 
 // How long a stop marker is protected from the pre-flight cleanup of a new
 // generation. A marker younger than this may still be awaiting observation by
@@ -34,6 +36,24 @@ import { MetricsServer } from "$lib/server/metrics";
 // would lose the stop. Aborted generations consume their marker on shutdown,
 // so markers normally live far shorter than this.
 const STOP_MARKER_GRACE_MS = 5_000;
+
+// Shape a message's updates for storage: drop keepalives and replace each stream token
+// with a length marker (content is stored separately), preserving ordering without
+// duplicating text. Shared by the full save and the writer's incremental materialise so
+// both persist the same thing under materializedSeq.
+function compressUpdatesForStorage(updates: Message["updates"]): Message["updates"] {
+	return (
+		updates
+			?.filter(
+				(u) => !(u.type === MessageUpdateType.Status && u.status === MessageUpdateStatus.KeepAlive)
+			)
+			.map((u) => {
+				if (u.type !== MessageUpdateType.Stream) return u;
+				const len = u.len ?? (u.token ?? "").length;
+				return { type: MessageUpdateType.Stream, token: "", len } satisfies MessageStreamUpdate;
+			}) ?? []
+	);
+}
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -359,6 +379,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		error(500, "Failed to create prompt");
 	}
 
+	// The stamp is what tells a reader a log exists; every run records one.
+	const effectiveGenerationId = generationId ?? randomUUID();
+	messageToWriteTo.generationId = effectiveGenerationId;
+
 	// update the conversation with the new messages
 	await collections.conversations.updateOne(
 		{ _id: convId },
@@ -375,24 +399,19 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const metricsModelId = model.id ?? model.name ?? conv.model;
 	const metricsLabels = { model: metricsModelId };
 
-	const persistConversation = async () => {
-		const messagesForSave = conv.messages.map((msg) => {
-			const filteredUpdates =
-				msg.updates
-					?.filter(
-						(u) =>
-							!(u.type === MessageUpdateType.Status && u.status === MessageUpdateStatus.KeepAlive)
-					)
-					.map((u) => {
-						if (u.type !== MessageUpdateType.Stream) return u;
-						// Preserve existing len if already compressed, otherwise compute from token
-						const len = u.len ?? (u.token ?? "").length;
-						// store a lightweight marker to preserve ordering without duplicating content
-						return { type: MessageUpdateType.Stream, token: "", len } satisfies MessageStreamUpdate;
-					}) ?? [];
+	let generationWriter: GenerationWriter | undefined;
 
-			return { ...msg, updates: filteredUpdates };
-		});
+	const persistConversation = async () => {
+		// This rewrites the whole messages array, so stamp materializedSeq from the same
+		// synchronous instant as the content below, or a reader resumes from a stale point
+		// and replays text the message already contains.
+		if (generationWriter && messageToWriteTo) {
+			messageToWriteTo.materializedSeq = generationWriter.currentSeq();
+		}
+		const messagesForSave = conv.messages.map((msg) => ({
+			...msg,
+			updates: compressUpdatesForStorage(msg.updates),
+		}));
 
 		await collections.conversations.updateOne(
 			{ _id: convId },
@@ -435,6 +454,22 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						// transient DB error; the next tick retries
 					});
 			}, 300);
+
+			const writer = await createGenerationWriter({
+				generationId: effectiveGenerationId,
+				conversationId: convId,
+				messageId: messageToWriteTo.id,
+				userId: locals.user?._id,
+				sessionId: locals.sessionId,
+				snapshot: () => ({
+					content: messageToWriteTo.content,
+					reasoning: messageToWriteTo.reasoning,
+					files: messageToWriteTo.files,
+					routerMetadata: messageToWriteTo.routerMetadata,
+					updates: compressUpdatesForStorage(messageToWriteTo.updates),
+				}),
+			});
+			generationWriter = writer;
 
 			let finalAnswerReceived = false;
 			let abortedByUser = false;
@@ -578,6 +613,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					);
 				}
 
+				// Before the padding below rewrites `event`: the log stores what was
+				// actually generated, not the padded wire form.
+				writer.push(event);
+
 				// Avoid remote keylogging attack executed by watching packet lengths
 				// by padding the text with null chars to a fixed length
 				// https://cdn.arstechnica.net/wp-content/uploads/2024/03/LLM-Side-Channel.pdf
@@ -604,10 +643,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				};
 
 				await enqueueUpdate();
-
-				if (clientDetached) {
-					await persistConversation();
-				}
 			}
 
 			let hasError = false;
@@ -745,6 +780,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}
 
 			await persistConversation();
+			await writer.finish({
+				status: hasError ? "error" : abortedByUser ? "interrupted" : "completed",
+			});
 			clearInterval(abortMarkerWatcher);
 			abortRegistry.unregister(conversationKey, ctrl);
 
