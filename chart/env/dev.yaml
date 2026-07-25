@@ -60,7 +60,7 @@ envVars:
   PUBLIC_ORIGIN: ""
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "https://plausible.io/js/pa-Io_oigECawqdlgpf5qvHb.js"
   PUBLIC_FEATURE_ANNOUNCEMENTS: >
-    [{"title": "Gemma-4-31B at 700 tokens/s", "description": "Run Gemma-4-31B at 700 tokens/s thanks to Cerebras inference.", "link": "/models/google/gemma-4-31B-it", "cta": "Go to the model", "maxDate": "2026-08-01"}]
+    [{"title": "Inkling is now on HuggingChat", "description": "Thinking Machines' first open-weights model: a 975B-param MoE that reasons over text, images, and audio.", "link": "/models/thinkingmachines/Inkling", "cta": "Try it now", "maxDate": "2026-08-15"}]
 
   TASK_MODEL: "meta-llama/Llama-3.1-8B-Instruct"
   # Tombstone: unread by current code, kept so any old pod still on the pre-#2265
