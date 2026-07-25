@@ -405,6 +405,25 @@
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
 
+	// Fresh chat: the composer sits vertically centered with the greeting above
+	// it, and docks to the bottom of the column as soon as the conversation has
+	// content. `pending` covers the gap between a send and the first mounted
+	// message, so the composer never bounces mid-send. `loading` is deliberately
+	// not part of this: on the home/model routes it turns true while the
+	// conversation is being created, and docking there would strand the composer
+	// at the bottom of an empty screen until the navigation lands.
+	// Counted over rendered messages only: a conversation created but never sent
+	// to still carries its `system` preprompt message, which paints nothing — that
+	// screen is as empty as the home route's and gets the same treatment.
+	let renderedMessageCount = $derived(
+		messages.filter((message) => message.from === "user" || message.from === "assistant").length
+	);
+	let isFreshChat = $derived(!renderedMessageCount && !pending);
+	// A virtual keyboard covers the lower half of the screen and no ResizeObserver
+	// fires for it, so a centered composer would end up behind it: dock while the
+	// input is focused on touch devices (what every other chat app does too).
+	let composerCentered = $derived(isFreshChat && !(focused && isVirtualKeyboard()));
+
 	let activeRouterExamplePrompt = $state<string | null>(null);
 	// Use MCP examples when all base servers are enabled, otherwise use router examples
 	let activeExamples = $derived<RouterExample[]>(
@@ -686,14 +705,9 @@
 							readOnly={isReadOnly}
 						/>
 					</div>
-				{:else}
-					<ChatIntroduction
-						{currentModel}
-						onmessage={(content) => {
-							onmessage?.(content);
-						}}
-					/>
 				{/if}
+				<!-- No fresh-chat branch: the greeting is rendered above the
+				     vertically centered composer overlay, not in this column. -->
 			</div>
 
 			<ScrollToPreviousBtn
@@ -711,276 +725,303 @@
 
 		<!-- --scrollbar-gutter (measured by chatScroll) keeps the composer text
 		     aligned with the message column, whose content box is narrowed by
-		     the scroller's scrollbar-gutter on classic-scrollbar platforms. -->
+		     the scroller's scrollbar-gutter on classic-scrollbar platforms.
+
+		     Placement: `bottom-0` docks the composer under the conversation; on a
+		     fresh chat `bottom-1/2` plus a half-its-own-height translate centers
+		     the greeting + composer group in the column instead. Pure CSS, so the
+		     server-rendered markup already lands centered — nothing jumps once JS
+		     takes over. The measured element is the inner wrapper, so the greeting
+		     never inflates the clearance the scroll spacer derives from it.
+
+		     `max-h-full` + `justify-end` is the clamp that keeps the send button
+		     reachable: a group taller than the column (long draft plus
+		     attachments on a short viewport) can no longer center — its box is
+		     capped at the column height, which lands the composer flush with the
+		     bottom exactly as the docked layout does, and the greeting is what
+		     overflows instead. -->
 		<div
-			bind:clientHeight={composerHeight}
-			class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full
-			max-w-3xl flex-col items-center justify-center bg-linear-to-t from-white
-			via-white to-white/0 px-[calc(0.875rem+var(--scrollbar-gutter,0px))] pt-2 *:pointer-events-auto
-			max-sm:py-0 sm:px-[calc(1.25rem+var(--scrollbar-gutter,0px))]
-			md:pb-4 xl:max-w-4xl dark:border-gray-800 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0"
+			class={[
+				"pointer-events-none absolute inset-x-0 z-0 mx-auto flex max-h-full w-full max-w-3xl flex-col items-center justify-end xl:max-w-4xl",
+				composerCentered ? "bottom-1/2 translate-y-1/2" : "bottom-0",
+			]}
 		>
-			{#if !draft.length && !messages.length && !sources.length && !loading && (currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
-				<div
-					class="mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 select-none dark:text-gray-500"
-				>
-					{#each activeExamples as ex}
-						<button
-							class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur-sm hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
-							onclick={() => startExample(ex)}
-						>
-							{ex.title}
-							{#if ex.artifact}
-								<LucideSparkles class="size-3 flex-none text-blue-600 dark:text-blue-400" />
-							{/if}
-						</button>
-					{/each}
-				</div>
+			{#if composerCentered}
+				<ChatIntroduction {currentModel} />
 			{/if}
-			{#if shouldShowRouterFollowUps && !lastIsError}
-				<div
-					class="mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 select-none dark:text-gray-500"
-				>
-					<!-- <span class=" text-gray-500 dark:text-gray-400">Follow ups</span> -->
-					{#each routerFollowUps as followUp}
-						<button
-							class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur-sm hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
-							onclick={() => startFollowUp(followUp)}
-						>
-							<CarbonDirectionRight class="scale-y-[-1] text-xs" />
-							{followUp.title}</button
-						>
-					{/each}
-				</div>
-			{/if}
-			{#if sources?.length && !loading}
-				<div
-					in:fly|local={sources.length === 1 ? { y: -20, easing: cubicInOut } : undefined}
-					class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl pb-3"
-				>
-					{#each sources as source, index}
-						{#await source then src}
-							<UploadedFile
-								file={src}
-								onclose={() => {
-									files = files.filter((_, i) => i !== index);
-								}}
-							/>
-						{/await}
-					{/each}
-				</div>
-			{/if}
-
-			<div class="w-full">
-				<div class="flex w-full *:mb-3">
-					{#if !loading && lastIsError}
-						<RetryBtn
-							classNames="ml-auto"
-							onClick={() => {
-								if (lastMessage && lastMessage.ancestors) {
-									chatScroll.armRetry();
-									onretry?.({
-										id: lastMessage.id,
-									});
-								}
-							}}
-						/>
-					{/if}
-				</div>
-				<form
-					tabindex="-1"
-					aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
-					onsubmit={(e) => {
-						e.preventDefault();
-						handleSubmit();
-					}}
-					class={{
-						"relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 dark:border-gray-700 dark:bg-gray-800": true,
-						"opacity-30": isReadOnly,
-						"max-sm:mb-4": focused && isVirtualKeyboard(),
-					}}
-				>
-					{#if isRecording || isTranscribing}
-						<VoiceRecorder
-							{isTranscribing}
-							{isTouchDevice}
-							oncancel={() => {
-								isRecording = false;
-							}}
-							onconfirm={handleRecordingConfirm}
-							onsend={handleRecordingSend}
-							onerror={handleRecordingError}
-						/>
-					{:else if onDrag && isFileUploadEnabled}
-						<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
-					{:else}
-						<div
-							class="flex w-full flex-1 rounded-xl border-none bg-transparent"
-							class:paste-glow={pastedLongContent}
-						>
-							{#if lastIsError}
-								<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
-							{:else}
-								<ChatInput
-									placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
-									{loading}
-									bind:value={draft}
-									bind:files
-									mimeTypes={activeMimeTypes}
-									onsubmit={handleSubmit}
-									{onPaste}
-									disabled={isReadOnly || lastIsError}
-									{modelIsMultimodal}
-									{modelSupportsTools}
-									bind:focused
-								/>
-							{/if}
-
-							{#if loading}
-								<StopGeneratingBtn
-									onClick={() => {
-										hapticError();
-										onstop?.();
-									}}
-									showBorder={true}
-									classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow-sm transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
-								/>
-							{:else}
-								{#if transcriptionEnabled}
-									<button
-										type="button"
-										class="absolute right-10 bottom-2 mr-1.5 btn size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 sm:right-9 sm:size-7 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white"
-										disabled={isReadOnly}
-										onclick={() => {
-											isRecording = true;
-										}}
-										aria-label="Start voice recording"
-									>
-										<IconMic class="size-4" />
-									</button>
+			<div
+				bind:clientHeight={composerHeight}
+				class="flex w-full flex-col items-center justify-center bg-linear-to-t from-white
+				via-white to-white/0 px-[calc(0.875rem+var(--scrollbar-gutter,0px))] pt-2 *:pointer-events-auto
+				max-sm:py-0 sm:px-[calc(1.25rem+var(--scrollbar-gutter,0px))]
+				md:pb-4 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0"
+			>
+				{#if !draft.length && !renderedMessageCount && !sources.length && !loading && (currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
+					<div
+						class="mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 select-none dark:text-gray-500"
+					>
+						{#each activeExamples as ex}
+							<button
+								class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur-sm hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
+								onclick={() => startExample(ex)}
+							>
+								{ex.title}
+								{#if ex.artifact}
+									<LucideSparkles class="size-3 flex-none text-blue-600 dark:text-blue-400" />
 								{/if}
-								<button
-									class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
-									isReadOnly
-										? ''
-										: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
-									disabled={!draft || isReadOnly}
-									type="submit"
-									aria-label="Send message"
-									name="submit"
-								>
-									<IconArrowUp />
-								</button>
-							{/if}
-						</div>
-					{/if}
-				</form>
-				<div
-					class={{
-						"mt-1.5 flex h-5 items-center self-stretch px-0.5 text-xs whitespace-nowrap text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
-						"max-sm:hidden": focused && isVirtualKeyboard(),
-					}}
-				>
-					{#if models.find((m) => m.id === currentModel.id)}
-						{#if loading && streamingToolCallName}
-							<span class="inline-flex items-center gap-1 text-xs whitespace-nowrap">
-								<LucideHammer class="size-3" />
-								Calling tool
-								<span class="loading-dots font-medium">
-									{availableTools.find((t) => t.name === streamingToolCallName)?.displayName ??
-										streamingToolCallName}
-								</span>
-							</span>
-						{:else if !currentModel.isRouter || !loading}
-							<a
-								href="{base}/settings/{currentModel.id}"
-								onclick={(e) => {
-									if (requireAuthUser()) {
-										e.preventDefault();
+							</button>
+						{/each}
+					</div>
+				{/if}
+				{#if shouldShowRouterFollowUps && !lastIsError}
+					<div
+						class="mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 select-none dark:text-gray-500"
+					>
+						<!-- <span class=" text-gray-500 dark:text-gray-400">Follow ups</span> -->
+						{#each routerFollowUps as followUp}
+							<button
+								class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur-sm hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
+								onclick={() => startFollowUp(followUp)}
+							>
+								<CarbonDirectionRight class="scale-y-[-1] text-xs" />
+								{followUp.title}</button
+							>
+						{/each}
+					</div>
+				{/if}
+				{#if sources?.length && !loading}
+					<div
+						in:fly|local={sources.length === 1 ? { y: -20, easing: cubicInOut } : undefined}
+						class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl pb-3"
+					>
+						{#each sources as source, index}
+							{#await source then src}
+								<UploadedFile
+									file={src}
+									onclose={() => {
+										files = files.filter((_, i) => i !== index);
+									}}
+								/>
+							{/await}
+						{/each}
+					</div>
+				{/if}
+
+				<div class="w-full">
+					<div class="flex w-full *:mb-3">
+						{#if !loading && lastIsError}
+							<RetryBtn
+								classNames="ml-auto"
+								onClick={() => {
+									if (lastMessage && lastMessage.ancestors) {
+										chatScroll.armRetry();
+										onretry?.({
+											id: lastMessage.id,
+										});
 									}
 								}}
-								class="inline-flex min-w-0 items-center gap-1 hover:underline"
-							>
-								{#if currentModel.isRouter}
-									<IconOmni />
-									<span class="truncate">{currentModel.displayName}</span>
-								{:else}
-									<span class="shrink-0">Model:</span>
-									{#if currentModel.logoUrl}
-										<img
-											src={currentModel.logoUrl}
-											alt=""
-											class="size-3 flex-none rounded-sm border bg-white dark:border-gray-700"
-										/>
-									{/if}
-									<span class="truncate">{currentModel.displayName}</span>
-									{#if hasProviderOverride}
-										{@const hubOrg =
-											PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
-										<span
-											class="inline-flex shrink-0 items-center rounded-sm p-0.5 {providerOverride ===
-											'fastest'
-												? 'bg-green-100 text-green-600 dark:bg-green-800/20 dark:text-green-500'
-												: providerOverride === 'cheapest'
-													? 'bg-blue-100 text-blue-600 dark:bg-blue-800/20 dark:text-blue-500'
-													: ''}"
-											title="Provider: {providerOverride}"
-										>
-											{#if providerOverride === "fastest"}
-												<IconFast classNames="text-sm" />
-											{:else if providerOverride === "cheapest"}
-												<IconCheap classNames="text-sm" />
-											{:else if hubOrg}
-												<img
-													src="https://huggingface.co/api/avatars/{hubOrg}"
-													alt={providerOverride}
-													class="size-3 flex-none rounded-xs"
-												/>
-											{/if}
-										</span>
-									{/if}
-								{/if}
-								<CarbonCaretDown class="-ml-0.5 shrink-0 text-xxs" />
-							</a>
-						{:else if showRouterDetails && streamingRouterMetadata?.route}
-							<div
-								class="mr-2 flex items-center gap-1.5 text-xs text-[.70rem] leading-none whitespace-nowrap text-gray-400 dark:text-gray-400"
-							>
-								<IconOmni classNames="text-xs animate-pulse" />
-
-								<span class="router-badge-text router-shimmer">
-									{streamingRouterMetadata.route}
-								</span>
-
-								<span class="text-gray-500">with</span>
-
-								<span class="router-badge-text">
-									{streamingRouterModelName}
-								</span>
-							</div>
+							/>
+						{/if}
+					</div>
+					<form
+						tabindex="-1"
+						aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
+						onsubmit={(e) => {
+							e.preventDefault();
+							handleSubmit();
+						}}
+						class={{
+							"relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 dark:border-gray-700 dark:bg-gray-800": true,
+							"opacity-30": isReadOnly,
+							"max-sm:mb-4": focused && isVirtualKeyboard(),
+						}}
+					>
+						{#if isRecording || isTranscribing}
+							<VoiceRecorder
+								{isTranscribing}
+								{isTouchDevice}
+								oncancel={() => {
+									isRecording = false;
+								}}
+								onconfirm={handleRecordingConfirm}
+								onsend={handleRecordingSend}
+								onerror={handleRecordingError}
+							/>
+						{:else if onDrag && isFileUploadEnabled}
+							<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 						{:else}
 							<div
-								class="loading-dots relative inline-flex items-center text-gray-400 dark:text-gray-400"
-								aria-label="Routing…"
+								class="flex w-full flex-1 rounded-xl border-none bg-transparent"
+								class:paste-glow={pastedLongContent}
 							>
-								<IconOmni classNames="text-xs animate-pulse mr-1" /> Routing
+								{#if lastIsError}
+									<ChatInput
+										value="Sorry, something went wrong. Please try again."
+										disabled={true}
+									/>
+								{:else}
+									<ChatInput
+										placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
+										{loading}
+										bind:value={draft}
+										bind:files
+										mimeTypes={activeMimeTypes}
+										onsubmit={handleSubmit}
+										{onPaste}
+										disabled={isReadOnly || lastIsError}
+										{modelIsMultimodal}
+										{modelSupportsTools}
+										bind:focused
+									/>
+								{/if}
+
+								{#if loading}
+									<StopGeneratingBtn
+										onClick={() => {
+											hapticError();
+											onstop?.();
+										}}
+										showBorder={true}
+										classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow-sm transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
+									/>
+								{:else}
+									{#if transcriptionEnabled}
+										<button
+											type="button"
+											class="absolute right-10 bottom-2 mr-1.5 btn size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 sm:right-9 sm:size-7 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white"
+											disabled={isReadOnly}
+											onclick={() => {
+												isRecording = true;
+											}}
+											aria-label="Start voice recording"
+										>
+											<IconMic class="size-4" />
+										</button>
+									{/if}
+									<button
+										class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
+										isReadOnly
+											? ''
+											: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
+										disabled={!draft || isReadOnly}
+										type="submit"
+										aria-label="Send message"
+										name="submit"
+									>
+										<IconArrowUp />
+									</button>
+								{/if}
 							</div>
 						{/if}
-					{:else}
-						<span class="inline-flex items-center line-through dark:border-gray-700">
-							{currentModel.id}
-						</span>
-					{/if}
-					{#if !messages.length && !loading}
-						<span class="max-sm:hidden"
-							>{publicConfig.PUBLIC_CAVEAT || "Generated content may be inaccurate or false."}</span
-						>
-					{/if}
-					{#if $settings.reasoningOverrides?.[currentModel.id] ?? currentModel.supportsReasoning}
-						<div class="ml-auto">
-							<ThinkingEffortChip modelId={currentModel.id} />
-						</div>
-					{/if}
+					</form>
+					<div
+						class={{
+							"mt-1.5 flex h-5 items-center self-stretch px-0.5 text-xs whitespace-nowrap text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
+							"max-sm:hidden": focused && isVirtualKeyboard(),
+						}}
+					>
+						{#if models.find((m) => m.id === currentModel.id)}
+							{#if loading && streamingToolCallName}
+								<span class="inline-flex items-center gap-1 text-xs whitespace-nowrap">
+									<LucideHammer class="size-3" />
+									Calling tool
+									<span class="loading-dots font-medium">
+										{availableTools.find((t) => t.name === streamingToolCallName)?.displayName ??
+											streamingToolCallName}
+									</span>
+								</span>
+							{:else if !currentModel.isRouter || !loading}
+								<a
+									href="{base}/settings/{currentModel.id}"
+									onclick={(e) => {
+										if (requireAuthUser()) {
+											e.preventDefault();
+										}
+									}}
+									class="inline-flex min-w-0 items-center gap-1 hover:underline"
+								>
+									{#if currentModel.isRouter}
+										<IconOmni />
+										<span class="truncate">{currentModel.displayName}</span>
+									{:else}
+										<span class="shrink-0">Model:</span>
+										{#if currentModel.logoUrl}
+											<img
+												src={currentModel.logoUrl}
+												alt=""
+												class="size-3 flex-none rounded-sm border bg-white dark:border-gray-700"
+											/>
+										{/if}
+										<span class="truncate">{currentModel.displayName}</span>
+										{#if hasProviderOverride}
+											{@const hubOrg =
+												PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
+											<span
+												class="inline-flex shrink-0 items-center rounded-sm p-0.5 {providerOverride ===
+												'fastest'
+													? 'bg-green-100 text-green-600 dark:bg-green-800/20 dark:text-green-500'
+													: providerOverride === 'cheapest'
+														? 'bg-blue-100 text-blue-600 dark:bg-blue-800/20 dark:text-blue-500'
+														: ''}"
+												title="Provider: {providerOverride}"
+											>
+												{#if providerOverride === "fastest"}
+													<IconFast classNames="text-sm" />
+												{:else if providerOverride === "cheapest"}
+													<IconCheap classNames="text-sm" />
+												{:else if hubOrg}
+													<img
+														src="https://huggingface.co/api/avatars/{hubOrg}"
+														alt={providerOverride}
+														class="size-3 flex-none rounded-xs"
+													/>
+												{/if}
+											</span>
+										{/if}
+									{/if}
+									<CarbonCaretDown class="-ml-0.5 shrink-0 text-xxs" />
+								</a>
+							{:else if showRouterDetails && streamingRouterMetadata?.route}
+								<div
+									class="mr-2 flex items-center gap-1.5 text-xs text-[.70rem] leading-none whitespace-nowrap text-gray-400 dark:text-gray-400"
+								>
+									<IconOmni classNames="text-xs animate-pulse" />
+
+									<span class="router-badge-text router-shimmer">
+										{streamingRouterMetadata.route}
+									</span>
+
+									<span class="text-gray-500">with</span>
+
+									<span class="router-badge-text">
+										{streamingRouterModelName}
+									</span>
+								</div>
+							{:else}
+								<div
+									class="loading-dots relative inline-flex items-center text-gray-400 dark:text-gray-400"
+									aria-label="Routing…"
+								>
+									<IconOmni classNames="text-xs animate-pulse mr-1" /> Routing
+								</div>
+							{/if}
+						{:else}
+							<span class="inline-flex items-center line-through dark:border-gray-700">
+								{currentModel.id}
+							</span>
+						{/if}
+						{#if !renderedMessageCount && !loading}
+							<span class="max-sm:hidden"
+								>{publicConfig.PUBLIC_CAVEAT ||
+									"Generated content may be inaccurate or false."}</span
+							>
+						{/if}
+						{#if $settings.reasoningOverrides?.[currentModel.id] ?? currentModel.supportsReasoning}
+							<div class="ml-auto">
+								<ThinkingEffortChip modelId={currentModel.id} />
+							</div>
+						{/if}
+					</div>
 				</div>
 			</div>
 		</div>
