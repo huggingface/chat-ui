@@ -89,11 +89,21 @@ export async function consumeMessageUpdates(
 			if (update.type === MessageUpdateType.Stream) {
 				const lastUpdate = updatesBuffer.at(-1);
 				if (lastUpdate?.type === MessageUpdateType.Stream) {
-					// Fresh objects/arrays so the UI reacts to merged tokens.
-					const merged = {
-						...lastUpdate,
-						token: (lastUpdate.token ?? "") + (update.token ?? ""),
-					};
+					// Persisted streams use empty-token length markers whose spans are
+					// read from message.content. Keep that representation when live text
+					// resumes, or replacing the marker with a token makes the renderer
+					// drop the marker's original span at the reattach boundary.
+					const merged =
+						lastUpdate.token === "" && lastUpdate.len !== undefined
+							? {
+									...lastUpdate,
+									len: lastUpdate.len + update.token.length,
+								}
+							: {
+									...lastUpdate,
+									token: lastUpdate.token + update.token,
+								};
+					// Fresh objects/arrays so the UI reacts to merged tokens or lengths.
 					updatesBuffer = [...updatesBuffer.slice(0, -1), merged];
 				} else {
 					updatesBuffer = [...updatesBuffer, update];

@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { mergedStreamToken } from "./writer";
+import { afterEach, beforeAll, describe, it, expect } from "vitest";
+import { ObjectId } from "mongodb";
+import { randomUUID } from "node:crypto";
+import { collections, ready } from "$lib/server/database";
+import { createGenerationWriter, mergedStreamToken } from "./writer";
 import {
 	MessageUpdateType,
 	MessageReasoningUpdateType,
@@ -55,5 +58,76 @@ describe("mergedStreamToken", () => {
 	it("returns null when there is no tail to merge into", () => {
 		expect(mergedStreamToken(undefined, text("x"))).toBeNull();
 		expect(mergedStreamToken(undefined, reasoning("x"))).toBeNull();
+	});
+});
+
+describe.sequential("generation writer cursor", () => {
+	beforeAll(async () => {
+		await ready;
+	});
+
+	afterEach(async () => {
+		await Promise.all([
+			collections.conversations.deleteMany({}),
+			collections.generations.deleteMany({}),
+			collections.generationEvents.deleteMany({}),
+		]);
+	});
+
+	it("seals the event covered by a synchronously captured cursor", async () => {
+		const conversationId = new ObjectId();
+		const messageId = randomUUID();
+		const generationId = randomUUID();
+		const now = new Date();
+		let content = "";
+
+		await collections.conversations.insertOne({
+			_id: conversationId,
+			messages: [
+				{
+					id: messageId,
+					from: "assistant",
+					content,
+					updates: [],
+					createdAt: now,
+					updatedAt: now,
+				},
+			],
+			createdAt: now,
+			updatedAt: now,
+		} as never);
+
+		const writer = await createGenerationWriter({
+			generationId,
+			conversationId,
+			messageId,
+			snapshot: () => ({ content }),
+		});
+
+		content += "alpha ";
+		writer.push(text("alpha "));
+
+		// This is how the POST handler snapshots on client detach: capture the
+		// cursor and content synchronously, then persist them together.
+		const materializedSeq = writer.currentSeq();
+		const materializedContent = content;
+
+		// A later token must not merge into the pending event already covered by
+		// materializedSeq, which would make replay disagree with the captured content.
+		content += "beta ";
+		writer.push(text("beta "));
+		await writer.finish({ status: "completed" });
+
+		const events = await collections.generationEvents
+			.find({ generationId, seq: { $lte: materializedSeq } })
+			.sort({ seq: 1 })
+			.toArray();
+		const replayed = events
+			.filter((event) => event.event.type === MessageUpdateType.Stream)
+			.map((event) => (event.event.type === MessageUpdateType.Stream ? event.event.token : ""))
+			.join("");
+
+		expect(materializedSeq).toBeGreaterThan(0);
+		expect(replayed).toBe(materializedContent);
 	});
 });
