@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	assertAuthorizationResponseIssuer,
 	assertIssuerMatches,
 	assertPkceS256Supported,
 	assertProtectedResourceMatches,
@@ -85,6 +86,34 @@ describe("OAuth metadata binding", () => {
 				issuer: "https://attacker.example.com",
 			})
 		).toThrow(/issuer mismatch/);
+	});
+
+	it("accepts an authorization response issued by the expected server", () => {
+		expect(() =>
+			assertAuthorizationResponseIssuer("https://auth.example.com/", metadata)
+		).not.toThrow();
+	});
+
+	it("rejects an authorization response minted by a different issuer", () => {
+		expect(() =>
+			assertAuthorizationResponseIssuer("https://attacker.example.com", metadata)
+		).toThrow(/issuer mismatch/);
+	});
+
+	it("rejects an unparseable iss", () => {
+		expect(() => assertAuthorizationResponseIssuer("not-a-url", metadata)).toThrow(
+			/not a valid URL/
+		);
+	});
+
+	it("only requires iss when the authorization server advertises it", () => {
+		expect(() => assertAuthorizationResponseIssuer(null, metadata)).not.toThrow();
+		expect(() =>
+			assertAuthorizationResponseIssuer(null, {
+				...metadata,
+				authorization_response_iss_parameter_supported: true,
+			})
+		).toThrow(/missing iss/);
 	});
 
 	it("requires exact protected-resource binding", () => {

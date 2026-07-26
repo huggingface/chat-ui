@@ -88,6 +88,47 @@ export function assertIssuerMatches(
 }
 
 /**
+ * RFC 9207 §2.4 / OAuth 2.1 mix-up mitigation. Without this check an
+ * authorization server we already talk to can bounce the user to a different,
+ * honest authorization server and receive that server's authorization code —
+ * which we would then exchange, along with the flow's PKCE verifier, at the
+ * attacker's token endpoint.
+ *
+ * `iss` is validated whenever it is present, and required once the
+ * authorization server's metadata advertises that it always sends it.
+ */
+export function assertAuthorizationResponseIssuer(
+	receivedIssuer: string | null | undefined,
+	metadata: AuthorizationServerMetadata
+): void {
+	const issAlwaysSent =
+		(metadata as unknown as Record<string, unknown>)
+			.authorization_response_iss_parameter_supported === true;
+
+	if (!receivedIssuer) {
+		if (issAlwaysSent) {
+			throw new Error(
+				"Authorization response is missing iss, which this authorization server advertises as always present"
+			);
+		}
+		return;
+	}
+
+	let received: string;
+	try {
+		received = comparableUrl(receivedIssuer);
+	} catch {
+		throw new Error("Authorization response iss is not a valid URL");
+	}
+
+	if (received !== comparableUrl(metadata.issuer)) {
+		throw new Error(
+			`Authorization response issuer mismatch: expected ${metadata.issuer}, received ${receivedIssuer}`
+		);
+	}
+}
+
+/**
  * RFC 9728 §3.3 requires clients to bind protected-resource metadata to the
  * resource for which it was requested.
  */

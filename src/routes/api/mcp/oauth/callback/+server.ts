@@ -8,6 +8,7 @@ import {
 	publicOAuthState,
 	storeAuthorizationTokens,
 } from "$lib/server/mcp/oauth/connections";
+import { assertAuthorizationResponseIssuer } from "$lib/server/mcp/oauth/validation";
 import type { MCPOAuthState } from "$lib/types/Tool";
 import type {
 	AuthorizationServerMetadata,
@@ -156,6 +157,24 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			ok: false,
 			flowId: flow.id,
 			error: "State mismatch (CSRF protection)",
+		});
+	}
+
+	try {
+		assertAuthorizationResponseIssuer(
+			url.searchParams.get("iss"),
+			connection.asMetadata as unknown as AuthorizationServerMetadata
+		);
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : "Issuer validation failed";
+		logger.warn(
+			{ err: msg, flowId: flow.id },
+			"[mcp-oauth] rejected authorization response issuer"
+		);
+		return respond({
+			ok: false,
+			flowId: flow.id,
+			error: "Authorization server mismatch",
 		});
 	}
 
