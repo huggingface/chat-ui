@@ -104,7 +104,7 @@
 				class="fixed right-4 bottom-4 z-50 btn flex items-center gap-2 rounded-full border-2 border-red-500/60 bg-red-800/90 px-4 py-1.5 text-sm text-white shadow-lg"
 				title="Send error to chat"
 				onclick={() => {
-					pendingChatInput.set(composeText());
+					pendingChatInput.set({ text: composeText() });
 					onclose?.();
 				}}
 			>
