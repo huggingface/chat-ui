@@ -435,15 +435,47 @@
 			: []
 	);
 	let routerUserMessages = $derived(messages.filter((msg) => msg.from === "user"));
-	let shouldShowRouterFollowUps = $derived(
-		!draft.length &&
-			activeRouterExamplePrompt &&
+
+	// Prompt-example rows (starters above a fresh composer, follow-ups after the
+	// first exchange) are split into "does this row belong on this screen" and
+	// "should its chips be showing right now". The row keeps its box for the
+	// whole first question, and only the chips fade — mounting and unmounting it
+	// instead moved the composer 18px on the first keystroke, and again when the
+	// MCP store hydrated. The chips are always rendered so the reserved height is
+	// the row's real height rather than a hardcoded one; `invisible` also takes
+	// them out of the tab order and the accessibility tree.
+	//
+	// The MCP store only fills in on mount, so before that the server-rendered
+	// markup would have to guess whether tools examples apply. It doesn't have to:
+	// the base-server list travels in the SSR payload and base servers are enabled
+	// unless the user turned them off, so the row is reserved from the first paint
+	// with no guess for a deployment that configures none.
+	let baseMcpServerCount = $derived(
+		((page.data as { mcpBaseServers?: unknown[] }).mcpBaseServers ?? []).length
+	);
+	let toolExamplesApply = $derived(
+		currentModel.isRouter ||
+			(modelSupportsTools && ($mcpServersLoaded ? $allBaseServersEnabled : baseMcpServerCount > 0))
+	);
+	let showExamplesRow = $derived(
+		isFreshChat &&
+			toolExamplesApply &&
+			activeExamples.length > 0 &&
+			!hideRouterExamples &&
+			!lastIsError
+	);
+	let examplesChipsVisible = $derived(
+		showExamplesRow && $mcpServersLoaded && !draft.length && !sources.length && !loading
+	);
+	let showFollowUpsRow = $derived(
+		Boolean(activeRouterExamplePrompt) &&
 			routerFollowUps.length > 0 &&
 			routerUserMessages.length === 1 &&
 			(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) &&
 			!hideRouterExamples &&
-			!loading
+			!lastIsError
 	);
+	let followUpChipsVisible = $derived(showFollowUpsRow && !draft.length && !loading);
 
 	$effect(() => {
 		if (
@@ -756,9 +788,12 @@
 				max-sm:py-0 sm:px-[calc(1.25rem+var(--scrollbar-gutter,0px))]
 				md:pb-4 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0"
 			>
-				{#if !draft.length && !renderedMessageCount && !sources.length && !loading && (currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
+				{#if showExamplesRow}
 					<div
-						class="mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 select-none dark:text-gray-500"
+						class={[
+							"mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 transition-[opacity,visibility] duration-150 select-none dark:text-gray-500",
+							!examplesChipsVisible && "pointer-events-none invisible opacity-0",
+						]}
 					>
 						{#each activeExamples as ex}
 							<button
@@ -773,9 +808,12 @@
 						{/each}
 					</div>
 				{/if}
-				{#if shouldShowRouterFollowUps && !lastIsError}
+				{#if showFollowUpsRow}
 					<div
-						class="mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 select-none dark:text-gray-500"
+						class={[
+							"mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 transition-[opacity,visibility] duration-150 select-none dark:text-gray-500",
+							!followUpChipsVisible && "pointer-events-none invisible opacity-0",
+						]}
 					>
 						<!-- <span class=" text-gray-500 dark:text-gray-400">Follow ups</span> -->
 						{#each routerFollowUps as followUp}
