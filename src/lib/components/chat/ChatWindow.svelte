@@ -42,7 +42,6 @@
 	import { routerExamples } from "$lib/constants/routerExamples";
 	import { mcpExamples } from "$lib/constants/mcpExamples";
 	import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExamples";
-	import { allBaseServersEnabled, mcpServersLoaded } from "$lib/stores/mcpServers";
 	import { shareModal } from "$lib/stores/shareModal";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
 	import FeatureAnnouncementToast from "../FeatureAnnouncementToast.svelte";
@@ -425,10 +424,15 @@
 	let composerCentered = $derived(isFreshChat && !(focused && isVirtualKeyboard()));
 
 	let activeRouterExamplePrompt = $state<string | null>(null);
-	// Use MCP examples when all base servers are enabled, otherwise use router examples
-	let activeExamples = $derived<RouterExample[]>(
-		$allBaseServersEnabled ? mcpExamples : routerExamples
+	// Which starter set applies is read from the configured base-server list in
+	// the SSR payload rather than from the MCP store. The store only fills in at
+	// hydration, so keying the set off it swapped every chip's label mid-load —
+	// the deployment's server list is the same fact, and the server has it too.
+	let mcpConfigured = $derived(
+		((page.data as { mcpBaseServers?: unknown[] }).mcpBaseServers ?? []).length > 0
 	);
+	let toolExamplesApply = $derived(modelSupportsTools && mcpConfigured);
+	let activeExamples = $derived<RouterExample[]>(toolExamplesApply ? mcpExamples : routerExamples);
 	let routerFollowUps = $derived<RouterFollowUp[]>(
 		activeRouterExamplePrompt
 			? (activeExamples.find((ex) => ex.prompt === activeRouterExamplePrompt)?.followUps ?? [])
@@ -445,51 +449,41 @@
 	// the row's real height rather than a hardcoded one; `invisible` also takes
 	// them out of the tab order and the accessibility tree.
 	//
-	// Whether the row is reserved is deliberately decided from data the server
-	// also has — the configured base-server list, which travels in the SSR
-	// payload — and never from the MCP store, which only fills in on mount from
-	// localStorage. Reserving on `$allBaseServersEnabled` would put the row back
-	// in the hands of a client-only preference: a returning user who has turned
-	// off any one configured server would get it reserved during SSR and dropped
-	// at hydration, which is the shift this whole split exists to remove. The
-	// cost is that such a user keeps an empty reserved row on a non-router
-	// tools model — invisible whitespace in a centered layout, where a jump on
-	// every page load is not.
-	let baseMcpServerCount = $derived(
-		((page.data as { mcpBaseServers?: unknown[] }).mcpBaseServers ?? []).length
-	);
+	// Nothing here may depend on the MCP store. Every input is either SSR payload
+	// or user settings, both of which the server renders from, so the first
+	// painted frame is already the final one: the chips are in the server HTML
+	// with their final labels, visible before any JavaScript runs. Gating them on
+	// the store instead meant the row painted empty and filled in a few hundred
+	// ms later on a fast connection — and stayed empty for as long as the bundle
+	// took to arrive on a slow one, which read as "the examples are just gone".
+	//
+	// The store's one unique fact is which servers the user has since switched
+	// off, kept in localStorage. Honouring it here would put first paint back in
+	// the hands of a value the server cannot see, so it is deliberately ignored:
+	// a user who turned MCP off still gets tool-flavoured starters, which are
+	// prompts they can send either way.
 	let showExamplesRow = $derived(
 		isFreshChat &&
-			(currentModel.isRouter || (modelSupportsTools && baseMcpServerCount > 0)) &&
+			(currentModel.isRouter || toolExamplesApply) &&
 			activeExamples.length > 0 &&
 			!hideRouterExamples &&
 			!lastIsError
 	);
-	// Whether the chips themselves show is the real, client-side truth, gated on
-	// the store having loaded so the router set never flashes before the MCP one.
 	let examplesChipsVisible = $derived(
-		showExamplesRow &&
-			$mcpServersLoaded &&
-			(currentModel.isRouter || $allBaseServersEnabled) &&
-			!draft.length &&
-			!sources.length &&
-			!loading
+		showExamplesRow && !draft.length && !sources.length && !loading
 	);
 	let showFollowUpsRow = $derived(
 		Boolean(activeRouterExamplePrompt) &&
 			routerFollowUps.length > 0 &&
 			routerUserMessages.length === 1 &&
-			(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) &&
+			(currentModel.isRouter || toolExamplesApply) &&
 			!hideRouterExamples &&
 			!lastIsError
 	);
 	let followUpChipsVisible = $derived(showFollowUpsRow && !draft.length && !loading);
 
 	$effect(() => {
-		if (
-			!(currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) ||
-			!messages.length
-		) {
+		if (!(currentModel.isRouter || toolExamplesApply) || !messages.length) {
 			activeRouterExamplePrompt = null;
 			return;
 		}
@@ -631,10 +625,19 @@
 <div class="pointer-events-none relative flex min-h-0 min-w-0">
 	<!-- --scrollbar-gutter: measured half-gutter of the scroll container, added
 	     to the composer overlay's padding so its text stays aligned with the
-	     message column on classic-scrollbar platforms. -->
+	     message column on classic-scrollbar platforms.
+
+	     Held at zero on a fresh chat. The gutter can only be measured once the
+	     scroll container exists, so it is 0 in server-rendered markup and jumps
+	     to its real value at hydration — which moved the centered composer 10px
+	     sideways and narrowed it by 20px, in the middle of an otherwise empty
+	     screen where it was the only thing to look at. There are no messages to
+	     align with yet, so the alignment it buys is worth nothing until the
+	     composer docks, and by then the compensation rides along with a
+	     several-hundred-pixel vertical move. -->
 	<div
 		class="pointer-events-auto relative z-[-1] min-h-0 min-w-0 flex-1"
-		style="--scrollbar-gutter: {chatScroll.gutterHalfPx}px"
+		style="--scrollbar-gutter: {composerCentered ? 0 : chatScroll.gutterHalfPx}px"
 	>
 		{#if shareModalOpen}
 			<ShareConversationModal open={shareModalOpen} onclose={() => shareModal.close()} />
