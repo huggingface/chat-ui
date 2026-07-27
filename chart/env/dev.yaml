@@ -60,7 +60,7 @@ envVars:
   PUBLIC_ORIGIN: ""
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "https://plausible.io/js/pa-Io_oigECawqdlgpf5qvHb.js"
   PUBLIC_FEATURE_ANNOUNCEMENTS: >
-    [{"title": "Gemma-4-31B at 700 tokens/s", "description": "Run Gemma-4-31B at 700 tokens/s thanks to Cerebras inference.", "link": "/models/google/gemma-4-31B-it", "cta": "Go to the model", "maxDate": "2026-08-01"}]
+    [{"title": "Gemma-4-31B at 700 tokens/s", "description": "Run Gemma-4-31B at 700 tokens/s thanks to Cerebras inference.", "link": "/models/google/gemma-4-31B-it", "cta": "Go to the model", "maxDate": "2026-08-01"}, {"title": "Kimi K3 is here", "description": "Moonshot's 2.8T open-weight MoE, with native vision and a 1M-token context window.", "link": "/models/moonshotai/Kimi-K3", "cta": "Chat with Kimi K3", "maxDate": "2026-09-15"}]
 
   TASK_MODEL: "meta-llama/Llama-3.1-8B-Instruct"
   # Tombstone: unread by current code, kept so any old pod still on the pre-#2265
@@ -82,6 +82,15 @@ envVars:
   MODELS: >
     [
       { "id": "omni", "supportsArtifacts": true },
+      { "id": "moonshotai/Kimi-K3", "description": "2.8T MoE with native vision, 1M context, and always-on thinking.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "tencent/Hy3", "description": "295B MoE for deep reasoning, agentic coding, and 256K context.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "XiaomiMiMo/MiMo-V2.5", "description": "310B omnimodal MoE handling text, image, video, and audio at 1M context.", "supportsArtifacts": true },
+      { "id": "zai-org/GLM-4.7-FP8", "description": "FP8 GLM-4.7 for efficient agentic coding, reasoning, and tool use.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "zai-org/GLM-4.6-FP8", "description": "FP8 GLM-4.6 for efficient long-context multilingual reasoning and agents.", "supportsArtifacts": true },
+      { "id": "swiss-ai/Apertus-v1.5-70B", "description": "Open Swiss multimodal model, massively multilingual with 256K context.", "supportsArtifacts": true },
+      { "id": "swiss-ai/Apertus-v1.5-8B", "description": "Compact open Swiss multilingual model with image and audio input." },
+      { "id": "Qwen/Qwen2.5-VL-72B-Instruct", "description": "Vision-language Qwen for documents, charts, and long video understanding.", "supportsArtifacts": true },
+      { "id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B", "description": "Distilled Qwen with R1 stepwise reasoning in mid-size footprint." },
       { "id": "thinkingmachines/Inkling", "description": "Multimodal 975B MoE with 41B active params and adjustable reasoning effort.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "prism-ml/Ternary-Bonsai-27B-AWQ-4bit", "description": "AWQ 4-bit ternary Qwen3.6 27B with vision for single-GPU serving." },
       { "id": "prism-ml/Ternary-Bonsai-27B-gguf", "description": "Ternary GGUF Qwen3.6 27B for on-device reasoning at 1.7 bits." },
@@ -190,7 +199,6 @@ envVars:
       { "id": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B", "description": "Llama distilled from R1 strong reasoning and structured outputs."},
       { "id": "Qwen/Qwen2.5-72B-Instruct", "description": "Accurate detailed instruction model supports tools and long contexts." },
       { "id": "meta-llama/Llama-Guard-4-12B", "description": "Safety guardrail model filters and enforces content policies." },
-      { "id": "CohereLabs/command-a-vision-07-2025", "description": "Command model with image input captioning and visual QA." },
       { "id": "Sao10K/L3-8B-Stheno-v3.2", "description": "Community Llama variant themed tuning and unique conversational style." },
       { "id": "CohereLabs/c4ai-command-r-08-2024", "description": "Cohere Command variant instruction following with specialized tuning." },
       { "id": "CohereLabs/aya-expanse-32b", "description": "Aya Expanse large comprehensive knowledge and reasoning capabilities." },
