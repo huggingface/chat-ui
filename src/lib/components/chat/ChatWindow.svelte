@@ -445,27 +445,35 @@
 	// the row's real height rather than a hardcoded one; `invisible` also takes
 	// them out of the tab order and the accessibility tree.
 	//
-	// The MCP store only fills in on mount, so before that the server-rendered
-	// markup would have to guess whether tools examples apply. It doesn't have to:
-	// the base-server list travels in the SSR payload and base servers are enabled
-	// unless the user turned them off, so the row is reserved from the first paint
-	// with no guess for a deployment that configures none.
+	// Whether the row is reserved is deliberately decided from data the server
+	// also has — the configured base-server list, which travels in the SSR
+	// payload — and never from the MCP store, which only fills in on mount from
+	// localStorage. Reserving on `$allBaseServersEnabled` would put the row back
+	// in the hands of a client-only preference: a returning user who has turned
+	// off any one configured server would get it reserved during SSR and dropped
+	// at hydration, which is the shift this whole split exists to remove. The
+	// cost is that such a user keeps an empty reserved row on a non-router
+	// tools model — invisible whitespace in a centered layout, where a jump on
+	// every page load is not.
 	let baseMcpServerCount = $derived(
 		((page.data as { mcpBaseServers?: unknown[] }).mcpBaseServers ?? []).length
 	);
-	let toolExamplesApply = $derived(
-		currentModel.isRouter ||
-			(modelSupportsTools && ($mcpServersLoaded ? $allBaseServersEnabled : baseMcpServerCount > 0))
-	);
 	let showExamplesRow = $derived(
 		isFreshChat &&
-			toolExamplesApply &&
+			(currentModel.isRouter || (modelSupportsTools && baseMcpServerCount > 0)) &&
 			activeExamples.length > 0 &&
 			!hideRouterExamples &&
 			!lastIsError
 	);
+	// Whether the chips themselves show is the real, client-side truth, gated on
+	// the store having loaded so the router set never flashes before the MCP one.
 	let examplesChipsVisible = $derived(
-		showExamplesRow && $mcpServersLoaded && !draft.length && !sources.length && !loading
+		showExamplesRow &&
+			$mcpServersLoaded &&
+			(currentModel.isRouter || $allBaseServersEnabled) &&
+			!draft.length &&
+			!sources.length &&
+			!loading
 	);
 	let showFollowUpsRow = $derived(
 		Boolean(activeRouterExamplePrompt) &&
