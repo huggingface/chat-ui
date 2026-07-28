@@ -462,7 +462,9 @@
 			</button>
 		</div>
 
-		<div class="flex flex-none items-center gap-0.5 text-gray-400">
+		<!-- gray-500 in light mode: gray-400 on white reads as disabled, while in dark
+		     mode it sits at the right contrast against the panel already -->
+		<div class="flex flex-none items-center gap-0.5 text-gray-500 dark:text-gray-400">
 			{#if version}
 				<!-- Deploy leads the cluster: it's the promoted action and the only
 				     labeled control here, so keeping it next to the tab switcher leaves
