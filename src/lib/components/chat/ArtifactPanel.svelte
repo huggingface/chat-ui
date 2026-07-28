@@ -464,6 +464,26 @@
 
 		<div class="flex flex-none items-center gap-0.5 text-gray-400">
 			{#if version}
+				<!-- Deploy leads the cluster: it's the promoted action and the only
+				     labeled control here, so keeping it next to the tab switcher leaves
+				     the trailing icons as one uniform icon-only group.
+				     The label rides a container query on the header, not the viewport:
+				     the panel is user-resizable, so only its own width says whether
+				     there's room for it beside the title. Below the threshold it
+				     collapses back to the bare rocket. -->
+				{#if canDeploy}
+					<button
+						type="button"
+						class="btn gap-1 rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 @min-[470px]:pr-2 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+						title={currentDeployment ? "Update Space" : "Deploy to Space"}
+						onclick={() => (deployModalOpen = true)}
+					>
+						<CarbonRocket />
+						<span class="hidden font-medium @min-[470px]:inline">
+							{currentDeployment ? "Update" : "Deploy"}
+						</span>
+					</button>
+				{/if}
 				<CopyToClipBoardBtn
 					value={version.content}
 					classNames="btn rounded-md p-1.5 text-sm hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 focus:ring-0"
@@ -477,23 +497,6 @@
 				>
 					<CarbonDownload />
 				</button>
-				{#if canDeploy}
-					<!-- The label rides a container query on the header, not the viewport:
-					     the panel is user-resizable, so only its own width says whether
-					     there's room for it beside the title. Below the threshold it
-					     collapses back to the bare rocket. -->
-					<button
-						type="button"
-						class="btn gap-1 rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 @min-[470px]:pr-2 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-						title={currentDeployment ? "Update Space" : "Deploy to Space"}
-						onclick={() => (deployModalOpen = true)}
-					>
-						<CarbonRocket />
-						<span class="hidden font-medium @min-[470px]:inline">
-							{currentDeployment ? "Update" : "Deploy"}
-						</span>
-					</button>
-				{/if}
 				{#if fullscreenSupported}
 					<button
 						type="button"
