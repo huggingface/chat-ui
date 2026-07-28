@@ -426,7 +426,7 @@
 {#snippet panelContent()}
 	<!-- header (z-10 so button tooltips aren't painted over by the body) -->
 	<header
-		class="relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
+		class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
 	>
 		<div class="flex min-w-0 flex-1 items-center gap-2">
 			{#if isStreamingVersion}
@@ -478,13 +478,20 @@
 					<CarbonDownload />
 				</button>
 				{#if canDeploy}
+					<!-- The label rides a container query on the header, not the viewport:
+					     the panel is user-resizable, so only its own width says whether
+					     there's room for it beside the title. Below the threshold it
+					     collapses back to the bare rocket. -->
 					<button
 						type="button"
-						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+						class="btn gap-1 rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 @min-[470px]:pr-2 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 						title={currentDeployment ? "Update Space" : "Deploy to Space"}
 						onclick={() => (deployModalOpen = true)}
 					>
 						<CarbonRocket />
+						<span class="hidden font-medium @min-[470px]:inline">
+							{currentDeployment ? "Update" : "Deploy"}
+						</span>
 					</button>
 				{/if}
 				{#if fullscreenSupported}
