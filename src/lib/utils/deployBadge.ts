@@ -111,17 +111,18 @@ ${END_SCRIPT_TAG}`;
 }
 
 /**
- * Append the badge to a complete HTML document, just before the final
- * `</body>` when there is one (otherwise at the very end). Everything else in
- * the document is left byte-for-byte untouched.
+ * Append the badge to a complete HTML document. The script goes at the very
+ * end, after `</html>` — the parser's "after after body" mode reparents it into
+ * `<body>`, so it runs exactly as it would from inside the document. Everything
+ * before it is left byte-for-byte untouched.
+ *
+ * Deliberately no search for a `</body>` to inject before: the artifact is
+ * arbitrary author HTML, so a textual match can land inside a trailing script's
+ * string literal or an HTML comment — where the badge's own `</script>` would
+ * terminate the artifact's script and corrupt the page — and scanning for the
+ * *last* match is quadratic on content that repeats the tag. Appending has
+ * neither problem and produces the same result in the browser.
  */
 export function appendHuggingChatBadge(html: string): string {
-	const script = "\n" + buildBadgeScript() + "\n";
-	// Match the *last* closing body tag so nested/escaped ones in the artifact
-	// source don't capture the injection point.
-	const lastBodyClose = /<\/body\s*>(?![\s\S]*<\/body\s*>)/i;
-	if (lastBodyClose.test(html)) {
-		return html.replace(lastBodyClose, (tag) => script + tag);
-	}
-	return html + script;
+	return html + "\n" + buildBadgeScript() + "\n";
 }

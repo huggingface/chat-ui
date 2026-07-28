@@ -91,19 +91,36 @@ describe("HuggingChat badge", () => {
 		}
 	});
 
-	it("goes just before the last closing body tag", () => {
-		const out = buildDeployableHtml(
-			"html",
-			"<!doctype html><html><body><pre>&lt;/body&gt;</pre></body></html>"
-		);
-		expect(out.indexOf(BADGE_HOST_ATTRIBUTE)).toBeLessThan(out.lastIndexOf("</body>"));
-		expect(out.trimEnd().endsWith("</html>")).toBe(true);
+	it("goes after the whole document, never inside it", () => {
+		const doc = "<!doctype html><html><body><p>hi</p></body></html>";
+		const out = buildDeployableHtml("html", doc);
+		expect(out.startsWith(doc)).toBe(true);
+		expect(out.indexOf(BADGE_HOST_ATTRIBUTE)).toBeGreaterThan(out.lastIndexOf("</html>"));
+	});
+
+	// A `</body>` in a trailing script's string literal used to capture the
+	// injection point, so the badge's own `</script>` terminated the artifact's
+	// script — breaking the page *and* losing the badge.
+	it("never injects into a trailing script that mentions a closing body tag", () => {
+		const doc = `<!doctype html><html><body><h1>hi</h1></body>\n<script>var tpl = "</body>";</script>\n</html>`;
+		const out = buildDeployableHtml("html", doc);
+		expect(out.startsWith(doc)).toBe(true);
+		expect(out).not.toContain('var tpl = "\n<script');
 	});
 
 	it("appends at the end when the document has no body tag", () => {
 		const out = buildDeployableHtml("html", "<p>fragment only</p>");
 		expect(out.startsWith("<p>fragment only</p>")).toBe(true);
 		expect(out).toContain(BADGE_HOST_ATTRIBUTE);
+	});
+
+	// Selecting an injection point used to be quadratic in the number of
+	// `</body>` occurrences; appending is linear regardless of content.
+	it("stays fast on content that repeats the closing body tag", () => {
+		const doc = "<html><body>" + "</body>".repeat(20_000) + "</html>";
+		const start = performance.now();
+		buildDeployableHtml("html", doc);
+		expect(performance.now() - start).toBeLessThan(100);
 	});
 
 	it("cannot be terminated early by artifact content", () => {
