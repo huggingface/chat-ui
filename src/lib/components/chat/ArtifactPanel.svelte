@@ -474,12 +474,12 @@
 				{#if canDeploy}
 					<button
 						type="button"
-						class="btn gap-1 rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 @min-[470px]:pr-2 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+						class="btn gap-1 rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 @min-[580px]:pr-2 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 						title={currentDeployment ? "Update Space" : "Deploy to Space"}
 						onclick={() => (deployModalOpen = true)}
 					>
 						<CarbonRocket />
-						<span class="hidden font-medium @min-[470px]:inline">
+						<span class="hidden font-medium @min-[580px]:inline">
 							{currentDeployment ? "Update" : "Deploy"}
 						</span>
 					</button>
