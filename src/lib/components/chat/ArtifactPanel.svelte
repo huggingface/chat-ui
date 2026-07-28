@@ -462,7 +462,7 @@
 			</button>
 		</div>
 
-		<div class="flex flex-none items-center gap-0.5 text-gray-400">
+		<div class="flex flex-none items-center gap-0.5 text-gray-500 dark:text-gray-400">
 			{#if version}
 				<!-- Deploy leads the cluster: it's the promoted action and the only
 				     labeled control here, so keeping it next to the tab switcher leaves
