@@ -278,6 +278,11 @@
 
 	function onPointerDown(e: PointerEvent) {
 		if (!image || e.button !== 0) return;
+		// The canvas never needs focus: without this, a real mouse press moves
+		// focus to the dialog AFTER this handler, and the resulting textarea
+		// blur would immediately close or even delete the editor this handler
+		// just opened (synthetic-event tests don't reproduce that default).
+		e.preventDefault();
 		const point = toImagePoint(e);
 		if (!point) return;
 		// A badge is clickable with any tool selected: clicking a number is an
@@ -375,7 +380,11 @@
 		else if (editingIndex !== null && editingIndex > index) editingIndex -= 1;
 	}
 
-	function onNoteBlur(e: FocusEvent) {
+	function onNoteBlur(e: FocusEvent, index: number) {
+		// A blur from a textarea that is no longer the active editor (its
+		// popover target switched within the same interaction) must not commit
+		// against the new editor's index
+		if (editingIndex !== index) return;
 		// Focus moving within the popover (to its delete button) isn't a dismissal
 		if (popoverEl && e.relatedTarget instanceof Node && popoverEl.contains(e.relatedTarget)) return;
 		commitEditing();
@@ -412,8 +421,16 @@
 
 	// Escape reaches us through Modal's onclose: with a note editor open it
 	// dismisses just the editor (mirroring how the panel's nested modals handle
-	// Escape); otherwise it closes the whole modal
+	// Escape); otherwise it closes the whole modal. Modal dispatches the same
+	// Escape twice when focus is inside the dialog (window capture listener
+	// plus the dialog's own keydown), so duplicate calls within one event are
+	// latched — otherwise the second call would fall through and close the
+	// whole session right after the first one dismissed the editor.
+	let closeRequestLatched = false;
 	function requestClose() {
+		if (closeRequestLatched) return;
+		closeRequestLatched = true;
+		queueMicrotask(() => (closeRequestLatched = false));
 		if (editingIndex !== null) {
 			commitEditing();
 			return;
@@ -527,7 +544,10 @@
 			wrapRect.width - width - 8
 		);
 		// Bottom clamp leaves room for the textarea to grow a few lines
-		const top = Math.min(Math.max(8, badgeY + badgeRadius * scaleY + 8), wrapRect.height - 120);
+		// Reserve the popover's full potential height (textarea max-h-32 = 128px
+		// plus padding and borders): the wrapper is overflow-hidden, so a short
+		// reserve would clip long multiline notes near the bottom edge
+		const top = Math.min(Math.max(8, badgeY + badgeRadius * scaleY + 8), wrapRect.height - 150);
 		popoverStyle = `left:${left}px; top:${top}px; width:${width}px;`;
 	});
 
@@ -638,6 +658,10 @@
 			{/if}
 
 			{#if !isNarrow && editingIndex !== null && comments[editingIndex]}
+				<!-- ownIndex freezes which comment this editor instance belongs to:
+				     the blur handler must not act when the editing target has
+				     already moved on (stale blur committing against the new index) -->
+				{@const ownIndex = editingIndex}
 				<div
 					bind:this={popoverEl}
 					class="absolute z-10 flex items-start gap-1.5 rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-600 dark:bg-gray-800"
@@ -655,7 +679,7 @@
 							placeholder="What about this area?"
 							bind:value={comments[editingIndex].note}
 							onkeydown={onNoteKeydown}
-							onblur={onNoteBlur}
+							onblur={(e) => onNoteBlur(e, ownIndex)}
 							use:autogrow
 						></textarea>
 					{/key}
