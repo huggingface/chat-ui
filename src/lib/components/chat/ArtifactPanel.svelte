@@ -11,10 +11,13 @@
 		isDeployableKind,
 		type PreviewError,
 	} from "$lib/utils/previewSrcdoc";
+	import { captureArtifactScreenshot, pngDataUrlToFile } from "$lib/utils/artifactCapture";
 	import { parseExternalUrl } from "$lib/utils/externalLink";
 	import { escapeHTML } from "$lib/utils/markedLight";
 	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_FRACTION } from "$lib/stores/artifactPanel.svelte";
 	import { StickToBottomController } from "$lib/utils/scroll/stickToBottom";
+	import { pendingChatFiles } from "$lib/stores/pendingChatFiles";
+	import { error as errorStore } from "$lib/stores/errors";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { page } from "$app/state";
 
@@ -23,10 +26,12 @@
 	import ExternalLinkModal from "../ExternalLinkModal.svelte";
 	import HtmlPreviewModal from "../HtmlPreviewModal.svelte";
 	import DeployToSpaceModal from "./DeployToSpaceModal.svelte";
+	import ScreenshotAnnotationModal from "./ScreenshotAnnotationModal.svelte";
 
 	import CarbonCloseLarge from "~icons/carbon/close-large";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
+	import CarbonCamera from "~icons/carbon/camera";
 	import CarbonDownload from "~icons/carbon/download";
 	import CarbonRocket from "~icons/carbon/rocket";
 	import CarbonMaximize from "~icons/carbon/maximize";
@@ -37,6 +42,8 @@
 	interface Props {
 		registry: ArtifactRegistry;
 		loading?: boolean;
+		/** Whether the current model accepts image attachments (enables screenshot-to-chat) */
+		canScreenshot?: boolean;
 		/**
 		 * Sends an ask-to-fix message directly to the chat, returning whether it
 		 * was dispatched. Absent when the conversation can't accept messages
@@ -45,7 +52,7 @@
 		onsend?: (text: string) => boolean;
 	}
 
-	let { registry, loading = false, onsend }: Props = $props();
+	let { registry, loading = false, canScreenshot = false, onsend }: Props = $props();
 
 	let artifact = $derived(
 		artifactPanel.identifier ? registry.artifacts.get(artifactPanel.identifier) : undefined
@@ -292,6 +299,17 @@
 		errors = [];
 	});
 
+	// True once the iframe finished loading the current srcdoc. srcdoc
+	// navigation is asynchronous, so right after a version switch the old
+	// document still occupies the frame (and still answers on the shared
+	// channel); capture stays disabled until the load event confirms the
+	// displayed document is the one srcdoc describes.
+	let previewLoaded = $state(false);
+	$effect(() => {
+		void srcdoc;
+		previewLoaded = false;
+	});
+
 	type PreviewMessage = {
 		type: string;
 		channel: string;
@@ -331,6 +349,59 @@
 
 	function askToFixErrors() {
 		sendFixRequest(composeFixRequest(errors));
+	}
+
+	// ----- screenshot to chat -----
+	// Only the live iframe preview can be captured: a non-null srcdoc already
+	// implies a complete, previewable, non-markdown version on the preview tab.
+	let screenshotSupported = $derived(
+		canScreenshot && effectiveTab === "preview" && !!srcdoc && previewLoaded
+	);
+	let capturing = $state(false);
+	let pendingScreenshot = $state<{ dataUrl: string; fileName: string } | null>(null);
+
+	async function screenshotPreview() {
+		// pendingScreenshot guard: a capture resolving while the annotation modal
+		// is already open would silently swap the image under the user.
+		// previewLoaded guard: before the iframe committed the current srcdoc,
+		// the previous document would answer the request under the new name.
+		if (!iframeEl || capturing || pendingScreenshot || !previewLoaded || !artifact) return;
+		capturing = true;
+		// Freeze the name now: a new version can stream in (or the user can
+		// navigate) while the annotation modal is open
+		const slug = artifact.identifier.replace(/[^a-zA-Z0-9_-]+/g, "-") || "artifact";
+		const fileName = `${slug}-v${displayVersionNumber}-screenshot.png`;
+		const requestedSrcdoc = srcdoc;
+		try {
+			// Transparent documents composite over the iframe's own backing, so
+			// passing its computed background keeps the shot true to what the
+			// user sees in light and dark mode
+			const backing = getComputedStyle(iframeEl).backgroundColor;
+			const dataUrl = await captureArtifactScreenshot(iframeEl, previewChannel, backing);
+			// The channel survives srcdoc swaps, so a version switch (streaming
+			// edit, version nav) mid-capture would answer from the replacement
+			// document; a shot of a different document must not be attached
+			// under the frozen file name
+			if (srcdoc !== requestedSrcdoc) {
+				throw new Error("the preview changed during capture");
+			}
+			pendingScreenshot = { dataUrl, fileName };
+		} catch (err) {
+			errorStore.set(
+				`Screenshot failed: ${err instanceof Error ? err.message : "unexpected error"}`
+			);
+		} finally {
+			capturing = false;
+		}
+	}
+
+	function attachScreenshot(annotatedDataUrl: string) {
+		const shot = pendingScreenshot;
+		if (!shot) return;
+		pendingChatFiles.set([pngDataUrlToFile(annotatedDataUrl, shot.fileName)]);
+		pendingScreenshot = null;
+		// On mobile the panel overlays the chat; close it so the attachment is visible
+		if (!isDesktop) artifactPanel.close();
 	}
 
 	// ----- actions -----
@@ -561,6 +632,7 @@
 					class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
 					sandbox="allow-scripts allow-forms"
 					referrerpolicy="no-referrer"
+					onload={() => (previewLoaded = true)}
 					{srcdoc}
 				></iframe>
 			{/if}
@@ -685,6 +757,25 @@
 					<span class="ml-0.5 text-red-600 dark:text-red-500">−{stats.removed}</span>
 				</button>
 			{/if}
+			{#if !isStreamingVersion && screenshotSupported}
+				<!-- Rightmost footer action, labeled with a plain word: the header
+				     camera icon alone wasn't discoverable enough for the
+				     screenshot-and-annotate feedback loop -->
+				<button
+					type="button"
+					class="btn flex-none gap-1.5 rounded-md border border-gray-200/80 bg-white/90 px-2 py-0.5 font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700/80 dark:bg-gray-900/90 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+					title="Screenshot the preview, annotate it, and attach it to the chat"
+					disabled={capturing}
+					onclick={screenshotPreview}
+				>
+					{#if capturing}
+						<EosIconsLoading class="text-xs" />
+					{:else}
+						<CarbonCamera class="text-xs" />
+					{/if}
+					Annotate
+				</button>
+			{/if}
 		</div>
 	</footer>
 {/snippet}
@@ -738,6 +829,14 @@
 
 {#if externalLinkUrl}
 	<ExternalLinkModal url={externalLinkUrl} onclose={() => (externalLinkUrl = null)} />
+{/if}
+
+{#if pendingScreenshot}
+	<ScreenshotAnnotationModal
+		dataUrl={pendingScreenshot.dataUrl}
+		onconfirm={attachScreenshot}
+		onclose={() => (pendingScreenshot = null)}
+	/>
 {/if}
 
 {#if deployModalOpen && version && artifact && conversationId}
