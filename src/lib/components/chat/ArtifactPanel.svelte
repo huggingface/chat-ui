@@ -341,12 +341,20 @@
 		// navigate) while the annotation modal is open
 		const slug = artifact.identifier.replace(/[^a-zA-Z0-9_-]+/g, "-") || "artifact";
 		const fileName = `${slug}-v${displayVersionNumber}-screenshot.png`;
+		const requestedSrcdoc = srcdoc;
 		try {
 			// Transparent documents composite over the iframe's own backing, so
 			// passing its computed background keeps the shot true to what the
 			// user sees in light and dark mode
 			const backing = getComputedStyle(iframeEl).backgroundColor;
 			const dataUrl = await captureArtifactScreenshot(iframeEl, previewChannel, backing);
+			// The channel survives srcdoc swaps, so a version switch (streaming
+			// edit, version nav) mid-capture would answer from the replacement
+			// document; a shot of a different document must not be attached
+			// under the frozen file name
+			if (srcdoc !== requestedSrcdoc) {
+				throw new Error("the preview changed during capture");
+			}
 			pendingScreenshot = { dataUrl, fileName };
 		} catch (err) {
 			errorStore.set(

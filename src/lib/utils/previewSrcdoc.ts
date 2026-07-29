@@ -138,10 +138,18 @@ function buildPreviewHookScript(channel: string): string {
       var visibleWidth = root.clientWidth > 0 ? Math.min(scrollWidth, root.clientWidth) : scrollWidth;
       // Cap the long edge so a tall page can't produce a giant payload
       var scale = Math.min(1, 4096 / Math.max(visibleWidth, height));
+      // Body capture drops anything painted on <html>, so a page that styles
+      // its background there (body transparent) would get the panel backing
+      // instead of its own color: prefer the root's computed background when
+      // it has one. Gradients/images on <html> stay out of reach (a fill
+      // color is all the capture API takes), but those normally live on body.
+      var rootBackground = '';
+      try { rootBackground = getComputedStyle(document.documentElement).backgroundColor || ''; } catch (err) {}
+      if (rootBackground === 'transparent' || rootBackground === 'rgba(0, 0, 0, 0)') rootBackground = '';
       window.snapdom.toCanvas(root, {
         dpr: 1,
         scale: scale,
-        backgroundColor: typeof detail.backgroundColor === 'string' && detail.backgroundColor ? detail.backgroundColor : '#ffffff',
+        backgroundColor: rootBackground || (typeof detail.backgroundColor === 'string' && detail.backgroundColor ? detail.backgroundColor : '#ffffff'),
         embedFonts: true,
         fast: true
       }).then(function(canvas){

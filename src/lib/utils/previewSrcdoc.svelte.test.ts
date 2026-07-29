@@ -216,6 +216,27 @@ describe("preview screenshot capture", () => {
 		expect(rightEdge[2]).toBeGreaterThan(30);
 	});
 
+	// Regression: pages that paint their background on <html> (body left
+	// transparent) must keep that background in the shot, not receive the
+	// panel backing passed by the parent.
+	it("keeps a background painted on the html element", { timeout: 20_000 }, async () => {
+		const channel = "test_capture_root_bg";
+		const iframe = renderPreview(
+			`<style>html { background: #008080; }</style>
+			<div style="width:40px;height:40px"></div>`,
+			channel
+		);
+		await new Promise<void>((resolve) =>
+			iframe.addEventListener("load", () => resolve(), { once: true })
+		);
+		const dataUrl = await captureArtifactScreenshot(iframe, channel, "#0a0a0a");
+		const corner = await decodePixel(dataUrl, 10, 10);
+		// Teal from the html rule, not the #0a0a0a backing
+		expect(corner[0]).toBeLessThan(40);
+		expect(corner[1]).toBeGreaterThan(90);
+		expect(corner[2]).toBeGreaterThan(90);
+	});
+
 	it("rejects when the preview never answers", async () => {
 		const iframe = document.createElement("iframe");
 		iframe.sandbox.add("allow-scripts");
