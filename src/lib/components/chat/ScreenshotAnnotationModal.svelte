@@ -197,21 +197,39 @@
 		}
 		if (label === null) return;
 		// Badge sits on the pin point / the region's top-left corner, with a
-		// white halo so the number stays readable on any background
+		// white halo so the number stays readable on any background. Its center
+		// is pulled inside the canvas so an edge pin doesn't export a clipped,
+		// unreadable number.
+		const center = badgeCenter(comment);
 		ctx.beginPath();
-		ctx.arc(comment.x, comment.y, badgeRadius, 0, Math.PI * 2);
+		ctx.arc(center.x, center.y, badgeRadius, 0, Math.PI * 2);
 		ctx.fillStyle = COMMENT_COLOR;
 		ctx.fill();
 		ctx.lineWidth = Math.max(1.5, strokeWidth * 0.5);
 		ctx.strokeStyle = "#ffffff";
 		ctx.beginPath();
-		ctx.arc(comment.x, comment.y, badgeRadius, 0, Math.PI * 2);
+		ctx.arc(center.x, center.y, badgeRadius, 0, Math.PI * 2);
 		ctx.stroke();
 		ctx.fillStyle = "#ffffff";
 		ctx.font = `600 ${Math.round(badgeRadius * 1.1)}px system-ui, sans-serif`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
-		ctx.fillText(label, comment.x, comment.y + badgeRadius * 0.06);
+		ctx.fillText(label, center.x, center.y + badgeRadius * 0.06);
+	}
+
+	/**
+	 * Where a comment's badge is drawn: the anchor point, clamped inward so the
+	 * circle (and halo) stays fully inside the canvas at the edges. Hit-testing
+	 * and popover anchoring use the same point so they match the pixels.
+	 */
+	function badgeCenter(comment: { x: number; y: number }): Point {
+		const canvas = canvasEl;
+		if (!canvas) return { x: comment.x, y: comment.y };
+		const margin = badgeRadius + Math.max(1.5, strokeWidth * 0.5) / 2;
+		return {
+			x: Math.min(Math.max(comment.x, margin), Math.max(canvas.width - margin, margin)),
+			y: Math.min(Math.max(comment.y, margin), Math.max(canvas.height - margin, margin)),
+		};
 	}
 
 	function normalizedDraft(region: { ox: number; oy: number; px: number; py: number }) {
@@ -271,7 +289,8 @@
 			displayScale > 0 ? 14 / displayScale : badgeRadius * 1.4
 		);
 		for (let i = comments.length - 1; i >= 0; i--) {
-			if (Math.hypot(point.x - comments[i].x, point.y - comments[i].y) <= hitRadius) return i;
+			const center = badgeCenter(comments[i]);
+			if (Math.hypot(point.x - center.x, point.y - center.y) <= hitRadius) return i;
 		}
 		return null;
 	}
@@ -489,9 +508,13 @@
 		};
 	}
 
-	/** Enter commits the note, Shift+Enter inserts a newline */
+	/**
+	 * Enter commits the note, Shift+Enter inserts a newline. Enter that is
+	 * accepting an IME composition candidate (CJK input) must pass through,
+	 * or the candidate would be committed as a premature note commit.
+	 */
 	function onNoteKeydown(e: KeyboardEvent) {
-		if (e.key === "Enter" && !e.shiftKey) {
+		if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
 			e.preventDefault();
 			(e.target as HTMLTextAreaElement).blur();
 		}
@@ -536,8 +559,10 @@
 		if (canvasRect.width === 0 || canvas.width === 0) return;
 		const scaleX = canvasRect.width / canvas.width;
 		const scaleY = canvasRect.height / canvas.height;
-		const badgeX = canvasRect.left - wrapRect.left + comment.x * scaleX;
-		const badgeY = canvasRect.top - wrapRect.top + comment.y * scaleY;
+		// Anchor on the drawn badge (clamped inward at edges), not the raw point
+		const center = badgeCenter(comment);
+		const badgeX = canvasRect.left - wrapRect.left + center.x * scaleX;
+		const badgeY = canvasRect.top - wrapRect.top + center.y * scaleY;
 		const width = 280;
 		const left = Math.min(
 			Math.max(8, badgeX + badgeRadius * scaleX + 8),
@@ -687,8 +712,8 @@
 						type="button"
 						class="btn flex-none rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
 						title="Delete note"
-						onpointerdown={(e) => {
-							e.preventDefault();
+						onpointerdown={(e) => e.preventDefault()}
+						onclick={() => {
 							if (editingIndex !== null) deleteComment(editingIndex);
 						}}
 					>
@@ -721,10 +746,8 @@
 							type="button"
 							class="btn flex-none rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 							title="Delete note"
-							onpointerdown={(e) => {
-								e.preventDefault();
-								deleteComment(i);
-							}}
+							onpointerdown={(e) => e.preventDefault()}
+							onclick={() => deleteComment(i)}
 						>
 							<LucideX />
 						</button>
