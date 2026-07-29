@@ -79,6 +79,7 @@
 		"@polka/compression": "^1.0.0-next.28",
 		"@resvg/resvg-js": "^2.6.2",
 		"@tailwindcss/vite": "^4.3.0",
+		"@zumer/snapdom": "^2.23.1",
 		"bits-ui": "^2.14.2",
 		"date-fns": "^2.29.3",
 		"file-type": "^21.3.1",

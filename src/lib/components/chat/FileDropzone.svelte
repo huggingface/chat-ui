@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { mimeMatchesAllowlist } from "$lib/utils/mimeMatch";
 	import CarbonImage from "~icons/carbon/image";
 
 	interface Props {
@@ -31,16 +32,7 @@
 					if (file) {
 						// check if the file matches the mimeTypes
 						// else abort
-						if (
-							!mimeTypes.some((mimeType: string) => {
-								const [type, subtype] = mimeType.split("/");
-								const [fileType, fileSubtype] = file.type.split("/");
-								return (
-									(type === "*" || type === fileType) &&
-									(subtype === "*" || subtype === fileSubtype)
-								);
-							})
-						) {
+						if (!mimeMatchesAllowlist(file.type, mimeTypes)) {
 							setErrorMsg(
 								`Some file type not supported. Only allowed: ${mimeTypes.join(
 									", "

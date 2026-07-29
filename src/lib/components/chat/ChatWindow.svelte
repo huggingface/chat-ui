@@ -49,6 +49,8 @@
 	import { getActiveAnnouncement } from "$lib/utils/featureAnnouncements";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { pendingChatInput } from "$lib/stores/pendingChatInput";
+	import { pendingChatFiles } from "$lib/stores/pendingChatFiles";
+	import { mimeMatchesAllowlist } from "$lib/utils/mimeMatch";
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideSparkles from "~icons/lucide/sparkles";
 
@@ -197,15 +199,9 @@
 			e.preventDefault();
 
 			// filter based on activeMimeTypes, including wildcards
-			const filteredFiles = pastedFiles.filter((file) => {
-				return activeMimeTypes.some((mimeType: string) => {
-					const [type, subtype] = mimeType.split("/");
-					const [fileType, fileSubtype] = file.type.split("/");
-					return (
-						(type === "*" || fileType === type) && (subtype === "*" || fileSubtype === subtype)
-					);
-				});
-			});
+			const filteredFiles = pastedFiles.filter((file) =>
+				mimeMatchesAllowlist(file.type, activeMimeTypes)
+			);
 
 			files = [...files, ...filteredFiles];
 		}
@@ -450,6 +446,18 @@
 			draft = $pendingChatInput;
 			pendingChatInput.set(undefined);
 		}
+	});
+
+	// Files queued from outside the composer (e.g. artifact screenshots); same
+	// consume-and-clear contract as pendingChatInput, same accept rules as paste
+	$effect(() => {
+		const pending = $pendingChatFiles;
+		if (!pending?.length || shared) return;
+		const accepted = pending.filter((file) => mimeMatchesAllowlist(file.type, activeMimeTypes));
+		if (accepted.length) {
+			files = [...untrack(() => files), ...accepted];
+		}
+		pendingChatFiles.set(undefined);
 	});
 
 	function triggerPrompt(prompt: string) {
@@ -986,7 +994,11 @@
 		</div>
 	</div>
 
-	<ArtifactPanel registry={artifactRegistry} {loading} />
+	<ArtifactPanel
+		registry={artifactRegistry}
+		{loading}
+		canScreenshot={!shared && !isReadOnly && mimeMatchesAllowlist("image/png", activeMimeTypes)}
+	/>
 </div>
 
 <style>

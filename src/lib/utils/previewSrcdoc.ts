@@ -16,6 +16,11 @@ import type { ArtifactKind } from "./artifacts";
  * over an attacker-chosen path. Navigating from inside the sandbox would
  * be broken anyway — the opened tab would inherit the sandbox's opaque
  * origin.
+ *
+ * The hook also answers screenshot requests from the parent (see
+ * artifactCapture.ts): the sandbox has an opaque origin the parent cannot
+ * reach into, so the parent sends the capture library's source over
+ * postMessage and the document renders itself to a PNG data URL in-process.
  */
 
 const END_SCRIPT_TAG = "</scr" + "ipt>";
@@ -25,7 +30,138 @@ function buildPreviewHookScript(channel: string): string {
 	// parent window to postMessage to, so the hook is omitted entirely and the
 	// shipped document is just the artifact itself.
 	if (!channel) return "";
-	return `\n<script>\n(function(){\n  function send(type, detail){\n    try{ parent.postMessage({ type: type, channel: '${channel}', detail: detail }, '*'); }catch(e){}\n  }\n  function nearestAnchor(node){\n    while (node && node !== document) {\n      if (node.tagName && node.tagName.toLowerCase() === 'a') return node;\n      node = node.parentNode;\n    }\n    return null;\n  }\n  function anchorHref(anchor){\n    var href = anchor.href;\n    if (typeof href === 'string') return href;\n    if (href && typeof href.baseVal === 'string') {\n      try { return new URL(href.baseVal, document.baseURI).href; } catch (err) { return ''; }\n    }\n    return '';\n  }\n  function scrollToFragment(raw){\n    var id = raw.slice(1);\n    try { id = decodeURIComponent(id); } catch (err) {}\n    var target = id ? document.getElementById(id) : null;\n    if (target && target.scrollIntoView) target.scrollIntoView();\n  }\n  function intercept(ev){\n    var anchor = nearestAnchor(ev.target);\n    if (!anchor) return;\n    ev.preventDefault();\n    ev.stopPropagation();\n    var raw = anchor.getAttribute('href') || anchor.getAttribute('xlink:href') || '';\n    if (raw.charAt(0) === '#') {\n      scrollToFragment(raw);\n      return;\n    }\n    if (!/^\\s*https?:/i.test(raw)) return;\n    var href = anchorHref(anchor);\n    if (/^https?:/i.test(href)) {\n      send('chatui.preview.openLink', { href: href });\n    }\n  }\n  window.addEventListener('click', intercept, true);\n  window.addEventListener('auxclick', intercept, true);\n  window.addEventListener('keydown', function(ev){\n    if (ev.key === 'Enter' || ev.key === ' ') {\n      intercept(ev);\n    }\n  }, true);\n  window.addEventListener('error', function(ev){\n    var msg = ev && ev.message ? ev.message : 'Script error';\n    var stack = ev && ev.error && ev.error.stack ? ev.error.stack : undefined;\n    send('chatui.preview.error', { message: msg, stack: stack });\n  });\n  window.addEventListener('unhandledrejection', function(ev){\n    var r = ev && ev.reason;\n    var msg = (typeof r === 'string') ? r : (r && r.message) ? r.message : 'Unhandled promise rejection';\n    var stack = r && r.stack ? r.stack : undefined;\n    send('chatui.preview.error', { message: msg, stack: stack });\n  });\n})();\n${END_SCRIPT_TAG}`;
+	return `\n<script>
+(function(){
+  function send(type, detail){
+    try{ parent.postMessage({ type: type, channel: '${channel}', detail: detail }, '*'); }catch(e){}
+  }
+  function nearestAnchor(node){
+    while (node && node !== document) {
+      if (node.tagName && node.tagName.toLowerCase() === 'a') return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+  function anchorHref(anchor){
+    var href = anchor.href;
+    if (typeof href === 'string') return href;
+    if (href && typeof href.baseVal === 'string') {
+      try { return new URL(href.baseVal, document.baseURI).href; } catch (err) { return ''; }
+    }
+    return '';
+  }
+  function scrollToFragment(raw){
+    var id = raw.slice(1);
+    try { id = decodeURIComponent(id); } catch (err) {}
+    var target = id ? document.getElementById(id) : null;
+    if (target && target.scrollIntoView) target.scrollIntoView();
+  }
+  function intercept(ev){
+    var anchor = nearestAnchor(ev.target);
+    if (!anchor) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    var raw = anchor.getAttribute('href') || anchor.getAttribute('xlink:href') || '';
+    if (raw.charAt(0) === '#') {
+      scrollToFragment(raw);
+      return;
+    }
+    if (!/^\\s*https?:/i.test(raw)) return;
+    var href = anchorHref(anchor);
+    if (/^https?:/i.test(href)) {
+      send('chatui.preview.openLink', { href: href });
+    }
+  }
+  window.addEventListener('click', intercept, true);
+  window.addEventListener('auxclick', intercept, true);
+  window.addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      intercept(ev);
+    }
+  }, true);
+  window.addEventListener('error', function(ev){
+    var msg = ev && ev.message ? ev.message : 'Script error';
+    var stack = ev && ev.error && ev.error.stack ? ev.error.stack : undefined;
+    send('chatui.preview.error', { message: msg, stack: stack });
+  });
+  window.addEventListener('unhandledrejection', function(ev){
+    var r = ev && ev.reason;
+    var msg = (typeof r === 'string') ? r : (r && r.message) ? r.message : 'Unhandled promise rejection';
+    var stack = r && r.stack ? r.stack : undefined;
+    send('chatui.preview.error', { message: msg, stack: stack });
+  });
+  // Screenshots read WebGL canvases via toDataURL, which returns a blank
+  // image once the frame's drawing buffer has been discarded. Default
+  // preserveDrawingBuffer on (unless the artifact set it explicitly) so
+  // three.js scenes and canvas games capture what's on screen. This hook
+  // only exists in previews, so deployed pages keep stock behavior.
+  var getContext = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function(type, attrs){
+    if ((type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') &&
+        (!attrs || attrs.preserveDrawingBuffer === undefined)) {
+      attrs = Object.assign({}, attrs, { preserveDrawingBuffer: true });
+    }
+    return getContext.call(this, type, attrs);
+  };
+  window.addEventListener('message', function(ev){
+    // Only the embedding app may request a capture. The artifact's own code
+    // could still forge a request at itself, but that grants nothing it
+    // can't already do, and the parent validates every result it receives.
+    if (ev.source !== window.parent) return;
+    var data = ev.data;
+    if (!data || data.channel !== '${channel}' || data.type !== 'chatui.preview.captureRequest') return;
+    var detail = data.detail || {};
+    var id = typeof detail.id === 'string' ? detail.id : '';
+    function fail(err){
+      send('chatui.preview.captureResult', { id: id, error: String(err && err.message ? err.message : err) });
+    }
+    try {
+      if (!window.snapdom) {
+        if (typeof detail.source !== 'string' || !detail.source) { fail('capture library missing'); return; }
+        var s = document.createElement('script');
+        s.textContent = detail.source;
+        (document.head || document.documentElement).appendChild(s);
+        s.remove();
+        if (!window.snapdom) { fail('capture library failed to initialize'); return; }
+      }
+      // Capture the body, not documentElement: SnapDOM renders the <html>
+      // element as empty/background-only for common full-viewport layouts
+      // (e.g. flex-centered body with min-height:100vh), while body capture
+      // is reliable. Transparent areas get the backgroundColor fill below.
+      var root = document.body || document.documentElement;
+      var scrollWidth = Math.max(root.scrollWidth, root.clientWidth, 1);
+      var height = Math.max(root.scrollHeight, root.clientHeight, 1);
+      // Decorative layers wider than the viewport (200% wave strips, parallax
+      // slides) widen SnapDOM's output into a dead band of background fill;
+      // clip the shot to the visible width. Height is NOT clipped: capturing
+      // tall documents full page is intentional.
+      var visibleWidth = root.clientWidth > 0 ? Math.min(scrollWidth, root.clientWidth) : scrollWidth;
+      // Cap the long edge so a tall page can't produce a giant payload
+      var scale = Math.min(1, 4096 / Math.max(visibleWidth, height));
+      window.snapdom.toCanvas(root, {
+        dpr: 1,
+        scale: scale,
+        backgroundColor: typeof detail.backgroundColor === 'string' && detail.backgroundColor ? detail.backgroundColor : '#ffffff',
+        embedFonts: true,
+        fast: true
+      }).then(function(canvas){
+        var targetWidth = Math.round(visibleWidth * scale);
+        if (canvas.width > targetWidth + 1) {
+          var clipped = document.createElement('canvas');
+          clipped.width = targetWidth;
+          clipped.height = canvas.height;
+          var clipCtx = clipped.getContext('2d');
+          if (clipCtx) {
+            clipCtx.drawImage(canvas, 0, 0);
+            canvas = clipped;
+          }
+        }
+        send('chatui.preview.captureResult', { id: id, dataUrl: canvas.toDataURL('image/png') });
+      }).catch(fail);
+    } catch (err) { fail(err); }
+  });
+})();
+${END_SCRIPT_TAG}`;
 }
 
 /** JSON-encode a string for embedding inside an inline <script>, escaping `</` so the HTML parser can't terminate the script early. */
