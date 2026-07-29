@@ -72,12 +72,14 @@ export function captureArtifactScreenshot(
 
 	return new Promise<string>((resolve, reject) => {
 		const id = `capture_${Math.random().toString(36).slice(2)}`;
+		let settled = false;
 
 		const timer = setTimeout(() => {
 			cleanup();
 			reject(new Error("timed out waiting for the preview"));
 		}, timeoutMs);
 		function cleanup() {
+			settled = true;
 			clearTimeout(timer);
 			window.removeEventListener("message", onMessage);
 		}
@@ -116,6 +118,11 @@ export function captureArtifactScreenshot(
 		window.addEventListener("message", onMessage);
 		loadCaptureLibrarySource().then(
 			(source) => {
+				// The source fetch can outlive the timeout (first use on a slow
+				// connection): a request posted after rejection would trigger an
+				// expensive render whose response nobody listens for, and stacked
+				// retries would fire several at once
+				if (settled) return;
 				// Re-read contentWindow: the iframe may have reloaded (srcdoc swap)
 				// while the library chunk was loading
 				iframe.contentWindow?.postMessage(
@@ -128,6 +135,7 @@ export function captureArtifactScreenshot(
 				);
 			},
 			(err) => {
+				if (settled) return;
 				cleanup();
 				reject(err instanceof Error ? err : new Error("could not load the capture library"));
 			}
