@@ -299,6 +299,17 @@
 		errors = [];
 	});
 
+	// True once the iframe finished loading the current srcdoc. srcdoc
+	// navigation is asynchronous, so right after a version switch the old
+	// document still occupies the frame (and still answers on the shared
+	// channel); capture stays disabled until the load event confirms the
+	// displayed document is the one srcdoc describes.
+	let previewLoaded = $state(false);
+	$effect(() => {
+		void srcdoc;
+		previewLoaded = false;
+	});
+
 	type PreviewMessage = {
 		type: string;
 		channel: string;
@@ -343,14 +354,18 @@
 	// ----- screenshot to chat -----
 	// Only the live iframe preview can be captured: a non-null srcdoc already
 	// implies a complete, previewable, non-markdown version on the preview tab.
-	let screenshotSupported = $derived(canScreenshot && effectiveTab === "preview" && !!srcdoc);
+	let screenshotSupported = $derived(
+		canScreenshot && effectiveTab === "preview" && !!srcdoc && previewLoaded
+	);
 	let capturing = $state(false);
 	let pendingScreenshot = $state<{ dataUrl: string; fileName: string } | null>(null);
 
 	async function screenshotPreview() {
 		// pendingScreenshot guard: a capture resolving while the annotation modal
-		// is already open would silently swap the image under the user
-		if (!iframeEl || capturing || pendingScreenshot || !artifact) return;
+		// is already open would silently swap the image under the user.
+		// previewLoaded guard: before the iframe committed the current srcdoc,
+		// the previous document would answer the request under the new name.
+		if (!iframeEl || capturing || pendingScreenshot || !previewLoaded || !artifact) return;
 		capturing = true;
 		// Freeze the name now: a new version can stream in (or the user can
 		// navigate) while the annotation modal is open
@@ -617,6 +632,7 @@
 					class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
 					sandbox="allow-scripts allow-forms"
 					referrerpolicy="no-referrer"
+					onload={() => (previewLoaded = true)}
 					{srcdoc}
 				></iframe>
 			{/if}
