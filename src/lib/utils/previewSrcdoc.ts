@@ -1,4 +1,5 @@
 import type { ArtifactKind } from "./artifacts";
+import { appendHuggingChatBadge } from "./deployBadge";
 
 /**
  * Builders for sandboxed iframe `srcdoc` documents used by live previews
@@ -24,6 +25,23 @@ import type { ArtifactKind } from "./artifacts";
  */
 
 const END_SCRIPT_TAG = "</scr" + "ipt>";
+
+/** An uncaught error forwarded from a preview iframe via the postMessage hook. */
+export interface PreviewError {
+	message: string;
+	stack?: string;
+}
+
+/** The chat message sent when the user asks the model to fix captured preview errors. */
+export function composeFixRequest(errors: PreviewError[]): string {
+	const first = errors[0];
+	const summary = first
+		? `${first.message}${first.stack ? `\n${first.stack}` : ""}`
+		: "Unknown error";
+	return errors.length > 1
+		? `it's not working: ${summary} (+${errors.length - 1} more) - can you fix it?`
+		: `it's not working: ${summary} - can you fix it?`;
+}
 
 function buildPreviewHookScript(channel: string): string {
 	// Deployed artifacts (a static Space) pass an empty channel: there is no
@@ -363,11 +381,19 @@ export function isDeployableKind(kind: ArtifactKind): boolean {
  * Build the standalone `index.html` shipped to a deployed static Space. Unlike
  * the preview builders this passes an empty channel, so the postMessage hook is
  * stripped (a deployed page has no parent window to talk to). Raw HTML is shipped
- * verbatim — it is already a complete self-contained page and we must not inject
+ * as-is — it is already a complete self-contained page and we must not inject
  * a `<base target="_blank">` that would rewrite its link behaviour. SVG/React/
  * Mermaid reuse the same wrappers as the preview, minus the hook.
+ *
+ * Every deployed page then gets the "Made with HuggingChat" badge appended (see
+ * `deployBadge.ts`); it is self-contained and shadow-isolated, so it is the one
+ * thing added to otherwise untouched artifact markup.
  */
 export function buildDeployableHtml(kind: ArtifactKind, content: string): string {
+	return appendHuggingChatBadge(buildDeployableDocument(kind, content));
+}
+
+function buildDeployableDocument(kind: ArtifactKind, content: string): string {
 	switch (kind) {
 		case "react":
 			return buildReactSrcdoc(content, "");

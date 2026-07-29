@@ -5,13 +5,17 @@
 	import type { ArtifactRegistry, ArtifactVersion } from "$lib/utils/artifacts";
 	import { artifactFileName, isPreviewableKind } from "$lib/utils/artifacts";
 	import { diffLines, diffStats, renderDiffHtml } from "$lib/utils/artifactDiff";
-	import { buildArtifactSrcdoc, isDeployableKind } from "$lib/utils/previewSrcdoc";
+	import {
+		buildArtifactSrcdoc,
+		composeFixRequest,
+		isDeployableKind,
+		type PreviewError,
+	} from "$lib/utils/previewSrcdoc";
 	import { captureArtifactScreenshot, pngDataUrlToFile } from "$lib/utils/artifactCapture";
 	import { parseExternalUrl } from "$lib/utils/externalLink";
 	import { escapeHTML } from "$lib/utils/markedLight";
 	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_FRACTION } from "$lib/stores/artifactPanel.svelte";
 	import { StickToBottomController } from "$lib/utils/scroll/stickToBottom";
-	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 	import { pendingChatFiles } from "$lib/stores/pendingChatFiles";
 	import { error as errorStore } from "$lib/stores/errors";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
@@ -40,9 +44,15 @@
 		loading?: boolean;
 		/** Whether the current model accepts image attachments (enables screenshot-to-chat) */
 		canScreenshot?: boolean;
+		/**
+		 * Sends an ask-to-fix message directly to the chat, returning whether it
+		 * was dispatched. Absent when the conversation can't accept messages
+		 * (read-only, errored generation), which hides the ask-to-fix controls.
+		 */
+		onsend?: (text: string) => boolean;
 	}
 
-	let { registry, loading = false, canScreenshot = false }: Props = $props();
+	let { registry, loading = false, canScreenshot = false, onsend }: Props = $props();
 
 	let artifact = $derived(
 		artifactPanel.identifier ? registry.artifacts.get(artifactPanel.identifier) : undefined
@@ -274,7 +284,7 @@
 	// ----- live preview -----
 	const previewChannel = `artifact_${Math.random().toString(36).slice(2)}`;
 	let iframeEl: HTMLIFrameElement | undefined = $state();
-	let errors: { message: string; stack?: string }[] = $state([]);
+	let errors: PreviewError[] = $state([]);
 	let externalLinkUrl = $state<URL | null>(null);
 
 	let srcdoc = $derived.by(() => {
@@ -315,14 +325,19 @@
 		errors = [...errors, { message: String(detail.message ?? "Error"), stack: detail.stack }];
 	}
 
+	// Sends the fix request as a chat message right away. On mobile the panel
+	// is a fullscreen overlay that would hide both the sent message and the
+	// streaming reply, so close it on send; the panel auto-reopens when the
+	// fixed version starts streaming in (maybeAutoOpen). On desktop the chat is
+	// visible next to the panel, which stays open to receive the fix.
+	function sendFixRequest(text: string): boolean {
+		const sent = onsend?.(text) ?? false;
+		if (sent && !isDesktop) artifactPanel.close();
+		return sent;
+	}
+
 	function askToFixErrors() {
-		const lines = errors.map((e, i) => `${i + 1}. ${e.message}${e.stack ? `\n${e.stack}` : ""}`);
-		const summary = lines[0] ?? "Unknown error";
-		pendingChatInput.set(
-			errors.length > 1
-				? `it's not working: ${summary} (+${errors.length - 1} more) - can you fix it?`
-				: `it's not working: ${summary} - can you fix it?`
-		);
+		sendFixRequest(composeFixRequest(errors));
 	}
 
 	// ----- screenshot to chat -----
@@ -699,11 +714,14 @@
 				<span class="router-shimmer whitespace-nowrap">
 					{version?.op === "update" ? "Applying edit" : "Generating"}
 				</span>
-			{:else if errors.length > 0}
+			{:else if errors.length > 0 && onsend}
 				<button
 					type="button"
-					class="btn flex items-center gap-1.5 rounded-full border border-red-300/60 bg-red-50 px-2.5 py-0.5 text-red-600 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
-					title="Send the error to the chat input"
+					class="btn flex items-center gap-1.5 rounded-full border border-red-300/60 bg-red-50 px-2.5 py-0.5 text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+					title={loading
+						? "Wait for the current response to finish"
+						: "Send the errors and ask for a fix"}
+					disabled={loading}
 					onclick={askToFixErrors}
 				>
 					{errors.length} error{errors.length > 1 ? "s" : ""} — ask to fix
@@ -783,10 +801,13 @@
 {/if}
 
 {#if fullscreenOpen && version}
+	<!-- The modal can't render a disabled state for its floating error button,
+	     so streaming gates the handler entirely -->
 	<HtmlPreviewModal
 		html={version.content}
 		kind={version.type}
 		onclose={() => (fullscreenOpen = false)}
+		onsend={onsend && !loading ? sendFixRequest : undefined}
 	/>
 {/if}
 

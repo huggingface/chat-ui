@@ -48,7 +48,6 @@
 	import FeatureAnnouncementToast from "../FeatureAnnouncementToast.svelte";
 	import { getActiveAnnouncement } from "$lib/utils/featureAnnouncements";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-	import { pendingChatInput } from "$lib/stores/pendingChatInput";
 	import { pendingChatFiles } from "$lib/stores/pendingChatFiles";
 	import { mimeMatchesAllowlist } from "$lib/utils/mimeMatch";
 	import LucideHammer from "~icons/lucide/hammer";
@@ -129,6 +128,12 @@
 			return artifactRegistry;
 		},
 		panel: artifactPanel,
+		// Deep consumers (e.g. the code-block preview modal) can't render a
+		// meaningful disabled state, so streaming also gates availability here;
+		// the panel gets the handler as a prop and disables on `loading` itself.
+		get requestFix() {
+			return canSendFix && !loading ? sendFixRequest : undefined;
+		},
 	});
 
 	// Auto-open the panel when a new artifact version starts streaming in
@@ -236,6 +241,30 @@
 				(u) => u.type === "status" && u.status === "error"
 			) ?? -1) !== -1
 	);
+
+	// Preview "ask to fix" buttons (artifact panel footer, fullscreen preview
+	// modals) send their message directly instead of prefilling the composer.
+	// Bypasses the draft on purpose: a half-typed message must survive the click.
+	let canSendFix = $derived(!isReadOnly && !lastIsError);
+	function sendFixRequest(text: string): boolean {
+		if (requireAuthUser() || loading) return false;
+		tap();
+		chatScroll.armSend();
+		// Queued attachments belong to the user's next message, not to this
+		// machine-composed one. The send handler snapshots the bound `files`
+		// synchronously before its first await, so emptying around the call is
+		// enough to keep them out of the request — and it skips clearing them
+		// post-send when it consumed none (see writeMessage), so the restored
+		// queue survives.
+		const queuedFiles = files;
+		files = [];
+		try {
+			onmessage?.(text);
+		} finally {
+			files = queuedFiles;
+		}
+		return true;
+	}
 
 	// Expose currently running tool call name (if any) from the streaming assistant message
 	const availableTools: ToolFront[] = $derived.by(
@@ -441,15 +470,8 @@
 		activeRouterExamplePrompt = match ? match.prompt : null;
 	});
 
-	$effect(() => {
-		if ($pendingChatInput) {
-			draft = $pendingChatInput;
-			pendingChatInput.set(undefined);
-		}
-	});
-
-	// Files queued from outside the composer (e.g. artifact screenshots); same
-	// consume-and-clear contract as pendingChatInput, same accept rules as paste
+	// Files queued from outside the composer (e.g. artifact screenshots),
+	// consumed and cleared on arrival, same accept rules as paste
 	$effect(() => {
 		const pending = $pendingChatFiles;
 		if (!pending?.length || shared) return;
@@ -998,6 +1020,7 @@
 		registry={artifactRegistry}
 		{loading}
 		canScreenshot={!shared && !isReadOnly && mimeMatchesAllowlist("image/png", activeMimeTypes)}
+		onsend={canSendFix ? sendFixRequest : undefined}
 	/>
 </div>
 

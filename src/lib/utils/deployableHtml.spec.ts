@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { buildDeployableHtml, isDeployableKind } from "$lib/utils/previewSrcdoc";
+import {
+	buildArtifactSrcdoc,
+	buildDeployableHtml,
+	isDeployableKind,
+} from "$lib/utils/previewSrcdoc";
+import { BADGE_HOST_ATTRIBUTE } from "$lib/utils/deployBadge";
+
+/** Drop the injected badge script so the rest of the document can be compared. */
+function stripBadge(html: string): string {
+	return html.replace(/\n<script data-huggingchat-badge[\s\S]*?<\/script>\n/, "");
+}
 
 describe("buildDeployableHtml", () => {
 	it("flags only self-contained kinds as deployable", () => {
@@ -11,11 +21,11 @@ describe("buildDeployableHtml", () => {
 		expect(isDeployableKind("markdown")).toBe(false);
 	});
 
-	it("ships raw HTML verbatim (no base tag or preview hook injected)", () => {
+	it("ships raw HTML untouched apart from the badge (no base tag or preview hook)", () => {
 		const html = `<!doctype html><html><head><title>App</title></head><body><a href="/page">x</a></body></html>`;
 		const out = buildDeployableHtml("html", html);
-		expect(out).toBe(html);
 		expect(out).not.toContain("base target");
+		expect(stripBadge(out)).toBe(html);
 	});
 
 	// The deployed page has no parent window, so the postMessage hook (which the
@@ -54,5 +64,69 @@ describe("buildDeployableHtml", () => {
 		const out = buildDeployableHtml("svg", svg);
 		expect(out).toContain("<!doctype html>");
 		expect(out).toContain("<svg");
+	});
+});
+
+describe("HuggingChat badge", () => {
+	const kinds = [
+		["html", "<!doctype html><html><body><p>hi</p></body></html>"],
+		["svg", "<svg xmlns='http://www.w3.org/2000/svg'><rect width='10' height='10'/></svg>"],
+		["react", "export default function App(){ return <div>hi</div>; }"],
+		["mermaid", "graph TD; A-->B;"],
+	] as const;
+
+	it("is injected into every deployed kind, inside a closed shadow root", () => {
+		for (const [kind, content] of kinds) {
+			const out = buildDeployableHtml(kind, content);
+			expect(out, kind).toContain(BADGE_HOST_ATTRIBUTE);
+			expect(out, kind).toContain("Made with HuggingChat");
+			expect(out, kind).toContain("https://huggingface.co/chat");
+			expect(out, kind).toContain('mode: "closed"');
+		}
+	});
+
+	it("is never injected into previews", () => {
+		for (const [kind, content] of kinds) {
+			expect(buildArtifactSrcdoc(kind, content, "chan"), kind).not.toContain(BADGE_HOST_ATTRIBUTE);
+		}
+	});
+
+	it("goes after the whole document, never inside it", () => {
+		const doc = "<!doctype html><html><body><p>hi</p></body></html>";
+		const out = buildDeployableHtml("html", doc);
+		expect(out.startsWith(doc)).toBe(true);
+		expect(out.indexOf(BADGE_HOST_ATTRIBUTE)).toBeGreaterThan(out.lastIndexOf("</html>"));
+	});
+
+	// A `</body>` in a trailing script's string literal used to capture the
+	// injection point, so the badge's own `</script>` terminated the artifact's
+	// script — breaking the page *and* losing the badge.
+	it("never injects into a trailing script that mentions a closing body tag", () => {
+		const doc = `<!doctype html><html><body><h1>hi</h1></body>\n<script>var tpl = "</body>";</script>\n</html>`;
+		const out = buildDeployableHtml("html", doc);
+		expect(out.startsWith(doc)).toBe(true);
+		expect(out).not.toContain('var tpl = "\n<script');
+	});
+
+	it("appends at the end when the document has no body tag", () => {
+		const out = buildDeployableHtml("html", "<p>fragment only</p>");
+		expect(out.startsWith("<p>fragment only</p>")).toBe(true);
+		expect(out).toContain(BADGE_HOST_ATTRIBUTE);
+	});
+
+	// Selecting an injection point used to be quadratic in the number of
+	// `</body>` occurrences; appending is linear regardless of content.
+	it("stays fast on content that repeats the closing body tag", () => {
+		const doc = "<html><body>" + "</body>".repeat(20_000) + "</html>";
+		const start = performance.now();
+		buildDeployableHtml("html", doc);
+		expect(performance.now() - start).toBeLessThan(100);
+	});
+
+	it("cannot be terminated early by artifact content", () => {
+		const out = buildDeployableHtml("html", "<body></body>");
+		// The badge script must contain no raw `</script` other than its own terminator.
+		const script = out.slice(out.indexOf("<script data-huggingchat-badge"));
+		expect(script.match(/<\/script/gi)).toHaveLength(1);
 	});
 });

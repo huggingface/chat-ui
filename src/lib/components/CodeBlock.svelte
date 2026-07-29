@@ -4,6 +4,7 @@
 	import HtmlPreviewModal from "./HtmlPreviewModal.svelte";
 	import PlayFilledAlt from "~icons/carbon/play-filled-alt";
 	import EosIconsLoading from "~icons/eos-icons/loading";
+	import { getArtifactsContext } from "$lib/utils/artifactsContext";
 
 	interface Props {
 		code?: string;
@@ -12,6 +13,10 @@
 	}
 
 	let { code = "", rawCode = "", loading = false }: Props = $props();
+
+	// Lets the preview modal send its ask-to-fix message straight to the chat.
+	// Undefined outside a chat window (or while it can't accept messages).
+	const artifactsContext = getArtifactsContext();
 
 	let previewOpen = $state(false);
 
@@ -82,6 +87,10 @@
 		></pre>
 
 	{#if previewOpen}
-		<HtmlPreviewModal html={rawCode} onclose={() => (previewOpen = false)} />
+		<HtmlPreviewModal
+			html={rawCode}
+			onclose={() => (previewOpen = false)}
+			onsend={artifactsContext?.requestFix}
+		/>
 	{/if}
 </div>
