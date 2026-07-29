@@ -20,6 +20,23 @@ import type { ArtifactKind } from "./artifacts";
 
 const END_SCRIPT_TAG = "</scr" + "ipt>";
 
+/** An uncaught error forwarded from a preview iframe via the postMessage hook. */
+export interface PreviewError {
+	message: string;
+	stack?: string;
+}
+
+/** The chat message sent when the user asks the model to fix captured preview errors. */
+export function composeFixRequest(errors: PreviewError[]): string {
+	const first = errors[0];
+	const summary = first
+		? `${first.message}${first.stack ? `\n${first.stack}` : ""}`
+		: "Unknown error";
+	return errors.length > 1
+		? `it's not working: ${summary} (+${errors.length - 1} more) - can you fix it?`
+		: `it's not working: ${summary} - can you fix it?`;
+}
+
 function buildPreviewHookScript(channel: string): string {
 	// Deployed artifacts (a static Space) pass an empty channel: there is no
 	// parent window to postMessage to, so the hook is omitted entirely and the
