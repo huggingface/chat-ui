@@ -359,7 +359,9 @@
 		canScreenshot && effectiveTab === "preview" && !!srcdoc && previewLoaded
 	);
 	let capturing = $state(false);
-	let pendingScreenshot = $state<{ dataUrl: string; fileName: string } | null>(null);
+	let pendingScreenshot = $state<{ dataUrl: string; fileName: string; subject: string } | null>(
+		null
+	);
 
 	async function screenshotPreview() {
 		// pendingScreenshot guard: a capture resolving while the annotation modal
@@ -368,10 +370,11 @@
 		// the previous document would answer the request under the new name.
 		if (!iframeEl || capturing || pendingScreenshot || !previewLoaded || !artifact) return;
 		capturing = true;
-		// Freeze the name now: a new version can stream in (or the user can
-		// navigate) while the annotation modal is open
+		// Freeze name and subject now: a new version can stream in (or the user
+		// can navigate) while the annotation modal is open
 		const slug = artifact.identifier.replace(/[^a-zA-Z0-9_-]+/g, "-") || "artifact";
 		const fileName = `${slug}-v${displayVersionNumber}-screenshot.png`;
+		const subject = `"${version?.title ?? artifact.identifier}" (v${displayVersionNumber})`;
 		const requestedSrcdoc = srcdoc;
 		try {
 			// Transparent documents composite over the iframe's own backing, so
@@ -386,7 +389,7 @@
 			if (srcdoc !== requestedSrcdoc) {
 				throw new Error("the preview changed during capture");
 			}
-			pendingScreenshot = { dataUrl, fileName };
+			pendingScreenshot = { dataUrl, fileName, subject };
 		} catch (err) {
 			errorStore.set(
 				`Screenshot failed: ${err instanceof Error ? err.message : "unexpected error"}`
@@ -401,8 +404,9 @@
 		if (!shot) return;
 		pendingComposerPayload.set({
 			files: [pngDataUrlToFile(annotatedDataUrl, shot.fileName)],
-			// Numbered to match the badges baked into the image
-			text: formatScreenshotNotes(notes),
+			// Numbered to match the badges baked into the image; the subject header
+			// keeps blocks apart when several annotated screenshots share a draft
+			text: formatScreenshotNotes(notes, shot.subject),
 		});
 		pendingScreenshot = null;
 		// On mobile the panel overlays the chat; close it so the attachment is visible

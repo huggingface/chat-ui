@@ -67,6 +67,8 @@
 	let editingIndex = $state<number | null>(null);
 	/** Live drag preview for the comment tool, kept as origin + pointer */
 	let draftRegion = $state<{ ox: number; oy: number; px: number; py: number } | null>(null);
+	/** Bumped to re-trigger the focus effect when editingIndex itself doesn't change */
+	let focusNonce = $state(0);
 	let nextCommentId = 0;
 
 	let canvasEl: HTMLCanvasElement | undefined = $state();
@@ -255,9 +257,19 @@
 		};
 	}
 
-	/** Topmost comment whose badge contains the point, for click-to-reopen */
+	/**
+	 * Topmost comment whose badge contains the point, for click-to-reopen.
+	 * The hit target has a floor in screen pixels: on a heavily downscaled
+	 * capture the badge's image-space radius can shrink to a couple of CSS
+	 * pixels, which would make badges effectively unclickable.
+	 */
 	function commentIndexAt(point: Point): number | null {
-		const hitRadius = badgeRadius * 1.4;
+		const canvas = canvasEl;
+		const displayScale = canvas ? canvas.getBoundingClientRect().width / canvas.width : 1;
+		const hitRadius = Math.max(
+			badgeRadius * 1.4,
+			displayScale > 0 ? 14 / displayScale : badgeRadius * 1.4
+		);
 		for (let i = comments.length - 1; i >= 0; i--) {
 			if (Math.hypot(point.x - comments[i].x, point.y - comments[i].y) <= hitRadius) return i;
 		}
@@ -268,15 +280,23 @@
 		if (!image || e.button !== 0) return;
 		const point = toImagePoint(e);
 		if (!point) return;
+		// A badge is clickable with any tool selected: clicking a number is an
+		// unambiguous "show me this note". Clicking the badge of the note that's
+		// already open keeps it open and pulls focus back to it (editingIndex
+		// doesn't change on this path, so the focus effect needs the nudge).
+		if (editingIndex !== null && commentIndexAt(point) === editingIndex) {
+			focusNonce += 1;
+			return;
+		}
+		// Settle any open editor first so indices are stable for the hit test
+		// (an abandoned empty comment gets dropped here)
+		commitEditing();
+		const hit = commentIndexAt(point);
+		if (hit !== null) {
+			editingIndex = hit;
+			return;
+		}
 		if (tool === "comment") {
-			// Runs before the open editor's blur: settle it first so indices are
-			// stable for the hit test below
-			commitEditing();
-			const hit = commentIndexAt(point);
-			if (hit !== null) {
-				editingIndex = hit;
-				return;
-			}
 			(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 			draftRegion = { ox: point.x, oy: point.y, px: point.x, py: point.y };
 			return;
@@ -292,11 +312,17 @@
 			draftRegion = { ...draftRegion, px: point.x, py: point.y };
 			return;
 		}
-		if (!current) return;
-		current =
-			current.tool === "pen"
-				? { ...current, points: [...current.points, point] }
-				: { ...current, points: [current.points[0], point] };
+		if (current) {
+			current =
+				current.tool === "pen"
+					? { ...current, points: [...current.points, point] }
+					: { ...current, points: [current.points[0], point] };
+			return;
+		}
+		// Idle hover: badges advertise their clickability
+		if (canvasEl) {
+			canvasEl.style.cursor = commentIndexAt(point) !== null ? "pointer" : "";
+		}
 	}
 
 	function onPointerUp() {
@@ -408,9 +434,76 @@
 		);
 	}
 
-	function autofocus(node: HTMLElement, enabled: boolean = true) {
-		if (enabled) node.focus();
+	// Focus when the token is set, and again whenever it changes: the popover
+	// element survives switching between comments (the {#if} block never
+	// unmounts), so a mount-only focus would miss badge-to-badge jumps
+	function autofocus(node: HTMLElement, token: unknown = true) {
+		function apply(value: unknown) {
+			if (value === false || value === null || value === undefined) return;
+			// Deferred a task: focusing a just-mounted element synchronously
+			// during the render flush doesn't reliably stick. setTimeout rather
+			// than requestAnimationFrame — rAF can be throttled to never when the
+			// page isn't actively compositing.
+			setTimeout(() => {
+				if (node.isConnected) {
+					node.focus();
+					node.scrollIntoView({ block: "nearest" });
+				}
+			}, 0);
+		}
+		apply(token);
+		return {
+			update: apply,
+		};
 	}
+
+	/** Keep a note textarea as tall as its content (capped by CSS max-height) */
+	function autogrow(node: HTMLTextAreaElement) {
+		function resize() {
+			node.style.height = "auto";
+			node.style.height = `${node.scrollHeight}px`;
+		}
+		resize();
+		node.addEventListener("input", resize);
+		return {
+			destroy() {
+				node.removeEventListener("input", resize);
+			},
+		};
+	}
+
+	/** Enter commits the note, Shift+Enter inserts a newline */
+	function onNoteKeydown(e: KeyboardEvent) {
+		if (e.key === "Enter" && !e.shiftKey) {
+			e.preventDefault();
+			(e.target as HTMLTextAreaElement).blur();
+		}
+	}
+
+	// Popover focus is driven by state, not element mount: mount-time focus
+	// proved unreliable for the reopen path. The popover element is read lazily
+	// inside the deferred attempts (untracked on purpose) with a short bounded
+	// retry, so the effect doesn't depend on bind:this flush ordering.
+	$effect(() => {
+		if (isNarrow || editingIndex === null) return;
+		void comments[editingIndex]?.id;
+		void focusNonce;
+		let cancelled = false;
+		let tries = 0;
+		const attempt = () => {
+			if (cancelled) return;
+			const target = popoverEl?.querySelector("textarea");
+			if (target) {
+				target.focus();
+				return;
+			}
+			if (++tries < 10) setTimeout(attempt, 16);
+		};
+		setTimeout(attempt, 0);
+		return () => {
+			cancelled = true;
+		};
+	});
 
 	// ----- desktop popover positioning (image space -> container CSS space) -----
 	let popoverStyle = $state("");
@@ -428,12 +521,13 @@
 		const scaleY = canvasRect.height / canvas.height;
 		const badgeX = canvasRect.left - wrapRect.left + comment.x * scaleX;
 		const badgeY = canvasRect.top - wrapRect.top + comment.y * scaleY;
-		const width = 264;
+		const width = 280;
 		const left = Math.min(
 			Math.max(8, badgeX + badgeRadius * scaleX + 8),
 			wrapRect.width - width - 8
 		);
-		const top = Math.min(Math.max(8, badgeY + badgeRadius * scaleY + 8), wrapRect.height - 56);
+		// Bottom clamp leaves room for the textarea to grow a few lines
+		const top = Math.min(Math.max(8, badgeY + badgeRadius * scaleY + 8), wrapRect.height - 120);
 		popoverStyle = `left:${left}px; top:${top}px; width:${width}px;`;
 	});
 
@@ -443,7 +537,7 @@
 	const toolBtnInactive =
 		"text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200";
 	const noteInput =
-		"min-w-0 flex-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-800 outline-hidden placeholder:text-gray-400 focus:border-blue-400 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-blue-500";
+		"scrollbar-custom max-h-32 min-w-0 flex-1 resize-none overflow-y-auto rounded-md border border-gray-200 bg-white px-2 py-1 text-sm leading-snug text-gray-800 outline-hidden placeholder:text-gray-400 focus:border-blue-400 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-blue-500";
 </script>
 
 <svelte:window onkeydown={onKeydown} onresize={() => (resizeNonce += 1)} />
@@ -546,23 +640,25 @@
 			{#if !isNarrow && editingIndex !== null && comments[editingIndex]}
 				<div
 					bind:this={popoverEl}
-					class="absolute z-10 flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+					class="absolute z-10 flex items-start gap-1.5 rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-600 dark:bg-gray-800"
 					style={popoverStyle}
 				>
 					<span
-						class="flex size-5 flex-none items-center justify-center rounded-full bg-blue-500 text-xs font-semibold text-white"
+						class="mt-0.5 flex size-5 flex-none items-center justify-center rounded-full bg-blue-500 text-xs font-semibold text-white"
 					>
 						{editingIndex + 1}
 					</span>
-					<input
-						type="text"
-						class={noteInput}
-						placeholder="What about this area?"
-						bind:value={comments[editingIndex].note}
-						onkeydown={(e) => e.key === "Enter" && commitEditing()}
-						onblur={onNoteBlur}
-						use:autofocus
-					/>
+					{#key comments[editingIndex].id}
+						<textarea
+							rows="1"
+							class={noteInput}
+							placeholder="What about this area?"
+							bind:value={comments[editingIndex].note}
+							onkeydown={onNoteKeydown}
+							onblur={onNoteBlur}
+							use:autogrow
+						></textarea>
+					{/key}
 					<button
 						type="button"
 						class="btn flex-none rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
@@ -581,21 +677,22 @@
 		{#if isNarrow && comments.length > 0}
 			<ul class="flex flex-col gap-1.5">
 				{#each comments as comment, i (comment.id)}
-					<li class="flex items-center gap-2">
+					<li class="flex items-start gap-2">
 						<span
-							class="flex size-5 flex-none items-center justify-center rounded-full bg-blue-500 text-xs font-semibold text-white"
+							class="mt-1 flex size-5 flex-none items-center justify-center rounded-full bg-blue-500 text-xs font-semibold text-white"
 						>
 							{i + 1}
 						</span>
-						<input
-							type="text"
+						<textarea
+							rows="1"
 							class={noteInput}
 							placeholder="What about this area?"
 							bind:value={comment.note}
-							onkeydown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+							onkeydown={onNoteKeydown}
 							onblur={() => onRowBlur(i)}
-							use:autofocus={editingIndex === i}
-						/>
+							use:autofocus={editingIndex === i ? editingIndex : null}
+							use:autogrow
+						></textarea>
 						<button
 							type="button"
 							class="btn flex-none rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
