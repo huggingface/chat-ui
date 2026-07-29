@@ -16,7 +16,8 @@
 	import { escapeHTML } from "$lib/utils/markedLight";
 	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_FRACTION } from "$lib/stores/artifactPanel.svelte";
 	import { StickToBottomController } from "$lib/utils/scroll/stickToBottom";
-	import { pendingChatFiles } from "$lib/stores/pendingChatFiles";
+	import { pendingComposerPayload } from "$lib/stores/pendingComposerPayload";
+	import { formatScreenshotNotes } from "$lib/utils/screenshotNotes";
 	import { error as errorStore } from "$lib/stores/errors";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { page } from "$app/state";
@@ -395,10 +396,14 @@
 		}
 	}
 
-	function attachScreenshot(annotatedDataUrl: string) {
+	function attachScreenshot(annotatedDataUrl: string, notes: string[]) {
 		const shot = pendingScreenshot;
 		if (!shot) return;
-		pendingChatFiles.set([pngDataUrlToFile(annotatedDataUrl, shot.fileName)]);
+		pendingComposerPayload.set({
+			files: [pngDataUrlToFile(annotatedDataUrl, shot.fileName)],
+			// Numbered to match the badges baked into the image
+			text: formatScreenshotNotes(notes),
+		});
 		pendingScreenshot = null;
 		// On mobile the panel overlays the chat; close it so the attachment is visible
 		if (!isDesktop) artifactPanel.close();

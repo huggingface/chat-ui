@@ -48,7 +48,7 @@
 	import FeatureAnnouncementToast from "../FeatureAnnouncementToast.svelte";
 	import { getActiveAnnouncement } from "$lib/utils/featureAnnouncements";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-	import { pendingChatFiles } from "$lib/stores/pendingChatFiles";
+	import { pendingComposerPayload } from "$lib/stores/pendingComposerPayload";
 	import { mimeMatchesAllowlist } from "$lib/utils/mimeMatch";
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideSparkles from "~icons/lucide/sparkles";
@@ -470,16 +470,23 @@
 		activeRouterExamplePrompt = match ? match.prompt : null;
 	});
 
-	// Files queued from outside the composer (e.g. artifact screenshots),
-	// consumed and cleared on arrival, same accept rules as paste
+	// Composer content queued from outside (e.g. an annotated artifact
+	// screenshot plus its notes), consumed and cleared on arrival: files use
+	// the same accept rules as paste, text appends to the editable draft
 	$effect(() => {
-		const pending = $pendingChatFiles;
-		if (!pending?.length || shared) return;
-		const accepted = pending.filter((file) => mimeMatchesAllowlist(file.type, activeMimeTypes));
+		const pending = $pendingComposerPayload;
+		if (!pending || shared) return;
+		const accepted = (pending.files ?? []).filter((file) =>
+			mimeMatchesAllowlist(file.type, activeMimeTypes)
+		);
 		if (accepted.length) {
 			files = [...untrack(() => files), ...accepted];
 		}
-		pendingChatFiles.set(undefined);
+		if (pending.text) {
+			const currentDraft = untrack(() => draft);
+			draft = currentDraft.trim() ? `${currentDraft}\n\n${pending.text}` : pending.text;
+		}
+		pendingComposerPayload.set(undefined);
 	});
 
 	function triggerPrompt(prompt: string) {
