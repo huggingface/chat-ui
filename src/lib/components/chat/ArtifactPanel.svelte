@@ -9,6 +9,7 @@
 		buildArtifactSrcdoc,
 		composeFixRequest,
 		isDeployableKind,
+		MAX_CAPTURED_PREVIEW_ERRORS,
 		type PreviewError,
 	} from "$lib/utils/previewSrcdoc";
 	import { captureArtifactScreenshot, pngDataUrlToFile } from "$lib/utils/artifactCapture";
@@ -333,6 +334,7 @@
 			return;
 		}
 		if (data.type !== "chatui.preview.error") return;
+		if (errors.length >= MAX_CAPTURED_PREVIEW_ERRORS) return;
 		const detail = (data.detail ?? {}) as { message?: unknown; stack?: string };
 		errors = [...errors, { message: String(detail.message ?? "Error"), stack: detail.stack }];
 	}

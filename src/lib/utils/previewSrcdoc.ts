@@ -32,15 +32,49 @@ export interface PreviewError {
 	stack?: string;
 }
 
+/**
+ * Cap on stored preview errors: a handler that throws every frame or click
+ * emits the same error endlessly, and each append rebuilds the captured list.
+ * Beyond this the extras carry no new signal for a fix request anyway.
+ */
+export const MAX_CAPTURED_PREVIEW_ERRORS = 100;
+
+const MAX_DISTINCT_ERRORS = 5;
+const MAX_STACK_LINES = 5;
+const MAX_ERROR_CHARS = 700;
+
+function renderError({ error, count }: { error: PreviewError; count: number }): string {
+	const times = count > 1 ? ` (repeated ${count} times)` : "";
+	// Keep only the top of the stack: for single-file artifacts the first
+	// frames carry the useful location, and deep stacks would drown the list
+	const stack = error.stack?.split("\n").slice(0, MAX_STACK_LINES).join("\n") ?? "";
+	const rendered = `${error.message}${times}${stack ? `\n${stack}` : ""}`;
+	return rendered.length > MAX_ERROR_CHARS ? `${rendered.slice(0, MAX_ERROR_CHARS)}…` : rendered;
+}
+
 /** The chat message sent when the user asks the model to fix captured preview errors. */
 export function composeFixRequest(errors: PreviewError[]): string {
-	const first = errors[0];
-	const summary = first
-		? `${first.message}${first.stack ? `\n${first.stack}` : ""}`
-		: "Unknown error";
-	return errors.length > 1
-		? `it's not working: ${summary} (+${errors.length - 1} more) - can you fix it?`
-		: `it's not working: ${summary} - can you fix it?`;
+	// Collapse repeats (a throwing rAF/event handler emits the same error over
+	// and over) so each distinct failure is listed once, with a count
+	const distinct = new Map<string, { error: PreviewError; count: number }>();
+	for (const error of errors) {
+		const key = `${error.message}\n${error.stack ?? ""}`;
+		const entry = distinct.get(key);
+		if (entry) entry.count += 1;
+		else distinct.set(key, { error, count: 1 });
+	}
+	const entries = [...distinct.values()];
+
+	if (entries.length <= 1) {
+		const summary = entries.length ? renderError(entries[0]) : "Unknown error";
+		return `it's not working: ${summary} - can you fix it?`;
+	}
+
+	const shown = entries.slice(0, MAX_DISTINCT_ERRORS);
+	const omitted = entries.length - shown.length;
+	const list = shown.map((entry, i) => `${i + 1}. ${renderError(entry)}`).join("\n");
+	const tail = omitted > 0 ? `\n(+${omitted} more distinct error${omitted > 1 ? "s" : ""})` : "";
+	return `it's not working, I see ${entries.length} errors:\n${list}${tail}\ncan you fix them?`;
 }
 
 function buildPreviewHookScript(channel: string): string {
