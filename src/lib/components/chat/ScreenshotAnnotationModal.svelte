@@ -506,7 +506,15 @@
 	function autogrow(node: HTMLTextAreaElement) {
 		function resize() {
 			node.style.height = "auto";
-			node.style.height = `${node.scrollHeight}px`;
+			const contentHeight = node.scrollHeight;
+			const maxHeight = parseFloat(getComputedStyle(node).maxHeight);
+			// The themed scrollbar is a classic 8px gutter rather than an overlay,
+			// so a permanent overflow-y:auto would show a track even for a
+			// single-line note (scrollHeight rounds above the box by a pixel).
+			// Only allow scrolling once the note is actually clamped at max height.
+			node.style.overflowY =
+				Number.isFinite(maxHeight) && contentHeight > maxHeight ? "auto" : "hidden";
+			node.style.height = `${contentHeight}px`;
 		}
 		resize();
 		node.addEventListener("input", resize);
@@ -590,8 +598,10 @@
 	const toolBtnActive = "bg-white text-gray-800 shadow-xs dark:bg-gray-600 dark:text-gray-100";
 	const toolBtnInactive =
 		"text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200";
+	// overflow-y-hidden by default; autogrow flips it to auto only when the note
+	// is clamped at max-height, so no scrollbar gutter shows for short notes
 	const noteInput =
-		"scrollbar-custom max-h-32 min-w-0 flex-1 resize-none overflow-y-auto rounded-md border border-gray-200 bg-white px-2 py-1 text-sm leading-snug text-gray-800 outline-hidden placeholder:text-gray-400 focus:border-blue-400 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-blue-500";
+		"scrollbar-custom max-h-32 min-w-0 flex-1 resize-none overflow-y-hidden rounded-md border border-gray-200 bg-white px-2 py-1 text-sm leading-snug text-gray-800 outline-hidden placeholder:text-gray-400 focus:border-blue-400 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-blue-500";
 </script>
 
 <svelte:window onkeydown={onKeydown} onresize={() => (resizeNonce += 1)} />
