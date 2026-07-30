@@ -114,6 +114,7 @@
 			current = null;
 			comments = [];
 			editingIndex = null;
+			composingNote = false;
 			draftRegion = null;
 			loadFailed = false;
 		};
@@ -413,8 +414,12 @@
 
 	function deleteComment(index: number) {
 		comments = comments.filter((_, i) => i !== index);
-		if (editingIndex === index) editingIndex = null;
-		else if (editingIndex !== null && editingIndex > index) editingIndex -= 1;
+		if (editingIndex === index) {
+			// Deleting via the X suppresses the textarea's blur (to keep focus
+			// controlled), so compositionend may never fire for a composing note
+			composingNote = false;
+			editingIndex = null;
+		} else if (editingIndex !== null && editingIndex > index) editingIndex -= 1;
 	}
 
 	function onNoteBlur(e: FocusEvent, index: number) {
@@ -429,7 +434,10 @@
 
 	/** Blur handler for mobile list rows: empty rows evaporate on leave */
 	function onRowBlur(index: number) {
-		if (editingIndex === index) editingIndex = null;
+		if (editingIndex === index) {
+			composingNote = false;
+			editingIndex = null;
+		}
 		const comment = comments[index];
 		if (comment && !comment.note.trim()) deleteComment(index);
 	}
@@ -443,6 +451,7 @@
 		current = null;
 		comments = [];
 		editingIndex = null;
+		composingNote = false;
 		draftRegion = null;
 	}
 
