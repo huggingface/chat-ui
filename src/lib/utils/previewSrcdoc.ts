@@ -57,13 +57,16 @@ export const PREVIEW_SANDBOX =
  * across engines (and let an artifact pass e.g. fullscreen on to a media
  * embed it contains). Everything granted is device-UX or write-only:
  * fullscreen, motion sensors for tilt controls (also required for
- * devicemotion/deviceorientation events), gamepad, media autoplay, wake lock,
- * and clipboard-write. Privacy-sensitive inputs — camera, microphone,
+ * devicemotion/deviceorientation events), gamepad, media autoplay, and
+ * clipboard-write. Privacy-sensitive inputs — camera, microphone,
  * geolocation, clipboard-read, display-capture — are deliberately NOT
- * delegated, and reads of user data stay impossible.
+ * delegated, and reads of user data stay impossible. `screen-wake-lock` is
+ * also withheld: it needs no user gesture, previews can open with zero
+ * clicks, and a silent lock would keep a walked-away-from display awake for
+ * no preview-side benefit (active use keeps the screen on by itself).
  */
 export const PREVIEW_ALLOW =
-	"fullscreen *; pointer-lock *; accelerometer *; gyroscope *; magnetometer *; gamepad *; autoplay *; clipboard-write *; screen-wake-lock *";
+	"fullscreen *; pointer-lock *; accelerometer *; gyroscope *; magnetometer *; gamepad *; autoplay *; clipboard-write *";
 
 /** An uncaught error forwarded from a preview iframe via the postMessage hook. */
 export interface PreviewError {

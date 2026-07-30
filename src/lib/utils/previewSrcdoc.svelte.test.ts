@@ -320,7 +320,9 @@ describe("preview iframe capability grants", () => {
 		expect(res.gamepad).toBe(true);
 		expect(res.autoplay).toBe(true);
 		expect(res["clipboard-write"]).toBe(true);
-		expect(res["screen-wake-lock"]).toBe(true);
+		// Denied: no gesture needed and previews can open with zero clicks, so a
+		// silent lock could keep a walked-away-from display awake
+		expect(res["screen-wake-lock"]).toBe(false);
 		// Denied: reads of user data and devices
 		expect(res.camera).toBe(false);
 		expect(res.microphone).toBe(false);
