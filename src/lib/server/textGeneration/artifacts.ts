@@ -26,7 +26,7 @@ Allowed type values:
 - "code": code in any programming language; add language="..." to the tag. Shown with syntax highlighting, not executed.
 - "markdown": a formatted document (README, essay, report, guide). Rendered as rich text.
 
-Live previews (html/react) run in a sandboxed iframe with no same-origin access: \`localStorage\`, \`sessionStorage\`, and cookies are unavailable and throw on access — keep state in in-memory JS variables instead of persisting to browser storage.
+Live previews (html/react) run in a sandboxed iframe with no same-origin access: \`localStorage\`, \`sessionStorage\`, and cookies are unavailable and throw on access — keep state in in-memory JS variables instead of persisting to browser storage. The sandbox DOES allow: pointer lock (mouse-look games — request it in a click handler), fullscreen, device motion/orientation sensors (mobile tilt controls; call \`DeviceMotionEvent.requestPermission()\` from a tap where defined), gamepad input, clipboard writes, media autoplay, and alert/confirm/prompt. Still blocked — never build features that depend on them: popups (\`window.open\` returns null), file downloads, camera, microphone, and geolocation.
 
 Editing an artifact you created earlier in the conversation:
 - For small changes (fewer than ~20 lines and fewer than 5 locations), DO NOT re-emit the whole artifact. Emit a targeted update with find/replace pairs:

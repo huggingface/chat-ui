@@ -8,6 +8,8 @@
 		capturePreviewError,
 		composeFixRequest,
 		normalizePreviewError,
+		PREVIEW_ALLOW,
+		PREVIEW_SANDBOX,
 		type CapturedPreviewError,
 	} from "$lib/utils/previewSrcdoc";
 	import { parseExternalUrl } from "$lib/utils/externalLink";
@@ -86,7 +88,9 @@
 			bind:this={iframeEl}
 			title="HTML Preview"
 			class="h-full w-full"
-			sandbox="allow-scripts"
+			sandbox={PREVIEW_SANDBOX}
+			allow={PREVIEW_ALLOW}
+			allowfullscreen
 			referrerpolicy="no-referrer"
 			{srcdoc}
 		></iframe>

@@ -11,6 +11,8 @@
 		composeFixRequest,
 		isDeployableKind,
 		normalizePreviewError,
+		PREVIEW_ALLOW,
+		PREVIEW_SANDBOX,
 		type CapturedPreviewError,
 	} from "$lib/utils/previewSrcdoc";
 	import { captureArtifactScreenshot, pngDataUrlToFile } from "$lib/utils/artifactCapture";
@@ -640,7 +642,9 @@
 					bind:this={iframeEl}
 					title="Artifact preview"
 					class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
-					sandbox="allow-scripts allow-forms"
+					sandbox={PREVIEW_SANDBOX}
+					allow={PREVIEW_ALLOW}
+					allowfullscreen
 					referrerpolicy="no-referrer"
 					onload={() => (previewLoaded = true)}
 					{srcdoc}
