@@ -23,6 +23,11 @@ export type ToolRun = {
 	output: string;
 };
 
+export type ToolImagePart = {
+	type: "image_url";
+	image_url: { url: string; detail: "auto" };
+};
+
 export interface NormalizedToolCall {
 	id: string;
 	name: string;
@@ -47,6 +52,7 @@ export interface ExecuteToolCallsParams {
 export interface ToolCallExecutionResult {
 	toolMessages: ChatCompletionMessageParam[];
 	toolRuns: ToolRun[];
+	toolImages: ToolImagePart[];
 	finalAnswer?: { text: string; interrupted: boolean };
 }
 
@@ -64,6 +70,17 @@ const serverMap = (servers: McpServerConfig[]): Map<string, McpServerConfig> => 
 	return map;
 };
 
+function toToolImagePart(block: unknown): ToolImagePart | undefined {
+	if (!block || typeof block !== "object") return undefined;
+	const obj = block as Record<string, unknown>;
+	if (obj.type !== "image" || typeof obj.data !== "string" || typeof obj.mimeType !== "string")
+		return undefined;
+	return {
+		type: "image_url",
+		image_url: { url: `data:${obj.mimeType};base64,${obj.data}`, detail: "auto" },
+	};
+}
+
 export async function* executeToolCalls({
 	calls,
 	mapping,
@@ -78,6 +95,7 @@ export async function* executeToolCalls({
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
+	const toolImages: ToolImagePart[] = [];
 	const serverLookup = serverMap(servers);
 	// Pre-emit call + ETA updates and prepare tasks
 	type TaskResult = {
@@ -335,7 +353,14 @@ export async function* executeToolCalls({
 		const name = prepared[r.index].call.name;
 		const id = prepared[r.index].call.id;
 		if (!r.error) {
-			const output = r.output ?? "";
+			let output = r.output ?? "";
+			// Extract any image content blocks returned by the MCP tool
+			const imageParts = (r.blocks ?? []).map(toToolImagePart).filter(Boolean) as ToolImagePart[];
+			toolImages.push(...imageParts);
+			// If output is empty but images were returned, provide placeholder text
+			if (output === "" && imageParts.length > 0) {
+				output = "Tool returned image(s).";
+			}
 			toolRuns.push({ name, parameters: r.paramsClean, output });
 			// For the LLM follow-up call, we keep only the textual output
 			toolMessages.push({ role: "tool", tool_call_id: id, content: output });
@@ -345,5 +370,5 @@ export async function* executeToolCalls({
 		}
 	}
 
-	yield { type: "complete", summary: { toolMessages, toolRuns } };
+	yield { type: "complete", summary: { toolMessages, toolRuns, toolImages } };
 }
