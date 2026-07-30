@@ -16,9 +16,7 @@ export function mcpFetchForServer(server: McpServerConfig): typeof fetch {
 					}
 				: init
 		);
-		// Only inspect error responses for an OAuth scope challenge. Cloning a 2xx streamable-HTTP
-		// (SSE) body and abandoning the clone deadlocks the stream the MCP SDK is reading, hanging
-		// connect() forever. Challenges are always 4xx, so gating on !ok is safe.
+		// Only on error responses: cloning a 2xx (SSE) body deadlocks the stream the MCP SDK reads.
 		if (server.oauthChallengeHandler && !response.ok) {
 			try {
 				await server.oauthChallengeHandler(response.clone());

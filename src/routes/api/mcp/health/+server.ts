@@ -137,9 +137,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						}
 					: init
 			);
-			// Only clone/inspect error responses. Cloning a 2xx streamable-HTTP (SSE) body and
-			// abandoning the clone deadlocks the stream the MCP SDK reads, hanging connect().
-			// insufficient_scope challenges are always 4xx, so gating on !ok is safe.
+			// Only on error responses: cloning a 2xx (SSE) body deadlocks the stream the MCP SDK reads.
 			if (oauthConnectionId && !response.ok) {
 				const challenged = await captureInsufficientScopeResponse(
 					locals,
