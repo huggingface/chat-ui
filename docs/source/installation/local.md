@@ -28,6 +28,7 @@ Chat UI connects to any OpenAI-compatible API. Set `OPENAI_BASE_URL` to your pro
 | Ollama       | `http://127.0.0.1:11434/v1`        |
 | llama.cpp    | `http://127.0.0.1:8080/v1`         |
 | OpenRouter   | `https://openrouter.ai/api/v1`     |
+| OrcaRouter   | `https://api.orcarouter.ai/v1`     |
 
 See the [configuration overview](../configuration/overview) for all available options.
 

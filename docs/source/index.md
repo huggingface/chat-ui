@@ -8,6 +8,7 @@ Chat UI connects to any OpenAI-compatible API endpoint, making it work with:
 - [Ollama](https://ollama.ai)
 - [llama.cpp](https://github.com/ggerganov/llama.cpp)
 - [OpenRouter](https://openrouter.ai)
+- [OrcaRouter](https://www.orcarouter.ai)
 - Any other OpenAI-compatible service
 
 **[MCP Tools](./configuration/mcp-tools)**: Function calling via Model Context Protocol (MCP) servers
@@ -35,6 +36,7 @@ You can use any OpenAI-compatible endpoint:
 | Ollama       | `http://127.0.0.1:11434/v1`        | `ollama`         |
 | llama.cpp    | `http://127.0.0.1:8080/v1`         | `sk-local`       |
 | OpenRouter   | `https://openrouter.ai/api/v1`     | `sk-or-v1-xxx`   |
+| OrcaRouter   | `https://api.orcarouter.ai/v1`     | `sk-orca-xxx`    |
 
 **Step 2 - Install and run:**
 
