@@ -282,11 +282,14 @@ function runInPreviewFrame(
 describe("preview iframe capability grants", () => {
 	// The attribute strings are a security contract; lock the load-bearing
 	// tokens at the source so a rewording can't silently weaken them.
-	it("never grants same-origin, popups, or downloads", () => {
+	it("never grants same-origin, popups, downloads, or modals", () => {
 		expect(PREVIEW_SANDBOX).not.toContain("allow-same-origin");
 		expect(PREVIEW_SANDBOX).not.toContain("allow-popups");
 		expect(PREVIEW_SANDBOX).not.toContain("allow-downloads");
 		expect(PREVIEW_SANDBOX).not.toContain("allow-top-navigation");
+		// Previews auto-open with zero clicks (shared conversations, streaming);
+		// a dialog loop would block the tab, so modals must stay off
+		expect(PREVIEW_SANDBOX).not.toContain("allow-modals");
 		for (const feature of ["camera", "microphone", "geolocation", "clipboard-read"]) {
 			expect(PREVIEW_ALLOW).not.toContain(feature);
 		}

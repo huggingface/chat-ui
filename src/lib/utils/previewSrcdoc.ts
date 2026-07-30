@@ -35,15 +35,19 @@ const END_SCRIPT_TAG = "</scr" + "ipt>";
  * a capability that stays inside the frame:
  * - `allow-pointer-lock`: mouse-look games can capture the cursor (Esc always
  *   releases, and the browser overlays its own exit hint)
- * - `allow-modals`: alert/confirm/prompt work instead of silently no-oping,
- *   matching how the same page behaves once deployed as a Space
  * - `allow-orientation-lock`: fullscreen games can lock to landscape
  * Deliberately absent besides same-origin: `allow-popups` (link clicks leave
- * through the parent's external-link confirm instead) and `allow-downloads`
- * (generated code must not be able to drop files into the user's Downloads).
+ * through the parent's external-link confirm instead), `allow-downloads`
+ * (generated code must not be able to drop files into the user's Downloads),
+ * and `allow-modals` — previews auto-open with zero clicks (streaming, and
+ * shared conversations on load), and a dialog from a same-process iframe
+ * blocks the parent's event loop, so a `while(true) alert()` artifact would
+ * hold the tab hostage with the panel's own close button dead between
+ * dialogs. Without the token, dialog calls are silent no-ops; the system
+ * prompt steers models to in-page UI instead.
  */
 export const PREVIEW_SANDBOX =
-	"allow-scripts allow-forms allow-pointer-lock allow-modals allow-orientation-lock";
+	"allow-scripts allow-forms allow-pointer-lock allow-orientation-lock";
 
 /**
  * Permission-policy delegations for preview iframes. Features default to a
