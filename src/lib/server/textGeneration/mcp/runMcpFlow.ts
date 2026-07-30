@@ -346,7 +346,8 @@ export async function* runMcpFlow({
 		let messagesOpenAI: ChatCompletionMessageParam[] = await prepareMessagesWithFiles(
 			messages,
 			imageProcessor,
-			mmEnabled
+			mmEnabled,
+			{ replayToolHistory: true }
 		);
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
 		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone);
@@ -678,16 +679,28 @@ export async function* runMcpFlow({
 					function: { name: call.name, arguments: call.arguments },
 				}));
 
-				// Avoid sending <think> content back to the model alongside tool_calls
-				// to prevent confusing follow-up reasoning. Strip any think blocks.
+				// Move <think> content out of `content` and echo it back as
+				// `reasoning_content`: preserved-thinking models (e.g. Kimi K2/K3)
+				// condition their next tool round on prior reasoning and degrade
+				// when it's dropped; other providers ignore the field.
+				const thinkParts: string[] = [];
 				const assistantContentForToolMsg = lastAssistantContent.replace(
-					/<think>[\s\S]*?(?:<\/think>|$)/g,
-					""
+					/<think>([\s\S]*?)(?:<\/think>|$)/g,
+					(_match, inner: string) => {
+						thinkParts.push(inner);
+						return "";
+					}
 				);
-				const assistantToolMessage: ChatCompletionMessageParam = {
+				const reasoningForToolMsg = thinkParts.join("\n").trim();
+				// Omit `content` entirely when nothing visible remains — some
+				// OpenAI-compatible backends 400 on empty text next to tool_calls.
+				const assistantToolMessage: ChatCompletionMessageParam & { reasoning_content?: string } = {
 					role: "assistant",
-					content: assistantContentForToolMsg,
 					tool_calls: toolCalls,
+					...(assistantContentForToolMsg.trim().length > 0
+						? { content: assistantContentForToolMsg }
+						: {}),
+					...(reasoningForToolMsg.length > 0 ? { reasoning_content: reasoningForToolMsg } : {}),
 				};
 
 				const exec = executeToolCalls({
