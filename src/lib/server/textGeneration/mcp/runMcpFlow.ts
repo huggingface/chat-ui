@@ -347,7 +347,14 @@ export async function* runMcpFlow({
 			messages,
 			imageProcessor,
 			mmEnabled,
-			{ replayToolHistory: true }
+			{
+				replayToolHistory: true,
+				// Cross-turn reasoning echo is gated on the capability flag; the
+				// in-loop echo below stays evidence-based (the model just emitted it).
+				attachReasoning: Boolean(
+					(targetModel as unknown as { supportsReasoning?: boolean }).supportsReasoning
+				),
+			}
 		);
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
 		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone);
