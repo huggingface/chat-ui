@@ -13,8 +13,11 @@ export function formatScreenshotNotes(
 ): string | undefined {
 	const cleaned = notes.map((note) => note.trim()).filter(Boolean);
 	if (cleaned.length === 0) return undefined;
+	// "numbered marks" states the number-to-image correspondence in two words:
+	// without it models tend to infer the referent from conversation context
+	// instead of locating the marker on the image
 	return [
-		subject ? `Notes on the ${subject} screenshot:` : "Screenshot notes:",
+		subject ? `${subject} screenshot with numbered marks:` : "Screenshot with numbered marks:",
 		// Continuation lines of a multiline note are indented so the numbering
 		// stays scannable
 		...cleaned.map((note, i) => `${i + 1}. ${note.replace(/\s*\n\s*/g, "\n   ")}`),

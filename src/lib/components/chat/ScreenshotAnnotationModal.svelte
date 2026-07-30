@@ -117,7 +117,9 @@
 	let strokeWidth = $derived(
 		image ? Math.max(3, Math.round(Math.max(image.naturalWidth, image.naturalHeight) / 350)) : 3
 	);
-	let badgeRadius = $derived(Math.max(9, strokeWidth * 2.4));
+	let badgeRadius = $derived(Math.max(11, strokeWidth * 2.8));
+	/** White halo ring width around badges (shared with the edge clamp) */
+	let badgeHalo = $derived(Math.max(2, strokeWidth * 0.6));
 
 	function drawAnnotation(ctx: CanvasRenderingContext2D, annotation: Annotation) {
 		const pts = annotation.points;
@@ -186,12 +188,19 @@
 		comment: { x: number; y: number; w: number; h: number },
 		label: string | null
 	) {
-		const outlineWidth = Math.max(2, strokeWidth * 0.8);
+		const outlineWidth = Math.max(2.5, strokeWidth);
 		if (comment.w > 0 || comment.h > 0) {
+			// Two-pass dash: a wider white casing under the blue keeps the
+			// outline readable on any artifact, including blue and purple ones
+			// (both dashes share the pattern and phase, so the white frames
+			// each blue segment)
+			ctx.lineCap = "butt";
+			ctx.setLineDash([strokeWidth * 2.2, strokeWidth * 1.6]);
+			ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+			ctx.lineWidth = outlineWidth + Math.max(2, strokeWidth * 0.7);
+			ctx.strokeRect(comment.x, comment.y, comment.w, comment.h);
 			ctx.strokeStyle = COMMENT_COLOR;
 			ctx.lineWidth = outlineWidth;
-			ctx.lineCap = "butt";
-			ctx.setLineDash([strokeWidth * 2, strokeWidth * 1.5]);
 			ctx.strokeRect(comment.x, comment.y, comment.w, comment.h);
 			ctx.setLineDash([]);
 		}
@@ -205,7 +214,7 @@
 		ctx.arc(center.x, center.y, badgeRadius, 0, Math.PI * 2);
 		ctx.fillStyle = COMMENT_COLOR;
 		ctx.fill();
-		ctx.lineWidth = Math.max(1.5, strokeWidth * 0.5);
+		ctx.lineWidth = badgeHalo;
 		ctx.strokeStyle = "#ffffff";
 		ctx.beginPath();
 		ctx.arc(center.x, center.y, badgeRadius, 0, Math.PI * 2);
@@ -225,7 +234,7 @@
 	function badgeCenter(comment: { x: number; y: number }): Point {
 		const canvas = canvasEl;
 		if (!canvas) return { x: comment.x, y: comment.y };
-		const margin = badgeRadius + Math.max(1.5, strokeWidth * 0.5) / 2;
+		const margin = badgeRadius + badgeHalo / 2;
 		return {
 			x: Math.min(Math.max(comment.x, margin), Math.max(canvas.width - margin, margin)),
 			y: Math.min(Math.max(comment.y, margin), Math.max(canvas.height - margin, margin)),
