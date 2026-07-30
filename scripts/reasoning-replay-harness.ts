@@ -1,18 +1,22 @@
 /**
- * Compatibility harness for the reasoning/tool-history replay changes.
+ * Compatibility + speed harness for the reasoning/tool-history replay changes.
  *
  * Sends one synthetic tool-using conversation to the first N router models in
- * three shapes and compares acceptance:
- *   S1 baseline  — flat {role, content} history (current prod behavior)
+ * three shapes and compares acceptance and streaming speed:
+ *   S1 baseline  — flat {role, content} history (previous prod behavior)
  *   S2 replay    — output of prepareMessagesWithFiles({replayToolHistory: true})
  *   S3 in-loop   — S2 with reasoning_content on a tool-call assistant message
- *                  and `content` omitted (the shape runMcpFlow now sends
- *                  between tool rounds)
+ *                  and `content` omitted (the shape runMcpFlow sends between
+ *                  tool rounds)
+ *
+ * Requests stream (like prod) and are repeated REPS times sequentially per
+ * model/scenario, models in parallel, measuring time-to-first-token and
+ * generation throughput (approximated from SSE delta chunks).
  *
  * Ship criterion: every model that accepts S1 must also accept S2 and S3.
  *
- * Run it the same way as the other repo scripts (see "populate" in package.json),
- * passing this file's path to vite-node.
+ * Run it the same way as the other repo scripts (see "populate" in
+ * package.json), passing this file's path to vite-node.
  */
 import { readFileSync } from "fs";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
@@ -23,6 +27,7 @@ import { ToolResultStatus } from "$lib/types/Tool";
 import type { OpenAI } from "openai";
 
 const MODEL_COUNT = 10;
+const REPS = 2;
 const REQUEST_TIMEOUT_MS = 90_000;
 const MAX_TOKENS = 120;
 
@@ -132,7 +137,10 @@ const imageProcessor = (() => {
 	throw new Error("unused");
 }) as unknown as ReturnType<typeof makeImageProcessor>;
 
-async function buildScenarios(): Promise<Record<string, ChatMessage[]>> {
+const SCENARIO_NAMES = ["S1-baseline", "S2-replay", "S3-inloop"] as const;
+type ScenarioName = (typeof SCENARIO_NAMES)[number];
+
+async function buildScenarios(): Promise<Record<ScenarioName, ChatMessage[]>> {
 	const baseline: ChatMessage[] = [
 		{ role: "system", content: SYSTEM },
 		...(await prepareMessagesWithFiles(storedHistory, imageProcessor, false)),
@@ -144,7 +152,7 @@ async function buildScenarios(): Promise<Record<string, ChatMessage[]>> {
 		})),
 	];
 	// S3: attach reasoning_content to the first tool-call assistant message,
-	// mirroring what runMcpFlow now sends between rounds of a live turn.
+	// mirroring what runMcpFlow sends between rounds of a live turn.
 	const inloop: ChatMessage[] = replay.map((m) =>
 		m.role === "assistant" && "tool_calls" in m && m.tool_calls?.[0]?.id === "call-1"
 			? { ...m, reasoning_content: "The user wants current weather, calling get_weather first." }
@@ -153,27 +161,31 @@ async function buildScenarios(): Promise<Record<string, ChatMessage[]>> {
 	return { "S1-baseline": baseline, "S2-replay": replay, "S3-inloop": inloop };
 }
 
-type Verdict = {
-	model: string;
-	scenario: string;
+type RunResult = {
 	ok: boolean;
-	ms: number;
+	ttftMs?: number;
+	totalMs: number;
+	genTokens: number;
 	coherent?: boolean;
 	note: string;
 };
 
+/** One streaming request; TTFT = first delta carrying content/reasoning/tool_calls. */
 async function runOne(
 	baseUrl: string,
 	apiKey: string,
 	model: string,
-	scenario: string,
 	messages: ChatMessage[]
-): Promise<Verdict> {
+): Promise<RunResult> {
 	const started = Date.now();
 	try {
 		const res = await fetch(`${baseUrl}/chat/completions`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${apiKey}`,
+				"X-use-cache": "false",
+			},
 			body: JSON.stringify({
 				model,
 				messages,
@@ -181,44 +193,129 @@ async function runOne(
 				tool_choice: "auto",
 				temperature: 0,
 				max_tokens: MAX_TOKENS,
-				stream: false,
+				stream: true,
 			}),
 			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 		});
-		const ms = Date.now() - started;
-		if (!res.ok) {
+		if (!res.ok || !res.body) {
 			const body = (await res.text()).slice(0, 300).replace(/\s+/g, " ");
-			return { model, scenario, ok: false, ms, note: `HTTP ${res.status}: ${body}` };
+			return {
+				ok: false,
+				totalMs: Date.now() - started,
+				genTokens: 0,
+				note: `HTTP ${res.status}: ${body}`,
+			};
 		}
-		const json = (await res.json()) as {
-			choices?: Array<{
-				message?: { content?: string | null; tool_calls?: unknown[] };
-			}>;
-		};
-		const msg = json.choices?.[0]?.message;
-		const content = (msg?.content ?? "").trim();
-		const calledTools = Array.isArray(msg?.tool_calls) && msg.tool_calls.length > 0;
-		if (!content && !calledTools) {
-			return { model, scenario, ok: false, ms, note: "empty response" };
+
+		let ttftMs: number | undefined;
+		let genTokens = 0;
+		let content = "";
+		let sawToolCall = false;
+		const reader = res.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			buffer += decoder.decode(value, { stream: true });
+			const lines = buffer.split("\n");
+			buffer = lines.pop() ?? "";
+			for (const line of lines) {
+				if (!line.startsWith("data:")) continue;
+				const payload = line.slice(5).trim();
+				if (!payload || payload === "[DONE]") continue;
+				let delta: Record<string, unknown> | undefined;
+				try {
+					const parsed = JSON.parse(payload) as {
+						choices?: Array<{ delta?: Record<string, unknown> }>;
+					};
+					delta = parsed.choices?.[0]?.delta;
+				} catch {
+					continue;
+				}
+				if (!delta) continue;
+				const text =
+					(typeof delta.content === "string" ? delta.content : "") +
+					(typeof delta.reasoning === "string" ? delta.reasoning : "") +
+					(typeof delta.reasoning_content === "string" ? delta.reasoning_content : "");
+				const hasToolCall = Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0;
+				if (hasToolCall) sawToolCall = true;
+				if (text.length > 0 || hasToolCall) {
+					ttftMs ??= Date.now() - started;
+					genTokens += 1;
+				}
+				if (typeof delta.content === "string") content += delta.content;
+			}
+		}
+		const totalMs = Date.now() - started;
+		content = content.trim();
+		if (!content && !sawToolCall && genTokens === 0) {
+			return { ok: false, ttftMs, totalMs, genTokens, note: "empty response" };
 		}
 		const coherent = content.length > 0 ? /paris/i.test(content) && /18/.test(content) : undefined;
 		return {
-			model,
-			scenario,
 			ok: true,
-			ms,
+			ttftMs,
+			totalMs,
+			genTokens,
 			coherent,
-			note: calledTools && !content ? "answered with tool_calls" : content.slice(0, 80),
+			note: sawToolCall && !content ? "answered with tool_calls" : content.slice(0, 80),
 		};
 	} catch (err) {
 		return {
-			model,
-			scenario,
 			ok: false,
-			ms: Date.now() - started,
+			totalMs: Date.now() - started,
+			genTokens: 0,
 			note: err instanceof Error ? `${err.name}: ${err.message.slice(0, 200)}` : String(err),
 		};
 	}
+}
+
+const median = (values: number[]): number | undefined => {
+	if (values.length === 0) return undefined;
+	const sorted = [...values].sort((a, b) => a - b);
+	return sorted[Math.floor(sorted.length / 2)];
+};
+
+type ScenarioStats = {
+	scenario: ScenarioName;
+	ok: boolean;
+	coherent?: boolean;
+	ttftMs?: number;
+	tokPerSec?: number;
+	totalMs?: number;
+	note: string;
+};
+
+async function runModel(
+	baseUrl: string,
+	apiKey: string,
+	model: string,
+	scenarios: Record<ScenarioName, ChatMessage[]>
+): Promise<ScenarioStats[]> {
+	const stats: ScenarioStats[] = [];
+	for (const scenario of SCENARIO_NAMES) {
+		const runs: RunResult[] = [];
+		for (let rep = 0; rep < REPS; rep += 1) {
+			runs.push(await runOne(baseUrl, apiKey, model, scenarios[scenario]));
+		}
+		const okRuns = runs.filter((r) => r.ok);
+		const speedRuns = okRuns.filter((r) => r.ttftMs !== undefined && r.genTokens > 1);
+		stats.push({
+			scenario,
+			ok: okRuns.length > 0,
+			coherent: okRuns.find((r) => r.coherent !== undefined)?.coherent,
+			ttftMs: median(speedRuns.map((r) => r.ttftMs ?? 0)),
+			tokPerSec: median(
+				speedRuns.map(
+					(r) => (r.genTokens - 1) / Math.max(0.001, (r.totalMs - (r.ttftMs ?? 0)) / 1000)
+				)
+			),
+			totalMs: median(okRuns.map((r) => r.totalMs)),
+			note: (okRuns[0] ?? runs[0]).note,
+		});
+	}
+	return stats;
 }
 
 async function main() {
@@ -231,50 +328,41 @@ async function main() {
 	if (!modelsRes.ok) throw new Error(`GET /models failed: HTTP ${modelsRes.status}`);
 	const modelsJson = (await modelsRes.json()) as { data?: Array<{ id: string }> };
 	const models = (modelsJson.data ?? []).slice(0, MODEL_COUNT).map((m) => m.id);
-	console.log(`Testing ${models.length} models:\n  ${models.join("\n  ")}\n`);
 
 	const scenarios = await buildScenarios();
-	const jobs: Array<Promise<Verdict>> = [];
-	for (const model of models) {
-		for (const [name, messages] of Object.entries(scenarios)) {
-			jobs.push(runOne(baseUrl, apiKey, model, name, messages));
-		}
+	for (const name of SCENARIO_NAMES) {
+		console.log(`${name}: payload ${JSON.stringify(scenarios[name]).length} chars`);
 	}
-	const verdicts = await Promise.all(jobs);
+	console.log(`Testing ${models.length} models, ${REPS} reps per scenario:\n`);
 
-	const byModel = new Map<string, Verdict[]>();
-	for (const v of verdicts) {
-		byModel.set(v.model, [...(byModel.get(v.model) ?? []), v]);
-	}
+	const results = await Promise.all(
+		models.map(async (model) => ({
+			model,
+			stats: await runModel(baseUrl, apiKey, model, scenarios),
+		}))
+	);
 
 	let regressions = 0;
-	console.log("\n=== RESULTS ===");
-	for (const [model, list] of byModel) {
-		const get = (s: string) => list.find((v) => v.scenario === s);
-		const s1 = get("S1-baseline");
-		const s2 = get("S2-replay");
-		const s3 = get("S3-inloop");
-		const flag = (v?: Verdict) =>
-			v?.ok ? `OK${v.coherent === false ? "(incoherent)" : ""}` : `FAIL`;
-		const regressed = Boolean(s1?.ok && (!s2?.ok || !s3?.ok));
+	const fmt = (n?: number) => (n === undefined ? "   —" : String(Math.round(n)).padStart(4));
+	console.log("\n=== RESULTS (median over reps; ttft ms | ~tok/s | total ms) ===");
+	for (const { model, stats } of results) {
+		const s1 = stats.find((s) => s.scenario === "S1-baseline");
+		const regressed = Boolean(s1?.ok && stats.some((s) => s.scenario !== "S1-baseline" && !s.ok));
 		if (regressed) regressions += 1;
-		console.log(
-			`${regressed ? "❌" : "✅"} ${model}\n` +
-				`    S1-baseline: ${flag(s1)} (${s1?.ms}ms) ${s1?.ok ? "" : s1?.note}\n` +
-				`    S2-replay:   ${flag(s2)} (${s2?.ms}ms) ${s2?.ok ? "" : s2?.note}\n` +
-				`    S3-inloop:   ${flag(s3)} (${s3?.ms}ms) ${s3?.ok ? "" : s3?.note}`
-		);
-		for (const v of [s1, s2, s3]) {
-			if (v?.ok && v.note && !v.note.startsWith("answered")) {
-				console.log(`      ${v.scenario} → ${v.note}`);
-			}
+		console.log(`${regressed ? "❌" : "✅"} ${model}`);
+		for (const s of stats) {
+			const status = s.ok ? `OK${s.coherent === false ? "(incoherent)" : ""}` : "FAIL";
+			console.log(
+				`    ${s.scenario.padEnd(12)} ${status.padEnd(5)} ttft ${fmt(s.ttftMs)} | ${fmt(
+					s.tokPerSec
+				)} tok/s | total ${fmt(s.totalMs)}${s.ok ? "" : `  ${s.note}`}`
+			);
 		}
 	}
 
 	console.log(
 		`\n${regressions === 0 ? "SHIPPABLE" : "NOT SHIPPABLE"}: ${regressions} model(s) regressed vs baseline.`
 	);
-	console.log(JSON.stringify(verdicts, null, 1));
 	process.exit(regressions === 0 ? 0 : 1);
 }
 
