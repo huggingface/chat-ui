@@ -17,7 +17,10 @@ export async function* openAICompletionToTextGenerationStream(
 		if (text) {
 			generatedText = generatedText + text;
 		}
-		const output: TextGenerationStreamOutput = {
+		// `finish_reason: "length"` => hit max_tokens before completing; surface it so the
+		// pipeline flags the answer as interrupted rather than persisting a truncated message.
+		const truncated = last && choices?.[0]?.finish_reason === "length";
+		const output: TextGenerationStreamOutput & { truncated?: boolean } = {
 			token: {
 				id: tokenId++,
 				text,
@@ -26,6 +29,7 @@ export async function* openAICompletionToTextGenerationStream(
 			},
 			generated_text: last ? generatedText : null,
 			details: null,
+			...(truncated ? { truncated: true } : {}),
 		};
 		yield output;
 	}

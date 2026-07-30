@@ -124,7 +124,11 @@ export async function* openAIChatToTextGenerationStream(
 
 		// Accumulate the combined token into the full text
 		generatedText += combined;
-		const output: TextGenerationStreamOutput = {
+		// `finish_reason: "length"` means the model hit its max_tokens budget mid-generation
+		// (e.g. exhausted the budget while still reasoning). Surface it so the pipeline can flag
+		// the answer as interrupted instead of silently persisting a truncated message as complete.
+		const truncated = last && choices?.[0]?.finish_reason === "length";
+		const output: TextGenerationStreamOutput & { truncated?: boolean } = {
 			token: {
 				id: tokenId++,
 				text: combined,
@@ -133,6 +137,7 @@ export async function* openAIChatToTextGenerationStream(
 			},
 			generated_text: last ? generatedText : null,
 			details: null,
+			...(truncated ? { truncated: true } : {}),
 		};
 		yield output;
 
@@ -187,6 +192,8 @@ export async function* openAIChatToTextGenerationSingle(
 		content = `<think>${r}</think>` + content;
 	}
 	const tokenId = 0;
+	// Hit the max_tokens budget before completing (see streaming adapter above).
+	const truncated = completion.choices?.[0]?.finish_reason === "length";
 
 	// Yield the content as a single token
 	yield {
@@ -198,6 +205,7 @@ export async function* openAIChatToTextGenerationSingle(
 		},
 		generated_text: content,
 		details: null,
+		...(truncated ? { truncated: true } : {}),
 		...(getRouterMetadata
 			? (() => {
 					const metadata = getRouterMetadata();
@@ -207,6 +215,7 @@ export async function* openAIChatToTextGenerationSingle(
 				})()
 			: {}),
 	} as TextGenerationStreamOutput & {
+		truncated?: boolean;
 		routerMetadata?: { route?: string; model?: string; provider?: string };
 	};
 }

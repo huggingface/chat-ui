@@ -508,8 +508,12 @@ export async function* runMcpFlow({
 			let firstToolDeltaLogged = false;
 			let sawToolCall = false;
 			let tokenCount = 0;
+			let finishReason: string | null = null;
 			for await (const chunk of completionStream) {
 				const choice = chunk.choices?.[0];
+				// Captured before the delta guard: the terminating chunk often carries the
+				// finish_reason with an empty/absent delta.
+				if (choice?.finish_reason) finishReason = choice.finish_reason;
 				const delta = choice?.delta;
 				if (!delta) continue;
 
@@ -744,13 +748,22 @@ export async function* runMcpFlow({
 			if (!streamedContent && lastAssistantContent.trim().length > 0) {
 				yield { type: MessageUpdateType.Stream, token: lastAssistantContent };
 			}
+			// `finish_reason: "length"` means the model hit its max_tokens budget before
+			// completing; flag it as interrupted instead of saving a truncated answer as complete.
+			const truncated = finishReason === "length";
+			if (truncated) {
+				logger.warn(
+					{ conversationId: conv._id.toString(), length: lastAssistantContent.length, loop },
+					"[mcp] generation truncated: model hit max_tokens (finish_reason=length) before completing"
+				);
+			}
 			yield {
 				type: MessageUpdateType.FinalAnswer,
 				text: lastAssistantContent,
-				interrupted: false,
+				interrupted: truncated,
 			};
 			logger.info(
-				{ length: lastAssistantContent.length, loop },
+				{ length: lastAssistantContent.length, loop, truncated },
 				"[mcp] final answer emitted (no tool_calls)"
 			);
 			return "completed";
