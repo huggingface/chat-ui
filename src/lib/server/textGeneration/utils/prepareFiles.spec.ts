@@ -82,30 +82,34 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 				role: "assistant",
 				tool_calls: [
 					{
-						id: "u1",
+						id: "u10000000",
 						type: "function",
 						function: { name: "get_weather", arguments: JSON.stringify({ city: "Paris" }) },
 					},
 				],
 			},
-			{ role: "tool", tool_call_id: "u1", content: "18°C, sunny" },
+			{ role: "tool", tool_call_id: "u10000000", content: "18°C, sunny" },
 			{
 				role: "assistant",
 				tool_calls: [
 					{
-						id: "u2",
+						id: "u20000000",
 						type: "function",
 						function: { name: "get_forecast", arguments: JSON.stringify({ city: "Paris" }) },
 					},
 				],
 			},
-			{ role: "tool", tool_call_id: "u2", content: "sunny all week" },
+			{ role: "tool", tool_call_id: "u20000000", content: "sunny all week" },
 			{
 				role: "assistant",
 				content: "It is 18°C and sunny in Paris.",
 				reasoning_content: "need the tool",
 			},
 		]);
+		// Mistral-family templates require exactly nine alphanumeric chars
+		for (const m of prepared) {
+			if (m.role === "tool") expect(m.tool_call_id).toMatch(/^[a-zA-Z0-9]{9}$/);
+		}
 		// tool-call messages must not carry a content key at all
 		const withToolCalls = prepared.filter((m) => "tool_calls" in m);
 		for (const message of withToolCalls) {
@@ -133,14 +137,64 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 			{
 				role: "assistant",
 				tool_calls: [
-					{ id: "a", type: "function", function: { name: "search", arguments: '{"q":"x"}' } },
-					{ id: "b", type: "function", function: { name: "search", arguments: '{"q":"y"}' } },
+					{
+						id: "a00000000",
+						type: "function",
+						function: { name: "search", arguments: '{"q":"x"}' },
+					},
+					{
+						id: "b00000000",
+						type: "function",
+						function: { name: "search", arguments: '{"q":"y"}' },
+					},
 				],
 			},
-			{ role: "tool", tool_call_id: "a", content: "res-a" },
-			{ role: "tool", tool_call_id: "b", content: "Error: timeout" },
+			{ role: "tool", tool_call_id: "a00000000", content: "res-a" },
+			{ role: "tool", tool_call_id: "b00000000", content: "Error: timeout" },
 			{ role: "assistant", content: "done" },
 		]);
+	});
+
+	it("marks calls without a persisted outcome as interrupted instead of empty success", async () => {
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "",
+				updates: [callUpdate("u1", "get_weather", { city: "Paris" })],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		expect(prepared[1]).toEqual({
+			role: "tool",
+			tool_call_id: "u10000000",
+			content: "Error: interrupted before a result was recorded",
+		});
+	});
+
+	it("degrades the oldest turns to flat messages once the replay budget is spent", async () => {
+		// Each turn carries ~7×8k of tool output, so two turns exceed the 100k
+		// budget: the newest keeps its tool history, the oldest goes flat.
+		const bigTurn = (prefix: string): EndpointMessage => ({
+			from: "assistant",
+			content: `${prefix} done`,
+			updates: Array.from({ length: 7 }, (_, i) => [
+				callUpdate(`${prefix}${i}`, "search", { q: String(i) }),
+				resultUpdate(`${prefix}${i}`, "search", "x".repeat(8000)),
+			]).flat(),
+		});
+		const messages: EndpointMessage[] = [
+			bigTurn("old"),
+			{ from: "user", content: "next" },
+			bigTurn("new"),
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		expect(prepared[0]).toEqual({ role: "assistant", content: "old done" });
+		expect(prepared[1]).toEqual({ role: "user", content: "next" });
+		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(7);
 	});
 
 	it("attaches persisted message.reasoning alongside extracted think blocks", async () => {

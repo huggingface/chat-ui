@@ -25,6 +25,31 @@ type AssistantReplayMessage = ChatMessageParam & { reasoning_content?: string };
 /** Cap replayed tool outputs so old turns can't flood the context window. */
 const MAX_REPLAYED_TOOL_OUTPUT_CHARS = 8000;
 
+/**
+ * Cumulative cap on the expanded replay payload across the whole history.
+ * Turns are budgeted newest-first; older turns that don't fit fall back to
+ * the flat {role, content} shape the request used before replay existed, so a
+ * long tool-heavy conversation can't outgrow a context window it used to fit.
+ */
+const REPLAY_HISTORY_BUDGET_CHARS = 100_000;
+
+/**
+ * Normalize a persisted update uuid into a provider-safe tool_call_id.
+ * Mistral-family chat templates require exactly nine alphanumeric characters,
+ * a shape every other provider also accepts; the persisted uuid is only a
+ * correlation key, so the id just has to pair calls with results consistently.
+ */
+function toToolCallId(uuid: string, used: Set<string>): string {
+	const alnum = uuid.replace(/[^a-zA-Z0-9]/g, "") || "toolcall0";
+	let candidate = (alnum + "0".repeat(9)).slice(0, 9);
+	for (let salt = 1; used.has(candidate); salt += 1) {
+		const suffix = String(salt);
+		candidate = (alnum + "0".repeat(9)).slice(0, 9 - suffix.length) + suffix;
+	}
+	used.add(candidate);
+	return candidate;
+}
+
 const isToolCallUpdate = (u: MessageUpdate): u is MessageToolCallUpdate =>
 	u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Call;
 const isToolResultUpdate = (u: MessageUpdate): u is MessageToolResultUpdate =>
@@ -57,9 +82,9 @@ function splitReasoning(
  * requests see the tool calls and their outputs instead of a flat text
  * summary. Rounds are inferred from update order — a Call update arriving
  * after any Result/Error starts a new round, matching how the live loop emits
- * one batch of calls per completion round. The update `uuid` doubles as the
- * OpenAI `tool_call_id` (the original model-issued id is not persisted; the id
- * only needs to pair calls with results consistently).
+ * one batch of calls per completion round. Each call's `tool_call_id` is
+ * derived from the persisted update uuid via toToolCallId (the original
+ * model-issued id is not persisted).
  */
 function replayAssistantTurn(message: EndpointMessage): AssistantReplayMessage[] {
 	const updates = message.updates ?? [];
@@ -109,24 +134,34 @@ function replayAssistantTurn(message: EndpointMessage): AssistantReplayMessage[]
 		rounds.push(round);
 	}
 
+	const usedIds = new Set<string>();
+	const idByUuid = new Map(callUpdates.map((u) => [u.uuid, toToolCallId(u.uuid, usedIds)]));
+
 	const replayed: AssistantReplayMessage[] = [];
 	for (const callsInRound of rounds) {
 		// No `content` key on tool-call messages: some OpenAI-compatible
 		// backends reject empty text next to tool_calls with a 400, and the
 		// per-round visible text is not persisted anyway.
+		// Arguments are best-effort: updates persist only top-level primitive
+		// params (nested values and file payloads are deliberately kept out of
+		// storage), so the replay may be a subset of what the tool ran with.
 		replayed.push({
 			role: "assistant",
 			tool_calls: callsInRound.map((u) => ({
-				id: u.uuid,
+				id: idByUuid.get(u.uuid) ?? u.uuid,
 				type: "function" as const,
 				function: { name: u.call.name, arguments: JSON.stringify(u.call.parameters ?? {}) },
 			})),
 		});
 		for (const u of callsInRound) {
-			const output = outputsByUuid.get(u.uuid) ?? "";
+			// A call with no persisted outcome means the run was aborted
+			// mid-execution; say so instead of fabricating an empty success.
+			const output = outputsByUuid.has(u.uuid)
+				? (outputsByUuid.get(u.uuid) ?? "")
+				: "Error: interrupted before a result was recorded";
 			replayed.push({
 				role: "tool",
-				tool_call_id: u.uuid,
+				tool_call_id: idByUuid.get(u.uuid) ?? u.uuid,
 				content:
 					output.length > MAX_REPLAYED_TOOL_OUTPUT_CHARS
 						? output.slice(0, MAX_REPLAYED_TOOL_OUTPUT_CHARS) + "\n[...truncated]"
@@ -153,8 +188,9 @@ export async function prepareMessagesWithFiles(
 	isMultimodal: boolean,
 	options?: { replayToolHistory?: boolean }
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
+	type ReplayCandidate = { replay: AssistantReplayMessage[]; flat: ChatMessageParam };
 	const prepared = await Promise.all(
-		messages.map(async (message): Promise<ChatMessageParam[]> => {
+		messages.map(async (message): Promise<ChatMessageParam[] | ReplayCandidate> => {
 			if (message.from === "user" && message.files && message.files.length > 0) {
 				const { imageParts, textContent } = await prepareFiles(
 					imageProcessor,
@@ -175,12 +211,34 @@ export async function prepareMessagesWithFiles(
 				return [{ role: message.from, content: messageText }];
 			}
 			if (options?.replayToolHistory && message.from === "assistant") {
-				return replayAssistantTurn(message);
+				return {
+					replay: replayAssistantTurn(message),
+					flat: { role: "assistant", content: message.content },
+				};
 			}
 			return [{ role: message.from, content: message.content }];
 		})
 	);
-	return prepared.flat();
+
+	// Spend the replay budget newest-first so recent turns keep their full
+	// tool history and older ones degrade to the pre-replay flat shape.
+	let budget = REPLAY_HISTORY_BUDGET_CHARS;
+	const resolved: ChatMessageParam[][] = new Array(prepared.length);
+	for (let i = prepared.length - 1; i >= 0; i -= 1) {
+		const entry = prepared[i];
+		if (Array.isArray(entry)) {
+			resolved[i] = entry;
+			continue;
+		}
+		const cost = JSON.stringify(entry.replay).length;
+		if (cost <= budget) {
+			budget -= cost;
+			resolved[i] = entry.replay;
+		} else {
+			resolved[i] = [entry.flat];
+		}
+	}
+	return resolved.flat();
 }
 
 async function prepareFiles(
