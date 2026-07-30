@@ -69,6 +69,13 @@
 	let draftRegion = $state<{ ox: number; oy: number; px: number; py: number } | null>(null);
 	/** Bumped to re-trigger the focus effect when editingIndex itself doesn't change */
 	let focusNonce = $state(0);
+	/**
+	 * True while a note's IME composition is active. Modal calls `onclose`
+	 * without the event, so Escape can't be inspected for `isComposing` there;
+	 * tracked here instead (same approach as ChatInput) so an Escape meant to
+	 * cancel a composition doesn't dismiss the editor and drop the candidate.
+	 */
+	let composingNote = $state(false);
 	let nextCommentId = 0;
 
 	let canvasEl: HTMLCanvasElement | undefined = $state();
@@ -393,6 +400,8 @@
 
 	/** Close the note editor; a comment left with an empty note is discarded */
 	function commitEditing() {
+		// The composing textarea is going away, so compositionend may never fire
+		composingNote = false;
 		if (editingIndex === null) return;
 		const index = editingIndex;
 		editingIndex = null;
@@ -456,6 +465,8 @@
 	// whole session right after the first one dismissed the editor.
 	let closeRequestLatched = false;
 	function requestClose() {
+		// Escape that is cancelling an IME composition belongs to the IME
+		if (composingNote) return;
 		if (closeRequestLatched) return;
 		closeRequestLatched = true;
 		queueMicrotask(() => (closeRequestLatched = false));
@@ -723,6 +734,8 @@
 							placeholder="What about this area?"
 							bind:value={comments[editingIndex].note}
 							onkeydown={onNoteKeydown}
+							oncompositionstart={() => (composingNote = true)}
+							oncompositionend={() => (composingNote = false)}
 							onblur={(e) => onNoteBlur(e, ownIndex)}
 							use:autogrow
 						></textarea>
@@ -757,6 +770,8 @@
 							placeholder="What about this area?"
 							bind:value={comment.note}
 							onkeydown={onNoteKeydown}
+							oncompositionstart={() => (composingNote = true)}
+							oncompositionend={() => (composingNote = false)}
 							onblur={() => onRowBlur(i)}
 							use:autofocus={editingIndex === i ? editingIndex : null}
 							use:autogrow
