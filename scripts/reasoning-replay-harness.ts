@@ -137,28 +137,69 @@ const imageProcessor = (() => {
 	throw new Error("unused");
 }) as unknown as ReturnType<typeof makeImageProcessor>;
 
-const SCENARIO_NAMES = ["S1-baseline", "S2-replay", "S3-inloop"] as const;
-type ScenarioName = (typeof SCENARIO_NAMES)[number];
+/** Tool-less two-turn conversation for the plain-flow scenarios. */
+const storedPlainHistory: EndpointMessage[] = [
+	{ from: "user", content: "If a train travels 120 km in 1.5 hours, what is its average speed?" },
+	{
+		from: "assistant",
+		content: "<think>120 divided by 1.5 is 80, so 80 km/h.</think>The average speed is 80 km/h.",
+	},
+	{
+		from: "user",
+		content: "In one short sentence: what speed did you compute in your previous answer?",
+	},
+];
 
-async function buildScenarios(): Promise<Record<ScenarioName, ChatMessage[]>> {
-	const baseline: ChatMessage[] = [
+type Scenario = {
+	name: string;
+	messages: ChatMessage[];
+	withTools: boolean;
+	expect: RegExp[];
+};
+
+/** Baseline scenario name → scenarios that must not regress against it. */
+const FAMILIES: Record<string, string[]> = {
+	"S1-baseline": ["S2-replay", "S3-inloop"],
+	"P1-plain": ["P2-reasoning"],
+};
+
+async function buildScenarios(): Promise<Scenario[]> {
+	const toolExpect = [/paris/i, /18/];
+	const plainExpect = [/80/];
+	const withSystem = (msgs: ChatMessage[]): ChatMessage[] => [
 		{ role: "system", content: SYSTEM },
-		...(await prepareMessagesWithFiles(storedHistory, imageProcessor, false)),
+		...msgs,
 	];
-	const replay: ChatMessage[] = [
-		{ role: "system", content: SYSTEM },
-		...(await prepareMessagesWithFiles(storedHistory, imageProcessor, false, {
+
+	const baseline = withSystem(await prepareMessagesWithFiles(storedHistory, imageProcessor, false));
+	const replay = withSystem(
+		await prepareMessagesWithFiles(storedHistory, imageProcessor, false, {
 			replayToolHistory: true,
-		})),
-	];
+		})
+	);
 	// S3: attach reasoning_content to the first tool-call assistant message,
 	// mirroring what runMcpFlow sends between rounds of a live turn.
 	const inloop: ChatMessage[] = replay.map((m) =>
-		m.role === "assistant" && "tool_calls" in m && m.tool_calls?.[0]?.id === "call-1"
+		m.role === "assistant" && "tool_calls" in m && m.tool_calls?.[0]?.id === "call10000"
 			? { ...m, reasoning_content: "The user wants current weather, calling get_weather first." }
 			: m
 	);
-	return { "S1-baseline": baseline, "S2-replay": replay, "S3-inloop": inloop };
+	const plain = withSystem(
+		await prepareMessagesWithFiles(storedPlainHistory, imageProcessor, false)
+	);
+	const plainReasoning = withSystem(
+		await prepareMessagesWithFiles(storedPlainHistory, imageProcessor, false, {
+			attachReasoning: true,
+		})
+	);
+
+	return [
+		{ name: "S1-baseline", messages: baseline, withTools: true, expect: toolExpect },
+		{ name: "S2-replay", messages: replay, withTools: true, expect: toolExpect },
+		{ name: "S3-inloop", messages: inloop, withTools: true, expect: toolExpect },
+		{ name: "P1-plain", messages: plain, withTools: false, expect: plainExpect },
+		{ name: "P2-reasoning", messages: plainReasoning, withTools: false, expect: plainExpect },
+	];
 }
 
 type RunResult = {
@@ -175,7 +216,7 @@ async function runOne(
 	baseUrl: string,
 	apiKey: string,
 	model: string,
-	messages: ChatMessage[]
+	scenario: Scenario
 ): Promise<RunResult> {
 	const started = Date.now();
 	try {
@@ -188,9 +229,8 @@ async function runOne(
 			},
 			body: JSON.stringify({
 				model,
-				messages,
-				tools: TOOLS,
-				tool_choice: "auto",
+				messages: scenario.messages,
+				...(scenario.withTools ? { tools: TOOLS, tool_choice: "auto" } : {}),
 				temperature: 0,
 				max_tokens: MAX_TOKENS,
 				stream: true,
@@ -252,7 +292,8 @@ async function runOne(
 		if (!content && !sawToolCall && genTokens === 0) {
 			return { ok: false, ttftMs, totalMs, genTokens, note: "empty response" };
 		}
-		const coherent = content.length > 0 ? /paris/i.test(content) && /18/.test(content) : undefined;
+		const coherent =
+			content.length > 0 ? scenario.expect.every((re) => re.test(content)) : undefined;
 		return {
 			ok: true,
 			ttftMs,
@@ -278,7 +319,7 @@ const median = (values: number[]): number | undefined => {
 };
 
 type ScenarioStats = {
-	scenario: ScenarioName;
+	scenario: string;
 	ok: boolean;
 	coherent?: boolean;
 	ttftMs?: number;
@@ -291,18 +332,18 @@ async function runModel(
 	baseUrl: string,
 	apiKey: string,
 	model: string,
-	scenarios: Record<ScenarioName, ChatMessage[]>
+	scenarios: Scenario[]
 ): Promise<ScenarioStats[]> {
 	const stats: ScenarioStats[] = [];
-	for (const scenario of SCENARIO_NAMES) {
+	for (const scenario of scenarios) {
 		const runs: RunResult[] = [];
 		for (let rep = 0; rep < REPS; rep += 1) {
-			runs.push(await runOne(baseUrl, apiKey, model, scenarios[scenario]));
+			runs.push(await runOne(baseUrl, apiKey, model, scenario));
 		}
 		const okRuns = runs.filter((r) => r.ok);
 		const speedRuns = okRuns.filter((r) => r.ttftMs !== undefined && r.genTokens > 1);
 		stats.push({
-			scenario,
+			scenario: scenario.name,
 			ok: okRuns.length > 0,
 			coherent: okRuns.find((r) => r.coherent !== undefined)?.coherent,
 			ttftMs: median(speedRuns.map((r) => r.ttftMs ?? 0)),
@@ -330,8 +371,8 @@ async function main() {
 	const models = (modelsJson.data ?? []).slice(0, MODEL_COUNT).map((m) => m.id);
 
 	const scenarios = await buildScenarios();
-	for (const name of SCENARIO_NAMES) {
-		console.log(`${name}: payload ${JSON.stringify(scenarios[name]).length} chars`);
+	for (const scenario of scenarios) {
+		console.log(`${scenario.name}: payload ${JSON.stringify(scenario.messages).length} chars`);
 	}
 	console.log(`Testing ${models.length} models, ${REPS} reps per scenario:\n`);
 
@@ -346,8 +387,12 @@ async function main() {
 	const fmt = (n?: number) => (n === undefined ? "   —" : String(Math.round(n)).padStart(4));
 	console.log("\n=== RESULTS (median over reps; ttft ms | ~tok/s | total ms) ===");
 	for (const { model, stats } of results) {
-		const s1 = stats.find((s) => s.scenario === "S1-baseline");
-		const regressed = Boolean(s1?.ok && stats.some((s) => s.scenario !== "S1-baseline" && !s.ok));
+		const regressed = Object.entries(FAMILIES).some(([base, dependents]) => {
+			const baseStat = stats.find((s) => s.scenario === base);
+			return Boolean(
+				baseStat?.ok && dependents.some((name) => !stats.find((s) => s.scenario === name)?.ok)
+			);
+		});
 		if (regressed) regressions += 1;
 		console.log(`${regressed ? "❌" : "✅"} ${model}`);
 		for (const s of stats) {

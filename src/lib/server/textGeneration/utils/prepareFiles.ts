@@ -86,13 +86,16 @@ function splitReasoning(
  * derived from the persisted update uuid via toToolCallId (the original
  * model-issued id is not persisted).
  */
-function replayAssistantTurn(message: EndpointMessage): AssistantReplayMessage[] {
+function replayAssistantTurn(
+	message: EndpointMessage,
+	includeReasoning: boolean
+): AssistantReplayMessage[] {
 	const updates = message.updates ?? [];
 	const { visible, reasoning } = splitReasoning(message.content, message.reasoning);
 	const finalMessage: AssistantReplayMessage = {
 		role: "assistant",
 		content: visible,
-		...(reasoning.length > 0 ? { reasoning_content: reasoning } : {}),
+		...(includeReasoning && reasoning.length > 0 ? { reasoning_content: reasoning } : {}),
 	};
 
 	const callUpdates = updates.filter(isToolCallUpdate);
@@ -181,12 +184,17 @@ function replayAssistantTurn(message: EndpointMessage): AssistantReplayMessage[]
  * - With `replayToolHistory`, expands past assistant turns into their
  *   assistant/tool message pairs (from persisted updates) and re-attaches
  *   reasoning as `reasoning_content` instead of inline `<think>` text.
+ * - With `attachReasoning`, only the reasoning half: assistant turns stay
+ *   flat but carry `reasoning_content`, for tool-less requests where replayed
+ *   tool messages would be undefined behavior (no `tools` in the request).
+ *   Callers gate it on the model's reasoning capability; with
+ *   `replayToolHistory` it defaults to on unless explicitly disabled.
  */
 export async function prepareMessagesWithFiles(
 	messages: EndpointMessage[],
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
 	isMultimodal: boolean,
-	options?: { replayToolHistory?: boolean }
+	options?: { replayToolHistory?: boolean; attachReasoning?: boolean }
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
 	type ReplayCandidate = { replay: AssistantReplayMessage[]; flat: ChatMessageParam };
 	const prepared = await Promise.all(
@@ -210,11 +218,26 @@ export async function prepareMessagesWithFiles(
 
 				return [{ role: message.from, content: messageText }];
 			}
-			if (options?.replayToolHistory && message.from === "assistant") {
-				return {
-					replay: replayAssistantTurn(message),
-					flat: { role: "assistant", content: message.content },
-				};
+			if (message.from === "assistant") {
+				const flat: ChatMessageParam = { role: "assistant", content: message.content };
+				if (options?.replayToolHistory) {
+					return {
+						replay: replayAssistantTurn(message, options?.attachReasoning ?? true),
+						flat,
+					};
+				}
+				if (options?.attachReasoning) {
+					const { visible, reasoning } = splitReasoning(message.content, message.reasoning);
+					if (reasoning.length === 0) {
+						return [flat];
+					}
+					// Candidate, not a plain array, so the reasoning payload goes
+					// through the same newest-first budget as tool replay.
+					return {
+						replay: [{ role: "assistant", content: visible, reasoning_content: reasoning }],
+						flat,
+					};
+				}
 			}
 			return [{ role: message.from, content: message.content }];
 		})

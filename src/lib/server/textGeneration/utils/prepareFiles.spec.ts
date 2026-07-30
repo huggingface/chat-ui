@@ -197,6 +197,74 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(7);
 	});
 
+	it("attachReasoning splits reasoning out but never emits tool messages", async () => {
+		const messages: EndpointMessage[] = [
+			{ from: "user", content: "hi" },
+			{
+				from: "assistant",
+				content: "<think>inline part</think>final answer",
+				reasoning: "stored part",
+				updates: [
+					callUpdate("u1", "get_weather", { city: "Paris" }),
+					resultUpdate("u1", "get_weather", "18°C"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			attachReasoning: true,
+		});
+		expect(prepared).toEqual([
+			{ role: "user", content: "hi" },
+			{
+				role: "assistant",
+				content: "final answer",
+				reasoning_content: "stored part\ninline part",
+			},
+		]);
+	});
+
+	it("attachReasoning leaves assistant turns without reasoning untouched", async () => {
+		const messages: EndpointMessage[] = [{ from: "assistant", content: "plain answer" }];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			attachReasoning: true,
+		});
+		expect(prepared).toEqual([{ role: "assistant", content: "plain answer" }]);
+		expect("reasoning_content" in prepared[0]).toBe(false);
+	});
+
+	it("attachReasoning spends the same replay budget, oldest turns first", async () => {
+		// Two turns of ~60k reasoning exceed the 100k budget: the newest keeps
+		// reasoning_content, the oldest falls back to the untouched flat shape.
+		const bigReasoningTurn = (n: number): EndpointMessage => ({
+			from: "assistant",
+			content: `<think>${"x".repeat(60_000)}</think>answer ${n}`,
+		});
+		const messages: EndpointMessage[] = [bigReasoningTurn(1), bigReasoningTurn(2)];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			attachReasoning: true,
+		});
+		expect("reasoning_content" in prepared[0]).toBe(false);
+		expect(prepared[0].content).toContain("<think>");
+		expect(prepared[1]).toMatchObject({ role: "assistant", content: "answer 2" });
+		expect("reasoning_content" in prepared[1]).toBe(true);
+	});
+
+	it("replayToolHistory with attachReasoning disabled keeps tool pairs but drops reasoning", async () => {
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "<think>secret chain</think>done",
+				updates: [callUpdate("u1", "search", { q: "x" }), resultUpdate("u1", "search", "res")],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+			attachReasoning: false,
+		});
+		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(1);
+		expect(prepared.at(-1)).toEqual({ role: "assistant", content: "done" });
+	});
+
 	it("attaches persisted message.reasoning alongside extracted think blocks", async () => {
 		const messages: EndpointMessage[] = [
 			{
