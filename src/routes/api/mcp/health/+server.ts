@@ -137,7 +137,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						}
 					: init
 			);
-			if (oauthConnectionId) {
+			// Only on error responses: cloning a 2xx (SSE) body deadlocks the stream the MCP SDK reads.
+			if (oauthConnectionId && !response.ok) {
 				const challenged = await captureInsufficientScopeResponse(
 					locals,
 					oauthConnectionId,

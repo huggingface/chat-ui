@@ -16,7 +16,8 @@ export function mcpFetchForServer(server: McpServerConfig): typeof fetch {
 					}
 				: init
 		);
-		if (server.oauthChallengeHandler) {
+		// Only on error responses: cloning a 2xx (SSE) body deadlocks the stream the MCP SDK reads.
+		if (server.oauthChallengeHandler && !response.ok) {
 			try {
 				await server.oauthChallengeHandler(response.clone());
 			} catch (error) {
