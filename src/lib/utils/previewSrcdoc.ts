@@ -32,15 +32,88 @@ export interface PreviewError {
 	stack?: string;
 }
 
+/** A distinct captured error signature plus how many times it was emitted. */
+export interface CapturedPreviewError extends PreviewError {
+	count: number;
+}
+
+/**
+ * Cap on distinct stored signatures. Repeats of a known signature only bump
+ * its count, so a handler that throws every frame can never crowd out a later
+ * unrelated failure; this only bounds pathological pages whose every error is
+ * unique (e.g. a timestamp baked into the message).
+ */
+export const MAX_DISTINCT_CAPTURED_ERRORS = 20;
+/**
+ * Count saturation per signature. Once reached, further repeats return the
+ * input array unchanged, so the state assignment in the collectors becomes a
+ * reactive no-op and an error throwing every frame stops churning the UI.
+ */
+export const MAX_COUNTED_REPEATS = 999;
+/** Per-field cap at capture, well above what a fix request ever renders. */
+const MAX_CAPTURED_FIELD_CHARS = 4000;
+
+const MAX_LISTED_ERRORS = 5;
+const MAX_STACK_LINES = 5;
+const MAX_ERROR_CHARS = 700;
+
+/**
+ * Normalize an untrusted error payload from the preview channel. The iframe
+ * forwards whatever the page threw or rejected with, so `stack` can be any
+ * shape; anything but a string is dropped rather than rendered.
+ */
+export function normalizePreviewError(detail: unknown): PreviewError {
+	const raw = (detail ?? {}) as { message?: unknown; stack?: unknown };
+	return {
+		message: String(raw.message ?? "Error").slice(0, MAX_CAPTURED_FIELD_CHARS),
+		stack: typeof raw.stack === "string" ? raw.stack.slice(0, MAX_CAPTURED_FIELD_CHARS) : undefined,
+	};
+}
+
+/**
+ * Fold an incoming error into the captured list: a repeat of a known
+ * signature increments that entry's count (until saturation), a new signature
+ * appends until the distinct cap. Returns the input array untouched when
+ * nothing changed, and a new array otherwise, so Svelte state consumers can
+ * assign the result directly and only pay for real changes.
+ */
+export function capturePreviewError(
+	captured: CapturedPreviewError[],
+	incoming: PreviewError
+): CapturedPreviewError[] {
+	const index = captured.findIndex(
+		(e) => e.message === incoming.message && e.stack === incoming.stack
+	);
+	if (index !== -1) {
+		if (captured[index].count >= MAX_COUNTED_REPEATS) return captured;
+		return captured.map((e, i) => (i === index ? { ...e, count: e.count + 1 } : e));
+	}
+	if (captured.length >= MAX_DISTINCT_CAPTURED_ERRORS) return captured;
+	return [...captured, { ...incoming, count: 1 }];
+}
+
+function renderError(error: CapturedPreviewError): string {
+	const shownCount = error.count >= MAX_COUNTED_REPEATS ? `${MAX_COUNTED_REPEATS}+` : error.count;
+	const times = error.count > 1 ? ` (repeated ${shownCount} times)` : "";
+	// Keep only the top of the stack: for single-file artifacts the first
+	// frames carry the useful location, and deep stacks would drown the list
+	const stack = error.stack?.split("\n").slice(0, MAX_STACK_LINES).join("\n") ?? "";
+	const rendered = `${error.message}${times}${stack ? `\n${stack}` : ""}`;
+	return rendered.length > MAX_ERROR_CHARS ? `${rendered.slice(0, MAX_ERROR_CHARS)}…` : rendered;
+}
+
 /** The chat message sent when the user asks the model to fix captured preview errors. */
-export function composeFixRequest(errors: PreviewError[]): string {
-	const first = errors[0];
-	const summary = first
-		? `${first.message}${first.stack ? `\n${first.stack}` : ""}`
-		: "Unknown error";
-	return errors.length > 1
-		? `it's not working: ${summary} (+${errors.length - 1} more) - can you fix it?`
-		: `it's not working: ${summary} - can you fix it?`;
+export function composeFixRequest(errors: CapturedPreviewError[]): string {
+	if (errors.length <= 1) {
+		const summary = errors.length ? renderError(errors[0]) : "Unknown error";
+		return `it's not working: ${summary} - can you fix it?`;
+	}
+
+	const shown = errors.slice(0, MAX_LISTED_ERRORS);
+	const omitted = errors.length - shown.length;
+	const list = shown.map((entry, i) => `${i + 1}. ${renderError(entry)}`).join("\n");
+	const tail = omitted > 0 ? `\n(+${omitted} more distinct error${omitted > 1 ? "s" : ""})` : "";
+	return `it's not working, I see ${errors.length} errors:\n${list}${tail}\ncan you fix them?`;
 }
 
 function buildPreviewHookScript(channel: string): string {
