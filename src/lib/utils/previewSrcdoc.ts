@@ -26,6 +26,48 @@ import { appendHuggingChatBadge } from "./deployBadge";
 
 const END_SCRIPT_TAG = "</scr" + "ipt>";
 
+/**
+ * Sandbox tokens for preview iframes (artifact panel + fullscreen modal).
+ *
+ * `allow-same-origin` is deliberately ABSENT and must stay absent: it is the
+ * security boundary. Without it the document runs in an opaque origin with no
+ * access to the app's cookies, storage, or DOM. Every token here only grants
+ * a capability that stays inside the frame:
+ * - `allow-pointer-lock`: mouse-look games can capture the cursor (Esc always
+ *   releases, and the browser overlays its own exit hint)
+ * - `allow-orientation-lock`: fullscreen games can lock to landscape
+ * Deliberately absent besides same-origin: `allow-popups` (link clicks leave
+ * through the parent's external-link confirm instead), `allow-downloads`
+ * (generated code must not be able to drop files into the user's Downloads),
+ * and `allow-modals` — previews auto-open with zero clicks (streaming, and
+ * shared conversations on load), and a dialog from a same-process iframe
+ * blocks the parent's event loop, so a `while(true) alert()` artifact would
+ * hold the tab hostage with the panel's own close button dead between
+ * dialogs. Without the token, dialog calls are silent no-ops; the system
+ * prompt steers models to in-page UI instead.
+ */
+export const PREVIEW_SANDBOX =
+	"allow-scripts allow-forms allow-pointer-lock allow-orientation-lock";
+
+/**
+ * Permission-policy delegations for preview iframes. Features default to a
+ * `'self'` allowlist, which a sandboxed srcdoc frame (opaque origin) never
+ * matches, so anything artifacts should be able to use must be delegated
+ * here; the explicit `*` allowlists are what reliably match an opaque origin
+ * across engines (and let an artifact pass e.g. fullscreen on to a media
+ * embed it contains). Everything granted is device-UX or write-only:
+ * fullscreen, motion sensors for tilt controls (also required for
+ * devicemotion/deviceorientation events), gamepad, media autoplay, and
+ * clipboard-write. Privacy-sensitive inputs — camera, microphone,
+ * geolocation, clipboard-read, display-capture — are deliberately NOT
+ * delegated, and reads of user data stay impossible. `screen-wake-lock` is
+ * also withheld: it needs no user gesture, previews can open with zero
+ * clicks, and a silent lock would keep a walked-away-from display awake for
+ * no preview-side benefit (active use keeps the screen on by itself).
+ */
+export const PREVIEW_ALLOW =
+	"fullscreen *; pointer-lock *; accelerometer *; gyroscope *; magnetometer *; gamepad *; autoplay *; clipboard-write *";
+
 /** An uncaught error forwarded from a preview iframe via the postMessage hook. */
 export interface PreviewError {
 	message: string;
