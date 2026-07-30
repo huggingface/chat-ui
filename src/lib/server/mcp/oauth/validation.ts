@@ -53,8 +53,19 @@ export function parseAuthorizationServerMetadata(input: unknown): AuthorizationS
 	return metadata;
 }
 
+// Some servers send null for optional client fields (logo_uri, tos_uri); the SDK schema rejects
+// null, so drop null-valued keys rather than failing the whole registration.
+function dropNullValues(input: unknown): unknown {
+	if (input === null || typeof input !== "object" || Array.isArray(input)) {
+		return input;
+	}
+	return Object.fromEntries(
+		Object.entries(input as Record<string, unknown>).filter(([, value]) => value !== null)
+	);
+}
+
 export function parseClientInformation(input: unknown): OAuthClientInformationFull {
-	const client = OAuthClientInformationFullSchema.parse(input);
+	const client = OAuthClientInformationFullSchema.parse(dropNullValues(input));
 	if (!client.client_id.trim()) {
 		throw new Error("OAuth client_id must not be empty");
 	}

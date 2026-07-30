@@ -57,6 +57,17 @@ describe("OAuth metadata validation", () => {
 		);
 	});
 
+	it("drops null optional client metadata some servers return", () => {
+		const client = parseClientInformation({
+			client_id: "client",
+			redirect_uris: ["https://chat.example.com/api/mcp/oauth/callback"],
+			logo_uri: null,
+			tos_uri: null,
+		});
+		expect(client.logo_uri).toBeUndefined();
+		expect(client.tos_uri).toBeUndefined();
+	});
+
 	it("requires authorization servers to advertise PKCE S256", () => {
 		expect(() =>
 			assertPkceS256Supported({
