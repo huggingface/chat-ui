@@ -568,6 +568,16 @@ async function main() {
 	if (missing.length > 0) {
 		console.log(`Skipping pinned models no longer on the router: ${missing.join(", ")}`);
 	}
+	// An empty cohort (model churn, a misconfigured endpoint) would otherwise
+	// fall through to zero regressions/zero semantic failures and print
+	// SHIPPABLE without a single request sent — an indeterminate run must
+	// fail loudly, not look identical to a clean pass.
+	if (models.length === 0) {
+		console.error(
+			`No pinned models are available on the router (checked ${PINNED_MODELS.length}); nothing was tested.`
+		);
+		process.exit(1);
+	}
 
 	// Scenarios are built per model (attachReasoning depends on each model's
 	// real supportsReasoning flag — see buildScenarios's doc comment), so log
@@ -600,9 +610,18 @@ async function main() {
 	for (const { model, stats } of results) {
 		const regressed = Object.entries(FAMILIES).some(([base, dependents]) => {
 			const baseStat = stats.find((s) => s.scenario === base);
-			return Boolean(
-				baseStat?.ok && dependents.some((name) => !stats.find((s) => s.scenario === name)?.ok)
-			);
+			if (!baseStat?.ok) return false;
+			return dependents.some((name) => {
+				const dep = stats.find((s) => s.scenario === name);
+				if (!dep?.ok) return true;
+				// A dependent scenario that technically succeeded but answered
+				// incoherently, when the baseline it's compared against did not,
+				// is a real regression: the request was accepted but the replayed
+				// history degraded the answer. Only compares against a coherent
+				// baseline — an already-incoherent baseline says nothing about
+				// whether replay made things worse.
+				return baseStat.coherent !== false && dep.coherent === false;
+			});
 		});
 		// Semantic gate: N2-nonce-replay succeeding at the HTTP level is not
 		// enough — the nonce must actually appear in the answer, or replay

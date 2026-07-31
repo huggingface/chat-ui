@@ -866,6 +866,36 @@ export async function PATCH({ request, locals, params }) {
 		...(values.model !== undefined && { model: values.model }),
 	};
 
+	// Switching the pinned model (e.g. the retired-model recovery banner) means
+	// every prior assistant message was actually produced by the OLD model, not
+	// the new one. Those messages have no routerMetadata.model of their own —
+	// it's only ever stamped for the "omni" router alias — so history-replay's
+	// same-producer check would otherwise default to treating them as
+	// same-producer as the newly selected model and attach the old model's
+	// reasoning_content to a turn it never produced. Backfill the retiring
+	// model's id onto messages that don't already carry producer metadata so
+	// the mismatch is recorded before it's lost.
+	if (values.model !== undefined && values.model !== conv.model) {
+		const retiredModel = conv.model;
+		const messagesForSave = conv.messages.map((msg) =>
+			msg.from === "assistant" && !msg.routerMetadata?.model
+				? {
+						...msg,
+						routerMetadata: {
+							route: msg.routerMetadata?.route ?? "",
+							model: retiredModel,
+							provider: msg.routerMetadata?.provider,
+						},
+					}
+				: msg
+		);
+		await collections.conversations.updateOne(
+			{ _id: convId },
+			{ $set: { ...updateValues, messages: messagesForSave } }
+		);
+		return new Response();
+	}
+
 	await collections.conversations.updateOne(
 		{
 			_id: convId,
