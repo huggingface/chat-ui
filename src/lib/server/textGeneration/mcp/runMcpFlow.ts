@@ -14,7 +14,7 @@ import { buildToolPreprompt } from "../utils/toolPrompt";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
 import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
-import { parseToolArguments } from "./toolArgs";
+import { hasTruncatedToolCall, parseToolArguments } from "./toolArgs";
 import type { TextGenerationContext } from "../types";
 import {
 	hasAuthHeader,
@@ -632,9 +632,8 @@ export async function* runMcpFlow({
 				thinkOpen = false;
 			}
 
-			// Truncated output leaves the tool-call arguments as an unusable JSON fragment.
 			let discardedTruncatedToolCalls = false;
-			if (finishReason === "length" && Object.keys(toolCallState).length > 0) {
+			if (hasTruncatedToolCall(finishReason, Object.values(toolCallState))) {
 				if (truncatedToolCallRetries < MAX_TRUNCATED_TOOL_CALL_RETRIES) {
 					truncatedToolCallRetries += 1;
 					logger.warn(
@@ -646,11 +645,14 @@ export async function* runMcpFlow({
 						.trim();
 					messagesOpenAI = [
 						...messagesOpenAI,
-						// Without this the nudge below lands as a second consecutive user
-						// message, which some providers reject.
-						...(visibleContent.length > 0
-							? [{ role: "assistant" as const, content: visibleContent }]
-							: []),
+						// Not optional: a tool-only response leaves no visible content, and
+						// without this turn the nudge below is a second consecutive user
+						// message, which providers enforcing alternating roles reject —
+						// failing the very retry meant to recover the call.
+						{
+							role: "assistant" as const,
+							content: visibleContent || "(Tool call cut off by the output limit.)",
+						},
 						{
 							role: "user" as const,
 							content:

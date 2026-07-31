@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseToolArguments } from "./toolArgs";
+import { hasTruncatedToolCall, parseToolArguments } from "./toolArgs";
 
 describe("parseToolArguments", () => {
 	it("decodes a well-formed object", () => {
@@ -33,5 +33,38 @@ describe("parseToolArguments", () => {
 	it("rejects non-string input", () => {
 		expect(parseToolArguments(42)).toBeNull();
 		expect(parseToolArguments({ repo_id: "acme/model" })).toBeNull();
+	});
+});
+
+describe("hasTruncatedToolCall", () => {
+	const good = { name: "hf_fs", arguments: '{"path":"README.md"}' };
+	const cutOff = { name: "hf_fs_write", arguments: '{"content":"line one' };
+
+	it("ignores completions that did not hit the output limit", () => {
+		expect(hasTruncatedToolCall("stop", [cutOff])).toBe(false);
+		expect(hasTruncatedToolCall("tool_calls", [cutOff])).toBe(false);
+		expect(hasTruncatedToolCall(undefined, [cutOff])).toBe(false);
+	});
+
+	it("reports a call whose arguments were cut off", () => {
+		expect(hasTruncatedToolCall("length", [cutOff])).toBe(true);
+		expect(hasTruncatedToolCall("length", [good, cutOff])).toBe(true);
+	});
+
+	// The limit can land after a complete arguments object; discarding those would
+	// retry, and eventually give up on, a call that was fine.
+	it("leaves complete calls alone even at the output limit", () => {
+		expect(hasTruncatedToolCall("length", [good])).toBe(false);
+		expect(hasTruncatedToolCall("length", [good, good])).toBe(false);
+		expect(hasTruncatedToolCall("length", [])).toBe(false);
+	});
+
+	it("treats an empty argument string as a complete no-argument call", () => {
+		expect(hasTruncatedToolCall("length", [{ name: "hf_whoami", arguments: "" }])).toBe(false);
+		expect(hasTruncatedToolCall("length", [{ name: "hf_whoami" }])).toBe(false);
+	});
+
+	it("reports a call cut off before its name arrived", () => {
+		expect(hasTruncatedToolCall("length", [{ arguments: "" }])).toBe(true);
 	});
 });

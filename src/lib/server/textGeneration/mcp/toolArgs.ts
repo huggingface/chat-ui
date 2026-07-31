@@ -21,3 +21,22 @@ export function parseToolArguments(raw: unknown): Record<string, unknown> | null
 	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
 	return parsed as Record<string, unknown>;
 }
+
+/**
+ * Whether a completion stopped at the output limit *and* left a tool call unusable.
+ *
+ * `finish_reason: "length"` alone does not mean the calls are broken: the limit can
+ * land after a complete arguments object, and a no-argument call is complete when
+ * empty. Discarding those would retry, and eventually give up on, a call that was fine.
+ */
+export function hasTruncatedToolCall(
+	finishReason: string | null | undefined,
+	calls: Iterable<{ name?: string; arguments?: string }>
+): boolean {
+	if (finishReason !== "length") return false;
+	for (const call of calls) {
+		// A call cut off before its name arrived is unusable even if its arguments parse.
+		if (!call.name || parseToolArguments(call.arguments) === null) return true;
+	}
+	return false;
+}
