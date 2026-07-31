@@ -92,6 +92,12 @@ function replayAssistantTurn(
 ): AssistantReplayMessage[] {
 	const updates = message.updates ?? [];
 	const { visible, reasoning } = splitReasoning(message.content, message.reasoning);
+	// The recovered reasoning rides on the final message because that is where
+	// it came from: message.content persists only the last loop iteration's
+	// text, and per-round reasoning is never stored (stream updates compress
+	// to lengths), so replayed tool-call messages have none of their own.
+	// Within a live turn, runMcpFlow attaches each round's reasoning to its
+	// tool-call message as it happens.
 	const finalMessage: AssistantReplayMessage = {
 		role: "assistant",
 		content: visible,
