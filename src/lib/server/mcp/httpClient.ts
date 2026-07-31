@@ -36,6 +36,12 @@ export function getMcpToolTimeoutMs(): number {
 
 export type McpToolTextResponse = {
 	text: string;
+	/**
+	 * The server reported the call as failed. MCP returns tool failures as a normal
+	 * result with `isError: true` and the failure text in the content blocks, so this
+	 * never surfaces as a thrown error — callers must check it explicitly.
+	 */
+	isError: boolean;
 	/** If the server returned structuredContent, include it raw */
 	structured?: unknown;
 	/** Raw content blocks returned by the server, if any */
@@ -141,5 +147,6 @@ export async function callMcpTool(
 	const contentBlocks = Array.isArray(response?.content)
 		? (response.content as unknown[])
 		: undefined;
-	return { text, structured, content: contentBlocks };
+	const isError = (response as unknown as { isError?: unknown })?.isError === true;
+	return { text, isError, structured, content: contentBlocks };
 }
