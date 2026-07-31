@@ -92,7 +92,10 @@ async function* textGenerationWithoutTitle(
 			step = await mcpGen.next();
 		}
 		const mcpResult = step.value;
-		if (mcpResult === "not_applicable") {
+		// `!mcpProducedOutput` is not redundant with the result: runMcpFlow catches its own
+		// errors, so a failure could still surface here as "not_applicable" rather than a
+		// throw, and re-running would discard whatever the user has already been shown.
+		if (mcpResult === "not_applicable" && !mcpProducedOutput) {
 			// fallback to normal text generation
 			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
 		}

@@ -105,6 +105,18 @@ describe("textGeneration MCP fallback", () => {
 		expect(mocks.generate).not.toHaveBeenCalled();
 	});
 
+	// runMcpFlow catches its own errors, so a post-output failure can reach the caller as
+	// "not_applicable" rather than a throw. Falling back on that is the same discard.
+	it("does not fall back on not_applicable once output has been produced", async () => {
+		mocks.runMcpFlow.mockImplementation(
+			mcpFlow({ updates: [TOOL_UPDATE], result: "not_applicable" })
+		);
+
+		await collect(makeContext());
+
+		expect(mocks.generate).not.toHaveBeenCalled();
+	});
+
 	// Regression: the same discard, reached via the error path.
 	it("surfaces a failure that happens after MCP produced output", async () => {
 		mocks.runMcpFlow.mockImplementation(

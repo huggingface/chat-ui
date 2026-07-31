@@ -293,6 +293,10 @@ export async function* runMcpFlow({
 		return "not_applicable";
 	}
 
+	// Declared outside the try so the catch can see it: whether the user has been shown
+	// anything for this turn, which decides whether a failure is recoverable.
+	let producedOutput = false;
+
 	try {
 		const { tools: oaTools, mapping } = await getOpenAiToolsForMcp(servers, {
 			signal: abortSignal,
@@ -600,6 +604,7 @@ export async function* runMcpFlow({
 					lastAssistantContent += combined;
 					if (!sawToolCall) {
 						streamedContent = true;
+						producedOutput = true;
 						yield { type: MessageUpdateType.Stream, token: combined };
 						tokenCount += combined.length;
 					}
@@ -707,6 +712,7 @@ export async function* runMcpFlow({
 				let toolRunCount = 0;
 				for await (const event of exec) {
 					if (event.type === "update") {
+						producedOutput = true;
 						yield event.update;
 					} else {
 						messagesOpenAI = [
@@ -782,7 +788,12 @@ export async function* runMcpFlow({
 			logger.debug({}, "[mcp] aborted by user");
 			return "aborted";
 		}
-		logger.warn({ err: msg }, "[mcp] flow failed, falling back to default endpoint");
+		// Swallowing this into "not_applicable" would tell the caller MCP never ran, and
+		// it would answer the question again with no tools — discarding the tool work
+		// already streamed to the user. Only a failure before anything was shown is
+		// recoverable that way.
+		if (producedOutput) throw err;
+		logger.warn({ err: msg }, "[mcp] flow failed before any output; falling back");
 	}
 	// Note: pooled MCP clients are shared across concurrent requests, so they must NOT be
 	// closed here — that rejects other turns' in-flight tool calls with "-32000 Connection
