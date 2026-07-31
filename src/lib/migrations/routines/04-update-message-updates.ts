@@ -48,12 +48,7 @@ type FileUpdate = {
 };
 
 type OldMessageUpdate =
-	| FinalAnswer
-	| TextStreamUpdate
-	| WebSearchUpdate
-	| StatusUpdate
-	| ErrorUpdate
-	| FileUpdate;
+	FinalAnswer | TextStreamUpdate | WebSearchUpdate | StatusUpdate | ErrorUpdate | FileUpdate;
 
 /** Converts the old message update to the new schema */
 function convertMessageUpdate(message: Message, update: OldMessageUpdate): MessageUpdate | null {
