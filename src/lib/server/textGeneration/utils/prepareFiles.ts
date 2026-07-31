@@ -59,22 +59,20 @@ const isToolErrorUpdate = (u: MessageUpdate): u is MessageToolErrorUpdate =>
 
 /**
  * Split `<think>` blocks out of assistant text, merging them with the
- * separately persisted `message.reasoning` when present.
+ * separately persisted `message.reasoning` when present. Parts are returned
+ * individually so replay can pair round reasoning back to its tool round.
  */
 function splitReasoning(
 	content: string,
 	storedReasoning?: string
-): { visible: string; reasoning: string } {
+): { visible: string; parts: string[] } {
 	const thinkParts: string[] = [];
 	const visible = content.replace(/<think>([\s\S]*?)(?:<\/think>|$)/g, (_match, inner: string) => {
 		thinkParts.push(inner);
 		return "";
 	});
-	const reasoning = [storedReasoning ?? "", ...thinkParts]
-		.map((part) => part.trim())
-		.filter(Boolean)
-		.join("\n");
-	return { visible: visible.trim(), reasoning };
+	const parts = [storedReasoning ?? "", ...thinkParts].map((part) => part.trim()).filter(Boolean);
+	return { visible: visible.trim(), parts };
 }
 
 /**
@@ -91,22 +89,26 @@ function replayAssistantTurn(
 	includeReasoning: boolean
 ): AssistantReplayMessage[] {
 	const updates = message.updates ?? [];
-	const { visible, reasoning } = splitReasoning(message.content, message.reasoning);
-	// The recovered reasoning rides on the final message because that is where
-	// it came from: message.content persists only the last loop iteration's
-	// text, and per-round reasoning is never stored (stream updates compress
-	// to lengths), so replayed tool-call messages have none of their own.
-	// Within a live turn, runMcpFlow attaches each round's reasoning to its
-	// tool-call message as it happens.
-	const finalMessage: AssistantReplayMessage = {
-		role: "assistant",
-		content: visible,
-		...(includeReasoning && reasoning.length > 0 ? { reasoning_content: reasoning } : {}),
+	const { visible, parts } = splitReasoning(message.content, message.reasoning);
+	// `parts` holds every recovered reasoning block across the whole turn:
+	// when tools ran, the FinalAnswer handler merges the pre-tool stream into
+	// content, so earlier rounds' think blocks survive there too. Rounds whose
+	// Call update persisted its own `reasoning` (written by the live loop since
+	// this field existed) reclaim their block below; whatever remains belongs
+	// to the final answer.
+	const remainingParts = [...parts];
+	const buildFinalMessage = (): AssistantReplayMessage => {
+		const reasoning = remainingParts.join("\n");
+		return {
+			role: "assistant",
+			content: visible,
+			...(includeReasoning && reasoning.length > 0 ? { reasoning_content: reasoning } : {}),
+		};
 	};
 
 	const callUpdates = updates.filter(isToolCallUpdate);
 	if (callUpdates.length === 0) {
-		return [finalMessage];
+		return [buildFinalMessage()];
 	}
 
 	const outputsByUuid = new Map<string, string>();
@@ -148,6 +150,23 @@ function replayAssistantTurn(
 
 	const replayed: AssistantReplayMessage[] = [];
 	for (const callsInRound of rounds) {
+		// Reasoning persisted on the round's Call update goes back on this
+		// round's message and is deduped out of the final answer's blocks.
+		const roundReasoning = includeReasoning
+			? (callsInRound.map((u) => u.reasoning?.trim()).find(Boolean) ?? "")
+			: "";
+		if (roundReasoning) {
+			const exact = remainingParts.indexOf(roundReasoning);
+			if (exact !== -1) {
+				remainingParts.splice(exact, 1);
+			} else {
+				for (let i = remainingParts.length - 1; i >= 0; i -= 1) {
+					if (roundReasoning.includes(remainingParts[i])) {
+						remainingParts.splice(i, 1);
+					}
+				}
+			}
+		}
 		// No `content` key on tool-call messages: some OpenAI-compatible
 		// backends reject empty text next to tool_calls with a 400, and the
 		// per-round visible text is not persisted anyway.
@@ -161,6 +180,7 @@ function replayAssistantTurn(
 				type: "function" as const,
 				function: { name: u.call.name, arguments: JSON.stringify(u.call.parameters ?? {}) },
 			})),
+			...(roundReasoning ? { reasoning_content: roundReasoning } : {}),
 		});
 		for (const u of callsInRound) {
 			// A call with no persisted outcome means the run was aborted
@@ -178,7 +198,7 @@ function replayAssistantTurn(
 			});
 		}
 	}
-	replayed.push(finalMessage);
+	replayed.push(buildFinalMessage());
 	return replayed;
 }
 
@@ -233,7 +253,8 @@ export async function prepareMessagesWithFiles(
 					};
 				}
 				if (options?.attachReasoning) {
-					const { visible, reasoning } = splitReasoning(message.content, message.reasoning);
+					const { visible, parts } = splitReasoning(message.content, message.reasoning);
+					const reasoning = parts.join("\n");
 					if (reasoning.length === 0) {
 						return [flat];
 					}

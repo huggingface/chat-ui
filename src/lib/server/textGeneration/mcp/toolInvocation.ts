@@ -43,6 +43,8 @@ export interface ExecuteToolCallsParams {
 	};
 	abortSignal?: AbortSignal;
 	toolTimeoutMs?: number;
+	/** Reasoning that led to this round of calls; persisted on the round's first Call update. */
+	roundReasoning?: string;
 }
 
 export interface ToolCallExecutionResult {
@@ -75,6 +77,7 @@ export async function* executeToolCalls({
 	processToolOutput,
 	abortSignal,
 	toolTimeoutMs,
+	roundReasoning,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
@@ -106,7 +109,7 @@ export async function* executeToolCalls({
 		return { call, argsObj, paramsClean, uuid: randomUUID() };
 	});
 
-	for (const p of prepared) {
+	for (const [index, p] of prepared.entries()) {
 		yield {
 			type: "update",
 			update: {
@@ -114,6 +117,7 @@ export async function* executeToolCalls({
 				subtype: MessageToolUpdateType.Call,
 				uuid: p.uuid,
 				call: { name: p.call.name, parameters: p.paramsClean },
+				...(index === 0 && roundReasoning?.trim() ? { reasoning: roundReasoning } : {}),
 			},
 		};
 		yield {

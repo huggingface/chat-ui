@@ -174,16 +174,18 @@ export async function endpointOai(
 			abortSignal,
 			provider,
 			reasoningEffort,
+			reasoningOverride,
 		}) => {
 			// Format messages for the chat API, handling multimodal content if supported.
 			// attachReasoning re-attaches persisted reasoning as reasoning_content on
-			// past assistant turns (preserved-thinking models condition on it), gated
-			// on the model's reasoning capability like reasoning_effort forwarding so
+			// past assistant turns (preserved-thinking models condition on it). The
+			// per-user reasoning override wins in both directions, else the model's
+			// capability flag decides, mirroring reasoning_effort forwarding, so
 			// strict non-reasoning backends never see the extra field; tool replay
 			// stays off here since this path never declares tools.
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
 				await prepareMessagesWithFiles(messages, imageProcessor, isMultimodal ?? model.multimodal, {
-					attachReasoning: Boolean(model.supportsReasoning),
+					attachReasoning: reasoningOverride ?? Boolean(model.supportsReasoning),
 				});
 
 			// Normalize preprompt and handle empty values

@@ -65,6 +65,12 @@ interface MessageToolUpdateBase<TSubtype extends MessageToolUpdateType> {
 
 export interface MessageToolCallUpdate extends MessageToolUpdateBase<MessageToolUpdateType.Call> {
 	call: ToolCall;
+	/**
+	 * Reasoning that led to this round of calls (set on the round's first call
+	 * update). Lets history replay re-attach reasoning to the right assistant
+	 * message; absent on messages persisted before this field existed.
+	 */
+	reasoning?: string;
 }
 
 export interface MessageToolResultUpdate extends MessageToolUpdateBase<MessageToolUpdateType.Result> {

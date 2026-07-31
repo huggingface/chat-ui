@@ -37,6 +37,7 @@ export type RunMcpFlowContext = Pick<
 	| "forceTools"
 	| "provider"
 	| "reasoningEffort"
+	| "reasoningOverride"
 	| "locals"
 > & { messages: EndpointMessage[] };
 
@@ -58,6 +59,7 @@ export async function* runMcpFlow({
 	forceTools,
 	provider,
 	reasoningEffort,
+	reasoningOverride,
 	locals,
 	preprompt,
 	abortSignal,
@@ -360,11 +362,12 @@ export async function* runMcpFlow({
 			mmEnabled,
 			{
 				replayToolHistory: true,
-				// Cross-turn reasoning echo is gated on the capability flag; the
-				// in-loop echo below stays evidence-based (the model just emitted it).
-				attachReasoning: Boolean(
-					(targetModel as unknown as { supportsReasoning?: boolean }).supportsReasoning
-				),
+				// Cross-turn reasoning echo: the per-user override wins in both
+				// directions, else the capability flag decides. The in-loop echo
+				// below stays evidence-based (the model just emitted it).
+				attachReasoning:
+					reasoningOverride ??
+					Boolean((targetModel as unknown as { supportsReasoning?: boolean }).supportsReasoning),
 			}
 		);
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
@@ -761,6 +764,9 @@ export async function* runMcpFlow({
 					toPrimitive,
 					processToolOutput,
 					abortSignal,
+					// Persisted on the round's first Call update so history replay
+					// can re-attach this round's reasoning to its own message.
+					roundReasoning: reasoningForToolMsg,
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;

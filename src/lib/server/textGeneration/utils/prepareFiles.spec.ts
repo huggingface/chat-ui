@@ -197,6 +197,45 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(7);
 	});
 
+	it("re-attaches persisted round reasoning to its own tool-call message", async () => {
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content:
+					"<think>round one reasoning</think><think>final reasoning</think>It is 18°C in Paris.",
+				updates: [
+					{
+						...callUpdate("u1", "get_weather", { city: "Paris" }),
+						reasoning: "round one reasoning",
+					},
+					resultUpdate("u1", "get_weather", "18°C"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		expect(prepared).toEqual([
+			{
+				role: "assistant",
+				tool_calls: [
+					{
+						id: "u10000000",
+						type: "function",
+						function: { name: "get_weather", arguments: '{"city":"Paris"}' },
+					},
+				],
+				reasoning_content: "round one reasoning",
+			},
+			{ role: "tool", tool_call_id: "u10000000", content: "18°C" },
+			{
+				role: "assistant",
+				content: "It is 18°C in Paris.",
+				reasoning_content: "final reasoning",
+			},
+		]);
+	});
+
 	it("never expands an older turn when a newer turn already fell back to flat", async () => {
 		// The newest turn alone exceeds the 100k budget, so it goes flat; the
 		// older turn must then go flat too, even though it would fit on its own.
