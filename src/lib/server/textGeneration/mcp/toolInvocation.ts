@@ -262,11 +262,6 @@ export async function* executeToolCalls({
 			);
 			const { annotated } = processToolOutput(toolResponse.text ?? "");
 
-			// A tool that fails reports it as a normal result carrying `isError: true`,
-			// with the failure text in the content blocks — nothing is thrown, so the
-			// catch below never sees it. Route it to the same failure path as a thrown
-			// error; otherwise the user sees a green tick and the model is handed an
-			// error message labelled as a successful result and reasons on top of it.
 			if (toolResponse.isError) {
 				const message = annotated.trim() || "The tool reported an error with no message.";
 				logger.warn(
