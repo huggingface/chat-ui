@@ -359,6 +359,60 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		]);
 	});
 
+	it("omits an empty flat fallback once the budget is exhausted", async () => {
+		// The newest turn alone exceeds the budget, forcing every turn flat;
+		// the older turn was interrupted before any visible text, so its flat
+		// shape would be {role: assistant, content: ""} — it must be omitted
+		// like the replay and plain branches already do, not emitted.
+		const interrupted: EndpointMessage = {
+			from: "assistant",
+			content: "",
+			updates: [callUpdate("i1", "search", { q: "x" })],
+		};
+		const huge: EndpointMessage = {
+			from: "assistant",
+			content: "new done",
+			updates: Array.from({ length: 14 }, (_, i) => [
+				callUpdate(`new${i}`, "search", { q: String(i) }),
+				resultUpdate(`new${i}`, "search", "x".repeat(8000)),
+			]).flat(),
+		};
+		const messages: EndpointMessage[] = [interrupted, { from: "user", content: "next" }, huge];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		expect(prepared).toEqual([
+			{ role: "user", content: "next" },
+			{ role: "assistant", content: "new done" },
+		]);
+	});
+
+	it("does not pull final-answer text matching an unstreamed preamble before the tools", async () => {
+		// A preamble persisted on the Call update but never merged into stored
+		// content (it arrived in the same delta as the first tool_calls entry)
+		// is not a prefix of the visible text. Identical text inside the final
+		// answer must stay where it is — mild duplication is acceptable,
+		// reordering the conversation is not.
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "The answer is 42. Let me check. Done.",
+				updates: [
+					{ ...callUpdate("u1", "search", { q: "x" }), content: "Let me check." },
+					resultUpdate("u1", "search", "42"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		expect(prepared[0]).toMatchObject({ role: "assistant", content: "Let me check." });
+		expect(prepared.at(-1)).toEqual({
+			role: "assistant",
+			content: "The answer is 42. Let me check. Done.",
+		});
+	});
+
 	it("attachReasoning splits reasoning out but never emits tool messages", async () => {
 		const messages: EndpointMessage[] = [
 			{ from: "user", content: "hi" },

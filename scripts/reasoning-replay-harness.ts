@@ -538,7 +538,12 @@ async function runModel(
 			ok: okRuns.length === runs.length,
 			okCount: okRuns.length,
 			repCount: runs.length,
-			coherent: okRuns.find((r) => r.coherent !== undefined)?.coherent,
+			// Aggregate across every judged successful rep (like nonceOk): one
+			// incoherent rep is a sampled semantic failure even if another rep
+			// happened to answer well.
+			coherent: okRuns.some((r) => r.coherent !== undefined)
+				? okRuns.every((r) => r.coherent !== false)
+				: undefined,
 			nonceOk: nonceRuns.length > 0 ? nonceRuns.every((r) => r.nonceOk) : undefined,
 			ttftMs: median(speedRuns.map((r) => r.ttftMs ?? 0)),
 			tokPerSec: median(

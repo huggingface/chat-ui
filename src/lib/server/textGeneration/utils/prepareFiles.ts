@@ -230,16 +230,16 @@ function replayAssistantTurn(
 		// because `remainingVisible` comes from splitReasoning trim-normalized;
 		// visible text has no byte-exactness requirement, unlike reasoning.
 		const roundContent = (callsInRound.find((u) => u.content?.trim())?.content ?? "").trim();
-		if (roundContent) {
-			if (remainingVisible.startsWith(roundContent)) {
-				remainingVisible = remainingVisible.slice(roundContent.length);
-			} else {
-				const idx = remainingVisible.indexOf(roundContent);
-				if (idx !== -1) {
-					remainingVisible =
-						remainingVisible.slice(0, idx) + remainingVisible.slice(idx + roundContent.length);
-				}
-			}
+		if (roundContent && remainingVisible.startsWith(roundContent)) {
+			// Prefix-only, deliberately: rounds consume the visible text in
+			// chronological order, so a streamed preamble is always the next
+			// prefix. A persisted preamble that is NOT a prefix was never merged
+			// into stored content (content arriving in the same delta as the
+			// first tool_calls entry is suppressed from the stream), so a deeper
+			// indexOf match could only hit identical text belonging to the final
+			// answer — removing that would reorder the conversation. The failure
+			// mode of not matching is mild duplication, which is safer.
+			remainingVisible = remainingVisible.slice(roundContent.length).trimStart();
 		}
 		// `content` is included only when a preamble was actually persisted
 		// (messages recorded before this field existed have none); omitted
@@ -415,7 +415,11 @@ export async function prepareMessagesWithFiles(
 			resolved[i] = entry.replay;
 		} else {
 			exhausted = true;
-			resolved[i] = [entry.flat];
+			// Same phantom-turn guard as the replay and plain branches: an
+			// interrupted turn whose stripped content is empty must be omitted,
+			// not sent as {role: "assistant", content: ""}.
+			const flatContent = typeof entry.flat.content === "string" ? entry.flat.content : "";
+			resolved[i] = flatContent.trim().length > 0 ? [entry.flat] : [];
 		}
 	}
 	return resolved.flat();
