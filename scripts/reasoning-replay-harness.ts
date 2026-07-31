@@ -631,8 +631,15 @@ async function main() {
 		// rep that failed at the HTTP level (timeout, 5xx) must never mask a
 		// DIFFERENT rep that succeeded and directly demonstrated the nonce is
 		// missing — that observed failure is real signal either way.
+		// The scenario must ALSO have succeeded overall: if every rep timed out
+		// or errored, nonceRuns is empty and nonceOk is undefined (neither true
+		// nor false), which must not read as "no semantic failure" — the sole
+		// proof that replay works semantically was never obtained, so treat an
+		// unresolved nonce scenario as a failure too, not a silent pass.
 		const nonceScenario = stats.find((s) => s.scenario === "N2-nonce-replay");
-		const semanticFailure = nonceScenario?.nonceOk === false;
+		const semanticFailure = Boolean(
+			nonceScenario && (nonceScenario.nonceOk === false || !nonceScenario.ok)
+		);
 		if (regressed) regressions += 1;
 		if (semanticFailure) semanticFailures += 1;
 		console.log(`${regressed || semanticFailure ? "❌" : "✅"} ${model}`);
