@@ -44,6 +44,8 @@ export interface ExecuteToolCallsParams {
 	toolTimeoutMs?: number;
 	/** Reasoning that led to this round of calls; persisted on the round's first Call update. */
 	roundReasoning?: string;
+	/** Visible text streamed before this round's calls; persisted on the round's first Call update. */
+	roundContent?: string;
 }
 
 export interface ToolCallExecutionResult {
@@ -77,6 +79,7 @@ export async function* executeToolCalls({
 	abortSignal,
 	toolTimeoutMs,
 	roundReasoning,
+	roundContent,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
@@ -117,6 +120,7 @@ export async function* executeToolCalls({
 				uuid: p.uuid,
 				call: { name: p.call.name, parameters: p.paramsClean },
 				...(index === 0 && roundReasoning?.trim() ? { reasoning: roundReasoning } : {}),
+				...(index === 0 && roundContent?.trim() ? { content: roundContent } : {}),
 			},
 		};
 		yield {

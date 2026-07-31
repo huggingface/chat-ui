@@ -61,6 +61,10 @@ const isToolErrorUpdate = (u: MessageUpdate): u is MessageToolErrorUpdate =>
  * Split `<think>` blocks out of assistant text, merging them with the
  * separately persisted `message.reasoning` when present. Parts are returned
  * individually so replay can pair round reasoning back to its tool round.
+ * Parts are filtered by whether they're non-blank but kept byte-exact
+ * otherwise: vendors documenting preserved thinking can require the
+ * reasoning payload sent back unmodified, so trimming must only decide
+ * whether a part counts as empty, never change what gets echoed.
  */
 function splitReasoning(
 	content: string,
@@ -71,8 +75,16 @@ function splitReasoning(
 		thinkParts.push(inner);
 		return "";
 	});
-	const parts = [storedReasoning ?? "", ...thinkParts].map((part) => part.trim()).filter(Boolean);
+	const parts = [storedReasoning ?? "", ...thinkParts].filter((part) => part.trim().length > 0);
 	return { visible: visible.trim(), parts };
+}
+
+/** Strip `<think>` blocks without collecting them; used for the degraded
+ * fallback shape so a budget cutoff never leaks raw reasoning as visible
+ * content, including to models whose vendor requires historical thoughts
+ * to be stripped (e.g. Gemma) regardless of the replay budget. */
+function stripThink(content: string): string {
+	return content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, "").trim();
 }
 
 /**
@@ -90,18 +102,21 @@ function replayAssistantTurn(
 ): AssistantReplayMessage[] {
 	const updates = message.updates ?? [];
 	const { visible, parts } = splitReasoning(message.content, message.reasoning);
-	// `parts` holds every recovered reasoning block across the whole turn:
-	// when tools ran, the FinalAnswer handler merges the pre-tool stream into
-	// content, so earlier rounds' think blocks survive there too. Rounds whose
-	// Call update persisted its own `reasoning` (written by the live loop since
-	// this field existed) reclaim their block below; whatever remains belongs
-	// to the final answer.
+	// `parts` holds every recovered reasoning block across the whole turn, and
+	// `remainingVisible` the full visible text: when tools ran, the
+	// FinalAnswer handler merges the pre-tool stream into content, so earlier
+	// rounds' think blocks and preamble text survive there too, concatenated
+	// in chronological order. Rounds whose Call update persisted its own
+	// `reasoning`/`content` (written by the live loop since those fields
+	// existed) reclaim their piece below; whatever remains belongs to the
+	// final answer.
 	const remainingParts = [...parts];
+	let remainingVisible = visible;
 	const buildFinalMessage = (): AssistantReplayMessage => {
 		const reasoning = remainingParts.join("\n");
 		return {
 			role: "assistant",
-			content: visible,
+			content: remainingVisible.trim(),
 			...(includeReasoning && reasoning.length > 0 ? { reasoning_content: reasoning } : {}),
 		};
 	};
@@ -150,10 +165,14 @@ function replayAssistantTurn(
 
 	const replayed: AssistantReplayMessage[] = [];
 	for (const callsInRound of rounds) {
-		// Reasoning persisted on the round's Call update goes back on this
-		// round's message and is deduped out of the final answer's blocks.
+		// Reasoning and preamble text persisted on the round's Call update go
+		// back on this round's message and are deduped out of the final
+		// answer's blocks. Kept byte-exact (trim only tests for emptiness): see
+		// splitReasoning for why reasoning fidelity matters; the same
+		// unmodified-echo principle is applied to preamble text for symmetry
+		// and so the dedup below matches reliably.
 		const roundReasoning = includeReasoning
-			? (callsInRound.map((u) => u.reasoning?.trim()).find(Boolean) ?? "")
+			? (callsInRound.find((u) => u.reasoning?.trim())?.reasoning ?? "")
 			: "";
 		if (roundReasoning) {
 			const exact = remainingParts.indexOf(roundReasoning);
@@ -167,9 +186,27 @@ function replayAssistantTurn(
 				}
 			}
 		}
-		// No `content` key on tool-call messages: some OpenAI-compatible
-		// backends reject empty text next to tool_calls with a 400, and the
-		// per-round visible text is not persisted anyway.
+		// Visible text streamed before this round's calls (e.g. "Let me check
+		// that."): rounds are processed oldest-first, matching the
+		// chronological order text was concatenated into `message.content`, so
+		// removing a matched prefix keeps the remainder correctly ordered for
+		// the final message.
+		const roundContent = callsInRound.find((u) => u.content?.trim())?.content ?? "";
+		if (roundContent) {
+			if (remainingVisible.startsWith(roundContent)) {
+				remainingVisible = remainingVisible.slice(roundContent.length);
+			} else {
+				const idx = remainingVisible.indexOf(roundContent);
+				if (idx !== -1) {
+					remainingVisible =
+						remainingVisible.slice(0, idx) + remainingVisible.slice(idx + roundContent.length);
+				}
+			}
+		}
+		// `content` is included only when a preamble was actually persisted
+		// (messages recorded before this field existed have none); omitted
+		// otherwise since some OpenAI-compatible backends reject empty text
+		// next to tool_calls with a 400.
 		// Arguments are best-effort: updates persist only top-level primitive
 		// params (nested values and file payloads are deliberately kept out of
 		// storage), so the replay may be a subset of what the tool ran with.
@@ -180,6 +217,7 @@ function replayAssistantTurn(
 				type: "function" as const,
 				function: { name: u.call.name, arguments: JSON.stringify(u.call.parameters ?? {}) },
 			})),
+			...(roundContent.trim().length > 0 ? { content: roundContent } : {}),
 			...(roundReasoning ? { reasoning_content: roundReasoning } : {}),
 		});
 		for (const u of callsInRound) {
@@ -245,8 +283,17 @@ export async function prepareMessagesWithFiles(
 				return [{ role: message.from, content: messageText }];
 			}
 			if (message.from === "assistant") {
-				const flat: ChatMessageParam = { role: "assistant", content: message.content };
 				if (options?.replayToolHistory) {
+					// The budget-fallback `flat` must still strip <think>, not just
+					// drop the reasoning_content/tool-replay enrichments: the raw
+					// string leaks reasoning as visible content to every model that
+					// falls back to it, including ones (e.g. Gemma) whose vendor
+					// requires historical thoughts to be stripped regardless of the
+					// replay budget.
+					const flat: ChatMessageParam = {
+						role: "assistant",
+						content: stripThink(message.content),
+					};
 					return {
 						replay: replayAssistantTurn(message, options?.attachReasoning ?? true),
 						flat,
@@ -256,13 +303,17 @@ export async function prepareMessagesWithFiles(
 					const { visible, parts } = splitReasoning(message.content, message.reasoning);
 					const reasoning = parts.join("\n");
 					if (reasoning.length === 0) {
-						return [flat];
+						// Nothing was found to strip, so the raw content is already
+						// the correct shape.
+						return [{ role: "assistant", content: message.content }];
 					}
 					// Candidate, not a plain array, so the reasoning payload goes
-					// through the same newest-first budget as tool replay.
+					// through the same newest-first budget as tool replay. The
+					// fallback keeps the same stripped `visible` text and just
+					// drops reasoning_content, for the same reason as above.
 					return {
 						replay: [{ role: "assistant", content: visible, reasoning_content: reasoning }],
-						flat,
+						flat: { role: "assistant", content: visible },
 					};
 				}
 			}

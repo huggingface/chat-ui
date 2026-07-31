@@ -297,9 +297,11 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		expect("reasoning_content" in prepared[0]).toBe(false);
 	});
 
-	it("attachReasoning spends the same replay budget, oldest turns first", async () => {
+	it("attachReasoning spends the same replay budget, oldest turns first, without leaking <think> in the fallback", async () => {
 		// Two turns of ~60k reasoning exceed the 100k budget: the newest keeps
-		// reasoning_content, the oldest falls back to the untouched flat shape.
+		// reasoning_content, the oldest falls back to a <think>-stripped flat
+		// shape (not the raw string) so models that must never see historical
+		// thoughts (e.g. Gemma) don't get them just because the budget ran out.
 		const bigReasoningTurn = (n: number): EndpointMessage => ({
 			from: "assistant",
 			content: `<think>${"x".repeat(60_000)}</think>answer ${n}`,
@@ -309,7 +311,7 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 			attachReasoning: true,
 		});
 		expect("reasoning_content" in prepared[0]).toBe(false);
-		expect(prepared[0].content).toContain("<think>");
+		expect(prepared[0]).toEqual({ role: "assistant", content: "answer 1" });
 		expect(prepared[1]).toMatchObject({ role: "assistant", content: "answer 2" });
 		expect("reasoning_content" in prepared[1]).toBe(true);
 	});
@@ -328,6 +330,107 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		});
 		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(1);
 		expect(prepared.at(-1)).toEqual({ role: "assistant", content: "done" });
+	});
+
+	it("keeps reasoning bytes exact (no trimming) while still dropping whitespace-only parts", async () => {
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "<think>  leading and trailing space  </think><think>   </think>done",
+				updates: [],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		// the whitespace-only second block is dropped, but the first block's
+		// surrounding spaces survive verbatim in the echoed value
+		expect(prepared).toEqual([
+			{
+				role: "assistant",
+				content: "done",
+				reasoning_content: "  leading and trailing space  ",
+			},
+		]);
+	});
+
+	it("keeps a round's preamble text on its own tool-call message instead of the final answer", async () => {
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				// message.content is purely the model's own streamed tokens (round
+				// preamble(s) + final answer), never the tool's own output text.
+				content: "Let me check that.It is 18°C and sunny in Paris.",
+				updates: [
+					{
+						...callUpdate("u1", "get_weather", { city: "Paris" }),
+						content: "Let me check that.",
+					},
+					resultUpdate("u1", "get_weather", "18°C, sunny"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		expect(prepared).toEqual([
+			{
+				role: "assistant",
+				tool_calls: [
+					{
+						id: "u10000000",
+						type: "function",
+						function: { name: "get_weather", arguments: '{"city":"Paris"}' },
+					},
+				],
+				content: "Let me check that.",
+			},
+			{ role: "tool", tool_call_id: "u10000000", content: "18°C, sunny" },
+			{ role: "assistant", content: "It is 18°C and sunny in Paris." },
+		]);
+	});
+
+	it("omits content on the tool-call message when no preamble was persisted (pre-existing messages)", async () => {
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "It is 18°C and sunny in Paris.",
+				updates: [
+					callUpdate("u1", "get_weather", { city: "Paris" }),
+					resultUpdate("u1", "get_weather", "18°C"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const toolCallMsg = prepared.find((m) => "tool_calls" in m);
+		expect(toolCallMsg && "content" in toolCallMsg).toBe(false);
+	});
+
+	it("strips <think> from the replayToolHistory budget fallback instead of leaking it raw", async () => {
+		const bigTurn = (n: number): EndpointMessage => ({
+			from: "assistant",
+			content: `<think>${"x".repeat(60_000)}</think>answer ${n}`,
+			updates: [
+				callUpdate(`c${n}`, "search", { q: String(n) }),
+				resultUpdate(`c${n}`, "search", "x".repeat(60_000)),
+			],
+		});
+		const messages: EndpointMessage[] = [bigTurn(1), bigTurn(2)];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		// turn 1 (oldest) fell back to flat because turn 2 alone (~68k of
+		// reasoning + capped tool output) already spends most of the 100k
+		// budget: it must be plain content with no reasoning_content leaking
+		// through, and no raw <think> tag either.
+		const flatCandidates = prepared.filter(
+			(m) => m.role === "assistant" && !("tool_calls" in m) && !("reasoning_content" in m)
+		);
+		expect(flatCandidates).toHaveLength(1);
+		expect(flatCandidates[0].content).toBe("answer 1");
+		expect(flatCandidates[0].content).not.toContain("<think>");
 	});
 
 	it("attaches persisted message.reasoning alongside extracted think blocks", async () => {

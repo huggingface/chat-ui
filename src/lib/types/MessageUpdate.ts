@@ -71,6 +71,14 @@ export interface MessageToolCallUpdate extends MessageToolUpdateBase<MessageTool
 	 * message; absent on messages persisted before this field existed.
 	 */
 	reasoning?: string;
+	/**
+	 * Visible text the model streamed before this round's tool calls (set on
+	 * the round's first call update), e.g. "Let me check that." Lets history
+	 * replay keep the preamble on its own round's assistant message instead of
+	 * moving it after the tool results; absent on messages persisted before
+	 * this field existed.
+	 */
+	content?: string;
 }
 
 export interface MessageToolResultUpdate extends MessageToolUpdateBase<MessageToolUpdateType.Result> {
