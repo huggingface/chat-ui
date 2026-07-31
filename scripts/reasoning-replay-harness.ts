@@ -1,19 +1,37 @@
 /**
- * Compatibility + speed harness for the reasoning/tool-history replay changes.
+ * Compatibility + semantic + speed harness for the reasoning/tool-history
+ * replay changes.
  *
- * Sends one synthetic tool-using conversation to the first N router models in
- * three shapes and compares acceptance and streaming speed:
+ * Sends synthetic conversations to a pinned cohort of router models (see
+ * PINNED_MODELS) in several shapes and compares acceptance, semantic
+ * correctness, and streaming speed:
  *   S1 baseline  — flat {role, content} history (previous prod behavior)
  *   S2 replay    — output of prepareMessagesWithFiles({replayToolHistory: true})
  *   S3 in-loop   — S2 with reasoning_content on a tool-call assistant message
  *                  and `content` omitted (the shape runMcpFlow sends between
  *                  tool rounds)
+ *   P1/P2        — tool-less flow, flat vs reasoning_content attached
+ *   N1/N2        — semantic proof (see below), not just shape acceptance
+ *
+ * N1/N2 close the harness's biggest evidentiary gap: S1-S3's stored tool
+ * result already restates the facts (Paris, 18°C) in the visible assistant
+ * answer, so a model can answer the follow-up correctly from the flat
+ * baseline without ever needing replayed history — shape acceptance was
+ * being mistaken for semantic proof. N1/N2 instead fabricate a tool result
+ * containing a nonce that appears NOWHERE in visible content, then ask for
+ * it: only a model that actually received the replayed tool history can
+ * answer, so N2-nonce-replay containing the nonce is direct proof replay
+ * works, not just that the provider accepted the payload shape.
  *
  * Requests stream (like prod) and are repeated REPS times sequentially per
  * model/scenario, models in parallel, measuring time-to-first-token and
  * generation throughput (approximated from SSE delta chunks).
  *
- * Ship criterion: every model that accepts S1 must also accept S2 and S3.
+ * Ship criteria (both gate the exit code):
+ *   1. Every model that accepts a baseline scenario must also accept its
+ *      dependent scenarios (see FAMILIES) — shape-acceptance regression.
+ *   2. Every model that accepts N2-nonce-replay must produce the nonce in
+ *      its answer — semantic regression, independent of (1).
  *
  * Run it the same way as the other repo scripts (see "populate" in
  * package.json), passing this file's path to vite-node.
@@ -26,10 +44,59 @@ import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpda
 import { ToolResultStatus } from "$lib/types/Tool";
 import type { OpenAI } from "openai";
 
-const MODEL_COUNT = 10;
 const REPS = 2;
 const REQUEST_TIMEOUT_MS = 90_000;
-const MAX_TOKENS = 120;
+// Reasoning models can spend 250-450+ tokens thinking before emitting any
+// visible content, especially when the answer requires recalling a specific
+// fact (the nonce scenarios). A tighter budget was observed cutting content
+// to empty (finish_reason: "length") after reasoning alone exhausted it.
+const MAX_TOKENS = 400;
+
+/**
+ * Pinned to the models this PR's research established a preservation policy
+ * for (see the PR body's vendor-guidance table), plus two controls, instead
+ * of "first N from /models": an unpinned population drifts across runs and
+ * says nothing about whether the models this PR actually targets behave.
+ * gemma-4-31B-it and Llama-3.1-8B-Instruct are controls — Gemma's vendor
+ * requires stripping historical thoughts (must stay unflagged, must NOT gain
+ * cross-turn reasoning_content), Llama has no reasoning mechanism at all.
+ */
+const PINNED_MODELS = [
+	"moonshotai/Kimi-K3",
+	"moonshotai/Kimi-K2.7-Code",
+	"MiniMaxAI/MiniMax-M3",
+	"deepseek-ai/DeepSeek-V4-Flash",
+	"deepseek-ai/DeepSeek-V4-Pro",
+	"zai-org/GLM-5.2",
+	"Qwen/Qwen3.6-27B",
+	"Qwen/Qwen3.6-35B-A3B",
+	"google/gemma-4-31B-it",
+	"meta-llama/Llama-3.1-8B-Instruct",
+];
+
+/**
+ * Mirrors each pinned model's real `supportsReasoning` flag (chart/env/*.yaml)
+ * so the cross-turn scenarios (S2/P2/N2 below) build the same attachReasoning
+ * value production would actually resolve for that model. Building them with
+ * a hardcoded `true` for every model would send Gemma and Llama — both
+ * deliberately unflagged — a cross-turn reasoning_content shape production
+ * never sends them, which proves nothing about their real (correct) policy
+ * and could even fail them for the wrong reason. S3-inloop is exempt: the
+ * in-loop echo it models is evidence-based and ungated in production for
+ * every model (see runMcpFlow.ts), so it stays unconditioned here too.
+ */
+const MODEL_SUPPORTS_REASONING: Record<string, boolean> = {
+	"moonshotai/Kimi-K3": true,
+	"moonshotai/Kimi-K2.7-Code": true,
+	"MiniMaxAI/MiniMax-M3": true,
+	"deepseek-ai/DeepSeek-V4-Flash": true,
+	"deepseek-ai/DeepSeek-V4-Pro": true,
+	"zai-org/GLM-5.2": true,
+	"Qwen/Qwen3.6-27B": true,
+	"Qwen/Qwen3.6-35B-A3B": true,
+	"google/gemma-4-31B-it": false,
+	"meta-llama/Llama-3.1-8B-Instruct": false,
+};
 
 type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam & {
 	reasoning_content?: string;
@@ -137,6 +204,58 @@ const imageProcessor = (() => {
 	throw new Error("unused");
 }) as unknown as ReturnType<typeof makeImageProcessor>;
 
+/**
+ * A nonce that appears ONLY in the fabricated tool result, never in the
+ * assistant's visible content — the semantic proof scenario's whole point.
+ * High-entropy enough that a model cannot plausibly guess or hallucinate it.
+ */
+const NONCE = "Q7M4-XP29";
+
+/**
+ * Same shape as storedHistory, but the tool result carries a fact (the
+ * nonce) that the visible assistant answer never restates. Flat history
+ * drops the tool entirely, so a model can only produce the nonce in the
+ * follow-up if it actually saw replayed tool history — unlike storedHistory
+ * above, where the visible answer already gives away every fact the
+ * follow-up asks about.
+ *
+ * Framed as a weather station id, not "internal_reference": an early version
+ * used that field name and a safety-tuned model (Kimi-K3) correctly recalled
+ * it in its own reasoning_content but then refused to repeat it, reading
+ * "internal" as "not meant for the user" — a fixture-wording false negative,
+ * not a replay failure. A station id has no such ambiguity.
+ */
+const storedNonceHistory: EndpointMessage[] = [
+	{ from: "user", content: "What's the weather in Paris right now?" },
+	{
+		from: "assistant",
+		content: "<think>Checking the weather tool.</think>It's sunny and mild in Paris right now.",
+		updates: [
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Call,
+				uuid: "nonce-call-1",
+				call: { name: "get_weather", parameters: { city: "Paris" } },
+			},
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: "nonce-call-1",
+				result: {
+					status: ToolResultStatus.Success,
+					call: { name: "get_weather", parameters: { city: "Paris" } },
+					outputs: [{ text: `Sunny, 19°C. station_id=${NONCE}` }],
+				},
+			},
+		],
+	},
+	{
+		from: "user",
+		content:
+			"In one short sentence: what weather station ID did the tool report? It looked like XXXX-XXXX.",
+	},
+];
+
 /** Tool-less two-turn conversation for the plain-flow scenarios. */
 const storedPlainHistory: EndpointMessage[] = [
 	{ from: "user", content: "If a train travels 120 km in 1.5 hours, what is its average speed?" },
@@ -155,6 +274,14 @@ type Scenario = {
 	messages: ChatMessage[];
 	withTools: boolean;
 	expect: RegExp[];
+	/**
+	 * Semantic gate on the final answer text, independent of `expect`:
+	 * "must-contain" fails the scenario (regardless of HTTP-level success) if
+	 * the nonce is absent; "must-not-contain" is informational only (logged,
+	 * never gates) — a sanity check that the flat baseline truly has no way
+	 * to know the nonce.
+	 */
+	nonceCheck?: "must-contain" | "must-not-contain";
 };
 
 /** Baseline scenario name → scenarios that must not regress against it. */
@@ -163,7 +290,15 @@ const FAMILIES: Record<string, string[]> = {
 	"P1-plain": ["P2-reasoning"],
 };
 
-async function buildScenarios(): Promise<Scenario[]> {
+/**
+ * Builds the scenario set for one model. `supportsReasoning` should be that
+ * model's real MODEL_SUPPORTS_REASONING value: it decides attachReasoning for
+ * every cross-turn scenario (S2/P2/N2) the same way production resolves it,
+ * so an unflagged model is tested against the shape it will actually receive
+ * rather than one forced uniformly onto every model. S3-inloop is the one
+ * exception — see MODEL_SUPPORTS_REASONING's doc comment for why.
+ */
+async function buildScenarios(supportsReasoning: boolean): Promise<Scenario[]> {
 	const toolExpect = [/paris/i, /18/];
 	const plainExpect = [/80/];
 	const withSystem = (msgs: ChatMessage[]): ChatMessage[] => [
@@ -175,10 +310,14 @@ async function buildScenarios(): Promise<Scenario[]> {
 	const replay = withSystem(
 		await prepareMessagesWithFiles(storedHistory, imageProcessor, false, {
 			replayToolHistory: true,
+			attachReasoning: supportsReasoning,
 		})
 	);
 	// S3: attach reasoning_content to the first tool-call assistant message,
-	// mirroring what runMcpFlow sends between rounds of a live turn.
+	// mirroring what runMcpFlow sends between rounds of a live turn. Built
+	// from `replay` above, but only ever touches the tool-call message (never
+	// gated by attachReasoning either in this fixture or in production), so
+	// it's unaffected by whichever attachReasoning value built `replay`.
 	const inloop: ChatMessage[] = replay.map((m) =>
 		m.role === "assistant" && "tool_calls" in m && m.tool_calls?.[0]?.id === "call10000"
 			? { ...m, reasoning_content: "The user wants current weather, calling get_weather first." }
@@ -189,7 +328,21 @@ async function buildScenarios(): Promise<Scenario[]> {
 	);
 	const plainReasoning = withSystem(
 		await prepareMessagesWithFiles(storedPlainHistory, imageProcessor, false, {
-			attachReasoning: true,
+			attachReasoning: supportsReasoning,
+		})
+	);
+	const nonceFlat = withSystem(
+		await prepareMessagesWithFiles(storedNonceHistory, imageProcessor, false)
+	);
+	// The nonce itself lives in the replayed tool RESULT, which is always
+	// replayed unconditionally (tool replay is never gated by
+	// attachReasoning) — so this scenario's semantic proof is unaffected by
+	// supportsReasoning either way; it's threaded through purely so an
+	// unflagged model isn't sent an unrealistic reasoning_content alongside it.
+	const nonceReplay = withSystem(
+		await prepareMessagesWithFiles(storedNonceHistory, imageProcessor, false, {
+			replayToolHistory: true,
+			attachReasoning: supportsReasoning,
 		})
 	);
 
@@ -199,6 +352,20 @@ async function buildScenarios(): Promise<Scenario[]> {
 		{ name: "S3-inloop", messages: inloop, withTools: true, expect: toolExpect },
 		{ name: "P1-plain", messages: plain, withTools: false, expect: plainExpect },
 		{ name: "P2-reasoning", messages: plainReasoning, withTools: false, expect: plainExpect },
+		{
+			name: "N1-nonce-flat",
+			messages: nonceFlat,
+			withTools: true,
+			expect: [],
+			nonceCheck: "must-not-contain",
+		},
+		{
+			name: "N2-nonce-replay",
+			messages: nonceReplay,
+			withTools: true,
+			expect: [],
+			nonceCheck: "must-contain",
+		},
 	];
 }
 
@@ -208,6 +375,8 @@ type RunResult = {
 	totalMs: number;
 	genTokens: number;
 	coherent?: boolean;
+	/** Only set when scenario.nonceCheck is defined; see that field's doc. */
+	nonceOk?: boolean;
 	note: string;
 };
 
@@ -295,12 +464,21 @@ async function runOne(
 		}
 		const coherent =
 			content.length > 0 ? scenario.expect.every((re) => re.test(content)) : undefined;
+		// A tool-calls-only response (no text) never satisfies a nonce check:
+		// the semantic proof requires the fact to appear in the model's actual
+		// answer, not just that some request happened to succeed.
+		const nonceOk = scenario.nonceCheck
+			? scenario.nonceCheck === "must-contain"
+				? content.includes(NONCE)
+				: !content.includes(NONCE)
+			: undefined;
 		return {
 			ok: true,
 			ttftMs,
 			totalMs,
 			genTokens,
 			coherent,
+			nonceOk,
 			note: sawToolCall && !content ? "answered with tool_calls" : content.slice(0, 80),
 		};
 	} catch (err) {
@@ -325,6 +503,8 @@ type ScenarioStats = {
 	okCount: number;
 	repCount: number;
 	coherent?: boolean;
+	/** Only meaningful when the scenario has nonceCheck: "must-contain". */
+	nonceOk?: boolean;
 	ttftMs?: number;
 	tokPerSec?: number;
 	totalMs?: number;
@@ -350,12 +530,16 @@ async function runModel(
 		// different schema validation) is a real half-failure, not a
 		// compatibility pass. okCount/repCount surface the partial case
 		// distinctly instead of rounding it up to "ok".
+		// nonceOk is likewise strict: every successful rep must satisfy the
+		// nonce check, not just one out of REPS.
+		const nonceRuns = okRuns.filter((r) => r.nonceOk !== undefined);
 		stats.push({
 			scenario: scenario.name,
 			ok: okRuns.length === runs.length,
 			okCount: okRuns.length,
 			repCount: runs.length,
 			coherent: okRuns.find((r) => r.coherent !== undefined)?.coherent,
+			nonceOk: nonceRuns.length > 0 ? nonceRuns.every((r) => r.nonceOk) : undefined,
 			ttftMs: median(speedRuns.map((r) => r.ttftMs ?? 0)),
 			tokPerSec: median(
 				speedRuns.map(
@@ -378,22 +562,39 @@ async function main() {
 	});
 	if (!modelsRes.ok) throw new Error(`GET /models failed: HTTP ${modelsRes.status}`);
 	const modelsJson = (await modelsRes.json()) as { data?: Array<{ id: string }> };
-	const models = (modelsJson.data ?? []).slice(0, MODEL_COUNT).map((m) => m.id);
-
-	const scenarios = await buildScenarios();
-	for (const scenario of scenarios) {
-		console.log(`${scenario.name}: payload ${JSON.stringify(scenario.messages).length} chars`);
+	const availableIds = new Set((modelsJson.data ?? []).map((m) => m.id));
+	const models = PINNED_MODELS.filter((id) => availableIds.has(id));
+	const missing = PINNED_MODELS.filter((id) => !availableIds.has(id));
+	if (missing.length > 0) {
+		console.log(`Skipping pinned models no longer on the router: ${missing.join(", ")}`);
 	}
-	console.log(`Testing ${models.length} models, ${REPS} reps per scenario:\n`);
+
+	// Scenarios are built per model (attachReasoning depends on each model's
+	// real supportsReasoning flag — see buildScenarios's doc comment), so log
+	// representative payload sizes for both variants once instead of per model.
+	for (const supportsReasoning of [true, false]) {
+		const sample = await buildScenarios(supportsReasoning);
+		console.log(`--- payload sizes (supportsReasoning=${supportsReasoning}) ---`);
+		for (const scenario of sample) {
+			console.log(`${scenario.name}: payload ${JSON.stringify(scenario.messages).length} chars`);
+		}
+	}
+	console.log(`\nTesting ${models.length} models, ${REPS} reps per scenario:\n`);
 
 	const results = await Promise.all(
 		models.map(async (model) => ({
 			model,
-			stats: await runModel(baseUrl, apiKey, model, scenarios),
+			stats: await runModel(
+				baseUrl,
+				apiKey,
+				model,
+				await buildScenarios(MODEL_SUPPORTS_REASONING[model] ?? false)
+			),
 		}))
 	);
 
 	let regressions = 0;
+	let semanticFailures = 0;
 	const fmt = (n?: number) => (n === undefined ? "   —" : String(Math.round(n)).padStart(4));
 	console.log("\n=== RESULTS (median over reps; ttft ms | ~tok/s | total ms) ===");
 	for (const { model, stats } of results) {
@@ -403,27 +604,40 @@ async function main() {
 				baseStat?.ok && dependents.some((name) => !stats.find((s) => s.scenario === name)?.ok)
 			);
 		});
+		// Semantic gate: N2-nonce-replay succeeding at the HTTP level is not
+		// enough — the nonce must actually appear in the answer, or replay
+		// isn't proven to work, only that the provider accepted the shape.
+		// nonceOk is independent of overall scenario.ok on purpose: runModel
+		// already scopes it to only the reps that succeeded (nonceRuns), so a
+		// rep that failed at the HTTP level (timeout, 5xx) must never mask a
+		// DIFFERENT rep that succeeded and directly demonstrated the nonce is
+		// missing — that observed failure is real signal either way.
+		const nonceScenario = stats.find((s) => s.scenario === "N2-nonce-replay");
+		const semanticFailure = nonceScenario?.nonceOk === false;
 		if (regressed) regressions += 1;
-		console.log(`${regressed ? "❌" : "✅"} ${model}`);
+		if (semanticFailure) semanticFailures += 1;
+		console.log(`${regressed || semanticFailure ? "❌" : "✅"} ${model}`);
 		for (const s of stats) {
 			const partial = !s.ok && s.okCount > 0;
-			const status = s.ok
-				? `OK${s.coherent === false ? "(incoherent)" : ""}`
-				: partial
-					? `FLAKY(${s.okCount}/${s.repCount})`
-					: "FAIL";
+			const nonceFailed = s.nonceOk === false;
+			const status = !s.ok
+				? `${partial ? `FLAKY(${s.okCount}/${s.repCount})` : "FAIL"}${nonceFailed ? ", no nonce" : ""}`
+				: nonceFailed
+					? "OK(no nonce)"
+					: `OK${s.coherent === false ? "(incoherent)" : ""}`;
 			console.log(
-				`    ${s.scenario.padEnd(12)} ${status.padEnd(14)} ttft ${fmt(s.ttftMs)} | ${fmt(
+				`    ${s.scenario.padEnd(16)} ${status.padEnd(14)} ttft ${fmt(s.ttftMs)} | ${fmt(
 					s.tokPerSec
-				)} tok/s | total ${fmt(s.totalMs)}${s.ok ? "" : `  ${s.note}`}`
+				)} tok/s | total ${fmt(s.totalMs)}${s.ok && !nonceFailed ? "" : `  ${s.note}`}`
 			);
 		}
 	}
 
 	console.log(
-		`\n${regressions === 0 ? "SHIPPABLE" : "NOT SHIPPABLE"}: ${regressions} model(s) regressed vs baseline.`
+		`\n${regressions === 0 && semanticFailures === 0 ? "SHIPPABLE" : "NOT SHIPPABLE"}: ` +
+			`${regressions} model(s) shape-regressed, ${semanticFailures} model(s) failed the nonce semantic proof.`
 	);
-	process.exit(regressions === 0 ? 0 : 1);
+	process.exit(regressions === 0 && semanticFailures === 0 ? 0 : 1);
 }
 
 main().catch((err) => {

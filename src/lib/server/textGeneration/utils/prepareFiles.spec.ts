@@ -481,4 +481,214 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 			},
 		]);
 	});
+
+	it("strips historical <think> content even with attachReasoning disabled (Gemma-style models)", async () => {
+		// Some vendors (Gemma) document that historical thoughts must be
+		// stripped across completed turns. Previously, attachReasoning:false
+		// fell through to raw message.content, leaking inline <think> text.
+		const messages: EndpointMessage[] = [
+			{ from: "assistant", content: "<think>private prior thought</think>Final answer" },
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			attachReasoning: false,
+		});
+		expect(prepared).toEqual([{ role: "assistant", content: "Final answer" }]);
+	});
+
+	it("strips historical <think> content with no options passed at all", async () => {
+		const messages: EndpointMessage[] = [
+			{ from: "assistant", content: "<think>thought</think>done" },
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false);
+		expect(prepared).toEqual([{ role: "assistant", content: "done" }]);
+	});
+
+	it("strips an empty <think></think> block even when nothing survives to attach as reasoning", async () => {
+		const messages: EndpointMessage[] = [{ from: "assistant", content: "<think></think>Hello" }];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			attachReasoning: true,
+		});
+		expect(prepared).toEqual([{ role: "assistant", content: "Hello" }]);
+	});
+
+	it("suppresses reasoning_content for a message produced by a different router-resolved model", async () => {
+		// Under the "omni" router alias, each turn can be produced by a
+		// different model. Reasoning is conditioned on its own producer, so a
+		// message routed to model A must not have its reasoning replayed when
+		// the current turn targets model B.
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "<think>model A's private reasoning</think>answer from A",
+				routerMetadata: { route: "r", model: "model-a" },
+			},
+		];
+		const suppressed = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			attachReasoning: true,
+			currentProducerModel: "model-b",
+		});
+		expect(suppressed).toEqual([{ role: "assistant", content: "answer from A" }]);
+
+		const allowed = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			attachReasoning: true,
+			currentProducerModel: "model-a",
+		});
+		expect(allowed).toEqual([
+			{
+				role: "assistant",
+				content: "answer from A",
+				reasoning_content: "model A's private reasoning",
+			},
+		]);
+	});
+
+	it("treats a message with no routerMetadata as same-producer (the common pinned-model case)", async () => {
+		const messages: EndpointMessage[] = [
+			{ from: "assistant", content: "<think>reasoning</think>answer" },
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			attachReasoning: true,
+			currentProducerModel: "any-model",
+		});
+		expect(prepared).toEqual([
+			{ role: "assistant", content: "answer", reasoning_content: "reasoning" },
+		]);
+	});
+
+	it("gates replayed tool-round reasoning by producer, but always replays tool calls/results", async () => {
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "done",
+				routerMetadata: { route: "r", model: "model-a" },
+				updates: [
+					{
+						...callUpdate("u1", "get_weather", { city: "Paris" }),
+						reasoning: "model A reasoning",
+					},
+					resultUpdate("u1", "get_weather", "18°C"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+			currentProducerModel: "model-b",
+		});
+		// Tool calls and results are protocol-neutral and always replay.
+		expect(prepared).toEqual([
+			{
+				role: "assistant",
+				tool_calls: [
+					{
+						id: "u10000000",
+						type: "function",
+						function: { name: "get_weather", arguments: '{"city":"Paris"}' },
+					},
+				],
+			},
+			{ role: "tool", tool_call_id: "u10000000", content: "18°C" },
+			{ role: "assistant", content: "done" },
+		]);
+		// No reasoning_content anywhere, since the producer doesn't match.
+		expect(prepared.some((m) => "reasoning_content" in m)).toBe(false);
+	});
+
+	it("replays the persisted raw arguments string instead of reserializing sanitized parameters", async () => {
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "done",
+				updates: [
+					{
+						...callUpdate("u1", "search", { query: "x" }),
+						argumentsRaw: '{"query":{"city":"Paris","units":"metric"},"images":["image_1"]}',
+					},
+					resultUpdate("u1", "search", "res"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const callMessage = prepared[0] as { tool_calls?: Array<{ function: { arguments: string } }> };
+		expect(callMessage.tool_calls?.[0]?.function.arguments).toBe(
+			'{"query":{"city":"Paris","units":"metric"},"images":["image_1"]}'
+		);
+	});
+
+	it("falls back to sanitized parameters when argumentsRaw was not persisted (legacy messages)", async () => {
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "done",
+				updates: [callUpdate("u1", "search", { q: "x" }), resultUpdate("u1", "search", "res")],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const callMessage = prepared[0] as { tool_calls?: Array<{ function: { arguments: string } }> };
+		expect(callMessage.tool_calls?.[0]?.function.arguments).toBe('{"q":"x"}');
+	});
+
+	it("falls back to sanitized parameters when a persisted argumentsRaw is not valid JSON", async () => {
+		// toolInvocation.ts already guards this at write time, but replay must
+		// never trust a persisted argumentsRaw blindly at its own read
+		// boundary — defense in depth against a future write path or
+		// otherwise-corrupted data. Invalid JSON here must never reach the
+		// outgoing tool_calls.function.arguments, since a provider that
+		// validates that field could reject the whole continuation.
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "done",
+				updates: [
+					{ ...callUpdate("u1", "search", { q: "x" }), argumentsRaw: '{"q":"unterminated' },
+					resultUpdate("u1", "search", "res"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const callMessage = prepared[0] as { tool_calls?: Array<{ function: { arguments: string } }> };
+		expect(callMessage.tool_calls?.[0]?.function.arguments).toBe('{"q":"x"}');
+		expect(() => JSON.parse(callMessage.tool_calls?.[0]?.function.arguments ?? "")).not.toThrow();
+	});
+
+	it("falls back to sanitized parameters when a persisted argumentsRaw is valid JSON but not an object", async () => {
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "done",
+				updates: [
+					{ ...callUpdate("u1", "search", { q: "x" }), argumentsRaw: "[1,2,3]" },
+					resultUpdate("u1", "search", "res"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const callMessage = prepared[0] as { tool_calls?: Array<{ function: { arguments: string } }> };
+		expect(callMessage.tool_calls?.[0]?.function.arguments).toBe('{"q":"x"}');
+	});
+
+	it("still emits the normalized tool_call_id even when the original provider id is persisted", async () => {
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "done",
+				updates: [
+					{ ...callUpdate("u1", "search", { q: "x" }), originalId: "call_abc123XYZ" },
+					resultUpdate("u1", "search", "res"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const callMessage = prepared[0] as { tool_calls?: Array<{ id: string }> };
+		expect(callMessage.tool_calls?.[0]?.id).toBe("u10000000");
+	});
 });

@@ -12,6 +12,7 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
+import { isValidJsonObject } from "$lib/server/textGeneration/mcp/toolInvocation";
 
 type ChatMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -58,6 +59,26 @@ const isToolErrorUpdate = (u: MessageUpdate): u is MessageToolErrorUpdate =>
 	u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Error;
 
 /**
+ * Whether a historical message's own producer (its persisted
+ * `routerMetadata.model`, set for messages generated through the "omni"
+ * router alias) matches the model about to consume the request. A message
+ * with no routerMetadata was produced by whatever single model the
+ * conversation is pinned to — the common case — and is always treated as
+ * same-producer since there is nothing to contradict. Reasoning is
+ * conditioned on the producing model's own prior thoughts; attaching one
+ * model's reasoning_content to a different model's turn is unverified and
+ * skipped rather than risked. Tool call/result replay is protocol-neutral
+ * (a `tool` message is just data) and is never gated by this.
+ */
+function reasoningProducerMatches(
+	message: EndpointMessage,
+	currentProducerModel?: string
+): boolean {
+	const producer = message.routerMetadata?.model;
+	return !producer || !currentProducerModel || producer === currentProducerModel;
+}
+
+/**
  * Split `<think>` blocks out of assistant text, merging them with the
  * separately persisted `message.reasoning` when present. Parts are returned
  * individually so replay can pair round reasoning back to its tool round.
@@ -93,8 +114,10 @@ function stripThink(content: string): string {
  * summary. Rounds are inferred from update order — a Call update arriving
  * after any Result/Error starts a new round, matching how the live loop emits
  * one batch of calls per completion round. Each call's `tool_call_id` is
- * derived from the persisted update uuid via toToolCallId (the original
- * model-issued id is not persisted).
+ * always the normalized id from toToolCallId, even though the original
+ * provider-issued id may also be persisted (see MessageToolCallUpdate):
+ * emitting it unconditionally keeps one code path and satisfies every
+ * provider's id-shape requirements, including Mistral-family templates.
  */
 function replayAssistantTurn(
 	message: EndpointMessage,
@@ -209,15 +232,27 @@ function replayAssistantTurn(
 		// (messages recorded before this field existed have none); omitted
 		// otherwise since some OpenAI-compatible backends reject empty text
 		// next to tool_calls with a 400.
-		// Arguments are best-effort: updates persist only top-level primitive
-		// params (nested values and file payloads are deliberately kept out of
-		// storage), so the replay may be a subset of what the tool ran with.
+		// Arguments prefer the persisted raw JSON string the model actually
+		// sent (argumentsRaw): the sanitized fallback only keeps top-level
+		// primitive params (nested values and file payloads are deliberately
+		// kept out of storage), so it can under-represent the real call.
+		// Legacy updates without argumentsRaw, and any argumentsRaw that
+		// somehow isn't valid JSON (toolInvocation.ts already guards this at
+		// write time, but a replayed value must never be trusted blindly at
+		// its own read boundary — belt and suspenders against a future write
+		// path or manipulated data), fall back to the sanitized form.
 		replayed.push({
 			role: "assistant",
 			tool_calls: callsInRound.map((u) => ({
 				id: idByUuid.get(u.uuid) ?? u.uuid,
 				type: "function" as const,
-				function: { name: u.call.name, arguments: JSON.stringify(u.call.parameters ?? {}) },
+				function: {
+					name: u.call.name,
+					arguments:
+						u.argumentsRaw && isValidJsonObject(u.argumentsRaw)
+							? u.argumentsRaw
+							: JSON.stringify(u.call.parameters ?? {}),
+				},
 			})),
 			...(roundContent.trim().length > 0 ? { content: roundContent } : {}),
 			...(roundReasoning ? { reasoning_content: roundReasoning } : {}),
@@ -247,6 +282,9 @@ function replayAssistantTurn(
  * - Processes images via the provided imageProcessor (resize/convert) when multimodal is enabled.
  * - Injects text-file content into the user message text.
  * - Leaves messages untouched when no files or multimodal disabled.
+ * - Historical assistant `<think>` blocks are always stripped from outgoing
+ *   content, whether or not any reasoning option below is set: raw think
+ *   markup must never be replayed as visible text to any model.
  * - With `replayToolHistory`, expands past assistant turns into their
  *   assistant/tool message pairs (from persisted updates) and re-attaches
  *   reasoning as `reasoning_content` instead of inline `<think>` text.
@@ -255,12 +293,23 @@ function replayAssistantTurn(
  *   tool messages would be undefined behavior (no `tools` in the request).
  *   Callers gate it on the model's reasoning capability; with
  *   `replayToolHistory` it defaults to on unless explicitly disabled.
+ * - `currentProducerModel` additionally gates reasoning_content per message:
+ *   a message routed (via the router alias) to a different model than the
+ *   one about to consume this request has its reasoning suppressed, since
+ *   reasoning is conditioned on the producing model's own prior thoughts.
+ *   Messages with no routerMetadata (the common pinned-model case) are
+ *   unaffected. Tool call/result replay is protocol-neutral and always
+ *   proceeds regardless of producer.
  */
 export async function prepareMessagesWithFiles(
 	messages: EndpointMessage[],
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
 	isMultimodal: boolean,
-	options?: { replayToolHistory?: boolean; attachReasoning?: boolean }
+	options?: {
+		replayToolHistory?: boolean;
+		attachReasoning?: boolean;
+		currentProducerModel?: string;
+	}
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
 	type ReplayCandidate = { replay: AssistantReplayMessage[]; flat: ChatMessageParam };
 	const prepared = await Promise.all(
@@ -285,6 +334,12 @@ export async function prepareMessagesWithFiles(
 				return [{ role: message.from, content: messageText }];
 			}
 			if (message.from === "assistant") {
+				const wantsReasoning =
+					(options?.replayToolHistory
+						? (options?.attachReasoning ?? true)
+						: Boolean(options?.attachReasoning)) &&
+					reasoningProducerMatches(message, options?.currentProducerModel);
+
 				if (options?.replayToolHistory) {
 					// The budget-fallback `flat` must still strip <think>, not just
 					// drop the reasoning_content/tool-replay enrichments: the raw
@@ -297,27 +352,26 @@ export async function prepareMessagesWithFiles(
 						content: stripThink(message.content),
 					};
 					return {
-						replay: replayAssistantTurn(message, options?.attachReasoning ?? true),
+						replay: replayAssistantTurn(message, wantsReasoning),
 						flat,
 					};
 				}
-				if (options?.attachReasoning) {
-					const { visible, parts } = splitReasoning(message.content, message.reasoning);
-					const reasoning = parts.join("\n");
-					if (reasoning.length === 0) {
-						// Nothing was found to strip, so the raw content is already
-						// the correct shape.
-						return [{ role: "assistant", content: message.content }];
-					}
-					// Candidate, not a plain array, so the reasoning payload goes
-					// through the same newest-first budget as tool replay. The
-					// fallback keeps the same stripped `visible` text and just
-					// drops reasoning_content, for the same reason as above.
-					return {
-						replay: [{ role: "assistant", content: visible, reasoning_content: reasoning }],
-						flat: { role: "assistant", content: visible },
-					};
+				const { visible, parts } = splitReasoning(message.content, message.reasoning);
+				const reasoning = parts.join("\n");
+				if (!wantsReasoning || reasoning.length === 0) {
+					// Either nothing to attach, or attachment is disabled/gated:
+					// either way `visible` (think-stripped) is the correct shape,
+					// never the raw `message.content`.
+					return [{ role: "assistant", content: visible }];
 				}
+				// Candidate, not a plain array, so the reasoning payload goes
+				// through the same newest-first budget as tool replay. The
+				// fallback keeps the same stripped `visible` text and just
+				// drops reasoning_content, for the same reason as above.
+				return {
+					replay: [{ role: "assistant", content: visible, reasoning_content: reasoning }],
+					flat: { role: "assistant", content: visible },
+				};
 			}
 			return [{ role: message.from, content: message.content }];
 		})
