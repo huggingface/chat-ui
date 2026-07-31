@@ -751,7 +751,13 @@ export async function* runMcpFlow({
 						return "";
 					}
 				);
-				const reasoningForToolMsg = thinkParts.join("\n").trim();
+				// Trim only to TEST for emptiness — the joined value itself must stay
+				// byte-exact once it's echoed back and persisted: vendors documenting
+				// preserved thinking (e.g. Z.ai's "must return the complete,
+				// unmodified reasoning_content") can condition on or cache against the
+				// exact bytes, so stripping whitespace here would send a corrupted
+				// trace on the next round/turn.
+				const reasoningForToolMsg = thinkParts.join("\n");
 				// Omit `content` entirely when nothing visible remains — some
 				// OpenAI-compatible backends 400 on empty text next to tool_calls.
 				const assistantToolMessage: ChatCompletionMessageParam & { reasoning_content?: string } = {
@@ -760,7 +766,9 @@ export async function* runMcpFlow({
 					...(assistantContentForToolMsg.trim().length > 0
 						? { content: assistantContentForToolMsg }
 						: {}),
-					...(reasoningForToolMsg.length > 0 ? { reasoning_content: reasoningForToolMsg } : {}),
+					...(reasoningForToolMsg.trim().length > 0
+						? { reasoning_content: reasoningForToolMsg }
+						: {}),
 				};
 
 				const exec = executeToolCalls({
@@ -773,8 +781,10 @@ export async function* runMcpFlow({
 					processToolOutput,
 					abortSignal,
 					// Persisted on the round's first Call update so history replay
-					// can re-attach this round's reasoning to its own message.
+					// can re-attach this round's reasoning and preamble text to its
+					// own message instead of moving them onto the final answer.
 					roundReasoning: reasoningForToolMsg,
+					roundContent: assistantContentForToolMsg,
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;

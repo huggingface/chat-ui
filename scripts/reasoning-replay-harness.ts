@@ -322,6 +322,8 @@ const median = (values: number[]): number | undefined => {
 type ScenarioStats = {
 	scenario: string;
 	ok: boolean;
+	okCount: number;
+	repCount: number;
 	coherent?: boolean;
 	ttftMs?: number;
 	tokPerSec?: number;
@@ -343,9 +345,16 @@ async function runModel(
 		}
 		const okRuns = runs.filter((r) => r.ok);
 		const speedRuns = okRuns.filter((r) => r.ttftMs !== undefined && r.genTokens > 1);
+		// Require every repetition to pass: a scenario that succeeds once and
+		// fails once (e.g. a request landing on a provider variant with
+		// different schema validation) is a real half-failure, not a
+		// compatibility pass. okCount/repCount surface the partial case
+		// distinctly instead of rounding it up to "ok".
 		stats.push({
 			scenario: scenario.name,
-			ok: okRuns.length > 0,
+			ok: okRuns.length === runs.length,
+			okCount: okRuns.length,
+			repCount: runs.length,
 			coherent: okRuns.find((r) => r.coherent !== undefined)?.coherent,
 			ttftMs: median(speedRuns.map((r) => r.ttftMs ?? 0)),
 			tokPerSec: median(
@@ -397,9 +406,14 @@ async function main() {
 		if (regressed) regressions += 1;
 		console.log(`${regressed ? "❌" : "✅"} ${model}`);
 		for (const s of stats) {
-			const status = s.ok ? `OK${s.coherent === false ? "(incoherent)" : ""}` : "FAIL";
+			const partial = !s.ok && s.okCount > 0;
+			const status = s.ok
+				? `OK${s.coherent === false ? "(incoherent)" : ""}`
+				: partial
+					? `FLAKY(${s.okCount}/${s.repCount})`
+					: "FAIL";
 			console.log(
-				`    ${s.scenario.padEnd(12)} ${status.padEnd(5)} ttft ${fmt(s.ttftMs)} | ${fmt(
+				`    ${s.scenario.padEnd(12)} ${status.padEnd(14)} ttft ${fmt(s.ttftMs)} | ${fmt(
 					s.tokPerSec
 				)} tok/s | total ${fmt(s.totalMs)}${s.ok ? "" : `  ${s.note}`}`
 			);
