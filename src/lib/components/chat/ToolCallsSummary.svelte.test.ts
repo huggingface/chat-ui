@@ -5,8 +5,7 @@ import { page } from "@vitest/browser/context";
 import { describe, expect, it } from "vitest";
 
 type ProcessBlock =
-	| { type: "think"; content: string; closed: boolean }
-	| { type: "tool"; uuid: string; updates: [] };
+	{ type: "think"; content: string; closed: boolean } | { type: "tool"; uuid: string; updates: [] };
 
 const thinkBlock = (content: string): ProcessBlock => ({ type: "think", content, closed: true });
 const toolBlock = (uuid: string): ProcessBlock => ({ type: "tool", uuid, updates: [] });

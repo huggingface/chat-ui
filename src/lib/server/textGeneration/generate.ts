@@ -36,8 +36,7 @@ export async function* generate(
 	let status = "";
 	const startTime = new Date();
 	const modelReasoning = Reflect.get(model, "reasoning") as
-		| { type: string; beginToken?: string; endToken?: string; regex?: string }
-		| undefined;
+		{ type: string; beginToken?: string; endToken?: string; regex?: string } | undefined;
 	if (
 		modelReasoning &&
 		(modelReasoning.type === "regex" ||
