@@ -79,6 +79,22 @@ export interface MessageToolCallUpdate extends MessageToolUpdateBase<MessageTool
 	 * this field existed.
 	 */
 	content?: string;
+	/**
+	 * Original provider-issued tool_call id and raw JSON arguments string, as
+	 * sent by the model (set on every Call update; argumentsRaw only when it
+	 * validates as JSON — a malformed string is never persisted here, since
+	 * replaying invalid JSON in a historical tool call could get the whole
+	 * continuation rejected by providers that validate the field). Replay
+	 * uses argumentsRaw when present for byte-accurate arguments instead of
+	 * reserializing the sanitized primitive parameters; the emitted
+	 * tool_call_id is always the
+	 * normalized one regardless (see toToolCallId in prepareFiles.ts), so
+	 * originalId is captured for future fidelity but not replayed as-is.
+	 * Absent on messages persisted before this field existed, or if the
+	 * provider's response omitted an id.
+	 */
+	originalId?: string;
+	argumentsRaw?: string;
 }
 
 export interface MessageToolResultUpdate extends MessageToolUpdateBase<MessageToolUpdateType.Result> {

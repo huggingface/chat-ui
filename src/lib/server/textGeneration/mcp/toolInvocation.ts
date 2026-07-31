@@ -58,6 +58,24 @@ export type ToolExecutionEvent =
 	| { type: "update"; update: MessageUpdate }
 	| { type: "complete"; summary: ToolCallExecutionResult };
 
+/**
+ * Whether a string is valid, parseable JSON encoding an object. Guards
+ * argumentsRaw persistence: a model can stream a truncated or otherwise
+ * malformed `arguments` string, which `parseArgs` already tolerates for the
+ * live tool call (falling back to `{}`), but persisting that malformed
+ * string as argumentsRaw would later replay invalid JSON as a historical
+ * tool_calls.function.arguments — some providers validate that field and
+ * would reject the whole continuation, not just this one call.
+ */
+export function isValidJsonObject(raw: string): boolean {
+	try {
+		const parsed: unknown = JSON.parse(raw);
+		return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
+	} catch {
+		return false;
+	}
+}
+
 const serverMap = (servers: McpServerConfig[]): Map<string, McpServerConfig> => {
 	const map = new Map<string, McpServerConfig>();
 	for (const server of servers) {
@@ -119,6 +137,10 @@ export async function* executeToolCalls({
 				subtype: MessageToolUpdateType.Call,
 				uuid: p.uuid,
 				call: { name: p.call.name, parameters: p.paramsClean },
+				...(p.call.id?.trim() ? { originalId: p.call.id } : {}),
+				...(p.call.arguments?.trim() && isValidJsonObject(p.call.arguments)
+					? { argumentsRaw: p.call.arguments }
+					: {}),
 				...(index === 0 && roundReasoning?.trim() ? { reasoning: roundReasoning } : {}),
 				// Preamble text is trimmed (unlike reasoning, which stays
 				// byte-exact): replay compares it against the trim-normalized

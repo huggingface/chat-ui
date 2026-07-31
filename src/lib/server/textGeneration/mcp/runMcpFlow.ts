@@ -357,6 +357,11 @@ export async function* runMcpFlow({
 				attachReasoning:
 					reasoningOverride ??
 					Boolean((targetModel as unknown as { supportsReasoning?: boolean }).supportsReasoning),
+				// The model resolved for THIS turn. Under the "omni" router alias a
+				// prior turn in the same conversation can have been produced by a
+				// different model (per-message routing, no user action needed); this
+				// gates reasoning_content to only replay onto its own producer.
+				currentProducerModel: candidateModelId ?? targetModel.id ?? targetModel.name,
 			}
 		);
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
