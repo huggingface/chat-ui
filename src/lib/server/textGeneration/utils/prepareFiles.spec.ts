@@ -305,6 +305,34 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		]);
 	});
 
+	it("does not delete an unrelated final reasoning block during round dedup, only the positionally-matching one", async () => {
+		// The round's persisted reasoning ("Need weather forecast") doesn't
+		// exactly match either extracted <think> block, so exact match misses.
+		// It DOES contain "Need weather" (the round's own, positionally-first,
+		// mismatched-by-formatting block) as a substring, but it also contains
+		// "weather" (the unrelated final block) as a substring — only the first
+		// must be removed; the final block must survive.
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "<think>Need weather</think><think>weather</think>Final text.",
+				updates: [
+					{
+						...callUpdate("u1", "get_weather", { city: "Paris" }),
+						reasoning: "Need weather forecast",
+					},
+					resultUpdate("u1", "get_weather", "18°C"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const finalMessage = prepared.at(-1) as { content?: string; reasoning_content?: string };
+		expect(finalMessage.content).toBe("Final text.");
+		expect(finalMessage.reasoning_content).toBe("weather");
+	});
+
 	it("never expands an older turn when a newer turn already fell back to flat", async () => {
 		// The newest turn alone exceeds the 100k budget, so it goes flat; the
 		// older turn must then go flat too, even though it would fit on its own.
@@ -364,6 +392,21 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		});
 		expect(prepared).toEqual([{ role: "assistant", content: "plain answer" }]);
 		expect("reasoning_content" in prepared[0]).toBe(false);
+	});
+
+	it("omits an interrupted reasoning-only turn entirely when attachReasoning is off, instead of a phantom empty message", async () => {
+		// content is only a think block (no visible text ever streamed) and
+		// attachReasoning is false, so wantsReasoning is false: the plain
+		// {role: assistant, content: visible} path would otherwise emit an
+		// empty-content message with nothing else attached.
+		const messages: EndpointMessage[] = [
+			{ from: "user", content: "hi" },
+			{ from: "assistant", content: "<think>only reasoning, no answer</think>" },
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			attachReasoning: false,
+		});
+		expect(prepared).toEqual([{ role: "user", content: "hi" }]);
 	});
 
 	it("attachReasoning spends the same replay budget, oldest turns first, without leaking <think> in the fallback", async () => {

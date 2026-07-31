@@ -210,12 +210,16 @@ function replayAssistantTurn(
 			const exact = remainingParts.indexOf(roundReasoning);
 			if (exact !== -1) {
 				remainingParts.splice(exact, 1);
-			} else {
-				for (let i = remainingParts.length - 1; i >= 0; i -= 1) {
-					if (roundReasoning.includes(remainingParts[i])) {
-						remainingParts.splice(i, 1);
-					}
-				}
+			} else if (remainingParts.length > 0 && roundReasoning.includes(remainingParts[0])) {
+				// Positional fallback only, never a scan of the whole array: parts
+				// are chronologically ordered and rounds are processed oldest-first,
+				// so the earliest still-unconsumed part is the only one that can be
+				// attributed to this round when exact match fails (e.g. formatting
+				// drift). A LATER part merely being a substring of this round's
+				// reasoning is coincidence, not evidence it belongs here — removing
+				// it would silently delete an unrelated (and possibly the final
+				// answer's own) reasoning block.
+				remainingParts.splice(0, 1);
 			}
 		}
 		// Visible text streamed before this round's calls (e.g. "Let me check
@@ -371,8 +375,12 @@ export async function prepareMessagesWithFiles(
 				if (!wantsReasoning || reasoning.length === 0) {
 					// Either nothing to attach, or attachment is disabled/gated:
 					// either way `visible` (think-stripped) is the correct shape,
-					// never the raw `message.content`.
-					return [{ role: "assistant", content: visible }];
+					// never the raw `message.content` — but a turn interrupted
+					// before any visible text (or one whose only content was
+					// reasoning this call is gated from attaching) must not replay
+					// as a phantom `{role: assistant, content: ""}` with nothing
+					// else attached; omit it entirely instead.
+					return visible.length > 0 ? [{ role: "assistant", content: visible }] : [];
 				}
 				// Candidate, not a plain array, so the reasoning payload goes
 				// through the same newest-first budget as tool replay. The
