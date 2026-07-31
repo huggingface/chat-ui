@@ -197,6 +197,32 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(7);
 	});
 
+	it("never expands an older turn when a newer turn already fell back to flat", async () => {
+		// The newest turn alone exceeds the 100k budget, so it goes flat; the
+		// older turn must then go flat too, even though it would fit on its own.
+		const turn = (prefix: string, calls: number): EndpointMessage => ({
+			from: "assistant",
+			content: `${prefix} done`,
+			updates: Array.from({ length: calls }, (_, i) => [
+				callUpdate(`${prefix}${i}`, "search", { q: String(i) }),
+				resultUpdate(`${prefix}${i}`, "search", "x".repeat(8000)),
+			]).flat(),
+		});
+		const messages: EndpointMessage[] = [
+			turn("old", 2),
+			{ from: "user", content: "next" },
+			turn("new", 14),
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		expect(prepared).toEqual([
+			{ role: "assistant", content: "old done" },
+			{ role: "user", content: "next" },
+			{ role: "assistant", content: "new done" },
+		]);
+	});
+
 	it("attachReasoning splits reasoning out but never emits tool messages", async () => {
 		const messages: EndpointMessage[] = [
 			{ from: "user", content: "hi" },

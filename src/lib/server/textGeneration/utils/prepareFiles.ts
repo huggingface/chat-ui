@@ -250,8 +250,12 @@ export async function prepareMessagesWithFiles(
 	);
 
 	// Spend the replay budget newest-first so recent turns keep their full
-	// tool history and older ones degrade to the pre-replay flat shape.
+	// tool history and older ones degrade to the pre-replay flat shape. The
+	// degradation is monotonic: once any turn falls back to flat, every older
+	// turn does too, so the model never sees rich history for a stale turn
+	// while the turn it is continuing from is plain prose.
 	let budget = REPLAY_HISTORY_BUDGET_CHARS;
+	let exhausted = false;
 	const resolved: ChatMessageParam[][] = new Array(prepared.length);
 	for (let i = prepared.length - 1; i >= 0; i -= 1) {
 		const entry = prepared[i];
@@ -260,10 +264,11 @@ export async function prepareMessagesWithFiles(
 			continue;
 		}
 		const cost = JSON.stringify(entry.replay).length;
-		if (cost <= budget) {
+		if (!exhausted && cost <= budget) {
 			budget -= cost;
 			resolved[i] = entry.replay;
 		} else {
+			exhausted = true;
 			resolved[i] = [entry.flat];
 		}
 	}
