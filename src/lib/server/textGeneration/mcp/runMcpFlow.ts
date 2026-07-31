@@ -467,6 +467,11 @@ export async function* runMcpFlow({
 		// Track whether we're inside a <think> block when the upstream streams
 		// provider-specific reasoning tokens (e.g. `reasoning` or `reasoning_content`).
 		let thinkOpen = false;
+		// Leading whitespace-only reasoning deltas that arrived before the block
+		// opened (thinkOpen still false, so a blank chunk wouldn't otherwise open
+		// one). Held here and flushed once a non-blank delta opens the block, so
+		// the persisted trace stays byte-exact instead of silently dropping them.
+		let pendingReasoningWhitespace = "";
 
 		if (resolvedRoute && candidateModelId) {
 			yield {
@@ -489,6 +494,9 @@ export async function* runMcpFlow({
 
 			lastAssistantContent = "";
 			streamedContent = false;
+			// Discard any whitespace-only reasoning buffered but never flushed by a
+			// non-blank delta last round — it never became part of a real trace.
+			pendingReasoningWhitespace = "";
 
 			const completionRequest: ChatCompletionCreateParamsStreaming = {
 				...completionBase,
@@ -602,13 +610,18 @@ export async function* runMcpFlow({
 				// Whitespace-only deltas still count once a think block is open
 				// (paragraph breaks are part of the byte-exact trace); non-blank
 				// text is only required to OPEN a block, so stray leading
-				// whitespace can't create empty think blocks.
-				if (deltaReasoning.length > 0 && (thinkOpen || deltaReasoning.trim().length > 0)) {
-					if (!thinkOpen) {
-						combined += "<think>" + deltaReasoning;
+				// whitespace can't create empty think blocks on its own — but it
+				// must not be discarded either, so it's buffered until a non-blank
+				// delta arrives and flushed into the opening of the block.
+				if (deltaReasoning.length > 0) {
+					if (thinkOpen) {
+						combined += deltaReasoning;
+					} else if (deltaReasoning.trim().length > 0) {
+						combined += "<think>" + pendingReasoningWhitespace + deltaReasoning;
+						pendingReasoningWhitespace = "";
 						thinkOpen = true;
 					} else {
-						combined += deltaReasoning;
+						pendingReasoningWhitespace += deltaReasoning;
 					}
 				}
 
