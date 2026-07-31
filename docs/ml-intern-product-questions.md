@@ -1,6 +1,6 @@
 # ML Intern in HuggingChat — open product questions
 
-Companion to [ml-intern-parity-spec.md](./ml-intern-parity-spec.md). That doc says *what* to build; this one lists the decisions that are product calls, not engineering calls.
+Companion to [ml-intern-parity-spec.md](./ml-intern-parity-spec.md). That doc says _what_ to build; this one lists the decisions that are product calls, not engineering calls.
 
 ## How to use this
 
@@ -24,17 +24,17 @@ Everything else is downstream of this one.
 
 The spec describes full parity. There are at least three coherent products inside it, and they have very different cost, risk, and build size:
 
-| | Scope | Needs approval gates? | Needs cost UX? | Needs sandbox lifecycle? | Rough size |
-|---|---|---|---|---|---|
-| **A. Research assistant** | Reads papers, docs, Hub, GitHub. Writes a training script. **Never executes anything.** | No (all read-only) | No | No | Small |
-| **B. Supervised operator** | A + runs sandboxes and jobs, but every billable action is confirmed | Yes | Yes | Yes | Large |
-| **C. Autonomous intern** | B + auto-approve with budget caps + walk-away runs + out-of-band notification | Yes | Yes | Yes | Largest |
+|                            | Scope                                                                                   | Needs approval gates? | Needs cost UX? | Needs sandbox lifecycle? | Rough size |
+| -------------------------- | --------------------------------------------------------------------------------------- | --------------------- | -------------- | ------------------------ | ---------- |
+| **A. Research assistant**  | Reads papers, docs, Hub, GitHub. Writes a training script. **Never executes anything.** | No (all read-only)    | No             | No                       | Small      |
+| **B. Supervised operator** | A + runs sandboxes and jobs, but every billable action is confirmed                     | Yes                   | Yes            | Yes                      | Large      |
+| **C. Autonomous intern**   | B + auto-approve with budget caps + walk-away runs + out-of-band notification           | Yes                   | Yes            | Yes                      | Largest    |
 
 A is deliverable much sooner and is genuinely useful on its own — it's ~60% of the perceived "ML Intern" experience (research doctrine, plan, sub-agent, code grounding) with almost none of the risk surface. It also gives us real usage data on whether people want B.
 
 **Recommendation: ship A first, and treat it as a real product rather than a stepping stone.** But answer this deliberately — if the team's goal is B/C, then approval gates and cost UX are Phase 1 and the sequencing in the spec holds.
 
-**Corollary if we pick A:** we must decide whether A *hides* the compute tools or *shows them disabled with an explanation*. Hiding is cleaner; showing sets up the upgrade.
+**Corollary if we pick A:** we must decide whether A _hides_ the compute tools or _shows them disabled with an explanation_. Hiding is cleaner; showing sets up the upgrade.
 
 ### Q0.2 🟠 Who is this for?
 
@@ -46,7 +46,7 @@ This decides how much "you need credits" UX we build and whether the mode is dis
 
 ### Q0.3 🟢 Is this HuggingChat-only or does it ship to self-hosters?
 
-Nearly all of it is HF-specific (Jobs, Spaces sandboxes, Hub writes, HF billing). The `publicConfig.isHuggingChat` pattern exists for this. But the *harness* (approval, plan, compaction, sub-agent) is generic and self-hosters with their own MCP servers would benefit.
+Nearly all of it is HF-specific (Jobs, Spaces sandboxes, Hub writes, HF billing). The `publicConfig.isHuggingChat` pattern exists for this. But the _harness_ (approval, plan, compaction, sub-agent) is generic and self-hosters with their own MCP servers would benefit.
 
 Cheapest answer: harness generic, ML-Intern-specific surfaces gated. Worth confirming so we don't build config surface we don't need.
 
@@ -54,11 +54,11 @@ Cheapest answer: harness generic, ML-Intern-specific surfaces gated. Worth confi
 
 ## §1. Mode and entry
 
-### Q1.1 🔴 What *is* the mode, structurally?
+### Q1.1 🔴 What _is_ the mode, structurally?
 
 Four options, each with different implications:
 
-1. **A model.** ML Intern is an entry in the model picker. Uses the existing `supportsArtifacts`-style config flags. Familiar, discoverable, but conflates "which model" with "which behaviour", and the mode needs to *pin* a tools-capable model anyway.
+1. **A model.** ML Intern is an entry in the model picker. Uses the existing `supportsArtifacts`-style config flags. Familiar, discoverable, but conflates "which model" with "which behaviour", and the mode needs to _pin_ a tools-capable model anyway.
 2. **A per-conversation toggle.** Like the existing tools/MCP selector. Composable with any model. Risk: users toggle it on a model that can't do tools.
 3. **An assistant/persona.** Reuses existing assistant infrastructure (custom prompt + tools). Least new code. Risk: assistants are a somewhat separate product area with its own discovery.
 4. **A separate entry point** (`/chat/ml-intern` or similar). Strongest identity, clearest expectation-setting, most product surface to build.
@@ -73,7 +73,7 @@ If a user turns ML Intern mode on at message 10, what happens? The doctrine prom
 
 Options: allow it freely; allow on→off but not off→on; force a new conversation; offer "continue in a new ML Intern conversation" with context carried over.
 
-Same question in reverse: if a user turns it *off* mid-run, do we cancel in-flight jobs?
+Same question in reverse: if a user turns it _off_ mid-run, do we cancel in-flight jobs?
 
 ### Q1.3 🟢 What is it called, and how do we set expectations?
 
@@ -137,7 +137,7 @@ This is a real constraint on the engineering: the generation reaper currently ki
 
 A meaningful share of HuggingChat traffic is mobile. An approval card containing a 200-line training script, a cost estimate, and an edit affordance is a hard mobile design problem. Do we ship a reduced mobile card (approve/reject only, "open on desktop to edit")?
 
-### Q2.8 🟢 How do we show *which server* a tool came from?
+### Q2.8 🟢 How do we show _which server_ a tool came from?
 
 Once third-party MCP servers are in play, "Approve `write_file`?" is meaningless without knowing who's asking. Do tool cards carry a server identity chip? Is there a trust indicator distinguishing HF's own server from a user-added one?
 
@@ -149,7 +149,7 @@ Once third-party MCP servers are in play, "Approve `write_file`?" is meaningless
 
 HF bills real money for Jobs and Spaces. Options: raw USD; HF credits; an abstraction ("~2 hours of A100 time"); or nothing pre-flight and only actuals afterwards.
 
-Dollars are honest and make the approval card meaningful. They may also be alarming in a chat UI, and they're the number most likely to be *wrong* (pre-flight estimates are deliberately pessimistic — ml-intern reserves a full hour for any sandbox regardless of real use).
+Dollars are honest and make the approval card meaningful. They may also be alarming in a chat UI, and they're the number most likely to be _wrong_ (pre-flight estimates are deliberately pessimistic — ml-intern reserves a full hour for any sandbox regardless of real use).
 
 **Recommendation: show an explicitly-labelled estimate range on approval cards, and actuals afterwards.** Do not show a single confident number for something we're systematically over-estimating.
 
@@ -265,7 +265,7 @@ Genuinely ambiguous, and it's a money question either way. Pressing Stop today j
 
 ### Q6.2 🔴 When does a sandbox get torn down?
 
-A conversation has no "end". ml-intern ties the sandbox to a session and tears it down at session end, and *still* leaks enough Spaces to need an admin sweeper (they observed 2,310 orphans in one day).
+A conversation has no "end". ml-intern ties the sandbox to a session and tears it down at session end, and _still_ leaks enough Spaces to need an admin sweeper (they observed 2,310 orphans in one day).
 
 Options: idle timeout after last message; on conversation close/delete; explicit user action; never (rely on HF's own Space sleep).
 
@@ -315,13 +315,13 @@ A free user with no credits enables ML Intern mode and asks it to fine-tune some
 
 The sub-agent can run 60 tool calls over several minutes. Options: a single "Researching…" spinner; a collapsed block with live progress lines ("read 4 papers, 12 repos"); a fully expandable transcript.
 
-A silent multi-minute gap will read as a hang. But the whole point of the sub-agent is that its output *doesn't* enter the main context — showing everything undercuts the "here's a clean summary" value.
+A silent multi-minute gap will read as a hang. But the whole point of the sub-agent is that its output _doesn't_ enter the main context — showing everything undercuts the "here's a clean summary" value.
 
 **Recommendation: collapsed block with live progress, expandable to the full transcript.** Progress is essential; depth is optional.
 
 ### Q8.2 🟠 Does it need its own confirmation?
 
-One `research` call can consume ~190K tokens of the user's inference credits — potentially more than several tool calls we *do* gate. But prompting before every research call would be maddening and would break the doctrine.
+One `research` call can consume ~190K tokens of the user's inference credits — potentially more than several tool calls we _do_ gate. But prompting before every research call would be maddening and would break the doctrine.
 
 Options: never prompt (covered by the spend threshold in §3); prompt on the first one per conversation; give it its own token budget with a "keep going?" at the ceiling.
 
@@ -335,7 +335,7 @@ The research output is a synthesised recipe. Do we surface the papers/repos it r
 
 ### Q9.1 🟠 Do server-initiated questions look the same as our approval cards?
 
-MCP elicitation lets a server ask the *user* a form question mid-tool-call ("which dataset config?"). Mechanically it's the same pause; semantically it's different — a question, not a permission request.
+MCP elicitation lets a server ask the _user_ a form question mid-tool-call ("which dataset config?"). Mechanically it's the same pause; semantically it's different — a question, not a permission request.
 
 Same component with different framing, or a distinct one? Users need to be able to tell "the tool needs information" from "the tool wants permission to spend your money."
 
@@ -343,7 +343,7 @@ Same component with different framing, or a distinct one? Users need to be able 
 
 An elicitation request is a JSON schema that we turn into a form inside HuggingChat. A malicious or sloppy third-party server can put arbitrary text in field labels and descriptions — including text designed to look like it came from us.
 
-Do we: render elicitation only for trusted servers (HF's own) in v1? Always show a "this question is from *{server}*" attribution? Cap field counts and text lengths?
+Do we: render elicitation only for trusted servers (HF's own) in v1? Always show a "this question is from _{server}_" attribution? Cap field counts and text lengths?
 
 **Recommendation: HF's server only in v1, with attribution, and revisit before opening it up.**
 
@@ -380,7 +380,7 @@ Does the user see a generic error, or do we distinguish these? A run that did 40
 
 ### Q11.2 🟠 Is partial work presented as a result?
 
-If the agent trained a model, pushed it, and *then* the run failed, the user has a working model. Do we surface "here's what was produced before this failed", or does a failed run just look failed?
+If the agent trained a model, pushed it, and _then_ the run failed, the user has a working model. Do we surface "here's what was produced before this failed", or does a failed run just look failed?
 
 ### Q11.3 🟢 Can a failed run be resumed?
 
@@ -413,20 +413,21 @@ ml-intern uploads every run to a Hub dataset feeding SFT and KPI pipelines. Hugg
 This can start today, in parallel with the discussion above. All of it is correctness or protocol work with no user-visible decision attached:
 
 **Correctness fixes** (all are current bugs)
-- `isError` is never read — MCP tool errors are reported to the user *and the model* as successes.
+
+- `isError` is never read — MCP tool errors are reported to the user _and the model_ as successes.
 - Truncated tool arguments (`finish_reason: "length"`) parse to `{}` and the tool is dispatched with empty args.
 - Any error in the agentic flow silently re-runs the whole turn with no tools, discarding completed work. Same for hitting the 10-round cap.
-- A non-retryable 400 (e.g. a provider rejecting `reasoning_effort`) kills the turn. The OpenAI SDK already retries the *retryable* statuses, so this is about healing the ones it can't, not adding a retry ladder.
+- A non-retryable 400 (e.g. a provider rejecting `reasoning_effort`) kills the turn. The OpenAI SDK already retries the _retryable_ statuses, so this is about healing the ones it can't, not adding a retry ladder.
 
 **Tool-trail persistence and replay** — storing assistant `tool_calls` + `role:"tool"` results and reconstructing them into wire format, plus dangling-tool-call repair. Invisible to users; unblocks everything else.
 
-**MCP client protocol surface** — declaring client capabilities, plumbing tool annotations through, handling non-text content blocks and `structuredContent`, `resources/list` + `resources/read` plumbing (the *picker* is a product question; the client support isn't).
+**MCP client protocol surface** — declaring client capabilities, plumbing tool annotations through, handling non-text content blocks and `structuredContent`, `resources/list` + `resources/read` plumbing (the _picker_ is a product question; the client support isn't).
 
 **Loop internals** — configurable iteration budget, terminal states, doom-loop detection, malformed-argument recovery.
 
-**Compaction** — token accounting and the summarisation pass. Only the *failure* messaging (Q11.1) is product-facing.
+**Compaction** — token accounting and the summarisation pass. Only the _failure_ messaging (Q11.1) is product-facing.
 
-**Cost estimation library** — the price catalog and estimator. Only its *presentation* (§3) is a product question.
+**Cost estimation library** — the price catalog and estimator. Only its _presentation_ (§3) is a product question.
 
 ---
 
