@@ -39,8 +39,11 @@ export type RunMcpFlowContext = Pick<
 	| "locals"
 > & { messages: EndpointMessage[] };
 
-// Return type: "completed" = MCP ran successfully, "not_applicable" = MCP didn't run, "aborted" = user aborted
-export type McpFlowResult = "completed" | "not_applicable" | "aborted";
+// Only "not_applicable" means MCP never ran and the caller should generate normally.
+// Every other result has already emitted its own final answer.
+export type McpFlowResult = "completed" | "not_applicable" | "aborted" | "exhausted";
+
+const MAX_TOOL_ROUNDS = 10;
 
 export async function* runMcpFlow({
 	model,
@@ -464,7 +467,7 @@ export async function* runMcpFlow({
 			);
 		}
 
-		for (let loop = 0; loop < 10; loop += 1) {
+		for (let loop = 0; loop < MAX_TOOL_ROUNDS; loop += 1) {
 			// Check for abort at the start of each loop iteration
 			if (checkAborted()) {
 				logger.info({ loop }, "[mcp] aborting at start of loop iteration");
@@ -755,7 +758,18 @@ export async function* runMcpFlow({
 			);
 			return "completed";
 		}
-		logger.warn({}, "[mcp] exceeded tool-followup loops; falling back");
+		// Not "not_applicable": that re-runs the turn with no tools and discards every
+		// tool result this turn produced.
+		logger.warn({ maxRounds: MAX_TOOL_ROUNDS }, "[mcp] tool-round budget exhausted");
+		const exhaustedText =
+			lastAssistantContent.trim().length > 0
+				? lastAssistantContent
+				: "I stopped after too many tool steps without reaching an answer. Try narrowing the request or breaking it into smaller ones.";
+		if (!streamedContent) {
+			yield { type: MessageUpdateType.Stream, token: exhaustedText };
+		}
+		yield { type: MessageUpdateType.FinalAnswer, text: exhaustedText, interrupted: false };
+		return "exhausted";
 	} catch (err) {
 		const msg = String(err ?? "");
 		const isAbort =
