@@ -53,6 +53,7 @@ export async function* openAIChatToTextGenerationStream(
 		const delta: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & {
 			reasoning?: string;
 			reasoning_content?: string;
+			reasoning_text?: string;
 		} = choices?.[0]?.delta ?? {};
 		const content: string = delta.content ?? "";
 		const reasoning: string =
@@ -60,7 +61,9 @@ export async function* openAIChatToTextGenerationStream(
 				? (delta.reasoning as string)
 				: typeof delta?.reasoning_content === "string"
 					? (delta.reasoning_content as string)
-					: "";
+					: typeof delta?.reasoning_text === "string"
+						? (delta.reasoning_text as string)
+						: "";
 		const last = choices?.[0]?.finish_reason === "stop" || choices?.[0]?.finish_reason === "length";
 
 		// if the last token is a stop and the tool buffer is not empty, yield it as a generated_text
@@ -174,6 +177,7 @@ export async function* openAIChatToTextGenerationSingle(
 	const message: NonNullable<OpenAI.Chat.Completions.ChatCompletion.Choice>["message"] & {
 		reasoning?: string;
 		reasoning_content?: string;
+		reasoning_text?: string;
 	} = completion.choices?.[0]?.message ?? {};
 	let content: string = message?.content || "";
 	// Provider-dependent reasoning shapes (non-streaming)
@@ -182,7 +186,9 @@ export async function* openAIChatToTextGenerationSingle(
 			? (message.reasoning as string)
 			: typeof message?.reasoning_content === "string"
 				? (message.reasoning_content as string)
-				: "";
+				: typeof message?.reasoning_text === "string"
+					? (message.reasoning_text as string)
+					: "";
 	if (r && r.length > 0) {
 		content = `<think>${r}</think>` + content;
 	}

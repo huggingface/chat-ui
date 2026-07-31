@@ -277,7 +277,8 @@ async function runOne(
 				const text =
 					(typeof delta.content === "string" ? delta.content : "") +
 					(typeof delta.reasoning === "string" ? delta.reasoning : "") +
-					(typeof delta.reasoning_content === "string" ? delta.reasoning_content : "");
+					(typeof delta.reasoning_content === "string" ? delta.reasoning_content : "") +
+					(typeof delta.reasoning_text === "string" ? delta.reasoning_text : "");
 				const hasToolCall = Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0;
 				if (hasToolCall) sawToolCall = true;
 				if (text.length > 0 || hasToolCall) {
