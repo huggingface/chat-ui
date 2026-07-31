@@ -575,13 +575,21 @@ export async function* runMcpFlow({
 					return "";
 				})();
 
-				// Provider-dependent reasoning fields (e.g., `reasoning` or `reasoning_content`).
+				// Provider-dependent reasoning fields (`reasoning`, `reasoning_content`,
+				// or `reasoning_text`).
+				const deltaFields = delta as unknown as {
+					reasoning?: unknown;
+					reasoning_content?: unknown;
+					reasoning_text?: unknown;
+				};
 				const deltaReasoning: string =
-					typeof (delta as unknown as Record<string, unknown>)?.reasoning === "string"
-						? ((delta as unknown as { reasoning?: string }).reasoning as string)
-						: typeof (delta as unknown as Record<string, unknown>)?.reasoning_content === "string"
-							? ((delta as unknown as { reasoning_content?: string }).reasoning_content as string)
-							: "";
+					typeof deltaFields?.reasoning === "string"
+						? deltaFields.reasoning
+						: typeof deltaFields?.reasoning_content === "string"
+							? deltaFields.reasoning_content
+							: typeof deltaFields?.reasoning_text === "string"
+								? deltaFields.reasoning_text
+								: "";
 
 				// Merge reasoning + content into a single combined token stream, mirroring
 				// the OpenAI adapter so the UI can auto-detect <think> blocks.
