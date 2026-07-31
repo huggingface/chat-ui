@@ -190,8 +190,10 @@ function replayAssistantTurn(
 		// that."): rounds are processed oldest-first, matching the
 		// chronological order text was concatenated into `message.content`, so
 		// removing a matched prefix keeps the remainder correctly ordered for
-		// the final message.
-		const roundContent = callsInRound.find((u) => u.content?.trim())?.content ?? "";
+		// the final message. Trimmed on both sides (persistence trims too)
+		// because `remainingVisible` comes from splitReasoning trim-normalized;
+		// visible text has no byte-exactness requirement, unlike reasoning.
+		const roundContent = (callsInRound.find((u) => u.content?.trim())?.content ?? "").trim();
 		if (roundContent) {
 			if (remainingVisible.startsWith(roundContent)) {
 				remainingVisible = remainingVisible.slice(roundContent.length);

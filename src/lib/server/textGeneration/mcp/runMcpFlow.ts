@@ -594,7 +594,11 @@ export async function* runMcpFlow({
 				// Merge reasoning + content into a single combined token stream, mirroring
 				// the OpenAI adapter so the UI can auto-detect <think> blocks.
 				let combined = "";
-				if (deltaReasoning.trim().length > 0) {
+				// Whitespace-only deltas still count once a think block is open
+				// (paragraph breaks are part of the byte-exact trace); non-blank
+				// text is only required to OPEN a block, so stray leading
+				// whitespace can't create empty think blocks.
+				if (deltaReasoning.length > 0 && (thinkOpen || deltaReasoning.trim().length > 0)) {
 					if (!thinkOpen) {
 						combined += "<think>" + deltaReasoning;
 						thinkOpen = true;

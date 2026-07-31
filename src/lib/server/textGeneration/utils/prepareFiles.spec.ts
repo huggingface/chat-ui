@@ -197,6 +197,34 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(7);
 	});
 
+	it("dedups a round preamble persisted with leading whitespace", async () => {
+		// The pre-tool stream often starts with newlines after a think block; a
+		// Call update persisted untrimmed must still match the trim-normalized
+		// visible text, or the preamble replays twice.
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "<think>plan</think>\n\nLet me check that.\n\nHere is the answer.",
+				updates: [
+					{
+						...callUpdate("u1", "get_weather", { city: "Paris" }),
+						reasoning: "plan",
+						content: "\n\nLet me check that.",
+					},
+					resultUpdate("u1", "get_weather", "18°C"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const roundMessage = prepared[0] as { content?: string };
+		const finalMessage = prepared.at(-1) as { content?: string };
+		expect(roundMessage.content).toBe("Let me check that.");
+		expect(finalMessage.content).toContain("Here is the answer.");
+		expect(finalMessage.content).not.toContain("Let me check that.");
+	});
+
 	it("re-attaches persisted round reasoning to its own tool-call message", async () => {
 		const messages: EndpointMessage[] = [
 			{

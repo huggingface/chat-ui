@@ -120,7 +120,12 @@ export async function* executeToolCalls({
 				uuid: p.uuid,
 				call: { name: p.call.name, parameters: p.paramsClean },
 				...(index === 0 && roundReasoning?.trim() ? { reasoning: roundReasoning } : {}),
-				...(index === 0 && roundContent?.trim() ? { content: roundContent } : {}),
+				// Preamble text is trimmed (unlike reasoning, which stays
+				// byte-exact): replay compares it against the trim-normalized
+				// visible text from splitReasoning, so persisting leading
+				// whitespace would break the dedup match and duplicate the
+				// preamble in replayed history.
+				...(index === 0 && roundContent?.trim() ? { content: roundContent.trim() } : {}),
 			},
 		};
 		yield {
