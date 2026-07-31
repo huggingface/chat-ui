@@ -173,6 +173,47 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		});
 	});
 
+	it("omits the trailing assistant message entirely when a turn was interrupted before any final text or reasoning", async () => {
+		const messages: EndpointMessage[] = [
+			{
+				from: "assistant",
+				content: "",
+				updates: [
+					callUpdate("u1", "get_weather", { city: "Paris" }),
+					resultUpdate("u1", "get_weather", "18°C"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		// No trailing { role: "assistant", content: "" } — just the tool round.
+		expect(prepared).toEqual([
+			{
+				role: "assistant",
+				tool_calls: [
+					{
+						id: "u10000000",
+						type: "function",
+						function: { name: "get_weather", arguments: JSON.stringify({ city: "Paris" }) },
+					},
+				],
+			},
+			{ role: "tool", tool_call_id: "u10000000", content: "18°C" },
+		]);
+	});
+
+	it("omits an all-empty plain assistant message (no tool calls, no text, no reasoning) entirely", async () => {
+		const messages: EndpointMessage[] = [
+			{ from: "user", content: "hi" },
+			{ from: "assistant", content: "" },
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		expect(prepared).toEqual([{ role: "user", content: "hi" }]);
+	});
+
 	it("degrades the oldest turns to flat messages once the replay budget is spent", async () => {
 		// Each turn carries ~7×8k of tool output, so two turns exceed the 100k
 		// budget: the newest keeps its tool history, the oldest goes flat.

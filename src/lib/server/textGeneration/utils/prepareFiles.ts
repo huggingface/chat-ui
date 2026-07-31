@@ -135,18 +135,27 @@ function replayAssistantTurn(
 	// final answer.
 	const remainingParts = [...parts];
 	let remainingVisible = visible;
-	const buildFinalMessage = (): AssistantReplayMessage => {
+	// null, not an empty-content message, when a turn was interrupted before
+	// producing any final text or reasoning (e.g. aborted mid-tool-call): an
+	// empty trailing `{role: "assistant", content: ""}` with nothing else
+	// attached represents an assistant turn that never happened, and strict
+	// providers can reject it outright.
+	const buildFinalMessage = (): AssistantReplayMessage | null => {
 		const reasoning = remainingParts.join("\n");
+		const content = remainingVisible.trim();
+		const hasReasoning = includeReasoning && reasoning.length > 0;
+		if (content.length === 0 && !hasReasoning) return null;
 		return {
 			role: "assistant",
-			content: remainingVisible.trim(),
-			...(includeReasoning && reasoning.length > 0 ? { reasoning_content: reasoning } : {}),
+			content,
+			...(hasReasoning ? { reasoning_content: reasoning } : {}),
 		};
 	};
 
 	const callUpdates = updates.filter(isToolCallUpdate);
 	if (callUpdates.length === 0) {
-		return [buildFinalMessage()];
+		const finalMessage = buildFinalMessage();
+		return finalMessage ? [finalMessage] : [];
 	}
 
 	const outputsByUuid = new Map<string, string>();
@@ -273,7 +282,8 @@ function replayAssistantTurn(
 			});
 		}
 	}
-	replayed.push(buildFinalMessage());
+	const finalMessage = buildFinalMessage();
+	if (finalMessage) replayed.push(finalMessage);
 	return replayed;
 }
 
