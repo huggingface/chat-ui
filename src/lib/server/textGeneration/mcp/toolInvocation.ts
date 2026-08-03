@@ -261,6 +261,23 @@ export async function* executeToolCalls({
 				}
 			);
 			const { annotated } = processToolOutput(toolResponse.text ?? "");
+
+			if (toolResponse.isError) {
+				const message = annotated.trim() || "The tool reported an error with no message.";
+				logger.warn(
+					{ server: mappingEntry.server, tool: mappingEntry.tool, err: message },
+					"[mcp] tool returned an error result"
+				);
+				results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid: p.uuid,
+					message,
+				});
+				return;
+			}
+
 			logger.debug(
 				{ server: mappingEntry.server, tool: mappingEntry.tool },
 				"[mcp] tool call completed"
