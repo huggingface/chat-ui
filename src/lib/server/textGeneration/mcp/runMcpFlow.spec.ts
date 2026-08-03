@@ -229,16 +229,32 @@ describe("runMcpFlow", () => {
 			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: '{"a":1}' }] },
 			{ content: "done" },
 		]);
+		scriptToolResults("the tool output");
 
 		const { result } = await runFlow();
 
 		expect(result).toBe("completed");
 		expect(mocks.executeToolCalls).toHaveBeenCalledTimes(1);
-		// The follow-up must carry both the assistant's tool_calls and their results,
-		// or the provider rejects the request as an orphaned call.
+		// The call the model made has to reach the tool intact...
+		expect(mocks.executeToolCalls.mock.calls[0][0].calls).toEqual([
+			{ id: "call_1", name: "do_thing", arguments: '{"a":1}' },
+		]);
+
+		// ...and the follow-up has to carry the assistant's tool_calls *and* the matching
+		// results. An assistant message without its tool_calls leaves the tool messages
+		// orphaned, which providers reject outright.
 		const followUp = requestMessages(1);
-		expect(followUp.at(-2)).toMatchObject({ role: "assistant" });
-		expect(followUp.at(-1)).toMatchObject({ role: "tool", tool_call_id: "call_1" });
+		expect(followUp.at(-2)).toMatchObject({
+			role: "assistant",
+			tool_calls: [
+				{ id: "call_1", type: "function", function: { name: "do_thing", arguments: '{"a":1}' } },
+			],
+		});
+		expect(followUp.at(-1)).toEqual({
+			role: "tool",
+			tool_call_id: "call_1",
+			content: "the tool output",
+		});
 	});
 });
 
@@ -280,6 +296,9 @@ describe("runMcpFlow truncated tool calls", () => {
 
 		expect(result).toBe("completed");
 		expect(mocks.executeToolCalls).toHaveBeenCalledTimes(1);
+		expect(mocks.executeToolCalls.mock.calls[0][0].calls).toEqual([
+			{ id: "call_1", name: "do_thing", arguments: '{"a":1}' },
+		]);
 	});
 
 	it("gives up and answers after repeated truncation instead of hanging on", async () => {
@@ -310,6 +329,7 @@ describe("runMcpFlow termination", () => {
 		// "not_applicable" would make the caller re-run the turn with no tools and
 		// discard all ten rounds of work.
 		expect(result).toBe("exhausted");
+		expect(mocks.create).toHaveBeenCalledTimes(10);
 		expect(finalAnswer(updates)).toBeDefined();
 	});
 
