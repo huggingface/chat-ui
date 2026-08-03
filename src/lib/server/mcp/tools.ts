@@ -1,4 +1,4 @@
-import { Client } from "@modelcontextprotocol/sdk/client";
+import { createMcpClient } from "./client";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { McpServerConfig } from "./httpClient";
@@ -185,7 +185,7 @@ async function listServerTools(
 	opts: { signal?: AbortSignal } = {}
 ): Promise<ListedTool[]> {
 	const url = new URL(server.url);
-	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
+	const client = createMcpClient();
 	try {
 		try {
 			const transport = new StreamableHTTPClientTransport(url, {
