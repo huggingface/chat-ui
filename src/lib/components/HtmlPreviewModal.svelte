@@ -5,8 +5,12 @@
 	import CarbonClose from "~icons/carbon/close";
 	import {
 		buildArtifactSrcdoc,
+		capturePreviewError,
 		composeFixRequest,
-		type PreviewError,
+		normalizePreviewError,
+		PREVIEW_ALLOW,
+		PREVIEW_SANDBOX,
+		type CapturedPreviewError,
 	} from "$lib/utils/previewSrcdoc";
 	import { parseExternalUrl } from "$lib/utils/externalLink";
 	import type { ArtifactKind } from "$lib/utils/artifacts";
@@ -28,7 +32,7 @@
 
 	let iframeEl: HTMLIFrameElement | undefined = $state();
 	let channel = $state(`preview_${Math.random().toString(36).slice(2)}`);
-	let errors: PreviewError[] = $state([]);
+	let errors: CapturedPreviewError[] = $state([]);
 	let externalLinkUrl = $state<URL | null>(null);
 
 	let srcdoc = $derived(buildArtifactSrcdoc(kind, html, channel));
@@ -36,7 +40,7 @@
 	type PreviewMessage = {
 		type: string;
 		channel: string;
-		detail?: { message?: unknown; stack?: string; href?: unknown };
+		detail?: { message?: unknown; stack?: unknown; href?: unknown };
 	};
 
 	function onMessage(ev: MessageEvent) {
@@ -55,8 +59,7 @@
 			return;
 		}
 		if (data.type !== "chatui.preview.error") return;
-		const detail = (data.detail ?? {}) as { message?: unknown; stack?: string };
-		errors = [...errors, { message: String(detail.message ?? "Error"), stack: detail.stack }];
+		errors = capturePreviewError(errors, normalizePreviewError(data.detail));
 	}
 
 	onMount(() => {
@@ -85,7 +88,9 @@
 			bind:this={iframeEl}
 			title="HTML Preview"
 			class="h-full w-full"
-			sandbox="allow-scripts"
+			sandbox={PREVIEW_SANDBOX}
+			allow={PREVIEW_ALLOW}
+			allowfullscreen
 			referrerpolicy="no-referrer"
 			{srcdoc}
 		></iframe>

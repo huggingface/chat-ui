@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
+import { ToolResultStatus } from "$lib/types/Tool";
 import { parseToolArguments } from "./toolArgs";
 import type { NormalizedToolCall } from "./toolInvocation";
+import type { McpToolTextResponse } from "$lib/server/mcp/httpClient";
 import type { ChatCompletionToolMessageParam } from "openai/resources/chat/completions";
 
 const mcpMock = vi.hoisted(() => ({
@@ -25,6 +27,7 @@ const { executeToolCalls } = await import("./toolInvocation");
 
 const SERVERS = [{ name: "hf", url: "https://example.test/mcp" }];
 const MAPPING = { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } };
+const CALL: NormalizedToolCall = { id: "call_1", name: "do_thing", arguments: '{"a":1}' };
 
 const toPrimitive = (value: unknown) =>
 	typeof value === "string" || typeof value === "number" || typeof value === "boolean"
@@ -68,9 +71,80 @@ function toolUpdatesOf(events: Events) {
 	);
 }
 
+function mcpResult(overrides: Partial<McpToolTextResponse>): McpToolTextResponse {
+	return { text: "", isError: false, ...overrides };
+}
+
 beforeEach(() => {
 	mcpMock.callMcpTool.mockReset();
-	mcpMock.callMcpTool.mockResolvedValue({ text: "ok" });
+	mcpMock.callMcpTool.mockResolvedValue(mcpResult({ text: "ok" }));
+});
+
+describe("executeToolCalls", () => {
+	it("reports a successful call as a success", async () => {
+		mcpMock.callMcpTool.mockResolvedValue(mcpResult({ text: "all good" }));
+
+		const events = await drain([CALL]);
+
+		expect(toolMessagesOf(events)).toEqual([
+			{ role: "tool", tool_call_id: "call_1", content: "all good" },
+		]);
+		expect(summaryOf(events).toolRuns).toHaveLength(1);
+		const result = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Result);
+		expect(result).toBeDefined();
+		if (result?.subtype === MessageToolUpdateType.Result) {
+			expect(result.result.status).toBe(ToolResultStatus.Success);
+		}
+	});
+
+	// MCP reports tool failures as a normal result with `isError: true` rather than by
+	// throwing, so this path never reaches the catch. Before the fix it was reported to
+	// both the user and the model as a success.
+	it("reports an isError result as a failure and tells the model", async () => {
+		mcpMock.callMcpTool.mockResolvedValue(
+			mcpResult({ text: "repo not found: acme/missing", isError: true })
+		);
+
+		const events = await drain([CALL]);
+
+		expect(toolMessagesOf(events)).toEqual([
+			{ role: "tool", tool_call_id: "call_1", content: "Error: repo not found: acme/missing" },
+		]);
+		// A failed call produced no output, so it must not appear as a completed run.
+		expect(summaryOf(events).toolRuns).toHaveLength(0);
+
+		const updates = toolUpdatesOf(events);
+		expect(updates.some((u) => u.subtype === MessageToolUpdateType.Result)).toBe(false);
+		const error = updates.find((u) => u.subtype === MessageToolUpdateType.Error);
+		expect(error).toBeDefined();
+		if (error?.subtype === MessageToolUpdateType.Error) {
+			expect(error.message).toBe("repo not found: acme/missing");
+		}
+	});
+
+	it("falls back to a placeholder when an isError result carries no text", async () => {
+		mcpMock.callMcpTool.mockResolvedValue(mcpResult({ text: "   ", isError: true }));
+
+		const events = await drain([CALL]);
+
+		expect(toolMessagesOf(events)[0]).toEqual({
+			role: "tool",
+			tool_call_id: "call_1",
+			content: "Error: The tool reported an error with no message.",
+		});
+	});
+
+	it("still reports a thrown transport error as a failure", async () => {
+		mcpMock.callMcpTool.mockRejectedValue(new Error("connection refused"));
+
+		const events = await drain([CALL]);
+
+		expect(toolMessagesOf(events)[0]).toEqual({
+			role: "tool",
+			tool_call_id: "call_1",
+			content: "Error: connection refused",
+		});
+	});
 });
 
 describe("executeToolCalls argument handling", () => {

@@ -7,9 +7,13 @@
 	import { diffLines, diffStats, renderDiffHtml } from "$lib/utils/artifactDiff";
 	import {
 		buildArtifactSrcdoc,
+		capturePreviewError,
 		composeFixRequest,
 		isDeployableKind,
-		type PreviewError,
+		normalizePreviewError,
+		PREVIEW_ALLOW,
+		PREVIEW_SANDBOX,
+		type CapturedPreviewError,
 	} from "$lib/utils/previewSrcdoc";
 	import { captureArtifactScreenshot, pngDataUrlToFile } from "$lib/utils/artifactCapture";
 	import { parseExternalUrl } from "$lib/utils/externalLink";
@@ -285,7 +289,7 @@
 	// ----- live preview -----
 	const previewChannel = `artifact_${Math.random().toString(36).slice(2)}`;
 	let iframeEl: HTMLIFrameElement | undefined = $state();
-	let errors: PreviewError[] = $state([]);
+	let errors: CapturedPreviewError[] = $state([]);
 	let externalLinkUrl = $state<URL | null>(null);
 
 	let srcdoc = $derived.by(() => {
@@ -314,7 +318,7 @@
 	type PreviewMessage = {
 		type: string;
 		channel: string;
-		detail?: { message?: unknown; stack?: string; href?: unknown };
+		detail?: { message?: unknown; stack?: unknown; href?: unknown };
 	};
 
 	function onWindowMessage(ev: MessageEvent) {
@@ -333,8 +337,7 @@
 			return;
 		}
 		if (data.type !== "chatui.preview.error") return;
-		const detail = (data.detail ?? {}) as { message?: unknown; stack?: string };
-		errors = [...errors, { message: String(detail.message ?? "Error"), stack: detail.stack }];
+		errors = capturePreviewError(errors, normalizePreviewError(data.detail));
 	}
 
 	// Sends the fix request as a chat message right away. On mobile the panel
@@ -639,7 +642,9 @@
 					bind:this={iframeEl}
 					title="Artifact preview"
 					class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
-					sandbox="allow-scripts allow-forms"
+					sandbox={PREVIEW_SANDBOX}
+					allow={PREVIEW_ALLOW}
+					allowfullscreen
 					referrerpolicy="no-referrer"
 					onload={() => (previewLoaded = true)}
 					{srcdoc}

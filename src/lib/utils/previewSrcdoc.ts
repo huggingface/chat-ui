@@ -26,21 +26,136 @@ import { appendHuggingChatBadge } from "./deployBadge";
 
 const END_SCRIPT_TAG = "</scr" + "ipt>";
 
+/**
+ * Sandbox tokens for preview iframes (artifact panel + fullscreen modal).
+ *
+ * `allow-same-origin` is deliberately ABSENT and must stay absent: it is the
+ * security boundary. Without it the document runs in an opaque origin with no
+ * access to the app's cookies, storage, or DOM. Every token here only grants
+ * a capability that stays inside the frame:
+ * - `allow-pointer-lock`: mouse-look games can capture the cursor (Esc always
+ *   releases, and the browser overlays its own exit hint)
+ * - `allow-orientation-lock`: fullscreen games can lock to landscape
+ * Deliberately absent besides same-origin: `allow-popups` (link clicks leave
+ * through the parent's external-link confirm instead), `allow-downloads`
+ * (generated code must not be able to drop files into the user's Downloads),
+ * and `allow-modals` — previews auto-open with zero clicks (streaming, and
+ * shared conversations on load), and a dialog from a same-process iframe
+ * blocks the parent's event loop, so a `while(true) alert()` artifact would
+ * hold the tab hostage with the panel's own close button dead between
+ * dialogs. Without the token, dialog calls are silent no-ops; the system
+ * prompt steers models to in-page UI instead.
+ */
+export const PREVIEW_SANDBOX =
+	"allow-scripts allow-forms allow-pointer-lock allow-orientation-lock";
+
+/**
+ * Permission-policy delegations for preview iframes. Features default to a
+ * `'self'` allowlist, which a sandboxed srcdoc frame (opaque origin) never
+ * matches, so anything artifacts should be able to use must be delegated
+ * here; the explicit `*` allowlists are what reliably match an opaque origin
+ * across engines (and let an artifact pass e.g. fullscreen on to a media
+ * embed it contains). Everything granted is device-UX or write-only:
+ * fullscreen, motion sensors for tilt controls (also required for
+ * devicemotion/deviceorientation events), gamepad, media autoplay, and
+ * clipboard-write. Privacy-sensitive inputs — camera, microphone,
+ * geolocation, clipboard-read, display-capture — are deliberately NOT
+ * delegated, and reads of user data stay impossible. `screen-wake-lock` is
+ * also withheld: it needs no user gesture, previews can open with zero
+ * clicks, and a silent lock would keep a walked-away-from display awake for
+ * no preview-side benefit (active use keeps the screen on by itself).
+ */
+export const PREVIEW_ALLOW =
+	"fullscreen *; pointer-lock *; accelerometer *; gyroscope *; magnetometer *; gamepad *; autoplay *; clipboard-write *";
+
 /** An uncaught error forwarded from a preview iframe via the postMessage hook. */
 export interface PreviewError {
 	message: string;
 	stack?: string;
 }
 
+/** A distinct captured error signature plus how many times it was emitted. */
+export interface CapturedPreviewError extends PreviewError {
+	count: number;
+}
+
+/**
+ * Cap on distinct stored signatures. Repeats of a known signature only bump
+ * its count, so a handler that throws every frame can never crowd out a later
+ * unrelated failure; this only bounds pathological pages whose every error is
+ * unique (e.g. a timestamp baked into the message).
+ */
+export const MAX_DISTINCT_CAPTURED_ERRORS = 20;
+/**
+ * Count saturation per signature. Once reached, further repeats return the
+ * input array unchanged, so the state assignment in the collectors becomes a
+ * reactive no-op and an error throwing every frame stops churning the UI.
+ */
+export const MAX_COUNTED_REPEATS = 999;
+/** Per-field cap at capture, well above what a fix request ever renders. */
+const MAX_CAPTURED_FIELD_CHARS = 4000;
+
+const MAX_LISTED_ERRORS = 5;
+const MAX_STACK_LINES = 5;
+const MAX_ERROR_CHARS = 700;
+
+/**
+ * Normalize an untrusted error payload from the preview channel. The iframe
+ * forwards whatever the page threw or rejected with, so `stack` can be any
+ * shape; anything but a string is dropped rather than rendered.
+ */
+export function normalizePreviewError(detail: unknown): PreviewError {
+	const raw = (detail ?? {}) as { message?: unknown; stack?: unknown };
+	return {
+		message: String(raw.message ?? "Error").slice(0, MAX_CAPTURED_FIELD_CHARS),
+		stack: typeof raw.stack === "string" ? raw.stack.slice(0, MAX_CAPTURED_FIELD_CHARS) : undefined,
+	};
+}
+
+/**
+ * Fold an incoming error into the captured list: a repeat of a known
+ * signature increments that entry's count (until saturation), a new signature
+ * appends until the distinct cap. Returns the input array untouched when
+ * nothing changed, and a new array otherwise, so Svelte state consumers can
+ * assign the result directly and only pay for real changes.
+ */
+export function capturePreviewError(
+	captured: CapturedPreviewError[],
+	incoming: PreviewError
+): CapturedPreviewError[] {
+	const index = captured.findIndex(
+		(e) => e.message === incoming.message && e.stack === incoming.stack
+	);
+	if (index !== -1) {
+		if (captured[index].count >= MAX_COUNTED_REPEATS) return captured;
+		return captured.map((e, i) => (i === index ? { ...e, count: e.count + 1 } : e));
+	}
+	if (captured.length >= MAX_DISTINCT_CAPTURED_ERRORS) return captured;
+	return [...captured, { ...incoming, count: 1 }];
+}
+
+function renderError(error: CapturedPreviewError): string {
+	const shownCount = error.count >= MAX_COUNTED_REPEATS ? `${MAX_COUNTED_REPEATS}+` : error.count;
+	const times = error.count > 1 ? ` (repeated ${shownCount} times)` : "";
+	// Keep only the top of the stack: for single-file artifacts the first
+	// frames carry the useful location, and deep stacks would drown the list
+	const stack = error.stack?.split("\n").slice(0, MAX_STACK_LINES).join("\n") ?? "";
+	const rendered = `${error.message}${times}${stack ? `\n${stack}` : ""}`;
+	return rendered.length > MAX_ERROR_CHARS ? `${rendered.slice(0, MAX_ERROR_CHARS)}…` : rendered;
+}
+
 /** The chat message sent when the user asks the model to fix captured preview errors. */
-export function composeFixRequest(errors: PreviewError[]): string {
-	const first = errors[0];
-	const summary = first
-		? `${first.message}${first.stack ? `\n${first.stack}` : ""}`
-		: "Unknown error";
-	return errors.length > 1
-		? `it's not working: ${summary} (+${errors.length - 1} more) - can you fix it?`
-		: `it's not working: ${summary} - can you fix it?`;
+export function composeFixRequest(errors: CapturedPreviewError[]): string {
+	if (errors.length <= 1) {
+		const summary = errors.length ? renderError(errors[0]) : "Unknown error";
+		return `it's not working: ${summary} - can you fix it?`;
+	}
+
+	const shown = errors.slice(0, MAX_LISTED_ERRORS);
+	const omitted = errors.length - shown.length;
+	const list = shown.map((entry, i) => `${i + 1}. ${renderError(entry)}`).join("\n");
+	const tail = omitted > 0 ? `\n(+${omitted} more distinct error${omitted > 1 ? "s" : ""})` : "";
+	return `it's not working, I see ${errors.length} errors:\n${list}${tail}\ncan you fix them?`;
 }
 
 function buildPreviewHookScript(channel: string): string {
