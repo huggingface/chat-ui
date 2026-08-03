@@ -36,6 +36,7 @@ OPENAI_API_KEY=hf_************************
 | llama.cpp server (`llama.cpp --server --api`) | `http://127.0.0.1:8080/v1`         | `OPENAI_API_KEY=sk-local-demo` (any string works; llama.cpp ignores it) |
 | Ollama (with OpenAI-compatible bridge)        | `http://127.0.0.1:11434/v1`        | `OPENAI_API_KEY=ollama`                                                 |
 | OpenRouter                                    | `https://openrouter.ai/api/v1`     | `OPENAI_API_KEY=sk-or-v1-...`                                           |
+| DaoXE (multi-model multi-protocol gateway)    | `https://daoxe.com/v1`             | `OPENAI_API_KEY=<key from https://daoxe.com/dashboard>`                 |
 | Poe                                           | `https://api.poe.com/v1`           | `OPENAI_API_KEY=pk_...`                                                 |
 
 Check the root [`.env` template](./.env) for the full list of optional variables you can override.
