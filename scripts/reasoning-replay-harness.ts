@@ -269,6 +269,80 @@ const storedPlainHistory: EndpointMessage[] = [
 	},
 ];
 
+/**
+ * A turn that ended before producing any final answer: the tool ran, then the
+ * follow-up completion died or the user navigated away. #2472 keeps that work
+ * instead of discarding it, so the turn persists and gets replayed.
+ *
+ * Replay omits the trailing assistant message (an empty one represents a turn
+ * that never happened, and strict providers reject it), which leaves the
+ * payload going `tool` -> `user` with no assistant between them. That is a
+ * shape production never emitted before replay existed, and Mistral-family
+ * chat templates in particular enforce role alternation. Only a real provider
+ * can answer whether it is accepted — which is why this lives here and not in
+ * the offline spec that proves the shape is produced.
+ */
+const storedInterruptedHistory: EndpointMessage[] = [
+	{ from: "user", content: "What's the weather in Paris right now?" },
+	{
+		from: "assistant",
+		content: "",
+		updates: [
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Call,
+				uuid: "interrupted-call-1",
+				call: { name: "get_weather", parameters: { city: "Paris" } },
+			},
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: "interrupted-call-1",
+				result: {
+					status: ToolResultStatus.Success,
+					call: { name: "get_weather", parameters: { city: "Paris" } },
+					outputs: [{ text: "18°C, sunny" }],
+				},
+			},
+		],
+	},
+	{ from: "user", content: "In one short sentence: what is the weather in Paris?" },
+];
+
+/**
+ * A tool whose result carried no text at all — what an image-only MCP tool
+ * produces, since the client joins only text blocks. Replay emits
+ * `{role: "tool", content: ""}`; some OpenAI-compatible backends reject empty
+ * tool content outright, and those that accept it are told the tool returned
+ * nothing.
+ */
+const storedEmptyToolHistory: EndpointMessage[] = [
+	{ from: "user", content: "Chart the weather in Paris." },
+	{
+		from: "assistant",
+		content: "Here is the chart.",
+		updates: [
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Call,
+				uuid: "empty-call-1",
+				call: { name: "get_weather", parameters: { city: "Paris" } },
+			},
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: "empty-call-1",
+				result: {
+					status: ToolResultStatus.Success,
+					call: { name: "get_weather", parameters: { city: "Paris" } },
+					outputs: [{ text: "" }],
+				},
+			},
+		],
+	},
+	{ from: "user", content: "In one short sentence: describe the chart you made." },
+];
+
 type Scenario = {
 	name: string;
 	messages: ChatMessage[];
@@ -286,7 +360,7 @@ type Scenario = {
 
 /** Baseline scenario name → scenarios that must not regress against it. */
 const FAMILIES: Record<string, string[]> = {
-	"S1-baseline": ["S2-replay", "S3-inloop"],
+	"S1-baseline": ["S2-replay", "S3-inloop", "A1-interrupted", "A2-empty-tool"],
 	"P1-plain": ["P2-reasoning"],
 };
 
@@ -346,10 +420,31 @@ async function buildScenarios(supportsReasoning: boolean): Promise<Scenario[]> {
 		})
 	);
 
+	// Built through prepareMessagesWithFiles like every other scenario rather
+	// than hand-written: the point is to send what production actually emits for
+	// these histories, not an approximation of it.
+	const interrupted = withSystem(
+		await prepareMessagesWithFiles(storedInterruptedHistory, imageProcessor, false, {
+			replayToolHistory: true,
+			attachReasoning: supportsReasoning,
+		})
+	);
+	const emptyTool = withSystem(
+		await prepareMessagesWithFiles(storedEmptyToolHistory, imageProcessor, false, {
+			replayToolHistory: true,
+			attachReasoning: supportsReasoning,
+		})
+	);
+
 	return [
 		{ name: "S1-baseline", messages: baseline, withTools: true, expect: toolExpect },
 		{ name: "S2-replay", messages: replay, withTools: true, expect: toolExpect },
 		{ name: "S3-inloop", messages: inloop, withTools: true, expect: toolExpect },
+		// Acceptance-only (no `expect`): these ask whether the provider tolerates
+		// the shape at all. A coherence gate would conflate "rejected the payload"
+		// with "answered vaguely", and the answer's content is not the question.
+		{ name: "A1-interrupted", messages: interrupted, withTools: true, expect: [] },
+		{ name: "A2-empty-tool", messages: emptyTool, withTools: true, expect: [] },
 		{ name: "P1-plain", messages: plain, withTools: false, expect: plainExpect },
 		{ name: "P2-reasoning", messages: plainReasoning, withTools: false, expect: plainExpect },
 		{
