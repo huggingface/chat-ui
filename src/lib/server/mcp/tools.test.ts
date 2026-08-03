@@ -292,3 +292,106 @@ describe("getOpenAiToolsForMcp per-server cache", () => {
 		expect(mapping.search_Server_B.server).toBe("Server B");
 	});
 });
+
+describe("getOpenAiToolsForMcp tool annotations", () => {
+	beforeEach(() => {
+		resetMcpToolsCache();
+		mcpMock.listToolsCalls.length = 0;
+		mcpMock.responses.clear();
+	});
+
+	it("carries declared hints through to the mapping", async () => {
+		mcpMock.responses.set(SERVER_A.url, {
+			tools: [
+				{
+					...searchTool,
+					annotations: {
+						readOnlyHint: true,
+						destructiveHint: false,
+						idempotentHint: true,
+						openWorldHint: true,
+					},
+				},
+			],
+		});
+
+		const { mapping } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(mapping.search.annotations).toEqual({
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: true,
+		});
+	});
+
+	// Absence must stay distinguishable from a declaration: the spec's default is destructive.
+	it("leaves annotations absent when the server declares none", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+
+		const { mapping } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(mapping.search.annotations).toBeUndefined();
+	});
+
+	it("keeps only the hints the server actually declared", async () => {
+		mcpMock.responses.set(SERVER_A.url, {
+			tools: [{ ...searchTool, annotations: { readOnlyHint: true } }],
+		});
+
+		const { mapping } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(mapping.search.annotations).toEqual({ readOnlyHint: true });
+		expect(mapping.search.annotations).not.toHaveProperty("destructiveHint");
+	});
+
+	it("ignores non-boolean hint values rather than reading them as declarations", async () => {
+		mcpMock.responses.set(SERVER_A.url, {
+			tools: [
+				{
+					...searchTool,
+					annotations: { readOnlyHint: "yes", destructiveHint: 0, idempotentHint: true },
+				},
+			],
+		});
+
+		const { mapping } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(mapping.search.annotations).toEqual({ idempotentHint: true });
+	});
+
+	it("still uses the title annotation as a description fallback", async () => {
+		mcpMock.responses.set(SERVER_A.url, {
+			tools: [{ name: "search", annotations: { title: "Search things", readOnlyHint: true } }],
+		});
+
+		const { tools, mapping } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools[0].function.description).toBe("Search things");
+		expect(mapping.search.annotations).toEqual({ readOnlyHint: true });
+	});
+
+	// One tool with an unknown field takes down the whole tools array on strict providers.
+	it("keeps annotations out of the tool definition sent to the provider", async () => {
+		mcpMock.responses.set(SERVER_A.url, {
+			tools: [{ ...searchTool, annotations: { readOnlyHint: true } }],
+		});
+
+		const { tools } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools[0].function).not.toHaveProperty("annotations");
+		expect(tools[0]).not.toHaveProperty("annotations");
+	});
+
+	it("survives the cache round trip", async () => {
+		mcpMock.responses.set(SERVER_A.url, {
+			tools: [{ ...searchTool, annotations: { destructiveHint: true } }],
+		});
+
+		await getOpenAiToolsForMcp([SERVER_A]);
+		const cached = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(mcpMock.listToolsCalls).toEqual([SERVER_A.url]);
+		expect(cached.mapping.search.annotations).toEqual({ destructiveHint: true });
+	});
+});
