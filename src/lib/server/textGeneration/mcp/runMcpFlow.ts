@@ -14,6 +14,7 @@ import { buildToolPreprompt } from "../utils/toolPrompt";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
 import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
+import { hasTruncatedToolCall, parseToolArguments } from "./toolArgs";
 import type { TextGenerationContext } from "../types";
 import {
 	hasAuthHeader,
@@ -41,6 +42,9 @@ export type RunMcpFlowContext = Pick<
 
 // Return type: "completed" = MCP ran successfully, "not_applicable" = MCP didn't run, "aborted" = user aborted
 export type McpFlowResult = "completed" | "not_applicable" | "aborted";
+
+// Each retry costs a tool round, so give up quickly and answer without the tool.
+const MAX_TRUNCATED_TOOL_CALL_RETRIES = 2;
 
 export async function* runMcpFlow({
 	model,
@@ -430,14 +434,7 @@ export async function* runMcpFlow({
 			return undefined;
 		};
 
-		const parseArgs = (raw: unknown): Record<string, unknown> => {
-			if (typeof raw !== "string" || raw.trim().length === 0) return {};
-			try {
-				return JSON.parse(raw);
-			} catch {
-				return {};
-			}
-		};
+		const parseArgs = parseToolArguments;
 
 		const processToolOutput = (
 			text: string
@@ -451,6 +448,7 @@ export async function* runMcpFlow({
 		// Track whether we're inside a <think> block when the upstream streams
 		// provider-specific reasoning tokens (e.g. `reasoning` or `reasoning_content`).
 		let thinkOpen = false;
+		let truncatedToolCallRetries = 0;
 
 		if (resolvedRoute && candidateModelId) {
 			yield {
@@ -508,8 +506,11 @@ export async function* runMcpFlow({
 			let firstToolDeltaLogged = false;
 			let sawToolCall = false;
 			let tokenCount = 0;
+			let finishReason: string | null | undefined;
 			for await (const chunk of completionStream) {
 				const choice = chunk.choices?.[0];
+				// Before the delta guard: the terminal chunk can carry only a finish_reason.
+				if (choice?.finish_reason) finishReason = choice.finish_reason;
 				const delta = choice?.delta;
 				if (!delta) continue;
 
@@ -631,7 +632,40 @@ export async function* runMcpFlow({
 				thinkOpen = false;
 			}
 
-			if (Object.keys(toolCallState).length > 0) {
+			let discardedTruncatedToolCalls = false;
+			if (hasTruncatedToolCall(finishReason, Object.values(toolCallState))) {
+				if (truncatedToolCallRetries < MAX_TRUNCATED_TOOL_CALL_RETRIES) {
+					truncatedToolCallRetries += 1;
+					logger.warn(
+						{ loop, attempt: truncatedToolCallRetries },
+						"[mcp] tool call truncated by the output limit; retrying"
+					);
+					const visibleContent = lastAssistantContent
+						.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, "")
+						.trim();
+					messagesOpenAI = [
+						...messagesOpenAI,
+						// Not optional: a tool-only response leaves no visible content, and
+						// without this turn the nudge below is a second consecutive user
+						// message, which providers enforcing alternating roles reject —
+						// failing the very retry meant to recover the call.
+						{
+							role: "assistant" as const,
+							content: visibleContent || "(Tool call cut off by the output limit.)",
+						},
+						{
+							role: "user" as const,
+							content:
+								"[SYSTEM: Your previous response hit the output limit before the tool call was complete, so it was discarded. Retry with a smaller tool call — split large payloads across several calls and keep any inline file content short.]",
+						},
+					];
+					continue;
+				}
+				discardedTruncatedToolCalls = true;
+				logger.warn({ loop }, "[mcp] tool call truncated repeatedly; answering without running it");
+			}
+
+			if (!discardedTruncatedToolCalls && Object.keys(toolCallState).length > 0) {
 				// If any streamed call is missing id, perform a quick non-stream retry to recover full tool_calls with ids
 				const missingId = Object.values(toolCallState).some((c) => c?.name && !c?.id);
 				let calls: NormalizedToolCall[];
@@ -740,6 +774,12 @@ export async function* runMcpFlow({
 			if (thinkOpen) {
 				lastAssistantContent += "</think>";
 				thinkOpen = false;
+			}
+			// Without this the turn finalizes empty and the route reports a bare
+			// "No output was generated" instead of what actually happened.
+			if (discardedTruncatedToolCalls && lastAssistantContent.trim().length === 0) {
+				lastAssistantContent =
+					"I couldn't complete that tool call — the request kept exceeding the output limit. Try breaking it into smaller steps.";
 			}
 			if (!streamedContent && lastAssistantContent.trim().length > 0) {
 				yield { type: MessageUpdateType.Stream, token: lastAssistantContent };
