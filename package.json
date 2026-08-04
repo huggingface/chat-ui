@@ -86,7 +86,7 @@
 		"handlebars": "^4.7.8",
 		"highlight.js": "^11.7.0",
 		"htmlparser2": "^10.0.0",
-		"ip-address": "^9.0.5",
+		"ip-address": "^10.4.0",
 		"isomorphic-dompurify": "^3.8.0",
 		"json5": "^2.2.3",
 		"katex": "^0.16.21",
