@@ -19,13 +19,15 @@
 	});
 </script>
 
-<div class="my-auto grid items-center justify-center gap-8 text-center">
-	<div
-		class="flex -translate-y-16 items-center rounded-xl text-[1.6rem] font-semibold select-none md:-translate-y-12 md:text-[2.55rem]"
+<!-- Greeting above the vertically centered composer on a fresh chat. Sized to
+     leave the composer as the visual anchor of the screen. -->
+<div class="flex w-full flex-col items-center justify-end pb-6 text-center select-none md:pb-8">
+	<h1
+		class="flex items-center rounded-xl text-[1.6rem] leading-none font-semibold md:text-[2.55rem]"
 	>
 		<Logo classNames="size-[2.55rem] md:size-[4.25rem] dark:invert mr-0.5" />
 		{publicConfig.PUBLIC_APP_NAME}
-	</div>
+	</h1>
 	<!-- <div class="lg:col-span-1">
 		<div>
 			<div class="mb-3 flex items-center text-2xl font-semibold">
