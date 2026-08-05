@@ -92,7 +92,7 @@ envVars:
   MODELS: >
     [
       { "id": "omni", "supportsArtifacts": true },
-      { "id": "deepseek-ai/DeepSeek-V4-Flash-0731", "description": "Updated V4-Flash with adjustable thinking, stronger coding, and agentic tool use.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "deepseek-ai/DeepSeek-V4-Flash-0731", "description": "Updated V4-Flash with adjustable thinking, stronger coding, and agentic tool use.", "parameters": { "max_tokens": 49152 }, "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "thinkingmachines/Inkling-Small", "description": "Compact multimodal 276B MoE with 12B active params and adjustable reasoning effort.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "NousResearch/Hermes-3-Llama-3.1-70B", "description": "Steerable 70B Llama fine-tune for roleplay, agents, and function calling.", "supportsArtifacts": true },
       { "id": "Qwen/Qwen3-30B-A3B", "description": "Efficient hybrid 30B MoE with 3B active params and switchable thinking mode." },
