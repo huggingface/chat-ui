@@ -12,6 +12,7 @@ import {
 	type McpToolTextResponse,
 } from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
+import { buildModelToolOutput } from "$lib/server/mcp/toolOutput";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/sdk/client";
 
@@ -377,8 +378,15 @@ export async function* executeToolCalls({
 		if (!r.error) {
 			const output = r.output ?? "";
 			toolRuns.push({ name, parameters: r.paramsClean, output });
-			// For the LLM follow-up call, we keep only the textual output
-			toolMessages.push({ role: "tool", tool_call_id: id, content: output });
+			toolMessages.push({
+				role: "tool",
+				tool_call_id: id,
+				content: buildModelToolOutput({
+					text: output,
+					structured: r.structured,
+					content: r.blocks,
+				}),
+			});
 		} else {
 			// Communicate error to LLM so it doesn't hallucinate success
 			toolMessages.push({ role: "tool", tool_call_id: id, content: `Error: ${r.error}` });

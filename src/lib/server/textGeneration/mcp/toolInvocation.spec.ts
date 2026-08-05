@@ -189,3 +189,39 @@ describe("executeToolCalls argument handling", () => {
 		expect(toolMessages[1].content).toBe("ok");
 	});
 });
+
+describe("executeToolCalls non-text output", () => {
+	it("gives the model the parts of a result that are not plain text", async () => {
+		mcpMock.callMcpTool.mockResolvedValue(
+			mcpResult({
+				text: "Generated an image.",
+				structured: { space: "acme/sd" },
+				content: [
+					{ type: "text", text: "Generated an image." },
+					{ type: "image", mimeType: "image/png", data: "iVBORw0KGgo=" },
+				],
+			})
+		);
+
+		const events = await drain([CALL]);
+
+		expect(toolMessagesOf(events)[0].content).toBe(
+			'Generated an image.\n[image: image/png]\n{"space":"acme/sd"}'
+		);
+	});
+
+	// The UI renders the raw blocks itself, so widening the model's view must not
+	// change what it is handed.
+	it("leaves the UI result payload untouched", async () => {
+		const structured = { space: "acme/sd" };
+		const content = [{ type: "image", mimeType: "image/png", data: "iVBORw0KGgo=" }];
+		mcpMock.callMcpTool.mockResolvedValue(mcpResult({ text: "done", structured, content }));
+
+		const events = await drain([CALL]);
+
+		const result = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Result);
+		expect(result?.subtype === MessageToolUpdateType.Result && result.result).toMatchObject({
+			outputs: [{ text: "done", structured, content }],
+		});
+	});
+});
