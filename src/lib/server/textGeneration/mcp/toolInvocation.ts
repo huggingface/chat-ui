@@ -33,7 +33,8 @@ export interface ExecuteToolCallsParams {
 	calls: NormalizedToolCall[];
 	mapping: Record<string, McpToolMapping>;
 	servers: McpServerConfig[];
-	parseArgs: (raw: unknown) => Record<string, unknown>;
+	/** Returns `null` when the call's argument string could not be decoded — see `toolArgs.ts`. */
+	parseArgs: (raw: unknown) => Record<string, unknown> | null;
 	resolveFileRef?: FileRefResolver;
 	toPrimitive: (value: unknown) => Primitive | undefined;
 	processToolOutput: (text: string) => {
@@ -125,7 +126,7 @@ export async function* executeToolCalls({
 		// logging / status updates continue to show only the lightweight primitive
 		// arguments (e.g. "image_1") while the full data: URLs or image blobs are
 		// only sent to the MCP tool server.
-		attachFileRefsToArgs(argsObj, resolveFileRef);
+		if (argsObj) attachFileRefsToArgs(argsObj, resolveFileRef);
 		return { call, argsObj, paramsClean, uuid: randomUUID() };
 	});
 
@@ -235,6 +236,28 @@ export async function* executeToolCalls({
 			return;
 		}
 
+		// Never substitute `{}` here: the tool would run with no arguments and answer
+		// as though none were needed.
+		const argsObj = p.argsObj;
+		if (argsObj === null) {
+			const message =
+				"Invalid tool arguments: not a valid JSON object. Retry the call with a smaller, complete argument payload.";
+			logger.warn({ tool: p.call.name }, "[mcp] tool call had undecodable arguments");
+			results.push({
+				index,
+				error: message,
+				uuid: p.uuid,
+				paramsClean: p.paramsClean,
+			});
+			updatesQueue.push({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Error,
+				uuid: p.uuid,
+				message,
+			});
+			return;
+		}
+
 		const mappingEntry = mapping[p.call.name];
 		if (!mappingEntry) {
 			const message = `Unknown MCP function: ${p.call.name}`;
@@ -278,7 +301,7 @@ export async function* executeToolCalls({
 			const toolResponse: McpToolTextResponse = await callMcpTool(
 				serverCfg,
 				mappingEntry.tool,
-				p.argsObj,
+				argsObj,
 				{
 					client,
 					signal: abortSignal,
@@ -296,6 +319,23 @@ export async function* executeToolCalls({
 				}
 			);
 			const { annotated } = processToolOutput(toolResponse.text ?? "");
+
+			if (toolResponse.isError) {
+				const message = annotated.trim() || "The tool reported an error with no message.";
+				logger.warn(
+					{ server: mappingEntry.server, tool: mappingEntry.tool, err: message },
+					"[mcp] tool returned an error result"
+				);
+				results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid: p.uuid,
+					message,
+				});
+				return;
+			}
+
 			logger.debug(
 				{ server: mappingEntry.server, tool: mappingEntry.tool },
 				"[mcp] tool call completed"

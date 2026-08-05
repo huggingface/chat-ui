@@ -1,4 +1,5 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { createMcpClient } from "$lib/server/mcp/client";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { KeyValuePair } from "$lib/types/Tool";
@@ -106,10 +107,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		// Try Streamable HTTP transport first
 		try {
 			logger.info({}, `[MCP Health] Trying HTTP transport for ${url}`);
-			client = new Client({
-				name: "chat-ui-health-check",
-				version: "1.0.0",
-			});
+			client = createMcpClient("health");
 
 			const transport = new StreamableHTTPClientTransport(baseUrl, {
 				requestInit,
@@ -172,10 +170,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			// Try SSE transport
 			try {
 				logger.info({}, `[MCP Health] Trying SSE transport for ${url}`);
-				client = new Client({
-					name: "chat-ui-health-check",
-					version: "1.0.0",
-				});
+				client = createMcpClient("health");
 
 				const sseTransport = new SSEClientTransport(baseUrl, {
 					requestInit,
