@@ -75,4 +75,4 @@ jobs:
           display-workflow-run-url-interval: 10s
           ref: refs/heads/main
           token: ${{ secrets.GIT_TOKEN_INFRA_DEPLOYMENT }}
-          inputs: '{"path": "hub/chat-ui/chat-ui.yaml", "value": ${{ env.VALUES }}, "url": "${{ github.event.head_commit.url }}"}'
+          inputs: '{"path": "hub*/chat-ui/*.yaml", "value": ${{ env.VALUES }}, "url": "${{ github.event.head_commit.url }}"}'
