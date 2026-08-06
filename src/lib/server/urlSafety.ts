@@ -13,6 +13,20 @@ const UNSAFE_IPV4_SUBNETS = [
 	"192.168.0.0/16",
 ].map((s) => new Address4(s));
 
+// IPv4-mapped IPv6 range. Matched as a subnet rather than with ip-address's `is4()`, which
+// only recognises the dotted textual form: the URL parser rewrites `::ffff:127.0.0.1` to its
+// canonical hex form `::ffff:7f00:1`, for which `is4()` returns false.
+const IPV4_MAPPED_IPV6_SUBNET = new Address6("::ffff:0:0/96");
+
+// Unique local addresses (fc00::/7) are the IPv6 counterpart of the private IPv4 ranges;
+// `isLoopback()`/`isLinkLocal()` do not cover them.
+const UNIQUE_LOCAL_IPV6_SUBNET = new Address6("fc00::/7");
+
+/** IPv6 literals arrive from `URL.hostname` bracketed; `isIP` only accepts them bare. */
+function stripBrackets(hostname: string): string {
+	return hostname.replace(/^\[|]$/g, "");
+}
+
 function isUnsafeIp(address: string): boolean {
 	const family = isIP(address);
 
@@ -23,10 +37,18 @@ function isUnsafeIp(address: string): boolean {
 
 	if (family === 6) {
 		const addr = new Address6(address);
-		// Check IPv4-mapped IPv6 addresses (e.g. ::ffff:127.0.0.1)
-		if (addr.is4()) {
+		// IPv4-mapped addresses (e.g. ::ffff:127.0.0.1) connect to the embedded IPv4 host.
+		if (addr.isInSubnet(IPV4_MAPPED_IPV6_SUBNET)) {
 			const v4 = addr.to4();
 			return UNSAFE_IPV4_SUBNETS.some((subnet) => v4.isInSubnet(subnet));
+		}
+		// The unspecified address reaches localhost, exactly as 0.0.0.0 does.
+		if (addr.correctForm() === "::") {
+			return true;
+		}
+		// Unique local addresses (fc00::/7) are private, like 10.0.0.0/8 for IPv4.
+		if (addr.isInSubnet(UNIQUE_LOCAL_IPV6_SUBNET)) {
+			return true;
 		}
 		return addr.isLoopback() || addr.isLinkLocal();
 	}
@@ -102,7 +124,7 @@ export function isValidUrl(
 			return insecure;
 		}
 		// If the hostname is a raw IP literal, validate it
-		const cleanHostname = hostname.replace(/^\[|]$/g, "");
+		const cleanHostname = stripBrackets(hostname);
 		if (isIP(cleanHostname)) {
 			return insecure || !isUnsafeIp(cleanHostname);
 		}
@@ -159,8 +181,9 @@ function createSsrfAgent(exempt: (hostname: string) => boolean = () => false): A
 const ssrfSafeAgent = createSsrfAgent();
 
 /**
- * Only `localhost` needs the exemption. IP literals never reach the hook at all — undici calls
- * `lookup` only for names requiring DNS — so loopback and private-LAN literals already connect.
+ * Only `localhost` needs the DNS-hook exemption — it is the sole local host that reaches this
+ * hook (undici resolves it through DNS). Local IP literals never reach the hook and are gated
+ * up front by `assertSafeUrlHost`, which applies the same insecure-local allowance instead.
  */
 let localMcpAgent: Agent | undefined;
 function getLocalMcpAgent(): Agent {
@@ -172,24 +195,41 @@ const MAX_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /**
- * Fetch wrapper that validates resolved IPs at connection time
- * and validates redirect targets to prevent SSRF via open redirects.
+ * Assert that a URL's host is safe before we connect to it.
  *
- * If the caller sets `redirect: "manual"`, redirects are returned as-is
- * (the caller is responsible for validation). Otherwise, redirects are
- * followed internally with each hop validated by `isValidUrl`.
+ * The agent's `lookup` hook only runs for hosts undici resolves through DNS, so a URL carrying a
+ * raw IP literal would otherwise reach the network without `assertSafeIp` ever running. Checks
+ * `isUnsafeIp` rather than `isValidUrl` because the latter also demands HTTPS, which would break
+ * plain-HTTP MCP servers. When `allowLocal` is set (opt-in insecure MCP), local literals are
+ * exempted so `mcpFetch` can still reach a `127.0.0.1`/LAN server before the socket opens.
+ */
+function assertSafeUrlHost(urlString: string, allowLocal: boolean): void {
+	const host = stripBrackets(new URL(urlString).hostname.toLowerCase());
+	if (isIP(host) && isUnsafeIp(host) && !(allowLocal && isLocalMcpIp(host))) {
+		throw new Error(`Blocked request to unsafe IP (SSRF): ${host}`);
+	}
+}
+
+/**
+ * Fetch wrapper that rejects unsafe IP literals up front, validates resolved IPs at connection
+ * time, and validates redirect targets to prevent SSRF via open redirects.
+ *
+ * If the caller sets `redirect: "manual"`, redirects are returned as-is (the caller is
+ * responsible for validation). Otherwise, redirects are followed internally with each hop
+ * validated by `isValidUrl`.
  */
 async function guardedFetch(
 	url: string | URL,
 	init: RequestInit | undefined,
 	options: UrlSafetyOptions
 ): Promise<Response> {
-	const dispatcher =
-		options.allowInsecure && insecureMcpUrlsAllowed() ? getLocalMcpAgent() : ssrfSafeAgent;
+	const allowLocal = Boolean(options.allowInsecure) && insecureMcpUrlsAllowed();
+	const dispatcher = allowLocal ? getLocalMcpAgent() : ssrfSafeAgent;
 	const callerRedirect = init?.redirect ?? "follow";
 
 	if (callerRedirect === "error") {
 		// Honour redirect:"error" — make the request and throw if we get a redirect
+		assertSafeUrlHost(url.toString(), allowLocal);
 		const response = (await undiciFetch(url.toString(), {
 			...(init as Record<string, unknown>),
 			redirect: "manual",
@@ -203,6 +243,7 @@ async function guardedFetch(
 
 	if (callerRedirect === "manual") {
 		// Caller handles redirects — return as-is
+		assertSafeUrlHost(url.toString(), allowLocal);
 		return (await undiciFetch(url.toString(), {
 			...(init as Record<string, unknown>),
 			redirect: "manual",
@@ -217,6 +258,7 @@ async function guardedFetch(
 
 	// eslint-disable-next-line no-constant-condition
 	while (true) {
+		assertSafeUrlHost(currentUrl, allowLocal);
 		const response = (await undiciFetch(currentUrl, {
 			...(currentInit as Record<string, unknown>),
 			redirect: "manual",
