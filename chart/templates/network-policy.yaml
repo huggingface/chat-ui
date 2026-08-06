@@ -6,6 +6,9 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   {{- if .Values.networkPolicy.ingress.enabled }}
+  {{- if not .Values.networkPolicy.ingress.allowedBlocks }}
+  {{- fail "networkPolicy.ingress.enabled needs networkPolicy.ingress.allowedBlocks: a rule with no peers under `from` matches every source, so an empty list would open the port instead of restricting it" }}
+  {{- end }}
   ingress:
     ## Load balancer ENIs only, on the container port: application traffic and
     ## health checks both come from there. Kubelet probes are exempt from
@@ -67,6 +70,9 @@ spec:
         {{- end }}
     {{- end }}
     {{- range $rule := .Values.networkPolicy.extraEgress }}
+    {{- if not $rule.blocks }}
+    {{- fail "every networkPolicy.extraEgress entry needs blocks: a rule with no peers under `to` matches every destination" }}
+    {{- end }}
     ## Private destination on a single port (a database, for instance).
     - ports:
         - port: {{ $rule.port }}
