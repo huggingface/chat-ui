@@ -5,6 +5,30 @@ metadata:
   name: {{ include "name" . }}
   namespace: {{ .Release.Namespace }}
 spec:
+  {{- if .Values.networkPolicy.ingress.enabled }}
+  ingress:
+    ## Load balancer ENIs only, on the container port: application traffic and
+    ## health checks both come from there. Kubelet probes are exempt from
+    ## policies, so they keep working. Addresses come from the deployment layer.
+    - from:
+        {{- range $cidr := .Values.networkPolicy.ingress.allowedBlocks }}
+        - ipBlock:
+            cidr: {{ $cidr | quote }}
+        {{- end }}
+      ports:
+        - port: {{ .Values.networkPolicy.appPort }}
+          protocol: TCP
+    {{- if .Values.networkPolicy.ingress.metricsFromNamespace }}
+    ## Metrics scraping, from the monitoring namespace only.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingress.metricsFromNamespace | quote }}
+      ports:
+        - port: {{ .Values.networkPolicy.metricsPort }}
+          protocol: TCP
+    {{- end }}
+  {{- end }}
   egress:
     ## Cluster DNS. TCP/53 is needed for answers that do not fit in 512 bytes,
     ## and the link-local address is where a node-local resolver listens.
@@ -67,5 +91,8 @@ spec:
   podSelector:
     matchLabels: {{ include "labels.standard" . | nindent 6 }}
   policyTypes:
+    {{- if .Values.networkPolicy.ingress.enabled }}
+    - Ingress
+    {{- end }}
     - Egress
 {{- end }}
