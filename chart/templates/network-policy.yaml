@@ -6,9 +6,13 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   egress:
+    ## Cluster DNS. TCP/53 is needed for answers that do not fit in 512 bytes,
+    ## and the link-local address is where a node-local resolver listens.
     - ports:
         - port: 53
           protocol: UDP
+        - port: 53
+          protocol: TCP
       to:
         - namespaceSelector:
             matchLabels:
@@ -16,11 +20,42 @@ spec:
           podSelector:
             matchLabels:
               k8s-app: kube-dns
+        - ipBlock:
+            cidr: 169.254.169.42/32
+    {{- with .Values.networkPolicy.allowedBlocks }}
+    ## Deprecated: private ranges on every port. Prefer internalBlocks (443)
+    ## and extraEgress (one port each), which keep the surface minimal.
     - to:
-        {{- range $ip := .Values.networkPolicy.allowedBlocks }}
+        {{- range $ip := . }}
         - ipBlock:
             cidr: {{ $ip | quote }}
         {{- end }}
+    {{- end }}
+    {{- with .Values.networkPolicy.internalBlocks }}
+    ## Private ranges reachable over HTTPS only.
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        {{- range $ip := . }}
+        - ipBlock:
+            cidr: {{ $ip | quote }}
+        {{- end }}
+    {{- end }}
+    {{- range $rule := .Values.networkPolicy.extraEgress }}
+    ## Private destination on a single port (a database, for instance).
+    - ports:
+        - port: {{ $rule.port }}
+          protocol: TCP
+      to:
+        {{- range $ip := $rule.blocks }}
+        - ipBlock:
+            cidr: {{ $ip | quote }}
+        {{- end }}
+    {{- end }}
+    ## Public egress. Every private range stays denied, and the whole
+    ## link-local range with it: that is where the cloud metadata endpoint
+    ## lives, which a compromised pod must never reach.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -28,7 +63,7 @@ spec:
               - 10.0.0.0/8
               - 172.16.0.0/12
               - 192.168.0.0/16
-              - 169.254.169.254/32
+              - 169.254.0.0/16
   podSelector:
     matchLabels: {{ include "labels.standard" . | nindent 6 }}
   policyTypes:
