@@ -10,7 +10,15 @@ domain: huggingface.co
 
 networkPolicy:
   enabled: false
+  ## Deprecated: private ranges opened on every port. Prefer the two below.
   allowedBlocks: []
+  ## Private ranges reachable over HTTPS only.
+  internalBlocks: []
+  ## Private destinations that need one specific port, e.g.
+  ##   - port: 27017
+  ##     blocks: ["10.0.0.0/24"]
+  ## Addresses are supplied by the deployment layer, not committed here.
+  extraEgress: []
 
 service:
   type: NodePort
