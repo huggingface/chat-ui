@@ -174,10 +174,26 @@ export async function endpointOai(
 			abortSignal,
 			provider,
 			reasoningEffort,
+			reasoningOverride,
 		}) => {
-			// Format messages for the chat API, handling multimodal content if supported
+			// Format messages for the chat API, handling multimodal content if supported.
+			// attachReasoning re-attaches persisted reasoning as reasoning_content on
+			// past assistant turns (preserved-thinking models condition on it). The
+			// per-user reasoning override wins in both directions, else the model's
+			// capability flag decides, mirroring reasoning_effort forwarding, so
+			// strict non-reasoning backends never see the extra field; tool replay
+			// stays off here since this path never declares tools.
+			// currentProducerModel is this call's own resolved model: when invoked
+			// directly for a pinned conversation it's the only model that has ever
+			// produced a turn here, and when invoked as a router candidate (the
+			// "omni" alias resolves a candidate before delegating here) it's that
+			// resolved candidate — either way it gates reasoning_content to history
+			// this same model actually produced.
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-				await prepareMessagesWithFiles(messages, imageProcessor, isMultimodal ?? model.multimodal);
+				await prepareMessagesWithFiles(messages, imageProcessor, isMultimodal ?? model.multimodal, {
+					attachReasoning: reasoningOverride ?? Boolean(model.supportsReasoning),
+					currentProducerModel: model.id ?? model.name,
+				});
 
 			// Normalize preprompt and handle empty values
 			const normalizedPreprompt = typeof preprompt === "string" ? preprompt.trim() : "";

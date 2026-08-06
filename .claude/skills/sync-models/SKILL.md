@@ -64,7 +64,19 @@ Both directions share the same source of truth: whatever `https://router.hugging
    - **Whether it's a reasoning model** (see step 5)
 
 5. **Decide if the model is reasoning-capable**
-   A model is "reasoning-capable" for chat-ui purposes if it accepts the OpenAI-style `reasoning_effort: low|medium|high` parameter via the HF router and _meaningfully changes its chain-of-thought depth_ in response. Whether that holds depends on **both the model and the providers serving it** — the router is a transparent proxy, so behavior comes from each provider's implementation. Don't decide from the name alone.
+   The `supportsReasoning` flag controls TWO behaviors, and both must be appropriate before flagging:
+
+   1. chat-ui renders the thinking-effort dropdown and forwards `reasoning_effort` to the router;
+   2. chat-ui echoes the model's prior reasoning back as `reasoning_content` on past assistant messages (cross-turn "preserved thinking" — see `prepareFiles.ts` / `endpointOai.ts`).
+
+   A model qualifies for (1) if it accepts the OpenAI-style `reasoning_effort: low|medium|high` parameter via the HF router and _meaningfully changes its chain-of-thought depth_ in response. Whether that holds depends on **both the model and the providers serving it** — the router is a transparent proxy, so behavior comes from each provider's implementation. Don't decide from the name alone.
+
+   For (2), check the vendor's preserved-thinking / multi-turn guidance, because it can point in either direction:
+
+   - **Flag-strengthening**: the vendor documents that prior `reasoning_content` must or should be passed back in multi-turn or tool-calling flows. Known examples: Moonshot `thinking.keep` (Kimi K2.6+/K3), MiniMax "Interleaved Thinking" ("must preserve the model's thinking content completely"), DeepSeek V4 thinking mode (hard 400 if `reasoning_content` is missing on tool-call turns), Z.ai "Preserved Thinking" (`clear_thinking: false`), Qwen3.6 `preserve_thinking`.
+   - **Flag-blocking**: the vendor documents that historical thoughts must be STRIPPED across completed turns. Known example: the Gemma family — Google requires removing thoughts from previous turns ("historical model output must only include the final response") while preserving them only inside a single turn's tool loop, which chat-ui handles automatically without the flag. **Do not flag such models even though they emit reasoning and may accept an effort knob** — flagging would make chat-ui echo reasoning the vendor says to strip.
+
+   Vendor doc entry points for the preserved-thinking check: <https://platform.kimi.ai/docs/guide/use-kimi-k2-thinking-model>, <https://platform.minimax.io/docs/guides/text-m3-function-call>, <https://api-docs.deepseek.com/guides/thinking_mode/>, <https://docs.z.ai/guides/capabilities/thinking-mode>, <https://ai.google.dev/gemma/docs/capabilities/thinking>, plus the model card's own multi-turn/best-practices section (Qwen cards document what their chat template does with historical `<think>` blocks).
 
    **Heuristic shortlist (candidates worth verifying):**
 
@@ -141,7 +153,7 @@ Both directions share the same source of truth: whatever `https://router.hugging
    }
    ```
 
-   `supportsReasoning` is what makes chat-ui render the Thinking-effort dropdown in the chat footer for that model and forward `reasoning_effort` to the router. `supportsArtifacts` enables the artifacts side panel for the model.
+   `supportsReasoning` makes chat-ui render the Thinking-effort dropdown in the chat footer, forward `reasoning_effort` to the router, AND echo the model's prior reasoning back as `reasoning_content` on past assistant messages (preserved thinking). Models whose vendor requires stripping historical thoughts (Gemma family) must stay unflagged — see step 5. `supportsArtifacts` enables the artifacts side panel for the model.
 
 9. **Remove deprecated models from both files**
    Delete the full entry line for every id in the deprecated set (step 3) from **both** `chart/env/prod.yaml` and `chart/env/dev.yaml`. Match on the exact `"id"` value so near-duplicate ids aren't removed by accident, and keep the removal symmetric — the two files must end with the same model set.
