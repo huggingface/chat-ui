@@ -557,8 +557,17 @@ async function runOne(
 		if (!content && !sawToolCall && genTokens === 0) {
 			return { ok: false, ttftMs, totalMs, genTokens, note: "empty response" };
 		}
+		// An empty final answer cannot satisfy an `expect` check, so it counts as
+		// incoherent rather than unjudged. Left as `undefined` it passed the
+		// regression gate, which meant a rep that streamed only reasoning — or
+		// returned tool_calls and never got to an answer — could satisfy S2/S3 or
+		// P2 without ever producing the text the scenario exists to check for.
+		// Scenarios carrying no expectations (the acceptance-only ones, which ask
+		// whether a payload shape is tolerated at all) stay unjudged.
 		const coherent =
-			content.length > 0 ? scenario.expect.every((re) => re.test(content)) : undefined;
+			scenario.expect.length === 0
+				? undefined
+				: content.length > 0 && scenario.expect.every((re) => re.test(content));
 		// A tool-calls-only response (no text) never satisfies a nonce check:
 		// the semantic proof requires the fact to appear in the model's actual
 		// answer, not just that some request happened to succeed.
