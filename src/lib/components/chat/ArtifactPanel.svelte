@@ -5,12 +5,24 @@
 	import type { ArtifactRegistry, ArtifactVersion } from "$lib/utils/artifacts";
 	import { artifactFileName, isPreviewableKind } from "$lib/utils/artifacts";
 	import { diffLines, diffStats, renderDiffHtml } from "$lib/utils/artifactDiff";
-	import { buildArtifactSrcdoc, isDeployableKind } from "$lib/utils/previewSrcdoc";
+	import {
+		buildArtifactSrcdoc,
+		capturePreviewError,
+		composeFixRequest,
+		isDeployableKind,
+		normalizePreviewError,
+		PREVIEW_ALLOW,
+		PREVIEW_SANDBOX,
+		type CapturedPreviewError,
+	} from "$lib/utils/previewSrcdoc";
+	import { captureArtifactScreenshot, pngDataUrlToFile } from "$lib/utils/artifactCapture";
 	import { parseExternalUrl } from "$lib/utils/externalLink";
 	import { escapeHTML } from "$lib/utils/markedLight";
 	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_FRACTION } from "$lib/stores/artifactPanel.svelte";
 	import { StickToBottomController } from "$lib/utils/scroll/stickToBottom";
-	import { pendingChatInput } from "$lib/stores/pendingChatInput";
+	import { pendingComposerPayload } from "$lib/stores/pendingComposerPayload";
+	import { formatScreenshotNotes } from "$lib/utils/screenshotNotes";
+	import { error as errorStore } from "$lib/stores/errors";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { page } from "$app/state";
 
@@ -19,10 +31,12 @@
 	import ExternalLinkModal from "../ExternalLinkModal.svelte";
 	import HtmlPreviewModal from "../HtmlPreviewModal.svelte";
 	import DeployToSpaceModal from "./DeployToSpaceModal.svelte";
+	import ScreenshotAnnotationModal from "./ScreenshotAnnotationModal.svelte";
 
 	import CarbonCloseLarge from "~icons/carbon/close-large";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
+	import CarbonCamera from "~icons/carbon/camera";
 	import CarbonDownload from "~icons/carbon/download";
 	import CarbonRocket from "~icons/carbon/rocket";
 	import CarbonMaximize from "~icons/carbon/maximize";
@@ -33,9 +47,17 @@
 	interface Props {
 		registry: ArtifactRegistry;
 		loading?: boolean;
+		/** Whether the current model accepts image attachments (enables screenshot-to-chat) */
+		canScreenshot?: boolean;
+		/**
+		 * Sends an ask-to-fix message directly to the chat, returning whether it
+		 * was dispatched. Absent when the conversation can't accept messages
+		 * (read-only, errored generation), which hides the ask-to-fix controls.
+		 */
+		onsend?: (text: string) => boolean;
 	}
 
-	let { registry, loading = false }: Props = $props();
+	let { registry, loading = false, canScreenshot = false, onsend }: Props = $props();
 
 	let artifact = $derived(
 		artifactPanel.identifier ? registry.artifacts.get(artifactPanel.identifier) : undefined
@@ -267,7 +289,7 @@
 	// ----- live preview -----
 	const previewChannel = `artifact_${Math.random().toString(36).slice(2)}`;
 	let iframeEl: HTMLIFrameElement | undefined = $state();
-	let errors: { message: string; stack?: string }[] = $state([]);
+	let errors: CapturedPreviewError[] = $state([]);
 	let externalLinkUrl = $state<URL | null>(null);
 
 	let srcdoc = $derived.by(() => {
@@ -282,10 +304,21 @@
 		errors = [];
 	});
 
+	// True once the iframe finished loading the current srcdoc. srcdoc
+	// navigation is asynchronous, so right after a version switch the old
+	// document still occupies the frame (and still answers on the shared
+	// channel); capture stays disabled until the load event confirms the
+	// displayed document is the one srcdoc describes.
+	let previewLoaded = $state(false);
+	$effect(() => {
+		void srcdoc;
+		previewLoaded = false;
+	});
+
 	type PreviewMessage = {
 		type: string;
 		channel: string;
-		detail?: { message?: unknown; stack?: string; href?: unknown };
+		detail?: { message?: unknown; stack?: unknown; href?: unknown };
 	};
 
 	function onWindowMessage(ev: MessageEvent) {
@@ -304,18 +337,83 @@
 			return;
 		}
 		if (data.type !== "chatui.preview.error") return;
-		const detail = (data.detail ?? {}) as { message?: unknown; stack?: string };
-		errors = [...errors, { message: String(detail.message ?? "Error"), stack: detail.stack }];
+		errors = capturePreviewError(errors, normalizePreviewError(data.detail));
+	}
+
+	// Sends the fix request as a chat message right away. On mobile the panel
+	// is a fullscreen overlay that would hide both the sent message and the
+	// streaming reply, so close it on send; the panel auto-reopens when the
+	// fixed version starts streaming in (maybeAutoOpen). On desktop the chat is
+	// visible next to the panel, which stays open to receive the fix.
+	function sendFixRequest(text: string): boolean {
+		const sent = onsend?.(text) ?? false;
+		if (sent && !isDesktop) artifactPanel.close();
+		return sent;
 	}
 
 	function askToFixErrors() {
-		const lines = errors.map((e, i) => `${i + 1}. ${e.message}${e.stack ? `\n${e.stack}` : ""}`);
-		const summary = lines[0] ?? "Unknown error";
-		pendingChatInput.set(
-			errors.length > 1
-				? `it's not working: ${summary} (+${errors.length - 1} more) - can you fix it?`
-				: `it's not working: ${summary} - can you fix it?`
-		);
+		sendFixRequest(composeFixRequest(errors));
+	}
+
+	// ----- screenshot to chat -----
+	// Only the live iframe preview can be captured: a non-null srcdoc already
+	// implies a complete, previewable, non-markdown version on the preview tab.
+	let screenshotSupported = $derived(
+		canScreenshot && effectiveTab === "preview" && !!srcdoc && previewLoaded
+	);
+	let capturing = $state(false);
+	let pendingScreenshot = $state<{ dataUrl: string; fileName: string; subject: string } | null>(
+		null
+	);
+
+	async function screenshotPreview() {
+		// pendingScreenshot guard: a capture resolving while the annotation modal
+		// is already open would silently swap the image under the user.
+		// previewLoaded guard: before the iframe committed the current srcdoc,
+		// the previous document would answer the request under the new name.
+		if (!iframeEl || capturing || pendingScreenshot || !previewLoaded || !artifact) return;
+		capturing = true;
+		// Freeze name and subject now: a new version can stream in (or the user
+		// can navigate) while the annotation modal is open
+		const slug = artifact.identifier.replace(/[^a-zA-Z0-9_-]+/g, "-") || "artifact";
+		const fileName = `${slug}-v${displayVersionNumber}-screenshot.png`;
+		const subject = `"${version?.title ?? artifact.identifier}" (v${displayVersionNumber})`;
+		const requestedSrcdoc = srcdoc;
+		try {
+			// Transparent documents composite over the iframe's own backing, so
+			// passing its computed background keeps the shot true to what the
+			// user sees in light and dark mode
+			const backing = getComputedStyle(iframeEl).backgroundColor;
+			const dataUrl = await captureArtifactScreenshot(iframeEl, previewChannel, backing);
+			// The channel survives srcdoc swaps, so a version switch (streaming
+			// edit, version nav) mid-capture would answer from the replacement
+			// document; a shot of a different document must not be attached
+			// under the frozen file name
+			if (srcdoc !== requestedSrcdoc) {
+				throw new Error("the preview changed during capture");
+			}
+			pendingScreenshot = { dataUrl, fileName, subject };
+		} catch (err) {
+			errorStore.set(
+				`Screenshot failed: ${err instanceof Error ? err.message : "unexpected error"}`
+			);
+		} finally {
+			capturing = false;
+		}
+	}
+
+	function attachScreenshot(annotatedDataUrl: string, notes: string[]) {
+		const shot = pendingScreenshot;
+		if (!shot) return;
+		pendingComposerPayload.set({
+			files: [pngDataUrlToFile(annotatedDataUrl, shot.fileName)],
+			// Numbered to match the badges baked into the image; the subject header
+			// keeps blocks apart when several annotated screenshots share a draft
+			text: formatScreenshotNotes(notes, shot.subject),
+		});
+		pendingScreenshot = null;
+		// On mobile the panel overlays the chat; close it so the attachment is visible
+		if (!isDesktop) artifactPanel.close();
 	}
 
 	// ----- actions -----
@@ -426,7 +524,7 @@
 {#snippet panelContent()}
 	<!-- header (z-10 so button tooltips aren't painted over by the body) -->
 	<header
-		class="relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
+		class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
 	>
 		<div class="flex min-w-0 flex-1 items-center gap-2">
 			{#if isStreamingVersion}
@@ -462,8 +560,28 @@
 			</button>
 		</div>
 
-		<div class="flex flex-none items-center gap-0.5 text-gray-400">
+		<div class="flex flex-none items-center gap-0.5 text-gray-500 dark:text-gray-400">
 			{#if version}
+				<!-- Deploy leads the cluster: it's the promoted action and the only
+				     labeled control here, so keeping it next to the tab switcher leaves
+				     the trailing icons as one uniform icon-only group.
+				     The label rides a container query on the header, not the viewport:
+				     the panel is user-resizable, so only its own width says whether
+				     there's room for it beside the title. Below the threshold it
+				     collapses back to the bare rocket. -->
+				{#if canDeploy}
+					<button
+						type="button"
+						class="btn gap-1 rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 @min-[580px]:pr-2 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+						title={currentDeployment ? "Update Space" : "Deploy to Space"}
+						onclick={() => (deployModalOpen = true)}
+					>
+						<CarbonRocket />
+						<span class="hidden font-medium @min-[580px]:inline">
+							{currentDeployment ? "Update" : "Deploy"}
+						</span>
+					</button>
+				{/if}
 				<CopyToClipBoardBtn
 					value={version.content}
 					classNames="btn rounded-md p-1.5 text-sm hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 focus:ring-0"
@@ -477,16 +595,6 @@
 				>
 					<CarbonDownload />
 				</button>
-				{#if canDeploy}
-					<button
-						type="button"
-						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-						title={currentDeployment ? "Update Space" : "Deploy to Space"}
-						onclick={() => (deployModalOpen = true)}
-					>
-						<CarbonRocket />
-					</button>
-				{/if}
 				{#if fullscreenSupported}
 					<button
 						type="button"
@@ -534,8 +642,11 @@
 					bind:this={iframeEl}
 					title="Artifact preview"
 					class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
-					sandbox="allow-scripts allow-forms"
+					sandbox={PREVIEW_SANDBOX}
+					allow={PREVIEW_ALLOW}
+					allowfullscreen
 					referrerpolicy="no-referrer"
+					onload={() => (previewLoaded = true)}
 					{srcdoc}
 				></iframe>
 			{/if}
@@ -633,11 +744,14 @@
 				<span class="router-shimmer whitespace-nowrap">
 					{version?.op === "update" ? "Applying edit" : "Generating"}
 				</span>
-			{:else if errors.length > 0}
+			{:else if errors.length > 0 && onsend}
 				<button
 					type="button"
-					class="btn flex items-center gap-1.5 rounded-full border border-red-300/60 bg-red-50 px-2.5 py-0.5 text-red-600 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
-					title="Send the error to the chat input"
+					class="btn flex items-center gap-1.5 rounded-full border border-red-300/60 bg-red-50 px-2.5 py-0.5 text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+					title={loading
+						? "Wait for the current response to finish"
+						: "Send the errors and ask for a fix"}
+					disabled={loading}
 					onclick={askToFixErrors}
 				>
 					{errors.length} error{errors.length > 1 ? "s" : ""} — ask to fix
@@ -655,6 +769,25 @@
 				>
 					<span class="text-green-600 dark:text-green-500">+{stats.added}</span>
 					<span class="ml-0.5 text-red-600 dark:text-red-500">−{stats.removed}</span>
+				</button>
+			{/if}
+			{#if !isStreamingVersion && screenshotSupported}
+				<!-- Rightmost footer action, labeled with a plain word: the header
+				     camera icon alone wasn't discoverable enough for the
+				     screenshot-and-annotate feedback loop -->
+				<button
+					type="button"
+					class="btn flex-none gap-1.5 rounded-md border border-gray-200/80 bg-white/90 px-2 py-0.5 font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700/80 dark:bg-gray-900/90 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+					title="Screenshot the preview, annotate it, and attach it to the chat"
+					disabled={capturing}
+					onclick={screenshotPreview}
+				>
+					{#if capturing}
+						<EosIconsLoading class="text-xs" />
+					{:else}
+						<CarbonCamera class="text-xs" />
+					{/if}
+					Annotate
 				</button>
 			{/if}
 		</div>
@@ -698,15 +831,26 @@
 {/if}
 
 {#if fullscreenOpen && version}
+	<!-- The modal can't render a disabled state for its floating error button,
+	     so streaming gates the handler entirely -->
 	<HtmlPreviewModal
 		html={version.content}
 		kind={version.type}
 		onclose={() => (fullscreenOpen = false)}
+		onsend={onsend && !loading ? sendFixRequest : undefined}
 	/>
 {/if}
 
 {#if externalLinkUrl}
 	<ExternalLinkModal url={externalLinkUrl} onclose={() => (externalLinkUrl = null)} />
+{/if}
+
+{#if pendingScreenshot}
+	<ScreenshotAnnotationModal
+		dataUrl={pendingScreenshot.dataUrl}
+		onconfirm={attachScreenshot}
+		onclose={() => (pendingScreenshot = null)}
+	/>
 {/if}
 
 {#if deployModalOpen && version && artifact && conversationId}

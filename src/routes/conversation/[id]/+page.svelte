@@ -294,7 +294,11 @@
 			});
 			if (messageUpdatesIterator === undefined) return;
 
-			files = [];
+			// Clear only attachments this send actually consumed: a direct fix
+			// request (artifact "ask to fix") empties `files` around its call and
+			// restores the user's queued attachments right after, and an
+			// unconditional clear here would wipe that restored queue.
+			if (base64Files.length > 0) files = [];
 
 			await consumeMessageUpdates(messageUpdatesIterator, messageToWriteTo, {
 				streamingMode,
