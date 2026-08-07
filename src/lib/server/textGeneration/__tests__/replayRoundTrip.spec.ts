@@ -680,6 +680,35 @@ describe.sequential("model switching", () => {
 		expect(JSON.stringify(replayed), shape).not.toContain("Reasoning by the first model");
 	});
 
+	it("leaves the pinned model alone when a turn records a different producer", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([{ content: "First answer." }, { content: "Second answer." }]);
+		await sendMessage(conv, locals, "Question?", { withTools: false });
+
+		// What the "omni" alias produces: the turn is stamped with the candidate
+		// that actually answered, which is not the model the conversation is
+		// pinned to.
+		await collections.conversations.updateOne(
+			{ _id: conv._id },
+			{
+				$set: { "messages.$[m].routerMetadata": { route: "default", model: "test-org/text-only" } },
+			},
+			{ arrayFilters: [{ "m.from": "assistant" }] }
+		);
+
+		const stamped = await reload(conv);
+		expect(assistantMessages(stamped)[0].routerMetadata?.model).toBe("test-org/text-only");
+		await sendMessage(stamped, locals, "Follow-up?", { withTools: false });
+
+		// Reopening must show the pin, not whichever model happened to answer
+		// last — the GET handler returns `conversation.model` verbatim, so this
+		// is what the picker renders. Recording the producer must stay a
+		// data-only concern.
+		const after = await reload(conv);
+		expect(after.model).toBe(MODEL_ID);
+		expect(assistantMessages(after)[0].routerMetadata?.model).toBe("test-org/text-only");
+	});
+
 	it("does not discard messages written between reading the conversation and applying the switch", async () => {
 		const { conv, locals } = await newConversation();
 		scriptRounds([{ content: "First answer." }]);
