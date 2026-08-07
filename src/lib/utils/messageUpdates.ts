@@ -26,7 +26,12 @@ type MessageUpdateRequestOptions = {
 	// Optional: pass selected MCP server names (client-side selection)
 	selectedMcpServerNames?: string[];
 	// Optional: pass selected MCP server configs (for custom client-defined servers)
-	selectedMcpServers?: Array<{ name: string; url: string; headers?: KeyValuePair[] }>;
+	selectedMcpServers?: Array<{
+		name: string;
+		url: string;
+		headers?: KeyValuePair[];
+		oauthConnectionId?: string;
+	}>;
 	// User's IANA timezone (e.g. "America/New_York")
 	timezone?: string;
 	streamingMode?: StreamingMode;

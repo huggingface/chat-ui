@@ -2,16 +2,24 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { createMcpClient } from "$lib/server/mcp/client";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import type { KeyValuePair } from "$lib/types/Tool";
+import type { KeyValuePair, MCPOAuthState } from "$lib/types/Tool";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import type { RequestHandler } from "./$types";
 import { isValidUrl, mcpFetch } from "$lib/server/urlSafety";
 import { isStrictHfMcpLogin, hasNonEmptyToken, isExaMcpServer } from "$lib/server/mcp/hf";
+import {
+	captureInsufficientScopeResponse,
+	getOAuthConnection,
+	OAuthAuthorizationRequiredError,
+	publicOAuthState,
+	resolveOAuthAccessToken,
+} from "$lib/server/mcp/oauth/connections";
 
 interface HealthCheckRequest {
 	url: string;
 	headers?: KeyValuePair[];
+	oauthConnectionId?: string;
 }
 
 interface HealthCheckResponse {
@@ -23,14 +31,16 @@ interface HealthCheckResponse {
 	}>;
 	error?: string;
 	authRequired?: boolean;
+	oauth?: MCPOAuthState;
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	let client: Client | undefined;
+	let oauthState: MCPOAuthState | undefined;
 
 	try {
 		const body: HealthCheckRequest = await request.json();
-		const { url, headers } = body;
+		const { url, headers, oauthConnectionId } = body;
 
 		if (!url) {
 			return new Response(JSON.stringify({ ready: false, error: "URL is required" }), {
@@ -73,6 +83,21 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const headersRecord: Record<string, string> = headers?.length
 			? Object.fromEntries(headers.map((h) => [h.key, h.value]))
 			: {};
+		if (oauthConnectionId) {
+			if (Object.keys(headersRecord).some((key) => key.toLowerCase() === "authorization")) {
+				return new Response(
+					JSON.stringify({
+						ready: false,
+						error: "Use either an OAuth connection or a manual Authorization header",
+					}),
+					{ status: 400, headers: { "Content-Type": "application/json" } }
+				);
+			}
+			oauthState = publicOAuthState(await getOAuthConnection(locals, oauthConnectionId));
+			const resolved = await resolveOAuthAccessToken(locals, oauthConnectionId, url);
+			headersRecord["Authorization"] = `Bearer ${resolved.accessToken}`;
+			oauthState = resolved.state;
+		}
 		if (!headersRecord["Accept"]) {
 			headersRecord["Accept"] = "application/json, text/event-stream";
 		}
@@ -100,6 +125,31 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			headers: headersRecord,
 			signal,
 		};
+		const outboundFetch: typeof fetch = async (input, init) => {
+			const response = await mcpFetch(
+				input instanceof Request ? input.url : input,
+				input instanceof Request
+					? {
+							method: input.method,
+							headers: input.headers,
+							body: input.body,
+							signal: input.signal,
+							...init,
+						}
+					: init
+			);
+			// Only on error responses: cloning a 2xx (SSE) body deadlocks the stream the MCP SDK reads.
+			if (oauthConnectionId && !response.ok) {
+				const challenged = await captureInsufficientScopeResponse(
+					locals,
+					oauthConnectionId,
+					url,
+					response.clone()
+				).catch(() => undefined);
+				if (challenged) oauthState = challenged;
+			}
+			return response;
+		};
 
 		let httpError: Error | undefined;
 		let lastError: Error | undefined;
@@ -111,7 +161,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 			const transport = new StreamableHTTPClientTransport(baseUrl, {
 				requestInit,
-				fetch: mcpFetch,
+				fetch: outboundFetch,
 			});
 			logger.info({}, `[MCP Health] Connecting to ${url}...`);
 			await client.connect(transport);
@@ -132,6 +182,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						inputSchema: tool.inputSchema,
 					})),
 					authRequired: false,
+					oauth: oauthState,
 				};
 
 				const res = new Response(JSON.stringify(response), {
@@ -146,6 +197,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						ready: false,
 						error: "Connected but no tools available",
 						authRequired: false,
+						oauth: oauthState,
 					} as HealthCheckResponse),
 					{
 						status: 503,
@@ -174,7 +226,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 				const sseTransport = new SSEClientTransport(baseUrl, {
 					requestInit,
-					fetch: mcpFetch,
+					fetch: outboundFetch,
 				});
 				logger.info({}, `[MCP Health] Connecting via SSE...`);
 				await client.connect(sseTransport);
@@ -195,6 +247,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 							inputSchema: tool.inputSchema,
 						})),
 						authRequired: false,
+						oauth: oauthState,
 					};
 
 					const res = new Response(JSON.stringify(response), {
@@ -209,6 +262,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 							ready: false,
 							error: "Connected but no tools available",
 							authRequired: false,
+							oauth: oauthState,
 						} as HealthCheckResponse),
 						{
 							status: 503,
@@ -238,6 +292,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		// Detect unauthorized to signal auth requirement
 		const lower = (errorMessage || "").toLowerCase();
 		const authRequired =
+			oauthState?.status === "authorization_required" ||
 			lower.includes("unauthorized") ||
 			lower.includes("forbidden") ||
 			lower.includes("401") ||
@@ -245,8 +300,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		// Provide more helpful error messages
 		if (authRequired) {
-			errorMessage =
-				"Authentication required. Provide appropriate Authorization headers in the server configuration.";
+			errorMessage = oauthState?.scope
+				? `Additional authorization is required for scope: ${oauthState.scope}`
+				: "Authentication required. Provide appropriate Authorization headers in the server configuration.";
 		} else if (errorMessage.includes("not valid JSON")) {
 			errorMessage =
 				"Server returned invalid response. This might not be a valid MCP endpoint. MCP servers should respond to POST requests at /mcp with JSON-RPC messages.";
@@ -261,6 +317,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				ready: false,
 				error: errorMessage,
 				authRequired,
+				oauth: oauthState,
 			} as HealthCheckResponse),
 			{
 				status: 503,
@@ -282,6 +339,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const response: HealthCheckResponse = {
 			ready: false,
 			error: error instanceof Error ? error.message : "Unknown error",
+			authRequired:
+				error instanceof OAuthAuthorizationRequiredError ||
+				oauthState?.status === "authorization_required",
+			oauth: oauthState,
 		};
 
 		const res = new Response(JSON.stringify(response), {

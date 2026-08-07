@@ -8,7 +8,14 @@ import { writable, derived, get } from "svelte/store";
 import { base } from "$app/paths";
 import { env as publicEnv } from "$env/dynamic/public";
 import { browser } from "$app/environment";
-import type { MCPServer, ServerStatus, MCPTool } from "$lib/types/Tool";
+import type {
+	KeyValuePair,
+	MCPOAuthState,
+	MCPServer,
+	ServerStatus,
+	MCPTool,
+} from "$lib/types/Tool";
+import { disconnectOAuthConnection, discoverServer } from "$lib/utils/mcpOAuth";
 
 // Namespace storage by app identity to avoid collisions across apps
 function toKeyPart(s: string | undefined): string {
@@ -34,11 +41,46 @@ function loadCustomServers(): MCPServer[] {
 
 	try {
 		const json = localStorage.getItem(STORAGE_KEYS.CUSTOM_SERVERS);
-		return json ? JSON.parse(json) : [];
+		const parsed = json ? (JSON.parse(json) as unknown) : [];
+		if (!Array.isArray(parsed)) return [];
+		return parsed
+			.filter((server): server is MCPServer => Boolean(server && typeof server === "object"))
+			.map(stripLegacyOAuthSecrets);
 	} catch (error) {
 		console.error("Failed to load custom MCP servers from localStorage:", error);
 		return [];
 	}
+}
+
+function stripLegacyOAuthSecrets(server: MCPServer): MCPServer {
+	const raw = server.oauth as unknown;
+	if (!raw || typeof raw !== "object") return server;
+	const oauth = raw as Record<string, unknown>;
+	if (
+		typeof oauth.connectionId !== "string" ||
+		typeof oauth.issuer !== "string" ||
+		(oauth.status !== "authorized" && oauth.status !== "authorization_required")
+	) {
+		const clean = { ...server };
+		delete clean.oauth;
+		return { ...clean, authRequired: Boolean(server.authRequired || oauth.tokens) };
+	}
+	return {
+		...server,
+		oauth: {
+			connectionId: oauth.connectionId,
+			issuer: oauth.issuer,
+			status: oauth.status,
+			scope: typeof oauth.scope === "string" ? oauth.scope : undefined,
+			expiresAt: typeof oauth.expiresAt === "number" ? oauth.expiresAt : undefined,
+			manualClientRequired:
+				typeof oauth.manualClientRequired === "boolean" ? oauth.manualClientRequired : undefined,
+			clientWasManuallyEntered:
+				typeof oauth.clientWasManuallyEntered === "boolean"
+					? oauth.clientWasManuallyEntered
+					: undefined,
+		},
+	};
 }
 
 // Load selected server IDs from localStorage
@@ -320,6 +362,60 @@ export function updateServerStatus(
 }
 
 /**
+ * Build the user-entered headers sent for this server. OAuth credentials are
+ * resolved from the opaque connection ID at the server-side request boundary.
+ */
+export function effectiveServerHeaders(server: MCPServer): KeyValuePair[] {
+	return [...(server.headers ?? [])];
+}
+
+/**
+ * Set / replace the full OAuth state on a custom server (e.g., after the
+ * Authorize popup flow completes successfully).
+ */
+export function setServerOAuth(id: string, oauth: MCPOAuthState) {
+	allMcpServers.update(($servers) =>
+		$servers.map((s) => ({
+			...s,
+			...(s.id === id ? { oauth, authRequired: oauth.status !== "authorized" } : {}),
+		}))
+	);
+	persistCustomServers();
+}
+
+/**
+ * Delete the owner-scoped connection first, then best-effort revoke its token.
+ * A fresh discovery is attempted so the server remains re-authorizable.
+ */
+export async function disconnectServerOAuth(id: string, rediscover = true): Promise<boolean> {
+	const server = get(allMcpServers).find((s) => s.id === id);
+	if (!server?.oauth) return false;
+	const disconnected = await disconnectOAuthConnection(server.oauth.connectionId);
+	allMcpServers.update(($servers) =>
+		$servers.map((candidate) =>
+			candidate.id === id ? { ...candidate, oauth: undefined, authRequired: true } : candidate
+		)
+	);
+	try {
+		if (!rediscover) {
+			persistCustomServers();
+			return disconnected;
+		}
+		const discovery = await discoverServer(server.url);
+		if (discovery.connection) setServerOAuth(id, discovery.connection);
+	} catch {
+		persistCustomServers();
+	}
+	return disconnected;
+}
+
+function persistCustomServers() {
+	const all = get(allMcpServers);
+	const customs = all.filter((s) => s.type === "custom");
+	saveCustomServers(customs);
+}
+
+/**
  * Run health check on a server
  */
 export async function healthCheckServer(
@@ -331,15 +427,21 @@ export async function healthCheckServer(
 		const response = await fetch(`${base}/api/mcp/health`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ url: server.url, headers: server.headers }),
+			body: JSON.stringify({
+				url: server.url,
+				headers: effectiveServerHeaders(server),
+				oauthConnectionId: server.oauth?.connectionId,
+			}),
 		});
 
 		const result = await response.json();
 
 		if (result.ready && result.tools) {
+			if (result.oauth) setServerOAuth(server.id, result.oauth);
 			updateServerStatus(server.id, "connected", undefined, result.tools, false);
 			return { ready: true, tools: result.tools };
 		} else {
+			if (result.oauth) setServerOAuth(server.id, result.oauth);
 			updateServerStatus(server.id, "error", result.error, undefined, Boolean(result.authRequired));
 			return { ready: false, error: result.error };
 		}
@@ -350,7 +452,29 @@ export async function healthCheckServer(
 	}
 }
 
+/**
+ * After a full-page redirect OAuth flow returns, consume any handoff payload
+ * from the URL hash and apply it to the corresponding server entry.
+ */
+async function consumeOAuthRedirectIfAny() {
+	if (!browser) return;
+	const { consumeRedirectHandoff } = await import("$lib/utils/mcpOAuth");
+	const result = consumeRedirectHandoff();
+	if (!result) return;
+	const { payload, serverId } = result;
+	if (!payload.ok || !payload.connection) return;
+	setServerOAuth(serverId, payload.connection);
+	// Mirror the popup path's behavior: auto-enable a freshly-authorized server
+	// so its tools ship with the next chat without the user having to flip the
+	// switch on the card.
+	if (!get(selectedServerIds).has(serverId)) {
+		toggleServer(serverId);
+	}
+}
+
 // Initialize on module load
 if (browser) {
-	refreshMcpServers();
+	refreshMcpServers().then(() => {
+		consumeOAuthRedirectIfAny();
+	});
 }

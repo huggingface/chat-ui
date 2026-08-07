@@ -19,6 +19,8 @@ export interface McpServerConfig {
 	name: string;
 	url: string;
 	headers?: Record<string, string>;
+	oauthConnectionId?: string;
+	oauthChallengeHandler?: (response: Response) => Promise<void>;
 }
 
 const DEFAULT_TIMEOUT_MS = 120_000;

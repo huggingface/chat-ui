@@ -53,6 +53,57 @@ export interface MCPTool {
 	inputSchema?: unknown;
 }
 
+// Server-only OAuth token shape. Never serialize this through MCP browser APIs.
+export interface MCPOAuthTokens {
+	access_token: string;
+	token_type: string;
+	refresh_token?: string;
+	scope?: string;
+	expires_in?: number;
+	expires_at?: number;
+	id_token?: string;
+}
+
+// Snapshot of the discovery + DCR results so we can refresh tokens or
+// reconnect later without re-walking the WWW-Authenticate dance every time.
+// Schemas mirror @modelcontextprotocol/sdk/shared/auth (RFC 8414, RFC 7591),
+// kept loose here so we don't pull SDK Zod types into the public client bundle.
+export interface MCPAuthorizationServerMetadata {
+	issuer: string;
+	authorization_endpoint: string;
+	token_endpoint: string;
+	registration_endpoint?: string;
+	revocation_endpoint?: string;
+	scopes_supported?: string[];
+	code_challenge_methods_supported?: string[];
+	grant_types_supported?: string[];
+	token_endpoint_auth_methods_supported?: string[];
+	[key: string]: unknown;
+}
+
+export interface MCPClientInformation {
+	client_id: string;
+	client_secret?: string;
+	redirect_uris: string[];
+	client_id_issued_at?: number;
+	client_secret_expires_at?: number;
+	[key: string]: unknown;
+}
+
+/**
+ * Non-secret browser projection of an MCP OAuth connection. The opaque
+ * connectionId is owner-checked on every server-side use.
+ */
+export interface MCPOAuthState {
+	connectionId: string;
+	issuer: string;
+	status: "authorization_required" | "authorized";
+	scope?: string;
+	expiresAt?: number;
+	manualClientRequired?: boolean;
+	clientWasManuallyEntered?: boolean;
+}
+
 export interface MCPServer {
 	id: string;
 	name: string;
@@ -66,9 +117,12 @@ export interface MCPServer {
 	errorMessage?: string;
 	// Indicates server reports or appears to require OAuth or other auth
 	authRequired?: boolean;
+	// Public status for an owner-scoped server-side OAuth connection.
+	oauth?: MCPOAuthState;
 }
 
 export interface MCPServerApi {
 	url: string;
 	headers?: KeyValuePair[];
+	oauthConnectionId?: string;
 }
