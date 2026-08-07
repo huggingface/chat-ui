@@ -680,6 +680,57 @@ describe.sequential("model switching", () => {
 		expect(JSON.stringify(replayed), shape).not.toContain("Reasoning by the first model");
 	});
 
+	it("does not discard messages written between reading the conversation and applying the switch", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([{ content: "First answer." }]);
+		await sendMessage(conv, locals, "Question?", { withTools: false });
+
+		// The handler re-reads the conversation itself, so the race window is
+		// inside it. Freezing what that read returns reproduces the window
+		// deterministically: the snapshot predates the concurrent write below,
+		// exactly as it would when a generation is streaming.
+		const stale = await reload(conv);
+		const findOne = vi
+			.spyOn(collections.conversations, "findOne")
+			.mockResolvedValueOnce(stale as never);
+
+		const concurrent = {
+			id: crypto.randomUUID(),
+			from: "assistant" as const,
+			content: "Written by an in-flight generation.",
+			ancestors: [],
+			children: [],
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		};
+		await collections.conversations.updateOne(
+			{ _id: conv._id },
+			{ $push: { messages: concurrent as never } }
+		);
+
+		const patched = await PATCH({
+			request: new Request(`http://localhost/conversation/${conv._id}`, {
+				method: "PATCH",
+				body: JSON.stringify({ model: "test-org/text-only" }),
+			}),
+			locals,
+			params: { id: conv._id.toString() },
+		} as never);
+		expect(patched.status).toBe(200);
+		findOne.mockRestore();
+
+		const after = await reload(conv);
+		// Writing a mapped copy of the stale snapshot back over `messages` would
+		// drop this message entirely — the failure mode is losing a turn the user
+		// watched stream, not merely losing metadata.
+		expect(after.messages.map((m) => m.content)).toContain("Written by an in-flight generation.");
+		// ...and the backfill still has to have happened.
+		expect(after.model).toBe("test-org/text-only");
+		for (const message of after.messages.filter((m) => m.from === "assistant")) {
+			expect(message.routerMetadata?.model).toBe(MODEL_ID);
+		}
+	});
+
 	it("still replays tool calls and results across a model switch", async () => {
 		const { conv, locals } = await newConversation();
 		scriptRounds([
