@@ -238,6 +238,70 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(7);
 	});
 
+	it("charges plain messages against the budget, so a long history leaves less room for replay", async () => {
+		// One tool turn that fits the budget on its own. Preceded by a user turn
+		// large enough to consume the budget by itself, it must flatten: the cap
+		// covers the whole outgoing history, not just the replayed part, or a
+		// conversation that already fills a context window would still be handed
+		// another budget's worth on top.
+		const toolTurn: EndpointMessage = {
+			from: "assistant",
+			content: "done",
+			updates: [callUpdate("c1", "search", { q: "x" }), resultUpdate("c1", "search", "result")],
+		};
+
+		const withoutBallast = await prepareMessagesWithFiles(
+			[{ from: "user", content: "hi" }, toolTurn, { from: "user", content: "next" }],
+			imageProcessor,
+			false,
+			{ replayToolHistory: true }
+		);
+		expect(withoutBallast.filter((m) => m.role === "tool")).toHaveLength(1);
+
+		const withBallast = await prepareMessagesWithFiles(
+			[{ from: "user", content: "x".repeat(120_000) }, toolTurn, { from: "user", content: "next" }],
+			imageProcessor,
+			false,
+			{ replayToolHistory: true }
+		);
+		expect(withBallast.filter((m) => m.role === "tool")).toHaveLength(0);
+		// Degraded, never dropped — the user's own text is untouched.
+		expect(withBallast.filter((m) => m.role === "user")).toHaveLength(2);
+		expect(withBallast).toContainEqual({ role: "assistant", content: "done" });
+	});
+
+	it("charges an image a nominal size rather than its encoded length", async () => {
+		// A data URL runs to hundreds of thousands of characters. Charging that
+		// would let one attachment flatten every replayable turn behind it, even
+		// though the image itself costs the model ~a thousand tokens.
+		const bigImage = "data:image/png;base64," + "A".repeat(400_000);
+		const processor = (async () => ({
+			mime: "image/png",
+			image: { toString: () => "A".repeat(400_000) },
+		})) as unknown as ReturnType<typeof makeImageProcessor>;
+
+		const prepared = await prepareMessagesWithFiles(
+			[
+				{
+					from: "user",
+					content: "look",
+					files: [{ type: "base64", name: "a.png", value: bigImage, mime: "image/png" }],
+				},
+				{
+					from: "assistant",
+					content: "done",
+					updates: [callUpdate("c1", "search", { q: "x" }), resultUpdate("c1", "search", "result")],
+				},
+				{ from: "user", content: "next" },
+			],
+			processor,
+			true,
+			{ replayToolHistory: true }
+		);
+
+		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(1);
+	});
+
 	it("dedups a round preamble persisted with leading whitespace", async () => {
 		// The pre-tool stream often starts with newlines after a think block; a
 		// Call update persisted untrimmed must still match the trim-normalized

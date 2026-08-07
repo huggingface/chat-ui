@@ -27,12 +27,40 @@ type AssistantReplayMessage = ChatMessageParam & { reasoning_content?: string };
 const MAX_REPLAYED_TOOL_OUTPUT_CHARS = 8000;
 
 /**
- * Cumulative cap on the expanded replay payload across the whole history.
- * Turns are budgeted newest-first; older turns that don't fit fall back to
- * the flat {role, content} shape the request used before replay existed, so a
- * long tool-heavy conversation can't outgrow a context window it used to fit.
+ * Cumulative cap on the WHOLE outgoing history, not just the part replay
+ * expands. Every message is charged against it — system, user, and plain
+ * assistant turns included — because a long conversation that already fills a
+ * context window would otherwise still be handed another budget's worth of
+ * replay on top and overflow a window it previously fit.
+ *
+ * Nothing is ever dropped: messages that can't degrade are charged and kept,
+ * which can drive the budget negative. All the budget decides is how far back
+ * the richer replayed shape extends before turns fall back to the flat
+ * {role, content} form the request used before replay existed. Turns are
+ * charged newest-first, so recent history keeps its tool calls and reasoning.
+ *
+ * Not counted: the preprompt and tool schemas, which callers prepend after
+ * this function returns.
  */
-const REPLAY_HISTORY_BUDGET_CHARS = 100_000;
+const HISTORY_BUDGET_CHARS = 100_000;
+
+/**
+ * Nominal size charged for one image part instead of its encoded length. A
+ * data URL runs to hundreds of thousands of characters while the image costs
+ * the model on the order of a thousand tokens, so charging the encoding would
+ * let a single attachment flatten every replayable turn behind it.
+ */
+const IMAGE_COST_CHARS = 4_000;
+const IMAGE_COST_PLACEHOLDER = "i".repeat(IMAGE_COST_CHARS);
+
+/** Approximate the context a message (or list of them) occupies. */
+function historyCost(value: unknown): number {
+	return JSON.stringify(value, (key, inner) =>
+		key === "url" && typeof inner === "string" && inner.startsWith("data:")
+			? IMAGE_COST_PLACEHOLDER
+			: inner
+	).length;
+}
 
 /**
  * Normalize a persisted update uuid into a provider-safe tool_call_id.
@@ -400,27 +428,39 @@ export async function prepareMessagesWithFiles(
 	// degradation is monotonic: once any turn falls back to flat, every older
 	// turn does too, so the model never sees rich history for a stale turn
 	// while the turn it is continuing from is plain prose.
-	let budget = REPLAY_HISTORY_BUDGET_CHARS;
-	let exhausted = false;
-	const resolved: ChatMessageParam[][] = new Array(prepared.length);
+	// Two passes, because the budget caps the whole request and the messages that
+	// can't degrade aren't all at the newest end. Charging them as they're
+	// reached would let a huge older user turn be counted only after every newer
+	// turn had already been granted its replay — the total would still overrun.
+	//
+	// Pass 1 establishes the floor: what this request costs with no enrichment
+	// at all, which is also the exact shape it had before replay existed.
+	const flatForms: ChatMessageParam[][] = prepared.map((entry) => {
+		if (Array.isArray(entry)) return entry;
+		// Same phantom-turn guard as the replay and plain branches: an
+		// interrupted turn whose stripped content is empty must be omitted,
+		// not sent as {role: "assistant", content: ""}.
+		const flatContent = typeof entry.flat.content === "string" ? entry.flat.content : "";
+		return flatContent.trim().length > 0 ? [entry.flat] : [];
+	});
+	const floor = flatForms.reduce((total, form) => total + historyCost(form), 0);
+
+	// Pass 2 spends whatever is left on upgrading turns to their replayed shape,
+	// paying only the difference over the floor. A history that already exceeds
+	// the cap leaves nothing to spend, so every turn keeps its flat form and the
+	// request is no larger than it used to be.
+	let budget = HISTORY_BUDGET_CHARS - floor;
+	const resolved: ChatMessageParam[][] = [...flatForms];
 	for (let i = prepared.length - 1; i >= 0; i -= 1) {
 		const entry = prepared[i];
-		if (Array.isArray(entry)) {
-			resolved[i] = entry;
-			continue;
-		}
-		const cost = JSON.stringify(entry.replay).length;
-		if (!exhausted && cost <= budget) {
-			budget -= cost;
-			resolved[i] = entry.replay;
-		} else {
-			exhausted = true;
-			// Same phantom-turn guard as the replay and plain branches: an
-			// interrupted turn whose stripped content is empty must be omitted,
-			// not sent as {role: "assistant", content: ""}.
-			const flatContent = typeof entry.flat.content === "string" ? entry.flat.content : "";
-			resolved[i] = flatContent.trim().length > 0 ? [entry.flat] : [];
-		}
+		if (Array.isArray(entry)) continue;
+		const upgrade = historyCost(entry.replay) - historyCost(flatForms[i]);
+		// Monotonic: the first turn that doesn't fit stops the walk, so the model
+		// never sees rich history for a stale turn while the turn it is
+		// continuing from is plain prose.
+		if (upgrade > budget) break;
+		budget -= upgrade;
+		resolved[i] = entry.replay;
 	}
 	return resolved.flat();
 }
