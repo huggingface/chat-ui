@@ -875,24 +875,71 @@ export async function PATCH({ request, locals, params }) {
 	// reasoning_content to a turn it never produced. Backfill the retiring
 	// model's id onto messages that don't already carry producer metadata so
 	// the mismatch is recorded before it's lost.
-	if (values.model !== undefined && values.model !== conv.model) {
-		const retiredModel = conv.model;
-		const messagesForSave = conv.messages.map((msg) =>
-			msg.from === "assistant" && !msg.routerMetadata?.model
-				? {
-						...msg,
-						routerMetadata: {
-							route: msg.routerMetadata?.route ?? "",
-							model: retiredModel,
-							provider: msg.routerMetadata?.provider,
-						},
-					}
-				: msg
-		);
-		await collections.conversations.updateOne(
-			{ _id: convId },
-			{ $set: { ...updateValues, messages: messagesForSave } }
-		);
+	// Runs as an aggregation pipeline so the backfill is computed server-side from
+	// the document as it exists at write time. Mapping `conv.messages` in app code
+	// and writing the result back would replace the whole array with a snapshot
+	// read before the switch, silently discarding anything persisted in between —
+	// an in-flight generation writes the same array on every token batch.
+	// `$model` is likewise the currently pinned model rather than the one read
+	// earlier, so the id stamped is always the one messages were actually
+	// produced under, and the `$ne` gate means a switch that raced ahead of us
+	// leaves history untouched instead of restamping it.
+	if (values.model !== undefined) {
+		await collections.conversations.updateOne({ _id: convId }, [
+			{
+				$set: {
+					messages: {
+						$cond: [
+							{ $ne: ["$model", values.model] },
+							{
+								$map: {
+									input: "$messages",
+									as: "m",
+									in: {
+										$cond: [
+											{
+												$and: [
+													{ $eq: ["$$m.from", "assistant"] },
+													// No producer of its own: routerMetadata.model is only
+													// ever stamped for the "omni" router alias, so without
+													// this the replay same-producer check would treat these
+													// as produced by the newly selected model and attach the
+													// old model's reasoning to a turn it never produced.
+													{ $eq: [{ $ifNull: ["$$m.routerMetadata.model", ""] }, ""] },
+												],
+											},
+											{
+												$mergeObjects: [
+													"$$m",
+													{
+														// Merged rather than replaced so an existing `route`
+														// or `provider` survives; `route` is required by the
+														// type, hence the default underneath.
+														routerMetadata: {
+															$mergeObjects: [
+																{ route: "" },
+																{ $ifNull: ["$$m.routerMetadata", {}] },
+																{ model: "$model" },
+															],
+														},
+													},
+												],
+											},
+											"$$m",
+										],
+									},
+								},
+							},
+							"$messages",
+						],
+					},
+				},
+			},
+			// Separate stage: within one `$set` every expression sees the input
+			// document, so the backfill above must resolve `$model` before this
+			// overwrites it.
+			{ $set: updateValues },
+		]);
 		return new Response();
 	}
 
