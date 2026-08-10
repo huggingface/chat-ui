@@ -356,18 +356,34 @@ export async function* runMcpFlow({
 			},
 			"[mcp] starting completion with tools"
 		);
+		// Whether this model may be sent reasoning_content at all: the per-user
+		// override wins in both directions, else the capability flag decides.
+		//
+		// Governs the in-loop echo below as well as cross-turn replay. The echo
+		// used to be ungated, on the reasoning that the model had just emitted
+		// the trace itself — but emitting reasoning and accepting it back are
+		// different things, and at least one provider rejects the field outright
+		// rather than ignoring it:
+		//
+		//   HTTP 400 messages.2.assistant.reasoning_content: property
+		//   'messages.2.assistant.reasoning_content' is unsupported
+		//
+		// Ungated, that turns into a dead conversation mid-tool-loop for any
+		// model that both emits reasoning and is served by a provider which
+		// validates the field. Gating costs nothing: every preserved-thinking
+		// model this exists for is flagged, and the models that aren't have no
+		// trace to echo in the first place.
+		const mayEchoReasoning =
+			reasoningOverride ??
+			Boolean((targetModel as unknown as { supportsReasoning?: boolean }).supportsReasoning);
+
 		let messagesOpenAI: ChatCompletionMessageParam[] = await prepareMessagesWithFiles(
 			messages,
 			imageProcessor,
 			mmEnabled,
 			{
 				replayToolHistory: true,
-				// Cross-turn reasoning echo: the per-user override wins in both
-				// directions, else the capability flag decides. The in-loop echo
-				// below stays evidence-based (the model just emitted it).
-				attachReasoning:
-					reasoningOverride ??
-					Boolean((targetModel as unknown as { supportsReasoning?: boolean }).supportsReasoning),
+				attachReasoning: mayEchoReasoning,
 				// The model resolved for THIS turn. Under the "omni" router alias a
 				// prior turn in the same conversation can have been produced by a
 				// different model (per-message routing, no user action needed); this
@@ -793,7 +809,10 @@ export async function* runMcpFlow({
 					...(assistantContentForToolMsg.trim().length > 0
 						? { content: assistantContentForToolMsg }
 						: {}),
-					...(reasoningForToolMsg.trim().length > 0
+					// Gated by mayEchoReasoning — see where it is defined. Still
+					// persisted below regardless of the gate: recording what the model
+					// thought is inert, and only sending it can break a request.
+					...(mayEchoReasoning && reasoningForToolMsg.trim().length > 0
 						? { reasoning_content: reasoningForToolMsg }
 						: {}),
 				};
