@@ -193,6 +193,7 @@ export async function endpointOai(
 				await prepareMessagesWithFiles(messages, imageProcessor, isMultimodal ?? model.multimodal, {
 					attachReasoning: reasoningOverride ?? Boolean(model.supportsReasoning),
 					currentProducerModel: model.id ?? model.name,
+					contextLengthTokens: model.contextLength,
 				});
 
 			// Normalize preprompt and handle empty values

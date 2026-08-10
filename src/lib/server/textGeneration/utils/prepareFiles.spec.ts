@@ -270,6 +270,56 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		expect(withBallast).toContainEqual({ role: "assistant", content: "done" });
 	});
 
+	describe("context-aware budget", () => {
+		// ~80k of replay: comfortably inside the 100k ceiling, but more than a
+		// 32k-token window can take once the reserve is held back.
+		const bigTurn: EndpointMessage = {
+			from: "assistant",
+			content: "done",
+			updates: Array.from({ length: 10 }, (_, i) => [
+				callUpdate(`c${i}`, "search", { q: String(i) }),
+				resultUpdate(`c${i}`, "search", "x".repeat(8000)),
+			]).flat(),
+		};
+		const messages: EndpointMessage[] = [bigTurn, { from: "user", content: "next" }];
+		const toolCount = async (contextLengthTokens?: number) =>
+			(
+				await prepareMessagesWithFiles(messages, imageProcessor, false, {
+					replayToolHistory: true,
+					contextLengthTokens,
+				})
+			).filter((m) => m.role === "tool").length;
+
+		it("replays fully on a large window", async () => {
+			expect(await toolCount(1_048_576)).toBe(10);
+		});
+
+		it("keeps the flat ceiling when no window is reported", async () => {
+			// Self-hosted backends and routers that omit context_length must behave
+			// exactly as they did before models reported one.
+			expect(await toolCount(undefined)).toBe(10);
+		});
+
+		it("degrades on a window too small for the expansion", async () => {
+			// The regression this closes: the flat history fits this model, and
+			// before the budget knew the window, replay would expand it past what
+			// the model accepts and the request would 400.
+			expect(await toolCount(32_768)).toBe(0);
+		});
+
+		it("sends the pre-replay shape when the window is smaller than the reserve", async () => {
+			const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+				replayToolHistory: true,
+				contextLengthTokens: 4_096,
+			});
+			expect(prepared.filter((m) => m.role === "tool")).toHaveLength(0);
+			expect(prepared).toEqual([
+				{ role: "assistant", content: "done" },
+				{ role: "user", content: "next" },
+			]);
+		});
+	});
+
 	it("charges an image a nominal size rather than its encoded length", async () => {
 		// A data URL runs to hundreds of thousands of characters. Charging that
 		// would let one attachment flatten every replayable turn behind it, even

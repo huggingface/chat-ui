@@ -373,6 +373,11 @@ export async function* runMcpFlow({
 				// different model (per-message routing, no user action needed); this
 				// gates reasoning_content to only replay onto its own producer.
 				currentProducerModel: candidateModelId ?? targetModel.id ?? targetModel.name,
+				// The resolved target's window, not the router alias's: under "omni"
+				// the alias itself has none, and the candidate is what serves this
+				// request. Tool schemas are prepended after this returns, which is
+				// part of what CONTEXT_RESERVE_TOKENS holds back.
+				contextLengthTokens: (targetModel as unknown as { contextLength?: number }).contextLength,
 			}
 		);
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;

@@ -41,7 +41,21 @@ const modelConfig = z.object({
 		)
 		.optional(),
 	endpoints: z.array(endpointSchema).optional(),
-	providers: z.array(z.object({ supports_tools: z.boolean().optional() }).passthrough()).optional(),
+	providers: z
+		.array(
+			z
+				.object({
+					supports_tools: z.boolean().optional(),
+					context_length: z.number().int().positive().optional(),
+				})
+				.passthrough()
+		)
+		.optional(),
+	/**
+	 * Context window in tokens, aggregated across providers. Used to bound how
+	 * much conversation history is sent; absent when no provider reports one.
+	 */
+	contextLength: z.number().int().positive().optional(),
 	parameters: z
 		.object({
 			temperature: z.number().min(0).max(2).optional(),
@@ -96,7 +110,14 @@ const listSchema = z
 				id: z.string(),
 				description: z.string().optional(),
 				providers: z
-					.array(z.object({ supports_tools: z.boolean().optional() }).passthrough())
+					.array(
+						z
+							.object({
+								supports_tools: z.boolean().optional(),
+								context_length: z.number().int().positive().optional(),
+							})
+							.passthrough()
+					)
 					.optional(),
 				architecture: z
 					.object({
@@ -256,6 +277,13 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 
 			// If any provider supports tools, consider the model as supporting tools
 			const supportsTools = Boolean((m.providers ?? []).some((p) => p?.supports_tools === true));
+			// Smallest window any provider offers, not the largest: with
+			// `provider: "auto"` the router picks, so a request sized for the
+			// roomiest provider would overflow whichever one actually serves it.
+			const reportedContexts = (m.providers ?? [])
+				.map((p) => p?.context_length)
+				.filter((n): n is number => typeof n === "number" && n > 0);
+			const contextLength = reportedContexts.length ? Math.min(...reportedContexts) : undefined;
 			return {
 				id: m.id,
 				name: m.id,
@@ -263,6 +291,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				description: m.description,
 				logoUrl,
 				providers: m.providers,
+				contextLength,
 				multimodal: supportsImageInput,
 				multimodalAcceptedMimetypes: supportsImageInput ? ["image/*"] : undefined,
 				supportsTools,

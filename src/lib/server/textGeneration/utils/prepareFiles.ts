@@ -40,9 +40,44 @@ const MAX_REPLAYED_TOOL_OUTPUT_CHARS = 8000;
  * charged newest-first, so recent history keeps its tool calls and reasoning.
  *
  * Not counted: the preprompt and tool schemas, which callers prepend after
- * this function returns.
+ * this function returns — see CONTEXT_RESERVE_TOKENS.
+ *
+ * This is only the ceiling. When the model's context window is known it is
+ * lowered to fit (see budgetCharsFor), because on a small-context model a flat
+ * history that fit could otherwise be expanded into an overflow.
  */
 const HISTORY_BUDGET_CHARS = 100_000;
+
+/**
+ * Characters assumed per token when converting a context window into a
+ * character budget. Deliberately below the usual ~4 for English prose: a low
+ * ratio yields a smaller budget, so mis-estimating errs toward sending less
+ * rather than toward a request the model rejects outright.
+ */
+const CHARS_PER_TOKEN = 3;
+
+/**
+ * Held back from the context window for everything this function cannot see:
+ * the reply itself, the preprompt, and tool schemas — which run to thousands of
+ * tokens when several MCP servers are selected.
+ */
+const CONTEXT_RESERVE_TOKENS = 8_000;
+
+/**
+ * How many characters of history this request may spend.
+ *
+ * With no context length reported (self-hosted backends, or a router that
+ * omits it) this is the flat ceiling, i.e. the behaviour before models
+ * reported one. Otherwise the window bounds it, so replay can never push a
+ * request past what the model accepts. A window smaller than the reserve
+ * yields 0: everything degrades to the flat pre-replay shape, which is the
+ * most that model could ever have taken anyway.
+ */
+function budgetCharsFor(contextLengthTokens?: number): number {
+	if (!contextLengthTokens || contextLengthTokens <= 0) return HISTORY_BUDGET_CHARS;
+	const usableTokens = Math.max(0, contextLengthTokens - CONTEXT_RESERVE_TOKENS);
+	return Math.min(HISTORY_BUDGET_CHARS, usableTokens * CHARS_PER_TOKEN);
+}
 
 /**
  * Nominal size charged for one image part instead of its encoded length. A
@@ -351,6 +386,11 @@ export async function prepareMessagesWithFiles(
 		replayToolHistory?: boolean;
 		attachReasoning?: boolean;
 		currentProducerModel?: string;
+		/**
+		 * The consuming model's context window in tokens, when known. Bounds how
+		 * much history is sent; omitting it keeps the flat default ceiling.
+		 */
+		contextLengthTokens?: number;
 	}
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
 	type ReplayCandidate = { replay: AssistantReplayMessage[]; flat: ChatMessageParam };
@@ -449,7 +489,7 @@ export async function prepareMessagesWithFiles(
 	// paying only the difference over the floor. A history that already exceeds
 	// the cap leaves nothing to spend, so every turn keeps its flat form and the
 	// request is no larger than it used to be.
-	let budget = HISTORY_BUDGET_CHARS - floor;
+	let budget = budgetCharsFor(options?.contextLengthTokens) - floor;
 	const resolved: ChatMessageParam[][] = [...flatForms];
 	for (let i = prepared.length - 1; i >= 0; i -= 1) {
 		const entry = prepared[i];

@@ -680,6 +680,16 @@ describe.sequential("model switching", () => {
 		expect(JSON.stringify(replayed), shape).not.toContain("Reasoning by the first model");
 	});
 
+	it("derives the model's context window from the smallest provider that reports one", async () => {
+		// The plumbing behind the context-aware budget: parsed off the provider
+		// list in buildModels, carried on the model, and read at both
+		// prepareMessagesWithFiles call sites. Nothing else asserts it survives
+		// the parse, and a silent undefined would just restore the flat ceiling.
+		const { models } = await import("$lib/server/models");
+		const model = models.find((m) => m.id === MODEL_ID);
+		expect(model?.contextLength).toBe(262144);
+	});
+
 	it("leaves the pinned model alone when a turn records a different producer", async () => {
 		const { conv, locals } = await newConversation();
 		scriptRounds([{ content: "First answer." }, { content: "Second answer." }]);
