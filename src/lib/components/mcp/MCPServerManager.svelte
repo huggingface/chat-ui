@@ -215,7 +215,11 @@
 						</h3>
 						<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 							{#each baseServers as server (server.id)}
-								<ServerCard {server} isSelected={$selectedServerIds.has(server.id)} />
+								<ServerCard
+									{server}
+									isSelected={$selectedServerIds.has(server.id)}
+									onreauthorize={handleReauthorizeFromCard}
+								/>
 							{/each}
 						</div>
 					</div>

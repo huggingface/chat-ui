@@ -8,6 +8,8 @@ import { mcpFetchForServer } from "./fetch";
 type PoolEntry = { client: Client; lastUsedAt: number; activeCalls: number };
 
 const pool = new Map<string, PoolEntry>();
+// In-flight connects, keyed like the pool, so concurrent cold-misses share one connect.
+const inflight = new Map<string, Promise<Client>>();
 
 // Reuse a recently-used client as-is; ping it first if it has been idle longer than this,
 // since proxies / load balancers silently reap idle connections.
@@ -67,12 +69,33 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 			return existing.client;
 		} catch (err) {
 			if (signal?.aborted) throw err;
+			// Don't close a client mid-flight for another caller (e.g. a long tool call that hasn't
+			// refreshed lastUsedAt); hand it back and let a later idle ping reap it.
+			if (existing.activeCalls > 0) {
+				existing.lastUsedAt = Date.now();
+				return existing.client;
+			}
 			// Stale connection; evict it (unless a concurrent caller already replaced it) and reconnect.
 			if (pool.get(key) === existing) pool.delete(key);
 			existing.client.close?.().catch(() => {});
 		}
 	}
 
+	// Single-flight: concurrent cold-misses share one connect, so we never authenticate a client
+	// that no one tracks (unreleasable, unsweepable, and holding the bearer until process exit).
+	const pending = inflight.get(key);
+	if (pending) return pending;
+
+	const connectPromise = connectAndPool(server, key);
+	inflight.set(key, connectPromise);
+	try {
+		return await connectPromise;
+	} finally {
+		inflight.delete(key);
+	}
+}
+
+async function connectAndPool(server: McpServerConfig, key: string): Promise<Client> {
 	let firstError: unknown;
 	const client = createMcpClient();
 	const url = new URL(server.url);
@@ -84,8 +107,7 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 		try {
 			await client.connect(new StreamableHTTPClientTransport(url, { requestInit, fetch }));
 		} catch (httpErr) {
-			// Remember the original HTTP transport error so we can surface it if the fallback also fails.
-			// Today we always show the SSE message, which is misleading when the real failure was HTTP (e.g. 500).
+			// Remember the HTTP transport error so we can surface it if the SSE fallback also fails.
 			firstError = httpErr;
 			await client.connect(new SSEClientTransport(url, { requestInit, fetch }));
 		}

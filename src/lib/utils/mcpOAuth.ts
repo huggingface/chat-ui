@@ -103,13 +103,14 @@ export type OAuthDisconnectResult = "revoked" | "not-found" | "failed";
 // "revoked"/"not-found" both mean the server-side connection is gone; "failed" means the request
 // didn't land (network or 5xx), so the caller must keep local state rather than strand live credentials.
 export async function disconnectOAuthConnection(
-	connectionId: string
+	connectionId: string,
+	force = false
 ): Promise<OAuthDisconnectResult> {
 	try {
 		const res = await fetch(`${base}/api/mcp/oauth/revoke`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ connectionId }),
+			body: JSON.stringify({ connectionId, force }),
 		});
 		if (res.ok) return "revoked";
 		if (res.status === 404) return "not-found";

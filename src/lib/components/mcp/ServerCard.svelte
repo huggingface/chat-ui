@@ -77,7 +77,7 @@
 	async function handleDisconnect() {
 		disconnectError = null;
 		const ok = await disconnectServerOAuth(server.id);
-		if (!ok) disconnectError = "Couldn't reach the server to disconnect. Please try again.";
+		if (!ok) disconnectError = "Couldn't revoke the token — please try again.";
 	}
 
 	const statusInfo = $derived.by(() => {
@@ -131,7 +131,9 @@
 	}
 
 	async function handleDelete() {
-		if (server.oauth) await disconnectServerOAuth(server.id, false);
+		// Deleting the whole server: force-drop the connection (best-effort revoke) so we don't leave
+		// an orphaned server-side record behind.
+		if (server.oauth) await disconnectServerOAuth(server.id, false, true);
 		deleteCustomServer(server.id);
 	}
 </script>

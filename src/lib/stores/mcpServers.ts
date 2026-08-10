@@ -377,10 +377,14 @@ export function setServerOAuth(id: string, oauth: MCPOAuthState) {
 }
 
 // Delete the connection, best-effort revoke, then re-discover so the server stays re-authorizable.
-export async function disconnectServerOAuth(id: string, rediscover = true): Promise<boolean> {
+export async function disconnectServerOAuth(
+	id: string,
+	rediscover = true,
+	force = false
+): Promise<boolean> {
 	const server = get(allMcpServers).find((s) => s.id === id);
 	if (!server?.oauth) return false;
-	const result = await disconnectOAuthConnection(server.oauth.connectionId);
+	const result = await disconnectOAuthConnection(server.oauth.connectionId, force);
 	if (result === "failed") {
 		// The request never landed, so the server may still hold live credentials. Keep the local
 		// connection id so the user can retry instead of stranding an unreachable connection.
@@ -479,7 +483,26 @@ export async function healthCheckServer(
 			return { ready: true, tools: result.tools };
 		} else {
 			updateServerStatus(server.id, "error", result.error, undefined, Boolean(result.authRequired));
-			if (result.oauth) setServerOAuth(server.id, result.oauth);
+			if (result.oauth) {
+				setServerOAuth(server.id, result.oauth);
+			} else if (result.authRequired && !server.oauth) {
+				// An existing or base server that starts returning 401/403 has no OAuth connection yet.
+				// Probe for OAuth (unless it uses a manual Authorization header) so the card can offer
+				// Authorize instead of a dead-end error.
+				const hasManualAuth = (server.headers ?? []).some(
+					(h) => h.key.toLowerCase() === "authorization"
+				);
+				if (!hasManualAuth) {
+					try {
+						const discovery = await discoverServer(server.url);
+						if (discovery.requiresAuth && discovery.connection) {
+							setServerOAuth(server.id, discovery.connection);
+						}
+					} catch {
+						// best-effort upgrade; leave the auth-required error as-is
+					}
+				}
+			}
 			return { ready: false, error: result.error };
 		}
 	} catch (error) {

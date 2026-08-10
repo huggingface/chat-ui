@@ -171,6 +171,17 @@ function getLocalMcpAgent(): Agent {
 const MAX_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
+// Native fetch drops these when a redirect changes origin. This manual loop must do the same, or an
+// MCP/OAuth endpoint could redirect the user's bearer token (or cookies) to an attacker-controlled host.
+const CROSS_ORIGIN_STRIPPED_HEADERS = ["authorization", "cookie", "proxy-authorization"];
+
+function stripCredentialHeaders(init: RequestInit | undefined): RequestInit | undefined {
+	if (!init?.headers) return init;
+	const headers = new Headers(init.headers as HeadersInit);
+	for (const name of CROSS_ORIGIN_STRIPPED_HEADERS) headers.delete(name);
+	return { ...init, headers };
+}
+
 /**
  * Fetch wrapper that validates resolved IPs at connection time
  * and validates redirect targets to prevent SSRF via open redirects.
@@ -214,6 +225,7 @@ async function guardedFetch(
 	let currentUrl = url.toString();
 	let currentInit = init;
 	let redirectCount = 0;
+	let credentialsDropped = false;
 
 	// eslint-disable-next-line no-constant-condition
 	while (true) {
@@ -246,6 +258,15 @@ async function guardedFetch(
 				(response.status === 303 && method !== "GET" && method !== "HEAD")
 			) {
 				currentInit = { ...init, method: "GET", body: undefined };
+			}
+
+			// Once a hop crosses origin, strip credentials for this and every later hop (matching
+			// native fetch) so a redirect can't forward Authorization/Cookie to another host.
+			if (new URL(redirectUrl).origin !== new URL(currentUrl).origin) {
+				credentialsDropped = true;
+			}
+			if (credentialsDropped) {
+				currentInit = stripCredentialHeaders(currentInit);
 			}
 
 			currentUrl = redirectUrl;

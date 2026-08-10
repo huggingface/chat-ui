@@ -431,24 +431,68 @@ export async function captureInsufficientScopeResponse(
 	return recordInsufficientScope(locals, connectionId, expectedServerUrl, challenge.scope);
 }
 
+// Revoke every token the connection holds (RFC 7009). Returns true only if every attempted
+// revocation was confirmed, so a partial failure is treated as "may still be live".
+async function revokeConnectionTokens(connection: MCPOAuthConnection): Promise<boolean> {
+	const asMetadata = connection.asMetadata as AuthorizationServerMetadata;
+	const clientInfo = connection.clientInfo as OAuthClientInformationFull;
+	const results: boolean[] = [];
+	if (connection.tokens?.refresh_token) {
+		results.push(
+			await tryRevokeToken({
+				asMetadata,
+				clientInfo,
+				token: connection.tokens.refresh_token,
+				tokenTypeHint: "refresh_token",
+			})
+		);
+	}
+	if (connection.tokens?.access_token) {
+		results.push(
+			await tryRevokeToken({
+				asMetadata,
+				clientInfo,
+				token: connection.tokens.access_token,
+				tokenTypeHint: "access_token",
+			})
+		);
+	}
+	return results.length > 0 && results.every(Boolean);
+}
+
+/**
+ * Revoke first, delete second. If a revocation that could have succeeded fails, keep the record so
+ * the user can retry instead of stranding a still-valid credential — `force` (e.g. deleting the whole
+ * server) drops it regardless.
+ */
 export async function deleteOAuthConnection(
 	locals: App.Locals,
-	connectionId: string
-): Promise<{ revoked: boolean }> {
-	const connection = await collections.mcpOAuthConnections.findOneAndDelete(
-		connectionFilter(locals, connectionId),
-		{ includeResultMetadata: false }
+	connectionId: string,
+	options: { force?: boolean } = {}
+): Promise<{ deleted: boolean; revoked: boolean }> {
+	const connection = await collections.mcpOAuthConnections.findOne(
+		connectionFilter(locals, connectionId)
 	);
 	if (!connection) throw new OAuthConnectionAccessError();
 
-	const token = connection.tokens?.refresh_token ?? connection.tokens?.access_token;
-	if (!token || !connection.clientInfo) return { revoked: false };
-	return {
-		revoked: await tryRevokeToken({
-			asMetadata: connection.asMetadata as AuthorizationServerMetadata,
-			clientInfo: connection.clientInfo as OAuthClientInformationFull,
-			token,
-			tokenTypeHint: connection.tokens?.refresh_token ? "refresh_token" : "access_token",
-		}),
-	};
+	const revocationEndpoint = (connection.asMetadata as Record<string, unknown> | undefined)
+		?.revocation_endpoint;
+	const canRevoke =
+		Boolean(connection.clientInfo) &&
+		Boolean(connection.tokens) &&
+		typeof revocationEndpoint === "string" &&
+		revocationEndpoint.length > 0;
+
+	let revoked = false;
+	let revokeFailed = false;
+	if (canRevoke) {
+		revoked = await revokeConnectionTokens(connection);
+		revokeFailed = !revoked;
+	}
+
+	if (revokeFailed && !options.force) {
+		return { deleted: false, revoked: false };
+	}
+	await collections.mcpOAuthConnections.deleteOne(connectionFilter(locals, connectionId));
+	return { deleted: true, revoked };
 }
