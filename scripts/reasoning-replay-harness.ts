@@ -76,14 +76,17 @@ const PINNED_MODELS = [
 
 /**
  * Mirrors each pinned model's real `supportsReasoning` flag (chart/env/*.yaml)
- * so the cross-turn scenarios (S2/P2/N2 below) build the same attachReasoning
+ * so every reasoning-bearing scenario (S2/S3/P2/N2 below) builds the same gate
  * value production would actually resolve for that model. Building them with
  * a hardcoded `true` for every model would send Gemma and Llama — both
- * deliberately unflagged — a cross-turn reasoning_content shape production
- * never sends them, which proves nothing about their real (correct) policy
- * and could even fail them for the wrong reason. S3-inloop is exempt: the
- * in-loop echo it models is evidence-based and ungated in production for
- * every model (see runMcpFlow.ts), so it stays unconditioned here too.
+ * deliberately unflagged — a reasoning_content shape production never sends
+ * them, which proves nothing about their real (correct) policy and fails them
+ * for a payload they will never receive.
+ *
+ * S3-inloop used to be exempt, back when the in-loop echo was ungated in
+ * production. That exemption is what surfaced gemma-4-31B-it's provider
+ * rejecting reasoning_content with a 400 instead of ignoring it; runMcpFlow
+ * now gates the echo on this same flag, so the scenario follows it too.
  */
 const MODEL_SUPPORTS_REASONING: Record<string, boolean> = {
 	"moonshotai/Kimi-K3": true,
@@ -388,15 +391,25 @@ async function buildScenarios(supportsReasoning: boolean): Promise<Scenario[]> {
 		})
 	);
 	// S3: attach reasoning_content to the first tool-call assistant message,
-	// mirroring what runMcpFlow sends between rounds of a live turn. Built
-	// from `replay` above, but only ever touches the tool-call message (never
-	// gated by attachReasoning either in this fixture or in production), so
-	// it's unaffected by whichever attachReasoning value built `replay`.
-	const inloop: ChatMessage[] = replay.map((m) =>
-		m.role === "assistant" && "tool_calls" in m && m.tool_calls?.[0]?.id === "call10000"
-			? { ...m, reasoning_content: "The user wants current weather, calling get_weather first." }
-			: m
-	);
+	// mirroring what runMcpFlow sends between rounds of a live turn.
+	//
+	// Gated on the model's flag, like the cross-turn scenarios. It used to be
+	// unconditional, because the in-loop echo used to be ungated in production
+	// — which is precisely how this harness caught a provider that rejects the
+	// field outright (400 on gemma-4-31B-it) rather than ignoring it. Now that
+	// runMcpFlow gates the echo, sending it unconditionally here would test a
+	// shape production no longer produces, and fail unflagged models for a
+	// payload they will never receive.
+	const inloop: ChatMessage[] = supportsReasoning
+		? replay.map((m) =>
+				m.role === "assistant" && "tool_calls" in m && m.tool_calls?.[0]?.id === "call10000"
+					? {
+							...m,
+							reasoning_content: "The user wants current weather, calling get_weather first.",
+						}
+					: m
+			)
+		: replay;
 	const plain = withSystem(
 		await prepareMessagesWithFiles(storedPlainHistory, imageProcessor, false)
 	);
