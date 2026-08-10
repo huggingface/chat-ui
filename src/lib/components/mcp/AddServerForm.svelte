@@ -51,7 +51,6 @@
 
 	// A URL edit re-enables discovery, so a corrected URL isn't added without its OAuth state.
 	$effect(() => {
-		// Track url as a reactive dep
 		void url;
 		discoveryFailed = false;
 	});
