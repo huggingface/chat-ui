@@ -39,12 +39,16 @@ export const POST: RequestHandler = async ({ request, url, locals }) => {
 			return error(409, "MCP scope upgrade failed after the maximum number of attempts");
 		}
 		redirectUri = oauthCallbackUri(url);
-		if (connection.clientInfo) {
-			clientInfo = parseClientInformation(connection.clientInfo);
-			clientWasManuallyEntered = Boolean(connection.clientWasManuallyEntered);
-		} else if (parsed.clientInfo) {
+		const storedManual = Boolean(connection.clientWasManuallyEntered);
+		// Let a manually-entered client be corrected on retry, but never let the browser replace a
+		// dynamically-registered client (that would allow swapping in attacker-controlled credentials).
+		const canReplaceStored = !connection.clientInfo || storedManual;
+		if (parsed.clientInfo && canReplaceStored) {
 			clientInfo = parseClientInformation(parsed.clientInfo);
 			clientWasManuallyEntered = true;
+		} else if (connection.clientInfo) {
+			clientInfo = parseClientInformation(connection.clientInfo);
+			clientWasManuallyEntered = storedManual;
 		} else {
 			return error(400, "OAuth client information is required");
 		}

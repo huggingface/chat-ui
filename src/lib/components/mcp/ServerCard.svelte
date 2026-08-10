@@ -28,6 +28,7 @@
 	let { server, isSelected, onreauthorize }: Props = $props();
 
 	let isLoadingHealth = $state(false);
+	let disconnectError = $state<string | null>(null);
 
 	let now = $state(Date.now());
 	onMount(() => {
@@ -74,7 +75,9 @@
 	}
 
 	async function handleDisconnect() {
-		await disconnectServerOAuth(server.id);
+		disconnectError = null;
+		const ok = await disconnectServerOAuth(server.id);
+		if (!ok) disconnectError = "Couldn't reach the server to disconnect. Please try again.";
 	}
 
 	const statusInfo = $derived.by(() => {
@@ -271,6 +274,10 @@
 				</button>
 			{/if}
 		</div>
+
+		{#if disconnectError}
+			<p class="mt-2 text-xs text-red-600 dark:text-red-400">{disconnectError}</p>
+		{/if}
 
 		<!-- Tools List (Expandable) -->
 		{#if server.tools && server.tools.length > 0}

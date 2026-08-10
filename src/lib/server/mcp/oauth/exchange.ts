@@ -17,6 +17,15 @@ import {
 	parseClientInformation,
 } from "./validation";
 
+const REVOKE_TIMEOUT_MS = 10_000;
+
+// Token/refresh/revoke requests carry the code, PKCE verifier, client secret, and refresh token —
+// reject redirects so a token endpoint can't forward them to another origin (a compliant endpoint
+// never redirects these). `ssrfSafeFetch`'s default would follow the redirect and resend the body.
+function oauthEndpointFetch(url: string | URL, init?: RequestInit): Promise<Response> {
+	return ssrfSafeFetch(url, { ...init, redirect: "error" });
+}
+
 export async function buildAuthorizationUrl(args: {
 	asMetadata: AuthorizationServerMetadata;
 	clientInfo: OAuthClientInformationFull;
@@ -57,7 +66,7 @@ export async function exchangeCodeForTokens(args: {
 		codeVerifier: args.codeVerifier,
 		redirectUri: args.redirectUri,
 		resource: new URL(args.resource),
-		fetchFn: ssrfSafeFetch as unknown as typeof fetch,
+		fetchFn: oauthEndpointFetch as unknown as typeof fetch,
 	});
 	assertBearerTokens(tokens);
 	return tokens;
@@ -77,7 +86,7 @@ export async function refreshTokens(args: {
 		clientInformation,
 		refreshToken: args.refreshToken,
 		resource: new URL(args.resource),
-		fetchFn: ssrfSafeFetch as unknown as typeof fetch,
+		fetchFn: oauthEndpointFetch as unknown as typeof fetch,
 	});
 	assertBearerTokens(tokens);
 	return tokens;
@@ -115,13 +124,15 @@ export async function tryRevokeToken(args: {
 
 	try {
 		assertSafeOAuthUrl(endpoint, "Revocation endpoint");
-		const res = await ssrfSafeFetch(endpoint, {
+		const res = await oauthEndpointFetch(endpoint, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/x-www-form-urlencoded",
 				Accept: "application/json",
 			},
 			body,
+			// Bound the request so an AS that accepts but never responds can't hang disconnect forever.
+			signal: AbortSignal.timeout(REVOKE_TIMEOUT_MS),
 		});
 		try {
 			await res.body?.cancel();

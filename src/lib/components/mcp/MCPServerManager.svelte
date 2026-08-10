@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from "svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import ServerCard from "./ServerCard.svelte";
@@ -13,6 +14,7 @@
 		healthCheckServer,
 		setServerOAuth,
 		toggleServer,
+		reconcileOAuthConnections,
 	} from "$lib/stores/mcpServers";
 	import type { KeyValuePair, MCPOAuthState } from "$lib/types/Tool";
 	import type { DiscoveryResponse, OAuthCallbackPayload } from "$lib/utils/mcpOAuth";
@@ -42,6 +44,12 @@
 	const baseServers = $derived($allMcpServers.filter((s) => s.type === "base"));
 	const customServers = $derived($allMcpServers.filter((s) => s.type === "custom"));
 	const enabledCount = $derived($enabledServersCount);
+
+	// On open, re-sync OAuth state so a server challenged or revoked in the background shows the
+	// correct status instead of a stale "Authorized".
+	onMount(() => {
+		reconcileOAuthConnections();
+	});
 
 	function handleAddServer(serverData: {
 		name: string;

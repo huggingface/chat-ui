@@ -380,7 +380,12 @@ export function setServerOAuth(id: string, oauth: MCPOAuthState) {
 export async function disconnectServerOAuth(id: string, rediscover = true): Promise<boolean> {
 	const server = get(allMcpServers).find((s) => s.id === id);
 	if (!server?.oauth) return false;
-	const disconnected = await disconnectOAuthConnection(server.oauth.connectionId);
+	const result = await disconnectOAuthConnection(server.oauth.connectionId);
+	if (result === "failed") {
+		// The request never landed, so the server may still hold live credentials. Keep the local
+		// connection id so the user can retry instead of stranding an unreachable connection.
+		return false;
+	}
 	allMcpServers.update(($servers) =>
 		$servers.map((candidate) =>
 			candidate.id === id ? { ...candidate, oauth: undefined, authRequired: true } : candidate
@@ -389,14 +394,55 @@ export async function disconnectServerOAuth(id: string, rediscover = true): Prom
 	try {
 		if (!rediscover) {
 			persistCustomServers();
-			return disconnected;
+			return true;
 		}
 		const discovery = await discoverServer(server.url);
 		if (discovery.connection) setServerOAuth(id, discovery.connection);
 	} catch {
 		persistCustomServers();
 	}
-	return disconnected;
+	return true;
+}
+
+// Re-sync local OAuth state with the server for connected custom servers. A scope challenge or
+// revocation recorded server-side (e.g. mid-chat) otherwise leaves the card showing a stale status.
+export async function reconcileOAuthConnections(): Promise<void> {
+	if (!browser) return;
+	const servers = get(allMcpServers).filter((s) => s.oauth);
+	if (servers.length === 0) return;
+	const connectionIds = [
+		...new Set(
+			servers.map((s) => s.oauth?.connectionId).filter((id): id is string => typeof id === "string")
+		),
+	];
+	let states: Array<{ connectionId: string; state?: MCPOAuthState; missing?: boolean }> = [];
+	try {
+		const res = await fetch(`${base}/api/mcp/oauth/state`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ connectionIds }),
+		});
+		if (!res.ok) return;
+		const body = (await res.json()) as { states: typeof states };
+		states = body.states;
+	} catch {
+		return;
+	}
+	const byConnection = new Map(states.map((s) => [s.connectionId, s]));
+	for (const server of servers) {
+		const entry = server.oauth ? byConnection.get(server.oauth.connectionId) : undefined;
+		if (!entry) continue;
+		if (entry.missing) {
+			allMcpServers.update(($servers) =>
+				$servers.map((s) =>
+					s.id === server.id ? { ...s, oauth: undefined, authRequired: true } : s
+				)
+			);
+		} else if (entry.state) {
+			setServerOAuth(server.id, entry.state);
+		}
+	}
+	persistCustomServers();
 }
 
 function persistCustomServers() {
