@@ -307,6 +307,34 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 			expect(await toolCount(32_768)).toBe(0);
 		});
 
+		it("reserves the model's configured reply allowance, not a constant", async () => {
+			// A 128k window whose model is configured to emit up to 98304 tokens has
+			// room for this history OR that reply, not both. Reserving a flat
+			// constant grants the full ceiling and overflows once generation starts;
+			// reserving the real allowance leaves ~28k tokens for history, which
+			// this turn exceeds.
+			const turn: EndpointMessage = {
+				from: "assistant",
+				content: "done",
+				updates: Array.from({ length: 12 }, (_, i) => [
+					callUpdate(`b${i}`, "search", { q: String(i) }),
+					resultUpdate(`b${i}`, "search", "x".repeat(8000)),
+				]).flat(),
+			};
+			const history: EndpointMessage[] = [turn, { from: "user", content: "next" }];
+			const replayed = async (maxOutputTokens?: number) =>
+				(
+					await prepareMessagesWithFiles(history, imageProcessor, false, {
+						replayToolHistory: true,
+						contextLengthTokens: 131_072,
+						maxOutputTokens,
+					})
+				).filter((m) => m.role === "tool").length;
+
+			expect(await replayed(undefined)).toBe(12);
+			expect(await replayed(98_304)).toBe(0);
+		});
+
 		it("sends the pre-replay shape when the window is smaller than the reserve", async () => {
 			const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
 				replayToolHistory: true,

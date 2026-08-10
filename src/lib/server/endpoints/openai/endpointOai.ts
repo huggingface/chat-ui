@@ -176,6 +176,10 @@ export async function endpointOai(
 			reasoningEffort,
 			reasoningOverride,
 		}) => {
+			// Hoisted above the message prep so the history budget can reserve the
+			// reply allowance this request will actually ask for.
+			const parameters = { ...model.parameters, ...generateSettings };
+
 			// Format messages for the chat API, handling multimodal content if supported.
 			// attachReasoning re-attaches persisted reasoning as reasoning_content on
 			// past assistant turns (preserved-thinking models condition on it). The
@@ -194,6 +198,7 @@ export async function endpointOai(
 					attachReasoning: reasoningOverride ?? Boolean(model.supportsReasoning),
 					currentProducerModel: model.id ?? model.name,
 					contextLengthTokens: model.contextLength,
+					maxOutputTokens: parameters?.max_tokens,
 				});
 
 			// Normalize preprompt and handle empty values
@@ -218,9 +223,6 @@ export async function endpointOai(
 					messagesOpenAI = [{ role: "system", content: normalizedPreprompt }, ...messagesOpenAI];
 				}
 			}
-
-			// Combine model defaults with request-specific parameters
-			const parameters = { ...model.parameters, ...generateSettings };
 
 			// Build model ID with optional provider suffix (e.g., "model:fastest" or "model:together")
 			const baseModelId = model.id ?? model.name;

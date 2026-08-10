@@ -40,7 +40,7 @@ const MAX_REPLAYED_TOOL_OUTPUT_CHARS = 8000;
  * charged newest-first, so recent history keeps its tool calls and reasoning.
  *
  * Not counted: the preprompt and tool schemas, which callers prepend after
- * this function returns — see CONTEXT_RESERVE_TOKENS.
+ * this function returns — see PROMPT_OVERHEAD_TOKENS.
  *
  * This is only the ceiling. When the model's context window is known it is
  * lowered to fit (see budgetCharsFor), because on a small-context model a flat
@@ -57,11 +57,19 @@ const HISTORY_BUDGET_CHARS = 100_000;
 const CHARS_PER_TOKEN = 3;
 
 /**
- * Held back from the context window for everything this function cannot see:
- * the reply itself, the preprompt, and tool schemas — which run to thousands of
- * tokens when several MCP servers are selected.
+ * Held back from the context window for the preprompt and tool schemas, which
+ * run to thousands of tokens when several MCP servers are selected. The reply
+ * is reserved separately, from the model's own configured limit.
  */
-const CONTEXT_RESERVE_TOKENS = 8_000;
+const PROMPT_OVERHEAD_TOKENS = 4_000;
+
+/**
+ * Reply allowance when the model configures no explicit limit. Models that do
+ * configure one are reserved that instead — a model set to emit up to 98k
+ * tokens needs 98k held back, and a flat constant would let history plus reply
+ * exceed the window even though each fits on its own.
+ */
+const DEFAULT_OUTPUT_TOKENS = 4_096;
 
 /**
  * How many characters of history this request may spend.
@@ -73,9 +81,11 @@ const CONTEXT_RESERVE_TOKENS = 8_000;
  * yields 0: everything degrades to the flat pre-replay shape, which is the
  * most that model could ever have taken anyway.
  */
-function budgetCharsFor(contextLengthTokens?: number): number {
+function budgetCharsFor(contextLengthTokens?: number, maxOutputTokens?: number): number {
 	if (!contextLengthTokens || contextLengthTokens <= 0) return HISTORY_BUDGET_CHARS;
-	const usableTokens = Math.max(0, contextLengthTokens - CONTEXT_RESERVE_TOKENS);
+	const outputReserve =
+		maxOutputTokens && maxOutputTokens > 0 ? maxOutputTokens : DEFAULT_OUTPUT_TOKENS;
+	const usableTokens = Math.max(0, contextLengthTokens - outputReserve - PROMPT_OVERHEAD_TOKENS);
 	return Math.min(HISTORY_BUDGET_CHARS, usableTokens * CHARS_PER_TOKEN);
 }
 
@@ -391,6 +401,11 @@ export async function prepareMessagesWithFiles(
 		 * much history is sent; omitting it keeps the flat default ceiling.
 		 */
 		contextLengthTokens?: number;
+		/**
+		 * The reply allowance this request will ask for (the model's configured
+		 * max_tokens). Reserved from the window alongside prompt overhead.
+		 */
+		maxOutputTokens?: number;
 	}
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
 	type ReplayCandidate = { replay: AssistantReplayMessage[]; flat: ChatMessageParam };
@@ -489,7 +504,7 @@ export async function prepareMessagesWithFiles(
 	// paying only the difference over the floor. A history that already exceeds
 	// the cap leaves nothing to spend, so every turn keeps its flat form and the
 	// request is no larger than it used to be.
-	let budget = budgetCharsFor(options?.contextLengthTokens) - floor;
+	let budget = budgetCharsFor(options?.contextLengthTokens, options?.maxOutputTokens) - floor;
 	const resolved: ChatMessageParam[][] = [...flatForms];
 	for (let i = prepared.length - 1; i >= 0; i -= 1) {
 		const entry = prepared[i];

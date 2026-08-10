@@ -377,6 +377,17 @@ export async function* runMcpFlow({
 			reasoningOverride ??
 			Boolean((targetModel as unknown as { supportsReasoning?: boolean }).supportsReasoning);
 
+		// Hoisted above the message prep so the history budget can reserve the
+		// reply allowance this request will actually ask for.
+		const parameters = { ...targetModel.parameters, ...assistant?.generateSettings } as Record<
+			string,
+			unknown
+		>;
+		const maxTokens =
+			(parameters?.max_tokens as number | undefined) ??
+			(parameters?.max_new_tokens as number | undefined) ??
+			(parameters?.max_completion_tokens as number | undefined);
+
 		let messagesOpenAI: ChatCompletionMessageParam[] = await prepareMessagesWithFiles(
 			messages,
 			imageProcessor,
@@ -394,6 +405,7 @@ export async function* runMcpFlow({
 				// request. Tool schemas are prepended after this returns, which is
 				// part of what CONTEXT_RESERVE_TOKENS holds back.
 				contextLengthTokens: (targetModel as unknown as { contextLength?: number }).contextLength,
+				maxOutputTokens: maxTokens,
 			}
 		);
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
@@ -427,15 +439,6 @@ export async function* runMcpFlow({
 		) {
 			messagesOpenAI[0] = { ...messagesOpenAI[0], role: "user" };
 		}
-
-		const parameters = { ...targetModel.parameters, ...assistant?.generateSettings } as Record<
-			string,
-			unknown
-		>;
-		const maxTokens =
-			(parameters?.max_tokens as number | undefined) ??
-			(parameters?.max_new_tokens as number | undefined) ??
-			(parameters?.max_completion_tokens as number | undefined);
 
 		const stopSequences =
 			typeof parameters?.stop === "string"
