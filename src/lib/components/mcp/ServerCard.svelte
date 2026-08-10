@@ -29,10 +29,6 @@
 
 	let isLoadingHealth = $state(false);
 
-	// Reactive wall-clock tick so the `Authorized · expires in …` pill flips to
-	// `Authorization required` (and the Authorize button appears) as time passes
-	// while the modal is open. `Date.now()` alone is not a tracked reactive
-	// source in Svelte 5 — derivations that read it are frozen at first compute.
 	let now = $state(Date.now());
 	onMount(() => {
 		const id = setInterval(() => (now = Date.now()), 30_000);
@@ -46,8 +42,7 @@
 	const oauthAuthorized = $derived(
 		Boolean(
 			server.oauth?.status === "authorized" &&
-			// Refreshable connections stay authorized past the short-lived access token (we refresh
-			// on use); only a non-refreshable one lapses when its access token expires.
+			// Refreshable connections stay authorized past access-token expiry (refreshed on use).
 			(server.oauth.refreshable || !server.oauth.expiresAt || server.oauth.expiresAt > now)
 		)
 	);

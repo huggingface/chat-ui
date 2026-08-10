@@ -25,7 +25,6 @@ import { selectInitialOAuthScope } from "./scope";
 
 export interface DiscoveryResult {
 	requiresAuth: boolean;
-	// Set when requiresAuth=true
 	resource?: string;
 	resourceMetadataUrl?: string;
 	resourceMetadata?: OAuthProtectedResourceMetadata;
@@ -33,7 +32,6 @@ export interface DiscoveryResult {
 	clientInfo?: OAuthClientInformationFull;
 	registrationMethod?: "client_metadata_document" | "dynamic";
 	requestedScope?: string;
-	// Set when requiresAuth=false but the probe succeeded; informational.
 	probeStatus?: number;
 }
 
@@ -86,22 +84,7 @@ async function probeMcpServer(url: string, signal: AbortSignal): Promise<Respons
 	});
 }
 
-/**
- * Walk the MCP authorization discovery dance from a server URL:
- *
- *   1. Probe the MCP server with an `initialize` request (no auth).
- *   2. If we get a 401, parse the `WWW-Authenticate` header for the RFC 9728
- *      `resource_metadata` URL.
- *   3. Fetch the Protected Resource Metadata (RFC 9728) and pick the first
- *      `authorization_servers[]` entry.
- *   4. Fetch the Authorization Server Metadata (RFC 8414, with OIDC fallback).
- *   5. Prefer a Client ID Metadata Document when advertised, then fall back to
- *      RFC 7591 Dynamic Client Registration, then manual client information.
- *
- * Throws on hard failures (network errors, unparseable metadata). Returns
- * `requiresAuth: false` if the probe succeeded with 2xx — meaning the server
- * does not need auth.
- */
+/** Walk MCP OAuth discovery: probe → RFC 9728 resource metadata → RFC 8414 AS metadata → client (CIMD, DCR, or manual). Returns requiresAuth:false when the probe already succeeds. */
 export async function discoverServerOAuth(
 	serverUrl: string,
 	options: { redirectUri: string; clientMetadataUri: string; appName: string }

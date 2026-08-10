@@ -68,14 +68,10 @@
 			};
 			currentView = "authorize";
 		} else if (serverData.discovery?.requiresAuth) {
-			// Discovery said "needs auth" but we don't have enough metadata to
-			// drive the dance. Tell the user explicitly instead of silently adding
-			// a broken server.
+			// Needs auth but discovery couldn't load enough metadata — tell the user, don't add a broken server.
 			currentView = "list";
 			$error = `${serverData.url} requires authorization but its OAuth metadata could not be loaded. Try Health Check or contact the server admin.`;
 		} else {
-			// Non-OAuth server: just close the form. The user flips the Switch on
-			// the card to enable it (matches pre-PR behavior).
 			currentView = "list";
 		}
 	}
@@ -84,9 +80,6 @@
 		if (!pendingAuth || !payload.ok || !payload.connection) return;
 		const serverId = pendingAuth.serverId;
 		setServerOAuth(serverId, payload.connection);
-		// Auto-enable on first authorization so the user can immediately use the
-		// server. If they were re-authorizing an already-enabled server, leave the
-		// selection state alone — toggling would turn it off.
 		if (!$selectedServerIds.has(serverId)) {
 			toggleServer(serverId);
 		}

@@ -362,18 +362,10 @@ export function updateServerStatus(
 	);
 }
 
-/**
- * Build the user-entered headers sent for this server. OAuth credentials are
- * resolved from the opaque connection ID at the server-side request boundary.
- */
 export function effectiveServerHeaders(server: MCPServer): KeyValuePair[] {
 	return [...(server.headers ?? [])];
 }
 
-/**
- * Set / replace the full OAuth state on a custom server (e.g., after the
- * Authorize popup flow completes successfully).
- */
 export function setServerOAuth(id: string, oauth: MCPOAuthState) {
 	allMcpServers.update(($servers) =>
 		$servers.map((s) => ({
@@ -384,10 +376,7 @@ export function setServerOAuth(id: string, oauth: MCPOAuthState) {
 	persistCustomServers();
 }
 
-/**
- * Delete the owner-scoped connection first, then best-effort revoke its token.
- * A fresh discovery is attempted so the server remains re-authorizable.
- */
+// Delete the connection, best-effort revoke, then re-discover so the server stays re-authorizable.
 export async function disconnectServerOAuth(id: string, rediscover = true): Promise<boolean> {
 	const server = get(allMcpServers).find((s) => s.id === id);
 	if (!server?.oauth) return false;
@@ -437,8 +426,7 @@ export async function healthCheckServer(
 
 		const result = await response.json();
 
-		// Set the stable status before setServerOAuth persists to localStorage — otherwise the
-		// transient "connecting" is what gets saved, and the card is stuck on it after a reload.
+		// Persist the stable status before setServerOAuth writes localStorage, or "connecting" sticks after reload.
 		if (result.ready && result.tools) {
 			updateServerStatus(server.id, "connected", undefined, result.tools, false);
 			if (result.oauth) setServerOAuth(server.id, result.oauth);
@@ -455,10 +443,6 @@ export async function healthCheckServer(
 	}
 }
 
-/**
- * After a full-page redirect OAuth flow returns, consume any handoff payload
- * from the URL hash and apply it to the corresponding server entry.
- */
 async function consumeOAuthRedirectIfAny() {
 	if (!browser) return;
 	const { consumeRedirectHandoff } = await import("$lib/utils/mcpOAuth");
@@ -467,9 +451,6 @@ async function consumeOAuthRedirectIfAny() {
 	const { payload, serverId } = result;
 	if (!payload.ok || !payload.connection) return;
 	setServerOAuth(serverId, payload.connection);
-	// Mirror the popup path's behavior: auto-enable a freshly-authorized server
-	// so its tools ship with the next chat without the user having to flip the
-	// switch on the card.
 	if (!get(selectedServerIds).has(serverId)) {
 		toggleServer(serverId);
 	}

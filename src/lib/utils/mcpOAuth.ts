@@ -113,12 +113,7 @@ export async function disconnectOAuthConnection(connectionId: string): Promise<b
 	}
 }
 
-/**
- * Opens an OAuth popup and resolves with the postMessage payload from our
- * callback page. Rejects if the user closes the popup before a result arrives,
- * or if the popup never opens (popup-blocked / mobile). Caller can then fall
- * back to `runFullPageAuthFlow`.
- */
+/** Open an OAuth popup and resolve with its postMessage payload; rejects on popup-blocked/closed/timeout so the caller can fall back to a full-page redirect. */
 export function openAuthPopup(authUrl: string, flowId: string): Promise<OAuthCallbackPayload> {
 	return new Promise((resolve, reject) => {
 		let popup: Window | null;
@@ -186,11 +181,7 @@ export function openAuthPopup(authUrl: string, flowId: string): Promise<OAuthCal
 	});
 }
 
-/**
- * Mobile / popup-blocked fallback. Stashes the in-flight flow context in
- * sessionStorage keyed by flowId, then navigates the main tab to `authUrl`.
- * On return, `consumeRedirectHandoff()` picks up the result from the URL hash.
- */
+/** Popup-blocked fallback: stash the flow in sessionStorage and navigate to authUrl; consumeRedirectHandoff() reads the result on return. */
 export function runFullPageAuthFlow(args: { authUrl: string; flowId: string; serverId: string }) {
 	const pending = {
 		flowId: args.flowId,
@@ -241,11 +232,6 @@ export function clearPendingFullPage() {
 	} catch {}
 }
 
-/**
- * On page load, look for a `__mcp_oauth_handoff=` fragment in the URL hash.
- * If present, decode it, scrub it from the URL, and return the payload along
- * with any pending serverId we stashed before redirecting.
- */
 export function consumeRedirectHandoff(): {
 	payload: OAuthCallbackPayload;
 	serverId: string;

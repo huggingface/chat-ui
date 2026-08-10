@@ -1,17 +1,4 @@
-/**
- * Canonicalize an MCP server URL per RFC 8707 Section 2 / MCP Authorization spec.
- *
- * The canonical form:
- *  - lowercases the scheme and host
- *  - rejects URL fragments and embedded credentials
- *  - keeps a non-root trailing slash because it may be semantically significant
- *  - emits a bare host without the URL parser's implicit root slash
- *  - keeps the path otherwise verbatim (path components can be semantically
- *    significant when a single host serves multiple MCP servers)
- *  - keeps query string verbatim (e.g., the HF login MCP uses `?login`)
- *
- * Throws if the input is not a valid HTTP(S) resource identifier.
- */
+/** Canonicalize an MCP server URL per RFC 8707 §2: lowercase scheme/host, reject fragments/credentials, drop the parser's implicit root slash, keep path & query verbatim. Throws if not valid HTTP(S). */
 export function canonicalizeMcpUri(input: string | URL): string {
 	const url = input instanceof URL ? new URL(input.toString()) : new URL(input);
 

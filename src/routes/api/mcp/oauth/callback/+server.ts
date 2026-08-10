@@ -22,13 +22,7 @@ interface PopupResultMessage {
 	error?: string;
 }
 
-/**
- * Encode a value as JSON safe to embed inside an inline `<script>` tag. Escapes
- * the four sequences that can break out of or be reinterpreted by the HTML
- * parser before JavaScript sees the literal: `<`, `>`, `&`, and the U+2028 /
- * U+2029 line separators (which JS treats as line terminators in string
- * literals starting with ES2019, but historically broke parsers).
- */
+/** JSON-encode for safe embedding in an inline <script>: escapes <, >, &, and the U+2028/U+2029 line separators. */
 function jsonForInlineScript(value: unknown): string {
 	return JSON.stringify(value)
 		.replace(/</g, "\\u003c")

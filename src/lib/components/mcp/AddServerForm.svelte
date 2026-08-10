@@ -49,10 +49,7 @@
 	let showHeaderValues = $state<Record<number, boolean>>({});
 	let error = $state<string | null>(null);
 
-	// Reset the "skip discovery" escape hatch whenever the user edits the URL.
-	// Otherwise a typo'd URL that failed discovery once would silently bypass
-	// auto-discovery on every subsequent corrected URL too, leaving real
-	// OAuth-protected servers added without an oauth state.
+	// A URL edit re-enables discovery, so a corrected URL isn't added without its OAuth state.
 	$effect(() => {
 		// Track url as a reactive dep
 		void url;
@@ -114,9 +111,6 @@
 		const filteredHeaders = headers.filter((h) => h.key.trim() && h.value.trim());
 		const finalUrl = url.trim();
 
-		// Skip the OAuth probe entirely if the user already provided manual auth
-		// headers — this preserves the existing custom-server flow for API-key
-		// based servers without an extra round trip.
 		const hasManualAuth = filteredHeaders.some((h) => h.key.toLowerCase() === "authorization");
 		let discovery: DiscoveryResponse | undefined;
 		if (!hasManualAuth && !discoveryFailed) {
@@ -124,9 +118,7 @@
 			try {
 				discovery = await discoverServer(finalUrl);
 			} catch (e) {
-				// Discovery failed (network, broken server, AS down). Surface the
-				// error inline so the user can read it; on next submit we skip
-				// auto-discovery and add the server as-is.
+				// Surface the error inline; the next submit skips discovery and adds the server as-is.
 				probing = false;
 				discoveryFailed = true;
 				const msg = e instanceof Error ? e.message : "Discovery failed";

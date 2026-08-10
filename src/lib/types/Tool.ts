@@ -64,10 +64,7 @@ export interface MCPOAuthTokens {
 	id_token?: string;
 }
 
-// Snapshot of the discovery + DCR results so we can refresh tokens or
-// reconnect later without re-walking the WWW-Authenticate dance every time.
-// Schemas mirror @modelcontextprotocol/sdk/shared/auth (RFC 8414, RFC 7591),
-// kept loose here so we don't pull SDK Zod types into the public client bundle.
+// Loose mirror of @modelcontextprotocol/sdk/shared/auth (RFC 8414/7591) — keeps SDK Zod types out of the client bundle.
 export interface MCPAuthorizationServerMetadata {
 	issuer: string;
 	authorization_endpoint: string;
@@ -98,8 +95,6 @@ export interface MCPOAuthState {
 	connectionId: string;
 	issuer: string;
 	status: "authorization_required" | "authorized";
-	// A refresh token is stored, so an expired access token is silently renewed on next use — the
-	// UI should keep showing "Authorized" instead of prompting to re-authorize.
 	refreshable?: boolean;
 	scope?: string;
 	expiresAt?: number;
