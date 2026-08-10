@@ -46,7 +46,9 @@
 	const oauthAuthorized = $derived(
 		Boolean(
 			server.oauth?.status === "authorized" &&
-			(!server.oauth.expiresAt || server.oauth.expiresAt > now)
+			// Refreshable connections stay authorized past the short-lived access token (we refresh
+			// on use); only a non-refreshable one lapses when its access token expires.
+			(server.oauth.refreshable || !server.oauth.expiresAt || server.oauth.expiresAt > now)
 		)
 	);
 	const oauthNeedsAuth = $derived(Boolean(server.oauth) && !oauthAuthorized);
@@ -188,7 +190,7 @@
 						title={issuerHost ? `OAuth via ${issuerHost}` : "OAuth-authorized"}
 					>
 						<LucideShieldCheck class="size-3" />
-						Authorized{expiresInLabel ? ` · ${expiresInLabel}` : ""}
+						Authorized{!server.oauth?.refreshable && expiresInLabel ? ` · ${expiresInLabel}` : ""}
 					</span>
 				{:else if oauthNeedsAuth}
 					<span

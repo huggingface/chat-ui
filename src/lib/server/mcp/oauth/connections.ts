@@ -70,6 +70,7 @@ export function publicOAuthState(connection: MCPOAuthConnection): MCPOAuthState 
 		issuer: connection.asMetadata.issuer,
 		status:
 			connection.tokens && !connection.scopeChallenge ? "authorized" : "authorization_required",
+		refreshable: Boolean(connection.tokens?.refresh_token),
 		scope:
 			connection.scopeChallenge?.scope ?? connection.tokens?.scope ?? connection.requestedScope,
 		expiresAt: connection.tokens?.expires_at,

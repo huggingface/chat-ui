@@ -98,6 +98,9 @@ export interface MCPOAuthState {
 	connectionId: string;
 	issuer: string;
 	status: "authorization_required" | "authorized";
+	// A refresh token is stored, so an expired access token is silently renewed on next use — the
+	// UI should keep showing "Authorized" instead of prompting to re-authorize.
+	refreshable?: boolean;
 	scope?: string;
 	expiresAt?: number;
 	manualClientRequired?: boolean;

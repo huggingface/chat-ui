@@ -71,6 +71,7 @@ function stripLegacyOAuthSecrets(server: MCPServer): MCPServer {
 			connectionId: oauth.connectionId,
 			issuer: oauth.issuer,
 			status: oauth.status,
+			refreshable: typeof oauth.refreshable === "boolean" ? oauth.refreshable : undefined,
 			scope: typeof oauth.scope === "string" ? oauth.scope : undefined,
 			expiresAt: typeof oauth.expiresAt === "number" ? oauth.expiresAt : undefined,
 			manualClientRequired:
@@ -436,13 +437,15 @@ export async function healthCheckServer(
 
 		const result = await response.json();
 
+		// Set the stable status before setServerOAuth persists to localStorage — otherwise the
+		// transient "connecting" is what gets saved, and the card is stuck on it after a reload.
 		if (result.ready && result.tools) {
-			if (result.oauth) setServerOAuth(server.id, result.oauth);
 			updateServerStatus(server.id, "connected", undefined, result.tools, false);
+			if (result.oauth) setServerOAuth(server.id, result.oauth);
 			return { ready: true, tools: result.tools };
 		} else {
-			if (result.oauth) setServerOAuth(server.id, result.oauth);
 			updateServerStatus(server.id, "error", result.error, undefined, Boolean(result.authRequired));
+			if (result.oauth) setServerOAuth(server.id, result.oauth);
 			return { ready: false, error: result.error };
 		}
 	} catch (error) {
