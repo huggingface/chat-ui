@@ -719,6 +719,47 @@ describe.sequential("model switching", () => {
 		expect(assistantMessages(after)[0].routerMetadata?.model).toBe("test-org/text-only");
 	});
 
+	it("backfills the producer when the switch comes through the v2 API too", async () => {
+		// The backfill used to live only in the legacy handler, so switching via
+		// the public API left history unstamped and the next turn replayed one
+		// model's reasoning onto another. Both endpoints now share one helper.
+		const { PATCH: apiPatch } =
+			await import("../../../../routes/api/v2/conversations/[id]/+server");
+		const { conv, locals } = await newConversation();
+		await setReasoningOverride(locals, true);
+		scriptRounds([
+			{ reasoning: "Reasoning by the first model.", content: "First answer." },
+			{ content: "Second answer." },
+		]);
+
+		await sendMessage(conv, locals, "Question?", { withTools: false });
+
+		const patched = await apiPatch({
+			locals,
+			params: { id: conv._id.toString() },
+			request: new Request(`http://localhost/api/v2/conversations/${conv._id}`, {
+				method: "PATCH",
+				body: JSON.stringify({ model: "test-org/text-only" }),
+			}),
+		} as never);
+		expect(patched.status).toBe(200);
+
+		const stored = await reload(conv);
+		expect(stored.model).toBe("test-org/text-only");
+		expect(assistantMessages(stored)[0].routerMetadata?.model).toBe(MODEL_ID);
+
+		await setReasoningOverride(locals, true);
+		await sendMessage(stored, locals, "Follow-up?", { withTools: false });
+
+		const replayed = outgoing(1);
+		const shape = describeMessages(replayed);
+		expect(
+			replayed.some((m) => m.reasoning_content !== undefined),
+			shape
+		).toBe(false);
+		expect(JSON.stringify(replayed), shape).not.toContain("Reasoning by the first model");
+	});
+
 	it("does not discard messages written between reading the conversation and applying the switch", async () => {
 		const { conv, locals } = await newConversation();
 		scriptRounds([{ content: "First answer." }]);

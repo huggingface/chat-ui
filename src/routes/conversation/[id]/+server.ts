@@ -29,6 +29,7 @@ import { createGenerationWriter, type GenerationWriter } from "$lib/server/gener
 import { clampStoppedContent } from "$lib/server/stopTruncation";
 import { MetricsServer } from "$lib/server/metrics";
 import { randomUUID } from "$lib/utils/randomUuid";
+import { applyConversationSettings } from "$lib/server/conversationSettings";
 
 // How long a stop marker is protected from the pre-flight cleanup of a new
 // generation. A marker younger than this may still be awaiting observation by
@@ -858,99 +859,7 @@ export async function PATCH({ request, locals, params }) {
 		error(404, "Conversation not found");
 	}
 
-	// Only include defined values in the update, with title sanitized
-	const updateValues = {
-		...(values.title !== undefined && {
-			title: values.title.replace(/<\/?think>/gi, "").trim(),
-		}),
-		...(values.model !== undefined && { model: values.model }),
-	};
-
-	// Switching the pinned model (e.g. the retired-model recovery banner) means
-	// every prior assistant message was actually produced by the OLD model, not
-	// the new one. Those messages have no routerMetadata.model of their own —
-	// it's only ever stamped for the "omni" router alias — so history-replay's
-	// same-producer check would otherwise default to treating them as
-	// same-producer as the newly selected model and attach the old model's
-	// reasoning_content to a turn it never produced. Backfill the retiring
-	// model's id onto messages that don't already carry producer metadata so
-	// the mismatch is recorded before it's lost.
-	// Runs as an aggregation pipeline so the backfill is computed server-side from
-	// the document as it exists at write time. Mapping `conv.messages` in app code
-	// and writing the result back would replace the whole array with a snapshot
-	// read before the switch, silently discarding anything persisted in between —
-	// an in-flight generation writes the same array on every token batch.
-	// `$model` is likewise the currently pinned model rather than the one read
-	// earlier, so the id stamped is always the one messages were actually
-	// produced under, and the `$ne` gate means a switch that raced ahead of us
-	// leaves history untouched instead of restamping it.
-	if (values.model !== undefined) {
-		await collections.conversations.updateOne({ _id: convId }, [
-			{
-				$set: {
-					messages: {
-						$cond: [
-							{ $ne: ["$model", values.model] },
-							{
-								$map: {
-									input: "$messages",
-									as: "m",
-									in: {
-										$cond: [
-											{
-												$and: [
-													{ $eq: ["$$m.from", "assistant"] },
-													// No producer of its own: routerMetadata.model is only
-													// ever stamped for the "omni" router alias, so without
-													// this the replay same-producer check would treat these
-													// as produced by the newly selected model and attach the
-													// old model's reasoning to a turn it never produced.
-													{ $eq: [{ $ifNull: ["$$m.routerMetadata.model", ""] }, ""] },
-												],
-											},
-											{
-												$mergeObjects: [
-													"$$m",
-													{
-														// Merged rather than replaced so an existing `route`
-														// or `provider` survives; `route` is required by the
-														// type, hence the default underneath.
-														routerMetadata: {
-															$mergeObjects: [
-																{ route: "" },
-																{ $ifNull: ["$$m.routerMetadata", {}] },
-																{ model: "$model" },
-															],
-														},
-													},
-												],
-											},
-											"$$m",
-										],
-									},
-								},
-							},
-							"$messages",
-						],
-					},
-				},
-			},
-			// Separate stage: within one `$set` every expression sees the input
-			// document, so the backfill above must resolve `$model` before this
-			// overwrites it.
-			{ $set: updateValues },
-		]);
-		return new Response();
-	}
-
-	await collections.conversations.updateOne(
-		{
-			_id: convId,
-		},
-		{
-			$set: updateValues,
-		}
-	);
+	await applyConversationSettings({ _id: convId }, values);
 
 	return new Response();
 }
