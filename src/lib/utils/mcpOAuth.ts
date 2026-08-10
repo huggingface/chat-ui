@@ -119,6 +119,28 @@ export async function disconnectOAuthConnection(
 	}
 }
 
+// Current owner-checked state for one connection. Lets a caller recover a flow whose popup closed
+// before its result message arrived (e.g. a PUBLIC_ORIGIN mismatch drops the postMessage) — the
+// token exchange may already have completed server-side.
+export async function fetchOAuthConnectionState(
+	connectionId: string
+): Promise<MCPOAuthState | null> {
+	try {
+		const res = await fetch(`${base}/api/mcp/oauth/state`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ connectionIds: [connectionId] }),
+		});
+		if (!res.ok) return null;
+		const body = (await res.json()) as {
+			states: Array<{ connectionId: string; state?: MCPOAuthState; missing?: boolean }>;
+		};
+		return body.states.find((s) => s.connectionId === connectionId)?.state ?? null;
+	} catch {
+		return null;
+	}
+}
+
 /** Open an OAuth popup and resolve with its postMessage payload; rejects on popup-blocked/closed/timeout so the caller can fall back to a full-page redirect. */
 export function openAuthPopup(authUrl: string, flowId: string): Promise<OAuthCallbackPayload> {
 	return new Promise((resolve, reject) => {

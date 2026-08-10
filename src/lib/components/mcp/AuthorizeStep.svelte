@@ -5,6 +5,7 @@
 		openAuthPopup,
 		runFullPageAuthFlow,
 		startAuthFlow,
+		fetchOAuthConnectionState,
 		type OAuthCallbackPayload,
 	} from "$lib/utils/mcpOAuth";
 	import type { MCPClientInformation } from "$lib/types/Tool";
@@ -101,9 +102,21 @@
 					});
 					return;
 				}
-				if (code === "popup-closed") {
+				if (code === "popup-closed" || code === "timeout") {
+					// The popup can close before its result message reaches us (e.g. a PUBLIC_ORIGIN
+					// mismatch drops the postMessage). The exchange may still have completed server-side,
+					// so confirm the connection before treating it as a failure.
+					const recovered = await fetchOAuthConnectionState(discovery.connection.connectionId);
+					if (recovered?.status === "authorized") {
+						phase = "done";
+						onauthorized({ ok: true, flowId, connection: recovered });
+						return;
+					}
 					phase = "idle";
-					errorMessage = "Authorization window was closed before completing.";
+					errorMessage =
+						code === "timeout"
+							? "Authorization timed out before completing."
+							: "Authorization window was closed before completing.";
 					return;
 				}
 				phase = "error";
