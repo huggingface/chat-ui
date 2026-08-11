@@ -38,6 +38,7 @@
  */
 import { readFileSync } from "fs";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
+import { preservesReasoningByDefault } from "$lib/server/reasoningPolicy";
 import type { EndpointMessage } from "$lib/server/endpoints/endpoints";
 import type { makeImageProcessor } from "$lib/server/endpoints/images";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
@@ -75,31 +76,19 @@ const PINNED_MODELS = [
 ];
 
 /**
- * Mirrors each pinned model's real `supportsReasoning` flag (chart/env/*.yaml)
- * so every reasoning-bearing scenario (S2/S3/P2/N2 below) builds the same gate
- * value production would actually resolve for that model. Building them with
- * a hardcoded `true` for every model would send Gemma and Llama — both
- * deliberately unflagged — a reasoning_content shape production never sends
- * them, which proves nothing about their real (correct) policy and fails them
- * for a payload they will never receive.
+ * Resolves each pinned model the way production now does, so every
+ * reasoning-bearing scenario (S2/S3/P2/N2 below) is built with the same gate
+ * value it would really get. Sending a model a shape production never sends it
+ * proves nothing about its real policy and fails it for a payload it will
+ * never receive.
  *
- * S3-inloop used to be exempt, back when the in-loop echo was ungated in
- * production. That exemption is what surfaced gemma-4-31B-it's provider
- * rejecting reasoning_content with a 400 instead of ignoring it; runMcpFlow
- * now gates the echo on this same flag, so the scenario follows it too.
+ * Replay is on by default and blocked per family rather than opted into, so
+ * this delegates to the production policy instead of restating a flag table —
+ * a table would drift the moment a model was added, which is the failure mode
+ * the flip exists to remove. Only gemma is blocked today; Llama is unaffected
+ * either way because it emits no reasoning to replay.
  */
-const MODEL_SUPPORTS_REASONING: Record<string, boolean> = {
-	"moonshotai/Kimi-K3": true,
-	"moonshotai/Kimi-K2.7-Code": true,
-	"MiniMaxAI/MiniMax-M3": true,
-	"deepseek-ai/DeepSeek-V4-Flash": true,
-	"deepseek-ai/DeepSeek-V4-Pro": true,
-	"zai-org/GLM-5.2": true,
-	"Qwen/Qwen3.6-27B": true,
-	"Qwen/Qwen3.6-35B-A3B": true,
-	"google/gemma-4-31B-it": false,
-	"meta-llama/Llama-3.1-8B-Instruct": false,
-};
+const modelPreservesReasoning = (model: string) => preservesReasoningByDefault(model);
 
 type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam & {
 	reasoning_content?: string;
@@ -368,12 +357,12 @@ const FAMILIES: Record<string, string[]> = {
 };
 
 /**
- * Builds the scenario set for one model. `supportsReasoning` should be that
- * model's real MODEL_SUPPORTS_REASONING value: it decides attachReasoning for
- * every cross-turn scenario (S2/P2/N2) the same way production resolves it,
- * so an unflagged model is tested against the shape it will actually receive
- * rather than one forced uniformly onto every model. S3-inloop is the one
- * exception — see MODEL_SUPPORTS_REASONING's doc comment for why.
+ * Builds the scenario set for one model. `supportsReasoning` is that model's
+ * real production gate (see modelPreservesReasoning): it decides
+ * attachReasoning for every reasoning-bearing scenario — S2/P2/N2 across
+ * turns and S3 in-loop — the same way production resolves it, so a blocked
+ * model is tested against the shape it will actually receive rather than one
+ * forced uniformly onto every model.
  */
 async function buildScenarios(supportsReasoning: boolean): Promise<Scenario[]> {
 	const toolExpect = [/paris/i, /18/];
@@ -720,7 +709,7 @@ async function main() {
 				baseUrl,
 				apiKey,
 				model,
-				await buildScenarios(MODEL_SUPPORTS_REASONING[model] ?? false)
+				await buildScenarios(modelPreservesReasoning(model))
 			),
 		}))
 	);

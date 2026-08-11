@@ -184,9 +184,10 @@ export async function endpointOai(
 			// attachReasoning re-attaches persisted reasoning as reasoning_content on
 			// past assistant turns (preserved-thinking models condition on it). The
 			// per-user reasoning override wins in both directions, else the model's
-			// capability flag decides, mirroring reasoning_effort forwarding, so
-			// strict non-reasoning backends never see the extra field; tool replay
-			// stays off here since this path never declares tools.
+			// policy decides — on by default, off only for a blocklisted family
+			// (see reasoningPolicy.ts). A model that emitted no reasoning has none
+			// to replay, so defaulting on cannot invent one; tool replay stays off
+			// here since this path never declares tools.
 			// currentProducerModel is this call's own resolved model: when invoked
 			// directly for a pinned conversation it's the only model that has ever
 			// produced a turn here, and when invoked as a router candidate (the
@@ -195,7 +196,7 @@ export async function endpointOai(
 			// this same model actually produced.
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
 				await prepareMessagesWithFiles(messages, imageProcessor, isMultimodal ?? model.multimodal, {
-					attachReasoning: reasoningOverride ?? Boolean(model.supportsReasoning),
+					attachReasoning: reasoningOverride ?? model.preservesReasoning !== false,
 					currentProducerModel: model.id ?? model.name,
 					contextLengthTokens: model.contextLength,
 					maxOutputTokens: parameters?.max_tokens,

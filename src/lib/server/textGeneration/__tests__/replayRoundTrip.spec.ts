@@ -555,6 +555,27 @@ describe.sequential("cross-turn reasoning", () => {
 		expect(String(past?.content), shape).toBe("It is 18°C in Paris.");
 	});
 
+	it("replays reasoning with no per-model configuration at all", async () => {
+		// The whole point of the flip. Under the previous opt-in flag this model
+		// — unflagged, no override, nothing in MODELS — silently lost its
+		// reasoning, and nothing anywhere said so. Note there is no
+		// setReasoningOverride call here, deliberately.
+		const { conv, locals } = await newConversation();
+		scriptRounds([
+			{ reasoning: "The user wants Paris weather.", content: "It is 18°C in Paris." },
+			{ content: "Still sunny." },
+		]);
+
+		await sendMessage(conv, locals, "Weather in Paris?", { withTools: false });
+		await sendMessage(await reload(conv), locals, "Still sunny?", { withTools: false });
+
+		const replayed = outgoing(1);
+		const shape = describeMessages(replayed);
+		const past = replayed.find((m) => m.role === "assistant");
+		expect(past?.reasoning_content, shape).toBe("The user wants Paris weather.");
+		expect(String(past?.content), shape).not.toContain("<think>");
+	});
+
 	it("sends no reasoning_content at all when the user turned reasoning off", async () => {
 		const { conv, locals } = await newConversation();
 		await setReasoningOverride(locals, false);

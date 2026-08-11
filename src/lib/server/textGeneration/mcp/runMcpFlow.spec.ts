@@ -369,46 +369,47 @@ describe("runMcpFlow in-loop reasoning echo", () => {
 		]);
 	};
 
-	it("echoes the round's reasoning back to a model that supports it", async () => {
+	it("echoes the round's reasoning back by default", async () => {
 		withReasoning();
 
-		await runFlow({
-			model: { ...context().model, supportsReasoning: true },
-		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+		await runFlow();
 
 		expect(toolCallMessage(1)?.reasoning_content).toBe("I need the tool.");
 	});
 
-	it("omits reasoning_content for a model that does not support it", async () => {
-		// Not cosmetic: at least one provider rejects the field outright rather
+	it("omits reasoning_content for a blocklisted model", async () => {
+		// Not cosmetic: this family's provider rejects the field outright rather
 		// than ignoring it —
 		//   400 messages.2.assistant.reasoning_content: property ... is unsupported
 		// — which would end the conversation mid-tool-loop. Emitting a trace and
-		// accepting one back are different capabilities.
+		// accepting one back are different capabilities, and only the blocklist
+		// knows the difference.
 		withReasoning();
 
-		await runFlow();
+		await runFlow({
+			model: { ...context().model, id: "google/gemma-4-31B-it", preservesReasoning: false },
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
 
 		const message = toolCallMessage(1);
 		expect(message).toBeDefined();
 		expect(message && "reasoning_content" in message).toBe(false);
 	});
 
-	it("honours a user override that turns reasoning on for an unflagged model", async () => {
+	it("honours a user override that turns reasoning on for a blocklisted model", async () => {
 		withReasoning();
 
-		await runFlow({ reasoningOverride: true } as Partial<Parameters<typeof runMcpFlow>[0]>);
+		await runFlow({
+			reasoningOverride: true,
+			model: { ...context().model, preservesReasoning: false },
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
 
 		expect(toolCallMessage(1)?.reasoning_content).toBe("I need the tool.");
 	});
 
-	it("honours a user override that turns reasoning off for a flagged model", async () => {
+	it("honours a user override that turns reasoning off", async () => {
 		withReasoning();
 
-		await runFlow({
-			model: { ...context().model, supportsReasoning: true },
-			reasoningOverride: false,
-		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+		await runFlow({ reasoningOverride: false } as Partial<Parameters<typeof runMcpFlow>[0]>);
 
 		const message = toolCallMessage(1);
 		expect(message && "reasoning_content" in message).toBe(false);
