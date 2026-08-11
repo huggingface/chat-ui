@@ -134,7 +134,8 @@ describe("login", () => {
 			})
 		);
 		expect(migrated?.sessionId).toBeUndefined();
-		expect(migrated?.deleteAt).toBeUndefined();
+		// Authenticated connections carry a sliding idle TTL rather than living forever.
+		expect(migrated?.deleteAt?.getTime()).toBeGreaterThan(Date.now() + 80 * 24 * 60 * 60 * 1000);
 	});
 
 	it("should create default settings for new user", async () => {
