@@ -21,9 +21,13 @@ import {
 	tokensWithExpiresAt,
 	tryRevokeToken,
 } from "./exchange";
+import { decryptConnection, encryptClientInfo, encryptFlow, encryptTokens } from "./encryption";
 
 const ABANDONED_CONNECTION_TTL_MS = 15 * 60 * 1000;
 const ANONYMOUS_CONNECTION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+// Authenticated connections expire after this long unused (slid on each use), so abandoned grants
+// don't live forever; the token exchange keeps a live connection working past it.
+const AUTHENTICATED_CONNECTION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 const REFRESH_WAIT_ATTEMPTS = 25;
 const REFRESH_WAIT_MS = 100;
@@ -99,7 +103,7 @@ export async function createOAuthConnection(
 		resource: canonicalizeMcpUri(input.resource),
 		resourceMetadataUrl: input.resourceMetadataUrl,
 		asMetadata: input.asMetadata,
-		clientInfo: input.clientInfo,
+		clientInfo: input.clientInfo ? encryptClientInfo(input.clientInfo) : undefined,
 		registrationMethod: input.registrationMethod,
 		requestedScope: input.requestedScope,
 		status: "authorization_required",
@@ -118,20 +122,17 @@ export async function getOAuthConnection(
 ): Promise<MCPOAuthConnection> {
 	const filter = connectionFilter(locals, connectionId);
 	const owner = oauthConnectionOwner(locals);
-	const connection = owner.sessionId
-		? ((await collections.mcpOAuthConnections.findOneAndUpdate(
-				{ ...filter, tokens: { $exists: true } },
-				{
-					$set: {
-						deleteAt: new Date(Date.now() + ANONYMOUS_CONNECTION_TTL_MS),
-						updatedAt: new Date(),
-					},
-				},
-				{ returnDocument: "after", includeResultMetadata: false }
-			)) ?? (await collections.mcpOAuthConnections.findOne(filter)))
-		: await collections.mcpOAuthConnections.findOne(filter);
+	const ttlMs = owner.sessionId ? ANONYMOUS_CONNECTION_TTL_MS : AUTHENTICATED_CONNECTION_TTL_MS;
+	// Slide the expiry on each use of an authorized connection (anonymous or user-owned) so active
+	// connections stay alive and only truly-unused ones lapse.
+	const connection =
+		(await collections.mcpOAuthConnections.findOneAndUpdate(
+			{ ...filter, tokens: { $exists: true } },
+			{ $set: { deleteAt: new Date(Date.now() + ttlMs), updatedAt: new Date() } },
+			{ returnDocument: "after", includeResultMetadata: false }
+		)) ?? (await collections.mcpOAuthConnections.findOne(filter));
 	if (!connection) throw new OAuthConnectionAccessError();
-	return connection;
+	return decryptConnection(connection);
 }
 
 export async function migrateOAuthConnectionsToUser(
@@ -147,7 +148,11 @@ export async function migrateOAuthConnectionsToUser(
 					sessionId: "$$REMOVE",
 					updatedAt: new Date(),
 					deleteAt: {
-						$cond: [{ $eq: [{ $type: "$tokens" }, "missing"] }, "$deleteAt", "$$REMOVE"],
+						$cond: [
+							{ $eq: [{ $type: "$tokens" }, "missing"] },
+							"$deleteAt",
+							{ $add: ["$$NOW", AUTHENTICATED_CONNECTION_TTL_MS] },
+						],
 					},
 				},
 			},
@@ -177,12 +182,12 @@ export async function saveAuthorizationFlow(
 		},
 		{
 			$set: {
-				clientInfo: input.clientInfo,
+				clientInfo: encryptClientInfo(input.clientInfo),
 				clientWasManuallyEntered: input.clientWasManuallyEntered,
 				registrationMethod: input.clientWasManuallyEntered
 					? "manual"
 					: connection.registrationMethod,
-				flow: input.flow,
+				flow: encryptFlow(input.flow),
 				status: "authorization_required",
 				updatedAt: new Date(),
 			},
@@ -191,7 +196,7 @@ export async function saveAuthorizationFlow(
 		{ returnDocument: "after", includeResultMetadata: false }
 	);
 	if (!updated) throw new Error("OAuth connection changed while authorization was starting");
-	return updated;
+	return decryptConnection(updated);
 }
 
 /**
@@ -205,7 +210,7 @@ export async function consumeAuthorizationFlow(
 	redirectUri: string
 ): Promise<MCPOAuthConnection | null> {
 	if (!state) return null;
-	return collections.mcpOAuthConnections.findOneAndUpdate(
+	const consumed = await collections.mcpOAuthConnections.findOneAndUpdate(
 		{
 			...ownerFilter(locals),
 			"flow.expectedState": state,
@@ -218,6 +223,7 @@ export async function consumeAuthorizationFlow(
 		},
 		{ returnDocument: "before", includeResultMetadata: false }
 	);
+	return consumed ? decryptConnection(consumed) : null;
 }
 
 export async function storeAuthorizationTokens(
@@ -233,23 +239,23 @@ export async function storeAuthorizationTokens(
 		},
 		{
 			$set: {
-				tokens,
+				tokens: encryptTokens(tokens),
 				status: "authorized",
 				requestedScope: tokens.scope ?? connection.requestedScope,
 				...(connection.scopeChallenge ? { lastScopeChallenge: connection.scopeChallenge } : {}),
-				...(sessionOwned ? { deleteAt: new Date(Date.now() + ANONYMOUS_CONNECTION_TTL_MS) } : {}),
+				deleteAt: new Date(
+					Date.now() +
+						(sessionOwned ? ANONYMOUS_CONNECTION_TTL_MS : AUTHENTICATED_CONNECTION_TTL_MS)
+				),
 				updatedAt: new Date(),
 			},
-			$unset: {
-				scopeChallenge: "",
-				...(sessionOwned ? {} : { deleteAt: "" }),
-			},
+			$unset: { scopeChallenge: "" },
 			$inc: { version: 1 },
 		},
 		{ returnDocument: "after", includeResultMetadata: false }
 	);
 	if (!updated) throw new Error("OAuth authorization flow was superseded");
-	return updated;
+	return decryptConnection(updated);
 }
 
 function tokenNeedsRefresh(tokens: MCPOAuthTokens): boolean {
@@ -311,7 +317,6 @@ async function refreshConnection(
 					{
 						...connectionFilter(locals, connectionId),
 						version: current.version,
-						"tokens.refresh_token": current.tokens.refresh_token,
 					},
 					{
 						$unset: { tokens: "" },
@@ -332,15 +337,14 @@ async function refreshConnection(
 			{
 				...connectionFilter(locals, connectionId),
 				version: current.version,
-				"tokens.refresh_token": current.tokens.refresh_token,
 			},
 			{
-				$set: { tokens: nextTokens, status: "authorized", updatedAt: new Date() },
+				$set: { tokens: encryptTokens(nextTokens), status: "authorized", updatedAt: new Date() },
 				$inc: { version: 1 },
 			},
 			{ returnDocument: "after", includeResultMetadata: false }
 		);
-		if (updated) return updated;
+		if (updated) return decryptConnection(updated);
 		return getOAuthConnection(locals, connectionId);
 	} finally {
 		await releaseLock(lockKey, lockId);
@@ -470,10 +474,11 @@ export async function deleteOAuthConnection(
 	connectionId: string,
 	options: { force?: boolean } = {}
 ): Promise<{ deleted: boolean; revoked: boolean }> {
-	const connection = await collections.mcpOAuthConnections.findOne(
+	const stored = await collections.mcpOAuthConnections.findOne(
 		connectionFilter(locals, connectionId)
 	);
-	if (!connection) throw new OAuthConnectionAccessError();
+	if (!stored) throw new OAuthConnectionAccessError();
+	const connection = decryptConnection(stored);
 
 	const revocationEndpoint = (connection.asMetadata as Record<string, unknown> | undefined)
 		?.revocation_endpoint;

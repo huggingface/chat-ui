@@ -127,7 +127,9 @@ describe.sequential("server-side MCP OAuth connections", () => {
 			access_token: "user-access",
 			token_type: "Bearer",
 		});
-		expect(userAuthorized.deleteAt).toBeUndefined();
+		expect(userAuthorized.deleteAt?.getTime()).toBeGreaterThan(
+			Date.now() + 80 * 24 * 60 * 60 * 1000
+		);
 	});
 
 	it("migrates anonymous OAuth connections to a user on login", async () => {
@@ -150,7 +152,9 @@ describe.sequential("server-side MCP OAuth connections", () => {
 		const migratedPending = await getOAuthConnection(userOwner, pendingConnection._id.toString());
 		expect(migratedAuthorized.sessionId).toBeUndefined();
 		expect(migratedAuthorized.userId).toEqual(user._id);
-		expect(migratedAuthorized.deleteAt).toBeUndefined();
+		expect(migratedAuthorized.deleteAt?.getTime()).toBeGreaterThan(
+			Date.now() + 80 * 24 * 60 * 60 * 1000
+		);
 		expect(migratedPending.sessionId).toBeUndefined();
 		expect(migratedPending.userId).toEqual(user._id);
 		expect(migratedPending.deleteAt).toEqual(pendingExpiry);
