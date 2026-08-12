@@ -78,6 +78,7 @@ async function* textGenerationWithoutTitle(
 			forceTools: ctx.forceTools,
 			provider: ctx.provider,
 			reasoningEffort: ctx.reasoningEffort,
+			reasoningOverride: ctx.reasoningOverride,
 			locals: ctx.locals,
 			preprompt,
 			abortSignal: ctx.abortController.signal,

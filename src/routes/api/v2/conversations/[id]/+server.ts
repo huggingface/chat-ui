@@ -6,6 +6,7 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
 import { validModelIdSchema } from "$lib/server/models";
+import { applyConversationSettings } from "$lib/server/conversationSettings";
 
 export const GET: RequestHandler = async ({ locals, params, url }) => {
 	requireAuth(locals);
@@ -68,23 +69,16 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 		}
 	}
 
-	const updateValues = {
-		...(title !== undefined && {
-			title: title.replace(/<\/?think>/gi, "").trim(),
-		}),
-		...(model !== undefined && { model }),
-	};
-
 	const id = params.id ?? "";
 	if (!ObjectId.isValid(id)) {
 		error(400, "Invalid conversation ID");
 	}
-	const res = await collections.conversations.updateOne(
-		{
-			_id: new ObjectId(id),
-			...authCondition(locals),
-		},
-		{ $set: updateValues }
+	// Shared with the legacy handler: a plain $set here would change the pinned
+	// model without recording who produced the existing turns, and the next
+	// request would replay one model's reasoning onto another.
+	const res = await applyConversationSettings(
+		{ _id: new ObjectId(id), ...authCondition(locals) },
+		{ title, model }
 	);
 
 	if (typeof res.matchedCount === "number" ? res.matchedCount === 0 : res.modifiedCount === 0) {

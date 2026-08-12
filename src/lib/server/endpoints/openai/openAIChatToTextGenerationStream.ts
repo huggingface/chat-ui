@@ -14,6 +14,11 @@ export async function* openAIChatToTextGenerationStream(
 	let toolBuffer = ""; // legacy hack kept harmless
 	let metadataYielded = false;
 	let thinkOpen = false;
+	// Leading whitespace-only reasoning deltas that arrived before the block
+	// opened. Held here and flushed once a non-blank delta opens the block, so a
+	// blank chunk can't create an empty <think> on its own while the trace still
+	// stays byte-exact. Mirrors runMcpFlow, which does the same for the tool path.
+	let pendingReasoningWhitespace = "";
 
 	for await (const completion of completionStream) {
 		const retyped = completion as {
@@ -53,6 +58,7 @@ export async function* openAIChatToTextGenerationStream(
 		const delta: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & {
 			reasoning?: string;
 			reasoning_content?: string;
+			reasoning_text?: string;
 		} = choices?.[0]?.delta ?? {};
 		const content: string = delta.content ?? "";
 		const reasoning: string =
@@ -60,7 +66,9 @@ export async function* openAIChatToTextGenerationStream(
 				? (delta.reasoning as string)
 				: typeof delta?.reasoning_content === "string"
 					? (delta.reasoning_content as string)
-					: "";
+					: typeof delta?.reasoning_text === "string"
+						? (delta.reasoning_text as string)
+						: "";
 		const last = choices?.[0]?.finish_reason === "stop" || choices?.[0]?.finish_reason === "length";
 
 		// if the last token is a stop and the tool buffer is not empty, yield it as a generated_text
@@ -98,12 +106,19 @@ export async function* openAIChatToTextGenerationStream(
 		}
 
 		let combined = "";
-		if (reasoning && reasoning.length > 0) {
-			if (!thinkOpen) {
-				combined += "<think>" + reasoning;
+		// Whitespace-only deltas still count once a block is open (paragraph
+		// breaks are part of the trace); non-blank text is only required to OPEN
+		// one, so stray leading whitespace can't produce an empty think block —
+		// but it must not be discarded either, hence the buffer.
+		if (reasoning.length > 0) {
+			if (thinkOpen) {
+				combined += reasoning;
+			} else if (reasoning.trim().length > 0) {
+				combined += "<think>" + pendingReasoningWhitespace + reasoning;
+				pendingReasoningWhitespace = "";
 				thinkOpen = true;
 			} else {
-				combined += reasoning;
+				pendingReasoningWhitespace += reasoning;
 			}
 		}
 
@@ -174,6 +189,7 @@ export async function* openAIChatToTextGenerationSingle(
 	const message: NonNullable<OpenAI.Chat.Completions.ChatCompletion.Choice>["message"] & {
 		reasoning?: string;
 		reasoning_content?: string;
+		reasoning_text?: string;
 	} = completion.choices?.[0]?.message ?? {};
 	let content: string = message?.content || "";
 	// Provider-dependent reasoning shapes (non-streaming)
@@ -182,8 +198,14 @@ export async function* openAIChatToTextGenerationSingle(
 			? (message.reasoning as string)
 			: typeof message?.reasoning_content === "string"
 				? (message.reasoning_content as string)
-				: "";
-	if (r && r.length > 0) {
+				: typeof message?.reasoning_text === "string"
+					? (message.reasoning_text as string)
+					: "";
+	// Trim only to TEST for emptiness — whitespace-only reasoning is not a trace
+	// and must not become an empty <think> block, but anything real is echoed
+	// byte-exact, since vendors documenting preserved thinking can require the
+	// payload back unmodified.
+	if (r.trim().length > 0) {
 		content = `<think>${r}</think>` + content;
 	}
 	const tokenId = 0;

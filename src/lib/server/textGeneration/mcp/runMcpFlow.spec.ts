@@ -350,3 +350,68 @@ describe("runMcpFlow termination", () => {
 		await expect(runFlow()).rejects.toThrow("upstream died mid-run");
 	});
 });
+
+describe("runMcpFlow in-loop reasoning echo", () => {
+	/** The assistant turn carrying this round's tool_calls, as sent upstream. */
+	function toolCallMessage(n: number) {
+		return requestMessages(n).find(
+			(m) => m.role === "assistant" && "tool_calls" in m && m.tool_calls
+		) as (ChatCompletionMessageParam & { reasoning_content?: string }) | undefined;
+	}
+
+	const withReasoning = () => {
+		scriptRounds([
+			{
+				reasoning: "I need the tool.",
+				toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }],
+			},
+			{ content: "done" },
+		]);
+	};
+
+	it("echoes the round's reasoning back by default", async () => {
+		withReasoning();
+
+		await runFlow();
+
+		expect(toolCallMessage(1)?.reasoning_content).toBe("I need the tool.");
+	});
+
+	it("omits reasoning_content for a blocklisted model", async () => {
+		// Not cosmetic: this family's provider rejects the field outright rather
+		// than ignoring it —
+		//   400 messages.2.assistant.reasoning_content: property ... is unsupported
+		// — which would end the conversation mid-tool-loop. Emitting a trace and
+		// accepting one back are different capabilities, and only the blocklist
+		// knows the difference.
+		withReasoning();
+
+		await runFlow({
+			model: { ...context().model, id: "google/gemma-4-31B-it", preservesReasoning: false },
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		const message = toolCallMessage(1);
+		expect(message).toBeDefined();
+		expect(message && "reasoning_content" in message).toBe(false);
+	});
+
+	it("honours a user override that turns reasoning on for a blocklisted model", async () => {
+		withReasoning();
+
+		await runFlow({
+			reasoningOverride: true,
+			model: { ...context().model, preservesReasoning: false },
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(toolCallMessage(1)?.reasoning_content).toBe("I need the tool.");
+	});
+
+	it("honours a user override that turns reasoning off", async () => {
+		withReasoning();
+
+		await runFlow({ reasoningOverride: false } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		const message = toolCallMessage(1);
+		expect(message && "reasoning_content" in message).toBe(false);
+	});
+});

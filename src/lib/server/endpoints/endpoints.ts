@@ -25,6 +25,8 @@ export interface EndpointParameters {
 	provider?: string;
 	/** Optional thinking-effort, forwarded as OpenAI `reasoning_effort` when set */
 	reasoningEffort?: "low" | "medium" | "high";
+	/** Per-model user override for reasoning; wins over the model's supportsReasoning flag in both directions */
+	reasoningOverride?: boolean;
 }
 
 export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & {

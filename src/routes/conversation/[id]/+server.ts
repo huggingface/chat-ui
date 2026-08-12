@@ -29,6 +29,7 @@ import { createGenerationWriter, type GenerationWriter } from "$lib/server/gener
 import { clampStoppedContent } from "$lib/server/stopTruncation";
 import { MetricsServer } from "$lib/server/metrics";
 import { randomUUID } from "$lib/utils/randomUuid";
+import { applyConversationSettings } from "$lib/server/conversationSettings";
 
 // How long a stop marker is protected from the pre-flight cleanup of a new
 // generation. A marker younger than this may still be awaiting observation by
@@ -703,6 +704,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						(userSettings?.reasoningOverrides?.[model.id] ?? model.supportsReasoning)
 							? userSettings?.reasoningEffortOverrides?.[model.id]
 							: undefined,
+					reasoningOverride: userSettings?.reasoningOverrides?.[model.id],
 					// Artifacts aren't provider-determined, so the per-model user
 					// override applies on HuggingChat too
 					artifactsOverride: userSettings?.artifactsOverrides?.[model.id],
@@ -857,22 +859,7 @@ export async function PATCH({ request, locals, params }) {
 		error(404, "Conversation not found");
 	}
 
-	// Only include defined values in the update, with title sanitized
-	const updateValues = {
-		...(values.title !== undefined && {
-			title: values.title.replace(/<\/?think>/gi, "").trim(),
-		}),
-		...(values.model !== undefined && { model: values.model }),
-	};
-
-	await collections.conversations.updateOne(
-		{
-			_id: convId,
-		},
-		{
-			$set: updateValues,
-		}
-	);
+	await applyConversationSettings({ _id: convId }, values);
 
 	return new Response();
 }
