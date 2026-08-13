@@ -510,58 +510,89 @@
 			isDeployableKind(version.type)
 	);
 
-	// Fullscreen keyboard handling listens in the capture phase, at the same
-	// priority the old portaled Modal had. In the bubble phase Escape would
-	// race handlers like the conversation page's Esc-stops-generation (which
-	// preventDefaults while streaming) and lose, leaving the overlay stuck
-	// open. Registered only while fullscreen is up; the external-link confirm
-	// opened from a preview registers its own capture listener later (it
-	// mounts later), so deferring to it here keeps Esc dismissing just the
-	// confirm — and while the confirm is up, its Modal owns the keyboard.
-	//
-	// Tab is clamped to the overlay: the dialog renders in place rather than
-	// in a portal (the iframe must not remount), so without this, focus would
-	// tab through the obscured panel chrome behind it.
+	// Fullscreen Escape listens in the capture phase, at the same priority the
+	// old portaled Modal had. In the bubble phase it would race handlers like
+	// the conversation page's Esc-stops-generation (which preventDefaults
+	// while streaming) and lose, leaving the overlay stuck open. Registered
+	// only while fullscreen is up; the external-link confirm opened from a
+	// preview registers its own capture listener later (it mounts later), so
+	// deferring to it here keeps Esc dismissing just the confirm.
 	$effect(() => {
 		if (!fullscreenOpen) return;
-		const onKeydown = (e: KeyboardEvent) => {
-			if (e.defaultPrevented || externalLinkUrl) return;
-			if (e.key === "Escape") {
-				e.preventDefault();
-				fullscreenOpen = false;
-				return;
-			}
-			if (e.key !== "Tab" || !fullscreenEl) return;
-			const focusables = Array.from(
-				fullscreenEl.querySelectorAll<HTMLElement>("button:not([disabled]), iframe")
-			);
-			if (focusables.length === 0) return;
-			const first = focusables[0];
-			const last = focusables[focusables.length - 1];
-			const active = document.activeElement;
-			// From the container itself (its initial focus target) or from
-			// outside the overlay, route into the cycle explicitly
-			if (!(active instanceof HTMLElement) || !fullscreenEl.contains(active)) {
-				e.preventDefault();
-				first.focus();
-				return;
-			}
-			if (active === fullscreenEl) {
-				e.preventDefault();
-				(e.shiftKey ? last : first).focus();
-				return;
-			}
-			if (e.shiftKey && active === first) {
-				e.preventDefault();
-				last.focus();
-			} else if (!e.shiftKey && active === last) {
-				e.preventDefault();
-				first.focus();
-			}
+		const closeOnEscape = (e: KeyboardEvent) => {
+			if (e.key !== "Escape" || e.defaultPrevented) return;
+			if (externalLinkUrl) return; // the confirm's own listener handles it
+			e.preventDefault();
+			fullscreenOpen = false;
 		};
-		window.addEventListener("keydown", onKeydown, { capture: true });
-		return () => window.removeEventListener("keydown", onKeydown, { capture: true });
+		window.addEventListener("keydown", closeOnEscape, { capture: true });
+		return () => window.removeEventListener("keydown", closeOnEscape, { capture: true });
 	});
+
+	// While fullscreen is up, everything behind the overlay is made inert —
+	// each ancestor's siblings, walking up to the #app root — so the browser's
+	// own sequential focus navigation is confined to the overlay. A keydown
+	// Tab trap on this window could not do that: keydown inside the sandboxed
+	// iframe stays in that browsing context, so Shift+Tab from the iframe's
+	// first focusable would back out into the obscured panel chrome. The walk
+	// stops below #app, leaving body-level portals (the external-link confirm)
+	// interactive above the overlay; elements already inert are skipped so
+	// cleanup restores exactly what this effect changed.
+	$effect(() => {
+		if (!fullscreenOpen) return;
+		const boundary = document.getElementById("app") ?? document.body;
+		const madeInert: HTMLElement[] = [];
+		for (
+			let node: HTMLElement | null = fullscreenEl ?? null;
+			node && node !== boundary && node.parentElement;
+			node = node.parentElement
+		) {
+			for (const sibling of node.parentElement.children) {
+				if (sibling !== node && sibling instanceof HTMLElement && !sibling.inert) {
+					sibling.inert = true;
+					madeInert.push(sibling);
+				}
+			}
+		}
+		return () => {
+			for (const el of madeInert) el.inert = false;
+		};
+	});
+
+	// Wrap-around at the overlay's edges is done with focus sentinels rather
+	// than key handling: traversal that leaves the iframe's interior dispatches
+	// no keydown and no focusout in this browsing context (verified in
+	// Chromium — focus silently lands on <body>), so events can't be trusted
+	// here. Native sequential navigation does land on a tabbable sentinel,
+	// though, whose focus handler runs synchronously and completes the wrap.
+	function focusOverlayControl(which: "first" | "last") {
+		const controls = fullscreenEl?.querySelectorAll<HTMLElement>("button:not([disabled]), iframe");
+		if (!controls?.length) return;
+		controls[which === "first" ? 0 : controls.length - 1].focus();
+	}
+	// The wrap direction can't come from the sentinel event's relatedTarget —
+	// it's unreliable for cross-frame transitions — so the wrapper's focusin
+	// records which overlay element held parent-side focus last: the iframe
+	// means a sentinel arrival backed out of its interior.
+	let lastOverlayFocusWasIframe = false;
+	function onOverlayFocusIn(e: FocusEvent) {
+		if (!(e.target instanceof HTMLElement) || e.target.dataset.focusSentinel !== undefined) {
+			return;
+		}
+		lastOverlayFocusWasIframe = e.target instanceof HTMLIFrameElement;
+	}
+	// Start sentinel (sits before the iframe): reached backward out of the
+	// iframe's interior (wrap to the last control), or forward from the
+	// overlay container itself, its initial focus target (continue to the
+	// first).
+	function onStartSentinelFocus() {
+		focusOverlayControl(lastOverlayFocusWasIframe ? "last" : "first");
+	}
+	// End sentinel (sits after the chrome buttons): only reachable forward
+	// from the last control — wrap to the first.
+	function onEndSentinelFocus() {
+		focusOverlayControl("first");
+	}
 
 	// The overlay is a dialog rendered in place, so it manages focus itself:
 	// move focus onto it when it opens and hand it back (usually to the
@@ -812,10 +843,20 @@
 				aria-modal={fullscreenOpen ? true : undefined}
 				aria-label={fullscreenOpen ? "Fullscreen artifact preview" : undefined}
 				tabindex="-1"
+				onfocusin={onOverlayFocusIn}
 				class="bg-white outline-hidden dark:bg-gray-900 {fullscreenOpen
 					? 'fixed inset-0 z-30'
 					: 'absolute inset-0'}"
 			>
+				{#if fullscreenOpen}
+					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+					<div
+						class="sr-only"
+						tabindex="0"
+						data-focus-sentinel
+						onfocus={onStartSentinelFocus}
+					></div>
+				{/if}
 				<!-- Backing matches the panel theme so opening the preview doesn't flash
 				     white in dark mode while the document paints its own background;
 				     keyed so the refresh action can remount it for a fresh document -->
@@ -867,6 +908,8 @@
 							<span>Error caught ({errors.length}) — ask to fix</span>
 						</button>
 					{/if}
+					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+					<div class="sr-only" tabindex="0" data-focus-sentinel onfocus={onEndSentinelFocus}></div>
 				{/if}
 			</div>
 		{/if}
