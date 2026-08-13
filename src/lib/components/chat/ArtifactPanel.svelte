@@ -503,18 +503,30 @@
 			isDeployableKind(version.type)
 	);
 
-	function handleKeydown(e: KeyboardEvent) {
-		// An Escape already consumed by a modal (external-link confirm, deploy,
-		// annotation — their capture-phase listeners run first) must not also
-		// close the fullscreen preview or the panel
-		if (e.defaultPrevented) return;
-		if (e.key !== "Escape") return;
-		if (fullscreenOpen) {
+	// Fullscreen Escape listens in the capture phase, at the same priority the
+	// old portaled Modal had. In the bubble phase it would race handlers like
+	// the conversation page's Esc-stops-generation (which preventDefaults while
+	// streaming) and lose, leaving the overlay stuck open. Registered only
+	// while fullscreen is up; the external-link confirm opened from a preview
+	// registers its own capture listener later (it mounts later), so deferring
+	// to it here keeps Esc dismissing just the confirm.
+	$effect(() => {
+		if (!fullscreenOpen) return;
+		const closeOnEscape = (e: KeyboardEvent) => {
+			if (e.key !== "Escape" || e.defaultPrevented) return;
+			if (externalLinkUrl) return; // the confirm's own listener handles it
 			e.preventDefault();
 			fullscreenOpen = false;
-			return;
-		}
-		if (artifactPanel.open && !loading) {
+		};
+		window.addEventListener("keydown", closeOnEscape, { capture: true });
+		return () => window.removeEventListener("keydown", closeOnEscape, { capture: true });
+	});
+
+	function handleKeydown(e: KeyboardEvent) {
+		// An Escape already consumed elsewhere (modals and the fullscreen
+		// overlay all listen in the capture phase) must not also close the panel
+		if (e.defaultPrevented) return;
+		if (e.key === "Escape" && artifactPanel.open && !fullscreenOpen && !loading) {
 			e.preventDefault();
 			artifactPanel.close();
 		}
