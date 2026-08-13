@@ -445,10 +445,13 @@
 		previewReloadNonce += 1;
 	}
 	// A new version streaming in (or the artifact disappearing) unmounts the
-	// preview; leave fullscreen with it rather than popping back up whenever a
-	// preview exists again.
+	// preview, and the whole panel can close from under the overlay too (on
+	// mobile, confirming a screenshot annotation closes it). Leave fullscreen
+	// with them: a stuck-true fullscreenOpen would keep the global Escape
+	// listener swallowing keys and resurrect the overlay the next time the
+	// panel opens.
 	$effect(() => {
-		if (fullscreenOpen && !srcdoc) fullscreenOpen = false;
+		if (fullscreenOpen && (!srcdoc || !artifactPanel.open)) fullscreenOpen = false;
 	});
 	// The preview is on screen for the preview tab, or for fullscreen opened
 	// from the code tab (where it mounts fresh).
