@@ -29,16 +29,17 @@
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import ExternalLinkModal from "../ExternalLinkModal.svelte";
-	import HtmlPreviewModal from "../HtmlPreviewModal.svelte";
 	import DeployToSpaceModal from "./DeployToSpaceModal.svelte";
 	import ScreenshotAnnotationModal from "./ScreenshotAnnotationModal.svelte";
 
+	import CarbonClose from "~icons/carbon/close";
 	import CarbonCloseLarge from "~icons/carbon/close-large";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonCamera from "~icons/carbon/camera";
 	import CarbonDownload from "~icons/carbon/download";
 	import CarbonRocket from "~icons/carbon/rocket";
+	import CarbonRenew from "~icons/carbon/renew";
 	import CarbonMaximize from "~icons/carbon/maximize";
 	import LucideWrapText from "~icons/lucide/wrap-text";
 	import LucideDiff from "~icons/lucide/diff";
@@ -417,10 +418,31 @@
 	}
 
 	// ----- actions -----
+	// Fullscreen promotes the panel's own iframe to a viewport-filling overlay
+	// with CSS alone. It must stay the same element: remounting (or reparenting,
+	// which is why a portaled modal can't be used here) reloads the document and
+	// throws away the artifact's runtime state — scroll, form input, game
+	// progress — which should survive entering and leaving fullscreen.
 	let fullscreenOpen = $state(false);
-	let fullscreenSupported = $derived(
+	// Gates refresh + fullscreen, which both act on the live iframe preview
+	let livePreviewSupported = $derived(
 		!!version && version.complete && version.type !== "markdown" && version.type !== "code"
 	);
+	// Bumped to remount the iframe, restarting the preview with a fresh document
+	let previewReloadNonce = $state(0);
+	function refreshPreview() {
+		// The document restarts, so captured errors describe a run that no longer
+		// exists; previewLoaded gates capture until the new document commits
+		errors = [];
+		previewLoaded = false;
+		previewReloadNonce += 1;
+	}
+	// A new version streaming in (or the artifact disappearing) unmounts the
+	// preview; leave fullscreen with it rather than popping back up whenever a
+	// preview exists again.
+	$effect(() => {
+		if (fullscreenOpen && !srcdoc) fullscreenOpen = false;
+	});
 
 	function download() {
 		if (!version) return;
@@ -482,10 +504,17 @@
 	);
 
 	function handleKeydown(e: KeyboardEvent) {
-		// An Escape already consumed by a modal (external-link confirm, fullscreen
-		// preview) must not also close the panel
+		// An Escape already consumed by a modal (external-link confirm, deploy,
+		// annotation — their capture-phase listeners run first) must not also
+		// close the fullscreen preview or the panel
 		if (e.defaultPrevented) return;
-		if (e.key === "Escape" && artifactPanel.open && !fullscreenOpen && !loading) {
+		if (e.key !== "Escape") return;
+		if (fullscreenOpen) {
+			e.preventDefault();
+			fullscreenOpen = false;
+			return;
+		}
+		if (artifactPanel.open && !loading) {
 			e.preventDefault();
 			artifactPanel.close();
 		}
@@ -572,12 +601,12 @@
 				{#if canDeploy}
 					<button
 						type="button"
-						class="btn gap-1 rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 @min-[580px]:pr-2 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+						class="btn gap-1 rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 @min-[610px]:pr-2 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 						title={currentDeployment ? "Update Space" : "Deploy to Space"}
 						onclick={() => (deployModalOpen = true)}
 					>
 						<CarbonRocket />
-						<span class="hidden font-medium @min-[580px]:inline">
+						<span class="hidden font-medium @min-[610px]:inline">
 							{currentDeployment ? "Update" : "Deploy"}
 						</span>
 					</button>
@@ -595,7 +624,19 @@
 				>
 					<CarbonDownload />
 				</button>
-				{#if fullscreenSupported}
+				{#if livePreviewSupported}
+					<!-- Disabled (not hidden) on the code tab, where no live preview is
+					     mounted to reload — hiding it would shift the icon row on every
+					     tab switch -->
+					<button
+						type="button"
+						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+						title="Refresh preview"
+						disabled={effectiveTab !== "preview"}
+						onclick={refreshPreview}
+					>
+						<CarbonRenew />
+					</button>
 					<button
 						type="button"
 						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
@@ -635,20 +676,6 @@
 						<MarkdownRenderer content={version.content} />
 					</div>
 				</div>
-			{:else if srcdoc}
-				<!-- Backing matches the panel theme so opening the preview doesn't flash
-				     white in dark mode while the document paints its own background -->
-				<iframe
-					bind:this={iframeEl}
-					title="Artifact preview"
-					class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
-					sandbox={PREVIEW_SANDBOX}
-					allow={PREVIEW_ALLOW}
-					allowfullscreen
-					referrerpolicy="no-referrer"
-					onload={() => (previewLoaded = true)}
-					{srcdoc}
-				></iframe>
 			{/if}
 		{:else}
 			<!-- Same .prose pre styling as chat code blocks so the syntax theme matches
@@ -702,6 +729,74 @@
 					class="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t from-white/90 to-transparent dark:from-gray-900/90"
 				></div>
 			{/if}
+		{/if}
+
+		<!-- Live iframe preview. Rendered whenever it should be on screen — the
+		     preview tab, or fullscreen opened from the code tab — and promoted to
+		     a viewport-filling overlay by a class swap alone when fullscreen: the
+		     iframe node survives the toggle, so the document keeps its runtime
+		     state (a separate modal would rebuild it from scratch). z-30 clears
+		     the panel's own chrome (resize handle z-20) on desktop and sits at
+		     the mobile overlay's own layer; portaled modals (z-40 at the root
+		     stacking context) still stack above it. -->
+		{#if srcdoc && (effectiveTab === "preview" || fullscreenOpen)}
+			<div
+				class="bg-white dark:bg-gray-900 {fullscreenOpen
+					? 'fixed inset-0 z-30'
+					: 'absolute inset-0'}"
+			>
+				<!-- Backing matches the panel theme so opening the preview doesn't flash
+				     white in dark mode while the document paints its own background;
+				     keyed so the refresh action can remount it for a fresh document -->
+				{#key previewReloadNonce}
+					<iframe
+						bind:this={iframeEl}
+						title="Artifact preview"
+						class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
+						sandbox={PREVIEW_SANDBOX}
+						allow={PREVIEW_ALLOW}
+						allowfullscreen
+						referrerpolicy="no-referrer"
+						onload={() => (previewLoaded = true)}
+						{srcdoc}
+					></iframe>
+				{/key}
+				{#if fullscreenOpen}
+					<div class="absolute top-4 right-6 flex items-center gap-1.5">
+						<button
+							type="button"
+							class="btn flex h-7 items-center rounded-lg border border-gray-500/60 bg-gray-800 px-2 text-xs text-white shadow-xs backdrop-blur-sm transition-none hover:border-gray-500 hover:bg-gray-700 active:shadow-inner"
+							title="Refresh preview"
+							onclick={refreshPreview}
+						>
+							<CarbonRenew class="size-3.5" />
+						</button>
+						<button
+							type="button"
+							class="btn flex h-7 items-center gap-1 rounded-lg border border-gray-500/60 bg-gray-800 px-2 text-xs text-white shadow-xs backdrop-blur-sm transition-none hover:border-gray-500 hover:bg-gray-700 active:shadow-inner"
+							title="Close preview (Esc)"
+							onclick={() => (fullscreenOpen = false)}
+						>
+							<CarbonClose class="size-3.5" />
+							Close preview
+						</button>
+					</div>
+					{#if errors.length > 0 && onsend && !loading}
+						<button
+							type="button"
+							class="absolute right-4 bottom-4 btn flex items-center gap-2 rounded-full border-2 border-red-500/60 bg-red-800/90 px-4 py-1.5 text-sm text-white shadow-lg"
+							title="Send the errors and ask for a fix"
+							onclick={() => {
+								// Leave fullscreen only once the message is actually on its
+								// way, so the errors backing the request stay up otherwise
+								if (sendFixRequest(composeFixRequest(errors))) fullscreenOpen = false;
+							}}
+						>
+							<span>Error caught ({errors.length}) — ask to fix</span>
+						</button>
+					{/if}
+				{/if}
+			</div>
 		{/if}
 	</div>
 
@@ -828,17 +923,6 @@
 			{@render panelContent()}
 		</div>
 	{/if}
-{/if}
-
-{#if fullscreenOpen && version}
-	<!-- The modal can't render a disabled state for its floating error button,
-	     so streaming gates the handler entirely -->
-	<HtmlPreviewModal
-		html={version.content}
-		kind={version.type}
-		onclose={() => (fullscreenOpen = false)}
-		onsend={onsend && !loading ? sendFixRequest : undefined}
-	/>
 {/if}
 
 {#if externalLinkUrl}
