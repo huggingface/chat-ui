@@ -424,6 +424,7 @@
 	// throws away the artifact's runtime state — scroll, form input, game
 	// progress — which should survive entering and leaving fullscreen.
 	let fullscreenOpen = $state(false);
+	let fullscreenEl: HTMLElement | undefined = $state();
 	// Gates refresh + fullscreen, which both act on the live iframe preview
 	let livePreviewSupported = $derived(
 		!!version && version.complete && version.type !== "markdown" && version.type !== "code"
@@ -431,6 +432,12 @@
 	// Bumped to remount the iframe, restarting the preview with a fresh document
 	let previewReloadNonce = $state(0);
 	function refreshPreview() {
+		// Remounting mid-capture would leave the in-flight capture holding a
+		// detached iframe: best case a shot of the pre-refresh document (the
+		// srcdoc guard can't tell, only the nonce changed), worst case the 15s
+		// timeout. The refresh buttons are disabled while capturing; this covers
+		// any non-pointer path.
+		if (capturing) return;
 		// The document restarts, so captured errors describe a run that no longer
 		// exists; previewLoaded gates capture until the new document commits
 		errors = [];
@@ -503,23 +510,69 @@
 			isDeployableKind(version.type)
 	);
 
-	// Fullscreen Escape listens in the capture phase, at the same priority the
-	// old portaled Modal had. In the bubble phase it would race handlers like
-	// the conversation page's Esc-stops-generation (which preventDefaults while
-	// streaming) and lose, leaving the overlay stuck open. Registered only
-	// while fullscreen is up; the external-link confirm opened from a preview
-	// registers its own capture listener later (it mounts later), so deferring
-	// to it here keeps Esc dismissing just the confirm.
+	// Fullscreen keyboard handling listens in the capture phase, at the same
+	// priority the old portaled Modal had. In the bubble phase Escape would
+	// race handlers like the conversation page's Esc-stops-generation (which
+	// preventDefaults while streaming) and lose, leaving the overlay stuck
+	// open. Registered only while fullscreen is up; the external-link confirm
+	// opened from a preview registers its own capture listener later (it
+	// mounts later), so deferring to it here keeps Esc dismissing just the
+	// confirm — and while the confirm is up, its Modal owns the keyboard.
+	//
+	// Tab is clamped to the overlay: the dialog renders in place rather than
+	// in a portal (the iframe must not remount), so without this, focus would
+	// tab through the obscured panel chrome behind it.
 	$effect(() => {
 		if (!fullscreenOpen) return;
-		const closeOnEscape = (e: KeyboardEvent) => {
-			if (e.key !== "Escape" || e.defaultPrevented) return;
-			if (externalLinkUrl) return; // the confirm's own listener handles it
-			e.preventDefault();
-			fullscreenOpen = false;
+		const onKeydown = (e: KeyboardEvent) => {
+			if (e.defaultPrevented || externalLinkUrl) return;
+			if (e.key === "Escape") {
+				e.preventDefault();
+				fullscreenOpen = false;
+				return;
+			}
+			if (e.key !== "Tab" || !fullscreenEl) return;
+			const focusables = Array.from(
+				fullscreenEl.querySelectorAll<HTMLElement>("button:not([disabled]), iframe")
+			);
+			if (focusables.length === 0) return;
+			const first = focusables[0];
+			const last = focusables[focusables.length - 1];
+			const active = document.activeElement;
+			// From the container itself (its initial focus target) or from
+			// outside the overlay, route into the cycle explicitly
+			if (!(active instanceof HTMLElement) || !fullscreenEl.contains(active)) {
+				e.preventDefault();
+				first.focus();
+				return;
+			}
+			if (active === fullscreenEl) {
+				e.preventDefault();
+				(e.shiftKey ? last : first).focus();
+				return;
+			}
+			if (e.shiftKey && active === first) {
+				e.preventDefault();
+				last.focus();
+			} else if (!e.shiftKey && active === last) {
+				e.preventDefault();
+				first.focus();
+			}
 		};
-		window.addEventListener("keydown", closeOnEscape, { capture: true });
-		return () => window.removeEventListener("keydown", closeOnEscape, { capture: true });
+		window.addEventListener("keydown", onKeydown, { capture: true });
+		return () => window.removeEventListener("keydown", onKeydown, { capture: true });
+	});
+
+	// The overlay is a dialog rendered in place, so it manages focus itself:
+	// move focus onto it when it opens and hand it back (usually to the
+	// maximize button) when it closes.
+	$effect(() => {
+		if (!fullscreenOpen) return;
+		const previous = document.activeElement;
+		fullscreenEl?.focus();
+		return () => {
+			if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+		};
 	});
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -639,12 +692,13 @@
 				{#if livePreviewSupported}
 					<!-- Disabled (not hidden) on the code tab, where no live preview is
 					     mounted to reload — hiding it would shift the icon row on every
-					     tab switch -->
+					     tab switch. Also disabled mid-capture: remounting would pull the
+					     document out from under the in-flight screenshot. -->
 					<button
 						type="button"
 						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 						title="Refresh preview"
-						disabled={effectiveTab !== "preview"}
+						disabled={effectiveTab !== "preview" || capturing}
 						onclick={refreshPreview}
 					>
 						<CarbonRenew />
@@ -753,7 +807,12 @@
 		     stacking context) still stack above it. -->
 		{#if srcdoc && (effectiveTab === "preview" || fullscreenOpen)}
 			<div
-				class="bg-white dark:bg-gray-900 {fullscreenOpen
+				bind:this={fullscreenEl}
+				role={fullscreenOpen ? "dialog" : undefined}
+				aria-modal={fullscreenOpen ? true : undefined}
+				aria-label={fullscreenOpen ? "Fullscreen artifact preview" : undefined}
+				tabindex="-1"
+				class="bg-white outline-hidden dark:bg-gray-900 {fullscreenOpen
 					? 'fixed inset-0 z-30'
 					: 'absolute inset-0'}"
 			>
@@ -777,8 +836,9 @@
 					<div class="absolute top-4 right-6 flex items-center gap-1.5">
 						<button
 							type="button"
-							class="btn flex h-7 items-center rounded-lg border border-gray-500/60 bg-gray-800 px-2 text-xs text-white shadow-xs backdrop-blur-sm transition-none hover:border-gray-500 hover:bg-gray-700 active:shadow-inner"
+							class="btn flex h-7 items-center rounded-lg border border-gray-500/60 bg-gray-800 px-2 text-xs text-white shadow-xs backdrop-blur-sm transition-none hover:border-gray-500 hover:bg-gray-700 active:shadow-inner disabled:cursor-not-allowed disabled:opacity-50"
 							title="Refresh preview"
+							disabled={capturing}
 							onclick={refreshPreview}
 						>
 							<CarbonRenew class="size-3.5" />
