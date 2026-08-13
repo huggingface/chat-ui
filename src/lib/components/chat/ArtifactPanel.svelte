@@ -450,6 +450,22 @@
 	$effect(() => {
 		if (fullscreenOpen && !srcdoc) fullscreenOpen = false;
 	});
+	// The preview is on screen for the preview tab, or for fullscreen opened
+	// from the code tab (where it mounts fresh).
+	let previewShown = $derived(!!srcdoc && (effectiveTab === "preview" || fullscreenOpen));
+	// Every (re)mount of the preview starts a fresh document, but only srcdoc
+	// changes run the reset effects above — so a remount with the same srcdoc
+	// (switching away to the code tab and back, or opening fullscreen from the
+	// code tab) would keep the previous run's captured errors against a
+	// document that hasn't produced them, and a stale previewLoaded from the
+	// old document. Reset both when the preview comes back on screen. Toggling
+	// fullscreen from the preview tab doesn't re-run this (previewShown stays
+	// true), which is what keeps captured errors carrying into fullscreen.
+	$effect(() => {
+		if (!previewShown) return;
+		errors = [];
+		previewLoaded = false;
+	});
 
 	function download() {
 		if (!version) return;
@@ -836,7 +852,7 @@
 		     the panel's own chrome (resize handle z-20) on desktop and sits at
 		     the mobile overlay's own layer; portaled modals (z-40 at the root
 		     stacking context) still stack above it. -->
-		{#if srcdoc && (effectiveTab === "preview" || fullscreenOpen)}
+		{#if previewShown}
 			<div
 				bind:this={fullscreenEl}
 				role={fullscreenOpen ? "dialog" : undefined}
