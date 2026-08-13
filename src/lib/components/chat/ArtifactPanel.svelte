@@ -1005,15 +1005,28 @@
 {/snippet}
 
 {#if artifactPanel.open && artifact}
-	{#if isDesktop}
-		<aside
-			bind:this={asideEl}
-			class="pointer-events-auto relative z-10 flex h-full flex-none flex-col overflow-hidden border-l border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
-			style="width: {artifactPanel.widthPx !== null
-				? `${artifactPanel.widthPx}px`
-				: ARTIFACT_PANEL_DEFAULT_FRACTION}; min-width: max(20%, 300px); max-width: 80%;"
-			aria-label="Artifact panel"
-		>
+	<!-- One persistent container reshaped by breakpoint classes, NOT two
+	     alternate branches: a branch swap would remount panelContent — and the
+	     live preview iframe with it — so crossing the 768px breakpoint (e.g.
+	     rotating a tablet) would reload the artifact and lose its state, in
+	     fullscreen included. Desktop: resizable side panel. Mobile: viewport
+	     overlay with dialog semantics. -->
+	<aside
+		bind:this={asideEl}
+		role={isDesktop ? undefined : "dialog"}
+		class="pointer-events-auto flex flex-col bg-white dark:bg-gray-900 {isDesktop
+			? 'relative z-10 h-full flex-none overflow-hidden border-l border-gray-100 dark:border-gray-800'
+			: 'fixed inset-0 z-30'}"
+		style={isDesktop
+			? `width: ${
+					artifactPanel.widthPx !== null
+						? `${artifactPanel.widthPx}px`
+						: ARTIFACT_PANEL_DEFAULT_FRACTION
+				}; min-width: max(20%, 300px); max-width: 80%;`
+			: ""}
+		aria-label="Artifact panel"
+	>
+		{#if isDesktop}
 			<!-- resize handle (drag to resize, double-click to reset) -->
 			<div
 				role="separator"
@@ -1027,17 +1040,9 @@
 				onpointercancel={onResizeEnd}
 				ondblclick={() => artifactPanel.resetWidth()}
 			></div>
-			{@render panelContent()}
-		</aside>
-	{:else}
-		<div
-			class="pointer-events-auto fixed inset-0 z-30 flex flex-col bg-white dark:bg-gray-900"
-			role="dialog"
-			aria-label="Artifact panel"
-		>
-			{@render panelContent()}
-		</div>
-	{/if}
+		{/if}
+		{@render panelContent()}
+	</aside>
 {/if}
 
 {#if externalLinkUrl}
