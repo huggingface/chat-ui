@@ -82,6 +82,12 @@ envVars:
   MODELS: >
     [
       { "id": "omni", "supportsArtifacts": true },
+      { "id": "deepseek-ai/DeepSeek-V4-Pro-0813", "description": "Updated V4-Pro flagship with stronger agentic coding and adjustable thinking.", "parameters": { "max_tokens": 98304 }, "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "zai-org/GLM-4.7-FP8", "description": "FP8 GLM-4.7 for efficient coding, reasoning, and agentic tool use.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "CohereLabs/command-a-plus-05-2026-bf16", "description": "218B MoE Command A+ with vision, 48 languages, and agentic tool use.", "supportsArtifacts": true },
+      { "id": "CohereLabs/command-a-plus-05-2026-fp8", "description": "FP8 Command A+ for efficient multimodal agentic and multilingual inference.", "supportsArtifacts": true },
+      { "id": "CohereLabs/command-a-plus-05-2026-w4a4", "description": "W4A4 Command A+ for compact multimodal agents on minimal GPUs.", "supportsArtifacts": true },
+      { "id": "CohereLabs/command-a-vision-07-2025", "description": "112B vision-language Command A for enterprise documents, charts, and OCR.", "supportsArtifacts": true },
       { "id": "Qwen/Qwen3.8-2.4T-A95B", "description": "Flagship 2.4T MoE with 95B active params, always-on thinking, and 1M context.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "zai-org/GLM-4.5", "description": "Flagship GLM agent model unifying advanced reasoning, coding, and tool-using capabilities.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "meta-models/Muse-Glimmer-30B", "description": "Vision-language 30B agent for local tool use, coding, and screenshot understanding.", "supportsReasoning": true },
@@ -129,7 +135,6 @@ envVars:
       { "id": "moonshotai/Kimi-K2.6", "description": "Native multimodal 1T MoE for long-horizon coding and 300-sub-agent swarms.", "supportsArtifacts": true },
       { "id": "MiniMaxAI/MiniMax-M2.7", "description": "Self-evolving 230B MoE agent for frontier coding, reasoning, and tool use." , "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "zai-org/GLM-5.1", "description": "Upgraded 754B MoE for agentic coding, extended reasoning, and tool use.", "parameters": { "max_tokens": 98304 } , "supportsReasoning": true, "supportsArtifacts": true },
-      { "id": "zai-org/GLM-5.1-FP8", "description": "FP8 GLM-5.1 for efficient agentic coding and reasoning inference.", "parameters": { "max_tokens": 98304 } , "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "google/gemma-4-31B-it", "description": "Dense multimodal Gemma with 256K context, reasoning, and function calling.", "supportsArtifacts": true},
       { "id": "google/gemma-4-26B-A4B-it", "description": "Efficient multimodal MoE Gemma with 4B active params and 256K context."},
       { "id": "Qwen/Qwen3.5-9B", "description": "Dense multimodal hybrid with 262K context excelling at reasoning on-device."},
