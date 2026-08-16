@@ -111,18 +111,19 @@
 
 	// Global keyboard shortcut: New Chat (Ctrl/Cmd + Shift + O)
 	const onKeydown = (e: KeyboardEvent) => {
-		// Ignore when a modal has focus (app is inert)
-		const appEl = document.getElementById("app");
-		if (appEl?.hasAttribute("inert")) return;
-
 		const oPressed = e.key?.toLowerCase() === "o";
 		const metaOrCtrl = e.metaKey || e.ctrlKey;
-		if (oPressed && e.shiftKey && metaOrCtrl) {
-			e.preventDefault();
-			isAborted.set(true);
-			if (requireAuthUser()) return;
-			goto(`${base}/`, { invalidateAll: true });
-		}
+		if (!oPressed || !e.shiftKey || !metaOrCtrl) return;
+		// Ignore when a modal is open: portaled modals make the app inert
+		// (Modal.svelte), while in-place dialogs (the fullscreen artifact
+		// preview) sit inside #app so they can't use that signal and carry
+		// aria-modal instead
+		if (document.getElementById("app")?.hasAttribute("inert")) return;
+		if (document.querySelector('[aria-modal="true"]')) return;
+		e.preventDefault();
+		isAborted.set(true);
+		if (requireAuthUser()) return;
+		goto(`${base}/`, { invalidateAll: true });
 	};
 
 	onDestroy(() => {
