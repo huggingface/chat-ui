@@ -576,14 +576,25 @@
 	});
 
 	// The overlay is a dialog rendered in place, so it manages focus itself:
-	// move focus onto it when it opens and hand it back (usually to the
-	// maximize button) when it closes.
+	// move focus onto it when it opens and hand it back to the trigger
+	// (usually the maximize button) when it closes. The trigger is captured in
+	// openFullscreen, before any effect runs: the inert effect above blurs the
+	// header the trigger sits in, so by effect time activeElement is already
+	// the body.
+	let fullscreenReturnEl: HTMLElement | null = null;
+	function openFullscreen() {
+		const active = document.activeElement;
+		fullscreenReturnEl = active instanceof HTMLElement ? active : null;
+		fullscreenOpen = true;
+	}
 	$effect(() => {
 		if (!fullscreenOpen) return;
-		const previous = document.activeElement;
 		fullscreenEl?.focus();
 		return () => {
-			if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+			// The inert effect's cleanup has already run (creation order), so the
+			// trigger is focusable again
+			if (fullscreenReturnEl?.isConnected) fullscreenReturnEl.focus();
+			fullscreenReturnEl = null;
 		};
 	});
 
@@ -719,7 +730,7 @@
 						type="button"
 						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 						title="Open fullscreen"
-						onclick={() => (fullscreenOpen = true)}
+						onclick={openFullscreen}
 					>
 						<CarbonMaximize />
 					</button>
