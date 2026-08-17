@@ -2,17 +2,12 @@ import { Client, type ClientCapabilities } from "@modelcontextprotocol/client";
 import { isElicitationEnabled } from "./elicitationConfig";
 
 /**
- * A capability declared without a handler makes servers issue a request the SDK can only
- * answer with method-not-found. Add one only in the change that implements its handler.
- *
- * `elicitation` is declared for session clients only. A health probe has no chat behind
- * it, so a server that asked it for user input would be told to wait on a screen nobody
- * is looking at.
+ * Declare a capability only in the change that implements its handler, or servers issue
+ * requests the SDK can only answer with method-not-found. Health probes get none: there is
+ * no chat behind them to ask. Spell both elicitation modes out — a bare `elicitation: {}`
+ * reads as form-only and the server SDK then refuses to send a URL elicitation at all.
  */
 export function mcpClientCapabilities(kind: McpClientKind): ClientCapabilities {
-	// Both modes spelled out: a bare `elicitation: {}` is read as `{ form: {} }`, and the
-	// server SDK then refuses to send a URL elicitation at all ("Client does not support
-	// url elicitation") — the handler for it would never run.
 	return kind === "session" && isElicitationEnabled() ? { elicitation: { form: {}, url: {} } } : {};
 }
 

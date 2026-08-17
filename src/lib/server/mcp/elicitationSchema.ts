@@ -4,24 +4,13 @@ import type {
 	ElicitationValue,
 } from "$lib/types/McpElicitation";
 
-/**
- * Normalization and validation for `elicitation/create`.
- *
- * Everything crossing this boundary is authored by the MCP server, which is not
- * necessarily the operator's own: field names become object keys, labels become on-screen
- * text, and the whole payload gets persisted and replayed. Nothing here trusts its input.
- *
- * Kept free of database and SDK imports so both directions — request in, answer out — are
- * testable as plain functions.
- */
+/** Nothing here trusts its input: every value is authored by the MCP server. */
 
-// Caps on an untrusted payload. Generous enough that no plausible real form hits them.
 const MAX_FIELDS = 32;
 const MAX_OPTIONS = 100;
 const MAX_MESSAGE_CHARS = 2_000;
 const MAX_TITLE_CHARS = 200;
 const MAX_DESCRIPTION_CHARS = 1_000;
-/** Bounds what a single answer can add to the conversation document. */
 const MAX_ANSWER_CHARS = 10_000;
 
 const asRecord = (value: unknown): Record<string, unknown> | undefined =>
@@ -31,8 +20,7 @@ const asRecord = (value: unknown): Record<string, unknown> | undefined =>
 
 const asText = (value: unknown, max: number): string | undefined => {
 	if (typeof value !== "string") return undefined;
-	// Control characters would let a server smuggle line breaks into a label to fake
-	// chrome around the form; strip rather than reject so a stray tab is not fatal.
+	// Stripped so a label cannot smuggle line breaks in and fake chrome around the form.
 	const cleaned = value.replace(/[\p{Cc}\p{Cf}]/gu, " ").trim();
 	if (!cleaned) return undefined;
 	return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
@@ -43,14 +31,12 @@ const asFiniteNumber = (value: unknown): number | undefined =>
 
 type Option = { value: string; label: string };
 
-/** `enum` + optional `enumNames`, the original and still most common spelling. */
 function optionsFromEnum(def: Record<string, unknown>): Option[] | undefined {
 	if (!Array.isArray(def.enum)) return undefined;
 	const values = def.enum.filter((v): v is string => typeof v === "string");
 	if (values.length !== def.enum.length) return undefined;
 	const names = Array.isArray(def.enumNames) ? def.enumNames : undefined;
-	// Only trust parallel labels when they actually line up; a mismatched array would
-	// otherwise silently label an option with another option's name.
+	// A mismatched array would silently label an option with another option's name.
 	const labelled = names?.length === values.length && names.every((n) => typeof n === "string");
 	return values.map((value, i) => ({
 		value,
@@ -58,7 +44,6 @@ function optionsFromEnum(def: Record<string, unknown>): Option[] | undefined {
 	}));
 }
 
-/** `oneOf`/`anyOf` of `{const, title}`, the current spelling for titled options. */
 function optionsFromConstList(list: unknown): Option[] | undefined {
 	if (!Array.isArray(list)) return undefined;
 	const options: Option[] = [];
@@ -162,12 +147,6 @@ export type NormalizeResult =
 	| { ok: true; payload: Omit<ElicitationRequestPayload, "elicitationId"> }
 	| { ok: false; reason: string };
 
-/**
- * Turn raw `elicitation/create` params into the payload the rest of the app uses, or
- * explain why they cannot be shown. A field that cannot be rendered fails the whole
- * request: dropping it would hand the server an answer that silently omits something it
- * asked for and marked required.
- */
 export function normalizeElicitationRequest(params: unknown): NormalizeResult {
 	const raw = asRecord(params);
 	if (!raw) return { ok: false, reason: "Malformed elicitation params." };
@@ -183,8 +162,7 @@ export function normalizeElicitationRequest(params: unknown): NormalizeResult {
 		} catch {
 			return { ok: false, reason: "URL elicitation has an unparseable url." };
 		}
-		// The user is about to be invited to click this. Anything but http(s) — `javascript:`,
-		// `data:`, a custom app scheme — is not something we hand a one-click affordance to.
+		// The user gets a one-click affordance for this, so no `javascript:`/`data:`/app schemes.
 		if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
 			return { ok: false, reason: `Unsupported URL scheme: ${parsed.protocol}` };
 		}
@@ -245,14 +223,7 @@ function checkFormat(value: string, format: string): boolean {
 export type ValidateResult =
 	{ ok: true; content: Record<string, ElicitationValue> } | { ok: false; error: string };
 
-/**
- * Check a submitted answer against the fields that were asked for.
- *
- * The browser enforces the same rules for usability, but this is the copy that counts —
- * the answer is posted by the client and goes straight to the MCP server, so an
- * unvalidated one would let anyone who can reach the endpoint hand the server whatever
- * shape they liked.
- */
+/** The copy that counts: the browser's checks are for usability, this answer reaches the server. */
 export function validateElicitationContent(
 	fields: ElicitationField[],
 	raw: unknown

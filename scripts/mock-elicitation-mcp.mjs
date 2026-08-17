@@ -1,15 +1,8 @@
 /**
  * MCP server for exercising elicitation by hand.
  *
- * Stateful on purpose. The client answers `elicitation/create` with a *new* HTTP POST, so
- * a stateless server (a fresh instance per request, as in mock-image-mcp.mjs) would hand
- * that answer to an instance that never asked anything and the call would hang.
- *
- * Four tools, one per path worth seeing:
- *   book_meeting      every field kind the spec allows, generous timeout — the happy path
- *   double_check      two prompts in one call        — the deadline must stay paused across both
- *   impatient_confirm 5s timeout on its own request  — the "server stopped waiting" path
- *   sign_in           URL mode                       — the link, not a form
+ * Stateful, unlike mock-image-mcp.mjs: the client answers `elicitation/create` on a new
+ * POST, which a per-request server instance would not recognise.
  *
  * Run:  node scripts/mock-elicitation-mcp.mjs
  * Then add http://127.0.0.1:8792/mcp as an MCP server in the UI.
@@ -23,8 +16,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 
 const PORT = Number(process.env.MOCK_ELICITATION_MCP_PORT ?? 8792);
 
-// Long enough to test walking away. The MCP SDK's default is 60s, which is why an
-// untouched server usually gives up long before chat-ui's own expiry.
+// Long enough to test walking away; the MCP SDK default is 60s.
 const PATIENT_MS = 60 * 60_000;
 
 const report = (tool, result) =>
@@ -148,8 +140,6 @@ function buildServer() {
 				);
 				return { content: [{ type: "text", text: report("impatient_confirm", result) }] };
 			} catch (err) {
-				// The client should now close the prompt on its own rather than leave a form
-				// up that can no longer be answered.
 				console.log("[mock-elicitation-mcp] impatient_confirm gave up:", String(err));
 				return {
 					content: [{ type: "text", text: "Gave up waiting for confirmation." }],

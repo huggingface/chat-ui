@@ -201,8 +201,7 @@ describe("validateElicitationContent", () => {
 	});
 
 	it("rejects a field the server never asked for", () => {
-		// Otherwise anyone posting to the endpoint could inject extra keys into what the
-		// server receives.
+		// Otherwise the endpoint lets anyone inject extra keys into what the server receives.
 		expect(validateElicitationContent(fields, { name: "Ada", admin: true })).toMatchObject({
 			ok: false,
 		});

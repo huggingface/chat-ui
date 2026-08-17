@@ -23,7 +23,7 @@ export interface McpServerConfig {
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 
-/** Time the *server* may go without responding; time spent waiting on a user is excluded. */
+/** Time the server may go without responding; waiting on a user does not count. */
 export function getMcpToolTimeoutMs(): number {
 	const envValue = config.MCP_TOOL_TIMEOUT_MS;
 	if (envValue) {
@@ -55,22 +55,12 @@ export type McpToolProgress = {
 	message?: string;
 };
 
-/**
- * Only a leak guard. The real deadline is `createCallDeadline` below; the SDK's own timer
- * has to be pushed out of the way because it cannot express "not while a user is thinking".
- */
+/** Leak guard only; the deadline below is the real one. */
 const ABSOLUTE_CEILING_MS = 6 * 60 * 60_000;
 
 /**
- * The deadline for one tool call, enforced here instead of by the SDK.
- *
- * `Protocol.request` arms a plain wall-clock timer when the request goes out, and only a
- * server-sent progress notification resets it — MCP has no "still waiting on the user"
- * signal a client can send. Owning the timer is what lets an elicitation stop the clock,
- * so a prompt can sit as long as it needs to without the call expiring underneath it.
- *
- * Aborting (rather than letting the SDK time out) also makes the SDK send
- * `notifications/cancelled`, so a server that is still working learns to stop.
+ * Owned here rather than left to the SDK, whose timer only a server-sent progress
+ * notification can reset — an elicitation needs to stop the clock while a user thinks.
  */
 export function createCallDeadline(timeoutMs: number, outer?: AbortSignal) {
 	const controller = new AbortController();
@@ -100,20 +90,15 @@ export function createCallDeadline(timeoutMs: number, outer?: AbortSignal) {
 
 	return {
 		signal: controller.signal,
-		/** Restore per-attempt semantics: a reconnect re-sends the request from scratch. */
 		restart() {
 			disarm();
 			arm();
 		},
-		/**
-		 * Waiting on a person is not the server being slow. Counted, because one call can
-		 * be asked more than one thing before it finishes.
-		 */
+		/** Counted: one call can be asked more than one thing before it finishes. */
 		pause() {
 			paused++;
 			disarm();
 		},
-		/** Restarts the full budget, exactly as a progress notification would. */
 		resume() {
 			paused = Math.max(0, paused - 1);
 			arm();
@@ -142,10 +127,7 @@ export async function callMcpTool(
 		signal?: AbortSignal;
 		client?: Client;
 		onProgress?: (progress: McpToolProgress) => void;
-		/**
-		 * Where to show a prompt if the server asks the user something mid-call. Omit and
-		 * any `elicitation/create` on this connection is declined.
-		 */
+		/** Omit and any `elicitation/create` on this connection is declined. */
 		elicitation?: { sink: ElicitationSink; toolUuid: string };
 	} = {}
 ): Promise<McpToolTextResponse> {

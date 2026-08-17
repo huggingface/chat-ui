@@ -317,13 +317,11 @@ export class Database {
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for generationEvents by createdAt"));
 
-		// The waiting pod polls by id, and the answering pod writes by id.
 		mcpElicitations
 			.createIndex({ elicitationId: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating index for mcpElicitations by elicitationId"));
-		// Must stay well clear of MCP_ELICITATION_TIMEOUT_MS (an hour by default), or a row
-		// is swept while its form is still on screen and answering it 404s. Expiry is decided
-		// by `expiresAt`, which the answer path checks; this only reclaims space.
+		// Must stay well clear of MCP_ELICITATION_TIMEOUT_MS, or a row is swept while its
+		// form is still on screen and answering it 404s.
 		mcpElicitations
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for mcpElicitations by createdAt"));

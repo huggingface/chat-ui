@@ -13,9 +13,8 @@
 	interface Props {
 		conversationId: string;
 		request: ElicitationRequestPayload;
-		/** Epoch ms; past it the server has stopped waiting and the answer is refused. */
+		/** Epoch ms. */
 		expiresAt: number;
-		/** Present once the run recorded an outcome — including one nobody supplied. */
 		resolved?: MessageElicitationResolvedUpdate;
 	}
 
@@ -33,20 +32,19 @@
 			} else if (field.kind === "select") {
 				out[field.name] = typeof field.default === "string" ? field.default : "";
 			} else {
-				// Numbers live as strings while typing, and are parsed back on submit.
+				// Kept as a string while typing; parsed back on submit.
 				out[field.name] = field.default !== undefined ? String(field.default) : "";
 			}
 		}
 		return out;
 	}
 
-	// Seeded once on purpose: a block's request is fixed for its lifetime, and re-deriving
-	// would throw away whatever the user has typed so far.
+	// Seeded once: re-deriving would discard whatever the user has typed.
 	// svelte-ignore state_referenced_locally
 	let values = $state<Record<string, ElicitationValue>>(initialValues(request.fields ?? []));
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
-	/** Set as soon as our own POST succeeds, so the form settles without waiting for the run's echo. */
+	/** Settles the form without waiting for the run to echo the outcome back. */
 	let submitted = $state<ElicitationAction | null>(null);
 
 	let now = $state(Date.now());
@@ -56,15 +54,11 @@
 
 	$effect(() => {
 		if (!open) return;
-		// Per-second only once the countdown is actually showing seconds; a prompt open for
-		// an hour has no reason to re-render 3600 times.
 		const period = expiresAt - now > 120_000 ? 30_000 : 1_000;
 		const timer = setInterval(() => (now = Date.now()), period);
 		return () => clearInterval(timer);
 	});
 
-	// Coarse while there is plenty of time — a prompt can stay open for an hour, and a raw
-	// second count that high reads as pressure rather than information.
 	let timeLeft = $derived.by(() => {
 		const seconds = Math.max(0, Math.ceil((expiresAt - now) / 1000));
 		if (seconds >= 3_600) return `${Math.floor(seconds / 3_600)}h left`;
@@ -72,8 +66,6 @@
 		return `${seconds}s left`;
 	});
 
-	// Only the host, and only for display: the full URL is shown as text below it so a
-	// long path cannot push the actual destination out of sight.
 	let linkHost = $derived.by(() => {
 		if (!request.url) return "";
 		try {
@@ -126,8 +118,7 @@
 		try {
 			const res = await fetch(`${base}/conversation/${conversationId}/elicitation`, {
 				method: "POST",
-				// Asking for JSON keeps a rejection readable: without it SvelteKit answers
-				// `error()` with an HTML page, which is not something to show in a chat bubble.
+				// Without Accept, SvelteKit answers `error()` with an HTML page.
 				headers: { "Content-Type": "application/json", Accept: "application/json" },
 				body: JSON.stringify({
 					elicitationId: request.elicitationId,
@@ -148,8 +139,7 @@
 		}
 	}
 
-	// Submitting through the form (rather than clicking a plain button) is what makes the
-	// browser run `required`, `min`, `maxlength` and friends before anything is sent.
+	// Submitting through the form is what runs the browser's own field validation.
 	const formId = $derived(`elicit-form-${request.elicitationId}`);
 
 	const inputClass =
@@ -164,7 +154,6 @@
 			<span class="text-sm font-medium text-gray-700 dark:text-gray-200">
 				{request.mode === "url" ? "Action needed" : "Input requested"}
 			</span>
-			<!-- Named, because the question is the server's and not the app's. -->
 			<span class="text-xs text-gray-500 dark:text-gray-400">
 				from <code
 					class="rounded-sm bg-blue-50 px-1 py-px font-mono text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
