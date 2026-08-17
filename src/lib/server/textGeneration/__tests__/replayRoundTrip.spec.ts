@@ -55,8 +55,7 @@ vi.mock("$lib/server/urlSafety", async (importOriginal) => ({
 	isValidUrl: () => true,
 }));
 
-// Only the listing is scripted; the rest of the module (the mapping predicates the
-// invocation path calls on every tool call) must keep its real behavior.
+// Spread, not a literal: the invocation path calls other exports on every tool call.
 vi.mock("$lib/server/mcp/tools", async (importOriginal) => ({
 	...(await importOriginal<typeof import("$lib/server/mcp/tools")>()),
 	getOpenAiToolsForMcp: async () => ({

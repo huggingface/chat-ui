@@ -27,14 +27,7 @@ interface HealthCheckResponse {
 	authRequired?: boolean;
 }
 
-/**
- * What a connected server offers, and whether that makes it usable. Shared by both transport
- * branches below so the two never drift.
- *
- * `listTools` is allowed to fail: a server may expose only resources, and the MCP spec does
- * not require the tools capability. Such a server is healthy, so a rejection here is not
- * grounds for falling through to the SSE retry.
- */
+/** `listTools` may fail — a resources-only server is valid, and must not trigger the SSE retry. */
 async function readCatalog(
 	client: Client,
 	url: string

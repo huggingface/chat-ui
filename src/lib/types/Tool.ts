@@ -53,10 +53,7 @@ export interface MCPTool {
 	inputSchema?: unknown;
 }
 
-/**
- * A read-only datum a server exposes. `uri` is absent for a URI template, which stands for a
- * family of resources the server does not enumerate; `uriTemplate` is absent for a concrete one.
- */
+/** Exactly one of `uri` (a concrete resource) or `uriTemplate` (a family) is set. */
 export interface MCPResource {
 	uri?: string;
 	uriTemplate?: string;

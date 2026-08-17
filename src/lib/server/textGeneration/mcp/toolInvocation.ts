@@ -180,8 +180,7 @@ export async function* executeToolCalls({
 		};
 	}
 
-	// Preload clients per distinct server used in this batch. Resource functions are skipped:
-	// they are not bound to one server, and their own path pools its client when it resolves one.
+	// Preload clients per distinct server used in this batch (resource fns have no one server).
 	const distinctServerNames = Array.from(
 		new Set(
 			prepared
@@ -319,8 +318,6 @@ export async function* executeToolCalls({
 						signal: abortSignal,
 						timeoutMs: effectiveTimeoutMs,
 					});
-					// An unresolvable URI is the model's mistake to correct on the next round,
-					// so it goes back as a tool error rather than a successful empty read.
 					if (read.isError) {
 						logger.warn({ uri, err: read.text }, "[mcp] resource read rejected");
 						fail(read.text);

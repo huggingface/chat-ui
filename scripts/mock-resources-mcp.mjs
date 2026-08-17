@@ -1,16 +1,10 @@
 /**
  * Throwaway MCP server for exercising resources support by hand — delete when done.
  *
- * Exposes one tool (so the server looks realistic) and four resources chosen to hit
- * every branch of the read path:
- *
  *   file:///briefing.md   text, with an unguessable fact  — proves the model READ it
  *   note:///{id}          URI template                    — proves template routing
  *   image:///logo.png     binary blob                     — must be described, not inlined
  *   file:///huge.log      44k chars                       — must truncate at 32k
- *
- * The fact in briefing.md is the point: no model can produce "PELICAN-7734" from
- * training data, so if it turns up in the answer, the resource was genuinely read.
  *
  * Run:  node scripts/mock-resources-mcp.mjs
  * Then add http://127.0.0.1:8792/mcp as an MCP server in the UI.
@@ -22,7 +16,6 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 
 const PORT = Number(process.env.MOCK_RESOURCES_MCP_PORT ?? 8792);
 
-/** Smallest valid PNG (1x1, transparent). */
 const PNG_1X1 =
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
@@ -39,12 +32,9 @@ function buildServer() {
 		{ capabilities: { tools: {}, resources: {} } }
 	);
 
-	// A tool, so this is not a resources-only server and the tool array stays mixed.
-	server.registerTool(
-		"ping",
-		{ description: "Returns pong.", inputSchema: {} },
-		() => ({ content: [{ type: "text", text: "pong" }] })
-	);
+	server.registerTool("ping", { description: "Returns pong.", inputSchema: {} }, () => ({
+		content: [{ type: "text", text: "pong" }],
+	}));
 
 	server.registerResource(
 		"briefing",
@@ -95,10 +85,13 @@ function buildServer() {
 	server.registerResource(
 		"huge",
 		"file:///huge.log",
-		{ title: "Huge log", description: "44k characters, to exercise truncation.", mimeType: "text/plain" },
+		{
+			title: "Huge log",
+			description: "44k characters, to exercise truncation.",
+			mimeType: "text/plain",
+		},
 		(uri) => {
 			console.log("[mock-resources-mcp] read", uri.href, "(oversized)");
-			// The tail marker must NOT survive truncation — that is how you tell it worked.
 			return {
 				contents: [
 					{
@@ -125,7 +118,6 @@ const httpServer = createServer((req, res) => {
 		}
 
 		if (url.pathname === "/mcp") {
-			// Stateless: a fresh server + transport per request, torn down after.
 			const server = buildServer();
 			const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 			res.on("close", () => {

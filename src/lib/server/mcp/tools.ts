@@ -31,12 +31,7 @@ export interface McpToolMapping {
 	annotations?: McpToolAnnotations;
 }
 
-/**
- * Resources are reached through two synthetic functions rather than one function per
- * resource: a server may expose hundreds, and they would crowd out its real tools in the
- * array sent to the provider. Neither is bound to a single server — `list` spans them all
- * and `read` resolves its URI's owner at call time.
- */
+/** Two functions, not one per resource: a server may expose hundreds and crowd out its tools. */
 export interface McpResourceFnMapping {
 	fnName: string;
 	kind: "resource";
@@ -66,7 +61,6 @@ type CachedServerTool = {
 	annotations?: McpToolAnnotations;
 };
 
-/** A resource the server enumerates by concrete URI. */
 export type CachedServerResource = {
 	uri: string;
 	name?: string;
@@ -74,7 +68,6 @@ export type CachedServerResource = {
 	mimeType?: string;
 };
 
-/** A URI template, for resource families the server does not enumerate one by one. */
 export type CachedServerResourceTemplate = {
 	uriTemplate: string;
 	name?: string;
@@ -82,11 +75,7 @@ export type CachedServerResourceTemplate = {
 	mimeType?: string;
 };
 
-/**
- * Everything one connection to a server yields. Tools and resources share a cache entry
- * because they share a key and a TTL — listing them separately would double the connection
- * churn this cache exists to avoid.
- */
+/** Tools and resources share this entry; listing them separately doubles connection churn. */
 export type ServerCatalog = {
 	tools: CachedServerTool[];
 	resources: CachedServerResource[];
@@ -113,7 +102,6 @@ function sanitizeName(name: string) {
 	return name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
 }
 
-/** Free variant of a fixed function name, for names with no server to disambiguate them. */
 function reserveName(candidate: string, taken: Record<string, unknown>): string {
 	if (!(candidate in taken)) return candidate;
 	for (let n = 2; n < 10; n += 1) {
@@ -234,8 +222,6 @@ type ListedResource = {
 
 type ListedResourceTemplate = Omit<ListedResource, "uri"> & { uriTemplate?: unknown };
 
-// A server may enumerate far more resources than are useful to put in front of a model, and
-// listing is paginated. Both bounds are belt-and-braces: whichever trips first stops paging.
 const MAX_RESOURCE_PAGES = 10;
 const MAX_RESOURCES_PER_SERVER = 250;
 
@@ -243,11 +229,6 @@ function optionalString(value: unknown): string | undefined {
 	return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
-/**
- * Walk a paginated MCP listing to exhaustion (within bounds). `listPage` is the SDK call;
- * `pick` pulls the page's array out of the envelope, since resources and templates use
- * different property names for it.
- */
 async function listAllPages<T>(
 	listPage: (params: { cursor?: string }) => Promise<unknown>,
 	pick: (page: Record<string, unknown>) => unknown
@@ -277,8 +258,6 @@ function normalizeResources(raw: ListedResource[]): CachedServerResource[] {
 		out.push({
 			uri,
 			name: optionalString(resource.name),
-			// `title` is the human-facing label; use it only when there is no description,
-			// so a resource that declares neither still says something useful to the model.
 			description: optionalString(resource.description) ?? optionalString(resource.title),
 			mimeType: optionalString(resource.mimeType),
 		});
@@ -301,18 +280,13 @@ function normalizeResourceTemplates(raw: ListedResourceTemplate[]): CachedServer
 	return out;
 }
 
-/**
- * Resource listing for a connected client. Returns empty rather than throwing: a server whose
- * resource listing is broken must still contribute its tools, which is what the caller is
- * primarily after.
- */
+/** Never throws: a broken resource listing must not cost the server its tools. */
 export async function listResourcesFor(
 	client: Client,
 	label: string,
 	opts: { signal?: AbortSignal } = {}
 ): Promise<Pick<ServerCatalog, "resources" | "templates">> {
-	// Declared capability first: a server that never declares `resources` would answer both
-	// calls below with method-not-found, so asking is a guaranteed wasted round trip.
+	// Without this an undeclaring server eats two guaranteed method-not-found round trips.
 	if (!client.getServerCapabilities()?.resources) {
 		return { resources: [], templates: [] };
 	}
@@ -322,8 +296,6 @@ export async function listResourcesFor(
 			(params) => client.listResources(params, { signal: opts.signal }),
 			(page) => page.resources
 		),
-		// Templates are optional even for a server that declares `resources`, so a rejection
-		// here is unremarkable and must not cost us the concrete resources.
 		listAllPages<ListedResourceTemplate>(
 			(params) => client.listResourceTemplates(params, { signal: opts.signal }),
 			(page) => page.resourceTemplates
@@ -437,11 +409,6 @@ async function fetchServerCatalog(
 	return { tools: normalized, resources: raw.resources, templates: raw.templates };
 }
 
-/**
- * Each server's catalog, index-aligned with `servers`. Only cold servers are fetched, in
- * parallel. A failed listing contributes nothing and caches nothing, so the next request
- * retries that server.
- */
 export async function getMcpCatalog(
 	servers: McpServerConfig[],
 	{ ttlMs = DEFAULT_TTL_MS, signal }: { ttlMs?: number; signal?: AbortSignal } = {}

@@ -50,7 +50,6 @@ vi.mock("@modelcontextprotocol/sdk/client", () => ({
 	},
 }));
 
-/** Narrow away the resource-function variant; resource mappings are asserted on their own. */
 function toolMapping(mapping: Record<string, McpFunctionMapping>, name: string): McpToolMapping {
 	const entry = mapping[name];
 	if (!entry || isResourceFn(entry)) throw new Error(`no tool mapping named ${name}`);
@@ -450,7 +449,6 @@ describe("getOpenAiToolsForMcp resource functions", () => {
 		expect(tools.map((t) => t.function.name)).toEqual(["search"]);
 	});
 
-	// A server that never declares the capability would answer with method-not-found.
 	it("does not ask an undeclaring server for its resources", async () => {
 		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
 
@@ -482,8 +480,6 @@ describe("getOpenAiToolsForMcp resource functions", () => {
 		});
 	});
 
-	// Templates are how a server advertises resources it does not enumerate, so a server
-	// that only has templates still needs the functions.
 	it("exposes the functions for a server with only URI templates", async () => {
 		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
 		mcpMock.resources.set(SERVER_A.url, {
@@ -507,7 +503,6 @@ describe("getOpenAiToolsForMcp resource functions", () => {
 		expect(list?.function.description).toContain("Server A, Server B");
 	});
 
-	// A real tool owns its name; the synthetic one yields.
 	it("does not take a name a real tool already holds", async () => {
 		mcpMock.responses.set(SERVER_A.url, {
 			tools: [{ name: "read_mcp_resource", description: "a real tool", inputSchema: {} }],
@@ -529,7 +524,6 @@ describe("getOpenAiToolsForMcp resource functions", () => {
 		});
 	});
 
-	// The whole point of listing both over one connection.
 	it("lists resources over the same cached connection as tools", async () => {
 		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
 		mcpMock.resources.set(SERVER_A.url, { resources: [readme] });
@@ -541,7 +535,6 @@ describe("getOpenAiToolsForMcp resource functions", () => {
 		expect(mcpMock.listResourcesCalls).toEqual([SERVER_A.url]);
 	});
 
-	// The caller is primarily after tools; a broken resource listing must not cost them.
 	it("keeps a server's tools when its resource listing fails", async () => {
 		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
 		mcpMock.resources.set(SERVER_A.url, new Error("resources exploded"));

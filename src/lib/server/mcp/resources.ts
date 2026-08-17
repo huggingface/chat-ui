@@ -4,14 +4,8 @@ import { getClient, evictFromPool, retainClient, releaseClient } from "./clientP
 import { getMcpCatalog, type CachedServerResource, type ServerCatalog } from "./tools";
 import { logger } from "$lib/server/logger";
 
-/**
- * Cap on the text handed back to the model for one resource. A resource is arbitrary
- * server-side data — a whole log file or dataset is a legitimate resource — and an
- * unbounded read would blow the context window and the turn's budget with it.
- */
+/** A resource is arbitrary server data; unbounded, one read can swallow the context window. */
 const MAX_RESOURCE_TEXT_CHARS = 32_000;
-
-/** Cap on the listing, for the same reason. Listings are far cheaper per entry than reads. */
 const MAX_LISTED_RESOURCES = 200;
 
 export type McpResourceReadResult = {
@@ -31,12 +25,7 @@ function truncate(text: string, limit: number): string {
 	return `${text.slice(0, limit)}\n\n[Truncated: the resource is ${text.length} characters, ${limit} shown.]`;
 }
 
-/**
- * Compile a level-1 RFC 6570 template into an anchored matcher. Only used to work out which
- * server owns a URI, so it deliberately does not try to extract variables — an over-broad
- * match would still route to a server that can answer for the URI, and a server that cannot
- * says so.
- */
+/** Routing only, so variables are deliberately not extracted — an over-broad match is harmless. */
 function templateToRegExp(uriTemplate: string): RegExp | undefined {
 	const literals = uriTemplate.split(/\{[^{}]*\}/g);
 	if (literals.length < 2) return undefined;
@@ -57,11 +46,7 @@ function describeResource(server: string, resource: CachedServerResource): strin
 	return resource.description ? `${line}\n    ${resource.description}` : line;
 }
 
-/**
- * Which server can serve `uri`: an enumerated resource wins, then a template whose shape it
- * fits. A URI matching nothing is reported as unresolvable rather than broadcast to every
- * server, so a typo costs one message instead of a round trip per connected server.
- */
+/** No match is reported back, never broadcast: a typo must not cost a round trip per server. */
 function resolveOwner(
 	servers: McpServerConfig[],
 	catalogs: ServerCatalog[],
@@ -154,8 +139,7 @@ export async function readMcpResource(
 	const effectiveTimeoutMs = timeoutMs ?? getMcpToolTimeoutMs();
 	let activeClient = await getClient(server, signal);
 
-	// Mirrors callMcpTool: a pooled connection can be reaped by a proxy or lost to a server
-	// restart between calls, and the retry is on a genuinely fresh client.
+	// Mirrors callMcpTool: a pooled connection can be reaped by a proxy between calls.
 	const maxReconnectAttempts = 2;
 	let response;
 	for (let attempt = 0; ; attempt++) {
@@ -194,8 +178,7 @@ export async function readMcpResource(
 			continue;
 		}
 		if (typeof content?.blob === "string") {
-			// Binary contents are base64; inlining them would spend the context window on bytes
-			// the model cannot read anyway, so report what is there instead.
+			// Never inline: base64 the model cannot read would spend the context window on bytes.
 			const mimeType = typeof content.mimeType === "string" ? content.mimeType : "unknown type";
 			const approxBytes = Math.floor((content.blob.length * 3) / 4);
 			rendered.push(`[Binary content: ${mimeType}, ~${approxBytes} bytes, not inlined.]`);

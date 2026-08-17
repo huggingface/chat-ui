@@ -5,7 +5,6 @@ import type { ServerCatalog } from "./tools";
 
 const mocks = vi.hoisted(() => ({
 	catalogs: [] as unknown[],
-	// Servers whose client was asked to read, in call order, so routing is assertable.
 	readsBy: [] as string[],
 	readResource: async (_params: { uri: string }): Promise<unknown> => ({ contents: [] }),
 }));
@@ -104,7 +103,6 @@ describe("listMcpResources", () => {
 		expect(listing).toContain("- file:///{path} | name: project file | server: Docs");
 	});
 
-	// An unbounded listing would spend the context window before the model reads anything.
 	it("caps the listing and reports the total it was drawn from", async () => {
 		mocks.catalogs = [
 			catalog({
@@ -147,7 +145,6 @@ describe("readMcpResource", () => {
 		expect(mocks.readsBy).toEqual(["Files"]);
 	});
 
-	// A typo must cost one message, not a round trip against every connected server.
 	it("reports an unresolvable URI without contacting any server", async () => {
 		mocks.catalogs = [catalog({ resources: [{ uri: "doc://a" }] })];
 
@@ -183,7 +180,6 @@ describe("readMcpResource", () => {
 		expect((await readMcpResource([SERVER_A], "doc://a")).text).toBe("one\n\ntwo");
 	});
 
-	// base64 bytes the model cannot read would otherwise eat the whole context window.
 	it("describes binary content instead of inlining it", async () => {
 		mocks.catalogs = [catalog({ resources: [{ uri: "doc://a" }] })];
 		const blob = "A".repeat(4_000);
