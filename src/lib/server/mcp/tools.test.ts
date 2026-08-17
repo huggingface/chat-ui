@@ -12,6 +12,8 @@ const mcpMock = vi.hoisted(() => ({
 vi.mock("@modelcontextprotocol/sdk/client", () => ({
 	Client: class {
 		private url = "";
+		// Session clients register one per declared capability; listing never invokes them.
+		setRequestHandler() {}
 		async connect(transport: { url?: unknown }) {
 			this.url = String(transport.url ?? "");
 		}

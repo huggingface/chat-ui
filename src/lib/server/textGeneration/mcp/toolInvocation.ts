@@ -12,8 +12,10 @@ import {
 	type McpToolTextResponse,
 } from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
+import type { ElicitationSink } from "$lib/server/mcp/elicitation";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/sdk/client";
+import type { ObjectId } from "mongodb";
 
 export type Primitive = string | number | boolean;
 
@@ -47,6 +49,11 @@ export interface ExecuteToolCallsParams {
 	roundReasoning?: string;
 	/** Visible text streamed before this round's calls; persisted on the round's first Call update. */
 	roundContent?: string;
+	/**
+	 * Which chat to show a prompt in when a server asks the user for input mid-call.
+	 * Omit and elicitation requests on these calls are declined.
+	 */
+	elicitation?: { conversationId: ObjectId; generationId?: string };
 }
 
 export interface ToolCallExecutionResult {
@@ -99,6 +106,7 @@ export async function* executeToolCalls({
 	toolTimeoutMs,
 	roundReasoning,
 	roundContent,
+	elicitation,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
@@ -217,6 +225,15 @@ export async function* executeToolCalls({
 	const updatesQueue = createQueue<MessageUpdate>();
 	const results: TaskResult[] = [];
 
+	// A prompt raised by a server is just another update on this round's stream, so it
+	// reaches the browser — and the persisted event log — by the same path as progress.
+	const elicitationSink: ElicitationSink | undefined = elicitation && {
+		id: elicitation.generationId ?? `conversation:${elicitation.conversationId.toString()}`,
+		conversationId: elicitation.conversationId,
+		...(elicitation.generationId ? { generationId: elicitation.generationId } : {}),
+		emit: (update) => updatesQueue.push(update),
+	};
+
 	const tasks = prepared.map(async (p, index) => {
 		// Check abort before starting each tool call
 		if (abortSignal?.aborted) {
@@ -306,6 +323,7 @@ export async function* executeToolCalls({
 					client,
 					signal: abortSignal,
 					timeoutMs: effectiveTimeoutMs,
+					...(elicitationSink ? { elicitation: { sink: elicitationSink, toolUuid: p.uuid } } : {}),
 					onProgress: (progress) => {
 						updatesQueue.push({
 							type: MessageUpdateType.Tool,

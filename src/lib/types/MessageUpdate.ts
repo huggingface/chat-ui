@@ -1,5 +1,10 @@
 import type { InferenceProvider } from "@huggingface/inference";
 import type { ToolCall, ToolResult } from "$lib/types/Tool";
+import type {
+	ElicitationAction,
+	ElicitationRequestPayload,
+	ElicitationResolution,
+} from "$lib/types/McpElicitation";
 
 export type MessageUpdate =
 	| MessageStatusUpdate
@@ -9,7 +14,8 @@ export type MessageUpdate =
 	| MessageFileUpdate
 	| MessageFinalAnswerUpdate
 	| MessageReasoningUpdate
-	| MessageRouterMetadataUpdate;
+	| MessageRouterMetadataUpdate
+	| MessageElicitationUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -20,6 +26,7 @@ export enum MessageUpdateType {
 	FinalAnswer = "finalAnswer",
 	Reasoning = "reasoning",
 	RouterMetadata = "routerMetadata",
+	Elicitation = "elicitation",
 }
 
 // Status
@@ -156,4 +163,39 @@ export interface MessageRouterMetadataUpdate {
 	route: string;
 	model: string;
 	provider?: InferenceProvider;
+}
+
+// Elicitation: an MCP server asking the user for input in the middle of a tool call.
+export enum MessageElicitationUpdateType {
+	Request = "request",
+	Resolved = "resolved",
+}
+
+export type MessageElicitationUpdate =
+	MessageElicitationRequestUpdate | MessageElicitationResolvedUpdate;
+
+export interface MessageElicitationRequestUpdate {
+	type: MessageUpdateType.Elicitation;
+	subtype: MessageElicitationUpdateType.Request;
+	request: ElicitationRequestPayload;
+	/** Epoch ms. Replayed history uses it to render a stale form as expired without asking the server. */
+	expiresAt: number;
+	/**
+	 * The tool call that triggered it, when that is knowable. MCP gives a server-initiated
+	 * request no link back to the call it belongs to, and pooled clients run calls
+	 * concurrently, so this is set only when exactly one call was in flight.
+	 */
+	toolUuid?: string;
+}
+
+/**
+ * Terminal state for one elicitation. Always emitted, including when nobody answered, so
+ * a reloaded transcript never shows a form that is still waiting for input.
+ */
+export interface MessageElicitationResolvedUpdate {
+	type: MessageUpdateType.Elicitation;
+	subtype: MessageElicitationUpdateType.Resolved;
+	elicitationId: string;
+	action: ElicitationAction;
+	resolution: ElicitationResolution;
 }
