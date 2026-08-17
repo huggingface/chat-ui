@@ -39,6 +39,7 @@ export type RunMcpFlowContext = Pick<
 	| "reasoningEffort"
 	| "reasoningOverride"
 	| "locals"
+	| "generationId"
 > & { messages: EndpointMessage[] };
 
 // Only "not_applicable" means MCP never ran and the caller should generate normally.
@@ -61,6 +62,7 @@ export async function* runMcpFlow({
 	reasoningEffort,
 	reasoningOverride,
 	locals,
+	generationId,
 	preprompt,
 	abortSignal,
 	abortController,
@@ -831,6 +833,7 @@ export async function* runMcpFlow({
 					// own message instead of moving them onto the final answer.
 					roundReasoning: reasoningForToolMsg,
 					roundContent: assistantContentForToolMsg,
+					elicitation: { conversationId: conv._id, generationId },
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;

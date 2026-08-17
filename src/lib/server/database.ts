@@ -3,6 +3,7 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Generation, GenerationEvent } from "$lib/types/Generation";
+import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
@@ -130,6 +131,7 @@ export class Database {
 		const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
 		const generations = db.collection<Generation>("generations");
 		const generationEvents = db.collection<GenerationEvent>("generationEvents");
+		const mcpElicitations = db.collection<McpElicitation>("mcpElicitations");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
@@ -160,6 +162,7 @@ export class Database {
 			abortedGenerations,
 			generations,
 			generationEvents,
+			mcpElicitations,
 			settings,
 			users,
 			sessions,
@@ -187,6 +190,7 @@ export class Database {
 			abortedGenerations,
 			generations,
 			generationEvents,
+			mcpElicitations,
 			settings,
 			users,
 			sessions,
@@ -312,6 +316,17 @@ export class Database {
 		generationEvents
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for generationEvents by createdAt"));
+
+		// The waiting pod polls by id, and the answering pod writes by id.
+		mcpElicitations
+			.createIndex({ elicitationId: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating index for mcpElicitations by elicitationId"));
+		// Must stay well clear of MCP_ELICITATION_TIMEOUT_MS (an hour by default), or a row
+		// is swept while its form is still on screen and answering it 404s. Expiry is decided
+		// by `expiresAt`, which the answer path checks; this only reclaims space.
+		mcpElicitations
+			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for mcpElicitations by createdAt"));
 
 		sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch((e) => logger.error(e));
 		settings

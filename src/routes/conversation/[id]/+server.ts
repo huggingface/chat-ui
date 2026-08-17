@@ -710,6 +710,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					artifactsOverride: userSettings?.artifactsOverrides?.[model.id],
 					locals,
 					abortController: ctrl,
+					generationId: effectiveGenerationId,
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);
