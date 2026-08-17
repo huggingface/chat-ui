@@ -49,10 +49,7 @@ export interface ExecuteToolCallsParams {
 	roundReasoning?: string;
 	/** Visible text streamed before this round's calls; persisted on the round's first Call update. */
 	roundContent?: string;
-	/**
-	 * Which chat to show a prompt in when a server asks the user for input mid-call.
-	 * Omit and elicitation requests on these calls are declined.
-	 */
+	/** Omit and elicitation requests raised by these calls are declined. */
 	elicitation?: { conversationId: ObjectId; generationId?: string };
 }
 
@@ -225,8 +222,6 @@ export async function* executeToolCalls({
 	const updatesQueue = createQueue<MessageUpdate>();
 	const results: TaskResult[] = [];
 
-	// A prompt raised by a server is just another update on this round's stream, so it
-	// reaches the browser — and the persisted event log — by the same path as progress.
 	const elicitationSink: ElicitationSink | undefined = elicitation && {
 		id: elicitation.generationId ?? `conversation:${elicitation.conversationId.toString()}`,
 		conversationId: elicitation.conversationId,

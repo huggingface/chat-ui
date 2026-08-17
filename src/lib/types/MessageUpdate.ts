@@ -165,7 +165,6 @@ export interface MessageRouterMetadataUpdate {
 	provider?: InferenceProvider;
 }
 
-// Elicitation: an MCP server asking the user for input in the middle of a tool call.
 export enum MessageElicitationUpdateType {
 	Request = "request",
 	Resolved = "resolved",
@@ -178,20 +177,13 @@ export interface MessageElicitationRequestUpdate {
 	type: MessageUpdateType.Elicitation;
 	subtype: MessageElicitationUpdateType.Request;
 	request: ElicitationRequestPayload;
-	/** Epoch ms. Replayed history uses it to render a stale form as expired without asking the server. */
+	/** Epoch ms, so replayed history can render a stale form as expired on its own. */
 	expiresAt: number;
-	/**
-	 * The tool call that triggered it, when that is knowable. MCP gives a server-initiated
-	 * request no link back to the call it belongs to, and pooled clients run calls
-	 * concurrently, so this is set only when exactly one call was in flight.
-	 */
+	/** Only set when exactly one call was in flight; MCP does not link the two. */
 	toolUuid?: string;
 }
 
-/**
- * Terminal state for one elicitation. Always emitted, including when nobody answered, so
- * a reloaded transcript never shows a form that is still waiting for input.
- */
+/** Always emitted, even when nobody answered, so replay never shows a form still waiting. */
 export interface MessageElicitationResolvedUpdate {
 	type: MessageUpdateType.Elicitation;
 	subtype: MessageElicitationUpdateType.Resolved;

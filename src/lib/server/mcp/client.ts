@@ -3,17 +3,12 @@ import { ElicitRequestSchema, type ClientCapabilities } from "@modelcontextproto
 import { isElicitationEnabled } from "./elicitationConfig";
 
 /**
- * A capability declared without a handler makes servers issue a request the SDK can only
- * answer with method-not-found. Add one only in the change that implements its handler.
- *
- * `elicitation` is declared for session clients only. A health probe has no chat behind
- * it, so a server that asked it for user input would be told to wait on a screen nobody
- * is looking at.
+ * Declare a capability only in the change that implements its handler, or servers issue
+ * requests the SDK can only answer with method-not-found. Health probes get none: there is
+ * no chat behind them to ask. Spell both elicitation modes out — a bare `elicitation: {}`
+ * reads as form-only and the server SDK then refuses to send a URL elicitation at all.
  */
 export function mcpClientCapabilities(kind: McpClientKind): ClientCapabilities {
-	// Both modes spelled out: a bare `elicitation: {}` is read as `{ form: {} }`, and the
-	// server SDK then refuses to send a URL elicitation at all ("Client does not support
-	// url elicitation") — the handler for it would never run.
 	return kind === "session" && isElicitationEnabled() ? { elicitation: { form: {}, url: {} } } : {};
 }
 
@@ -35,13 +30,10 @@ export function createMcpClient(kind: McpClientKind = "session"): Client {
 	const client = new Client(CLIENT_INFO[kind], { capabilities });
 
 	if (capabilities.elicitation) {
-		// Imported on demand: the handler reaches the database, and a static edge from here
-		// would drag a Mongo connection into every module that only wants to build a client.
+		// Imported on demand, or every module building a client drags in a Mongo connection.
 		client.setRequestHandler(ElicitRequestSchema, async (request, extra) => {
 			const { handleElicitationRequest } = await import("./elicitation");
-			// `extra.signal` fires when the server sends `notifications/cancelled` for this
-			// request — i.e. it stopped waiting for the answer. Without it we would keep a
-			// form on screen that can no longer be answered.
+			// `extra.signal` fires on `notifications/cancelled`, i.e. the server gave up.
 			return handleElicitationRequest(client, request.params, extra.signal);
 		});
 	}

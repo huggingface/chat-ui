@@ -53,16 +53,13 @@ describe("createMcpClient", () => {
 	});
 
 	it("declares both elicitation modes on session clients", () => {
-		// A bare `elicitation: {}` reads as form-only, and the server SDK then refuses to
-		// send a URL elicitation — so the mode has to be named to be reachable.
+		// A bare `elicitation: {}` reads as form-only and URL mode is never sent.
 		createMcpClient("session");
 
 		expect(built(0).options.capabilities).toEqual({ elicitation: { form: {}, url: {} } });
 	});
 
 	it("never declares elicitation to a health probe", () => {
-		// No chat is behind a probe, so a server told to elicit would be waiting on a
-		// screen nobody is looking at.
 		createMcpClient("health");
 
 		expect(built(0).options.capabilities).toEqual({});
@@ -70,8 +67,7 @@ describe("createMcpClient", () => {
 	});
 
 	it("registers a handler for every capability it declares", () => {
-		// A capability declared without a handler makes servers issue a request the SDK
-		// can only answer with method-not-found.
+		// A capability without a handler gets servers a method-not-found.
 		createMcpClient("session");
 
 		expect(Object.keys(built(0).options.capabilities)).toHaveLength(built(0).handlers.size);

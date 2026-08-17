@@ -291,8 +291,7 @@
 					expiresAt: update.expiresAt,
 				});
 			} else if (isMessageElicitationResolvedUpdate(update)) {
-				// Settles the form already in the transcript rather than adding a block, so a
-				// replayed conversation shows the outcome on the prompt it belongs to.
+				// Settles the existing block rather than adding one.
 				const target = res.find(
 					(b): b is ElicitationBlock =>
 						b.type === "elicitation" && b.request.elicitationId === update.elicitationId
@@ -361,8 +360,7 @@
 				flush();
 				units.push({ kind: "artifact", op: block.op, opIndex: block.opIndex });
 			} else if (block.type === "elicitation") {
-				// Never folded into the collapsible tool summary: it is the one block the
-				// user has to be able to act on.
+				// Never folded into the collapsible summary: the user has to be able to act on it.
 				flush();
 				units.push({
 					kind: "elicitation",

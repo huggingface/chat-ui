@@ -20,9 +20,8 @@ import type { McpCallDeadline } from "./httpClient";
 
 const POLL_INTERVAL_MS = 400;
 
-/** Where a prompt is shown and an answer is waited for: one live generation. */
 export interface ElicitationSink {
-	/** Stable per generation, so two calls from the same run are recognised as one audience. */
+	/** Stable per generation, so two calls from one run count as a single audience. */
 	id: string;
 	conversationId: ObjectId;
 	generationId?: string;
@@ -33,20 +32,11 @@ interface CallContext {
 	sink: ElicitationSink;
 	server: string;
 	toolUuid: string;
-	/** Stopped for as long as the user is being asked something, then restarted. */
 	deadline: Pick<McpCallDeadline, "pause" | "resume">;
 	signal?: AbortSignal;
 }
 
-/**
- * Tool calls currently running on each pooled client.
- *
- * MCP gives a server-initiated request no link back to the client request that provoked
- * it, and `clientPool` shares one client across every chat using the same server and
- * headers. So the only way to know whose screen an `elicitation/create` belongs on is to
- * look at what that client is doing right now — hence this registry, and hence the
- * refusal in `routeTo` when the answer is not unique.
- */
+/** MCP does not link an `elicitation/create` to the call that provoked it; this is the only clue. */
 const inFlight = new WeakMap<Client, Set<CallContext>>();
 
 export async function withElicitationContext<T>(
@@ -76,13 +66,9 @@ function routeTo(client: Client): Route | { refusal: string } {
 	}
 	const audiences = new Set(contexts.map((c) => c.sink.id));
 	if (audiences.size > 1) {
-		// Two different chats are using this pooled connection at once. Guessing would
-		// mean showing one user's prompt — and collecting their answer — in someone
-		// else's conversation, so refuse instead.
+		// Never guess: that puts one user's prompt, and their answer, in another's conversation.
 		return { refusal: "concurrent tool calls from different generations" };
 	}
-	// One audience, so every call here belongs to the round the user is answering for and
-	// all of their clocks stop together — we cannot tell which one actually asked.
 	return { context: contexts[0], siblings: contexts, attributable: contexts.length === 1 };
 }
 
@@ -105,12 +91,7 @@ const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
 		signal?.addEventListener("abort", onAbort, { once: true });
 	});
 
-/**
- * Give up on a prompt nobody answered, and record that we did.
- *
- * Conditional on the row still being pending so it can race the answer endpoint without
- * overwriting a real answer that landed a moment earlier.
- */
+/** Filtered on `pending` so racing the answer endpoint cannot overwrite a real answer. */
 async function abandon(
 	elicitationId: string,
 	resolution: Exclude<ElicitationResolution, "user">
@@ -129,8 +110,7 @@ async function abandon(
 		)
 		.catch(() => null);
 
-	// Nothing left to claim: an answer landed between the last poll and this write, and
-	// discarding it now would lose input the user has already given.
+	// Nothing to claim means an answer landed since the last poll; discarding it loses input.
 	if (claimed?.matchedCount === 0) {
 		const current = await collections.mcpElicitations.findOne({ elicitationId }).catch(() => null);
 		if (current?.status === "resolved" && current.action) {
@@ -144,13 +124,7 @@ async function abandon(
 	return { action: "cancel", resolution };
 }
 
-/**
- * Show a prompt and wait for the user, across pods.
- *
- * The answer arrives on whichever pod serves the user's POST, which need not be this one,
- * so the row in Mongo is the channel and polling is the delivery — the same shape
- * `abortedGenerations` uses for stop.
- */
+/** Polled, not pushed: the answer lands on whichever pod served the user's POST. */
 async function awaitAnswer(
 	elicitationId: string,
 	{
@@ -163,14 +137,12 @@ async function awaitAnswer(
 		generation && server ? AbortSignal.any([generation, server]) : (generation ?? server);
 
 	for (;;) {
-		// Checked in this order so the reason shown is the one that actually happened first:
-		// the user stopping the response, versus the server giving up on its own request.
+		// Order matters: stopping the response is what makes the server hang up.
 		if (generation?.aborted) return abandon(elicitationId, "aborted");
 		if (server?.aborted) return abandon(elicitationId, "withdrawn");
 		if (Date.now() >= deadlineAt) return abandon(elicitationId, "expired");
 
-		// `undefined` for a failed read, so a transient database blip is retried rather
-		// than mistaken for a row that is gone.
+		// `undefined` on failure, so a database blip is retried rather than read as a gone row.
 		const doc = await collections.mcpElicitations
 			.findOne({ elicitationId }, { projection: { status: 1, action: 1, content: 1 } })
 			.catch(() => undefined);
@@ -182,21 +154,13 @@ async function awaitAnswer(
 				resolution: "user",
 			};
 		}
-		// The row really is gone — dropped by the TTL sweep — so there is nothing to wait for.
 		if (doc === null) return { action: "cancel", resolution: "expired" };
 
 		await sleep(Math.min(POLL_INTERVAL_MS, Math.max(0, deadlineAt - Date.now())), signal);
 	}
 }
 
-/**
- * Answer an `elicitation/create`: show it to the user who triggered the tool call, wait,
- * and hand the result back to the server.
- *
- * Never throws. Every failure — unroutable, unrenderable, unanswered — becomes a `cancel`,
- * which the spec requires servers to handle, so a bad prompt degrades to a tool call that
- * proceeds without the extra input instead of a broken conversation.
- */
+/** Never throws: every failure becomes a `cancel`, which servers must already handle. */
 export async function handleElicitationRequest(
 	client: Client,
 	params: unknown,
@@ -226,7 +190,6 @@ export async function handleElicitationRequest(
 		server: context.server,
 	};
 
-	// Independent of the tool call's deadline, which is stopped for the duration below.
 	const expiresAt = new Date(Date.now() + getElicitationTimeoutMs());
 
 	const now = new Date();
@@ -255,8 +218,7 @@ export async function handleElicitationRequest(
 		...(attributable ? { toolUuid: context.toolUuid } : {}),
 	});
 
-	// Stop the tool call's clock for as long as a person is being asked something, so a
-	// slow answer never expires the call that is waiting on it.
+	// Without this the call expires underneath a user who takes their time answering it.
 	for (const sibling of siblings) sibling.deadline.pause();
 	let outcome: ElicitationOutcome;
 	try {
@@ -282,7 +244,6 @@ export async function handleElicitationRequest(
 		"[mcp] elicitation resolved"
 	);
 
-	// Content is meaningful only on accept; the spec has servers ignore it otherwise.
 	return outcome.action === "accept"
 		? { action: "accept", content: outcome.content ?? {} }
 		: { action: outcome.action };
@@ -290,10 +251,6 @@ export async function handleElicitationRequest(
 
 export type SubmitResult = { ok: true } | { ok: false; status: 400 | 404 | 409; error: string };
 
-/**
- * Record the user's answer. Called by the response endpoint on whichever pod served it,
- * which is usually not the pod waiting on the tool call.
- */
 export async function submitElicitationAnswer({
 	elicitationId,
 	conversationId,
@@ -305,8 +262,7 @@ export async function submitElicitationAnswer({
 	action: ElicitationAction;
 	content?: unknown;
 }): Promise<SubmitResult> {
-	// Scoped by conversation, so holding an id is not enough to answer a prompt raised in
-	// a conversation the caller does not own.
+	// Scoped by conversation: holding an id is not authority to answer someone else's prompt.
 	const doc = await collections.mcpElicitations.findOne({ elicitationId, conversationId });
 	if (!doc) return { ok: false, status: 404, error: "Unknown elicitation." };
 	if (doc.status !== "pending") return { ok: false, status: 409, error: "Already answered." };
@@ -323,8 +279,7 @@ export async function submitElicitationAnswer({
 		}
 	}
 
-	// `status: "pending"` in the filter makes a double submit a no-op rather than a
-	// second, different answer to a server that already got the first.
+	// `status: "pending"` makes a double submit a no-op rather than a second, different answer.
 	const updated = await collections.mcpElicitations.updateOne(
 		{ elicitationId, conversationId, status: "pending" },
 		{

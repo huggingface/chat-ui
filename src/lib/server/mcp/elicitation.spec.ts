@@ -176,8 +176,7 @@ describe("elicitation routing", () => {
 	});
 
 	it("stops the tool call's clock for as long as the prompt is open", async () => {
-		// Without this the call would expire underneath a user who takes their time, since
-		// MCP has no way to tell a server that a human is still thinking.
+		// Without this the call expires underneath a user who takes their time.
 		const client = newClient();
 		const { sink, updates } = makeSink(new ObjectId(), "gen-1");
 		const deadline = spyDeadline();
@@ -216,8 +215,7 @@ describe("elicitation routing", () => {
 	});
 
 	it("stops every call in the round, not just the one it picked", async () => {
-		// Which of the parallel calls asked is unknowable, and they are all part of the
-		// round the user is answering for.
+		// Which of the parallel calls asked is unknowable.
 		const client = newClient();
 		const { sink, updates } = makeSink(new ObjectId(), "gen-1");
 		const first = spyDeadline();
@@ -245,9 +243,7 @@ describe("elicitation routing", () => {
 	});
 
 	it("closes the prompt when the server withdraws its request", async () => {
-		// Servers put their own timeout on `elicitation/create` — 60s by SDK default — and
-		// send `notifications/cancelled` when it fires. Leaving the form up after that
-		// would invite an answer nobody is listening for.
+		// Servers time out their own request (60s by SDK default) and cancel it.
 		const client = newClient();
 		const { sink, updates } = makeSink(new ObjectId(), "gen-1");
 		const server = new AbortController();
@@ -276,8 +272,7 @@ describe("elicitation routing", () => {
 		);
 
 		await waitForRequest(updates);
-		// Stopping the response is what makes the server hang up, so the user's action is
-		// the honest explanation of the two.
+		// Stopping the response is what makes the server hang up.
 		generation.abort();
 		server.abort();
 

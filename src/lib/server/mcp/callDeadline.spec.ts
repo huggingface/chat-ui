@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createCallDeadline } from "./httpClient";
 
-/**
- * The tool call deadline is enforced here rather than by the MCP SDK, whose timer only a
- * server-sent progress notification can reset. These are the properties that buys us.
- */
 describe("createCallDeadline", () => {
 	beforeEach(() => vi.useFakeTimers());
 	afterEach(() => vi.useRealTimers());
@@ -21,8 +17,7 @@ describe("createCallDeadline", () => {
 	});
 
 	it("does not run while a user is being asked something", () => {
-		// The whole point: a person taking five minutes over a form must not kill the call
-		// that is waiting on their answer.
+		// The whole point: a slow answer must not kill the call waiting on it.
 		const deadline = createCallDeadline(1_000);
 
 		deadline.pause();

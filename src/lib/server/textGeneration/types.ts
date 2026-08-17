@@ -27,9 +27,6 @@ export interface TextGenerationContext {
 	artifactsOverride?: boolean;
 	locals: App.Locals | undefined;
 	abortController: AbortController;
-	/**
-	 * This run's id. Identifies the audience for an MCP elicitation, so a prompt raised
-	 * mid tool call is shown to the chat that triggered it and nobody else.
-	 */
+	/** Also identifies the audience for an MCP elicitation raised mid tool call. */
 	generationId?: string;
 }

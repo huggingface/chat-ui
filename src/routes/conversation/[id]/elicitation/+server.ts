@@ -9,23 +9,13 @@ import { z } from "zod";
 const bodySchema = z.object({
 	elicitationId: z.string().uuid(),
 	action: z.enum(["accept", "decline", "cancel"]),
-	/**
-	 * Shape-checked here only far enough to be JSON of the right primitive kinds; the
-	 * real check is against the schema the server actually asked for, which lives on the
-	 * stored request rather than in anything the browser sends.
-	 */
+	/** Only shape-checked here; the real check is against the stored requested schema. */
 	content: z
 		.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]))
 		.optional(),
 });
 
-/**
- * Deliver a user's answer to an MCP server waiting mid tool call.
- *
- * Deliberately not part of the generation stream: the run holding the tool call may be on
- * another pod, so the answer is written to the conversation's pending elicitation and the
- * waiting pod picks it up from there.
- */
+/** Separate from the generation stream: the run holding the tool call may be on another pod. */
 export const POST: RequestHandler = async ({ params, locals, request }) => {
 	if (!locals.user && !locals.sessionId) error(401, "Unauthorized");
 

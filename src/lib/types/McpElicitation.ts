@@ -2,12 +2,7 @@ import type { ObjectId } from "mongodb";
 import type { Conversation } from "./Conversation";
 import type { Timestamps } from "./Timestamps";
 
-/**
- * A form field, normalized from MCP's `PrimitiveSchemaDefinition`. The spec spells the
- * same select box six ways (`enum`, `enum`+`enumNames`, `oneOf`, and array variants of
- * each); collapsing them here means the browser, the response validator and the UI all
- * read one shape, and a new spec spelling only has to be taught to the normalizer.
- */
+/** Normalized from MCP's `PrimitiveSchemaDefinition`, which spells a select box six ways. */
 export type ElicitationField =
 	| {
 			kind: "string";
@@ -56,50 +51,29 @@ export type ElicitationValue = string | number | boolean | string[];
 
 export type ElicitationAction = "accept" | "decline" | "cancel";
 
-/**
- * Why a pending elicitation stopped waiting without the user answering. Surfaced in the
- * transcript so a form that vanished is explained rather than just gone.
- *
- * `withdrawn` is the common one in practice: the server put its own timeout on the
- * request it sent us (60s by MCP SDK default) and gave up before the user got back.
- */
+/** `withdrawn` is the server giving up on its own request, which it usually does first. */
 export type ElicitationResolution = "user" | "expired" | "aborted" | "withdrawn";
 
-/**
- * The part of an elicitation that is safe to show and to replay: every string here came
- * from the MCP server, so it is untrusted display text and must never be rendered as
- * markup.
- */
+/** Every string here is server-authored, so it is display text and never markup. */
 export interface ElicitationRequestPayload {
 	elicitationId: string;
-	/** Name of the MCP server asking, so the user can see who wants the data. */
 	server: string;
 	mode: "form" | "url";
 	message: string;
-	/** Present in `form` mode. */
 	fields?: ElicitationField[];
-	/** Present in `url` mode. Always http(s) — other schemes are rejected on arrival. */
 	url?: string;
 }
 
-/**
- * A pending request for user input, raised by an MCP server mid tool call.
- *
- * It lives in the database rather than in the process that is waiting because the pod
- * serving the user's answer need not be the pod running the generation — the same split
- * `abortedGenerations` exists for.
- */
+/** In the database because the pod serving the answer need not be the one waiting on it. */
 export interface McpElicitation extends Timestamps {
 	_id: ObjectId;
 	elicitationId: string;
 	conversationId: Conversation["_id"];
-	/** The run that raised it; absent only if the run had no writer. */
 	generationId?: string;
 	status: "pending" | "resolved";
 	request: ElicitationRequestPayload;
 	action?: ElicitationAction;
 	content?: Record<string, ElicitationValue>;
-	/** After this instant the answer is refused and the waiter gives up. */
 	expiresAt: Date;
 	resolvedAt?: Date;
 }
