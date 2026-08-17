@@ -7,14 +7,14 @@
  *   file:///huge.log      44k chars                       — must truncate at 32k
  *
  * Run:  node scripts/mock-resources-mcp.mjs
- * Then add http://127.0.0.1:8792/mcp as an MCP server in the UI.
+ * Then add http://127.0.0.1:8793/mcp as an MCP server in the UI.
  * Requires MCP_ALLOW_INSECURE_URLS=true, or chat-ui rejects the loopback URL.
  */
 import { createServer } from "node:http";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
-const PORT = Number(process.env.MOCK_RESOURCES_MCP_PORT ?? 8792);
+const PORT = Number(process.env.MOCK_RESOURCES_MCP_PORT ?? 8793);
 
 const PNG_1X1 =
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
