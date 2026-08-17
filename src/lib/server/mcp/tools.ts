@@ -1,4 +1,5 @@
 import { createMcpClient } from "./client";
+import type { Client } from "@modelcontextprotocol/sdk/client";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { McpServerConfig } from "./httpClient";
@@ -30,6 +31,29 @@ export interface McpToolMapping {
 	annotations?: McpToolAnnotations;
 }
 
+/**
+ * Resources are reached through two synthetic functions rather than one function per
+ * resource: a server may expose hundreds, and they would crowd out its real tools in the
+ * array sent to the provider. Neither is bound to a single server — `list` spans them all
+ * and `read` resolves its URI's owner at call time.
+ */
+export interface McpResourceFnMapping {
+	fnName: string;
+	kind: "resource";
+	action: "list" | "read";
+}
+
+export type McpFunctionMapping = McpToolMapping | McpResourceFnMapping;
+
+export function isResourceFn(
+	mapping: McpFunctionMapping | undefined
+): mapping is McpResourceFnMapping {
+	return mapping !== undefined && "kind" in mapping && mapping.kind === "resource";
+}
+
+export const RESOURCE_LIST_FN = "list_mcp_resources";
+export const RESOURCE_READ_FN = "read_mcp_resource";
+
 // Tool listings are cached per server (url + headers), not per server set, so
 // toggling one server never invalidates the others' entries. Headers are part
 // of the key because they change what a server returns (e.g. the forwarded HF
@@ -42,10 +66,39 @@ type CachedServerTool = {
 	annotations?: McpToolAnnotations;
 };
 
+/** A resource the server enumerates by concrete URI. */
+export type CachedServerResource = {
+	uri: string;
+	name?: string;
+	description?: string;
+	mimeType?: string;
+};
+
+/** A URI template, for resource families the server does not enumerate one by one. */
+export type CachedServerResourceTemplate = {
+	uriTemplate: string;
+	name?: string;
+	description?: string;
+	mimeType?: string;
+};
+
+/**
+ * Everything one connection to a server yields. Tools and resources share a cache entry
+ * because they share a key and a TTL — listing them separately would double the connection
+ * churn this cache exists to avoid.
+ */
+export type ServerCatalog = {
+	tools: CachedServerTool[];
+	resources: CachedServerResource[];
+	templates: CachedServerResourceTemplate[];
+};
+
+const EMPTY_CATALOG: ServerCatalog = { tools: [], resources: [], templates: [] };
+
 interface ServerCacheEntry {
 	fetchedAt: number;
 	ttlMs: number;
-	tools: CachedServerTool[];
+	catalog: ServerCatalog;
 }
 
 const DEFAULT_TTL_MS = 60_000;
@@ -58,6 +111,16 @@ const cache = new Map<string, ServerCacheEntry>();
 // Normalize any disallowed characters (including ".") to underscore and trim to 64 chars.
 function sanitizeName(name: string) {
 	return name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+}
+
+/** Free variant of a fixed function name, for names with no server to disambiguate them. */
+function reserveName(candidate: string, taken: Record<string, unknown>): string {
+	if (!(candidate in taken)) return candidate;
+	for (let n = 2; n < 10; n += 1) {
+		const next = `${candidate}_${n}`.slice(0, 64);
+		if (!(next in taken)) return next;
+	}
+	return `${candidate}_mcp`.slice(0, 64);
 }
 
 const TYPE_IMPLYING_KEYWORDS = ["enum", "const", "$ref", "anyOf", "oneOf", "allOf", "not"] as const;
@@ -161,6 +224,130 @@ type ListedTool = {
 	annotations?: Record<string, unknown>;
 };
 
+type ListedResource = {
+	uri?: unknown;
+	name?: unknown;
+	title?: unknown;
+	description?: unknown;
+	mimeType?: unknown;
+};
+
+type ListedResourceTemplate = Omit<ListedResource, "uri"> & { uriTemplate?: unknown };
+
+// A server may enumerate far more resources than are useful to put in front of a model, and
+// listing is paginated. Both bounds are belt-and-braces: whichever trips first stops paging.
+const MAX_RESOURCE_PAGES = 10;
+const MAX_RESOURCES_PER_SERVER = 250;
+
+function optionalString(value: unknown): string | undefined {
+	return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+/**
+ * Walk a paginated MCP listing to exhaustion (within bounds). `listPage` is the SDK call;
+ * `pick` pulls the page's array out of the envelope, since resources and templates use
+ * different property names for it.
+ */
+async function listAllPages<T>(
+	listPage: (params: { cursor?: string }) => Promise<unknown>,
+	pick: (page: Record<string, unknown>) => unknown
+): Promise<T[]> {
+	const out: T[] = [];
+	let cursor: string | undefined;
+
+	for (let page = 0; page < MAX_RESOURCE_PAGES; page += 1) {
+		const response = await listPage(cursor ? { cursor } : {});
+		if (!isPlainObject(response)) break;
+
+		const items = pick(response);
+		if (Array.isArray(items)) out.push(...(items as T[]));
+
+		cursor = optionalString(response.nextCursor);
+		if (!cursor || out.length >= MAX_RESOURCES_PER_SERVER) break;
+	}
+
+	return out.slice(0, MAX_RESOURCES_PER_SERVER);
+}
+
+function normalizeResources(raw: ListedResource[]): CachedServerResource[] {
+	const out: CachedServerResource[] = [];
+	for (const resource of raw) {
+		const uri = optionalString(resource?.uri);
+		if (!uri) continue;
+		out.push({
+			uri,
+			name: optionalString(resource.name),
+			// `title` is the human-facing label; use it only when there is no description,
+			// so a resource that declares neither still says something useful to the model.
+			description: optionalString(resource.description) ?? optionalString(resource.title),
+			mimeType: optionalString(resource.mimeType),
+		});
+	}
+	return out;
+}
+
+function normalizeResourceTemplates(raw: ListedResourceTemplate[]): CachedServerResourceTemplate[] {
+	const out: CachedServerResourceTemplate[] = [];
+	for (const template of raw) {
+		const uriTemplate = optionalString(template?.uriTemplate);
+		if (!uriTemplate) continue;
+		out.push({
+			uriTemplate,
+			name: optionalString(template.name),
+			description: optionalString(template.description) ?? optionalString(template.title),
+			mimeType: optionalString(template.mimeType),
+		});
+	}
+	return out;
+}
+
+/**
+ * Resource listing for a connected client. Returns empty rather than throwing: a server whose
+ * resource listing is broken must still contribute its tools, which is what the caller is
+ * primarily after.
+ */
+export async function listResourcesFor(
+	client: Client,
+	label: string,
+	opts: { signal?: AbortSignal } = {}
+): Promise<Pick<ServerCatalog, "resources" | "templates">> {
+	// Declared capability first: a server that never declares `resources` would answer both
+	// calls below with method-not-found, so asking is a guaranteed wasted round trip.
+	if (!client.getServerCapabilities()?.resources) {
+		return { resources: [], templates: [] };
+	}
+
+	const listed = await Promise.allSettled([
+		listAllPages<ListedResource>(
+			(params) => client.listResources(params, { signal: opts.signal }),
+			(page) => page.resources
+		),
+		// Templates are optional even for a server that declares `resources`, so a rejection
+		// here is unremarkable and must not cost us the concrete resources.
+		listAllPages<ListedResourceTemplate>(
+			(params) => client.listResourceTemplates(params, { signal: opts.signal }),
+			(page) => page.resourceTemplates
+		),
+	]);
+
+	const [resourcesResult, templatesResult] = listed;
+	if (resourcesResult.status === "rejected") {
+		logger.debug(
+			{ server: label, err: String(resourcesResult.reason) },
+			"[mcp] failed to list resources for server"
+		);
+	}
+
+	return {
+		resources:
+			resourcesResult.status === "fulfilled" ? normalizeResources(resourcesResult.value) : [],
+		templates:
+			templatesResult.status === "fulfilled"
+				? normalizeResourceTemplates(templatesResult.value)
+				: [],
+	};
+}
+
 const ANNOTATION_HINTS = [
 	"readOnlyHint",
 	"destructiveHint",
@@ -180,10 +367,10 @@ function readAnnotations(raw: unknown): McpToolAnnotations | undefined {
 	return Object.keys(annotations).length > 0 ? annotations : undefined;
 }
 
-async function listServerTools(
+async function listServerCatalog(
 	server: McpServerConfig,
 	opts: { signal?: AbortSignal } = {}
-): Promise<ListedTool[]> {
+): Promise<{ tools: ListedTool[] } & Pick<ServerCatalog, "resources" | "templates">> {
 	const url = new URL(server.url);
 	const client = createMcpClient();
 	try {
@@ -203,6 +390,7 @@ async function listServerTools(
 
 		const response = await client.listTools({});
 		const tools = Array.isArray(response?.tools) ? (response.tools as ListedTool[]) : [];
+		const { resources, templates } = await listResourcesFor(client, server.name, opts);
 		try {
 			logger.debug(
 				{
@@ -210,11 +398,13 @@ async function listServerTools(
 					url: server.url,
 					count: tools.length,
 					toolNames: tools.map((t) => t?.name).filter(Boolean),
+					resourceCount: resources.length,
+					resourceTemplateCount: templates.length,
 				},
-				"[mcp] listed tools from server"
+				"[mcp] listed catalog from server"
 			);
 		} catch {}
-		return tools;
+		return { tools, resources, templates };
 	} finally {
 		try {
 			await client.close?.();
@@ -224,13 +414,13 @@ async function listServerTools(
 	}
 }
 
-async function fetchServerTools(
+async function fetchServerCatalog(
 	server: McpServerConfig,
 	opts: { signal?: AbortSignal } = {}
-): Promise<CachedServerTool[]> {
-	const raw = await listServerTools(server, opts);
+): Promise<ServerCatalog> {
+	const raw = await listServerCatalog(server, opts);
 	const normalized: CachedServerTool[] = [];
-	for (const tool of raw) {
+	for (const tool of raw.tools) {
 		if (typeof tool.name !== "string" || tool.name.trim().length === 0) {
 			continue;
 		}
@@ -244,46 +434,57 @@ async function fetchServerTools(
 			annotations: readAnnotations(tool.annotations),
 		});
 	}
-	return normalized;
+	return { tools: normalized, resources: raw.resources, templates: raw.templates };
+}
+
+/**
+ * Each server's catalog, index-aligned with `servers`. Only cold servers are fetched, in
+ * parallel. A failed listing contributes nothing and caches nothing, so the next request
+ * retries that server.
+ */
+export async function getMcpCatalog(
+	servers: McpServerConfig[],
+	{ ttlMs = DEFAULT_TTL_MS, signal }: { ttlMs?: number; signal?: AbortSignal } = {}
+): Promise<ServerCatalog[]> {
+	const now = Date.now();
+	evictExpired(now);
+
+	const listed = await Promise.all(
+		servers.map(async (server): Promise<ServerCatalog> => {
+			const key = serverCacheKey(server);
+			const cached = cache.get(key);
+			if (cached) {
+				return cached.catalog;
+			}
+			try {
+				const catalog = await fetchServerCatalog(server, { signal });
+				cache.set(key, { fetchedAt: now, ttlMs, catalog });
+				return catalog;
+			} catch (err) {
+				logger.debug(
+					{ server: server.name, url: server.url, err: String(err) },
+					"[mcp] failed to list catalog for server"
+				);
+				return EMPTY_CATALOG;
+			}
+		})
+	);
+	enforceCacheCap();
+	return listed;
 }
 
 export async function getOpenAiToolsForMcp(
 	servers: McpServerConfig[],
 	{ ttlMs = DEFAULT_TTL_MS, signal }: { ttlMs?: number; signal?: AbortSignal } = {}
-): Promise<{ tools: OpenAiTool[]; mapping: Record<string, McpToolMapping> }> {
-	const now = Date.now();
-	evictExpired(now);
-
-	// Resolve each server's tools from the per-server cache; only cold servers
-	// are fetched, in parallel. A failed listing contributes no tools and caches
-	// nothing, so the next request retries that server.
-	const listed = await Promise.all(
-		servers.map(async (server): Promise<CachedServerTool[]> => {
-			const key = serverCacheKey(server);
-			const cached = cache.get(key);
-			if (cached) {
-				return cached.tools;
-			}
-			try {
-				const tools = await fetchServerTools(server, { signal });
-				cache.set(key, { fetchedAt: now, ttlMs, tools });
-				return tools;
-			} catch (err) {
-				logger.debug(
-					{ server: server.name, url: server.url, err: String(err) },
-					"[mcp] failed to list tools for server"
-				);
-				return [];
-			}
-		})
-	);
-	enforceCacheCap();
+): Promise<{ tools: OpenAiTool[]; mapping: Record<string, McpFunctionMapping> }> {
+	const catalogs = await getMcpCatalog(servers, { ttlMs, signal });
+	const listed = catalogs.map((catalog) => catalog.tools);
 
 	// Function names depend on the request's server combination (collision
 	// suffixes), so definitions and mapping are rebuilt per request from the
 	// cached per-server listings.
 	const tools: OpenAiTool[] = [];
-	const mapping: Record<string, McpToolMapping> = {};
+	const mapping: Record<string, McpFunctionMapping> = {};
 
 	const seenNames = new Set<string>();
 
@@ -334,6 +535,43 @@ export async function getOpenAiToolsForMcp(
 				...(tool.annotations ? { annotations: tool.annotations } : {}),
 			};
 		}
+	}
+
+	// Resource functions come last so a real tool never loses its plain name to them.
+	const resourceServers = servers.filter(
+		(_, index) => catalogs[index].resources.length > 0 || catalogs[index].templates.length > 0
+	);
+	if (resourceServers.length > 0) {
+		const listFn = reserveName(RESOURCE_LIST_FN, mapping);
+		const readFn = reserveName(RESOURCE_READ_FN, mapping);
+		const serverList = resourceServers.map((server) => server.name).join(", ");
+
+		pushToolDefinition(
+			listFn,
+			`List the read-only data resources exposed by the connected MCP servers (${serverList}). ` +
+				`Returns each resource's URI, name, description and media type. Call this to discover a ` +
+				`URI, then pass that URI to ${readFn} to read its contents.`,
+			{ type: "object", properties: {}, additionalProperties: false }
+		);
+		mapping[listFn] = { fnName: listFn, kind: "resource", action: "list" };
+
+		pushToolDefinition(
+			readFn,
+			`Read the contents of an MCP resource by its URI. Get URIs from ${listFn}. Resources are ` +
+				`read-only reference data (files, documents, records), so reading one has no side effects.`,
+			{
+				type: "object",
+				properties: {
+					uri: {
+						type: "string",
+						description: `The resource URI exactly as reported by ${listFn}, e.g. "file:///notes.md".`,
+					},
+				},
+				required: ["uri"],
+				additionalProperties: false,
+			}
+		);
+		mapping[readFn] = { fnName: readFn, kind: "resource", action: "read" };
 	}
 
 	return { tools, mapping };

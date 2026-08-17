@@ -53,6 +53,18 @@ export interface MCPTool {
 	inputSchema?: unknown;
 }
 
+/**
+ * A read-only datum a server exposes. `uri` is absent for a URI template, which stands for a
+ * family of resources the server does not enumerate; `uriTemplate` is absent for a concrete one.
+ */
+export interface MCPResource {
+	uri?: string;
+	uriTemplate?: string;
+	name?: string;
+	description?: string;
+	mimeType?: string;
+}
+
 export interface MCPServer {
 	id: string;
 	name: string;
@@ -63,6 +75,7 @@ export interface MCPServer {
 	status?: ServerStatus;
 	isLocked?: boolean;
 	tools?: MCPTool[];
+	resources?: MCPResource[];
 	errorMessage?: string;
 	// Indicates server reports or appears to require OAuth or other auth
 	authRequired?: boolean;

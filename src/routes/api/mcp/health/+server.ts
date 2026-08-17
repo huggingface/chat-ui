@@ -2,7 +2,8 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { createMcpClient } from "$lib/server/mcp/client";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import type { KeyValuePair } from "$lib/types/Tool";
+import type { KeyValuePair, MCPResource } from "$lib/types/Tool";
+import { listResourcesFor } from "$lib/server/mcp/tools";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import type { RequestHandler } from "./$types";
@@ -21,8 +22,54 @@ interface HealthCheckResponse {
 		description?: string;
 		inputSchema?: unknown;
 	}>;
+	resources?: MCPResource[];
 	error?: string;
 	authRequired?: boolean;
+}
+
+/**
+ * What a connected server offers, and whether that makes it usable. Shared by both transport
+ * branches below so the two never drift.
+ *
+ * `listTools` is allowed to fail: a server may expose only resources, and the MCP spec does
+ * not require the tools capability. Such a server is healthy, so a rejection here is not
+ * grounds for falling through to the SSE retry.
+ */
+async function readCatalog(
+	client: Client,
+	url: string
+): Promise<HealthCheckResponse & { httpStatus: number }> {
+	let tools: HealthCheckResponse["tools"] = [];
+	try {
+		const toolsResponse = await client.listTools();
+		tools = (toolsResponse?.tools ?? []).map((tool) => ({
+			name: tool.name,
+			description: tool.description,
+			inputSchema: tool.inputSchema,
+		}));
+	} catch (error) {
+		logger.debug({ err: error }, `[MCP Health] ${url} exposes no tools`);
+	}
+
+	const { resources, templates } = await listResourcesFor(client, url);
+	const listedResources: MCPResource[] = [...resources, ...templates];
+
+	if (tools.length === 0 && listedResources.length === 0) {
+		return {
+			ready: false,
+			error: "Connected but no tools or resources available",
+			authRequired: false,
+			httpStatus: 503,
+		};
+	}
+
+	return {
+		ready: true,
+		tools,
+		resources: listedResources,
+		authRequired: false,
+		httpStatus: 200,
+	};
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -117,44 +164,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			await client.connect(transport);
 			logger.info({}, `[MCP Health] Connected successfully via HTTP`);
 
-			// Connection successful, get tools
-			const toolsResponse = await client.listTools();
-
-			// Disconnect after getting tools
+			const { httpStatus, ...response } = await readCatalog(client, url);
 			await client.close();
 
-			if (toolsResponse && toolsResponse.tools) {
-				const response: HealthCheckResponse = {
-					ready: true,
-					tools: toolsResponse.tools.map((tool) => ({
-						name: tool.name,
-						description: tool.description,
-						inputSchema: tool.inputSchema,
-					})),
-					authRequired: false,
-				};
-
-				const res = new Response(JSON.stringify(response), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				});
-				clearTimeout(timeoutId);
-				return res;
-			} else {
-				const res = new Response(
-					JSON.stringify({
-						ready: false,
-						error: "Connected but no tools available",
-						authRequired: false,
-					} as HealthCheckResponse),
-					{
-						status: 503,
-						headers: { "Content-Type": "application/json" },
-					}
-				);
-				clearTimeout(timeoutId);
-				return res;
-			}
+			const res = new Response(JSON.stringify(response satisfies HealthCheckResponse), {
+				status: httpStatus,
+				headers: { "Content-Type": "application/json" },
+			});
+			clearTimeout(timeoutId);
+			return res;
 		} catch (error) {
 			httpError = error instanceof Error ? error : new Error(String(error));
 			lastError = httpError;
@@ -180,44 +198,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				await client.connect(sseTransport);
 				logger.info({}, `[MCP Health] Connected successfully via SSE`);
 
-				// Connection successful, get tools
-				const toolsResponse = await client.listTools();
-
-				// Disconnect after getting tools
+				const { httpStatus, ...response } = await readCatalog(client, url);
 				await client.close();
 
-				if (toolsResponse && toolsResponse.tools) {
-					const response: HealthCheckResponse = {
-						ready: true,
-						tools: toolsResponse.tools.map((tool) => ({
-							name: tool.name,
-							description: tool.description,
-							inputSchema: tool.inputSchema,
-						})),
-						authRequired: false,
-					};
-
-					const res = new Response(JSON.stringify(response), {
-						status: 200,
-						headers: { "Content-Type": "application/json" },
-					});
-					clearTimeout(timeoutId);
-					return res;
-				} else {
-					const res = new Response(
-						JSON.stringify({
-							ready: false,
-							error: "Connected but no tools available",
-							authRequired: false,
-						} as HealthCheckResponse),
-						{
-							status: 503,
-							headers: { "Content-Type": "application/json" },
-						}
-					);
-					clearTimeout(timeoutId);
-					return res;
-				}
+				const res = new Response(JSON.stringify(response satisfies HealthCheckResponse), {
+					status: httpStatus,
+					headers: { "Content-Type": "application/json" },
+				});
+				clearTimeout(timeoutId);
+				return res;
 			} catch (sseError) {
 				lastError = sseError instanceof Error ? sseError : new Error(String(sseError));
 				// Prefer the HTTP error when both failed so UI shows the primary failure (e.g., HTTP 500) instead
