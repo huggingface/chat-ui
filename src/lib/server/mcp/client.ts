@@ -20,5 +20,10 @@ export type McpClientKind = keyof typeof CLIENT_INFO;
  * would look declared and never fire.
  */
 export function createMcpClient(kind: McpClientKind = "session"): Client {
-	return new Client(CLIENT_INFO[kind], { capabilities: MCP_CLIENT_CAPABILITIES });
+	return new Client(CLIENT_INFO[kind], {
+		capabilities: MCP_CLIENT_CAPABILITIES,
+		// The SDK defaults to `legacy`, i.e. never negotiating. Probe instead, and let the
+		// probe fall back on its own for the 2025-era servers that are still the majority.
+		versionNegotiation: { mode: "auto" },
+	});
 }
