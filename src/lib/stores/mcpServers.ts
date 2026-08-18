@@ -8,7 +8,7 @@ import { writable, derived, get } from "svelte/store";
 import { base } from "$app/paths";
 import { env as publicEnv } from "$env/dynamic/public";
 import { browser } from "$app/environment";
-import type { MCPServer, ServerStatus, MCPTool, MCPResource } from "$lib/types/Tool";
+import type { MCPServer, ServerStatus, MCPTool } from "$lib/types/Tool";
 
 // Namespace storage by app identity to avoid collisions across apps
 function toKeyPart(s: string | undefined): string {
@@ -302,8 +302,7 @@ export function updateServerStatus(
 	status: ServerStatus,
 	errorMessage?: string,
 	tools?: MCPTool[],
-	authRequired?: boolean,
-	resources?: MCPResource[]
+	authRequired?: boolean
 ) {
 	allMcpServers.update(($servers) =>
 		$servers.map((s) =>
@@ -313,7 +312,6 @@ export function updateServerStatus(
 						status,
 						errorMessage,
 						tools,
-						resources,
 						authRequired,
 					}
 				: s
@@ -339,7 +337,7 @@ export async function healthCheckServer(
 		const result = await response.json();
 
 		if (result.ready && result.tools) {
-			updateServerStatus(server.id, "connected", undefined, result.tools, false, result.resources);
+			updateServerStatus(server.id, "connected", undefined, result.tools, false);
 			return { ready: true, tools: result.tools };
 		} else {
 			updateServerStatus(server.id, "error", result.error, undefined, Boolean(result.authRequired));

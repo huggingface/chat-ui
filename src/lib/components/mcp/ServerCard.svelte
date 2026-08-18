@@ -7,7 +7,6 @@
 	import IconRefresh from "~icons/carbon/renew";
 	import IconTrash from "~icons/carbon/trash-can";
 	import LucideHammer from "~icons/lucide/hammer";
-	import LucideFileText from "~icons/lucide/file-text";
 	import IconSettings from "~icons/carbon/settings";
 	import Switch from "$lib/components/Switch.svelte";
 	import { getMcpServerFaviconUrl } from "$lib/utils/favicon";
@@ -133,14 +132,6 @@
 						{server.tools.length === 1 ? "tool" : "tools"}
 					</span>
 				{/if}
-
-				{#if server.resources && server.resources.length > 0}
-					<span class="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
-						<LucideFileText class="size-3" />
-						{server.resources.length}
-						{server.resources.length === 1 ? "resource" : "resources"}
-					</span>
-				{/if}
 			</div>
 		{/if}
 
@@ -202,27 +193,6 @@
 							<span class="font-medium text-gray-900 dark:text-gray-100">{tool.name}</span>
 							{#if tool.description}
 								<span class="text-gray-500 dark:text-gray-500">- {tool.description}</span>
-							{/if}
-						</li>
-					{/each}
-				</ul>
-			</details>
-		{/if}
-
-		<!-- Resources List (Expandable) -->
-		{#if server.resources && server.resources.length > 0}
-			<details class="mt-3">
-				<summary class="cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300">
-					Available Resources ({server.resources.length})
-				</summary>
-				<ul class="mt-2 space-y-1 text-xs">
-					{#each server.resources as resource}
-						<li class="text-gray-600 dark:text-gray-400">
-							<span class="font-medium break-all text-gray-900 dark:text-gray-100">
-								{resource.name || resource.uri || resource.uriTemplate}
-							</span>
-							{#if resource.description}
-								<span class="text-gray-500 dark:text-gray-500">- {resource.description}</span>
 							{/if}
 						</li>
 					{/each}
