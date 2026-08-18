@@ -14,7 +14,7 @@ import {
 import { getClient } from "$lib/server/mcp/clientPool";
 import type { ElicitationSink } from "$lib/server/mcp/elicitation";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
-import type { Client } from "@modelcontextprotocol/sdk/client";
+import type { Client } from "@modelcontextprotocol/client";
 import type { ObjectId } from "mongodb";
 
 export type Primitive = string | number | boolean;

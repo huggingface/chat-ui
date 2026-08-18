@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { ObjectId } from "mongodb";
-import type { Client } from "@modelcontextprotocol/sdk/client";
+import type { Client } from "@modelcontextprotocol/client";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
 import type {

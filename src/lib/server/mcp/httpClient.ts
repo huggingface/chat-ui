@@ -1,5 +1,4 @@
-import { Client } from "@modelcontextprotocol/sdk/client";
-import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client, SdkHttpError } from "@modelcontextprotocol/client";
 import { getClient, evictFromPool, retainClient, releaseClient } from "./clientPool";
 import { withElicitationContext, type ElicitationSink } from "./elicitation";
 import { config } from "$lib/server/config";
@@ -13,7 +12,7 @@ function isConnectionClosedError(err: unknown): boolean {
 // session expired and the client MUST start a new session with a new InitializeRequest —
 // which is exactly what reconnecting with a fresh client does.
 function isSessionExpiredError(err: unknown): boolean {
-	return err instanceof StreamableHTTPError && err.code === 404;
+	return err instanceof SdkHttpError && err.status === 404;
 }
 
 export interface McpServerConfig {
@@ -168,11 +167,7 @@ export async function callMcpTool(
 			retainClient(currentClient);
 			deadline.restart();
 			const invoke = () =>
-				currentClient.callTool(
-					{ name: tool, arguments: normalizedArgs },
-					undefined,
-					callToolOptions
-				);
+				currentClient.callTool({ name: tool, arguments: normalizedArgs }, callToolOptions);
 			try {
 				response = elicitation
 					? await withElicitationContext(

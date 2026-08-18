@@ -4,7 +4,7 @@ const constructed = vi.hoisted(
 	() => [] as Array<{ info: unknown; options: unknown; handlers: Map<unknown, unknown> }>
 );
 
-vi.mock("@modelcontextprotocol/sdk/client", () => ({
+vi.mock("@modelcontextprotocol/client", () => ({
 	Client: class {
 		handlers = new Map<unknown, unknown>();
 		constructor(info: unknown, options: unknown) {

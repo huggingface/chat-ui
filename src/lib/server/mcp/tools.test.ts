@@ -9,7 +9,7 @@ const mcpMock = vi.hoisted(() => ({
 	responses: new Map<string, { tools: unknown[] } | Error>(),
 }));
 
-vi.mock("@modelcontextprotocol/sdk/client", () => ({
+vi.mock("@modelcontextprotocol/client", () => ({
 	Client: class {
 		private url = "";
 		// Session clients register one per declared capability; listing never invokes them.
@@ -26,18 +26,12 @@ vi.mock("@modelcontextprotocol/sdk/client", () => ({
 		}
 		async close() {}
 	},
-}));
-
-vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
 	StreamableHTTPClientTransport: class {
 		url: unknown;
 		constructor(url: unknown) {
 			this.url = url;
 		}
 	},
-}));
-
-vi.mock("@modelcontextprotocol/sdk/client/sse.js", () => ({
 	SSEClientTransport: class {
 		url: unknown;
 		constructor(url: unknown) {

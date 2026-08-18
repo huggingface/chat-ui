@@ -1,6 +1,5 @@
 import { createMcpClient } from "./client";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StreamableHTTPClientTransport, SSEClientTransport } from "@modelcontextprotocol/client";
 import type { McpServerConfig } from "./httpClient";
 import { logger } from "$lib/server/logger";
 import { mcpFetch } from "$lib/server/urlSafety";

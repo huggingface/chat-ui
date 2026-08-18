@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ObjectId } from "mongodb";
-import type { Client } from "@modelcontextprotocol/sdk/client";
+import type { Client } from "@modelcontextprotocol/client";
 import { collections, ready } from "$lib/server/database";
 import {
 	handleElicitationRequest,

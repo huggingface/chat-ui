@@ -10,9 +10,8 @@
  */
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+import { McpServer, isInitializeRequest } from "@modelcontextprotocol/server";
 
 const PORT = Number(process.env.MOCK_ELICITATION_MCP_PORT ?? 8792);
 
@@ -34,7 +33,6 @@ function buildServer() {
 		{
 			description:
 				"Books a meeting. Asks the user for the details it needs before booking anything.",
-			inputSchema: {},
 		},
 		async () => {
 			console.log("[mock-elicitation-mcp] book_meeting -> asking for details");
@@ -84,7 +82,6 @@ function buildServer() {
 		"double_check",
 		{
 			description: "Performs a destructive action, confirming twice before doing it.",
-			inputSchema: {},
 		},
 		async () => {
 			console.log("[mock-elicitation-mcp] double_check -> prompt 1");
@@ -123,7 +120,6 @@ function buildServer() {
 		"impatient_confirm",
 		{
 			description: "Asks for a confirmation but only waits five seconds for it.",
-			inputSchema: {},
 		},
 		async () => {
 			console.log("[mock-elicitation-mcp] impatient_confirm -> asking, 5s timeout");
@@ -153,7 +149,6 @@ function buildServer() {
 		"sign_in",
 		{
 			description: "Signs the user in to the external service before continuing.",
-			inputSchema: {},
 		},
 		async () => {
 			console.log("[mock-elicitation-mcp] sign_in -> URL mode");
@@ -218,7 +213,7 @@ const httpServer = createServer((req, res) => {
 			return;
 		}
 
-		const transport = new StreamableHTTPServerTransport({
+		const transport = new NodeStreamableHTTPServerTransport({
 			sessionIdGenerator: () => randomUUID(),
 			onsessioninitialized: (id) => {
 				console.log(`[mock-elicitation-mcp] session ${id} opened`);

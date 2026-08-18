@@ -1,5 +1,4 @@
-import { Client } from "@modelcontextprotocol/sdk/client";
-import { ElicitRequestSchema, type ClientCapabilities } from "@modelcontextprotocol/sdk/types.js";
+import { Client, type ClientCapabilities } from "@modelcontextprotocol/client";
 import { isElicitationEnabled } from "./elicitationConfig";
 
 /**
@@ -31,10 +30,10 @@ export function createMcpClient(kind: McpClientKind = "session"): Client {
 
 	if (capabilities.elicitation) {
 		// Imported on demand, or every module building a client drags in a Mongo connection.
-		client.setRequestHandler(ElicitRequestSchema, async (request, extra) => {
+		client.setRequestHandler("elicitation/create", async (request, ctx) => {
 			const { handleElicitationRequest } = await import("./elicitation");
-			// `extra.signal` fires on `notifications/cancelled`, i.e. the server gave up.
-			return handleElicitationRequest(client, request.params, extra.signal);
+			// Fires on `notifications/cancelled`, i.e. the server gave up.
+			return handleElicitationRequest(client, request.params, ctx.mcpReq.signal);
 		});
 	}
 

@@ -17,8 +17,8 @@
  * Requires MCP_ALLOW_INSECURE_URLS=true, or chat-ui rejects the loopback URL.
  */
 import { createServer } from "node:http";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+import { McpServer } from "@modelcontextprotocol/server";
 
 const PORT = Number(process.env.MOCK_IMAGE_MCP_PORT ?? 8791);
 
@@ -37,7 +37,6 @@ function buildServer() {
 		{
 			description:
 				"Generates a picture of cheese. Returns the image itself, with no accompanying text.",
-			inputSchema: {},
 		},
 		() => {
 			console.log("[mock-image-mcp] generate_cheese_image -> image block only");
@@ -49,7 +48,6 @@ function buildServer() {
 		"empty_result",
 		{
 			description: "Performs an action that produces no output at all.",
-			inputSchema: {},
 		},
 		() => {
 			console.log("[mock-image-mcp] empty_result -> zero content blocks");
@@ -61,7 +59,6 @@ function buildServer() {
 		"image_with_text",
 		{
 			description: "Generates a picture of cheese and describes it in text.",
-			inputSchema: {},
 		},
 		() => {
 			console.log("[mock-image-mcp] image_with_text -> text + image (control)");
@@ -90,7 +87,7 @@ const httpServer = createServer((req, res) => {
 		if (url.pathname === "/mcp") {
 			// Stateless: a fresh server + transport per request, torn down after.
 			const server = buildServer();
-			const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+			const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 			res.on("close", () => {
 				void transport.close();
 				void server.close();
