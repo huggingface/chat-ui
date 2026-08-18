@@ -21,8 +21,6 @@ import type { McpCallDeadline } from "./httpClient";
 const POLL_INTERVAL_MS = 400;
 
 export interface ElicitationSink {
-	/** Stable per generation, so two calls from one run count as a single audience. */
-	id: string;
 	conversationId: ObjectId;
 	generationId?: string;
 	emit: (update: MessageUpdate) => void;
@@ -64,7 +62,9 @@ function routeTo(client: Client): Route | { refusal: string } {
 	if (contexts.length === 0) {
 		return { refusal: "no tool call is in flight on this connection" };
 	}
-	const audiences = new Set(contexts.map((c) => c.sink.id));
+	// Compared by identity, not by generationId: that is client-supplied, so two callers
+	// could claim the same one and collapse this check.
+	const audiences = new Set(contexts.map((c) => c.sink));
 	if (audiences.size > 1) {
 		// Never guess: that puts one user's prompt, and their answer, in another's conversation.
 		return { refusal: "concurrent tool calls from different generations" };
@@ -96,8 +96,8 @@ async function abandon(
 	elicitationId: string,
 	resolution: Exclude<ElicitationResolution, "user">
 ): Promise<ElicitationOutcome> {
-	const claimed = await collections.mcpElicitations
-		.updateOne(
+	const close = () =>
+		collections.mcpElicitations.updateOne(
 			{ elicitationId, status: "pending" },
 			{
 				$set: {
@@ -107,8 +107,15 @@ async function abandon(
 					updatedAt: new Date(),
 				},
 			}
-		)
-		.catch(() => null);
+		);
+
+	// Retried once: a row left pending is one a reloaded form can still submit into nothing.
+	const claimed = await close()
+		.catch(() => close())
+		.catch((err) => {
+			logger.error({ err, elicitationId }, "[mcp] failed to close elicitation");
+			return null;
+		});
 
 	// Nothing to claim means an answer landed since the last poll; discarding it loses input.
 	if (claimed?.matchedCount === 0) {

@@ -320,11 +320,11 @@ export class Database {
 		mcpElicitations
 			.createIndex({ elicitationId: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating index for mcpElicitations by elicitationId"));
-		// Must stay well clear of MCP_ELICITATION_TIMEOUT_MS, or a row is swept while its
-		// form is still on screen and answering it 404s.
+		// Keyed off expiry, not creation: MCP_ELICITATION_TIMEOUT_MS is unbounded, and a row
+		// swept while its form is still on screen makes answering it 404.
 		mcpElicitations
-			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
-			.catch((e) => logger.error(e, "Error creating TTL index for mcpElicitations by createdAt"));
+			.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for mcpElicitations by expiresAt"));
 
 		sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch((e) => logger.error(e));
 		settings

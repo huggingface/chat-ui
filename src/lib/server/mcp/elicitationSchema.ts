@@ -26,10 +26,21 @@ const asText = (value: unknown, max: number): string | undefined => {
 	return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
 };
 
+/** `out[name] = x` on one of these hits an inherited setter instead of creating a key. */
+const UNSAFE_FIELD_NAMES = new Set(["__proto__", "constructor", "prototype"]);
+
 const asFiniteNumber = (value: unknown): number | undefined =>
 	typeof value === "number" && Number.isFinite(value) ? value : undefined;
 
 type Option = { value: string; label: string };
+
+/** An untitled option shows its raw value, which still has to be safe to display. */
+const labelOf = (value: string) =>
+	asText(value, MAX_TITLE_CHARS) ?? value.slice(0, MAX_TITLE_CHARS);
+
+/** The UI keys options by value, so duplicates would break rendering outright. */
+const uniqueValues = (options: Option[]) =>
+	new Set(options.map((o) => o.value)).size === options.length;
 
 function optionsFromEnum(def: Record<string, unknown>): Option[] | undefined {
 	if (!Array.isArray(def.enum)) return undefined;
@@ -40,7 +51,7 @@ function optionsFromEnum(def: Record<string, unknown>): Option[] | undefined {
 	const labelled = names?.length === values.length && names.every((n) => typeof n === "string");
 	return values.map((value, i) => ({
 		value,
-		label: (labelled ? asText(names?.[i], MAX_TITLE_CHARS) : undefined) ?? value,
+		label: (labelled ? asText(names?.[i], MAX_TITLE_CHARS) : undefined) ?? labelOf(value),
 	}));
 }
 
@@ -50,14 +61,17 @@ function optionsFromConstList(list: unknown): Option[] | undefined {
 	for (const entry of list) {
 		const obj = asRecord(entry);
 		if (!obj || typeof obj.const !== "string") return undefined;
-		options.push({ value: obj.const, label: asText(obj.title, MAX_TITLE_CHARS) ?? obj.const });
+		options.push({
+			value: obj.const,
+			label: asText(obj.title, MAX_TITLE_CHARS) ?? labelOf(obj.const),
+		});
 	}
 	return options;
 }
 
 function normalizeField(name: string, raw: unknown, required: boolean): ElicitationField | null {
 	const def = asRecord(raw);
-	if (!def) return null;
+	if (!def || UNSAFE_FIELD_NAMES.has(name)) return null;
 
 	const common = {
 		name,
@@ -89,6 +103,7 @@ function normalizeField(name: string, raw: unknown, required: boolean): Elicitat
 		const options = optionsFromConstList(def.oneOf) ?? optionsFromEnum(def);
 		if (options) {
 			if (options.length === 0 || options.length > MAX_OPTIONS) return null;
+			if (!uniqueValues(options)) return null;
 			const fallback = typeof def.default === "string" ? def.default : undefined;
 			return {
 				kind: "select",
@@ -125,6 +140,7 @@ function normalizeField(name: string, raw: unknown, required: boolean): Elicitat
 		if (!items) return null;
 		const options = optionsFromConstList(items.anyOf) ?? optionsFromEnum(items);
 		if (!options || options.length === 0 || options.length > MAX_OPTIONS) return null;
+		if (!uniqueValues(options)) return null;
 		const known = new Set(options.map((o) => o.value));
 		const fallback = Array.isArray(def.default)
 			? def.default.filter((v): v is string => typeof v === "string" && known.has(v))
@@ -203,11 +219,13 @@ export function normalizeElicitationRequest(params: unknown): NormalizeResult {
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const DATE_TIME = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/;
+// RFC 3339, so the offset is required — the form converts before submitting.
+const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
 function checkFormat(value: string, format: string): boolean {
 	if (format === "email") return EMAIL.test(value);
-	if (format === "date") return DATE.test(value) && !Number.isNaN(Date.parse(value));
+	// Round-tripped, because Date.parse rolls impossible dates over (2024-02-31 -> March).
+	if (format === "date") return DATE.test(value) && new Date(value).toISOString().startsWith(value);
 	if (format === "date-time") return DATE_TIME.test(value) && !Number.isNaN(Date.parse(value));
 	if (format === "uri") {
 		try {
