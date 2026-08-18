@@ -53,15 +53,6 @@ export interface MCPTool {
 	inputSchema?: unknown;
 }
 
-/** Exactly one of `uri` (a concrete resource) or `uriTemplate` (a family) is set. */
-export interface MCPResource {
-	uri?: string;
-	uriTemplate?: string;
-	name?: string;
-	description?: string;
-	mimeType?: string;
-}
-
 export interface MCPServer {
 	id: string;
 	name: string;
@@ -72,7 +63,6 @@ export interface MCPServer {
 	status?: ServerStatus;
 	isLocked?: boolean;
 	tools?: MCPTool[];
-	resources?: MCPResource[];
 	errorMessage?: string;
 	// Indicates server reports or appears to require OAuth or other auth
 	authRequired?: boolean;

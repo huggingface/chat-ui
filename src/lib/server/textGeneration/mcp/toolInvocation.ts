@@ -4,15 +4,13 @@ import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import type { McpFunctionMapping, McpToolMapping } from "$lib/server/mcp/tools";
-import { isResourceFn } from "$lib/server/mcp/tools";
+import type { McpToolMapping } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import {
 	callMcpTool,
 	getMcpToolTimeoutMs,
 	type McpToolTextResponse,
 } from "$lib/server/mcp/httpClient";
-import { listMcpResources, readMcpResource } from "$lib/server/mcp/resources";
 import { getClient } from "$lib/server/mcp/clientPool";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/sdk/client";
@@ -33,7 +31,7 @@ export interface NormalizedToolCall {
 
 export interface ExecuteToolCallsParams {
 	calls: NormalizedToolCall[];
-	mapping: Record<string, McpFunctionMapping>;
+	mapping: Record<string, McpToolMapping>;
 	servers: McpServerConfig[];
 	/** Returns `null` when the call's argument string could not be decoded — see `toolArgs.ts`. */
 	parseArgs: (raw: unknown) => Record<string, unknown> | null;
@@ -77,22 +75,6 @@ export function isValidJsonObject(raw: string): boolean {
 	} catch {
 		return false;
 	}
-}
-
-/** A user stop reaches us as a rejection, but must not be logged or reported as a failure. */
-function describeCallError(
-	err: unknown,
-	abortSignal?: AbortSignal
-): { message: string; isAbort: boolean } {
-	const errMsg = err instanceof Error ? err.message : String(err);
-	const errName = err instanceof Error ? err.name : "";
-	const isAbort =
-		Boolean(abortSignal?.aborted) ||
-		errName === "AbortError" ||
-		errName === "APIUserAbortError" ||
-		errMsg === "Request was aborted." ||
-		errMsg === "This operation was aborted";
-	return { message: isAbort ? "Aborted by user" : errMsg, isAbort };
 }
 
 const serverMap = (servers: McpServerConfig[]): Map<string, McpServerConfig> => {
@@ -180,14 +162,9 @@ export async function* executeToolCalls({
 		};
 	}
 
-	// Preload clients per distinct server used in this batch (resource fns have no one server).
+	// Preload clients per distinct server used in this batch
 	const distinctServerNames = Array.from(
-		new Set(
-			prepared
-				.map((p) => mapping[p.call.name])
-				.filter((entry): entry is McpToolMapping => Boolean(entry) && !isResourceFn(entry))
-				.map((entry) => entry.server)
-		)
+		new Set(prepared.map((p) => mapping[p.call.name]?.server).filter(Boolean) as string[])
 	);
 	const clientMap = new Map<string, Client>();
 	await Promise.all(
@@ -298,58 +275,6 @@ export async function* executeToolCalls({
 			});
 			return;
 		}
-		if (isResourceFn(mappingEntry)) {
-			const fail = (message: string) => {
-				results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
-				updatesQueue.push({
-					type: MessageUpdateType.Tool,
-					subtype: MessageToolUpdateType.Error,
-					uuid: p.uuid,
-					message,
-				});
-			};
-			try {
-				let output: string;
-				if (mappingEntry.action === "list") {
-					output = await listMcpResources(servers, { signal: abortSignal });
-				} else {
-					const uri = typeof argsObj.uri === "string" ? argsObj.uri : "";
-					const read = await readMcpResource(servers, uri, {
-						signal: abortSignal,
-						timeoutMs: effectiveTimeoutMs,
-						...(typeof argsObj.server === "string" ? { server: argsObj.server } : {}),
-					});
-					if (read.isError) {
-						logger.warn({ uri, err: read.text }, "[mcp] resource read rejected");
-						fail(read.text);
-						return;
-					}
-					output = read.text;
-				}
-				results.push({ index, output, uuid: p.uuid, paramsClean: p.paramsClean });
-				updatesQueue.push({
-					type: MessageUpdateType.Tool,
-					subtype: MessageToolUpdateType.Result,
-					uuid: p.uuid,
-					result: {
-						status: ToolResultStatus.Success,
-						call: { name: p.call.name, parameters: p.paramsClean },
-						outputs: [{ text: output } as unknown as Record<string, unknown>],
-						display: true,
-					},
-				});
-			} catch (err) {
-				const { message, isAbort } = describeCallError(err, abortSignal);
-				if (isAbort) {
-					logger.debug({ action: mappingEntry.action }, "[mcp] resource call aborted by user");
-				} else {
-					logger.warn({ action: mappingEntry.action, err: message }, "[mcp] resource call failed");
-				}
-				fail(message);
-			}
-			return;
-		}
-
 		const serverCfg = serverLookup.get(mappingEntry.server);
 		if (!serverCfg) {
 			const message = `Unknown MCP server: ${mappingEntry.server}`;
@@ -441,7 +366,15 @@ export async function* executeToolCalls({
 				},
 			});
 		} catch (err) {
-			const { message, isAbort: isAbortError } = describeCallError(err, abortSignal);
+			const errMsg = err instanceof Error ? err.message : String(err);
+			const errName = err instanceof Error ? err.name : "";
+			const isAbortError =
+				abortSignal?.aborted ||
+				errName === "AbortError" ||
+				errName === "APIUserAbortError" ||
+				errMsg === "Request was aborted." ||
+				errMsg === "This operation was aborted";
+			const message = isAbortError ? "Aborted by user" : errMsg;
 
 			if (isAbortError) {
 				logger.debug(

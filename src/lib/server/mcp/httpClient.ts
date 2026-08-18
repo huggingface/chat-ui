@@ -3,7 +3,7 @@ import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamable
 import { getClient, evictFromPool, retainClient, releaseClient } from "./clientPool";
 import { config } from "$lib/server/config";
 
-export function isConnectionClosedError(err: unknown): boolean {
+function isConnectionClosedError(err: unknown): boolean {
 	const message = err instanceof Error ? err.message : String(err);
 	return message.includes("-32000") || message.toLowerCase().includes("connection closed");
 }
@@ -11,7 +11,7 @@ export function isConnectionClosedError(err: unknown): boolean {
 // Per the MCP Streamable HTTP spec, a 404 on a request carrying a session ID means the
 // session expired and the client MUST start a new session with a new InitializeRequest —
 // which is exactly what reconnecting with a fresh client does.
-export function isSessionExpiredError(err: unknown): boolean {
+function isSessionExpiredError(err: unknown): boolean {
 	return err instanceof StreamableHTTPError && err.code === 404;
 }
 
