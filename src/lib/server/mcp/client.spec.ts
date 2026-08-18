@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 const constructed = vi.hoisted(() => [] as Array<{ info: unknown; options: unknown }>);
 
-vi.mock("@modelcontextprotocol/sdk/client", () => ({
+vi.mock("@modelcontextprotocol/client", () => ({
 	Client: class {
 		constructor(info: unknown, options: unknown) {
 			constructed.push({ info, options });

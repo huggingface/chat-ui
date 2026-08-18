@@ -1,6 +1,4 @@
-import { Client } from "@modelcontextprotocol/sdk/client";
-import type { ClientCapabilities } from "@modelcontextprotocol/sdk/types.js";
-
+import { Client, type ClientCapabilities } from "@modelcontextprotocol/client";
 /**
  * Empty on purpose: a capability declared without a handler makes servers issue a
  * request the SDK can only answer with method-not-found. Add one only in the change
