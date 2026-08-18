@@ -13,7 +13,7 @@ import {
 } from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
-import type { Client } from "@modelcontextprotocol/sdk/client";
+import type { Client } from "@modelcontextprotocol/client";
 
 export type Primitive = string | number | boolean;
 

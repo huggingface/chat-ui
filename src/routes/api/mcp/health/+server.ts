@@ -1,7 +1,6 @@
-import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport, SSEClientTransport } from "@modelcontextprotocol/client";
+import type { Client } from "@modelcontextprotocol/client";
 import { createMcpClient } from "$lib/server/mcp/client";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { KeyValuePair } from "$lib/types/Tool";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
