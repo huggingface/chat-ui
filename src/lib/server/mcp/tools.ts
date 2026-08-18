@@ -102,13 +102,13 @@ function sanitizeName(name: string) {
 	return name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
 }
 
-function reserveName(candidate: string, taken: Record<string, unknown>): string {
+function reserveName(candidate: string, taken: Record<string, unknown>): string | undefined {
 	if (!(candidate in taken)) return candidate;
-	for (let n = 2; n < 10; n += 1) {
-		const next = `${candidate}_${n}`.slice(0, 64);
-		if (!(next in taken)) return next;
+	for (let n = 2; n < 100; n += 1) {
+		const next = `${candidate}_${n}`;
+		if (next.length <= 64 && !(next in taken)) return next;
 	}
-	return `${candidate}_mcp`.slice(0, 64);
+	return undefined;
 }
 
 const TYPE_IMPLYING_KEYWORDS = ["enum", "const", "$ref", "anyOf", "oneOf", "allOf", "not"] as const;
@@ -360,9 +360,17 @@ async function listServerCatalog(
 			await client.connect(transport);
 		}
 
-		const response = await client.listTools({});
-		const tools = Array.isArray(response?.tools) ? (response.tools as ListedTool[]) : [];
+		// A resources-only server rejects here; only fail if there is nothing to show for it.
+		let tools: ListedTool[] = [];
+		let toolsError: unknown;
+		try {
+			const response = await client.listTools({});
+			tools = Array.isArray(response?.tools) ? (response.tools as ListedTool[]) : [];
+		} catch (err) {
+			toolsError = err;
+		}
 		const { resources, templates } = await listResourcesFor(client, server.name, opts);
+		if (toolsError && resources.length === 0 && templates.length === 0) throw toolsError;
 		try {
 			logger.debug(
 				{
@@ -508,9 +516,10 @@ export async function getOpenAiToolsForMcp(
 	const resourceServers = servers.filter(
 		(_, index) => catalogs[index].resources.length > 0 || catalogs[index].templates.length > 0
 	);
-	if (resourceServers.length > 0) {
-		const listFn = reserveName(RESOURCE_LIST_FN, mapping);
-		const readFn = reserveName(RESOURCE_READ_FN, mapping);
+	const listFn = resourceServers.length ? reserveName(RESOURCE_LIST_FN, mapping) : undefined;
+	const readFn = resourceServers.length ? reserveName(RESOURCE_READ_FN, mapping) : undefined;
+	// Better no resource access at all than a synthetic name hijacking a real tool's dispatch.
+	if (listFn && readFn) {
 		const serverList = resourceServers.map((server) => server.name).join(", ");
 
 		pushToolDefinition(
@@ -532,6 +541,10 @@ export async function getOpenAiToolsForMcp(
 					uri: {
 						type: "string",
 						description: `The resource URI exactly as reported by ${listFn}, e.g. "file:///notes.md".`,
+					},
+					server: {
+						type: "string",
+						description: `Owning server name. Only needed when ${listFn} shows the same URI on more than one server.`,
 					},
 				},
 				required: ["uri"],

@@ -544,3 +544,64 @@ describe("getOpenAiToolsForMcp resource functions", () => {
 		expect(tools.map((t) => t.function.name)).toEqual(["search"]);
 	});
 });
+
+describe("getOpenAiToolsForMcp review fixes", () => {
+	beforeEach(() => {
+		resetMcpToolsCache();
+		mcpMock.listToolsCalls.length = 0;
+		mcpMock.listResourcesCalls.length = 0;
+		mcpMock.responses.clear();
+		mcpMock.resources.clear();
+	});
+
+	const readme = { uri: "file:///readme.md", name: "readme" };
+
+	it("still exposes resources when the server has no tools capability", async () => {
+		mcpMock.responses.set(SERVER_A.url, new Error("MCP error -32601: Method not found"));
+		mcpMock.resources.set(SERVER_A.url, { resources: [readme] });
+
+		const { tools } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools.map((t) => t.function.name)).toEqual(["list_mcp_resources", "read_mcp_resource"]);
+	});
+
+	// Swallowing this would cache an empty catalog for the whole TTL instead of retrying.
+	it("still fails a server whose listing yields neither tools nor resources", async () => {
+		mcpMock.responses.set(SERVER_A.url, new Error("boom"));
+
+		const { tools } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools).toEqual([]);
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		const retried = await getOpenAiToolsForMcp([SERVER_A]);
+		expect(retried.tools.map((t) => t.function.name)).toEqual(["search"]);
+	});
+
+	it("registers no resource functions rather than hijacking an occupied name", async () => {
+		const taken = ["read_mcp_resource"];
+		for (let n = 2; n < 100; n += 1) taken.push(`read_mcp_resource_${n}`);
+		mcpMock.responses.set(SERVER_A.url, {
+			tools: taken.map((name) => ({ name, description: "real", inputSchema: {} })),
+		});
+		mcpMock.resources.set(SERVER_A.url, { resources: [readme] });
+
+		const { tools, mapping } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools.map((t) => t.function.name)).not.toContain("list_mcp_resources");
+		for (const name of taken) {
+			expect(toolMapping(mapping, name).tool).toBe(name);
+		}
+	});
+
+	it("offers a server argument for disambiguating a shared URI", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		mcpMock.resources.set(SERVER_A.url, { resources: [readme] });
+
+		const { tools } = await getOpenAiToolsForMcp([SERVER_A]);
+		const read = tools.find((t) => t.function.name === "read_mcp_resource");
+		const props = (read?.function.parameters as Record<string, Record<string, unknown>>).properties;
+
+		expect(Object.keys(props)).toEqual(["uri", "server"]);
+		expect(read?.function.parameters?.required).toEqual(["uri"]);
+	});
+});

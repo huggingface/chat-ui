@@ -317,6 +317,7 @@ export async function* executeToolCalls({
 					const read = await readMcpResource(servers, uri, {
 						signal: abortSignal,
 						timeoutMs: effectiveTimeoutMs,
+						...(typeof argsObj.server === "string" ? { server: argsObj.server } : {}),
 					});
 					if (read.isError) {
 						logger.warn({ uri, err: read.text }, "[mcp] resource read rejected");

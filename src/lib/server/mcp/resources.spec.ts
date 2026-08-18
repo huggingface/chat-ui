@@ -212,3 +212,57 @@ describe("readMcpResource", () => {
 		});
 	});
 });
+
+describe("readMcpResource ambiguity", () => {
+	const shared = { uri: "file:///readme.md" };
+
+	it("refuses to guess when two servers expose the same URI", async () => {
+		mocks.catalogs = [catalog({ resources: [shared] }), catalog({ resources: [shared] })];
+
+		const result = await readMcpResource([SERVER_A, SERVER_B], "file:///readme.md");
+
+		expect(result.isError).toBe(true);
+		expect(result.text).toContain('"Docs", "Files"');
+		expect(mocks.readsBy).toEqual([]);
+	});
+
+	it("reads the named server when the caller disambiguates", async () => {
+		mocks.catalogs = [catalog({ resources: [shared] }), catalog({ resources: [shared] })];
+		mocks.readResource = async () => ({ contents: [{ text: "from Files" }] });
+
+		const result = await readMcpResource([SERVER_A, SERVER_B], "file:///readme.md", {
+			server: "Files",
+		});
+
+		expect(result).toEqual({ text: "from Files", isError: false });
+		expect(mocks.readsBy).toEqual(["Files"]);
+	});
+
+	it("reports a server argument that does not expose the URI", async () => {
+		mocks.catalogs = [catalog({ resources: [shared] }), catalog({})];
+
+		const result = await readMcpResource([SERVER_A, SERVER_B], "file:///readme.md", {
+			server: "Files",
+		});
+
+		expect(result.isError).toBe(true);
+		expect(result.text).toContain('"Files" does not expose');
+		expect(mocks.readsBy).toEqual([]);
+	});
+});
+
+describe("listMcpResources template cap", () => {
+	it("caps templates and reports the total", async () => {
+		mocks.catalogs = [
+			catalog({
+				templates: Array.from({ length: 80 }, (_, i) => ({ uriTemplate: `doc://{id}/${i}` })),
+			}),
+		];
+
+		const listing = await listMcpResources([SERVER_A]);
+
+		expect(listing).toContain("Resource URI templates (50 of 80 shown;");
+		expect(listing).toContain("doc://{id}/49");
+		expect(listing).not.toContain("doc://{id}/50 ");
+	});
+});

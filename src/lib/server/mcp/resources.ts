@@ -7,6 +7,8 @@ import { logger } from "$lib/server/logger";
 /** A resource is arbitrary server data; unbounded, one read can swallow the context window. */
 const MAX_RESOURCE_TEXT_CHARS = 32_000;
 const MAX_LISTED_RESOURCES = 200;
+/** Templates get their own budget so a long resource listing can never starve them out. */
+const MAX_LISTED_TEMPLATES = 50;
 
 export type McpResourceReadResult = {
 	text: string;
@@ -46,21 +48,19 @@ function describeResource(server: string, resource: CachedServerResource): strin
 	return resource.description ? `${line}\n    ${resource.description}` : line;
 }
 
-/** No match is reported back, never broadcast: a typo must not cost a round trip per server. */
-function resolveOwner(
+/** Every server that could serve `uri`; an enumerated match outranks a template one. */
+function resolveOwners(
 	servers: McpServerConfig[],
 	catalogs: ServerCatalog[],
 	uri: string
-): McpServerConfig | undefined {
-	for (const [index, server] of servers.entries()) {
-		if (catalogs[index].resources.some((resource) => resource.uri === uri)) return server;
-	}
-	for (const [index, server] of servers.entries()) {
-		for (const template of catalogs[index].templates) {
-			if (templateToRegExp(template.uriTemplate)?.test(uri)) return server;
-		}
-	}
-	return undefined;
+): McpServerConfig[] {
+	const enumerated = servers.filter((_, index) =>
+		catalogs[index].resources.some((resource) => resource.uri === uri)
+	);
+	if (enumerated.length > 0) return enumerated;
+	return servers.filter((_, index) =>
+		catalogs[index].templates.some((template) => templateToRegExp(template.uriTemplate)?.test(uri))
+	);
 }
 
 export async function listMcpResources(
@@ -85,8 +85,11 @@ export async function listMcpResources(
 	}
 
 	const templateLines: string[] = [];
+	let templateTotal = 0;
 	for (const [index, server] of servers.entries()) {
 		for (const template of catalogs[index].templates) {
+			templateTotal += 1;
+			if (templateLines.length >= MAX_LISTED_TEMPLATES) continue;
 			const parts = [`- ${template.uriTemplate}`];
 			if (template.name) parts.push(`name: ${template.name}`);
 			if (template.mimeType) parts.push(`type: ${template.mimeType}`);
@@ -109,11 +112,12 @@ export async function listMcpResources(
 		sections.push([heading, ...lines].join("\n"));
 	}
 	if (templateLines.length > 0) {
-		sections.push(
-			[`Resource URI templates (expand the {placeholders} to form a URI):`, ...templateLines].join(
-				"\n"
-			)
-		);
+		const shown =
+			templateTotal > templateLines.length ? `${templateLines.length} of ${templateTotal}` : null;
+		const heading = shown
+			? `Resource URI templates (${shown} shown; expand the {placeholders} to form a URI):`
+			: `Resource URI templates (expand the {placeholders} to form a URI):`;
+		sections.push([heading, ...templateLines].join("\n"));
 	}
 	return sections.join("\n\n");
 }
@@ -121,20 +125,37 @@ export async function listMcpResources(
 export async function readMcpResource(
 	servers: McpServerConfig[],
 	uri: string,
-	{ signal, timeoutMs }: { signal?: AbortSignal; timeoutMs?: number } = {}
+	{
+		signal,
+		timeoutMs,
+		server: serverName,
+	}: { signal?: AbortSignal; timeoutMs?: number; server?: string } = {}
 ): Promise<McpResourceReadResult> {
 	if (typeof uri !== "string" || uri.trim().length === 0) {
 		return { text: "A `uri` argument is required.", isError: true };
 	}
 
 	const catalogs = await getMcpCatalog(servers, { signal });
-	const server = resolveOwner(servers, catalogs, uri);
-	if (!server) {
+	const owners = resolveOwners(servers, catalogs, uri);
+	const candidates = serverName ? owners.filter((owner) => owner.name === serverName) : owners;
+
+	if (candidates.length === 0) {
 		return {
-			text: `No connected MCP server exposes the resource "${uri}". Call the resource listing function to see the available URIs.`,
+			text: serverName
+				? `The MCP server "${serverName}" does not expose the resource "${uri}". Call the resource listing function to see the available URIs.`
+				: `No connected MCP server exposes the resource "${uri}". Call the resource listing function to see the available URIs.`,
 			isError: true,
 		};
 	}
+	// Guessing between servers would silently return one server's document in another's name.
+	if (candidates.length > 1) {
+		const names = candidates.map((candidate) => `"${candidate.name}"`).join(", ");
+		return {
+			text: `The resource "${uri}" is exposed by more than one server (${names}). Retry with the \`server\` argument set to the one you want.`,
+			isError: true,
+		};
+	}
+	const server = candidates[0];
 
 	const effectiveTimeoutMs = timeoutMs ?? getMcpToolTimeoutMs();
 	let activeClient = await getClient(server, signal);
