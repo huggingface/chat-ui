@@ -102,6 +102,33 @@ describe("normalizeElicitationRequest", () => {
 		expect(result).toMatchObject({ ok: false });
 	});
 
+	it("rejects a field name that would hit an inherited setter", () => {
+		// `out.__proto__ = x` assigns through the prototype instead of creating an answer key.
+		for (const name of ["__proto__", "constructor", "prototype"]) {
+			expect(normalizeElicitationRequest(form({ [name]: { type: "string" } }))).toMatchObject({
+				ok: false,
+			});
+		}
+	});
+
+	it("rejects options whose values collide", () => {
+		// The form keys its options by value, so duplicates break rendering outright.
+		expect(
+			normalizeElicitationRequest(form({ pick: { type: "string", enum: ["a", "a"] } }))
+		).toMatchObject({ ok: false });
+		expect(
+			normalizeElicitationRequest(
+				form({ pick: { type: "array", items: { type: "string", enum: ["a", "a"] } } })
+			)
+		).toMatchObject({ ok: false });
+	});
+
+	it("sanitizes an option label that falls back to its raw value", () => {
+		const [field] = fieldsOf(form({ pick: { type: "string", enum: ["ok\u0007bad"] } }));
+
+		expect(field).toMatchObject({ options: [{ value: "ok\u0007bad", label: "ok bad" }] });
+	});
+
 	it("strips control characters out of server-authored display text", () => {
 		const [field] = fieldsOf(form({ name: { type: "string", title: "Name\n​Admin only" } }));
 
@@ -227,6 +254,28 @@ describe("validateElicitationContent", () => {
 				ok: false,
 			});
 		}
+	});
+
+	it("rejects a calendar date that does not exist", () => {
+		// Date.parse rolls 2024-02-31 forward into March rather than rejecting it.
+		const dated = fieldsOf(form({ when: { type: "string", format: "date" } }, ["when"]));
+
+		expect(validateElicitationContent(dated, { when: "2024-02-31" })).toMatchObject({ ok: false });
+		expect(validateElicitationContent(dated, { when: "2024-02-29" })).toMatchObject({ ok: true });
+	});
+
+	it("requires a date-time to carry an offset, as RFC 3339 does", () => {
+		const stamped = fieldsOf(form({ at: { type: "string", format: "date-time" } }, ["at"]));
+
+		expect(validateElicitationContent(stamped, { at: "2024-03-01T10:00" })).toMatchObject({
+			ok: false,
+		});
+		expect(validateElicitationContent(stamped, { at: "2024-03-01T10:00:00Z" })).toMatchObject({
+			ok: true,
+		});
+		expect(validateElicitationContent(stamped, { at: "2024-03-01T10:00:00+02:00" })).toMatchObject({
+			ok: true,
+		});
 	});
 
 	it("rejects an answer that is not an object", () => {

@@ -106,6 +106,12 @@
 				if (Number.isFinite(parsed)) out[field.name] = parsed;
 				continue;
 			}
+			// `datetime-local` has no offset, but the schema asked for RFC 3339.
+			if (field.kind === "string" && field.format === "date-time" && typeof value === "string") {
+				const parsed = new Date(value);
+				if (!Number.isNaN(parsed.getTime())) out[field.name] = parsed.toISOString();
+				continue;
+			}
 			out[field.name] = value;
 		}
 		return out;
@@ -211,13 +217,16 @@
 								<span>{field.title ?? field.name}</span>
 							</label>
 						{:else}
-							<label
-								for={id}
+							{@const grouped = field.kind === "select" && field.multiple}
+							<svelte:element
+								this={grouped ? "span" : "label"}
+								id={`${id}-label`}
+								for={grouped ? undefined : id}
 								class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
 							>
 								{field.title ?? field.name}
 								{#if field.required}<span class="text-red-500">*</span>{/if}
-							</label>
+							</svelte:element>
 						{/if}
 
 						{#if field.description}
@@ -272,7 +281,7 @@
 								{/each}
 							</select>
 						{:else if field.kind === "select"}
-							<div class="space-y-1">
+							<div class="space-y-1" role="group" aria-labelledby={`${id}-label`}>
 								{#each field.options as option (option.value)}
 									<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
 										<input

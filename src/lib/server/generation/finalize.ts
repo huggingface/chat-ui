@@ -43,6 +43,15 @@ export async function markGenerationInterrupted(
 		},
 		{ $set: { "messages.$.interrupted": true, "messages.$.updatedAt": now, updatedAt: now } }
 	);
+	// Nothing is left to poll these, so leaving them pending invites an answer into the void.
+	await collections.mcpElicitations
+		.updateMany(
+			{ generationId, status: "pending" },
+			{ $set: { status: "resolved", action: "cancel", resolvedAt: now, updatedAt: now } }
+		)
+		.catch((err) =>
+			logger.error({ err, generationId }, "[generation] failed to close pending elicitations")
+		);
 }
 
 export async function finalizeActiveRunsOnExit(): Promise<void> {

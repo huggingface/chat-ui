@@ -223,7 +223,6 @@ export async function* executeToolCalls({
 	const results: TaskResult[] = [];
 
 	const elicitationSink: ElicitationSink | undefined = elicitation && {
-		id: elicitation.generationId ?? `conversation:${elicitation.conversationId.toString()}`,
 		conversationId: elicitation.conversationId,
 		...(elicitation.generationId ? { generationId: elicitation.generationId } : {}),
 		emit: (update) => updatesQueue.push(update),

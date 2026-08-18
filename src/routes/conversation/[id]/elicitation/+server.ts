@@ -19,7 +19,8 @@ const bodySchema = z.object({
 export const POST: RequestHandler = async ({ params, locals, request }) => {
 	if (!locals.user && !locals.sessionId) error(401, "Unauthorized");
 
-	const conversationId = new ObjectId(z.string().parse(params.id));
+	if (!ObjectId.isValid(params.id)) error(404, "Conversation not found");
+	const conversationId = new ObjectId(params.id);
 
 	const conversation = await collections.conversations.findOne(
 		{ _id: conversationId, ...authCondition(locals) },

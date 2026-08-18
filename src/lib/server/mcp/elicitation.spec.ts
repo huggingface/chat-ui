@@ -39,7 +39,6 @@ const newClient = () => ({}) as Client;
 function makeSink(conversationId: ObjectId, generationId: string) {
 	const updates: MessageUpdate[] = [];
 	const sink: ElicitationSink = {
-		id: generationId,
 		conversationId,
 		generationId,
 		emit: (update) => updates.push(update),
@@ -120,6 +119,23 @@ describe("elicitation routing", () => {
 		);
 
 		// Routing either way would show one user's prompt in the other's conversation.
+		expect(result).toEqual({ action: "cancel" });
+		expect(a.updates).toHaveLength(0);
+		expect(b.updates).toHaveLength(0);
+	});
+
+	it("cancels even when two generations claim the same id", async () => {
+		// generationId comes from the request body, so it cannot be the audience check.
+		const client = newClient();
+		const a = makeSink(new ObjectId(), "same-id");
+		const b = makeSink(new ObjectId(), "same-id");
+
+		const result = await withElicitationContext(client, context(a.sink), () =>
+			withElicitationContext(client, context(b.sink), () =>
+				handleElicitationRequest(client, FORM_PARAMS)
+			)
+		);
+
 		expect(result).toEqual({ action: "cancel" });
 		expect(a.updates).toHaveLength(0);
 		expect(b.updates).toHaveLength(0);
