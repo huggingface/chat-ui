@@ -23,6 +23,7 @@ import { existsSync, mkdirSync } from "fs";
 import { findRepoRoot } from "./findRepoRoot";
 import type { ConfigKey } from "$lib/types/ConfigKey";
 import { config } from "$lib/server/config";
+import type { MCPOAuthConnection } from "$lib/types/MCPOAuthConnection";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
@@ -134,6 +135,7 @@ export class Database {
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
+		const mcpOAuthConnections = db.collection<MCPOAuthConnection>("mcpOAuthConnections");
 		const sharedConversations = db.collection<SharedConversation>("sharedConversations");
 		const bucket = new GridFSBucket(db, { bucketName: "files" });
 
@@ -170,6 +172,7 @@ export class Database {
 			tokenCaches,
 			tools,
 			config: configCollection,
+			mcpOAuthConnections,
 		};
 	}
 
@@ -194,6 +197,7 @@ export class Database {
 			semaphores,
 			tokenCaches,
 			config,
+			mcpOAuthConnections,
 		} = this.getCollections();
 
 		conversations
@@ -420,6 +424,24 @@ export class Database {
 		config
 			.createIndex({ key: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating index for config by key"));
+		mcpOAuthConnections
+			.createIndex(
+				{ userId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { userId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for MCP OAuth connections by user"));
+		mcpOAuthConnections
+			.createIndex(
+				{ sessionId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { sessionId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for MCP OAuth connections by session"));
+		mcpOAuthConnections
+			.createIndex({ deleteAt: 1 }, { expireAfterSeconds: 0 })
+			.catch((e) => logger.error(e, "Error creating expiry index for MCP OAuth connections"));
+		mcpOAuthConnections
+			.createIndex({ "flow.expectedState": 1 }, { unique: true, sparse: true })
+			.catch((e) => logger.error(e, "Error creating state index for MCP OAuth connections"));
 	}
 }
 
