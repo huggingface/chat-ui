@@ -1,12 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { sanitizeJsonSchema, getOpenAiToolsForMcp, resetMcpToolsCache } from "./tools";
+import {
+	sanitizeJsonSchema,
+	getOpenAiToolsForMcp,
+	resetMcpToolsCache,
+	isResourceFn,
+	type McpFunctionMapping,
+	type McpToolMapping,
+} from "./tools";
 import type { McpServerConfig } from "./httpClient";
 
 // In-memory MCP servers keyed by URL: each listTools call is recorded so tests
 // can assert exactly which servers were (re-)listed vs served from the cache.
 const mcpMock = vi.hoisted(() => ({
 	listToolsCalls: [] as string[],
+	listResourcesCalls: [] as string[],
 	responses: new Map<string, { tools: unknown[] } | Error>(),
+	// Only URLs present here declare the `resources` capability.
+	resources: new Map<string, { resources?: unknown[]; resourceTemplates?: unknown[] } | Error>(),
 }));
 
 vi.mock("@modelcontextprotocol/sdk/client", () => ({
@@ -15,6 +25,9 @@ vi.mock("@modelcontextprotocol/sdk/client", () => ({
 		async connect(transport: { url?: unknown }) {
 			this.url = String(transport.url ?? "");
 		}
+		getServerCapabilities() {
+			return mcpMock.resources.has(this.url) ? { tools: {}, resources: {} } : { tools: {} };
+		}
 		async listTools() {
 			mcpMock.listToolsCalls.push(this.url);
 			const response = mcpMock.responses.get(this.url);
@@ -22,9 +35,26 @@ vi.mock("@modelcontextprotocol/sdk/client", () => ({
 			if (response instanceof Error) throw response;
 			return response;
 		}
+		async listResources() {
+			mcpMock.listResourcesCalls.push(this.url);
+			const response = mcpMock.resources.get(this.url);
+			if (response instanceof Error) throw response;
+			return { resources: response?.resources ?? [] };
+		}
+		async listResourceTemplates() {
+			const response = mcpMock.resources.get(this.url);
+			if (response instanceof Error) throw response;
+			return { resourceTemplates: response?.resourceTemplates ?? [] };
+		}
 		async close() {}
 	},
 }));
+
+function toolMapping(mapping: Record<string, McpFunctionMapping>, name: string): McpToolMapping {
+	const entry = mapping[name];
+	if (!entry || isResourceFn(entry)) throw new Error(`no tool mapping named ${name}`);
+	return entry;
+}
 
 vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
 	StreamableHTTPClientTransport: class {
@@ -196,7 +226,9 @@ describe("getOpenAiToolsForMcp per-server cache", () => {
 	beforeEach(() => {
 		resetMcpToolsCache();
 		mcpMock.listToolsCalls.length = 0;
+		mcpMock.listResourcesCalls.length = 0;
 		mcpMock.responses.clear();
+		mcpMock.resources.clear();
 	});
 
 	afterEach(() => {
@@ -278,7 +310,7 @@ describe("getOpenAiToolsForMcp per-server cache", () => {
 		const renamed = await getOpenAiToolsForMcp([{ ...SERVER_A, name: "Renamed" }]);
 
 		expect(mcpMock.listToolsCalls).toEqual([SERVER_A.url]);
-		expect(renamed.mapping.search?.server).toBe("Renamed");
+		expect(toolMapping(renamed.mapping, "search").server).toBe("Renamed");
 	});
 
 	it("suffixes colliding tool names with the server name", async () => {
@@ -288,8 +320,8 @@ describe("getOpenAiToolsForMcp per-server cache", () => {
 		const { tools, mapping } = await getOpenAiToolsForMcp([SERVER_A, SERVER_B]);
 
 		expect(tools.map((t) => t.function.name)).toEqual(["search", "search_Server_B"]);
-		expect(mapping.search.server).toBe("Server A");
-		expect(mapping.search_Server_B.server).toBe("Server B");
+		expect(toolMapping(mapping, "search").server).toBe("Server A");
+		expect(toolMapping(mapping, "search_Server_B").server).toBe("Server B");
 	});
 });
 
@@ -297,7 +329,9 @@ describe("getOpenAiToolsForMcp tool annotations", () => {
 	beforeEach(() => {
 		resetMcpToolsCache();
 		mcpMock.listToolsCalls.length = 0;
+		mcpMock.listResourcesCalls.length = 0;
 		mcpMock.responses.clear();
+		mcpMock.resources.clear();
 	});
 
 	it("carries declared hints through to the mapping", async () => {
@@ -317,7 +351,7 @@ describe("getOpenAiToolsForMcp tool annotations", () => {
 
 		const { mapping } = await getOpenAiToolsForMcp([SERVER_A]);
 
-		expect(mapping.search.annotations).toEqual({
+		expect(toolMapping(mapping, "search").annotations).toEqual({
 			readOnlyHint: true,
 			destructiveHint: false,
 			idempotentHint: true,
@@ -331,7 +365,7 @@ describe("getOpenAiToolsForMcp tool annotations", () => {
 
 		const { mapping } = await getOpenAiToolsForMcp([SERVER_A]);
 
-		expect(mapping.search.annotations).toBeUndefined();
+		expect(toolMapping(mapping, "search").annotations).toBeUndefined();
 	});
 
 	it("keeps only the hints the server actually declared", async () => {
@@ -341,8 +375,8 @@ describe("getOpenAiToolsForMcp tool annotations", () => {
 
 		const { mapping } = await getOpenAiToolsForMcp([SERVER_A]);
 
-		expect(mapping.search.annotations).toEqual({ readOnlyHint: true });
-		expect(mapping.search.annotations).not.toHaveProperty("destructiveHint");
+		expect(toolMapping(mapping, "search").annotations).toEqual({ readOnlyHint: true });
+		expect(toolMapping(mapping, "search").annotations).not.toHaveProperty("destructiveHint");
 	});
 
 	it("ignores non-boolean hint values rather than reading them as declarations", async () => {
@@ -357,7 +391,7 @@ describe("getOpenAiToolsForMcp tool annotations", () => {
 
 		const { mapping } = await getOpenAiToolsForMcp([SERVER_A]);
 
-		expect(mapping.search.annotations).toEqual({ idempotentHint: true });
+		expect(toolMapping(mapping, "search").annotations).toEqual({ idempotentHint: true });
 	});
 
 	it("still uses the title annotation as a description fallback", async () => {
@@ -368,7 +402,7 @@ describe("getOpenAiToolsForMcp tool annotations", () => {
 		const { tools, mapping } = await getOpenAiToolsForMcp([SERVER_A]);
 
 		expect(tools[0].function.description).toBe("Search things");
-		expect(mapping.search.annotations).toEqual({ readOnlyHint: true });
+		expect(toolMapping(mapping, "search").annotations).toEqual({ readOnlyHint: true });
 	});
 
 	// One tool with an unknown field takes down the whole tools array on strict providers.
@@ -392,6 +426,182 @@ describe("getOpenAiToolsForMcp tool annotations", () => {
 		const cached = await getOpenAiToolsForMcp([SERVER_A]);
 
 		expect(mcpMock.listToolsCalls).toEqual([SERVER_A.url]);
-		expect(cached.mapping.search.annotations).toEqual({ destructiveHint: true });
+		expect(toolMapping(cached.mapping, "search").annotations).toEqual({ destructiveHint: true });
+	});
+});
+
+describe("getOpenAiToolsForMcp resource functions", () => {
+	beforeEach(() => {
+		resetMcpToolsCache();
+		mcpMock.listToolsCalls.length = 0;
+		mcpMock.listResourcesCalls.length = 0;
+		mcpMock.responses.clear();
+		mcpMock.resources.clear();
+	});
+
+	const readme = { uri: "file:///readme.md", name: "readme", mimeType: "text/markdown" };
+
+	it("adds no resource functions when no server exposes resources", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+
+		const { tools } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools.map((t) => t.function.name)).toEqual(["search"]);
+	});
+
+	it("does not ask an undeclaring server for its resources", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+
+		await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(mcpMock.listResourcesCalls).toEqual([]);
+	});
+
+	it("exposes list and read functions once any server has resources", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		mcpMock.resources.set(SERVER_A.url, { resources: [readme] });
+
+		const { tools, mapping } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools.map((t) => t.function.name)).toEqual([
+			"search",
+			"list_mcp_resources",
+			"read_mcp_resource",
+		]);
+		expect(mapping.list_mcp_resources).toEqual({
+			fnName: "list_mcp_resources",
+			kind: "resource",
+			action: "list",
+		});
+		expect(mapping.read_mcp_resource).toEqual({
+			fnName: "read_mcp_resource",
+			kind: "resource",
+			action: "read",
+		});
+	});
+
+	it("exposes the functions for a server with only URI templates", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		mcpMock.resources.set(SERVER_A.url, {
+			resourceTemplates: [{ uriTemplate: "file:///{path}", name: "project file" }],
+		});
+
+		const { tools } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools.map((t) => t.function.name)).toContain("list_mcp_resources");
+	});
+
+	it("names every server with resources in the list function description", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		mcpMock.responses.set(SERVER_B.url, { tools: [fetchTool] });
+		mcpMock.resources.set(SERVER_A.url, { resources: [readme] });
+		mcpMock.resources.set(SERVER_B.url, { resources: [readme] });
+
+		const { tools } = await getOpenAiToolsForMcp([SERVER_A, SERVER_B]);
+		const list = tools.find((t) => t.function.name === "list_mcp_resources");
+
+		expect(list?.function.description).toContain("Server A, Server B");
+	});
+
+	it("does not take a name a real tool already holds", async () => {
+		mcpMock.responses.set(SERVER_A.url, {
+			tools: [{ name: "read_mcp_resource", description: "a real tool", inputSchema: {} }],
+		});
+		mcpMock.resources.set(SERVER_A.url, { resources: [readme] });
+
+		const { tools, mapping } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools.map((t) => t.function.name)).toEqual([
+			"read_mcp_resource",
+			"list_mcp_resources",
+			"read_mcp_resource_2",
+		]);
+		expect(toolMapping(mapping, "read_mcp_resource").tool).toBe("read_mcp_resource");
+		expect(mapping.read_mcp_resource_2).toEqual({
+			fnName: "read_mcp_resource_2",
+			kind: "resource",
+			action: "read",
+		});
+	});
+
+	it("lists resources over the same cached connection as tools", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		mcpMock.resources.set(SERVER_A.url, { resources: [readme] });
+
+		await getOpenAiToolsForMcp([SERVER_A]);
+		await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(mcpMock.listToolsCalls).toEqual([SERVER_A.url]);
+		expect(mcpMock.listResourcesCalls).toEqual([SERVER_A.url]);
+	});
+
+	it("keeps a server's tools when its resource listing fails", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		mcpMock.resources.set(SERVER_A.url, new Error("resources exploded"));
+
+		const { tools } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools.map((t) => t.function.name)).toEqual(["search"]);
+	});
+});
+
+describe("getOpenAiToolsForMcp review fixes", () => {
+	beforeEach(() => {
+		resetMcpToolsCache();
+		mcpMock.listToolsCalls.length = 0;
+		mcpMock.listResourcesCalls.length = 0;
+		mcpMock.responses.clear();
+		mcpMock.resources.clear();
+	});
+
+	const readme = { uri: "file:///readme.md", name: "readme" };
+
+	it("still exposes resources when the server has no tools capability", async () => {
+		mcpMock.responses.set(SERVER_A.url, new Error("MCP error -32601: Method not found"));
+		mcpMock.resources.set(SERVER_A.url, { resources: [readme] });
+
+		const { tools } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools.map((t) => t.function.name)).toEqual(["list_mcp_resources", "read_mcp_resource"]);
+	});
+
+	// Swallowing this would cache an empty catalog for the whole TTL instead of retrying.
+	it("still fails a server whose listing yields neither tools nor resources", async () => {
+		mcpMock.responses.set(SERVER_A.url, new Error("boom"));
+
+		const { tools } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools).toEqual([]);
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		const retried = await getOpenAiToolsForMcp([SERVER_A]);
+		expect(retried.tools.map((t) => t.function.name)).toEqual(["search"]);
+	});
+
+	it("registers no resource functions rather than hijacking an occupied name", async () => {
+		const taken = ["read_mcp_resource"];
+		for (let n = 2; n < 100; n += 1) taken.push(`read_mcp_resource_${n}`);
+		mcpMock.responses.set(SERVER_A.url, {
+			tools: taken.map((name) => ({ name, description: "real", inputSchema: {} })),
+		});
+		mcpMock.resources.set(SERVER_A.url, { resources: [readme] });
+
+		const { tools, mapping } = await getOpenAiToolsForMcp([SERVER_A]);
+
+		expect(tools.map((t) => t.function.name)).not.toContain("list_mcp_resources");
+		for (const name of taken) {
+			expect(toolMapping(mapping, name).tool).toBe(name);
+		}
+	});
+
+	it("offers a server argument for disambiguating a shared URI", async () => {
+		mcpMock.responses.set(SERVER_A.url, { tools: [searchTool] });
+		mcpMock.resources.set(SERVER_A.url, { resources: [readme] });
+
+		const { tools } = await getOpenAiToolsForMcp([SERVER_A]);
+		const read = tools.find((t) => t.function.name === "read_mcp_resource");
+		const props = (read?.function.parameters as Record<string, Record<string, unknown>>).properties;
+
+		expect(Object.keys(props)).toEqual(["uri", "server"]);
+		expect(read?.function.parameters?.required).toEqual(["uri"]);
 	});
 });

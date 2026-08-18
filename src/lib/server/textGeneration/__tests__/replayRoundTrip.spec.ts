@@ -55,7 +55,9 @@ vi.mock("$lib/server/urlSafety", async (importOriginal) => ({
 	isValidUrl: () => true,
 }));
 
-vi.mock("$lib/server/mcp/tools", () => ({
+// Spread, not a literal: the invocation path calls other exports on every tool call.
+vi.mock("$lib/server/mcp/tools", async (importOriginal) => ({
+	...(await importOriginal<typeof import("$lib/server/mcp/tools")>()),
 	getOpenAiToolsForMcp: async () => ({
 		tools: [
 			{
