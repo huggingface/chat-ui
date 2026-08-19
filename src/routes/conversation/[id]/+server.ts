@@ -10,6 +10,7 @@ import { z } from "zod";
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
+	MessageElicitationUpdateType,
 	MessageReasoningUpdateType,
 	type MessageUpdate,
 	type MessageStreamUpdate,
@@ -495,6 +496,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 
 				if (
+					event.type === MessageUpdateType.Elicitation &&
+					event.subtype === MessageElicitationUpdateType.Request
+				) {
+					showedPrompt = true;
+				}
+
+				if (
 					event.type === MessageUpdateType.Status &&
 					event.status === MessageUpdateStatus.Finished
 				) {
@@ -659,6 +667,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}
 
 			let hasError = false;
+			// A run that ends showing a prompt produced no answer on purpose.
+			let showedPrompt = false;
 			const initialMessageContent = messageToWriteTo.content;
 
 			// Emit the streamed-so-far text as an interrupted final answer. The
@@ -794,7 +804,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			} finally {
 				// check if no output was generated
-				if (!hasError && !abortedByUser && messageToWriteTo.content === initialMessageContent) {
+				if (
+					!hasError &&
+					!abortedByUser &&
+					!showedPrompt &&
+					messageToWriteTo.content === initialMessageContent
+				) {
 					hasError = true;
 					logger.warn(
 						{
