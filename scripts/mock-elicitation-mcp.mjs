@@ -4,15 +4,24 @@
  * Stateful, unlike mock-image-mcp.mjs: the client answers `elicitation/create` on a new
  * POST, which a per-request server instance would not recognise.
  *
+ * Tools ask for input by RETURNING `input_required` (the 2026-07-28 style). On a 2025-era
+ * connection the SDK's shim turns that into a real `elicitation/create` request, so the
+ * same handler serves both — `impatient_confirm` stays on the old style on purpose, to
+ * keep exercising a server that gives up on its own request.
+ *
  * Run:  node scripts/mock-elicitation-mcp.mjs
  * Then add http://127.0.0.1:8792/mcp as an MCP server in the UI.
  * Requires MCP_ALLOW_INSECURE_URLS=true, or chat-ui rejects the loopback URL.
  */
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+import {
+	McpServer,
+	isInitializeRequest,
+	inputRequired,
+	acceptedContent,
+} from "@modelcontextprotocol/server";
 
 const PORT = Number(process.env.MOCK_ELICITATION_MCP_PORT ?? 8792);
 
@@ -34,88 +43,107 @@ function buildServer() {
 		{
 			description:
 				"Books a meeting. Asks the user for the details it needs before booking anything.",
-			inputSchema: {},
 		},
-		async () => {
-			console.log("[mock-elicitation-mcp] book_meeting -> asking for details");
-			const result = await server.server.elicitInput(
-				{
-					message: "I need a few details before I can book this meeting.",
-					requestedSchema: {
-						type: "object",
-						properties: {
-							title: { type: "string", title: "Meeting title", minLength: 3, maxLength: 60 },
-							email: { type: "string", title: "Your email", format: "email" },
-							day: { type: "string", title: "Date", format: "date" },
-							attendees: { type: "integer", title: "Attendees", minimum: 1, maximum: 50 },
-							room: {
-								type: "string",
-								title: "Room",
-								oneOf: [
-									{ const: "small", title: "Huddle room (4)" },
-									{ const: "large", title: "Boardroom (20)" },
-								],
-							},
-							extras: {
-								type: "array",
-								title: "Extras",
-								maxItems: 2,
-								items: {
-									anyOf: [
-										{ const: "coffee", title: "Coffee" },
-										{ const: "projector", title: "Projector" },
-										{ const: "notes", title: "Note taker" },
-									],
+		async (...args) => {
+			const ctx = args.at(-1);
+			const given = acceptedContent(ctx?.mcpReq?.inputResponses, "details");
+			if (!given) {
+				console.log("[mock-elicitation-mcp] book_meeting -> input_required");
+				return inputRequired({
+					inputRequests: {
+						details: inputRequired.elicit({
+							message: "I need a few details before I can book this meeting.",
+							requestedSchema: {
+								type: "object",
+								properties: {
+									title: { type: "string", title: "Meeting title", minLength: 3, maxLength: 60 },
+									email: { type: "string", title: "Your email", format: "email" },
+									day: { type: "string", title: "Date", format: "date" },
+									attendees: { type: "integer", title: "Attendees", minimum: 1, maximum: 50 },
+									room: {
+										type: "string",
+										title: "Room",
+										oneOf: [
+											{ const: "small", title: "Huddle room (4)" },
+											{ const: "large", title: "Boardroom (20)" },
+										],
+									},
+									extras: {
+										type: "array",
+										title: "Extras",
+										maxItems: 2,
+										items: {
+											anyOf: [
+												{ const: "coffee", title: "Coffee" },
+												{ const: "projector", title: "Projector" },
+												{ const: "notes", title: "Note taker" },
+											],
+										},
+									},
+									recurring: { type: "boolean", title: "Repeat weekly", default: false },
 								},
+								required: ["title", "day"],
 							},
-							recurring: { type: "boolean", title: "Repeat weekly", default: false },
-						},
-						required: ["title", "day"],
+						}),
 					},
-				},
-				{ timeout: PATIENT_MS }
-			);
-			console.log("[mock-elicitation-mcp] book_meeting <-", result.action);
-			return { content: [{ type: "text", text: report("book_meeting", result) }] };
+				});
+			}
+			console.log("[mock-elicitation-mcp] book_meeting <- re-entered");
+			return {
+				content: [{ type: "text", text: `book_meeting: ${JSON.stringify(given, null, 2)}` }],
+			};
 		}
 	);
 
 	server.registerTool(
 		"double_check",
-		{
-			description: "Performs a destructive action, confirming twice before doing it.",
-			inputSchema: {},
-		},
-		async () => {
-			console.log("[mock-elicitation-mcp] double_check -> prompt 1");
-			const first = await server.server.elicitInput(
-				{
-					message: "This will delete 412 records. Type DELETE to continue.",
-					requestedSchema: {
-						type: "object",
-						properties: { confirm: { type: "string", title: "Confirmation" } },
-						required: ["confirm"],
+		{ description: "Performs a destructive action, confirming twice before doing it." },
+		async (...args) => {
+			const ctx = args.at(-1);
+			// Each round carries only its own answers, so the step lives in `requestState` —
+			// the opaque string the client echoes back byte-exact. An accessor, not a field.
+			const step = ctx?.mcpReq?.requestState?.() ?? "start";
+			const responses = ctx?.mcpReq?.inputResponses;
+
+			if (step === "start") {
+				console.log("[mock-elicitation-mcp] double_check -> round 1");
+				return inputRequired({
+					requestState: "awaiting-confirm",
+					inputRequests: {
+						confirm: inputRequired.elicit({
+							message: "This will delete 412 records. Type DELETE to continue.",
+							requestedSchema: {
+								type: "object",
+								properties: { confirm: { type: "string", title: "Confirmation" } },
+								required: ["confirm"],
+							},
+						}),
 					},
-				},
-				{ timeout: PATIENT_MS }
-			);
-			if (first.action !== "accept" || first.content?.confirm !== "DELETE") {
-				return { content: [{ type: "text", text: "Aborted at the first confirmation." }] };
+				});
 			}
 
-			console.log("[mock-elicitation-mcp] double_check -> prompt 2");
-			const second = await server.server.elicitInput(
-				{
-					message: "Last chance. Really delete them?",
-					requestedSchema: {
-						type: "object",
-						properties: { sure: { type: "boolean", title: "Yes, delete them" } },
-						required: ["sure"],
+			if (step === "awaiting-confirm") {
+				if (acceptedContent(responses, "confirm")?.confirm !== "DELETE") {
+					return { content: [{ type: "text", text: "Aborted at the first confirmation." }] };
+				}
+				console.log("[mock-elicitation-mcp] double_check -> round 2");
+				return inputRequired({
+					requestState: "awaiting-sure",
+					inputRequests: {
+						sure: inputRequired.elicit({
+							message: "Last chance. Really delete them?",
+							requestedSchema: {
+								type: "object",
+								properties: { sure: { type: "boolean", title: "Yes, delete them" } },
+								required: ["sure"],
+							},
+						}),
 					},
-				},
-				{ timeout: PATIENT_MS }
-			);
-			return { content: [{ type: "text", text: report("double_check", second) }] };
+				});
+			}
+
+			const sure = acceptedContent(responses, "sure");
+			return { content: [{ type: "text", text: `double_check: ${JSON.stringify(sure)}` }] };
 		}
 	);
 
@@ -151,22 +179,21 @@ function buildServer() {
 
 	server.registerTool(
 		"sign_in",
-		{
-			description: "Signs the user in to the external service before continuing.",
-			inputSchema: {},
-		},
-		async () => {
-			console.log("[mock-elicitation-mcp] sign_in -> URL mode");
-			const result = await server.server.elicitInput(
-				{
-					mode: "url",
-					message: "Sign in to Example Corp, then come back here.",
-					elicitationId: randomUUID(),
-					url: "https://example.com/oauth/authorize?client_id=demo",
-				},
-				{ timeout: PATIENT_MS }
-			);
-			return { content: [{ type: "text", text: report("sign_in", result) }] };
+		{ description: "Signs the user in to the external service before continuing." },
+		async (...args) => {
+			const ctx = args.at(-1);
+			if (!ctx?.mcpReq?.inputResponses?.auth) {
+				console.log("[mock-elicitation-mcp] sign_in -> input_required (url)");
+				return inputRequired({
+					inputRequests: {
+						auth: inputRequired.elicitUrl({
+							message: "Sign in to Example Corp, then come back here.",
+							url: "https://example.com/oauth/authorize?client_id=demo",
+						}),
+					},
+				});
+			}
+			return { content: [{ type: "text", text: "sign_in: returned from the link" }] };
 		}
 	);
 
@@ -218,7 +245,7 @@ const httpServer = createServer((req, res) => {
 			return;
 		}
 
-		const transport = new StreamableHTTPServerTransport({
+		const transport = new NodeStreamableHTTPServerTransport({
 			sessionIdGenerator: () => randomUUID(),
 			onsessioninitialized: (id) => {
 				console.log(`[mock-elicitation-mcp] session ${id} opened`);
