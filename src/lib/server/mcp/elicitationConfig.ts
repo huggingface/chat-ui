@@ -7,7 +7,10 @@ export function isElicitationEnabled(): boolean {
 	return config.MCP_DISABLE_ELICITATION !== "true";
 }
 
-/** Bounds a run nobody answers and nobody stops, which would otherwise never finish. */
+/**
+ * On a 2026-era connection this is the only thing bounding a prompt: the server answered
+ * with `input_required` and is no longer waiting on anything.
+ */
 export function getElicitationTimeoutMs(): number {
 	const raw = config.MCP_ELICITATION_TIMEOUT_MS;
 	if (raw) {
