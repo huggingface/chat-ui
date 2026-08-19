@@ -24,6 +24,20 @@
 
 	const fields = $derived(request.fields ?? []);
 
+	/**
+	 * `date` and `datetime-local` inputs only accept `YYYY-MM-DD[THH:mm]`, so an RFC 3339
+	 * default — which is what the schema asks servers to send — renders as blank unless it
+	 * is narrowed to the shape the control understands.
+	 */
+	function forDateInput(value: string, format: "date" | "date-time"): string {
+		const parsed = new Date(value);
+		if (Number.isNaN(parsed.getTime())) return format === "date" ? value.slice(0, 10) : "";
+		const pad = (n: number) => String(n).padStart(2, "0");
+		const day = `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`;
+		if (format === "date") return day;
+		return `${day}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+	}
+
 	function initialValues(source: ElicitationField[]): Record<string, ElicitationValue> {
 		const out: Record<string, ElicitationValue> = {};
 		for (const field of source) {
@@ -33,6 +47,12 @@
 				out[field.name] = Array.isArray(field.default) ? [...field.default] : [];
 			} else if (field.kind === "select") {
 				out[field.name] = typeof field.default === "string" ? field.default : "";
+			} else if (
+				field.kind === "string" &&
+				(field.format === "date" || field.format === "date-time") &&
+				field.default !== undefined
+			) {
+				out[field.name] = forDateInput(field.default, field.format);
 			} else {
 				// Kept as a string while typing; parsed back on submit.
 				out[field.name] = field.default !== undefined ? String(field.default) : "";
@@ -44,6 +64,8 @@
 	// Seeded once: re-deriving would discard whatever the user has typed.
 	// svelte-ignore state_referenced_locally
 	let values = $state<Record<string, ElicitationValue>>(initialValues(request.fields ?? []));
+	/** Optional fields the user actually interacted with; see `payload`. */
+	let touched = $state(new Set<string>());
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
 	/** Settles the form without waiting for the run to echo the outcome back. */
@@ -69,6 +91,39 @@
 		return `${seconds}s left`;
 	});
 
+	/** Hosts that only exist inside a network the user did not choose to expose. */
+	const isPrivateHost = (host: string) =>
+		host === "localhost" ||
+		host.endsWith(".localhost") ||
+		host.endsWith(".local") ||
+		host.endsWith(".internal") ||
+		host === "::1" ||
+		host === "[::1]" ||
+		/^127\./.test(host) ||
+		/^10\./.test(host) ||
+		/^192\.168\./.test(host) ||
+		/^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+		/^169\.254\./.test(host);
+
+	/** The spec asks clients to flag ambiguous or suspicious link targets, punycode included. */
+	let urlWarnings = $derived.by(() => {
+		if (!request.url) return [];
+		let parsed: URL;
+		try {
+			parsed = new URL(request.url);
+		} catch {
+			return ["This link could not be read."];
+		}
+		const out: string[] = [];
+		if (/(^|\.)xn--/i.test(parsed.hostname)) {
+			out.push("This address uses punycode, which can be made to imitate another domain.");
+		}
+		if (parsed.protocol !== "https:") out.push("This link is not encrypted.");
+		if (isPrivateHost(parsed.hostname))
+			out.push("This link points into a private or local network.");
+		return out;
+	});
+
 	let linkHost = $derived.by(() => {
 		if (!request.url) return "";
 		try {
@@ -85,6 +140,11 @@
 
 	const isChecked = (name: string): boolean => values[name] === true;
 
+	const pickedCount = (name: string): number => {
+		const value = values[name];
+		return Array.isArray(value) ? value.length : 0;
+	};
+
 	const isPicked = (name: string, option: string): boolean => {
 		const value = values[name];
 		return Array.isArray(value) && value.includes(option);
@@ -92,6 +152,7 @@
 
 	function set(name: string, value: ElicitationValue) {
 		values = { ...values, [name]: value };
+		touched = new Set(touched).add(name);
 	}
 
 	function toggleOption(name: string, option: string, checked: boolean) {
@@ -104,6 +165,16 @@
 		for (const field of fields) {
 			const value = values[field.name];
 			if (value === "" || value === undefined || value === null) continue;
+			// A checkbox nobody touched is not an answer of "false" — leaving it out lets
+			// the server apply its own default.
+			if (
+				field.kind === "boolean" &&
+				!field.required &&
+				field.default === undefined &&
+				!touched.has(field.name)
+			) {
+				continue;
+			}
 			if (field.kind === "number") {
 				const parsed = typeof value === "number" ? value : Number(value);
 				if (Number.isFinite(parsed)) out[field.name] = parsed;
@@ -276,6 +347,9 @@
 					<p class="mt-1.5 font-mono text-xs break-all text-gray-400 dark:text-gray-500">
 						{request.url}
 					</p>
+					{#each urlWarnings as warning (warning)}
+						<p class="mt-1.5 text-xs text-amber-700 dark:text-amber-500">{warning}</p>
+					{/each}
 				</div>
 			{:else if fields.length > 0}
 				<form
@@ -366,20 +440,30 @@
 									{/each}
 								</select>
 							{:else if field.kind === "select"}
+								{@const atLimit =
+									field.maxItems !== undefined && pickedCount(field.name) >= field.maxItems}
 								<div class="space-y-1" role="group" aria-labelledby={`${id}-label`}>
 									{#each field.options as option (option.value)}
+										{@const picked = isPicked(field.name, option.value)}
 										<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
 											<input
 												type="checkbox"
 												value={option.value}
-												checked={isPicked(field.name, option.value)}
+												checked={picked}
 												onchange={(event) =>
 													toggleOption(field.name, option.value, event.currentTarget.checked)}
-												disabled={!open}
+												disabled={!open || (atLimit && !picked)}
 											/>
 											{option.label}
 										</label>
 									{/each}
+									{#if field.maxItems !== undefined}
+										<p class="text-xs text-gray-500 dark:text-gray-400">
+											Choose up to {field.maxItems}{field.minItems
+												? `, at least ${field.minItems}`
+												: ""}.
+										</p>
+									{/if}
 								</div>
 							{/if}
 						</div>
@@ -419,6 +503,15 @@
 						class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
 					>
 						Decline
+					</button>
+					<!-- Distinct from Decline: the spec requires a way to dismiss without choosing. -->
+					<button
+						type="button"
+						onclick={() => send("cancel")}
+						disabled={submitting}
+						class="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700"
+					>
+						Dismiss
 					</button>
 				</div>
 			{/if}
