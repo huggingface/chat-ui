@@ -108,7 +108,9 @@ function buildServer() {
 							message: "This will delete 412 records. Type DELETE to continue.",
 							requestedSchema: {
 								type: "object",
-								properties: { confirm: { type: "string", title: "Confirmation" } },
+								properties: {
+									confirm: { type: "string", title: 'Type "DELETE" to reach round two' },
+								},
 								required: ["confirm"],
 							},
 						}),
