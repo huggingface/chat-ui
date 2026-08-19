@@ -297,7 +297,17 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 	let messagesForPrompt: Message[] = [];
 
-	if (isRetry && messageId) {
+	if (resumeElicitationId && messageId) {
+		// Continue the assistant message the prompt parked, in place: its tool call and the
+		// answer belong to that turn, and a new one would strand them behind an empty user
+		// message.
+		const parked = conv.messages.find((message) => message.id === messageId);
+		if (!parked || parked.from !== "assistant") {
+			error(404, "No parked message to resume");
+		}
+		messageToWriteToId = parked.id;
+		messagesForPrompt = buildSubtree(conv, parked.id);
+	} else if (isRetry && messageId) {
 		// two cases, if we're retrying a user message with a newPrompt set,
 		// it means we're editing a user message
 		// if we're retrying on an assistant message, newPrompt cannot be set
@@ -691,12 +701,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							?.mcp?.selectedServers,
 						signal: ctrl.signal,
 					});
-					if (!outcome.resumed) {
-						logger.warn(
-							{ conversationId: id, reason: outcome.reason },
-							"[mcp] could not resume a parked tool call"
-						);
-					}
+					logger.info(
+						{ conversationId: id, resumed: outcome.resumed, reason: outcome.reason },
+						"[mcp] resuming a parked tool call"
+					);
+					if (outcome.update) await update(outcome.update);
 				}
 
 				const ctx: TextGenerationContext = {

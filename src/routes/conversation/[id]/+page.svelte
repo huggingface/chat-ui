@@ -171,7 +171,11 @@
 			let messageToWriteToId: Message["id"] | undefined = undefined;
 			// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 
-			if (isRetry && messageId) {
+			if (resumeElicitationId && messageId) {
+				// Continue the parked assistant message in place — mirrors the server, which
+				// writes back into it rather than starting a turn.
+				messageToWriteToId = messageId;
+			} else if (isRetry && messageId) {
 				// two cases, if we're retrying a user message with a newPrompt set,
 				// it means we're editing a user message
 				// if we're retrying on an assistant message, newPrompt cannot be set

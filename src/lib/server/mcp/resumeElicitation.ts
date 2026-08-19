@@ -1,5 +1,4 @@
-import { ObjectId } from "mongodb";
-import { collections } from "$lib/server/database";
+import type { ObjectId } from "mongodb";
 import { logger } from "$lib/server/logger";
 import { callMcpTool, getMcpToolTimeoutMs } from "./httpClient";
 import { getMcpServers } from "./registry";
@@ -14,8 +13,9 @@ import type { McpServerConfig } from "./httpClient";
  *
  * The 2026-era server kept no state — `requestState` and the answers are the whole
  * continuation — so this runs anywhere, on any connection, however long afterwards.
- * Appends the result to the assistant message so ordinary history replay carries it into
- * the next completion; nothing here talks to the model.
+ * Returns the update rather than writing it: the caller feeds it through the run's normal
+ * update path, so it streams, persists, and lands in the writer's snapshot together —
+ * writing it separately would be overwritten by the next materialise.
  */
 export async function resumeParkedToolCall({
 	conversationId,
@@ -27,7 +27,7 @@ export async function resumeParkedToolCall({
 	elicitationId: string;
 	extraServers?: McpServerConfig[];
 	signal?: AbortSignal;
-}): Promise<{ resumed: boolean; reason?: string }> {
+}): Promise<{ resumed: boolean; reason?: string; update?: MessageUpdate }> {
 	const taken = await takeResumableElicitation(conversationId, elicitationId);
 	const pending = taken?.row.pending;
 	if (!taken || !pending) return { resumed: false, reason: "no answered prompt to resume" };
@@ -86,10 +86,5 @@ export async function resumeParkedToolCall({
 		};
 	}
 
-	await collections.conversations.updateOne(
-		{ _id: conversationId, "messages.id": pending.messageId },
-		{ $push: { "messages.$.updates": update }, $set: { updatedAt: new Date() } }
-	);
-
-	return { resumed: true };
+	return { resumed: true, update };
 }
