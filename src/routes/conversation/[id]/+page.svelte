@@ -129,10 +129,12 @@
 
 	// this function is used to send new message to the backends
 	$effect(() => {
-		const id = $elicitationToResume;
-		if (!id || $loading) return;
+		const pending = $elicitationToResume;
+		// Left alone when it belongs elsewhere: the conversation it came from picks it up
+		// when it is next open, rather than this one resuming a stranger's tool call.
+		if (!pending || pending.conversationId !== convId || $loading) return;
 		elicitationToResume.set(null);
-		void writeMessage({ resumeElicitationId: id });
+		void writeMessage({ resumeElicitationId: pending.elicitationId });
 	});
 
 	async function writeMessage({

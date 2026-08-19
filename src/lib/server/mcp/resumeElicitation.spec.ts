@@ -169,6 +169,31 @@ describe("resuming a parked tool call", () => {
 		});
 	});
 
+	it("will not resume another conversation's prompt", async () => {
+		// The id alone is not authority: a page open on a different conversation must not
+		// continue this one's tool call.
+		calls.queue.push({ text: "should never run", isError: false });
+		const owner = new ObjectId();
+		const id = await park(owner, "first", "asked-once", { ok: "yes" });
+
+		const outcome = await resumeParkedToolCall({
+			conversationId: new ObjectId(),
+			elicitationId: id,
+			extraServers: SERVERS,
+		});
+
+		expect(outcome).toMatchObject({ resumed: false });
+		expect(calls.seen).toHaveLength(0);
+		// and the real owner can still resume it afterwards
+		const mine = await resumeParkedToolCall({
+			conversationId: owner,
+			elicitationId: id,
+			extraServers: SERVERS,
+		});
+		expect(mine.resumed).toBe(true);
+		expect(calls.seen).toHaveLength(1);
+	});
+
 	it("reports a prompt it cannot resume rather than pretending", async () => {
 		const outcome = await resumeParkedToolCall({
 			conversationId: new ObjectId(),

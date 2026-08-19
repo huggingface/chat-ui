@@ -214,7 +214,9 @@
 			submitted = action;
 			// A parked call has nothing waiting on it, so answering only records the answer —
 			// the run that continues it has to be started.
-			if (body?.resume) elicitationToResume.set(request.elicitationId);
+			if (body?.resume) {
+				elicitationToResume.set({ conversationId, elicitationId: request.elicitationId });
+			}
 		} catch {
 			error = "Could not send your answer.";
 		} finally {

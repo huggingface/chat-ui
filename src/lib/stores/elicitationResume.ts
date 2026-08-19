@@ -1,8 +1,13 @@
 import { writable } from "svelte/store";
 
 /**
- * Set to the id of a durable prompt the user has just answered. The conversation page
- * picks it up and starts the run that continues the parked tool call — the form is nested
- * too deeply to hand it a callback, and nothing else needs to know.
+ * A durable prompt the user has just answered, waiting for its conversation page to start
+ * the run that continues the parked tool call — the form is nested too deeply to hand it a
+ * callback. Carries the conversation because this store outlives navigation: the page
+ * component is reused across conversations, so an unscoped id would resume in whichever
+ * one happens to be open.
  */
-export const elicitationToResume = writable<string | null>(null);
+export const elicitationToResume = writable<{
+	conversationId: string;
+	elicitationId: string;
+} | null>(null);
