@@ -27,6 +27,10 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # Same reasoning as the e2e job below: browsers and their system libraries are baked
+    # in, so this job runs neither `playwright install` nor apt.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 10
 
     steps:
@@ -44,39 +48,26 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/mongodb-binaries
-          key: mongodb-binaries-${{ runner.os }}
+          key: mongodb-binaries-${{ runner.os }}-container
 
       - run: npm ci
 
-      # Split from `install-deps` on purpose: the browsers cache, the system deps
-      # cannot, since apt installs into the ephemeral runner rather than ~/.cache.
-      - name: Resolve Playwright version
-        id: playwright-version
-        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-chromium
-
-      - name: Install Playwright browsers
-        timeout-minutes: 6
-        run: npx playwright install chromium
-
-      # apt is the half that stalls, and no cache reaches it. Bounding each attempt
-      # turns a hung mirror into a retry on a fresh connection instead of a step that
-      # silently eats the job budget. The e2e job dodges this entirely by running in
-      # the Playwright container; this job keeps apt because chromium-only deps are a
-      # far smaller surface than chromium+webkit.
-      - name: Install Playwright system dependencies
-        timeout-minutes: 8
+      # The image bakes browsers for one Playwright version. Rather than pin that version
+      # in a second place and hope the two stay in step, ask Playwright where it expects
+      # its browsers and check they are actually there. Without this, a lockfile bump
+      # that forgets the tag above surfaces much later, inside the test run, as an
+      # opaque "Executable doesn't exist at /ms-playwright/...".
+      - name: Check the image has the browsers this Playwright expects
         run: |
-          for attempt in 1 2 3; do
-            timeout 150 npx playwright install-deps chromium && exit 0
-            echo "install-deps attempt $attempt stalled or failed; retrying"
-          done
-          exit 1
+          missing=$(npx playwright install --dry-run chromium \
+            | sed -n 's/^[[:space:]]*Install location:[[:space:]]*//p' \
+            | while IFS= read -r dir; do [ -d "$dir" ] || echo "$dir"; done)
+          if [ -n "$missing" ]; then
+            echo "::error file=.github/workflows/lint-and-test.yml::The container image is missing browsers this Playwright build expects:"
+            echo "$missing"
+            echo "::error file=.github/workflows/lint-and-test.yml::Bump the mcr.microsoft.com/playwright image tag to match playwright-core in package-lock.json."
+            exit 1
+          fi
 
       - name: "Tests (node)"
         run: npm run test
@@ -86,12 +77,12 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    # Browsers and every system library they need are baked into this image, so this
-    # job runs neither `playwright install` nor apt. That is the whole point: the apt
-    # half of `--with-deps` is the half that stalls (15+ minutes on 837daece, against a
-    # 36-137s baseline), and unlike the browser download it cannot be cached, because it
-    # installs into the runner rather than into ~/.cache. The tag must track
-    # playwright-core in package-lock.json; the check below enforces that.
+    # Browsers and every system library they need are baked into this image, so this job
+    # runs neither `playwright install` nor apt. That is the whole point: the apt half of
+    # `--with-deps` is the half that stalls, and unlike the browser download it cannot be
+    # cached, because it installs into the runner rather than into ~/.cache. Measured on
+    # 837daece, apt for chromium+webkit hung past 8 minutes while the browser download
+    # took 15s and apt for chromium alone took 14s.
     container:
       image: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 20
@@ -107,25 +98,32 @@ jobs:
           cache: "npm"
 
       # The harness starts its own MongoMemoryServer (see startTestDatabase in
-      # tests/fixtures.ts). Keyed apart from the unit-test job rather than shared:
-      # container jobs run with HOME=/github/home, so the two jobs resolve this path to
-      # different absolute locations and must not restore each other's entries.
+      # tests/fixtures.ts). Shares the unit-test job's key and so its downloaded mongod
+      # binary: both jobs are now containers, so both resolve ~ to /github/home. The
+      # `-container` suffix keeps them off entries saved when these jobs ran on the host
+      # and this path meant /home/runner.
       - name: Cache mongodb-memory-server binaries
         uses: actions/cache@v4
         with:
           path: ~/.cache/mongodb-binaries
-          key: mongodb-binaries-${{ runner.os }}-e2e-container
+          key: mongodb-binaries-${{ runner.os }}-container
 
       - run: npm ci
 
-      # The image bakes browsers for exactly one Playwright version. Without this, a
-      # lockfile bump that forgets the tag above fails much later, inside the test run,
-      # as an opaque "Executable doesn't exist at /ms-playwright/...".
-      - name: Check Playwright matches the container image
+      # The image bakes browsers for one Playwright version. Rather than pin that version
+      # in a second place and hope the two stay in step, ask Playwright where it expects
+      # its browsers and check they are actually there. Without this, a lockfile bump
+      # that forgets the tag above surfaces much later, inside the test run, as an
+      # opaque "Executable doesn't exist at /ms-playwright/...".
+      - name: Check the image has the browsers this Playwright expects
         run: |
-          locked=$(node -p "require('playwright-core/package.json').version")
-          if [ "$locked" != "1.61.1" ]; then
-            echo "::error file=.github/workflows/lint-and-test.yml::package-lock.json has playwright-core $locked, but the e2e job runs mcr.microsoft.com/playwright:v1.61.1-noble. Bump the container image tag to match."
+          missing=$(npx playwright install --dry-run chromium webkit \
+            | sed -n 's/^[[:space:]]*Install location:[[:space:]]*//p' \
+            | while IFS= read -r dir; do [ -d "$dir" ] || echo "$dir"; done)
+          if [ -n "$missing" ]; then
+            echo "::error file=.github/workflows/lint-and-test.yml::The container image is missing browsers this Playwright build expects:"
+            echo "$missing"
+            echo "::error file=.github/workflows/lint-and-test.yml::Bump the mcr.microsoft.com/playwright image tag to match playwright-core in package-lock.json."
             exit 1
           fi
 
