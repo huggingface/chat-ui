@@ -48,7 +48,28 @@ jobs:
 
       - run: npm ci
 
-      - run: npx playwright install --with-deps chromium
+      # The browser binaries cache; the system deps cannot. `install-deps` apt-installs
+      # into the ephemeral runner, not into ~/.cache, so it has to run on every job.
+      # The step timeouts are load-bearing. Both halves are network-bound and have
+      # stalled past the whole job budget before, which reads as a bare job timeout
+      # with no clue which step hung.
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-chromium
+
+      - name: Install Playwright browsers
+        timeout-minutes: 6
+        run: npx playwright install chromium
+
+      - name: Install Playwright system dependencies
+        timeout-minutes: 6
+        run: npx playwright install-deps chromium
 
       - name: "Tests (node)"
         run: npm run test
@@ -58,7 +79,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v3
@@ -81,9 +102,27 @@ jobs:
 
       - run: npm ci
 
+      # Same cache/deps split as the test job, see the comment there.
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+
       # WebKit is not optional — the worst regression cluster in this repo is
-      # Safari-specific scroll and layout behaviour.
-      - run: npx playwright install --with-deps chromium webkit
+      # Safari-specific scroll and layout behaviour. It also roughly doubles the
+      # download and triples the apt package list, so the cache matters most here.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-chromium-webkit
+
+      - name: Install Playwright browsers
+        timeout-minutes: 8
+        run: npx playwright install chromium webkit
+
+      - name: Install Playwright system dependencies
+        timeout-minutes: 8
+        run: npx playwright install-deps chromium webkit
 
       - name: "Tests (e2e)"
         run: npm run test:e2e
