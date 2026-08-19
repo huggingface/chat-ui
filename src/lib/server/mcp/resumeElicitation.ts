@@ -2,7 +2,7 @@ import type { ObjectId } from "mongodb";
 import { logger } from "$lib/server/logger";
 import { callMcpTool, getMcpToolTimeoutMs } from "./httpClient";
 import { getMcpServers } from "./registry";
-import { takeResumableElicitation } from "./elicitation";
+import { openDurableElicitation, takeResumableElicitation } from "./elicitation";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
@@ -20,21 +20,31 @@ import type { McpServerConfig } from "./httpClient";
 export async function resumeParkedToolCall({
 	conversationId,
 	elicitationId,
+	generationId,
 	extraServers = [],
 	signal,
 }: {
 	conversationId: ObjectId;
 	elicitationId: string;
+	generationId?: string;
 	extraServers?: McpServerConfig[];
 	signal?: AbortSignal;
-}): Promise<{ resumed: boolean; reason?: string; update?: MessageUpdate }> {
+}): Promise<{
+	resumed: boolean;
+	reason?: string;
+	updates: MessageUpdate[];
+	/** The tool asked something else; the run ends again until that is answered too. */
+	parkedAgain?: boolean;
+}> {
 	const taken = await takeResumableElicitation(conversationId, elicitationId);
 	const pending = taken?.row.pending;
-	if (!taken || !pending) return { resumed: false, reason: "no answered prompt to resume" };
+	if (!taken || !pending) {
+		return { resumed: false, reason: "no answered prompt to resume", updates: [] };
+	}
 	const { inputResponses } = taken;
 
 	const server = [...getMcpServers(), ...extraServers].find((s) => s.name === pending.server);
-	if (!server) return { resumed: false, reason: `unknown server ${pending.server}` };
+	if (!server) return { resumed: false, reason: `unknown server ${pending.server}`, updates: [] };
 
 	let update: MessageUpdate;
 	try {
@@ -47,9 +57,33 @@ export async function resumeParkedToolCall({
 			},
 		});
 
-		// A second prompt in the same call is a second round; this pass answers one.
+		// A tool can ask more than once. Park again on the same call rather than handing
+		// the model a round that never finished.
 		if (response.inputRequired) {
-			return { resumed: false, reason: "the tool asked for more input" };
+			const collected: MessageUpdate[] = [];
+			const opened = await openDurableElicitation({
+				sink: {
+					conversationId,
+					...(generationId ? { generationId } : {}),
+					emit: (u) => collected.push(u),
+				},
+				server: pending.server,
+				toolUuid: pending.toolUuid,
+				pending: {
+					tool: pending.tool,
+					args: pending.args,
+					messageId: pending.messageId,
+					toolCallId: pending.toolCallId,
+					toolUuid: pending.toolUuid,
+				},
+				inputRequired: response.inputRequired,
+			});
+			if (opened.opened) return { resumed: true, updates: collected, parkedAgain: true };
+			return {
+				resumed: false,
+				reason: `could not show the next prompt: ${opened.reason}`,
+				updates: [],
+			};
 		}
 
 		update = response.isError
@@ -86,5 +120,5 @@ export async function resumeParkedToolCall({
 		};
 	}
 
-	return { resumed: true, update };
+	return { resumed: true, updates: [update] };
 }

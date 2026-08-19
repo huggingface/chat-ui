@@ -692,20 +692,28 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				// Add billing organization to locals for the endpoint to use
 				locals.billingOrganization = userSettings?.billingOrganization;
 
+				let parkedAgain = false;
 				if (resumeElicitationId) {
 					const { resumeParkedToolCall } = await import("$lib/server/mcp/resumeElicitation");
 					const outcome = await resumeParkedToolCall({
 						conversationId: convId,
 						elicitationId: resumeElicitationId,
+						generationId: effectiveGenerationId,
 						extraServers: (locals as unknown as { mcp?: { selectedServers?: McpServerConfig[] } })
 							?.mcp?.selectedServers,
 						signal: ctrl.signal,
 					});
 					logger.info(
-						{ conversationId: id, resumed: outcome.resumed, reason: outcome.reason },
+						{
+							conversationId: id,
+							resumed: outcome.resumed,
+							parkedAgain: outcome.parkedAgain,
+							reason: outcome.reason,
+						},
 						"[mcp] resuming a parked tool call"
 					);
-					if (outcome.update) await update(outcome.update);
+					for (const event of outcome.updates) await update(event);
+					parkedAgain = outcome.parkedAgain === true;
 				}
 
 				const ctx: TextGenerationContext = {
@@ -743,8 +751,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					generationId: effectiveGenerationId,
 					messageId: messageToWriteTo.id,
 				};
-				// run the text generation and send updates to the client
-				for await (const event of textGeneration(ctx)) await update(event);
+				// run the text generation and send updates to the client. Skipped when the
+				// resumed call asked something else: the model has no round to answer yet.
+				if (!parkedAgain) {
+					for await (const event of textGeneration(ctx)) await update(event);
+				}
 				if (ctrl.signal.aborted) {
 					abortedByUser = true;
 				}
