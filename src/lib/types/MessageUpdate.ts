@@ -4,6 +4,7 @@ import type {
 	ElicitationAction,
 	ElicitationRequestPayload,
 	ElicitationResolution,
+	ElicitationValue,
 } from "$lib/types/McpElicitation";
 
 export type MessageUpdate =
@@ -193,4 +194,6 @@ export interface MessageElicitationResolvedUpdate {
 	elicitationId: string;
 	action: ElicitationAction;
 	resolution: ElicitationResolution;
+	/** What was submitted, so a reloaded transcript can still show the answers. */
+	content?: Record<string, ElicitationValue>;
 }

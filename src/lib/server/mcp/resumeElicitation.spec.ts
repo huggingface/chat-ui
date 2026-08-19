@@ -11,7 +11,10 @@ import {
 import { toNodeHandler } from "@modelcontextprotocol/node";
 import { collections, ready } from "$lib/server/database";
 import { resumeParkedToolCall } from "./resumeElicitation";
-import { isMessageElicitationRequestUpdate } from "$lib/utils/messageUpdates";
+import {
+	isMessageElicitationRequestUpdate,
+	isMessageElicitationResolvedUpdate,
+} from "$lib/utils/messageUpdates";
 
 await ready;
 
@@ -110,6 +113,10 @@ describe("resuming a parked tool call", () => {
 		});
 
 		expect(round1.parkedAgain).toBe(true);
+		// The answered prompt is settled first, so a reloaded transcript stops showing it
+		// as an open form and can render what was submitted.
+		const settled = round1.updates.find(isMessageElicitationResolvedUpdate);
+		expect(settled).toMatchObject({ action: "accept", content: { ok: "yes" } });
 		const prompt = round1.updates.find(isMessageElicitationRequestUpdate);
 		expect(prompt?.request.message).toBe("Are you sure?");
 		// A durable prompt carries no deadline, so the UI shows no countdown.
@@ -133,10 +140,13 @@ describe("resuming a parked tool call", () => {
 		});
 
 		expect(done.parkedAgain).toBeUndefined();
-		const update = done.updates[0] as unknown as {
-			result?: { outputs?: { text?: string }[] };
-		};
-		expect(update.result?.outputs?.[0]?.text).toContain("done");
+		expect(done.updates.find(isMessageElicitationResolvedUpdate)).toMatchObject({
+			action: "accept",
+		});
+		const result = done.updates.find(
+			(u) => u.type === "tool" && u.subtype === "result"
+		) as unknown as { result?: { outputs?: { text?: string }[] } };
+		expect(result?.result?.outputs?.[0]?.text).toContain("done");
 	});
 
 	it("reports a prompt it cannot resume rather than pretending", async () => {

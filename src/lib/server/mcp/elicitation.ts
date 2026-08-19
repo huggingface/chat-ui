@@ -246,6 +246,7 @@ export async function handleElicitationRequest(
 		elicitationId,
 		action: outcome.action,
 		resolution: outcome.resolution,
+		...(outcome.content ? { content: outcome.content } : {}),
 	});
 
 	logger.debug(

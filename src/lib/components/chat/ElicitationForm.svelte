@@ -8,6 +8,7 @@
 	import type { MessageElicitationResolvedUpdate } from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
 	import CarbonLaunch from "~icons/carbon/launch";
+	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import BlockWrapper from "./BlockWrapper.svelte";
 	import { elicitationToResume } from "$lib/stores/elicitationResume";
 
@@ -153,210 +154,274 @@
 	// Submitting through the form is what runs the browser's own field validation.
 	const formId = $derived(`elicit-form-${request.elicitationId}`);
 
+	let showAnswers = $state(false);
+
+	/** What was submitted: from this session if we just sent it, else from the transcript. */
+	let answered = $derived(resolved?.content ?? (submitted === "accept" ? payload() : undefined));
+
+	let settledLabel = $derived.by(() => {
+		if (outcome === "accept") return request.mode === "url" ? "Opened link" : "Answered";
+		if (outcome === "decline") return "Declined";
+		if (resolved?.resolution === "aborted") return "Cancelled with the response";
+		if (resolved?.resolution === "withdrawn") return `${request.server} stopped waiting`;
+		if (expired || resolved?.resolution === "expired") return "Expired unanswered";
+		return "Cancelled";
+	});
+
+	const labelFor = (name: string) => fields.find((f) => f.name === name)?.title ?? name;
+
+	const shown = (value: ElicitationValue) =>
+		Array.isArray(value) ? value.join(", ") : String(value);
+
 	const inputClass =
 		"w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white";
 </script>
 
-<BlockWrapper>
-	<div
-		class="rounded-xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/40"
-	>
-		<div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-			<span class="text-sm font-medium text-gray-700 dark:text-gray-200">
-				{request.mode === "url" ? "Action needed" : "Input requested"}
-			</span>
-			<span class="text-xs text-gray-500 dark:text-gray-400">
-				from <code
-					class="rounded-sm bg-blue-50 px-1 py-px font-mono text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+{#if !open}
+	<BlockWrapper>
+		<div class="flex max-w-full flex-col items-start gap-1 select-none">
+			<button
+				type="button"
+				class="group/header flex max-w-full cursor-pointer items-center gap-1 text-left whitespace-nowrap focus:outline-hidden"
+				onclick={() => (showAnswers = !showAnswers)}
+				aria-label={showAnswers ? "Collapse" : "Expand"}
+			>
+				<span
+					class="shrink-0 text-sm font-medium text-gray-500 transition-colors group-hover/header:text-gray-600 dark:text-gray-400 dark:group-hover/header:text-gray-300"
+				>
+					{settledLabel}
+				</span>
+				<code
+					class="min-w-0 truncate rounded-sm bg-blue-50 px-1 py-px font-mono text-xs text-blue-700 opacity-90 dark:bg-blue-900/30 dark:text-blue-300"
 					>{request.server}</code
 				>
-			</span>
-			{#if open}
-				<span class="ml-auto text-xs text-gray-400 tabular-nums dark:text-gray-500">
-					{timeLeft}
-				</span>
-			{/if}
+				<CarbonChevronRight
+					class="size-3.5 shrink-0 transition-all duration-200 group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {showAnswers
+						? 'rotate-90 text-gray-600 dark:text-gray-300'
+						: 'text-gray-400'}"
+				/>
+			</button>
 		</div>
 
-		<p class="mt-2 text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-300">
-			{request.message}
-		</p>
-
-		{#if request.mode === "url" && request.url}
-			<div class="mt-3">
-				<a
-					href={request.url}
-					target="_blank"
-					rel="noopener noreferrer nofollow"
-					class="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-700 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white"
-				>
-					<CarbonLaunch class="size-3.5" />
-					Open {linkHost}
-				</a>
-				<p class="mt-1.5 font-mono text-xs break-all text-gray-400 dark:text-gray-500">
-					{request.url}
-				</p>
+		{#if showAnswers}
+			<div class="mt-2 mb-4 space-y-3 text-gray-500 dark:text-gray-400">
+				<div class="space-y-1">
+					<div class="text-[10px] font-semibold text-gray-400 uppercase dark:text-gray-500">
+						Asked
+					</div>
+					<p class="text-xs whitespace-pre-wrap">{request.message}</p>
+					{#if request.url}
+						<p class="font-mono text-xs break-all">{request.url}</p>
+					{/if}
+				</div>
+				{#if answered && Object.keys(answered).length > 0}
+					<div class="space-y-1">
+						<div class="text-[10px] font-semibold text-gray-400 uppercase dark:text-gray-500">
+							Answered
+						</div>
+						<dl class="rounded-lg bg-gray-100 p-2 text-xs dark:bg-gray-800/70">
+							{#each Object.entries(answered) as [name, value] (name)}
+								<div class="flex gap-2 py-px">
+									<dt class="shrink-0 font-medium text-gray-500 dark:text-gray-400">
+										{labelFor(name)}
+									</dt>
+									<dd class="min-w-0 break-words text-gray-700 dark:text-gray-300">
+										{shown(value)}
+									</dd>
+								</div>
+							{/each}
+						</dl>
+					</div>
+				{/if}
 			</div>
-		{:else if fields.length > 0}
-			<form
-				id={formId}
-				class="mt-3 space-y-3"
-				onsubmit={(event) => {
-					event.preventDefault();
-					send("accept");
-				}}
-			>
-				{#each fields as field (field.name)}
-					{@const id = `elicit-${request.elicitationId}-${field.name}`}
-					<div>
-						{#if field.kind === "boolean"}
-							<label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+		{/if}
+	</BlockWrapper>
+{:else}
+	<BlockWrapper>
+		<div
+			class="rounded-xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/40"
+		>
+			<div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+				<span class="text-sm font-medium text-gray-700 dark:text-gray-200">
+					{request.mode === "url" ? "Action needed" : "Input requested"}
+				</span>
+				<span class="text-xs text-gray-500 dark:text-gray-400">
+					from <code
+						class="rounded-sm bg-blue-50 px-1 py-px font-mono text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+						>{request.server}</code
+					>
+				</span>
+				{#if open}
+					<span class="ml-auto text-xs text-gray-400 tabular-nums dark:text-gray-500">
+						{timeLeft}
+					</span>
+				{/if}
+			</div>
+
+			<p class="mt-2 text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-300">
+				{request.message}
+			</p>
+
+			{#if request.mode === "url" && request.url}
+				<div class="mt-3">
+					<a
+						href={request.url}
+						target="_blank"
+						rel="noopener noreferrer nofollow"
+						class="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-700 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white"
+					>
+						<CarbonLaunch class="size-3.5" />
+						Open {linkHost}
+					</a>
+					<p class="mt-1.5 font-mono text-xs break-all text-gray-400 dark:text-gray-500">
+						{request.url}
+					</p>
+				</div>
+			{:else if fields.length > 0}
+				<form
+					id={formId}
+					class="mt-3 space-y-3"
+					onsubmit={(event) => {
+						event.preventDefault();
+						send("accept");
+					}}
+				>
+					{#each fields as field (field.name)}
+						{@const id = `elicit-${request.elicitationId}-${field.name}`}
+						<div>
+							{#if field.kind === "boolean"}
+								<label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+									<input
+										{id}
+										type="checkbox"
+										checked={isChecked(field.name)}
+										onchange={(event) => set(field.name, event.currentTarget.checked)}
+										disabled={!open}
+										class="mt-0.5"
+									/>
+									<span>{field.title ?? field.name}</span>
+								</label>
+							{:else}
+								{@const grouped = field.kind === "select" && field.multiple}
+								<svelte:element
+									this={grouped ? "span" : "label"}
+									id={`${id}-label`}
+									for={grouped ? undefined : id}
+									class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+								>
+									{field.title ?? field.name}
+									{#if field.required}<span class="text-red-500">*</span>{/if}
+								</svelte:element>
+							{/if}
+
+							{#if field.description}
+								<p class="mb-1 text-xs text-gray-500 dark:text-gray-400">{field.description}</p>
+							{/if}
+
+							{#if field.kind === "string"}
 								<input
 									{id}
-									type="checkbox"
-									checked={isChecked(field.name)}
-									onchange={(event) => set(field.name, event.currentTarget.checked)}
+									type={field.format === "email"
+										? "email"
+										: field.format === "date"
+											? "date"
+											: field.format === "date-time"
+												? "datetime-local"
+												: field.format === "uri"
+													? "url"
+													: "text"}
+									value={textValue(field.name)}
+									oninput={(event) => set(field.name, event.currentTarget.value)}
+									required={field.required}
+									minlength={field.minLength}
+									maxlength={field.maxLength}
 									disabled={!open}
-									class="mt-0.5"
+									class={inputClass}
 								/>
-								<span>{field.title ?? field.name}</span>
-							</label>
-						{:else}
-							{@const grouped = field.kind === "select" && field.multiple}
-							<svelte:element
-								this={grouped ? "span" : "label"}
-								id={`${id}-label`}
-								for={grouped ? undefined : id}
-								class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-							>
-								{field.title ?? field.name}
-								{#if field.required}<span class="text-red-500">*</span>{/if}
-							</svelte:element>
-						{/if}
+							{:else if field.kind === "number"}
+								<input
+									{id}
+									type="number"
+									value={textValue(field.name)}
+									oninput={(event) => set(field.name, event.currentTarget.value)}
+									required={field.required}
+									min={field.minimum}
+									max={field.maximum}
+									step={field.integer ? 1 : "any"}
+									disabled={!open}
+									class={inputClass}
+								/>
+							{:else if field.kind === "select" && !field.multiple}
+								<select
+									{id}
+									value={textValue(field.name)}
+									onchange={(event) => set(field.name, event.currentTarget.value)}
+									required={field.required}
+									disabled={!open}
+									class={inputClass}
+								>
+									<option value="" disabled={field.required}>Choose…</option>
+									{#each field.options as option (option.value)}
+										<option value={option.value}>{option.label}</option>
+									{/each}
+								</select>
+							{:else if field.kind === "select"}
+								<div class="space-y-1" role="group" aria-labelledby={`${id}-label`}>
+									{#each field.options as option (option.value)}
+										<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+											<input
+												type="checkbox"
+												value={option.value}
+												checked={isPicked(field.name, option.value)}
+												onchange={(event) =>
+													toggleOption(field.name, option.value, event.currentTarget.checked)}
+												disabled={!open}
+											/>
+											{option.label}
+										</label>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					{/each}
+				</form>
+			{/if}
 
-						{#if field.description}
-							<p class="mb-1 text-xs text-gray-500 dark:text-gray-400">{field.description}</p>
-						{/if}
+			{#if error}
+				<p class="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>
+			{/if}
 
-						{#if field.kind === "string"}
-							<input
-								{id}
-								type={field.format === "email"
-									? "email"
-									: field.format === "date"
-										? "date"
-										: field.format === "date-time"
-											? "datetime-local"
-											: field.format === "uri"
-												? "url"
-												: "text"}
-								value={textValue(field.name)}
-								oninput={(event) => set(field.name, event.currentTarget.value)}
-								required={field.required}
-								minlength={field.minLength}
-								maxlength={field.maxLength}
-								disabled={!open}
-								class={inputClass}
-							/>
-						{:else if field.kind === "number"}
-							<input
-								{id}
-								type="number"
-								value={textValue(field.name)}
-								oninput={(event) => set(field.name, event.currentTarget.value)}
-								required={field.required}
-								min={field.minimum}
-								max={field.maximum}
-								step={field.integer ? 1 : "any"}
-								disabled={!open}
-								class={inputClass}
-							/>
-						{:else if field.kind === "select" && !field.multiple}
-							<select
-								{id}
-								value={textValue(field.name)}
-								onchange={(event) => set(field.name, event.currentTarget.value)}
-								required={field.required}
-								disabled={!open}
-								class={inputClass}
-							>
-								<option value="" disabled={field.required}>Choose…</option>
-								{#each field.options as option (option.value)}
-									<option value={option.value}>{option.label}</option>
-								{/each}
-							</select>
-						{:else if field.kind === "select"}
-							<div class="space-y-1" role="group" aria-labelledby={`${id}-label`}>
-								{#each field.options as option (option.value)}
-									<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-										<input
-											type="checkbox"
-											value={option.value}
-											checked={isPicked(field.name, option.value)}
-											onchange={(event) =>
-												toggleOption(field.name, option.value, event.currentTarget.checked)}
-											disabled={!open}
-										/>
-										{option.label}
-									</label>
-								{/each}
-							</div>
-						{/if}
-					</div>
-				{/each}
-			</form>
-		{/if}
-
-		{#if error}
-			<p class="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>
-		{/if}
-
-		{#if open}
-			<div class="mt-4 flex flex-wrap gap-2">
-				{#if request.mode === "form" && fields.length > 0}
-					<button
-						type="submit"
-						form={formId}
-						disabled={submitting}
-						class="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white"
-					>
-						Send
-					</button>
-				{:else}
+			{#if open}
+				<div class="mt-4 flex flex-wrap gap-2">
+					{#if request.mode === "form" && fields.length > 0}
+						<button
+							type="submit"
+							form={formId}
+							disabled={submitting}
+							class="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white"
+						>
+							Send
+						</button>
+					{:else}
+						<button
+							type="button"
+							onclick={() => send("accept")}
+							disabled={submitting}
+							class="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white"
+						>
+							I've done this
+						</button>
+					{/if}
 					<button
 						type="button"
-						onclick={() => send("accept")}
+						onclick={() => send("decline")}
 						disabled={submitting}
-						class="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white"
+						class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
 					>
-						I've done this
+						Decline
 					</button>
-				{/if}
-				<button
-					type="button"
-					onclick={() => send("decline")}
-					disabled={submitting}
-					class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-				>
-					Decline
-				</button>
-			</div>
-		{:else}
-			<p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-				{#if outcome === "accept"}
-					Sent.
-				{:else if outcome === "decline"}
-					Declined.
-				{:else if resolved?.resolution === "aborted"}
-					Cancelled when the response was stopped.
-				{:else if resolved?.resolution === "withdrawn"}
-					{request.server} stopped waiting for an answer.
-				{:else if expired || resolved?.resolution === "expired"}
-					This request expired without an answer.
-				{:else}
-					Cancelled.
-				{/if}
-			</p>
-		{/if}
-	</div>
-</BlockWrapper>
+				</div>
+			{/if}
+		</div>
+	</BlockWrapper>
+{/if}

@@ -4,7 +4,11 @@ import { callMcpTool, getMcpToolTimeoutMs } from "./httpClient";
 import { getMcpServers } from "./registry";
 import { openDurableElicitation, takeResumableElicitation } from "./elicitation";
 import { ToolResultStatus } from "$lib/types/Tool";
-import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
+import {
+	MessageElicitationUpdateType,
+	MessageToolUpdateType,
+	MessageUpdateType,
+} from "$lib/types/MessageUpdate";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import type { McpServerConfig } from "./httpClient";
 
@@ -43,6 +47,17 @@ export async function resumeParkedToolCall({
 	}
 	const { inputResponses } = taken;
 
+	// Nothing emitted this while the run was over, so the transcript still shows an open
+	// form. Settling it here is what lets a reloaded page render the answer instead.
+	const settled: MessageUpdate = {
+		type: MessageUpdateType.Elicitation,
+		subtype: MessageElicitationUpdateType.Resolved,
+		elicitationId,
+		action: taken.row.action ?? "cancel",
+		resolution: "user",
+		...(taken.row.content ? { content: taken.row.content } : {}),
+	};
+
 	const server = [...getMcpServers(), ...extraServers].find((s) => s.name === pending.server);
 	if (!server) return { resumed: false, reason: `unknown server ${pending.server}`, updates: [] };
 
@@ -78,11 +93,13 @@ export async function resumeParkedToolCall({
 				},
 				inputRequired: response.inputRequired,
 			});
-			if (opened.opened) return { resumed: true, updates: collected, parkedAgain: true };
+			if (opened.opened) {
+				return { resumed: true, updates: [settled, ...collected], parkedAgain: true };
+			}
 			return {
 				resumed: false,
 				reason: `could not show the next prompt: ${opened.reason}`,
-				updates: [],
+				updates: [settled],
 			};
 		}
 
@@ -120,5 +137,5 @@ export async function resumeParkedToolCall({
 		};
 	}
 
-	return { resumed: true, updates: [update] };
+	return { resumed: true, updates: [settled, update] };
 }
