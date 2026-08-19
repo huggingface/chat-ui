@@ -1,24 +1,21 @@
 /**
  * MCP server for exercising elicitation by hand.
  *
- * Stateful, unlike mock-image-mcp.mjs: the client answers `elicitation/create` on a new
- * POST, which a per-request server instance would not recognise.
- *
- * Tools ask for input by RETURNING `input_required` (the 2026-07-28 style). On a 2025-era
- * connection the SDK's shim turns that into a real `elicitation/create` request, so the
- * same handler serves both — `impatient_confirm` stays on the old style on purpose, to
- * keep exercising a server that gives up on its own request.
+ * Served through `createMcpHandler`, the 2026-07-28 entry point, so a client negotiating
+ * `auto` lands on the modern era and fulfils `input_required` natively — the path
+ * hf.co/mcp uses. Legacy requests are served statelessly, which cannot carry
+ * server-to-client requests; see docs/serving/legacy-clients.md for the routing pattern
+ * that keeps a sessionful legacy leg alongside.
  *
  * Run:  node scripts/mock-elicitation-mcp.mjs
  * Then add http://127.0.0.1:8792/mcp as an MCP server in the UI.
  * Requires MCP_ALLOW_INSECURE_URLS=true, or chat-ui rejects the loopback URL.
  */
 import { createServer } from "node:http";
-import { randomUUID } from "node:crypto";
-import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+import { toNodeHandler } from "@modelcontextprotocol/node";
 import {
+	createMcpHandler,
 	McpServer,
-	isInitializeRequest,
 	inputRequired,
 	acceptedContent,
 } from "@modelcontextprotocol/server";
@@ -33,10 +30,7 @@ const report = (tool, result) =>
 	(result.content ? `\n${JSON.stringify(result.content, null, 2)}` : "");
 
 function buildServer() {
-	const server = new McpServer(
-		{ name: "mock-elicitation-mcp", version: "1.0.0" },
-		{ capabilities: { tools: {} } }
-	);
+	const server = new McpServer({ name: "mock-elicitation-mcp", version: "1.0.0" });
 
 	server.registerTool(
 		"book_meeting",
@@ -154,7 +148,10 @@ function buildServer() {
 			inputSchema: {},
 		},
 		async () => {
-			console.log("[mock-elicitation-mcp] impatient_confirm -> asking, 5s timeout");
+			// The pre-MRTR style: the server sends the request. On a 2025-era connection this
+			// exercises the client's "server stopped waiting" path; on modern it fails fast,
+			// because a server cannot raise an unsolicited request there at all.
+			console.log("[mock-elicitation-mcp] impatient_confirm -> server-initiated, 5s timeout");
 			try {
 				const result = await server.server.elicitInput(
 					{
@@ -200,76 +197,7 @@ function buildServer() {
 	return server;
 }
 
-/** sessionId -> transport, so an elicitation answer reaches the instance that asked. */
-const sessions = new Map();
-
-async function readBody(req) {
-	const chunks = [];
-	for await (const chunk of req) chunks.push(chunk);
-	if (chunks.length === 0) return undefined;
-	return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-}
-
-const httpServer = createServer((req, res) => {
-	void (async () => {
-		const url = new URL(req.url ?? "/", `http://127.0.0.1:${PORT}`);
-
-		if (url.pathname === "/health") {
-			res.writeHead(200, { "content-type": "application/json" });
-			res.end(JSON.stringify({ ok: true, sessions: sessions.size }));
-			return;
-		}
-
-		if (url.pathname !== "/mcp") {
-			res.writeHead(404, { "content-type": "application/json" });
-			res.end(JSON.stringify({ error: "not found", path: url.pathname }));
-			return;
-		}
-
-		const sessionId = req.headers["mcp-session-id"];
-		const existing = typeof sessionId === "string" ? sessions.get(sessionId) : undefined;
-
-		if (existing) {
-			await existing.handleRequest(
-				req,
-				res,
-				req.method === "POST" ? await readBody(req) : undefined
-			);
-			return;
-		}
-
-		const body = req.method === "POST" ? await readBody(req) : undefined;
-		if (!isInitializeRequest(body)) {
-			res.writeHead(400, { "content-type": "application/json" });
-			res.end(JSON.stringify({ error: "no session; send initialize first" }));
-			return;
-		}
-
-		const transport = new NodeStreamableHTTPServerTransport({
-			sessionIdGenerator: () => randomUUID(),
-			onsessioninitialized: (id) => {
-				console.log(`[mock-elicitation-mcp] session ${id} opened`);
-				sessions.set(id, transport);
-			},
-		});
-		transport.onclose = () => {
-			if (transport.sessionId) {
-				console.log(`[mock-elicitation-mcp] session ${transport.sessionId} closed`);
-				sessions.delete(transport.sessionId);
-			}
-		};
-		await buildServer().connect(transport);
-		await transport.handleRequest(req, res, body);
-	})().catch((err) => {
-		console.error("[mock-elicitation-mcp]", err);
-		if (!res.headersSent) {
-			res.writeHead(500, { "content-type": "application/json" });
-			res.end(JSON.stringify({ error: String(err) }));
-		} else {
-			res.end();
-		}
-	});
-});
+const httpServer = createServer(toNodeHandler(createMcpHandler(buildServer)));
 
 httpServer.listen(PORT, "127.0.0.1", () => {
 	console.log(`[mock-elicitation-mcp] listening on http://127.0.0.1:${PORT}/mcp`);
