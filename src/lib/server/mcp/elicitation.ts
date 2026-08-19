@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import type { Client } from "@modelcontextprotocol/client";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
+import type { McpElicitation } from "$lib/types/McpElicitation";
 import type {
 	ElicitationAction,
 	ElicitationRequestPayload,
@@ -16,7 +17,8 @@ import {
 } from "$lib/types/MessageUpdate";
 import { normalizeElicitationRequest, validateElicitationContent } from "./elicitationSchema";
 import { getElicitationTimeoutMs } from "./elicitationConfig";
-import type { McpCallDeadline } from "./httpClient";
+import type { McpCallDeadline, McpInputRequired } from "./httpClient";
+import type { InputResponses } from "@modelcontextprotocol/client";
 
 const POLL_INTERVAL_MS = 400;
 
@@ -256,7 +258,8 @@ export async function handleElicitationRequest(
 		: { action: outcome.action };
 }
 
-export type SubmitResult = { ok: true } | { ok: false; status: 400 | 404 | 409; error: string };
+export type SubmitResult =
+	{ ok: true; resume: boolean } | { ok: false; status: 400 | 404 | 409; error: string };
 
 export async function submitElicitationAnswer({
 	elicitationId,
@@ -273,7 +276,7 @@ export async function submitElicitationAnswer({
 	const doc = await collections.mcpElicitations.findOne({ elicitationId, conversationId });
 	if (!doc) return { ok: false, status: 404, error: "Unknown elicitation." };
 	if (doc.status !== "pending") return { ok: false, status: 409, error: "Already answered." };
-	if (doc.expiresAt.getTime() <= Date.now()) {
+	if (doc.expiresAt && doc.expiresAt.getTime() <= Date.now()) {
 		return { ok: false, status: 409, error: "This request has expired." };
 	}
 
@@ -301,5 +304,91 @@ export async function submitElicitationAnswer({
 	);
 	if (updated.matchedCount === 0) return { ok: false, status: 409, error: "Already answered." };
 
-	return { ok: true };
+	return { ok: true, resume: doc.pending !== undefined };
+}
+
+/**
+ * Record a 2026-era prompt and show it. Returns without waiting: the server kept no state,
+ * so the answer can arrive from any process at any time and resume the call then.
+ */
+export async function openDurableElicitation({
+	sink,
+	server,
+	toolUuid,
+	pending,
+	inputRequired,
+}: {
+	sink: ElicitationSink;
+	server: string;
+	toolUuid: string;
+	pending: Omit<NonNullable<McpElicitation["pending"]>, "inputKey" | "requestState" | "server">;
+	inputRequired: McpInputRequired;
+}): Promise<{ opened: boolean; reason?: string }> {
+	const entries = Object.entries(inputRequired.inputRequests);
+	// One question per round keeps resume unambiguous; the spec permits more, but no
+	// server we have met asks for more, and answering half a round is not resumable.
+	if (entries.length !== 1) {
+		return { opened: false, reason: `expected one input request, got ${entries.length}` };
+	}
+	const [inputKey, request] = entries[0];
+	if (request.method !== "elicitation/create") {
+		return { opened: false, reason: `unsupported input request: ${request.method}` };
+	}
+
+	const normalized = normalizeElicitationRequest(request.params);
+	if (!normalized.ok) return { opened: false, reason: normalized.reason };
+
+	const elicitationId = randomUUID();
+	const payload: ElicitationRequestPayload = { ...normalized.payload, elicitationId, server };
+	const now = new Date();
+
+	try {
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			elicitationId,
+			conversationId: sink.conversationId,
+			...(sink.generationId ? { generationId: sink.generationId } : {}),
+			status: "pending",
+			request: payload,
+			pending: {
+				...pending,
+				server,
+				inputKey,
+				...(inputRequired.requestState !== undefined
+					? { requestState: inputRequired.requestState }
+					: {}),
+			},
+			createdAt: now,
+			updatedAt: now,
+		});
+	} catch (err) {
+		logger.error({ err, server }, "[mcp] failed to record durable elicitation");
+		return { opened: false, reason: "could not be recorded" };
+	}
+
+	sink.emit({
+		type: MessageUpdateType.Elicitation,
+		subtype: MessageElicitationUpdateType.Request,
+		request: payload,
+		toolUuid,
+	});
+	return { opened: true };
+}
+
+/** The answered prompt for a conversation, ready to re-issue its tool call. */
+export async function takeResumableElicitation(
+	conversationId: ObjectId,
+	elicitationId: string
+): Promise<{ row: McpElicitation; inputResponses: InputResponses } | null> {
+	const row = await collections.mcpElicitations.findOne({ elicitationId, conversationId });
+	if (!row?.pending || row.status !== "resolved" || !row.action) return null;
+	return {
+		row,
+		inputResponses: {
+			[row.pending.inputKey]: {
+				action: row.action,
+				...(row.content ? { content: row.content } : {}),
+			},
+		},
+	};
 }

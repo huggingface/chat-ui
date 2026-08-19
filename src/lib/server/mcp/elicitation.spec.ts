@@ -367,7 +367,8 @@ describe("submitElicitationAnswer", () => {
 			content: { name: "Ada" },
 		});
 
-		expect(result).toEqual({ ok: true });
+		// `resume: false` — a blocking prompt is already unblocked by the write itself.
+		expect(result).toEqual({ ok: true, resume: false });
 		const row = await collections.mcpElicitations.findOne({ elicitationId });
 		expect(row).toMatchObject({ status: "resolved", action: "accept", content: { name: "Ada" } });
 	});

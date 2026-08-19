@@ -177,8 +177,11 @@ export interface MessageElicitationRequestUpdate {
 	type: MessageUpdateType.Elicitation;
 	subtype: MessageElicitationUpdateType.Request;
 	request: ElicitationRequestPayload;
-	/** Epoch ms, so replayed history can render a stale form as expired on its own. */
-	expiresAt: number;
+	/**
+	 * Epoch ms. Only a 2025-era prompt has one — it blocks a live request. A 2026-era
+	 * prompt is answered out of band and never expires, so the UI shows no countdown.
+	 */
+	expiresAt?: number;
 	/** Only set when exactly one call was in flight; MCP does not link the two. */
 	toolUuid?: string;
 }

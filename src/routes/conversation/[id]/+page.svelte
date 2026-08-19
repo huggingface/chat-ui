@@ -20,6 +20,7 @@
 		resolveStreamingMode,
 		applyStreamingMode,
 	} from "$lib/utils/messageUpdates";
+	import { elicitationToResume } from "$lib/stores/elicitationResume";
 	import { consumeMessageUpdates } from "$lib/utils/consumeMessageUpdates";
 	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
@@ -127,14 +128,23 @@
 	}
 
 	// this function is used to send new message to the backends
+	$effect(() => {
+		const id = $elicitationToResume;
+		if (!id || $loading) return;
+		elicitationToResume.set(null);
+		void writeMessage({ resumeElicitationId: id });
+	});
+
 	async function writeMessage({
 		prompt,
 		messageId = messagesPath.at(-1)?.id ?? undefined,
 		isRetry = false,
+		resumeElicitationId,
 	}: {
 		prompt?: string;
 		messageId?: ReturnType<typeof v4>;
 		isRetry?: boolean;
+		resumeElicitationId?: string;
 	}): Promise<void> {
 		try {
 			stopRequestedFor = null;
@@ -273,6 +283,7 @@
 					inputs: prompt,
 					messageId,
 					isRetry,
+					...(resumeElicitationId ? { resumeElicitationId } : {}),
 					generationId: activeGenerationId,
 					files: isRetry ? userMessage?.files : base64Files,
 					selectedMcpServerNames: $enabledServers.map((s) => s.name),

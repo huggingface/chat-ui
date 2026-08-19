@@ -74,6 +74,23 @@ export interface McpElicitation extends Timestamps {
 	request: ElicitationRequestPayload;
 	action?: ElicitationAction;
 	content?: Record<string, ElicitationValue>;
-	expiresAt: Date;
+	/** Absent for a 2026-era prompt: nothing is waiting, so nothing expires. */
+	expiresAt?: Date;
 	resolvedAt?: Date;
+	/**
+	 * Everything needed to re-issue the tool call once answered. Present only for a
+	 * 2026-era prompt, where the server kept no state and any process can continue it.
+	 */
+	pending?: {
+		server: string;
+		tool: string;
+		args: Record<string, unknown>;
+		/** Opaque; echoed back byte-exact. */
+		requestState?: string;
+		/** Which key in the server's `inputRequests` this form answers. */
+		inputKey: string;
+		messageId: string;
+		toolCallId: string;
+		toolUuid: string;
+	};
 }

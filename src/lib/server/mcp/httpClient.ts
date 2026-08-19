@@ -1,4 +1,5 @@
-import { Client, SdkHttpError } from "@modelcontextprotocol/client";
+import { Client, SdkHttpError, isInputRequiredResult } from "@modelcontextprotocol/client";
+import type { InputRequests, InputResponses } from "@modelcontextprotocol/client";
 import { getClient, evictFromPool, retainClient, releaseClient } from "./clientPool";
 import { withElicitationContext, type ElicitationSink } from "./elicitation";
 import { config } from "$lib/server/config";
@@ -35,7 +36,19 @@ export function getMcpToolTimeoutMs(): number {
 	return DEFAULT_TIMEOUT_MS;
 }
 
+/**
+ * What a 2026-era server returns instead of blocking: the questions it needs answered and
+ * the opaque state to echo back. Nothing is live once this is returned, so the answer can
+ * come from another process, another pod, or another day.
+ */
+export type McpInputRequired = {
+	inputRequests: InputRequests;
+	requestState?: string;
+};
+
 export type McpToolTextResponse = {
+	/** Set when the server wants input before it can finish. Modern era only. */
+	inputRequired?: McpInputRequired;
 	text: string;
 	/**
 	 * The server reported the call as failed. MCP returns tool failures as a normal
@@ -122,6 +135,7 @@ export async function callMcpTool(
 		client,
 		onProgress,
 		elicitation,
+		resume,
 	}: {
 		timeoutMs?: number;
 		signal?: AbortSignal;
@@ -129,6 +143,8 @@ export async function callMcpTool(
 		onProgress?: (progress: McpToolProgress) => void;
 		/** Omit and any `elicitation/create` on this connection is declined. */
 		elicitation?: { sink: ElicitationSink; toolUuid: string };
+		/** Answers to a previous `input_required`, replayed verbatim to continue that call. */
+		resume?: { inputResponses: InputResponses; requestState?: string };
 	} = {}
 ): Promise<McpToolTextResponse> {
 	const normalizedArgs =
@@ -145,6 +161,9 @@ export async function callMcpTool(
 	const callToolOptions = {
 		signal: deadline.signal,
 		timeout: ABSOLUTE_CEILING_MS,
+		// Hand an `input_required` back rather than letting the driver block on our
+		// handler: a 2026-era prompt is answered out of band, not inside this call.
+		allowInputRequired: true,
 		// Enable progress tokens so long-running tools keep extending the timeout.
 		onprogress: (progress: McpToolProgress) => {
 			deadline.restart();
@@ -167,7 +186,15 @@ export async function callMcpTool(
 			retainClient(currentClient);
 			deadline.restart();
 			const invoke = () =>
-				currentClient.callTool({ name: tool, arguments: normalizedArgs }, callToolOptions);
+				currentClient.callTool(
+					{
+						name: tool,
+						arguments: normalizedArgs,
+						...(resume ? { inputResponses: resume.inputResponses } : {}),
+						...(resume?.requestState !== undefined ? { requestState: resume.requestState } : {}),
+					},
+					callToolOptions
+				);
 			try {
 				response = elicitation
 					? await withElicitationContext(
@@ -207,6 +234,17 @@ export async function callMcpTool(
 		}
 	} finally {
 		deadline.dispose();
+	}
+
+	if (isInputRequiredResult(response)) {
+		return {
+			text: "",
+			isError: false,
+			inputRequired: {
+				inputRequests: response.inputRequests ?? {},
+				...(response.requestState !== undefined ? { requestState: response.requestState } : {}),
+			},
+		};
 	}
 
 	const parts = Array.isArray(response?.content) ? (response.content as Array<unknown>) : [];

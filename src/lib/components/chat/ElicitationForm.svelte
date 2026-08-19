@@ -9,12 +9,13 @@
 	import { base } from "$app/paths";
 	import CarbonLaunch from "~icons/carbon/launch";
 	import BlockWrapper from "./BlockWrapper.svelte";
+	import { elicitationToResume } from "$lib/stores/elicitationResume";
 
 	interface Props {
 		conversationId: string;
 		request: ElicitationRequestPayload;
-		/** Epoch ms. */
-		expiresAt: number;
+		/** Epoch ms; absent for a 2026-era prompt, which nothing is waiting on. */
+		expiresAt?: number;
 		resolved?: MessageElicitationResolvedUpdate;
 	}
 
@@ -49,17 +50,18 @@
 
 	let now = $state(Date.now());
 	let outcome = $derived(resolved?.action ?? submitted);
-	let expired = $derived(!outcome && now >= expiresAt);
+	let expired = $derived(!outcome && expiresAt !== undefined && now >= expiresAt);
 	let open = $derived(!outcome && !expired);
 
 	$effect(() => {
-		if (!open) return;
+		if (!open || expiresAt === undefined) return;
 		const period = expiresAt - now > 120_000 ? 30_000 : 1_000;
 		const timer = setInterval(() => (now = Date.now()), period);
 		return () => clearInterval(timer);
 	});
 
 	let timeLeft = $derived.by(() => {
+		if (expiresAt === undefined) return "";
 		const seconds = Math.max(0, Math.ceil((expiresAt - now) / 1000));
 		if (seconds >= 3_600) return `${Math.floor(seconds / 3_600)}h left`;
 		if (seconds >= 120) return `${Math.floor(seconds / 60)}m left`;
@@ -132,12 +134,15 @@
 					...(action === "accept" && request.mode === "form" ? { content: payload() } : {}),
 				}),
 			});
+			const body = await res.json().catch(() => null);
 			if (!res.ok) {
-				const body = await res.json().catch(() => null);
 				error = typeof body?.message === "string" ? body.message : "Could not send your answer.";
 				return;
 			}
 			submitted = action;
+			// A parked call has nothing waiting on it, so answering only records the answer —
+			// the run that continues it has to be started.
+			if (body?.resume) elicitationToResume.set(request.elicitationId);
 		} catch {
 			error = "Could not send your answer.";
 		} finally {

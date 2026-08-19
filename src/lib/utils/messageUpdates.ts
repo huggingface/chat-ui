@@ -23,6 +23,8 @@ type MessageUpdateRequestOptions = {
 	messageId?: string;
 	isRetry: boolean;
 	isContinue?: boolean;
+	/** Continue the tool call a durable elicitation parked, before generating. */
+	resumeElicitationId?: string;
 	// Client-chosen id for this generation run, echoed back by stop-generating
 	// so the server can match a stop point to the run it belongs to
 	generationId?: string;
@@ -64,6 +66,7 @@ export async function fetchMessageUpdates(
 		inputs: opts.inputs,
 		id: opts.messageId,
 		is_retry: opts.isRetry,
+		...(opts.resumeElicitationId ? { resumeElicitationId: opts.resumeElicitationId } : {}),
 		is_continue: Boolean(opts.isContinue),
 		generationId: opts.generationId,
 		// Will be ignored server-side if unsupported

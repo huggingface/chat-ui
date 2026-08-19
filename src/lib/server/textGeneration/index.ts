@@ -85,6 +85,7 @@ async function* textGenerationWithoutTitle(
 			abortController: ctx.abortController,
 			promptedAt: ctx.promptedAt,
 			generationId: ctx.generationId,
+			messageId: ctx.messageId,
 		});
 
 		let step = await mcpGen.next();

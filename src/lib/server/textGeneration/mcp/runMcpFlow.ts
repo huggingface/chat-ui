@@ -40,11 +40,18 @@ export type RunMcpFlowContext = Pick<
 	| "reasoningOverride"
 	| "locals"
 	| "generationId"
+	| "messageId"
 > & { messages: EndpointMessage[] };
 
 // Only "not_applicable" means MCP never ran and the caller should generate normally.
 // Every other result has already emitted its own final answer.
-export type McpFlowResult = "completed" | "not_applicable" | "aborted" | "exhausted";
+export type McpFlowResult =
+	| "completed"
+	| "not_applicable"
+	| "aborted"
+	| "exhausted"
+	/** A 2026-era prompt is open; the run ends here and resumes when it is answered. */
+	| "awaiting_input";
 
 const MAX_TOOL_ROUNDS = 10;
 
@@ -63,6 +70,7 @@ export async function* runMcpFlow({
 	reasoningOverride,
 	locals,
 	generationId,
+	messageId,
 	preprompt,
 	abortSignal,
 	abortController,
@@ -833,7 +841,7 @@ export async function* runMcpFlow({
 					// own message instead of moving them onto the final answer.
 					roundReasoning: reasoningForToolMsg,
 					roundContent: assistantContentForToolMsg,
-					elicitation: { conversationId: conv._id, generationId },
+					elicitation: { conversationId: conv._id, generationId, messageId },
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;
@@ -842,6 +850,10 @@ export async function* runMcpFlow({
 						producedOutput = true;
 						yield event.update;
 					} else {
+						if (event.summary.awaitingInput) {
+							logger.info({ loop }, "[mcp] parked on a durable prompt; run ends until answered");
+							return "awaiting_input";
+						}
 						messagesOpenAI = [
 							...messagesOpenAI,
 							assistantToolMessage,

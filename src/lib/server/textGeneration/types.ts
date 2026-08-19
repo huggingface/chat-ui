@@ -29,4 +29,6 @@ export interface TextGenerationContext {
 	abortController: AbortController;
 	/** Also identifies the audience for an MCP elicitation raised mid tool call. */
 	generationId?: string;
+	/** The assistant message this run writes into; a durable prompt resumes against it. */
+	messageId?: string;
 }

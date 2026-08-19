@@ -154,7 +154,7 @@
 	type ElicitationBlock = {
 		type: "elicitation";
 		request: ElicitationRequestPayload;
-		expiresAt: number;
+		expiresAt?: number;
 		resolved?: MessageElicitationResolvedUpdate;
 	};
 

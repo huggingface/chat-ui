@@ -23,6 +23,7 @@ import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
+import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
@@ -179,6 +180,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		inputs: newPrompt,
 		id: messageId,
 		is_retry: isRetry,
+		resumeElicitationId,
 		generationId,
 		selectedMcpServerNames,
 		selectedMcpServers,
@@ -196,6 +198,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					.transform((s) => s.replace(/\r\n/g, "\n"))
 			),
 			is_retry: z.optional(z.boolean()),
+			/** Continue the tool call a durable elicitation parked, before generating. */
+			resumeElicitationId: z.optional(z.string().uuid()),
 			selectedMcpServerNames: z.optional(z.array(z.string())),
 			selectedMcpServers: z
 				.optional(
@@ -678,6 +682,23 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				// Add billing organization to locals for the endpoint to use
 				locals.billingOrganization = userSettings?.billingOrganization;
 
+				if (resumeElicitationId) {
+					const { resumeParkedToolCall } = await import("$lib/server/mcp/resumeElicitation");
+					const outcome = await resumeParkedToolCall({
+						conversationId: convId,
+						elicitationId: resumeElicitationId,
+						extraServers: (locals as unknown as { mcp?: { selectedServers?: McpServerConfig[] } })
+							?.mcp?.selectedServers,
+						signal: ctrl.signal,
+					});
+					if (!outcome.resumed) {
+						logger.warn(
+							{ conversationId: id, reason: outcome.reason },
+							"[mcp] could not resume a parked tool call"
+						);
+					}
+				}
+
 				const ctx: TextGenerationContext = {
 					model,
 					endpoint: await model.getEndpoint(),
@@ -711,6 +732,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					locals,
 					abortController: ctrl,
 					generationId: effectiveGenerationId,
+					messageId: messageToWriteTo.id,
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);

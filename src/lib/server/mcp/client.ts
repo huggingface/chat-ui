@@ -31,6 +31,9 @@ export function createMcpClient(kind: McpClientKind = "session"): Client {
 		// The SDK defaults to `legacy`, i.e. never negotiating. Probe instead, and let the
 		// probe fall back on its own for the 2025-era servers that are still the majority.
 		versionNegotiation: { mode: "auto" },
+		// A 2026-era prompt outlives this call, so the driver must not block our handler
+		// waiting for one. `callMcpTool` opts each call into receiving `input_required`.
+		inputRequired: { autoFulfill: false },
 	});
 
 	if (capabilities.elicitation) {
