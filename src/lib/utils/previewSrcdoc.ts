@@ -1,4 +1,5 @@
 import type { ArtifactKind } from "./artifacts";
+import { appendHuggingChatBadge } from "./deployBadge";
 
 /**
  * Builders for sandboxed iframe `srcdoc` documents used by live previews
@@ -16,16 +17,292 @@ import type { ArtifactKind } from "./artifacts";
  * over an attacker-chosen path. Navigating from inside the sandbox would
  * be broken anyway — the opened tab would inherit the sandbox's opaque
  * origin.
+ *
+ * The hook also answers screenshot requests from the parent (see
+ * artifactCapture.ts): the sandbox has an opaque origin the parent cannot
+ * reach into, so the parent sends the capture library's source over
+ * postMessage and the document renders itself to a PNG data URL in-process.
  */
 
 const END_SCRIPT_TAG = "</scr" + "ipt>";
+
+/**
+ * Sandbox tokens for preview iframes (artifact panel + fullscreen modal).
+ *
+ * `allow-same-origin` is deliberately ABSENT and must stay absent: it is the
+ * security boundary. Without it the document runs in an opaque origin with no
+ * access to the app's cookies, storage, or DOM. Every token here only grants
+ * a capability that stays inside the frame:
+ * - `allow-pointer-lock`: mouse-look games can capture the cursor (Esc always
+ *   releases, and the browser overlays its own exit hint)
+ * - `allow-orientation-lock`: fullscreen games can lock to landscape
+ * Deliberately absent besides same-origin: `allow-popups` (link clicks leave
+ * through the parent's external-link confirm instead), `allow-downloads`
+ * (generated code must not be able to drop files into the user's Downloads),
+ * and `allow-modals` — previews auto-open with zero clicks (streaming, and
+ * shared conversations on load), and a dialog from a same-process iframe
+ * blocks the parent's event loop, so a `while(true) alert()` artifact would
+ * hold the tab hostage with the panel's own close button dead between
+ * dialogs. Without the token, dialog calls are silent no-ops; the system
+ * prompt steers models to in-page UI instead.
+ */
+export const PREVIEW_SANDBOX =
+	"allow-scripts allow-forms allow-pointer-lock allow-orientation-lock";
+
+/**
+ * Permission-policy delegations for preview iframes. Features default to a
+ * `'self'` allowlist, which a sandboxed srcdoc frame (opaque origin) never
+ * matches, so anything artifacts should be able to use must be delegated
+ * here; the explicit `*` allowlists are what reliably match an opaque origin
+ * across engines (and let an artifact pass e.g. fullscreen on to a media
+ * embed it contains). Everything granted is device-UX or write-only:
+ * fullscreen, motion sensors for tilt controls (also required for
+ * devicemotion/deviceorientation events), gamepad, media autoplay, and
+ * clipboard-write. Privacy-sensitive inputs — camera, microphone,
+ * geolocation, clipboard-read, display-capture — are deliberately NOT
+ * delegated, and reads of user data stay impossible. `screen-wake-lock` is
+ * also withheld: it needs no user gesture, previews can open with zero
+ * clicks, and a silent lock would keep a walked-away-from display awake for
+ * no preview-side benefit (active use keeps the screen on by itself).
+ */
+export const PREVIEW_ALLOW =
+	"fullscreen *; pointer-lock *; accelerometer *; gyroscope *; magnetometer *; gamepad *; autoplay *; clipboard-write *";
+
+/** An uncaught error forwarded from a preview iframe via the postMessage hook. */
+export interface PreviewError {
+	message: string;
+	stack?: string;
+}
+
+/** A distinct captured error signature plus how many times it was emitted. */
+export interface CapturedPreviewError extends PreviewError {
+	count: number;
+}
+
+/**
+ * Cap on distinct stored signatures. Repeats of a known signature only bump
+ * its count, so a handler that throws every frame can never crowd out a later
+ * unrelated failure; this only bounds pathological pages whose every error is
+ * unique (e.g. a timestamp baked into the message).
+ */
+export const MAX_DISTINCT_CAPTURED_ERRORS = 20;
+/**
+ * Count saturation per signature. Once reached, further repeats return the
+ * input array unchanged, so the state assignment in the collectors becomes a
+ * reactive no-op and an error throwing every frame stops churning the UI.
+ */
+export const MAX_COUNTED_REPEATS = 999;
+/** Per-field cap at capture, well above what a fix request ever renders. */
+const MAX_CAPTURED_FIELD_CHARS = 4000;
+
+const MAX_LISTED_ERRORS = 5;
+const MAX_STACK_LINES = 5;
+const MAX_ERROR_CHARS = 700;
+
+/**
+ * Normalize an untrusted error payload from the preview channel. The iframe
+ * forwards whatever the page threw or rejected with, so `stack` can be any
+ * shape; anything but a string is dropped rather than rendered.
+ */
+export function normalizePreviewError(detail: unknown): PreviewError {
+	const raw = (detail ?? {}) as { message?: unknown; stack?: unknown };
+	return {
+		message: String(raw.message ?? "Error").slice(0, MAX_CAPTURED_FIELD_CHARS),
+		stack: typeof raw.stack === "string" ? raw.stack.slice(0, MAX_CAPTURED_FIELD_CHARS) : undefined,
+	};
+}
+
+/**
+ * Fold an incoming error into the captured list: a repeat of a known
+ * signature increments that entry's count (until saturation), a new signature
+ * appends until the distinct cap. Returns the input array untouched when
+ * nothing changed, and a new array otherwise, so Svelte state consumers can
+ * assign the result directly and only pay for real changes.
+ */
+export function capturePreviewError(
+	captured: CapturedPreviewError[],
+	incoming: PreviewError
+): CapturedPreviewError[] {
+	const index = captured.findIndex(
+		(e) => e.message === incoming.message && e.stack === incoming.stack
+	);
+	if (index !== -1) {
+		if (captured[index].count >= MAX_COUNTED_REPEATS) return captured;
+		return captured.map((e, i) => (i === index ? { ...e, count: e.count + 1 } : e));
+	}
+	if (captured.length >= MAX_DISTINCT_CAPTURED_ERRORS) return captured;
+	return [...captured, { ...incoming, count: 1 }];
+}
+
+function renderError(error: CapturedPreviewError): string {
+	const shownCount = error.count >= MAX_COUNTED_REPEATS ? `${MAX_COUNTED_REPEATS}+` : error.count;
+	const times = error.count > 1 ? ` (repeated ${shownCount} times)` : "";
+	// Keep only the top of the stack: for single-file artifacts the first
+	// frames carry the useful location, and deep stacks would drown the list
+	const stack = error.stack?.split("\n").slice(0, MAX_STACK_LINES).join("\n") ?? "";
+	const rendered = `${error.message}${times}${stack ? `\n${stack}` : ""}`;
+	return rendered.length > MAX_ERROR_CHARS ? `${rendered.slice(0, MAX_ERROR_CHARS)}…` : rendered;
+}
+
+/** The chat message sent when the user asks the model to fix captured preview errors. */
+export function composeFixRequest(errors: CapturedPreviewError[]): string {
+	if (errors.length <= 1) {
+		const summary = errors.length ? renderError(errors[0]) : "Unknown error";
+		return `it's not working: ${summary} - can you fix it?`;
+	}
+
+	const shown = errors.slice(0, MAX_LISTED_ERRORS);
+	const omitted = errors.length - shown.length;
+	const list = shown.map((entry, i) => `${i + 1}. ${renderError(entry)}`).join("\n");
+	const tail = omitted > 0 ? `\n(+${omitted} more distinct error${omitted > 1 ? "s" : ""})` : "";
+	return `it's not working, I see ${errors.length} errors:\n${list}${tail}\ncan you fix them?`;
+}
 
 function buildPreviewHookScript(channel: string): string {
 	// Deployed artifacts (a static Space) pass an empty channel: there is no
 	// parent window to postMessage to, so the hook is omitted entirely and the
 	// shipped document is just the artifact itself.
 	if (!channel) return "";
-	return `\n<script>\n(function(){\n  function send(type, detail){\n    try{ parent.postMessage({ type: type, channel: '${channel}', detail: detail }, '*'); }catch(e){}\n  }\n  function nearestAnchor(node){\n    while (node && node !== document) {\n      if (node.tagName && node.tagName.toLowerCase() === 'a') return node;\n      node = node.parentNode;\n    }\n    return null;\n  }\n  function anchorHref(anchor){\n    var href = anchor.href;\n    if (typeof href === 'string') return href;\n    if (href && typeof href.baseVal === 'string') {\n      try { return new URL(href.baseVal, document.baseURI).href; } catch (err) { return ''; }\n    }\n    return '';\n  }\n  function scrollToFragment(raw){\n    var id = raw.slice(1);\n    try { id = decodeURIComponent(id); } catch (err) {}\n    var target = id ? document.getElementById(id) : null;\n    if (target && target.scrollIntoView) target.scrollIntoView();\n  }\n  function intercept(ev){\n    var anchor = nearestAnchor(ev.target);\n    if (!anchor) return;\n    ev.preventDefault();\n    ev.stopPropagation();\n    var raw = anchor.getAttribute('href') || anchor.getAttribute('xlink:href') || '';\n    if (raw.charAt(0) === '#') {\n      scrollToFragment(raw);\n      return;\n    }\n    if (!/^\\s*https?:/i.test(raw)) return;\n    var href = anchorHref(anchor);\n    if (/^https?:/i.test(href)) {\n      send('chatui.preview.openLink', { href: href });\n    }\n  }\n  window.addEventListener('click', intercept, true);\n  window.addEventListener('auxclick', intercept, true);\n  window.addEventListener('keydown', function(ev){\n    if (ev.key === 'Enter' || ev.key === ' ') {\n      intercept(ev);\n    }\n  }, true);\n  window.addEventListener('error', function(ev){\n    var msg = ev && ev.message ? ev.message : 'Script error';\n    var stack = ev && ev.error && ev.error.stack ? ev.error.stack : undefined;\n    send('chatui.preview.error', { message: msg, stack: stack });\n  });\n  window.addEventListener('unhandledrejection', function(ev){\n    var r = ev && ev.reason;\n    var msg = (typeof r === 'string') ? r : (r && r.message) ? r.message : 'Unhandled promise rejection';\n    var stack = r && r.stack ? r.stack : undefined;\n    send('chatui.preview.error', { message: msg, stack: stack });\n  });\n})();\n${END_SCRIPT_TAG}`;
+	return `\n<script>
+(function(){
+  function send(type, detail){
+    try{ parent.postMessage({ type: type, channel: '${channel}', detail: detail }, '*'); }catch(e){}
+  }
+  function nearestAnchor(node){
+    while (node && node !== document) {
+      if (node.tagName && node.tagName.toLowerCase() === 'a') return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+  function anchorHref(anchor){
+    var href = anchor.href;
+    if (typeof href === 'string') return href;
+    if (href && typeof href.baseVal === 'string') {
+      try { return new URL(href.baseVal, document.baseURI).href; } catch (err) { return ''; }
+    }
+    return '';
+  }
+  function scrollToFragment(raw){
+    var id = raw.slice(1);
+    try { id = decodeURIComponent(id); } catch (err) {}
+    var target = id ? document.getElementById(id) : null;
+    if (target && target.scrollIntoView) target.scrollIntoView();
+  }
+  function intercept(ev){
+    var anchor = nearestAnchor(ev.target);
+    if (!anchor) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    var raw = anchor.getAttribute('href') || anchor.getAttribute('xlink:href') || '';
+    if (raw.charAt(0) === '#') {
+      scrollToFragment(raw);
+      return;
+    }
+    if (!/^\\s*https?:/i.test(raw)) return;
+    var href = anchorHref(anchor);
+    if (/^https?:/i.test(href)) {
+      send('chatui.preview.openLink', { href: href });
+    }
+  }
+  window.addEventListener('click', intercept, true);
+  window.addEventListener('auxclick', intercept, true);
+  window.addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      intercept(ev);
+    }
+  }, true);
+  window.addEventListener('error', function(ev){
+    var msg = ev && ev.message ? ev.message : 'Script error';
+    var stack = ev && ev.error && ev.error.stack ? ev.error.stack : undefined;
+    send('chatui.preview.error', { message: msg, stack: stack });
+  });
+  window.addEventListener('unhandledrejection', function(ev){
+    var r = ev && ev.reason;
+    var msg = (typeof r === 'string') ? r : (r && r.message) ? r.message : 'Unhandled promise rejection';
+    var stack = r && r.stack ? r.stack : undefined;
+    send('chatui.preview.error', { message: msg, stack: stack });
+  });
+  // Screenshots read WebGL canvases via toDataURL, which returns a blank
+  // image once the frame's drawing buffer has been discarded. Default
+  // preserveDrawingBuffer on (unless the artifact set it explicitly) so
+  // three.js scenes and canvas games capture what's on screen. This hook
+  // only exists in previews, so deployed pages keep stock behavior.
+  var getContext = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function(type, attrs){
+    if ((type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') &&
+        (!attrs || attrs.preserveDrawingBuffer === undefined)) {
+      attrs = Object.assign({}, attrs, { preserveDrawingBuffer: true });
+    }
+    return getContext.call(this, type, attrs);
+  };
+  window.addEventListener('message', function(ev){
+    // Only the embedding app may request a capture. The artifact's own code
+    // could still forge a request at itself, but that grants nothing it
+    // can't already do, and the parent validates every result it receives.
+    if (ev.source !== window.parent) return;
+    var data = ev.data;
+    if (!data || data.channel !== '${channel}' || data.type !== 'chatui.preview.captureRequest') return;
+    var detail = data.detail || {};
+    var id = typeof detail.id === 'string' ? detail.id : '';
+    function fail(err){
+      send('chatui.preview.captureResult', { id: id, error: String(err && err.message ? err.message : err) });
+    }
+    try {
+      if (!window.snapdom) {
+        if (typeof detail.source !== 'string' || !detail.source) { fail('capture library missing'); return; }
+        var s = document.createElement('script');
+        s.textContent = detail.source;
+        (document.head || document.documentElement).appendChild(s);
+        s.remove();
+        if (!window.snapdom) { fail('capture library failed to initialize'); return; }
+      }
+      // Capture the body, not documentElement: SnapDOM renders the <html>
+      // element as empty/background-only for common full-viewport layouts
+      // (e.g. flex-centered body with min-height:100vh), while body capture
+      // is reliable. Transparent areas get the backgroundColor fill below.
+      var root = document.body || document.documentElement;
+      var scrollWidth = Math.max(root.scrollWidth, root.clientWidth, 1);
+      var height = Math.max(root.scrollHeight, root.clientHeight, 1);
+      // Decorative layers wider than the viewport (200% wave strips, parallax
+      // slides) widen SnapDOM's output into a dead band of background fill;
+      // clip the shot to the visible width. Height is NOT clipped: capturing
+      // tall documents full page is intentional.
+      var visibleWidth = root.clientWidth > 0 ? Math.min(scrollWidth, root.clientWidth) : scrollWidth;
+      // Cap the long edge so a tall page can't produce a giant payload
+      var scale = Math.min(1, 4096 / Math.max(visibleWidth, height));
+      // Body capture drops anything painted on <html>, so a page that styles
+      // its background there (body transparent) would get the panel backing
+      // instead of its own color: prefer the root's computed background when
+      // it has one. Gradients/images on <html> stay out of reach (a fill
+      // color is all the capture API takes), but those normally live on body.
+      var rootBackground = '';
+      try { rootBackground = getComputedStyle(document.documentElement).backgroundColor || ''; } catch (err) {}
+      if (rootBackground === 'transparent' || rootBackground === 'rgba(0, 0, 0, 0)') rootBackground = '';
+      window.snapdom.toCanvas(root, {
+        dpr: 1,
+        scale: scale,
+        backgroundColor: rootBackground || (typeof detail.backgroundColor === 'string' && detail.backgroundColor ? detail.backgroundColor : '#ffffff'),
+        embedFonts: true,
+        fast: true
+      }).then(function(canvas){
+        var targetWidth = Math.round(visibleWidth * scale);
+        if (canvas.width > targetWidth + 1) {
+          var clipped = document.createElement('canvas');
+          clipped.width = targetWidth;
+          clipped.height = canvas.height;
+          var clipCtx = clipped.getContext('2d');
+          if (clipCtx) {
+            clipCtx.drawImage(canvas, 0, 0);
+            canvas = clipped;
+          }
+        }
+        send('chatui.preview.captureResult', { id: id, dataUrl: canvas.toDataURL('image/png') });
+      }).catch(fail);
+    } catch (err) { fail(err); }
+  });
+})();
+${END_SCRIPT_TAG}`;
 }
 
 /** JSON-encode a string for embedding inside an inline <script>, escaping `</` so the HTML parser can't terminate the script early. */
@@ -219,11 +496,19 @@ export function isDeployableKind(kind: ArtifactKind): boolean {
  * Build the standalone `index.html` shipped to a deployed static Space. Unlike
  * the preview builders this passes an empty channel, so the postMessage hook is
  * stripped (a deployed page has no parent window to talk to). Raw HTML is shipped
- * verbatim — it is already a complete self-contained page and we must not inject
+ * as-is — it is already a complete self-contained page and we must not inject
  * a `<base target="_blank">` that would rewrite its link behaviour. SVG/React/
  * Mermaid reuse the same wrappers as the preview, minus the hook.
+ *
+ * Every deployed page then gets the "Made with HuggingChat" badge appended (see
+ * `deployBadge.ts`); it is self-contained and shadow-isolated, so it is the one
+ * thing added to otherwise untouched artifact markup.
  */
 export function buildDeployableHtml(kind: ArtifactKind, content: string): string {
+	return appendHuggingChatBadge(buildDeployableDocument(kind, content));
+}
+
+function buildDeployableDocument(kind: ArtifactKind, content: string): string {
 	switch (kind) {
 		case "react":
 			return buildReactSrcdoc(content, "");

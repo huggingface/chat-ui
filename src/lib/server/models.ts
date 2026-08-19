@@ -6,6 +6,7 @@ import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints"
 
 import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
+import { preservesReasoningByDefault } from "$lib/server/reasoningPolicy";
 import { makeRouterEndpoint } from "$lib/server/router/endpoint";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
@@ -41,7 +42,21 @@ const modelConfig = z.object({
 		)
 		.optional(),
 	endpoints: z.array(endpointSchema).optional(),
-	providers: z.array(z.object({ supports_tools: z.boolean().optional() }).passthrough()).optional(),
+	providers: z
+		.array(
+			z
+				.object({
+					supports_tools: z.boolean().optional(),
+					context_length: z.number().int().positive().optional(),
+				})
+				.passthrough()
+		)
+		.optional(),
+	/**
+	 * Context window in tokens, aggregated across providers. Used to bound how
+	 * much conversation history is sent; absent when no provider reports one.
+	 */
+	contextLength: z.number().int().positive().optional(),
 	parameters: z
 		.object({
 			temperature: z.number().min(0).max(2).optional(),
@@ -59,8 +74,16 @@ const modelConfig = z.object({
 	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
 	// Aggregated tool-calling capability across providers (HF router)
 	supportsTools: z.boolean().default(false),
-	// Reasoning-capable model (accepts `reasoning_effort` parameter)
+	// Reasoning-capable model (accepts `reasoning_effort` parameter). Drives the
+	// Thinking-effort control only — whether prior reasoning is echoed back is
+	// `preservesReasoning`, which defaults on and is derived, not opted into.
 	supportsReasoning: z.boolean().default(false),
+	/**
+	 * Whether the model may be sent its own prior reasoning back. Derived from
+	 * the id (see reasoningPolicy.ts) when the config says nothing; an explicit
+	 * entry here wins, so a backend needing the opposite can say so per model.
+	 */
+	preservesReasoning: z.boolean().optional(),
 	// Opt-in artifacts: when true, the model is instructed to emit <artifact>
 	// blocks rendered in the side panel. Set per model via MODELS overrides.
 	supportsArtifacts: z.boolean().default(false),
@@ -96,7 +119,14 @@ const listSchema = z
 				id: z.string(),
 				description: z.string().optional(),
 				providers: z
-					.array(z.object({ supports_tools: z.boolean().optional() }).passthrough())
+					.array(
+						z
+							.object({
+								supports_tools: z.boolean().optional(),
+								context_length: z.number().int().positive().optional(),
+							})
+							.passthrough()
+					)
 					.optional(),
 				architecture: z
 					.object({
@@ -256,6 +286,13 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 
 			// If any provider supports tools, consider the model as supporting tools
 			const supportsTools = Boolean((m.providers ?? []).some((p) => p?.supports_tools === true));
+			// Smallest window any provider offers, not the largest: with
+			// `provider: "auto"` the router picks, so a request sized for the
+			// roomiest provider would overflow whichever one actually serves it.
+			const reportedContexts = (m.providers ?? [])
+				.map((p) => p?.context_length)
+				.filter((n): n is number => typeof n === "number" && n > 0);
+			const contextLength = reportedContexts.length ? Math.min(...reportedContexts) : undefined;
 			return {
 				id: m.id,
 				name: m.id,
@@ -263,6 +300,10 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				description: m.description,
 				logoUrl,
 				providers: m.providers,
+				contextLength,
+				// Derived, not opted into: see reasoningPolicy.ts. A MODELS override
+				// with an explicit value replaces this in the merge below.
+				preservesReasoning: preservesReasoningByDefault(m.id),
 				multimodal: supportsImageInput,
 				multimodalAcceptedMimetypes: supportsImageInput ? ["image/*"] : undefined,
 				supportsTools,

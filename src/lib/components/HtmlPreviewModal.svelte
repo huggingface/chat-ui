@@ -3,8 +3,15 @@
 	import ExternalLinkModal from "./ExternalLinkModal.svelte";
 	import { onMount, onDestroy } from "svelte";
 	import CarbonClose from "~icons/carbon/close";
-	import { pendingChatInput } from "$lib/stores/pendingChatInput";
-	import { buildArtifactSrcdoc } from "$lib/utils/previewSrcdoc";
+	import {
+		buildArtifactSrcdoc,
+		capturePreviewError,
+		composeFixRequest,
+		normalizePreviewError,
+		PREVIEW_ALLOW,
+		PREVIEW_SANDBOX,
+		type CapturedPreviewError,
+	} from "$lib/utils/previewSrcdoc";
 	import { parseExternalUrl } from "$lib/utils/externalLink";
 	import type { ArtifactKind } from "$lib/utils/artifacts";
 
@@ -13,13 +20,19 @@
 		/** How to render the content; html also covers raw SVG documents */
 		kind?: ArtifactKind;
 		onclose?: () => void;
+		/**
+		 * Sends an ask-to-fix message directly to the chat, returning whether it
+		 * was dispatched. Absent when sending isn't possible, which hides the
+		 * error button.
+		 */
+		onsend?: (text: string) => boolean;
 	}
 
-	let { html, kind = "html", onclose }: Props = $props();
+	let { html, kind = "html", onclose, onsend }: Props = $props();
 
 	let iframeEl: HTMLIFrameElement | undefined = $state();
 	let channel = $state(`preview_${Math.random().toString(36).slice(2)}`);
-	let errors: { message: string; stack?: string }[] = $state([]);
+	let errors: CapturedPreviewError[] = $state([]);
 	let externalLinkUrl = $state<URL | null>(null);
 
 	let srcdoc = $derived(buildArtifactSrcdoc(kind, html, channel));
@@ -27,7 +40,7 @@
 	type PreviewMessage = {
 		type: string;
 		channel: string;
-		detail?: { message?: unknown; stack?: string; href?: unknown };
+		detail?: { message?: unknown; stack?: unknown; href?: unknown };
 	};
 
 	function onMessage(ev: MessageEvent) {
@@ -46,8 +59,7 @@
 			return;
 		}
 		if (data.type !== "chatui.preview.error") return;
-		const detail = (data.detail ?? {}) as { message?: unknown; stack?: string };
-		errors = [...errors, { message: String(detail.message ?? "Error"), stack: detail.stack }];
+		errors = capturePreviewError(errors, normalizePreviewError(data.detail));
 	}
 
 	onMount(() => {
@@ -56,14 +68,6 @@
 	onDestroy(() => {
 		window.removeEventListener("message", onMessage);
 	});
-
-	function composeText(): string {
-		const lines = errors.map((e, i) => `${i + 1}. ${e.message}${e.stack ? `\n${e.stack}` : ""}`);
-		const summary = lines[0] ?? "Unknown error";
-		return errors.length > 1
-			? `it's not working: ${summary} (+${errors.length - 1} more) - can you fix it?`
-			: `it's not working: ${summary} - can you fix it?`;
-	}
 
 	// Esc/backdrop while the external-link confirm is open dismisses just the
 	// confirm; the fullscreen preview itself stays up. (Esc reaches this Modal's
@@ -84,7 +88,9 @@
 			bind:this={iframeEl}
 			title="HTML Preview"
 			class="h-full w-full"
-			sandbox="allow-scripts"
+			sandbox={PREVIEW_SANDBOX}
+			allow={PREVIEW_ALLOW}
+			allowfullscreen
 			referrerpolicy="no-referrer"
 			{srcdoc}
 		></iframe>
@@ -99,16 +105,17 @@
 			Close preview
 		</button>
 
-		{#if errors.length > 0}
+		{#if errors.length > 0 && onsend}
 			<button
 				class="fixed right-4 bottom-4 z-50 btn flex items-center gap-2 rounded-full border-2 border-red-500/60 bg-red-800/90 px-4 py-1.5 text-sm text-white shadow-lg"
-				title="Send error to chat"
+				title="Send the errors and ask for a fix"
 				onclick={() => {
-					pendingChatInput.set(composeText());
-					onclose?.();
+					// Close only once the message is actually on its way, so the
+					// preview (and the errors backing the request) stays up otherwise
+					if (onsend?.(composeFixRequest(errors))) onclose?.();
 				}}
 			>
-				<span>Error caught ({errors.length})</span>
+				<span>Error caught ({errors.length}) — ask to fix</span>
 			</button>
 		{/if}
 	</div>

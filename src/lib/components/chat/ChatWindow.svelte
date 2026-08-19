@@ -48,7 +48,8 @@
 	import FeatureAnnouncementToast from "../FeatureAnnouncementToast.svelte";
 	import { getActiveAnnouncement } from "$lib/utils/featureAnnouncements";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-	import { pendingChatInput } from "$lib/stores/pendingChatInput";
+	import { pendingComposerPayload } from "$lib/stores/pendingComposerPayload";
+	import { mimeMatchesAllowlist } from "$lib/utils/mimeMatch";
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideSparkles from "~icons/lucide/sparkles";
 
@@ -127,6 +128,12 @@
 			return artifactRegistry;
 		},
 		panel: artifactPanel,
+		// Deep consumers (e.g. the code-block preview modal) can't render a
+		// meaningful disabled state, so streaming also gates availability here;
+		// the panel gets the handler as a prop and disables on `loading` itself.
+		get requestFix() {
+			return canSendFix && !loading ? sendFixRequest : undefined;
+		},
 	});
 
 	// Auto-open the panel when a new artifact version starts streaming in
@@ -197,15 +204,9 @@
 			e.preventDefault();
 
 			// filter based on activeMimeTypes, including wildcards
-			const filteredFiles = pastedFiles.filter((file) => {
-				return activeMimeTypes.some((mimeType: string) => {
-					const [type, subtype] = mimeType.split("/");
-					const [fileType, fileSubtype] = file.type.split("/");
-					return (
-						(type === "*" || fileType === type) && (subtype === "*" || fileSubtype === subtype)
-					);
-				});
-			});
+			const filteredFiles = pastedFiles.filter((file) =>
+				mimeMatchesAllowlist(file.type, activeMimeTypes)
+			);
 
 			files = [...files, ...filteredFiles];
 		}
@@ -240,6 +241,30 @@
 				(u) => u.type === "status" && u.status === "error"
 			) ?? -1) !== -1
 	);
+
+	// Preview "ask to fix" buttons (artifact panel footer, fullscreen preview
+	// modals) send their message directly instead of prefilling the composer.
+	// Bypasses the draft on purpose: a half-typed message must survive the click.
+	let canSendFix = $derived(!isReadOnly && !lastIsError);
+	function sendFixRequest(text: string): boolean {
+		if (requireAuthUser() || loading) return false;
+		tap();
+		chatScroll.armSend();
+		// Queued attachments belong to the user's next message, not to this
+		// machine-composed one. The send handler snapshots the bound `files`
+		// synchronously before its first await, so emptying around the call is
+		// enough to keep them out of the request — and it skips clearing them
+		// post-send when it consumed none (see writeMessage), so the restored
+		// queue survives.
+		const queuedFiles = files;
+		files = [];
+		try {
+			onmessage?.(text);
+		} finally {
+			files = queuedFiles;
+		}
+		return true;
+	}
 
 	// Expose currently running tool call name (if any) from the streaming assistant message
 	const availableTools: ToolFront[] = $derived.by(
@@ -445,11 +470,23 @@
 		activeRouterExamplePrompt = match ? match.prompt : null;
 	});
 
+	// Composer content queued from outside (e.g. an annotated artifact
+	// screenshot plus its notes), consumed and cleared on arrival: files use
+	// the same accept rules as paste, text appends to the editable draft
 	$effect(() => {
-		if ($pendingChatInput) {
-			draft = $pendingChatInput;
-			pendingChatInput.set(undefined);
+		const pending = $pendingComposerPayload;
+		if (!pending || shared) return;
+		const accepted = (pending.files ?? []).filter((file) =>
+			mimeMatchesAllowlist(file.type, activeMimeTypes)
+		);
+		if (accepted.length) {
+			files = [...untrack(() => files), ...accepted];
 		}
+		if (pending.text) {
+			const currentDraft = untrack(() => draft);
+			draft = currentDraft.trim() ? `${currentDraft}\n\n${pending.text}` : pending.text;
+		}
+		pendingComposerPayload.set(undefined);
 	});
 
 	function triggerPrompt(prompt: string) {
@@ -986,7 +1023,12 @@
 		</div>
 	</div>
 
-	<ArtifactPanel registry={artifactRegistry} {loading} />
+	<ArtifactPanel
+		registry={artifactRegistry}
+		{loading}
+		canScreenshot={!shared && !isReadOnly && mimeMatchesAllowlist("image/png", activeMimeTypes)}
+		onsend={canSendFix ? sendFixRequest : undefined}
+	/>
 </div>
 
 <style>

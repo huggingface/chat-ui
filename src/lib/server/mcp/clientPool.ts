@@ -1,6 +1,6 @@
-import { Client } from "@modelcontextprotocol/sdk/client";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StreamableHTTPClientTransport, SSEClientTransport } from "@modelcontextprotocol/client";
+import type { Client } from "@modelcontextprotocol/client";
+import { createMcpClient } from "./client";
 import type { McpServerConfig } from "./httpClient";
 import { mcpFetch } from "$lib/server/urlSafety";
 
@@ -73,7 +73,7 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 	}
 
 	let firstError: unknown;
-	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
+	const client = createMcpClient();
 	const url = new URL(server.url);
 	// Pooled clients outlive the request that created them, so never bind the per-request
 	// abort signal to the transport. Per-call cancellation goes through RequestOptions instead.

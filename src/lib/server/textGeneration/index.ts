@@ -12,6 +12,16 @@ import { runMcpFlow } from "./mcp/runMcpFlow";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
 
+/** Updates that mean the user has already been shown something for this turn. */
+function isVisibleWork(update: MessageUpdate): boolean {
+	return (
+		update.type === MessageUpdateType.Stream ||
+		update.type === MessageUpdateType.Tool ||
+		update.type === MessageUpdateType.Reasoning ||
+		update.type === MessageUpdateType.FinalAnswer
+	);
+}
+
 async function* keepAlive(done: AbortSignal): AsyncGenerator<MessageUpdate, undefined, undefined> {
 	while (!done.aborted) {
 		yield {
@@ -55,6 +65,8 @@ async function* textGenerationWithoutTitle(
 
 	const processedMessages = await preprocessMessages(messages, convId);
 
+	let mcpProducedOutput = false;
+
 	// Try MCP tool flow first; fall back to default generation if not selected/available
 	try {
 		const mcpGen = runMcpFlow({
@@ -66,6 +78,7 @@ async function* textGenerationWithoutTitle(
 			forceTools: ctx.forceTools,
 			provider: ctx.provider,
 			reasoningEffort: ctx.reasoningEffort,
+			reasoningOverride: ctx.reasoningOverride,
 			locals: ctx.locals,
 			preprompt,
 			abortSignal: ctx.abortController.signal,
@@ -75,15 +88,19 @@ async function* textGenerationWithoutTitle(
 
 		let step = await mcpGen.next();
 		while (!step.done) {
+			if (isVisibleWork(step.value)) mcpProducedOutput = true;
 			yield step.value;
 			step = await mcpGen.next();
 		}
 		const mcpResult = step.value;
-		if (mcpResult === "not_applicable") {
+		// `!mcpProducedOutput` is not redundant with the result: runMcpFlow catches its own
+		// errors, so a failure could still surface here as "not_applicable" rather than a
+		// throw, and re-running would discard whatever the user has already been shown.
+		if (mcpResult === "not_applicable" && !mcpProducedOutput) {
 			// fallback to normal text generation
 			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
 		}
-		// If mcpResult is "completed" or "aborted", don't fall back
+		// Every other result already emitted a final answer; falling back would replace it.
 	} catch (err) {
 		// Don't fall back on abort errors - user intentionally stopped
 		const isAbort =
@@ -92,8 +109,13 @@ async function* textGenerationWithoutTitle(
 				(err.name === "AbortError" ||
 					err.name === "APIUserAbortError" ||
 					err.message.includes("Request was aborted")));
-		if (!isAbort) {
-			// On non-abort MCP error, fall back to normal generation
+		if (isAbort) {
+			// nothing to recover; the partial message is already what the user saw
+		} else if (mcpProducedOutput) {
+			// Falling back here would discard the tool work and answer as if none of it ran.
+			throw err;
+		} else {
+			// Nothing was shown yet, so a clean tool-free retry is a real recovery.
 			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
 		}
 	}

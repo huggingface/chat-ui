@@ -2,12 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import type { Message } from "$lib/types/Message";
 import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
-import {
-	GENERATION_STALE_MS,
-	isAssistantGenerationTerminal,
-	isConversationGenerationActive,
-	isGenerationStale,
-} from "./generationState";
+import { isAssistantGenerationTerminal, isConversationGenerationActive } from "./generationState";
 
 function assistantMessage(overrides: Partial<Message> = {}): Message {
 	return {
@@ -77,27 +72,66 @@ describe("generationState", () => {
 		expect(isAssistantGenerationTerminal(message)).toBe(true);
 		expect(isConversationGenerationActive([message])).toBe(false);
 	});
-});
 
-describe("isGenerationStale", () => {
-	test("a recent write is not stale", () => {
-		expect(isGenerationStale(new Date())).toBe(false);
-		expect(isGenerationStale(new Date(Date.now() - GENERATION_STALE_MS + 5_000))).toBe(false);
+	// Edge cases that drive the streaming UI state (stop button, resume) and that
+	// P3b's rewrite must preserve.
+
+	test("an assistant message with no updates at all is non-terminal (still generating)", () => {
+		// A freshly-created assistant message before any terminal marker lands.
+		const message = assistantMessage({ updates: [] });
+		expect(isAssistantGenerationTerminal(message)).toBe(false);
+		expect(isConversationGenerationActive([message])).toBe(true);
 	});
 
-	test("a write older than the threshold is stale", () => {
-		expect(isGenerationStale(new Date(Date.now() - GENERATION_STALE_MS - 1_000))).toBe(true);
+	test("an assistant message with undefined updates is non-terminal", () => {
+		const message = assistantMessage({ updates: undefined });
+		expect(isAssistantGenerationTerminal(message)).toBe(false);
 	});
 
-	test("accepts ISO strings (API payloads)", () => {
+	test("a missing / non-assistant message is treated as terminal", () => {
+		expect(isAssistantGenerationTerminal(undefined)).toBe(true);
 		expect(
-			isGenerationStale(new Date(Date.now() - GENERATION_STALE_MS - 1_000).toISOString())
+			isAssistantGenerationTerminal({
+				from: "user",
+				id: "u1" as Message["id"],
+				content: "hi",
+				children: [],
+			})
 		).toBe(true);
-		expect(isGenerationStale(new Date().toISOString())).toBe(false);
 	});
 
-	test("missing or invalid timestamps are never stale", () => {
-		expect(isGenerationStale(undefined)).toBe(false);
-		expect(isGenerationStale("not-a-date")).toBe(false);
+	test("an empty conversation is not active", () => {
+		expect(isConversationGenerationActive([])).toBe(false);
+	});
+
+	test("a conversation with no assistant message is not active", () => {
+		expect(
+			isConversationGenerationActive([
+				{ from: "user", id: "u1" as Message["id"], content: "hi", children: [] },
+			])
+		).toBe(false);
+	});
+
+	test("activeness is decided by the LAST assistant message, not an earlier one", () => {
+		const earlierDone = assistantMessage({
+			id: "a1" as Message["id"],
+			updates: [{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished }],
+		});
+		const latestRunning = assistantMessage({
+			id: "a2" as Message["id"],
+			updates: [{ type: MessageUpdateType.Stream, token: "still going" }],
+		});
+		expect(isConversationGenerationActive([earlierDone, latestRunning])).toBe(true);
+
+		const latestDone = assistantMessage({
+			id: "a2" as Message["id"],
+			updates: [{ type: MessageUpdateType.FinalAnswer, text: "done", interrupted: false }],
+		});
+		expect(isConversationGenerationActive([latestRunning, latestDone])).toBe(false);
+	});
+
+	test("interrupted wins even without any terminal update present", () => {
+		const message = assistantMessage({ interrupted: true, updates: undefined });
+		expect(isAssistantGenerationTerminal(message)).toBe(true);
 	});
 });

@@ -1,5 +1,4 @@
-import { Client } from "@modelcontextprotocol/sdk/client";
-import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client, SdkHttpError } from "@modelcontextprotocol/client";
 import { getClient, evictFromPool, retainClient, releaseClient } from "./clientPool";
 import { config } from "$lib/server/config";
 
@@ -12,7 +11,7 @@ function isConnectionClosedError(err: unknown): boolean {
 // session expired and the client MUST start a new session with a new InitializeRequest —
 // which is exactly what reconnecting with a fresh client does.
 function isSessionExpiredError(err: unknown): boolean {
-	return err instanceof StreamableHTTPError && err.code === 404;
+	return err instanceof SdkHttpError && err.status === 404;
 }
 
 export interface McpServerConfig {
@@ -36,6 +35,12 @@ export function getMcpToolTimeoutMs(): number {
 
 export type McpToolTextResponse = {
 	text: string;
+	/**
+	 * The server reported the call as failed. MCP returns tool failures as a normal
+	 * result with `isError: true` and the failure text in the content blocks, so this
+	 * never surfaces as a thrown error — callers must check it explicitly.
+	 */
+	isError: boolean;
 	/** If the server returned structuredContent, include it raw */
 	structured?: unknown;
 	/** Raw content blocks returned by the server, if any */
@@ -100,7 +105,6 @@ export async function callMcpTool(
 		try {
 			response = await currentClient.callTool(
 				{ name: tool, arguments: normalizedArgs },
-				undefined,
 				callToolOptions
 			);
 			break;
@@ -141,5 +145,6 @@ export async function callMcpTool(
 	const contentBlocks = Array.isArray(response?.content)
 		? (response.content as unknown[])
 		: undefined;
-	return { text, structured, content: contentBlocks };
+	const isError = (response as unknown as { isError?: unknown })?.isError === true;
+	return { text, isError, structured, content: contentBlocks };
 }

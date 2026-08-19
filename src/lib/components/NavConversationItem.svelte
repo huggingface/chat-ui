@@ -12,6 +12,9 @@
 	import EditConversationModal from "$lib/components/EditConversationModal.svelte";
 	import DeleteConversationModal from "$lib/components/DeleteConversationModal.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { useActiveGenerationsStore } from "$lib/stores/activeGenerations.svelte";
+
+	const activeGenerations = useActiveGenerationsStore();
 
 	interface Props {
 		conv: ConvSidebar;
@@ -59,6 +62,13 @@
 	class="group flex h-8 flex-none items-center gap-1.5 rounded-lg pr-1.5 pl-2 text-base text-gray-600 hover:bg-gray-100 max-sm:h-10 sm:text-sm dark:text-gray-300 dark:hover:bg-gray-700
 		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}"
 >
+	{#if activeGenerations.has(conv.id)}
+		<span
+			class="size-1.5 flex-none animate-pulse rounded-full bg-blue-500 dark:bg-blue-400"
+			title="Generating…"
+			aria-label="Generating"
+		></span>
+	{/if}
 	{#if inlineEditing}
 		<input
 			bind:this={inputEl}

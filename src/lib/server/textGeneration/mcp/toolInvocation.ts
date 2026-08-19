@@ -13,7 +13,7 @@ import {
 } from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
-import type { Client } from "@modelcontextprotocol/sdk/client";
+import type { Client } from "@modelcontextprotocol/client";
 
 export type Primitive = string | number | boolean;
 
@@ -33,7 +33,8 @@ export interface ExecuteToolCallsParams {
 	calls: NormalizedToolCall[];
 	mapping: Record<string, McpToolMapping>;
 	servers: McpServerConfig[];
-	parseArgs: (raw: unknown) => Record<string, unknown>;
+	/** Returns `null` when the call's argument string could not be decoded — see `toolArgs.ts`. */
+	parseArgs: (raw: unknown) => Record<string, unknown> | null;
 	resolveFileRef?: FileRefResolver;
 	toPrimitive: (value: unknown) => Primitive | undefined;
 	processToolOutput: (text: string) => {
@@ -42,6 +43,10 @@ export interface ExecuteToolCallsParams {
 	};
 	abortSignal?: AbortSignal;
 	toolTimeoutMs?: number;
+	/** Reasoning that led to this round of calls; persisted on the round's first Call update. */
+	roundReasoning?: string;
+	/** Visible text streamed before this round's calls; persisted on the round's first Call update. */
+	roundContent?: string;
 }
 
 export interface ToolCallExecutionResult {
@@ -53,6 +58,24 @@ export interface ToolCallExecutionResult {
 export type ToolExecutionEvent =
 	| { type: "update"; update: MessageUpdate }
 	| { type: "complete"; summary: ToolCallExecutionResult };
+
+/**
+ * Whether a string is valid, parseable JSON encoding an object. Guards
+ * argumentsRaw persistence: a model can stream a truncated or otherwise
+ * malformed `arguments` string, which `parseArgs` already tolerates for the
+ * live tool call (falling back to `{}`), but persisting that malformed
+ * string as argumentsRaw would later replay invalid JSON as a historical
+ * tool_calls.function.arguments — some providers validate that field and
+ * would reject the whole continuation, not just this one call.
+ */
+export function isValidJsonObject(raw: string): boolean {
+	try {
+		const parsed: unknown = JSON.parse(raw);
+		return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
+	} catch {
+		return false;
+	}
+}
 
 const serverMap = (servers: McpServerConfig[]): Map<string, McpServerConfig> => {
 	const map = new Map<string, McpServerConfig>();
@@ -74,6 +97,8 @@ export async function* executeToolCalls({
 	processToolOutput,
 	abortSignal,
 	toolTimeoutMs,
+	roundReasoning,
+	roundContent,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
@@ -101,11 +126,11 @@ export async function* executeToolCalls({
 		// logging / status updates continue to show only the lightweight primitive
 		// arguments (e.g. "image_1") while the full data: URLs or image blobs are
 		// only sent to the MCP tool server.
-		attachFileRefsToArgs(argsObj, resolveFileRef);
+		if (argsObj) attachFileRefsToArgs(argsObj, resolveFileRef);
 		return { call, argsObj, paramsClean, uuid: randomUUID() };
 	});
 
-	for (const p of prepared) {
+	for (const [index, p] of prepared.entries()) {
 		yield {
 			type: "update",
 			update: {
@@ -113,6 +138,17 @@ export async function* executeToolCalls({
 				subtype: MessageToolUpdateType.Call,
 				uuid: p.uuid,
 				call: { name: p.call.name, parameters: p.paramsClean },
+				...(p.call.id?.trim() ? { originalId: p.call.id } : {}),
+				...(p.call.arguments?.trim() && isValidJsonObject(p.call.arguments)
+					? { argumentsRaw: p.call.arguments }
+					: {}),
+				...(index === 0 && roundReasoning?.trim() ? { reasoning: roundReasoning } : {}),
+				// Preamble text is trimmed (unlike reasoning, which stays
+				// byte-exact): replay compares it against the trim-normalized
+				// visible text from splitReasoning, so persisting leading
+				// whitespace would break the dedup match and duplicate the
+				// preamble in replayed history.
+				...(index === 0 && roundContent?.trim() ? { content: roundContent.trim() } : {}),
 			},
 		};
 		yield {
@@ -200,6 +236,28 @@ export async function* executeToolCalls({
 			return;
 		}
 
+		// Never substitute `{}` here: the tool would run with no arguments and answer
+		// as though none were needed.
+		const argsObj = p.argsObj;
+		if (argsObj === null) {
+			const message =
+				"Invalid tool arguments: not a valid JSON object. Retry the call with a smaller, complete argument payload.";
+			logger.warn({ tool: p.call.name }, "[mcp] tool call had undecodable arguments");
+			results.push({
+				index,
+				error: message,
+				uuid: p.uuid,
+				paramsClean: p.paramsClean,
+			});
+			updatesQueue.push({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Error,
+				uuid: p.uuid,
+				message,
+			});
+			return;
+		}
+
 		const mappingEntry = mapping[p.call.name];
 		if (!mappingEntry) {
 			const message = `Unknown MCP function: ${p.call.name}`;
@@ -243,7 +301,7 @@ export async function* executeToolCalls({
 			const toolResponse: McpToolTextResponse = await callMcpTool(
 				serverCfg,
 				mappingEntry.tool,
-				p.argsObj,
+				argsObj,
 				{
 					client,
 					signal: abortSignal,
@@ -261,6 +319,23 @@ export async function* executeToolCalls({
 				}
 			);
 			const { annotated } = processToolOutput(toolResponse.text ?? "");
+
+			if (toolResponse.isError) {
+				const message = annotated.trim() || "The tool reported an error with no message.";
+				logger.warn(
+					{ server: mappingEntry.server, tool: mappingEntry.tool, err: message },
+					"[mcp] tool returned an error result"
+				);
+				results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid: p.uuid,
+					message,
+				});
+				return;
+			}
+
 			logger.debug(
 				{ server: mappingEntry.server, tool: mappingEntry.tool },
 				"[mcp] tool call completed"

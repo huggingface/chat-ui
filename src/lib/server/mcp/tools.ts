@@ -1,6 +1,5 @@
-import { Client } from "@modelcontextprotocol/sdk/client";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { createMcpClient } from "./client";
+import { StreamableHTTPClientTransport, SSEClientTransport } from "@modelcontextprotocol/client";
 import type { McpServerConfig } from "./httpClient";
 import { logger } from "$lib/server/logger";
 import { mcpFetch } from "$lib/server/urlSafety";
@@ -11,10 +10,23 @@ export type OpenAiTool = {
 	function: { name: string; description?: string; parameters?: Record<string, unknown> };
 };
 
+/**
+ * Behaviour hints a server declares for a tool. Advisory — the server chooses what to
+ * claim. Deliberately not resolved against the spec's defaults (an undeclared tool is
+ * `destructiveHint: true`), so a caller can tell "declared safe" from "said nothing".
+ */
+export type McpToolAnnotations = {
+	readOnlyHint?: boolean;
+	destructiveHint?: boolean;
+	idempotentHint?: boolean;
+	openWorldHint?: boolean;
+};
+
 export interface McpToolMapping {
 	fnName: string;
 	server: string;
 	tool: string;
+	annotations?: McpToolAnnotations;
 }
 
 // Tool listings are cached per server (url + headers), not per server set, so
@@ -26,6 +38,7 @@ type CachedServerTool = {
 	name: string;
 	description?: string;
 	parameters?: Record<string, unknown>;
+	annotations?: McpToolAnnotations;
 };
 
 interface ServerCacheEntry {
@@ -144,15 +157,34 @@ type ListedTool = {
 	name?: string;
 	inputSchema?: Record<string, unknown>;
 	description?: string;
-	annotations?: { title?: string };
+	annotations?: Record<string, unknown>;
 };
+
+const ANNOTATION_HINTS = [
+	"readOnlyHint",
+	"destructiveHint",
+	"idempotentHint",
+	"openWorldHint",
+] as const;
+
+/** Booleans only: a truthy string must not be stored as a declared hint. */
+function readAnnotations(raw: unknown): McpToolAnnotations | undefined {
+	if (!isPlainObject(raw)) return undefined;
+
+	const annotations: McpToolAnnotations = {};
+	for (const hint of ANNOTATION_HINTS) {
+		const value = raw[hint];
+		if (typeof value === "boolean") annotations[hint] = value;
+	}
+	return Object.keys(annotations).length > 0 ? annotations : undefined;
+}
 
 async function listServerTools(
 	server: McpServerConfig,
 	opts: { signal?: AbortSignal } = {}
 ): Promise<ListedTool[]> {
 	const url = new URL(server.url);
-	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
+	const client = createMcpClient();
 	try {
 		try {
 			const transport = new StreamableHTTPClientTransport(url, {
@@ -201,12 +233,14 @@ async function fetchServerTools(
 		if (typeof tool.name !== "string" || tool.name.trim().length === 0) {
 			continue;
 		}
+		const title = typeof tool.annotations?.title === "string" ? tool.annotations.title : undefined;
 		normalized.push({
 			name: tool.name,
-			description: tool.description ?? tool.annotations?.title,
+			description: tool.description ?? title,
 			parameters: isPlainObject(tool.inputSchema)
 				? sanitizeJsonSchema(tool.inputSchema)
 				: undefined,
+			annotations: readAnnotations(tool.annotations),
 		});
 	}
 	return normalized;
@@ -290,11 +324,13 @@ export async function getOpenAiToolsForMcp(
 				}
 			}
 
+			// Annotations stay off the tool definition: strict providers reject unknown fields.
 			pushToolDefinition(plainName, tool.description, tool.parameters);
 			mapping[plainName] = {
 				fnName: plainName,
 				server: server.name,
 				tool: tool.name,
+				...(tool.annotations ? { annotations: tool.annotations } : {}),
 			};
 		}
 	}

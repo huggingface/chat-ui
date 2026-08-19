@@ -12,6 +12,19 @@ export type Message = Partial<Timestamps> & {
 	// Optional server or client-side reasoning content (<think> blocks)
 	reasoning?: string;
 	score?: -1 | 0 | 1;
+
+	/**
+	 * The run that produced this message. Absent on messages written before
+	 * generation events existed, which is how a reader tells the two apart.
+	 */
+	generationId?: string;
+	/**
+	 * Highest `generationEvents.seq` already folded into `content`/`reasoning`.
+	 * A reader resumes from here. Written in the same $set as the content it
+	 * describes, so the two can never disagree — except on a stopped run, whose
+	 * content is deliberately clamped back to what the user saw.
+	 */
+	materializedSeq?: number;
 	/**
 	 * Either contains the base64 encoded image data
 	 * or the hash of the file stored on the server

@@ -50,6 +50,8 @@ const MUTABLE_COLLECTIONS = [
 	"conversations.stats",
 	"sharedConversations",
 	"abortedGenerations",
+	"generations",
+	"generationEvents",
 	"messageEvents",
 	"reports",
 	"settings",
