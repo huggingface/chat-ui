@@ -27,8 +27,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    # Same reasoning as the e2e job below: browsers and their system libraries are baked
-    # in, so this job runs neither `playwright install` nor apt.
+    # Browsers and their system deps are baked in; do not add `playwright install`.
     container:
       image: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 10
@@ -52,11 +51,6 @@ jobs:
 
       - run: npm ci
 
-      # The image bakes browsers for one Playwright version. Rather than pin that version
-      # in a second place and hope the two stay in step, ask Playwright where it expects
-      # its browsers and check they are actually there. Without this, a lockfile bump
-      # that forgets the tag above surfaces much later, inside the test run, as an
-      # opaque "Executable doesn't exist at /ms-playwright/...".
       - name: Check the image has the browsers this Playwright expects
         run: |
           missing=$(npx playwright install --dry-run chromium \
@@ -77,12 +71,6 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    # Browsers and every system library they need are baked into this image, so this job
-    # runs neither `playwright install` nor apt. That is the whole point: the apt half of
-    # `--with-deps` is the half that stalls, and unlike the browser download it cannot be
-    # cached, because it installs into the runner rather than into ~/.cache. Measured on
-    # 837daece, apt for chromium+webkit hung past 8 minutes while the browser download
-    # took 15s and apt for chromium alone took 14s.
     container:
       image: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 20
@@ -98,10 +86,8 @@ jobs:
           cache: "npm"
 
       # The harness starts its own MongoMemoryServer (see startTestDatabase in
-      # tests/fixtures.ts). Shares the unit-test job's key and so its downloaded mongod
-      # binary: both jobs are now containers, so both resolve ~ to /github/home. The
-      # `-container` suffix keeps them off entries saved when these jobs ran on the host
-      # and this path meant /home/runner.
+      # tests/fixtures.ts). Same cache key as the unit-test job so they share the
+      # downloaded mongod binary.
       - name: Cache mongodb-memory-server binaries
         uses: actions/cache@v4
         with:
@@ -110,11 +96,6 @@ jobs:
 
       - run: npm ci
 
-      # The image bakes browsers for one Playwright version. Rather than pin that version
-      # in a second place and hope the two stay in step, ask Playwright where it expects
-      # its browsers and check they are actually there. Without this, a lockfile bump
-      # that forgets the tag above surfaces much later, inside the test run, as an
-      # opaque "Executable doesn't exist at /ms-playwright/...".
       - name: Check the image has the browsers this Playwright expects
         run: |
           missing=$(npx playwright install --dry-run chromium webkit \
