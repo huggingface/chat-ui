@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { MAX_OTHER_CHARS } from "$lib/types/McpElicitation";
 	import type {
 		ElicitationAction,
 		ElicitationField,
@@ -143,6 +144,21 @@
 		return Array.isArray(value) && value.includes(option);
 	};
 
+	/** A control character, so it can never collide with a label the model or a server sent. */
+	const OTHER = "\u0000other";
+	let otherText = $state<Record<string, string>>({});
+	const otherPicked = (field: ElicitationField) =>
+		field.kind === "select" &&
+		(field.multiple ? isPicked(field.name, OTHER) : values[field.name] === OTHER);
+	/** The typed value replaces the marker; an empty one is not an answer at all. */
+	const resolveOther = (name: string, value: string) =>
+		value === OTHER ? (otherText[name] ?? "").trim() : value;
+
+	function setOtherText(name: string, text: string) {
+		otherText = { ...otherText, [name]: text };
+		touched = new Set(touched).add(name);
+	}
+
 	function set(name: string, value: ElicitationValue) {
 		values = { ...values, [name]: value };
 		touched = new Set(touched).add(name);
@@ -179,13 +195,32 @@
 				if (!Number.isNaN(parsed.getTime())) out[field.name] = parsed.toISOString();
 				continue;
 			}
+			if (field.kind === "select" && field.allowOther) {
+				if (Array.isArray(value)) {
+					const resolved = value.map((v) => resolveOther(field.name, v)).filter(Boolean);
+					if (resolved.length > 0) out[field.name] = resolved;
+					continue;
+				}
+				const resolved = resolveOther(field.name, String(value));
+				if (resolved) out[field.name] = resolved;
+				continue;
+			}
 			out[field.name] = value;
 		}
 		return out;
 	}
 
+	/** Submitting a blank "Other" would drop the answer silently, so stop before sending. */
+	function missingOtherText(): boolean {
+		return fields.some((field) => otherPicked(field) && !(otherText[field.name] ?? "").trim());
+	}
+
 	async function send(action: ElicitationAction) {
 		if (submitting || !open) return;
+		if (action === "accept" && missingOtherText()) {
+			error = "Tell us what you meant by “Other”, or pick one of the choices.";
+			return;
+		}
 		submitting = true;
 		error = null;
 		try {
@@ -434,6 +469,9 @@
 										{#each field.options as option (option.value)}
 											<option value={option.value}>{option.label}</option>
 										{/each}
+										{#if field.allowOther}
+											<option value={OTHER}>Something else…</option>
+										{/if}
 									</select>
 								{:else if field.kind === "select"}
 									{@const atLimit =
@@ -455,6 +493,21 @@
 												{option.label}
 											</label>
 										{/each}
+										{#if field.allowOther}
+											{@const picked = isPicked(field.name, OTHER)}
+											<label
+												class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+											>
+												<input
+													type="checkbox"
+													checked={picked}
+													onchange={(event) =>
+														toggleOption(field.name, OTHER, event.currentTarget.checked)}
+													disabled={!open || (atLimit && !picked)}
+												/>
+												Something else…
+											</label>
+										{/if}
 										{#if field.maxItems !== undefined}
 											<p class="text-xs text-gray-500 dark:text-gray-400">
 												Choose up to {field.maxItems}{field.minItems
@@ -463,6 +516,18 @@
 											</p>
 										{/if}
 									</div>
+								{/if}
+								{#if otherPicked(field)}
+									<input
+										type="text"
+										value={otherText[field.name] ?? ""}
+										oninput={(event) => setOtherText(field.name, event.currentTarget.value)}
+										maxlength={MAX_OTHER_CHARS}
+										disabled={!open}
+										placeholder="Tell us what you had in mind"
+										aria-label={`Your own answer for ${field.title ?? field.name}`}
+										class={`mt-2 ${inputClass}`}
+									/>
 								{/if}
 							</div>
 						{/each}

@@ -129,6 +129,8 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 			required: true,
 			multiple: q?.multiSelect === true,
 			options,
+			// The model's options are guesses; the user always keeps a way to say otherwise.
+			allowOther: true,
 			...(q?.multiSelect === true ? { minItems: 1 } : {}),
 		});
 	}

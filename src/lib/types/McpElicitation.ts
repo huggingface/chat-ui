@@ -2,6 +2,9 @@ import type { ObjectId } from "mongodb";
 import type { Conversation } from "./Conversation";
 import type { Timestamps } from "./Timestamps";
 
+/** How much typed text an "Other" answer may carry. */
+export const MAX_OTHER_CHARS = 200;
+
 /** Normalized from MCP's `PrimitiveSchemaDefinition`, which spells a select box six ways. */
 export type ElicitationField =
 	| {
@@ -42,6 +45,8 @@ export type ElicitationField =
 			required: boolean;
 			multiple: boolean;
 			options: Array<{ value: string; label: string }>;
+			/** Offers an "Other" choice whose value is typed rather than picked. */
+			allowOther?: boolean;
 			minItems?: number;
 			maxItems?: number;
 			default?: string | string[];

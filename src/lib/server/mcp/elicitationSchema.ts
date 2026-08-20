@@ -1,3 +1,4 @@
+import { MAX_OTHER_CHARS } from "$lib/types/McpElicitation";
 import type {
 	ElicitationField,
 	ElicitationRequestPayload,
@@ -308,6 +309,11 @@ export function validateElicitationContent(
 			}
 			case "select": {
 				const allowed = new Set(field.options.map((o) => o.value));
+				// An "Other" answer is typed, so it is the one select value that is not on the
+				// list. Bounded here because nothing upstream constrains what was typed.
+				const permitted = (v: string) =>
+					allowed.has(v) ||
+					(field.allowOther === true && v.length > 0 && v.length <= MAX_OTHER_CHARS);
 				if (field.multiple) {
 					if (!Array.isArray(value) || value.some((v) => typeof v !== "string")) {
 						return { ok: false, error: `"${field.name}" must be a list of strings.` };
@@ -317,7 +323,7 @@ export function validateElicitationContent(
 						return { ok: false, error: `"${field.name}" has duplicate selections.` };
 					}
 					for (const v of picked) {
-						if (!allowed.has(v))
+						if (!permitted(v))
 							return { ok: false, error: `"${field.name}" has an unknown option.` };
 					}
 					if (field.minItems !== undefined && picked.length < field.minItems) {
@@ -332,7 +338,7 @@ export function validateElicitationContent(
 					totalChars += picked.join("").length;
 					content[field.name] = picked;
 				} else {
-					if (typeof value !== "string" || !allowed.has(value)) {
+					if (typeof value !== "string" || !permitted(value)) {
 						return { ok: false, error: `"${field.name}" has an unknown option.` };
 					}
 					totalChars += value.length;
