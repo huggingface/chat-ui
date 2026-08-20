@@ -1,5 +1,11 @@
 import type { InferenceProvider } from "@huggingface/inference";
 import type { ToolCall, ToolResult } from "$lib/types/Tool";
+import type {
+	ElicitationAction,
+	ElicitationRequestPayload,
+	ElicitationResolution,
+	ElicitationValue,
+} from "$lib/types/McpElicitation";
 
 export type MessageUpdate =
 	| MessageStatusUpdate
@@ -9,7 +15,8 @@ export type MessageUpdate =
 	| MessageFileUpdate
 	| MessageFinalAnswerUpdate
 	| MessageReasoningUpdate
-	| MessageRouterMetadataUpdate;
+	| MessageRouterMetadataUpdate
+	| MessageElicitationUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -20,6 +27,7 @@ export enum MessageUpdateType {
 	FinalAnswer = "finalAnswer",
 	Reasoning = "reasoning",
 	RouterMetadata = "routerMetadata",
+	Elicitation = "elicitation",
 }
 
 // Status
@@ -156,4 +164,36 @@ export interface MessageRouterMetadataUpdate {
 	route: string;
 	model: string;
 	provider?: InferenceProvider;
+}
+
+export enum MessageElicitationUpdateType {
+	Request = "request",
+	Resolved = "resolved",
+}
+
+export type MessageElicitationUpdate =
+	MessageElicitationRequestUpdate | MessageElicitationResolvedUpdate;
+
+export interface MessageElicitationRequestUpdate {
+	type: MessageUpdateType.Elicitation;
+	subtype: MessageElicitationUpdateType.Request;
+	request: ElicitationRequestPayload;
+	/**
+	 * Epoch ms. Only a 2025-era prompt has one — it blocks a live request. A 2026-era
+	 * prompt is answered out of band and never expires, so the UI shows no countdown.
+	 */
+	expiresAt?: number;
+	/** Only set when exactly one call was in flight; MCP does not link the two. */
+	toolUuid?: string;
+}
+
+/** Always emitted, even when nobody answered, so replay never shows a form still waiting. */
+export interface MessageElicitationResolvedUpdate {
+	type: MessageUpdateType.Elicitation;
+	subtype: MessageElicitationUpdateType.Resolved;
+	elicitationId: string;
+	action: ElicitationAction;
+	resolution: ElicitationResolution;
+	/** What was submitted, so a reloaded transcript can still show the answers. */
+	content?: Record<string, ElicitationValue>;
 }

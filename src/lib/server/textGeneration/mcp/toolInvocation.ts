@@ -12,8 +12,10 @@ import {
 	type McpToolTextResponse,
 } from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
+import { openDurableElicitation, type ElicitationSink } from "$lib/server/mcp/elicitation";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/client";
+import type { ObjectId } from "mongodb";
 
 export type Primitive = string | number | boolean;
 
@@ -47,12 +49,16 @@ export interface ExecuteToolCallsParams {
 	roundReasoning?: string;
 	/** Visible text streamed before this round's calls; persisted on the round's first Call update. */
 	roundContent?: string;
+	/** Omit and elicitation requests raised by these calls are declined. */
+	elicitation?: { conversationId: ObjectId; generationId?: string; messageId?: string };
 }
 
 export interface ToolCallExecutionResult {
 	toolMessages: ChatCompletionMessageParam[];
 	toolRuns: ToolRun[];
 	finalAnswer?: { text: string; interrupted: boolean };
+	/** A 2026-era prompt is open; this round has no result until it is answered. */
+	awaitingInput?: boolean;
 }
 
 export type ToolExecutionEvent =
@@ -99,6 +105,7 @@ export async function* executeToolCalls({
 	toolTimeoutMs,
 	roundReasoning,
 	roundContent,
+	elicitation,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
@@ -111,6 +118,7 @@ export async function* executeToolCalls({
 		structured?: unknown;
 		blocks?: unknown[];
 		error?: string;
+		awaiting?: boolean;
 		uuid: string;
 		paramsClean: Record<string, Primitive>;
 	};
@@ -216,6 +224,13 @@ export async function* executeToolCalls({
 
 	const updatesQueue = createQueue<MessageUpdate>();
 	const results: TaskResult[] = [];
+	let awaitingInput = false;
+
+	const elicitationSink: ElicitationSink | undefined = elicitation && {
+		conversationId: elicitation.conversationId,
+		...(elicitation.generationId ? { generationId: elicitation.generationId } : {}),
+		emit: (update) => updatesQueue.push(update),
+	};
 
 	const tasks = prepared.map(async (p, index) => {
 		// Check abort before starting each tool call
@@ -306,6 +321,7 @@ export async function* executeToolCalls({
 					client,
 					signal: abortSignal,
 					timeoutMs: effectiveTimeoutMs,
+					...(elicitationSink ? { elicitation: { sink: elicitationSink, toolUuid: p.uuid } } : {}),
 					onProgress: (progress) => {
 						updatesQueue.push({
 							type: MessageUpdateType.Tool,
@@ -318,6 +334,44 @@ export async function* executeToolCalls({
 					},
 				}
 			);
+			if (toolResponse.inputRequired) {
+				const opened = elicitationSink
+					? await openDurableElicitation({
+							sink: elicitationSink,
+							server: mappingEntry.server,
+							toolUuid: p.uuid,
+							pending: {
+								tool: mappingEntry.tool,
+								args: argsObj,
+								messageId: elicitation?.messageId ?? "",
+								toolCallId: p.call.id,
+								toolUuid: p.uuid,
+							},
+							inputRequired: toolResponse.inputRequired,
+						})
+					: { opened: false, reason: "no chat to ask" };
+
+				if (opened.opened) {
+					awaitingInput = true;
+					results.push({ index, awaiting: true, uuid: p.uuid, paramsClean: p.paramsClean });
+					return;
+				}
+
+				const message = `The tool asked for input that could not be shown (${opened.reason}).`;
+				logger.warn(
+					{ server: mappingEntry.server, tool: mappingEntry.tool, reason: opened.reason },
+					"[mcp] could not open a durable elicitation"
+				);
+				results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid: p.uuid,
+					message,
+				});
+				return;
+			}
+
 			const { annotated } = processToolOutput(toolResponse.text ?? "");
 
 			if (toolResponse.isError) {
@@ -409,6 +463,7 @@ export async function* executeToolCalls({
 	for (const r of results) {
 		const name = prepared[r.index].call.name;
 		const id = prepared[r.index].call.id;
+		if (r.awaiting) continue;
 		if (!r.error) {
 			const output = r.output ?? "";
 			toolRuns.push({ name, parameters: r.paramsClean, output });
@@ -420,5 +475,8 @@ export async function* executeToolCalls({
 		}
 	}
 
-	yield { type: "complete", summary: { toolMessages, toolRuns } };
+	yield {
+		type: "complete",
+		summary: { toolMessages, toolRuns, ...(awaitingInput ? { awaitingInput: true } : {}) },
+	};
 }

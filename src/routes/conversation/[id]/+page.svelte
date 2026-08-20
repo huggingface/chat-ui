@@ -20,6 +20,7 @@
 		resolveStreamingMode,
 		applyStreamingMode,
 	} from "$lib/utils/messageUpdates";
+	import { elicitationToResume } from "$lib/stores/elicitationResume";
 	import { consumeMessageUpdates } from "$lib/utils/consumeMessageUpdates";
 	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
@@ -127,14 +128,25 @@
 	}
 
 	// this function is used to send new message to the backends
+	$effect(() => {
+		const pending = $elicitationToResume;
+		// Left alone when it belongs elsewhere: the conversation it came from picks it up
+		// when it is next open, rather than this one resuming a stranger's tool call.
+		if (!pending || pending.conversationId !== convId || $loading) return;
+		elicitationToResume.set(null);
+		void writeMessage({ resumeElicitationId: pending.elicitationId });
+	});
+
 	async function writeMessage({
 		prompt,
 		messageId = messagesPath.at(-1)?.id ?? undefined,
 		isRetry = false,
+		resumeElicitationId,
 	}: {
 		prompt?: string;
 		messageId?: ReturnType<typeof v4>;
 		isRetry?: boolean;
+		resumeElicitationId?: string;
 	}): Promise<void> {
 		try {
 			stopRequestedFor = null;
@@ -161,7 +173,11 @@
 			let messageToWriteToId: Message["id"] | undefined = undefined;
 			// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 
-			if (isRetry && messageId) {
+			if (resumeElicitationId && messageId) {
+				// Continue the parked assistant message in place — mirrors the server, which
+				// writes back into it rather than starting a turn.
+				messageToWriteToId = messageId;
+			} else if (isRetry && messageId) {
 				// two cases, if we're retrying a user message with a newPrompt set,
 				// it means we're editing a user message
 				// if we're retrying on an assistant message, newPrompt cannot be set
@@ -273,6 +289,7 @@
 					inputs: prompt,
 					messageId,
 					isRetry,
+					...(resumeElicitationId ? { resumeElicitationId } : {}),
 					generationId: activeGenerationId,
 					files: isRetry ? userMessage?.files : base64Files,
 					selectedMcpServerNames: $enabledServers.map((s) => s.name),

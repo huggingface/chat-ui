@@ -23,8 +23,19 @@
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import ToolCallsSummary from "./ToolCallsSummary.svelte";
 	import ArtifactCard from "./ArtifactCard.svelte";
-	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
-	import { MessageUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
+	import ElicitationForm from "./ElicitationForm.svelte";
+	import {
+		isMessageToolUpdate,
+		isMessageElicitationRequestUpdate,
+		isMessageElicitationResolvedUpdate,
+	} from "$lib/utils/messageUpdates";
+	import {
+		MessageUpdateType,
+		type MessageToolUpdate,
+		type MessageElicitationResolvedUpdate,
+	} from "$lib/types/MessageUpdate";
+	import type { ElicitationRequestPayload } from "$lib/types/McpElicitation";
+	import { page } from "$app/state";
 	import ImageLightbox from "./ImageLightbox.svelte";
 	import { splitArtifactSegments, stripArtifacts } from "$lib/utils/artifacts";
 	import type { ArtifactOperation } from "$lib/utils/artifacts";
@@ -140,11 +151,19 @@
 		stripArtifacts(message.content.replace(THINK_BLOCK_REGEX, "")).trim()
 	);
 
+	type ElicitationBlock = {
+		type: "elicitation";
+		request: ElicitationRequestPayload;
+		expiresAt?: number;
+		resolved?: MessageElicitationResolvedUpdate;
+	};
+
 	type Block =
 		| { type: "text"; content: string }
 		| { type: "think"; content: string; closed: boolean }
 		| { type: "tool"; uuid: string; updates: MessageToolUpdate[] }
-		| { type: "artifact"; op: ArtifactOperation; opIndex: number };
+		| { type: "artifact"; op: ArtifactOperation; opIndex: number }
+		| ElicitationBlock;
 
 	type ToolBlock = Extract<Block, { type: "tool" }>;
 	type ProcessBlock = Extract<Block, { type: "think" } | { type: "tool" }>;
@@ -152,7 +171,8 @@
 	type RenderUnit =
 		| { kind: "text"; content: string }
 		| { kind: "group"; blocks: ProcessBlock[]; toolCount: number }
-		| { kind: "artifact"; op: ArtifactOperation; opIndex: number };
+		| { kind: "artifact"; op: ArtifactOperation; opIndex: number }
+		| ({ kind: "elicitation" } & Omit<ElicitationBlock, "type">);
 
 	// Expand any text block containing <think>…</think> into dedicated think blocks
 	// so reasoning can be grouped/collapsed separately from the answer text.
@@ -264,6 +284,19 @@
 				} else {
 					res.push({ type: "tool" as const, uuid: update.uuid, updates: [update] });
 				}
+			} else if (isMessageElicitationRequestUpdate(update)) {
+				res.push({
+					type: "elicitation" as const,
+					request: update.request,
+					expiresAt: update.expiresAt,
+				});
+			} else if (isMessageElicitationResolvedUpdate(update)) {
+				// Settles the existing block rather than adding one.
+				const target = res.find(
+					(b): b is ElicitationBlock =>
+						b.type === "elicitation" && b.request.elicitationId === update.elicitationId
+				);
+				if (target) target.resolved = update;
 			} else if (update.type === MessageUpdateType.FinalAnswer) {
 				sawFinalAnswer = true;
 				const finalText = update.text ?? "";
@@ -326,6 +359,15 @@
 			} else if (block.type === "artifact") {
 				flush();
 				units.push({ kind: "artifact", op: block.op, opIndex: block.opIndex });
+			} else if (block.type === "elicitation") {
+				// Never folded into the collapsible summary: the user has to be able to act on it.
+				flush();
+				units.push({
+					kind: "elicitation",
+					request: block.request,
+					expiresAt: block.expiresAt,
+					resolved: block.resolved,
+				});
 			} else {
 				flush();
 				units.push({ kind: "text", content: block.content });
@@ -341,7 +383,7 @@
 	let isProcessStreaming = $derived.by(() => {
 		if (!isLast || !loading) return false;
 		const last = blocks.at(-1);
-		return !!last && (last.type === "think" || last.type === "tool");
+		return !!last && (last.type === "think" || last.type === "tool" || last.type === "elicitation");
 	});
 
 	$effect(() => {
@@ -422,6 +464,15 @@
 							{/if}
 						{:else if block.type === "artifact"}
 							<ArtifactCard op={block.op} messageId={message.id} opIndex={block.opIndex} />
+						{:else if block.type === "elicitation"}
+							<div data-exclude-from-copy>
+								<ElicitationForm
+									conversationId={page.params.id ?? ""}
+									request={block.request}
+									expiresAt={block.expiresAt}
+									resolved={block.resolved}
+								/>
+							</div>
 						{:else}
 							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
 								{#if block.type === "think"}
@@ -448,6 +499,15 @@
 							{/if}
 						{:else if unit.kind === "artifact"}
 							<ArtifactCard op={unit.op} messageId={message.id} opIndex={unit.opIndex} />
+						{:else if unit.kind === "elicitation"}
+							<div data-exclude-from-copy>
+								<ElicitationForm
+									conversationId={page.params.id ?? ""}
+									request={unit.request}
+									expiresAt={unit.expiresAt}
+									resolved={unit.resolved}
+								/>
+							</div>
 						{:else if unit.kind === "group"}
 							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
 								{#if unit.blocks.length > 1}
