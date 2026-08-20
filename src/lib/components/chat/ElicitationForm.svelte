@@ -12,6 +12,7 @@
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import BlockWrapper from "./BlockWrapper.svelte";
 	import { elicitationToResume } from "$lib/stores/elicitationResume";
+	import { pendingQuestion } from "$lib/stores/pendingQuestion";
 	import { forDateInput } from "$lib/utils/elicitationDate";
 
 	interface Props {
@@ -64,11 +65,19 @@
 	let expired = $derived(!outcome && expiresAt !== undefined && now >= expiresAt);
 	let open = $derived(!outcome && !expired);
 	/**
-	 * The model's own question is a decision the run is waiting on, so it sits above the
-	 * composer rather than scrolling away up the transcript. Once answered it settles into
-	 * the same collapsed row an MCP prompt leaves behind.
+	 * The model's own question is a decision the run is waiting on, so it is handed to the
+	 * composer instead of being drawn here. Answering it settles the same collapsed row an
+	 * MCP prompt leaves behind, which this component still renders.
 	 */
-	let pinned = $derived(open && request.source === "assistant");
+	let liftedToComposer = $derived(open && request.source === "assistant");
+
+	$effect(() => {
+		if (!liftedToComposer) return;
+		pendingQuestion.set({ conversationId, request });
+		// Cleared on settling and on unmount, so switching conversations cannot leave a
+		// question hanging over a chat it was never asked in.
+		return () => pendingQuestion.set(null);
+	});
 
 	$effect(() => {
 		if (!open || expiresAt === undefined) return;
@@ -278,7 +287,9 @@
 		"w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white";
 </script>
 
-{#if !open}
+{#if liftedToComposer}
+	<!-- shown over the composer -->
+{:else if !open}
 	<BlockWrapper>
 		<div class="flex max-w-full flex-col items-start gap-1 select-none">
 			<button
@@ -338,247 +349,241 @@
 		{/if}
 	</BlockWrapper>
 {:else}
-	<div class={pinned ? "sticky bottom-0 z-10 pb-2" : ""}>
-		<BlockWrapper>
-			<div
-				class="rounded-xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/40"
-			>
-				<div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-					<span class="text-sm font-medium text-gray-700 dark:text-gray-200">
-						{request.mode === "url" ? "Action needed" : "Input requested"}
-					</span>
-					<span class="text-xs text-gray-500 dark:text-gray-400">
-						from <code
-							class="rounded-sm bg-blue-50 px-1 py-px font-mono text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-							>{request.server}</code
-						>
-					</span>
-					{#if open}
-						<span class="ml-auto text-xs text-gray-400 tabular-nums dark:text-gray-500">
-							{timeLeft}
-						</span>
-					{/if}
-				</div>
-
-				<p class="mt-2 text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-300">
-					{request.message}
-				</p>
-
-				{#if request.mode === "url" && request.url}
-					<div class="mt-3">
-						<a
-							href={request.url}
-							target="_blank"
-							rel="noopener noreferrer nofollow"
-							class="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-700 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white"
-						>
-							<CarbonLaunch class="size-3.5" />
-							Open {linkHost}
-						</a>
-						<p class="mt-1.5 font-mono text-xs break-all text-gray-400 dark:text-gray-500">
-							{request.url}
-						</p>
-						{#each urlWarnings as warning (warning)}
-							<p class="mt-1.5 text-xs text-amber-700 dark:text-amber-500">{warning}</p>
-						{/each}
-					</div>
-				{:else if fields.length > 0}
-					<form
-						id={formId}
-						class="mt-3 space-y-3"
-						onsubmit={(event) => {
-							event.preventDefault();
-							send("accept");
-						}}
+	<BlockWrapper>
+		<div
+			class="rounded-xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/40"
+		>
+			<div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+				<span class="text-sm font-medium text-gray-700 dark:text-gray-200">
+					{request.mode === "url" ? "Action needed" : "Input requested"}
+				</span>
+				<span class="text-xs text-gray-500 dark:text-gray-400">
+					from <code
+						class="rounded-sm bg-blue-50 px-1 py-px font-mono text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+						>{request.server}</code
 					>
-						{#each fields as field (field.name)}
-							{@const id = `elicit-${request.elicitationId}-${field.name}`}
-							<div>
-								{#if field.kind === "boolean"}
-									<label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
-										<input
-											{id}
-											type="checkbox"
-											checked={isChecked(field.name)}
-											onchange={(event) => set(field.name, event.currentTarget.checked)}
-											disabled={!open}
-											class="mt-0.5"
-										/>
-										<span>{field.title ?? field.name}</span>
-									</label>
-								{:else}
-									{@const grouped = field.kind === "select" && field.multiple}
-									<svelte:element
-										this={grouped ? "span" : "label"}
-										id={`${id}-label`}
-										for={grouped ? undefined : id}
-										class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-									>
-										{field.title ?? field.name}
-										{#if field.required}<span class="text-red-500">*</span>{/if}
-									</svelte:element>
-								{/if}
-
-								{#if field.description}
-									<p class="mb-1 text-xs text-gray-500 dark:text-gray-400">{field.description}</p>
-								{/if}
-
-								{#if field.kind === "string"}
-									<input
-										{id}
-										type={field.format === "email"
-											? "email"
-											: field.format === "date"
-												? "date"
-												: field.format === "date-time"
-													? "datetime-local"
-													: field.format === "uri"
-														? "url"
-														: "text"}
-										value={textValue(field.name)}
-										oninput={(event) => set(field.name, event.currentTarget.value)}
-										required={field.required}
-										minlength={field.minLength}
-										maxlength={field.maxLength}
-										disabled={!open}
-										class={inputClass}
-									/>
-								{:else if field.kind === "number"}
-									<input
-										{id}
-										type="number"
-										value={textValue(field.name)}
-										oninput={(event) => set(field.name, event.currentTarget.value)}
-										required={field.required}
-										min={field.minimum}
-										max={field.maximum}
-										step={field.integer ? 1 : "any"}
-										disabled={!open}
-										class={inputClass}
-									/>
-								{:else if field.kind === "select" && !field.multiple}
-									<select
-										{id}
-										value={textValue(field.name)}
-										onchange={(event) => set(field.name, event.currentTarget.value)}
-										required={field.required}
-										disabled={!open}
-										class={inputClass}
-									>
-										<option value="" disabled={field.required}>Choose…</option>
-										{#each field.options as option (option.value)}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-										{#if field.allowOther}
-											<option value={OTHER}>Something else…</option>
-										{/if}
-									</select>
-								{:else if field.kind === "select"}
-									{@const atLimit =
-										field.maxItems !== undefined && pickedCount(field.name) >= field.maxItems}
-									<div class="space-y-1" role="group" aria-labelledby={`${id}-label`}>
-										{#each field.options as option (option.value)}
-											{@const picked = isPicked(field.name, option.value)}
-											<label
-												class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
-											>
-												<input
-													type="checkbox"
-													value={option.value}
-													checked={picked}
-													onchange={(event) =>
-														toggleOption(field.name, option.value, event.currentTarget.checked)}
-													disabled={!open || (atLimit && !picked)}
-												/>
-												{option.label}
-											</label>
-										{/each}
-										{#if field.allowOther}
-											{@const picked = isPicked(field.name, OTHER)}
-											<label
-												class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
-											>
-												<input
-													type="checkbox"
-													checked={picked}
-													onchange={(event) =>
-														toggleOption(field.name, OTHER, event.currentTarget.checked)}
-													disabled={!open || (atLimit && !picked)}
-												/>
-												Something else…
-											</label>
-										{/if}
-										{#if field.maxItems !== undefined}
-											<p class="text-xs text-gray-500 dark:text-gray-400">
-												Choose up to {field.maxItems}{field.minItems
-													? `, at least ${field.minItems}`
-													: ""}.
-											</p>
-										{/if}
-									</div>
-								{/if}
-								{#if otherPicked(field)}
-									<input
-										type="text"
-										value={otherText[field.name] ?? ""}
-										oninput={(event) => setOtherText(field.name, event.currentTarget.value)}
-										maxlength={MAX_OTHER_CHARS}
-										disabled={!open}
-										placeholder="Tell us what you had in mind"
-										aria-label={`Your own answer for ${field.title ?? field.name}`}
-										class={`mt-2 ${inputClass}`}
-									/>
-								{/if}
-							</div>
-						{/each}
-					</form>
-				{/if}
-
-				{#if error}
-					<p class="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>
-				{/if}
-
+				</span>
 				{#if open}
-					<div class="mt-4 flex flex-wrap gap-2">
-						{#if request.mode === "form" && fields.length > 0}
-							<button
-								type="submit"
-								form={formId}
-								disabled={submitting}
-								class="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white"
-							>
-								Send
-							</button>
-						{:else}
-							<button
-								type="button"
-								onclick={() => send("accept")}
-								disabled={submitting}
-								class="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white"
-							>
-								I've done this
-							</button>
-						{/if}
-						<button
-							type="button"
-							onclick={() => send("decline")}
-							disabled={submitting}
-							class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-						>
-							Decline
-						</button>
-						<!-- Distinct from Decline: the spec requires a way to dismiss without choosing. -->
-						<button
-							type="button"
-							onclick={() => send("cancel")}
-							disabled={submitting}
-							class="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700"
-						>
-							Dismiss
-						</button>
-					</div>
+					<span class="ml-auto text-xs text-gray-400 tabular-nums dark:text-gray-500">
+						{timeLeft}
+					</span>
 				{/if}
 			</div>
-		</BlockWrapper>
-	</div>
+
+			<p class="mt-2 text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-300">
+				{request.message}
+			</p>
+
+			{#if request.mode === "url" && request.url}
+				<div class="mt-3">
+					<a
+						href={request.url}
+						target="_blank"
+						rel="noopener noreferrer nofollow"
+						class="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-700 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white"
+					>
+						<CarbonLaunch class="size-3.5" />
+						Open {linkHost}
+					</a>
+					<p class="mt-1.5 font-mono text-xs break-all text-gray-400 dark:text-gray-500">
+						{request.url}
+					</p>
+					{#each urlWarnings as warning (warning)}
+						<p class="mt-1.5 text-xs text-amber-700 dark:text-amber-500">{warning}</p>
+					{/each}
+				</div>
+			{:else if fields.length > 0}
+				<form
+					id={formId}
+					class="mt-3 space-y-3"
+					onsubmit={(event) => {
+						event.preventDefault();
+						send("accept");
+					}}
+				>
+					{#each fields as field (field.name)}
+						{@const id = `elicit-${request.elicitationId}-${field.name}`}
+						<div>
+							{#if field.kind === "boolean"}
+								<label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+									<input
+										{id}
+										type="checkbox"
+										checked={isChecked(field.name)}
+										onchange={(event) => set(field.name, event.currentTarget.checked)}
+										disabled={!open}
+										class="mt-0.5"
+									/>
+									<span>{field.title ?? field.name}</span>
+								</label>
+							{:else}
+								{@const grouped = field.kind === "select" && field.multiple}
+								<svelte:element
+									this={grouped ? "span" : "label"}
+									id={`${id}-label`}
+									for={grouped ? undefined : id}
+									class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+								>
+									{field.title ?? field.name}
+									{#if field.required}<span class="text-red-500">*</span>{/if}
+								</svelte:element>
+							{/if}
+
+							{#if field.description}
+								<p class="mb-1 text-xs text-gray-500 dark:text-gray-400">{field.description}</p>
+							{/if}
+
+							{#if field.kind === "string"}
+								<input
+									{id}
+									type={field.format === "email"
+										? "email"
+										: field.format === "date"
+											? "date"
+											: field.format === "date-time"
+												? "datetime-local"
+												: field.format === "uri"
+													? "url"
+													: "text"}
+									value={textValue(field.name)}
+									oninput={(event) => set(field.name, event.currentTarget.value)}
+									required={field.required}
+									minlength={field.minLength}
+									maxlength={field.maxLength}
+									disabled={!open}
+									class={inputClass}
+								/>
+							{:else if field.kind === "number"}
+								<input
+									{id}
+									type="number"
+									value={textValue(field.name)}
+									oninput={(event) => set(field.name, event.currentTarget.value)}
+									required={field.required}
+									min={field.minimum}
+									max={field.maximum}
+									step={field.integer ? 1 : "any"}
+									disabled={!open}
+									class={inputClass}
+								/>
+							{:else if field.kind === "select" && !field.multiple}
+								<select
+									{id}
+									value={textValue(field.name)}
+									onchange={(event) => set(field.name, event.currentTarget.value)}
+									required={field.required}
+									disabled={!open}
+									class={inputClass}
+								>
+									<option value="" disabled={field.required}>Choose…</option>
+									{#each field.options as option (option.value)}
+										<option value={option.value}>{option.label}</option>
+									{/each}
+									{#if field.allowOther}
+										<option value={OTHER}>Something else…</option>
+									{/if}
+								</select>
+							{:else if field.kind === "select"}
+								{@const atLimit =
+									field.maxItems !== undefined && pickedCount(field.name) >= field.maxItems}
+								<div class="space-y-1" role="group" aria-labelledby={`${id}-label`}>
+									{#each field.options as option (option.value)}
+										{@const picked = isPicked(field.name, option.value)}
+										<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+											<input
+												type="checkbox"
+												value={option.value}
+												checked={picked}
+												onchange={(event) =>
+													toggleOption(field.name, option.value, event.currentTarget.checked)}
+												disabled={!open || (atLimit && !picked)}
+											/>
+											{option.label}
+										</label>
+									{/each}
+									{#if field.allowOther}
+										{@const picked = isPicked(field.name, OTHER)}
+										<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+											<input
+												type="checkbox"
+												checked={picked}
+												onchange={(event) =>
+													toggleOption(field.name, OTHER, event.currentTarget.checked)}
+												disabled={!open || (atLimit && !picked)}
+											/>
+											Something else…
+										</label>
+									{/if}
+									{#if field.maxItems !== undefined}
+										<p class="text-xs text-gray-500 dark:text-gray-400">
+											Choose up to {field.maxItems}{field.minItems
+												? `, at least ${field.minItems}`
+												: ""}.
+										</p>
+									{/if}
+								</div>
+							{/if}
+							{#if otherPicked(field)}
+								<input
+									type="text"
+									value={otherText[field.name] ?? ""}
+									oninput={(event) => setOtherText(field.name, event.currentTarget.value)}
+									maxlength={MAX_OTHER_CHARS}
+									disabled={!open}
+									placeholder="Tell us what you had in mind"
+									aria-label={`Your own answer for ${field.title ?? field.name}`}
+									class={`mt-2 ${inputClass}`}
+								/>
+							{/if}
+						</div>
+					{/each}
+				</form>
+			{/if}
+
+			{#if error}
+				<p class="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>
+			{/if}
+
+			{#if open}
+				<div class="mt-4 flex flex-wrap gap-2">
+					{#if request.mode === "form" && fields.length > 0}
+						<button
+							type="submit"
+							form={formId}
+							disabled={submitting}
+							class="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white"
+						>
+							Send
+						</button>
+					{:else}
+						<button
+							type="button"
+							onclick={() => send("accept")}
+							disabled={submitting}
+							class="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-white"
+						>
+							I've done this
+						</button>
+					{/if}
+					<button
+						type="button"
+						onclick={() => send("decline")}
+						disabled={submitting}
+						class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+					>
+						Decline
+					</button>
+					<!-- Distinct from Decline: the spec requires a way to dismiss without choosing. -->
+					<button
+						type="button"
+						onclick={() => send("cancel")}
+						disabled={submitting}
+						class="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700"
+					>
+						Dismiss
+					</button>
+				</div>
+			{/if}
+		</div>
+	</BlockWrapper>
 {/if}

@@ -17,6 +17,8 @@
 	import IconMic from "~icons/lucide/mic";
 
 	import ChatInput from "./ChatInput.svelte";
+	import AskQuestion from "./AskQuestion.svelte";
+	import { pendingQuestion } from "$lib/stores/pendingQuestion";
 	import VoiceRecorder from "./VoiceRecorder.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
@@ -60,6 +62,11 @@
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { tap, error as hapticError } from "$lib/utils/haptics";
 	import { page } from "$app/state";
+
+	// Only this conversation's question; the store outlives a navigation by a tick.
+	let askQuestion = $derived(
+		$pendingQuestion && $pendingQuestion.conversationId === page.params.id ? $pendingQuestion : null
+	);
 	import {
 		isMessageToolCallUpdate,
 		isMessageToolErrorUpdate,
@@ -809,6 +816,9 @@
 			{/if}
 
 			<div class="w-full">
+				{#if askQuestion}
+					<AskQuestion conversationId={askQuestion.conversationId} request={askQuestion.request} />
+				{/if}
 				<div class="flex w-full *:mb-3">
 					{#if !loading && lastIsError}
 						<RetryBtn
