@@ -2,6 +2,9 @@ import ElicitationForm from "./ElicitationForm.svelte";
 import { render } from "vitest-browser-svelte";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import type { ElicitationField, ElicitationRequestPayload } from "$lib/types/McpElicitation";
+import { MessageElicitationUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
+import { pendingQuestion } from "$lib/stores/pendingQuestion";
+import { get } from "svelte/store";
 
 /** Answers are POSTed, so what reaches the server is the assertion worth making. */
 let sent: Array<Record<string, unknown>>;
@@ -196,5 +199,67 @@ describe('an "Other" answer', () => {
 
 		await vi.waitFor(() => expect(baseElement.textContent).toMatch(/Other/));
 		expect(sent).toHaveLength(0);
+	});
+});
+
+describe("a question the model asked", () => {
+	const question: ElicitationField = {
+		kind: "select",
+		name: "q1",
+		title: "Storage",
+		description: "Where should uploads go?",
+		required: true,
+		multiple: false,
+		options: [
+			{ value: "S3", label: "S3" },
+			{ value: "Disk", label: "Disk" },
+		],
+	};
+
+	const askRequest = (): ElicitationRequestPayload => ({
+		...formWith([question]),
+		source: "assistant",
+	});
+
+	afterEach(() => pendingQuestion.set(null));
+
+	it("is handed to the composer rather than drawn in the transcript", async () => {
+		const { baseElement } = render(ElicitationForm, {
+			conversationId: "abc",
+			request: askRequest(),
+		});
+
+		// Nothing of the form itself: the composer draws it.
+		expect(baseElement.querySelector("select")).toBeNull();
+		expect(baseElement.textContent).not.toContain("Where should uploads go?");
+		await vi.waitFor(() => expect(get(pendingQuestion)).toMatchObject({ conversationId: "abc" }));
+	});
+
+	it("stays in the transcript once answered, and lets the composer go", async () => {
+		const { baseElement } = render(ElicitationForm, {
+			conversationId: "abc",
+			request: askRequest(),
+			resolved: {
+				type: MessageUpdateType.Elicitation,
+				subtype: MessageElicitationUpdateType.Resolved,
+				elicitationId: askRequest().elicitationId,
+				action: "accept",
+				resolution: "user",
+				content: { q1: "S3" },
+			},
+		});
+
+		expect(baseElement.textContent).toContain("Answered");
+		expect(get(pendingQuestion)).toBeNull();
+	});
+
+	it("leaves an MCP prompt in the transcript where it belongs", () => {
+		const { baseElement } = render(ElicitationForm, {
+			conversationId: "abc",
+			request: formWith([question]),
+		});
+
+		expect(baseElement.querySelector("select")).not.toBeNull();
+		expect(get(pendingQuestion)).toBeNull();
 	});
 });
