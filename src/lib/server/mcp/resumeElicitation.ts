@@ -11,6 +11,7 @@ import {
 } from "$lib/types/MessageUpdate";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import type { McpServerConfig } from "./httpClient";
+import { ASK_USER_QUESTION_TOOL_NAME, answerToToolResult } from "$lib/server/askUserQuestion";
 
 /**
  * Re-issue the tool call a durable prompt parked, now that it has an answer.
@@ -57,6 +58,35 @@ export async function resumeParkedToolCall({
 		resolution: "user",
 		...(taken.row.content ? { content: taken.row.content } : {}),
 	};
+
+	// The model's own question: the answer is the result, so there is nothing to re-issue.
+	if (pending.kind === "ask") {
+		return {
+			resumed: true,
+			updates: [
+				settled,
+				{
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Result,
+					uuid: pending.toolUuid,
+					result: {
+						status: ToolResultStatus.Success,
+						call: { name: ASK_USER_QUESTION_TOOL_NAME, parameters: {} },
+						outputs: [
+							{
+								text: answerToToolResult(
+									taken.row.request,
+									taken.row.action ?? "cancel",
+									taken.row.content
+								),
+							},
+						] as unknown as Record<string, unknown>[],
+						display: true,
+					},
+				},
+			],
+		};
+	}
 
 	const server = [...getMcpServers(), ...extraServers].find((s) => s.name === pending.server);
 	if (!server) return { resumed: false, reason: `unknown server ${pending.server}`, updates: [] };
