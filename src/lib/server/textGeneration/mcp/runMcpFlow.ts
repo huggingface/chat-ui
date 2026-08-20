@@ -27,6 +27,7 @@ import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepa
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
+import { withoutContentLength } from "$lib/server/undiciCompat";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -336,7 +337,7 @@ export async function* runMcpFlow({
 			input: RequestInfo | URL,
 			init?: RequestInit
 		): Promise<Response> => {
-			const res = await fetch(input, init);
+			const res = await fetch(input, withoutContentLength(init));
 			const p = res.headers.get("x-inference-provider");
 			if (p && !providerHeader) providerHeader = p;
 			return res;
