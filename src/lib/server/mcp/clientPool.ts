@@ -57,16 +57,20 @@ function ensureSweeper() {
 	sweeper.unref?.();
 }
 
-function keyOf(server: McpServerConfig) {
+function keyOf(server: McpServerConfig, isolation?: string) {
 	const headers = Object.entries(server.headers ?? {})
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([k, v]) => `${k}:${v}`)
 		.join("|\u0000|");
-	return `${server.url}|${headers}`;
+	return `${server.url}|${headers}|${isolation ?? ""}`;
 }
 
-export async function getClient(server: McpServerConfig, signal?: AbortSignal): Promise<Client> {
-	const key = keyOf(server);
+export async function getClient(
+	server: McpServerConfig,
+	signal?: AbortSignal,
+	isolation?: string
+): Promise<Client> {
+	const key = keyOf(server, isolation);
 	const existing = pool.get(key);
 	if (existing) {
 		if (Date.now() - existing.lastUsedAt <= PING_AFTER_IDLE_MS) {
@@ -157,8 +161,8 @@ export async function drainPool() {
  * Take a client out of circulation. Returns it only when nothing else is using it, so the
  * caller cannot close a connection another conversation is still talking over.
  */
-export function evictFromPool(server: McpServerConfig): Client | undefined {
-	const key = keyOf(server);
+export function evictFromPool(server: McpServerConfig, isolation?: string): Client | undefined {
+	const key = keyOf(server, isolation);
 	const entry = pool.get(key);
 	if (!entry) return undefined;
 	pool.delete(key);
@@ -168,4 +172,24 @@ export function evictFromPool(server: McpServerConfig): Client | undefined {
 	}
 	entries.delete(entry.client);
 	return entry.client;
+}
+
+/**
+ * A connection an unsolicited `elicitation/create` can be attributed on. A legacy server
+ * pushes one down the connection with nothing tying it to a call, so it can only be routed
+ * when every call on that connection belongs to the same conversation; sharing one instead
+ * means a prompt raised for one chat gets declined because another chat is also mid-call.
+ * A modern server answers the call itself, so it keeps the shared connection.
+ */
+export async function getAttributableClient(
+	server: McpServerConfig,
+	conversationId: string,
+	signal?: AbortSignal
+): Promise<{ client: Client; isolation?: string }> {
+	const isolation = `conversation:${conversationId}`;
+	if (!pool.has(keyOf(server, isolation))) {
+		const shared = await getClient(server, signal);
+		if (shared.getProtocolEra() === "modern") return { client: shared };
+	}
+	return { client: await getClient(server, signal, isolation), isolation };
 }

@@ -1,11 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const built = vi.hoisted(() => ({ clients: [] as { closed: boolean }[] }));
+const built = vi.hoisted(() => ({
+	clients: [] as { closed: boolean }[],
+	era: "legacy" as "legacy" | "modern",
+}));
 
 vi.mock("./client", () => ({
 	createMcpClient: () => {
 		const client = {
 			closed: false,
+			getProtocolEra: () => built.era,
 			async connect() {},
 			async close() {
 				this.closed = true;
@@ -25,13 +29,15 @@ vi.mock("@modelcontextprotocol/client", () => ({
 }));
 vi.mock("$lib/server/urlSafety", () => ({ mcpFetch: () => Promise.resolve(new Response()) }));
 
-const { getClient, retainClient, releaseClient, evictFromPool } = await import("./clientPool");
+const { getClient, retainClient, releaseClient, evictFromPool, getAttributableClient } =
+	await import("./clientPool");
 
 const SERVER = { name: "Shared", url: "https://shared.example/mcp" };
 
 describe("a pooled client shared by two conversations", () => {
 	beforeEach(() => {
 		built.clients.length = 0;
+		built.era = "legacy";
 	});
 
 	it("is not closed out from under a call another conversation is still making", async () => {
@@ -61,5 +67,36 @@ describe("a pooled client shared by two conversations", () => {
 		const evicted = evictFromPool(SERVER);
 
 		expect(evicted).toBe(client);
+	});
+});
+
+describe("a connection a prompt has to be attributed on", () => {
+	beforeEach(() => {
+		built.clients.length = 0;
+		built.era = "legacy";
+	});
+
+	it("is per-conversation on a legacy server", async () => {
+		const server = { name: "Legacy", url: "https://legacy.example/mcp" };
+
+		const a = await getAttributableClient(server, "conversation-a");
+		const b = await getAttributableClient(server, "conversation-b");
+
+		expect(a.client).not.toBe(b.client);
+		expect(a.isolation).not.toBe(b.isolation);
+
+		// The same conversation keeps its own connection rather than opening another.
+		expect((await getAttributableClient(server, "conversation-a")).client).toBe(a.client);
+	});
+
+	it("is shared on a modern server, which answers the call instead of pushing a prompt", async () => {
+		built.era = "modern";
+		const server = { name: "Modern", url: "https://modern.example/mcp" };
+
+		const a = await getAttributableClient(server, "conversation-a");
+		const b = await getAttributableClient(server, "conversation-b");
+
+		expect(a.client).toBe(b.client);
+		expect(a.isolation).toBeUndefined();
 	});
 });

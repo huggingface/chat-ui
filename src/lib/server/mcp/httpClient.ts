@@ -1,6 +1,12 @@
 import { Client, SdkHttpError, isInputRequiredResult } from "@modelcontextprotocol/client";
 import type { InputRequests, InputResponses } from "@modelcontextprotocol/client";
-import { getClient, evictFromPool, retainClient, releaseClient } from "./clientPool";
+import {
+	getClient,
+	getAttributableClient,
+	evictFromPool,
+	retainClient,
+	releaseClient,
+} from "./clientPool";
 import { withElicitationContext, type ElicitationSink } from "./elicitation";
 import { config } from "$lib/server/config";
 
@@ -153,8 +159,14 @@ export async function callMcpTool(
 			: undefined;
 
 	// Get a (possibly pooled) client. Cancellation and timeout are enforced per call
-	// via the request options below, not on the pooled transport itself.
-	let activeClient = client ?? (await getClient(server, signal));
+	// via the request options below, not on the pooled transport itself. A call that can
+	// be interrupted for input needs a connection its prompts can be attributed on, so the
+	// preloaded shared client is not reused for one.
+	const scoped = elicitation
+		? await getAttributableClient(server, elicitation.sink.conversationId.toString(), signal)
+		: undefined;
+	const isolation = scoped?.isolation;
+	let activeClient = scoped?.client ?? client ?? (await getClient(server, signal));
 
 	const deadline = createCallDeadline(timeoutMs, signal);
 
@@ -220,14 +232,14 @@ export async function callMcpTool(
 				}
 
 				// Evict stale client and close it
-				const stale = evictFromPool(server);
+				const stale = evictFromPool(server, isolation);
 				stale?.close?.().catch(() => {});
 
 				// Brief backoff before later retries (the server may be mid-restart)
 				if (attempt > 0) {
 					await new Promise((resolve) => setTimeout(resolve, 1_000 * attempt));
 				}
-				activeClient = await getClient(server, signal);
+				activeClient = await getClient(server, signal, isolation);
 			} finally {
 				releaseClient(currentClient);
 			}
