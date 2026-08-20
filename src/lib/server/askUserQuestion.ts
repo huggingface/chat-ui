@@ -23,10 +23,12 @@ export const askUserQuestionTool = {
 	function: {
 		name: ASK_USER_QUESTION_TOOL_NAME,
 		description:
-			"Ask the user to decide between concrete options when the request is genuinely " +
-			"ambiguous and the readings would lead to materially different work. Prefer making " +
-			"a reasonable choice and saying so. Never use it for information you can find " +
-			"yourself, or for a question with an obvious default.",
+			"Put a decision to the user as options they can click, and wait for the answer. " +
+			"Use it when the request has more than one sensible reading and those readings " +
+			"lead to materially different work — which framing, which scope, which of several " +
+			"approaches. Prefer it to asking in prose, which cannot be answered with a click. " +
+			"Not for something you can look up, a choice with an obvious default, or anything " +
+			"the user has already told you.",
 		parameters: {
 			type: "object",
 			properties: {
