@@ -264,6 +264,22 @@ describe("the model asking the user a question", () => {
 		});
 	});
 
+	it("takes only one question per round, and tells the model why", async () => {
+		const second: NormalizedToolCall = { ...ASK, id: "call_ask_2" };
+		const events = await drain([ASK, second], CHAT);
+
+		// The second call would never be shown, and a tool call with no result gets the
+		// next turn rejected by the provider.
+		expect(askMock.openAskPrompt).toHaveBeenCalledTimes(1);
+		expect(summaryOf(events).awaitingInput).toBe(true);
+
+		const errors = toolUpdatesOf(events).filter((u) => u.subtype === MessageToolUpdateType.Error);
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toMatchObject({
+			message: expect.stringContaining("single call's `questions` array"),
+		});
+	});
+
 	it("has nowhere to ask when there is no chat behind the call", async () => {
 		const events = await drain([ASK]);
 

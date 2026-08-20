@@ -300,11 +300,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 	let messagesForPrompt: Message[] = [];
 
-	if (resumeElicitationId && messageId) {
+	if (resumeElicitationId) {
 		// Continue the assistant message the prompt parked, in place: its tool call and the
 		// answer belong to that turn, and a new one would strand them behind an empty user
-		// message.
-		const parked = conv.messages.find((message) => message.id === messageId);
+		// message. Taken from the record rather than the request, or a turn sent while the
+		// prompt was open would move the answer onto it.
+		const { parkedMessageId } = await import("$lib/server/mcp/elicitation");
+		const parkedId = await parkedMessageId(convId, resumeElicitationId);
+		const parked = conv.messages.find((message) => message.id === parkedId);
 		if (!parked || parked.from !== "assistant") {
 			error(404, "No parked message to resume");
 		}

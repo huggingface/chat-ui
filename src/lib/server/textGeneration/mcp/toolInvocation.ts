@@ -233,6 +233,9 @@ export async function* executeToolCalls({
 		emit: (update) => updatesQueue.push(update),
 	};
 
+	const askCalls = prepared.filter((p) => p.call.name === ASK_USER_QUESTION_TOOL_NAME);
+	const askIndex = (p: (typeof prepared)[number]) => askCalls.indexOf(p);
+
 	const tasks = prepared.map(async (p, index) => {
 		// Check abort before starting each tool call
 		if (abortSignal?.aborted) {
@@ -275,6 +278,23 @@ export async function* executeToolCalls({
 		}
 
 		if (p.call.name === ASK_USER_QUESTION_TOOL_NAME) {
+			// One round parks on one prompt, so a second question asked beside it would never
+			// be shown and its call would never get a result — which providers reject on the
+			// next turn. One call carries several questions, so say that instead.
+			if (askIndex(p) > 0) {
+				const message =
+					"Only one ask_user_question call can be answered per turn. " +
+					"Put every question in a single call's `questions` array.";
+				results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid: p.uuid,
+					message,
+				});
+				return;
+			}
+
 			const opened = elicitationSink
 				? await openAskPrompt({
 						sink: elicitationSink,

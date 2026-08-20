@@ -318,3 +318,25 @@ describe("resuming the model's own question", () => {
 		expect(outcome.updates).toHaveLength(0);
 	});
 });
+
+describe("which turn a parked call belongs to", () => {
+	it("comes from the record, not from whatever was sent since", async () => {
+		const { parkedMessageId } = await import("./elicitation");
+		const conversationId = new ObjectId();
+		const elicitationId = crypto.randomUUID();
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			elicitationId,
+			conversationId,
+			status: "pending",
+			request: { elicitationId, server: "", mode: "form", message: "?", fields: [] },
+			pending: { kind: "ask", messageId: "parked-message", toolCallId: "c1", toolUuid: "u1" },
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+
+		expect(await parkedMessageId(conversationId, elicitationId)).toBe("parked-message");
+		// Another conversation holding the id is not entitled to the answer.
+		expect(await parkedMessageId(new ObjectId(), elicitationId)).toBeUndefined();
+	});
+});
