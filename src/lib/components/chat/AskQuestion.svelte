@@ -106,7 +106,8 @@
 	}
 
 	const rowClass =
-		"flex w-full cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 text-left transition-colors";
+		"flex w-full cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 text-left transition-colors " +
+		"focus:ring-2 focus:ring-gray-300 focus:outline-hidden dark:focus:ring-gray-700";
 </script>
 
 <div
@@ -194,7 +195,7 @@
 						disabled={submitting}
 						placeholder="Tell us what you had in mind"
 						aria-label="Your own answer"
-						class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+						class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-gray-300 focus:outline-hidden dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:ring-gray-700"
 					/>
 				{/if}
 			{/if}

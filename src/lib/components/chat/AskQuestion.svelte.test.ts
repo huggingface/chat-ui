@@ -130,6 +130,16 @@ describe("a question from the assistant", () => {
 		expect(sent[0]).toMatchObject({ content: { q1: "SQLite" } });
 	});
 
+	it("suppresses the browser's own focus outline, as every other input here does", async () => {
+		const { baseElement } = mount([ask("q1", "Which database?")]);
+		rowFor(baseElement, "Something else")?.click();
+		await vi.waitFor(() => expect(baseElement.querySelector('input[type="text"]')).not.toBeNull());
+
+		const input = baseElement.querySelector<HTMLInputElement>('input[type="text"]');
+		input?.focus();
+		expect(getComputedStyle(input as Element).outlineStyle).toBe("none");
+	});
+
 	it("lets the user decline without answering", async () => {
 		const { baseElement } = mount([ask("q1", "Which database?")]);
 		button(baseElement, "Skip")?.click();
