@@ -44,7 +44,7 @@ export type ElicitationField =
 			description?: string;
 			required: boolean;
 			multiple: boolean;
-			options: Array<{ value: string; label: string }>;
+			options: Array<{ value: string; label: string; description?: string }>;
 			/** Offers an "Other" choice whose value is typed rather than picked. */
 			allowOther?: boolean;
 			minItems?: number;

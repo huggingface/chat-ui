@@ -107,13 +107,15 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 		const question = asText(q?.question, 300);
 		if (!question) return { ok: false, reason: `question ${index + 1} has no text` };
 
-		const options: Array<{ value: string; label: string }> = [];
+		const options: Array<{ value: string; label: string; description?: string }> = [];
 		const rawOptions = Array.isArray(q?.options) ? q.options : [];
 		for (const rawOption of rawOptions) {
-			const label = asText((rawOption as Record<string, unknown>)?.label, 80);
+			const option = rawOption as Record<string, unknown>;
+			const label = asText(option?.label, 80);
 			// Keyed by value in the form, so a repeat would break rendering outright.
 			if (!label || options.some((o) => o.value === label)) continue;
-			options.push({ value: label, label });
+			const description = asText(option?.description, 200);
+			options.push({ value: label, label, ...(description ? { description } : {}) });
 		}
 		if (options.length < MIN_OPTIONS) {
 			return { ok: false, reason: `question ${index + 1} needs at least ${MIN_OPTIONS} options` };
