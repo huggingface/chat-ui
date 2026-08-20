@@ -130,3 +130,71 @@ describe("a date default the server sent as RFC 3339", () => {
 		expect(input?.value).toBe("2026-09-01");
 	});
 });
+
+describe('an "Other" answer', () => {
+	const pick = (over: Partial<ElicitationField> = {}): ElicitationField =>
+		({
+			kind: "select",
+			name: "pick",
+			title: "Pick",
+			required: true,
+			multiple: false,
+			allowOther: true,
+			options: [
+				{ value: "A", label: "A" },
+				{ value: "B", label: "B" },
+			],
+			...over,
+		}) as ElicitationField;
+
+	const otherInput = (el: HTMLElement) => el.querySelector<HTMLInputElement>('input[type="text"]');
+
+	/** Chosen by its label, so the test never has to know the marker value. */
+	const chooseOther = async (el: HTMLElement) => {
+		const select = el.querySelector<HTMLSelectElement>("select");
+		const option = [...(select?.options ?? [])].find((o) =>
+			/Something else/.test(o.textContent ?? "")
+		);
+		expect(option).toBeDefined();
+		if (select && option) {
+			select.value = option.value;
+			select.dispatchEvent(new Event("change", { bubbles: true }));
+		}
+		await vi.waitFor(() => expect(otherInput(el)).not.toBeNull());
+	};
+
+	const type = (el: HTMLElement, text: string) => {
+		const input = otherInput(el);
+		if (input) {
+			input.value = text;
+			input.dispatchEvent(new Event("input", { bubbles: true }));
+		}
+	};
+
+	it("stays hidden until the user reaches for it", async () => {
+		const { baseElement } = mount([pick()]);
+		expect(otherInput(baseElement)).toBeNull();
+		await chooseOther(baseElement);
+		expect(otherInput(baseElement)).not.toBeNull();
+	});
+
+	it("sends what was typed, not the marker", async () => {
+		const { baseElement } = mount([pick()]);
+		await chooseOther(baseElement);
+		type(baseElement, "Neither, use SQLite");
+		expect(await submit(baseElement)).toMatchObject({ pick: "Neither, use SQLite" });
+	});
+
+	it("refuses to submit while the box is empty, rather than dropping the answer", async () => {
+		const { baseElement } = mount([pick()]);
+		await chooseOther(baseElement);
+
+		const send = [...baseElement.querySelectorAll("button")].find((b) =>
+			/send|submit/i.test(b.textContent ?? "")
+		);
+		send?.click();
+
+		await vi.waitFor(() => expect(baseElement.textContent).toMatch(/Other/));
+		expect(sent).toHaveLength(0);
+	});
+});
