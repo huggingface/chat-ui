@@ -12,6 +12,7 @@ import {
 	type McpToolTextResponse,
 } from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
+import { ASK_USER_QUESTION_TOOL_NAME, openAskPrompt } from "$lib/server/askUserQuestion";
 import { openDurableElicitation, type ElicitationSink } from "$lib/server/mcp/elicitation";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/client";
@@ -264,6 +265,36 @@ export async function* executeToolCalls({
 				uuid: p.uuid,
 				paramsClean: p.paramsClean,
 			});
+			updatesQueue.push({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Error,
+				uuid: p.uuid,
+				message,
+			});
+			return;
+		}
+
+		if (p.call.name === ASK_USER_QUESTION_TOOL_NAME) {
+			const opened = elicitationSink
+				? await openAskPrompt({
+						sink: elicitationSink,
+						toolUuid: p.uuid,
+						toolCallId: p.call.id,
+						messageId: elicitation?.messageId ?? "",
+						args: parseArgs(p.call.arguments),
+					})
+				: { opened: false, reason: "no chat to ask" };
+
+			if (opened.opened) {
+				awaitingInput = true;
+				results.push({ index, awaiting: true, uuid: p.uuid, paramsClean: p.paramsClean });
+				return;
+			}
+
+			// Answering it is the only way this call finishes, so a question that cannot be
+			// shown has to come back as an error rather than a silent skip.
+			const message = `The question could not be shown (${opened.reason}).`;
+			results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
 			updatesQueue.push({
 				type: MessageUpdateType.Tool,
 				subtype: MessageToolUpdateType.Error,
