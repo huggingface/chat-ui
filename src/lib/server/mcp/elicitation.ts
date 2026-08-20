@@ -396,3 +396,19 @@ export async function takeResumableElicitation(
 		},
 	};
 }
+
+/**
+ * Which assistant turn a parked call belongs to. Recorded when the prompt was opened, so it
+ * survives anything the user does in the meantime — the client's idea of the last message
+ * is not the parked one once another turn has been sent since.
+ */
+export async function parkedMessageId(
+	conversationId: ObjectId,
+	elicitationId: string
+): Promise<string | undefined> {
+	const row = await collections.mcpElicitations.findOne(
+		{ elicitationId, conversationId },
+		{ projection: { pending: 1 } }
+	);
+	return row?.pending?.messageId;
+}
