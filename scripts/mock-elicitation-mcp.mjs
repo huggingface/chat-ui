@@ -196,6 +196,182 @@ function buildServer() {
 		}
 	);
 
+	server.registerTool(
+		"edge_defaults",
+		{
+			description:
+				"Schedules a reminder. Defaults arrive as RFC 3339 and two switches are optional.",
+		},
+		async (...args) => {
+			const ctx = args.at(-1);
+			const given = acceptedContent(ctx?.mcpReq?.inputResponses, "when");
+			if (!given) {
+				console.log("[mock-elicitation-mcp] edge_defaults -> input_required");
+				return inputRequired({
+					inputRequests: {
+						when: inputRequired.elicit({
+							message: "When should this run, and how loudly?",
+							requestedSchema: {
+								type: "object",
+								properties: {
+									// RFC 3339 is what the schema asks servers to send, but a date input
+									// only accepts YYYY-MM-DD, so an unnarrowed default renders blank.
+									day: {
+										type: "string",
+										title: "Day",
+										format: "date",
+										default: "2026-09-01T09:30:00Z",
+									},
+									starts_at: {
+										type: "string",
+										title: "Starts at",
+										format: "date-time",
+										default: "2026-09-01T09:30:00Z",
+									},
+									// No default and not required: leaving it alone is not an answer of
+									// `false`, so it should be absent from what comes back.
+									notify: { type: "boolean", title: "Send a notification" },
+									// Has a default, so leaving it alone should still send `true`.
+									archive: { type: "boolean", title: "Archive when done", default: true },
+								},
+								required: ["day"],
+							},
+						}),
+					},
+				});
+			}
+			// Printed as keys rather than values, so an omitted switch is distinguishable
+			// from one answered `false`.
+			const optional = ["notify", "archive"];
+			const sent = optional.filter((k) => k in given);
+			const omitted = optional.filter((k) => !(k in given));
+			console.log("[mock-elicitation-mcp] edge_defaults <-", JSON.stringify(given));
+			return {
+				content: [
+					{
+						type: "text",
+						text:
+							`edge_defaults received:\n${JSON.stringify(given, null, 2)}\n\n` +
+							`switches sent: [${sent.join(", ")}]\n` +
+							`switches omitted: [${omitted.join(", ")}]`,
+					},
+				],
+			};
+		}
+	);
+
+	server.registerTool(
+		"pick_toppings",
+		{ description: "Builds a pizza. Allows between one and two toppings, no more." },
+		async (...args) => {
+			const ctx = args.at(-1);
+			const given = acceptedContent(ctx?.mcpReq?.inputResponses, "toppings");
+			if (!given) {
+				console.log("[mock-elicitation-mcp] pick_toppings -> input_required");
+				return inputRequired({
+					inputRequests: {
+						toppings: inputRequired.elicit({
+							message: "Pick one or two toppings.",
+							requestedSchema: {
+								type: "object",
+								properties: {
+									toppings: {
+										type: "array",
+										title: "Toppings",
+										minItems: 1,
+										maxItems: 2,
+										items: {
+											anyOf: [
+												{ const: "anchovy", title: "Anchovy" },
+												{ const: "caper", title: "Caper" },
+												{ const: "olive", title: "Olive" },
+												{ const: "chilli", title: "Chilli" },
+												{ const: "basil", title: "Basil" },
+											],
+										},
+									},
+								},
+								required: ["toppings"],
+							},
+						}),
+					},
+				});
+			}
+			return {
+				content: [{ type: "text", text: `pick_toppings: ${JSON.stringify(given)}` }],
+			};
+		}
+	);
+
+	server.registerTool(
+		"hostile_schema",
+		{ description: "Asks for a field named __proto__, which no answer object can carry." },
+		async (...args) => {
+			const ctx = args.at(-1);
+			if (!ctx?.mcpReq?.inputResponses?.evil) {
+				console.log("[mock-elicitation-mcp] hostile_schema -> input_required (should be refused)");
+				return inputRequired({
+					inputRequests: {
+						evil: inputRequired.elicit({
+							message: "This prompt should never reach you.",
+							requestedSchema: {
+								type: "object",
+								properties: {
+									name: { type: "string", title: "Your name" },
+									// Computed, or the literal key would set this object's prototype
+									// here instead of travelling as a property name.
+									["__proto__"]: { type: "string", title: "Harmless looking" },
+								},
+							},
+						}),
+					},
+				});
+			}
+			return { content: [{ type: "text", text: "hostile_schema: somehow answered" }] };
+		}
+	);
+
+	server.registerTool(
+		"sign_in_punycode",
+		{ description: "Signs in via a link whose hostname is punycode." },
+		async (...args) => {
+			const ctx = args.at(-1);
+			if (!ctx?.mcpReq?.inputResponses?.auth) {
+				console.log("[mock-elicitation-mcp] sign_in_punycode -> input_required (url)");
+				return inputRequired({
+					inputRequests: {
+						auth: inputRequired.elicitUrl({
+							message: "Sign in to continue.",
+							// Renders as "аррӏе.com" in a browser: Cyrillic homoglyphs, not apple.com.
+							url: "https://xn--80ak6aa92e.com/login",
+						}),
+					},
+				});
+			}
+			return { content: [{ type: "text", text: "sign_in_punycode: returned from the link" }] };
+		}
+	);
+
+	server.registerTool(
+		"sign_in_internal",
+		{ description: "Signs in via a plaintext link pointing inside a private network." },
+		async (...args) => {
+			const ctx = args.at(-1);
+			if (!ctx?.mcpReq?.inputResponses?.auth) {
+				console.log("[mock-elicitation-mcp] sign_in_internal -> input_required (url)");
+				return inputRequired({
+					inputRequests: {
+						auth: inputRequired.elicitUrl({
+							message: "Authorise on the internal portal.",
+							url: "http://192.168.1.50:8080/auth?next=/admin",
+						}),
+					},
+				});
+			}
+			return { content: [{ type: "text", text: "sign_in_internal: returned from the link" }] };
+		}
+	);
+
 	return server;
 }
 
@@ -203,7 +379,8 @@ const httpServer = createServer(toNodeHandler(createMcpHandler(buildServer)));
 
 httpServer.listen(PORT, "127.0.0.1", () => {
 	console.log(`[mock-elicitation-mcp] listening on http://127.0.0.1:${PORT}/mcp`);
-	console.log(
-		"[mock-elicitation-mcp] tools: book_meeting, double_check, impatient_confirm, sign_in"
-	);
+	console.log("[mock-elicitation-mcp] tools:");
+	console.log("  book_meeting, double_check, impatient_confirm, sign_in");
+	console.log("  edge_defaults, pick_toppings, hostile_schema");
+	console.log("  sign_in_punycode, sign_in_internal");
 });
