@@ -44,9 +44,11 @@ export async function markGenerationInterrupted(
 		{ $set: { "messages.$.interrupted": true, "messages.$.updatedAt": now, updatedAt: now } }
 	);
 	// Nothing is left to poll these, so leaving them pending invites an answer into the void.
+	// Scoped by conversation as well: `generationId` is client-chosen, so on its own it would
+	// let a caller close a prompt belonging to a chat this run has nothing to do with.
 	await collections.mcpElicitations
 		.updateMany(
-			{ generationId, status: "pending" },
+			{ generationId, conversationId: run.conversationId, status: "pending" },
 			{ $set: { status: "resolved", action: "cancel", resolvedAt: now, updatedAt: now } }
 		)
 		.catch((err) =>
