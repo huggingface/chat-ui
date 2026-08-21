@@ -1,5 +1,6 @@
 import type { ProcessedModel } from "$lib/server/models";
 import type { GETModelResponse, GETModelsResponse } from "$lib/server/api/types";
+import { resolvePlanningDefault } from "$lib/server/textGeneration/builtinTools";
 
 // API responses must never serialize a model object directly: the raw
 // ProcessedModel carries server-only configuration (an `endpoints` array that
@@ -26,6 +27,9 @@ export function serializeModelSummary(model: ProcessedModel): GETModelsResponse[
 			(model as unknown as { supportsReasoning?: boolean }).supportsReasoning ?? false,
 		supportsArtifacts:
 			(model as unknown as { supportsArtifacts?: boolean }).supportsArtifacts ?? false,
+		// Resolved (flag ?? inferred) so the client sees the effective default
+		// without knowing about PLANNING_ENABLED.
+		supportsPlanning: resolvePlanningDefault(model),
 		unlisted: model.unlisted,
 		hasInferenceAPI: model.hasInferenceAPI,
 		isRouter: model.isRouter,

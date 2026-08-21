@@ -522,6 +522,13 @@ describe("runMcpFlow offering the plan tool", () => {
 		expect(toolNames()).toContain("update_plan");
 	});
 
+	it("honours the user's per-model setting over the resolved default", async () => {
+		mocks.planningEnabled = "true";
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({ planningOverride: false } as Partial<Parameters<typeof runMcpFlow>[0]>);
+		expect(toolNames()).not.toContain("update_plan");
+	});
+
 	it("excludes the router alias from the inferred default", async () => {
 		// The alias reports supportsTools whenever router tools are on; inferring from it
 		// would silently put planning on every routed conversation.

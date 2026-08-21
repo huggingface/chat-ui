@@ -33,6 +33,7 @@ interface SettingsResponse {
 	multimodalOverrides: Record<string, boolean>;
 	toolsOverrides: Record<string, boolean>;
 	artifactsOverrides: Record<string, boolean>;
+	planningOverrides: Record<string, boolean>;
 	hidePromptExamples: Record<string, boolean>;
 	providerOverrides: Record<string, string>;
 	reasoningEffortOverrides: Record<string, "low" | "medium" | "high">;

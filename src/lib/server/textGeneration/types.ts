@@ -25,6 +25,8 @@ export interface TextGenerationContext {
 	reasoningOverride?: boolean;
 	/** Per-model user override for artifacts; wins over the model's supportsArtifacts flag in both directions */
 	artifactsOverride?: boolean;
+	/** Per-model user override for planning; wins over the model's resolved planning default in both directions */
+	planningOverride?: boolean;
 	locals: App.Locals | undefined;
 	abortController: AbortController;
 	/** Also identifies the audience for an MCP elicitation raised mid tool call. */

@@ -20,6 +20,7 @@ const settingsSchema = z.object({
 	multimodalOverrides: z.record(z.boolean()).default({}),
 	toolsOverrides: z.record(z.boolean()).default({}),
 	artifactsOverrides: z.record(z.boolean()).default({}),
+	planningOverrides: z.record(z.boolean()).default({}),
 	providerOverrides: z.record(z.string()).default({}),
 	reasoningEffortOverrides: z.record(z.enum(["low", "medium", "high"])).default({}),
 	reasoningOverrides: z.record(z.boolean()).default({}),
@@ -75,6 +76,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		toolsOverrides: config.isHuggingChat ? {} : (settings?.toolsOverrides ?? {}),
 		// Not provider-determined, so user-editable even on HuggingChat
 		artifactsOverrides: settings?.artifactsOverrides ?? {},
+		planningOverrides: settings?.planningOverrides ?? {},
 		providerOverrides: settings?.providerOverrides ?? {},
 		reasoningEffortOverrides: settings?.reasoningEffortOverrides ?? {},
 		reasoningOverrides: config.isHuggingChat ? {} : (settings?.reasoningOverrides ?? {}),
