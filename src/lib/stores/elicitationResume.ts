@@ -10,4 +10,6 @@ import { writable } from "svelte/store";
 export const elicitationToResume = writable<{
 	conversationId: string;
 	elicitationId: string;
+	/** The assistant turn the call parked on; the page's own last message may not be it. */
+	messageId?: string;
 } | null>(null);

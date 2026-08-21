@@ -40,8 +40,13 @@ export async function sendElicitationAnswer({
 
 	// A parked call has nothing waiting on it, so answering only records the answer — the
 	// run that continues it has to be started.
-	if ((body as { resume?: boolean } | null)?.resume) {
-		elicitationToResume.set({ conversationId, elicitationId });
+	const parsed = body as { resume?: boolean; messageId?: string } | null;
+	if (parsed?.resume) {
+		elicitationToResume.set({
+			conversationId,
+			elicitationId,
+			...(parsed.messageId ? { messageId: parsed.messageId } : {}),
+		});
 	}
 	return { ok: true };
 }
