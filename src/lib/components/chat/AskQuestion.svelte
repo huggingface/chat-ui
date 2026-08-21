@@ -140,7 +140,9 @@
 			{/if}
 		</div>
 
-		<div class="flex flex-col gap-1.5">
+		<!-- Bracketed rather than boxed: the rows need something to sit against, but a
+		     border each puts a box inside the panel's box again. -->
+		<div class="flex flex-col gap-1.5 border-y border-gray-200 py-2 dark:border-gray-700">
 			{#each select.options as option (option.value)}
 				{@const picked = chosen(select.name).includes(option.value)}
 				<button
