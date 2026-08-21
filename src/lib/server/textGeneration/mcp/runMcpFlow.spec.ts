@@ -29,7 +29,12 @@ const mocks = vi.hoisted(() => ({
 		type: string;
 		function: { name: string };
 	}>,
+	servers: [{ name: "hf", url: "https://example.test/mcp" }] as Array<{
+		name: string;
+		url: string;
+	}>,
 	disableAsk: undefined as string | undefined,
+	planningEnabled: undefined as string | undefined,
 }));
 
 vi.mock("openai", () => ({
@@ -50,20 +55,26 @@ vi.mock("$lib/server/config", () => ({
 		get DISABLE_ASK_USER_QUESTION() {
 			return mocks.disableAsk;
 		},
+		get PLANNING_ENABLED() {
+			return mocks.planningEnabled;
+		},
 	},
 }));
 
 vi.mock("$lib/server/mcp/registry", () => ({
-	getMcpServers: () => [{ name: "hf", url: "https://example.test/mcp" }],
+	getMcpServers: () => mocks.servers,
 }));
 
 vi.mock("$lib/server/urlSafety", () => ({ isValidUrl: () => true }));
 
 vi.mock("$lib/server/mcp/tools", () => ({
-	getOpenAiToolsForMcp: async () => ({
-		tools: mocks.mcpTools,
-		mapping: { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } },
-	}),
+	getOpenAiToolsForMcp: async (servers: unknown[]) =>
+		servers.length === 0
+			? { tools: [], mapping: {} }
+			: {
+					tools: mocks.mcpTools,
+					mapping: { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } },
+				},
 }));
 
 vi.mock("./routerResolution", () => ({
@@ -214,7 +225,9 @@ beforeEach(() => {
 	mocks.executeToolCalls.mockReset();
 	mocks.getAbortTime.mockReset();
 	mocks.mcpTools = [{ type: "function", function: { name: "do_thing" } }];
+	mocks.servers = [{ name: "hf", url: "https://example.test/mcp" }];
 	mocks.disableAsk = undefined;
+	mocks.planningEnabled = undefined;
 	mocks.getAbortTime.mockReturnValue(undefined);
 	scriptToolResults();
 });
@@ -447,13 +460,128 @@ describe("runMcpFlow offering the question tool", () => {
 		expect(toolNames()).toEqual(["do_thing"]);
 	});
 
-	it("does not engage the flow on its own when no MCP tool exists", async () => {
-		// Offering it to every conversation would put the tool-calling path in front of
-		// people who have configured nothing.
+	it("engages the flow with builtin tools alone when MCP listing yields nothing", async () => {
 		mocks.mcpTools = [];
 		scriptRounds([{ content: "the answer" }]);
 		const { result } = await runFlow();
+		expect(result).toBe("completed");
+		expect(toolNames()).toEqual(["ask_user_question"]);
+	});
+
+	it("engages the flow with builtin tools alone when no MCP server is selected", async () => {
+		mocks.servers = [];
+		scriptRounds([{ content: "the answer" }]);
+		const { result } = await runFlow();
+		expect(result).toBe("completed");
+		expect(toolNames()).toEqual(["ask_user_question"]);
+	});
+
+	it("still skips the flow when there is neither an MCP server nor a builtin tool", async () => {
+		mocks.servers = [];
+		mocks.disableAsk = "true";
+		const { result } = await runFlow();
 		expect(result).toBe("not_applicable");
 		expect(mocks.create).not.toHaveBeenCalled();
+	});
+});
+
+describe("runMcpFlow offering the plan tool", () => {
+	const toolNames = () =>
+		(
+			(mocks.create.mock.calls[0]?.[0] as { tools?: Array<{ function: { name: string } }> })
+				?.tools ?? []
+		).map((t) => t.function.name);
+
+	it("is off until the global switch is set", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow();
+		expect(toolNames()).not.toContain("update_plan");
+	});
+
+	it("rides the inferred default on a tools-capable model once enabled", async () => {
+		mocks.planningEnabled = "true";
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow();
+		expect(toolNames()).toContain("update_plan");
+	});
+
+	it("lets supportsPlanning opt a model out of the inferred default", async () => {
+		mocks.planningEnabled = "true";
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({
+			model: { ...context().model, supportsPlanning: false },
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+		expect(toolNames()).not.toContain("update_plan");
+	});
+
+	it("lets supportsPlanning force-enable a model without the global switch", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({
+			model: { ...context().model, supportsPlanning: true },
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+		expect(toolNames()).toContain("update_plan");
+	});
+
+	it("excludes the router alias from the inferred default", async () => {
+		// The alias reports supportsTools whenever router tools are on; inferring from it
+		// would silently put planning on every routed conversation.
+		mocks.planningEnabled = "true";
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({
+			model: { ...context().model, isRouter: true },
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+		expect(toolNames()).not.toContain("update_plan");
+	});
+
+	it("drops an MCP tool shadowed by a builtin name", async () => {
+		mocks.planningEnabled = "true";
+		mocks.mcpTools = [
+			{ type: "function", function: { name: "do_thing" } },
+			{ type: "function", function: { name: "update_plan" } },
+		];
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow();
+		expect(toolNames().filter((name) => name === "update_plan")).toHaveLength(1);
+	});
+
+	it("injects the current plan at the tail of the last user message", async () => {
+		mocks.planningEnabled = "true";
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({
+			conv: {
+				_id: new ObjectId(),
+				plan: {
+					goal: "Ship the feature",
+					steps: [{ step: "write it", status: "in_progress" }],
+					version: 2,
+					updatedAt: new Date(),
+				},
+			},
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		const lastUser = requestMessages(0).findLast((m) => m.role === "user");
+		expect(String(lastUser?.content)).toContain("hello");
+		expect(String(lastUser?.content)).toContain("CURRENT PLAN");
+		expect(String(lastUser?.content)).toContain("PLAN (v2 — 0/1 done)");
+	});
+
+	it("does not inject a stale plan when the tool is not offered", async () => {
+		// A plan block that says "revise it with update_plan" must never appear
+		// without the tool it names.
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({
+			conv: {
+				_id: new ObjectId(),
+				plan: {
+					goal: "Ship the feature",
+					steps: [{ step: "write it", status: "pending" }],
+					version: 1,
+					updatedAt: new Date(),
+				},
+			},
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		const lastUser = requestMessages(0).findLast((m) => m.role === "user");
+		expect(String(lastUser?.content)).not.toContain("CURRENT PLAN");
 	});
 });

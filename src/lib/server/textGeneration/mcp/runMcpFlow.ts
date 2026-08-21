@@ -28,7 +28,8 @@ import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
-import { askUserQuestionTool } from "$lib/server/askUserQuestion";
+import { getEnabledBuiltinTools, shouldSkipMcpFlow } from "../builtinTools";
+import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -97,6 +98,15 @@ export async function* runMcpFlow({
 		}
 		return false;
 	};
+	const builtinTools = getEnabledBuiltinTools({
+		model: model as unknown as {
+			supportsTools?: boolean;
+			supportsPlanning?: boolean;
+			isRouter?: boolean;
+		},
+		conv,
+	});
+
 	// Start from env-configured servers
 	let servers = getMcpServers();
 	try {
@@ -160,8 +170,8 @@ export async function* runMcpFlow({
 	}
 
 	// If selection/merge yielded no servers, bail early with clearer log
-	if (servers.length === 0) {
-		logger.warn({}, "[mcp] no MCP servers selected after merge/name filter");
+	if (shouldSkipMcpFlow(servers.length, builtinTools.length)) {
+		logger.warn({}, "[mcp] no MCP servers selected after merge/name filter, and no builtin tools");
 		return "not_applicable";
 	}
 
@@ -185,7 +195,7 @@ export async function* runMcpFlow({
 			}
 		} catch {}
 	}
-	if (servers.length === 0) {
+	if (shouldSkipMcpFlow(servers.length, builtinTools.length)) {
 		logger.warn({}, "[mcp] all selected MCP servers rejected by URL safety guard");
 		return "not_applicable";
 	}
@@ -254,7 +264,7 @@ export async function* runMcpFlow({
 		{ count: servers.length, servers: servers.map((s) => s.name) },
 		"[mcp] servers configured"
 	);
-	if (servers.length === 0) {
+	if (shouldSkipMcpFlow(servers.length, builtinTools.length)) {
 		return "not_applicable";
 	}
 
@@ -319,19 +329,27 @@ export async function* runMcpFlow({
 		const { tools: mcpTools, mapping } = await getOpenAiToolsForMcp(servers, {
 			signal: abortSignal,
 		});
-		// Alongside the MCP tools, never on its own: a conversation with no MCP server keeps
-		// the plain generation path it has always taken.
-		const oaTools =
-			mcpTools.length > 0 && config.DISABLE_ASK_USER_QUESTION !== "true"
-				? [...mcpTools, askUserQuestionTool]
-				: mcpTools;
+		// An MCP tool that collides with a builtin name is dropped: dispatch checks
+		// builtins first, so the MCP twin would be advertised but unreachable.
+		const builtinNames = new Set(builtinTools.map((tool) => tool.name));
+		const collisions = mcpTools.filter((tool) => builtinNames.has(tool.function.name));
+		if (collisions.length > 0) {
+			logger.warn(
+				{ dropped: collisions.map((tool) => tool.function.name) },
+				"[mcp] dropped MCP tools shadowed by builtin tools"
+			);
+		}
+		const oaTools = [
+			...builtinTools.map((tool) => tool.definition),
+			...mcpTools.filter((tool) => !builtinNames.has(tool.function.name)),
+		];
 		try {
 			logger.info(
 				{ toolCount: oaTools.length, toolNames: oaTools.map((t) => t.function.name) },
 				"[mcp] openai tool defs built"
 			);
 		} catch {}
-		if (mcpTools.length === 0) {
+		if (oaTools.length === 0) {
 			logger.warn({}, "[mcp] zero tools available after listing; skipping MCP flow");
 			return "not_applicable";
 		}
@@ -424,7 +442,7 @@ export async function* runMcpFlow({
 			}
 		);
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
-		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone);
+		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone, builtinTools);
 		const prepromptPieces: string[] = [];
 		if (toolPreprompt.trim().length > 0) {
 			prepromptPieces.push(toolPreprompt);
@@ -442,6 +460,13 @@ export async function* runMcpFlow({
 			}
 		} else if (mergedPreprompt.length > 0) {
 			messagesOpenAI = [{ role: "system", content: mergedPreprompt }, ...messagesOpenAI];
+		}
+
+		// Tail-injected once per turn; within the turn, freshness travels in the tool
+		// results. Gated on the tool being offered so a stale plan can't tell the model
+		// to call a tool it doesn't have.
+		if (conv.plan && builtinTools.some((tool) => tool.name === PLAN_TOOL_NAME)) {
+			messagesOpenAI = injectPlanState(messagesOpenAI, conv.plan);
 		}
 
 		// Work around servers that reject `system` role
@@ -850,6 +875,7 @@ export async function* runMcpFlow({
 					roundReasoning: reasoningForToolMsg,
 					roundContent: assistantContentForToolMsg,
 					elicitation: { conversationId: conv._id, generationId, messageId },
+					builtinTools,
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;

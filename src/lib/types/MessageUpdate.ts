@@ -1,5 +1,6 @@
 import type { InferenceProvider } from "@huggingface/inference";
 import type { ToolCall, ToolResult } from "$lib/types/Tool";
+import type { PlanStep } from "$lib/types/Plan";
 import type {
 	ElicitationAction,
 	ElicitationRequestPayload,
@@ -16,7 +17,8 @@ export type MessageUpdate =
 	| MessageFinalAnswerUpdate
 	| MessageReasoningUpdate
 	| MessageRouterMetadataUpdate
-	| MessageElicitationUpdate;
+	| MessageElicitationUpdate
+	| MessagePlanUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -28,6 +30,7 @@ export enum MessageUpdateType {
 	Reasoning = "reasoning",
 	RouterMetadata = "routerMetadata",
 	Elicitation = "elicitation",
+	Plan = "plan",
 }
 
 // Status
@@ -196,4 +199,20 @@ export interface MessageElicitationResolvedUpdate {
 	resolution: ElicitationResolution;
 	/** What was submitted, so a reloaded transcript can still show the answers. */
 	content?: Record<string, ElicitationValue>;
+}
+
+/**
+ * Snapshot of the plan after an `update_plan` call. Plain JSON only (no Date):
+ * it travels the JSONL stream and is persisted verbatim in `Message.updates`.
+ * The authoritative current state lives on `Conversation.plan`.
+ */
+export interface MessagePlanUpdate {
+	type: MessageUpdateType.Plan;
+	/** uuid of the update_plan tool call that produced this state. */
+	uuid: string;
+	goal: string;
+	steps: PlanStep[];
+	/** Model-authored one-line changelog for this update. */
+	explanation?: string;
+	version: number;
 }

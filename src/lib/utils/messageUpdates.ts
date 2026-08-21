@@ -9,6 +9,7 @@ import {
 	type MessageElicitationUpdate,
 	type MessageElicitationRequestUpdate,
 	type MessageElicitationResolvedUpdate,
+	type MessagePlanUpdate,
 	MessageUpdateType,
 	MessageUpdateStatus,
 	MessageToolUpdateType,
@@ -394,6 +395,9 @@ export const isMessageElicitationResolvedUpdate = (
 	update: MessageUpdate
 ): update is MessageElicitationResolvedUpdate =>
 	isMessageElicitationUpdate(update) && update.subtype === MessageElicitationUpdateType.Resolved;
+
+export const isMessagePlanUpdate = (update: MessageUpdate): update is MessagePlanUpdate =>
+	update.type === MessageUpdateType.Plan;
 
 const defaultSleep = (ms: number): Promise<void> =>
 	new Promise((resolve) => setTimeout(resolve, ms));

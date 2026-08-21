@@ -87,6 +87,13 @@ const modelConfig = z.object({
 	// Opt-in artifacts: when true, the model is instructed to emit <artifact>
 	// blocks rendered in the side panel. Set per model via MODELS overrides.
 	supportsArtifacts: z.boolean().default(false),
+	/**
+	 * Per-model exception to the inferred planning default (PLANNING_ENABLED +
+	 * supportsTools): `false` opts a badly-planning model out, `true` force-enables
+	 * one. `.optional()` is load-bearing — undefined means "use the inferred
+	 * default", which `.default(false)` would erase.
+	 */
+	supportsPlanning: z.boolean().optional(),
 	unlisted: z.boolean().default(false),
 	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */
