@@ -18,7 +18,7 @@
 
 	import ChatInput from "./ChatInput.svelte";
 	import AskQuestion from "./AskQuestion.svelte";
-	import { pendingQuestion } from "$lib/stores/pendingQuestion";
+	import { firstQuestionFor } from "$lib/stores/pendingQuestion";
 	import VoiceRecorder from "./VoiceRecorder.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
@@ -72,9 +72,8 @@
 	import { page } from "$app/state";
 
 	// Only this conversation's question; the store outlives a navigation by a tick.
-	let askQuestion = $derived(
-		$pendingQuestion && $pendingQuestion.conversationId === page.params.id ? $pendingQuestion : null
-	);
+	let questionStore = $derived(firstQuestionFor(page.params.id));
+	let askQuestion = $derived($questionStore);
 	import {
 		isMessageToolCallUpdate,
 		isMessageToolErrorUpdate,

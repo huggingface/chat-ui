@@ -3,7 +3,7 @@ import { render } from "vitest-browser-svelte";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import type { ElicitationField, ElicitationRequestPayload } from "$lib/types/McpElicitation";
 import { MessageElicitationUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
-import { pendingQuestion } from "$lib/stores/pendingQuestion";
+import { pendingQuestions, unregisterQuestion } from "$lib/stores/pendingQuestion";
 import { get } from "svelte/store";
 
 /** Answers are POSTed, so what reaches the server is the assertion worth making. */
@@ -221,7 +221,9 @@ describe("a question the model asked", () => {
 		source: "assistant",
 	});
 
-	afterEach(() => pendingQuestion.set(null));
+	afterEach(() => {
+		for (const q of get(pendingQuestions)) unregisterQuestion(q.request.elicitationId);
+	});
 
 	it("is handed to the composer rather than drawn in the transcript", async () => {
 		const { baseElement } = render(ElicitationForm, {
@@ -232,7 +234,9 @@ describe("a question the model asked", () => {
 		// Nothing of the form itself: the composer draws it.
 		expect(baseElement.querySelector("select")).toBeNull();
 		expect(baseElement.textContent).not.toContain("Where should uploads go?");
-		await vi.waitFor(() => expect(get(pendingQuestion)).toMatchObject({ conversationId: "abc" }));
+		await vi.waitFor(() =>
+			expect(get(pendingQuestions)).toMatchObject([{ conversationId: "abc" }])
+		);
 	});
 
 	it("stays in the transcript once answered, and lets the composer go", async () => {
@@ -250,7 +254,24 @@ describe("a question the model asked", () => {
 		});
 
 		expect(baseElement.textContent).toContain("Answered");
-		expect(get(pendingQuestion)).toBeNull();
+		expect(get(pendingQuestions)).toHaveLength(0);
+	});
+
+	it("does not let a later question hide one still waiting", async () => {
+		const first = askRequest();
+		const second = { ...askRequest(), elicitationId: "22222222-2222-4222-8222-222222222222" };
+		render(ElicitationForm, { conversationId: "abc", request: first });
+		render(ElicitationForm, { conversationId: "abc", request: second });
+
+		await vi.waitFor(() => expect(get(pendingQuestions)).toHaveLength(2));
+		// Oldest first: the composer works through them in the order they were asked.
+		expect(get(pendingQuestions)[0].request.elicitationId).toBe(first.elicitationId);
+
+		// Settling the newer one must not take the older one's slot with it, or it could
+		// never be answered and its tool call would never get a result.
+		unregisterQuestion(second.elicitationId);
+		expect(get(pendingQuestions)).toHaveLength(1);
+		expect(get(pendingQuestions)[0].request.elicitationId).toBe(first.elicitationId);
 	});
 
 	it("leaves an MCP prompt in the transcript where it belongs", () => {
@@ -260,6 +281,6 @@ describe("a question the model asked", () => {
 		});
 
 		expect(baseElement.querySelector("select")).not.toBeNull();
-		expect(get(pendingQuestion)).toBeNull();
+		expect(get(pendingQuestions)).toHaveLength(0);
 	});
 });
