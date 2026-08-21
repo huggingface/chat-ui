@@ -2,6 +2,7 @@ import type { MessageFile } from "$lib/types/Message";
 import type { EndpointMessage } from "$lib/server/endpoints/endpoints";
 import type { OpenAI } from "openai";
 import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
+import { stripThink } from "$lib/utils/stripThink";
 import type { makeImageProcessor } from "$lib/server/endpoints/images";
 import {
 	MessageToolUpdateType,
@@ -171,14 +172,6 @@ function splitReasoning(
 	});
 	const parts = [storedReasoning ?? "", ...thinkParts].filter((part) => part.trim().length > 0);
 	return { visible: visible.trim(), parts };
-}
-
-/** Strip `<think>` blocks without collecting them; used for the degraded
- * fallback shape so a budget cutoff never leaks raw reasoning as visible
- * content, including to models whose vendor requires historical thoughts
- * to be stripped (e.g. Gemma) regardless of the replay budget. */
-function stripThink(content: string): string {
-	return content.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, "").trim();
 }
 
 /**
