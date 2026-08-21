@@ -224,11 +224,11 @@
 			<p class="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
 		{/if}
 
-		<div class="mt-3 flex items-center gap-2">
+		<div class="mt-2 flex items-center gap-2">
 			{#if step > 0}
 				<button
 					type="button"
-					class="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+					class="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
 					disabled={submitting}
 					onclick={() => {
 						step -= 1;
@@ -259,7 +259,7 @@
 			{/if}
 			<button
 				type="button"
-				class="ml-auto rounded-lg px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+				class="ml-auto rounded-lg px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 				disabled={submitting}
 				onclick={() => finish("decline")}
 			>
