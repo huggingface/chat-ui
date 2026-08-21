@@ -68,7 +68,6 @@ describe("a question from the assistant", () => {
 		expect(baseElement.textContent).toContain("1 of 2");
 
 		rowFor(baseElement, "Postgres")?.click();
-		button(baseElement, "Next")?.click();
 
 		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which host?"));
 		expect(baseElement.textContent).not.toContain("Which database?");
@@ -77,7 +76,6 @@ describe("a question from the assistant", () => {
 	it("sends each answer under its own question", async () => {
 		const { baseElement } = mount([ask("q1", "Which database?"), ask("q2", "Which host?")]);
 		rowFor(baseElement, "Postgres")?.click();
-		button(baseElement, "Next")?.click();
 		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which host?"));
 		rowFor(baseElement, "Mongo")?.click();
 		button(baseElement, "Send")?.click();
@@ -106,12 +104,58 @@ describe("a question from the assistant", () => {
 		expect(sent[0]).toMatchObject({ content: { q1: ["Postgres", "Mongo"] } });
 	});
 
-	it("will not move on until something is chosen", async () => {
+	it("moves on by itself once a single-answer question is answered", async () => {
 		const { baseElement } = mount([ask("q1", "Which database?"), ask("q2", "Which host?")]);
+		// Nothing to press: the click is the whole interaction.
+		expect(button(baseElement, "Next")).toBeUndefined();
+
+		rowFor(baseElement, "Postgres")?.click();
+		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which host?"));
+	});
+
+	it("advances again when an earlier answer is changed", async () => {
+		const { baseElement } = mount([ask("q1", "Which database?"), ask("q2", "Which host?")]);
+		rowFor(baseElement, "Postgres")?.click();
+		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which host?"));
+
+		button(baseElement, "Back")?.click();
+		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which database?"));
+		rowFor(baseElement, "Mongo")?.click();
+
+		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which host?"));
+	});
+
+	it("never sends on its own, however the last question is answered", async () => {
+		const { baseElement } = mount([ask("q1", "Which database?")]);
+		rowFor(baseElement, "Postgres")?.click();
+
+		// Sending is the user's own act, so a click on the last question only chooses.
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(sent).toHaveLength(0);
+		expect(button(baseElement, "Send")).toBeDefined();
+	});
+
+	it("still asks for Next when one click cannot finish the question", async () => {
+		const { baseElement } = mount([
+			ask("q1", "Which databases?", { multiple: true }),
+			ask("q2", "Which host?"),
+		]);
+		rowFor(baseElement, "Postgres")?.click();
+
+		// More may follow, so it waits to be told the answer is complete.
+		await vi.waitFor(() => expect(button(baseElement, "Next")).toBeDefined());
+		expect(baseElement.textContent).toContain("Which databases?");
+
 		button(baseElement, "Next")?.click();
+		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which host?"));
+	});
+
+	it("refuses to send the last question unanswered", async () => {
+		const { baseElement } = mount([ask("q1", "Which database?")]);
+		button(baseElement, "Send")?.click();
 
 		await vi.waitFor(() => expect(baseElement.textContent).toContain("Pick an option"));
-		expect(baseElement.textContent).toContain("Which database?");
+		expect(sent).toHaveLength(0);
 	});
 
 	it("takes an answer nobody offered", async () => {
