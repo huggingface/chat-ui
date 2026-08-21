@@ -12,7 +12,7 @@ import {
 	type McpToolTextResponse,
 } from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
-import { ASK_USER_QUESTION_TOOL_NAME, openAskPrompt } from "$lib/server/askUserQuestion";
+import type { BuiltinTool } from "../builtinTools/types";
 import { openDurableElicitation, type ElicitationSink } from "$lib/server/mcp/elicitation";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/client";
@@ -52,6 +52,8 @@ export interface ExecuteToolCallsParams {
 	roundContent?: string;
 	/** Omit and elicitation requests raised by these calls are declined. */
 	elicitation?: { conversationId: ObjectId; generationId?: string; messageId?: string };
+	/** Locally-executed tools, dispatched before the MCP mapping lookup. */
+	builtinTools?: BuiltinTool[];
 }
 
 export interface ToolCallExecutionResult {
@@ -107,6 +109,7 @@ export async function* executeToolCalls({
 	roundReasoning,
 	roundContent,
 	elicitation,
+	builtinTools,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
@@ -233,8 +236,10 @@ export async function* executeToolCalls({
 		emit: (update) => updatesQueue.push(update),
 	};
 
-	const askCalls = prepared.filter((p) => p.call.name === ASK_USER_QUESTION_TOOL_NAME);
-	const askIndex = (p: (typeof prepared)[number]) => askCalls.indexOf(p);
+	const builtinByName = new Map((builtinTools ?? []).map((tool) => [tool.name, tool]));
+	// Positional, not success-conditional: which parking call survives must not depend
+	// on a race between concurrent tasks.
+	const parkingCalls = prepared.filter((p) => builtinByName.get(p.call.name)?.mayPark);
 
 	const tasks = prepared.map(async (p, index) => {
 		// Check abort before starting each tool call
@@ -277,13 +282,13 @@ export async function* executeToolCalls({
 			return;
 		}
 
-		if (p.call.name === ASK_USER_QUESTION_TOOL_NAME) {
+		const builtin = builtinByName.get(p.call.name);
+		if (builtin) {
 			// A round parks on one prompt, so a second would never be shown and its call would
 			// never get a result — which providers reject on the next turn.
-			if (askIndex(p) > 0) {
+			if (builtin.mayPark && parkingCalls.indexOf(p) > 0) {
 				const message =
-					"Only one ask_user_question call can be answered per turn. " +
-					"Put every question in a single call's `questions` array.";
+					builtin.parkRefusalMessage ?? "Only one call that waits on the user can run per turn.";
 				results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
 				updatesQueue.push({
 					type: MessageUpdateType.Tool,
@@ -294,31 +299,62 @@ export async function* executeToolCalls({
 				return;
 			}
 
-			const opened = elicitationSink
-				? await openAskPrompt({
-						sink: elicitationSink,
-						toolUuid: p.uuid,
-						toolCallId: p.call.id,
-						messageId: elicitation?.messageId ?? "",
-						args: parseArgs(p.call.arguments),
-					})
-				: { opened: false, reason: "no chat to ask" };
+			try {
+				const outcome = await builtin.execute(argsObj, {
+					uuid: p.uuid,
+					toolCallId: p.call.id,
+					messageId: elicitation?.messageId,
+					generationId: elicitation?.generationId,
+					elicitationSink,
+				});
 
-			if (opened.opened) {
-				awaitingInput = true;
-				results.push({ index, awaiting: true, uuid: p.uuid, paramsClean: p.paramsClean });
-				return;
+				if ("awaitingInput" in outcome) {
+					awaitingInput = true;
+					results.push({ index, awaiting: true, uuid: p.uuid, paramsClean: p.paramsClean });
+					return;
+				}
+				if ("error" in outcome) {
+					results.push({ index, error: outcome.error, uuid: p.uuid, paramsClean: p.paramsClean });
+					updatesQueue.push({
+						type: MessageUpdateType.Tool,
+						subtype: MessageToolUpdateType.Error,
+						uuid: p.uuid,
+						message: outcome.error,
+					});
+					return;
+				}
+
+				results.push({
+					index,
+					output: outcome.resultText,
+					uuid: p.uuid,
+					paramsClean: p.paramsClean,
+				});
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Result,
+					uuid: p.uuid,
+					result: {
+						status: ToolResultStatus.Success,
+						call: { name: p.call.name, parameters: p.paramsClean },
+						outputs: [{ text: outcome.resultText } as unknown as Record<string, unknown>],
+						display: true,
+					},
+				});
+				for (const update of outcome.extraUpdates ?? []) {
+					updatesQueue.push(update);
+				}
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				logger.warn({ tool: p.call.name, err: message }, "[builtin] tool call failed");
+				results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid: p.uuid,
+					message,
+				});
 			}
-
-			// Answering is the only way this call finishes, so a silent skip would hang it.
-			const message = `The question could not be shown (${opened.reason}).`;
-			results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
-			updatesQueue.push({
-				type: MessageUpdateType.Tool,
-				subtype: MessageToolUpdateType.Error,
-				uuid: p.uuid,
-				message,
-			});
 			return;
 		}
 

@@ -1,5 +1,6 @@
 import type { ObjectId } from "mongodb";
 import type { Message } from "./Message";
+import type { PlanState } from "./Plan";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 import type { Assistant } from "./Assistant";
@@ -41,6 +42,12 @@ export interface Conversation extends Timestamps {
 	 * here maps to an app-created Space.
 	 */
 	deployedSpaces?: Record<string, DeployedSpace>;
+
+	/**
+	 * Written by the `update_plan` builtin tool with its own targeted `$set`, so
+	 * the messages-only writes in the conversation route never clobber it.
+	 */
+	plan?: PlanState;
 }
 
 export interface DeployedSpace {
