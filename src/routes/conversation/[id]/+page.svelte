@@ -134,7 +134,12 @@
 		// when it is next open, rather than this one resuming a stranger's tool call.
 		if (!pending || pending.conversationId !== convId || $loading) return;
 		elicitationToResume.set(null);
-		void writeMessage({ resumeElicitationId: pending.elicitationId });
+		// The turn that asked, not the page's current last message — another turn may have
+		// been sent while the prompt was open, and the continuation belongs to the parked one.
+		void writeMessage({
+			resumeElicitationId: pending.elicitationId,
+			...(pending.messageId ? { messageId: pending.messageId } : {}),
+		});
 	});
 
 	async function writeMessage({

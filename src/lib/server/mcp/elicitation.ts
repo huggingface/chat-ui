@@ -260,7 +260,8 @@ export async function handleElicitationRequest(
 }
 
 export type SubmitResult =
-	{ ok: true; resume: boolean } | { ok: false; status: 400 | 404 | 409; error: string };
+	| { ok: true; resume: boolean; messageId?: string }
+	| { ok: false; status: 400 | 404 | 409; error: string };
 
 export async function submitElicitationAnswer({
 	elicitationId,
@@ -305,7 +306,13 @@ export async function submitElicitationAnswer({
 	);
 	if (updated.matchedCount === 0) return { ok: false, status: 409, error: "Already answered." };
 
-	return { ok: true, resume: doc.pending !== undefined };
+	// The turn that asked, so the client streams the continuation into it rather than into
+	// whatever it currently has last.
+	return {
+		ok: true,
+		resume: doc.pending !== undefined,
+		...(doc.pending ? { messageId: doc.pending.messageId } : {}),
+	};
 }
 
 /**

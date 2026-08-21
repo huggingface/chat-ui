@@ -316,6 +316,21 @@ describe('an answer typed into "Other"', () => {
 		});
 	});
 
+	it("is not whitespace standing in for an answer", () => {
+		expect(validateElicitationContent(field({ allowOther: true }), { pick: "   " })).toMatchObject({
+			ok: false,
+		});
+	});
+
+	it("is one typed answer, not a way past the option list", () => {
+		// The form offers a single box, so a crafted request is the only way to send two.
+		expect(
+			validateElicitationContent(field({ allowOther: true, multiple: true }), {
+				pick: ["mine", "also mine"],
+			})
+		).toMatchObject({ ok: false });
+	});
+
 	it("sits alongside picked options in a multi-select", () => {
 		expect(
 			validateElicitationContent(field({ allowOther: true, multiple: true }), {

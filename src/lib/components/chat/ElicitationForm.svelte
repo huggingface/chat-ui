@@ -7,11 +7,10 @@
 		ElicitationValue,
 	} from "$lib/types/McpElicitation";
 	import type { MessageElicitationResolvedUpdate } from "$lib/types/MessageUpdate";
-	import { base } from "$app/paths";
 	import CarbonLaunch from "~icons/carbon/launch";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import BlockWrapper from "./BlockWrapper.svelte";
-	import { elicitationToResume } from "$lib/stores/elicitationResume";
+	import { sendElicitationAnswer } from "$lib/utils/sendElicitationAnswer";
 	import { pendingQuestion } from "$lib/stores/pendingQuestion";
 	import { forDateInput } from "$lib/utils/elicitationDate";
 
@@ -232,33 +231,18 @@
 		}
 		submitting = true;
 		error = null;
-		try {
-			const res = await fetch(`${base}/conversation/${conversationId}/elicitation`, {
-				method: "POST",
-				// Without Accept, SvelteKit answers `error()` with an HTML page.
-				headers: { "Content-Type": "application/json", Accept: "application/json" },
-				body: JSON.stringify({
-					elicitationId: request.elicitationId,
-					action,
-					...(action === "accept" && request.mode === "form" ? { content: payload() } : {}),
-				}),
-			});
-			const body = await res.json().catch(() => null);
-			if (!res.ok) {
-				error = typeof body?.message === "string" ? body.message : "Could not send your answer.";
-				return;
-			}
-			submitted = action;
-			// A parked call has nothing waiting on it, so answering only records the answer —
-			// the run that continues it has to be started.
-			if (body?.resume) {
-				elicitationToResume.set({ conversationId, elicitationId: request.elicitationId });
-			}
-		} catch {
-			error = "Could not send your answer.";
-		} finally {
-			submitting = false;
+		const result = await sendElicitationAnswer({
+			conversationId,
+			elicitationId: request.elicitationId,
+			action,
+			...(action === "accept" && request.mode === "form" ? { content: payload() } : {}),
+		});
+		submitting = false;
+		if (!result.ok) {
+			error = result.error;
+			return;
 		}
+		submitted = action;
 	}
 
 	// Submitting through the form is what runs the browser's own field validation.
