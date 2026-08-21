@@ -30,6 +30,13 @@
 	/** Every question normalizes to a select; anything else is not one of ours to draw. */
 	let select = $derived(field?.kind === "select" ? field : undefined);
 	let isLast = $derived(step === fields.length - 1);
+	/**
+	 * Picking one answer advances on its own, so Next is only for the questions a single
+	 * click cannot finish: several answers, or one being typed.
+	 */
+	let needsNext = $derived(
+		!isLast && select !== undefined && (select.multiple || showOther[select.name] === true)
+	);
 	const chosen = (name: string) => picks[name] ?? [];
 
 	function toggle(f: ElicitationField, value: string) {
@@ -45,6 +52,10 @@
 		// clears any typed answer rather than leaving both showing as chosen.
 		if (!multiple) showOther = { ...showOther, [f.name]: false };
 		error = null;
+		// One answer means the click was the whole interaction, so move on — including
+		// when an earlier answer is being changed. Never off the last question: sending
+		// is always the user's own act.
+		if (!multiple && !isLast) step += 1;
 	}
 
 	function toggleOther(f: ElicitationField) {
@@ -107,7 +118,8 @@
 	}
 
 	const rowClass =
-		"flex w-full cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 text-left transition-colors " +
+		"flex w-full cursor-pointer items-start gap-3 rounded-md px-2 py-1.5 text-left transition-colors " +
+		"hover:bg-gray-100 dark:hover:bg-gray-700/60 " +
 		"focus:ring-2 focus:ring-gray-300 focus:outline-hidden dark:focus:ring-gray-700";
 </script>
 
@@ -133,9 +145,7 @@
 				{@const picked = chosen(select.name).includes(option.value)}
 				<button
 					type="button"
-					class="{rowClass} {picked
-						? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-						: 'border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50'}"
+					class={rowClass}
 					aria-pressed={picked}
 					disabled={submitting}
 					onclick={() => toggle(select, option.value)}
@@ -152,7 +162,11 @@
 						{/if}
 					</span>
 					<span class="min-w-0">
-						<span class="block text-sm text-gray-900 dark:text-gray-100">{option.label}</span>
+						<span
+							class="block text-sm {picked
+								? 'font-medium text-blue-700 dark:text-blue-300'
+								: 'text-gray-900 dark:text-gray-100'}">{option.label}</span
+						>
 						{#if option.description}
 							<span class="block text-xs text-gray-500 dark:text-gray-400"
 								>{option.description}</span
@@ -166,9 +180,7 @@
 				{@const on = showOther[select.name] === true}
 				<button
 					type="button"
-					class="{rowClass} {on
-						? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-						: 'border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50'}"
+					class={rowClass}
 					aria-pressed={on}
 					disabled={submitting}
 					onclick={() => toggleOther(select)}
@@ -184,7 +196,11 @@
 							<span class="block size-1.5 rounded-full bg-white"></span>
 						{/if}
 					</span>
-					<span class="text-sm text-gray-900 dark:text-gray-100">Something else…</span>
+					<span
+						class="text-sm {on
+							? 'font-medium text-blue-700 dark:text-blue-300'
+							: 'text-gray-900 dark:text-gray-100'}">Something else…</span
+					>
 				</button>
 				{#if on}
 					<input
@@ -220,14 +236,25 @@
 					<CarbonArrowLeft class="size-3" /> Back
 				</button>
 			{/if}
-			<button
-				type="button"
-				class="rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-				disabled={submitting}
-				onclick={() => (isLast ? finish("accept") : advance())}
-			>
-				{isLast ? "Send" : "Next"}
-			</button>
+			{#if isLast}
+				<button
+					type="button"
+					class="rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+					disabled={submitting}
+					onclick={() => finish("accept")}
+				>
+					Send
+				</button>
+			{:else if needsNext}
+				<button
+					type="button"
+					class="rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+					disabled={submitting}
+					onclick={() => advance()}
+				>
+					Next
+				</button>
+			{/if}
 			<button
 				type="button"
 				class="ml-auto rounded-lg px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
