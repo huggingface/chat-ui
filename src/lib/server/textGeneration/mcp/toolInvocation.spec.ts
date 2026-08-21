@@ -4,6 +4,7 @@ import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpda
 import { ToolResultStatus } from "$lib/types/Tool";
 import { parseToolArguments } from "./toolArgs";
 import type { NormalizedToolCall } from "./toolInvocation";
+import type { BuiltinTool } from "../builtinTools/types";
 import type { McpToolTextResponse } from "$lib/server/mcp/httpClient";
 import type { ChatCompletionToolMessageParam } from "openai/resources/chat/completions";
 
@@ -18,13 +19,6 @@ vi.mock("$lib/server/mcp/httpClient", () => ({
 
 vi.mock("$lib/server/mcp/clientPool", () => ({
 	getClient: vi.fn(async () => ({})),
-}));
-
-// Stubbed so the dispatch decision is what is under test, not the database write behind it.
-const askMock = vi.hoisted(() => ({ openAskPrompt: vi.fn() }));
-vi.mock("$lib/server/askUserQuestion", () => ({
-	ASK_USER_QUESTION_TOOL_NAME: "ask_user_question",
-	openAskPrompt: askMock.openAskPrompt,
 }));
 
 vi.mock("../../logger", () => ({
@@ -46,7 +40,8 @@ const processToolOutput = (text: string) => ({ annotated: text, sources: [] });
 
 async function drain(
 	calls: NormalizedToolCall[],
-	elicitation?: { conversationId: ObjectId; generationId?: string; messageId?: string }
+	elicitation?: { conversationId: ObjectId; generationId?: string; messageId?: string },
+	builtinTools?: BuiltinTool[]
 ) {
 	const events = [];
 	for await (const event of executeToolCalls({
@@ -57,6 +52,7 @@ async function drain(
 		toPrimitive,
 		processToolOutput,
 		...(elicitation ? { elicitation } : {}),
+		...(builtinTools ? { builtinTools } : {}),
 	})) {
 		events.push(event);
 	}
@@ -89,8 +85,6 @@ function mcpResult(overrides: Partial<McpToolTextResponse>): McpToolTextResponse
 
 beforeEach(() => {
 	mcpMock.callMcpTool.mockReset();
-	askMock.openAskPrompt.mockReset();
-	askMock.openAskPrompt.mockResolvedValue({ opened: true });
 	mcpMock.callMcpTool.mockResolvedValue(mcpResult({ text: "ok" }));
 });
 
@@ -229,7 +223,7 @@ describe("isValidJsonObject", () => {
 	});
 });
 
-describe("the model asking the user a question", () => {
+describe("builtin tool dispatch", () => {
 	const ASK: NormalizedToolCall = {
 		id: "call_ask",
 		name: "ask_user_question",
@@ -238,22 +232,42 @@ describe("the model asking the user a question", () => {
 	};
 	const CHAT = { conversationId: new ObjectId(), messageId: "m1" };
 
+	const execute = vi.fn<BuiltinTool["execute"]>();
+	const parkingBuiltin: BuiltinTool = {
+		name: "ask_user_question",
+		definition: { type: "function", function: { name: "ask_user_question" } },
+		mayPark: true,
+		parkRefusalMessage:
+			"Only one ask_user_question call can be answered per turn. " +
+			"Put every question in a single call's `questions` array.",
+		execute,
+	};
+
+	beforeEach(() => {
+		execute.mockReset();
+		execute.mockImplementation(async (_args, ctx) =>
+			ctx.elicitationSink
+				? { awaitingInput: true }
+				: { error: "The question could not be shown (no chat to ask)." }
+		);
+	});
+
 	it("parks the run instead of looking for a server to call", async () => {
-		const events = await drain([ASK], CHAT);
+		const events = await drain([ASK], CHAT, [parkingBuiltin]);
 
 		expect(mcpMock.callMcpTool).not.toHaveBeenCalled();
 		expect(summaryOf(events).awaitingInput).toBe(true);
-		expect(askMock.openAskPrompt).toHaveBeenCalledTimes(1);
-		expect(askMock.openAskPrompt.mock.calls[0][0]).toMatchObject({
-			toolCallId: "call_ask",
-			messageId: "m1",
-			args: { questions: [{ question: "Which?" }] },
-		});
+		expect(execute).toHaveBeenCalledTimes(1);
+		expect(execute.mock.calls[0][0]).toMatchObject({ questions: [{ question: "Which?" }] });
+		expect(execute.mock.calls[0][1]).toMatchObject({ toolCallId: "call_ask", messageId: "m1" });
+		expect(execute.mock.calls[0][1].elicitationSink).toBeDefined();
 	});
 
-	it("is an error, not a silent skip, when the question cannot be shown", async () => {
-		askMock.openAskPrompt.mockResolvedValue({ opened: false, reason: "no questions were given" });
-		const events = await drain([ASK], CHAT);
+	it("is an error, not a silent skip, when the builtin reports one", async () => {
+		execute.mockResolvedValue({
+			error: "The question could not be shown (no questions were given).",
+		});
+		const events = await drain([ASK], CHAT, [parkingBuiltin]);
 
 		expect(summaryOf(events).awaitingInput).toBeUndefined();
 		const errors = toolUpdatesOf(events).filter((u) => u.subtype === MessageToolUpdateType.Error);
@@ -263,11 +277,11 @@ describe("the model asking the user a question", () => {
 		});
 	});
 
-	it("takes only one question per round, and tells the model why", async () => {
+	it("takes only one parking call per round, and tells the model why", async () => {
 		const second: NormalizedToolCall = { ...ASK, id: "call_ask_2" };
-		const events = await drain([ASK, second], CHAT);
+		const events = await drain([ASK, second], CHAT, [parkingBuiltin]);
 
-		expect(askMock.openAskPrompt).toHaveBeenCalledTimes(1);
+		expect(execute).toHaveBeenCalledTimes(1);
 		expect(summaryOf(events).awaitingInput).toBe(true);
 
 		const errors = toolUpdatesOf(events).filter((u) => u.subtype === MessageToolUpdateType.Error);
@@ -277,13 +291,70 @@ describe("the model asking the user a question", () => {
 		});
 	});
 
-	it("has nowhere to ask when there is no chat behind the call", async () => {
-		const events = await drain([ASK]);
+	it("hands the builtin no sink when there is no chat behind the call", async () => {
+		const events = await drain([ASK], undefined, [parkingBuiltin]);
 
-		expect(askMock.openAskPrompt).not.toHaveBeenCalled();
+		expect(execute).toHaveBeenCalledTimes(1);
+		expect(execute.mock.calls[0][1].elicitationSink).toBeUndefined();
 		expect(summaryOf(events).awaitingInput).toBeUndefined();
 		expect(
 			toolUpdatesOf(events).filter((u) => u.subtype === MessageToolUpdateType.Error)
 		).toHaveLength(1);
+	});
+
+	it("streams a finished builtin's result and extra updates, and collates in call order", async () => {
+		const planBuiltin: BuiltinTool = {
+			name: "update_plan",
+			definition: { type: "function", function: { name: "update_plan" } },
+			execute: async (_args, ctx) => ({
+				resultText: "PLAN (v1 — 0/1 done)",
+				extraUpdates: [
+					{
+						type: MessageUpdateType.Plan,
+						uuid: ctx.uuid,
+						goal: "ship it",
+						steps: [{ step: "do the thing", status: "pending" }],
+						version: 1,
+					},
+				],
+			}),
+		};
+		const events = await drain(
+			[CALL, { id: "call_plan", name: "update_plan", arguments: '{"goal":"ship it"}' }],
+			CHAT,
+			[planBuiltin]
+		);
+
+		expect(mcpMock.callMcpTool).toHaveBeenCalledTimes(1);
+		const planUpdates = events.flatMap((e) =>
+			e.type === "update" && e.update.type === MessageUpdateType.Plan ? [e.update] : []
+		);
+		expect(planUpdates).toHaveLength(1);
+		expect(planUpdates[0]).toMatchObject({ goal: "ship it", version: 1 });
+
+		const results = toolUpdatesOf(events).filter((u) => u.subtype === MessageToolUpdateType.Result);
+		expect(results).toHaveLength(2);
+		// Original call order survives finish-order streaming.
+		expect(toolMessagesOf(events).map((m) => m.tool_call_id)).toEqual(["call_1", "call_plan"]);
+		expect(toolMessagesOf(events)[1].content).toBe("PLAN (v1 — 0/1 done)");
+	});
+
+	it("reports a builtin that throws as a failure instead of crashing the round", async () => {
+		const throwing: BuiltinTool = {
+			name: "update_plan",
+			definition: { type: "function", function: { name: "update_plan" } },
+			execute: async () => {
+				throw new Error("db down");
+			},
+		};
+		const events = await drain([{ id: "call_plan", name: "update_plan", arguments: "{}" }], CHAT, [
+			throwing,
+		]);
+
+		expect(toolMessagesOf(events)[0]).toEqual({
+			role: "tool",
+			tool_call_id: "call_plan",
+			content: "Error: db down",
+		});
 	});
 });
