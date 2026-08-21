@@ -24,15 +24,18 @@
 	import ToolCallsSummary from "./ToolCallsSummary.svelte";
 	import ArtifactCard from "./ArtifactCard.svelte";
 	import ElicitationForm from "./ElicitationForm.svelte";
+	import PlanCard from "./PlanCard.svelte";
 	import {
 		isMessageToolUpdate,
 		isMessageElicitationRequestUpdate,
 		isMessageElicitationResolvedUpdate,
+		isMessagePlanUpdate,
 	} from "$lib/utils/messageUpdates";
 	import {
 		MessageUpdateType,
 		type MessageToolUpdate,
 		type MessageElicitationResolvedUpdate,
+		type MessagePlanUpdate,
 	} from "$lib/types/MessageUpdate";
 	import type { ElicitationRequestPayload } from "$lib/types/McpElicitation";
 	import { page } from "$app/state";
@@ -163,7 +166,8 @@
 		| { type: "think"; content: string; closed: boolean }
 		| { type: "tool"; uuid: string; updates: MessageToolUpdate[] }
 		| { type: "artifact"; op: ArtifactOperation; opIndex: number }
-		| ElicitationBlock;
+		| ElicitationBlock
+		| { type: "plan"; update: MessagePlanUpdate };
 
 	type ToolBlock = Extract<Block, { type: "tool" }>;
 	type ProcessBlock = Extract<Block, { type: "think" } | { type: "tool" }>;
@@ -172,7 +176,8 @@
 		| { kind: "text"; content: string }
 		| { kind: "group"; blocks: ProcessBlock[]; toolCount: number }
 		| { kind: "artifact"; op: ArtifactOperation; opIndex: number }
-		| ({ kind: "elicitation" } & Omit<ElicitationBlock, "type">);
+		| ({ kind: "elicitation" } & Omit<ElicitationBlock, "type">)
+		| { kind: "plan"; update: MessagePlanUpdate };
 
 	// Expand any text block containing <think>…</think> into dedicated think blocks
 	// so reasoning can be grouped/collapsed separately from the answer text.
@@ -297,6 +302,16 @@
 						b.type === "elicitation" && b.request.elicitationId === update.elicitationId
 				);
 				if (target) target.resolved = update;
+			} else if (isMessagePlanUpdate(update)) {
+				// One live card per message: a later update supersedes the earlier card and
+				// takes its stream position, and the generic tool card for the same call
+				// gives way to the dedicated one (a failed call emits no Plan update, so
+				// its error card survives).
+				const toolIdx = res.findIndex((b) => b.type === "tool" && b.uuid === update.uuid);
+				if (toolIdx !== -1) res.splice(toolIdx, 1);
+				const planIdx = res.findIndex((b) => b.type === "plan");
+				if (planIdx !== -1) res.splice(planIdx, 1);
+				res.push({ type: "plan", update });
 			} else if (update.type === MessageUpdateType.FinalAnswer) {
 				sawFinalAnswer = true;
 				const finalText = update.text ?? "";
@@ -368,6 +383,10 @@
 					expiresAt: block.expiresAt,
 					resolved: block.resolved,
 				});
+			} else if (block.type === "plan") {
+				// Never folded into the collapsible summary: the plan stays visible.
+				flush();
+				units.push({ kind: "plan", update: block.update });
 			} else {
 				flush();
 				units.push({ kind: "text", content: block.content });
@@ -383,7 +402,13 @@
 	let isProcessStreaming = $derived.by(() => {
 		if (!isLast || !loading) return false;
 		const last = blocks.at(-1);
-		return !!last && (last.type === "think" || last.type === "tool" || last.type === "elicitation");
+		return (
+			!!last &&
+			(last.type === "think" ||
+				last.type === "tool" ||
+				last.type === "elicitation" ||
+				last.type === "plan")
+		);
 	});
 
 	$effect(() => {
@@ -455,7 +480,7 @@
 				{#if isProcessStreaming}
 					<!-- Streaming the thinking / tool phase: render every block flat and
 					     inline, exactly like today. Nesting kicks in once the answer starts. -->
-					{#each blocks as block, blockIndex (block.type === "tool" ? `tool-${block.uuid}-${blockIndex}` : `block-${blockIndex}`)}
+					{#each blocks as block, blockIndex (block.type === "tool" ? `tool-${block.uuid}-${blockIndex}` : block.type === "plan" ? `plan-${block.update.version}` : `block-${blockIndex}`)}
 						{#if block.type === "text"}
 							{#if block.content.trim().length > 0}
 								<div class={proseClasses}>
@@ -473,6 +498,10 @@
 									resolved={block.resolved}
 								/>
 							</div>
+						{:else if block.type === "plan"}
+							<div data-exclude-from-copy>
+								<PlanCard update={block.update} />
+							</div>
 						{:else}
 							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
 								{#if block.type === "think"}
@@ -488,7 +517,7 @@
 					{/each}
 				{:else}
 					<!-- Answer started or generation finished: nest the process blocks. -->
-					{#each renderUnits as unit, unitIndex (`${unit.kind}-${unitIndex}`)}
+					{#each renderUnits as unit, unitIndex (unit.kind === "plan" ? `plan-${unit.update.version}` : `${unit.kind}-${unitIndex}`)}
 						{#if unit.kind === "text"}
 							{#if isLast && loading && unit.content.length === 0}
 								<IconLoading classNames="loading inline ml-2 first:ml-0" />
@@ -507,6 +536,10 @@
 									expiresAt={unit.expiresAt}
 									resolved={unit.resolved}
 								/>
+							</div>
+						{:else if unit.kind === "plan"}
+							<div data-exclude-from-copy>
+								<PlanCard update={unit.update} />
 							</div>
 						{:else if unit.kind === "group"}
 							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
