@@ -4,6 +4,7 @@ import { logger } from "$lib/server/logger";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { Conversation } from "$lib/types/Conversation";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
+import { stripThink } from "$lib/utils/stripThink";
 
 export async function* generateTitleForConversation(
 	conv: Conversation,
@@ -69,7 +70,11 @@ Return only the title text.`,
 	)
 		.then((summary) => {
 			const firstFive = prompt.split(/\s+/g).slice(0, 5).join(" ");
-			const trimmed = String(summary ?? "").trim();
+			// Reasoning models can spend the whole `max_tokens` budget thinking, which
+			// leaves an unterminated `<think>` block and no title after it. Strip the
+			// trace so that truncated reasoning falls back to the first five words
+			// instead of being shown to the user as their chat title.
+			const trimmed = stripThink(String(summary ?? ""));
 			// Fallback: if empty, return first five words only (no emoji)
 			return trimmed || firstFive;
 		})
@@ -80,4 +85,4 @@ Return only the title text.`,
 		});
 }
 
-// No post-processing: rely solely on prompt instructions above
+// Beyond stripping reasoning traces, no post-processing: rely on prompt instructions above
