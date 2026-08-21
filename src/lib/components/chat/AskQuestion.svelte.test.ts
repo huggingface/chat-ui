@@ -106,7 +106,6 @@ describe("a question from the assistant", () => {
 
 	it("moves on by itself once a single-answer question is answered", async () => {
 		const { baseElement } = mount([ask("q1", "Which database?"), ask("q2", "Which host?")]);
-		// Nothing to press: the click is the whole interaction.
 		expect(button(baseElement, "Next")).toBeUndefined();
 
 		rowFor(baseElement, "Postgres")?.click();
@@ -129,7 +128,6 @@ describe("a question from the assistant", () => {
 		const { baseElement } = mount([ask("q1", "Which database?")]);
 		rowFor(baseElement, "Postgres")?.click();
 
-		// Sending is the user's own act, so a click on the last question only chooses.
 		await new Promise((resolve) => setTimeout(resolve, 50));
 		expect(sent).toHaveLength(0);
 		expect(button(baseElement, "Send")).toBeDefined();
@@ -142,7 +140,6 @@ describe("a question from the assistant", () => {
 		]);
 		rowFor(baseElement, "Postgres")?.click();
 
-		// More may follow, so it waits to be told the answer is complete.
 		await vi.waitFor(() => expect(button(baseElement, "Next")).toBeDefined());
 		expect(baseElement.textContent).toContain("Which databases?");
 
@@ -189,8 +186,7 @@ describe("a question from the assistant", () => {
 		const barHeight = () =>
 			(baseElement.querySelector("div.mt-2.flex") as HTMLElement).getBoundingClientRect().height;
 
-		// Send is taller than Skip, so without a floor the panel grows on the last question
-		// and everything above it shifts as the user moves through.
+		// Send is taller than Skip, so without a floor the panel grows on the last question.
 		const withSkipAlone = barHeight();
 		rowFor(baseElement, "Postgres")?.click();
 		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which host?"));

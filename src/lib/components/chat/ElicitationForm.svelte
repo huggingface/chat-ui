@@ -63,11 +63,7 @@
 	let outcome = $derived(resolved?.action ?? submitted);
 	let expired = $derived(!outcome && expiresAt !== undefined && now >= expiresAt);
 	let open = $derived(!outcome && !expired);
-	/**
-	 * The model's own question is a decision the run is waiting on, so it is handed to the
-	 * composer instead of being drawn here. Answering it settles the same collapsed row an
-	 * MCP prompt leaves behind, which this component still renders.
-	 */
+	/** Drawn by the composer instead; this component still renders the settled row. */
 	let liftedToComposer = $derived(open && request.source === "assistant");
 
 	$effect(() => {
@@ -158,7 +154,6 @@
 	const otherPicked = (field: ElicitationField) =>
 		field.kind === "select" &&
 		(field.multiple ? isPicked(field.name, OTHER) : values[field.name] === OTHER);
-	/** The typed value replaces the marker; an empty one is not an answer at all. */
 	const resolveOther = (name: string, value: string) =>
 		value === OTHER ? (otherText[name] ?? "").trim() : value;
 

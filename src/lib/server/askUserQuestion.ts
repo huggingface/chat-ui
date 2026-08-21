@@ -6,7 +6,6 @@ import type { ElicitationField, ElicitationRequestPayload } from "$lib/types/Mcp
 import type { ElicitationSink } from "$lib/server/mcp/elicitation";
 import { MessageElicitationUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 
-/** Mirrors the harness tools people already know; a wider form belongs to MCP elicitation. */
 const MAX_QUESTIONS = 4;
 const MAX_OPTIONS = 4;
 const MIN_OPTIONS = 2;
@@ -14,10 +13,6 @@ const MAX_HEADER_CHARS = 12;
 
 export const ASK_USER_QUESTION_TOOL_NAME = "ask_user_question";
 
-/**
- * Declared to the model alongside the MCP tools. Kept deliberately narrow: anything a free
- * text answer would suit is better asked in the reply, where it costs no round trip.
- */
 export const askUserQuestionTool = {
 	type: "function" as const,
 	function: {
@@ -151,7 +146,6 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 	};
 }
 
-/** What the model is handed once the user has chosen. */
 export function answerToToolResult(
 	payload: ElicitationRequestPayload,
 	action: "accept" | "decline" | "cancel",
@@ -170,10 +164,7 @@ export function answerToToolResult(
 	return `The user answered:\n\n${answered.join("\n\n")}`;
 }
 
-/**
- * Record the question and show it. Returns without waiting: nothing is holding the run
- * open, so the answer arrives on a later request and continues the call then.
- */
+/** Returns without waiting: nothing holds the run open, so the answer arrives later. */
 export async function openAskPrompt({
 	sink,
 	toolUuid,

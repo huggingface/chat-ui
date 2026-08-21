@@ -2,10 +2,7 @@ import { base } from "$app/paths";
 import { elicitationToResume } from "$lib/stores/elicitationResume";
 import type { ElicitationAction, ElicitationValue } from "$lib/types/McpElicitation";
 
-/**
- * Shared by the in-stream form and the question shown over the composer, so both settle a
- * prompt the same way and neither can forget to ask for the parked run to be continued.
- */
+/** Shared, so neither answer path can forget to ask for the parked run to be continued. */
 export async function sendElicitationAnswer({
 	conversationId,
 	elicitationId,

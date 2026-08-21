@@ -309,9 +309,7 @@ export function validateElicitationContent(
 			}
 			case "select": {
 				const allowed = new Set(field.options.map((o) => o.value));
-				// An "Other" answer is typed, so it is the one select value that is not on the
-				// list — one, not several, and not whitespace standing in for an answer.
-				// Bounded here because nothing upstream constrains what was typed.
+				// The one value not on the list, bounded because nothing upstream constrains it.
 				const isOther = (v: string) =>
 					field.allowOther === true && v.trim().length > 0 && v.length <= MAX_OTHER_CHARS;
 				const permitted = (v: string) => allowed.has(v) || isOther(v);
@@ -327,8 +325,7 @@ export function validateElicitationContent(
 						if (!permitted(v))
 							return { ok: false, error: `"${field.name}" has an unknown option.` };
 					}
-					// The form offers one "Other" box, so more than one off-list value did not
-					// come from it.
+					// The form offers one box, so a second off-list value did not come from it.
 					if (picked.filter((v) => !allowed.has(v)).length > 1) {
 						return { ok: false, error: `"${field.name}" has more than one typed answer.` };
 					}

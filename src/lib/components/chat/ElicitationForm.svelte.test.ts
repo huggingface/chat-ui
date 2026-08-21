@@ -231,7 +231,6 @@ describe("a question the model asked", () => {
 			request: askRequest(),
 		});
 
-		// Nothing of the form itself: the composer draws it.
 		expect(baseElement.querySelector("select")).toBeNull();
 		expect(baseElement.textContent).not.toContain("Where should uploads go?");
 		await vi.waitFor(() =>
@@ -264,11 +263,8 @@ describe("a question the model asked", () => {
 		render(ElicitationForm, { conversationId: "abc", request: second });
 
 		await vi.waitFor(() => expect(get(pendingQuestions)).toHaveLength(2));
-		// Oldest first: the composer works through them in the order they were asked.
 		expect(get(pendingQuestions)[0].request.elicitationId).toBe(first.elicitationId);
 
-		// Settling the newer one must not take the older one's slot with it, or it could
-		// never be answered and its tool call would never get a result.
 		unregisterQuestion(second.elicitationId);
 		expect(get(pendingQuestions)).toHaveLength(1);
 		expect(get(pendingQuestions)[0].request.elicitationId).toBe(first.elicitationId);

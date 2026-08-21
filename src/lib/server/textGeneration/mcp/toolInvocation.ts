@@ -278,9 +278,8 @@ export async function* executeToolCalls({
 		}
 
 		if (p.call.name === ASK_USER_QUESTION_TOOL_NAME) {
-			// One round parks on one prompt, so a second question asked beside it would never
-			// be shown and its call would never get a result — which providers reject on the
-			// next turn. One call carries several questions, so say that instead.
+			// A round parks on one prompt, so a second would never be shown and its call would
+			// never get a result — which providers reject on the next turn.
 			if (askIndex(p) > 0) {
 				const message =
 					"Only one ask_user_question call can be answered per turn. " +
@@ -311,8 +310,7 @@ export async function* executeToolCalls({
 				return;
 			}
 
-			// Answering it is the only way this call finishes, so a question that cannot be
-			// shown has to come back as an error rather than a silent skip.
+			// Answering is the only way this call finishes, so a silent skip would hang it.
 			const message = `The question could not be shown (${opened.reason}).`;
 			results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
 			updatesQueue.push({
