@@ -11,7 +11,7 @@
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import BlockWrapper from "./BlockWrapper.svelte";
 	import { sendElicitationAnswer } from "$lib/utils/sendElicitationAnswer";
-	import { pendingQuestion } from "$lib/stores/pendingQuestion";
+	import { registerQuestion, unregisterQuestion } from "$lib/stores/pendingQuestion";
 	import { forDateInput } from "$lib/utils/elicitationDate";
 
 	interface Props {
@@ -72,10 +72,10 @@
 
 	$effect(() => {
 		if (!liftedToComposer) return;
-		pendingQuestion.set({ conversationId, request });
-		// Cleared on settling and on unmount, so switching conversations cannot leave a
+		registerQuestion(conversationId, request);
+		// Removed on settling and on unmount, so switching conversations cannot leave a
 		// question hanging over a chat it was never asked in.
-		return () => pendingQuestion.set(null);
+		return () => unregisterQuestion(request.elicitationId);
 	});
 
 	$effect(() => {

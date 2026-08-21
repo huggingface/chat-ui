@@ -7,7 +7,7 @@
 		ElicitationValue,
 	} from "$lib/types/McpElicitation";
 	import { sendElicitationAnswer } from "$lib/utils/sendElicitationAnswer";
-	import { pendingQuestion } from "$lib/stores/pendingQuestion";
+	import { unregisterQuestion } from "$lib/stores/pendingQuestion";
 
 	interface Props {
 		conversationId: string;
@@ -102,7 +102,8 @@
 			return;
 		}
 		// The transcript shows the settled row from here; nothing is waiting on this panel.
-		pendingQuestion.set(null);
+		// Only this question: another may still be open behind it.
+		unregisterQuestion(request.elicitationId);
 	}
 
 	const rowClass =
