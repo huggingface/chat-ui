@@ -102,7 +102,6 @@ describe("the result handed back to the model", () => {
 	});
 
 	it("tells the model to carry on when nobody answered", () => {
-		// Otherwise the run stalls on a question the user has already waved away.
 		expect(answerToToolResult(payload, "decline")).toMatch(/best judgement/);
 		expect(answerToToolResult(payload, "cancel")).toMatch(/best judgement/);
 	});

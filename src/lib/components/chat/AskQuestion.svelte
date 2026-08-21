@@ -18,7 +18,6 @@
 
 	const fields = $derived(request.fields ?? []);
 
-	/** Asked one at a time; a wall of questions is a form, which is what this is not. */
 	let step = $state(0);
 	let picks = $state<Record<string, string[]>>({});
 	let otherText = $state<Record<string, string>>({});
@@ -30,10 +29,7 @@
 	/** Every question normalizes to a select; anything else is not one of ours to draw. */
 	let select = $derived(field?.kind === "select" ? field : undefined);
 	let isLast = $derived(step === fields.length - 1);
-	/**
-	 * Picking one answer advances on its own, so Next is only for the questions a single
-	 * click cannot finish: several answers, or one being typed.
-	 */
+	/** Only for questions a click cannot finish: several answers, or one being typed. */
 	let needsNext = $derived(
 		!isLast && select !== undefined && (select.multiple || showOther[select.name] === true)
 	);
@@ -48,13 +44,10 @@
 				: [...current, value]
 			: [value];
 		picks = { ...picks, [f.name]: next };
-		// A single-pick question is answered the moment it is clicked, so picking one
-		// clears any typed answer rather than leaving both showing as chosen.
+		// Or a typed answer would still show as chosen beside the picked one.
 		if (!multiple) showOther = { ...showOther, [f.name]: false };
 		error = null;
-		// One answer means the click was the whole interaction, so move on — including
-		// when an earlier answer is being changed. Never off the last question: sending
-		// is always the user's own act.
+		// Never off the last question: sending is the user's own act.
 		if (!multiple && !isLast) step += 1;
 	}
 
@@ -66,7 +59,6 @@
 		error = null;
 	}
 
-	/** The typed answer stands in for a picked one, so an empty box is not an answer. */
 	const answerFor = (f: ElicitationField): string[] => {
 		const typed = showOther[f.name] ? (otherText[f.name] ?? "").trim() : "";
 		return typed ? [...chosen(f.name), typed] : chosen(f.name);
@@ -112,7 +104,6 @@
 			error = result.error;
 			return;
 		}
-		// The transcript shows the settled row from here; nothing is waiting on this panel.
 		// Only this question: another may still be open behind it.
 		unregisterQuestion(request.elicitationId);
 	}
@@ -140,8 +131,6 @@
 			{/if}
 		</div>
 
-		<!-- Bracketed rather than boxed: the rows need something to sit against, but a
-		     border each puts a box inside the panel's box again. -->
 		<div class="flex flex-col gap-1.5 border-y border-gray-200 py-2 dark:border-gray-700">
 			{#each select.options as option (option.value)}
 				{@const picked = chosen(select.name).includes(option.value)}

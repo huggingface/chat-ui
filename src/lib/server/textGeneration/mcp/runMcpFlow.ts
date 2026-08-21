@@ -333,9 +333,8 @@ export async function* runMcpFlow({
 		const { tools: mcpTools, mapping } = await getOpenAiToolsForMcp(servers, {
 			signal: abortSignal,
 		});
-		// Offered alongside the MCP tools rather than on its own, so this flow still engages
-		// only when there are real tools to run. A conversation with no MCP server keeps the
-		// plain generation path it has always taken.
+		// Alongside the MCP tools, never on its own: a conversation with no MCP server keeps
+		// the plain generation path it has always taken.
 		const oaTools =
 			mcpTools.length > 0 && config.DISABLE_ASK_USER_QUESTION !== "true"
 				? [...mcpTools, askUserQuestionTool]

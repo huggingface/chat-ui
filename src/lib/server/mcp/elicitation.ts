@@ -306,8 +306,6 @@ export async function submitElicitationAnswer({
 	);
 	if (updated.matchedCount === 0) return { ok: false, status: 409, error: "Already answered." };
 
-	// The turn that asked, so the client streams the continuation into it rather than into
-	// whatever it currently has last.
 	return {
 		ok: true,
 		resume: doc.pending !== undefined,
@@ -404,11 +402,7 @@ export async function takeResumableElicitation(
 	};
 }
 
-/**
- * Which assistant turn a parked call belongs to. Recorded when the prompt was opened, so it
- * survives anything the user does in the meantime — the client's idea of the last message
- * is not the parked one once another turn has been sent since.
- */
+/** Recorded when the prompt opened, so it survives whatever the user does meanwhile. */
 export async function parkedMessageId(
 	conversationId: ObjectId,
 	elicitationId: string

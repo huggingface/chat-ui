@@ -2,7 +2,6 @@ import type { ObjectId } from "mongodb";
 import type { Conversation } from "./Conversation";
 import type { Timestamps } from "./Timestamps";
 
-/** How much typed text an "Other" answer may carry. */
 export const MAX_OTHER_CHARS = 200;
 
 /** Normalized from MCP's `PrimitiveSchemaDefinition`, which spells a select box six ways. */
@@ -87,7 +86,6 @@ export interface McpElicitation extends Timestamps {
 	/** Absent for a 2026-era prompt: nothing is waiting, so nothing expires. */
 	expiresAt?: Date;
 	resolvedAt?: Date;
-	/** Everything needed to continue the tool call once answered. */
 	pending?: PendingCall;
 }
 

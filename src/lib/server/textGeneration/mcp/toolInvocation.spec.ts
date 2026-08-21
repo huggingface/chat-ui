@@ -255,7 +255,6 @@ describe("the model asking the user a question", () => {
 		askMock.openAskPrompt.mockResolvedValue({ opened: false, reason: "no questions were given" });
 		const events = await drain([ASK], CHAT);
 
-		// Answering it is the only way the call finishes, so the model has to be told.
 		expect(summaryOf(events).awaitingInput).toBeUndefined();
 		const errors = toolUpdatesOf(events).filter((u) => u.subtype === MessageToolUpdateType.Error);
 		expect(errors).toHaveLength(1);
@@ -268,8 +267,6 @@ describe("the model asking the user a question", () => {
 		const second: NormalizedToolCall = { ...ASK, id: "call_ask_2" };
 		const events = await drain([ASK, second], CHAT);
 
-		// The second call would never be shown, and a tool call with no result gets the
-		// next turn rejected by the provider.
 		expect(askMock.openAskPrompt).toHaveBeenCalledTimes(1);
 		expect(summaryOf(events).awaitingInput).toBe(true);
 

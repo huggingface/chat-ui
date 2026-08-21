@@ -264,7 +264,6 @@ describe("resuming the model's own question", () => {
 			extraServers: SERVERS,
 		});
 
-		// The answer is the result; there is no call to re-issue.
 		expect(calls.seen).toHaveLength(0);
 		expect(outcome).toMatchObject({ resumed: true });
 		expect(outcome.parkedAgain).toBeUndefined();
