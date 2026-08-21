@@ -20,6 +20,7 @@ export type GETModelsResponse = Array<{
 	supportsTools: boolean;
 	supportsReasoning: boolean;
 	supportsArtifacts: boolean;
+	supportsPlanning: boolean;
 	unlisted: boolean;
 	hasInferenceAPI: boolean;
 	isRouter: boolean;

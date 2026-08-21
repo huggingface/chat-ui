@@ -41,6 +41,7 @@ export type RunMcpFlowContext = Pick<
 	| "provider"
 	| "reasoningEffort"
 	| "reasoningOverride"
+	| "planningOverride"
 	| "locals"
 	| "generationId"
 	| "messageId"
@@ -71,6 +72,7 @@ export async function* runMcpFlow({
 	provider,
 	reasoningEffort,
 	reasoningOverride,
+	planningOverride,
 	locals,
 	generationId,
 	messageId,
@@ -105,6 +107,7 @@ export async function* runMcpFlow({
 			isRouter?: boolean;
 		},
 		conv,
+		planningOverride,
 	});
 
 	// Start from env-configured servers

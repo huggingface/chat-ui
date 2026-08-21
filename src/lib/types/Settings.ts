@@ -44,6 +44,13 @@ export interface Settings extends Timestamps {
 	artifactsOverrides?: Record<string, boolean>;
 
 	/**
+	 * Per-model planning toggle. Overrides the model's resolved planning
+	 * default (supportsPlanning, else PLANNING_ENABLED + tool support) in both
+	 * directions.
+	 */
+	planningOverrides?: Record<string, boolean>;
+
+	/**
 	 * Per-model toggle to hide Omni prompt suggestions shown near the composer.
 	 * When set to `true`, prompt examples for that model are suppressed.
 	 */
@@ -100,6 +107,7 @@ export const DEFAULT_SETTINGS = {
 	multimodalOverrides: {},
 	toolsOverrides: {},
 	artifactsOverrides: {},
+	planningOverrides: {},
 	hidePromptExamples: {},
 	providerOverrides: {},
 	reasoningEffortOverrides: {},

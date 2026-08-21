@@ -76,6 +76,21 @@ describe("getEnabledBuiltinTools", () => {
 		);
 		expect(toolNames({ supportsTools: false, supportsPlanning: true })).toContain("update_plan");
 	});
+
+	it("lets the user's per-model setting beat the resolved default in both directions", () => {
+		mocks.planningEnabled = "true";
+		const names = (
+			model: Parameters<typeof getEnabledBuiltinTools>[0]["model"],
+			override: boolean
+		) =>
+			getEnabledBuiltinTools({ model, conv: conv(), planningOverride: override }).map(
+				(tool) => tool.name
+			);
+		expect(names({ supportsTools: true }, false)).not.toContain("update_plan");
+		expect(names({ supportsTools: true, supportsPlanning: false }, true)).toContain("update_plan");
+		mocks.planningEnabled = undefined;
+		expect(names({}, true)).toContain("update_plan");
+	});
 });
 
 describe("shouldSkipMcpFlow", () => {

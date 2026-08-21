@@ -92,6 +92,16 @@
 		}));
 	}
 
+	function getPlanningOverride() {
+		return $settings.planningOverrides?.[modelId] ?? Boolean(model?.supportsPlanning);
+	}
+	function setPlanningOverride(v: boolean) {
+		settings.update((s) => ({
+			...s,
+			planningOverrides: { ...s.planningOverrides, [modelId]: v },
+		}));
+	}
+
 	function getCustomPrompt() {
 		return $settings.customPrompts?.[modelId] ?? "";
 	}
@@ -416,6 +426,28 @@
 						<Switch
 							name="artifactsOverride"
 							bind:checked={getArtifactsOverride, setArtifactsOverride}
+						/>
+					</div>
+
+					<div class="flex items-start justify-between py-3">
+						<div>
+							<div
+								class="flex items-center gap-1.5 text-[13px] font-medium text-gray-800 dark:text-gray-200"
+							>
+								Planning
+								<span
+									class="rounded-full bg-gray-100 px-1.5 py-px text-[10px] font-semibold text-gray-500 uppercase dark:bg-gray-700 dark:text-gray-400"
+								>
+									Beta
+								</span>
+							</div>
+							<p class="text-[12px] text-gray-500 dark:text-gray-400">
+								Let the model keep a visible task plan for complex, multi-step work.
+							</p>
+						</div>
+						<Switch
+							name="planningOverride"
+							bind:checked={getPlanningOverride, setPlanningOverride}
 						/>
 					</div>
 

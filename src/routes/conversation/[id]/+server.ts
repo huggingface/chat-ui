@@ -759,6 +759,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					// Artifacts aren't provider-determined, so the per-model user
 					// override applies on HuggingChat too
 					artifactsOverride: userSettings?.artifactsOverrides?.[model.id],
+					// Planning follows the same rule as artifacts
+					planningOverride: userSettings?.planningOverrides?.[model.id],
 					locals,
 					abortController: ctrl,
 					generationId: effectiveGenerationId,
