@@ -24,6 +24,12 @@ const mocks = vi.hoisted(() => ({
 	create: vi.fn(),
 	executeToolCalls: vi.fn(),
 	getAbortTime: vi.fn(() => undefined as number | undefined),
+	// Mutable so a test can strip the MCP tools or pull the tool's kill switch.
+	mcpTools: [{ type: "function", function: { name: "do_thing" } }] as Array<{
+		type: string;
+		function: { name: string };
+	}>,
+	disableAsk: undefined as string | undefined,
 }));
 
 vi.mock("openai", () => ({
@@ -41,6 +47,9 @@ vi.mock("$lib/server/config", () => ({
 		EXA_API_KEY: "",
 		USE_USER_TOKEN: "false",
 		isHuggingChat: false,
+		get DISABLE_ASK_USER_QUESTION() {
+			return mocks.disableAsk;
+		},
 	},
 }));
 
@@ -52,7 +61,7 @@ vi.mock("$lib/server/urlSafety", () => ({ isValidUrl: () => true }));
 
 vi.mock("$lib/server/mcp/tools", () => ({
 	getOpenAiToolsForMcp: async () => ({
-		tools: [{ type: "function", function: { name: "do_thing" } }],
+		tools: mocks.mcpTools,
 		mapping: { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } },
 	}),
 }));
@@ -204,6 +213,8 @@ beforeEach(() => {
 	mocks.create.mockReset();
 	mocks.executeToolCalls.mockReset();
 	mocks.getAbortTime.mockReset();
+	mocks.mcpTools = [{ type: "function", function: { name: "do_thing" } }];
+	mocks.disableAsk = undefined;
 	mocks.getAbortTime.mockReturnValue(undefined);
 	scriptToolResults();
 });
@@ -413,5 +424,36 @@ describe("runMcpFlow in-loop reasoning echo", () => {
 
 		const message = toolCallMessage(1);
 		expect(message && "reasoning_content" in message).toBe(false);
+	});
+});
+
+describe("runMcpFlow offering the question tool", () => {
+	const toolNames = () =>
+		(
+			(mocks.create.mock.calls[0]?.[0] as { tools?: Array<{ function: { name: string } }> })
+				?.tools ?? []
+		).map((t) => t.function.name);
+
+	it("offers it alongside the MCP tools", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow();
+		expect(toolNames()).toContain("ask_user_question");
+	});
+
+	it("withdraws it when the kill switch is set", async () => {
+		mocks.disableAsk = "true";
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow();
+		expect(toolNames()).toEqual(["do_thing"]);
+	});
+
+	it("does not engage the flow on its own when no MCP tool exists", async () => {
+		// Offering it to every conversation would put the tool-calling path in front of
+		// people who have configured nothing.
+		mocks.mcpTools = [];
+		scriptRounds([{ content: "the answer" }]);
+		const { result } = await runFlow();
+		expect(result).toBe("not_applicable");
+		expect(mocks.create).not.toHaveBeenCalled();
 	});
 });

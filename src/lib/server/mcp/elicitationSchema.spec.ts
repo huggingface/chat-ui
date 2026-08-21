@@ -1,3 +1,4 @@
+import { MAX_OTHER_CHARS } from "$lib/types/McpElicitation";
 import { describe, it, expect } from "vitest";
 import { normalizeElicitationRequest, validateElicitationContent } from "./elicitationSchema";
 import type { ElicitationField } from "$lib/types/McpElicitation";
@@ -280,5 +281,61 @@ describe("validateElicitationContent", () => {
 
 	it("rejects an answer that is not an object", () => {
 		expect(validateElicitationContent(fields, "Ada")).toMatchObject({ ok: false });
+	});
+});
+
+describe('an answer typed into "Other"', () => {
+	const field = (over: Record<string, unknown> = {}) => [
+		{
+			kind: "select" as const,
+			name: "pick",
+			required: true,
+			multiple: false,
+			options: [
+				{ value: "a", label: "A" },
+				{ value: "b", label: "B" },
+			],
+			...over,
+		},
+	];
+
+	it("is accepted only when the field offers one", () => {
+		expect(validateElicitationContent(field({ allowOther: true }), { pick: "mine" })).toMatchObject(
+			{
+				ok: true,
+				content: { pick: "mine" },
+			}
+		);
+		expect(validateElicitationContent(field(), { pick: "mine" })).toMatchObject({ ok: false });
+	});
+
+	it("is bounded, since nothing upstream constrains what was typed", () => {
+		const long = "x".repeat(MAX_OTHER_CHARS + 1);
+		expect(validateElicitationContent(field({ allowOther: true }), { pick: long })).toMatchObject({
+			ok: false,
+		});
+	});
+
+	it("is not whitespace standing in for an answer", () => {
+		expect(validateElicitationContent(field({ allowOther: true }), { pick: "   " })).toMatchObject({
+			ok: false,
+		});
+	});
+
+	it("is one typed answer, not a way past the option list", () => {
+		// The form offers a single box, so a crafted request is the only way to send two.
+		expect(
+			validateElicitationContent(field({ allowOther: true, multiple: true }), {
+				pick: ["mine", "also mine"],
+			})
+		).toMatchObject({ ok: false });
+	});
+
+	it("sits alongside picked options in a multi-select", () => {
+		expect(
+			validateElicitationContent(field({ allowOther: true, multiple: true }), {
+				pick: ["a", "something else"],
+			})
+		).toMatchObject({ ok: true, content: { pick: ["a", "something else"] } });
 	});
 });

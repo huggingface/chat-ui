@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { ObjectId } from "mongodb";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { parseToolArguments } from "./toolArgs";
@@ -19,6 +20,13 @@ vi.mock("$lib/server/mcp/clientPool", () => ({
 	getClient: vi.fn(async () => ({})),
 }));
 
+// Stubbed so the dispatch decision is what is under test, not the database write behind it.
+const askMock = vi.hoisted(() => ({ openAskPrompt: vi.fn() }));
+vi.mock("$lib/server/askUserQuestion", () => ({
+	ASK_USER_QUESTION_TOOL_NAME: "ask_user_question",
+	openAskPrompt: askMock.openAskPrompt,
+}));
+
 vi.mock("../../logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -36,7 +44,10 @@ const toPrimitive = (value: unknown) =>
 
 const processToolOutput = (text: string) => ({ annotated: text, sources: [] });
 
-async function drain(calls: NormalizedToolCall[]) {
+async function drain(
+	calls: NormalizedToolCall[],
+	elicitation?: { conversationId: ObjectId; generationId?: string; messageId?: string }
+) {
 	const events = [];
 	for await (const event of executeToolCalls({
 		calls,
@@ -45,6 +56,7 @@ async function drain(calls: NormalizedToolCall[]) {
 		parseArgs: parseToolArguments,
 		toPrimitive,
 		processToolOutput,
+		...(elicitation ? { elicitation } : {}),
 	})) {
 		events.push(event);
 	}
@@ -77,6 +89,8 @@ function mcpResult(overrides: Partial<McpToolTextResponse>): McpToolTextResponse
 
 beforeEach(() => {
 	mcpMock.callMcpTool.mockReset();
+	askMock.openAskPrompt.mockReset();
+	askMock.openAskPrompt.mockResolvedValue({ opened: true });
 	mcpMock.callMcpTool.mockResolvedValue(mcpResult({ text: "ok" }));
 });
 
@@ -212,5 +226,64 @@ describe("isValidJsonObject", () => {
 		expect(isValidJsonObject("null")).toBe(false);
 		expect(isValidJsonObject('"a string"')).toBe(false);
 		expect(isValidJsonObject("42")).toBe(false);
+	});
+});
+
+describe("the model asking the user a question", () => {
+	const ASK: NormalizedToolCall = {
+		id: "call_ask",
+		name: "ask_user_question",
+		arguments:
+			'{"questions":[{"question":"Which?","header":"Which","multiSelect":false,"options":[]}]}',
+	};
+	const CHAT = { conversationId: new ObjectId(), messageId: "m1" };
+
+	it("parks the run instead of looking for a server to call", async () => {
+		const events = await drain([ASK], CHAT);
+
+		expect(mcpMock.callMcpTool).not.toHaveBeenCalled();
+		expect(summaryOf(events).awaitingInput).toBe(true);
+		expect(askMock.openAskPrompt).toHaveBeenCalledTimes(1);
+		expect(askMock.openAskPrompt.mock.calls[0][0]).toMatchObject({
+			toolCallId: "call_ask",
+			messageId: "m1",
+			args: { questions: [{ question: "Which?" }] },
+		});
+	});
+
+	it("is an error, not a silent skip, when the question cannot be shown", async () => {
+		askMock.openAskPrompt.mockResolvedValue({ opened: false, reason: "no questions were given" });
+		const events = await drain([ASK], CHAT);
+
+		expect(summaryOf(events).awaitingInput).toBeUndefined();
+		const errors = toolUpdatesOf(events).filter((u) => u.subtype === MessageToolUpdateType.Error);
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toMatchObject({
+			message: expect.stringContaining("no questions were given"),
+		});
+	});
+
+	it("takes only one question per round, and tells the model why", async () => {
+		const second: NormalizedToolCall = { ...ASK, id: "call_ask_2" };
+		const events = await drain([ASK, second], CHAT);
+
+		expect(askMock.openAskPrompt).toHaveBeenCalledTimes(1);
+		expect(summaryOf(events).awaitingInput).toBe(true);
+
+		const errors = toolUpdatesOf(events).filter((u) => u.subtype === MessageToolUpdateType.Error);
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toMatchObject({
+			message: expect.stringContaining("single call's `questions` array"),
+		});
+	});
+
+	it("has nowhere to ask when there is no chat behind the call", async () => {
+		const events = await drain([ASK]);
+
+		expect(askMock.openAskPrompt).not.toHaveBeenCalled();
+		expect(summaryOf(events).awaitingInput).toBeUndefined();
+		expect(
+			toolUpdatesOf(events).filter((u) => u.subtype === MessageToolUpdateType.Error)
+		).toHaveLength(1);
 	});
 });

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { MAX_OTHER_CHARS } from "$lib/types/McpElicitation";
 	import type {
 		ElicitationAction,
 		ElicitationField,
@@ -6,11 +7,11 @@
 		ElicitationValue,
 	} from "$lib/types/McpElicitation";
 	import type { MessageElicitationResolvedUpdate } from "$lib/types/MessageUpdate";
-	import { base } from "$app/paths";
 	import CarbonLaunch from "~icons/carbon/launch";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import BlockWrapper from "./BlockWrapper.svelte";
-	import { elicitationToResume } from "$lib/stores/elicitationResume";
+	import { sendElicitationAnswer } from "$lib/utils/sendElicitationAnswer";
+	import { registerQuestion, unregisterQuestion } from "$lib/stores/pendingQuestion";
 	import { forDateInput } from "$lib/utils/elicitationDate";
 
 	interface Props {
@@ -62,6 +63,16 @@
 	let outcome = $derived(resolved?.action ?? submitted);
 	let expired = $derived(!outcome && expiresAt !== undefined && now >= expiresAt);
 	let open = $derived(!outcome && !expired);
+	/** Drawn by the composer instead; this component still renders the settled row. */
+	let liftedToComposer = $derived(open && request.source === "assistant");
+
+	$effect(() => {
+		if (!liftedToComposer) return;
+		registerQuestion(conversationId, request);
+		// Removed on settling and on unmount, so switching conversations cannot leave a
+		// question hanging over a chat it was never asked in.
+		return () => unregisterQuestion(request.elicitationId);
+	});
 
 	$effect(() => {
 		if (!open || expiresAt === undefined) return;
@@ -137,6 +148,20 @@
 		return Array.isArray(value) && value.includes(option);
 	};
 
+	/** A control character, so it can never collide with a label the model or a server sent. */
+	const OTHER = "\u0000other";
+	let otherText = $state<Record<string, string>>({});
+	const otherPicked = (field: ElicitationField) =>
+		field.kind === "select" &&
+		(field.multiple ? isPicked(field.name, OTHER) : values[field.name] === OTHER);
+	const resolveOther = (name: string, value: string) =>
+		value === OTHER ? (otherText[name] ?? "").trim() : value;
+
+	function setOtherText(name: string, text: string) {
+		otherText = { ...otherText, [name]: text };
+		touched = new Set(touched).add(name);
+	}
+
 	function set(name: string, value: ElicitationValue) {
 		values = { ...values, [name]: value };
 		touched = new Set(touched).add(name);
@@ -173,42 +198,46 @@
 				if (!Number.isNaN(parsed.getTime())) out[field.name] = parsed.toISOString();
 				continue;
 			}
+			if (field.kind === "select" && field.allowOther) {
+				if (Array.isArray(value)) {
+					const resolved = value.map((v) => resolveOther(field.name, v)).filter(Boolean);
+					if (resolved.length > 0) out[field.name] = resolved;
+					continue;
+				}
+				const resolved = resolveOther(field.name, String(value));
+				if (resolved) out[field.name] = resolved;
+				continue;
+			}
 			out[field.name] = value;
 		}
 		return out;
 	}
 
+	/** Submitting a blank "Other" would drop the answer silently, so stop before sending. */
+	function missingOtherText(): boolean {
+		return fields.some((field) => otherPicked(field) && !(otherText[field.name] ?? "").trim());
+	}
+
 	async function send(action: ElicitationAction) {
 		if (submitting || !open) return;
+		if (action === "accept" && missingOtherText()) {
+			error = "Tell us what you meant by “Other”, or pick one of the choices.";
+			return;
+		}
 		submitting = true;
 		error = null;
-		try {
-			const res = await fetch(`${base}/conversation/${conversationId}/elicitation`, {
-				method: "POST",
-				// Without Accept, SvelteKit answers `error()` with an HTML page.
-				headers: { "Content-Type": "application/json", Accept: "application/json" },
-				body: JSON.stringify({
-					elicitationId: request.elicitationId,
-					action,
-					...(action === "accept" && request.mode === "form" ? { content: payload() } : {}),
-				}),
-			});
-			const body = await res.json().catch(() => null);
-			if (!res.ok) {
-				error = typeof body?.message === "string" ? body.message : "Could not send your answer.";
-				return;
-			}
-			submitted = action;
-			// A parked call has nothing waiting on it, so answering only records the answer —
-			// the run that continues it has to be started.
-			if (body?.resume) {
-				elicitationToResume.set({ conversationId, elicitationId: request.elicitationId });
-			}
-		} catch {
-			error = "Could not send your answer.";
-		} finally {
-			submitting = false;
+		const result = await sendElicitationAnswer({
+			conversationId,
+			elicitationId: request.elicitationId,
+			action,
+			...(action === "accept" && request.mode === "form" ? { content: payload() } : {}),
+		});
+		submitting = false;
+		if (!result.ok) {
+			error = result.error;
+			return;
 		}
+		submitted = action;
 	}
 
 	// Submitting through the form is what runs the browser's own field validation.
@@ -234,10 +263,13 @@
 		Array.isArray(value) ? value.join(", ") : String(value);
 
 	const inputClass =
-		"w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white";
+		"w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm " +
+		"focus:ring-2 focus:ring-gray-300 focus:outline-hidden dark:focus:ring-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white";
 </script>
 
-{#if !open}
+{#if liftedToComposer}
+	<!-- shown over the composer -->
+{:else if !open}
 	<BlockWrapper>
 		<div class="flex max-w-full flex-col items-start gap-1 select-none">
 			<button
@@ -427,6 +459,9 @@
 									{#each field.options as option (option.value)}
 										<option value={option.value}>{option.label}</option>
 									{/each}
+									{#if field.allowOther}
+										<option value={OTHER}>Something else…</option>
+									{/if}
 								</select>
 							{:else if field.kind === "select"}
 								{@const atLimit =
@@ -446,6 +481,19 @@
 											{option.label}
 										</label>
 									{/each}
+									{#if field.allowOther}
+										{@const picked = isPicked(field.name, OTHER)}
+										<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+											<input
+												type="checkbox"
+												checked={picked}
+												onchange={(event) =>
+													toggleOption(field.name, OTHER, event.currentTarget.checked)}
+												disabled={!open || (atLimit && !picked)}
+											/>
+											Something else…
+										</label>
+									{/if}
 									{#if field.maxItems !== undefined}
 										<p class="text-xs text-gray-500 dark:text-gray-400">
 											Choose up to {field.maxItems}{field.minItems
@@ -454,6 +502,18 @@
 										</p>
 									{/if}
 								</div>
+							{/if}
+							{#if otherPicked(field)}
+								<input
+									type="text"
+									value={otherText[field.name] ?? ""}
+									oninput={(event) => setOtherText(field.name, event.currentTarget.value)}
+									maxlength={MAX_OTHER_CHARS}
+									disabled={!open}
+									placeholder="Tell us what you had in mind"
+									aria-label={`Your own answer for ${field.title ?? field.name}`}
+									class={`mt-2 ${inputClass}`}
+								/>
 							{/if}
 						</div>
 					{/each}

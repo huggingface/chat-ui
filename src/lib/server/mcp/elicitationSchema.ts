@@ -1,3 +1,4 @@
+import { MAX_OTHER_CHARS } from "$lib/types/McpElicitation";
 import type {
 	ElicitationField,
 	ElicitationRequestPayload,
@@ -308,6 +309,10 @@ export function validateElicitationContent(
 			}
 			case "select": {
 				const allowed = new Set(field.options.map((o) => o.value));
+				// The one value not on the list, bounded because nothing upstream constrains it.
+				const isOther = (v: string) =>
+					field.allowOther === true && v.trim().length > 0 && v.length <= MAX_OTHER_CHARS;
+				const permitted = (v: string) => allowed.has(v) || isOther(v);
 				if (field.multiple) {
 					if (!Array.isArray(value) || value.some((v) => typeof v !== "string")) {
 						return { ok: false, error: `"${field.name}" must be a list of strings.` };
@@ -317,8 +322,12 @@ export function validateElicitationContent(
 						return { ok: false, error: `"${field.name}" has duplicate selections.` };
 					}
 					for (const v of picked) {
-						if (!allowed.has(v))
+						if (!permitted(v))
 							return { ok: false, error: `"${field.name}" has an unknown option.` };
+					}
+					// The form offers one box, so a second off-list value did not come from it.
+					if (picked.filter((v) => !allowed.has(v)).length > 1) {
+						return { ok: false, error: `"${field.name}" has more than one typed answer.` };
 					}
 					if (field.minItems !== undefined && picked.length < field.minItems) {
 						return { ok: false, error: `"${field.name}" needs more selections.` };
@@ -332,7 +341,7 @@ export function validateElicitationContent(
 					totalChars += picked.join("").length;
 					content[field.name] = picked;
 				} else {
-					if (typeof value !== "string" || !allowed.has(value)) {
+					if (typeof value !== "string" || !permitted(value)) {
 						return { ok: false, error: `"${field.name}" has an unknown option.` };
 					}
 					totalChars += value.length;

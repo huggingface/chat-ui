@@ -12,6 +12,7 @@ import {
 	type McpToolTextResponse,
 } from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
+import { ASK_USER_QUESTION_TOOL_NAME, openAskPrompt } from "$lib/server/askUserQuestion";
 import { openDurableElicitation, type ElicitationSink } from "$lib/server/mcp/elicitation";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/client";
@@ -232,6 +233,9 @@ export async function* executeToolCalls({
 		emit: (update) => updatesQueue.push(update),
 	};
 
+	const askCalls = prepared.filter((p) => p.call.name === ASK_USER_QUESTION_TOOL_NAME);
+	const askIndex = (p: (typeof prepared)[number]) => askCalls.indexOf(p);
+
 	const tasks = prepared.map(async (p, index) => {
 		// Check abort before starting each tool call
 		if (abortSignal?.aborted) {
@@ -264,6 +268,51 @@ export async function* executeToolCalls({
 				uuid: p.uuid,
 				paramsClean: p.paramsClean,
 			});
+			updatesQueue.push({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Error,
+				uuid: p.uuid,
+				message,
+			});
+			return;
+		}
+
+		if (p.call.name === ASK_USER_QUESTION_TOOL_NAME) {
+			// A round parks on one prompt, so a second would never be shown and its call would
+			// never get a result — which providers reject on the next turn.
+			if (askIndex(p) > 0) {
+				const message =
+					"Only one ask_user_question call can be answered per turn. " +
+					"Put every question in a single call's `questions` array.";
+				results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid: p.uuid,
+					message,
+				});
+				return;
+			}
+
+			const opened = elicitationSink
+				? await openAskPrompt({
+						sink: elicitationSink,
+						toolUuid: p.uuid,
+						toolCallId: p.call.id,
+						messageId: elicitation?.messageId ?? "",
+						args: parseArgs(p.call.arguments),
+					})
+				: { opened: false, reason: "no chat to ask" };
+
+			if (opened.opened) {
+				awaitingInput = true;
+				results.push({ index, awaiting: true, uuid: p.uuid, paramsClean: p.paramsClean });
+				return;
+			}
+
+			// Answering is the only way this call finishes, so a silent skip would hang it.
+			const message = `The question could not be shown (${opened.reason}).`;
+			results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
 			updatesQueue.push({
 				type: MessageUpdateType.Tool,
 				subtype: MessageToolUpdateType.Error,
