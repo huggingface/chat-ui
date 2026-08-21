@@ -224,7 +224,7 @@
 			<p class="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
 		{/if}
 
-		<div class="mt-2 flex items-center gap-2">
+		<div class="mt-2 flex min-h-7 items-center gap-2">
 			{#if step > 0}
 				<button
 					type="button"

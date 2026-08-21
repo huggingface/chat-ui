@@ -184,6 +184,20 @@ describe("a question from the assistant", () => {
 		expect(getComputedStyle(input as Element).outlineStyle).toBe("none");
 	});
 
+	it("keeps the row under the options the same height throughout", async () => {
+		const { baseElement } = mount([ask("q1", "Which database?"), ask("q2", "Which host?")]);
+		const barHeight = () =>
+			(baseElement.querySelector("div.mt-2.flex") as HTMLElement).getBoundingClientRect().height;
+
+		// Send is taller than Skip, so without a floor the panel grows on the last question
+		// and everything above it shifts as the user moves through.
+		const withSkipAlone = barHeight();
+		rowFor(baseElement, "Postgres")?.click();
+		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which host?"));
+
+		expect(barHeight()).toBe(withSkipAlone);
+	});
+
 	it("lets the user decline without answering", async () => {
 		const { baseElement } = mount([ask("q1", "Which database?")]);
 		button(baseElement, "Skip")?.click();
