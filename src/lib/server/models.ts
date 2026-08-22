@@ -8,6 +8,7 @@ import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
 import { preservesReasoningByDefault } from "$lib/server/reasoningPolicy";
 import { makeRouterEndpoint } from "$lib/server/router/endpoint";
+import { validateFreeTierRouterConfig } from "$lib/server/router/userTier";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -441,6 +442,7 @@ if (!building) {
 	defaultModel = models[0];
 	taskModel = resolveTaskModel(models);
 	validModelIdSchema = createValidModelIdSchema(models);
+	validateFreeTierRouterConfig(models);
 
 	logger.info(
 		{ total: models.length, durationMs: Date.now() - startedAt },

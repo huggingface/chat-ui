@@ -17,6 +17,7 @@ import {
 	pickToolsCapableModel,
 } from "./toolsRoute";
 import { getConfiguredMultimodalModelId } from "./multimodal";
+import { getFreeUserModel, resolveUserTier } from "./userTier";
 
 const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
@@ -201,8 +202,14 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			}
 		}
 
-		// Tools bypass: if enabled and tools are active, route to tools model
-		if (routerToolsEnabled && hasToolsActive) {
+		// Resolved after the multimodal bypass, which is tier-independent — image requests
+		// never pay for the billing lookup.
+		const tier = await resolveUserTier(params.locals);
+
+		// Tools bypass: if enabled and tools are active, route to tools model. Free users skip
+		// the bypass and go through the candidate loop below instead, which pins them to the
+		// free-tier model with the agentic route's models as fallbacks.
+		if (routerToolsEnabled && hasToolsActive && tier !== "free") {
 			let toolsModel: ProcessedModel | undefined;
 			try {
 				const all = await getModels();
@@ -249,13 +256,24 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		});
 
 		const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || routerModel.id;
-		const { candidates } = resolveRouteModels(routeSelection.routeName, routes, fallbackModel);
+		let { candidates } = resolveRouteModels(routeSelection.routeName, routes, fallbackModel);
+
+		// Free-tier users try the cheap model first and keep the route's normal candidates as
+		// fallbacks; the route name stays semantic for the UI badge.
+		if (tier === "free") {
+			const freeUserModel = getFreeUserModel();
+			candidates = [freeUserModel, ...candidates.filter((c) => c !== freeUserModel)];
+			logger.info(
+				{ route: routeSelection.routeName, model: freeUserModel },
+				"[router] free-tier user; pinning to free-tier model"
+			);
+		}
 
 		let lastErr: unknown = undefined;
 		for (const candidate of candidates) {
 			try {
 				logger.info(
-					{ route: routeSelection.routeName, model: candidate },
+					{ route: routeSelection.routeName, model: candidate, tier },
 					"[router] trying candidate"
 				);
 				const ep = await createCandidateEndpoint(candidate);

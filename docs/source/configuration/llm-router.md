@@ -78,6 +78,20 @@ LLM_ROUTER_TOOLS_MODEL=moonshotai/Kimi-K2.6
 
 If the flag is off (or no tools-capable model is found), tool-active requests flow through the heuristic and pick the `agentic` route from the policy file.
 
+## Free-Tier Routing
+
+Optionally pin users who cannot currently pay for inference on Hugging Face (no PRO subscription, no prepaid credits or valid payment method, and no paying billing organization selected) to a cheaper model:
+
+```ini
+LLM_ROUTER_FREE_USER_MODEL=deepseek-ai/DeepSeek-V4-Flash-0731
+```
+
+Free users get this model for the default and tools routes, falling back to the route's normal models if it fails. Image requests keep `LLM_ROUTER_MULTIMODAL_MODEL` (pick a tools-capable free model if you use the tools shortcut). Paying users keep the normal route selection, and requests to a directly-picked (non-Omni) model are never affected.
+
+Payment status is read from the Hub's OAuth `userinfo` endpoint using the logged-in user's token, so this requires Hugging Face OIDC login and the `read-billing` scope in `OPENID_SCOPES` (included in the default). Results are cached in-process for about 10 minutes, and lookups fail open: if the Hub can't be reached, the user is treated as paying.
+
+Leave `LLM_ROUTER_FREE_USER_MODEL` empty (the default) to disable the feature entirely — no billing lookups are made and routing behaves exactly as described above.
+
 ## UI Customization
 
 Customize how the router appears in the model selector:
