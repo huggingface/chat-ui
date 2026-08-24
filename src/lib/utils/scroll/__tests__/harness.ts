@@ -24,9 +24,9 @@ export interface FixtureOptions {
 
 export interface Fixture {
 	container: HTMLDivElement;
-	/** The growing wrapper (the app's `messagesEl`). */
+	/** The growing wrapper (the app's `messagesEl`); its padding-bottom plays
+	 * the composer clearance. */
 	content: HTMLDivElement;
-	spacer: HTMLDivElement;
 	addBlock(height: number, opts?: { user?: boolean; id?: string }): HTMLDivElement;
 	lastBlock(): HTMLDivElement;
 	growLast(px: number): void;
@@ -48,25 +48,20 @@ export function createFixture(options: FixtureOptions = {}): Fixture {
 	container.tabIndex = 0;
 
 	// Mirrors ChatWindow's structure: a full-height column wrapping the
-	// growing messages element plus the send-anchor spacer.
+	// growing messages element (whose bottom padding is the clearance).
 	const column = document.createElement("div");
 	column.style.cssText = "display: flex; flex-direction: column; min-height: 100%;";
 
 	const content = document.createElement("div");
 	content.style.cssText = "display: flex; flex-direction: column;";
 
-	const spacer = document.createElement("div");
-	spacer.style.cssText = "flex-shrink: 0; height: 0px;";
-
 	column.appendChild(content);
-	column.appendChild(spacer);
 	container.appendChild(column);
 	document.body.appendChild(container);
 
 	const fixture: Fixture = {
 		container,
 		content,
-		spacer,
 		addBlock(height, opts = {}) {
 			const block = document.createElement("div");
 			block.style.cssText = `height: ${height}px; flex-shrink: 0;`;

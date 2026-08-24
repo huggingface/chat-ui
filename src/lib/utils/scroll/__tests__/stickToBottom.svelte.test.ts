@@ -55,26 +55,8 @@ describe("mount & basic follow", () => {
 		expect(controller.pinned).toBe(true);
 	});
 
-	it("follows a single large growth back to the bottom (spring)", async () => {
+	it("growth snaps to the bottom on the next frame — never a glide", async () => {
 		const { fixture, controller } = setup();
-		fixture.growLast(500);
-		await waitFor(() => fixture.distance() <= ARRIVED, { label: "spring reaches bottom" });
-		expect(controller.pinned).toBe(true);
-	});
-
-	it("stays glued through continuous rAF-cadence streaming", async () => {
-		const { fixture } = setup();
-		let maxLag = 0;
-		await stream(fixture, { pxPerFrame: 8, frameCount: 60 }, () => {
-			maxLag = Math.max(maxLag, fixture.distance());
-		});
-		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settles after stream" });
-		// Spring lag stays bounded well within the spacer's 208px floor.
-		expect(maxLag).toBeLessThan(200);
-	});
-
-	it("instant follow mode pins hard on every growth", async () => {
-		const { fixture } = setup({}, { followMode: "instant" });
 		// Snap = ResizeObserver delivery + one tick (a few frames); a spring from
 		// 700px away cannot get within 2px in 6 ticks in any rAF regime.
 		fixture.growLast(700);
@@ -82,27 +64,19 @@ describe("mount & basic follow", () => {
 			maxFrames: 6,
 			label: "snaps to the bottom",
 		});
+		expect(controller.pinned).toBe(true);
 	});
 
-	it("setFollowMode swaps behavior at runtime without moving the view", async () => {
-		const { fixture, controller } = setup({}, { followMode: "instant" });
-		// The swap itself is inert — no write, no motion.
-		controller.setFollowMode("spring");
-		const top = fixture.scrollTop();
-		await frames(2);
-		expect(fixture.scrollTop()).toBe(top);
-		// Growth now glides instead of snapping…
-		fixture.growLast(700);
-		await frames(2);
-		expect(fixture.distance()).toBeGreaterThan(100);
-		await waitFor(() => fixture.distance() <= ARRIVED, { label: "spring reaches bottom" });
-		// …and swapping back makes the next growth snap again.
-		controller.setFollowMode("instant");
-		fixture.growLast(700);
-		await waitFor(() => fixture.distance() <= ARRIVED, {
-			maxFrames: 6,
-			label: "snaps to the bottom",
+	it("stays glued through continuous rAF-cadence streaming with bounded lag", async () => {
+		const { fixture } = setup();
+		let maxLag = 0;
+		await stream(fixture, { pxPerFrame: 8, frameCount: 60 }, () => {
+			maxLag = Math.max(maxLag, fixture.distance());
 		});
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settles after stream" });
+		// Snap follows lag at most a frame or two of growth — nothing like the
+		// old spring's elastic gap.
+		expect(maxLag).toBeLessThan(40);
 	});
 
 	it("re-pins to the live bottom when the container itself resizes", async () => {
@@ -125,10 +99,29 @@ describe("detach on user intent", () => {
 		expect(controller.pinned).toBe(false);
 	});
 
-	it("wheel up halts a running follow animation immediately", async () => {
+	it("accumulated upward drift below the threshold keeps following; crossing it detaches", async () => {
 		const { fixture, controller } = setup();
-		fixture.growLast(1200);
-		await frames(3); // spring in flight
+		// Let the initial ResizeObserver delivery settle so its follow can't
+		// interleave with the sub-threshold wheels below.
+		await frames(3);
+		await nextTask();
+		wheel(fixture.container, -2);
+		await frame();
+		expect(controller.pinned).toBe(true);
+		wheel(fixture.container, -2);
+		await frame();
+		expect(controller.pinned).toBe(false);
+	});
+
+	it("wheel up halts a running glide immediately (the user always wins the fight)", async () => {
+		const { fixture, controller } = setup();
+		fixture.addBlock(1200);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle tall fixture" });
+		await nextTask();
+		dragScrollbarTo(fixture.container, 0);
+		await frame();
+		controller.animateToBottom();
+		await frames(3); // glide in flight
 		const before = fixture.scrollTop();
 		wheel(fixture.container, -120);
 		await frames(3);
@@ -137,14 +130,30 @@ describe("detach on user intent", () => {
 		expect(fixture.scrollTop()).toBeLessThanOrEqual(before - 120 + 1);
 	});
 
-	it("scrollbar drag up unpins (no wheel/touch involved)", async () => {
+	it("a touch drag during a glide takes the view (glide canceled)", async () => {
+		const { fixture, controller } = setup();
+		fixture.addBlock(1200);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle tall fixture" });
+		await nextTask();
+		dragScrollbarTo(fixture.container, 0);
+		await frame();
+		controller.animateToBottom();
+		await frames(2); // glide in flight
+		await touchDrag(fixture.container, { fromY: 100, toY: 220 });
+		expect(controller.pinned).toBe(false);
+		const top = fixture.scrollTop();
+		await frames(3);
+		expect(fixture.scrollTop()).toBe(top);
+	});
+
+	it("scrollbar drag up unpins (no wheel/touch involved — position is the signal)", async () => {
 		const { fixture, controller } = setup();
 		dragScrollbarTo(fixture.container, fixture.scrollTop() - 200);
 		await frame();
 		expect(controller.pinned).toBe(false);
 	});
 
-	it("PageUp unpins via the keyboard fast path", async () => {
+	it("PageUp unpins through its own scroll — no keyboard handler needed", async () => {
 		const { fixture, controller } = setup();
 		pressKey(fixture.container, "PageUp");
 		await frame();
@@ -183,15 +192,6 @@ describe("gestures that must NOT change pin state", () => {
 		expect(controller.pinned).toBe(true);
 	});
 
-	it("touches starting in a configured edge-swipe zone are ignored", async () => {
-		const { fixture, controller } = setup({}, { ignoreTouchZonePx: 40 });
-		await touchDrag(fixture.container, { fromY: 100, toY: 260, x: 30, noScroll: true });
-		expect(controller.pinned).toBe(true);
-		// Outside the zone the same gesture detaches.
-		await touchDrag(fixture.container, { fromY: 100, toY: 260, x: 60 });
-		expect(controller.pinned).toBe(false);
-	});
-
 	it("keydown already consumed by a widget (defaultPrevented) is ignored", async () => {
 		const { fixture, controller } = setup();
 		fixture.container.addEventListener("keydown", (e) => e.preventDefault(), {
@@ -212,7 +212,7 @@ describe("gestures that must NOT change pin state", () => {
 		expect(controller.pinned).toBe(true);
 	});
 
-	it("wheel up over an inner scrollable that can consume it does not unpin", async () => {
+	it("wheel up consumed by an inner scrollable does not unpin", async () => {
 		const { fixture, controller } = setup();
 		const inner = document.createElement("div");
 		inner.style.cssText = "height: 100px; overflow-y: auto; flex-shrink: 0;";
@@ -224,8 +224,24 @@ describe("gestures that must NOT change pin state", () => {
 		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle after append" });
 		inner.scrollTop = 200; // the code block can scroll up on its own
 		await frame();
+		// The inner scroller consumes the wheel: the conversation never moves,
+		// so there is no upward movement to read as intent.
 		wheel(fixture.container, -120, { target: inner, noScroll: true });
 		await frame();
+		expect(controller.pinned).toBe(true);
+	});
+
+	it("a wheel down during a glide does not cancel it", async () => {
+		const { fixture, controller } = setup();
+		fixture.addBlock(1200);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle tall fixture" });
+		await nextTask();
+		dragScrollbarTo(fixture.container, 0);
+		await frame();
+		controller.animateToBottom();
+		await frames(2);
+		wheel(fixture.container, 60); // helping toward the bottom
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "glide still completes" });
 		expect(controller.pinned).toBe(true);
 	});
 
@@ -252,7 +268,7 @@ describe("gestures that must NOT change pin state", () => {
 		expect(fixture.scrollTop()).toBe(100);
 	});
 
-	it("shrink that clamps the view to the bottom resumes following (sentinel parity)", async () => {
+	it("shrink that clamps the view to the bottom resumes following", async () => {
 		const { fixture, controller } = setup();
 		fixture.addBlock(800);
 		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle" });
@@ -328,13 +344,13 @@ describe("re-attach", () => {
 		expect(controller.pinned).toBe(true);
 	});
 
-	it("re-attach glides the remaining gap even in instant follow mode", async () => {
-		const { fixture, controller } = setup({}, { followMode: "instant" });
+	it("re-attach glides the remaining gap closed instead of snapping", async () => {
+		const { fixture, controller } = setup();
 		wheel(fixture.container, -300);
 		await frame();
 		expect(controller.pinned).toBe(false);
 		// Scroll back down to just inside the near-bottom zone: re-pins and
-		// closes the last stretch with the spring — instant mode is for content
+		// closes the last stretch with the spring — snaps are for content
 		// growth, not for the user's own return to the bottom.
 		dragScrollbarTo(fixture.container, fixture.maxScrollTop() - 50);
 		await frames(2);
@@ -394,7 +410,7 @@ describe("commands", () => {
 	it("reduced motion makes every move instant", async () => {
 		const { fixture, controller } = setup({}, { reducedMotion: () => true });
 		fixture.growLast(500);
-		await frames(2); // ResizeObserver tick, no spring frames
+		await frames(2); // ResizeObserver tick, synchronous write, no glide frames
 		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
 		dragScrollbarTo(fixture.container, 0);
 		await frame();
@@ -415,7 +431,7 @@ describe("state reporting", () => {
 		expect(controller.getState().nearBottom).toBe(false);
 		expect(controller.getState().scrolledUp).toBe(true);
 		// Growth while detached must refresh state without any scroll event
-		// (the old buttons went stale exactly here).
+		// (the pre-controller buttons went stale exactly here).
 		dragScrollbarTo(fixture.container, fixture.maxScrollTop() - 50);
 		await frame();
 		wheel(fixture.container, -10);
@@ -454,7 +470,7 @@ describe("no layout shift while following", () => {
 	});
 });
 
-describe("fuzz: attribution invariants under random interleaving", () => {
+describe("fuzz: geometric invariants under random interleaving", () => {
 	it("never unpins from programmatic motion, never pins without the user reaching bottom", async () => {
 		const { fixture, controller } = setup({
 			blocks: [{ height: 300, user: true }, { height: 900 }],

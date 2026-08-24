@@ -1,19 +1,21 @@
 /**
- * Single-owner stick-to-bottom controller for a scrollable container.
+ * Geometric stick-to-bottom controller for a scrollable container.
  *
- * Replaces the previous stack of four uncoordinated systems (snapScrollToBottom
- * action, ChatWindow's spacer ResizeObserver autoscroll, and one listener set
- * per floating button) with one controller that owns exactly one scroll/wheel/
- * touch/keydown listener each, one ResizeObserver, and one rAF animation loop.
+ * The pin state is decided by where scroll positions land, not by which device
+ * produced them (in the spirit of Streamdown's pinned scroll): upward movement
+ * detaches, downward movement into the near-bottom zone re-attaches, and a
+ * clamp to the bottom after content shrank re-attaches because there is
+ * nothing below left to read. This works without any bookkeeping of expected
+ * positions because every programmatic move either lands exactly at the bottom
+ * (follows) or begins by explicitly unpinning (jumps to a reading position) —
+ * so programmatic scroll events can never *look like* user intent, and the
+ * previous implementation's write-attribution queue, follow-mode duality,
+ * wheel/touch intent tracking, keyboard handler, and inner-scrollable walks
+ * are all unnecessary.
  *
- * Core mechanism — position-based scroll attribution instead of timers:
- * every programmatic write records the scrollTop it expects the next scroll
- * event to report. A scroll event that matches a pending write is ours; one
- * that matches a browser clamp after content shrank is neither ours nor the
- * user's; everything else is user input, by construction. This classifies
- * scrollbar drags, keyboard scrolling, find-in-page and selection auto-scroll
- * correctly without grace periods, and it cannot mistake the tail of a smooth
- * scroll for user input the way time-based heuristics do.
+ * While pinned, growth is answered with a next-frame snap; easing exists only
+ * for explicit moves (send, the jump buttons, re-attach catch-up), as a
+ * live-target spring that any upward wheel or touch cancels instantly.
  */
 
 export interface StickToBottomState {
@@ -32,42 +34,27 @@ export interface StickToBottomOptions {
 	/**
 	 * The element whose growth is being followed. Must be the element that
 	 * actually resizes with content — observing a `height: 100%` wrapper is the
-	 * bug that killed the previous implementation's autoscroll entirely.
+	 * bug that killed an earlier implementation's autoscroll entirely.
 	 */
 	content?: () => HTMLElement | null | undefined;
 	onStateChange?: (state: StickToBottomState) => void;
 	/**
 	 * Runs at the start of every content/container resize pass, before the
-	 * controller re-pins — the hook where the chat spacer recomputes so the
-	 * follow targets post-spacer geometry. `containerResized` is true when the
-	 * container's own box changed (or on programmatic recompute()), letting
-	 * callers skip container-box measurements on pure content growth.
+	 * controller re-follows. `containerResized` is true when the container's
+	 * own box changed (or on programmatic recompute()), letting callers skip
+	 * container-box measurements on pure content growth.
 	 */
 	onContentResize?: (containerResized: boolean) => void;
-	/** 'spring' glides toward the bottom; 'instant' hard-pins every growth.
-	 * Initial value — swappable at runtime via setFollowMode(). */
-	followMode?: "spring" | "instant";
 	nearBottomPx?: number;
 	scrolledUpPx?: number;
-	/**
-	 * Touches starting within this many px of the left edge are ignored — for
-	 * hosts where an edge-swipe gesture (e.g. a nav drawer) claims that strip
-	 * and preventDefaults the touch, so it never scrolls anything.
-	 */
-	ignoreTouchZonePx?: number;
 	/** Test seam; defaults to matchMedia('(prefers-reduced-motion: reduce)'). */
 	reducedMotion?: () => boolean;
 }
 
 const AT_BOTTOM_EPS = 2;
-/** Tolerance when matching a scroll event against a pending programmatic write
- * (fractional scrollTop under browser zoom / HiDPI rounding). */
-const WRITE_MATCH_EPS = 1.5;
 /** Cumulative upward user movement (px) required to unpin — filters sub-pixel
  * jitter without ignoring the smallest deliberate scroll. */
 const UNPIN_DRIFT_PX = 3;
-/** Upward finger travel (px) before a touch gesture counts as scroll intent. */
-const TOUCH_INTENT_PX = 10;
 /** Spring time constant: reach ~63% of remaining distance every 80ms. */
 const SPRING_TAU_MS = 80;
 /** Below this remaining distance the spring snaps to the target. */
@@ -83,7 +70,7 @@ interface Animation {
 	target: () => number;
 	lastTime: number;
 	/** Write the full remaining distance on the first tick instead of springing.
-	 * Instant follows still go through a tick (not a synchronous write) so a
+	 * Growth follows go through a tick (not a synchronous write) so a
 	 * same-frame user scroll — whose scroll event dispatches before rAF
 	 * callbacks — is classified first and its unpin cancels the write. */
 	snap?: boolean;
@@ -91,9 +78,7 @@ interface Animation {
 
 export class StickToBottomController {
 	private container: HTMLElement;
-	private opts: Required<
-		Pick<StickToBottomOptions, "followMode" | "nearBottomPx" | "scrolledUpPx" | "ignoreTouchZonePx">
-	> &
+	private opts: Required<Pick<StickToBottomOptions, "nearBottomPx" | "scrolledUpPx">> &
 		StickToBottomOptions;
 
 	private state: StickToBottomState = {
@@ -104,11 +89,10 @@ export class StickToBottomController {
 		distanceFromBottom: 0,
 	};
 
-	/** Current follow behavior; starts from opts.followMode (see setFollowMode). */
-	private followMode: "spring" | "instant";
-
-	/** scrollTop values we wrote and whose scroll events haven't arrived yet. */
-	private pendingWrites: number[] = [];
+	/** Attribution baselines: the last classified position and geometry. Moved
+	 * only in write() and onScroll, never in onResize — a scroll event can
+	 * still be in flight for a position change that predates a resize, and
+	 * classifying it (the clamp rule especially) needs the older baseline. */
 	private lastTop: number;
 	private lastScrollHeight: number;
 	private lastMax: number;
@@ -119,20 +103,16 @@ export class StickToBottomController {
 
 	private resizeObserver: ResizeObserver | null = null;
 	private observedContent: HTMLElement | null = null;
-	private touch: { id: number; y: number; target: EventTarget | null; intent: boolean } | null =
-		null;
+	private lastTouchY: number | null = null;
 	private destroyed = false;
 
 	constructor(container: HTMLElement, options: StickToBottomOptions = {}) {
 		this.container = container;
 		this.opts = {
-			followMode: "spring",
 			nearBottomPx: 60,
 			scrolledUpPx: 200,
-			ignoreTouchZonePx: 0,
 			...options,
 		};
-		this.followMode = this.opts.followMode;
 
 		this.lastTop = this.clampedTop();
 		this.lastScrollHeight = container.scrollHeight;
@@ -145,7 +125,6 @@ export class StickToBottomController {
 		container.addEventListener("touchmove", this.onTouchMove, { passive: true });
 		container.addEventListener("touchend", this.onTouchEnd, { passive: true });
 		container.addEventListener("touchcancel", this.onTouchEnd, { passive: true });
-		container.addEventListener("keydown", this.onKeyDown);
 
 		if (typeof ResizeObserver !== "undefined") {
 			this.resizeObserver = new ResizeObserver(this.onResize);
@@ -166,14 +145,6 @@ export class StickToBottomController {
 	 * direction comparison so a bottom-bounce is never read as user intent. */
 	private clampedTop(): number {
 		return Math.min(Math.max(this.container.scrollTop, 0), this.maxScrollTop());
-	}
-
-	private distanceFromBottom(): number {
-		return this.maxScrollTop() - this.clampedTop();
-	}
-
-	private canScroll(): boolean {
-		return this.container.scrollHeight > this.container.clientHeight + 1;
 	}
 
 	private prefersReducedMotion(): boolean {
@@ -200,7 +171,7 @@ export class StickToBottomController {
 	}
 
 	private recomputeState(forceNotify = false, geometry?: { top: number; distance: number }) {
-		const distance = geometry?.distance ?? this.distanceFromBottom();
+		const distance = geometry?.distance ?? this.maxScrollTop() - this.clampedTop();
 		const top = geometry?.top ?? this.clampedTop();
 		const next: StickToBottomState = {
 			pinned: this.state.pinned,
@@ -236,7 +207,7 @@ export class StickToBottomController {
 	 * growth above the viewport (late images, markdown swaps) doesn't shove the
 	 * text under their eyes. Its adjustments are recognized in the scroll
 	 * handler by their signature (scrollHeight and scrollTop change together,
-	 * distance-from-bottom constant) so they are never mistaken for user input.
+	 * distance-from-bottom constant) so they are never read as user intent.
 	 * No-op on Safari, which has no native anchoring at all — consistent either
 	 * way.
 	 */
@@ -249,39 +220,17 @@ export class StickToBottomController {
 	private write(top: number) {
 		const max = this.maxScrollTop();
 		const clamped = Math.min(Math.max(top, 0), max);
-		// Same-position writes fire no scroll event; recording one would leave a
-		// pending entry that never gets consumed and could later swallow a real
-		// user scroll that happens to land on it.
 		const before = this.container.scrollTop;
 		if (Math.abs(before - clamped) < 0.5) return;
 		this.container.scrollTop = clamped;
-		// Read back: under fractional zoom a sub-pixel write can round to the
-		// same device pixel (no event will fire), and iOS can drop writes during
-		// active momentum. Only positions that actually applied are expected.
-		const after = this.container.scrollTop;
-		if (after === before) return;
-		this.pendingWrites.push(after);
-		if (this.pendingWrites.length > 4) this.pendingWrites.shift();
-		// Update the last-known position NOW: if a user scroll lands in the same
-		// frame, the browser coalesces both into one event at the user's final
-		// position, and direction detection must compare against where we
-		// actually put the view — not against a frame-old value.
-		this.lastTop = Math.min(Math.max(after, 0), max);
+		// Move the baselines NOW: the scroll event for this write must read as
+		// zero movement, and if a user scroll lands in the same frame the
+		// browser coalesces both into one event at the user's final position —
+		// whose delta against the post-write baseline is exactly the user's own
+		// movement. This is the entire residue of write attribution.
+		this.lastTop = Math.min(Math.max(this.container.scrollTop, 0), max);
 		this.lastMax = max;
 		this.lastScrollHeight = this.container.scrollHeight;
-	}
-
-	/** Match a scroll event's position against pending writes; consume on hit. */
-	private consumeWrite(top: number): boolean {
-		for (let i = 0; i < this.pendingWrites.length; i++) {
-			if (Math.abs(this.pendingWrites[i] - top) <= WRITE_MATCH_EPS) {
-				// Drop the matched write and everything older (their events were
-				// coalesced away by the browser).
-				this.pendingWrites.splice(0, i + 1);
-				return true;
-			}
-		}
-		return false;
 	}
 
 	// --- public commands ----------------------------------------------------------
@@ -294,7 +243,8 @@ export class StickToBottomController {
 		this.recomputeState();
 	}
 
-	/** Animated to bottom + pinned. Button click, fine-pointer send. */
+	/** Animated to bottom + pinned, chasing the live bottom. Button click,
+	 * fine-pointer send/anchor. */
 	animateToBottom() {
 		this.setPinned(true);
 		if (this.shouldSkipAnimation()) {
@@ -316,15 +266,6 @@ export class StickToBottomController {
 		this.stopAnimation();
 		this.upwardDrift = 0;
 		this.setPinned(false);
-	}
-
-	/** Swap how pinned follows track content growth: 'spring' glides (streaming
-	 * replies), 'instant' snaps (settling content, where a glide is motion
-	 * without information). Growth follows only — a user re-attaching at the
-	 * bottom glides in either mode. Takes effect on the next growth — never
-	 * moves the view by itself, and never interrupts an animation in flight. */
-	setFollowMode(mode: "spring" | "instant") {
-		this.followMode = mode;
 	}
 
 	/** Animated move that does NOT engage following (e.g. scroll-to-previous). */
@@ -364,7 +305,6 @@ export class StickToBottomController {
 		c.removeEventListener("touchmove", this.onTouchMove);
 		c.removeEventListener("touchend", this.onTouchEnd);
 		c.removeEventListener("touchcancel", this.onTouchEnd);
-		c.removeEventListener("keydown", this.onKeyDown);
 		this.resizeObserver?.disconnect();
 		this.resizeObserver = null;
 	}
@@ -412,10 +352,10 @@ export class StickToBottomController {
 	};
 
 	/**
-	 * Pinned + the view must catch up to the bottom: glide (spring) or snap
-	 * (instant/reduced-motion/hidden). The instant follow mode only applies to
-	 * content growth — a user re-attaching at the bottom glides the remaining
-	 * gap closed regardless of mode, so coming back never feels like a teleport.
+	 * Pinned + the view must catch up to the bottom. Growth snaps on the next
+	 * tick; a user re-attaching glides the remaining gap closed so coming back
+	 * never feels like a teleport. A live-target glide already in flight (send,
+	 * jump button) is left alone — it lands at the new bottom by itself.
 	 */
 	private follow(reason: "growth" | "reattach" = "growth") {
 		if (!this.state.pinned) return;
@@ -426,18 +366,15 @@ export class StickToBottomController {
 			this.write(this.maxScrollTop());
 			return;
 		}
-		// Instant follows snap on the next tick rather than writing synchronously:
-		// this often runs inside a ResizeObserver callback, and a user scroll from
-		// the same frame may not have dispatched its scroll event yet. A
-		// synchronous write would land after the user's movement and be matched
-		// as ours by the coalesced event — silently swallowing the unpin. Scroll
-		// events run before rAF callbacks, so one tick of deferral lets the
-		// user's unpin cancel the write instead.
-		if (this.followMode === "instant" && reason === "growth") {
-			// A leftover glide (mode just flipped, or an animateToBottom) is
-			// replaced: instant mode owes the bottom on the very next tick.
-			if (!this.anim?.snap) this.startAnimation(() => this.maxScrollTop(), { snap: true });
-		} else if (!this.anim) {
+		if (this.anim) return;
+		if (reason === "growth") {
+			// One tick of deferral, not a synchronous write: this runs inside a
+			// ResizeObserver callback, and a user scroll from the same frame may
+			// not have dispatched its scroll event yet. Scroll events run before
+			// rAF callbacks, so the user's unpin cancels the pending snap instead
+			// of being overwritten by it.
+			this.startAnimation(() => this.maxScrollTop(), { snap: true });
+		} else {
 			this.startAnimation(() => this.maxScrollTop());
 		}
 	}
@@ -448,53 +385,41 @@ export class StickToBottomController {
 		// One geometry snapshot per event; every derived value below reuses it.
 		const scrollHeight = this.container.scrollHeight;
 		const max = Math.max(0, scrollHeight - this.container.clientHeight);
-		const rawTop = this.container.scrollTop;
-		const top = Math.min(Math.max(rawTop, 0), max);
+		const top = Math.min(Math.max(this.container.scrollTop, 0), max);
 		const distance = max - top;
 
-		const ours = this.consumeWrite(rawTop);
-		// Any delivered event supersedes older writes (per-element scroll events
-		// are coalesced to the latest position each frame) — clearing here keeps
-		// stale ≈bottom entries from swallowing a later real user scroll that
-		// happens to land on the same position (e.g. a scrollbar drag to the
-		// bottom, whose re-pin must NOT be skipped).
-		this.pendingWrites.length = 0;
-		// The browser clamped scrollTop because maxScrollTop shrank — content
-		// got shorter (branch switch, collapsing reasoning block) or the
-		// viewport got taller (window resize, panel close). Not user input.
+		// The browser clamped a parked view to the (new) exact bottom because
+		// content got shorter (branch switch, collapsing reasoning block) or the
+		// viewport got taller (window resize, keyboard close). There is nothing
+		// below left to read, so following is the only sensible continuation.
 		const clamped =
-			!ours &&
-			max < this.lastMax &&
-			Math.abs(top - max) <= WRITE_MATCH_EPS &&
-			this.lastTop > max + WRITE_MATCH_EPS;
+			distance <= AT_BOTTOM_EPS &&
+			max < this.lastMax - AT_BOTTOM_EPS &&
+			this.lastTop > max + AT_BOTTOM_EPS;
 		// Native scroll anchoring (enabled while unpinned) compensating for
 		// content growth above the viewport: scrollTop and scrollHeight move
 		// together, distance from the bottom stays put. Not user input either.
 		const anchorAdjust =
-			!ours &&
 			!clamped &&
 			scrollHeight !== this.lastScrollHeight &&
 			Math.abs(distance - (this.lastMax - this.lastTop)) <= AT_BOTTOM_EPS;
 
-		if (clamped && !this.state.pinned) {
-			// A clamp by definition lands the view at the (new) exact bottom;
-			// there is nothing below to read, so following is the only sensible
-			// continuation (the old sentinel behaved the same way). Without this,
-			// a reasoning-collapse or keyboard-close clamp would leave a detached
-			// user sitting at the bottom while the stream runs below the fold.
-			this.setPinned(true);
-		} else if (!ours && !clamped && !anchorAdjust) {
-			// User input, by construction.
+		if (clamped) {
+			this.upwardDrift = 0;
+			if (!this.state.pinned) this.setPinned(true);
+		} else if (!anchorAdjust) {
 			if (top < this.lastTop) {
+				// Upward movement. Our own writes moved the baselines already, so
+				// a delta here is the user's (or a coalesced event's user share).
 				this.upwardDrift += this.lastTop - top;
-				if (this.upwardDrift >= UNPIN_DRIFT_PX && this.state.pinned) {
+				if (this.upwardDrift >= UNPIN_DRIFT_PX && (this.state.pinned || this.anim)) {
 					this.unpin();
 				}
-			} else {
+			} else if (top > this.lastTop) {
 				this.upwardDrift = 0;
-				if (top > this.lastTop && distance <= this.opts.nearBottomPx && !this.state.pinned) {
+				if (!this.state.pinned && distance <= this.opts.nearBottomPx) {
 					// User came back to the bottom zone: re-engage and glide the
-					// remaining gap closed (spring, so no re-attach snap).
+					// remaining gap closed.
 					this.setPinned(true);
 					this.follow("reattach");
 				}
@@ -515,13 +440,6 @@ export class StickToBottomController {
 		this.syncContentObserver();
 		this.opts.onContentResize?.(containerResized);
 		this.follow();
-		// Deliberately do NOT refresh the attribution baselines (lastTop &co)
-		// here: a scroll event can still be in flight for a position change
-		// that happened before this resize (ResizeObserver delivery can precede
-		// the scroll steps when the change originated inside a rAF callback),
-		// and classifying that event needs the pre-change baseline. Baselines
-		// move only in write() and onScroll — the clamp rule (max < lastMax)
-		// then recognizes shrink/viewport-growth clamps on its own.
 		this.recomputeState();
 	};
 
@@ -535,31 +453,6 @@ export class StickToBottomController {
 		if (content) this.resizeObserver.observe(content);
 	}
 
-	/**
-	 * True when a scrollable element between `target` and the container will
-	 * consume this wheel/touch delta itself (e.g. wheel-up inside a code block
-	 * that can still scroll up) — in that case the gesture says nothing about
-	 * the chat container and must not change pin state.
-	 */
-	private innerScrollableConsumes(target: EventTarget | null, deltaY: number): boolean {
-		let el = target instanceof Element ? target : null;
-		while (el && el !== this.container) {
-			if (el instanceof HTMLElement && el.scrollHeight > el.clientHeight + 1) {
-				const hasRoom =
-					deltaY < 0 ? el.scrollTop > 0 : el.scrollTop < el.scrollHeight - el.clientHeight - 1;
-				if (hasRoom) {
-					// Only a real scroller consumes wheel/touch deltas — an
-					// overflow:hidden element can carry residual scrollTop but the
-					// browser won't scroll it, so the gesture reaches the container.
-					const overflowY = getComputedStyle(el).overflowY;
-					if (overflowY === "auto" || overflowY === "scroll") return true;
-				}
-			}
-			el = el.parentElement;
-		}
-		return false;
-	}
-
 	private normalizeWheelDelta(event: WheelEvent): number {
 		if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return event.deltaY * 16;
 		if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE)
@@ -567,103 +460,46 @@ export class StickToBottomController {
 		return event.deltaY;
 	}
 
+	/**
+	 * Input handlers exist ONLY to interrupt an in-flight glide: a spring
+	 * moving toward the bottom can outpace the user's upward scroll within a
+	 * frame, so the coalesced scroll event would read as downward and the
+	 * geometric rules alone would let the glide win the fight. With no glide
+	 * running (all of streaming — growth follows are snaps, not glides), these
+	 * handlers do nothing and the scroll events decide everything, which is
+	 * what makes wheel-in-a-code-block, pinch-zoom, horizontal pans and
+	 * edge-swipe gestures need no special handling: they move nothing, so they
+	 * change nothing.
+	 */
 	private onWheel = (event: WheelEvent) => {
-		// ctrl+wheel is pinch-zoom, not scrolling.
-		if (event.ctrlKey) return;
-		// Dominantly horizontal trackpad pans (e.g. over a wide code block)
-		// carry small vertical jitter that must not read as scroll intent.
-		if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
-		const deltaY = this.normalizeWheelDelta(event);
-		if (deltaY === 0) return;
-
-		// Cheap state checks come first: wheel events arrive at trackpad rates
-		// during streaming (when layout is dirty every frame), and the ancestor
-		// walk below forces a reflow — skip it whenever nothing could change.
-		if (deltaY < 0) {
-			if (!this.state.pinned && !this.anim) return;
-			if (!this.canScroll()) return;
-			if (this.innerScrollableConsumes(event.target, deltaY)) return;
-			// Fast path so a running follow animation halts the same frame the
-			// user pushes back, instead of waiting for the scroll event.
-			this.unpin();
-		} else {
-			if (this.state.pinned || !this.canScroll()) return;
-			if (this.distanceFromBottom() > this.opts.nearBottomPx) return;
-			if (this.innerScrollableConsumes(event.target, deltaY)) return;
-			this.setPinned(true);
-			this.follow("reattach");
-		}
+		if (!this.anim || this.anim.snap) return;
+		if (event.ctrlKey) return; // pinch-zoom
+		if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return; // horizontal pan
+		if (this.normalizeWheelDelta(event) < 0) this.unpin();
 	};
 
 	private onTouchStart = (event: TouchEvent) => {
-		// A second finger means pinch-zoom, not scrolling — drop the gesture
-		// entirely (its fingers spreading must not read as scroll intent).
-		if (event.touches.length > 1) {
-			this.touch = null;
-			return;
-		}
-		const t = event.touches[0];
-		if (!t) return;
-		if (t.clientX < this.opts.ignoreTouchZonePx) return;
-		this.touch = { id: t.identifier, y: t.clientY, target: event.target, intent: false };
+		this.lastTouchY = event.touches.length === 1 ? event.touches[0].clientY : null;
 	};
 
 	private onTouchMove = (event: TouchEvent) => {
-		if (event.touches.length > 1) {
-			this.touch = null;
+		if (event.touches.length !== 1) {
+			this.lastTouchY = null;
 			return;
 		}
-		if (!this.touch || !this.canScroll()) return;
-		let t: Touch | undefined;
-		for (let i = 0; i < event.touches.length; i++) {
-			if (event.touches[i].identifier === this.touch.id) t = event.touches[i];
-		}
-		if (!t) return;
-
-		const travel = t.clientY - this.touch.y; // finger down = view up
-		if (!this.touch.intent && Math.abs(travel) < TOUCH_INTENT_PX) return;
-		this.touch.intent = true;
-
-		if (travel > 0) {
-			if (!this.innerScrollableConsumes(this.touch.target, -1)) this.unpin();
-		} else if (
-			travel < 0 &&
-			!this.state.pinned &&
-			this.distanceFromBottom() <= this.opts.nearBottomPx &&
-			!this.innerScrollableConsumes(this.touch.target, 1)
-		) {
-			this.setPinned(true);
-			this.follow("reattach");
-		}
-		this.touch.y = t.clientY;
+		const y = event.touches[0].clientY;
+		const lastY = this.lastTouchY;
+		this.lastTouchY = y;
+		// An active finger dragging AWAY from the bottom (finger down = content
+		// up) during a glide takes the view. Drags toward the bottom leave the
+		// glide running — it is already going where they want, and the geometric
+		// re-attach rule covers them if it gets canceled elsewhere. Momentum
+		// after the finger lifts sends no touchmove, but its scroll events carry
+		// direction and the geometric rules handle them.
+		if (this.anim && !this.anim.snap && lastY !== null && y > lastY + 1) this.unpin();
 	};
 
-	private onTouchEnd = (event: TouchEvent) => {
-		if (!this.touch) return;
-		for (let i = 0; i < event.touches.length; i++) {
-			if (event.touches[i].identifier === this.touch.id) return;
-		}
-		this.touch = null;
-	};
-
-	private onKeyDown = (event: KeyboardEvent) => {
-		// A widget that consumed the key (dropdown menu, select) will not
-		// scroll the container — no intent to read.
-		if (event.defaultPrevented) return;
-		const target = event.target;
-		if (
-			target instanceof HTMLElement &&
-			(target.tagName === "INPUT" ||
-				target.tagName === "TEXTAREA" ||
-				target.tagName === "SELECT" ||
-				target.isContentEditable)
-		) {
-			return;
-		}
-		if (event.key === "PageUp" || event.key === "Home" || event.key === "ArrowUp") {
-			if (this.canScroll()) this.unpin();
-		}
-		// Downward keys (PageDown/End/ArrowDown/Space) re-pin through the scroll
-		// handler's nearBottom rule once the native scroll lands there.
+	private onTouchEnd = () => {
+		this.lastTouchY = null;
 	};
 }
