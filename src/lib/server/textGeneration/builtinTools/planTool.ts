@@ -11,6 +11,7 @@ export const PLAN_TOOL_NAME = "update_plan";
 
 const MAX_STEPS = 20;
 const MAX_STEP_CHARS = 200;
+const MAX_STEP_LABEL_CHARS = 24;
 const MAX_GOAL_CHARS = 1500;
 const MAX_EXPLANATION_CHARS = 200;
 
@@ -55,13 +56,19 @@ export const planToolDefinition = {
 						type: "object",
 						properties: {
 							step: { type: "string", description: "The step, short and imperative." },
+							label: {
+								type: "string",
+								description:
+									"One or two words naming the step for the compact progress display, " +
+									"e.g. 'Baseline eval'.",
+							},
 							status: {
 								type: "string",
 								enum: ["pending", "in_progress", "completed", "skipped"],
 								description: "Mark abandoned steps skipped instead of deleting them.",
 							},
 						},
-						required: ["step", "status"],
+						required: ["step", "status", "label"],
 					},
 				},
 			},
@@ -77,6 +84,7 @@ const planArgsSchema = z.object({
 		.array(
 			z.object({
 				step: z.string().trim().min(1, "every step needs text"),
+				label: z.string().trim().optional(),
 				status: z.enum(["pending", "in_progress", "completed", "skipped"]),
 			})
 		)
@@ -111,7 +119,12 @@ export function parsePlanArgs(args: Record<string, unknown>): ParsedPlanArgs {
 			if (sawInProgress) status = "pending";
 			sawInProgress = true;
 		}
-		return { step: truncate(step.step, MAX_STEP_CHARS), status };
+		const label = step.label ? truncate(step.label, MAX_STEP_LABEL_CHARS) : undefined;
+		return {
+			step: truncate(step.step, MAX_STEP_CHARS),
+			status,
+			...(label ? { label } : {}),
+		};
 	});
 
 	const explanation = parsed.data.explanation
@@ -197,7 +210,7 @@ export function createPlanTool(conv: Pick<Conversation, "_id" | "plan">): Builti
 		exemptFromToolRestraint: true,
 		preprompt:
 			`PLANNING: For complex multi-step work — several distinct stages, multiple tool calls, or requirements that evolve over the conversation — call ${PLAN_TOOL_NAME} before starting and keep it current as you go. ` +
-			`Keep 3-7 short, verifiable steps with exactly one in_progress; mark steps completed the moment they finish, and mark abandoned steps skipped instead of deleting them. ` +
+			`Keep 3-7 short, verifiable steps with exactly one in_progress, each with a one-or-two-word label; mark steps completed the moment they finish, and mark abandoned steps skipped instead of deleting them. ` +
 			`Rewrite the goal whenever the user's requirements change so it always folds in every correction so far. ` +
 			`Never use it for simple or single-step requests, and do not repeat the plan in your reply — the interface already shows it.`,
 		async execute(args, ctx) {

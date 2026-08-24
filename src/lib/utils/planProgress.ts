@@ -12,9 +12,8 @@ const MAX_LABEL_CHARS = 24;
 const MAX_LABEL_WORDS = 3;
 
 /**
- * A dot-sized name derived from the step text. The plan schema carries one
- * string per step, so the strip's short labels are cut from it here; if the
- * tool ever grows a model-authored label field, it supersedes this.
+ * Fallback dot name cut from the step text, for plans persisted before the
+ * schema grew its model-authored `label` (or the odd update that omits one).
  */
 function shortLabel(step: string): string {
 	const words = step.split(/\s+/).slice(0, MAX_LABEL_WORDS).join(" ");
@@ -24,10 +23,13 @@ function shortLabel(step: string): string {
 
 /** update_plan steps in the shape the ML Assistant progress strip renders. */
 export function planStepsToMlSteps(steps: PlanStep[]): MlPlanStep[] {
-	return steps.map((step) => ({
-		label: shortLabel(step.step),
-		statusLabel: shortLabel(step.step),
-		description: step.step,
-		status: STATUS_MAP[step.status],
-	}));
+	return steps.map((step) => {
+		const label = step.label ?? shortLabel(step.step);
+		return {
+			label,
+			statusLabel: label,
+			description: step.step,
+			status: STATUS_MAP[step.status],
+		};
+	});
 }

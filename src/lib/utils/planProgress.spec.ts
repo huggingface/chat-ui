@@ -38,4 +38,17 @@ describe("planStepsToMlSteps", () => {
 		expect(mapped.label).toBe("Baseline eval");
 		expect(mapped.statusLabel).toBe("Baseline eval");
 	});
+
+	it("prefers the model-authored label over any cut of the step text", () => {
+		const [mapped] = planStepsToMlSteps([
+			{
+				step: "Design the social companion: pick platforms and handles",
+				label: "Social design",
+				status: "in_progress",
+			},
+		]);
+		expect(mapped.label).toBe("Social design");
+		expect(mapped.statusLabel).toBe("Social design");
+		expect(mapped.description).toBe("Design the social companion: pick platforms and handles");
+	});
 });

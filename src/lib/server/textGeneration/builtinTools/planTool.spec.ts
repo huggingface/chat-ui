@@ -81,6 +81,25 @@ describe("parsePlanArgs", () => {
 		expect(parsed.ok).toBe(true);
 		if (parsed.ok) expect(parsed.steps[0].step.length).toBeLessThanOrEqual(200);
 	});
+
+	it("keeps a step label, truncated, and drops a blank one", () => {
+		const parsed = parsePlanArgs({
+			goal: "g",
+			steps: [
+				{ step: "run the baseline", label: "Baseline eval", status: "pending" },
+				{ step: "train", label: "y".repeat(60), status: "pending" },
+				{ step: "compare", label: "   ", status: "pending" },
+				{ step: "report", status: "pending" },
+			],
+		});
+		expect(parsed.ok).toBe(true);
+		if (parsed.ok) {
+			expect(parsed.steps[0].label).toBe("Baseline eval");
+			expect(parsed.steps[1].label?.length).toBeLessThanOrEqual(24);
+			expect(parsed.steps[2].label).toBeUndefined();
+			expect(parsed.steps[3].label).toBeUndefined();
+		}
+	});
 });
 
 describe("renderPlanBlock", () => {
