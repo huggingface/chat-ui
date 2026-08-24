@@ -33,11 +33,10 @@ export function createTurnDom(chat: ChatScroll, content: HTMLElement): TurnDom {
 			content.style.paddingBottom = `${chat.bottomClearancePx}px`;
 		});
 		$effect(() => {
-			const anchored = chat.anchoredTurnKey;
+			const anchoredIndex = chat.anchoredTurnIndex;
 			const minHeight = chat.anchorMinHeightPx;
 			for (let i = 0; i < groups.length; i++) {
-				const isAnchoredLast = i === groups.length - 1 && groups[i].key === anchored;
-				groups[i].el.style.minHeight = isAnchoredLast ? `${minHeight}px` : "";
+				groups[i].el.style.minHeight = i === anchoredIndex ? `${minHeight}px` : "";
 			}
 		});
 	});

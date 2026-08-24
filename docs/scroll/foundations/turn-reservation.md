@@ -49,7 +49,10 @@ stateDiagram-v2
 - **Clean complete:** see Settling.
 - **Environment failing:** a failed or aborted request settles the turn with whatever arrived; reservation kept.
 - **Page going away:** reservations are session state. After a reload, no turn is anchored — the loaded conversation has no trailing blank space, and the view simply sits at the bottom of real content. This is deliberately different from within-session behavior and mirrors what major chat products do.
-- **Something else changing the target:** regenerate collapses the old reply _inside_ the reservation — the box holds its size, so the collapse moves nothing anywhere (see [regenerating and branches](../features/regenerating-and-branches.md)). A branch switch to a different user message makes a different turn last; the reservation no longer applies, and shrinkage follows the clamp rule of the scroll model.
+- **Something else changing the target:** regenerate collapses the old reply _inside_ the reservation — the box holds its size, so the collapse moves nothing anywhere (see [regenerating and branches](../features/regenerating-and-branches.md)). Cycling alternatives of the anchored turn's reply keeps the reservation: alternatives of different lengths compare inside a stable box, with no jumping between them. A branch switch that puts a _different_ turn in the trailing position drops the reservation entirely; shrinkage then follows the clamp rule of the scroll model.
+
+  > Technical note: when the stream ends, the server's canonical copy of the conversation replaces the optimistic one, and every message — and therefore every turn — gets a fresh identity. The reservation follows the trailing turn across that re-keying, which is why nothing moves at the end of a stream even though the entire message list was just swapped. A branch switch is told apart from this reconciliation by its explicit signal, not by guessing from the shape of the change.
+
 - **Input channel changing:** the virtual keyboard closing enlarges the view; the reservation is recomputed from the new height and the anchored message keeps its place 50px below the top (both the view and the reservation grew by the same amount). See [composer, viewport and gutter](../cross-cutting/composer-viewport-gutter.md).
 
 ## Interactions with other systems
@@ -62,7 +65,7 @@ stateDiagram-v2
 - **A sent message taller than the view** exceeds its reservation by itself; the reservation is inert and behavior is plain following. You see the tail of your message, and the reply streams in below it.
 - **A resumed conversation** (a reply parked mid-stream, picked up again) anchors the resumed turn when streaming resumes: the continuation streams into a reservation exactly as a fresh reply would.
 - **Regenerating in a freshly loaded conversation** anchors that turn at the moment of regeneration — the reservation appears in the same frame the old reply collapses, so the collapse is absorbed and the view does not jump even though the turn was never anchored before.
-- The reservation applies only while its turn is the **last** turn. If a branch switch makes an older turn last, no reservation applies to it unless it is the anchored turn itself (switching back to the anchored branch restores its reservation).
+- The reservation lives on the **trailing** turn only. A branch switch that changes which turn trails drops it for good; it comes back the next time a reply streams (a send or a regenerate re-anchors as usual). Switching among the anchored turn's own reply alternatives is not a change of turn — the reservation holds.
 
 ## Open questions and verification
 

@@ -22,7 +22,7 @@ interface ChatFixture {
 	fixture: Fixture;
 	chat: ReturnType<typeof createChatScroll>;
 	dom: TurnDom;
-	messages: { id: string; from: "user" | "assistant" }[];
+	messages: { id: string; from: "user" | "assistant"; terminal?: boolean }[];
 	sync: (opts?: { loading?: boolean; conversationKey?: string }) => void;
 	/** Mount a fresh turn — user message plus (empty) reply — as a send does,
 	 * with `loading` already true unless overridden. */
@@ -32,6 +32,11 @@ interface ChatFixture {
 	) => { user: HTMLDivElement; assistant: HTMLDivElement; key: string };
 	/** Swap the trailing reply for a fresh empty sibling — a regenerate. */
 	swapAssistant: (opts?: { loading?: boolean }) => HTMLDivElement;
+	/** Mark the trailing reply terminal — the stream is over. */
+	settleLast: () => void;
+	/** The post-stream server reconciliation: every message (and so every
+	 * turn) gets a fresh identity, content and geometry unchanged. */
+	reKeyAll: (opts?: { loading?: boolean }) => void;
 	lastAssistant: () => HTMLDivElement;
 	growLastAssistant: (px: number) => void;
 	lastGroupMinHeight: () => string;
@@ -49,6 +54,7 @@ function createChat({
 	turns = 3,
 	viewportHeight = 400,
 	firstSyncLoading = false,
+	lastTerminal = true,
 } = {}): ChatFixture {
 	const fixture = createFixture({ viewportHeight, blocks: [] });
 	const chat = createChatScroll();
@@ -81,9 +87,15 @@ function createChat({
 		const group = newGroup(userId);
 		group.appendChild(blockEl(userHeight, { user: true, id: userId }));
 		lastAssistantEl = group.appendChild(blockEl(assistantHeight, { id: assistantId }));
-		messages.push({ id: userId, from: "user" }, { id: assistantId, from: "assistant" });
+		messages.push(
+			{ id: userId, from: "user" },
+			{ id: assistantId, from: "assistant", terminal: true }
+		);
 	};
 	for (let i = 0; i < turns; i++) addTurn();
+	if (!lastTerminal && messages.length) {
+		messages[messages.length - 1].terminal = false;
+	}
 
 	const containerAction = chat.attach(fixture.container, { content: () => fixture.content });
 
@@ -93,11 +105,15 @@ function createChat({
 		dom,
 		messages,
 		sync({ loading = false, conversationKey = "c1" } = {}) {
+			// Mirrors ChatWindow's structural effect, terminal check included.
 			const last = messages.at(-1);
+			const lastTurnKey = dom.groups.at(-1)?.key ?? null;
+			const streaming = loading && last?.from === "assistant" && !last.terminal;
 			chat.sync({
 				conversationKey,
-				anchorCandidateKey:
-					loading && last?.from === "assistant" ? (dom.groups.at(-1)?.key ?? null) : null,
+				turnCount: dom.groups.length,
+				lastTurnKey,
+				streamingTurnKey: streaming ? lastTurnKey : null,
 			});
 			dom.flush();
 		},
@@ -108,7 +124,10 @@ function createChat({
 			const user = group.appendChild(blockEl(userHeight, { user: true, id: userId }));
 			const assistant = group.appendChild(blockEl(empty ? 0 : 60, { id: assistantId }));
 			lastAssistantEl = assistant;
-			messages.push({ id: userId, from: "user" }, { id: assistantId, from: "assistant" });
+			messages.push(
+				{ id: userId, from: "user" },
+				{ id: assistantId, from: "assistant", terminal: false }
+			);
 			api.sync({ loading });
 			return { user, assistant, key: userId };
 		},
@@ -120,9 +139,23 @@ function createChat({
 			const assistantId = `a${++n}`;
 			const assistant = group.el.appendChild(blockEl(0, { id: assistantId }));
 			lastAssistantEl = assistant;
-			messages.push({ id: assistantId, from: "assistant" });
+			messages.push({ id: assistantId, from: "assistant", terminal: false });
 			api.sync({ loading });
 			return assistant;
+		},
+		settleLast() {
+			const last = messages.at(-1);
+			if (last) last.terminal = true;
+			api.sync({ loading: false });
+		},
+		reKeyAll({ loading = false } = {}) {
+			for (const group of dom.groups) {
+				group.key = `rekeyed-${group.key}`;
+			}
+			for (const message of messages) {
+				message.id = `rekeyed-${message.id}`;
+			}
+			api.sync({ loading });
 		},
 		lastAssistant() {
 			if (!lastAssistantEl) throw new Error("no assistant mounted");
@@ -219,13 +252,32 @@ describe("send anchoring", () => {
 		const { assistant } = chat.mountPair();
 		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
 		assistant.style.height = "60px"; // short reply, stream over
-		chat.sync({ loading: false });
+		chat.settleLast();
 		await frames(4);
 		expect(chat.lastGroupMinHeight()).toBe(`${RESERVATION}px`);
 		const scrollTop = chat.fixture.scrollTop();
 		await frames(10);
 		expect(chat.fixture.scrollTop()).toBe(scrollTop);
 		expect(chat.lastGroupMinHeight()).toBe(`${RESERVATION}px`);
+	});
+
+	it("the post-stream server reconciliation re-keys every turn: the reservation carries over, nothing moves", async () => {
+		const chat = createChat();
+		chat.chat.notifySend();
+		const { assistant } = chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
+		assistant.style.height = "60px";
+		chat.settleLast();
+		await frames(3);
+		const scrollTop = chat.fixture.scrollTop();
+		const scrollHeight = chat.fixture.container.scrollHeight;
+		// The invalidate lands: same turns, entirely new identities.
+		chat.reKeyAll();
+		await frames(4);
+		expect(chat.lastGroupMinHeight()).toBe(`${RESERVATION}px`);
+		expect(chat.fixture.container.scrollHeight).toBe(scrollHeight);
+		expect(chat.fixture.scrollTop()).toBe(scrollTop);
+		expect(chat.chat.state.pinned).toBe(true);
 	});
 
 	it("send re-attaches a detached reader (sending is the request to see the exchange)", async () => {
@@ -257,7 +309,12 @@ describe("send anchoring", () => {
 	it("still anchors a pair that mounts late (attachment encoding has no deadline)", async () => {
 		const chat = createChat();
 		chat.chat.notifySend();
+		// The pre-mount gap: loading is on but the trailing message is still the
+		// previous, settled reply — which must NOT anchor (its turn inflating
+		// and deflating around the mount is the visible bug this guards).
+		chat.sync({ loading: true });
 		await frames(10); // encoding, MCP hydration…
+		expect(chat.lastGroupMinHeight()).toBe("");
 		const { user } = chat.mountPair();
 		await waitFor(() => Math.abs(topOf(user, chat) - ANCHOR_OFFSET) <= 2, {
 			label: "late pair still anchors",
@@ -315,6 +372,60 @@ describe("regenerate & branches", () => {
 		expect(chat.fixture.container.scrollHeight).toBe(scrollHeight);
 		expect(chat.fixture.scrollTop()).toBe(scrollTop);
 		expect(chat.chat.state.pinned).toBe(true);
+	});
+
+	it("cycling alternatives of the anchored turn keeps its reservation (stable comparison box)", async () => {
+		const chat = createChat();
+		chat.chat.notifySend();
+		const { assistant } = chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
+		assistant.style.height = "90px";
+		chat.settleLast();
+		await frames(3);
+		const scrollTop = chat.fixture.scrollTop();
+		// ‹ › on the reply: a different assistant sibling, same turn key.
+		chat.chat.notifyBranchSwitch();
+		chat.swapAssistant({ loading: false });
+		await frames(4);
+		expect(chat.lastGroupMinHeight()).toBe(`${RESERVATION}px`);
+		expect(chat.fixture.scrollTop()).toBe(scrollTop);
+	});
+
+	it("switching to a branch with a different trailing turn drops the reservation", async () => {
+		const chat = createChat();
+		chat.chat.notifySend();
+		const { assistant } = chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
+		assistant.style.height = "60px";
+		chat.settleLast();
+		await frames(3);
+		// ‹ › on the anchored turn's USER message: an edited alternative — a
+		// different turn entirely takes the trailing position.
+		chat.chat.notifyBranchSwitch();
+		chat.dom.removeLastGroup()?.remove();
+		chat.messages.pop();
+		chat.messages.pop();
+		const group = document.createElement("div");
+		group.style.cssText = "display: flex; flex-direction: column; flex-shrink: 0;";
+		chat.fixture.content.appendChild(group);
+		chat.dom.addGroup("alt-u", group);
+		const user = document.createElement("div");
+		user.style.cssText = "height: 40px; flex-shrink: 0;";
+		user.dataset.messageId = "alt-u";
+		user.dataset.messageType = "user";
+		group.appendChild(user);
+		const reply = document.createElement("div");
+		reply.style.cssText = "height: 60px; flex-shrink: 0;";
+		reply.dataset.messageId = "alt-a";
+		group.appendChild(reply);
+		chat.messages.push(
+			{ id: "alt-u", from: "user" },
+			{ id: "alt-a", from: "assistant", terminal: true }
+		);
+		chat.sync();
+		await frames(4);
+		expect(chat.chat.anchoredTurnKey).toBe(null);
+		expect(chat.lastGroupMinHeight()).toBe("");
 	});
 
 	it("branch switch keeps the compared message stationary (shorter branch clamps, no teleport)", async () => {
@@ -399,7 +510,7 @@ describe("conversation switch", () => {
 	});
 
 	it("adopts a mid-stream conversation's anchor on open, with no animation", async () => {
-		const chat = createChat({ turns: 2, firstSyncLoading: true });
+		const chat = createChat({ turns: 2, firstSyncLoading: true, lastTerminal: false });
 		expect(chat.chat.anchoredTurnKey).toBe("u2");
 		await frames(3);
 		expect(chat.lastGroupMinHeight()).toBe(`${RESERVATION}px`);

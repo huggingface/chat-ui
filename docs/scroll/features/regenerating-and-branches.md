@@ -55,7 +55,7 @@ stateDiagram-v2
 - **Clean complete:** the branch switch itself is instantaneous — its "complete" is the swap; regenerate completes as a normal settle.
 - **Environment failing:** a failed regenerate settles the turn with the error bar; the reservation (opened at anchoring) is kept, so the failed state is as still as a successful one.
 - **Page going away:** after a reload, the regenerated reply (or its error) is simply part of the loaded conversation; no turn is anchored.
-- **Something else changing the target:** switching to a branch whose last turn is _the anchored turn_ restores that turn's reservation (it is last again); switching to any other branch shows no reservation. Either way the compared message holds still, and only a clamp can move the view.
+- **Something else changing the target:** cycling the anchored turn's reply alternatives keeps its reservation, so alternatives of different lengths compare inside a stable box; switching to a branch with a different trailing turn drops the reservation. Either way the compared message holds still, and only a clamp can move the view.
 - **Input channel changing:** nothing specific; positions rule, as everywhere.
 
 ## Interactions with other systems

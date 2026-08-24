@@ -34,11 +34,16 @@ const PREVIOUS_TOP_OFFSET_PX = ANCHOR_TOP_OFFSET_PX;
 
 export interface ChatScrollSnapshot {
 	conversationKey: string | undefined;
-	/** The trailing turn's key while its reply is streaming, else null: the
-	 * caller passes `loading && trailing message is the assistant's` — the
-	 * whole condition for a turn to anchor. Never clears the latch (a settled
-	 * turn keeps its reservation); only a conversation switch does. */
-	anchorCandidateKey: string | null;
+	turnCount: number;
+	/** The trailing turn's key, whatever its state — the identity the anchor
+	 * follows across the post-stream server reconciliation, which re-keys
+	 * every message. */
+	lastTurnKey: string | null;
+	/** The trailing turn's key while a reply is streaming INTO it (loading,
+	 * trailing message is the assistant's, and that message is not already
+	 * terminal — the pre-mount gap after a submit still trails the previous,
+	 * settled reply, which must not anchor), else null. */
+	streamingTurnKey: string | null;
 }
 
 export class ChatScroll {
@@ -72,9 +77,17 @@ export class ChatScroll {
 	 * default equals the historical clearance. */
 	bottomClearancePx = $state(MIN_CLEARANCE_PX);
 
-	/** The turn currently holding the reservation, by turn key (the id of the
-	 * turn's first message). ChatWindow gives the matching turn group its
-	 * min-height while it is the last turn. */
+	/** The turn currently holding the reservation, by position. The TEMPLATE
+	 * binds min-height to this index, not to the key: the post-stream server
+	 * reconciliation re-keys every message, and a key-bound reservation would
+	 * blink out for the render in between — an unreserved layout the browser
+	 * clamps against, yanking the settled view. Positions survive re-keying,
+	 * so the swapped-in turns render with their reservation already on. */
+	anchoredTurnIndex: number | null = $state(null);
+
+	/** The anchored turn's key (the id of its first message) — the identity
+	 * sync() uses to tell a branch switch (drop the anchor) from the server
+	 * re-keying the same turn (carry it over). */
 	anchoredTurnKey: string | null = $state(null);
 
 	anchorMinHeightPx = $derived(anchorMinHeight(this.viewportHeightPx, this.bottomClearancePx));
@@ -87,6 +100,9 @@ export class ChatScroll {
 
 	private lastConversationKey: string | undefined;
 	private initialized = false;
+	/** Set by notifyBranchSwitch, consumed by the next sync: the switch's
+	 * structural change must drop a stale anchor, not carry it over. */
+	private pendingBranchSwitch = false;
 
 	// --- wiring -------------------------------------------------------------------
 
@@ -150,8 +166,11 @@ export class ChatScroll {
 
 	/** Branch/alternative switch: the compared message must stay put. Content
 	 * above the branch point is untouched, so disengaging the follow keeps it
-	 * stationary; the controller's clamp rule handles shorter branches. */
+	 * stationary; the controller's clamp rule handles shorter branches. The
+	 * flag lets sync() tell the switch's structural change apart from a
+	 * server reconciliation re-keying the same turns (see sync). */
 	notifyBranchSwitch() {
+		this.pendingBranchSwitch = true;
 		this.controller?.unpin();
 	}
 
@@ -161,41 +180,81 @@ export class ChatScroll {
 	 * re-runs on token flushes).
 	 */
 	sync(snapshot: ChatScrollSnapshot) {
-		const { conversationKey, anchorCandidateKey } = snapshot;
+		const { conversationKey, turnCount, lastTurnKey, streamingTurnKey } = snapshot;
 
 		if (!this.initialized || conversationKey !== this.lastConversationKey) {
 			const isFirstRun = !this.initialized;
 			this.initialized = true;
 			this.lastConversationKey = conversationKey;
+			this.pendingBranchSwitch = false;
 			// Adopt silently: a conversation opened mid-stream (resume, or a
 			// switch back to a generating one) anchors its streaming turn with
 			// no motion beyond the reset's jump.
-			this.anchoredTurnKey = anchorCandidateKey;
+			this.setAnchor(streamingTurnKey, streamingTurnKey ? turnCount - 1 : null);
 			if (!isFirstRun) this.reset();
 			return;
 		}
 
-		if (anchorCandidateKey && anchorCandidateKey !== this.anchoredTurnKey) {
-			// A reply started streaming into a turn that wasn't the anchored one:
-			// move the reservation there, and carry a still-pinned view to the
-			// anchor (one continuous motion with the send's own glide). A user
-			// who detached since submitting stays exactly where they are.
-			//
-			// The pin is deferred one microtask: this runs mid-render-flush, and
-			// pinning here would force layout BEFORE the reservation's template
-			// binding lands — a regenerate's collapse would clamp against that
-			// intermediate geometry and the clamp's scroll event, measured
-			// against the final (taller) content, would read as the user
-			// scrolling up and detach them. After the flush, shrink and
-			// reservation resolve in one layout and the clamp rule holds.
-			this.anchoredTurnKey = anchorCandidateKey;
-			if (this.state.pinned) {
-				const behavior = this.pinBehaviorForSend();
-				queueMicrotask(() => {
-					if (this.state.pinned) this.controller?.pin(behavior);
-				});
+		const wasBranchSwitch = this.pendingBranchSwitch;
+		this.pendingBranchSwitch = false;
+
+		if (streamingTurnKey) {
+			if (streamingTurnKey !== this.anchoredTurnKey) {
+				// A reply started streaming into a turn that wasn't the anchored
+				// one: move the reservation there, and carry a still-pinned view
+				// to the anchor (one continuous motion with the send's own
+				// glide). A user who detached since submitting stays put.
+				//
+				// The pin is deferred one microtask: this runs mid-render-flush,
+				// and pinning here would force layout BEFORE the reservation's
+				// template binding lands — a regenerate's collapse would clamp
+				// against that intermediate geometry and the clamp's scroll
+				// event, measured against the final (taller) content, would read
+				// as the user scrolling up and detach them. After the flush,
+				// shrink and reservation resolve in one layout and the clamp
+				// rule holds.
+				this.setAnchor(streamingTurnKey, turnCount - 1);
+				if (this.state.pinned) {
+					const behavior = this.pinBehaviorForSend();
+					queueMicrotask(() => {
+						if (this.state.pinned) this.controller?.pin(behavior);
+					});
+				}
+			}
+			return;
+		}
+
+		if (this.anchoredTurnKey === null) return;
+		if (this.anchoredTurnIndex !== null && this.anchoredTurnIndex >= turnCount) {
+			// The anchored position no longer exists (a branch switch onto a
+			// shorter path): nothing to reserve.
+			this.setAnchor(null, null);
+		} else if (lastTurnKey !== this.anchoredTurnKey) {
+			if (wasBranchSwitch) {
+				// Switched to a branch whose trailing turn is a different one:
+				// the reservation does not follow the user across branches.
+				// (Cycling alternatives of the anchored turn itself keeps the
+				// same turn key — the reservation holds and alternatives of
+				// different lengths compare inside a stable box.)
+				this.setAnchor(null, null);
+			} else if (lastTurnKey && this.anchoredTurnIndex === turnCount - 1) {
+				// Same conversation, same trailing turn, new identity: the
+				// post-stream server reconciliation re-keys every message.
+				// Carry the identity over; the index — which the template
+				// renders from — never wavered, so no frame lacked the
+				// reservation and the settled view never jumps.
+				this.anchoredTurnKey = lastTurnKey;
+			} else {
+				// The anchored position stopped being the trailing turn without
+				// a branch-switch signal (defensive; no current flow does this).
+				this.setAnchor(null, null);
 			}
 		}
+	}
+
+	private setAnchor(key: string | null, index: number | null) {
+		this.anchoredTurnKey = key;
+		this.anchoredTurnIndex = index;
 	}
 
 	/** Conversation switched: instant bottom, reservation cleared (any adopted

@@ -33,6 +33,7 @@
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
 	import { browser } from "$app/environment";
 	import { createChatScroll } from "$lib/utils/scroll/chatScroll.svelte";
+	import { isAssistantGenerationTerminal } from "$lib/utils/generationState";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ShareConversationModal from "../ShareConversationModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
@@ -371,15 +372,24 @@
 		return groups;
 	});
 
-	// Structural sync: conversation identity, plus which turn (if any) a reply
-	// is currently streaming into — the whole condition for a turn to anchor.
-	// Reads ids/from/loading only, so token flushes never re-run it.
+	// Structural sync: conversation identity, the trailing turn, and which turn
+	// (if any) a reply is currently streaming into — the whole condition for a
+	// turn to anchor. Reads ids/from/loading only (terminal-ness untracked), so
+	// token flushes never re-run it. The terminal check keeps the pre-mount gap
+	// after a submit — when the trailing message is still the previous, settled
+	// reply — from anchoring that turn.
 	$effect(() => {
 		const lastMessage = messages.at(-1);
+		const lastTurnKey = turns.at(-1)?.key ?? null;
+		const streaming =
+			loading &&
+			lastMessage?.from === "assistant" &&
+			untrack(() => !isAssistantGenerationTerminal(lastMessage));
 		chatScroll.sync({
 			conversationKey: page.params?.id,
-			anchorCandidateKey:
-				loading && lastMessage?.from === "assistant" ? (turns.at(-1)?.key ?? null) : null,
+			turnCount: turns.length,
+			lastTurnKey,
+			streamingTurnKey: streaming ? lastTurnKey : null,
 		});
 	});
 
@@ -715,10 +725,13 @@
 						style:padding-bottom="{chatScroll.bottomClearancePx}px"
 					>
 						{#each turns as turn, turnIdx (turn.key)}
+							<!-- The reservation binds to the anchored INDEX, not the key:
+							     the post-stream reconciliation re-keys every message, and a
+							     key-bound reservation would drop out for the in-between
+							     render — an unreserved layout the browser clamps against. -->
 							<div
 								class="flex flex-col gap-8"
-								style:min-height={turnIdx === turns.length - 1 &&
-								turn.key === chatScroll.anchoredTurnKey
+								style:min-height={turnIdx === chatScroll.anchoredTurnIndex
 									? `${chatScroll.anchorMinHeightPx}px`
 									: null}
 							>

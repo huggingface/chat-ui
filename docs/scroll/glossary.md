@@ -44,7 +44,7 @@ The browser forcing the scroll position down to the (new) bottom because content
 
 ### the anchored turn
 
-The turn whose reply most recently streamed (or is streaming) in this session. It is the only turn with a _reservation_. The anchor moves to a new turn when its reply starts, stays after the reply finishes, and clears when the user switches conversations. A freshly loaded conversation has no anchored turn.
+The turn whose reply most recently streamed (or is streaming) in this session. It is the only turn with a _reservation_. The anchor moves to a new turn when its reply starts, stays after the reply finishes — surviving the end-of-stream reconciliation that re-identifies every message, and surviving switches among that turn's own reply alternatives — and clears when the user switches conversations or to a branch with a different trailing turn. A freshly loaded conversation has no anchored turn.
 
 ### the reservation
 

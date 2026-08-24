@@ -16,7 +16,7 @@ This document covers the **filling**, **following**, and **settling** phases of 
 
 - **Filling.** The view is motionless while the reply fills its reservation. Reading during fill is reading a still page: scrolling up detaches (which changes nothing visually — nothing was moving), and returning to the bottom re-attaches. The scrollbar is still too, because the page height is constant.
 - **Following.** Growth past the reservation moves a following view down in same-frame snaps. Chunky growth — a code block swapping in its highlighted form, an image arriving — moves it by that chunk: the motion equals the content change, no more, no less. A detached view never moves; growth below the fold is silent, and growth _above_ a detached reader is compensated so their text holds still ([scroll model](../foundations/scroll-model.md)).
-- **Settling.** The stream ends. Nothing moves — not now, and not when the final markdown pass, syntax highlighting, or late images land afterwards, so long as the view is where following left it (at the bottom, those late changes are followed like any growth; detached, they are compensated or silent). There is no end-of-stream scroll correction.
+- **Settling.** The stream ends. Nothing moves — not now, not when the conversation is silently reconciled with the server's canonical copy a moment later, and not when the final markdown pass, syntax highlighting, or late images land afterwards, so long as the view is where following left it (at the bottom, those late changes are followed like any growth; detached, they are compensated or silent). There is no end-of-stream scroll correction.
 
 <a id="settling"></a>
 
