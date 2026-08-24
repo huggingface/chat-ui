@@ -15,9 +15,11 @@ export const IMAGE_MIME_ALLOWLIST_DEFAULT = ["image/jpeg", "image/png"] as const
 // forking the code, e.g. PUBLIC_TEXT_MIME_ALLOWLIST="text/x-typescript,text/x-python"
 function parseExtraMimeTypes(value: string | undefined): string[] {
 	if (!value) return [];
+	// Lowercased so the client matcher, which compares case-sensitively, agrees
+	// with the server's own lowercasing. MIME types are case-insensitive.
 	return value
 		.split(",")
-		.map((entry) => entry.trim())
+		.map((entry) => entry.trim().toLowerCase())
 		.filter(Boolean);
 }
 

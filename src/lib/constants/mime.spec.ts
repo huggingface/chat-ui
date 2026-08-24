@@ -56,4 +56,12 @@ describe("TEXT_MIME_ALLOWLIST", () => {
 		expect(mimeMatchesAllowlist("application/x-yaml", TEXT_MIME_ALLOWLIST)).toBe(true);
 		expect(mimeMatchesAllowlist("image/png", TEXT_MIME_ALLOWLIST)).toBe(false);
 	});
+
+	it("lowercases entries so the case-sensitive client matcher still matches", async () => {
+		const { TEXT_MIME_ALLOWLIST } = await loadAllowlist("Application/X-Yaml");
+		const { mimeMatchesAllowlist } = await import("$lib/utils/mimeMatch");
+
+		expect(TEXT_MIME_ALLOWLIST).toContain("application/x-yaml");
+		expect(mimeMatchesAllowlist("application/x-yaml", TEXT_MIME_ALLOWLIST)).toBe(true);
+	});
 });
