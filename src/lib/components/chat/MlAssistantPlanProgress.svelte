@@ -184,7 +184,7 @@
 	.ml-dot[data-status="skipped"] {
 		background: #eff0f6;
 		border: 1px solid #d7d9e2;
-		color: #9b9ca6;
+		color: #aeafbb;
 	}
 
 	/* Solid (the strip's own band color) so the connector line cannot show
@@ -198,7 +198,7 @@
 	:global(.dark) .ml-dot[data-status="skipped"] {
 		background: #20222d;
 		border-color: #383e54;
-		color: #767a88;
+		color: #6a6e7d;
 	}
 
 	@keyframes mlpulse {
