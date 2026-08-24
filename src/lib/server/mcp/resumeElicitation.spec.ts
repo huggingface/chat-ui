@@ -206,3 +206,136 @@ describe("resuming a parked tool call", () => {
 		expect(calls.seen).toHaveLength(0);
 	});
 });
+
+describe("resuming the model's own question", () => {
+	async function parkAsk(
+		conversationId: ObjectId,
+		action: "accept" | "decline",
+		content?: Record<string, string | string[]>
+	) {
+		const elicitationId = crypto.randomUUID();
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			elicitationId,
+			conversationId,
+			status: "resolved",
+			action,
+			...(content ? { content } : {}),
+			request: {
+				elicitationId,
+				source: "assistant",
+				server: "",
+				mode: "form",
+				message: "",
+				fields: [
+					{
+						kind: "select",
+						name: "q1",
+						title: "Storage",
+						description: "Where should uploads go?",
+						required: true,
+						multiple: false,
+						options: [
+							{ value: "S3", label: "S3" },
+							{ value: "Disk", label: "Disk" },
+						],
+					},
+				],
+			},
+			pending: { kind: "ask", messageId: "m1", toolCallId: "c1", toolUuid: "u1" },
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+		return elicitationId;
+	}
+
+	beforeEach(() => {
+		calls.queue.length = 0;
+		calls.seen.length = 0;
+	});
+
+	it("hands the answer straight back without calling any server", async () => {
+		const conversationId = new ObjectId();
+		const id = await parkAsk(conversationId, "accept", { q1: "S3" });
+
+		const outcome = await resumeParkedToolCall({
+			conversationId,
+			elicitationId: id,
+			extraServers: SERVERS,
+		});
+
+		expect(calls.seen).toHaveLength(0);
+		expect(outcome).toMatchObject({ resumed: true });
+		expect(outcome.parkedAgain).toBeUndefined();
+
+		const result = outcome.updates.find(
+			(u) => "subtype" in u && u.subtype === "result"
+		) as unknown as { result: { outputs: Array<{ text: string }> } };
+		expect(result.result.outputs[0].text).toContain("Where should uploads go?");
+		expect(result.result.outputs[0].text).toContain("S3");
+	});
+
+	it("settles the prompt so a reloaded transcript stops showing it open", async () => {
+		const conversationId = new ObjectId();
+		const id = await parkAsk(conversationId, "accept", { q1: "S3" });
+
+		const outcome = await resumeParkedToolCall({
+			conversationId,
+			elicitationId: id,
+			extraServers: SERVERS,
+		});
+
+		expect(outcome.updates.filter(isMessageElicitationResolvedUpdate)).toHaveLength(1);
+	});
+
+	it("tells the model to carry on when the question was skipped", async () => {
+		const conversationId = new ObjectId();
+		const id = await parkAsk(conversationId, "decline");
+
+		const outcome = await resumeParkedToolCall({
+			conversationId,
+			elicitationId: id,
+			extraServers: SERVERS,
+		});
+
+		const result = outcome.updates.find(
+			(u) => "subtype" in u && u.subtype === "result"
+		) as unknown as { result: { outputs: Array<{ text: string }> } };
+		expect(result.result.outputs[0].text).toMatch(/best judgement/);
+	});
+
+	it("will not answer a question asked in another conversation", async () => {
+		const id = await parkAsk(new ObjectId(), "accept", { q1: "S3" });
+
+		const outcome = await resumeParkedToolCall({
+			conversationId: new ObjectId(),
+			elicitationId: id,
+			extraServers: SERVERS,
+		});
+
+		expect(outcome).toMatchObject({ resumed: false });
+		expect(outcome.updates).toHaveLength(0);
+	});
+});
+
+describe("which turn a parked call belongs to", () => {
+	it("comes from the record, not from whatever was sent since", async () => {
+		const { parkedMessageId } = await import("./elicitation");
+		const conversationId = new ObjectId();
+		const elicitationId = crypto.randomUUID();
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			elicitationId,
+			conversationId,
+			status: "pending",
+			request: { elicitationId, server: "", mode: "form", message: "?", fields: [] },
+			pending: { kind: "ask", messageId: "parked-message", toolCallId: "c1", toolUuid: "u1" },
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+
+		expect(await parkedMessageId(conversationId, elicitationId)).toBe("parked-message");
+		// Another conversation holding the id is not entitled to the answer.
+		expect(await parkedMessageId(new ObjectId(), elicitationId)).toBeUndefined();
+	});
+});

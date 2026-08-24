@@ -25,4 +25,15 @@ describe("buildToolPreprompt", () => {
 		const prompt = buildToolPreprompt([tool("web_search_exa")]);
 		expect(prompt).toContain("instead of answering from memory");
 	});
+
+	it("only guides asking the user when that tool is on offer", () => {
+		const without = buildToolPreprompt([tool("web_search_exa")]);
+		expect(without).not.toContain("ASKING THE USER:");
+		expect(without).not.toContain("This does not apply to");
+
+		const withAsk = buildToolPreprompt([tool("web_search_exa"), tool("ask_user_question")]);
+		expect(withAsk).toContain("ASKING THE USER:");
+		// Without the carve-out the blanket "do not use a tool" above rules the question out.
+		expect(withAsk).toContain("This does not apply to ask_user_question");
+	});
 });

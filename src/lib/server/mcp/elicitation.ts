@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import type { Client } from "@modelcontextprotocol/client";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
-import type { McpElicitation } from "$lib/types/McpElicitation";
+import type { McpElicitation, PendingMcpCall } from "$lib/types/McpElicitation";
 import type {
 	ElicitationAction,
 	ElicitationRequestPayload,
@@ -260,7 +260,8 @@ export async function handleElicitationRequest(
 }
 
 export type SubmitResult =
-	{ ok: true; resume: boolean } | { ok: false; status: 400 | 404 | 409; error: string };
+	| { ok: true; resume: boolean; messageId?: string }
+	| { ok: false; status: 400 | 404 | 409; error: string };
 
 export async function submitElicitationAnswer({
 	elicitationId,
@@ -305,7 +306,11 @@ export async function submitElicitationAnswer({
 	);
 	if (updated.matchedCount === 0) return { ok: false, status: 409, error: "Already answered." };
 
-	return { ok: true, resume: doc.pending !== undefined };
+	return {
+		ok: true,
+		resume: doc.pending !== undefined,
+		...(doc.pending ? { messageId: doc.pending.messageId } : {}),
+	};
 }
 
 /**
@@ -322,7 +327,7 @@ export async function openDurableElicitation({
 	sink: ElicitationSink;
 	server: string;
 	toolUuid: string;
-	pending: Omit<NonNullable<McpElicitation["pending"]>, "inputKey" | "requestState" | "server">;
+	pending: Omit<PendingMcpCall, "kind" | "inputKey" | "requestState" | "server">;
 	inputRequired: McpInputRequired;
 }): Promise<{ opened: boolean; reason?: string }> {
 	const entries = Object.entries(inputRequired.inputRequests);
@@ -383,6 +388,9 @@ export async function takeResumableElicitation(
 ): Promise<{ row: McpElicitation; inputResponses: InputResponses } | null> {
 	const row = await collections.mcpElicitations.findOne({ elicitationId, conversationId });
 	if (!row?.pending || row.status !== "resolved" || !row.action) return null;
+	// The model's own question is answered by the answer itself; there is no call to replay
+	// responses into.
+	if (row.pending.kind === "ask") return { row, inputResponses: {} };
 	return {
 		row,
 		inputResponses: {
@@ -392,4 +400,16 @@ export async function takeResumableElicitation(
 			},
 		},
 	};
+}
+
+/** Recorded when the prompt opened, so it survives whatever the user does meanwhile. */
+export async function parkedMessageId(
+	conversationId: ObjectId,
+	elicitationId: string
+): Promise<string | undefined> {
+	const row = await collections.mcpElicitations.findOne(
+		{ elicitationId, conversationId },
+		{ projection: { pending: 1 } }
+	);
+	return row?.pending?.messageId;
 }

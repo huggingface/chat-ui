@@ -50,6 +50,8 @@
 
 	let convId = $derived(page.params.id ?? "");
 	let pending = $state(false);
+	/** A resumed call streams into the message that parked, so it needs no placeholder. */
+	let resuming = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
 	// Conversation-scoped stop tombstone. A boolean reset on page.params.id
@@ -134,7 +136,11 @@
 		// when it is next open, rather than this one resuming a stranger's tool call.
 		if (!pending || pending.conversationId !== convId || $loading) return;
 		elicitationToResume.set(null);
-		void writeMessage({ resumeElicitationId: pending.elicitationId });
+		// The turn that asked: another may have been sent while the prompt was open.
+		void writeMessage({
+			resumeElicitationId: pending.elicitationId,
+			...(pending.messageId ? { messageId: pending.messageId } : {}),
+		});
 	});
 
 	async function writeMessage({
@@ -153,6 +159,7 @@
 			$isAborted = false;
 			$loading = true;
 			pending = true;
+			resuming = Boolean(resumeElicitationId);
 			writeMessageInFlight = true;
 			// Create the controller before any await: a Stop click during file
 			// encoding or MCP hydration must abort THIS request, not whichever
@@ -324,6 +331,7 @@
 				onStreamStart: () => {
 					if (pending) streamStart();
 					pending = false;
+					resuming = false;
 				},
 				onTitle: (title) => convsStore.update(convId, { title }),
 				onError: (update) => {
@@ -361,6 +369,7 @@
 			activeGenerationId = undefined;
 			$loading = false;
 			pending = false;
+			resuming = false;
 			// Wait for the stop request to complete before refreshing data,
 			// so the abort marker is durably written before we poll for the
 			// terminal state below.
@@ -689,6 +698,7 @@
 <ChatWindow
 	loading={$loading}
 	{pending}
+	{resuming}
 	messages={messagesPath as Message[]}
 	{messagesAlternatives}
 	shared={data.shared}

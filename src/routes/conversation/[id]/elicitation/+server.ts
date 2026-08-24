@@ -41,5 +41,5 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	if (!result.ok) error(result.status, result.error);
 
 	// A parked 2026-era call resumes on a fresh run; a blocking one is already unblocked.
-	return json({ ok: true, resume: result.resume });
+	return json({ ok: true, resume: result.resume, messageId: result.messageId });
 };

@@ -29,6 +29,7 @@ import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
+import { askUserQuestionTool } from "$lib/server/askUserQuestion";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -329,16 +330,22 @@ export async function* runMcpFlow({
 	let producedOutput = false;
 
 	try {
-		const { tools: oaTools, mapping } = await getOpenAiToolsForMcp(servers, {
+		const { tools: mcpTools, mapping } = await getOpenAiToolsForMcp(servers, {
 			signal: abortSignal,
 		});
+		// Alongside the MCP tools, never on its own: a conversation with no MCP server keeps
+		// the plain generation path it has always taken.
+		const oaTools =
+			isMlAssistantConversation(conv) && mcpTools.length > 0
+				? [...mcpTools, askUserQuestionTool]
+				: mcpTools;
 		try {
 			logger.info(
 				{ toolCount: oaTools.length, toolNames: oaTools.map((t) => t.function.name) },
 				"[mcp] openai tool defs built"
 			);
 		} catch {}
-		if (oaTools.length === 0) {
+		if (mcpTools.length === 0) {
 			logger.warn({}, "[mcp] zero tools available after listing; skipping MCP flow");
 			return "not_applicable";
 		}
