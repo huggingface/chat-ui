@@ -115,13 +115,27 @@ test("scrolling up during a stream detaches: growth never moves the view again",
 		})
 		.toBeGreaterThan(initial.scrollHeight);
 
-	// Scroll up — the position change is the signal, whatever produced it
-	// (mirrors a scrollbar drag; wheel emulation differs across engines).
-	await page.evaluate((selector) => {
-		const el = document.querySelector(selector);
-		if (!(el instanceof HTMLElement)) throw new Error("scroll container not found");
-		el.scrollTop -= 400;
-	}, CONTAINER);
+	// Scroll up the way a user does — a real wheel gesture over the
+	// conversation. (A bare scrollTop write is what the browser's own
+	// adjustments look like and is deliberately not a detach.) Engines animate
+	// wheel scrolling, so wait for the position to settle before measuring.
+	const box = await page.locator(CONTAINER).boundingBox();
+	if (!box) throw new Error("scroll container has no box");
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.mouse.wheel(0, -400);
+	const beforeWheel = (await containerGeometry(page)).scrollTop;
+	let settled = await containerGeometry(page);
+	await expect
+		.poll(
+			async () => {
+				const now = await containerGeometry(page);
+				const stable = now.scrollTop === settled.scrollTop && now.scrollTop < beforeWheel;
+				settled = now;
+				return stable;
+			},
+			{ timeout: 5_000, intervals: [150], message: "wheel moved the view and it settled" }
+		)
+		.toBe(true);
 
 	const detached = await containerGeometry(page);
 	await page.waitForTimeout(700); // many more chunks arrive

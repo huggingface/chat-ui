@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { StickToBottomController, type StickToBottomOptions } from "../stickToBottom";
 import {
+	browserScrollTo,
 	createFixture,
 	dragScrollbarTo,
 	frame,
@@ -306,6 +307,67 @@ describe("gestures that must NOT change pin state", () => {
 		if (Math.abs(fixture.distance() - distanceBefore) <= 2) {
 			expect(fixture.distance()).toBeGreaterThan(40);
 		}
+	});
+});
+
+describe("browser-initiated movement (no gesture)", () => {
+	it("an upward move with no gesture behind it is undone in the same event while following", async () => {
+		const { fixture, controller } = setup();
+		await frames(3);
+		await nextTask();
+		// Safari clamps the scroller while DOM nodes are swapped and reports it
+		// as a scroll event; nothing the user did produced this.
+		browserScrollTo(fixture.container, fixture.scrollTop() - 200);
+		await frame();
+		expect(controller.pinned).toBe(true);
+		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
+	});
+
+	it("the same move while detached is left alone (find-in-page keeps its result in view)", async () => {
+		const { fixture, controller } = setup();
+		wheel(fixture.container, -120);
+		await frame();
+		expect(controller.pinned).toBe(false);
+		await nextTask();
+		browserScrollTo(fixture.container, 40);
+		await frames(2);
+		expect(controller.pinned).toBe(false);
+		expect(fixture.scrollTop()).toBe(40);
+	});
+
+	it("touch momentum after the finger lifts still counts as the user's", async () => {
+		const { fixture, controller } = setup();
+		await frames(3); // let the initial ResizeObserver settle
+		await nextTask();
+		// A drag too small to detach on its own…
+		await touchDrag(fixture.container, { fromY: 100, toY: 102, steps: 1 });
+		expect(controller.pinned).toBe(true);
+		// …whose momentum (scroll events with no touch events behind them)
+		// carries on right after the lift.
+		browserScrollTo(fixture.container, fixture.scrollTop() - 60);
+		await frame();
+		expect(controller.pinned).toBe(false);
+	});
+
+	it("a glide in flight is not teleported by a browser-initiated move", async () => {
+		const { fixture, controller } = setup();
+		fixture.addBlock(1200);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle tall fixture" });
+		await nextTask();
+		dragScrollbarTo(fixture.container, 0);
+		await frame();
+		// Let the drag's gesture window lapse: the move below must carry none.
+		await new Promise((resolve) => setTimeout(resolve, 250));
+		controller.animateToBottom();
+		await frames(2);
+		const mid = fixture.scrollTop();
+		browserScrollTo(fixture.container, mid - 30);
+		await frames(2);
+		// Still pinned, and the spring simply carried on toward the bottom —
+		// no instant jump to the end.
+		expect(controller.pinned).toBe(true);
+		expect(fixture.distance()).toBeGreaterThan(ARRIVED);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "glide completes" });
 	});
 });
 
