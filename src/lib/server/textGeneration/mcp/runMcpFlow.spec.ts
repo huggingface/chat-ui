@@ -24,13 +24,15 @@ const mocks = vi.hoisted(() => ({
 	create: vi.fn(),
 	executeToolCalls: vi.fn(),
 	getAbortTime: vi.fn(() => undefined as number | undefined),
-	// Mutable so a test can strip the MCP tools or pull the tool's kill switch.
+	// Mutable so a test can strip the MCP tools.
 	mcpTools: [{ type: "function", function: { name: "do_thing" } }] as Array<{
 		type: string;
 		function: { name: string };
 	}>,
-	disableAsk: undefined as string | undefined,
 }));
+
+// The gate itself is real; only the build flag behind it is forced on.
+vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
 
 vi.mock("openai", () => ({
 	OpenAI: class {
@@ -47,9 +49,6 @@ vi.mock("$lib/server/config", () => ({
 		EXA_API_KEY: "",
 		USE_USER_TOKEN: "false",
 		isHuggingChat: false,
-		get DISABLE_ASK_USER_QUESTION() {
-			return mocks.disableAsk;
-		},
 	},
 }));
 
@@ -214,7 +213,6 @@ beforeEach(() => {
 	mocks.executeToolCalls.mockReset();
 	mocks.getAbortTime.mockReset();
 	mocks.mcpTools = [{ type: "function", function: { name: "do_thing" } }];
-	mocks.disableAsk = undefined;
 	mocks.getAbortTime.mockReturnValue(undefined);
 	scriptToolResults();
 });
@@ -434,14 +432,17 @@ describe("runMcpFlow offering the question tool", () => {
 				?.tools ?? []
 		).map((t) => t.function.name);
 
-	it("offers it alongside the MCP tools", async () => {
+	const inMlMode = { conv: { _id: new ObjectId(), mlAssistant: true } } as unknown as Parameters<
+		typeof runMcpFlow
+	>[0];
+
+	it("offers it alongside the MCP tools in ML Assistant mode", async () => {
 		scriptRounds([{ content: "the answer" }]);
-		await runFlow();
+		await runFlow(inMlMode);
 		expect(toolNames()).toContain("ask_user_question");
 	});
 
-	it("withdraws it when the kill switch is set", async () => {
-		mocks.disableAsk = "true";
+	it("withholds it from a conversation outside the mode", async () => {
 		scriptRounds([{ content: "the answer" }]);
 		await runFlow();
 		expect(toolNames()).toEqual(["do_thing"]);
@@ -452,7 +453,7 @@ describe("runMcpFlow offering the question tool", () => {
 		// people who have configured nothing.
 		mocks.mcpTools = [];
 		scriptRounds([{ content: "the answer" }]);
-		const { result } = await runFlow();
+		const { result } = await runFlow(inMlMode);
 		expect(result).toBe("not_applicable");
 		expect(mocks.create).not.toHaveBeenCalled();
 	});

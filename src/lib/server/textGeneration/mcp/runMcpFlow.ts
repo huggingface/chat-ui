@@ -336,7 +336,7 @@ export async function* runMcpFlow({
 		// Alongside the MCP tools, never on its own: a conversation with no MCP server keeps
 		// the plain generation path it has always taken.
 		const oaTools =
-			mcpTools.length > 0 && config.DISABLE_ASK_USER_QUESTION !== "true"
+			isMlAssistantConversation(conv) && mcpTools.length > 0
 				? [...mcpTools, askUserQuestionTool]
 				: mcpTools;
 		try {
