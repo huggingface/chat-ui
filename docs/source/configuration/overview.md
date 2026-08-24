@@ -72,6 +72,18 @@ ENABLE_DATA_EXPORT=true         # Allow users to export their data
 ALLOW_IFRAME=false              # Disallow embedding in iframes (set to true to allow)
 ```
 
+## Build Flags
+
+Some features are fixed when the app is built rather than read at runtime, so a
+build either ships them or has no way to turn them on:
+
+```ini
+ML_ASSISTANT_MODE=true          # Compile in ML Assistant mode (composer header strip)
+```
+
+Pass it to `npm run build`, or as a `--build-arg` to `docker build`. Setting it on
+an already-built instance has no effect.
+
 ## User Authentication
 
 Use OpenID Connect for authentication:

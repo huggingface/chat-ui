@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy, untrack } from "svelte";
+	import { onDestroy, onMount, untrack } from "svelte";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
@@ -52,6 +52,15 @@
 	import { mimeMatchesAllowlist } from "$lib/utils/mimeMatch";
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideSparkles from "~icons/lucide/sparkles";
+	import MlAssistantStrip from "./MlAssistantStrip.svelte";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import {
+		ML_ASSISTANT_EFFORT,
+		ML_ASSISTANT_PLACEHOLDER,
+		mlAssistantExamples,
+	} from "$lib/constants/mlAssistant";
+	import type { ReasoningEffort } from "$lib/types/Settings";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -160,6 +169,9 @@
 		if (requireAuthUser() || loading || !draft) return;
 		tap();
 		chatScroll.armSend();
+		// Latches the mode onto the conversation, so the strip stays and swaps its
+		// tool note for the plan progress row. No-op when the mode is off.
+		mlAssistant.startTask();
 		onmessage?.(draft);
 		draft = "";
 	};
@@ -430,10 +442,77 @@
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
 
+	// --- ML Assistant mode (build flag, see $lib/utils/mlAssistantFlag) --------
+
+	let mlModeOn = $derived(ML_ASSISTANT_MODE && mlAssistant.enabled);
+	let mlTaskRunning = $derived(ML_ASSISTANT_MODE && mlAssistant.taskStarted);
+	// Sending with the mode off collapses the strip away for good; sending with it
+	// on keeps the strip, which is where the plan progress lives.
+	let mlStripVisible = $derived(ML_ASSISTANT_MODE && (mlTaskRunning || messages.length === 0));
+
+	$effect(() => {
+		if (!ML_ASSISTANT_MODE) return;
+		const conversationId = page.params?.id;
+		const startedInMlMode = Boolean((page.data as { mlAssistant?: boolean }).mlAssistant);
+		untrack(() => {
+			if (mlAssistant.syncConversation(conversationId, startedInMlMode)) releaseMlEffort();
+		});
+	});
+
+	onMount(() => {
+		// A reload drops the mode but not the effort override it was holding, so this
+		// load is the one that has to hand the setting back. Guarded on the mode being
+		// off: this also runs when navigating into the conversation a mode-on send just
+		// created, and that hold is still live.
+		if (!ML_ASSISTANT_MODE || mlAssistant.enabled) return;
+		mlAssistant.restoreEffortHold();
+		releaseMlEffort();
+	});
+
+	// The preset runs at high effort. Effort is read from the user's saved settings
+	// when the request is built, so the mode has to write the override rather than
+	// only display it; the previous value goes back when the mode is switched off.
+	function holdMlEffort() {
+		if (mlAssistant.effortHold) return;
+		const overrides = { ...($settings.reasoningEffortOverrides ?? {}) };
+		mlAssistant.effortHold = {
+			modelId: currentModel.id,
+			previous: overrides[currentModel.id],
+		};
+		overrides[currentModel.id] = ML_ASSISTANT_EFFORT;
+		settings.instantSet({ reasoningEffortOverrides: overrides });
+	}
+
+	function releaseMlEffort() {
+		const hold = mlAssistant.effortHold;
+		if (!hold) return;
+		mlAssistant.effortHold = null;
+		const overrides: Record<string, ReasoningEffort> = {
+			...($settings.reasoningEffortOverrides ?? {}),
+		};
+		if (hold.previous === undefined) {
+			delete overrides[hold.modelId];
+		} else {
+			overrides[hold.modelId] = hold.previous;
+		}
+		settings.instantSet({ reasoningEffortOverrides: overrides });
+	}
+
+	function toggleMlMode(next: boolean) {
+		if (requireAuthUser()) return;
+		mlAssistant.toggle(next);
+		if (mlAssistant.enabled) {
+			holdMlEffort();
+		} else {
+			releaseMlEffort();
+		}
+	}
+
 	let activeRouterExamplePrompt = $state<string | null>(null);
-	// Use MCP examples when all base servers are enabled, otherwise use router examples
+	// ML Assistant mode brings its own chip set; otherwise use MCP examples when all
+	// base servers are enabled, and router examples when they are not.
 	let activeExamples = $derived<RouterExample[]>(
-		$allBaseServersEnabled ? mcpExamples : routerExamples
+		mlModeOn ? mlAssistantExamples : $allBaseServersEnabled ? mcpExamples : routerExamples
 	);
 	let routerFollowUps = $derived<RouterFollowUp[]>(
 		activeRouterExamplePrompt
@@ -757,13 +836,18 @@
 			max-sm:py-0 sm:px-[calc(1.25rem+var(--scrollbar-gutter,0px))]
 			md:pb-4 xl:max-w-4xl dark:border-gray-800 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0"
 		>
-			{#if !draft.length && !messages.length && !sources.length && !loading && (currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
+			{#if !draft.length && !messages.length && !sources.length && !loading && (mlModeOn || currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
 				<div
 					class="mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 select-none dark:text-gray-500"
 				>
 					{#each activeExamples as ex}
 						<button
-							class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur-sm hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
+							class={[
+								"flex items-center gap-1 rounded-lg px-2 py-0.5 text-center text-sm backdrop-blur-sm",
+								mlModeOn
+									? "bg-[#eef2ff] text-[#3450cc] dark:bg-[#1b2140] dark:text-[#93a4f0]"
+									: "bg-gray-100/90 hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400",
+							]}
 							onclick={() => startExample(ex)}
 						>
 							{ex.title}
@@ -832,85 +916,110 @@
 						handleSubmit();
 					}}
 					class={{
-						"relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 dark:border-gray-700 dark:bg-gray-800": true,
+						"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
+						"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
+						"border-[#dfe4fb] dark:border-[#2b3357]": mlModeOn && mlStripVisible,
+						"dark:border-gray-700": !(mlModeOn && mlStripVisible),
 						"opacity-30": isReadOnly,
 						"max-sm:mb-4": focused && isVirtualKeyboard(),
 					}}
 				>
-					{#if isRecording || isTranscribing}
-						<VoiceRecorder
-							{isTranscribing}
-							{isTouchDevice}
-							oncancel={() => {
-								isRecording = false;
-							}}
-							onconfirm={handleRecordingConfirm}
-							onsend={handleRecordingSend}
-							onerror={handleRecordingError}
+					{#if ML_ASSISTANT_MODE}
+						<MlAssistantStrip
+							visible={mlStripVisible}
+							enabled={mlAssistant.enabled}
+							taskRunning={mlTaskRunning}
+							steps={mlAssistant.steps}
+							statusLabel={mlAssistant.statusLabel}
+							complete={mlAssistant.complete}
+							ontoggle={toggleMlMode}
 						/>
-					{:else if onDrag && isFileUploadEnabled}
-						<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
-					{:else}
-						<div
-							class="flex w-full flex-1 rounded-xl border-none bg-transparent"
-							class:paste-glow={pastedLongContent}
-						>
-							{#if lastIsError}
-								<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
-							{:else}
-								<ChatInput
-									placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
-									{loading}
-									bind:value={draft}
-									bind:files
-									mimeTypes={activeMimeTypes}
-									onsubmit={handleSubmit}
-									{onPaste}
-									disabled={isReadOnly || lastIsError}
-									{modelIsMultimodal}
-									{modelSupportsTools}
-									bind:focused
-								/>
-							{/if}
+					{/if}
+					<!-- The composer box is a column so the ML Assistant strip can stack on
+					     top; this row is the composer proper and keeps its own layout. -->
+					<div class="flex w-full items-center">
+						{#if isRecording || isTranscribing}
+							<VoiceRecorder
+								{isTranscribing}
+								{isTouchDevice}
+								oncancel={() => {
+									isRecording = false;
+								}}
+								onconfirm={handleRecordingConfirm}
+								onsend={handleRecordingSend}
+								onerror={handleRecordingError}
+							/>
+						{:else if onDrag && isFileUploadEnabled}
+							<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
+						{:else}
+							<div
+								class="flex w-full flex-1 rounded-xl border-none bg-transparent"
+								class:paste-glow={pastedLongContent}
+							>
+								{#if lastIsError}
+									<ChatInput
+										value="Sorry, something went wrong. Please try again."
+										disabled={true}
+									/>
+								{:else}
+									<ChatInput
+										placeholder={isReadOnly
+											? "This conversation is read-only."
+											: mlModeOn
+												? ML_ASSISTANT_PLACEHOLDER
+												: "Ask anything"}
+										{loading}
+										bind:value={draft}
+										bind:files
+										mimeTypes={activeMimeTypes}
+										onsubmit={handleSubmit}
+										{onPaste}
+										disabled={isReadOnly || lastIsError}
+										{modelIsMultimodal}
+										{modelSupportsTools}
+										bind:focused
+									/>
+								{/if}
 
-							{#if loading}
-								<StopGeneratingBtn
-									onClick={() => {
-										hapticError();
-										onstop?.();
-									}}
-									showBorder={true}
-									classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow-sm transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
-								/>
-							{:else}
-								{#if transcriptionEnabled}
-									<button
-										type="button"
-										class="absolute right-10 bottom-2 mr-1.5 btn size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 sm:right-9 sm:size-7 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white"
-										disabled={isReadOnly}
-										onclick={() => {
-											isRecording = true;
+								{#if loading}
+									<StopGeneratingBtn
+										onClick={() => {
+											hapticError();
+											onstop?.();
 										}}
-										aria-label="Start voice recording"
+										showBorder={true}
+										classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow-sm transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
+									/>
+								{:else}
+									{#if transcriptionEnabled}
+										<button
+											type="button"
+											class="absolute right-10 bottom-2 mr-1.5 btn size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 sm:right-9 sm:size-7 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white"
+											disabled={isReadOnly}
+											onclick={() => {
+												isRecording = true;
+											}}
+											aria-label="Start voice recording"
+										>
+											<IconMic class="size-4" />
+										</button>
+									{/if}
+									<button
+										class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
+										isReadOnly
+											? ''
+											: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
+										disabled={!draft || isReadOnly}
+										type="submit"
+										aria-label="Send message"
+										name="submit"
 									>
-										<IconMic class="size-4" />
+										<IconArrowUp />
 									</button>
 								{/if}
-								<button
-									class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
-									isReadOnly
-										? ''
-										: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
-									disabled={!draft || isReadOnly}
-									type="submit"
-									aria-label="Send message"
-									name="submit"
-								>
-									<IconArrowUp />
-								</button>
-							{/if}
-						</div>
-					{/if}
+							</div>
+						{/if}
+					</div>
 				</form>
 				<div
 					class={{

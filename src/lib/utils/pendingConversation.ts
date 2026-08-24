@@ -15,6 +15,7 @@ export interface ConversationData {
 	modelId: string;
 	shared: boolean;
 	deployedSpaces?: Record<string, DeployedSpace>;
+	mlAssistant?: boolean;
 }
 
 // One-shot handoff of the conversation payload embedded in the create

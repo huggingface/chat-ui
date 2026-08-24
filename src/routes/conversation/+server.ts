@@ -11,6 +11,7 @@ import { authCondition } from "$lib/server/auth";
 import { usageLimits } from "$lib/server/usageLimits";
 import { MetricsServer } from "$lib/server/metrics";
 import superjson from "superjson";
+import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -22,6 +23,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			fromShare: z.string().optional(),
 			model: validateModel(models),
 			preprompt: z.string().optional(),
+			mlAssistant: z.boolean().optional(),
 		})
 		.safeParse(JSON.parse(body));
 
@@ -77,8 +79,19 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		error(400, "Can't start a conversation with an unlisted model");
 	}
 
+	// Only builds that ship ML Assistant mode can start a conversation in it.
+	const isMlAssistant = ML_ASSISTANT_MODE && values.mlAssistant === true;
+
 	// use provided preprompt or model preprompt
 	values.preprompt ??= model?.preprompt ?? "";
+
+	// The ML Assistant preset supplies the whole system prompt at generation time.
+	// Storing nothing here keeps the user's per-model custom prompt out of the
+	// conversation entirely — the endpoint appends a stored system message after
+	// the preprompt, so leaving one would compose the two.
+	if (isMlAssistant) {
+		values.preprompt = "";
+	}
 
 	if (messages && messages.length > 0 && messages[0].from === "system") {
 		messages[0].content = values.preprompt;
@@ -100,6 +113,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		userAgent: request.headers.get("User-Agent") ?? undefined,
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
+		// Only builds that ship ML Assistant mode can mark a conversation with it.
+		...(isMlAssistant ? { mlAssistant: true } : {}),
 	});
 
 	if (MetricsServer.isEnabled()) {
@@ -130,6 +145,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				// only reports shared=true when the viewing URL's fromShare matches.
 				shared: false,
 				deployedSpaces: undefined,
+				mlAssistant: isMlAssistant ? true : undefined,
 			}),
 		}),
 		{ headers: { "Content-Type": "application/json" } }

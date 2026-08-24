@@ -8,6 +8,7 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { storePendingFiles } from "$lib/utils/pendingFiles";
@@ -48,6 +49,9 @@
 						($settings.customPromptsEnabled?.[modelId] ?? true)
 							? $settings.customPrompts[modelId]
 							: "",
+					// The composer latches the mode before handing the message over, so
+					// the conversation this creates is marked with it from the start.
+					mlAssistant: mlAssistant.taskStarted,
 				}),
 			});
 

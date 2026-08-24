@@ -28,6 +28,7 @@ import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
+import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -156,6 +157,19 @@ export async function* runMcpFlow({
 		}
 	} catch {
 		// ignore selection merge errors and proceed with env servers
+	}
+
+	// The preset's servers go on after the user's selection has been filtered, so
+	// they survive a selection that excludes them. Anything the user picked on top
+	// still comes through — extra servers are configurable, these are not.
+	if (isMlAssistantConversation(conv)) {
+		servers = withMlAssistantServers(servers);
+		try {
+			logger.debug(
+				{ servers: servers.map((s) => s.name) },
+				"[mcp] applied ML Assistant preset servers"
+			);
+		} catch {}
 	}
 
 	// If selection/merge yielded no servers, bail early with clearer log
