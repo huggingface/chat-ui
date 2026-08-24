@@ -22,7 +22,7 @@
 
 <div class="flex items-center gap-3">
 	<Tooltip.Provider delayDuration={80} disableHoverableContent>
-		<div class="flex items-center gap-[5px]">
+		<div class="ml-dot-row flex items-center gap-[10px]">
 			{#each steps as step, index (index)}
 				<Tooltip.Root
 					open={openStep === index}
@@ -62,7 +62,7 @@
 
 <style>
 	/* 27x44 hit target that leaves the 22px dot's footprint untouched, so the row
-	   still lays out on the designed 5px gap. */
+	   still lays out on the designed 10px gap. */
 	:global(.ml-dot-hit) {
 		display: grid;
 		place-items: center;
@@ -80,7 +80,30 @@
 		border-radius: 8px;
 	}
 
+	/* Stepper connector behind the dots, ending under the outer dots' centers. */
+	.ml-dot-row {
+		position: relative;
+	}
+
+	.ml-dot-row::before {
+		content: "";
+		position: absolute;
+		top: 50%;
+		left: 11px;
+		right: 11px;
+		height: 1.5px;
+		transform: translateY(-50%);
+		border-radius: 1px;
+		background: #aebcec;
+		pointer-events: none;
+	}
+
+	:global(.dark) .ml-dot-row::before {
+		background: #46538a;
+	}
+
 	.ml-dot {
+		position: relative;
 		display: grid;
 		place-items: center;
 		box-sizing: border-box;
@@ -123,8 +146,9 @@
 		opacity: 0.65;
 	}
 
+	/* Solid (strip band color) so the connector line cannot show through. */
 	:global(.dark) .ml-dot[data-status="pending"] {
-		background: transparent;
+		background: #151a2e;
 		border-color: #3a3a42;
 		color: #7a7a84;
 	}

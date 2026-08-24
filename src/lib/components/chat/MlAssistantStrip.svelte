@@ -68,7 +68,9 @@
 		<!-- The plan replaces the tool note, but only once there is a plan to show:
 		     a run that has not reported its steps yet would otherwise leave a gap. -->
 		{#if taskRunning && steps.length}
-			<MlAssistantPlanProgress {steps} {statusLabel} {complete} />
+			<span class="ml-2 flex min-w-0 items-center">
+				<MlAssistantPlanProgress {steps} {statusLabel} {complete} />
+			</span>
 		{:else if enabled}
 			<span class="truncate font-mono text-xs text-[#7f8cd8]">
 				{ML_ASSISTANT_TOOLS.join(" · ")}
