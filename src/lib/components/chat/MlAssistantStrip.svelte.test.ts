@@ -165,10 +165,12 @@ describe("MlAssistantStrip", () => {
 			statusLabel: "Training",
 		});
 		const dots = [...container.querySelectorAll(".ml-dot")];
-		// A completed step trades its number for a tick.
-		expect(dots.map((d) => d.textContent?.trim())).toEqual(["", "2", "3", "4"]);
+		// Settled steps trade their number for an icon: a tick when done, a slash
+		// when skipped. Unsettled steps keep their number.
+		expect(dots.map((d) => d.textContent?.trim())).toEqual(["", "", "3", "4"]);
 		expect(dots[0].querySelector("svg")).not.toBeNull();
-		expect(dots[1].querySelector("svg")).toBeNull();
+		expect(dots[1].querySelector("svg")).not.toBeNull();
+		expect(dots[2].querySelector("svg")).toBeNull();
 		expect(box(dots[0])).toEqual({ width: 22, height: 22 });
 
 		const [done, skipped, running, pending] = dots.map(style);

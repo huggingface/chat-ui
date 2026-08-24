@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Tooltip } from "bits-ui";
 	import LucideCheck from "~icons/lucide/check";
+	import LucideSlash from "~icons/lucide/slash";
 	import type { MlPlanStep } from "$lib/types/MlAssistant";
 
 	interface Props {
@@ -16,6 +17,9 @@
 	// than one flag per dot so opening a second dot closes the first.
 	let openStep = $state(-1);
 
+	// None of the dot glyphs clear 4.5:1 by design (they are decorative), so this
+	// label is the accessible carrier of each step's name and status — the visible
+	// numeral/icon never makes it redundant.
 	function accessibleName(step: MlPlanStep) {
 		return `${step.label} — ${step.status}`;
 	}
@@ -37,7 +41,9 @@
 					>
 						<span class="ml-dot" data-status={step.status}>
 							{#if step.status === "done"}
-								<LucideCheck class="ml-dot-check" aria-hidden="true" />
+								<LucideCheck class="ml-dot-icon" aria-hidden="true" />
+							{:else if step.status === "skipped"}
+								<LucideSlash class="ml-dot-icon ml-dot-slash" aria-hidden="true" />
 							{:else}
 								{index + 1}
 							{/if}
@@ -146,11 +152,22 @@
 		color: #fff;
 	}
 
-	/* Thickened past lucide's default 2 so the tick stays legible at dot size. */
-	:global(.ml-dot-check) {
+	/* Thickened past lucide's default 2 so the strokes stay legible at dot size. */
+	:global(.ml-dot-icon) {
 		width: 13px;
 		height: 13px;
 		stroke-width: 3.5;
+	}
+
+	/* The slash spans lucide's full viewBox diagonal, so it runs smaller and
+	   thicker than the check to sit at the same visual weight. */
+	:global(.ml-dot-slash) {
+		width: 10px;
+		height: 10px;
+		stroke-width: 6;
+		/* A stroke this wide overshoots the path's endpoints; without this the
+		   rounded caps clip against the viewBox. */
+		overflow: visible;
 	}
 
 	/* Washed out via pre-blended solids, not element opacity — a translucent dot
@@ -159,7 +176,7 @@
 	.ml-dot[data-status="skipped"] {
 		background: #eff0f6;
 		border: 1px solid #d7d9e2;
-		color: #8f8f9a;
+		color: #9b9ca6;
 	}
 
 	/* Solid (the strip's own band color) so the connector line cannot show
@@ -173,7 +190,7 @@
 	:global(.dark) .ml-dot[data-status="skipped"] {
 		background: #20222d;
 		border-color: #383e54;
-		color: #7e8290;
+		color: #767a88;
 	}
 
 	@keyframes mlpulse {
