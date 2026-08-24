@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Tooltip } from "bits-ui";
+	import LucideCheck from "~icons/lucide/check";
 	import type { MlPlanStep } from "$lib/types/MlAssistant";
 
 	interface Props {
@@ -34,7 +35,13 @@
 						aria-label={accessibleName(step)}
 						onclick={() => (openStep = openStep === index ? -1 : index)}
 					>
-						<span class="ml-dot" data-status={step.status}>{index + 1}</span>
+						<span class="ml-dot" data-status={step.status}>
+							{#if step.status === "done"}
+								<LucideCheck class="ml-dot-check" aria-hidden="true" />
+							{:else}
+								{index + 1}
+							{/if}
+						</span>
 					</Tooltip.Trigger>
 					<Tooltip.Portal>
 						<Tooltip.Content class="ml-dot-tooltip" side="top" sideOffset={10}>
@@ -137,6 +144,13 @@
 		background: #16a34a;
 		border: 1px solid #16a34a;
 		color: #fff;
+	}
+
+	/* Thickened past lucide's default 2 so the tick stays legible at dot size. */
+	:global(.ml-dot-check) {
+		width: 13px;
+		height: 13px;
+		stroke-width: 3.5;
 	}
 
 	.ml-dot[data-status="skipped"] {

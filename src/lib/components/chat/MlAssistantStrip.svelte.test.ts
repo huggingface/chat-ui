@@ -165,7 +165,10 @@ describe("MlAssistantStrip", () => {
 			statusLabel: "Training",
 		});
 		const dots = [...container.querySelectorAll(".ml-dot")];
-		expect(dots.map((d) => d.textContent)).toEqual(["1", "2", "3", "4"]);
+		// A completed step trades its number for a tick.
+		expect(dots.map((d) => d.textContent?.trim())).toEqual(["", "2", "3", "4"]);
+		expect(dots[0].querySelector("svg")).not.toBeNull();
+		expect(dots[1].querySelector("svg")).toBeNull();
 		expect(box(dots[0])).toEqual({ width: 22, height: 22 });
 
 		const [done, skipped, running, pending] = dots.map(style);
@@ -178,7 +181,7 @@ describe("MlAssistantStrip", () => {
 		expect(pending.borderTopColor).toBe("rgb(220, 220, 226)");
 	});
 
-	it("keeps the dots tappable without disturbing the row's 5px rhythm", () => {
+	it("keeps the dots tappable without disturbing the row's 10px rhythm", () => {
 		const { container } = mount({
 			enabled: true,
 			taskRunning: true,
@@ -190,7 +193,7 @@ describe("MlAssistantStrip", () => {
 
 		const dots = [...container.querySelectorAll(".ml-dot")];
 		const gap = dots[1].getBoundingClientRect().left - dots[0].getBoundingClientRect().right;
-		expect(Math.round(gap)).toBe(5);
+		expect(Math.round(gap)).toBe(10);
 	});
 
 	it("names each dot by its step and status", () => {
