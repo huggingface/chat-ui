@@ -70,8 +70,7 @@ const spinners = (el: HTMLElement) => el.querySelectorAll(".loading").length;
 describe("a run still working with nothing streaming", () => {
 	// One mount per test: they share a document, so a second would count the first's.
 	it("says so after a question has been answered", () => {
-		// The settled row is all that is on screen while the resumed call restarts, and it
-		// does not animate — without this the model looks stalled.
+		// The settled row is all there is while the call restarts, and it does not animate.
 		expect(spinners(mount([call("u1"), ...answeredQuestion]).baseElement)).toBe(1);
 	});
 

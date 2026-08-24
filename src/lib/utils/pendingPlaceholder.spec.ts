@@ -21,8 +21,7 @@ describe("the placeholder for a request that has not started streaming", () => {
 	});
 
 	it("stays away while a parked call resumes", () => {
-		// That message already carries the tool call, so the blank test above misses it and
-		// an empty bubble would sit under the conversation until the stream restarted.
+		// That message already carries the tool call, so the blank test above misses it.
 		expect(
 			shouldShowPendingPlaceholder({
 				pending: true,

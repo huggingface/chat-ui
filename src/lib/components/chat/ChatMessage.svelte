@@ -382,11 +382,7 @@
 	// Still mid-process (thinking / calling tools, no answer yet) → render the
 	// blocks flat like today. Once the final answer starts streaming the last
 	// block becomes text, so this flips to false and the nested summary takes over.
-	/**
-	 * Whether the last block is showing its own progress. Reasoning and a running tool
-	 * animate; a finished tool and an answered question do not, and after a parked call
-	 * resumes that is all there is on screen while the model works.
-	 */
+	/** Reasoning and a running tool animate; a finished tool and a settled question do not. */
 	let trailingBlockShowsProgress = $derived.by(() => {
 		const last = blocks.at(-1);
 		if (!last) return false;

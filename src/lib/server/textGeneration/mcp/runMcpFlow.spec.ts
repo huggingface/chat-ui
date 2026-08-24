@@ -449,8 +449,6 @@ describe("runMcpFlow offering the question tool", () => {
 	});
 
 	it("does not engage the flow on its own when no MCP tool exists", async () => {
-		// Offering it to every conversation would put the tool-calling path in front of
-		// people who have configured nothing.
 		mocks.mcpTools = [];
 		scriptRounds([{ content: "the answer" }]);
 		const { result } = await runFlow(inMlMode);
