@@ -170,9 +170,19 @@ export function wheel(container: HTMLElement, deltaY: number, opts: WheelOptions
 	if (!opts.noScroll && !opts.ctrlKey) container.scrollTop += deltaY;
 }
 
-/** Exactly what a scrollbar drag produces: a scroll event at a new position,
- * with no wheel/touch/key event anywhere near it. */
+/** Exactly what a scrollbar drag produces: a mousedown on the container
+ * itself (the scrollbar is part of it), a scroll event at the new position,
+ * and a mouseup — with no wheel/touch/key event anywhere near it. */
 export function dragScrollbarTo(container: HTMLElement, top: number) {
+	container.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+	container.scrollTop = top;
+	window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+}
+
+/** A scroll the browser made on its own: a bare position change with no
+ * input event of any kind — what find-in-page, assistive tech, and Safari's
+ * mid-DOM-swap clamps look like. */
+export function browserScrollTo(container: HTMLElement, top: number) {
 	container.scrollTop = top;
 }
 

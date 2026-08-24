@@ -11,7 +11,10 @@
  * so programmatic scroll events can never *look like* user intent, and the
  * previous implementation's write-attribution queue, follow-mode duality,
  * wheel/touch intent tracking, keyboard handler, and inner-scrollable walks
- * are all unnecessary.
+ * are all unnecessary. The one thing geometry cannot tell apart is the
+ * browser moving the view on its own (Safari does, mid-DOM-swap): input
+ * listeners therefore stamp gestures, and an upward move with no gesture
+ * behind it is undone rather than obeyed.
  *
  * While pinned, growth is answered with a next-frame snap; easing exists only
  * for explicit moves (send, the jump buttons, re-attach catch-up), as a
@@ -55,6 +58,17 @@ const AT_BOTTOM_EPS = 2;
 /** Cumulative upward user movement (px) required to unpin — filters sub-pixel
  * jitter without ignoring the smallest deliberate scroll. */
 const UNPIN_DRIFT_PX = 3;
+/**
+ * How long after a user gesture (wheel, touch, scrollbar mousedown, key) an
+ * upward scroll event still counts as the user's. Each user-attributed event
+ * extends the window, so a touch flick's momentum — a stream of events with
+ * no touch events behind it — stays attributed for its whole run, while an
+ * isolated event the browser produced on its own does not. Safari clamps a
+ * scroller's position synchronously while DOM nodes are being swapped
+ * (streaming markdown, keyed re-renders, hydration) and then reports the
+ * clamp as a scroll event; with no gesture behind it, that is not a detach.
+ */
+const GESTURE_CHAIN_MS = 150;
 /** Spring time constant: reach ~63% of remaining distance every 80ms. */
 const SPRING_TAU_MS = 80;
 /** Below this remaining distance the spring snaps to the target. */
@@ -104,6 +118,10 @@ export class StickToBottomController {
 	private resizeObserver: ResizeObserver | null = null;
 	private observedContent: HTMLElement | null = null;
 	private lastTouchY: number | null = null;
+	/** Gesture attribution (see GESTURE_CHAIN_MS). */
+	private lastGestureAt = Number.NEGATIVE_INFINITY;
+	private pointerHeld = false;
+	private touchHeld = false;
 	private destroyed = false;
 
 	constructor(container: HTMLElement, options: StickToBottomOptions = {}) {
@@ -125,6 +143,11 @@ export class StickToBottomController {
 		container.addEventListener("touchmove", this.onTouchMove, { passive: true });
 		container.addEventListener("touchend", this.onTouchEnd, { passive: true });
 		container.addEventListener("touchcancel", this.onTouchEnd, { passive: true });
+		container.addEventListener("keydown", this.onKeyDown, { passive: true });
+		container.addEventListener("mousedown", this.onMouseDown, { passive: true });
+		if (typeof window !== "undefined") {
+			window.addEventListener("mouseup", this.onWindowMouseUp, { passive: true });
+		}
 
 		if (typeof ResizeObserver !== "undefined") {
 			this.resizeObserver = new ResizeObserver(this.onResize);
@@ -305,6 +328,11 @@ export class StickToBottomController {
 		c.removeEventListener("touchmove", this.onTouchMove);
 		c.removeEventListener("touchend", this.onTouchEnd);
 		c.removeEventListener("touchcancel", this.onTouchEnd);
+		c.removeEventListener("keydown", this.onKeyDown);
+		c.removeEventListener("mousedown", this.onMouseDown);
+		if (typeof window !== "undefined") {
+			window.removeEventListener("mouseup", this.onWindowMouseUp);
+		}
 		this.resizeObserver?.disconnect();
 		this.resizeObserver = null;
 	}
@@ -410,12 +438,30 @@ export class StickToBottomController {
 		} else if (!anchorAdjust) {
 			if (top < this.lastTop) {
 				// Upward movement. Our own writes moved the baselines already, so
-				// a delta here is the user's (or a coalesced event's user share).
-				this.upwardDrift += this.lastTop - top;
-				if (this.upwardDrift >= UNPIN_DRIFT_PX && (this.state.pinned || this.anim)) {
-					this.unpin();
+				// a delta here is either the user's (or a coalesced event's user
+				// share) — or the browser's own doing, which only the absence of
+				// any gesture can reveal.
+				if (!this.gestured()) {
+					if (this.state.pinned) {
+						// Browser-initiated (Safari clamping mid-DOM-swap): undo it in
+						// the same event, before paint, so nothing flickers. A glide
+						// in flight is left to continue from the real position.
+						if (!this.anim || this.anim.snap) {
+							this.stopAnimation();
+							this.write(this.maxScrollTop());
+							this.recomputeState();
+							return;
+						}
+					}
+				} else {
+					this.lastGestureAt = performance.now();
+					this.upwardDrift += this.lastTop - top;
+					if (this.upwardDrift >= UNPIN_DRIFT_PX && (this.state.pinned || this.anim)) {
+						this.unpin();
+					}
 				}
 			} else if (top > this.lastTop) {
+				if (this.gestured()) this.lastGestureAt = performance.now();
 				this.upwardDrift = 0;
 				if (!this.state.pinned && distance <= this.opts.nearBottomPx) {
 					// User came back to the bottom zone: re-engage and glide the
@@ -453,6 +499,43 @@ export class StickToBottomController {
 		if (content) this.resizeObserver.observe(content);
 	}
 
+	// --- gesture attribution --------------------------------------------------------
+
+	private noteGesture() {
+		this.lastGestureAt = performance.now();
+	}
+
+	/** True while the user is plausibly the author of scroll movement: a
+	 * pointer or finger held down, or a gesture (or user-attributed scroll
+	 * event) within GESTURE_CHAIN_MS. */
+	private gestured(): boolean {
+		return (
+			this.pointerHeld ||
+			this.touchHeld ||
+			performance.now() - this.lastGestureAt <= GESTURE_CHAIN_MS
+		);
+	}
+
+	private onKeyDown = () => {
+		// Keys pressed on the (focusable) scroller scroll it natively.
+		this.noteGesture();
+	};
+
+	private onMouseDown = (event: MouseEvent) => {
+		// A scrollbar drag lands its mousedown on the container itself; a text
+		// selection drag (which auto-scrolls) on content. Clicks on controls —
+		// the jump buttons live inside the scroller — are not scroll gestures.
+		if (event.target instanceof Element && event.target.closest("button, a")) return;
+		this.pointerHeld = true;
+		this.noteGesture();
+	};
+
+	private onWindowMouseUp = () => {
+		if (!this.pointerHeld) return;
+		this.pointerHeld = false;
+		this.noteGesture();
+	};
+
 	private normalizeWheelDelta(event: WheelEvent): number {
 		if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return event.deltaY * 16;
 		if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE)
@@ -472,6 +555,7 @@ export class StickToBottomController {
 	 * change nothing.
 	 */
 	private onWheel = (event: WheelEvent) => {
+		this.noteGesture();
 		if (!this.anim || this.anim.snap) return;
 		if (event.ctrlKey) return; // pinch-zoom
 		if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return; // horizontal pan
@@ -479,10 +563,13 @@ export class StickToBottomController {
 	};
 
 	private onTouchStart = (event: TouchEvent) => {
+		this.touchHeld = true;
+		this.noteGesture();
 		this.lastTouchY = event.touches.length === 1 ? event.touches[0].clientY : null;
 	};
 
 	private onTouchMove = (event: TouchEvent) => {
+		this.noteGesture();
 		if (event.touches.length !== 1) {
 			this.lastTouchY = null;
 			return;
@@ -500,6 +587,9 @@ export class StickToBottomController {
 	};
 
 	private onTouchEnd = () => {
+		// Momentum follows the lift: its scroll events chain off this stamp.
+		this.touchHeld = false;
+		this.noteGesture();
 		this.lastTouchY = null;
 	};
 }
