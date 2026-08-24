@@ -58,6 +58,8 @@
 	import MlAssistantStrip from "./MlAssistantStrip.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { planStepsToMlSteps } from "$lib/utils/planProgress";
+	import type { PlanState } from "$lib/types/Plan";
 	import {
 		ML_ASSISTANT_EFFORT,
 		ML_ASSISTANT_PLACEHOLDER,
@@ -460,8 +462,18 @@
 	$effect(() => {
 		if (!ML_ASSISTANT_MODE) return;
 		const conversationId = page.params?.id;
-		const startedInMlMode = Boolean((page.data as { mlAssistant?: boolean }).mlAssistant);
-		untrack(() => mlAssistant.syncConversation(conversationId, startedInMlMode));
+		const { mlAssistant: startedInMlMode, plan } = page.data as {
+			mlAssistant?: boolean;
+			plan?: PlanState;
+		};
+		untrack(() => {
+			const reset = mlAssistant.syncConversation(conversationId, Boolean(startedInMlMode));
+			// A reopened mode conversation renders mid-plan from the stored snapshot;
+			// a reset without one keeps the strip on its tool note.
+			if (reset && startedInMlMode && plan?.steps.length) {
+				mlAssistant.setPlan(planStepsToMlSteps(plan.steps));
+			}
+		});
 	});
 
 	function toggleMlMode(next: boolean) {
