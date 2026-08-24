@@ -26,6 +26,8 @@
 	import ElicitationForm from "./ElicitationForm.svelte";
 	import {
 		isMessageToolUpdate,
+		isMessageToolResultUpdate,
+		isMessageToolErrorUpdate,
 		isMessageElicitationRequestUpdate,
 		isMessageElicitationResolvedUpdate,
 	} from "$lib/utils/messageUpdates";
@@ -380,6 +382,23 @@
 	// Still mid-process (thinking / calling tools, no answer yet) → render the
 	// blocks flat like today. Once the final answer starts streaming the last
 	// block becomes text, so this flips to false and the nested summary takes over.
+	/**
+	 * Whether the last block is showing its own progress. Reasoning and a running tool
+	 * animate; a finished tool and an answered question do not, and after a parked call
+	 * resumes that is all there is on screen while the model works.
+	 */
+	let trailingBlockShowsProgress = $derived.by(() => {
+		const last = blocks.at(-1);
+		if (!last) return false;
+		if (last.type === "think") return !last.closed;
+		if (last.type === "tool") {
+			return !last.updates.some(
+				(update) => isMessageToolResultUpdate(update) || isMessageToolErrorUpdate(update)
+			);
+		}
+		return false;
+	});
+
 	let isProcessStreaming = $derived.by(() => {
 		if (!isLast || !loading) return false;
 		const last = blocks.at(-1);
@@ -486,6 +505,9 @@
 							</div>
 						{/if}
 					{/each}
+					{#if !trailingBlockShowsProgress}
+						<IconLoading classNames="loading mt-1 inline first:ml-0" />
+					{/if}
 				{:else}
 					<!-- Answer started or generation finished: nest the process blocks. -->
 					{#each renderUnits as unit, unitIndex (`${unit.kind}-${unitIndex}`)}
