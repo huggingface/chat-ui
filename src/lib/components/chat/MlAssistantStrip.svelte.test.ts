@@ -173,8 +173,10 @@ describe("MlAssistantStrip", () => {
 
 		const [done, skipped, running, pending] = dots.map(style);
 		expect(done.backgroundColor).toBe(SUCCESS);
-		expect(skipped.backgroundColor).toBe("rgb(238, 238, 241)");
-		expect(skipped.opacity).toBe("0.65");
+		// Washed out via pre-blended solids, not element opacity, so the connector
+		// line cannot show through a translucent dot.
+		expect(skipped.backgroundColor).toBe("rgb(239, 240, 246)");
+		expect(skipped.opacity).toBe("1");
 		expect(running.backgroundColor).toBe(ACCENT);
 		expect(running.animationName).toContain("mlpulse");
 		expect(pending.backgroundColor).toBe("rgb(255, 255, 255)");

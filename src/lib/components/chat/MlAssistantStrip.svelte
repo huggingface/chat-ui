@@ -38,7 +38,7 @@
 		class={[
 			"ml-strip flex items-center gap-[9px] border-b px-4 py-[9px] text-[13.5px]",
 			enabled
-				? "border-[#e2e7fb] bg-[#f0f3ff] text-[#2244cc] dark:border-[#2b3357] dark:bg-[#151a2e] dark:text-[#93a4f0]"
+				? "border-[#e2e7fb] bg-[var(--ml-strip-band)] text-[#2244cc] [--ml-strip-band:#f0f3ff] dark:border-[#2b3357] dark:text-[#93a4f0] dark:[--ml-strip-band:#151a2e]"
 				: "border-[#ececee] bg-transparent text-[#9a9aa0] dark:border-gray-700 dark:text-gray-500",
 		]}
 	>

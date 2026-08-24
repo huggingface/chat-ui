@@ -153,24 +153,27 @@
 		stroke-width: 3.5;
 	}
 
+	/* Washed out via pre-blended solids, not element opacity — a translucent dot
+	   would let the connector line show through. Border and text stay a notch
+	   above the band so a skipped dot reads muted, not missing. */
 	.ml-dot[data-status="skipped"] {
-		background: #eeeef1;
-		border: 1px solid #eeeef1;
-		color: #b4b4bc;
-		opacity: 0.65;
+		background: #eff0f6;
+		border: 1px solid #d7d9e2;
+		color: #8f8f9a;
 	}
 
-	/* Solid (strip band color) so the connector line cannot show through. */
+	/* Solid (the strip's own band color) so the connector line cannot show
+	   through, staying in step if the band is ever retinted. */
 	:global(.dark) .ml-dot[data-status="pending"] {
-		background: #151a2e;
+		background: var(--ml-strip-band, #151a2e);
 		border-color: #3a3a42;
 		color: #7a7a84;
 	}
 
 	:global(.dark) .ml-dot[data-status="skipped"] {
-		background: #26262c;
-		border-color: #26262c;
-		color: #6f6f79;
+		background: #20222d;
+		border-color: #383e54;
+		color: #7e8290;
 	}
 
 	@keyframes mlpulse {
