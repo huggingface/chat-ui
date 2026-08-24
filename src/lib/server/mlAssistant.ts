@@ -47,8 +47,14 @@ export function isMlAssistantConversation(conv: Pick<Conversation, "mlAssistant"
  * first. Deduplicated by name with the preset winning.
  */
 export function withMlAssistantServers(servers: McpServerConfig[]): McpServerConfig[] {
-	const byName = new Map<string, McpServerConfig>();
-	for (const server of servers) byName.set(server.name, server);
-	for (const server of ML_ASSISTANT_MCP_SERVERS) byName.set(server.name, server);
+	// Seeded with the preset rather than overwriting later: Map#set keeps an
+	// existing key's position, so merging the other way round would leave a
+	// preset server wherever the user's same-named entry happened to sit.
+	const byName = new Map<string, McpServerConfig>(
+		ML_ASSISTANT_MCP_SERVERS.map((server) => [server.name, server])
+	);
+	for (const server of servers) {
+		if (!byName.has(server.name)) byName.set(server.name, server);
+	}
 	return [...byName.values()];
 }

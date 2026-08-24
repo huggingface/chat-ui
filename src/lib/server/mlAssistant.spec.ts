@@ -34,6 +34,27 @@ describe("ML Assistant preset", () => {
 		expect(merged.find((s) => s.name === preset.name)?.url).toBe(preset.url);
 	});
 
+	it("puts the preset's servers first", () => {
+		const merged = withMlAssistantServers([
+			{ name: "Web Search (Exa)", url: "https://mcp.exa.ai/mcp" },
+		]);
+
+		expect(merged.slice(0, ML_ASSISTANT_MCP_SERVERS.length).map((s) => s.name)).toEqual(
+			ML_ASSISTANT_MCP_SERVERS.map((s) => s.name)
+		);
+	});
+
+	it("keeps a same-named preset server in the preset's position, not the user's", () => {
+		const preset = ML_ASSISTANT_MCP_SERVERS[0];
+		const merged = withMlAssistantServers([
+			{ name: "First", url: "https://first.example/mcp" },
+			{ name: preset.name, url: "https://shadow.example/mcp" },
+		]);
+
+		expect(merged[0].name).toBe(preset.name);
+		expect(merged[0].url).toBe(preset.url);
+	});
+
 	it("adds the preset even when nothing was selected", () => {
 		expect(withMlAssistantServers([]).map((s) => s.name)).toEqual(
 			ML_ASSISTANT_MCP_SERVERS.map((s) => s.name)

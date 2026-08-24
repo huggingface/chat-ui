@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy, onMount, untrack } from "svelte";
+	import { onDestroy, untrack } from "svelte";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
@@ -60,7 +60,6 @@
 		ML_ASSISTANT_PLACEHOLDER,
 		mlAssistantExamples,
 	} from "$lib/constants/mlAssistant";
-	import type { ReasoningEffort } from "$lib/types/Settings";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -454,58 +453,12 @@
 		if (!ML_ASSISTANT_MODE) return;
 		const conversationId = page.params?.id;
 		const startedInMlMode = Boolean((page.data as { mlAssistant?: boolean }).mlAssistant);
-		untrack(() => {
-			if (mlAssistant.syncConversation(conversationId, startedInMlMode)) releaseMlEffort();
-		});
+		untrack(() => mlAssistant.syncConversation(conversationId, startedInMlMode));
 	});
-
-	onMount(() => {
-		// A reload drops the mode but not the effort override it was holding, so this
-		// load is the one that has to hand the setting back. Guarded on the mode being
-		// off: this also runs when navigating into the conversation a mode-on send just
-		// created, and that hold is still live.
-		if (!ML_ASSISTANT_MODE || mlAssistant.enabled) return;
-		mlAssistant.restoreEffortHold();
-		releaseMlEffort();
-	});
-
-	// The preset runs at high effort. Effort is read from the user's saved settings
-	// when the request is built, so the mode has to write the override rather than
-	// only display it; the previous value goes back when the mode is switched off.
-	function holdMlEffort() {
-		if (mlAssistant.effortHold) return;
-		const overrides = { ...($settings.reasoningEffortOverrides ?? {}) };
-		mlAssistant.effortHold = {
-			modelId: currentModel.id,
-			previous: overrides[currentModel.id],
-		};
-		overrides[currentModel.id] = ML_ASSISTANT_EFFORT;
-		settings.instantSet({ reasoningEffortOverrides: overrides });
-	}
-
-	function releaseMlEffort() {
-		const hold = mlAssistant.effortHold;
-		if (!hold) return;
-		mlAssistant.effortHold = null;
-		const overrides: Record<string, ReasoningEffort> = {
-			...($settings.reasoningEffortOverrides ?? {}),
-		};
-		if (hold.previous === undefined) {
-			delete overrides[hold.modelId];
-		} else {
-			overrides[hold.modelId] = hold.previous;
-		}
-		settings.instantSet({ reasoningEffortOverrides: overrides });
-	}
 
 	function toggleMlMode(next: boolean) {
 		if (requireAuthUser()) return;
 		mlAssistant.toggle(next);
-		if (mlAssistant.enabled) {
-			holdMlEffort();
-		} else {
-			releaseMlEffort();
-		}
 	}
 
 	let activeRouterExamplePrompt = $state<string | null>(null);
@@ -1124,7 +1077,10 @@
 					{/if}
 					{#if $settings.reasoningOverrides?.[currentModel.id] ?? currentModel.supportsReasoning}
 						<div class="ml-auto">
-							<ThinkingEffortChip modelId={currentModel.id} />
+							<ThinkingEffortChip
+								modelId={currentModel.id}
+								presetEffort={mlModeOn ? ML_ASSISTANT_EFFORT : undefined}
+							/>
 						</div>
 					{/if}
 				</div>

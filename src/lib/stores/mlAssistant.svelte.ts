@@ -1,14 +1,4 @@
-import { browser } from "$app/environment";
 import type { MlPlanStep, MlPlanStepStatus } from "$lib/types/MlAssistant";
-import type { ReasoningEffort } from "$lib/types/Settings";
-
-/** A reasoning-effort override the preset replaced, and the value to put back. */
-export interface MlEffortHold {
-	modelId: string;
-	previous?: ReasoningEffort;
-}
-
-const EFFORT_HOLD_KEY = "mlAssistantEffortHold";
 
 /**
  * UI state for ML Assistant mode (see `$lib/utils/mlAssistantFlag`).
@@ -27,51 +17,8 @@ class MlAssistantStore {
 	/** The plan as reported by the run. Empty until a plan arrives. */
 	steps = $state<MlPlanStep[]>([]);
 
-	#effortHold = $state<MlEffortHold | null>(null);
-
 	/** Conversation the state above belongs to, so a different one starts clean. */
 	#conversationKey: string | undefined;
-
-	/**
-	 * Reasoning-effort override the preset is holding, with the value to put back.
-	 * Lives here rather than in the composer so it survives the navigation from the
-	 * home composer into the conversation the send creates, and is mirrored into
-	 * sessionStorage so a reload — which drops the mode but not the override — can
-	 * still hand the user their setting back (see `restoreEffortHold`).
-	 */
-	get effortHold() {
-		return this.#effortHold;
-	}
-
-	set effortHold(hold: MlEffortHold | null) {
-		this.#effortHold = hold;
-		if (!browser) return;
-		if (hold) {
-			sessionStorage.setItem(EFFORT_HOLD_KEY, JSON.stringify(hold));
-		} else {
-			sessionStorage.removeItem(EFFORT_HOLD_KEY);
-		}
-	}
-
-	/**
-	 * Picks up a hold left by an earlier page load. The mode is client state and
-	 * does not survive a reload, so whatever it was holding has to be released by
-	 * the next load instead.
-	 */
-	restoreEffortHold(): MlEffortHold | null {
-		if (!browser || this.#effortHold) return this.#effortHold;
-		const raw = sessionStorage.getItem(EFFORT_HOLD_KEY);
-		if (!raw) return null;
-		try {
-			const hold = JSON.parse(raw) as MlEffortHold;
-			if (typeof hold?.modelId === "string") {
-				this.#effortHold = hold;
-			}
-		} catch {
-			sessionStorage.removeItem(EFFORT_HOLD_KEY);
-		}
-		return this.#effortHold;
-	}
 
 	/** The switch stops being interactive once the mode is locked in. */
 	get locked() {
@@ -105,6 +52,16 @@ class MlAssistantStore {
 	startTask() {
 		if (!this.enabled) return;
 		this.taskStarted = true;
+	}
+
+	/**
+	 * Undoes `startTask` when the send it was latched for never produced a
+	 * conversation. Without this a failed create leaves the composer locked in a
+	 * task that does not exist, with no way to switch the mode back off.
+	 */
+	abortTask() {
+		this.taskStarted = false;
+		this.steps = [];
 	}
 
 	/**
@@ -143,7 +100,14 @@ class MlAssistantStore {
 	 */
 	syncConversation(key: string | undefined, isMlConversation = false): boolean {
 		if (this.#conversationKey === key) return false;
-		const adopting = this.#conversationKey === undefined && key !== undefined && this.taskStarted;
+		// Adoption is only for the conversation the run just created, which arrives
+		// already marked. Without that check, opening any conversation while a
+		// create is pending would inherit the mode the server knows nothing about.
+		const adopting =
+			this.#conversationKey === undefined &&
+			key !== undefined &&
+			this.taskStarted &&
+			isMlConversation;
 		this.#conversationKey = key;
 		if (adopting) return false;
 		this.reset();

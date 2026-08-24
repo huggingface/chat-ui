@@ -12,7 +12,6 @@ const step = (label: string, status: MlPlanStep["status"]): MlPlanStep => ({
 describe("mlAssistant store", () => {
 	beforeEach(() => {
 		mlAssistant.reset();
-		mlAssistant.effortHold = null;
 		mlAssistant.syncConversation(undefined);
 	});
 
@@ -59,10 +58,36 @@ describe("mlAssistant store", () => {
 	it("adopts the conversation a run started from the home composer creates", () => {
 		mlAssistant.toggle(true);
 		mlAssistant.startTask();
+		mlAssistant.setPlan([step("Research", "running")]);
 
-		expect(mlAssistant.syncConversation("new-conversation")).toBe(false);
+		// The created conversation arrives already marked, and keeps its plan.
+		expect(mlAssistant.syncConversation("new-conversation", true)).toBe(false);
 		expect(mlAssistant.enabled).toBe(true);
 		expect(mlAssistant.taskStarted).toBe(true);
+		expect(mlAssistant.steps).toHaveLength(1);
+	});
+
+	it("does not adopt a plain conversation opened while a create is in flight", () => {
+		mlAssistant.toggle(true);
+		mlAssistant.startTask();
+
+		expect(mlAssistant.syncConversation("someone-elses-conversation")).toBe(true);
+		expect(mlAssistant.enabled).toBe(false);
+		expect(mlAssistant.taskStarted).toBe(false);
+	});
+
+	it("unlatches the task when the conversation it was for never got created", () => {
+		mlAssistant.toggle(true);
+		mlAssistant.startTask();
+		mlAssistant.setPlan([step("Research", "running")]);
+
+		mlAssistant.abortTask();
+
+		expect(mlAssistant.taskStarted).toBe(false);
+		expect(mlAssistant.steps).toEqual([]);
+		// The switch is usable again, and the mode stays on so a retry keeps it.
+		expect(mlAssistant.locked).toBe(false);
+		expect(mlAssistant.enabled).toBe(true);
 	});
 
 	it("resets when the conversation changes", () => {
@@ -115,18 +140,6 @@ describe("mlAssistant store", () => {
 
 		expect(mlAssistant.syncConversation("same")).toBe(false);
 		expect(mlAssistant.enabled).toBe(true);
-	});
-
-	it("round-trips the effort hold it is asked to keep", () => {
-		expect(mlAssistant.effortHold).toBeNull();
-
-		mlAssistant.effortHold = { modelId: "org/model", previous: "low" };
-		expect(mlAssistant.effortHold).toEqual({ modelId: "org/model", previous: "low" });
-
-		// Held across a conversation reset: only the composer can put the value
-		// back, so `reset()` must not drop the record of what to put back.
-		mlAssistant.syncConversation("elsewhere");
-		expect(mlAssistant.effortHold).toEqual({ modelId: "org/model", previous: "low" });
 	});
 
 	it("ignores a status update for a step outside the plan", () => {

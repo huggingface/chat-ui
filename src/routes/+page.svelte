@@ -77,6 +77,8 @@
 				}
 				error.set(errorMessage);
 				console.error("Error while creating conversation: ", errorMessage);
+				// The composer latched the mode for a conversation that never happened.
+				mlAssistant.abortTask();
 				return;
 			}
 
@@ -115,6 +117,8 @@
 		} catch (err) {
 			error.set((err as Error).message || ERROR_MESSAGES.default);
 			console.error(err);
+			// The composer latched the mode for a conversation that never happened.
+			mlAssistant.abortTask();
 		} finally {
 			$loading = false;
 		}

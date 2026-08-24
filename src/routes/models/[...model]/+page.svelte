@@ -58,6 +58,8 @@
 			if (!res.ok) {
 				error.set("Error while creating conversation, try again.");
 				console.error("Error while creating conversation: " + (await res.text()));
+				// The composer latched the mode for a conversation that never happened.
+				mlAssistant.abortTask();
 				return;
 			}
 
@@ -85,6 +87,8 @@
 		} catch (err) {
 			error.set(ERROR_MESSAGES.default);
 			console.error(err);
+			// The composer latched the mode for a conversation that never happened.
+			mlAssistant.abortTask();
 		} finally {
 			loading = false;
 		}
