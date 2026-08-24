@@ -50,6 +50,8 @@
 
 	let convId = $derived(page.params.id ?? "");
 	let pending = $state(false);
+	/** A resumed call streams into the message that parked, so it needs no placeholder. */
+	let resuming = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
 	// Conversation-scoped stop tombstone. A boolean reset on page.params.id
@@ -157,6 +159,7 @@
 			$isAborted = false;
 			$loading = true;
 			pending = true;
+			resuming = Boolean(resumeElicitationId);
 			writeMessageInFlight = true;
 			// Create the controller before any await: a Stop click during file
 			// encoding or MCP hydration must abort THIS request, not whichever
@@ -328,6 +331,7 @@
 				onStreamStart: () => {
 					if (pending) streamStart();
 					pending = false;
+					resuming = false;
 				},
 				onTitle: (title) => convsStore.update(convId, { title }),
 				onError: (update) => {
@@ -365,6 +369,7 @@
 			activeGenerationId = undefined;
 			$loading = false;
 			pending = false;
+			resuming = false;
 			// Wait for the stop request to complete before refreshing data,
 			// so the abort marker is durably written before we poll for the
 			// terminal state below.
@@ -693,6 +698,7 @@
 <ChatWindow
 	loading={$loading}
 	{pending}
+	{resuming}
 	messages={messagesPath as Message[]}
 	{messagesAlternatives}
 	shared={data.shared}

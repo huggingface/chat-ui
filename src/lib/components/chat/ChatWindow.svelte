@@ -19,6 +19,7 @@
 	import ChatInput from "./ChatInput.svelte";
 	import AskQuestion from "./AskQuestion.svelte";
 	import { firstQuestionFor } from "$lib/stores/pendingQuestion";
+	import { shouldShowPendingPlaceholder } from "$lib/utils/pendingPlaceholder";
 	import VoiceRecorder from "./VoiceRecorder.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
@@ -86,6 +87,7 @@
 		messagesAlternatives?: Message["id"][][];
 		loading?: boolean;
 		pending?: boolean;
+		resuming?: boolean;
 		shared?: boolean;
 		currentModel: Model;
 		models: Model[];
@@ -103,6 +105,7 @@
 		messagesAlternatives = [],
 		loading = false,
 		pending = false,
+		resuming = false,
 		shared = false,
 		currentModel,
 		models,
@@ -231,8 +234,7 @@
 
 	let lastMessage = $derived(browser && (messages.at(-1) as Message));
 	let showPendingPlaceholder = $derived(
-		pending &&
-			!(lastMessage && lastMessage.from === "assistant" && (lastMessage.content ?? "").length === 0)
+		shouldShowPendingPlaceholder({ pending, resuming, lastMessage: lastMessage || undefined })
 	);
 	let streamingAssistantMessage = $derived(
 		(() => {
