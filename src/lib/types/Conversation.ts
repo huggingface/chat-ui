@@ -26,6 +26,14 @@ export interface Conversation extends Timestamps {
 	userAgent?: string;
 
 	/**
+	 * Set when the conversation was started in ML Assistant mode. The mode is a
+	 * property of the conversation, not of the tab that started it, so reopening
+	 * one brings its composer strip back. Only ever written by builds that ship
+	 * the feature (see `$lib/utils/mlAssistantFlag`).
+	 */
+	mlAssistant?: boolean;
+
+	/**
 	 * Spaces this conversation's artifacts have been deployed to, keyed by the
 	 * stable artifact `identifier`. Lets a re-deploy push a new commit to the same
 	 * Space instead of creating a new one. Only Spaces created through this app's

@@ -28,6 +28,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 		modelId: conversation.model,
 		shared: conversation.shared,
 		deployedSpaces: "deployedSpaces" in conversation ? conversation.deployedSpaces : undefined,
+		mlAssistant: "mlAssistant" in conversation ? conversation.mlAssistant : undefined,
 	});
 };
 
