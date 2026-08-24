@@ -201,12 +201,12 @@
 	// diffs land on their first change, everything else starts at the top.
 
 	// While streaming, the code view stays pinned to the bottom through a
-	// StickToBottomController in instant mode (code arrives in chunky highlight
-	// repaints, where a glide adds motion without information). The controller
-	// owns detach/re-attach, so a user scrolling up to read earlier output is
-	// never fought mid-gesture, re-attaching catches up immediately, and
-	// content reflows (word-wrap toggle, panel resize) re-pin only while
-	// actually following.
+	// StickToBottomController (growth follows are snaps — code arrives in
+	// chunky highlight repaints, where a glide adds motion without
+	// information). The controller owns detach/re-attach, so a user scrolling
+	// up to read earlier output is never fought mid-gesture, re-attaching
+	// catches up immediately, and content reflows (word-wrap toggle, panel
+	// resize) re-pin only while actually following.
 	let codeStick: StickToBottomController | null = null;
 	$effect(() => {
 		const el = codeScrollEl;
@@ -215,7 +215,6 @@
 			// The <code> child (kept block-level in the template so the size
 			// observer actually fires) is what grows with streamed content —
 			// the <pre> itself is h-full and never resizes.
-			followMode: "instant",
 			content: () => (el.firstElementChild as HTMLElement | null) ?? undefined,
 		});
 		// The anchor effect below decides each view's initial position; nothing

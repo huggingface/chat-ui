@@ -33,8 +33,6 @@
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
 	import { browser } from "$app/environment";
 	import { createChatScroll } from "$lib/utils/scroll/chatScroll.svelte";
-	import { MIN_SPACER_FALLBACK_PX } from "$lib/utils/scroll/spacer";
-	import { NAV_EDGE_SWIPE_ZONE_PX } from "$lib/constants/gestures";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ShareConversationModal from "../ShareConversationModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
@@ -176,7 +174,7 @@
 	const handleSubmit = () => {
 		if (requireAuthUser() || loading || !draft) return;
 		tap();
-		chatScroll.armSend();
+		chatScroll.notifySend();
 		// Latches the mode onto the conversation, so the strip stays and swaps its
 		// tool note for the plan progress row. No-op when the mode is off.
 		mlAssistant.startTask();
@@ -268,7 +266,7 @@
 	function sendFixRequest(text: string): boolean {
 		if (requireAuthUser() || loading) return false;
 		tap();
-		chatScroll.armSend();
+		chatScroll.notifySend();
 		// Queued attachments belong to the user's next message, not to this
 		// machine-composed one. The send handler snapshots the bound `files`
 		// synchronously before its first await, so emptying around the call is
@@ -355,15 +353,33 @@
 	let pendingEl: HTMLElement | undefined = $state();
 	let composerHeight = $state<number | undefined>(undefined);
 
-	// Structural sync: conversation identity + message-list shape. Reads only
-	// ids/from (content is read untracked), so token flushes never re-run it;
-	// the meaning of each change comes from explicit intents armed at the
-	// send/retry/branch call sites.
+	// Turn grouping: a user message starts a turn, following assistant messages
+	// join it (plus a headless leading turn for edge shapes). Each turn renders
+	// as one group so the anchored turn's reservation is a single CSS
+	// min-height — see docs/scroll/foundations/turn-reservation.md. Reads only
+	// ids/from, so token flushes never regroup.
+	let turns = $derived.by(() => {
+		const groups: { key: string; messages: Message[] }[] = [];
+		for (const message of messages) {
+			const last = groups.at(-1);
+			if (message.from === "user" || !last) {
+				groups.push({ key: message.id, messages: [message] });
+			} else {
+				last.messages.push(message);
+			}
+		}
+		return groups;
+	});
+
+	// Structural sync: conversation identity, plus which turn (if any) a reply
+	// is currently streaming into — the whole condition for a turn to anchor.
+	// Reads ids/from/loading only, so token flushes never re-run it.
 	$effect(() => {
+		const lastMessage = messages.at(-1);
 		chatScroll.sync({
 			conversationKey: page.params?.id,
-			messages: messages.map((m) => ({ id: m.id, from: m.from })),
-			lastMessageEmpty: untrack(() => (messages.at(-1)?.content ?? "") === ""),
+			anchorCandidateKey:
+				loading && lastMessage?.from === "assistant" ? (turns.at(-1)?.key ?? null) : null,
 		});
 	});
 
@@ -390,13 +406,6 @@
 
 	$effect(() => {
 		chatScroll.setComposerHeight(composerHeight);
-	});
-
-	// Follow behavior tracks generation state: glide while a reply streams,
-	// snap while idle — a conversation switch must land at the bottom with no
-	// animated scrolling while its async content (markdown, images) settles.
-	$effect(() => {
-		chatScroll.setStreaming(loading);
 	});
 
 	// Shared conversations containing artifacts usually exist to show one off:
@@ -683,7 +692,6 @@
 			aria-label="Conversation messages"
 			use:chatScroll.attach={{
 				content: () => messagesEl ?? pendingEl,
-				ignoreTouchZonePx: NAV_EDGE_SWIPE_ZONE_PX,
 			}}
 		>
 			<!-- @container: descendants (e.g. the per-message router-metadata row) adapt
@@ -696,57 +704,65 @@
 				{/if}
 
 				{#if messages.length > 0}
-					<div bind:this={messagesEl} class="flex h-max flex-col gap-8">
-						{#each messages as message, idx (message.id)}
-							<ChatMessage
-								{loading}
-								{message}
-								alternatives={messagesAlternatives.find((a) => a.includes(message.id)) ?? []}
-								isAuthor={!shared}
-								readOnly={isReadOnly}
-								isLast={idx === messages.length - 1}
-								bind:editMsdgId
-								onretry={(payload) => {
-									// Edit-with-content mounts a fresh pair like a send and
-									// anchors it; a plain regenerate must never yank a user
-									// who triggered it from a scrolled-up position.
-									if (payload.content !== undefined) chatScroll.armSend();
-									else chatScroll.armRetry();
-									onretry?.(payload);
-								}}
-								onshowAlternateMsg={(payload) => {
-									chatScroll.notifyBranchSwitch();
-									onshowAlternateMsg?.(payload);
-								}}
-							/>
+					<!-- padding-bottom is the composer clearance (content never hides
+					     behind the composer overlay); the SSR-rendered value equals the
+					     historical clearance. The anchored turn's min-height is the
+					     reservation its reply streams into — space the turn owns from
+					     the start, so filling it moves nothing. -->
+					<div
+						bind:this={messagesEl}
+						class="flex h-max flex-col gap-8"
+						style:padding-bottom="{chatScroll.bottomClearancePx}px"
+					>
+						{#each turns as turn, turnIdx (turn.key)}
+							<div
+								class="flex flex-col gap-8"
+								style:min-height={turnIdx === turns.length - 1 &&
+								turn.key === chatScroll.anchoredTurnKey
+									? `${chatScroll.anchorMinHeightPx}px`
+									: null}
+							>
+								{#each turn.messages as message, msgIdx (message.id)}
+									<ChatMessage
+										{loading}
+										{message}
+										alternatives={messagesAlternatives.find((a) => a.includes(message.id)) ?? []}
+										isAuthor={!shared}
+										readOnly={isReadOnly}
+										isLast={turnIdx === turns.length - 1 && msgIdx === turn.messages.length - 1}
+										bind:editMsdgId
+										onretry={(payload) => {
+											// Edit-with-content mounts a fresh turn like a send; a
+											// plain regenerate needs nothing — the reservation
+											// absorbs the old reply's collapse either way.
+											if (payload.content !== undefined) chatScroll.notifySend();
+											onretry?.(payload);
+										}}
+										onshowAlternateMsg={(payload) => {
+											chatScroll.notifyBranchSwitch();
+											onshowAlternateMsg?.(payload);
+										}}
+									/>
+								{/each}
+								{#if turnIdx === turns.length - 1 && showPendingPlaceholder}
+									<ChatMessage
+										loading={true}
+										message={{
+											id: "pending-placeholder",
+											content: "",
+											from: "assistant",
+											children: [],
+										}}
+										isAuthor={!shared}
+										readOnly={isReadOnly}
+									/>
+								{/if}
+							</div>
 						{/each}
-						{#if showPendingPlaceholder}
-							<ChatMessage
-								loading={true}
-								message={{
-									id: "pending-placeholder",
-									content: "",
-									from: "assistant",
-									children: [],
-								}}
-								isAuthor={!shared}
-								readOnly={isReadOnly}
-							/>
-						{/if}
 						{#if isReadOnly}
 							<ModelSwitch {models} {currentModel} />
 						{/if}
 					</div>
-					<!-- Send-anchor spacer: inflated at send so the sent message lands near
-					     the viewport top, shrinking 1:1 as the reply grows (constant
-					     scrollHeight = zero motion), floored at composer clearance.
-					     chatScroll owns the height after hydration; the template value
-					     provides the composer clearance in server-rendered markup. -->
-					<div
-						use:chatScroll.attachSpacer
-						class="flex-shrink-0"
-						style="height: {MIN_SPACER_FALLBACK_PX}px"
-					></div>
 				{:else if pending}
 					<!-- Outside messagesEl, so it gets its own wrapper for the scroll
 					     controller's size observer (an h-full column never resizes). -->
@@ -863,7 +879,6 @@
 							classNames="ml-auto"
 							onClick={() => {
 								if (lastMessage && lastMessage.ancestors) {
-									chatScroll.armRetry();
 									onretry?.({
 										id: lastMessage.id,
 									});
