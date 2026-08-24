@@ -152,10 +152,15 @@
 		color: #fff;
 	}
 
-	/* Thickened past lucide's default 2 so the strokes stay legible at dot size. */
 	:global(.ml-dot-icon) {
 		width: 13px;
 		height: 13px;
+	}
+
+	/* On the path, not the svg: the icon inlines stroke-width="2" as a
+	   presentation attribute per path, which beats anything inherited from the
+	   root. Thickened well past 2 so the strokes stay legible at dot size. */
+	:global(.ml-dot-icon path) {
 		stroke-width: 3.5;
 	}
 
@@ -164,10 +169,13 @@
 	:global(.ml-dot-slash) {
 		width: 10px;
 		height: 10px;
-		stroke-width: 6;
-		/* A stroke this wide overshoots the path's endpoints; without this the
+		/* The wide stroke overshoots the path's endpoints; without this the
 		   rounded caps clip against the viewBox. */
 		overflow: visible;
+	}
+
+	:global(.ml-dot-slash path) {
+		stroke-width: 6;
 	}
 
 	/* Washed out via pre-blended solids, not element opacity — a translucent dot
