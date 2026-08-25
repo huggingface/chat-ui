@@ -124,6 +124,8 @@ export class StickToBottomController {
 	private lastTouchY: number | null = null;
 	/** Gesture attribution (see GESTURE_CHAIN_MS). */
 	private lastGestureAt = Number.NEGATIVE_INFINITY;
+	/** Single-jump inputs only (scrollbar mousedown, keys) — see anchorAdjust. */
+	private lastJumpGestureAt = Number.NEGATIVE_INFINITY;
 	private pointerHeld = false;
 	private touchHeld = false;
 	private destroyed = false;
@@ -458,9 +460,16 @@ export class StickToBottomController {
 			this.lastTop > max + AT_BOTTOM_EPS;
 		// Native scroll anchoring (enabled while unpinned) compensating for
 		// content growth above the viewport: scrollTop and scrollHeight move
-		// together, distance from the bottom stays put. Not user input either.
+		// together, distance from the bottom stays put. Not user input either —
+		// unless a single-jump input (a scrollbar drag, End/PageDown) is behind
+		// it: a reader parked at the anchor (distance 0) who drags to the new
+		// bottom after growth (distance 0) leaves the same geometric trace, and
+		// that IS the user. Wheel and touch move in chains of events whose
+		// distances change, so they never match this signature themselves, and
+		// an adjustment landing right after one is still the browser's.
 		const anchorAdjust =
 			!clamped &&
+			!this.jumpGestured() &&
 			scrollHeight !== this.lastScrollHeight &&
 			Math.abs(distance - (this.lastMax - this.lastTop)) <= AT_BOTTOM_EPS;
 
@@ -477,15 +486,11 @@ export class StickToBottomController {
 					if (this.state.pinned) {
 						// Browser-initiated (Safari clamping mid-DOM-swap): undo it in
 						// the same event, before paint, so nothing flickers. A glide in
-						// flight is put back where its last tick left it and carries
-						// on — left alone, a stream's per-token clamps would win the
-						// tug-of-war and the glide would never arrive.
-						if (!this.anim || this.anim.snap) {
-							this.stopAnimation();
-							this.write(this.maxScrollTop());
-						} else {
-							this.write(this.lastTop);
-						}
+						// flight is cut short and lands at the bottom right away: on a
+						// fast stream the per-token clamps arrive faster than a spring
+						// can win them back, and the user asked for the bottom.
+						this.stopAnimation();
+						this.write(this.maxScrollTop());
 						this.recomputeState();
 						return;
 					}
@@ -552,9 +557,16 @@ export class StickToBottomController {
 		);
 	}
 
+	/** A jump input (scrollbar, keys) within the chain window, or a pointer
+	 * still held on the scrollbar. */
+	private jumpGestured(): boolean {
+		return this.pointerHeld || performance.now() - this.lastJumpGestureAt <= GESTURE_CHAIN_MS;
+	}
+
 	private onKeyDown = () => {
 		// Keys pressed on the (focusable) scroller scroll it natively.
 		this.noteGesture();
+		this.lastJumpGestureAt = this.lastGestureAt;
 	};
 
 	private onMouseDown = (event: MouseEvent) => {
@@ -564,12 +576,14 @@ export class StickToBottomController {
 		if (event.target instanceof Element && event.target.closest("button, a")) return;
 		this.pointerHeld = true;
 		this.noteGesture();
+		this.lastJumpGestureAt = this.lastGestureAt;
 	};
 
 	private onWindowMouseUp = () => {
 		if (!this.pointerHeld) return;
 		this.pointerHeld = false;
 		this.noteGesture();
+		this.lastJumpGestureAt = this.lastGestureAt;
 	};
 
 	private normalizeWheelDelta(event: WheelEvent): number {
