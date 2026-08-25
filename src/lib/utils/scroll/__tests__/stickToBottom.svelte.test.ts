@@ -276,6 +276,54 @@ describe("gestures that must NOT change pin state", () => {
 		await waitFor(() => fixture.distance() <= ARRIVED, { label: "glide still completes" });
 	});
 
+	it("a touch starting in the edge-swipe zone never cancels a glide", async () => {
+		const { fixture, controller } = setup({}, { ignoreTouchZonePx: 40 });
+		fixture.addBlock(1200);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle tall fixture" });
+		await nextTask();
+		dragScrollbarTo(fixture.container, 0);
+		await frame();
+		await new Promise((resolve) => setTimeout(resolve, 250));
+		controller.animateToBottom();
+		await frames(2);
+		// The drawer claims this touch and prevents it from scrolling anything.
+		await touchDrag(fixture.container, { fromY: 100, toY: 220, x: 30, noScroll: true });
+		expect(controller.pinned).toBe(true);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "glide still completes" });
+	});
+
+	it("a mostly-horizontal drag with slight vertical drift does not cancel a glide", async () => {
+		const { fixture, controller } = setup();
+		fixture.addBlock(1200);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle tall fixture" });
+		await nextTask();
+		dragScrollbarTo(fixture.container, 0);
+		await frame();
+		await new Promise((resolve) => setTimeout(resolve, 250));
+		controller.animateToBottom();
+		await frames(2);
+		const el = fixture.container;
+		const id = 777;
+		const touch = (type: string, x: number, y: number) =>
+			el.dispatchEvent(
+				new TouchEvent(type, {
+					touches:
+						type === "touchend"
+							? []
+							: [new Touch({ identifier: id, target: el, clientX: x, clientY: y })],
+					changedTouches: [new Touch({ identifier: id, target: el, clientX: x, clientY: y })],
+					bubbles: true,
+				})
+			);
+		touch("touchstart", 100, 200);
+		touch("touchmove", 140, 203); // 40px right, 3px down
+		touch("touchmove", 180, 206);
+		touch("touchend", 180, 206);
+		await frames(2);
+		expect(controller.pinned).toBe(true);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "glide still completes" });
+	});
+
 	it("a wheel down during a glide does not cancel it", async () => {
 		const { fixture, controller } = setup();
 		fixture.addBlock(1200);
