@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
 	ML_ASSISTANT_MCP_SERVERS,
-	ML_ASSISTANT_PREPROMPT,
 	isMlAssistantConversation,
 	withMlAssistantServers,
 } from "./mlAssistant";
@@ -59,10 +58,5 @@ describe("ML Assistant preset", () => {
 		expect(withMlAssistantServers([]).map((s) => s.name)).toEqual(
 			ML_ASSISTANT_MCP_SERVERS.map((s) => s.name)
 		);
-	});
-
-	it("ships a prompt that does not depend on the model", () => {
-		expect(ML_ASSISTANT_PREPROMPT.trim().length).toBeGreaterThan(0);
-		expect(ML_ASSISTANT_PREPROMPT).not.toMatch(/\{\{|\$\{/);
 	});
 });

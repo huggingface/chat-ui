@@ -544,3 +544,51 @@ describe("runMcpFlow offering the plan tool", () => {
 		expect(String(lastUser?.content)).not.toContain("CURRENT PLAN");
 	});
 });
+
+describe("runMcpFlow under the ML Assistant preset", () => {
+	const inMlMode = { conv: { _id: new ObjectId(), mlAssistant: true } } as unknown as Parameters<
+		typeof runMcpFlow
+	>[0];
+
+	const systemPrompt = (n = 0) => String(requestMessages(n)[0]?.content ?? "");
+
+	it("sends the preset's tool preprompt instead of the generic one", async () => {
+		// Both in one message is a contradiction: the generic text names writing
+		// code as a case to answer without tools, which is what the preset exists
+		// to overrule.
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow(inMlMode);
+
+		expect(systemPrompt()).toContain("USING TOOLS:");
+		expect(systemPrompt()).not.toContain("Do NOT call a tool unless");
+	});
+
+	it("leaves a conversation outside the mode on the generic tool preprompt", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow();
+		expect(systemPrompt()).toContain("Do NOT call a tool unless");
+		expect(systemPrompt()).not.toContain("USING TOOLS:");
+	});
+
+	it("keeps working past the round budget an ordinary conversation stops at", async () => {
+		const toolRound: Round = { toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] };
+		scriptRounds([...Array.from({ length: 11 }, () => toolRound), { content: "done" }]);
+
+		const { result } = await runFlow(inMlMode);
+
+		// Grounding ids, auditing a dataset and submitting a job is more than ten
+		// rounds on its own; the generic budget ends the turn mid-task.
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(12);
+	});
+
+	it("still stops, at the preset's own budget", async () => {
+		const toolRound: Round = { toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] };
+		scriptRounds(Array.from({ length: 100 }, () => toolRound));
+
+		const { result } = await runFlow(inMlMode);
+
+		expect(result).toBe("exhausted");
+		expect(mocks.create).toHaveBeenCalledTimes(100);
+	});
+});

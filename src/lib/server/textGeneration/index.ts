@@ -68,6 +68,8 @@ async function* textGenerationWithoutTitle(
 		mlAssistant,
 		artifactsOverride: ctx.artifactsOverride,
 		supportsArtifacts: ctx.model.supportsArtifacts,
+		username: ctx.username,
+		timezone: (ctx.locals as unknown as { timezone?: string } | undefined)?.timezone,
 	});
 
 	const processedMessages = await preprocessMessages(messages, convId);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolvePreprompt } from "./preprompt";
 import { injectArtifactsPrompt } from "./artifacts";
-import { ML_ASSISTANT_PREPROMPT } from "$lib/server/mlAssistant";
+import { ML_ASSISTANT_PREPROMPT, mlAssistantSessionContext } from "$lib/server/mlAssistantPrompt";
 
 /**
  * The ML Assistant preset must not change how artifacts resolve for anything
@@ -94,13 +94,53 @@ describe("resolvePreprompt", () => {
 	});
 
 	it("force-enables artifacts for the preset even when the model and override say no", () => {
+		const now = new Date("2026-08-24T09:07:00Z");
+
 		expect(
 			resolvePreprompt({
 				conversationPreprompt: undefined,
 				mlAssistant: true,
 				artifactsOverride: false,
 				supportsArtifacts: false,
+				timezone: "UTC",
+				now,
 			})
-		).toBe(injectArtifactsPrompt(ML_ASSISTANT_PREPROMPT));
+		).toBe(
+			`${injectArtifactsPrompt(ML_ASSISTANT_PREPROMPT)}\n\n${mlAssistantSessionContext({
+				timezone: "UTC",
+				now,
+			})}`
+		);
+	});
+
+	it("stamps the session context last, where the namespace rule reads it", () => {
+		const resolved = resolvePreprompt({
+			conversationPreprompt: undefined,
+			mlAssistant: true,
+			username: "pngwn",
+			timezone: "UTC",
+			now: new Date("2026-08-24T09:07:00Z"),
+		});
+
+		expect(resolved).toContain("User=pngwn");
+		// After the artifacts prompt, not merely somewhere in the message: the rule
+		// keys off the last line, and artifacts is appended by the same call.
+		expect(resolved?.trimEnd().endsWith("User=pngwn]")).toBe(true);
+	});
+
+	it("says the user is unknown rather than leaving the preset to guess", () => {
+		expect(resolvePreprompt({ conversationPreprompt: undefined, mlAssistant: true })).toContain(
+			"User=unknown"
+		);
+	});
+
+	it("stamps nothing outside the preset", () => {
+		expect(
+			resolvePreprompt({
+				conversationPreprompt: "You are a pirate.",
+				mlAssistant: false,
+				username: "pngwn",
+			})
+		).toBe("You are a pirate.");
 	});
 });
