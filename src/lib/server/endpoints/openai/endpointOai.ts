@@ -15,6 +15,7 @@ import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
+import { withoutContentLength } from "$lib/server/undiciCompat";
 // uuid import removed (no tool call ids)
 
 export const endpointOAIParametersSchema = z.object({
@@ -78,7 +79,7 @@ export async function endpointOai(
 
 	// Custom fetch wrapper to capture response headers for router metadata
 	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
-		const response = await fetch(url, init);
+		const response = await fetch(url, withoutContentLength(init));
 
 		// Capture router headers if present (fallback for non-streaming)
 		const routeHeader = response.headers.get("X-Router-Route");

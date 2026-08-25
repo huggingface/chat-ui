@@ -1,8 +1,16 @@
 import { GridFSBucket, MongoClient, ReadPreference } from "mongodb";
+// The mongodb driver require()s these lazily at runtime when the connection
+// string uses authMechanism=MONGODB-AWS (IRSA / web identity in prod). Import
+// them statically so dependency-cleanup passes don't strip them from
+// package.json again — that already happened twice (97bf7184, 6d842efc) and
+// the second time crash-looped prod with MongoMissingDependencyError.
+import "aws4";
+import "@aws-sdk/credential-providers";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Generation, GenerationEvent } from "$lib/types/Generation";
+import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
@@ -130,6 +138,7 @@ export class Database {
 		const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
 		const generations = db.collection<Generation>("generations");
 		const generationEvents = db.collection<GenerationEvent>("generationEvents");
+		const mcpElicitations = db.collection<McpElicitation>("mcpElicitations");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
@@ -160,6 +169,7 @@ export class Database {
 			abortedGenerations,
 			generations,
 			generationEvents,
+			mcpElicitations,
 			settings,
 			users,
 			sessions,
@@ -187,6 +197,7 @@ export class Database {
 			abortedGenerations,
 			generations,
 			generationEvents,
+			mcpElicitations,
 			settings,
 			users,
 			sessions,
@@ -312,6 +323,15 @@ export class Database {
 		generationEvents
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for generationEvents by createdAt"));
+
+		mcpElicitations
+			.createIndex({ elicitationId: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating index for mcpElicitations by elicitationId"));
+		// Keyed off expiry, not creation: MCP_ELICITATION_TIMEOUT_MS is unbounded, and a row
+		// swept while its form is still on screen makes answering it 404.
+		mcpElicitations
+			.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for mcpElicitations by expiresAt"));
 
 		sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch((e) => logger.error(e));
 		settings

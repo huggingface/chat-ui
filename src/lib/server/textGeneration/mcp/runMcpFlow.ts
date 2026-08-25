@@ -27,6 +27,10 @@ import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepa
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
+import { withoutContentLength } from "$lib/server/undiciCompat";
+import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
+import { getEnabledBuiltinTools, shouldSkipMcpFlow } from "../builtinTools";
+import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -39,11 +43,19 @@ export type RunMcpFlowContext = Pick<
 	| "reasoningEffort"
 	| "reasoningOverride"
 	| "locals"
+	| "generationId"
+	| "messageId"
 > & { messages: EndpointMessage[] };
 
 // Only "not_applicable" means MCP never ran and the caller should generate normally.
 // Every other result has already emitted its own final answer.
-export type McpFlowResult = "completed" | "not_applicable" | "aborted" | "exhausted";
+export type McpFlowResult =
+	| "completed"
+	| "not_applicable"
+	| "aborted"
+	| "exhausted"
+	/** A 2026-era prompt is open; the run ends here and resumes when it is answered. */
+	| "awaiting_input";
 
 const MAX_TOOL_ROUNDS = 10;
 
@@ -61,6 +73,8 @@ export async function* runMcpFlow({
 	reasoningEffort,
 	reasoningOverride,
 	locals,
+	generationId,
+	messageId,
 	preprompt,
 	abortSignal,
 	abortController,
@@ -85,6 +99,8 @@ export async function* runMcpFlow({
 		}
 		return false;
 	};
+	const builtinTools = getEnabledBuiltinTools({ conv });
+
 	// Start from env-configured servers
 	let servers = getMcpServers();
 	try {
@@ -147,9 +163,22 @@ export async function* runMcpFlow({
 		// ignore selection merge errors and proceed with env servers
 	}
 
+	// The preset's servers go on after the user's selection has been filtered, so
+	// they survive a selection that excludes them. Anything the user picked on top
+	// still comes through — extra servers are configurable, these are not.
+	if (isMlAssistantConversation(conv)) {
+		servers = withMlAssistantServers(servers);
+		try {
+			logger.debug(
+				{ servers: servers.map((s) => s.name) },
+				"[mcp] applied ML Assistant preset servers"
+			);
+		} catch {}
+	}
+
 	// If selection/merge yielded no servers, bail early with clearer log
-	if (servers.length === 0) {
-		logger.warn({}, "[mcp] no MCP servers selected after merge/name filter");
+	if (shouldSkipMcpFlow(servers.length, builtinTools.length)) {
+		logger.warn({}, "[mcp] no MCP servers selected after merge/name filter, and no builtin tools");
 		return "not_applicable";
 	}
 
@@ -173,7 +202,7 @@ export async function* runMcpFlow({
 			}
 		} catch {}
 	}
-	if (servers.length === 0) {
+	if (shouldSkipMcpFlow(servers.length, builtinTools.length)) {
 		logger.warn({}, "[mcp] all selected MCP servers rejected by URL safety guard");
 		return "not_applicable";
 	}
@@ -242,7 +271,7 @@ export async function* runMcpFlow({
 		{ count: servers.length, servers: servers.map((s) => s.name) },
 		"[mcp] servers configured"
 	);
-	if (servers.length === 0) {
+	if (shouldSkipMcpFlow(servers.length, builtinTools.length)) {
 		return "not_applicable";
 	}
 
@@ -304,9 +333,23 @@ export async function* runMcpFlow({
 	let producedOutput = false;
 
 	try {
-		const { tools: oaTools, mapping } = await getOpenAiToolsForMcp(servers, {
+		const { tools: mcpTools, mapping } = await getOpenAiToolsForMcp(servers, {
 			signal: abortSignal,
 		});
+		// An MCP tool that collides with a builtin name is dropped: dispatch checks
+		// builtins first, so the MCP twin would be advertised but unreachable.
+		const builtinNames = new Set(builtinTools.map((tool) => tool.name));
+		const collisions = mcpTools.filter((tool) => builtinNames.has(tool.function.name));
+		if (collisions.length > 0) {
+			logger.warn(
+				{ dropped: collisions.map((tool) => tool.function.name) },
+				"[mcp] dropped MCP tools shadowed by builtin tools"
+			);
+		}
+		const oaTools = [
+			...builtinTools.map((tool) => tool.definition),
+			...mcpTools.filter((tool) => !builtinNames.has(tool.function.name)),
+		];
 		try {
 			logger.info(
 				{ toolCount: oaTools.length, toolNames: oaTools.map((t) => t.function.name) },
@@ -326,7 +369,7 @@ export async function* runMcpFlow({
 			input: RequestInfo | URL,
 			init?: RequestInit
 		): Promise<Response> => {
-			const res = await fetch(input, init);
+			const res = await fetch(input, withoutContentLength(init));
 			const p = res.headers.get("x-inference-provider");
 			if (p && !providerHeader) providerHeader = p;
 			return res;
@@ -406,7 +449,7 @@ export async function* runMcpFlow({
 			}
 		);
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
-		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone);
+		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone, builtinTools);
 		const prepromptPieces: string[] = [];
 		if (toolPreprompt.trim().length > 0) {
 			prepromptPieces.push(toolPreprompt);
@@ -424,6 +467,13 @@ export async function* runMcpFlow({
 			}
 		} else if (mergedPreprompt.length > 0) {
 			messagesOpenAI = [{ role: "system", content: mergedPreprompt }, ...messagesOpenAI];
+		}
+
+		// Tail-injected once per turn; within the turn, freshness travels in the tool
+		// results. Gated on the tool being offered so a stale plan can't tell the model
+		// to call a tool it doesn't have.
+		if (conv.plan && builtinTools.some((tool) => tool.name === PLAN_TOOL_NAME)) {
+			messagesOpenAI = injectPlanState(messagesOpenAI, conv.plan);
 		}
 
 		// Work around servers that reject `system` role
@@ -831,6 +881,8 @@ export async function* runMcpFlow({
 					// own message instead of moving them onto the final answer.
 					roundReasoning: reasoningForToolMsg,
 					roundContent: assistantContentForToolMsg,
+					elicitation: { conversationId: conv._id, generationId, messageId },
+					builtinTools,
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;
@@ -839,6 +891,10 @@ export async function* runMcpFlow({
 						producedOutput = true;
 						yield event.update;
 					} else {
+						if (event.summary.awaitingInput) {
+							logger.info({ loop }, "[mcp] parked on a durable prompt; run ends until answered");
+							return "awaiting_input";
+						}
 						messagesOpenAI = [
 							...messagesOpenAI,
 							assistantToolMessage,

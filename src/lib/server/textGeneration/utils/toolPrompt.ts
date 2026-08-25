@@ -1,6 +1,11 @@
 import type { OpenAiTool } from "$lib/server/mcp/tools";
+import type { BuiltinTool } from "../builtinTools/types";
 
-export function buildToolPreprompt(tools: OpenAiTool[], timezone?: string): string {
+export function buildToolPreprompt(
+	tools: OpenAiTool[],
+	timezone?: string,
+	builtins?: Array<Pick<BuiltinTool, "name" | "preprompt" | "exemptFromToolRestraint">>
+): string {
 	if (!Array.isArray(tools) || tools.length === 0) return "";
 	const names = tools
 		.map((t) => (t?.function?.name ? String(t.function.name) : ""))
@@ -19,10 +24,23 @@ export function buildToolPreprompt(tools: OpenAiTool[], timezone?: string): stri
 	const currentDateTime = now.toLocaleString("en-US", dateTimeOptions);
 	const isoDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 	const locationLine = timezone ? ` User's timezone: ${timezone}.` : "";
+	// Only builtins actually on offer this turn contribute guidance.
+	const offered = (builtins ?? []).filter((builtin) => names.includes(builtin.name));
+	const exemptNames = offered
+		.filter((builtin) => builtin.exemptFromToolRestraint)
+		.map((builtin) => builtin.name);
+	const builtinGuidance = offered
+		.map((builtin) => builtin.preprompt?.trim() ?? "")
+		.filter((text) => text.length > 0);
 	return [
 		`You have access to these tools: ${names.join(", ")}.`,
 		`Current date and time: ${currentDateTime} (${isoDate}).${locationLine}`,
-		`IMPORTANT: Do NOT call a tool unless the user's request requires capabilities you lack (e.g., real-time data, image generation, code execution) or external information you do not have. For tasks like writing code, creative writing, math, or building apps, respond directly without tools. When in doubt, do not use a tool.`,
+		`IMPORTANT: Do NOT call a tool unless the user's request requires capabilities you lack (e.g., real-time data, image generation, code execution) or external information you do not have. For tasks like writing code, creative writing, math, or building apps, respond directly without tools. When in doubt, do not use a tool.${
+			exemptNames.length > 0
+				? ` This does not apply to ${exemptNames.join(" or ")}, covered below.`
+				: ""
+		}`,
+		...builtinGuidance,
 		`PARALLEL TOOL CALLS: When multiple tool calls are needed and they are independent of each other (i.e., one does not need the result of another), call them all at once in a single response instead of one at a time. Only chain tool calls sequentially when a later call depends on an earlier call's output.`,
 		`SEARCH: Use 3-6 precise keywords. For historical events, include the year the event occurred. For recent or current topics, use today's year (${now.getFullYear()}). When a tool accepts date-range parameters (e.g., startPublishedDate, endPublishedDate), always use today's date (${isoDate}) as the end date unless the user specifies otherwise. For multi-part questions, search each part separately. If the results only partially cover the question, run a follow-up search or crawl the most relevant result URL instead of answering from memory.`,
 		`GROUNDING: When you answer from tool results, the results are your only source of facts. Do not supplement them with specifics from your own knowledge — details not present in the results are likely wrong, even when they sound plausible. If a fact is missing, search again or say you could not verify it. Attribute key facts to their sources with markdown links to the result URLs. If results conflict, say so. Never fabricate URLs, citations, or facts.`,

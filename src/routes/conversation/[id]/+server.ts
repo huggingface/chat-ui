@@ -10,6 +10,7 @@ import { z } from "zod";
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
+	MessageElicitationUpdateType,
 	MessageReasoningUpdateType,
 	type MessageUpdate,
 	type MessageStreamUpdate,
@@ -23,6 +24,9 @@ import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
+import type { McpServerConfig } from "$lib/server/mcp/httpClient";
+import { isMlAssistantConversation } from "$lib/server/mlAssistant";
+import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
@@ -179,6 +183,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		inputs: newPrompt,
 		id: messageId,
 		is_retry: isRetry,
+		resumeElicitationId,
 		generationId,
 		selectedMcpServerNames,
 		selectedMcpServers,
@@ -196,6 +201,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					.transform((s) => s.replace(/\r\n/g, "\n"))
 			),
 			is_retry: z.optional(z.boolean()),
+			/** Continue the tool call a durable elicitation parked, before generating. */
+			resumeElicitationId: z.optional(z.string().uuid()),
 			selectedMcpServerNames: z.optional(z.array(z.string())),
 			selectedMcpServers: z
 				.optional(
@@ -293,7 +300,20 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 	let messagesForPrompt: Message[] = [];
 
-	if (isRetry && messageId) {
+	if (resumeElicitationId) {
+		// Continue the assistant message the prompt parked, in place: its tool call and the
+		// answer belong to that turn, and a new one would strand them behind an empty user
+		// message. Taken from the record rather than the request, or a turn sent while the
+		// prompt was open would move the answer onto it.
+		const { parkedMessageId } = await import("$lib/server/mcp/elicitation");
+		const parkedId = await parkedMessageId(convId, resumeElicitationId);
+		const parked = conv.messages.find((message) => message.id === parkedId);
+		if (!parked || parked.from !== "assistant") {
+			error(404, "No parked message to resume");
+		}
+		messageToWriteToId = parked.id;
+		messagesForPrompt = buildSubtree(conv, parked.id);
+	} else if (isRetry && messageId) {
 		// two cases, if we're retrying a user message with a newPrompt set,
 		// it means we're editing a user message
 		// if we're retrying on an assistant message, newPrompt cannot be set
@@ -481,6 +501,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 
 				if (
+					event.type === MessageUpdateType.Elicitation &&
+					event.subtype === MessageElicitationUpdateType.Request
+				) {
+					showedPrompt = true;
+				}
+
+				if (
 					event.type === MessageUpdateType.Status &&
 					event.status === MessageUpdateStatus.Finished
 				) {
@@ -645,6 +672,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}
 
 			let hasError = false;
+			// A run that ends showing a prompt produced no answer on purpose.
+			let showedPrompt = false;
 			const initialMessageContent = messageToWriteTo.content;
 
 			// Emit the streamed-so-far text as an interrupted final answer. The
@@ -678,6 +707,30 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				// Add billing organization to locals for the endpoint to use
 				locals.billingOrganization = userSettings?.billingOrganization;
 
+				let parkedAgain = false;
+				if (resumeElicitationId) {
+					const { resumeParkedToolCall } = await import("$lib/server/mcp/resumeElicitation");
+					const outcome = await resumeParkedToolCall({
+						conversationId: convId,
+						elicitationId: resumeElicitationId,
+						generationId: effectiveGenerationId,
+						extraServers: (locals as unknown as { mcp?: { selectedServers?: McpServerConfig[] } })
+							?.mcp?.selectedServers,
+						signal: ctrl.signal,
+					});
+					logger.info(
+						{
+							conversationId: id,
+							resumed: outcome.resumed,
+							parkedAgain: outcome.parkedAgain,
+							reason: outcome.reason,
+						},
+						"[mcp] resuming a parked tool call"
+					);
+					for (const event of outcome.updates) await update(event);
+					parkedAgain = outcome.parkedAgain === true;
+				}
+
 				const ctx: TextGenerationContext = {
 					model,
 					endpoint: await model.getEndpoint(),
@@ -699,10 +752,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							? userSettings?.providerOverrides?.[model.id]
 							: undefined,
 					// Thinking-effort override (only forwarded for reasoning-capable models;
-					// per-user override can force-enable on self-hosted)
+					// per-user override can force-enable on self-hosted). The ML Assistant
+					// preset pins its own effort here rather than writing the user's saved
+					// setting, so the mode never outlives the conversation it belongs to.
 					reasoningEffort:
 						(userSettings?.reasoningOverrides?.[model.id] ?? model.supportsReasoning)
-							? userSettings?.reasoningEffortOverrides?.[model.id]
+							? isMlAssistantConversation(conv)
+								? ML_ASSISTANT_EFFORT
+								: userSettings?.reasoningEffortOverrides?.[model.id]
 							: undefined,
 					reasoningOverride: userSettings?.reasoningOverrides?.[model.id],
 					// Artifacts aren't provider-determined, so the per-model user
@@ -710,9 +767,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					artifactsOverride: userSettings?.artifactsOverrides?.[model.id],
 					locals,
 					abortController: ctrl,
+					generationId: effectiveGenerationId,
+					messageId: messageToWriteTo.id,
 				};
-				// run the text generation and send updates to the client
-				for await (const event of textGeneration(ctx)) await update(event);
+				// run the text generation and send updates to the client. Skipped when the
+				// resumed call asked something else: the model has no round to answer yet.
+				if (!parkedAgain) {
+					for await (const event of textGeneration(ctx)) await update(event);
+				}
 				if (ctrl.signal.aborted) {
 					abortedByUser = true;
 				}
@@ -751,7 +813,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			} finally {
 				// check if no output was generated
-				if (!hasError && !abortedByUser && messageToWriteTo.content === initialMessageContent) {
+				if (
+					!hasError &&
+					!abortedByUser &&
+					!showedPrompt &&
+					messageToWriteTo.content === initialMessageContent
+				) {
 					hasError = true;
 					logger.warn(
 						{

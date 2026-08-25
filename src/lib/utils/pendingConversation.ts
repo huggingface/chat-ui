@@ -1,6 +1,7 @@
 import { browser } from "$app/environment";
 import type { Message } from "$lib/types/Message";
 import type { DeployedSpace } from "$lib/types/Conversation";
+import type { PlanState } from "$lib/types/Plan";
 
 // Payload shape of GET /api/v2/conversations/[id] (post superjson-parse),
 // shared by the page load and the create-conversation seed.
@@ -15,6 +16,8 @@ export interface ConversationData {
 	modelId: string;
 	shared: boolean;
 	deployedSpaces?: Record<string, DeployedSpace>;
+	mlAssistant?: boolean;
+	plan?: PlanState;
 }
 
 // One-shot handoff of the conversation payload embedded in the create

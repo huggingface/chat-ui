@@ -1,6 +1,7 @@
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
+	type MessagePlanUpdate,
 	type MessageStatusUpdate,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
@@ -18,6 +19,8 @@ export interface ConsumeContext {
 	onStreamStart: () => void;
 	onTitle: (title: string) => void;
 	onError: (update: MessageStatusUpdate) => void;
+	/** Fired on every plan snapshot, so mode UI can track progress outside the message. */
+	onPlan?: (update: MessagePlanUpdate) => void;
 }
 
 /**
@@ -151,6 +154,8 @@ export async function consumeMessageUpdates(
 			];
 		} else if (update.type === MessageUpdateType.RouterMetadata) {
 			message.routerMetadata = { route: update.route, model: update.model };
+		} else if (update.type === MessageUpdateType.Plan) {
+			ctx.onPlan?.(update);
 		}
 	}
 

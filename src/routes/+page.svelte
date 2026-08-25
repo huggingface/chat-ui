@@ -19,6 +19,7 @@
 	import { loading } from "$lib/stores/loading.js";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 
 	let { data } = $props();
 
@@ -57,6 +58,9 @@
 						($settings.customPromptsEnabled?.[$settings.activeModel] ?? true)
 							? $settings.customPrompts[$settings.activeModel]
 							: "",
+					// The composer latches the mode before handing the message over, so
+					// the conversation this creates is marked with it from the start.
+					mlAssistant: mlAssistant.taskStarted,
 				}),
 			});
 
@@ -73,6 +77,8 @@
 				}
 				error.set(errorMessage);
 				console.error("Error while creating conversation: ", errorMessage);
+				// The composer latched the mode for a conversation that never happened.
+				mlAssistant.abortTask();
 				return;
 			}
 
@@ -111,6 +117,8 @@
 		} catch (err) {
 			error.set((err as Error).message || ERROR_MESSAGES.default);
 			console.error(err);
+			// The composer latched the mode for a conversation that never happened.
+			mlAssistant.abortTask();
 		} finally {
 			$loading = false;
 		}
