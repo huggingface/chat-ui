@@ -232,6 +232,50 @@ describe("gestures that must NOT change pin state", () => {
 		expect(controller.pinned).toBe(true);
 	});
 
+	it("a wheel up consumed by an inner scroller does not cancel a glide", async () => {
+		const { fixture, controller } = setup();
+		const inner = document.createElement("div");
+		inner.style.cssText = "height: 100px; overflow-y: auto; flex-shrink: 0;";
+		const innerContent = document.createElement("div");
+		innerContent.style.height = "500px";
+		inner.appendChild(innerContent);
+		fixture.content.appendChild(inner);
+		fixture.addBlock(1200);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle tall fixture" });
+		inner.scrollTop = 200; // the tool output / code block can scroll up on its own
+		await nextTask();
+		dragScrollbarTo(fixture.container, 0);
+		await frame();
+		controller.animateToBottom();
+		await frames(2); // glide in flight
+		wheel(fixture.container, -120, { target: inner, noScroll: true });
+		await frames(2);
+		expect(controller.pinned).toBe(true);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "glide still completes" });
+	});
+
+	it("a touch drag inside an inner scroller does not cancel a glide", async () => {
+		const { fixture, controller } = setup();
+		const inner = document.createElement("div");
+		inner.style.cssText = "height: 100px; overflow-y: auto; flex-shrink: 0;";
+		const innerContent = document.createElement("div");
+		innerContent.style.height = "500px";
+		inner.appendChild(innerContent);
+		fixture.content.appendChild(inner);
+		fixture.addBlock(1200);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle tall fixture" });
+		inner.scrollTop = 200;
+		await nextTask();
+		dragScrollbarTo(fixture.container, 0);
+		await frame();
+		await new Promise((resolve) => setTimeout(resolve, 250)); // let the drag's gesture window lapse
+		controller.animateToBottom();
+		await frames(2);
+		await touchDrag(fixture.container, { fromY: 100, toY: 220, target: inner, noScroll: true });
+		expect(controller.pinned).toBe(true);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "glide still completes" });
+	});
+
 	it("a wheel down during a glide does not cancel it", async () => {
 		const { fixture, controller } = setup();
 		fixture.addBlock(1200);

@@ -609,8 +609,29 @@ export class StickToBottomController {
 		if (!this.anim || this.anim.snap) return;
 		if (event.ctrlKey) return; // pinch-zoom
 		if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return; // horizontal pan
-		if (this.normalizeWheelDelta(event) < 0) this.unpin();
+		if (this.normalizeWheelDelta(event) >= 0) return;
+		if (this.innerScrollerConsumesUp(event.target)) return;
+		this.unpin();
 	};
+
+	/**
+	 * True when a scrollable element between `target` and the container can
+	 * still scroll up: the browser hands an upward wheel or drag to it, the
+	 * conversation does not move, and the gesture says nothing about the
+	 * glide. Only consulted while a glide is in flight — the ancestor walk
+	 * forces layout, and outside glides the scroll events decide everything.
+	 */
+	private innerScrollerConsumesUp(target: EventTarget | null): boolean {
+		let el = target instanceof Element ? target : null;
+		while (el && el !== this.container) {
+			if (el instanceof HTMLElement && el.scrollTop > 0 && el.scrollHeight > el.clientHeight + 1) {
+				const overflowY = getComputedStyle(el).overflowY;
+				if (overflowY === "auto" || overflowY === "scroll") return true;
+			}
+			el = el.parentElement;
+		}
+		return false;
+	}
 
 	private onTouchStart = (event: TouchEvent) => {
 		this.touchHeld = true;
@@ -633,7 +654,9 @@ export class StickToBottomController {
 		// re-attach rule covers them if it gets canceled elsewhere. Momentum
 		// after the finger lifts sends no touchmove, but its scroll events carry
 		// direction and the geometric rules handle them.
-		if (this.anim && !this.anim.snap && lastY !== null && y > lastY + 1) this.unpin();
+		if (!this.anim || this.anim.snap || lastY === null || y <= lastY + 1) return;
+		if (this.innerScrollerConsumesUp(event.target)) return;
+		this.unpin();
 	};
 
 	private onTouchEnd = () => {
