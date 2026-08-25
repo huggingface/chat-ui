@@ -31,7 +31,12 @@ export interface ParkedCall extends Timestamps {
 	toolUuid: string;
 
 	kind: ParkedCallKind;
-	status: "waiting" | "resumed" | "abandoned";
+	/**
+	 * `resuming` is the claim: a sweeper transitions out of `waiting` atomically so
+	 * two pods cannot both wake the same turn. A row left in `resuming` is one whose
+	 * pod died mid-resume, which is why `attempts` is counted.
+	 */
+	status: "waiting" | "resuming" | "resumed" | "abandoned";
 	/** When the sweeper should wake this. Indexed with `status` — that pair is the sweep. */
 	resumeAt: Date;
 	/** Model-authored: what it is waiting for. Display text, never markup. */

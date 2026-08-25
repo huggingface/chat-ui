@@ -461,7 +461,7 @@ describe("runMcpFlow offering the question tool", () => {
 		scriptRounds([{ content: "the answer" }]);
 		const { result } = await runFlow(inMlMode);
 		expect(result).toBe("completed");
-		expect(toolNames()).toEqual(["ask_user_question", "update_plan"]);
+		expect(toolNames()).toEqual(["ask_user_question", "update_plan", "wait"]);
 	});
 
 	it("still skips the flow outside the mode when no MCP server is selected", async () => {

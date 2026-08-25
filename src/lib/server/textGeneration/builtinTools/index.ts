@@ -3,6 +3,7 @@ import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { askUserQuestionBuiltin } from "./askUserQuestion";
 import { githubGroundingBuiltins } from "./githubGrounding";
 import { createPlanTool } from "./planTool";
+import { waitBuiltin } from "./waitTool";
 import type { BuiltinTool } from "./types";
 
 export type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
@@ -21,7 +22,12 @@ export function getEnabledBuiltinTools(params: {
 	// The GitHub tools carry a second condition of their own — they withhold
 	// themselves without a GITHUB_TOKEN — which is still policy, so it lives with
 	// them rather than leaking a config read into this list.
-	return [askUserQuestionBuiltin, createPlanTool(params.conv), ...githubGroundingBuiltins()];
+	return [
+		askUserQuestionBuiltin,
+		createPlanTool(params.conv),
+		waitBuiltin,
+		...githubGroundingBuiltins(),
+	];
 }
 
 /**
