@@ -11,6 +11,7 @@ import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Generation, GenerationEvent } from "$lib/types/Generation";
 import type { McpElicitation } from "$lib/types/McpElicitation";
+import type { ParkedCall } from "$lib/types/ParkedCall";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
@@ -139,6 +140,7 @@ export class Database {
 		const generations = db.collection<Generation>("generations");
 		const generationEvents = db.collection<GenerationEvent>("generationEvents");
 		const mcpElicitations = db.collection<McpElicitation>("mcpElicitations");
+		const parkedCalls = db.collection<ParkedCall>("parkedCalls");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
@@ -170,6 +172,7 @@ export class Database {
 			generations,
 			generationEvents,
 			mcpElicitations,
+			parkedCalls,
 			settings,
 			users,
 			sessions,
@@ -198,6 +201,7 @@ export class Database {
 			generations,
 			generationEvents,
 			mcpElicitations,
+			parkedCalls,
 			settings,
 			users,
 			sessions,
@@ -323,6 +327,23 @@ export class Database {
 		generationEvents
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for generationEvents by createdAt"));
+
+		parkedCalls
+			.createIndex({ parkedCallId: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating index for parkedCalls by parkedCallId"));
+		// The sweep itself: due rows, oldest first. Compound so a waiting row that is
+		// not yet due costs nothing to skip.
+		parkedCalls
+			.createIndex({ status: 1, resumeAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for parkedCalls by status and resumeAt"));
+		parkedCalls
+			.createIndex({ conversationId: 1 })
+			.catch((e) => logger.error(e, "Error creating index for parkedCalls by conversationId"));
+		// Rows outlive their usefulness once resumed; a week is long enough to debug a
+		// run and short enough that the collection stays small.
+		parkedCalls
+			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for parkedCalls by createdAt"));
 
 		mcpElicitations
 			.createIndex({ elicitationId: 1 }, { unique: true })

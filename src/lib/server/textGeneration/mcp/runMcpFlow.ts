@@ -900,6 +900,13 @@ export async function* runMcpFlow({
 					roundReasoning: reasoningForToolMsg,
 					roundContent: assistantContentForToolMsg,
 					elicitation: { conversationId: conv._id, generationId, messageId },
+					// A parked call resumes with no request behind it, so the identity it
+					// should act as has to be recorded now, while there still is one.
+					owner: {
+						userId: (locals as unknown as { user?: { _id?: import("mongodb").ObjectId } })?.user
+							?._id,
+						sessionId: (locals as unknown as { sessionId?: string })?.sessionId,
+					},
 					builtinTools,
 				});
 				let toolMsgCount = 0;

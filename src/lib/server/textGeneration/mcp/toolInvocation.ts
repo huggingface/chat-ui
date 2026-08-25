@@ -52,6 +52,8 @@ export interface ExecuteToolCallsParams {
 	roundContent?: string;
 	/** Omit and elicitation requests raised by these calls are declined. */
 	elicitation?: { conversationId: ObjectId; generationId?: string; messageId?: string };
+	/** Identity the turn runs as, for a builtin that has to be resumable later. */
+	owner?: { userId?: ObjectId; sessionId?: string };
 	/** Locally-executed tools, dispatched before the MCP mapping lookup. */
 	builtinTools?: BuiltinTool[];
 }
@@ -109,6 +111,7 @@ export async function* executeToolCalls({
 	roundReasoning,
 	roundContent,
 	elicitation,
+	owner,
 	builtinTools,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
@@ -303,6 +306,9 @@ export async function* executeToolCalls({
 				const outcome = await builtin.execute(argsObj, {
 					uuid: p.uuid,
 					toolCallId: p.call.id,
+					conversationId: elicitation?.conversationId,
+					userId: owner?.userId,
+					sessionId: owner?.sessionId,
 					messageId: elicitation?.messageId,
 					generationId: elicitation?.generationId,
 					elicitationSink,
