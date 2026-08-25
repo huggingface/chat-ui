@@ -159,6 +159,10 @@ export class StickToBottomController {
 	 * text selection, which is not scroll intent until it drags. */
 	private pressStart: { x: number; y: number } | null = null;
 	private touchHeld = false;
+	/** Where a held, vertically dragging finger is pushing the conversation —
+	 * only while the conversation can follow it (not at the edge it pushes
+	 * toward, not inside a nested scroller that takes the drag). */
+	private touchDirection: "up" | "down" | null = null;
 	private destroyed = false;
 
 	constructor(container: HTMLElement, options: StickToBottomOptions = {}) {
@@ -611,12 +615,13 @@ export class StickToBottomController {
 	}
 
 	/** True while the user is plausibly the author of upward movement: a
-	 * scrollbar or dragging pointer held, a moving finger, or an upward-capable
-	 * gesture (or user-attributed upward scroll event) within GESTURE_CHAIN_MS. */
+	 * scrollbar or dragging pointer held, a finger dragging the conversation
+	 * that way, or an upward-capable gesture (or user-attributed upward scroll
+	 * event) within GESTURE_CHAIN_MS. */
 	private gesturedUp(): boolean {
 		return (
 			this.pointerHeld ||
-			this.touchHeld ||
+			this.touchDirection === "up" ||
 			performance.now() - this.lastUpGestureAt <= GESTURE_CHAIN_MS
 		);
 	}
@@ -624,7 +629,7 @@ export class StickToBottomController {
 	private gesturedDown(): boolean {
 		return (
 			this.pointerHeld ||
-			this.touchHeld ||
+			this.touchDirection === "down" ||
 			performance.now() - this.lastDownGestureAt <= GESTURE_CHAIN_MS
 		);
 	}
@@ -765,6 +770,7 @@ export class StickToBottomController {
 		this.lastTouchX = tracked ? t.clientX : null;
 		this.touchStart = tracked ? { x: t.clientX, y: t.clientY } : null;
 		this.touchHeld = false;
+		this.touchDirection = null;
 	};
 
 	private onTouchMove = (event: TouchEvent) => {
@@ -773,6 +779,7 @@ export class StickToBottomController {
 			this.lastTouchX = null;
 			this.touchStart = null;
 			this.touchHeld = false;
+			this.touchDirection = null;
 			return;
 		}
 		const y = event.touches[0].clientY;
@@ -793,25 +800,37 @@ export class StickToBottomController {
 			if (dy < 4 || dx > dy) return;
 			this.touchHeld = true;
 		}
-		// Finger down = content up.
-		if (Math.abs(y - lastY) >= Math.abs(x - lastX)) this.noteGesture(y > lastY ? "up" : "down");
+		// Finger down = content up. A move counts — as a stamp, and as the held
+		// finger's direction — only when the conversation can follow it: a
+		// finger pushing against the edge it is at (the reflex of asking for
+		// more while following at the bottom), or one a nested code block
+		// scrolls with, moves the conversation nowhere and must not lend
+		// Safari's next clamp the look of user intent. A mostly-horizontal move
+		// (a swipe with slight vertical drift) says nothing either.
+		if (y === lastY || Math.abs(y - lastY) < Math.abs(x - lastX)) return;
+		const direction = y > lastY ? "up" : "down";
+		const movable =
+			(direction === "up"
+				? this.clampedTop() > AT_BOTTOM_EPS
+				: this.distanceFromBottom() > AT_BOTTOM_EPS) &&
+			!this.innerScrollerConsumes(event.target, direction);
+		this.touchDirection = movable ? direction : null;
+		if (!movable) return;
+		this.noteGesture(direction);
 		// An active finger dragging AWAY from the bottom (finger down = content
 		// up) during a glide takes the view. Drags toward the bottom leave the
 		// glide running — it is already going where they want, and the geometric
 		// re-attach rule covers them if it gets canceled elsewhere. Momentum
 		// after the finger lifts sends no touchmove, but its scroll events carry
-		// direction and the geometric rules handle them. A mostly-horizontal
-		// drag (a swipe with slight vertical drift) is not scroll intent.
-		if (!this.anim || this.anim.snap || y <= lastY + 1) return;
-		if (Math.abs(x - lastX) > y - lastY) return;
-		if (this.innerScrollerConsumes(event.target, "up")) return;
-		this.unpin();
+		// direction and the geometric rules handle them.
+		if (direction === "up" && y > lastY + 1 && this.anim && !this.anim.snap) this.unpin();
 	};
 
 	private onTouchEnd = () => {
 		// Momentum follows the lift: its scroll events chain off the last move's
 		// stamp; a tap that never moved leaves no stamp at all.
 		this.touchHeld = false;
+		this.touchDirection = null;
 		this.touchStart = null;
 		this.lastTouchY = null;
 		this.lastTouchX = null;
