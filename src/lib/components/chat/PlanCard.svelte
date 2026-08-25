@@ -72,7 +72,7 @@
 							{#if step.status === "completed"}
 								<CarbonCheckmark class="size-3.5 text-green-600 dark:text-green-500" />
 							{:else if step.status === "in_progress"}
-								<CarbonInProgress class="size-3.5 text-blue-600 dark:text-blue-400" />
+								<CarbonInProgress class="size-3.5 text-orange-600 dark:text-orange-400" />
 							{:else if step.status === "skipped"}
 								<CarbonSubtract class="size-3.5 text-gray-300 dark:text-gray-600" />
 							{:else}

@@ -818,7 +818,7 @@
 							class={[
 								"flex items-center gap-1 rounded-lg px-2 py-0.5 text-center text-sm backdrop-blur-sm",
 								mlModeOn
-									? "bg-[#eef2ff] text-[#3450cc] dark:bg-[#1b2140] dark:text-[#93a4f0]"
+									? "bg-[#fff1e4] text-[#c2410c] dark:bg-[#3a2410] dark:text-[#fdba74]"
 									: "bg-gray-100/90 hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400",
 							]}
 							onclick={() => startExample(ex)}
@@ -894,7 +894,7 @@
 					class={{
 						"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
 						"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
-						"border-[#dfe4fb] dark:border-[#2b3357]": mlModeOn && mlStripVisible,
+						"border-[#f7ddc2] dark:border-[#54371c]": mlModeOn && mlStripVisible,
 						"dark:border-gray-700": !(mlModeOn && mlStripVisible),
 						"opacity-30": isReadOnly,
 						"max-sm:mb-4": focused && isVirtualKeyboard(),

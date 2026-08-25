@@ -64,7 +64,7 @@
 	<span
 		class={[
 			"text-[13.5px] leading-none font-medium whitespace-nowrap",
-			complete ? "text-[#16a34a] dark:text-[#4ade80]" : "text-[#2244cc] dark:text-[#93a4f0]",
+			complete ? "text-[#16a34a] dark:text-[#4ade80]" : "text-[#c2410c] dark:text-[#fdba74]",
 		]}
 		aria-live="polite"
 		aria-atomic="true"
@@ -88,7 +88,7 @@
 	}
 
 	:global(.ml-dot-hit:focus-visible) {
-		outline: 2px solid #2244cc;
+		outline: 2px solid #ea580c;
 		outline-offset: -8px;
 		border-radius: 8px;
 	}
@@ -107,12 +107,12 @@
 		height: 1.5px;
 		transform: translateY(-50%);
 		border-radius: 1px;
-		background: #aebcec;
+		background: #f2cda4;
 		pointer-events: none;
 	}
 
 	:global(.dark) .ml-dot-row::before {
-		background: #46538a;
+		background: #7a4f24;
 	}
 
 	.ml-dot {
@@ -140,8 +140,8 @@
 	}
 
 	.ml-dot[data-status="running"] {
-		background: #2244cc;
-		border: 1px solid #2244cc;
+		background: #ea580c;
+		border: 1px solid #ea580c;
 		color: #fff;
 		animation: mlpulse 1.5s ease-in-out infinite;
 	}
@@ -182,32 +182,32 @@
 	   would let the connector line show through. Border and text stay a notch
 	   above the band so a skipped dot reads muted, not missing. */
 	.ml-dot[data-status="skipped"] {
-		background: #eff0f6;
-		border: 1px solid #d7d9e2;
+		background: #f4f0ef;
+		border: 1px solid #d9d5d1;
 		color: #aeafbb;
 	}
 
 	/* Solid (the strip's own band color) so the connector line cannot show
 	   through, staying in step if the band is ever retinted. */
 	:global(.dark) .ml-dot[data-status="pending"] {
-		background: var(--ml-strip-band, #151a2e);
+		background: var(--ml-strip-band, #2b1c0e);
 		border-color: #3a3a42;
 		color: #7a7a84;
 	}
 
 	:global(.dark) .ml-dot[data-status="skipped"] {
-		background: #20222d;
-		border-color: #383e54;
+		background: #282222;
+		border-color: #46403a;
 		color: #6a6e7d;
 	}
 
 	@keyframes mlpulse {
 		0%,
 		100% {
-			box-shadow: 0 0 0 0 rgba(34, 68, 204, 0.45);
+			box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.45);
 		}
 		50% {
-			box-shadow: 0 0 0 5px rgba(34, 68, 204, 0);
+			box-shadow: 0 0 0 5px rgba(234, 88, 12, 0);
 		}
 	}
 

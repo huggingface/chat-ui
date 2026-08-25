@@ -8,7 +8,10 @@ import type { MlPlanStep } from "$lib/types/MlAssistant";
  * computed style rather than class names.
  */
 
-const ACCENT = "rgb(34, 68, 204)";
+// The mode's fills (switch track, running dot) and its text run two different
+// oranges: vibrant for surfaces, darker for legible text on the pale band.
+const ACCENT = "rgb(234, 88, 12)";
+const ACCENT_TEXT = "rgb(194, 65, 12)";
 const SUCCESS = "rgb(22, 163, 74)";
 
 const step = (
@@ -53,7 +56,7 @@ describe("MlAssistantStrip", () => {
 		const { container } = mount();
 		const strip = find(container, ".ml-strip");
 
-		expect(strip.textContent).toContain("ML Assistant");
+		expect(strip.textContent).toContain("ML Intern");
 		expect(strip.textContent).toContain(
 			"— tools and prompts for papers, finetuning, demos and datasets"
 		);
@@ -68,9 +71,9 @@ describe("MlAssistantStrip", () => {
 
 		expect(strip.textContent).toContain("papers · training · spaces · datasets · eval · hub");
 		expect(container.textContent).toContain("Configure");
-		expect(style(strip).backgroundColor).toBe("rgb(240, 243, 255)");
-		expect(style(strip).borderBottomColor).toBe("rgb(226, 231, 251)");
-		expect(style(strip).color).toBe(ACCENT);
+		expect(style(strip).backgroundColor).toBe("rgb(255, 244, 234)");
+		expect(style(strip).borderBottomColor).toBe("rgb(251, 228, 204)");
+		expect(style(strip).color).toBe(ACCENT_TEXT);
 	});
 
 	it("lays the strip out on the specified spacing", () => {
@@ -102,7 +105,7 @@ describe("MlAssistantStrip", () => {
 
 		expect(control.getAttribute("role")).toBe("switch");
 		expect(control.getAttribute("aria-checked")).toBe("false");
-		expect(control.getAttribute("aria-label")).toBe("ML Assistant mode");
+		expect(control.getAttribute("aria-label")).toBe("ML Intern mode");
 		// Visual size is 26x15, but the control itself has to stay tappable.
 		expect(box(control)).toEqual({ width: 44, height: 44 });
 
@@ -177,7 +180,7 @@ describe("MlAssistantStrip", () => {
 		expect(done.backgroundColor).toBe(SUCCESS);
 		// Washed out via pre-blended solids, not element opacity, so the connector
 		// line cannot show through a translucent dot.
-		expect(skipped.backgroundColor).toBe("rgb(239, 240, 246)");
+		expect(skipped.backgroundColor).toBe("rgb(244, 240, 239)");
 		expect(skipped.opacity).toBe("1");
 		expect(running.backgroundColor).toBe(ACCENT);
 		expect(running.animationName).toContain("mlpulse");
@@ -224,7 +227,7 @@ describe("MlAssistantStrip", () => {
 			'[aria-live="polite"]'
 		);
 		expect(running.textContent?.trim()).toBe("Training");
-		expect(style(running).color).toBe(ACCENT);
+		expect(style(running).color).toBe(ACCENT_TEXT);
 
 		const done = find(
 			mount({
@@ -248,7 +251,7 @@ describe("MlAssistantStrip", () => {
 			statusLabel: "Training",
 		});
 
-		expect(container.textContent).toContain("ML Assistant, mode on");
+		expect(container.textContent).toContain("ML Intern, mode on");
 	});
 
 	it("reaches a step's description by keyboard focus, not hover alone", async () => {

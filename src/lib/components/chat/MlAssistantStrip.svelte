@@ -38,7 +38,7 @@
 		class={[
 			"ml-strip flex items-center gap-[9px] border-b px-4 py-[9px] text-[13.5px]",
 			enabled
-				? "border-[#e2e7fb] bg-[var(--ml-strip-band)] text-[#2244cc] [--ml-strip-band:#f0f3ff] dark:border-[#2b3357] dark:text-[#93a4f0] dark:[--ml-strip-band:#151a2e]"
+				? "border-[#fbe4cc] bg-[var(--ml-strip-band)] text-[#c2410c] [--ml-strip-band:#fff4ea] dark:border-[#54371c] dark:text-[#fdba74] dark:[--ml-strip-band:#2b1c0e]"
 				: "border-[#ececee] bg-transparent text-[#9a9aa0] dark:border-gray-700 dark:text-gray-500",
 		]}
 	>
@@ -51,7 +51,7 @@
 				checked={enabled}
 				disabled={taskRunning}
 				onCheckedChange={ontoggle}
-				aria-label="ML Assistant mode"
+				aria-label="ML Intern mode"
 			>
 				<span class="ml-switch-track" class:is-on={enabled}>
 					<Switch.Thumb class="ml-switch-knob" />
@@ -62,7 +62,7 @@
 		<!-- The switch is gone once a task is running, so the title has to be what
 		     tells a screen reader the mode is on. -->
 		<span class="flex-none" class:font-semibold={enabled}>
-			ML Assistant{#if taskRunning}<span class="sr-only">, mode on</span>{/if}
+			ML Intern{#if taskRunning}<span class="sr-only">, mode on</span>{/if}
 		</span>
 
 		<!-- The plan replaces the tool note, but only once there is a plan to show:
@@ -167,7 +167,7 @@
 	}
 
 	.ml-switch-track.is-on {
-		background: #2244cc;
+		background: #ea580c;
 	}
 
 	:global(.dark) .ml-switch-track {
@@ -179,7 +179,7 @@
 	}
 
 	:global(.ml-switch:focus-visible) .ml-switch-track {
-		outline: 2px solid #2244cc;
+		outline: 2px solid #ea580c;
 		outline-offset: 2px;
 	}
 

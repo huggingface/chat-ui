@@ -47,7 +47,7 @@
 </script>
 
 {#if presetEffort}
-	<span title="Set by ML Assistant mode">Effort: {label}</span>
+	<span title="Set by ML Intern mode">Effort: {label}</span>
 {:else}
 	<DropdownMenu.Root>
 		<DropdownMenu.Trigger
