@@ -53,7 +53,7 @@ stateDiagram-v2
 - **Environment failing:** a dropped stream behaves like Stop plus an error bar under the turn; no motion. A hidden tab: see modifiers.
 - **Page going away:** reload mid-stream reloads at the bottom, following; a still-running generation resumes streaming into a re-anchored turn.
 - **Something else changing the target:** nothing else can change the streaming turn. Late inflation of _earlier_ messages (images above) is compensated for detached readers and followed for attached ones.
-- **Input channel changing:** keyboard PageUp/Home detach; End re-attaches by landing at the bottom. Find-in-page jumps carry no gesture, so while following, a jump upward is undone and the view stays at the bottom — scroll first (any gesture) to keep a find result in view; while detached, jumps are left alone. The virtual keyboard: see cross-cutting.
+- **Input channel changing:** keyboard PageUp/Home detach; End re-attaches by landing at the bottom. Find-in-page jumps detach like any scroll of the reader's, with one exception: a jump landing within a fraction of a second of a content change (mid-stream, on a fast model) is indistinguishable from Safari's clamps and is undone — scroll first, or wait a beat, to keep a find result in view during a stream. While detached, jumps are always left alone. The virtual keyboard: see cross-cutting.
 
 ## Interactions with other systems
 

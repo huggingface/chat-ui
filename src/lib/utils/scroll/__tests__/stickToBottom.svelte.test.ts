@@ -360,11 +360,26 @@ describe("browser-initiated movement (no gesture)", () => {
 		await frames(3);
 		await nextTask();
 		// Safari clamps the scroller while DOM nodes are swapped and reports it
-		// as a scroll event; nothing the user did produced this.
+		// as a scroll event; nothing the user did produced this — the DOM did.
+		fixture.lastBlock().replaceWith(fixture.lastBlock().cloneNode(true));
 		browserScrollTo(fixture.container, fixture.scrollTop() - 200);
 		await frame();
 		expect(controller.pinned).toBe(true);
 		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
+	});
+
+	it("a quiet browser navigation while following (find-in-page) detaches and keeps its place", async () => {
+		const { fixture, controller } = setup();
+		await frames(3);
+		await new Promise((resolve) => setTimeout(resolve, 250)); // nothing changes in the DOM
+		browserScrollTo(fixture.container, fixture.scrollTop() - 200);
+		await frame();
+		expect(controller.pinned).toBe(false);
+		expect(fixture.distance()).toBeGreaterThan(150);
+		const top = fixture.scrollTop();
+		fixture.growLast(300);
+		await frames(3);
+		expect(fixture.scrollTop()).toBe(top);
 	});
 
 	it("the same move while detached is left alone (find-in-page keeps its result in view)", async () => {
@@ -405,6 +420,8 @@ describe("browser-initiated movement (no gesture)", () => {
 		controller.animateToBottom();
 		await frames(2);
 		const mid = fixture.scrollTop();
+		// A streaming token's re-render: the DOM changes, and Safari clamps.
+		fixture.lastBlock().replaceWith(fixture.lastBlock().cloneNode(true));
 		browserScrollTo(fixture.container, mid - 30);
 		await frames(2);
 		// Still pinned; rather than nursing the spring through a stream's

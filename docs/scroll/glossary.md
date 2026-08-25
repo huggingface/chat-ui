@@ -28,7 +28,7 @@ The state a send, edit, or regenerate lands in: the sent message anchored near t
 
 ### detach
 
-Leaving the following state by scrolling up. Any deliberate upward scroll — 3px of accumulated upward movement by wheel, trackpad, scrollbar drag, keyboard, or touch — detaches. Upward movement the browser makes on its own (no gesture behind it) does not: while following it is undone at once. While detached, content growth never moves the view.
+Leaving the following state by scrolling up. Any deliberate upward scroll — 3px of accumulated upward movement by wheel, trackpad, scrollbar drag, keyboard, or touch — detaches. Upward movement the browser makes on its own right after a content change (Safari's clamps) does not: while following it is undone at once. Browser navigation with a quiet page (find-in-page) does detach. While detached, content growth never moves the view.
 
 ### re-attach
 
