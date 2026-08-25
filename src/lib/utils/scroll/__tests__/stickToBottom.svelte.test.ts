@@ -512,6 +512,33 @@ describe("browser-initiated movement (no gesture)", () => {
 		touch("touchend", 220, 203);
 	});
 
+	it("a finger swiping up at the bottom (asking for more while following) is not upward intent: a clamp is undone", async () => {
+		const { fixture, controller } = setup();
+		await frames(3);
+		await nextTask();
+		const el = fixture.container;
+		const touch = (type: string, clientY: number) =>
+			el.dispatchEvent(
+				new TouchEvent(type, {
+					touches:
+						type === "touchend"
+							? []
+							: [new Touch({ identifier: 8, target: el, clientX: 100, clientY })],
+					changedTouches: [new Touch({ identifier: 8, target: el, clientX: 100, clientY })],
+					bubbles: true,
+				})
+			);
+		touch("touchstart", 300);
+		touch("touchmove", 260); // finger up = content down: nothing below to show
+		touch("touchmove", 220);
+		fixture.lastBlock().replaceWith(fixture.lastBlock().cloneNode(true));
+		browserScrollTo(fixture.container, fixture.scrollTop() - 200);
+		await frame();
+		expect(controller.pinned).toBe(true);
+		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
+		touch("touchend", 220);
+	});
+
 	it("keys typed into an editable field inside the scroller are not gestures: a clamp is still undone", async () => {
 		const { fixture, controller } = setup();
 		const textarea = document.createElement("textarea");
