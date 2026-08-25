@@ -4,7 +4,7 @@ What happens to the view between pressing Send and the reply's first tokens, for
 
 ## Summary
 
-Sending a message carries the view to the new exchange: the sent message glides to 50px below the top of the view, blank space opens beneath it, and the reply streams into that space without moving anything. Send is the one moment the product moves the view on the user's behalf even if they were reading elsewhere — pressing Send _is_ the request to see the exchange — but the user can take the view back at any instant, including mid-glide.
+Sending a message carries the view to the new exchange: the sent message glides to 50px below the top of the view, blank space opens beneath it, and the reply streams into that space without moving anything — and keeps not moving anything once the reply grows past the bottom of the view. The view lands in read mode: the reader keeps their place at the start of the answer however fast the model writes, and a jump button offers the live bottom for those who want to watch it. Send is the one moment the product moves the view on the user's behalf even if they were reading elsewhere — pressing Send _is_ the request to see the exchange — but the user can take the view back at any instant, including mid-glide.
 
 ## The simple case
 
@@ -16,9 +16,9 @@ In an ongoing conversation, following, on a laptop: the user types and presses E
 
   > Technical note: on touch devices the move is a snap because iOS suppresses smooth programmatic scrolling during touch and momentum and replays it when the gesture settles, which would visibly scroll the view long after the tap.
 
-- **Anchoring.** The new turn — sent message plus empty reply — appears, together with its [reservation](../foundations/turn-reservation.md), usually within the same instant; with attachments, after they finish encoding (a placeholder reply may bridge the gap at the bottom). The still-running glide's target has now moved: it carries on smoothly to the new bottom, which by construction places the sent message at the anchor offset. On touch, the follow snaps there instead. There is no second animation — arming's move and anchoring's move are one continuous motion.
+- **Anchoring.** The new turn — sent message plus empty reply — appears, together with its [reservation](../foundations/turn-reservation.md), usually within the same instant; with attachments, after they finish encoding (a placeholder reply may bridge the gap at the bottom). The still-running glide is retargeted at the turn's own anchor position — the sent message 50px below the top — and lands there **detached**: this is read mode. On touch, the move is a snap. There is no second animation — arming's move and anchoring's move are one continuous motion. The jump buttons never appear during the glide.
 - **Filling.** Tokens stream into the reservation; the view is motionless. See [the turn reservation](../foundations/turn-reservation.md).
-- **Following.** If the reply outgrows the reservation, the view follows growth with snaps. See [the scroll model](../foundations/scroll-model.md).
+- **Following — opt-in.** If the reply outgrows the reservation, the page grows below the fold and the view stays exactly where it is. Once the reply extends more than 200px below, the jump-to-bottom button appears; pressing it (or scrolling down into the bottom zone) engages following, from which point growth moves the view with snaps until the next upward scroll. See [the scroll model](../foundations/scroll-model.md).
 - **Settling.** The stream ends; the view stays where following left it. No end-of-turn correction of any kind.
 
 ```mermaid
@@ -26,10 +26,13 @@ stateDiagram-v2
     [*] --> Arming : submit accepted
     Arming --> Anchoring : turn + reservation appear
     Arming --> Detached : user scrolls up while waiting
-    Anchoring --> Filling : glide lands / snap
+    Anchoring --> Filling : glide lands (read mode)
     Anchoring --> Detached : user scrolls up mid-glide
-    Filling --> Following : reply outgrows reservation
+    Filling --> ReadMode : reply outgrows reservation (view still)
+    ReadMode --> Following : jump button / scroll to bottom
+    Following --> ReadMode : upward scroll
     Filling --> Settled : stream ends short
+    ReadMode --> Settled : stream ends long
     Following --> Settled : stream ends long
     Detached --> Filling : user returns to bottom
 ```
@@ -61,7 +64,7 @@ stateDiagram-v2
 ## Edge cases
 
 - **Send while detached, far up:** the view still comes down (send means "show me"), as one glide from wherever the user was; distances beyond 2500px teleport most of the way first.
-- **Edit-and-send** behaves exactly like send: the edited exchange is a fresh turn at the end of the visible branch and anchors identically.
+- **Edit-and-send** behaves exactly like send: the edited exchange is a fresh turn at the end of the visible branch and anchors identically, in read mode.
 - **Send with large attachments:** arming's glide reaches the current bottom and waits (following); the turn appears when encoding finishes and the follow carries the view to the anchor. The wait shows a placeholder reply at the bottom.
 - **First message of a brand-new conversation:** identical anchoring; the page navigates from the home screen to the conversation route mid-turn, which resets and re-anchors in place — not observable as motion.
 - **Two rapid sends** (second submit as soon as the first stream ends): the anchor simply moves to the newest turn; the previous turn's leftover blank space sits above the new exchange, out of view.

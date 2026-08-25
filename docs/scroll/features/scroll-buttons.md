@@ -4,7 +4,7 @@ The two floating buttons that appear while reading away from the bottom.
 
 ## Summary
 
-While the user reads away from the bottom, two round buttons float at the lower right: **jump to bottom** glides to the live bottom and re-attaches; **jump to previous** glides the previous user message to the top of the view and stays detached. They exist only when useful — never while following, appearing past 200px of distance and disappearing within 60px — and their thresholds are sticky so they never flicker at the boundary.
+While the user reads away from the bottom, two round buttons float at the lower right: **jump to bottom** glides to the live bottom and engages following; **jump to previous** glides the previous user message to the top of the view and stays detached. They exist only when useful — never while following or while a glide is in flight, appearing past 200px of distance and disappearing within 60px — and their thresholds are sticky so they never flicker at the boundary. During a streaming reply in read mode, jump to bottom is the way to start watching the newest lines.
 
 ## The simple case
 
@@ -14,7 +14,7 @@ Mid-stream, the user scrolls up three screens. Both buttons fade in at the lower
 
 The buttons are companions to the **following/detached** loop rather than turn phases:
 
-- **Appearing.** Both buttons require being detached with more than 200px of distance from the bottom. Jump to previous additionally requires being scrolled more than 200px down from the top (near the very top there is no "previous" left to reveal). While following, the buttons never show — not even transiently during send glides or fast growth.
+- **Appearing.** Both buttons require being detached, not gliding, with more than 200px of distance from the bottom. Jump to previous additionally requires being scrolled more than 200px down from the top (near the very top there is no "previous" left to reveal). While following or during any glide (send, jump, re-attach), the buttons never show. In read mode they appear as soon as the streaming reply extends more than 200px below the fold.
 - **Jump to bottom.** One click: re-attach now, then glide to the bottom. The target is live — during streaming the glide lands on the _current_ bottom, never short. Jumps longer than 2500px teleport to 1200px out and glide the rest. An upward scroll mid-glide cancels and detaches, as always.
 - **Jump to previous.** One click: glide so the nearest user message above the top of the view lands 50px below the top (the same offset as an anchored turn — turn starts are the skimming landmarks). The view stays detached: this is a reading move, not a return. Repeated clicks walk turn by turn toward the beginning. If no user message is above the view, the nearest message of any kind is used; if none, the click does nothing.
 - **Disappearing.** Buttons hide when the distance falls to 60px or below, or the view re-attaches for any reason. Between 60px and 200px, buttons keep whatever visibility they had (the sticky band that prevents flicker).

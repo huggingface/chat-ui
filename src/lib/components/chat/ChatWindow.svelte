@@ -724,11 +724,13 @@
 						class="flex h-max flex-col gap-8"
 						style:padding-bottom="{chatScroll.bottomClearancePx}px"
 					>
-						{#each turns as turn, turnIdx (turn.key)}
-							<!-- The reservation binds to the anchored INDEX, not the key:
-							     the post-stream reconciliation re-keys every message, and a
-							     key-bound reservation would drop out for the in-between
-							     render — an unreserved layout the browser clamps against. -->
+						<!-- Turn groups are identified by position, not key: the post-stream
+						     reconciliation re-keys every message, and re-created group
+						     elements would give Safari an in-between layout to clamp the
+						     view against (it clamps synchronously mid-DOM-swap). Messages
+						     inside stay keyed by id; the group's reservation binds to the
+						     anchored INDEX for the same reason. -->
+						{#each turns as turn, turnIdx}
 							<div
 								class="flex flex-col gap-8"
 								style:min-height={turnIdx === chatScroll.anchoredTurnIndex

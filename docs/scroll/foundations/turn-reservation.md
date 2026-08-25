@@ -17,7 +17,7 @@ The user sends "Explain monads" in an ongoing conversation. The view glides down
 - **Arming.** The user submits. Nothing is reserved yet — the exchange has not appeared.
 - **Anchoring.** The new turn appears (in the same instant as, or shortly after, the submit — attachments are encoded first) and immediately becomes the anchored turn with its reservation in place. Both arrive in the same frame: the turn is never visible un-reserved. The previously anchored turn, no longer last, keeps nothing — but since the new reservation opens below it, nothing above the new turn moves.
 - **Filling.** The reply grows inside the reservation. The page height is constant; a following view does not move; a detached view does not move; the scrollbar thumb does not move or resize. This phase lasts until the turn's content reaches the reservation's edge.
-- **Following.** Content past the reservation grows the page; the scroll model takes over. The transition is seamless — the first pixel past the edge behaves exactly like every later one.
+- **Following — only if engaged.** Content past the reservation grows the page below the fold. The view does not move: the anchor landed in read mode, and following is the reader's choice (scroll to the bottom, or the jump button that appears once the reply extends more than 200px below). Once engaged, the scroll model takes over and the transition is seamless.
 - **Settling.** The stream ends. The reservation is _not_ removed: a short reply leaves blank space below it, and the view stays exactly where it is. Removing the reservation here would yank the settled view — the blank space is the price of stillness, and it also keeps the sent message's reading position stable if the user scrolls back up.
 
 ```mermaid
@@ -25,7 +25,7 @@ stateDiagram-v2
     [*] --> Unreserved : conversation loads
     Unreserved --> Reserved : reply begins (turn appears + reservation, same frame)
     Reserved --> Filling : tokens arrive
-    Filling --> Overflowing : content reaches the reservation edge
+    Filling --> Overflowing : content reaches the reservation edge (view still; page grows below)
     Filling --> Kept : stream ends short
     Overflowing --> Kept : stream ends long
     Kept --> Reserved : next send (anchor moves to the new last turn)

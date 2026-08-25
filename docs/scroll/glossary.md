@@ -20,7 +20,11 @@ The lowest 60px of scroll positions. Scrolling down into this zone counts as ret
 
 ### following / pinned
 
-The state in which the view is glued to the bottom: whenever content below grows, the view moves so the bottom stays visible. "Pinned" is the same state seen from the code's side; documents prefer _following_.
+The state in which the view is glued to the bottom: whenever content below grows, the view moves so the bottom stays visible. "Pinned" is the same state seen from the code's side; documents prefer _following_. Following is engaged by arriving at the bottom (opening a conversation, scrolling down into the near-bottom zone, the jump-to-bottom button) — never by a send, which lands in _read mode_.
+
+### read mode
+
+The state a send, edit, or regenerate lands in: the sent message anchored near the top, the view detached. The reply fills its reservation and, past it, grows below the fold without moving the view, so the beginning of even a fast model's answer stays where the reader is. Following is one gesture away (the near-bottom zone or the jump button); any upward scroll returns to read mode.
 
 ### detach
 

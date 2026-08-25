@@ -30,6 +30,9 @@ export interface StickToBottomState {
 	nearBottom: boolean;
 	/** Scrolled more than `scrolledUpPx` away from the top. */
 	scrolledUp: boolean;
+	/** An animated move (send, jump buttons, re-attach catch-up) is in
+	 * flight — the view is on its way somewhere, not parked. */
+	gliding: boolean;
 	distanceFromBottom: number;
 }
 
@@ -100,6 +103,7 @@ export class StickToBottomController {
 		atBottom: true,
 		nearBottom: true,
 		scrolledUp: false,
+		gliding: false,
 		distanceFromBottom: 0,
 	};
 
@@ -201,12 +205,14 @@ export class StickToBottomController {
 			atBottom: distance <= AT_BOTTOM_EPS,
 			nearBottom: distance <= this.opts.nearBottomPx,
 			scrolledUp: top > this.opts.scrolledUpPx,
+			gliding: this.anim !== null && !this.anim.snap,
 			distanceFromBottom: distance,
 		};
 		const changed =
 			next.atBottom !== this.state.atBottom ||
 			next.nearBottom !== this.state.nearBottom ||
 			next.scrolledUp !== this.state.scrolledUp ||
+			next.gliding !== this.state.gliding ||
 			next.distanceFromBottom !== this.state.distanceFromBottom;
 		this.state = next;
 		if (changed || forceNotify) this.opts.onStateChange?.(this.getState());
@@ -291,16 +297,38 @@ export class StickToBottomController {
 		this.setPinned(false);
 	}
 
-	/** Animated move that does NOT engage following (e.g. scroll-to-previous). */
-	animateTo(top: number) {
+	/** Explicit park moves adopt the current geometry as the attribution
+	 * baseline: a clamp the browser applied just before (a regenerate's
+	 * collapse landing in read mode) has its scroll event still in flight, and
+	 * measured against the pre-clamp baseline it would read as "clamped to the
+	 * bottom, re-attach" — undoing the park. The view is where it was asked to
+	 * be; nothing before that is user intent or a clamp to honor. */
+	private adoptBaselines() {
+		this.lastTop = this.clampedTop();
+		this.lastMax = this.maxScrollTop();
+		this.lastScrollHeight = this.container.scrollHeight;
+		this.upwardDrift = 0;
+	}
+
+	/**
+	 * Animated move that does NOT engage following (scroll-to-previous, the
+	 * read-mode landing of a send). A function target is re-read every frame,
+	 * so a landing computed from element geometry stays correct while late
+	 * content (a placeholder unmounting, the composer settling) still shifts
+	 * that geometry; either way the target is clamped to what is reachable
+	 * each tick, so the glide always terminates instead of chasing a position
+	 * the page cannot scroll to.
+	 */
+	animateTo(top: number | (() => number)) {
 		this.unpin();
+		this.adoptBaselines();
+		const resolve = typeof top === "function" ? top : () => top;
 		if (this.shouldSkipAnimation()) {
-			this.write(top);
+			this.write(resolve());
 			this.recomputeState();
 			return;
 		}
-		const clamped = Math.min(Math.max(top, 0), this.maxScrollTop());
-		this.startAnimation(() => clamped);
+		this.startAnimation(() => Math.min(Math.max(resolve(), 0), this.maxScrollTop()));
 	}
 
 	/** Instant move that does NOT engage following (deterministic view anchors,
@@ -308,6 +336,7 @@ export class StickToBottomController {
 	scrollTo(top: number) {
 		this.stopAnimation();
 		this.setPinned(false);
+		this.adoptBaselines();
 		this.write(top);
 		this.recomputeState();
 	}
@@ -342,14 +371,17 @@ export class StickToBottomController {
 	private startAnimation(target: () => number, opts?: { snap?: boolean }) {
 		this.anim = { target, lastTime: performance.now(), snap: opts?.snap };
 		if (this.rafId === null) this.rafId = requestAnimationFrame(this.tick);
+		this.recomputeState();
 	}
 
 	private stopAnimation() {
+		const had = this.anim !== null;
 		this.anim = null;
 		if (this.rafId !== null) {
 			cancelAnimationFrame(this.rafId);
 			this.rafId = null;
 		}
+		if (had) this.recomputeState();
 	}
 
 	private tick = (time: number) => {
@@ -444,14 +476,18 @@ export class StickToBottomController {
 				if (!this.gestured()) {
 					if (this.state.pinned) {
 						// Browser-initiated (Safari clamping mid-DOM-swap): undo it in
-						// the same event, before paint, so nothing flickers. A glide
-						// in flight is left to continue from the real position.
+						// the same event, before paint, so nothing flickers. A glide in
+						// flight is put back where its last tick left it and carries
+						// on — left alone, a stream's per-token clamps would win the
+						// tug-of-war and the glide would never arrive.
 						if (!this.anim || this.anim.snap) {
 							this.stopAnimation();
 							this.write(this.maxScrollTop());
-							this.recomputeState();
-							return;
+						} else {
+							this.write(this.lastTop);
 						}
+						this.recomputeState();
+						return;
 					}
 				} else {
 					this.lastGestureAt = performance.now();

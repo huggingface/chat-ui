@@ -15,7 +15,7 @@ The reply wasn't right; the user clicks regenerate under it, at the bottom of th
 For regenerate, the turn phases replay in place:
 
 - **Arming.** Regenerate is clicked (the retry button under a reply, or the error bar's Try again). Unlike send, arming does _not_ move a detached view — regenerating is a request for new content, not a request to see it; the user who scrolled up stays put.
-- **Anchoring.** The turn becomes the anchored turn in the same frame the old reply collapses. The reservation holds the turn's box open, so the collapse is invisible: page height at the bottom is unchanged (or grows, if the turn had never been anchored and its content was shorter than a reservation — growth below the fold, silent for a detached reader, followed for an attached one). A view following at the bottom is carried to the anchor position by the follow; a detached view does not move at all.
+- **Anchoring.** The turn becomes the anchored turn in the same frame the old reply collapses. The reservation holds the turn's box open, so the collapse is invisible: page height at the bottom is unchanged (or grows, if the turn had never been anchored and its content was shorter than a reservation — growth below the fold, silent for a detached reader). A view that was following at the bottom is carried to the anchor position and left there in read mode, like a send; a detached view does not move at all.
 - **Filling / Following / Settling.** Identical to a send from here on.
 
 For a branch switch (‹ › arrows on a user or assistant message):
