@@ -450,6 +450,43 @@ describe("browser-initiated movement (no gesture)", () => {
 		window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
 	});
 
+	it("a downward wheel at the bottom is not upward intent: a following view still undoes a clamp", async () => {
+		const { fixture, controller } = setup();
+		await frames(3);
+		await nextTask();
+		wheel(fixture.container, 120); // the reflex while watching a stream at the bottom
+		fixture.lastBlock().replaceWith(fixture.lastBlock().cloneNode(true));
+		browserScrollTo(fixture.container, fixture.scrollTop() - 200);
+		await frame();
+		expect(controller.pinned).toBe(true);
+		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
+	});
+
+	it("a tap (touch that never moves) is not a gesture: a following view still undoes a clamp", async () => {
+		const { fixture, controller } = setup();
+		await frames(3);
+		await nextTask();
+		const el = fixture.container;
+		const tap = (type: string) =>
+			el.dispatchEvent(
+				new TouchEvent(type, {
+					touches:
+						type === "touchend"
+							? []
+							: [new Touch({ identifier: 9, target: el, clientX: 100, clientY: 200 })],
+					changedTouches: [new Touch({ identifier: 9, target: el, clientX: 100, clientY: 200 })],
+					bubbles: true,
+				})
+			);
+		tap("touchstart");
+		tap("touchend");
+		fixture.lastBlock().replaceWith(fixture.lastBlock().cloneNode(true));
+		browserScrollTo(fixture.container, fixture.scrollTop() - 200);
+		await frame();
+		expect(controller.pinned).toBe(true);
+		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
+	});
+
 	it("a quiet browser navigation while following (find-in-page) detaches and keeps its place", async () => {
 		const { fixture, controller } = setup();
 		await frames(3);
@@ -476,18 +513,20 @@ describe("browser-initiated movement (no gesture)", () => {
 		expect(fixture.scrollTop()).toBe(40);
 	});
 
-	it("touch momentum after the finger lifts still counts as the user's", async () => {
+	it("a flick's momentum keeps its place while detached, even as content changes", async () => {
 		const { fixture, controller } = setup();
 		await frames(3); // let the initial ResizeObserver settle
 		await nextTask();
-		// A drag too small to detach on its own…
-		await touchDrag(fixture.container, { fromY: 100, toY: 102, steps: 1 });
-		expect(controller.pinned).toBe(true);
-		// …whose momentum (scroll events with no touch events behind them)
-		// carries on right after the lift.
-		browserScrollTo(fixture.container, fixture.scrollTop() - 60);
+		await touchDrag(fixture.container, { fromY: 100, toY: 160 });
+		expect(controller.pinned).toBe(false);
+		// Momentum after the lift: scroll events with no touch events behind
+		// them, landing while the stream keeps changing the DOM.
+		fixture.lastBlock().replaceWith(fixture.lastBlock().cloneNode(true));
+		const before = fixture.scrollTop();
+		browserScrollTo(fixture.container, before - 60);
 		await frame();
 		expect(controller.pinned).toBe(false);
+		expect(fixture.scrollTop()).toBe(before - 60);
 	});
 
 	it("a browser-initiated move during a following glide lands it at the bottom at once", async () => {

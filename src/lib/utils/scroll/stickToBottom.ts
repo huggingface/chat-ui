@@ -145,8 +145,13 @@ export class StickToBottomController {
 	private lastResizeAt = Number.NEGATIVE_INFINITY;
 	private lastTouchY: number | null = null;
 	private lastTouchX: number | null = null;
-	/** Gesture attribution (see GESTURE_CHAIN_MS). */
-	private lastGestureAt = Number.NEGATIVE_INFINITY;
+	/** Where the current touch started; a touch is a gesture once it has moved. */
+	private touchStart: { x: number; y: number } | null = null;
+	/** Gesture attribution (see GESTURE_CHAIN_MS), by the direction the input
+	 * could have moved the conversation: an upward scroll event is the user's
+	 * only when an upward-capable gesture is behind it. */
+	private lastUpGestureAt = Number.NEGATIVE_INFINITY;
+	private lastDownGestureAt = Number.NEGATIVE_INFINITY;
 	/** Single-jump inputs only (scrollbar mousedown, keys) — see anchorAdjust. */
 	private lastJumpGestureAt = Number.NEGATIVE_INFINITY;
 	private pointerHeld = false;
@@ -518,7 +523,7 @@ export class StickToBottomController {
 				// a delta here is either the user's (or a coalesced event's user
 				// share) — or the browser's own doing, which only the absence of
 				// any gesture can reveal.
-				if (!this.gestured() && this.state.pinned && this.contentActive()) {
+				if (!this.gesturedUp() && this.state.pinned && this.contentActive()) {
 					// Browser-initiated (Safari clamping mid-DOM-swap — the DOM just
 					// changed): undo it in the same event, before paint, so nothing
 					// flickers. A glide in flight is cut short and lands at the bottom
@@ -529,18 +534,18 @@ export class StickToBottomController {
 					this.write(this.maxScrollTop());
 					this.recomputeState();
 					return;
-				} else if (this.gestured() || this.state.pinned) {
+				} else if (this.gesturedUp() || this.state.pinned) {
 					// The user's own movement — or, with a quiet DOM, the browser
 					// navigating on the reader's behalf (find-in-page, assistive
 					// technology), which is theirs to keep just the same.
-					if (this.gestured()) this.lastGestureAt = performance.now();
+					if (this.gesturedUp()) this.lastUpGestureAt = performance.now();
 					this.upwardDrift += this.lastTop - top;
 					if (this.upwardDrift >= UNPIN_DRIFT_PX && (this.state.pinned || this.anim)) {
 						this.unpin();
 					}
 				}
 			} else if (top > this.lastTop) {
-				if (this.gestured()) this.lastGestureAt = performance.now();
+				if (this.gesturedDown()) this.lastDownGestureAt = performance.now();
 				this.upwardDrift = 0;
 				if (!this.state.pinned && distance <= this.opts.nearBottomPx) {
 					// User came back to the bottom zone: re-engage and glide the
@@ -599,18 +604,28 @@ export class StickToBottomController {
 
 	// --- gesture attribution --------------------------------------------------------
 
-	private noteGesture() {
-		this.lastGestureAt = performance.now();
+	private noteGesture(direction: "up" | "down" | "both") {
+		const now = performance.now();
+		if (direction !== "down") this.lastUpGestureAt = now;
+		if (direction !== "up") this.lastDownGestureAt = now;
 	}
 
-	/** True while the user is plausibly the author of scroll movement: a
-	 * pointer or finger held down, or a gesture (or user-attributed scroll
-	 * event) within GESTURE_CHAIN_MS. */
-	private gestured(): boolean {
+	/** True while the user is plausibly the author of upward movement: a
+	 * scrollbar or dragging pointer held, a moving finger, or an upward-capable
+	 * gesture (or user-attributed upward scroll event) within GESTURE_CHAIN_MS. */
+	private gesturedUp(): boolean {
 		return (
 			this.pointerHeld ||
 			this.touchHeld ||
-			performance.now() - this.lastGestureAt <= GESTURE_CHAIN_MS
+			performance.now() - this.lastUpGestureAt <= GESTURE_CHAIN_MS
+		);
+	}
+
+	private gesturedDown(): boolean {
+		return (
+			this.pointerHeld ||
+			this.touchHeld ||
+			performance.now() - this.lastDownGestureAt <= GESTURE_CHAIN_MS
 		);
 	}
 
@@ -620,10 +635,17 @@ export class StickToBottomController {
 		return this.pointerHeld || performance.now() - this.lastJumpGestureAt <= GESTURE_CHAIN_MS;
 	}
 
-	private onKeyDown = () => {
+	private onKeyDown = (event: KeyboardEvent) => {
 		// Keys pressed on the (focusable) scroller scroll it natively.
-		this.noteGesture();
-		this.lastJumpGestureAt = this.lastGestureAt;
+		const key = event.key;
+		const direction =
+			key === "PageUp" || key === "ArrowUp" || key === "Home"
+				? "up"
+				: key === "PageDown" || key === "ArrowDown" || key === "End" || key === " "
+					? "down"
+					: "both";
+		this.noteGesture(direction);
+		this.lastJumpGestureAt = performance.now();
 	};
 
 	private onMouseDown = (event: MouseEvent) => {
@@ -637,8 +659,8 @@ export class StickToBottomController {
 		if (event.target instanceof Element && event.target.closest("button, a")) return;
 		if (event.target === this.container) {
 			this.pointerHeld = true;
-			this.noteGesture();
-			this.lastJumpGestureAt = this.lastGestureAt;
+			this.noteGesture("both");
+			this.lastJumpGestureAt = performance.now();
 			return;
 		}
 		this.pressStart = { x: event.clientX, y: event.clientY };
@@ -651,15 +673,15 @@ export class StickToBottomController {
 		// The press became a drag (a text selection): scroll intent from here.
 		this.pressStart = null;
 		this.pointerHeld = true;
-		this.noteGesture();
+		this.noteGesture("both");
 	};
 
 	private onWindowMouseUp = () => {
 		this.pressStart = null;
 		if (!this.pointerHeld) return;
 		this.pointerHeld = false;
-		this.noteGesture();
-		this.lastJumpGestureAt = this.lastGestureAt;
+		this.noteGesture("both");
+		this.lastJumpGestureAt = performance.now();
 	};
 
 	private normalizeWheelDelta(event: WheelEvent): number {
@@ -681,28 +703,51 @@ export class StickToBottomController {
 	 * change nothing.
 	 */
 	private onWheel = (event: WheelEvent) => {
-		this.noteGesture();
-		if (!this.anim || this.anim.snap) return;
+		// Stamp only a wheel that can actually move the conversation, in the
+		// direction it can move it: a pinch, a horizontal pan, a wheel at the
+		// edge it points to, or one a nested scroller consumes moves nothing —
+		// and must not lend Safari's next clamp the look of user intent.
 		if (event.ctrlKey) return; // pinch-zoom
 		if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return; // horizontal pan
-		if (this.normalizeWheelDelta(event) >= 0) return;
-		if (this.innerScrollerConsumesUp(event.target)) return;
-		this.unpin();
+		const deltaY = this.normalizeWheelDelta(event);
+		if (deltaY === 0) return;
+		const direction = deltaY < 0 ? "up" : "down";
+		if (
+			direction === "up"
+				? this.clampedTop() <= AT_BOTTOM_EPS
+				: this.distanceFromBottom() <= AT_BOTTOM_EPS
+		) {
+			return;
+		}
+		if (this.innerScrollerConsumes(event.target, direction)) return;
+		this.noteGesture(direction);
+		// An upward wheel during a glide takes the view; a downward one leaves
+		// the glide running toward where the user wants to go anyway.
+		if (direction === "up" && this.anim && !this.anim.snap) this.unpin();
 	};
+
+	private distanceFromBottom(): number {
+		return this.maxScrollTop() - this.clampedTop();
+	}
 
 	/**
 	 * True when a scrollable element between `target` and the container can
-	 * still scroll up: the browser hands an upward wheel or drag to it, the
-	 * conversation does not move, and the gesture says nothing about the
-	 * glide. Only consulted while a glide is in flight — the ancestor walk
-	 * forces layout, and outside glides the scroll events decide everything.
+	 * still scroll in `direction`: the browser hands the wheel or drag to it,
+	 * the conversation does not move, and the input says nothing about it.
+	 * The ancestor walk forces layout; it runs once per wheel/touch event.
 	 */
-	private innerScrollerConsumesUp(target: EventTarget | null): boolean {
+	private innerScrollerConsumes(target: EventTarget | null, direction: "up" | "down"): boolean {
 		let el = target instanceof Element ? target : null;
 		while (el && el !== this.container) {
-			if (el instanceof HTMLElement && el.scrollTop > 0 && el.scrollHeight > el.clientHeight + 1) {
-				const overflowY = getComputedStyle(el).overflowY;
-				if (overflowY === "auto" || overflowY === "scroll") return true;
+			if (el instanceof HTMLElement && el.scrollHeight > el.clientHeight + 1) {
+				const room =
+					direction === "up"
+						? el.scrollTop > 0
+						: el.scrollTop < el.scrollHeight - el.clientHeight - 1;
+				if (room) {
+					const overflowY = getComputedStyle(el).overflowY;
+					if (overflowY === "auto" || overflowY === "scroll") return true;
+				}
 			}
 			el = el.parentElement;
 		}
@@ -710,30 +755,39 @@ export class StickToBottomController {
 	}
 
 	private onTouchStart = (event: TouchEvent) => {
-		this.touchHeld = true;
-		this.noteGesture();
 		const t = event.touches.length === 1 ? event.touches[0] : null;
 		// A touch in the edge-swipe zone belongs to the host's drawer gesture:
 		// it will not scroll the conversation, so it says nothing about a glide.
+		// A tap says nothing either: a touch is a gesture once it has moved.
 		const tracked = t !== null && t.clientX >= this.opts.ignoreTouchZonePx;
 		this.lastTouchY = tracked ? t.clientY : null;
 		this.lastTouchX = tracked ? t.clientX : null;
+		this.touchStart = tracked ? { x: t.clientX, y: t.clientY } : null;
+		this.touchHeld = false;
 	};
 
 	private onTouchMove = (event: TouchEvent) => {
-		this.noteGesture();
 		if (event.touches.length !== 1) {
 			this.lastTouchY = null;
 			this.lastTouchX = null;
+			this.touchStart = null;
+			this.touchHeld = false;
 			return;
 		}
 		const y = event.touches[0].clientY;
 		const x = event.touches[0].clientX;
 		const lastY = this.lastTouchY;
 		const lastX = this.lastTouchX;
-		if (lastY === null || lastX === null) return; // ignored (edge zone) or multi-touch
+		const start = this.touchStart;
+		if (lastY === null || lastX === null || !start) return; // ignored (edge zone) or multi-touch
 		this.lastTouchY = y;
 		this.lastTouchX = x;
+		if (!this.touchHeld) {
+			if (Math.abs(x - start.x) < 4 && Math.abs(y - start.y) < 4) return; // a tap, so far
+			this.touchHeld = true;
+		}
+		// Finger down = content up.
+		if (Math.abs(y - lastY) >= Math.abs(x - lastX)) this.noteGesture(y > lastY ? "up" : "down");
 		// An active finger dragging AWAY from the bottom (finger down = content
 		// up) during a glide takes the view. Drags toward the bottom leave the
 		// glide running — it is already going where they want, and the geometric
@@ -743,14 +797,15 @@ export class StickToBottomController {
 		// drag (a swipe with slight vertical drift) is not scroll intent.
 		if (!this.anim || this.anim.snap || y <= lastY + 1) return;
 		if (Math.abs(x - lastX) > y - lastY) return;
-		if (this.innerScrollerConsumesUp(event.target)) return;
+		if (this.innerScrollerConsumes(event.target, "up")) return;
 		this.unpin();
 	};
 
 	private onTouchEnd = () => {
-		// Momentum follows the lift: its scroll events chain off this stamp.
+		// Momentum follows the lift: its scroll events chain off the last move's
+		// stamp; a tap that never moved leaves no stamp at all.
 		this.touchHeld = false;
-		this.noteGesture();
+		this.touchStart = null;
 		this.lastTouchY = null;
 		this.lastTouchX = null;
 	};
