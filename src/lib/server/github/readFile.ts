@@ -267,7 +267,16 @@ export async function readFile(
 	if (!window.ok) return { text: window.message, isError: true };
 
 	const { start, end, cappedBy } = window.window;
-	const body = lines.slice(start - 1, end).join("\n");
+	let body = lines.slice(start - 1, end).join("\n");
+
+	// The window is line-granular, so a line longer than the whole budget survives
+	// it: a minified or generated file is one line and can run to megabytes, which
+	// would defeat the cap entirely and can push the next completion past its
+	// context. The cap is a promise about output size, so it is enforced on the
+	// text rather than on the line count.
+	const cutMidLine = body.length > MAX_WINDOW_CHARS;
+	if (cutMidLine) body = body.slice(0, MAX_WINDOW_CHARS);
+
 	const fence = fenceFor(body);
 	const language = notebook ? "markdown" : languageFor(path);
 
@@ -282,7 +291,11 @@ export async function readFile(
 			`Showing lines ${start}-${end} of ${lines.length}. Use line_start and line_end to read the rest.`
 		);
 	}
-	if (cappedBy === "lines") {
+	if (cutMidLine) {
+		footer.push(
+			`Line ${start} is longer than the ${MAX_WINDOW_CHARS.toLocaleString("en-US")} character limit for one read and was cut mid-line, so what you see above is incomplete.`
+		);
+	} else if (cappedBy === "lines") {
 		footer.push(`The requested range was capped at ${MAX_WINDOW_LINES} lines per read.`);
 	} else if (cappedBy === "chars") {
 		footer.push(

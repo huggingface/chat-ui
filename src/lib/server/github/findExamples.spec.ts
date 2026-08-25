@@ -184,6 +184,42 @@ describe("findExamples", () => {
 		expect(result.text).not.toContain("beefbeef");
 	});
 
+	it("never abbreviates a branch name as though it were a commit", async () => {
+		// Slicing to 7 turns a default branch called `development` into `develop`, a ref
+		// that does not exist — so a failed SHA lookup must not produce a fake commit.
+		install(({ path }) => {
+			if (path === "/repos/huggingface/trl") return { json: { default_branch: "development" } };
+			if (path.startsWith("/repos/huggingface/trl/git/ref/")) return { status: 500 };
+			if (path.startsWith("/repos/huggingface/trl/git/trees/development")) {
+				return { json: treeResponse(TRL_TREE) };
+			}
+			return undefined;
+		});
+
+		const result = await findExamples({ repo: "trl", max_results: 1 });
+
+		expect(result.isError).toBe(false);
+		expect(result.text).toContain("'ref': 'development'");
+		expect(result.text).not.toContain("develop'");
+		// And says the listing is not pinned, rather than implying a snapshot.
+		expect(result.text).toContain("not pinned");
+	});
+
+	it("reads the tree through the branch when the commit cannot be resolved", async () => {
+		const recorder = install(({ path }) => {
+			if (path === "/repos/huggingface/trl") return { json: { default_branch: "main" } };
+			if (path.startsWith("/repos/huggingface/trl/git/ref/")) return { status: 500 };
+			if (path.startsWith("/repos/huggingface/trl/git/trees/main")) {
+				return { json: treeResponse(TRL_TREE) };
+			}
+			return undefined;
+		});
+
+		const result = await findExamples({ repo: "trl", max_results: 1 });
+		expect(result.isError).toBe(false);
+		expect(recorder.paths.some((p) => p.includes("/git/trees/main"))).toBe(true);
+	});
+
 	it("accepts a bare name and an owner/repo pair alike", async () => {
 		install(trlResponder());
 		const bare = await findExamples({ repo: "trl" });

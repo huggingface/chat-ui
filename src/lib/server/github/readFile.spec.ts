@@ -3,7 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("$lib/server/config", () => ({ config: { GITHUB_TOKEN: "ghp_test_token" } }));
 
 import { resetGithubCache } from "./client";
-import { MAX_WINDOW_LINES, readFile, resolveWindow, splitLines } from "./readFile";
+import {
+	MAX_WINDOW_CHARS,
+	MAX_WINDOW_LINES,
+	readFile,
+	resolveWindow,
+	splitLines,
+} from "./readFile";
 import { installGithubFetch, type GithubFetchMock, type Responder } from "./__fixtures__/mockFetch";
 
 const CONTENTS = "/repos/huggingface/trl/contents/examples/scripts/sft.py";
@@ -276,6 +282,30 @@ describe("readFile", () => {
 		expect(result.text).toContain("The file is empty.");
 		expect(result.text).not.toContain("```");
 		expect(recorder.requests).toHaveLength(1);
+	});
+
+	it("cuts a single line that is longer than the whole character budget", async () => {
+		// A minified or generated file is one line and can run to megabytes. The window
+		// is line-granular, so without this the cap does not bind at all.
+		install(serveFile("x".repeat(MAX_WINDOW_CHARS * 3)));
+		const result = await readFile({ repo: "trl", path: "examples/scripts/sft.py" });
+
+		expect(result.isError).toBe(false);
+		expect(result.text.length).toBeLessThan(MAX_WINDOW_CHARS + 2_000);
+		expect(result.text).toContain("cut mid-line");
+	});
+
+	it("cuts an oversized line reached through an explicit range too", async () => {
+		install(serveFile(`short\n${"y".repeat(MAX_WINDOW_CHARS * 2)}\nshort`));
+		const result = await readFile({
+			repo: "trl",
+			path: "examples/scripts/sft.py",
+			line_start: 2,
+			line_end: 2,
+		});
+
+		expect(result.text.length).toBeLessThan(MAX_WINDOW_CHARS + 2_000);
+		expect(result.text).toContain("Line 2 is longer than");
 	});
 
 	it("requires a path, and says which tool finds one", async () => {

@@ -328,12 +328,16 @@ function formatResults({
 	keyword: string;
 	matches: ExampleFile[];
 	shown: ExampleFile[];
-	commit: string;
+	/** The resolved commit, or undefined when the tree was read through the branch. */
+	commit?: string;
 	branch: string;
 	truncatedTree: boolean;
 }): string {
 	const slug = repoSlug(ref);
-	const short = commit.slice(0, 7);
+	// Abbreviating is safe for a SHA and destroys a branch name: truncating a
+	// default branch called `development` to `develop` advertises a ref that does
+	// not exist and breaks the find-to-read chain outright.
+	const readRef = commit ? commit.slice(0, 7) : branch;
 	const suffix = keyword ? ` matching '${keyword}'` : "";
 	const header =
 		matches.length > shown.length
@@ -341,7 +345,9 @@ function formatResults({
 			: `**Found ${matches.length} example file${matches.length === 1 ? "" : "s"} in ${slug}${suffix}**`;
 
 	const notes = [
-		`Tree read at commit ${short} (branch ${branch}). Pass that ref to github_read_file to read the same snapshot.`,
+		commit
+			? `Tree read at commit ${readRef} (branch ${branch}). Pass that ref to github_read_file to read the same snapshot.`
+			: `Tree read from branch ${branch}, which could not be resolved to a commit — these results are not pinned, so the branch may move before you read from it.`,
 	];
 	if (truncatedTree) {
 		notes.push(
@@ -350,11 +356,11 @@ function formatResults({
 	}
 
 	const entries = shown.map((file, index) => {
-		const readArgs = `{'repo': '${slug}', 'path': '${file.path}', 'ref': '${short}'}`;
+		const readArgs = `{'repo': '${slug}', 'path': '${file.path}', 'ref': '${readRef}'}`;
 		return [
 			`${index + 1}. **${file.path}**`,
 			`   Size: ${file.size.toLocaleString("en-US")} bytes`,
-			`   URL: https://github.com/${slug}/blob/${short}/${encodePath(file.path)}`,
+			`   URL: https://github.com/${slug}/blob/${encodeURIComponent(readRef)}/${encodePath(file.path)}`,
 			`   To read, use: ${readArgs}`,
 		].join("\n");
 	});
@@ -395,10 +401,12 @@ export async function findExamples(
 		`${base}/git/ref/heads/${encodePath(branch)}`,
 		{ signal, timeoutMs: METADATA_TIMEOUT_MS }
 	);
-	const commit = head.ok ? (head.data.object?.sha ?? branch) : branch;
+	// Undefined rather than the branch name when resolution fails, so nothing
+	// downstream can mistake one for the other.
+	const commit = head.ok ? head.data.object?.sha : undefined;
 
 	const tree = await githubJson<TreeResponse>(
-		`${base}/git/trees/${encodeURIComponent(commit)}?recursive=1`,
+		`${base}/git/trees/${encodeURIComponent(commit ?? branch)}?recursive=1`,
 		{ signal }
 	);
 	if (!tree.ok) return { text: tree.message, isError: true };
@@ -436,7 +444,7 @@ export async function findExamples(
 			keyword,
 			matches,
 			shown: matches.slice(0, maxResults),
-			commit,
+			...(commit ? { commit } : {}),
 			branch,
 			truncatedTree,
 		}),
