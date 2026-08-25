@@ -29,6 +29,10 @@ const mocks = vi.hoisted(() => ({
 		type: string;
 		function: { name: string };
 	}>,
+	servers: [{ name: "hf", url: "https://example.test/mcp" }] as Array<{
+		name: string;
+		url: string;
+	}>,
 }));
 
 // The gate itself is real; only the build flag behind it is forced on.
@@ -53,16 +57,19 @@ vi.mock("$lib/server/config", () => ({
 }));
 
 vi.mock("$lib/server/mcp/registry", () => ({
-	getMcpServers: () => [{ name: "hf", url: "https://example.test/mcp" }],
+	getMcpServers: () => mocks.servers,
 }));
 
 vi.mock("$lib/server/urlSafety", () => ({ isValidUrl: () => true }));
 
 vi.mock("$lib/server/mcp/tools", () => ({
-	getOpenAiToolsForMcp: async () => ({
-		tools: mocks.mcpTools,
-		mapping: { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } },
-	}),
+	getOpenAiToolsForMcp: async (servers: unknown[]) =>
+		servers.length === 0
+			? { tools: [], mapping: {} }
+			: {
+					tools: mocks.mcpTools,
+					mapping: { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } },
+				},
 }));
 
 vi.mock("./routerResolution", () => ({
@@ -213,6 +220,7 @@ beforeEach(() => {
 	mocks.executeToolCalls.mockReset();
 	mocks.getAbortTime.mockReset();
 	mocks.mcpTools = [{ type: "function", function: { name: "do_thing" } }];
+	mocks.servers = [{ name: "hf", url: "https://example.test/mcp" }];
 	mocks.getAbortTime.mockReturnValue(undefined);
 	scriptToolResults();
 });
@@ -448,11 +456,91 @@ describe("runMcpFlow offering the question tool", () => {
 		expect(toolNames()).toEqual(["do_thing"]);
 	});
 
-	it("does not engage the flow on its own when no MCP tool exists", async () => {
+	it("engages the flow with builtin tools alone when MCP listing yields nothing", async () => {
 		mocks.mcpTools = [];
 		scriptRounds([{ content: "the answer" }]);
 		const { result } = await runFlow(inMlMode);
+		expect(result).toBe("completed");
+		expect(toolNames()).toEqual(["ask_user_question", "update_plan"]);
+	});
+
+	it("still skips the flow outside the mode when no MCP server is selected", async () => {
+		mocks.servers = [];
+		const { result } = await runFlow();
 		expect(result).toBe("not_applicable");
 		expect(mocks.create).not.toHaveBeenCalled();
+	});
+});
+
+describe("runMcpFlow offering the plan tool", () => {
+	const toolNames = () =>
+		(
+			(mocks.create.mock.calls[0]?.[0] as { tools?: Array<{ function: { name: string } }> })
+				?.tools ?? []
+		).map((t) => t.function.name);
+
+	const mlConv = (extra: Record<string, unknown> = {}) =>
+		({ _id: new ObjectId(), mlAssistant: true, ...extra }) as unknown as Parameters<
+			typeof runMcpFlow
+		>[0]["conv"];
+
+	it("offers it in ML Assistant mode and nowhere else", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+		expect(toolNames()).toContain("update_plan");
+
+		mocks.create.mockClear();
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow();
+		expect(toolNames()).not.toContain("update_plan");
+	});
+
+	it("drops an MCP tool shadowed by a builtin name", async () => {
+		mocks.mcpTools = [
+			{ type: "function", function: { name: "do_thing" } },
+			{ type: "function", function: { name: "update_plan" } },
+		];
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+		expect(toolNames().filter((name) => name === "update_plan")).toHaveLength(1);
+	});
+
+	it("injects the current plan at the tail of the last user message", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({
+			conv: mlConv({
+				plan: {
+					goal: "Ship the feature",
+					steps: [{ step: "write it", status: "in_progress" }],
+					version: 2,
+					updatedAt: new Date(),
+				},
+			}),
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		const lastUser = requestMessages(0).findLast((m) => m.role === "user");
+		expect(String(lastUser?.content)).toContain("hello");
+		expect(String(lastUser?.content)).toContain("CURRENT PLAN");
+		expect(String(lastUser?.content)).toContain("PLAN (v2 — 0/1 done)");
+	});
+
+	it("does not inject a stale plan when the tool is not offered", async () => {
+		// A plan block that says "revise it with update_plan" must never appear
+		// without the tool it names — here, outside ML Assistant mode.
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({
+			conv: {
+				_id: new ObjectId(),
+				plan: {
+					goal: "Ship the feature",
+					steps: [{ step: "write it", status: "pending" }],
+					version: 1,
+					updatedAt: new Date(),
+				},
+			},
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		const lastUser = requestMessages(0).findLast((m) => m.role === "user");
+		expect(String(lastUser?.content)).not.toContain("CURRENT PLAN");
 	});
 });
