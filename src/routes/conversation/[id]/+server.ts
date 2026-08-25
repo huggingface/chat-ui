@@ -13,7 +13,6 @@ import {
 	MessageElicitationUpdateType,
 	MessageReasoningUpdateType,
 	type MessageUpdate,
-	type MessageStreamUpdate,
 } from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
@@ -28,6 +27,7 @@ import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
+import { compressUpdatesForStorage } from "$lib/server/generation/compressUpdates";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
 import { clampStoppedContent } from "$lib/server/stopTruncation";
@@ -41,24 +41,6 @@ import { applyConversationSettings } from "$lib/server/conversationSettings";
 // would lose the stop. Aborted generations consume their marker on shutdown,
 // so markers normally live far shorter than this.
 const STOP_MARKER_GRACE_MS = 5_000;
-
-// Shape a message's updates for storage: drop keepalives and replace each stream token
-// with a length marker (content is stored separately), preserving ordering without
-// duplicating text. Shared by the full save and the writer's incremental materialise so
-// both persist the same thing under materializedSeq.
-function compressUpdatesForStorage(updates: Message["updates"]): Message["updates"] {
-	return (
-		updates
-			?.filter(
-				(u) => !(u.type === MessageUpdateType.Status && u.status === MessageUpdateStatus.KeepAlive)
-			)
-			.map((u) => {
-				if (u.type !== MessageUpdateType.Stream) return u;
-				const len = u.len ?? (u.token ?? "").length;
-				return { type: MessageUpdateType.Stream, token: "", len } satisfies MessageStreamUpdate;
-			}) ?? []
-	);
-}
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
