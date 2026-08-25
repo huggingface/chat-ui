@@ -72,6 +72,15 @@ const UNPIN_DRIFT_PX = 3;
  * clamp as a scroll event; with no gesture behind it, that is not a detach.
  */
 const GESTURE_CHAIN_MS = 150;
+/**
+ * How long after a content change (a DOM mutation or a resize of the followed
+ * content) an upward, gesture-less scroll event while following still counts
+ * as the browser's own clamp rather than navigation. Safari's clamps arrive
+ * in the rendering update right after the mutation that caused them; a
+ * find-in-page jump or an assistive-technology scroll changes nothing in the
+ * DOM first, so with a quiet DOM the move is the reader's and detaches.
+ */
+const CONTENT_ACTIVITY_MS = 120;
 /** Spring time constant: reach ~63% of remaining distance every 80ms. */
 const SPRING_TAU_MS = 80;
 /** Below this remaining distance the spring snaps to the target. */
@@ -120,7 +129,11 @@ export class StickToBottomController {
 	private rafId: number | null = null;
 
 	private resizeObserver: ResizeObserver | null = null;
+	private mutationObserver: MutationObserver | null = null;
 	private observedContent: HTMLElement | null = null;
+	/** Content activity stamps (see CONTENT_ACTIVITY_MS). */
+	private lastMutationAt = Number.NEGATIVE_INFINITY;
+	private lastResizeAt = Number.NEGATIVE_INFINITY;
 	private lastTouchY: number | null = null;
 	/** Gesture attribution (see GESTURE_CHAIN_MS). */
 	private lastGestureAt = Number.NEGATIVE_INFINITY;
@@ -155,6 +168,11 @@ export class StickToBottomController {
 			window.addEventListener("mouseup", this.onWindowMouseUp, { passive: true });
 		}
 
+		if (typeof MutationObserver !== "undefined") {
+			this.mutationObserver = new MutationObserver(() => {
+				this.lastMutationAt = performance.now();
+			});
+		}
 		if (typeof ResizeObserver !== "undefined") {
 			this.resizeObserver = new ResizeObserver(this.onResize);
 			this.resizeObserver.observe(container);
@@ -366,6 +384,8 @@ export class StickToBottomController {
 		}
 		this.resizeObserver?.disconnect();
 		this.resizeObserver = null;
+		this.mutationObserver?.disconnect();
+		this.mutationObserver = null;
 	}
 
 	// --- animation ------------------------------------------------------------------
@@ -482,20 +502,22 @@ export class StickToBottomController {
 				// a delta here is either the user's (or a coalesced event's user
 				// share) — or the browser's own doing, which only the absence of
 				// any gesture can reveal.
-				if (!this.gestured()) {
-					if (this.state.pinned) {
-						// Browser-initiated (Safari clamping mid-DOM-swap): undo it in
-						// the same event, before paint, so nothing flickers. A glide in
-						// flight is cut short and lands at the bottom right away: on a
-						// fast stream the per-token clamps arrive faster than a spring
-						// can win them back, and the user asked for the bottom.
-						this.stopAnimation();
-						this.write(this.maxScrollTop());
-						this.recomputeState();
-						return;
-					}
-				} else {
-					this.lastGestureAt = performance.now();
+				if (!this.gestured() && this.state.pinned && this.contentActive()) {
+					// Browser-initiated (Safari clamping mid-DOM-swap — the DOM just
+					// changed): undo it in the same event, before paint, so nothing
+					// flickers. A glide in flight is cut short and lands at the bottom
+					// right away: on a fast stream the per-token clamps arrive faster
+					// than a spring can win them back, and the user asked for the
+					// bottom.
+					this.stopAnimation();
+					this.write(this.maxScrollTop());
+					this.recomputeState();
+					return;
+				} else if (this.gestured() || this.state.pinned) {
+					// The user's own movement — or, with a quiet DOM, the browser
+					// navigating on the reader's behalf (find-in-page, assistive
+					// technology), which is theirs to keep just the same.
+					if (this.gestured()) this.lastGestureAt = performance.now();
 					this.upwardDrift += this.lastTop - top;
 					if (this.upwardDrift >= UNPIN_DRIFT_PX && (this.state.pinned || this.anim)) {
 						this.unpin();
@@ -521,6 +543,7 @@ export class StickToBottomController {
 
 	private onResize = (entries?: ResizeObserverEntry[]) => {
 		if (this.destroyed) return;
+		this.lastResizeAt = performance.now();
 		// The gutter (and other container-box-dependent measurements) can only
 		// change when the container itself resized, not on every content frame.
 		const containerResized = !entries || entries.some((e) => e.target === this.container);
@@ -538,6 +561,24 @@ export class StickToBottomController {
 		if (this.observedContent) this.resizeObserver.unobserve(this.observedContent);
 		this.observedContent = content ?? null;
 		if (content) this.resizeObserver.observe(content);
+		this.mutationObserver?.disconnect();
+		if (content) {
+			this.mutationObserver?.observe(content, {
+				childList: true,
+				subtree: true,
+				attributes: true,
+				characterData: true,
+			});
+		}
+	}
+
+	/** The followed content changed within CONTENT_ACTIVITY_MS. */
+	private contentActive(): boolean {
+		const now = performance.now();
+		return (
+			now - this.lastMutationAt <= CONTENT_ACTIVITY_MS ||
+			now - this.lastResizeAt <= CONTENT_ACTIVITY_MS
+		);
 	}
 
 	// --- gesture attribution --------------------------------------------------------
