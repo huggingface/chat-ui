@@ -487,6 +487,73 @@ describe("browser-initiated movement (no gesture)", () => {
 		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
 	});
 
+	it("a horizontal swipe held on content is not upward intent: a clamp while the finger is down is undone", async () => {
+		const { fixture, controller } = setup();
+		await frames(3);
+		await nextTask();
+		const el = fixture.container;
+		const touch = (type: string, clientX: number, clientY: number) =>
+			el.dispatchEvent(
+				new TouchEvent(type, {
+					touches:
+						type === "touchend" ? [] : [new Touch({ identifier: 7, target: el, clientX, clientY })],
+					changedTouches: [new Touch({ identifier: 7, target: el, clientX, clientY })],
+					bubbles: true,
+				})
+			);
+		touch("touchstart", 100, 200);
+		touch("touchmove", 160, 201); // swiping a code block sideways
+		touch("touchmove", 220, 203);
+		fixture.lastBlock().replaceWith(fixture.lastBlock().cloneNode(true));
+		browserScrollTo(fixture.container, fixture.scrollTop() - 200);
+		await frame();
+		expect(controller.pinned).toBe(true);
+		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
+		touch("touchend", 220, 203);
+	});
+
+	it("keys typed into an editable field inside the scroller are not gestures: a clamp is still undone", async () => {
+		const { fixture, controller } = setup();
+		const textarea = document.createElement("textarea");
+		fixture.content.appendChild(textarea);
+		await frames(2);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle after append" });
+		await nextTask();
+		textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+		fixture.lastBlock().replaceWith(fixture.lastBlock().cloneNode(true));
+		browserScrollTo(fixture.container, fixture.scrollTop() - 200);
+		await frame();
+		expect(controller.pinned).toBe(true);
+		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
+	});
+
+	it("a key that cannot scroll (a letter on the scroller) is not a gesture: a clamp is still undone", async () => {
+		const { fixture, controller } = setup();
+		await frames(3);
+		await nextTask();
+		fixture.container.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+		fixture.lastBlock().replaceWith(fixture.lastBlock().cloneNode(true));
+		browserScrollTo(fixture.container, fixture.scrollTop() - 200);
+		await frame();
+		expect(controller.pinned).toBe(true);
+		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
+	});
+
+	it("PageUp from a control focused inside the scroller is the user's scroll, even mid-stream", async () => {
+		const { fixture, controller } = setup();
+		const button = document.createElement("button");
+		button.textContent = "copy";
+		fixture.content.appendChild(button);
+		await frames(2);
+		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle after append" });
+		button.dispatchEvent(new KeyboardEvent("keydown", { key: "PageUp", bubbles: true }));
+		fixture.content.firstElementChild?.replaceWith(fixture.content.children[0].cloneNode(true)); // content is active
+		browserScrollTo(fixture.container, fixture.scrollTop() - fixture.container.clientHeight * 0.9);
+		await frame();
+		expect(controller.pinned).toBe(false);
+		expect(fixture.distance()).toBeGreaterThan(150);
+	});
+
 	it("a quiet browser navigation while following (find-in-page) detaches and keeps its place", async () => {
 		const { fixture, controller } = setup();
 		await frames(3);

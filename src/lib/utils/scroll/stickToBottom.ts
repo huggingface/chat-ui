@@ -636,14 +636,15 @@ export class StickToBottomController {
 	}
 
 	private onKeyDown = (event: KeyboardEvent) => {
-		// Keys pressed on the (focusable) scroller scroll it natively.
-		const key = event.key;
-		const direction =
-			key === "PageUp" || key === "ArrowUp" || key === "Home"
-				? "up"
-				: key === "PageDown" || key === "ArrowDown" || key === "End" || key === " "
-					? "down"
-					: "both";
+		// Only a scrolling key the page has not consumed, pressed outside an
+		// editable field, scrolls the conversation natively — from the focused
+		// scroller or from a control focused inside it. Anything else (typing
+		// in a message-edit textarea, a key a widget took, the space that
+		// activates a button) moves nothing and must not lend Safari's next
+		// clamp the look of user intent.
+		if (event.defaultPrevented) return;
+		const direction = scrollKeyDirection(event);
+		if (!direction || keyConsumedBy(event.target, event.key)) return;
 		this.noteGesture(direction);
 		this.lastJumpGestureAt = performance.now();
 	};
@@ -783,7 +784,13 @@ export class StickToBottomController {
 		this.lastTouchY = y;
 		this.lastTouchX = x;
 		if (!this.touchHeld) {
-			if (Math.abs(x - start.x) < 4 && Math.abs(y - start.y) < 4) return; // a tap, so far
+			// A touch is a gesture once it has traveled vertically. A tap, or a
+			// swipe along a horizontally scrolling code block, moves the
+			// conversation nowhere: it stamps nothing, and the finger it keeps
+			// down must not lend Safari's next clamp the look of user intent.
+			const dx = Math.abs(x - start.x);
+			const dy = Math.abs(y - start.y);
+			if (dy < 4 || dx > dy) return;
 			this.touchHeld = true;
 		}
 		// Finger down = content up.
@@ -809,4 +816,36 @@ export class StickToBottomController {
 		this.lastTouchY = null;
 		this.lastTouchX = null;
 	};
+}
+
+/** The direction a key scrolls a focused scroller natively, or null for a key that does not scroll. */
+function scrollKeyDirection(event: KeyboardEvent): "up" | "down" | null {
+	switch (event.key) {
+		case "PageUp":
+		case "ArrowUp":
+		case "Home":
+			return "up";
+		case "PageDown":
+		case "ArrowDown":
+		case "End":
+			return "down";
+		case " ":
+			return event.shiftKey ? "up" : "down";
+		default:
+			return null;
+	}
+}
+
+/** An editable field takes its keys; a control takes the space that activates it. */
+function keyConsumedBy(target: EventTarget | null, key: string): boolean {
+	if (!(target instanceof HTMLElement)) return false;
+	if (
+		target.isContentEditable ||
+		target instanceof HTMLInputElement ||
+		target instanceof HTMLTextAreaElement ||
+		target instanceof HTMLSelectElement
+	) {
+		return true;
+	}
+	return key === " " && target.closest("button, a, summary, [role='button']") !== null;
 }
