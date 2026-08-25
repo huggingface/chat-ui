@@ -3,6 +3,12 @@ export type PlanStepStatus = "pending" | "in_progress" | "completed" | "skipped"
 export interface PlanStep {
 	step: string;
 	status: PlanStepStatus;
+	/**
+	 * Model-authored one-or-two-word name for compact progress displays (the ML
+	 * Assistant strip's dots and their accessible names). Absent on plans from
+	 * before the field existed; consumers fall back to cutting `step`.
+	 */
+	label?: string;
 }
 
 /**

@@ -37,8 +37,10 @@
 	<div
 		class={[
 			"ml-strip flex items-center gap-[9px] border-b px-4 py-[9px] text-[13.5px]",
+			// Label text must clear 4.5:1 on the band: #c2410c on #fff4ea is 4.78:1 with
+			// little headroom — retint band and text together, not separately.
 			enabled
-				? "border-[#e2e7fb] bg-[#f0f3ff] text-[#2244cc] dark:border-[#2b3357] dark:bg-[#151a2e] dark:text-[#93a4f0]"
+				? "border-[#fbe4cc] bg-[var(--ml-strip-band)] text-[#c2410c] [--ml-strip-band:#fff4ea] dark:border-[#54371c] dark:text-[#fdba74] dark:[--ml-strip-band:#2b1c0e]"
 				: "border-[#ececee] bg-transparent text-[#9a9aa0] dark:border-gray-700 dark:text-gray-500",
 		]}
 	>
@@ -51,7 +53,7 @@
 				checked={enabled}
 				disabled={taskRunning}
 				onCheckedChange={ontoggle}
-				aria-label="ML Assistant mode"
+				aria-label="ML Intern mode"
 			>
 				<span class="ml-switch-track" class:is-on={enabled}>
 					<Switch.Thumb class="ml-switch-knob" />
@@ -62,13 +64,15 @@
 		<!-- The switch is gone once a task is running, so the title has to be what
 		     tells a screen reader the mode is on. -->
 		<span class="flex-none" class:font-semibold={enabled}>
-			ML Assistant{#if taskRunning}<span class="sr-only">, mode on</span>{/if}
+			ML Intern{#if taskRunning}<span class="sr-only">, mode on</span>{/if}
 		</span>
 
 		<!-- The plan replaces the tool note, but only once there is a plan to show:
 		     a run that has not reported its steps yet would otherwise leave a gap. -->
 		{#if taskRunning && steps.length}
-			<MlAssistantPlanProgress {steps} {statusLabel} {complete} />
+			<span class="ml-2 flex min-w-0 items-center">
+				<MlAssistantPlanProgress {steps} {statusLabel} {complete} />
+			</span>
 		{:else if enabled}
 			<span class="truncate font-mono text-xs text-[#7f8cd8]">
 				{ML_ASSISTANT_TOOLS.join(" · ")}
@@ -165,7 +169,7 @@
 	}
 
 	.ml-switch-track.is-on {
-		background: #2244cc;
+		background: #ea580c;
 	}
 
 	:global(.dark) .ml-switch-track {
@@ -177,7 +181,7 @@
 	}
 
 	:global(.ml-switch:focus-visible) .ml-switch-track {
-		outline: 2px solid #2244cc;
+		outline: 2px solid #ea580c;
 		outline-offset: 2px;
 	}
 

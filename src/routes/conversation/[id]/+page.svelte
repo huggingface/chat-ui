@@ -41,6 +41,9 @@
 	} from "$lib/utils/generationState";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
+	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+	import { planStepsToMlSteps } from "$lib/utils/planProgress";
 
 	let { data } = $props();
 
@@ -334,6 +337,9 @@
 					resuming = false;
 				},
 				onTitle: (title) => convsStore.update(convId, { title }),
+				onPlan: (update) => {
+					if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
+				},
 				onError: (update) => {
 					if (update.statusCode === 402) {
 						showSubscribeModal = true;
@@ -438,6 +444,9 @@
 					onAbort: () => controller.abort(),
 					onStreamStart: () => {},
 					onTitle: (title) => convsStore.update(runConvId, { title }),
+					onPlan: (update) => {
+						if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
+					},
 					onError: (update) => {
 						$error = update.message ?? "An error has occurred";
 					},
