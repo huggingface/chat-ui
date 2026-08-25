@@ -120,11 +120,18 @@ export class ChatScroll {
 	// --- wiring -------------------------------------------------------------------
 
 	/** `use:` action for the scroll container. */
-	attach = (node: HTMLElement, params?: { content?: () => HTMLElement | null | undefined }) => {
+	attach = (
+		node: HTMLElement,
+		params?: {
+			content?: () => HTMLElement | null | undefined;
+			ignoreTouchZonePx?: number;
+		}
+	) => {
 		this.container = node;
 		this.contentEl = params?.content ?? null;
 		this.controller = new StickToBottomController(node, {
 			content: () => this.contentEl?.() ?? undefined,
+			ignoreTouchZonePx: params?.ignoreTouchZonePx,
 			onStateChange: (s) => this.applyState(s),
 			onContentResize: (containerResized) => {
 				if (containerResized) this.measureContainer();

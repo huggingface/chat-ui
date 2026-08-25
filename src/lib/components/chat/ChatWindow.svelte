@@ -34,6 +34,7 @@
 	import { browser } from "$app/environment";
 	import { createChatScroll } from "$lib/utils/scroll/chatScroll.svelte";
 	import { isAssistantGenerationTerminal } from "$lib/utils/generationState";
+	import { NAV_EDGE_SWIPE_ZONE_PX } from "$lib/constants/gestures";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ShareConversationModal from "../ShareConversationModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
@@ -702,6 +703,7 @@
 			aria-label="Conversation messages"
 			use:chatScroll.attach={{
 				content: () => messagesEl ?? pendingEl,
+				ignoreTouchZonePx: NAV_EDGE_SWIPE_ZONE_PX,
 			}}
 		>
 			<!-- @container: descendants (e.g. the per-message router-metadata row) adapt

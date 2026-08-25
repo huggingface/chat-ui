@@ -53,6 +53,13 @@ export interface StickToBottomOptions {
 	onContentResize?: (containerResized: boolean) => void;
 	nearBottomPx?: number;
 	scrolledUpPx?: number;
+	/**
+	 * Touches starting within this many px of the left edge are ignored — for
+	 * hosts where an edge-swipe gesture (e.g. a nav drawer) claims that strip
+	 * and prevents the touch from scrolling anything, so it must not cancel a
+	 * glide either.
+	 */
+	ignoreTouchZonePx?: number;
 	/** Test seam; defaults to matchMedia('(prefers-reduced-motion: reduce)'). */
 	reducedMotion?: () => boolean;
 }
@@ -104,7 +111,9 @@ interface Animation {
 
 export class StickToBottomController {
 	private container: HTMLElement;
-	private opts: Required<Pick<StickToBottomOptions, "nearBottomPx" | "scrolledUpPx">> &
+	private opts: Required<
+		Pick<StickToBottomOptions, "nearBottomPx" | "scrolledUpPx" | "ignoreTouchZonePx">
+	> &
 		StickToBottomOptions;
 
 	private state: StickToBottomState = {
@@ -135,6 +144,7 @@ export class StickToBottomController {
 	private lastMutationAt = Number.NEGATIVE_INFINITY;
 	private lastResizeAt = Number.NEGATIVE_INFINITY;
 	private lastTouchY: number | null = null;
+	private lastTouchX: number | null = null;
 	/** Gesture attribution (see GESTURE_CHAIN_MS). */
 	private lastGestureAt = Number.NEGATIVE_INFINITY;
 	/** Single-jump inputs only (scrollbar mousedown, keys) — see anchorAdjust. */
@@ -148,6 +158,7 @@ export class StickToBottomController {
 		this.opts = {
 			nearBottomPx: 60,
 			scrolledUpPx: 200,
+			ignoreTouchZonePx: 0,
 			...options,
 		};
 
@@ -677,25 +688,37 @@ export class StickToBottomController {
 	private onTouchStart = (event: TouchEvent) => {
 		this.touchHeld = true;
 		this.noteGesture();
-		this.lastTouchY = event.touches.length === 1 ? event.touches[0].clientY : null;
+		const t = event.touches.length === 1 ? event.touches[0] : null;
+		// A touch in the edge-swipe zone belongs to the host's drawer gesture:
+		// it will not scroll the conversation, so it says nothing about a glide.
+		const tracked = t !== null && t.clientX >= this.opts.ignoreTouchZonePx;
+		this.lastTouchY = tracked ? t.clientY : null;
+		this.lastTouchX = tracked ? t.clientX : null;
 	};
 
 	private onTouchMove = (event: TouchEvent) => {
 		this.noteGesture();
 		if (event.touches.length !== 1) {
 			this.lastTouchY = null;
+			this.lastTouchX = null;
 			return;
 		}
 		const y = event.touches[0].clientY;
+		const x = event.touches[0].clientX;
 		const lastY = this.lastTouchY;
+		const lastX = this.lastTouchX;
+		if (lastY === null || lastX === null) return; // ignored (edge zone) or multi-touch
 		this.lastTouchY = y;
+		this.lastTouchX = x;
 		// An active finger dragging AWAY from the bottom (finger down = content
 		// up) during a glide takes the view. Drags toward the bottom leave the
 		// glide running — it is already going where they want, and the geometric
 		// re-attach rule covers them if it gets canceled elsewhere. Momentum
 		// after the finger lifts sends no touchmove, but its scroll events carry
-		// direction and the geometric rules handle them.
-		if (!this.anim || this.anim.snap || lastY === null || y <= lastY + 1) return;
+		// direction and the geometric rules handle them. A mostly-horizontal
+		// drag (a swipe with slight vertical drift) is not scroll intent.
+		if (!this.anim || this.anim.snap || y <= lastY + 1) return;
+		if (Math.abs(x - lastX) > y - lastY) return;
 		if (this.innerScrollerConsumesUp(event.target)) return;
 		this.unpin();
 	};
@@ -705,5 +728,6 @@ export class StickToBottomController {
 		this.touchHeld = false;
 		this.noteGesture();
 		this.lastTouchY = null;
+		this.lastTouchX = null;
 	};
 }
