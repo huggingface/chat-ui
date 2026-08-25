@@ -416,6 +416,40 @@ describe("browser-initiated movement (no gesture)", () => {
 		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
 	});
 
+	it("a stationary press on message text is not a gesture: a following view still undoes a clamp", async () => {
+		const { fixture, controller } = setup();
+		await frames(3);
+		await nextTask();
+		// Mouse down on ordinary content (a click, or a selection about to
+		// start) — then Safari's per-token clamp lands.
+		fixture
+			.lastBlock()
+			.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: 100, clientY: 200 }));
+		fixture.lastBlock().replaceWith(fixture.lastBlock().cloneNode(true));
+		browserScrollTo(fixture.container, fixture.scrollTop() - 200);
+		await frame();
+		expect(controller.pinned).toBe(true);
+		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
+		window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+	});
+
+	it("a press that drags (a text selection auto-scrolling up) is the user's and detaches", async () => {
+		const { fixture, controller } = setup();
+		await frames(3);
+		await nextTask();
+		fixture
+			.lastBlock()
+			.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: 100, clientY: 200 }));
+		fixture
+			.lastBlock()
+			.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: 100, clientY: 170 }));
+		fixture.lastBlock().replaceWith(fixture.lastBlock().cloneNode(true));
+		browserScrollTo(fixture.container, fixture.scrollTop() - 200);
+		await frame();
+		expect(controller.pinned).toBe(false);
+		window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+	});
+
 	it("a quiet browser navigation while following (find-in-page) detaches and keeps its place", async () => {
 		const { fixture, controller } = setup();
 		await frames(3);

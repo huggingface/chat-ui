@@ -150,6 +150,9 @@ export class StickToBottomController {
 	/** Single-jump inputs only (scrollbar mousedown, keys) — see anchorAdjust. */
 	private lastJumpGestureAt = Number.NEGATIVE_INFINITY;
 	private pointerHeld = false;
+	/** A press on content that has not moved yet — a click or the start of a
+	 * text selection, which is not scroll intent until it drags. */
+	private pressStart: { x: number; y: number } | null = null;
 	private touchHeld = false;
 	private destroyed = false;
 
@@ -175,6 +178,7 @@ export class StickToBottomController {
 		container.addEventListener("touchcancel", this.onTouchEnd, { passive: true });
 		container.addEventListener("keydown", this.onKeyDown, { passive: true });
 		container.addEventListener("mousedown", this.onMouseDown, { passive: true });
+		container.addEventListener("mousemove", this.onMouseMove, { passive: true });
 		if (typeof window !== "undefined") {
 			window.addEventListener("mouseup", this.onWindowMouseUp, { passive: true });
 		}
@@ -390,6 +394,7 @@ export class StickToBottomController {
 		c.removeEventListener("touchcancel", this.onTouchEnd);
 		c.removeEventListener("keydown", this.onKeyDown);
 		c.removeEventListener("mousedown", this.onMouseDown);
+		c.removeEventListener("mousemove", this.onMouseMove);
 		if (typeof window !== "undefined") {
 			window.removeEventListener("mouseup", this.onWindowMouseUp);
 		}
@@ -622,16 +627,35 @@ export class StickToBottomController {
 	};
 
 	private onMouseDown = (event: MouseEvent) => {
-		// A scrollbar drag lands its mousedown on the container itself; a text
-		// selection drag (which auto-scrolls) on content. Clicks on controls —
-		// the jump buttons live inside the scroller — are not scroll gestures.
+		// A scrollbar drag lands its mousedown on the container itself: scroll
+		// intent from the first pixel. A press on content is a click or the
+		// start of a text selection — not scroll intent until it drags (a
+		// selection drag auto-scrolls), so it is only remembered here; a click
+		// during a stream must not turn Safari's next clamp into a detach.
+		// Clicks on controls — the jump buttons live inside the scroller — are
+		// never scroll gestures.
 		if (event.target instanceof Element && event.target.closest("button, a")) return;
+		if (event.target === this.container) {
+			this.pointerHeld = true;
+			this.noteGesture();
+			this.lastJumpGestureAt = this.lastGestureAt;
+			return;
+		}
+		this.pressStart = { x: event.clientX, y: event.clientY };
+	};
+
+	private onMouseMove = (event: MouseEvent) => {
+		const start = this.pressStart;
+		if (!start) return;
+		if (Math.abs(event.clientX - start.x) < 4 && Math.abs(event.clientY - start.y) < 4) return;
+		// The press became a drag (a text selection): scroll intent from here.
+		this.pressStart = null;
 		this.pointerHeld = true;
 		this.noteGesture();
-		this.lastJumpGestureAt = this.lastGestureAt;
 	};
 
 	private onWindowMouseUp = () => {
+		this.pressStart = null;
 		if (!this.pointerHeld) return;
 		this.pointerHeld = false;
 		this.noteGesture();
