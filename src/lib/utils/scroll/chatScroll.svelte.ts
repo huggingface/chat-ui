@@ -7,6 +7,14 @@
  * reservation height, the composer clearance (the message column's bottom
  * padding), the scrollbar half-gutter, and the floating-button visibility.
  *
+ * Read mode: when a reply starts streaming, the view is carried to the turn's
+ * anchor position and left DETACHED there. The reply fills its reservation
+ * without moving anything, and once it outgrows the viewport the page grows
+ * below the fold while the reader keeps their place — the beginning of a fast
+ * model's answer never runs away from them. Following is a choice: scrolling
+ * down into the bottom zone or pressing the jump button engages it, and any
+ * upward scroll disengages it again (the controller's rules from there on).
+ *
  * The latch replaces the old intent machinery (armSend/armRetry, known-id
  * sets, TTLs, branch-switch suppression): the anchored turn is *derived* from
  * what is true — a reply is streaming and the trailing message is the
@@ -53,12 +61,13 @@ export class ChatScroll {
 		atBottom: true,
 		nearBottom: true,
 		scrolledUp: false,
+		gliding: false,
 		distanceFromBottom: 0,
 	});
 
-	/** Hysteresis latch: buttons never render while pinned (they would flash
-	 * during the send glide whenever the gap transiently exceeds the
-	 * threshold). */
+	/** Hysteresis latch: buttons never render while pinned or while a glide is
+	 * in flight (they would flash during the send glide, whose gap transiently
+	 * exceeds the threshold — and that glide lands detached). */
 	private buttonsVisible = $state(false);
 
 	showJumpToBottom = $derived(this.buttonsVisible);
@@ -100,6 +109,10 @@ export class ChatScroll {
 
 	private lastConversationKey: string | undefined;
 	private initialized = false;
+	/** The previous sync's streaming turn, so a stream START (null → key, or a
+	 * key change) is what carries the view to the anchor — a regenerate keeps
+	 * the turn key and must anchor all the same. */
+	private lastStreamingTurnKey: string | null = null;
 	/** Set by notifyBranchSwitch, consumed by the next sync: the switch's
 	 * structural change must drop a stale anchor, not carry it over. */
 	private pendingBranchSwitch = false;
@@ -157,9 +170,9 @@ export class ChatScroll {
 
 	/** User submitted a message (send, edit-with-content, or a preview's "ask
 	 * to fix"): sending is the request to see the exchange, so the view comes
-	 * down now — and the engaged pin carries it on to the anchor when the new
-	 * turn mounts. An upward scroll at any point revokes this (geometric
-	 * unpin), after which nothing yanks the user back. */
+	 * down now — and the engaged pin is what lets sync() carry it on to the
+	 * anchor (read mode) when the new turn mounts. An upward scroll at any
+	 * point revokes this (geometric unpin), after which nothing moves them. */
 	notifySend() {
 		this.controller?.pin(this.pinBehaviorForSend());
 	}
@@ -187,9 +200,12 @@ export class ChatScroll {
 			this.initialized = true;
 			this.lastConversationKey = conversationKey;
 			this.pendingBranchSwitch = false;
+			this.lastStreamingTurnKey = streamingTurnKey;
 			// Adopt silently: a conversation opened mid-stream (resume, or a
 			// switch back to a generating one) anchors its streaming turn with
-			// no motion beyond the reset's jump.
+			// no motion beyond the reset's jump — and keeps following, since
+			// the user arrived here by choosing the conversation, not by
+			// sending.
 			this.setAnchor(streamingTurnKey, streamingTurnKey ? turnCount - 1 : null);
 			if (!isFirstRun) this.reset();
 			return;
@@ -197,29 +213,29 @@ export class ChatScroll {
 
 		const wasBranchSwitch = this.pendingBranchSwitch;
 		this.pendingBranchSwitch = false;
+		const streamStarted =
+			streamingTurnKey !== null && streamingTurnKey !== this.lastStreamingTurnKey;
+		this.lastStreamingTurnKey = streamingTurnKey;
 
 		if (streamingTurnKey) {
 			if (streamingTurnKey !== this.anchoredTurnKey) {
-				// A reply started streaming into a turn that wasn't the anchored
-				// one: move the reservation there, and carry a still-pinned view
-				// to the anchor (one continuous motion with the send's own
-				// glide). A user who detached since submitting stays put.
-				//
-				// The pin is deferred one microtask: this runs mid-render-flush,
-				// and pinning here would force layout BEFORE the reservation's
-				// template binding lands — a regenerate's collapse would clamp
-				// against that intermediate geometry and the clamp's scroll
-				// event, measured against the final (taller) content, would read
-				// as the user scrolling up and detach them. After the flush,
-				// shrink and reservation resolve in one layout and the clamp
-				// rule holds.
 				this.setAnchor(streamingTurnKey, turnCount - 1);
-				if (this.state.pinned) {
-					const behavior = this.pinBehaviorForSend();
-					queueMicrotask(() => {
-						if (this.state.pinned) this.controller?.pin(behavior);
-					});
-				}
+			}
+			if (streamStarted && this.state.pinned) {
+				// A reply just started streaming (send, edit, regenerate) and the
+				// view is still engaged from the submit: carry it to the anchor
+				// (one continuous motion with the send's own glide) and leave it
+				// there in read mode. A user who detached since submitting stays
+				// exactly where they are.
+				//
+				// Deferred one microtask: this runs mid-render-flush, before the
+				// reservation's template binding lands — measuring the anchor
+				// here would read pre-reservation geometry, and forcing layout
+				// mid-flush lets a regenerate's collapse clamp against it.
+				const behavior = this.pinBehaviorForSend();
+				queueMicrotask(() => {
+					if (this.state.pinned) this.moveToAnchor(behavior);
+				});
 			}
 			return;
 		}
@@ -250,6 +266,38 @@ export class ChatScroll {
 				this.setAnchor(null, null);
 			}
 		}
+	}
+
+	/**
+	 * Read mode landing: the anchored turn's first message sits
+	 * ANCHOR_TOP_OFFSET_PX below the viewport top, and the view is DETACHED
+	 * there — growth past the reservation never moves it; the user re-engages
+	 * following by scrolling to the bottom or pressing the jump button. The
+	 * target is the turn's own position rather than the live bottom, so a
+	 * reply that has already outgrown its reservation still lands on its start.
+	 */
+	private moveToAnchor(behavior: "instant" | "animate") {
+		const container = this.container;
+		const controller = this.controller;
+		if (!container || !controller) return;
+		// Live: the turn's position can still shift after the mount (the
+		// pending placeholder unmounting from the previous turn, the composer
+		// settling), and a glide must land on where the turn IS, not where it
+		// was when the glide started.
+		const target = () => {
+			const group =
+				this.anchoredTurnIndex === null
+					? null
+					: (this.contentEl?.()?.children[this.anchoredTurnIndex] ?? null);
+			return group
+				? group.getBoundingClientRect().top -
+						container.getBoundingClientRect().top +
+						container.scrollTop -
+						ANCHOR_TOP_OFFSET_PX
+				: container.scrollHeight - container.clientHeight;
+		};
+		if (behavior === "animate") controller.animateTo(target);
+		else controller.scrollTo(target());
 	}
 
 	private setAnchor(key: string | null, index: number | null) {
@@ -335,7 +383,7 @@ export class ChatScroll {
 	private applyState(s: StickToBottomState) {
 		Object.assign(this.state, s);
 
-		if (s.pinned || s.distanceFromBottom <= BUTTONS_HIDE_PX) {
+		if (s.pinned || s.gliding || s.distanceFromBottom <= BUTTONS_HIDE_PX) {
 			this.buttonsVisible = false;
 		} else if (s.distanceFromBottom > BUTTONS_SHOW_PX) {
 			this.buttonsVisible = true;

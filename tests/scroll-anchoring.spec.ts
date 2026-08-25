@@ -86,7 +86,7 @@ test("send anchors the sent message and the reply fills reserved space without m
 	expect(settled.scrollTop).toBe(before.scrollTop);
 });
 
-test("scrolling up during a stream detaches: growth never moves the view again", async ({
+test("read mode past the reservation, wheel-up stays put, the jump button re-engages following", async ({
 	page,
 	seedConversation,
 	mockOpenAI,
@@ -94,7 +94,7 @@ test("scrolling up during a stream detaches: growth never moves the view again",
 	// Long enough to outgrow the reservation and keep streaming well past the
 	// measurement window below.
 	await mockOpenAI.setDefaultScenario({
-		content: Array.from({ length: 400 }, (_, i) => `token${i} `),
+		content: Array.from({ length: 700 }, (_, i) => `token${i} `),
 		chunkDelayMs: 40,
 		finishReason: "stop",
 	});
@@ -105,14 +105,46 @@ test("scrolling up during a stream detaches: growth never moves the view again",
 	await page.getByPlaceholder("Ask anything").fill("stream long");
 	await page.getByRole("button", { name: "Send message" }).click();
 
-	// Wait until the reply has outgrown its reservation (page height growing).
-	const initial = await containerGeometry(page);
+	// Wait for the anchor to land, then for the reply to outgrow its
+	// reservation by more than the jump button's threshold.
+	const sent = page.locator('[data-message-type="user"]', { hasText: "stream long" });
+	await expect
+		.poll(
+			async () => {
+				const [containerBox, sentBox] = await Promise.all([
+					page.locator(CONTAINER).boundingBox(),
+					sent.boundingBox(),
+				]);
+				if (!containerBox || !sentBox) return Number.NaN;
+				return Math.abs(sentBox.y - containerBox.y - ANCHOR_OFFSET_PX);
+			},
+			{ timeout: 5000, message: "sent message reaches the anchor offset" }
+		)
+		.toBeLessThanOrEqual(2);
+	// Let the glide's final sub-pixel tick land before taking the baseline.
+	let landed = await containerGeometry(page);
+	await expect
+		.poll(
+			async () => {
+				const now = await containerGeometry(page);
+				const stable = now.scrollTop === landed.scrollTop;
+				landed = now;
+				return stable;
+			},
+			{ timeout: 5000, intervals: [150], message: "anchor glide settled" }
+		)
+		.toBe(true);
+	const initial = landed;
 	await expect
 		.poll(async () => (await containerGeometry(page)).scrollHeight, {
 			timeout: 15_000,
 			message: "reply outgrows the reservation",
 		})
-		.toBeGreaterThan(initial.scrollHeight);
+		.toBeGreaterThan(initial.scrollHeight + 300);
+	// Read mode: the page grew below the fold but the view did not move — the
+	// beginning of the reply is still where the reader left it.
+	const afterOutgrow = await containerGeometry(page);
+	expect(afterOutgrow.scrollTop).toBe(initial.scrollTop);
 
 	// Scroll up the way a user does — a real wheel gesture over the
 	// conversation. (A bare scrollTop write is what the browser's own
@@ -121,8 +153,8 @@ test("scrolling up during a stream detaches: growth never moves the view again",
 	const box = await page.locator(CONTAINER).boundingBox();
 	if (!box) throw new Error("scroll container has no box");
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-	await page.mouse.wheel(0, -400);
 	const beforeWheel = (await containerGeometry(page)).scrollTop;
+	await page.mouse.wheel(0, -400);
 	let settled = await containerGeometry(page);
 	await expect
 		.poll(
@@ -142,7 +174,7 @@ test("scrolling up during a stream detaches: growth never moves the view again",
 	expect(later.scrollTop).toBe(detached.scrollTop); // the view is the user's
 	// The window really sat mid-stream: the final token had not rendered yet…
 	const rendered = await page.locator('[data-message-role="assistant"]').last().textContent();
-	expect(rendered ?? "").not.toContain("token399");
+	expect(rendered ?? "").not.toContain("token699");
 	// …and the growth that arrived meanwhile never moved the detached view.
 	expect(later.scrollHeight).toBeGreaterThan(detached.scrollHeight);
 

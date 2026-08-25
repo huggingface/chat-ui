@@ -7,6 +7,7 @@ import {
 	dragScrollbarTo,
 	frame,
 	frames,
+	nextTask,
 	startClsProbe,
 	waitFor,
 	wheel,
@@ -185,15 +186,17 @@ function topOf(el: Element, chat: ChatFixture): number {
 }
 
 describe("send anchoring", () => {
-	it("anchors the sent message ~50px below the viewport top", async () => {
+	it("anchors the sent message ~50px below the viewport top, landing in read mode", async () => {
 		const chat = createChat();
 		chat.chat.notifySend();
 		const { user } = chat.mountPair();
 		await waitFor(() => Math.abs(topOf(user, chat) - ANCHOR_OFFSET) <= 2, {
 			label: "user message glides to the anchor offset",
 		});
-		expect(chat.fixture.distance()).toBeLessThanOrEqual(ARRIVED); // pinned at bottom
+		expect(chat.fixture.distance()).toBeLessThanOrEqual(ARRIVED); // the anchor IS the bottom while filling
 		expect(chat.lastGroupMinHeight()).toBe(`${RESERVATION}px`);
+		// Detached: following is the reader's choice from here on.
+		expect(chat.chat.state.pinned).toBe(false);
 	});
 
 	it("fill phase: constant scrollHeight, zero scroll movement, zero layout shift", async () => {
@@ -218,23 +221,73 @@ describe("send anchoring", () => {
 		probe.stop();
 	});
 
-	it("hands off seamlessly from fill to follow when the reply outgrows the reservation", async () => {
+	it("read mode: a reply outgrowing its reservation never moves the view; the jump button appears", async () => {
 		const chat = createChat();
 		chat.chat.notifySend();
 		const { assistant } = chat.mountPair();
 		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
-		let maxFrameJump = 0;
-		let prevTop = chat.fixture.scrollTop();
+		await frames(3);
+		const scrollTop = chat.fixture.scrollTop();
 		for (let i = 0; i < 60; i++) {
 			assistant.style.height = `${parseFloat(assistant.style.height) + 10}px`;
 			await frame();
-			const top = chat.fixture.scrollTop();
-			maxFrameJump = Math.max(maxFrameJump, Math.abs(top - prevTop));
-			expect(top).toBeGreaterThanOrEqual(prevTop); // never scrolls backward
-			prevTop = top;
+			expect(chat.fixture.scrollTop()).toBe(scrollTop);
 		}
-		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "follows to bottom" });
-		expect(maxFrameJump).toBeLessThan(80); // motion tracks growth, no teleports
+		await frames(3);
+		expect(chat.fixture.scrollTop()).toBe(scrollTop);
+		expect(chat.fixture.distance()).toBeGreaterThan(200);
+		expect(chat.chat.state.pinned).toBe(false);
+		expect(chat.chat.showJumpToBottom).toBe(true);
+	});
+
+	it("scrolling down to the bottom during read mode engages following", async () => {
+		const chat = createChat();
+		chat.chat.notifySend();
+		const { assistant } = chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
+		assistant.style.height = "400px"; // outgrew the reservation
+		await frames(3);
+		expect(chat.chat.state.pinned).toBe(false);
+		await nextTask();
+		dragScrollbarTo(chat.fixture.container, chat.fixture.maxScrollTop());
+		await frame();
+		expect(chat.chat.state.pinned).toBe(true);
+		assistant.style.height = "700px";
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "follows again" });
+	});
+
+	it("the jump button engages following during read mode", async () => {
+		const chat = createChat();
+		chat.chat.notifySend();
+		const { assistant } = chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
+		assistant.style.height = "500px";
+		await frames(3);
+		expect(chat.chat.showJumpToBottom).toBe(true);
+		chat.chat.scrollToBottom();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "jump lands on the bottom" });
+		expect(chat.chat.state.pinned).toBe(true);
+		assistant.style.height = "800px";
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "keeps following" });
+	});
+
+	it("a new send resets to read mode even when the user was following", async () => {
+		const chat = createChat();
+		chat.chat.notifySend();
+		const first = chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
+		first.assistant.style.height = "500px";
+		await frames(3);
+		chat.chat.scrollToBottom();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "following" });
+		expect(chat.chat.state.pinned).toBe(true);
+		chat.settleLast();
+		chat.chat.notifySend();
+		const second = chat.mountPair();
+		await waitFor(() => Math.abs(topOf(second.user, chat) - ANCHOR_OFFSET) <= 2, {
+			label: "new exchange anchors",
+		});
+		expect(chat.chat.state.pinned).toBe(false);
 	});
 
 	it("the first exchange anchors like any other turn", async () => {
@@ -277,10 +330,10 @@ describe("send anchoring", () => {
 		expect(chat.lastGroupMinHeight()).toBe(`${RESERVATION}px`);
 		expect(chat.fixture.container.scrollHeight).toBe(scrollHeight);
 		expect(chat.fixture.scrollTop()).toBe(scrollTop);
-		expect(chat.chat.state.pinned).toBe(true);
+		expect(chat.chat.state.pinned).toBe(false); // read mode, untouched by the swap
 	});
 
-	it("send re-attaches a detached reader (sending is the request to see the exchange)", async () => {
+	it("send carries a detached reader to the new exchange (sending is the request to see it)", async () => {
 		const chat = createChat({ turns: 5 });
 		wheel(chat.fixture.container, -600);
 		await frame();
@@ -290,7 +343,7 @@ describe("send anchoring", () => {
 		await waitFor(() => Math.abs(topOf(user, chat) - ANCHOR_OFFSET) <= 2, {
 			label: "carried down to the new exchange",
 		});
-		expect(chat.chat.state.pinned).toBe(true);
+		expect(chat.chat.state.pinned).toBe(false); // read mode on arrival
 	});
 
 	it("scrolling up while a send is in flight revokes its pin but keeps the reservation", async () => {
@@ -326,7 +379,22 @@ describe("send anchoring", () => {
 		chat.chat.notifySend();
 		const { user } = chat.mountPair(40, { empty: false });
 		await waitFor(() => Math.abs(topOf(user, chat) - ANCHOR_OFFSET) <= 2, { label: "anchored" });
-		expect(chat.chat.state.pinned).toBe(true);
+		expect(chat.chat.state.pinned).toBe(false);
+	});
+
+	it("a send glide never shows the jump button, even though it lands detached", async () => {
+		const chat = createChat({ turns: 8 });
+		dragScrollbarTo(chat.fixture.container, 0);
+		await frame();
+		chat.chat.notifySend();
+		chat.mountPair();
+		let sawButton = false;
+		while (chat.fixture.distance() > ARRIVED) {
+			sawButton ||= chat.chat.showJumpToBottom;
+			await frame();
+		}
+		expect(sawButton).toBe(false);
+		expect(chat.chat.state.pinned).toBe(false);
 	});
 });
 
@@ -344,11 +412,11 @@ describe("regenerate & branches", () => {
 		expect(chat.lastGroupMinHeight()).toBe(`${RESERVATION}px`);
 	});
 
-	it("regenerate at the bottom re-anchors the turn", async () => {
+	it("regenerate at the bottom re-anchors the turn, in read mode", async () => {
 		const chat = createChat({ turns: 5 });
 		chat.swapAssistant();
 		await frames(3);
-		expect(chat.chat.state.pinned).toBe(true);
+		expect(chat.chat.state.pinned).toBe(false);
 		const userEl = chat.fixture.container.querySelector('[data-message-id="u5"]');
 		expect(userEl).not.toBeNull();
 		await waitFor(
@@ -371,7 +439,7 @@ describe("regenerate & branches", () => {
 		await frames(4);
 		expect(chat.fixture.container.scrollHeight).toBe(scrollHeight);
 		expect(chat.fixture.scrollTop()).toBe(scrollTop);
-		expect(chat.chat.state.pinned).toBe(true);
+		expect(chat.chat.state.pinned).toBe(false);
 	});
 
 	it("cycling alternatives of the anchored turn keeps its reservation (stable comparison box)", async () => {
@@ -509,9 +577,10 @@ describe("conversation switch", () => {
 		});
 	});
 
-	it("adopts a mid-stream conversation's anchor on open, with no animation", async () => {
+	it("adopts a mid-stream conversation's anchor on open, following (no read mode on open)", async () => {
 		const chat = createChat({ turns: 2, firstSyncLoading: true, lastTerminal: false });
 		expect(chat.chat.anchoredTurnKey).toBe("u2");
+		expect(chat.chat.state.pinned).toBe(true);
 		await frames(3);
 		expect(chat.lastGroupMinHeight()).toBe(`${RESERVATION}px`);
 		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "at the bottom" });
