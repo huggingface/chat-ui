@@ -40,6 +40,13 @@ export function installGithubFetch(responder: Responder): GithubFetchMock {
 		const url = input instanceof Request ? input.url : String(input);
 		if (!url.startsWith(API_ROOT)) return previous(input, init);
 
+		// Real fetch rejects on an aborted signal rather than answering. Without this
+		// a test asserting that cancellation propagates would pass against a mock that
+		// silently ignored the signal.
+		if (init?.signal?.aborted) {
+			throw Object.assign(new Error("This operation was aborted"), { name: "AbortError" });
+		}
+
 		const headers: Record<string, string> = {};
 		for (const [key, value] of Object.entries((init?.headers ?? {}) as Record<string, string>)) {
 			headers[key.toLowerCase()] = value;

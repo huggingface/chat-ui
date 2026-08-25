@@ -47,10 +47,6 @@ const HANDLERS: Record<
 	[GITHUB_READ_FILE]: readFile,
 };
 
-export function isGithubToolName(name: string): boolean {
-	return Object.hasOwn(HANDLERS, name);
-}
-
 /**
  * Stateless, side-effect-free, idempotent reads. No session, no user identity,
  * nothing to approve — which is what makes them safe to run unattended.

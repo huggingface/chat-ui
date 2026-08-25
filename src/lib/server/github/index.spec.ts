@@ -9,7 +9,6 @@ import {
 	GITHUB_LIST_REPOS,
 	GITHUB_READ_FILE,
 	githubTools,
-	isGithubToolName,
 	runGithubTool,
 } from "./index";
 import { installGithubFetch, type GithubFetchMock } from "./__fixtures__/mockFetch";
@@ -65,16 +64,6 @@ describe("githubTools", () => {
 	it("marks only `repo` required on find_examples, so a keyword is optional", () => {
 		const tool = githubTools().find((t) => t.function.name === GITHUB_FIND_EXAMPLES);
 		expect(tool?.function.parameters.required).toEqual(["repo"]);
-	});
-});
-
-describe("isGithubToolName", () => {
-	it("recognises the three tools and nothing else", () => {
-		expect(isGithubToolName(GITHUB_FIND_EXAMPLES)).toBe(true);
-		expect(isGithubToolName(GITHUB_READ_FILE)).toBe(true);
-		expect(isGithubToolName(GITHUB_LIST_REPOS)).toBe(true);
-		expect(isGithubToolName("hf_jobs")).toBe(false);
-		expect(isGithubToolName("toString")).toBe(false);
 	});
 });
 
