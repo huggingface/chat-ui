@@ -1,6 +1,9 @@
 import type { OpenAiTool } from "$lib/server/mcp/tools";
 import type { BuiltinTool } from "../builtinTools/types";
-import { ML_ASSISTANT_TOOL_DOCTRINE } from "$lib/server/mlAssistantPrompt";
+import {
+	ML_ASSISTANT_TOOL_DOCTRINE,
+	mlAssistantToolDoctrineBlocks,
+} from "$lib/server/mlAssistantPrompt";
 
 export function buildToolPreprompt(
 	tools: OpenAiTool[],
@@ -70,5 +73,8 @@ export function buildToolPreprompt(
 		`Default to image references; only use a full http(s) URL when the tool description explicitly asks for one, or reuse a URL a previous tool returned.`,
 	].join(" ");
 
-	return general;
+	// Blocks, not sentences: a tool contract is a list the model reads down before
+	// acting, so it keeps its own paragraphs instead of being flattened into the
+	// run of general guidance. Empty outside the mode, where the join is a no-op.
+	return [general, ...(mlAssistant ? mlAssistantToolDoctrineBlocks(names) : [])].join("\n\n");
 }

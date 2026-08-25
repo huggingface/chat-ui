@@ -160,6 +160,38 @@ export function mlAssistantSessionContext({
 }
 
 /**
+ * Doctrine that belongs beside one tool rather than in the prompt: it is sent
+ * only when that tool is actually on offer, so a run without it never reads a
+ * contract for a thing it cannot do.
+ *
+ * These are MCP tools served by hf.co/mcp, whose descriptions we do not own and
+ * deliberately do not rewrite — the text below is ours, the schema stays theirs.
+ * The rules here restate ones the prompt already carries. That is the point:
+ * they are restated at the surface where they get violated.
+ */
+const HF_JOBS_CONTRACT = `RUNNING JOBS (hf_jobs): a job is remote compute with ephemeral storage, a wall-clock limit, and per-minute billing against the user's credits. These lines go on the pre-flight list you print before submitting, and every one of them has to be true. The list is printed so the user can stop you before the credits are spent, not after.
+
+- Token. Pushing to the Hub from inside a job needs the token passed in explicitly as a secret (HF_TOKEN). Leave it out and the run trains for an hour and then fails at the push, which is the most expensive mistake available here.
+- Hardware. The default flavor is cpu-basic: two CPU cores. A training job that does not name a GPU flavor does not fail, it crawls. Name the flavor.
+- Timeout. Set it above your estimate of the run, not at it. A timeout shorter than the run loses the run at the end.
+- Dependencies. State them explicitly, pinned — with the uv --with arguments or an image that already has them. Never build flash-attention from source in a job; it eats the budget and usually fails.
+- Destination. push_to_hub with an explicit hub_model_id in the namespace from the session context, or a mounted bucket volume for checkpoints. Nothing written to the container's own disk survives the job.
+- Data. Mount a large dataset as a volume rather than downloading it into the container.
+- Size. Smoke-test the same script for a handful of steps on the smallest GPU that fits, then launch the real run. Submit one job before you fan out.
+
+Picking hardware: t4-small for smoke tests and small models, a10g-small or a10g-large for a small finetune, a100-large for real training, multi-GPU above that. Prices change — read hf://docs/hub/jobs-pricing.md rather than quoting a rate from memory, and tell the user the hourly rate and your estimated wall-clock before you spend their credits.
+
+After submitting, report the job id and its URL, then follow it with the logs operation. A submitted job is not a finished one, and a job that failed says why in its logs — read them before you change anything.`;
+
+const HF_FS_WRITE_RULES = `WRITING TO THE HUB (hf_fs_write): read a file before you overwrite it, and pass the parent commit SHA you read it at, so a concurrent change fails loudly instead of being silently clobbered. Write to a repo in your own namespace, or propose the change as a PR — do not commit to someone else's main branch. Deletes are not recoverable: say what you are removing and why before you remove it.`;
+
+/** Keyed by tool name as the model sees it in the schema. */
+const TOOL_DOCTRINE: ReadonlyArray<{ tool: string; text: string }> = [
+	{ tool: "hf_jobs", text: HF_JOBS_CONTRACT },
+	{ tool: "hf_fs_write", text: HF_FS_WRITE_RULES },
+];
+
+/**
  * The doctrine paragraphs the mode swaps into the tool preprompt, in place of
  * the generic restraint, search and grounding text. Assembled by
  * `buildToolPreprompt` rather than here, so that everything else it sends —
@@ -176,3 +208,8 @@ export const ML_ASSISTANT_TOOL_DOCTRINE = {
 
 	largeResults: `WHEN RESULTS ARE LARGE: Job logs, dataset previews and file listings can be long. Read them, then carry forward the part that matters — the failing line, the column names, the final metric — instead of restating the whole output back to the user.`,
 } as const;
+
+/** The contracts for whichever of these tools this run actually has. */
+export function mlAssistantToolDoctrineBlocks(toolNames: string[]): string[] {
+	return TOOL_DOCTRINE.filter(({ tool }) => toolNames.includes(tool)).map(({ text }) => text);
+}

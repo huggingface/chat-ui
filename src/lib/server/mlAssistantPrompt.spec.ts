@@ -72,6 +72,45 @@ describe("ML Assistant preprompt", () => {
 	});
 });
 
+describe("ML Assistant tool-keyed doctrine", () => {
+	it("sends the job contract only to a run that can submit jobs", () => {
+		// It restates rules the preset prompt already carries, deliberately, at the
+		// surface they get violated at — but a run without the tool would be
+		// reading a contract for something it cannot do.
+		expect(inMode([tool("hf_jobs")])).toContain("RUNNING JOBS (hf_jobs):");
+		expect(inMode([tool("hf_fs")])).not.toContain("RUNNING JOBS");
+	});
+
+	it("states the three that cost a whole run", () => {
+		const jobs = inMode([tool("hf_jobs")]);
+
+		// Each of these fails late or silently: no token means the push fails after
+		// the training, no flavor means it trains on two CPU cores, and a short
+		// timeout kills the run at the end.
+		expect(jobs).toContain("HF_TOKEN");
+		expect(jobs).toContain("cpu-basic");
+		expect(jobs).toContain("Timeout.");
+		expect(jobs).toContain("push_to_hub");
+	});
+
+	it("points at the pricing doc instead of quoting rates", () => {
+		// A price table in a prompt goes stale silently; a pointer does not.
+		expect(inMode([tool("hf_jobs")])).toContain("hf://docs/hub/jobs-pricing.md");
+	});
+
+	it("sends the write rules only to a run that can write", () => {
+		expect(inMode([tool("hf_fs_write")])).toContain("WRITING TO THE HUB (hf_fs_write):");
+		expect(inMode([tool("hf_fs")])).not.toContain("WRITING TO THE HUB");
+	});
+
+	it("keeps each block on its own paragraph", () => {
+		// They are lists the model reads down before acting, not sentences in the
+		// run of general guidance.
+		const both = inMode([tool("hf_jobs"), tool("hf_fs_write")]);
+		expect(both.split("\n\n").length).toBeGreaterThan(2);
+	});
+});
+
 describe("ML Assistant system message size", () => {
 	it("stays under the ceiling it is re-sent at", () => {
 		// The preset's tool preprompt, prompt and the artifacts prompt it
@@ -82,10 +121,11 @@ describe("ML Assistant system message size", () => {
 		//
 		// Counted with one builtin's guidance in it. The GitHub grounding tools add
 		// their own on top when a GITHUB_TOKEN is configured, which is the headroom
-		// between this and the ceiling.
+		// between this and the ceiling. Raised once, from 18k, for the hf_jobs
+		// submission contract.
 		const composed = [
 			buildToolPreprompt(
-				[...HF_TOOLS, tool("ask_user_question")],
+				[...HF_TOOLS, tool("hf_fs_write"), tool("ask_user_question")],
 				undefined,
 				[askUserQuestionBuiltin],
 				{ mlAssistant: true }
@@ -94,7 +134,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(18_000);
+		expect(composed.length).toBeLessThan(19_000);
 	});
 });
 
