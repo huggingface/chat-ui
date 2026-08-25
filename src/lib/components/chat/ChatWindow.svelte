@@ -357,7 +357,7 @@
 	// Turn grouping: a user message starts a turn, following assistant messages
 	// join it (plus a headless leading turn for edge shapes). Each turn renders
 	// as one group so the anchored turn's reservation is a single CSS
-	// min-height — see docs/scroll/foundations/turn-reservation.md. Reads only
+	// min-height. Reads only
 	// ids/from, so token flushes never regroup.
 	let turns = $derived.by(() => {
 		const groups: { key: string; messages: Message[] }[] = [];
