@@ -18,9 +18,16 @@ import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 /**
  * MCP servers always available in the mode. Merged over the user's selection by
  * name, so a same-named entry of theirs cannot shadow one of these.
+ *
+ * The `?login` endpoint, not the bare one: `isStrictHfMcpLogin` matches on the
+ * exact URL, and it is what gates both the user's HF token being forwarded to
+ * the server and the login control on the server card. Without it the mode's
+ * Hub tools run anonymously — no whoami, no jobs, no writes — and because the
+ * preset wins the name collision, it would override the correctly configured
+ * entry that prod and dev already ship rather than merely getting itself wrong.
  */
 export const ML_ASSISTANT_MCP_SERVERS: McpServerConfig[] = [
-	{ name: "Hugging Face", url: "https://hf.co/mcp" },
+	{ name: "Hugging Face", url: "https://hf.co/mcp?login" },
 ];
 
 /**

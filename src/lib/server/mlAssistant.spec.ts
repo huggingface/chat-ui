@@ -5,6 +5,7 @@ import {
 	withMlAssistantServers,
 } from "./mlAssistant";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+import { isStrictHfMcpLogin } from "./mcp/hf";
 
 describe("ML Assistant preset", () => {
 	it("marks a conversation only when the build ships the mode", () => {
@@ -52,6 +53,15 @@ describe("ML Assistant preset", () => {
 
 		expect(merged[0].name).toBe(preset.name);
 		expect(merged[0].url).toBe(preset.url);
+	});
+
+	it("points at the HF endpoint that can authenticate", () => {
+		// The bare https://hf.co/mcp never gets the user's token forwarded and offers
+		// no login control, so the mode's Hub tools would run anonymously. It is
+		// worse than a local mistake: the preset wins the name collision, so it
+		// would replace the ?login entry prod and dev already configure.
+		const hf = ML_ASSISTANT_MCP_SERVERS.find((server) => server.url.includes("hf.co"));
+		expect(hf && isStrictHfMcpLogin(hf.url)).toBe(true);
 	});
 
 	it("adds the preset even when nothing was selected", () => {
