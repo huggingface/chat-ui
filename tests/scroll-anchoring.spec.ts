@@ -144,7 +144,7 @@ test("read mode past the reservation, wheel-up stays put, the jump button re-eng
 	// Read mode: the page grew below the fold but the view did not move — the
 	// beginning of the reply is still where the reader left it.
 	const afterOutgrow = await containerGeometry(page);
-	expect(afterOutgrow.scrollTop).toBe(initial.scrollTop);
+	expect(Math.abs(afterOutgrow.scrollTop - initial.scrollTop)).toBeLessThanOrEqual(2); // sub-pixel rounding
 
 	// Scroll up the way a user does — a real wheel gesture over the
 	// conversation. (A bare scrollTop write is what the browser's own

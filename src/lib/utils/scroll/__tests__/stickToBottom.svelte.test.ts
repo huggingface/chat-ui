@@ -349,7 +349,7 @@ describe("browser-initiated movement (no gesture)", () => {
 		expect(controller.pinned).toBe(false);
 	});
 
-	it("a glide in flight is not teleported by a browser-initiated move", async () => {
+	it("a browser-initiated move during a following glide lands it at the bottom at once", async () => {
 		const { fixture, controller } = setup();
 		fixture.addBlock(1200);
 		await waitFor(() => fixture.distance() <= ARRIVED, { label: "settle tall fixture" });
@@ -363,11 +363,11 @@ describe("browser-initiated movement (no gesture)", () => {
 		const mid = fixture.scrollTop();
 		browserScrollTo(fixture.container, mid - 30);
 		await frames(2);
-		// Still pinned, and the spring simply carried on toward the bottom —
-		// no instant jump to the end.
+		// Still pinned; rather than nursing the spring through a stream's
+		// per-token clamps (Safari), the move is answered by landing at the
+		// bottom immediately.
 		expect(controller.pinned).toBe(true);
-		expect(fixture.distance()).toBeGreaterThan(ARRIVED);
-		await waitFor(() => fixture.distance() <= ARRIVED, { label: "glide completes" });
+		expect(fixture.distance()).toBeLessThanOrEqual(ARRIVED);
 	});
 });
 

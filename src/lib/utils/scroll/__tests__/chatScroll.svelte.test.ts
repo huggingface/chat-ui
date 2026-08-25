@@ -8,6 +8,7 @@ import {
 	frame,
 	frames,
 	nextTask,
+	pressKey,
 	startClsProbe,
 	waitFor,
 	wheel,
@@ -254,6 +255,20 @@ describe("send anchoring", () => {
 		expect(chat.chat.state.pinned).toBe(true);
 		assistant.style.height = "700px";
 		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "follows again" });
+	});
+
+	it("the End key engages following during read mode (a single-jump input after growth)", async () => {
+		const chat = createChat();
+		chat.chat.notifySend();
+		const { assistant } = chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
+		assistant.style.height = "400px"; // outgrew the reservation; baselines now stale
+		await frames(3);
+		expect(chat.chat.state.pinned).toBe(false);
+		await nextTask();
+		pressKey(chat.fixture.container, "End");
+		await frame();
+		expect(chat.chat.state.pinned).toBe(true);
 	});
 
 	it("the jump button engages following during read mode", async () => {
