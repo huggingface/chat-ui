@@ -26,6 +26,7 @@ describe("ML Assistant preprompt", () => {
 	it("keeps every section that carries a rule", () => {
 		for (const heading of [
 			"# Your knowledge of the HF libraries is outdated",
+			"# Reading a paper you are about to implement",
 			"# Mistakes you WILL make without checking",
 			"# Before you propose a training or evaluation run",
 			"# Audit the data before you use it",
@@ -98,6 +99,34 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(inMode([tool("hf_jobs")])).toContain("hf://docs/hub/jobs-pricing.md");
 	});
 
+	it("reasons about hardware in cost to finish, not cost per hour", () => {
+		// Every job in the first real run went to the cheapest flavor, because the
+		// doctrine said "smallest" and never said "how long". Cheapest per hour is
+		// not cheapest per job when a faster GPU finishes in a third of the time.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("cost to FINISH");
+		expect(jobs).toContain("ask_user_question");
+		expect(jobs).toContain("hf://docs/hub/jobs-pricing.md");
+	});
+
+	it("sends paper-finding rules with the filesystem tool", () => {
+		// It searched for a paper by title with hub_repo_search — a repo search —
+		// twice, and concluded nothing was there.
+		const fs = inMode([tool("hf_fs")]);
+
+		expect(fs).toContain("papers live at hf://papers");
+		expect(fs).toContain("hub_repo_search searches REPOSITORIES");
+		expect(inMode([tool("hf_jobs")])).not.toContain("papers live at hf://papers");
+	});
+
+	it("guides web search only where web search exists", () => {
+		// The mode replaces the generic tool preprompt, SEARCH paragraph included,
+		// so a deployment with Exa configured would otherwise get none.
+		expect(inMode([tool("web_search_exa")])).toContain("SEARCHING THE WEB");
+		expect(inMode([tool("hf_fs")])).not.toContain("SEARCHING THE WEB");
+	});
+
 	it("sends the write rules only to a run that can write", () => {
 		expect(inMode([tool("hf_fs_write")])).toContain("WRITING TO THE HUB (hf_fs_write):");
 		expect(inMode([tool("hf_fs")])).not.toContain("WRITING TO THE HUB");
@@ -119,13 +148,26 @@ describe("ML Assistant system message size", () => {
 		// ceiling, not a measurement: growing past it should be a decision someone
 		// makes here, not something that happens a paragraph at a time.
 		//
-		// Counted with one builtin's guidance in it. The GitHub grounding tools add
-		// their own on top when a GITHUB_TOKEN is configured, which is the headroom
-		// between this and the ceiling. Raised once, from 18k, for the hf_jobs
-		// submission contract.
+		// Counted with one builtin's guidance in it; the GitHub grounding tools add
+		// their own when a GITHUB_TOKEN is configured.
+		//
+		// Raised twice, deliberately, and the reasons are the point of keeping it:
+		// 18k -> 19k for the hf_jobs submission contract, 19k -> 22k for the
+		// citation hop, the paper-finding rules, the web-search block and
+		// cost-to-finish hardware reasoning. Measured at ~20.3k.
 		const composed = [
 			buildToolPreprompt(
-				[...HF_TOOLS, tool("hf_fs_write"), tool("ask_user_question")],
+				// The worst case, not a typical one: every preset tool plus the web
+				// search a configured deployment adds. A ceiling measured against a
+				// smaller set is a ceiling that does not bind.
+				[
+					...HF_TOOLS,
+					tool("hf_fs_write"),
+					tool("ask_user_question"),
+					tool("update_plan"),
+					tool("github_find_examples"),
+					tool("web_search_exa"),
+				],
 				undefined,
 				[askUserQuestionBuiltin],
 				{ mlAssistant: true }
@@ -134,7 +176,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(19_000);
+		expect(composed.length).toBeLessThan(22_000);
 	});
 });
 
