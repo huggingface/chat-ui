@@ -29,6 +29,12 @@ export interface BuiltinToolContext {
 	generationId?: string;
 	/** Absent when there is no chat to prompt (no elicitation context for the run). */
 	elicitationSink?: ElicitationSink;
+	/**
+	 * Cancelled when the user aborts the generation. Only matters to a builtin that
+	 * does I/O — the first two parked or wrote and returned — but without it a tool
+	 * making a 30s network call keeps going long after its result is discarded.
+	 */
+	abortSignal?: AbortSignal;
 }
 
 /**

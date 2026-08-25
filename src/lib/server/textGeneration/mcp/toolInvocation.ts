@@ -306,6 +306,7 @@ export async function* executeToolCalls({
 					messageId: elicitation?.messageId,
 					generationId: elicitation?.generationId,
 					elicitationSink,
+					abortSignal,
 				});
 
 				if ("awaitingInput" in outcome) {

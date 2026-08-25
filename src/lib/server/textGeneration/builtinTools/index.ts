@@ -1,6 +1,7 @@
 import type { Conversation } from "$lib/types/Conversation";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { askUserQuestionBuiltin } from "./askUserQuestion";
+import { githubGroundingBuiltins } from "./githubGrounding";
 import { createPlanTool } from "./planTool";
 import type { BuiltinTool } from "./types";
 
@@ -17,7 +18,10 @@ export function getEnabledBuiltinTools(params: {
 	conv: Pick<Conversation, "_id" | "plan" | "mlAssistant">;
 }): BuiltinTool[] {
 	if (!isMlAssistantConversation(params.conv)) return [];
-	return [askUserQuestionBuiltin, createPlanTool(params.conv)];
+	// The GitHub tools carry a second condition of their own — they withhold
+	// themselves without a GITHUB_TOKEN — which is still policy, so it lives with
+	// them rather than leaking a config read into this list.
+	return [askUserQuestionBuiltin, createPlanTool(params.conv), ...githubGroundingBuiltins()];
 }
 
 /**
