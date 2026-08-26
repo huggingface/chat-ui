@@ -116,6 +116,7 @@ describe("registration", () => {
 		).toEqual([
 			"ask_user_question",
 			"update_plan",
+			"wait",
 			"github_list_repos",
 			"github_find_examples",
 			"github_read_file",
@@ -132,6 +133,6 @@ describe("registration", () => {
 			getEnabledBuiltinTools({ conv: { _id: new ObjectId(), mlAssistant: true } }).map(
 				(t) => t.name
 			)
-		).toEqual(["ask_user_question", "update_plan"]);
+		).toEqual(["ask_user_question", "update_plan", "wait"]);
 	});
 });

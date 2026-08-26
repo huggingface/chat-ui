@@ -8,12 +8,11 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import {
+	MessageToolUpdateType,
 	MessageUpdateStatus,
 	MessageUpdateType,
 	MessageElicitationUpdateType,
-	MessageReasoningUpdateType,
 	type MessageUpdate,
-	type MessageStreamUpdate,
 } from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
@@ -28,6 +27,8 @@ import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
+import { compressUpdatesForStorage } from "$lib/server/generation/compressUpdates";
+import { applyUpdateToMessage } from "$lib/server/generation/applyUpdate";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
 import { clampStoppedContent } from "$lib/server/stopTruncation";
@@ -41,24 +42,6 @@ import { applyConversationSettings } from "$lib/server/conversationSettings";
 // would lose the stop. Aborted generations consume their marker on shutdown,
 // so markers normally live far shorter than this.
 const STOP_MARKER_GRACE_MS = 5_000;
-
-// Shape a message's updates for storage: drop keepalives and replace each stream token
-// with a length marker (content is stored separately), preserving ordering without
-// duplicating text. Shared by the full save and the writer's incremental materialise so
-// both persist the same thing under materializedSeq.
-function compressUpdatesForStorage(updates: Message["updates"]): Message["updates"] {
-	return (
-		updates
-			?.filter(
-				(u) => !(u.type === MessageUpdateType.Status && u.status === MessageUpdateStatus.KeepAlive)
-			)
-			.map((u) => {
-				if (u.type !== MessageUpdateType.Stream) return u;
-				const len = u.len ?? (u.token ?? "").length;
-				return { type: MessageUpdateType.Stream, token: "", len } satisfies MessageStreamUpdate;
-			}) ?? []
-	);
-}
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -491,6 +474,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			generationWriter = writer;
 
 			let finalAnswerReceived = false;
+			// A turn can end having produced no text and still have done something —
+			// a tool call that parked the turn is the case that matters. Without this
+			// the no-output guard below calls that an error and persists it as one.
+			let sawToolCall = false;
 			let abortedByUser = false;
 			let finishedStatusSent = false;
 
@@ -514,12 +501,31 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					finishedStatusSent = true;
 				}
 
-				// Add token to content or skip if empty
-				if (event.type === MessageUpdateType.Stream) {
-					if (event.token === "") return;
-					messageToWriteTo.content += event.token;
+				if (event.type === MessageUpdateType.Tool && event.subtype === MessageToolUpdateType.Call) {
+					sawToolCall = true;
+				}
 
-					if (metricsEnabled && metrics) {
+				// Add token to content or skip if empty
+				const applied = applyUpdateToMessage(event, {
+					message: messageToWriteTo,
+					conv,
+					initialContent: initialMessageContent,
+					isRouterModel: Boolean(model?.isRouter),
+				});
+				// An empty stream token is not an event: it reaches neither the log,
+				// the client, nor the message.
+				if (applied.skipped) return;
+
+				if (applied.titleChanged) {
+					await collections.conversations.updateOne(
+						{ _id: convId },
+						{ $set: { title: conv?.title, updatedAt: new Date() } }
+					);
+				}
+				if (applied.finalAnswerReceived) finalAnswerReceived = true;
+
+				if (metricsEnabled && metrics) {
+					if (event.type === MessageUpdateType.Stream) {
 						const now = Date.now();
 						metrics.model.tokenCountTotal.inc(metricsLabels);
 
@@ -532,115 +538,18 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							? lastTokenTimestamp.getTime()
 							: promptedAt.getTime();
 						metrics.model.timePerOutputToken.observe(metricsLabels, now - previousTimestamp);
+						lastTokenTimestamp = new Date();
+					} else if (event.type === MessageUpdateType.FinalAnswer) {
+						metrics.model.latency.observe(metricsLabels, Date.now() - promptedAt.getTime());
 					}
-
+				} else if (event.type === MessageUpdateType.Stream) {
 					lastTokenTimestamp = new Date();
 				}
 
-				// Append reasoning stream tokens to message.reasoning (server-side)
-				else if (
-					event.type === MessageUpdateType.Reasoning &&
-					event.subtype === MessageReasoningUpdateType.Stream &&
-					"token" in event
-				) {
-					messageToWriteTo.reasoning ??= "";
-					messageToWriteTo.reasoning += event.token;
-				}
-
-				// Set the title
-				else if (event.type === MessageUpdateType.Title) {
-					// Always strip <think> markers from titles when saving
-					const sanitizedTitle = event.title.replace(/<\/?think>/gi, "").trim();
-					conv.title = sanitizedTitle;
-					await collections.conversations.updateOne(
-						{ _id: convId },
-						{ $set: { title: conv?.title, updatedAt: new Date() } }
-					);
-				}
-
-				// Set the final text and the interrupted flag
-				else if (event.type === MessageUpdateType.FinalAnswer) {
-					messageToWriteTo.interrupted = event.interrupted;
-					// Default behavior: replace the streamed text with the provider's final text.
-					// However, when tools (MCP/function calls) were used, providers often stream
-					// some content (e.g., a story) before triggering tools, then return a
-					// different follow‑up message afterwards (e.g., an image caption). Our
-					// previous logic overwrote the pre‑tool content. Preserve it by merging in
-					// the pre‑tool stream when tool updates occurred and the final text does
-					// not already include the streamed prefix.
-					const hadTools = (messageToWriteTo.updates ?? []).some(
-						(u) => u.type === MessageUpdateType.Tool
-					);
-
-					if (hadTools) {
-						const existing = messageToWriteTo.content.slice(initialMessageContent.length);
-						if (existing && existing.length > 0) {
-							// A. If we already streamed the same final text, keep as-is.
-							if (event.text && existing.endsWith(event.text)) {
-								messageToWriteTo.content = initialMessageContent + existing;
-							}
-							// B. If the final text already includes the streamed prefix, use it verbatim.
-							else if (event.text && event.text.startsWith(existing)) {
-								messageToWriteTo.content = initialMessageContent + event.text;
-							}
-							// C. Otherwise, merge with a paragraph break for readability.
-							else {
-								const needsGap = !/\n\n$/.test(existing) && !/^\n/.test(event.text ?? "");
-								messageToWriteTo.content =
-									initialMessageContent + existing + (needsGap ? "\n\n" : "") + (event.text ?? "");
-							}
-						} else {
-							messageToWriteTo.content = initialMessageContent + (event.text ?? "");
-						}
-					} else {
-						messageToWriteTo.content = initialMessageContent + event.text;
-					}
-					finalAnswerReceived = true;
-
-					if (metricsEnabled && metrics) {
-						metrics.model.latency.observe(metricsLabels, Date.now() - promptedAt.getTime());
-					}
-				}
-
-				// Add file
-				else if (event.type === MessageUpdateType.File) {
-					messageToWriteTo.files = [
-						...(messageToWriteTo.files ?? []),
-						{ type: "hash", name: event.name, value: event.sha, mime: event.mime },
-					];
-				}
-
-				// Store router metadata (for router models) or provider info (for all models)
-				else if (event.type === MessageUpdateType.RouterMetadata) {
-					// Merge metadata updates to preserve existing fields (router may send route/model first, then provider comes later)
-					if (model?.isRouter) {
-						messageToWriteTo.routerMetadata = {
-							route: event.route || messageToWriteTo.routerMetadata?.route || "",
-							model: event.model || messageToWriteTo.routerMetadata?.model || "",
-							provider: event.provider || messageToWriteTo.routerMetadata?.provider,
-						};
-					}
-					// Store provider-only metadata for non-router models if available
-					else if (event.provider) {
-						messageToWriteTo.routerMetadata = {
-							route: messageToWriteTo.routerMetadata?.route || "",
-							model: messageToWriteTo.routerMetadata?.model || "",
-							provider: event.provider,
-						};
-					}
-				}
-
-				// Append updates for audit/replay (streams too, to preserve ordering)
-				if (!(
-					event.type === MessageUpdateType.Status && event.status === MessageUpdateStatus.KeepAlive
-				)) {
-					messageToWriteTo?.updates?.push(
-						event.type === MessageUpdateType.Stream ? { ...event } : event
-					);
-				}
-
 				// Before the padding below rewrites `event`: the log stores what was
-				// actually generated, not the padded wire form.
+				// actually generated, not the padded wire form. Without this the
+				// reattach endpoint has no events to replay and materializedSeq never
+				// advances past zero.
 				writer.push(event);
 
 				// Avoid remote keylogging attack executed by watching packet lengths
@@ -649,8 +558,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				if (event.type === MessageUpdateType.Stream) {
 					event = { ...event, token: event.token.padEnd(16, "\0") };
 				}
-
-				messageToWriteTo.updatedAt = new Date();
 
 				const enqueueUpdate = async () => {
 					if (clientDetached) return;
@@ -817,6 +724,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					!hasError &&
 					!abortedByUser &&
 					!showedPrompt &&
+					!sawToolCall &&
 					messageToWriteTo.content === initialMessageContent
 				) {
 					hasError = true;

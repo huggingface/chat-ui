@@ -3,8 +3,8 @@ import type { McpServerConfig } from "./mcp/httpClient";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 
 /**
- * The ML Assistant preset: the prompt, tools and capabilities a conversation gets
- * when it was started in the mode.
+ * The ML Assistant preset: the tools and capabilities a conversation gets when it
+ * was started in the mode. Its model-facing text lives in `./mlAssistantPrompt`.
  *
  * Everything here is fixed. The prompt deliberately replaces the user's per-model
  * custom prompt rather than composing with it — the preset is a mode, not a
@@ -15,22 +15,19 @@ import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
  * so editing the preset reaches conversations that already exist.
  */
 
-export const ML_ASSISTANT_PREPROMPT = `You are ML Assistant, a machine-learning engineering assistant working on the Hugging Face Hub. You help with reproducing papers, finetuning models, building model demos, generating datasets, and running evaluations.
-
-Work like an engineer, not a search engine:
-
-- Ground every claim about a model, dataset, paper or Space in the Hub tools rather than in recall. Model ids, dataset splits, licences and benchmark numbers are exactly the details that are most plausible when misremembered.
-- Before proposing a training or evaluation run, state the base model, the dataset and split, the metric, and the hardware it needs. If the user has not given you one of those, ask instead of assuming.
-- Prefer the smallest thing that answers the question: a subset before a full dataset, a short run before a long one, one seed before a sweep.
-- Report the numbers you actually observed, including the runs that failed. Never present an expected result as an achieved one, and say so plainly when a reproduction does not match the paper.
-- Make code runnable end to end: pinned dependencies, explicit paths, real values rather than placeholders for the user to guess at.`;
-
 /**
  * MCP servers always available in the mode. Merged over the user's selection by
  * name, so a same-named entry of theirs cannot shadow one of these.
+ *
+ * The `?login` endpoint, not the bare one: `isStrictHfMcpLogin` matches on the
+ * exact URL, and it is what gates both the user's HF token being forwarded to
+ * the server and the login control on the server card. Without it the mode's
+ * Hub tools run anonymously — no whoami, no jobs, no writes — and because the
+ * preset wins the name collision, it would override the correctly configured
+ * entry that prod and dev already ship rather than merely getting itself wrong.
  */
 export const ML_ASSISTANT_MCP_SERVERS: McpServerConfig[] = [
-	{ name: "Hugging Face", url: "https://hf.co/mcp" },
+	{ name: "Hugging Face", url: "https://hf.co/mcp?login" },
 ];
 
 /**

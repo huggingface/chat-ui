@@ -315,6 +315,27 @@ async function setReasoningOverride(locals: App.Locals, value: boolean) {
 
 // ── The round trip ────────────────────────────────────────────────────────────
 
+describe.sequential("the generation log", () => {
+	it("records the turn's events, so a reattaching client has something to replay", async () => {
+		// The route builds the message and feeds the writer in the same closure. An
+		// earlier refactor extracted the message half and dropped `writer.push` with
+		// it: every turn still looked right in the conversation while the log stayed
+		// empty and `materializedSeq` never left zero — invisible until a client
+		// reattached. Nothing else here reads the log, so it went unnoticed.
+		const { conv, locals } = await newConversation();
+		scriptRounds([{ content: "hello" }]);
+
+		await sendMessage(conv, locals, "hi");
+
+		const generation = await collections.generations.findOne({ conversationId: conv._id });
+		expect(generation?.seq ?? 0).toBeGreaterThan(0);
+		const events = await collections.generationEvents.countDocuments({
+			generationId: generation?.generationId ?? "",
+		});
+		expect(events).toBeGreaterThan(0);
+	});
+});
+
 describe.sequential("tool history survives the round trip through Mongo", () => {
 	it("replays a past tool round as assistant/tool pairs on the next turn", async () => {
 		const { conv, locals } = await newConversation();

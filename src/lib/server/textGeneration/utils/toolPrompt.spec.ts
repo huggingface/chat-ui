@@ -26,6 +26,16 @@ describe("buildToolPreprompt", () => {
 		expect(prompt).toContain("instead of answering from memory");
 	});
 
+	it("survives a timezone the client made up", () => {
+		// Client-supplied, validated only as a string. Intl throws on an unknown
+		// zone, and the throw is caught upstream — which silently answers without
+		// tools instead of failing, so it is easy to miss.
+		const prompt = buildToolPreprompt([tool("web_search_exa")], "Not/AZone");
+
+		expect(prompt).toContain("web_search_exa");
+		expect(prompt).not.toContain("Not/AZone");
+	});
+
 	it("only includes a builtin's guidance when that tool is on offer", () => {
 		const askBuiltin = {
 			name: "ask_user_question",

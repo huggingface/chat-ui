@@ -59,6 +59,13 @@ export type McpFlowResult =
 
 const MAX_TOOL_ROUNDS = 10;
 
+// ML Assistant runs jobs, and the round budget is what it spends grounding ids,
+// auditing a dataset, reading a working example and then submitting: ten does not
+// survive one training task, and exhausting the budget ends the turn with an
+// apology instead of an answer. Only the preset gets the larger budget — an
+// ordinary conversation that loops is still stopped early.
+const ML_ASSISTANT_MAX_TOOL_ROUNDS = 100;
+
 // Each retry costs a tool round, so give up quickly and answer without the tool.
 const MAX_TRUNCATED_TOOL_CALL_RETRIES = 2;
 
@@ -100,6 +107,9 @@ export async function* runMcpFlow({
 		return false;
 	};
 	const builtinTools = getEnabledBuiltinTools({ conv });
+	// Read once: the preset decides the servers, the round budget and which tool
+	// doctrine is sent, and they must all agree within a run.
+	const mlAssistant = isMlAssistantConversation(conv);
 
 	// Start from env-configured servers
 	let servers = getMcpServers();
@@ -166,7 +176,7 @@ export async function* runMcpFlow({
 	// The preset's servers go on after the user's selection has been filtered, so
 	// they survive a selection that excludes them. Anything the user picked on top
 	// still comes through — extra servers are configurable, these are not.
-	if (isMlAssistantConversation(conv)) {
+	if (mlAssistant) {
 		servers = withMlAssistantServers(servers);
 		try {
 			logger.debug(
@@ -449,7 +459,13 @@ export async function* runMcpFlow({
 			}
 		);
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
-		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone, builtinTools);
+		// In the mode the doctrine paragraphs are swapped, not appended to: the
+		// generic restraint rule tells the model not to reach for a tool unless it
+		// lacks a capability, and names writing code as a case to answer directly,
+		// which is the inverse of the preset's doctrine.
+		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone, builtinTools, {
+			mlAssistant,
+		});
 		const prepromptPieces: string[] = [];
 		if (toolPreprompt.trim().length > 0) {
 			prepromptPieces.push(toolPreprompt);
@@ -537,6 +553,8 @@ export async function* runMcpFlow({
 			sources: { index: number; link: string }[];
 		} => ({ annotated: text, sources: [] });
 
+		const maxToolRounds = mlAssistant ? ML_ASSISTANT_MAX_TOOL_ROUNDS : MAX_TOOL_ROUNDS;
+
 		let lastAssistantContent = "";
 		let streamedContent = false;
 		// Track whether we're inside a <think> block when the upstream streams
@@ -561,7 +579,7 @@ export async function* runMcpFlow({
 			);
 		}
 
-		for (let loop = 0; loop < MAX_TOOL_ROUNDS; loop += 1) {
+		for (let loop = 0; loop < maxToolRounds; loop += 1) {
 			// Check for abort at the start of each loop iteration
 			if (checkAborted()) {
 				logger.info({ loop }, "[mcp] aborting at start of loop iteration");
@@ -882,6 +900,13 @@ export async function* runMcpFlow({
 					roundReasoning: reasoningForToolMsg,
 					roundContent: assistantContentForToolMsg,
 					elicitation: { conversationId: conv._id, generationId, messageId },
+					// A parked call resumes with no request behind it, so the identity it
+					// should act as has to be recorded now, while there still is one.
+					owner: {
+						userId: (locals as unknown as { user?: { _id?: import("mongodb").ObjectId } })?.user
+							?._id,
+						sessionId: (locals as unknown as { sessionId?: string })?.sessionId,
+					},
 					builtinTools,
 				});
 				let toolMsgCount = 0;
@@ -952,7 +977,7 @@ export async function* runMcpFlow({
 		}
 		// Not "not_applicable": that re-runs the turn with no tools and discards every
 		// tool result this turn produced.
-		logger.warn({ maxRounds: MAX_TOOL_ROUNDS }, "[mcp] tool-round budget exhausted");
+		logger.warn({ maxRounds: maxToolRounds }, "[mcp] tool-round budget exhausted");
 		const exhaustedText =
 			lastAssistantContent.trim().length > 0
 				? lastAssistantContent

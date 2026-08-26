@@ -1,3 +1,4 @@
+import type { ObjectId } from "mongodb";
 import type { OpenAiTool } from "$lib/server/mcp/tools";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import type { ElicitationSink } from "$lib/server/mcp/elicitation";
@@ -19,6 +20,15 @@ export type BuiltinToolResult =
 export interface BuiltinToolContext {
 	/** uuid of this call's Tool updates, shared with any extraUpdates that reference it. */
 	uuid: string;
+	/** The conversation this call belongs to. Absent only where the run has no chat context. */
+	conversationId?: ObjectId;
+	/**
+	 * Who the turn belongs to. A tool that parks has to record this: the resume
+	 * happens with no request to read an identity from, and must act as the user
+	 * who parked rather than as whatever swept it.
+	 */
+	userId?: ObjectId;
+	sessionId?: string;
 	/** Provider-issued tool_call id. */
 	toolCallId: string;
 	/**

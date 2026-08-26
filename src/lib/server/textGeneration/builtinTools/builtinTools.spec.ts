@@ -38,6 +38,7 @@ describe("getEnabledBuiltinTools", () => {
 		expect(toolNames({ _id: new ObjectId(), mlAssistant: true })).toEqual([
 			"ask_user_question",
 			"update_plan",
+			"wait",
 		]);
 	});
 
