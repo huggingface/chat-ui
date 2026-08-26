@@ -223,6 +223,18 @@ describe("ML Assistant session context", () => {
 		);
 	});
 
+	it("survives a timezone the client made up", () => {
+		// `timezone` reaches this from the request body validated only as a string,
+		// and Intl throws RangeError on an unknown zone. This runs before the
+		// generation's try, so throwing here fails the whole turn.
+		const stamped = mlAssistantSessionContext({ username: "pngwn", timezone: "Not/AZone", now });
+
+		expect(stamped).toContain("User=pngwn");
+		expect(stamped).toContain("Date=2026-08-24");
+		// No zone is claimed, because none was honoured.
+		expect(stamped).not.toContain("Timezone=");
+	});
+
 	it("stamps the time in the user's zone", () => {
 		expect(mlAssistantSessionContext({ timezone: "Europe/Berlin", now })).toContain("Time=11:07");
 		expect(mlAssistantSessionContext({ now })).not.toContain("Timezone=");

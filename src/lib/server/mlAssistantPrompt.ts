@@ -152,21 +152,36 @@ export function mlAssistantSessionContext({
 	timezone?: string;
 	now?: Date;
 }): string {
-	const parts = new Intl.DateTimeFormat("en-CA", {
-		year: "numeric",
-		month: "2-digit",
-		day: "2-digit",
-		hour: "2-digit",
-		minute: "2-digit",
-		hour12: false,
-		...(timezone ? { timeZone: timezone } : {}),
-	}).formatToParts(now);
+	const format = (zone?: string) =>
+		new Intl.DateTimeFormat("en-CA", {
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+			hour: "2-digit",
+			minute: "2-digit",
+			hour12: false,
+			...(zone ? { timeZone: zone } : {}),
+		}).formatToParts(now);
+
+	// The zone comes from the request body and is validated only as a string, so
+	// it can be anything. Intl throws RangeError on one it does not know, and this
+	// runs before the generation's own try — an unusable zone would fail the turn
+	// outright rather than degrade it. Fall back to the server's zone, and stop
+	// claiming a zone we did not use.
+	let zone = timezone;
+	let parts;
+	try {
+		parts = format(zone);
+	} catch {
+		zone = undefined;
+		parts = format(undefined);
+	}
 	const at = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
 	const date = `${at("year")}-${at("month")}-${at("day")}`;
 	const time = `${at("hour")}:${at("minute")}`;
 	const user = username && username.trim().length > 0 ? username.trim() : "unknown";
 	return `[Session context: Date=${date}, Time=${time}${
-		timezone ? `, Timezone=${timezone}` : ""
+		zone ? `, Timezone=${zone}` : ""
 	}, User=${user}]`;
 }
 

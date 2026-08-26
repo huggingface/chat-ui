@@ -34,7 +34,17 @@ export function buildToolPreprompt(
 		minute: "2-digit",
 		...(timezone ? { timeZone: timezone } : {}),
 	};
-	const currentDateTime = now.toLocaleString("en-US", dateTimeOptions);
+	// Same exposure as the session-context stamp: the zone is client-supplied and
+	// validated only as a string, and Intl throws on one it does not know. Here the
+	// throw is caught upstream and degrades the turn to a tool-free answer, which
+	// is quieter than a failure and just as wrong.
+	let currentDateTime: string;
+	try {
+		currentDateTime = now.toLocaleString("en-US", dateTimeOptions);
+	} catch {
+		timezone = undefined;
+		currentDateTime = now.toLocaleString("en-US", { ...dateTimeOptions, timeZone: undefined });
+	}
 	const isoDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 	const locationLine = timezone ? ` User's timezone: ${timezone}.` : "";
 	// Only builtins actually on offer this turn contribute guidance.
