@@ -33,12 +33,28 @@ function sweepIntervalMs(): number {
 }
 
 /**
+ * How long a claim holds a row before another sweeper may take it. A resume that
+ * dies between the claim and its own error handling — or a pod that dies at any
+ * point — would otherwise strand the row in `resuming` until the TTL removed it,
+ * and `attempts` would never reach the retry ceiling it exists to enforce.
+ */
+const CLAIM_LEASE_MS = 5 * 60_000;
+
+/**
  * Claim one due row. The filter carries the status, so two pods racing on the
- * same row produce one winner and one miss rather than two resumed turns.
+ * same row produce one winner and one miss rather than two resumed turns. A
+ * claim whose lease has expired is fair game again, which is what makes the
+ * attempt counter meaningful.
  */
 async function claimDueCall(now: Date): Promise<ParkedCall | null> {
 	const claimed = await collections.parkedCalls.findOneAndUpdate(
-		{ status: "waiting", resumeAt: { $lte: now } },
+		{
+			resumeAt: { $lte: now },
+			$or: [
+				{ status: "waiting" },
+				{ status: "resuming", takenAt: { $lt: new Date(now.getTime() - CLAIM_LEASE_MS) } },
+			],
+		},
 		{ $set: { status: "resuming", takenAt: now, updatedAt: now }, $inc: { attempts: 1 } },
 		{ sort: { resumeAt: 1 }, returnDocument: "after" }
 	);
@@ -113,6 +129,15 @@ export async function resumeParkedCall(park: ParkedCall): Promise<void> {
 	const initialContent = message.content;
 	const promptedAt = new Date();
 	const abortController = new AbortController();
+
+	// The browser finds a running turn through the last assistant message's
+	// generationId. A resumed run that leaves the parked turn's id in place is
+	// invisible: its output only appears on a manual refresh.
+	message.generationId = generationId;
+	await collections.conversations.updateOne(
+		{ _id: conv._id, "messages.id": message.id },
+		{ $set: { "messages.$.generationId": generationId, updatedAt: new Date() } }
+	);
 
 	const writer = await createGenerationWriter({
 		generationId,
@@ -206,7 +231,17 @@ export async function resumeParkedCall(park: ParkedCall): Promise<void> {
 		};
 
 		for await (const event of textGeneration(ctx)) apply(event);
-		apply({ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished });
+		// A resumed turn may park again — on another wait, or on a question. Calling
+		// it finished would tell the client the work is over while a row sits waiting
+		// to wake it.
+		const parkedAgain = await collections.parkedCalls.countDocuments({
+			conversationId: conv._id,
+			messageId: message.id,
+			status: "waiting",
+		});
+		if (parkedAgain === 0) {
+			apply({ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished });
+		}
 	} catch (err) {
 		hasError = true;
 		logger.error({ err, parkedCallId: park.parkedCallId }, "[parked] resumed turn failed");

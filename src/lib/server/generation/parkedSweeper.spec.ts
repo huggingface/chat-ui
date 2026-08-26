@@ -66,6 +66,34 @@ describe("sweepParkedCalls", () => {
 		expect(rows.map((r) => r.attempts)).toEqual([1, 1, 1]);
 	});
 
+	it("reclaims a claim whose lease expired", async () => {
+		// A resume that dies before its own error handling — or a pod that dies at
+		// any point — leaves the row in `resuming`. Without a lease it sits there
+		// until the TTL removes it, and the attempt ceiling never applies.
+		await collections.parkedCalls.insertOne(
+			park({ status: "resuming", takenAt: new Date(Date.now() - 10 * 60_000), attempts: 1 })
+		);
+
+		await sweepParkedCalls();
+
+		const row = await collections.parkedCalls.findOne({});
+		expect(row?.attempts).toBe(2);
+		expect(row?.status).toBe("abandoned");
+	});
+
+	it("leaves a claim alone while its lease holds", async () => {
+		// Otherwise two sweepers a few seconds apart both resume the same turn.
+		await collections.parkedCalls.insertOne(
+			park({ status: "resuming", takenAt: new Date(), attempts: 1 })
+		);
+
+		await sweepParkedCalls();
+
+		const row = await collections.parkedCalls.findOne({});
+		expect(row?.status).toBe("resuming");
+		expect(row?.attempts).toBe(1);
+	});
+
 	it("gives up on a row that keeps failing to resume", async () => {
 		await collections.parkedCalls.insertOne(park({ attempts: 3 }));
 

@@ -8,6 +8,7 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import {
+	MessageToolUpdateType,
 	MessageUpdateStatus,
 	MessageUpdateType,
 	MessageElicitationUpdateType,
@@ -473,6 +474,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			generationWriter = writer;
 
 			let finalAnswerReceived = false;
+			// A turn can end having produced no text and still have done something —
+			// a tool call that parked the turn is the case that matters. Without this
+			// the no-output guard below calls that an error and persists it as one.
+			let sawToolCall = false;
 			let abortedByUser = false;
 			let finishedStatusSent = false;
 
@@ -494,6 +499,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					event.status === MessageUpdateStatus.Finished
 				) {
 					finishedStatusSent = true;
+				}
+
+				if (event.type === MessageUpdateType.Tool && event.subtype === MessageToolUpdateType.Call) {
+					sawToolCall = true;
 				}
 
 				// Add token to content or skip if empty
@@ -535,6 +544,19 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					}
 				} else if (event.type === MessageUpdateType.Stream) {
 					lastTokenTimestamp = new Date();
+				}
+
+				// Before the padding below rewrites `event`: the log stores what was
+				// actually generated, not the padded wire form. Without this the
+				// reattach endpoint has no events to replay and materializedSeq never
+				// advances past zero.
+				writer.push(event);
+
+				// Avoid remote keylogging attack executed by watching packet lengths
+				// by padding the text with null chars to a fixed length
+				// https://cdn.arstechnica.net/wp-content/uploads/2024/03/LLM-Side-Channel.pdf
+				if (event.type === MessageUpdateType.Stream) {
+					event = { ...event, token: event.token.padEnd(16, "\0") };
 				}
 
 				const enqueueUpdate = async () => {
@@ -702,6 +724,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					!hasError &&
 					!abortedByUser &&
 					!showedPrompt &&
+					!sawToolCall &&
 					messageToWriteTo.content === initialMessageContent
 				) {
 					hasError = true;
