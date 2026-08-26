@@ -50,6 +50,7 @@ describe("ML Assistant preprompt", () => {
 			"DEFAULT TIMEOUTS KILL JOBS",
 			"BATCH FAILURES",
 			"NEVER COMPILE FLASH-ATTENTION",
+			"PERMISSION ERRORS ARE NOT RETRIES",
 			"SCOPE-CHANGING FIXES",
 		]) {
 			expect(ML_ASSISTANT_PREPROMPT).toContain(mode);
@@ -120,6 +121,26 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(inMode([tool("hf_jobs")])).not.toContain("papers live at hf://papers");
 	});
 
+	it("tells the model to create a repo before writing to it", () => {
+		// "Repository not found" from a put reads like a permissions problem and is
+		// not: it means nothing was created. That cost a real run several calls.
+		const write = inMode([tool("hf_fs_write")]);
+
+		expect(write).toContain("create_repo first");
+		expect(write).toContain("Work in repos you created");
+	});
+
+	it("offers the sandbox as an optimisation with a fallback, not a dependency", () => {
+		// Availability depends on the account and the deployment, so the doctrine
+		// has to survive the tool being there and refusing to work.
+		const sandbox = inMode([tool("hf_sandbox")]);
+
+		expect(sandbox).toContain("SANDBOXES (hf_sandbox)");
+		expect(sandbox).toContain("hf_jobs");
+		expect(sandbox).toContain("do not retry");
+		expect(inMode([tool("hf_jobs")])).not.toContain("SANDBOXES (hf_sandbox)");
+	});
+
 	it("guides web search only where web search exists", () => {
 		// The mode replaces the generic tool preprompt, SEARCH paragraph included,
 		// so a deployment with Exa configured would otherwise get none.
@@ -151,10 +172,13 @@ describe("ML Assistant system message size", () => {
 		// Counted with one builtin's guidance in it; the GitHub grounding tools add
 		// their own when a GITHUB_TOKEN is configured.
 		//
-		// Raised twice, deliberately, and the reasons are the point of keeping it:
-		// 18k -> 19k for the hf_jobs submission contract, 19k -> 22k for the
-		// citation hop, the paper-finding rules, the web-search block and
-		// cost-to-finish hardware reasoning. Measured at ~20.3k.
+		// Raised deliberately each time, and the reasons are the point of keeping it:
+		// 18k -> 19k for the hf_jobs submission contract; 19k -> 22k for the citation
+		// hop, paper-finding, web search and cost-to-finish hardware; 22k -> 24k for
+		// headroom alone, not content — at 21,889 the guard fired on every edit,
+		// which makes it noise. That number is ~5,500 tokens, re-sent on every round
+		// of a hundred-round budget: it is the figure to watch, and the next raise
+		// should have to argue for itself against it.
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -167,6 +191,7 @@ describe("ML Assistant system message size", () => {
 					tool("update_plan"),
 					tool("github_find_examples"),
 					tool("web_search_exa"),
+					tool("hf_sandbox"),
 				],
 				undefined,
 				[askUserQuestionBuiltin],
@@ -176,7 +201,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(22_000);
+		expect(composed.length).toBeLessThan(24_000);
 	});
 });
 

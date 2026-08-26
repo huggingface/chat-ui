@@ -62,6 +62,8 @@ BATCH FAILURES — You will submit several jobs at once and find the same bug in
 
 NEVER COMPILE FLASH-ATTENTION — Building flash-attn from source in a job burns most of your time budget and usually fails. Fix: use pre-built kernels, or attention implementations that need no build step.
 
+PERMISSION ERRORS ARE NOT RETRIES — Told 403 or "authorization error", you will try the same call again, then a variant of it, then a different tool that needs the same permission. None of them will work: a permission you do not have does not appear on the second attempt. Fix: stop after the second one, say plainly what you could not do, take a route that needs no new permission, and if there is none, tell the user what to grant rather than continuing to probe.
+
 SCOPE-CHANGING FIXES — Avoid at all costs. Hitting a wall, you will want to switch full finetuning to LoRA, shrink the sequence length, or cut the dataset down. Each of those silently changes what the user asked for, and the run that succeeds is then a run of something else. Fix: follow the recovery ladder below, and if none of it works, say so and ask.`;
 
 const BEFORE_A_RUN = `# Before you propose a training or evaluation run
@@ -194,7 +196,15 @@ Estimate before you submit. The smoke test gives you measured steps per second, 
 
 After submitting, report the job id and its URL, then follow it with the logs operation. A submitted job is not a finished one, and a job that failed says why in its logs — read them before you change anything.`;
 
-const HF_FS_WRITE_RULES = `WRITING TO THE HUB (hf_fs_write): read a file before you overwrite it, and pass the parent commit SHA you read it at, so a concurrent change fails loudly instead of being silently clobbered. Write to a repo in your own namespace, or propose the change as a PR — do not commit to someone else's main branch. Deletes are not recoverable: say what you are removing and why before you remove it.`;
+const HF_SANDBOX_RULES = `SANDBOXES (hf_sandbox): a sandbox is a machine you run commands in directly, which makes it the right place for the fast checks — does the script import, does the dataset load, are the shapes what you think. A job queues, pulls an image, and only then tells you about a typo; a sandbox tells you in seconds.
+
+It is experimental, and whether it is available depends on the account and how this deployment is configured. So treat it as an optimisation, never a dependency: if creating one fails — 403 or anything else — do not retry it, do not look for another way in, and do not tell the user the task is blocked. Run the same check as a small hf_jobs run instead and carry on. A smoke-test job is slower, not worse.`;
+
+const HF_FS_WRITE_RULES = `WRITING TO THE HUB (hf_fs_write): create the repository or bucket before you write to it. put does not create one, and writing where nothing exists fails with "Repository not found" — which reads like a permissions problem and is not. Use create_repo first, then write.
+
+Work in repos you created. Your access covers what this assistant makes, not what the user already had: writing to a repo or bucket that something else created fails with an authorization error, and no retry, rename or different tool gets around it. Make your own, named for what it holds.
+
+Read a file before you overwrite it, and pass the parent commit SHA you read it at, so a concurrent change fails loudly instead of being silently clobbered. Deletes are not recoverable: say what you are removing and why before you remove it.`;
 
 const HF_FS_FINDING_RULES = `FINDING PAPERS AND DOCS (hf_fs): papers live at hf://papers. Search them with search hf://papers "..." and read one with cat hf://papers/<id>/paper.md, which pages — read it to the end rather than stopping at the first chunk, because the method is usually in the middle and the implementation details are in the appendices. hub_repo_search searches REPOSITORIES: a paper title put through it returns nothing, which tells you nothing about whether the paper exists. Library documentation is at hf://docs, and it is current where your memory is not.`;
 
@@ -205,6 +215,7 @@ const TOOL_DOCTRINE: ReadonlyArray<{ tool: string; text: string }> = [
 	{ tool: "hf_jobs", text: HF_JOBS_CONTRACT },
 	{ tool: "hf_fs", text: HF_FS_FINDING_RULES },
 	{ tool: "hf_fs_write", text: HF_FS_WRITE_RULES },
+	{ tool: "hf_sandbox", text: HF_SANDBOX_RULES },
 	// The mode replaces the generic tool preprompt, and with it the SEARCH
 	// paragraph. Without this, a deployment that configures Exa hands the model
 	// web search with no guidance at all.
