@@ -83,7 +83,7 @@ If the flag is off (or no tools-capable model is found), tool-active requests fl
 Optionally pin users who cannot currently pay for inference on Hugging Face (no PRO subscription, no prepaid credits or valid payment method, and no paying billing organization selected) to a cheaper model:
 
 ```ini
-LLM_ROUTER_FREE_USER_MODEL=deepseek-ai/DeepSeek-V4-Flash-0731
+LLM_ROUTER_FREE_USER_MODEL=zai-org/GLM-5.3-Flash
 ```
 
 Free users get this model for the default and tools routes, falling back to the route's normal models if it fails. Image requests keep `LLM_ROUTER_MULTIMODAL_MODEL` (pick a tools-capable free model if you use the tools shortcut). Paying users keep the normal route selection, and requests to a directly-picked (non-Omni) model are never affected.

@@ -72,7 +72,7 @@ envVars:
   LLM_ROUTER_MULTIMODAL_MODEL: "moonshotai/Kimi-K2.6"
   LLM_ROUTER_ENABLE_TOOLS: "true"
   LLM_ROUTER_TOOLS_MODEL: "moonshotai/Kimi-K2.6"
-  LLM_ROUTER_FREE_USER_MODEL: "deepseek-ai/DeepSeek-V4-Flash-0731"
+  LLM_ROUTER_FREE_USER_MODEL: "zai-org/GLM-5.3-Flash"
   TRANSCRIPTION_MODEL: "openai/whisper-large-v3-turbo"
   MCP_SERVERS: >
     [{"name": "Web Search (Exa)", "url": "https://mcp.exa.ai/mcp?tools=web_search_exa,get_code_context_exa,crawling_exa"}, {"name": "Hugging Face", "url": "https://hf.co/mcp?login"}]
@@ -83,6 +83,7 @@ envVars:
   MODELS: >
     [
       { "id": "omni", "supportsArtifacts": true },
+      { "id": "zai-org/GLM-5.3-Flash", "description": "Efficient 320B MoE with 18B active params, 300K context, and strong agentic coding.", "supportsArtifacts": true },
       { "id": "deepseek-ai/DeepSeek-V4-Flash-0731", "description": "Updated V4-Flash with adjustable thinking, stronger coding, and agentic tool use.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "thinkingmachines/Inkling-Small", "description": "Compact multimodal 276B MoE with 12B active params and adjustable reasoning effort.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "NousResearch/Hermes-3-Llama-3.1-70B", "description": "Steerable 70B Llama fine-tune for roleplay, agents, and function calling.", "supportsArtifacts": true },
