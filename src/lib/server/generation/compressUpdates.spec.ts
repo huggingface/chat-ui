@@ -65,9 +65,10 @@ describe("compressUpdatesForStorage", () => {
 		expect(compressUpdatesForStorage(updates)).toEqual(updates);
 	});
 
-	it("sheds stream markers before tool history when over the cap", () => {
-		// The text itself lives on the message; a marker only says where a tool
-		// card sat relative to it. The calls and results are the transcript.
+	it("merges adjacent stream markers, so a long turn keeps its layout AND its transcript", () => {
+		// Consecutive markers carry no more layout information than their sum;
+		// unmerged, a 30-minute reasoning turn crossed the cap and the backstop
+		// dropped every marker — the message rendered as one unanchored blob.
 		const updates = [
 			...Array.from({ length: 6000 }, (_, i) => token(`t${i}`)),
 			...Array.from({ length: 100 }, (_, i) => call(`c${i}`)),
@@ -75,7 +76,21 @@ describe("compressUpdatesForStorage", () => {
 
 		const compressed = compressUpdatesForStorage(updates) ?? [];
 
-		expect(compressed).toHaveLength(100);
+		expect(compressed).toHaveLength(101);
+		const merged = compressed[0];
+		const totalLen = Array.from({ length: 6000 }, (_, i) => `t${i}`).join("").length;
+		expect(merged).toMatchObject({ type: MessageUpdateType.Stream, token: "", len: totalLen });
+		expect(compressed.slice(1).every((u) => u.type === MessageUpdateType.Tool)).toBe(true);
+	});
+
+	it("sheds unmergeable stream markers before tool history when over the cap", () => {
+		// Markers cannot merge across a tool card. The text itself lives on the
+		// message; the calls and results are the transcript, so they survive.
+		const updates = Array.from({ length: 3000 }, (_, i) => [token(`t${i}`), call(`c${i}`)]).flat();
+
+		const compressed = compressUpdatesForStorage(updates) ?? [];
+
+		expect(compressed).toHaveLength(3000);
 		expect(compressed.every((u) => u.type === MessageUpdateType.Tool)).toBe(true);
 	});
 

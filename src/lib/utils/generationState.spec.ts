@@ -1,8 +1,17 @@
 import { describe, expect, test } from "vitest";
 
 import type { Message } from "$lib/types/Message";
-import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
-import { isAssistantGenerationTerminal, isConversationGenerationActive } from "./generationState";
+import {
+	MessageToolUpdateType,
+	MessageUpdateStatus,
+	MessageUpdateType,
+} from "$lib/types/MessageUpdate";
+import { ToolResultStatus } from "$lib/types/Tool";
+import {
+	isAssistantGenerationTerminal,
+	isAssistantParkedOnWait,
+	isConversationGenerationActive,
+} from "./generationState";
 
 function assistantMessage(overrides: Partial<Message> = {}): Message {
 	return {
@@ -133,5 +142,97 @@ describe("generationState", () => {
 	test("interrupted wins even without any terminal update present", () => {
 		const message = assistantMessage({ interrupted: true, updates: undefined });
 		expect(isAssistantGenerationTerminal(message)).toBe(true);
+	});
+
+	// A parked-and-resumed turn (the wait tool) has a lifecycle: every park
+	// stamps `finished`, every resume stamps a new `started`. The LAST lifecycle
+	// event decides — "ever finished" would freeze the message at its first park.
+
+	test("a resume after a park makes the message active again", () => {
+		const message = assistantMessage({
+			updates: [
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+				{ type: MessageUpdateType.Stream, token: "resumed output" },
+			],
+		});
+		expect(isAssistantGenerationTerminal(message)).toBe(false);
+		expect(isConversationGenerationActive([message])).toBe(true);
+	});
+
+	test("a turn parked again after a resume reads terminal until the next start", () => {
+		const message = assistantMessage({
+			updates: [
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished },
+			],
+		});
+		expect(isAssistantGenerationTerminal(message)).toBe(true);
+	});
+
+	test("a final answer after the last start is terminal", () => {
+		const message = assistantMessage({
+			updates: [
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+				{ type: MessageUpdateType.FinalAnswer, text: "done", interrupted: false },
+			],
+		});
+		expect(isAssistantGenerationTerminal(message)).toBe(true);
+	});
+});
+
+describe("isAssistantParkedOnWait", () => {
+	const waitCall = (uuid: string) => ({
+		type: MessageUpdateType.Tool as const,
+		subtype: MessageToolUpdateType.Call as const,
+		uuid,
+		call: { name: "wait", parameters: { seconds: 60, reason: "job running" } },
+	});
+	const resultFor = (uuid: string) => ({
+		type: MessageUpdateType.Tool as const,
+		subtype: MessageToolUpdateType.Result as const,
+		uuid,
+		result: {
+			status: ToolResultStatus.Success as const,
+			call: { name: "wait", parameters: {} },
+			outputs: [],
+			display: true,
+		},
+	});
+
+	test("a wait call without a result is parked, even though the run finished", () => {
+		const message = assistantMessage({
+			updates: [
+				waitCall("w1"),
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished },
+			],
+		});
+		expect(isAssistantParkedOnWait(message)).toBe(true);
+		expect(isAssistantGenerationTerminal(message)).toBe(true);
+	});
+
+	test("a resumed wait (call with result) is no longer parked", () => {
+		const message = assistantMessage({
+			updates: [waitCall("w1"), resultFor("w1")],
+		});
+		expect(isAssistantParkedOnWait(message)).toBe(false);
+	});
+
+	test("only wait calls count, and interrupted turns are never parked", () => {
+		const otherCall = {
+			type: MessageUpdateType.Tool as const,
+			subtype: MessageToolUpdateType.Call as const,
+			uuid: "t1",
+			call: { name: "hf_fs", parameters: {} },
+		};
+		expect(isAssistantParkedOnWait(assistantMessage({ updates: [otherCall] }))).toBe(false);
+		expect(
+			isAssistantParkedOnWait(assistantMessage({ interrupted: true, updates: [waitCall("w1")] }))
+		).toBe(false);
 	});
 });

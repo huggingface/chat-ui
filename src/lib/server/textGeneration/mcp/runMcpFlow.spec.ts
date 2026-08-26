@@ -6,6 +6,7 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import type { McpFlowResult, RunMcpFlowContext } from "./runMcpFlow";
 
 // ---------------------------------------------------------------------------
@@ -334,6 +335,72 @@ describe("runMcpFlow truncated tool calls", () => {
 	});
 });
 
+describe("runMcpFlow rate limits", () => {
+	it("absorbs a router 429 with backoff instead of failing a turn mid-flight", async () => {
+		vi.useFakeTimers();
+		try {
+			scriptRounds([
+				{ error: Object.assign(new Error('429 "Rate limit exceeded"'), { status: 429 }) },
+				{ content: "the answer" },
+			]);
+
+			const pending = runFlow();
+			// The backoff timer only exists once the flow reaches the throttled
+			// call; step the clock until the retry has landed.
+			for (let i = 0; i < 20 && mocks.create.mock.calls.length < 2; i += 1) {
+				await vi.advanceTimersByTimeAsync(1_000);
+			}
+			const { updates, result } = await pending;
+
+			expect(result).toBe("completed");
+			expect(finalAnswer(updates)).toBe("the answer");
+			expect(mocks.create).toHaveBeenCalledTimes(2);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("still surfaces a non-429 upstream failure", async () => {
+		scriptRounds([{ error: new Error("boom") }]);
+		const { result } = await runFlow();
+		// Fails before any output: the flow falls back rather than erroring the turn.
+		expect(result).toBe("not_applicable");
+	});
+});
+
+describe("runMcpFlow answers cut by the output limit", () => {
+	it("retries once when the final answer dies mid-reasoning instead of finalizing the half-thought", async () => {
+		scriptRounds([
+			{ reasoning: "the method is defined as", finishReason: "length" },
+			{ content: "the recovered answer" },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(finalAnswer(updates)).toBe("the recovered answer");
+		const retry = requestMessages(1);
+		// Reasoning-only rounds leave no prose; the synthesized assistant turn keeps
+		// the nudge from being a second consecutive user message.
+		expect(retry.at(-2)?.role).toBe("assistant");
+		expect(String(retry.at(-2)?.content ?? "")).not.toHaveLength(0);
+		expect(String(retry.at(-1)?.content)).toContain("output limit");
+	});
+
+	it("finalizes as interrupted when the retry is cut too", async () => {
+		scriptRounds([
+			{ reasoning: "first half-thought", finishReason: "length" },
+			{ reasoning: "second half-thought", finishReason: "length" },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		const answer = updates.find((u) => u.type === MessageUpdateType.FinalAnswer);
+		expect(answer?.type === MessageUpdateType.FinalAnswer && answer.interrupted).toBe(true);
+	});
+});
+
 describe("runMcpFlow termination", () => {
 	it("finalizes instead of reporting it never ran when the tool rounds run out", async () => {
 		const toolRound: Round = {
@@ -461,7 +528,7 @@ describe("runMcpFlow offering the question tool", () => {
 		scriptRounds([{ content: "the answer" }]);
 		const { result } = await runFlow(inMlMode);
 		expect(result).toBe("completed");
-		expect(toolNames()).toEqual(["ask_user_question", "update_plan", "wait"]);
+		expect(toolNames()).toEqual(["ask_user_question", "update_plan", "wait", "research"]);
 	});
 
 	it("still skips the flow outside the mode when no MCP server is selected", async () => {
@@ -568,6 +635,18 @@ describe("runMcpFlow under the ML Assistant preset", () => {
 		await runFlow();
 		expect(systemPrompt()).toContain("Do NOT call a tool unless");
 		expect(systemPrompt()).not.toContain("USING TOOLS:");
+	});
+
+	it("floors the completion budget so reasoning turns are not cut mid-think", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow(inMlMode);
+		expect(mocks.create.mock.calls[0][0].max_tokens).toBe(ML_ASSISTANT_MIN_COMPLETION_TOKENS);
+	});
+
+	it("leaves the catalog completion budget alone outside the mode", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow();
+		expect(mocks.create.mock.calls[0][0].max_tokens).toBeUndefined();
 	});
 
 	it("keeps working past the round budget an ordinary conversation stops at", async () => {

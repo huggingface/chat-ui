@@ -18,6 +18,15 @@ export const ML_ASSISTANT_PLACEHOLDER = "Describe the ML task — paper URL, mod
 /** Reasoning effort the preset runs at. */
 export const ML_ASSISTANT_EFFORT = "high" as const;
 
+/**
+ * Completion-token floor for the preset. Catalog max_tokens values are sized
+ * for chat answers; a high-effort reasoning turn regularly outruns them and
+ * gets cut mid-think, costing a retry round or an interrupted turn. A floor,
+ * not an override — a catalog value above it wins. Providers that cap lower
+ * clamp it themselves.
+ */
+export const ML_ASSISTANT_MIN_COMPLETION_TOKENS = 32_768;
+
 /** Suggestion chips that replace the default set while the mode is on. */
 export const mlAssistantExamples: RouterExample[] = [
 	{

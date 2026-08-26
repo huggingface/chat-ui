@@ -38,6 +38,7 @@
 	import {
 		isConversationGenerationActive,
 		isAssistantGenerationTerminal,
+		isAssistantParkedOnWait,
 	} from "$lib/utils/generationState";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
@@ -657,6 +658,49 @@
 		} else if (!pending) {
 			$loading = false;
 		}
+	});
+
+	// A turn parked on `wait` resumes server-side under a NEW generationId, with
+	// no request from this tab carrying its updates — the open page goes quiet
+	// while a reload would show them. So while the conversation is either active
+	// or parked on a wait, poll the server copy whenever this tab has no stream
+	// of its own (both flags are non-reactive, so they are checked per tick):
+	// when the generationId has moved on, or a turn this tab thought was live
+	// finished elsewhere, refresh — which re-enters the normal reattach path.
+	const DETACHED_POLL_MS = 5_000;
+	let generationActive = $derived(isConversationGenerationActive(messages));
+	let parkedOnWait = $derived(
+		isAssistantParkedOnWait(messages.findLast((m) => m.from === "assistant"))
+	);
+	$effect(() => {
+		if (!browser || (!generationActive && !parkedOnWait)) return;
+		const id = convId;
+		const client = useAPIClient();
+		const timer = setInterval(async () => {
+			if (convId !== id || writeMessageInFlight || reattachController) return;
+			try {
+				const conversation = (await client.conversations({ id }).get().then(handleResponse)) as {
+					messages: Message[];
+				};
+				const localLast = messages.findLast((m) => m.from === "assistant");
+				const remoteLast = conversation.messages.findLast((m) => m.from === "assistant");
+				if (!localLast?.generationId || !remoteLast) return;
+				const generationMovedOn = remoteLast.generationId !== localLast.generationId;
+				// While both copies are parked, remote-terminal is the steady state,
+				// not a transition — only a moved-on generationId means the resume
+				// began. Remote-terminal IS the transition when this tab believed
+				// the turn was still live (it finished while detached).
+				const finishedElsewhere =
+					!isAssistantGenerationTerminal(localLast) &&
+					!isConversationGenerationActive(conversation.messages);
+				if (generationMovedOn || finishedElsewhere) {
+					await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
+				}
+			} catch {
+				// Transient; the next tick retries.
+			}
+		}, DETACHED_POLL_MS);
+		return () => clearInterval(timer);
 	});
 
 	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages

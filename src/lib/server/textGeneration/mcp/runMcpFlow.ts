@@ -29,7 +29,9 @@ import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
-import { getEnabledBuiltinTools, shouldSkipMcpFlow } from "../builtinTools";
+import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
+import { withRateLimitRetry } from "../utils/rateLimitRetry";
+import { getEnabledBuiltinTools, isResearchTool, shouldSkipMcpFlow } from "../builtinTools";
 import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
 
 export type RunMcpFlowContext = Pick<
@@ -68,6 +70,12 @@ const ML_ASSISTANT_MAX_TOOL_ROUNDS = 100;
 
 // Each retry costs a tool round, so give up quickly and answer without the tool.
 const MAX_TRUNCATED_TOOL_CALL_RETRIES = 2;
+
+// One more attempt after a final answer is cut by the output limit mid-answer
+// (usually mid-<think> on reasoning models). If the nudged retry is cut too,
+// the limit is simply too small for this answer and retrying again just burns
+// rounds — finalize what exists, marked interrupted.
+const MAX_LENGTH_CUT_RETRIES = 1;
 
 export async function* runMcpFlow({
 	model,
@@ -433,10 +441,15 @@ export async function* runMcpFlow({
 			string,
 			unknown
 		>;
-		const maxTokens =
+		const catalogMaxTokens =
 			(parameters?.max_tokens as number | undefined) ??
 			(parameters?.max_new_tokens as number | undefined) ??
 			(parameters?.max_completion_tokens as number | undefined);
+		// The preset floors the reply allowance — see the constant for why. The
+		// research sub-agent inherits this through completionBase.
+		const maxTokens = mlAssistant
+			? Math.max(catalogMaxTokens ?? 0, ML_ASSISTANT_MIN_COMPLETION_TOKENS)
+			: catalogMaxTokens;
 
 		let messagesOpenAI: ChatCompletionMessageParam[] = await prepareMessagesWithFiles(
 			messages,
@@ -537,6 +550,28 @@ export async function* runMcpFlow({
 			...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
 		};
 
+		// The research builtin runs a nested tool loop and needs the request
+		// plumbing this turn resolved — client, sampling params, the listed
+		// MCP tools — which only exists here. Its definition and enablement
+		// stayed in builtinTools/; only the runtime binding lives at the
+		// call site.
+		builtinTools.find(isResearchTool)?.bind({
+			openai,
+			completionBase,
+			requestHeaders: {
+				"ChatUI-Conversation-ID": conv._id.toString(),
+				"X-use-cache": "false",
+				...(config.USE_USER_TOKEN === "true" && locals?.token
+					? { Authorization: `Bearer ${locals.token}` }
+					: {}),
+			},
+			servers,
+			mapping,
+			mcpTools,
+			hostBuiltinTools: builtinTools,
+			contextLengthTokens: (targetModel as unknown as { contextLength?: number }).contextLength,
+		});
+
 		const toPrimitive = (value: unknown) => {
 			if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
 				return value;
@@ -566,6 +601,7 @@ export async function* runMcpFlow({
 		// the persisted trace stays byte-exact instead of silently dropping them.
 		let pendingReasoningWhitespace = "";
 		let truncatedToolCallRetries = 0;
+		let lengthCutRetries = 0;
 
 		if (resolvedRoute && candidateModelId) {
 			yield {
@@ -597,17 +633,24 @@ export async function* runMcpFlow({
 				messages: messagesOpenAI,
 			};
 
-			const completionStream: Stream<ChatCompletionChunk> = await openai.chat.completions.create(
-				completionRequest,
+			// A turn several productive rounds deep must not die on one throttled
+			// request; absorb router 429s that outlast the SDK's quick retries.
+			const completionStream: Stream<ChatCompletionChunk> = await withRateLimitRetry(
+				() =>
+					openai.chat.completions.create(completionRequest, {
+						signal: abortSignal,
+						headers: {
+							"ChatUI-Conversation-ID": conv._id.toString(),
+							"X-use-cache": "false",
+							...(config.USE_USER_TOKEN === "true" && locals?.token
+								? { Authorization: `Bearer ${locals.token}` }
+								: {}),
+						},
+					}),
 				{
 					signal: abortSignal,
-					headers: {
-						"ChatUI-Conversation-ID": conv._id.toString(),
-						"X-use-cache": "false",
-						...(config.USE_USER_TOKEN === "true" && locals?.token
-							? { Authorization: `Bearer ${locals.token}` }
-							: {}),
-					},
+					onBackoff: (attempt, delayMs) =>
+						logger.warn({ loop, attempt, delayMs }, "[mcp] rate limited; backing off in-loop"),
 				}
 			);
 
@@ -955,6 +998,35 @@ export async function* runMcpFlow({
 				lastAssistantContent += "</think>";
 				thinkOpen = false;
 			}
+			// A response cut by the output limit is not an answer. With a reasoning
+			// model it usually ends inside the <think> block, so finalizing it
+			// reports a half-thought as a finished turn. Retry once, telling the
+			// model to answer with its remaining budget; a second cut finalizes as
+			// interrupted rather than pretending completion.
+			const cutMidAnswer = finishReason === "length" && !discardedTruncatedToolCalls;
+			if (cutMidAnswer && lengthCutRetries < MAX_LENGTH_CUT_RETRIES) {
+				lengthCutRetries += 1;
+				logger.warn(
+					{ loop, attempt: lengthCutRetries },
+					"[mcp] response cut by the output limit mid-answer; retrying"
+				);
+				const visibleContent = lastAssistantContent
+					.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, "")
+					.trim();
+				messagesOpenAI = [
+					...messagesOpenAI,
+					{
+						role: "assistant" as const,
+						content: visibleContent || "(Response cut off by the output limit mid-reasoning.)",
+					},
+					{
+						role: "user" as const,
+						content:
+							"[SYSTEM: Your previous response hit the output limit before it finished — most of it was internal reasoning. Give your final answer now, with minimal further reasoning and the answer itself kept concise.]",
+					},
+				];
+				continue;
+			}
 			// Without this the turn finalizes empty and the route reports a bare
 			// "No output was generated" instead of what actually happened.
 			if (discardedTruncatedToolCalls && lastAssistantContent.trim().length === 0) {
@@ -967,7 +1039,7 @@ export async function* runMcpFlow({
 			yield {
 				type: MessageUpdateType.FinalAnswer,
 				text: lastAssistantContent,
-				interrupted: false,
+				interrupted: cutMidAnswer,
 			};
 			logger.info(
 				{ length: lastAssistantContent.length, loop },
