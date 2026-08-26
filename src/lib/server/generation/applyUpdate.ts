@@ -54,27 +54,18 @@ export function applyUpdateToMessage(
 	if (event.type === MessageUpdateType.Stream) {
 		if (event.token === "") return SKIPPED;
 		message.content += event.token;
-	}
-
-	// Append reasoning stream tokens to message.reasoning (server-side)
-	else if (
+	} else if (
 		event.type === MessageUpdateType.Reasoning &&
 		event.subtype === MessageReasoningUpdateType.Stream &&
 		"token" in event
 	) {
 		message.reasoning ??= "";
 		message.reasoning += event.token;
-	}
-
-	// Set the title
-	else if (event.type === MessageUpdateType.Title) {
-		// Always strip <think> markers from titles when saving
+	} else if (event.type === MessageUpdateType.Title) {
+		// A reasoning model will put think markers in a title if nothing removes them.
 		conv.title = event.title.replace(/<\/?think>/gi, "").trim();
 		titleChanged = true;
-	}
-
-	// Set the final text and the interrupted flag
-	else if (event.type === MessageUpdateType.FinalAnswer) {
+	} else if (event.type === MessageUpdateType.FinalAnswer) {
 		message.interrupted = event.interrupted;
 		// Default behavior: replace the streamed text with the provider's final text.
 		// However, when tools (MCP/function calls) were used, providers often stream
@@ -109,18 +100,12 @@ export function applyUpdateToMessage(
 			message.content = initialContent + event.text;
 		}
 		finalAnswerReceived = true;
-	}
-
-	// Add file
-	else if (event.type === MessageUpdateType.File) {
+	} else if (event.type === MessageUpdateType.File) {
 		message.files = [
 			...(message.files ?? []),
 			{ type: "hash", name: event.name, value: event.sha, mime: event.mime },
 		];
-	}
-
-	// Store router metadata (for router models) or provider info (for all models)
-	else if (event.type === MessageUpdateType.RouterMetadata) {
+	} else if (event.type === MessageUpdateType.RouterMetadata) {
 		// Merge metadata updates to preserve existing fields (router may send route/model
 		// first, then provider comes later)
 		if (isRouterModel) {
@@ -129,9 +114,7 @@ export function applyUpdateToMessage(
 				model: event.model || message.routerMetadata?.model || "",
 				provider: event.provider || message.routerMetadata?.provider,
 			};
-		}
-		// Store provider-only metadata for non-router models if available
-		else if (event.provider) {
+		} else if (event.provider) {
 			message.routerMetadata = {
 				route: message.routerMetadata?.route || "",
 				model: message.routerMetadata?.model || "",
