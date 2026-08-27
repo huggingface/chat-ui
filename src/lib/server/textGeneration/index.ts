@@ -1,7 +1,6 @@
 import { preprocessMessages } from "../endpoints/preprocessMessages";
 
 import { generateTitleForConversation } from "./title";
-import { injectArtifactsPrompt } from "./artifacts";
 import {
 	type MessageUpdate,
 	MessageUpdateType,
@@ -11,6 +10,8 @@ import { generate } from "./generate";
 import { runMcpFlow } from "./mcp/runMcpFlow";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
+import { isMlAssistantConversation } from "$lib/server/mlAssistant";
+import { resolvePreprompt } from "./preprompt";
 
 /** Updates that mean the user has already been shown something for this turn. */
 function isVisibleWork(update: MessageUpdate): boolean {
@@ -56,12 +57,20 @@ async function* textGenerationWithoutTitle(
 	const { conv, messages } = ctx;
 	const convId = conv._id;
 
-	// Artifacts are opt-in per model (supportsArtifacts in the MODELS overrides),
-	// with a per-model user override from the model settings page
-	const preprompt =
-		(ctx.artifactsOverride ?? ctx.model.supportsArtifacts)
-			? injectArtifactsPrompt(conv.preprompt)
-			: conv.preprompt;
+	// ML Assistant conversations run the preset instead of the user's per-model
+	// custom prompt, and get its capabilities regardless of what the model
+	// advertises: the preset is a mode, not a set of defaults to fall back from.
+	// Outside it nothing changes — artifacts stay opt-in per model.
+	const mlAssistant = isMlAssistantConversation(conv);
+
+	const preprompt = resolvePreprompt({
+		conversationPreprompt: conv.preprompt,
+		mlAssistant,
+		artifactsOverride: ctx.artifactsOverride,
+		supportsArtifacts: ctx.model.supportsArtifacts,
+		username: ctx.username,
+		timezone: (ctx.locals as unknown as { timezone?: string } | undefined)?.timezone,
+	});
 
 	const processedMessages = await preprocessMessages(messages, convId);
 
@@ -75,14 +84,17 @@ async function* textGenerationWithoutTitle(
 			messages: processedMessages,
 			assistant: ctx.assistant,
 			forceMultimodal: ctx.forceMultimodal,
-			forceTools: ctx.forceTools,
+			forceTools: mlAssistant || ctx.forceTools,
 			provider: ctx.provider,
 			reasoningEffort: ctx.reasoningEffort,
+			reasoningOverride: ctx.reasoningOverride,
 			locals: ctx.locals,
 			preprompt,
 			abortSignal: ctx.abortController.signal,
 			abortController: ctx.abortController,
 			promptedAt: ctx.promptedAt,
+			generationId: ctx.generationId,
+			messageId: ctx.messageId,
 		});
 
 		let step = await mcpGen.next();

@@ -1,5 +1,12 @@
 import type { InferenceProvider } from "@huggingface/inference";
 import type { ToolCall, ToolResult } from "$lib/types/Tool";
+import type { PlanStep } from "$lib/types/Plan";
+import type {
+	ElicitationAction,
+	ElicitationRequestPayload,
+	ElicitationResolution,
+	ElicitationValue,
+} from "$lib/types/McpElicitation";
 
 export type MessageUpdate =
 	| MessageStatusUpdate
@@ -9,7 +16,9 @@ export type MessageUpdate =
 	| MessageFileUpdate
 	| MessageFinalAnswerUpdate
 	| MessageReasoningUpdate
-	| MessageRouterMetadataUpdate;
+	| MessageRouterMetadataUpdate
+	| MessageElicitationUpdate
+	| MessagePlanUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -20,6 +29,8 @@ export enum MessageUpdateType {
 	FinalAnswer = "finalAnswer",
 	Reasoning = "reasoning",
 	RouterMetadata = "routerMetadata",
+	Elicitation = "elicitation",
+	Plan = "plan",
 }
 
 // Status
@@ -65,6 +76,36 @@ interface MessageToolUpdateBase<TSubtype extends MessageToolUpdateType> {
 
 export interface MessageToolCallUpdate extends MessageToolUpdateBase<MessageToolUpdateType.Call> {
 	call: ToolCall;
+	/**
+	 * Reasoning that led to this round of calls (set on the round's first call
+	 * update). Lets history replay re-attach reasoning to the right assistant
+	 * message; absent on messages persisted before this field existed.
+	 */
+	reasoning?: string;
+	/**
+	 * Visible text the model streamed before this round's tool calls (set on
+	 * the round's first call update), e.g. "Let me check that." Lets history
+	 * replay keep the preamble on its own round's assistant message instead of
+	 * moving it after the tool results; absent on messages persisted before
+	 * this field existed.
+	 */
+	content?: string;
+	/**
+	 * Original provider-issued tool_call id and raw JSON arguments string, as
+	 * sent by the model (set on every Call update; argumentsRaw only when it
+	 * validates as JSON — a malformed string is never persisted here, since
+	 * replaying invalid JSON in a historical tool call could get the whole
+	 * continuation rejected by providers that validate the field). Replay
+	 * uses argumentsRaw when present for byte-accurate arguments instead of
+	 * reserializing the sanitized primitive parameters; the emitted
+	 * tool_call_id is always the
+	 * normalized one regardless (see toToolCallId in prepareFiles.ts), so
+	 * originalId is captured for future fidelity but not replayed as-is.
+	 * Absent on messages persisted before this field existed, or if the
+	 * provider's response omitted an id.
+	 */
+	originalId?: string;
+	argumentsRaw?: string;
 }
 
 export interface MessageToolResultUpdate extends MessageToolUpdateBase<MessageToolUpdateType.Result> {
@@ -126,4 +167,52 @@ export interface MessageRouterMetadataUpdate {
 	route: string;
 	model: string;
 	provider?: InferenceProvider;
+}
+
+export enum MessageElicitationUpdateType {
+	Request = "request",
+	Resolved = "resolved",
+}
+
+export type MessageElicitationUpdate =
+	MessageElicitationRequestUpdate | MessageElicitationResolvedUpdate;
+
+export interface MessageElicitationRequestUpdate {
+	type: MessageUpdateType.Elicitation;
+	subtype: MessageElicitationUpdateType.Request;
+	request: ElicitationRequestPayload;
+	/**
+	 * Epoch ms. Only a 2025-era prompt has one — it blocks a live request. A 2026-era
+	 * prompt is answered out of band and never expires, so the UI shows no countdown.
+	 */
+	expiresAt?: number;
+	/** Only set when exactly one call was in flight; MCP does not link the two. */
+	toolUuid?: string;
+}
+
+/** Always emitted, even when nobody answered, so replay never shows a form still waiting. */
+export interface MessageElicitationResolvedUpdate {
+	type: MessageUpdateType.Elicitation;
+	subtype: MessageElicitationUpdateType.Resolved;
+	elicitationId: string;
+	action: ElicitationAction;
+	resolution: ElicitationResolution;
+	/** What was submitted, so a reloaded transcript can still show the answers. */
+	content?: Record<string, ElicitationValue>;
+}
+
+/**
+ * Snapshot of the plan after an `update_plan` call. Plain JSON only (no Date):
+ * it travels the JSONL stream and is persisted verbatim in `Message.updates`.
+ * The authoritative current state lives on `Conversation.plan`.
+ */
+export interface MessagePlanUpdate {
+	type: MessageUpdateType.Plan;
+	/** uuid of the update_plan tool call that produced this state. */
+	uuid: string;
+	goal: string;
+	steps: PlanStep[];
+	/** Model-authored one-line changelog for this update. */
+	explanation?: string;
+	version: number;
 }

@@ -15,6 +15,7 @@ import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
+import { withoutContentLength } from "$lib/server/undiciCompat";
 // uuid import removed (no tool call ids)
 
 export const endpointOAIParametersSchema = z.object({
@@ -78,7 +79,7 @@ export async function endpointOai(
 
 	// Custom fetch wrapper to capture response headers for router metadata
 	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
-		const response = await fetch(url, init);
+		const response = await fetch(url, withoutContentLength(init));
 
 		// Capture router headers if present (fallback for non-streaming)
 		const routeHeader = response.headers.get("X-Router-Route");
@@ -174,10 +175,33 @@ export async function endpointOai(
 			abortSignal,
 			provider,
 			reasoningEffort,
+			reasoningOverride,
 		}) => {
-			// Format messages for the chat API, handling multimodal content if supported
+			// Hoisted above the message prep so the history budget can reserve the
+			// reply allowance this request will actually ask for.
+			const parameters = { ...model.parameters, ...generateSettings };
+
+			// Format messages for the chat API, handling multimodal content if supported.
+			// attachReasoning re-attaches persisted reasoning as reasoning_content on
+			// past assistant turns (preserved-thinking models condition on it). The
+			// per-user reasoning override wins in both directions, else the model's
+			// policy decides — on by default, off only for a blocklisted family
+			// (see reasoningPolicy.ts). A model that emitted no reasoning has none
+			// to replay, so defaulting on cannot invent one; tool replay stays off
+			// here since this path never declares tools.
+			// currentProducerModel is this call's own resolved model: when invoked
+			// directly for a pinned conversation it's the only model that has ever
+			// produced a turn here, and when invoked as a router candidate (the
+			// "omni" alias resolves a candidate before delegating here) it's that
+			// resolved candidate — either way it gates reasoning_content to history
+			// this same model actually produced.
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-				await prepareMessagesWithFiles(messages, imageProcessor, isMultimodal ?? model.multimodal);
+				await prepareMessagesWithFiles(messages, imageProcessor, isMultimodal ?? model.multimodal, {
+					attachReasoning: reasoningOverride ?? model.preservesReasoning !== false,
+					currentProducerModel: model.id ?? model.name,
+					contextLengthTokens: model.contextLength,
+					maxOutputTokens: parameters?.max_tokens,
+				});
 
 			// Normalize preprompt and handle empty values
 			const normalizedPreprompt = typeof preprompt === "string" ? preprompt.trim() : "";
@@ -201,9 +225,6 @@ export async function endpointOai(
 					messagesOpenAI = [{ role: "system", content: normalizedPreprompt }, ...messagesOpenAI];
 				}
 			}
-
-			// Combine model defaults with request-specific parameters
-			const parameters = { ...model.parameters, ...generateSettings };
 
 			// Build model ID with optional provider suffix (e.g., "model:fastest" or "model:together")
 			const baseModelId = model.id ?? model.name;

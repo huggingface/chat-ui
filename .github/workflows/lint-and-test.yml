@@ -27,6 +27,9 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # Browsers and their system deps are baked in; do not add `playwright install`.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 10
 
     steps:
@@ -44,11 +47,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/mongodb-binaries
-          key: mongodb-binaries-${{ runner.os }}
+          key: mongodb-binaries-${{ runner.os }}-container
 
       - run: npm ci
 
-      - run: npx playwright install --with-deps chromium
+      - name: Check the image has the browsers this Playwright expects
+        run: |
+          missing=$(npx playwright install --dry-run chromium \
+            | sed -n 's/^[[:space:]]*Install location:[[:space:]]*//p' \
+            | while IFS= read -r dir; do [ -d "$dir" ] || echo "$dir"; done)
+          if [ -n "$missing" ]; then
+            echo "::error file=.github/workflows/lint-and-test.yml::The container image is missing browsers this Playwright build expects:"
+            echo "$missing"
+            echo "::error file=.github/workflows/lint-and-test.yml::Bump the mcr.microsoft.com/playwright image tag to match playwright-core in package-lock.json."
+            exit 1
+          fi
 
       - name: "Tests (node)"
         run: npm run test
@@ -58,6 +71,8 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 20
 
     steps:
@@ -77,13 +92,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/mongodb-binaries
-          key: mongodb-binaries-${{ runner.os }}
+          key: mongodb-binaries-${{ runner.os }}-container
 
       - run: npm ci
 
-      # WebKit is not optional — the worst regression cluster in this repo is
-      # Safari-specific scroll and layout behaviour.
-      - run: npx playwright install --with-deps chromium webkit
+      - name: Check the image has the browsers this Playwright expects
+        run: |
+          missing=$(npx playwright install --dry-run chromium webkit \
+            | sed -n 's/^[[:space:]]*Install location:[[:space:]]*//p' \
+            | while IFS= read -r dir; do [ -d "$dir" ] || echo "$dir"; done)
+          if [ -n "$missing" ]; then
+            echo "::error file=.github/workflows/lint-and-test.yml::The container image is missing browsers this Playwright build expects:"
+            echo "$missing"
+            echo "::error file=.github/workflows/lint-and-test.yml::Bump the mcr.microsoft.com/playwright image tag to match playwright-core in package-lock.json."
+            exit 1
+          fi
 
       - name: "Tests (e2e)"
         run: npm run test:e2e

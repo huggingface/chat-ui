@@ -24,7 +24,19 @@ const mocks = vi.hoisted(() => ({
 	create: vi.fn(),
 	executeToolCalls: vi.fn(),
 	getAbortTime: vi.fn(() => undefined as number | undefined),
+	// Mutable so a test can strip the MCP tools.
+	mcpTools: [{ type: "function", function: { name: "do_thing" } }] as Array<{
+		type: string;
+		function: { name: string };
+	}>,
+	servers: [{ name: "hf", url: "https://example.test/mcp" }] as Array<{
+		name: string;
+		url: string;
+	}>,
 }));
+
+// The gate itself is real; only the build flag behind it is forced on.
+vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
 
 vi.mock("openai", () => ({
 	OpenAI: class {
@@ -45,16 +57,19 @@ vi.mock("$lib/server/config", () => ({
 }));
 
 vi.mock("$lib/server/mcp/registry", () => ({
-	getMcpServers: () => [{ name: "hf", url: "https://example.test/mcp" }],
+	getMcpServers: () => mocks.servers,
 }));
 
 vi.mock("$lib/server/urlSafety", () => ({ isValidUrl: () => true }));
 
 vi.mock("$lib/server/mcp/tools", () => ({
-	getOpenAiToolsForMcp: async () => ({
-		tools: [{ type: "function", function: { name: "do_thing" } }],
-		mapping: { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } },
-	}),
+	getOpenAiToolsForMcp: async (servers: unknown[]) =>
+		servers.length === 0
+			? { tools: [], mapping: {} }
+			: {
+					tools: mocks.mcpTools,
+					mapping: { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } },
+				},
 }));
 
 vi.mock("./routerResolution", () => ({
@@ -204,6 +219,8 @@ beforeEach(() => {
 	mocks.create.mockReset();
 	mocks.executeToolCalls.mockReset();
 	mocks.getAbortTime.mockReset();
+	mocks.mcpTools = [{ type: "function", function: { name: "do_thing" } }];
+	mocks.servers = [{ name: "hf", url: "https://example.test/mcp" }];
 	mocks.getAbortTime.mockReturnValue(undefined);
 	scriptToolResults();
 });
@@ -348,5 +365,230 @@ describe("runMcpFlow termination", () => {
 		]);
 
 		await expect(runFlow()).rejects.toThrow("upstream died mid-run");
+	});
+});
+
+describe("runMcpFlow in-loop reasoning echo", () => {
+	/** The assistant turn carrying this round's tool_calls, as sent upstream. */
+	function toolCallMessage(n: number) {
+		return requestMessages(n).find(
+			(m) => m.role === "assistant" && "tool_calls" in m && m.tool_calls
+		) as (ChatCompletionMessageParam & { reasoning_content?: string }) | undefined;
+	}
+
+	const withReasoning = () => {
+		scriptRounds([
+			{
+				reasoning: "I need the tool.",
+				toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }],
+			},
+			{ content: "done" },
+		]);
+	};
+
+	it("echoes the round's reasoning back by default", async () => {
+		withReasoning();
+
+		await runFlow();
+
+		expect(toolCallMessage(1)?.reasoning_content).toBe("I need the tool.");
+	});
+
+	it("omits reasoning_content for a blocklisted model", async () => {
+		// Not cosmetic: this family's provider rejects the field outright rather
+		// than ignoring it —
+		//   400 messages.2.assistant.reasoning_content: property ... is unsupported
+		// — which would end the conversation mid-tool-loop. Emitting a trace and
+		// accepting one back are different capabilities, and only the blocklist
+		// knows the difference.
+		withReasoning();
+
+		await runFlow({
+			model: { ...context().model, id: "google/gemma-4-31B-it", preservesReasoning: false },
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		const message = toolCallMessage(1);
+		expect(message).toBeDefined();
+		expect(message && "reasoning_content" in message).toBe(false);
+	});
+
+	it("honours a user override that turns reasoning on for a blocklisted model", async () => {
+		withReasoning();
+
+		await runFlow({
+			reasoningOverride: true,
+			model: { ...context().model, preservesReasoning: false },
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(toolCallMessage(1)?.reasoning_content).toBe("I need the tool.");
+	});
+
+	it("honours a user override that turns reasoning off", async () => {
+		withReasoning();
+
+		await runFlow({ reasoningOverride: false } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		const message = toolCallMessage(1);
+		expect(message && "reasoning_content" in message).toBe(false);
+	});
+});
+
+describe("runMcpFlow offering the question tool", () => {
+	const toolNames = () =>
+		(
+			(mocks.create.mock.calls[0]?.[0] as { tools?: Array<{ function: { name: string } }> })
+				?.tools ?? []
+		).map((t) => t.function.name);
+
+	const inMlMode = { conv: { _id: new ObjectId(), mlAssistant: true } } as unknown as Parameters<
+		typeof runMcpFlow
+	>[0];
+
+	it("offers it alongside the MCP tools in ML Assistant mode", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow(inMlMode);
+		expect(toolNames()).toContain("ask_user_question");
+	});
+
+	it("withholds it from a conversation outside the mode", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow();
+		expect(toolNames()).toEqual(["do_thing"]);
+	});
+
+	it("engages the flow with builtin tools alone when MCP listing yields nothing", async () => {
+		mocks.mcpTools = [];
+		scriptRounds([{ content: "the answer" }]);
+		const { result } = await runFlow(inMlMode);
+		expect(result).toBe("completed");
+		expect(toolNames()).toEqual(["ask_user_question", "update_plan", "wait"]);
+	});
+
+	it("still skips the flow outside the mode when no MCP server is selected", async () => {
+		mocks.servers = [];
+		const { result } = await runFlow();
+		expect(result).toBe("not_applicable");
+		expect(mocks.create).not.toHaveBeenCalled();
+	});
+});
+
+describe("runMcpFlow offering the plan tool", () => {
+	const toolNames = () =>
+		(
+			(mocks.create.mock.calls[0]?.[0] as { tools?: Array<{ function: { name: string } }> })
+				?.tools ?? []
+		).map((t) => t.function.name);
+
+	const mlConv = (extra: Record<string, unknown> = {}) =>
+		({ _id: new ObjectId(), mlAssistant: true, ...extra }) as unknown as Parameters<
+			typeof runMcpFlow
+		>[0]["conv"];
+
+	it("offers it in ML Assistant mode and nowhere else", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+		expect(toolNames()).toContain("update_plan");
+
+		mocks.create.mockClear();
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow();
+		expect(toolNames()).not.toContain("update_plan");
+	});
+
+	it("drops an MCP tool shadowed by a builtin name", async () => {
+		mocks.mcpTools = [
+			{ type: "function", function: { name: "do_thing" } },
+			{ type: "function", function: { name: "update_plan" } },
+		];
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+		expect(toolNames().filter((name) => name === "update_plan")).toHaveLength(1);
+	});
+
+	it("injects the current plan at the tail of the last user message", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({
+			conv: mlConv({
+				plan: {
+					goal: "Ship the feature",
+					steps: [{ step: "write it", status: "in_progress" }],
+					version: 2,
+					updatedAt: new Date(),
+				},
+			}),
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		const lastUser = requestMessages(0).findLast((m) => m.role === "user");
+		expect(String(lastUser?.content)).toContain("hello");
+		expect(String(lastUser?.content)).toContain("CURRENT PLAN");
+		expect(String(lastUser?.content)).toContain("PLAN (v2 — 0/1 done)");
+	});
+
+	it("does not inject a stale plan when the tool is not offered", async () => {
+		// A plan block that says "revise it with update_plan" must never appear
+		// without the tool it names — here, outside ML Assistant mode.
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({
+			conv: {
+				_id: new ObjectId(),
+				plan: {
+					goal: "Ship the feature",
+					steps: [{ step: "write it", status: "pending" }],
+					version: 1,
+					updatedAt: new Date(),
+				},
+			},
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		const lastUser = requestMessages(0).findLast((m) => m.role === "user");
+		expect(String(lastUser?.content)).not.toContain("CURRENT PLAN");
+	});
+});
+
+describe("runMcpFlow under the ML Assistant preset", () => {
+	const inMlMode = { conv: { _id: new ObjectId(), mlAssistant: true } } as unknown as Parameters<
+		typeof runMcpFlow
+	>[0];
+
+	const systemPrompt = (n = 0) => String(requestMessages(n)[0]?.content ?? "");
+
+	it("sends the preset's tool preprompt instead of the generic one", async () => {
+		// Both in one message is a contradiction: the generic text names writing
+		// code as a case to answer without tools, which is what the preset exists
+		// to overrule.
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow(inMlMode);
+
+		expect(systemPrompt()).toContain("USING TOOLS:");
+		expect(systemPrompt()).not.toContain("Do NOT call a tool unless");
+	});
+
+	it("leaves a conversation outside the mode on the generic tool preprompt", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow();
+		expect(systemPrompt()).toContain("Do NOT call a tool unless");
+		expect(systemPrompt()).not.toContain("USING TOOLS:");
+	});
+
+	it("keeps working past the round budget an ordinary conversation stops at", async () => {
+		const toolRound: Round = { toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] };
+		scriptRounds([...Array.from({ length: 11 }, () => toolRound), { content: "done" }]);
+
+		const { result } = await runFlow(inMlMode);
+
+		// Grounding ids, auditing a dataset and submitting a job is more than ten
+		// rounds on its own; the generic budget ends the turn mid-task.
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(12);
+	});
+
+	it("still stops, at the preset's own budget", async () => {
+		const toolRound: Round = { toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] };
+		scriptRounds(Array.from({ length: 100 }, () => toolRound));
+
+		const { result } = await runFlow(inMlMode);
+
+		expect(result).toBe("exhausted");
+		expect(mocks.create).toHaveBeenCalledTimes(100);
 	});
 });

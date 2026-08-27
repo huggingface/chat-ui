@@ -20,6 +20,7 @@
 		resolveStreamingMode,
 		applyStreamingMode,
 	} from "$lib/utils/messageUpdates";
+	import { elicitationToResume } from "$lib/stores/elicitationResume";
 	import { consumeMessageUpdates } from "$lib/utils/consumeMessageUpdates";
 	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
@@ -40,6 +41,9 @@
 	} from "$lib/utils/generationState";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
+	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+	import { planStepsToMlSteps } from "$lib/utils/planProgress";
 
 	let { data } = $props();
 
@@ -49,6 +53,8 @@
 
 	let convId = $derived(page.params.id ?? "");
 	let pending = $state(false);
+	/** A resumed call streams into the message that parked, so it needs no placeholder. */
+	let resuming = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
 	// Conversation-scoped stop tombstone. A boolean reset on page.params.id
@@ -127,20 +133,36 @@
 	}
 
 	// this function is used to send new message to the backends
+	$effect(() => {
+		const pending = $elicitationToResume;
+		// Left alone when it belongs elsewhere: the conversation it came from picks it up
+		// when it is next open, rather than this one resuming a stranger's tool call.
+		if (!pending || pending.conversationId !== convId || $loading) return;
+		elicitationToResume.set(null);
+		// The turn that asked: another may have been sent while the prompt was open.
+		void writeMessage({
+			resumeElicitationId: pending.elicitationId,
+			...(pending.messageId ? { messageId: pending.messageId } : {}),
+		});
+	});
+
 	async function writeMessage({
 		prompt,
 		messageId = messagesPath.at(-1)?.id ?? undefined,
 		isRetry = false,
+		resumeElicitationId,
 	}: {
 		prompt?: string;
 		messageId?: ReturnType<typeof v4>;
 		isRetry?: boolean;
+		resumeElicitationId?: string;
 	}): Promise<void> {
 		try {
 			stopRequestedFor = null;
 			$isAborted = false;
 			$loading = true;
 			pending = true;
+			resuming = Boolean(resumeElicitationId);
 			writeMessageInFlight = true;
 			// Create the controller before any await: a Stop click during file
 			// encoding or MCP hydration must abort THIS request, not whichever
@@ -161,7 +183,11 @@
 			let messageToWriteToId: Message["id"] | undefined = undefined;
 			// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 
-			if (isRetry && messageId) {
+			if (resumeElicitationId && messageId) {
+				// Continue the parked assistant message in place — mirrors the server, which
+				// writes back into it rather than starting a turn.
+				messageToWriteToId = messageId;
+			} else if (isRetry && messageId) {
 				// two cases, if we're retrying a user message with a newPrompt set,
 				// it means we're editing a user message
 				// if we're retrying on an assistant message, newPrompt cannot be set
@@ -273,6 +299,7 @@
 					inputs: prompt,
 					messageId,
 					isRetry,
+					...(resumeElicitationId ? { resumeElicitationId } : {}),
 					generationId: activeGenerationId,
 					files: isRetry ? userMessage?.files : base64Files,
 					selectedMcpServerNames: $enabledServers.map((s) => s.name),
@@ -307,8 +334,12 @@
 				onStreamStart: () => {
 					if (pending) streamStart();
 					pending = false;
+					resuming = false;
 				},
 				onTitle: (title) => convsStore.update(convId, { title }),
+				onPlan: (update) => {
+					if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
+				},
 				onError: (update) => {
 					if (update.statusCode === 402) {
 						showSubscribeModal = true;
@@ -344,6 +375,7 @@
 			activeGenerationId = undefined;
 			$loading = false;
 			pending = false;
+			resuming = false;
 			// Wait for the stop request to complete before refreshing data,
 			// so the abort marker is durably written before we poll for the
 			// terminal state below.
@@ -412,6 +444,9 @@
 					onAbort: () => controller.abort(),
 					onStreamStart: () => {},
 					onTitle: (title) => convsStore.update(runConvId, { title }),
+					onPlan: (update) => {
+						if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
+					},
 					onError: (update) => {
 						$error = update.message ?? "An error has occurred";
 					},
@@ -672,6 +707,7 @@
 <ChatWindow
 	loading={$loading}
 	{pending}
+	{resuming}
 	messages={messagesPath as Message[]}
 	{messagesAlternatives}
 	shared={data.shared}

@@ -27,6 +27,10 @@ import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepa
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
+import { withoutContentLength } from "$lib/server/undiciCompat";
+import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
+import { getEnabledBuiltinTools, shouldSkipMcpFlow } from "../builtinTools";
+import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -37,14 +41,30 @@ export type RunMcpFlowContext = Pick<
 	| "forceTools"
 	| "provider"
 	| "reasoningEffort"
+	| "reasoningOverride"
 	| "locals"
+	| "generationId"
+	| "messageId"
 > & { messages: EndpointMessage[] };
 
 // Only "not_applicable" means MCP never ran and the caller should generate normally.
 // Every other result has already emitted its own final answer.
-export type McpFlowResult = "completed" | "not_applicable" | "aborted" | "exhausted";
+export type McpFlowResult =
+	| "completed"
+	| "not_applicable"
+	| "aborted"
+	| "exhausted"
+	/** A 2026-era prompt is open; the run ends here and resumes when it is answered. */
+	| "awaiting_input";
 
 const MAX_TOOL_ROUNDS = 10;
+
+// ML Assistant runs jobs, and the round budget is what it spends grounding ids,
+// auditing a dataset, reading a working example and then submitting: ten does not
+// survive one training task, and exhausting the budget ends the turn with an
+// apology instead of an answer. Only the preset gets the larger budget — an
+// ordinary conversation that loops is still stopped early.
+const ML_ASSISTANT_MAX_TOOL_ROUNDS = 100;
 
 // Each retry costs a tool round, so give up quickly and answer without the tool.
 const MAX_TRUNCATED_TOOL_CALL_RETRIES = 2;
@@ -58,7 +78,10 @@ export async function* runMcpFlow({
 	forceTools,
 	provider,
 	reasoningEffort,
+	reasoningOverride,
 	locals,
+	generationId,
+	messageId,
 	preprompt,
 	abortSignal,
 	abortController,
@@ -83,6 +106,11 @@ export async function* runMcpFlow({
 		}
 		return false;
 	};
+	const builtinTools = getEnabledBuiltinTools({ conv });
+	// Read once: the preset decides the servers, the round budget and which tool
+	// doctrine is sent, and they must all agree within a run.
+	const mlAssistant = isMlAssistantConversation(conv);
+
 	// Start from env-configured servers
 	let servers = getMcpServers();
 	try {
@@ -145,9 +173,22 @@ export async function* runMcpFlow({
 		// ignore selection merge errors and proceed with env servers
 	}
 
+	// The preset's servers go on after the user's selection has been filtered, so
+	// they survive a selection that excludes them. Anything the user picked on top
+	// still comes through — extra servers are configurable, these are not.
+	if (mlAssistant) {
+		servers = withMlAssistantServers(servers);
+		try {
+			logger.debug(
+				{ servers: servers.map((s) => s.name) },
+				"[mcp] applied ML Assistant preset servers"
+			);
+		} catch {}
+	}
+
 	// If selection/merge yielded no servers, bail early with clearer log
-	if (servers.length === 0) {
-		logger.warn({}, "[mcp] no MCP servers selected after merge/name filter");
+	if (shouldSkipMcpFlow(servers.length, builtinTools.length)) {
+		logger.warn({}, "[mcp] no MCP servers selected after merge/name filter, and no builtin tools");
 		return "not_applicable";
 	}
 
@@ -171,7 +212,7 @@ export async function* runMcpFlow({
 			}
 		} catch {}
 	}
-	if (servers.length === 0) {
+	if (shouldSkipMcpFlow(servers.length, builtinTools.length)) {
 		logger.warn({}, "[mcp] all selected MCP servers rejected by URL safety guard");
 		return "not_applicable";
 	}
@@ -240,7 +281,7 @@ export async function* runMcpFlow({
 		{ count: servers.length, servers: servers.map((s) => s.name) },
 		"[mcp] servers configured"
 	);
-	if (servers.length === 0) {
+	if (shouldSkipMcpFlow(servers.length, builtinTools.length)) {
 		return "not_applicable";
 	}
 
@@ -302,9 +343,23 @@ export async function* runMcpFlow({
 	let producedOutput = false;
 
 	try {
-		const { tools: oaTools, mapping } = await getOpenAiToolsForMcp(servers, {
+		const { tools: mcpTools, mapping } = await getOpenAiToolsForMcp(servers, {
 			signal: abortSignal,
 		});
+		// An MCP tool that collides with a builtin name is dropped: dispatch checks
+		// builtins first, so the MCP twin would be advertised but unreachable.
+		const builtinNames = new Set(builtinTools.map((tool) => tool.name));
+		const collisions = mcpTools.filter((tool) => builtinNames.has(tool.function.name));
+		if (collisions.length > 0) {
+			logger.warn(
+				{ dropped: collisions.map((tool) => tool.function.name) },
+				"[mcp] dropped MCP tools shadowed by builtin tools"
+			);
+		}
+		const oaTools = [
+			...builtinTools.map((tool) => tool.definition),
+			...mcpTools.filter((tool) => !builtinNames.has(tool.function.name)),
+		];
 		try {
 			logger.info(
 				{ toolCount: oaTools.length, toolNames: oaTools.map((t) => t.function.name) },
@@ -324,7 +379,7 @@ export async function* runMcpFlow({
 			input: RequestInfo | URL,
 			init?: RequestInit
 		): Promise<Response> => {
-			const res = await fetch(input, init);
+			const res = await fetch(input, withoutContentLength(init));
 			const p = res.headers.get("x-inference-provider");
 			if (p && !providerHeader) providerHeader = p;
 			return res;
@@ -354,13 +409,63 @@ export async function* runMcpFlow({
 			},
 			"[mcp] starting completion with tools"
 		);
+		// Whether this model may be sent reasoning_content at all: the per-user
+		// override wins in both directions, else the model's policy decides — on
+		// by default, off only for a blocklisted family (see reasoningPolicy.ts).
+		//
+		// Governs the in-loop echo below as well as cross-turn replay, because
+		// emitting reasoning and accepting it back are different things: at least
+		// one provider rejects the field outright rather than ignoring it.
+		//
+		//   HTTP 400 messages.2.assistant.reasoning_content: property
+		//   'messages.2.assistant.reasoning_content' is unsupported
+		//
+		// Nothing is invented by defaulting on — reasoning is only echoed when
+		// the model actually produced it, so a non-reasoning model is unaffected
+		// either way.
+		const mayEchoReasoning =
+			reasoningOverride ??
+			(targetModel as unknown as { preservesReasoning?: boolean }).preservesReasoning !== false;
+
+		// Hoisted above the message prep so the history budget can reserve the
+		// reply allowance this request will actually ask for.
+		const parameters = { ...targetModel.parameters, ...assistant?.generateSettings } as Record<
+			string,
+			unknown
+		>;
+		const maxTokens =
+			(parameters?.max_tokens as number | undefined) ??
+			(parameters?.max_new_tokens as number | undefined) ??
+			(parameters?.max_completion_tokens as number | undefined);
+
 		let messagesOpenAI: ChatCompletionMessageParam[] = await prepareMessagesWithFiles(
 			messages,
 			imageProcessor,
-			mmEnabled
+			mmEnabled,
+			{
+				replayToolHistory: true,
+				attachReasoning: mayEchoReasoning,
+				// The model resolved for THIS turn. Under the "omni" router alias a
+				// prior turn in the same conversation can have been produced by a
+				// different model (per-message routing, no user action needed); this
+				// gates reasoning_content to only replay onto its own producer.
+				currentProducerModel: candidateModelId ?? targetModel.id ?? targetModel.name,
+				// The resolved target's window, not the router alias's: under "omni"
+				// the alias itself has none, and the candidate is what serves this
+				// request. Tool schemas are prepended after this returns, which is
+				// part of what CONTEXT_RESERVE_TOKENS holds back.
+				contextLengthTokens: (targetModel as unknown as { contextLength?: number }).contextLength,
+				maxOutputTokens: maxTokens,
+			}
 		);
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
-		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone);
+		// In the mode the doctrine paragraphs are swapped, not appended to: the
+		// generic restraint rule tells the model not to reach for a tool unless it
+		// lacks a capability, and names writing code as a case to answer directly,
+		// which is the inverse of the preset's doctrine.
+		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone, builtinTools, {
+			mlAssistant,
+		});
 		const prepromptPieces: string[] = [];
 		if (toolPreprompt.trim().length > 0) {
 			prepromptPieces.push(toolPreprompt);
@@ -380,6 +485,13 @@ export async function* runMcpFlow({
 			messagesOpenAI = [{ role: "system", content: mergedPreprompt }, ...messagesOpenAI];
 		}
 
+		// Tail-injected once per turn; within the turn, freshness travels in the tool
+		// results. Gated on the tool being offered so a stale plan can't tell the model
+		// to call a tool it doesn't have.
+		if (conv.plan && builtinTools.some((tool) => tool.name === PLAN_TOOL_NAME)) {
+			messagesOpenAI = injectPlanState(messagesOpenAI, conv.plan);
+		}
+
 		// Work around servers that reject `system` role
 		if (
 			typeof config.OPENAI_BASE_URL === "string" &&
@@ -390,15 +502,6 @@ export async function* runMcpFlow({
 		) {
 			messagesOpenAI[0] = { ...messagesOpenAI[0], role: "user" };
 		}
-
-		const parameters = { ...targetModel.parameters, ...assistant?.generateSettings } as Record<
-			string,
-			unknown
-		>;
-		const maxTokens =
-			(parameters?.max_tokens as number | undefined) ??
-			(parameters?.max_new_tokens as number | undefined) ??
-			(parameters?.max_completion_tokens as number | undefined);
 
 		const stopSequences =
 			typeof parameters?.stop === "string"
@@ -450,11 +553,18 @@ export async function* runMcpFlow({
 			sources: { index: number; link: string }[];
 		} => ({ annotated: text, sources: [] });
 
+		const maxToolRounds = mlAssistant ? ML_ASSISTANT_MAX_TOOL_ROUNDS : MAX_TOOL_ROUNDS;
+
 		let lastAssistantContent = "";
 		let streamedContent = false;
 		// Track whether we're inside a <think> block when the upstream streams
 		// provider-specific reasoning tokens (e.g. `reasoning` or `reasoning_content`).
 		let thinkOpen = false;
+		// Leading whitespace-only reasoning deltas that arrived before the block
+		// opened (thinkOpen still false, so a blank chunk wouldn't otherwise open
+		// one). Held here and flushed once a non-blank delta opens the block, so
+		// the persisted trace stays byte-exact instead of silently dropping them.
+		let pendingReasoningWhitespace = "";
 		let truncatedToolCallRetries = 0;
 
 		if (resolvedRoute && candidateModelId) {
@@ -469,7 +579,7 @@ export async function* runMcpFlow({
 			);
 		}
 
-		for (let loop = 0; loop < MAX_TOOL_ROUNDS; loop += 1) {
+		for (let loop = 0; loop < maxToolRounds; loop += 1) {
 			// Check for abort at the start of each loop iteration
 			if (checkAborted()) {
 				logger.info({ loop }, "[mcp] aborting at start of loop iteration");
@@ -478,6 +588,9 @@ export async function* runMcpFlow({
 
 			lastAssistantContent = "";
 			streamedContent = false;
+			// Discard any whitespace-only reasoning buffered but never flushed by a
+			// non-blank delta last round — it never became part of a real trace.
+			pendingReasoningWhitespace = "";
 
 			const completionRequest: ChatCompletionCreateParamsStreaming = {
 				...completionBase,
@@ -572,23 +685,40 @@ export async function* runMcpFlow({
 					return "";
 				})();
 
-				// Provider-dependent reasoning fields (e.g., `reasoning` or `reasoning_content`).
+				// Provider-dependent reasoning fields (`reasoning`, `reasoning_content`,
+				// or `reasoning_text`).
+				const deltaFields = delta as unknown as {
+					reasoning?: unknown;
+					reasoning_content?: unknown;
+					reasoning_text?: unknown;
+				};
 				const deltaReasoning: string =
-					typeof (delta as unknown as Record<string, unknown>)?.reasoning === "string"
-						? ((delta as unknown as { reasoning?: string }).reasoning as string)
-						: typeof (delta as unknown as Record<string, unknown>)?.reasoning_content === "string"
-							? ((delta as unknown as { reasoning_content?: string }).reasoning_content as string)
-							: "";
+					typeof deltaFields?.reasoning === "string"
+						? deltaFields.reasoning
+						: typeof deltaFields?.reasoning_content === "string"
+							? deltaFields.reasoning_content
+							: typeof deltaFields?.reasoning_text === "string"
+								? deltaFields.reasoning_text
+								: "";
 
 				// Merge reasoning + content into a single combined token stream, mirroring
 				// the OpenAI adapter so the UI can auto-detect <think> blocks.
 				let combined = "";
-				if (deltaReasoning.trim().length > 0) {
-					if (!thinkOpen) {
-						combined += "<think>" + deltaReasoning;
+				// Whitespace-only deltas still count once a think block is open
+				// (paragraph breaks are part of the byte-exact trace); non-blank
+				// text is only required to OPEN a block, so stray leading
+				// whitespace can't create empty think blocks on its own — but it
+				// must not be discarded either, so it's buffered until a non-blank
+				// delta arrives and flushed into the opening of the block.
+				if (deltaReasoning.length > 0) {
+					if (thinkOpen) {
+						combined += deltaReasoning;
+					} else if (deltaReasoning.trim().length > 0) {
+						combined += "<think>" + pendingReasoningWhitespace + deltaReasoning;
+						pendingReasoningWhitespace = "";
 						thinkOpen = true;
 					} else {
-						combined += deltaReasoning;
+						pendingReasoningWhitespace += deltaReasoning;
 					}
 				}
 
@@ -720,16 +850,39 @@ export async function* runMcpFlow({
 					function: { name: call.name, arguments: call.arguments },
 				}));
 
-				// Avoid sending <think> content back to the model alongside tool_calls
-				// to prevent confusing follow-up reasoning. Strip any think blocks.
+				// Move <think> content out of `content` and echo it back as
+				// `reasoning_content`: preserved-thinking models (e.g. Kimi K2/K3)
+				// condition their next tool round on prior reasoning and degrade
+				// when it's dropped; other providers ignore the field.
+				const thinkParts: string[] = [];
 				const assistantContentForToolMsg = lastAssistantContent.replace(
-					/<think>[\s\S]*?(?:<\/think>|$)/g,
-					""
+					/<think>([\s\S]*?)(?:<\/think>|$)/g,
+					(_match, inner: string) => {
+						thinkParts.push(inner);
+						return "";
+					}
 				);
-				const assistantToolMessage: ChatCompletionMessageParam = {
+				// Trim only to TEST for emptiness — the joined value itself must stay
+				// byte-exact once it's echoed back and persisted: vendors documenting
+				// preserved thinking (e.g. Z.ai's "must return the complete,
+				// unmodified reasoning_content") can condition on or cache against the
+				// exact bytes, so stripping whitespace here would send a corrupted
+				// trace on the next round/turn.
+				const reasoningForToolMsg = thinkParts.join("\n");
+				// Omit `content` entirely when nothing visible remains — some
+				// OpenAI-compatible backends 400 on empty text next to tool_calls.
+				const assistantToolMessage: ChatCompletionMessageParam & { reasoning_content?: string } = {
 					role: "assistant",
-					content: assistantContentForToolMsg,
 					tool_calls: toolCalls,
+					...(assistantContentForToolMsg.trim().length > 0
+						? { content: assistantContentForToolMsg }
+						: {}),
+					// Gated by mayEchoReasoning — see where it is defined. Still
+					// persisted below regardless of the gate: recording what the model
+					// thought is inert, and only sending it can break a request.
+					...(mayEchoReasoning && reasoningForToolMsg.trim().length > 0
+						? { reasoning_content: reasoningForToolMsg }
+						: {}),
 				};
 
 				const exec = executeToolCalls({
@@ -741,6 +894,20 @@ export async function* runMcpFlow({
 					toPrimitive,
 					processToolOutput,
 					abortSignal,
+					// Persisted on the round's first Call update so history replay
+					// can re-attach this round's reasoning and preamble text to its
+					// own message instead of moving them onto the final answer.
+					roundReasoning: reasoningForToolMsg,
+					roundContent: assistantContentForToolMsg,
+					elicitation: { conversationId: conv._id, generationId, messageId },
+					// A parked call resumes with no request behind it, so the identity it
+					// should act as has to be recorded now, while there still is one.
+					owner: {
+						userId: (locals as unknown as { user?: { _id?: import("mongodb").ObjectId } })?.user
+							?._id,
+						sessionId: (locals as unknown as { sessionId?: string })?.sessionId,
+					},
+					builtinTools,
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;
@@ -749,6 +916,10 @@ export async function* runMcpFlow({
 						producedOutput = true;
 						yield event.update;
 					} else {
+						if (event.summary.awaitingInput) {
+							logger.info({ loop }, "[mcp] parked on a durable prompt; run ends until answered");
+							return "awaiting_input";
+						}
 						messagesOpenAI = [
 							...messagesOpenAI,
 							assistantToolMessage,
@@ -806,7 +977,7 @@ export async function* runMcpFlow({
 		}
 		// Not "not_applicable": that re-runs the turn with no tools and discards every
 		// tool result this turn produced.
-		logger.warn({ maxRounds: MAX_TOOL_ROUNDS }, "[mcp] tool-round budget exhausted");
+		logger.warn({ maxRounds: maxToolRounds }, "[mcp] tool-round budget exhausted");
 		const exhaustedText =
 			lastAssistantContent.trim().length > 0
 				? lastAssistantContent
