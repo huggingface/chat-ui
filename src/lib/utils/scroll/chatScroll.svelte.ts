@@ -52,6 +52,13 @@ export interface ChatScrollSnapshot {
 	 * terminal — the pre-mount gap after a submit still trails the previous,
 	 * settled reply, which must not anchor), else null. */
 	streamingTurnKey: string | null;
+	/** True when the stream continues a message that already streamed work —
+	 * a parked wait elapsing, an answered question. The turn re-enters
+	 * streaming, but it is not a new reply: carrying the view to the anchor
+	 * again would yank a bottom-following reader to the turn's top mid-task
+	 * (in a one-turn agentic conversation, the literal top of the page). A
+	 * fresh reply (send, edit, regenerate) streams into an empty message. */
+	resumedStream: boolean;
 }
 
 export class ChatScroll {
@@ -200,7 +207,7 @@ export class ChatScroll {
 	 * re-runs on token flushes).
 	 */
 	sync(snapshot: ChatScrollSnapshot) {
-		const { conversationKey, turnCount, lastTurnKey, streamingTurnKey } = snapshot;
+		const { conversationKey, turnCount, lastTurnKey, streamingTurnKey, resumedStream } = snapshot;
 
 		if (!this.initialized || conversationKey !== this.lastConversationKey) {
 			const isFirstRun = !this.initialized;
@@ -228,12 +235,14 @@ export class ChatScroll {
 			if (streamingTurnKey !== this.anchoredTurnKey) {
 				this.setAnchor(streamingTurnKey, turnCount - 1);
 			}
-			if (streamStarted && this.state.pinned) {
+			if (streamStarted && !resumedStream && this.state.pinned) {
 				// A reply just started streaming (send, edit, regenerate) and the
 				// view is still engaged from the submit: carry it to the anchor
 				// (one continuous motion with the send's own glide) and leave it
 				// there in read mode. A user who detached since submitting stays
-				// exactly where they are.
+				// exactly where they are. A RESUMED stream (see resumedStream)
+				// never carries: the reader placed themselves during the run and
+				// the park/resume cycle must not move them.
 				//
 				// Deferred one microtask: this runs mid-render-flush, before the
 				// reservation's template binding lands — measuring the anchor

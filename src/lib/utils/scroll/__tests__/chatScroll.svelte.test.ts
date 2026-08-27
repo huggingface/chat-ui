@@ -24,7 +24,12 @@ interface ChatFixture {
 	fixture: Fixture;
 	chat: ReturnType<typeof createChatScroll>;
 	dom: TurnDom;
-	messages: { id: string; from: "user" | "assistant"; terminal?: boolean }[];
+	messages: {
+		id: string;
+		from: "user" | "assistant";
+		terminal?: boolean;
+		hasStreamedWork?: boolean;
+	}[];
 	sync: (opts?: { loading?: boolean; conversationKey?: string }) => void;
 	/** Mount a fresh turn — user message plus (empty) reply — as a send does,
 	 * with `loading` already true unless overridden. */
@@ -36,6 +41,11 @@ interface ChatFixture {
 	swapAssistant: (opts?: { loading?: boolean }) => HTMLDivElement;
 	/** Mark the trailing reply terminal — the stream is over. */
 	settleLast: () => void;
+	/** The wait tool parks the turn: reads terminal for the UI, loading off. */
+	parkLast: () => void;
+	/** The sweeper resumes the parked turn: the SAME message re-enters
+	 * streaming, already carrying its streamed work. */
+	resumeLast: () => void;
 	/** The post-stream server reconciliation: every message (and so every
 	 * turn) gets a fresh identity, content and geometry unchanged. */
 	reKeyAll: (opts?: { loading?: boolean }) => void;
@@ -116,6 +126,7 @@ function createChat({
 				turnCount: dom.groups.length,
 				lastTurnKey,
 				streamingTurnKey: streaming ? lastTurnKey : null,
+				resumedStream: Boolean(streaming && last?.hasStreamedWork),
 			});
 			dom.flush();
 		},
@@ -149,6 +160,19 @@ function createChat({
 			const last = messages.at(-1);
 			if (last) last.terminal = true;
 			api.sync({ loading: false });
+		},
+		parkLast() {
+			const last = messages.at(-1);
+			if (last) last.terminal = true;
+			api.sync({ loading: false });
+		},
+		resumeLast() {
+			const last = messages.at(-1);
+			if (last) {
+				last.terminal = false;
+				last.hasStreamedWork = true;
+			}
+			api.sync({ loading: true });
 		},
 		reKeyAll({ loading = false } = {}) {
 			for (const group of dom.groups) {
@@ -558,6 +582,74 @@ describe("regenerate & branches", () => {
 		const { user: sent } = chat.mountPair();
 		await waitFor(() => Math.abs(topOf(sent, chat) - ANCHOR_OFFSET) <= 2, {
 			label: "real pair anchors",
+		});
+	});
+});
+
+describe("park & resume", () => {
+	// The wait tool parks the turn (reads terminal, loading off) and the
+	// sweeper resumes it: the SAME message re-enters streaming. That is a
+	// continuation, not a new reply — it must never re-run the carry-to-anchor,
+	// which in a one-turn agentic conversation is the top of the page.
+
+	it("a resume never yanks a bottom-following reader to the turn top", async () => {
+		const chat = createChat();
+		chat.chat.notifySend();
+		const { assistant } = chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
+		// The reply outgrows its reservation; the reader chooses to follow live.
+		assistant.style.height = "900px";
+		await frames(3);
+		chat.chat.scrollToBottom();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "following" });
+		expect(chat.chat.state.pinned).toBe(true);
+
+		chat.parkLast();
+		await frames(2);
+		chat.resumeLast();
+		await frames(4);
+
+		// Still following the bottom — no motion toward the anchor.
+		expect(chat.chat.state.pinned).toBe(true);
+		expect(chat.fixture.distance()).toBeLessThanOrEqual(ARRIVED);
+		chat.growLastAssistant(300);
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "keeps following" });
+	});
+
+	it("a resume leaves a scrolled-up reader exactly where they are", async () => {
+		const chat = createChat();
+		chat.chat.notifySend();
+		const { assistant } = chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
+		assistant.style.height = "900px";
+		await frames(3);
+		wheel(chat.fixture.container, -400);
+		await frame();
+		const scrollTop = chat.fixture.scrollTop();
+
+		chat.parkLast();
+		await frames(2);
+		chat.resumeLast();
+		await frames(4);
+
+		expect(chat.fixture.scrollTop()).toBe(scrollTop);
+		expect(chat.chat.state.pinned).toBe(false);
+	});
+
+	it("a fresh send after a parked turn settles still carries to its anchor", async () => {
+		const chat = createChat();
+		chat.chat.notifySend();
+		chat.mountPair();
+		await waitFor(() => chat.fixture.distance() <= ARRIVED, { label: "anchored" });
+		chat.parkLast();
+		chat.resumeLast();
+		await frames(2);
+		chat.settleLast();
+		// The next exchange is a genuinely new reply: the carry still runs.
+		chat.chat.notifySend();
+		const { user } = chat.mountPair();
+		await waitFor(() => Math.abs(topOf(user, chat) - ANCHOR_OFFSET) <= 2, {
+			label: "new exchange anchors",
 		});
 	});
 });

@@ -399,6 +399,16 @@
 			turnCount: turns.length,
 			lastTurnKey,
 			streamingTurnKey: streaming ? lastTurnKey : null,
+			// Untracked like the terminal check: read once at the streaming flip,
+			// never per token. A park resuming (wait elapsed, question answered)
+			// re-enters streaming on a message that already carries work — a
+			// continuation, not a new reply, so the carry-to-anchor must not
+			// re-run. A fresh reply's message is still empty at the flip.
+			resumedStream: Boolean(
+				streaming &&
+				lastMessage &&
+				untrack(() => lastMessage.content.length > 0 || (lastMessage.updates?.length ?? 0) > 0)
+			),
 		});
 	});
 
