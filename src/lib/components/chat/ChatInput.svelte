@@ -233,10 +233,16 @@
 </script>
 
 <div class="flex min-h-full flex-1 flex-col" onpaste={onPaste}>
+	<!-- autocomplete=off is not autofill: it opts the composer out of the
+	     browser's session form-state restore, which otherwise re-pastes an
+	     already-sent prompt into the box on reload mid-generation (the value
+	     typed on / travels into this page's history entry across the SPA
+	     navigation, and the restore bypasses the Svelte binding). -->
 	<textarea
 		rows="1"
 		tabindex="0"
 		inputmode="text"
+		autocomplete="off"
 		class="scrollbar-custom max-h-[4lh] w-full resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent px-2.5 py-2.5 outline-hidden focus:ring-0 focus-visible:ring-0 sm:px-3 md:max-h-[8lh]"
 		class:text-gray-400={disabled}
 		bind:value
