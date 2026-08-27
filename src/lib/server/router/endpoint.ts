@@ -17,7 +17,7 @@ import {
 	pickToolsCapableModel,
 } from "./toolsRoute";
 import { getConfiguredMultimodalModelId } from "./multimodal";
-import { getFreeUserModel, resolveUserTier } from "./userTier";
+import { findFreeUserMultimodalModel, getFreeUserModel, resolveUserTier } from "./userTier";
 
 const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
@@ -169,7 +169,13 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			let multimodalCandidate: string | undefined;
 			try {
 				const all = await getModels();
-				multimodalCandidate = getConfiguredMultimodalModelId(all);
+				// A multimodal-capable free-user model also serves free users' image requests;
+				// with a text-only free model the tier is irrelevant and never resolved.
+				const freeUserMultimodal = findFreeUserMultimodalModel(all);
+				if (freeUserMultimodal && (await resolveUserTier(params.locals)) === "free") {
+					multimodalCandidate = freeUserMultimodal.id ?? freeUserMultimodal.name;
+				}
+				multimodalCandidate ??= getConfiguredMultimodalModelId(all);
 			} catch (e) {
 				logger.warn({ err: String(e) }, "[router] failed to load models for multimodal lookup");
 			}

@@ -47,6 +47,26 @@ export function getFreeUserModel(): string {
 	return (config.LLM_ROUTER_FREE_USER_MODEL || "").trim();
 }
 
+interface RoutableModel {
+	id: string;
+	name: string;
+	isRouter?: boolean;
+	multimodal?: boolean;
+}
+
+/**
+ * The free-user model when it can also serve image inputs (multimodal per the router),
+ * so free users' image requests stay on the cheap model instead of the premium
+ * multimodal one. Undefined when the feature is off or the free model is text-only.
+ */
+export function findFreeUserMultimodalModel<T extends RoutableModel>(
+	models: readonly T[] | undefined
+): T | undefined {
+	const id = getFreeUserModel();
+	if (!id || !models?.length) return undefined;
+	return models.find((m) => (m.id === id || m.name === id) && !m.isRouter && m.multimodal);
+}
+
 async function fetchUserBilling(token: string): Promise<HubUserInfo> {
 	const response = await fetch(USERINFO_URL, {
 		headers: { Authorization: `Bearer ${token}` },

@@ -23,6 +23,7 @@ const FIXTURE_MODELS = vi.hoisted(() => [
 		isRouter: false,
 		multimodal: false,
 	},
+	{ id: "free/vl-model", name: "free/vl-model", isRouter: false, multimodal: true },
 ]);
 
 vi.mock("$lib/server/config", () => ({ config: mockConfig }));
@@ -56,6 +57,7 @@ const { resolveRouterTarget } = await import("./routerResolution");
 const routerModel = FIXTURE_MODELS[0] as unknown as ProcessedModel;
 const kimi = FIXTURE_MODELS[1];
 const flash = FIXTURE_MODELS[2];
+const freeVl = FIXTURE_MODELS[3];
 
 function makeLocals(withTools = false): App.Locals {
 	return {
@@ -113,6 +115,29 @@ describe("resolveRouterTarget", () => {
 		expect(result.targetModel).toBe(kimi);
 		expect(result.resolvedRoute).toBe("multimodal");
 		expect(mocks.resolveUserTier).not.toHaveBeenCalled();
+	});
+
+	it("serves free users' image input with the free model when it is multimodal-capable", async () => {
+		mocks.resolveUserTier.mockResolvedValue("free");
+		mockConfig.LLM_ROUTER_FREE_USER_MODEL = "free/vl-model";
+		const result = await resolveRouterTarget({
+			model: routerModel,
+			hasImageInput: true,
+			locals: makeLocals(),
+		});
+		expect(result.targetModel).toBe(freeVl);
+		expect(result.resolvedRoute).toBe("multimodal");
+	});
+
+	it("keeps the regular multimodal model for paid users even with a multimodal free model", async () => {
+		mockConfig.LLM_ROUTER_FREE_USER_MODEL = "free/vl-model";
+		const result = await resolveRouterTarget({
+			model: routerModel,
+			hasImageInput: true,
+			locals: makeLocals(),
+		});
+		expect(result.targetModel).toBe(kimi);
+		expect(result.resolvedRoute).toBe("multimodal");
 	});
 
 	it("pins free users to the free-tier model on the tools route", async () => {

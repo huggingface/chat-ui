@@ -28,6 +28,7 @@ const FIXTURE_MODELS = vi.hoisted(() => [
 		isRouter: false,
 		multimodal: false,
 	},
+	{ id: "free/vl-model", name: "free/vl-model", isRouter: false, multimodal: true },
 ]);
 
 vi.mock("$lib/server/config", () => ({ config: mockConfig }));
@@ -141,6 +142,23 @@ describe("makeRouterEndpoint", () => {
 			model: "moonshotai/Kimi-K2.6",
 		});
 		expect(mocks.resolveUserTier).not.toHaveBeenCalled();
+	});
+
+	it("serves free users' image input with the free model when it is multimodal-capable", async () => {
+		mocks.resolveUserTier.mockResolvedValue("free");
+		mockConfig.LLM_ROUTER_FREE_USER_MODEL = "free/vl-model";
+		await expect(firstMetadata(makeParams({ image: true }))).resolves.toEqual({
+			route: "multimodal",
+			model: "free/vl-model",
+		});
+	});
+
+	it("keeps the regular multimodal model for paid users even with a multimodal free model", async () => {
+		mockConfig.LLM_ROUTER_FREE_USER_MODEL = "free/vl-model";
+		await expect(firstMetadata(makeParams({ image: true }))).resolves.toEqual({
+			route: "multimodal",
+			model: "moonshotai/Kimi-K2.6",
+		});
 	});
 
 	it("pins free users to the free-tier model on the tools route", async () => {

@@ -16,8 +16,12 @@ const loggerMock = vi.hoisted(() => ({
 vi.mock("$lib/server/config", () => ({ config: mockConfig }));
 vi.mock("$lib/server/logger", () => ({ logger: loggerMock }));
 
-const { resolveUserTier, getFreeUserModel, validateFreeTierRouterConfig } =
-	await import("./userTier");
+const {
+	resolveUserTier,
+	getFreeUserModel,
+	findFreeUserMultimodalModel,
+	validateFreeTierRouterConfig,
+} = await import("./userTier");
 
 const fetchMock = vi.fn();
 
@@ -62,6 +66,28 @@ describe("getFreeUserModel", () => {
 	it("returns the trimmed configured model", () => {
 		mockConfig.LLM_ROUTER_FREE_USER_MODEL = " deepseek-ai/DeepSeek-V4-Flash-0731 ";
 		expect(getFreeUserModel()).toBe("deepseek-ai/DeepSeek-V4-Flash-0731");
+	});
+});
+
+describe("findFreeUserMultimodalModel", () => {
+	const models = [
+		{ id: "text/model", name: "text/model", isRouter: false, multimodal: false },
+		{ id: "vl/model", name: "vl/model", isRouter: false, multimodal: true },
+	];
+
+	it("returns undefined when the feature is disabled", () => {
+		mockConfig.LLM_ROUTER_FREE_USER_MODEL = "";
+		expect(findFreeUserMultimodalModel(models)).toBeUndefined();
+	});
+
+	it("returns undefined when the free model is text-only", () => {
+		mockConfig.LLM_ROUTER_FREE_USER_MODEL = "text/model";
+		expect(findFreeUserMultimodalModel(models)).toBeUndefined();
+	});
+
+	it("returns the free model when it is multimodal-capable", () => {
+		mockConfig.LLM_ROUTER_FREE_USER_MODEL = "vl/model";
+		expect(findFreeUserMultimodalModel(models)).toBe(models[1]);
 	});
 });
 

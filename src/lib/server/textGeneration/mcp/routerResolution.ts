@@ -11,7 +11,11 @@ import {
 	pickToolsCapableModel,
 } from "$lib/server/router/toolsRoute";
 import { findConfiguredMultimodalModel } from "$lib/server/router/multimodal";
-import { getFreeUserModel, resolveUserTier } from "$lib/server/router/userTier";
+import {
+	findFreeUserMultimodalModel,
+	getFreeUserModel,
+	resolveUserTier,
+} from "$lib/server/router/userTier";
 import type { ProcessedModel } from "../../models";
 import { logger } from "../../logger";
 
@@ -46,10 +50,15 @@ export async function resolveRouterTarget({
 		const mod = await import("../../models");
 		const allModels = mod.models as ProcessedModel[];
 
-		// Multimodal bypass (applies to free users too — the free-tier model is text-only,
-		// so image requests keep the regular multimodal model)
+		// Multimodal bypass. A multimodal-capable free-user model also serves free users'
+		// image requests; with a text-only free model the tier is irrelevant and never
+		// resolved, and image requests keep the regular multimodal model.
 		if (hasImageInput) {
-			const multimodalCandidate = findConfiguredMultimodalModel(allModels);
+			const freeUserMultimodal = findFreeUserMultimodalModel(allModels);
+			const multimodalCandidate =
+				freeUserMultimodal && (await resolveUserTier(locals)) === "free"
+					? freeUserMultimodal
+					: findConfiguredMultimodalModel(allModels);
 			if (!multimodalCandidate) {
 				runMcp = false;
 				logger.warn(
