@@ -59,10 +59,7 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				});
 			}
 
-			if (
-				event.url.pathname.startsWith(`${base}/admin/`) ||
-				event.url.pathname === `${base}/admin`
-			) {
+			if (event.route.id === "/admin" || event.route.id?.startsWith("/admin/")) {
 				const ADMIN_SECRET = config.ADMIN_API_SECRET || config.PARQUET_EXPORT_SECRET;
 
 				if (!ADMIN_SECRET) {
