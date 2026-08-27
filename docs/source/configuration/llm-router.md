@@ -88,7 +88,7 @@ LLM_ROUTER_FREE_USER_MODEL=zai-org/GLM-5.3-Flash
 
 Free users get this model for the default and tools routes, falling back to the route's normal models if it fails. Image requests keep `LLM_ROUTER_MULTIMODAL_MODEL`, unless the free model is itself multimodal-capable (per the router), in which case it serves free users' images too (pick a tools-capable free model if you use the tools shortcut). Paying users keep the normal route selection, and requests to a directly-picked (non-Omni) model are never affected.
 
-Payment status is read from the Hub's OAuth `userinfo` endpoint using the logged-in user's token, so this requires Hugging Face OIDC login and the `read-billing` scope in `OPENID_SCOPES` (included in the default). Results are cached in-process for about 10 minutes, and lookups fail open: if the Hub can't be reached, the user is treated as paying.
+Payment status is read from the Hub's OAuth `userinfo` endpoint using the logged-in user's token, so this requires Hugging Face OIDC login and the `read-billing` scope in `OPENID_SCOPES` (included in the default). If a different OpenID provider is configured, the feature stays inactive and user tokens are never sent to huggingface.co. Results are cached in-process for about 10 minutes, and lookups fail open: if the Hub can't be reached, the user is treated as paying.
 
 Leave `LLM_ROUTER_FREE_USER_MODEL` empty (the default) to disable the feature entirely — no billing lookups are made and routing behaves exactly as described above.
 

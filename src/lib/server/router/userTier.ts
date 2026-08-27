@@ -1,5 +1,6 @@
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
+import JSON5 from "json5";
 
 export type UserTier = "free" | "paid";
 
@@ -46,6 +47,28 @@ function ensureSweeper() {
 /** The model free users are pinned to ("" when free-tier routing is disabled). */
 export function getFreeUserModel(): string {
 	return (config.LLM_ROUTER_FREE_USER_MODEL || "").trim();
+}
+
+/**
+ * The tier lookup authenticates against the Hub, so it must only run when the OAuth tokens
+ * chat-ui holds were issued by the Hub — a deployment using a third-party OpenID provider
+ * must never have its users' tokens forwarded to huggingface.co. Mirrors auth.ts's provider
+ * resolution (OPENID_CONFIG's PROVIDER_URL, falling back to OPENID_PROVIDER_URL).
+ */
+function isHuggingFaceOidcProvider(): boolean {
+	let providerUrl = config.OPENID_PROVIDER_URL || "";
+	try {
+		const parsed = JSON5.parse(config.OPENID_CONFIG || "{}") as { PROVIDER_URL?: string };
+		if (parsed.PROVIDER_URL) providerUrl = parsed.PROVIDER_URL;
+	} catch {
+		// Malformed OPENID_CONFIG never reaches here in practice (auth.ts fails the boot),
+		// but fall back to the plain env var rather than throwing from routing code.
+	}
+	try {
+		return new URL(providerUrl).hostname === "huggingface.co";
+	} catch {
+		return false;
+	}
 }
 
 interface RoutableModel {
@@ -134,6 +157,9 @@ async function fetchCacheEntry(userId: string, token: string): Promise<CacheEntr
  */
 export async function resolveUserTier(locals: App.Locals | undefined): Promise<UserTier> {
 	if (!getFreeUserModel()) return "paid";
+	// Never send a third-party provider's token to the Hub: without Hub-issued tokens the
+	// tier can't be determined, so the feature stays inactive.
+	if (!isHuggingFaceOidcProvider()) return "paid";
 	if (!locals?.user || !locals?.token) return "free";
 
 	const entry = await getCacheEntry(locals.user._id.toString(), locals.token);
@@ -164,7 +190,11 @@ export function validateFreeTierRouterConfig(
 		);
 	}
 
-	if (!(config.OPENID_SCOPES || "").split(/\s+/).includes("read-billing")) {
+	if (!isHuggingFaceOidcProvider()) {
+		logger.error(
+			"[userTier] free-tier routing is enabled but the OpenID provider is not huggingface.co; tier lookups are disabled (tokens are never sent to the Hub) and every user gets normal routing"
+		);
+	} else if (!(config.OPENID_SCOPES || "").split(/\s+/).includes("read-billing")) {
 		logger.error(
 			"[userTier] free-tier routing is enabled but OPENID_SCOPES lacks 'read-billing'; users with prepaid credits but no PRO subscription will be treated as free"
 		);

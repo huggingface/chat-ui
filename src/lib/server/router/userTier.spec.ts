@@ -4,6 +4,8 @@ import { ObjectId } from "mongodb";
 const mockConfig = vi.hoisted(() => ({
 	LLM_ROUTER_FREE_USER_MODEL: "",
 	OPENID_SCOPES: "openid profile inference-api read-billing",
+	OPENID_PROVIDER_URL: "https://huggingface.co",
+	OPENID_CONFIG: "",
 }));
 
 const loggerMock = vi.hoisted(() => ({
@@ -50,6 +52,8 @@ beforeEach(() => {
 	vi.stubGlobal("fetch", fetchMock);
 	mockConfig.LLM_ROUTER_FREE_USER_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731";
 	mockConfig.OPENID_SCOPES = "openid profile inference-api read-billing";
+	mockConfig.OPENID_PROVIDER_URL = "https://huggingface.co";
+	mockConfig.OPENID_CONFIG = "";
 });
 
 afterEach(() => {
@@ -94,6 +98,18 @@ describe("findFreeUserMultimodalModel", () => {
 describe("resolveUserTier", () => {
 	it("returns paid without any lookup when the feature is disabled", async () => {
 		mockConfig.LLM_ROUTER_FREE_USER_MODEL = "";
+		await expect(resolveUserTier(makeLocals())).resolves.toBe("paid");
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("returns paid without a lookup when the OpenID provider is not the Hub", async () => {
+		mockConfig.OPENID_PROVIDER_URL = "https://auth.example.com";
+		await expect(resolveUserTier(makeLocals())).resolves.toBe("paid");
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("honors a non-Hub PROVIDER_URL set via OPENID_CONFIG", async () => {
+		mockConfig.OPENID_CONFIG = '{ PROVIDER_URL: "https://auth.example.com" }';
 		await expect(resolveUserTier(makeLocals())).resolves.toBe("paid");
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
@@ -257,6 +273,12 @@ describe("validateFreeTierRouterConfig", () => {
 
 	it("errors when read-billing is missing from the OpenID scopes", () => {
 		mockConfig.OPENID_SCOPES = "openid profile";
+		validateFreeTierRouterConfig(models);
+		expect(loggerMock.error).toHaveBeenCalledTimes(1);
+	});
+
+	it("errors when enabled with a non-Hub OpenID provider", () => {
+		mockConfig.OPENID_PROVIDER_URL = "https://auth.example.com";
 		validateFreeTierRouterConfig(models);
 		expect(loggerMock.error).toHaveBeenCalledTimes(1);
 	});
