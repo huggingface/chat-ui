@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
+import { turnWaiting } from "$lib/server/generation/turnState";
 import { logger } from "$lib/server/logger";
 import type { BuiltinTool } from "./types";
 
@@ -123,6 +124,21 @@ export const waitBuiltin: BuiltinTool = {
 			{ parkedCallId, conversationId: ctx.conversationId.toString(), seconds: clamped, reason },
 			"[wait] turn parked"
 		);
+
+		// The park is a lifecycle transition: record it on the turn state and
+		// send it in-band, so every subscriber learns the absolute deadline from
+		// the same channel that carries the rest of the turn.
+		const stateUpdate = await turnWaiting(
+			{
+				conversationId: ctx.conversationId,
+				messageId: ctx.messageId,
+				producerId: ctx.generationId ?? "",
+				...(ctx.userId ? { userId: ctx.userId } : {}),
+				...(ctx.sessionId ? { sessionId: ctx.sessionId } : {}),
+			},
+			{ until: new Date(now.getTime() + clamped * 1000), reason }
+		);
+		ctx.elicitationSink?.emit(stateUpdate);
 
 		return { awaitingInput: true };
 	},

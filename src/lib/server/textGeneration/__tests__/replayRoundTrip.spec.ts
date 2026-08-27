@@ -478,7 +478,9 @@ describe.sequential("replaying a turn that ended badly", () => {
 			() => new Promise((resolve) => setTimeout(() => resolve({ text: "late" }), 5_000))
 		);
 
-		await sendMessageAndDetach(conv, locals, "Weather?", 3);
+		// One more chunk than before the turnState events existed: the turn now
+		// opens with an in-band `running` transition ahead of the tool call.
+		await sendMessageAndDetach(conv, locals, "Weather?", 4);
 
 		const stored = await reload(conv);
 		const lastAssistant = assistantMessages(stored).at(-1);

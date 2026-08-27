@@ -17,6 +17,29 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 		url.searchParams.get("fromShare")
 	);
 
+	// The last assistant message's authoritative liveness, alongside the
+	// snapshot it describes. `serverNow` lets the client correct clock skew so
+	// a waiting turn's countdown renders true remaining time on load.
+	const lastAssistant = [...conversation.messages]
+		.reverse()
+		.find((message) => message.from === "assistant");
+	// Share views resolve with a string id; ObjectId accepts both forms.
+	const turnStateDoc = lastAssistant
+		? await collections.turnStates
+				.findOne({ conversationId: new ObjectId(conversation._id), messageId: lastAssistant.id })
+				.catch(() => null)
+		: null;
+	const turnState = turnStateDoc
+		? {
+				messageId: turnStateDoc.messageId,
+				status: turnStateDoc.status,
+				serverNow: Date.now(),
+				...(turnStateDoc.waitUntil ? { until: turnStateDoc.waitUntil.getTime() } : {}),
+				...(turnStateDoc.waitReason ? { reason: turnStateDoc.waitReason } : {}),
+				...(turnStateDoc.error ? { error: turnStateDoc.error } : {}),
+			}
+		: undefined;
+
 	return superjsonResponse({
 		messages: conversation.messages,
 		title: conversation.title,
@@ -30,6 +53,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 		deployedSpaces: "deployedSpaces" in conversation ? conversation.deployedSpaces : undefined,
 		mlAssistant: "mlAssistant" in conversation ? conversation.mlAssistant : undefined,
 		plan: "plan" in conversation ? conversation.plan : undefined,
+		turnState,
 	});
 };
 

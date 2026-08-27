@@ -1,6 +1,7 @@
 import type { InferenceProvider } from "@huggingface/inference";
 import type { ToolCall, ToolResult } from "$lib/types/Tool";
 import type { PlanStep } from "$lib/types/Plan";
+import type { TurnStatus } from "$lib/types/TurnState";
 import type {
 	ElicitationAction,
 	ElicitationRequestPayload,
@@ -18,7 +19,8 @@ export type MessageUpdate =
 	| MessageReasoningUpdate
 	| MessageRouterMetadataUpdate
 	| MessageElicitationUpdate
-	| MessagePlanUpdate;
+	| MessagePlanUpdate
+	| MessageTurnStateUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -31,6 +33,24 @@ export enum MessageUpdateType {
 	RouterMetadata = "routerMetadata",
 	Elicitation = "elicitation",
 	Plan = "plan",
+	TurnState = "turnState",
+}
+
+/**
+ * In-band turn lifecycle transition (see TurnState). Delivered on the same
+ * channel as every other update so a subscriber learns about parks, resumes
+ * and endings without a side channel, and replay reproduces the history.
+ * Times are epoch milliseconds; `serverNow` is stamped at emission so the
+ * client can correct clock skew and render true remaining time.
+ */
+export interface MessageTurnStateUpdate {
+	type: MessageUpdateType.TurnState;
+	state: TurnStatus;
+	serverNow: number;
+	/** Absolute deadline, present when state === "waiting". */
+	until?: number;
+	reason?: string;
+	error?: string;
 }
 
 // Status

@@ -10,6 +10,7 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Generation, GenerationEvent } from "$lib/types/Generation";
+import type { TurnState } from "$lib/types/TurnState";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { ParkedCall } from "$lib/types/ParkedCall";
 import type { Settings } from "$lib/types/Settings";
@@ -139,6 +140,7 @@ export class Database {
 		const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
 		const generations = db.collection<Generation>("generations");
 		const generationEvents = db.collection<GenerationEvent>("generationEvents");
+		const turnStates = db.collection<TurnState>("turnStates");
 		const mcpElicitations = db.collection<McpElicitation>("mcpElicitations");
 		const parkedCalls = db.collection<ParkedCall>("parkedCalls");
 		const semaphores = db.collection<Semaphore>("semaphores");
@@ -171,6 +173,7 @@ export class Database {
 			abortedGenerations,
 			generations,
 			generationEvents,
+			turnStates,
 			mcpElicitations,
 			parkedCalls,
 			settings,
@@ -200,6 +203,7 @@ export class Database {
 			abortedGenerations,
 			generations,
 			generationEvents,
+			turnStates,
 			mcpElicitations,
 			parkedCalls,
 			settings,
@@ -333,6 +337,15 @@ export class Database {
 		generationEvents
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for generationEvents by createdAt"));
+
+		// One state document per turn; the unique key is what makes the upsert in
+		// turnState.ts race-safe. Ended turns expire like ended generations do.
+		turnStates
+			.createIndex({ conversationId: 1, messageId: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating unique turn index for turnStates"));
+		turnStates
+			.createIndex({ endedAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for turnStates by endedAt"));
 
 		parkedCalls
 			.createIndex({ parkedCallId: 1 }, { unique: true })

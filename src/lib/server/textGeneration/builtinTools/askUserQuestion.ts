@@ -3,6 +3,7 @@ import {
 	askUserQuestionTool,
 	openAskPrompt,
 } from "$lib/server/askUserQuestion";
+import { turnAwaitingInput } from "$lib/server/generation/turnState";
 import type { BuiltinTool } from "./types";
 
 export const askUserQuestionBuiltin: BuiltinTool = {
@@ -31,7 +32,22 @@ export const askUserQuestionBuiltin: BuiltinTool = {
 				})
 			: { opened: false as const, reason: "no chat to ask" };
 
-		if (opened.opened) return { awaitingInput: true };
+		if (opened.opened) {
+			// A shown question is a lifecycle transition: the turn is parked on the
+			// user. Recorded on the turn state and sent in-band like every other
+			// transition (see turnState.ts).
+			if (ctx.conversationId && ctx.messageId) {
+				const stateUpdate = await turnAwaitingInput({
+					conversationId: ctx.conversationId,
+					messageId: ctx.messageId,
+					producerId: ctx.generationId ?? "",
+					...(ctx.userId ? { userId: ctx.userId } : {}),
+					...(ctx.sessionId ? { sessionId: ctx.sessionId } : {}),
+				});
+				ctx.elicitationSink?.emit(stateUpdate);
+			}
+			return { awaitingInput: true };
+		}
 		// Answering is the only way this call finishes, so a silent skip would hang it.
 		return { error: `The question could not be shown (${opened.reason}).` };
 	},

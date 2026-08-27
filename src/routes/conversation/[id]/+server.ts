@@ -31,6 +31,7 @@ import { compressUpdatesForStorage } from "$lib/server/generation/compressUpdate
 import { applyUpdateToMessage } from "$lib/server/generation/applyUpdate";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
+import { turnEnded, turnRunning } from "$lib/server/generation/turnState";
 import { clampStoppedContent } from "$lib/server/stopTruncation";
 import { MetricsServer } from "$lib/server/metrics";
 import { randomUUID } from "$lib/utils/randomUuid";
@@ -608,6 +609,18 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				});
 			};
 
+			// This producer holds the turn from here: record it and say so in-band.
+			// The wait/ask tools move the state on mid-run when they park, and the
+			// terminal write below is a CAS that leaves such a park standing.
+			const turnKey = {
+				conversationId: convId,
+				messageId: messageToWriteTo.id,
+				producerId: effectiveGenerationId,
+				...(locals.user?._id ? { userId: locals.user._id } : {}),
+				...(locals.sessionId ? { sessionId: locals.sessionId } : {}),
+			};
+			await update(await turnRunning(turnKey));
+
 			try {
 				// Fetch user settings once for all overrides and billing org
 				const userSettings = await collections.settings.findOne(authCondition(locals));
@@ -754,6 +767,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					status: MessageUpdateStatus.Finished,
 				});
 			}
+
+			// CAS: misses when a park moved the state on mid-run, and the parked
+			// state (waiting / awaiting_input) stands — nothing is emitted.
+			const endedUpdate = await turnEnded(turnKey, {
+				failed: hasError,
+				...(hasError ? { error: "The turn ended on an error." } : {}),
+			});
+			if (endedUpdate) await update(endedUpdate);
 
 			await persistConversation();
 			await writer.finish({

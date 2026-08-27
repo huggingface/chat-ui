@@ -20,6 +20,7 @@ import type { ParkedCall } from "$lib/types/ParkedCall";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { createGenerationWriter } from "./writer";
 import { applyUpdateToMessage } from "./applyUpdate";
+import { turnEnded, turnRunning } from "./turnState";
 import { compressUpdatesForStorage } from "./compressUpdates";
 
 const SWEEP_BATCH = 5;
@@ -183,8 +184,20 @@ export async function resumeParkedCall(park: ParkedCall): Promise<void> {
 		);
 	};
 
+	// This producer holds the turn from here; the terminal write below is a CAS
+	// that leaves a park recorded mid-run standing. Same vocabulary as the route.
+	const turnKey = {
+		conversationId: conv._id,
+		messageId: message.id,
+		producerId: generationId,
+		...(park.userId ? { userId: park.userId } : {}),
+		...(locals.sessionId ? { sessionId: locals.sessionId } : {}),
+	};
+
 	let hasError = false;
 	try {
+		apply(await turnRunning(turnKey));
+
 		// The result the parked call has been missing. Replay pairs it with the call
 		// by uuid, which is what puts it in the model's history for the next round.
 		apply({
@@ -241,14 +254,20 @@ export async function resumeParkedCall(park: ParkedCall): Promise<void> {
 		// made a reloading client reattach to the already-ended generation in a
 		// refresh loop.
 		apply({ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished });
+		// CAS: misses when the resumed run parked again, and that state stands.
+		const endedUpdate = await turnEnded(turnKey, { failed: false });
+		if (endedUpdate) apply(endedUpdate);
 	} catch (err) {
 		hasError = true;
 		logger.error({ err, parkedCallId: park.parkedCallId }, "[parked] resumed turn failed");
+		const errorMessage = err instanceof Error ? err.message : "The resumed turn failed.";
 		apply({
 			type: MessageUpdateType.Status,
 			status: MessageUpdateStatus.Error,
-			message: err instanceof Error ? err.message : "The resumed turn failed.",
+			message: errorMessage,
 		});
+		const failedUpdate = await turnEnded(turnKey, { failed: true, error: errorMessage });
+		if (failedUpdate) apply(failedUpdate);
 	} finally {
 		await persist();
 		await writer.finish({ status: hasError ? "error" : "completed" });
