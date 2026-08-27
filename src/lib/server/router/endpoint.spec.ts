@@ -161,6 +161,16 @@ describe("makeRouterEndpoint", () => {
 		});
 	});
 
+	it("falls back to the regular multimodal model when the free multimodal model fails", async () => {
+		mocks.resolveUserTier.mockResolvedValue("free");
+		mockConfig.LLM_ROUTER_FREE_USER_MODEL = "free/vl-model";
+		mocks.failingModels.add("free/vl-model");
+		await expect(firstMetadata(makeParams({ image: true }))).resolves.toEqual({
+			route: "multimodal",
+			model: "moonshotai/Kimi-K2.6",
+		});
+	});
+
 	it("pins free users to the free-tier model on the tools route", async () => {
 		mocks.resolveUserTier.mockResolvedValue("free");
 		await expect(firstMetadata(makeParams({ tools: true }))).resolves.toEqual({

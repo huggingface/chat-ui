@@ -166,46 +166,60 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 
 		// Multimodal bypass: if enabled and images detected, route to multimodal model
 		if (routerMultimodalEnabled && hasImageInput) {
-			let multimodalCandidate: string | undefined;
+			const multimodalCandidates: string[] = [];
 			try {
 				const all = await getModels();
-				// A multimodal-capable free-user model also serves free users' image requests;
-				// with a text-only free model the tier is irrelevant and never resolved.
+				// A multimodal-capable free-user model also serves free users' image requests
+				// (with the regular multimodal model kept as fallback); with a text-only free
+				// model the tier is irrelevant and never resolved.
 				const freeUserMultimodal = findFreeUserMultimodalModel(all);
 				if (freeUserMultimodal && (await resolveUserTier(params.locals)) === "free") {
-					multimodalCandidate = freeUserMultimodal.id ?? freeUserMultimodal.name;
+					const freeCandidate = freeUserMultimodal.id ?? freeUserMultimodal.name;
+					if (freeCandidate) multimodalCandidates.push(freeCandidate);
 				}
-				multimodalCandidate ??= getConfiguredMultimodalModelId(all);
+				const configured = getConfiguredMultimodalModelId(all);
+				if (configured && !multimodalCandidates.includes(configured)) {
+					multimodalCandidates.push(configured);
+				}
 			} catch (e) {
 				logger.warn({ err: String(e) }, "[router] failed to load models for multimodal lookup");
 			}
-			if (!multimodalCandidate) {
+			if (multimodalCandidates.length === 0) {
 				throw new Error(
 					"Router multimodal is enabled but LLM_ROUTER_MULTIMODAL_MODEL is not correctly configured. Remove the image or configure a multimodal model via LLM_ROUTER_MULTIMODAL_MODEL."
 				);
 			}
 
-			try {
-				logger.info(
-					{ route: MULTIMODAL_ROUTE, model: multimodalCandidate },
-					"[router] multimodal input detected; routing to multimodal model"
-				);
-				const ep = await createCandidateEndpoint(multimodalCandidate);
-				const gen = await ep({ ...params });
-				return metadataThenStream(gen, multimodalCandidate, MULTIMODAL_ROUTE);
-			} catch (e) {
-				const { message, statusCode } = extractUpstreamError(e);
-				logger.error(
-					{
-						route: MULTIMODAL_ROUTE,
-						model: multimodalCandidate,
-						err: message,
-						...(statusCode && { status: statusCode }),
-					},
-					"[router] multimodal model failed"
-				);
-				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+			let lastMultimodalErr: unknown = undefined;
+			for (const multimodalCandidate of multimodalCandidates) {
+				try {
+					logger.info(
+						{ route: MULTIMODAL_ROUTE, model: multimodalCandidate },
+						"[router] multimodal input detected; routing to multimodal model"
+					);
+					const ep = await createCandidateEndpoint(multimodalCandidate);
+					const gen = await ep({ ...params });
+					return metadataThenStream(gen, multimodalCandidate, MULTIMODAL_ROUTE);
+				} catch (e) {
+					lastMultimodalErr = e;
+					const { message, statusCode } = extractUpstreamError(e);
+					logger.warn(
+						{
+							route: MULTIMODAL_ROUTE,
+							model: multimodalCandidate,
+							err: message,
+							...(statusCode && { status: statusCode }),
+						},
+						"[router] multimodal candidate failed"
+					);
+				}
 			}
+			const { message, statusCode } = extractUpstreamError(lastMultimodalErr);
+			logger.error(
+				{ route: MULTIMODAL_ROUTE, err: message, ...(statusCode && { status: statusCode }) },
+				"[router] multimodal model failed"
+			);
+			throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 		}
 
 		// Resolved after the multimodal bypass, which is tier-independent — image requests
