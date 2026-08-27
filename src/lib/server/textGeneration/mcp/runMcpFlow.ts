@@ -71,11 +71,12 @@ const ML_ASSISTANT_MAX_TOOL_ROUNDS = 100;
 // Each retry costs a tool round, so give up quickly and answer without the tool.
 const MAX_TRUNCATED_TOOL_CALL_RETRIES = 2;
 
-// One more attempt after a final answer is cut by the output limit mid-answer
-// (usually mid-<think> on reasoning models). If the nudged retry is cut too,
-// the limit is simply too small for this answer and retrying again just burns
-// rounds — finalize what exists, marked interrupted.
-const MAX_LENGTH_CUT_RETRIES = 1;
+// One more attempt after a final answer ends before any visible content —
+// cut by the output limit, or a stream that died mid-<think> with no "length"
+// signal. If the nudged retry is cut too, the budget is simply too small for
+// this answer and retrying again just burns rounds — finalize what exists,
+// marked interrupted.
+const MAX_CUT_ANSWER_RETRIES = 1;
 
 export async function* runMcpFlow({
 	model,
@@ -609,7 +610,7 @@ export async function* runMcpFlow({
 		// the persisted trace stays byte-exact instead of silently dropping them.
 		let pendingReasoningWhitespace = "";
 		let truncatedToolCallRetries = 0;
-		let lengthCutRetries = 0;
+		let cutAnswerRetries = 0;
 
 		if (resolvedRoute && candidateModelId) {
 			yield {
@@ -1021,29 +1022,35 @@ export async function* runMcpFlow({
 			}
 			// A response cut by the output limit is not an answer. With a reasoning
 			// model it usually ends inside the <think> block, so finalizing it
-			// reports a half-thought as a finished turn. Retry once, telling the
-			// model to answer with its remaining budget; a second cut finalizes as
-			// interrupted rather than pretending completion.
-			const cutMidAnswer = finishReason === "length" && !discardedTruncatedToolCalls;
-			if (cutMidAnswer && lengthCutRetries < MAX_LENGTH_CUT_RETRIES) {
-				lengthCutRetries += 1;
+			// reports a half-thought as a finished turn. The same failure arrives
+			// without the "length" signal when the stream dies mid-think, so a
+			// think-only response counts as cut regardless of finish_reason. Retry
+			// once, telling the model to answer with its remaining budget; a second
+			// cut finalizes as interrupted rather than pretending completion.
+			const visibleContent = lastAssistantContent
+				.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, "")
+				.trim();
+			const thinkOnlyAnswer = visibleContent.length === 0 && lastAssistantContent.trim().length > 0;
+			const cutMidAnswer =
+				(finishReason === "length" || thinkOnlyAnswer) && !discardedTruncatedToolCalls;
+			if (cutMidAnswer && cutAnswerRetries < MAX_CUT_ANSWER_RETRIES) {
+				cutAnswerRetries += 1;
 				logger.warn(
-					{ loop, attempt: lengthCutRetries },
-					"[mcp] response cut by the output limit mid-answer; retrying"
+					{ loop, attempt: cutAnswerRetries, finishReason, thinkOnlyAnswer },
+					"[mcp] response ended before a visible answer; retrying"
 				);
-				const visibleContent = lastAssistantContent
-					.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, "")
-					.trim();
 				messagesOpenAI = [
 					...messagesOpenAI,
 					{
 						role: "assistant" as const,
-						content: visibleContent || "(Response cut off by the output limit mid-reasoning.)",
+						content: visibleContent || "(Response ended mid-reasoning, before a visible answer.)",
 					},
 					{
 						role: "user" as const,
 						content:
-							"[SYSTEM: Your previous response hit the output limit before it finished — most of it was internal reasoning. Give your final answer now, with minimal further reasoning and the answer itself kept concise.]",
+							finishReason === "length"
+								? "[SYSTEM: Your previous response hit the output limit before it finished — most of it was internal reasoning. Give your final answer now, with minimal further reasoning and the answer itself kept concise.]"
+								: "[SYSTEM: Your previous response ended while still inside internal reasoning, so no visible answer was produced. Give your final answer now, with minimal further reasoning and the answer itself kept concise.]",
 					},
 				];
 				continue;
