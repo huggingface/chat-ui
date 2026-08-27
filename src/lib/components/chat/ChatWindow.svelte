@@ -708,9 +708,11 @@
 		{/if}
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<!-- tabindex: the document never scrolls in this app, so without it
-		     keyboard-only users cannot scroll the conversation at all. -->
+		     keyboard-only users cannot scroll the conversation at all. Keyboard
+		     focus draws a soft inset ring instead of the browser's default
+		     outline around the whole pane; mouse focus draws nothing. -->
 		<div
-			class="scrollbar-custom h-full [scrollbar-gutter:stable_both-edges] overflow-y-auto overscroll-contain"
+			class="scrollbar-custom h-full [scrollbar-gutter:stable_both-edges] overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-500/60 dark:focus-visible:outline-blue-400/60"
 			tabindex="0"
 			aria-label="Conversation messages"
 			use:chatScroll.attach={{
