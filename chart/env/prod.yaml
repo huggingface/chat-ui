@@ -70,7 +70,7 @@ envVars:
   PUBLIC_ORIGIN: "https://huggingface.co"
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "https://plausible.io/js/pa-Io_oigECawqdlgpf5qvHb.js"
   PUBLIC_FEATURE_ANNOUNCEMENTS: >
-    [{"title": "Gemma-4-31B at 700 tokens/s", "description": "Run Gemma-4-31B at 700 tokens/s thanks to Cerebras inference.", "link": "/models/google/gemma-4-31B-it", "cta": "Go to the model", "maxDate": "2026-08-01"}, {"title": "Kimi K3 is here", "description": "Moonshot's 2.8T open-weight MoE, with native vision and a 1M-token context window.", "link": "/models/moonshotai/Kimi-K3", "cta": "Chat with Kimi K3", "maxDate": "2026-09-15"}, {"title": "New DeepSeek V4 Flash", "description": "DeepSeek's updated 284B MoE with adjustable thinking, stronger agentic coding, and a 1M-token context window.", "link": "/models/deepseek-ai/DeepSeek-V4-Flash-0731", "cta": "Chat with V4 Flash", "maxDate": "2026-09-01"}]
+    [{"title": "Kimi K3 is here", "description": "Moonshot's 2.8T open-weight MoE, with native vision and a 1M-token context window.", "link": "/models/moonshotai/Kimi-K3", "cta": "Chat with Kimi K3", "maxDate": "2026-09-15"}, {"title": "New DeepSeek V4 Flash", "description": "DeepSeek's updated 284B MoE with adjustable thinking, stronger agentic coding, and a 1M-token context window.", "link": "/models/deepseek-ai/DeepSeek-V4-Flash-0731", "cta": "Chat with V4 Flash", "maxDate": "2026-09-01"}, {"title": "New GLM-5.3-Flash", "description": "Z.ai's natively multimodal 320B MoE, outperforming GLM-5.2 at one-tenth the price.", "link": "/models/zai-org/GLM-5.3-Flash", "cta": "Chat with GLM-5.3-Flash", "maxDate": "2026-09-30"}]
 
   TASK_MODEL: "meta-llama/Llama-3.1-8B-Instruct"
   # Tombstone: unread by current code, kept so any old pod still on the pre-#2265
