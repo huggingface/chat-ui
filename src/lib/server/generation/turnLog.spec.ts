@@ -12,7 +12,7 @@ import { ObjectId } from "mongodb";
 import { randomUUID } from "crypto";
 import { collections, ready } from "$lib/server/database";
 import { createGenerationWriter } from "./writer";
-import { isTurnAlive, turnEventsAfter } from "./turnLog";
+import { createGapTracker, isTurnAlive, turnEventsAfter } from "./turnLog";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 
 const token = (text: string): MessageUpdate => ({ type: MessageUpdateType.Stream, token: text });
@@ -184,5 +184,36 @@ describe("the turn-scoped event log", () => {
 		const events = await turnEventsAfter(conversationId, messageId, 0, 10);
 		expect(events.map((e) => e.seq)).toEqual([1, 2]);
 		expect(new Set(events.map((e) => e.generationId)).size).toBe(2);
+	});
+});
+
+describe("createGapTracker", () => {
+	it("holds a fresh gap (insert reordering) and releases only past tolerance", () => {
+		let t = 0;
+		const gap = createGapTracker(10_000, () => t);
+		expect(gap.blockedAt(5)).toBe(false); // first sighting: wait for the insert
+		t = 9_000;
+		expect(gap.blockedAt(5)).toBe(false); // still within tolerance
+		t = 11_000;
+		expect(gap.blockedAt(5)).toBe(true); // a hole: the reader must skip or starve
+	});
+
+	it("restarts the clock when the blocking sequence changes", () => {
+		let t = 0;
+		const gap = createGapTracker(10_000, () => t);
+		expect(gap.blockedAt(5)).toBe(false);
+		t = 11_000;
+		expect(gap.blockedAt(7)).toBe(false); // the hole moved: fresh sighting
+		t = 22_000;
+		expect(gap.blockedAt(7)).toBe(true);
+	});
+
+	it("clears on progress so a later gap gets its own full tolerance", () => {
+		let t = 0;
+		const gap = createGapTracker(10_000, () => t);
+		expect(gap.blockedAt(5)).toBe(false);
+		gap.advanced(); // the missing event arrived and was delivered
+		t = 60_000;
+		expect(gap.blockedAt(5)).toBe(false); // same seq, but a brand-new sighting
 	});
 });

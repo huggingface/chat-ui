@@ -42,6 +42,28 @@ function sweepIntervalMs(): number {
 const CLAIM_LEASE_MS = 5 * 60_000;
 
 /**
+ * A LIVE resume renews its claim on this cadence (see resumeParkedCall), so the
+ * lease only ever expires under a producer that actually died. Well under
+ * CLAIM_LEASE_MS: several consecutive renewals must all fail before a row can
+ * be stolen from a running resume.
+ */
+const LEASE_RENEW_MS = 60_000;
+
+/**
+ * Bump the claim's lease while the resume is still working. Guarded on the
+ * status so a renewal racing the finally's `resumed` write can never revive a
+ * finished row.
+ */
+export async function renewClaim(park: ParkedCall): Promise<void> {
+	const now = new Date();
+	await collections.parkedCalls
+		.updateOne({ _id: park._id, status: "resuming" }, { $set: { takenAt: now, updatedAt: now } })
+		.catch((err) =>
+			logger.warn({ err, parkedCallId: park.parkedCallId }, "[parked] failed to renew claim lease")
+		);
+}
+
+/**
  * Claim one due row. The filter carries the status, so two pods racing on the
  * same row produce one winner and one miss rather than two resumed turns. A
  * claim whose lease has expired is fair game again, which is what makes the
@@ -113,6 +135,23 @@ async function rebuildIdentity(park: ParkedCall) {
 
 /** Wake one parked turn: inject the tool result it parked on, then let it continue. */
 export async function resumeParkedCall(park: ParkedCall): Promise<void> {
+	// The claim lease exists to recover a resume whose pod DIED — but a live
+	// resumed run routinely outlives it (an ML continuation runs for tens of
+	// minutes). Without renewal the sweeper re-claims the row every
+	// CLAIM_LEASE_MS and launches a second producer onto the same turn:
+	// dueling writers over one seq range, interleaved turn states (a stale
+	// `waiting` landing after the live `running` is the stuck wait banner),
+	// and after MAX_ATTEMPTS the row is abandoned mid-run.
+	const leaseRenewer = setInterval(() => void renewClaim(park), LEASE_RENEW_MS);
+	leaseRenewer.unref?.();
+	try {
+		await resumeParkedCallInner(park);
+	} finally {
+		clearInterval(leaseRenewer);
+	}
+}
+
+async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 	const conv = await collections.conversations.findOne({ _id: park.conversationId });
 	if (!conv) return abandon(park, "conversation is gone");
 

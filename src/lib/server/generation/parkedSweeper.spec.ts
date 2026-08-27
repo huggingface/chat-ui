@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
-import { sweepParkedCalls } from "./parkedSweeper";
+import { renewClaim, sweepParkedCalls } from "./parkedSweeper";
 import type { ParkedCall } from "$lib/types/ParkedCall";
 
 const park = (over: Partial<ParkedCall> = {}): ParkedCall => ({
@@ -102,5 +102,39 @@ describe("sweepParkedCalls", () => {
 		const row = await collections.parkedCalls.findOne({});
 		expect(row?.status).toBe("abandoned");
 		expect(row?.abandonedReason).toContain("gave up");
+	});
+});
+
+describe("renewClaim", () => {
+	it("keeps a live resume's row from being stolen when its original lease ages out", async () => {
+		// A resumed ML turn routinely runs longer than the claim lease. The live
+		// resume renews; without the renewal the sweeper would re-claim the row
+		// and launch a SECOND producer onto the same turn — dueling writers,
+		// interleaved turn states (the stuck wait banner), an abandon mid-run.
+		const row = park({
+			status: "resuming",
+			takenAt: new Date(Date.now() - 10 * 60_000),
+			attempts: 1,
+		});
+		await collections.parkedCalls.insertOne(row);
+
+		await renewClaim(row);
+		await sweepParkedCalls();
+
+		const after = await collections.parkedCalls.findOne({});
+		expect(after?.status).toBe("resuming");
+		expect(after?.attempts).toBe(1);
+	});
+
+	it("never revives a row whose resume already finished", async () => {
+		const takenAt = new Date(Date.now() - 60_000);
+		const row = park({ status: "resumed", takenAt, attempts: 1 });
+		await collections.parkedCalls.insertOne(row);
+
+		await renewClaim(row);
+
+		const after = await collections.parkedCalls.findOne({});
+		expect(after?.status).toBe("resumed");
+		expect(after?.takenAt?.getTime()).toBe(takenAt.getTime());
 	});
 });

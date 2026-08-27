@@ -4,7 +4,13 @@ import { authCondition } from "$lib/server/auth";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import { isTurnAlive, latestTurnGeneration, turnEventsAfter } from "$lib/server/generation/turnLog";
+import {
+	createGapTracker,
+	isTurnAlive,
+	latestTurnGeneration,
+	turnEventsAfter,
+} from "$lib/server/generation/turnLog";
+import { logger } from "$lib/server/logger";
 
 /**
  * Subscribe to a TURN: replay the turn-scoped event log after `fromSeq`, then
@@ -22,6 +28,10 @@ const TAIL_INTERVAL_MS = 250;
 // Cap the connection so it churns rather than ageing behind a proxy; the client reconnects.
 const MAX_LIFETIME_MS = 5 * 60_000;
 const REPLAY_BATCH = 500;
+// How long a sequence gap may hold the drain before it is treated as a
+// permanent hole and skipped (see createGapTracker) — generous against insert
+// reordering (~40 polls), tiny against a turn that runs for an hour.
+const GAP_TOLERANCE_MS = 10_000;
 
 export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 	const convId = new ObjectId(z.string().parse(params.id));
@@ -74,6 +84,7 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 			}
 			const turnMessageId = messageId;
 
+			const gap = createGapTracker(GAP_TOLERANCE_MS);
 			const drain = async (): Promise<number> => {
 				let emitted = 0;
 				for (;;) {
@@ -82,14 +93,31 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 					for (const e of batch) {
 						// An unordered multi-document insert is not atomically visible.
 						// Do not advance past a sequence that may appear on the next poll,
-						// or it can never be emitted to this connection.
+						// or it can never be emitted to this connection...
 						if (e.seq !== cursor + 1) {
-							sawGap = true;
-							break;
+							if (!gap.blockedAt(e.seq)) {
+								sawGap = true;
+								break;
+							}
+							// ...unless the gap outlived any reordering: that is a hole (a
+							// failed insert), and a reader holding on it starves forever —
+							// the turn looks dead to its subscriber while the producer runs
+							// on. The holed events are lost either way; skip and live.
+							logger.warn(
+								{
+									conversationId: convId.toString(),
+									messageId: turnMessageId,
+									from: cursor + 1,
+									to: e.seq - 1,
+								},
+								"[stream] skipping a permanent hole in the turn event log"
+							);
+							cursor = e.seq - 1;
 						}
 						sendUpdate(e.seq, e.event);
 						cursor = e.seq;
 						emitted++;
+						gap.advanced();
 					}
 					if (sawGap || batch.length < REPLAY_BATCH) break;
 				}

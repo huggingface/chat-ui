@@ -89,3 +89,36 @@ export async function turnEventsAfter(
 		.limit(limit)
 		.toArray();
 }
+
+/**
+ * Distinguishes the two kinds of sequence gap a reader can see. A FRESH gap is
+ * insert reordering (an unordered multi-document insert is not atomically
+ * visible) and the missing event appears on a near-future poll — hold. A gap
+ * that persists past `toleranceMs` is a HOLE (a failed insert whose events
+ * never existed), and a reader holding on it starves forever: the turn looks
+ * dead to its subscriber while the producer runs on. The holed events are
+ * already lost either way, so past tolerance, liveness wins — skip.
+ */
+export function createGapTracker(toleranceMs: number, now: () => number = Date.now) {
+	let blockedSeq: number | null = null;
+	let since = 0;
+	return {
+		/** A contiguous event was delivered — whatever gap was tracked is gone. */
+		advanced(): void {
+			blockedSeq = null;
+		},
+		/**
+		 * The next available seq is not contiguous. Returns true once this same
+		 * hole has persisted past tolerance and the reader should skip it; a
+		 * different blocking seq (the hole moved) restarts the clock.
+		 */
+		blockedAt(seq: number): boolean {
+			if (blockedSeq !== seq) {
+				blockedSeq = seq;
+				since = now();
+				return false;
+			}
+			return now() - since > toleranceMs;
+		},
+	};
+}
