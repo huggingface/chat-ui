@@ -269,6 +269,40 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		expect(withBallast.filter((m) => m.role === "user")).toHaveLength(2);
 	});
 
+	it("keeps a failed turn's replay through a resume message, dangling call repaired", async () => {
+		// The resume-after-failure shape: the newest assistant turn died mid-tool-call
+		// and a user message follows it asking the model to continue. The exemption is
+		// positional (newest assistant candidate), so the trailing user message must
+		// not cost the failed turn its transcript — that transcript is exactly the
+		// work resume exists to preserve — and the call that never recorded a result
+		// must replay as an explicit interruption, not be dropped or 400 the request.
+		const prepared = await prepareMessagesWithFiles(
+			[
+				{ from: "user", content: "x".repeat(450_000) },
+				{
+					from: "assistant",
+					content: "",
+					updates: [
+						callUpdate("done1", "create_repo", { name: "repo" }),
+						resultUpdate("done1", "create_repo", "created pngwn/repo"),
+						callUpdate("dangling", "hf_jobs", { command: "run" }),
+					],
+				},
+				{ from: "user", content: "Your previous turn failed partway through. Continue." },
+			],
+			imageProcessor,
+			false,
+			{ replayToolHistory: true }
+		);
+		const toolMessages = prepared.filter((m) => m.role === "tool");
+		expect(toolMessages).toHaveLength(2);
+		expect(String(toolMessages[0]?.content)).toContain("created pngwn/repo");
+		expect(String(toolMessages[1]?.content)).toBe(
+			"Error: interrupted before a result was recorded"
+		);
+		expect(prepared.at(-1)?.role).toBe("user");
+	});
+
 	describe("context-aware budget", () => {
 		// ~80k of replay: comfortably inside the 100k ceiling, but more than a
 		// 32k-token window can take once the reserve is held back.
