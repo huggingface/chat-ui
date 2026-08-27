@@ -34,17 +34,34 @@ const MAX_PERSISTED_UPDATES = 5_000;
  * client as it always did.
  */
 export function compressUpdatesForStorage(updates: Message["updates"]): Message["updates"] {
-	const kept = (updates ?? [])
-		.filter(
-			(u) =>
-				!(u.type === MessageUpdateType.Status && u.status === MessageUpdateStatus.KeepAlive) &&
-				!(u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Progress)
-		)
-		.map((u) => {
-			if (u.type !== MessageUpdateType.Stream) return u;
-			const len = u.len ?? (u.token ?? "").length;
-			return { type: MessageUpdateType.Stream, token: "", len } satisfies MessageStreamUpdate;
-		});
+	const kept: NonNullable<Message["updates"]> = [];
+	for (const u of updates ?? []) {
+		if (u.type === MessageUpdateType.Status && u.status === MessageUpdateStatus.KeepAlive) {
+			continue;
+		}
+		if (u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Progress) {
+			continue;
+		}
+		if (u.type !== MessageUpdateType.Stream) {
+			kept.push(u);
+			continue;
+		}
+		// Stream markers exist ONLY to position tool cards relative to the text
+		// (the renderer slices message.content by their lens), so consecutive
+		// markers carry no more information than their sum. Merging them is what
+		// keeps a long turn's marker count proportional to its tool cards rather
+		// than its tokens — an unmerged 30-minute reasoning turn crossed the cap
+		// below, the backstop dropped every marker, and the whole message
+		// rendered as one unanchored blob with no tool calls in sight.
+		const len = u.len ?? (u.token ?? "").length;
+		if (len === 0) continue;
+		const last = kept.at(-1);
+		if (last?.type === MessageUpdateType.Stream) {
+			last.len = (last.len ?? 0) + len;
+		} else {
+			kept.push({ type: MessageUpdateType.Stream, token: "", len } satisfies MessageStreamUpdate);
+		}
+	}
 
 	if (kept.length <= MAX_PERSISTED_UPDATES) return kept;
 

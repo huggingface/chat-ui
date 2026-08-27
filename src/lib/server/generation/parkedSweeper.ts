@@ -231,17 +231,15 @@ export async function resumeParkedCall(park: ParkedCall): Promise<void> {
 		};
 
 		for await (const event of textGeneration(ctx)) apply(event);
-		// A resumed turn may park again — on another wait, or on a question. Calling
-		// it finished would tell the client the work is over while a row sits waiting
-		// to wake it.
-		const parkedAgain = await collections.parkedCalls.countDocuments({
-			conversationId: conv._id,
-			messageId: message.id,
-			status: "waiting",
-		});
-		if (parkedAgain === 0) {
-			apply({ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished });
-		}
+		// A resumed turn may park again — on another wait, or on a question. Either
+		// way this run's lifecycle closes with `finished`, matching what the route
+		// does when a fresh turn parks: the client derives liveness from the LAST
+		// lifecycle event (see generationState.ts), so the next resume's `started`
+		// is what reopens the message, and a parked one reads terminal — the same
+		// from every producer. Leaving `started` as the last event here instead
+		// made a reloading client reattach to the already-ended generation in a
+		// refresh loop.
+		apply({ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished });
 	} catch (err) {
 		hasError = true;
 		logger.error({ err, parkedCallId: park.parkedCallId }, "[parked] resumed turn failed");

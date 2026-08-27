@@ -3,6 +3,7 @@ import type { EndpointMessage } from "$lib/server/endpoints/endpoints";
 import type { OpenAI } from "openai";
 import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
 import { stripThink } from "$lib/utils/stripThink";
+import { stripLoneSurrogates } from "./loneSurrogates";
 import type { makeImageProcessor } from "$lib/server/endpoints/images";
 import {
 	MessageToolUpdateType,
@@ -347,7 +348,8 @@ function replayAssistantTurn(
 				tool_call_id: idByUuid.get(u.uuid) ?? u.uuid,
 				content:
 					output.length > MAX_REPLAYED_TOOL_OUTPUT_CHARS
-						? output.slice(0, MAX_REPLAYED_TOOL_OUTPUT_CHARS) + "\n[...truncated]"
+						? stripLoneSurrogates(output.slice(0, MAX_REPLAYED_TOOL_OUTPUT_CHARS)) +
+							"\n[...truncated]"
 						: output,
 			});
 		}

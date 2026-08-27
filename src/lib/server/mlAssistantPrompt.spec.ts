@@ -26,7 +26,7 @@ describe("ML Assistant preprompt", () => {
 	it("keeps every section that carries a rule", () => {
 		for (const heading of [
 			"# Your knowledge of the HF libraries is outdated",
-			"# Reading a paper you are about to implement",
+			"# Reproducing or implementing a paper",
 			"# Mistakes you WILL make without checking",
 			"# Before you propose a training or evaluation run",
 			"# Audit the data before you use it",
