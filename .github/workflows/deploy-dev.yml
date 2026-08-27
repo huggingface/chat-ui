@@ -57,7 +57,11 @@ jobs:
           cache-to: type=gha,mode=max,scope=amd64
           cache-from: type=gha,scope=amd64
           provenance: false
+          # TEMP (DO NOT MERGE): ML_ASSISTANT_MODE is a build-time define, so the
+          # ephemeral preview can only exercise the mode if the image build gets
+          # the flag. Revert this build-arg before merge.
           build-args: |
             INCLUDE_DB=false
             APP_BASE=/chat
             PUBLIC_COMMIT_SHA=${{ env.GITHUB_SHA_SHORT }}
+            ML_ASSISTANT_MODE=true
