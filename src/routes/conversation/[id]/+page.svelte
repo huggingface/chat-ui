@@ -35,11 +35,7 @@
 	import { loading } from "$lib/stores/loading.js";
 	import { streamStart } from "$lib/utils/haptics";
 	import { requireAuthUser } from "$lib/utils/auth.js";
-	import {
-		isConversationGenerationActive,
-		isAssistantGenerationTerminal,
-		isTurnSubscribable,
-	} from "$lib/utils/generationState";
+	import { isConversationGenerationActive, isTurnSubscribable } from "$lib/utils/generationState";
 	import { noteServerNow } from "$lib/utils/clockSkew.svelte";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
