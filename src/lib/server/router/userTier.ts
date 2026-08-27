@@ -29,6 +29,7 @@ const ERROR_TTL_MS = 60_000;
 const SWEEP_INTERVAL_MS = 60_000;
 
 const cache = new Map<string, CacheEntry>();
+const inflight = new Map<string, Promise<CacheEntry>>();
 let sweeper: ReturnType<typeof setInterval> | undefined;
 
 function ensureSweeper() {
@@ -84,6 +85,17 @@ async function getCacheEntry(userId: string, token: string): Promise<CacheEntry>
 		return existing;
 	}
 
+	// Coalesce concurrent misses: one Hub lookup per user at a time, so parallel requests
+	// can't double-spend the rate budget or overwrite each other's result.
+	const pending = inflight.get(userId);
+	if (pending) return pending;
+
+	const lookup = fetchCacheEntry(userId, token).finally(() => inflight.delete(userId));
+	inflight.set(userId, lookup);
+	return lookup;
+}
+
+async function fetchCacheEntry(userId: string, token: string): Promise<CacheEntry> {
 	let entry: CacheEntry;
 	try {
 		const data = await fetchUserBilling(token);

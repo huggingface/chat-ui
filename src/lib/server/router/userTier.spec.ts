@@ -226,6 +226,15 @@ describe("resolveUserTier", () => {
 		await resolveUserTier(makeLocals());
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
+
+	it("coalesces concurrent lookups for the same user into one fetch", async () => {
+		const locals = makeLocals();
+		fetchMock.mockResolvedValue(userInfoResponse({ isPro: false, canPay: false }));
+		await expect(
+			Promise.all([resolveUserTier(locals), resolveUserTier(locals), resolveUserTier(locals)])
+		).resolves.toEqual(["free", "free", "free"]);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
 });
 
 describe("validateFreeTierRouterConfig", () => {
