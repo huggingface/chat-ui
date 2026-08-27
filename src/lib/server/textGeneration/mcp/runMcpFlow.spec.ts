@@ -337,7 +337,11 @@ describe("runMcpFlow truncated tool calls", () => {
 
 describe("runMcpFlow rate limits", () => {
 	it("absorbs a router 429 with backoff instead of failing a turn mid-flight", async () => {
-		vi.useFakeTimers();
+		// Fake only the timer pair the backoff sleep uses: the flow crosses real
+		// async boundaries (dynamic import, mocked promises) before it ever
+		// schedules the sleep, and a blanket fake would starve those of event-loop
+		// turns — the CI-only hang this test once had.
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 		try {
 			scriptRounds([
 				{ error: Object.assign(new Error('429 "Rate limit exceeded"'), { status: 429 }) },
@@ -345,10 +349,11 @@ describe("runMcpFlow rate limits", () => {
 			]);
 
 			const pending = runFlow();
-			// The backoff timer only exists once the flow reaches the throttled
-			// call; step the clock until the retry has landed.
-			for (let i = 0; i < 20 && mocks.create.mock.calls.length < 2; i += 1) {
+			// Alternate fake-clock advances with real event-loop turns until the
+			// retry lands, however late the flow registers its backoff timer.
+			for (let i = 0; i < 200 && mocks.create.mock.calls.length < 2; i += 1) {
 				await vi.advanceTimersByTimeAsync(1_000);
+				await new Promise((resolve) => setImmediate(resolve));
 			}
 			const { updates, result } = await pending;
 
