@@ -411,16 +411,18 @@
 		}
 	}
 
-	// Stream a run this tab did not start (a returning tab, a second device, a run still
+	// Stream a turn this tab did not start (a returning tab, a second device, a run still
 	// in flight at load) into its message via the shared consumer. Resumes at the message's
-	// materialized cursor so no content is replayed twice.
+	// materialized cursor so no content is replayed twice. The subscription is keyed by the
+	// TURN, not the producer: a parked wait keeps the same connection, and the sweeper's
+	// resumed run continues the same sequence — there is no new identity to discover.
 	async function reattachToRun() {
 		if (!browser || writeMessageInFlight || reattachController) return;
 		const lastAssistant = messages.findLast((m) => m.from === "assistant");
 		if (
 			!lastAssistant ||
 			!lastAssistant.generationId ||
-			isAssistantGenerationTerminal(lastAssistant)
+			(isAssistantGenerationTerminal(lastAssistant) && !isAssistantParkedOnWait(lastAssistant))
 		) {
 			return;
 		}
@@ -431,7 +433,7 @@
 		const streamingMode = resolveStreamingMode($settings);
 
 		const url = new URL(`${base}/conversation/${runConvId}/stream`, window.location.href);
-		url.searchParams.set("generationId", lastAssistant.generationId);
+		url.searchParams.set("messageId", lastAssistant.id);
 		url.searchParams.set("fromSeq", String(lastAssistant.materializedSeq ?? 0));
 
 		try {

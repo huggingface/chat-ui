@@ -143,6 +143,7 @@ export async function resumeParkedCall(park: ParkedCall): Promise<void> {
 		generationId,
 		conversationId: conv._id,
 		messageId: message.id,
+		continueFromSeq: message.materializedSeq,
 		...(park.userId ? { userId: park.userId } : {}),
 		...(locals.sessionId ? { sessionId: locals.sessionId } : {}),
 		snapshot: () => ({

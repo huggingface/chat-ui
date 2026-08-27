@@ -324,6 +324,12 @@ export class Database {
 			.catch((e) =>
 				logger.error(e, "Error creating index for generationEvents by generationId and seq")
 			);
+		// The turn-scoped replay/tail scan, and the max-seq read a resumed producer
+		// seeds its counter from. Not unique: legacy events lack the keys, and the
+		// parked-call lease is what guarantees a single writer.
+		generationEvents
+			.createIndex({ conversationId: 1, messageId: 1, seq: 1 })
+			.catch((e) => logger.error(e, "Error creating turn-scoped index for generationEvents"));
 		generationEvents
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for generationEvents by createdAt"));

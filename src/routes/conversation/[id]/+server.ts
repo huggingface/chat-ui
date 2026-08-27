@@ -461,6 +461,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				generationId: effectiveGenerationId,
 				conversationId: convId,
 				messageId: messageToWriteTo.id,
+				continueFromSeq: messageToWriteTo.materializedSeq,
 				userId: locals.user?._id,
 				sessionId: locals.sessionId,
 				snapshot: () => ({

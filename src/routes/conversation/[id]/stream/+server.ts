@@ -4,16 +4,19 @@ import { authCondition } from "$lib/server/auth";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
+import { isTurnAlive, latestTurnGeneration, turnEventsAfter } from "$lib/server/generation/turnLog";
 
 /**
- * Reattach to a running (or recently finished) generation. Owns no generation — reads
- * the append-only `generationEvents` log, so it works from any tab, device, or pod.
- * Replays events after `fromSeq`, then tails until the run is terminal (the reaper
- * guarantees that even if the producing pod died).
+ * Subscribe to a TURN: replay the turn-scoped event log after `fromSeq`, then
+ * tail until the turn is over. Owns no generation — the log is keyed by the
+ * assistant message, and a resumed producer continues the same sequence, so
+ * the subscription survives park/resume cycles without the client ever
+ * learning a new identity. Works from any tab, device, or pod.
  *
- * SSE: `event: update` carries a MessageUpdate tagged `id: <seq>`, so EventSource
- * resumes via Last-Event-ID on reconnect; `event: end {status}` is terminal and the
- * client closes; a plain close (lifetime cap / transient) means reconnect.
+ * SSE: `event: update` carries a MessageUpdate tagged `id: <seq>`, so
+ * EventSource resumes via Last-Event-ID on reconnect; `event: end {status}` is
+ * terminal and the client closes; a plain close (lifetime cap / transient)
+ * means reconnect — lossless by construction, the cursor is turn-scoped.
  */
 const TAIL_INTERVAL_MS = 250;
 // Cap the connection so it churns rather than ageing behind a proxy; the client reconnects.
@@ -29,7 +32,19 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 	);
 	if (!conv) error(404, "Conversation not found");
 
-	const generationIdParam = url.searchParams.get("generationId") ?? undefined;
+	// The turn key. A pre-turn-scoped client may still send only a
+	// generationId; resolve it to its message so a stale tab keeps working
+	// across the deploy boundary.
+	let messageId = url.searchParams.get("messageId") ?? undefined;
+	if (!messageId) {
+		const generationIdParam = url.searchParams.get("generationId");
+		if (generationIdParam) {
+			const gen = await collections.generations
+				.findOne({ generationId: generationIdParam, conversationId: convId })
+				.catch(() => null);
+			messageId = gen?.messageId;
+		}
+	}
 
 	// Resent by EventSource on reconnect; wins over the query param.
 	const lastEventId = request.headers.get("last-event-id");
@@ -52,31 +67,17 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 				enc(`event: end\ndata: ${JSON.stringify({ status })}\n\n`);
 			const sendHeartbeat = () => enc(": heartbeat\n\n");
 
-			// Explicit id, else the newest run for this conversation.
-			const gen = await (
-				generationIdParam
-					? collections.generations.findOne({
-							generationId: generationIdParam,
-							conversationId: convId,
-						})
-					: collections.generations.findOne({ conversationId: convId }, { sort: { startedAt: -1 } })
-			).catch(() => null);
-
-			if (!gen) {
+			if (!messageId || !(await latestTurnGeneration(convId, messageId))) {
 				sendEnd("gone");
 				controller.close();
 				return;
 			}
-			const generationId = gen.generationId;
+			const turnMessageId = messageId;
 
 			const drain = async (): Promise<number> => {
 				let emitted = 0;
 				for (;;) {
-					const batch = await collections.generationEvents
-						.find({ generationId, seq: { $gt: cursor } })
-						.sort({ seq: 1 })
-						.limit(REPLAY_BATCH)
-						.toArray();
+					const batch = await turnEventsAfter(convId, turnMessageId, cursor, REPLAY_BATCH);
 					let sawGap = false;
 					for (const e of batch) {
 						// An unordered multi-document insert is not atomically visible.
@@ -114,13 +115,9 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 				await drain();
 
 				while (!signal.aborted && Date.now() < deadline) {
-					const current = await collections.generations.findOne(
-						{ generationId },
-						{ projection: { status: 1 } }
-					);
-					const status = current?.status ?? "gone";
+					const { alive, status } = await isTurnAlive(convId, turnMessageId);
 
-					if (status !== "running") {
+					if (!alive) {
 						// finish() appends its last events before flipping status, so a terminal
 						// read means they are all on disk — drain once more before ending.
 						await drain();
