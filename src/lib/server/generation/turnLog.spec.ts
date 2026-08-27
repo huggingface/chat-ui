@@ -64,6 +64,7 @@ afterEach(async () => {
 	await collections.generationEvents.deleteMany({});
 	await collections.generations.deleteMany({});
 	await collections.parkedCalls.deleteMany({});
+	await collections.turnStates.deleteMany({});
 });
 
 describe("the turn-scoped event log", () => {
@@ -134,6 +135,29 @@ describe("the turn-scoped event log", () => {
 		expect(events.map((e) => e.seq)).toEqual([329]);
 		// A client cursor from the pre-turn-scoped era stays meaningful.
 		expect(await turnEventsAfter(conversationId, messageId, 328, 10)).toHaveLength(1);
+	});
+
+	it("keeps a turn awaiting the user's answer alive, so subscriptions span questions", async () => {
+		const conversationId = new ObjectId();
+		const messageId = randomUUID();
+
+		const writer = await makeWriter(conversationId, messageId);
+		writer.push(token("asked something"));
+		await writer.finish({ status: "completed" });
+		await collections.turnStates.insertOne({
+			_id: new ObjectId(),
+			conversationId,
+			messageId,
+			status: "awaiting_input",
+			producerId: randomUUID(),
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+
+		expect(await isTurnAlive(conversationId, messageId)).toEqual({
+			alive: true,
+			status: "awaiting_input",
+		});
 	});
 
 	it("reports an unknown turn as gone", async () => {

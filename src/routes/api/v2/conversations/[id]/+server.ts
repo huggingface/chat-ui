@@ -7,6 +7,7 @@ import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
 import { validModelIdSchema } from "$lib/server/models";
 import { applyConversationSettings } from "$lib/server/conversationSettings";
+import type { TurnStateSnapshot } from "$lib/types/TurnState";
 
 export const GET: RequestHandler = async ({ locals, params, url }) => {
 	requireAuth(locals);
@@ -29,7 +30,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 				.findOne({ conversationId: new ObjectId(conversation._id), messageId: lastAssistant.id })
 				.catch(() => null)
 		: null;
-	const turnState = turnStateDoc
+	const turnState: TurnStateSnapshot | undefined = turnStateDoc
 		? {
 				messageId: turnStateDoc.messageId,
 				status: turnStateDoc.status,

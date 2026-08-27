@@ -1,16 +1,12 @@
 import { describe, expect, test } from "vitest";
 
 import type { Message } from "$lib/types/Message";
-import {
-	MessageToolUpdateType,
-	MessageUpdateStatus,
-	MessageUpdateType,
-} from "$lib/types/MessageUpdate";
-import { ToolResultStatus } from "$lib/types/Tool";
+import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
 import {
 	isAssistantGenerationTerminal,
-	isAssistantParkedOnWait,
 	isConversationGenerationActive,
+	isTurnSubscribable,
+	turnStateOf,
 } from "./generationState";
 
 function assistantMessage(overrides: Partial<Message> = {}): Message {
@@ -186,53 +182,75 @@ describe("generationState", () => {
 	});
 });
 
-describe("isAssistantParkedOnWait", () => {
-	const waitCall = (uuid: string) => ({
-		type: MessageUpdateType.Tool as const,
-		subtype: MessageToolUpdateType.Call as const,
-		uuid,
-		call: { name: "wait", parameters: { seconds: 60, reason: "job running" } },
-	});
-	const resultFor = (uuid: string) => ({
-		type: MessageUpdateType.Tool as const,
-		subtype: MessageToolUpdateType.Result as const,
-		uuid,
-		result: {
-			status: ToolResultStatus.Success as const,
-			call: { name: "wait", parameters: {} },
-			outputs: [],
-			display: true,
-		},
+describe("turn state as the authoritative liveness", () => {
+	const state = (
+		st: "running" | "waiting" | "awaiting_input" | "done" | "failed",
+		extras: { until?: number; reason?: string } = {}
+	) => ({
+		type: MessageUpdateType.TurnState as const,
+		state: st,
+		serverNow: Date.now(),
+		...extras,
 	});
 
-	test("a wait call without a result is parked, even though the run finished", () => {
+	test("turnStateOf returns the LAST turn state the message carries", () => {
 		const message = assistantMessage({
 			updates: [
-				waitCall("w1"),
+				state("running"),
+				state("waiting", { until: Date.now() + 60_000 }),
+				state("running"),
+			],
+		});
+		expect(turnStateOf(message)?.state).toBe("running");
+		expect(turnStateOf(assistantMessage({ updates: [] }))).toBeUndefined();
+	});
+
+	test("only a running turn is non-terminal for UI purposes", () => {
+		expect(isAssistantGenerationTerminal(assistantMessage({ updates: [state("running")] }))).toBe(
+			false
+		);
+		for (const st of ["waiting", "awaiting_input", "done", "failed"] as const) {
+			expect(isAssistantGenerationTerminal(assistantMessage({ updates: [state(st)] }))).toBe(true);
+		}
+	});
+
+	test("the state wins over legacy lifecycle statuses when both are present", () => {
+		// A parked run stamps `finished` after the waiting transition; the state,
+		// not the status, is the truth.
+		const message = assistantMessage({
+			updates: [
+				state("waiting", { until: Date.now() + 60_000, reason: "job" }),
 				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished },
 			],
 		});
-		expect(isAssistantParkedOnWait(message)).toBe(true);
+		expect(turnStateOf(message)?.state).toBe("waiting");
 		expect(isAssistantGenerationTerminal(message)).toBe(true);
+		expect(isTurnSubscribable(message)).toBe(true);
 	});
 
-	test("a resumed wait (call with result) is no longer parked", () => {
-		const message = assistantMessage({
-			updates: [waitCall("w1"), resultFor("w1")],
+	test("running, waiting and awaiting_input turns are subscribable; ended ones are not", () => {
+		for (const st of ["running", "waiting", "awaiting_input"] as const) {
+			expect(isTurnSubscribable(assistantMessage({ updates: [state(st)] }))).toBe(true);
+		}
+		for (const st of ["done", "failed"] as const) {
+			expect(isTurnSubscribable(assistantMessage({ updates: [state(st)] }))).toBe(false);
+		}
+	});
+
+	test("an interrupted message is neither active nor subscribable, whatever its state", () => {
+		const message = assistantMessage({ interrupted: true, updates: [state("running")] });
+		expect(isAssistantGenerationTerminal(message)).toBe(true);
+		expect(isTurnSubscribable(message)).toBe(false);
+	});
+
+	test("messages without a turn state fall back to the legacy lifecycle", () => {
+		const legacyLive = assistantMessage({
+			updates: [{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started }],
 		});
-		expect(isAssistantParkedOnWait(message)).toBe(false);
-	});
-
-	test("only wait calls count, and interrupted turns are never parked", () => {
-		const otherCall = {
-			type: MessageUpdateType.Tool as const,
-			subtype: MessageToolUpdateType.Call as const,
-			uuid: "t1",
-			call: { name: "hf_fs", parameters: {} },
-		};
-		expect(isAssistantParkedOnWait(assistantMessage({ updates: [otherCall] }))).toBe(false);
-		expect(
-			isAssistantParkedOnWait(assistantMessage({ interrupted: true, updates: [waitCall("w1")] }))
-		).toBe(false);
+		expect(isTurnSubscribable(legacyLive)).toBe(true);
+		const legacyDone = assistantMessage({
+			updates: [{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished }],
+		});
+		expect(isTurnSubscribable(legacyDone)).toBe(false);
 	});
 });

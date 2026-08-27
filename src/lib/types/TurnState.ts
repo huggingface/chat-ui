@@ -26,6 +26,20 @@ export type TurnStatus = "running" | "waiting" | "awaiting_input" | "done" | "fa
  * (producerId, status: "running"), so a park recorded mid-run cannot be
  * clobbered by the producer's own wind-down.
  */
+/**
+ * The wire shape a conversation snapshot carries for its last assistant
+ * message's turn state: absolute times as epoch ms, plus a fresh `serverNow`
+ * so the client can correct clock skew at load.
+ */
+export interface TurnStateSnapshot {
+	messageId: Message["id"];
+	status: TurnStatus;
+	serverNow: number;
+	until?: number;
+	reason?: string;
+	error?: string;
+}
+
 export interface TurnState extends Timestamps {
 	_id: ObjectId;
 	conversationId: Conversation["_id"];

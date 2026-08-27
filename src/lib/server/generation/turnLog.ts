@@ -53,6 +53,21 @@ export async function isTurnAlive(
 	});
 	if (parked > 0) return { alive: true, status: "parked" };
 
+	// A turn awaiting the user's answer is alive too: the answer (from any tab
+	// or device) continues the same turn log, and the open subscription is how
+	// every other view sees it. The connection idles on heartbeats and churns
+	// at the lifetime cap; a question abandoned forever is bounded by the
+	// reaping work (P4), not here. Only waiting/awaiting_input count — a state
+	// doc stuck in "running" with no running producer is a crashed run, which
+	// must read dead so subscribers get closure.
+	const state = await collections.turnStates.findOne(
+		{ conversationId, messageId },
+		{ projection: { status: 1 } }
+	);
+	if (state?.status === "waiting" || state?.status === "awaiting_input") {
+		return { alive: true, status: state.status };
+	}
+
 	return { alive: false, status: newest?.status ?? "gone" };
 }
 
