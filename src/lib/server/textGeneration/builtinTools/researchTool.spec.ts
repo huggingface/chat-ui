@@ -193,6 +193,32 @@ describe("the nested loop", () => {
 		expect(finalMessages[finalMessages.length - 1].content).toContain("[SYSTEM: ITERATION LIMIT]");
 	});
 
+	it("reserves the completion allowance before computing the budget thresholds", async () => {
+		// Window 200, reserve 100 → usable 100: a run at 96 tokens must force the
+		// summary even though it is far from 95% of the raw window, because the
+		// next request (96 prompt + 100 completion) would already exceed it.
+		createCompletion
+			.mockResolvedValueOnce(
+				respond({
+					toolCalls: [{ id: "t1", name: "hf_fs", arguments: '{"q":"a"}' }],
+					totalTokens: 96,
+				})
+			)
+			.mockResolvedValueOnce(respond({ content: "reserved summary" }));
+
+		const outcome = await boundTool({
+			contextLengthTokens: 200,
+			completionBase: { model: "test-model", stream: true, max_tokens: 100 },
+		}).execute({ task: "t" }, ctx);
+
+		expect(outcome).toEqual({ resultText: "reserved summary" });
+		const finalRequest = createCompletion.mock.calls[1][0];
+		expect(finalRequest.tools).toBeUndefined();
+		expect((finalRequest.messages as ChatCompletionMessageParam[]).at(-1)?.content).toBe(
+			RESEARCH_CONTEXT_MAX_PROMPT
+		);
+	});
+
 	it("nudges at 85% of context and hard-stops at 95% with a tool-less request", async () => {
 		createCompletion
 			.mockResolvedValueOnce(

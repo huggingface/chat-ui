@@ -445,10 +445,18 @@ export async function* runMcpFlow({
 			(parameters?.max_tokens as number | undefined) ??
 			(parameters?.max_new_tokens as number | undefined) ??
 			(parameters?.max_completion_tokens as number | undefined);
+		const targetContextLength = (targetModel as unknown as { contextLength?: number })
+			.contextLength;
 		// The preset floors the reply allowance — see the constant for why. The
-		// research sub-agent inherits this through completionBase.
+		// floor never claims more than half the model's window: prompt plus reply
+		// must fit it, and a backend that enforces the sum would reject the very
+		// first request of a small-window model. A catalog value above the floor
+		// still wins. The research sub-agent inherits this through completionBase.
+		const clampedFloor = targetContextLength
+			? Math.min(ML_ASSISTANT_MIN_COMPLETION_TOKENS, Math.floor(targetContextLength / 2))
+			: ML_ASSISTANT_MIN_COMPLETION_TOKENS;
 		const maxTokens = mlAssistant
-			? Math.max(catalogMaxTokens ?? 0, ML_ASSISTANT_MIN_COMPLETION_TOKENS)
+			? Math.max(catalogMaxTokens ?? 0, clampedFloor)
 			: catalogMaxTokens;
 
 		let messagesOpenAI: ChatCompletionMessageParam[] = await prepareMessagesWithFiles(
@@ -467,7 +475,7 @@ export async function* runMcpFlow({
 				// the alias itself has none, and the candidate is what serves this
 				// request. Tool schemas are prepended after this returns, which is
 				// part of what CONTEXT_RESERVE_TOKENS holds back.
-				contextLengthTokens: (targetModel as unknown as { contextLength?: number }).contextLength,
+				contextLengthTokens: targetContextLength,
 				maxOutputTokens: maxTokens,
 			}
 		);
@@ -569,7 +577,7 @@ export async function* runMcpFlow({
 			mapping,
 			mcpTools,
 			hostBuiltinTools: builtinTools,
-			contextLengthTokens: (targetModel as unknown as { contextLength?: number }).contextLength,
+			contextLengthTokens: targetContextLength,
 		});
 
 		const toPrimitive = (value: unknown) => {
@@ -855,17 +863,30 @@ export async function* runMcpFlow({
 						{ loop },
 						"[mcp] missing tool_call id in stream; retrying non-stream to recover ids"
 					);
-					const nonStream = await openai.chat.completions.create(
-						{ ...completionBase, messages: messagesOpenAI, stream: false },
+					// Same throttle absorption as the streaming call above: this recovery
+					// request is mid-round, where a surfaced 429 costs the whole turn.
+					const nonStream = await withRateLimitRetry(
+						() =>
+							openai.chat.completions.create(
+								{ ...completionBase, messages: messagesOpenAI, stream: false },
+								{
+									signal: abortSignal,
+									headers: {
+										"ChatUI-Conversation-ID": conv._id.toString(),
+										"X-use-cache": "false",
+										...(config.USE_USER_TOKEN === "true" && locals?.token
+											? { Authorization: `Bearer ${locals.token}` }
+											: {}),
+									},
+								}
+							),
 						{
 							signal: abortSignal,
-							headers: {
-								"ChatUI-Conversation-ID": conv._id.toString(),
-								"X-use-cache": "false",
-								...(config.USE_USER_TOKEN === "true" && locals?.token
-									? { Authorization: `Bearer ${locals.token}` }
-									: {}),
-							},
+							onBackoff: (attempt, delayMs) =>
+								logger.warn(
+									{ loop, attempt, delayMs },
+									"[mcp] rate limited on id recovery; backing off in-loop"
+								),
 						}
 					);
 					const tc = nonStream.choices?.[0]?.message?.tool_calls ?? [];

@@ -52,13 +52,12 @@ const RESEARCH_ALLOWED_TOOLS: ReadonlySet<string> = new Set([
 
 export const MAX_RESEARCH_ITERATIONS = 60;
 
-// Fractions of the resolved model's context at which the budget prompts fire.
-// The absolute fallbacks are the source's constants for a 200k model, used
-// when the model reports no context length.
+// Fractions of the model's usable context (window minus the completion
+// reserve) at which the budget prompts fire — the source fired at 170k/190k
+// of an assumed 200k window, which these reproduce when no reserve is set.
 const CONTEXT_WARN_FRACTION = 0.85;
 const CONTEXT_MAX_FRACTION = 0.95;
-const FALLBACK_CONTEXT_WARN = 170_000;
-const FALLBACK_CONTEXT_MAX = 190_000;
+const FALLBACK_CONTEXT_WINDOW = 200_000;
 
 // Head/tail split preserved from the source: the head carries the finding,
 // the tail carries the footer/totals a long listing usually ends with.
@@ -217,18 +216,23 @@ async function runResearch(
 		},
 	];
 
-	const contextWarnAt = deps.contextLengthTokens
-		? Math.floor(deps.contextLengthTokens * CONTEXT_WARN_FRACTION)
-		: FALLBACK_CONTEXT_WARN;
-	const contextMaxAt = deps.contextLengthTokens
-		? Math.floor(deps.contextLengthTokens * CONTEXT_MAX_FRACTION)
-		: FALLBACK_CONTEXT_MAX;
-
 	// The parent's tool set and tool_choice never reach the sub-agent; stream
 	// is overridden per request below.
 	const base = { ...deps.completionBase };
 	delete base.tools;
 	delete base.tool_choice;
+
+	// Budget thresholds are fractions of the USABLE window: what remains after
+	// reserving the completion allowance every request asks for. Without the
+	// reservation, a large max_tokens lets a request exceed the window between
+	// the 85% nudge and the 95% stop — an unrecoverable provider error instead
+	// of a forced summary. The floor guards a degenerate reserve that would
+	// leave no room to research at all.
+	const windowTokens = deps.contextLengthTokens ?? FALLBACK_CONTEXT_WINDOW;
+	const completionReserve = typeof base.max_tokens === "number" ? base.max_tokens : 0;
+	const usableTokens = Math.max(windowTokens - completionReserve, Math.floor(windowTokens / 4));
+	const contextWarnAt = Math.floor(usableTokens * CONTEXT_WARN_FRACTION);
+	const contextMaxAt = Math.floor(usableTokens * CONTEXT_MAX_FRACTION);
 
 	const complete = async (withTools: boolean) => {
 		const request: ChatCompletionCreateParamsNonStreaming = {

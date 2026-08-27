@@ -643,6 +643,21 @@ describe("runMcpFlow under the ML Assistant preset", () => {
 		expect(mocks.create.mock.calls[0][0].max_tokens).toBe(ML_ASSISTANT_MIN_COMPLETION_TOKENS);
 	});
 
+	it("clamps the completion floor to half a small model window", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({
+			...inMlMode,
+			model: {
+				id: "small/model",
+				name: "small/model",
+				supportsTools: true,
+				parameters: {},
+				contextLength: 16_384,
+			},
+		} as unknown as Parameters<typeof runMcpFlow>[0]);
+		expect(mocks.create.mock.calls[0][0].max_tokens).toBe(8_192);
+	});
+
 	it("leaves the catalog completion budget alone outside the mode", async () => {
 		scriptRounds([{ content: "the answer" }]);
 		await runFlow();
