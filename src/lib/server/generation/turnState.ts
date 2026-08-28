@@ -119,6 +119,37 @@ export async function turnAwaitingInput(key: TurnKey): Promise<MessageTurnStateU
 }
 
 /**
+ * A parked turn nothing will ever resume: the sweeper abandoned its row (the
+ * conversation or model is gone, or resume attempts ran out). Without this,
+ * the state document stays `waiting` forever — isTurnAlive reports the turn
+ * alive, subscriptions churn on heartbeats, and the client sits on an
+ * "overdue" banner for a wake that cannot come.
+ *
+ * CAS on the non-terminal states only — a terminal state some producer wrote
+ * meanwhile stands. There is no producer to emit through here, so the caller
+ * persists the returned update straight into the message instead; the next
+ * snapshot reads terminal even though no live subscriber gets it in-band.
+ */
+export async function turnAbandoned(
+	conversationId: Conversation["_id"],
+	messageId: Message["id"],
+	error: string
+): Promise<MessageTurnStateUpdate | null> {
+	const now = new Date();
+	try {
+		const result = await collections.turnStates.updateOne(
+			{ conversationId, messageId, status: { $in: ["waiting", "running"] } },
+			{ $set: { status: "failed" satisfies TurnStatus, endedAt: now, updatedAt: now, error } }
+		);
+		if (result.matchedCount === 0) return null;
+	} catch (err) {
+		logger.error({ err }, "[turnState] failed to record abandonment");
+		return null;
+	}
+	return buildUpdate("failed", { error });
+}
+
+/**
  * Terminal transition, as a compare-and-swap: only the producer that still
  * holds the turn in "running" may end it. A park written mid-run (the wait or
  * ask tool moved the state on) makes the CAS miss, and the parked state

@@ -14,6 +14,7 @@ import {
 import { getClient } from "$lib/server/mcp/clientPool";
 import type { BuiltinTool } from "../builtinTools/types";
 import { openDurableElicitation, type ElicitationSink } from "$lib/server/mcp/elicitation";
+import { turnAwaitingInput } from "$lib/server/generation/turnState";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/client";
 import type { ObjectId } from "mongodb";
@@ -444,6 +445,22 @@ export async function* executeToolCalls({
 					: { opened: false, reason: "no chat to ask" };
 
 				if (opened.opened) {
+					// A shown prompt parks the turn on the user — the same lifecycle
+					// transition the ask tool records (see turnState.ts). Without it
+					// the route's ending CAS reads the state as still-running and
+					// marks the turn done, closing every subscription while the
+					// prompt is open — an answer from another tab then streams into
+					// nothing. Covers re-parks too: every open lands here.
+					if (elicitation?.conversationId && elicitation.messageId) {
+						const stateUpdate = await turnAwaitingInput({
+							conversationId: elicitation.conversationId,
+							messageId: elicitation.messageId,
+							producerId: elicitation.generationId ?? "",
+							...(owner?.userId ? { userId: owner.userId } : {}),
+							...(owner?.sessionId ? { sessionId: owner.sessionId } : {}),
+						});
+						elicitationSink?.emit(stateUpdate);
+					}
 					awaitingInput = true;
 					results.push({ index, awaiting: true, uuid: p.uuid, paramsClean: p.paramsClean });
 					return;

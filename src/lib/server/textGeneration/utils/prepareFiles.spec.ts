@@ -368,6 +368,35 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 			expect(await replayed(98_304)).toBe(0);
 		});
 
+		it("fits the newest turn beside the flat floor when the window is real", async () => {
+			// Codex review: ~60k of flat floor plus an ~80k replay upgrade passed a
+			// ~96k window budget, because the newest-turn exemption judged the
+			// upgrade against the whole budget — sending ~140k characters the
+			// provider rejects outright, failing the turn. Against a real window
+			// the newest turn must fit beside the floor; the ballast exemption is
+			// soft-ceiling only (see the ballast test above).
+			const ballasted: EndpointMessage[] = [
+				{ from: "user", content: "y".repeat(60_000) },
+				bigTurn,
+				{ from: "user", content: "next" },
+			];
+			const replayedTools = async (contextLengthTokens?: number) =>
+				(
+					await prepareMessagesWithFiles(ballasted, imageProcessor, false, {
+						replayToolHistory: true,
+						contextLengthTokens,
+					})
+				).filter((m) => m.role === "tool").length;
+
+			// Room for floor and replay together: the transcript survives.
+			expect(await replayedTools(131_072)).toBe(10);
+			// The upgrade alone fits the ~96k budget, floor + upgrade does not:
+			// degrade rather than send a request the model cannot accept.
+			expect(await replayedTools(40_000)).toBe(0);
+			// No window reported: the soft-ceiling ballast exemption still holds.
+			expect(await replayedTools(undefined)).toBe(10);
+		});
+
 		it("sends the pre-replay shape when the window is smaller than the reserve", async () => {
 			const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
 				replayToolHistory: true,

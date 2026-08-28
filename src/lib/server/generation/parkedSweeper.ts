@@ -20,7 +20,7 @@ import type { ParkedCall } from "$lib/types/ParkedCall";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { createGenerationWriter } from "./writer";
 import { applyUpdateToMessage } from "./applyUpdate";
-import { turnEnded, turnRunning } from "./turnState";
+import { turnAbandoned, turnEnded, turnRunning } from "./turnState";
 import { compressUpdatesForStorage } from "./compressUpdates";
 
 const SWEEP_BATCH = 5;
@@ -91,6 +91,28 @@ async function abandon(park: ParkedCall, reason: string): Promise<void> {
 		{ _id: park._id },
 		{ $set: { status: "abandoned", abandonedReason: reason, updatedAt: new Date() } }
 	);
+	// Close the turn too: nothing will resume it, and a `waiting` state doc
+	// would read alive forever (see turnAbandoned). Persisting the terminal
+	// state into the message is what lets the next snapshot clear the wait
+	// banner — and makes the failed turn eligible for the Resume affordance.
+	const failedUpdate = await turnAbandoned(
+		park.conversationId,
+		park.messageId,
+		`The turn was abandoned: ${reason}.`
+	);
+	if (failedUpdate) {
+		await collections.conversations
+			.updateOne({ _id: park.conversationId, "messages.id": park.messageId }, {
+				$push: { "messages.$.updates": failedUpdate },
+				$set: { "messages.$.updatedAt": new Date(), updatedAt: new Date() },
+			} as never)
+			.catch((err) =>
+				logger.error(
+					{ err, parkedCallId: park.parkedCallId },
+					"[parked] failed to persist the abandoned turn state"
+				)
+			);
+	}
 }
 
 /**

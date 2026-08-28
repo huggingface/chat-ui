@@ -508,17 +508,23 @@ export async function prepareMessagesWithFiles(
 	// the cap leaves nothing to spend, so every turn keeps its flat form and the
 	// request is no larger than it used to be.
 	const total = budgetCharsFor(options?.contextLengthTokens, options?.maxOutputTokens);
+	const windowBounded = Boolean(options?.contextLengthTokens && options.contextLengthTokens > 0);
 	let budget = total - floor;
 	const resolved: ChatMessageParam[][] = [...flatForms];
 	// The newest replayable turn is the one a continuation resumes INTO: its
 	// tool transcript is the run's working state (parked waits, submitted jobs,
 	// answered questions), and flattening it decapitates the run — the resumed
-	// model literally forgets what it did. So it is judged against the WHOLE
-	// budget, not what the floor left over: history ballast can flatten older
-	// turns, never the one being continued. Only a window that could not carry
-	// the turn's replay at all degrades it (the no-overflow guard), because
-	// then flat is the only shape that fits.
+	// model literally forgets what it did. Against the SOFT ceiling (no window
+	// reported) it is therefore judged against the whole budget, not what the
+	// floor left over: history ballast can flatten older turns, never the one
+	// being continued, and over-sending against the soft ceiling is survivable.
+	// A WINDOW-bounded budget is physics, not policy: replay past it fails the
+	// whole request with a provider context error, which is strictly worse than
+	// the flat degradation — so there the newest turn must fit beside the flat
+	// floor like everything else (walking newest-first, it still claims the
+	// budget first).
 	let newestCandidate = true;
+	const newestLimit = windowBounded ? budget : total;
 	for (let i = prepared.length - 1; i >= 0; i -= 1) {
 		const entry = prepared[i];
 		if (Array.isArray(entry)) continue;
@@ -526,7 +532,7 @@ export async function prepareMessagesWithFiles(
 		// Monotonic past the newest turn: the first older turn that doesn't fit
 		// stops the walk, so the model never sees rich history for a stale turn
 		// while a newer one is plain prose.
-		if (newestCandidate ? upgrade > total : upgrade > budget) break;
+		if (newestCandidate ? upgrade > newestLimit : upgrade > budget) break;
 		newestCandidate = false;
 		budget -= upgrade;
 		resolved[i] = entry.replay;

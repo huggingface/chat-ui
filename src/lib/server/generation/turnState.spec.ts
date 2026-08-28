@@ -11,7 +11,7 @@ import { ObjectId } from "mongodb";
 import { randomUUID } from "crypto";
 import { collections, ready } from "$lib/server/database";
 import { createGenerationWriter } from "./writer";
-import { turnAwaitingInput, turnEnded, turnRunning, turnWaiting } from "./turnState";
+import { turnAbandoned, turnAwaitingInput, turnEnded, turnRunning, turnWaiting } from "./turnState";
 import { turnEventsAfter } from "./turnLog";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 
@@ -150,5 +150,39 @@ describe("turn state transitions", () => {
 			await turnEnded({ conversationId, messageId, producerId: randomUUID() }, { failed: false })
 		).toBeNull();
 		expect((await stateDoc(conversationId, messageId))?.status).toBe("running");
+	});
+});
+
+describe("turnAbandoned", () => {
+	it("fails a waiting turn nothing will resume, returning the in-band shape", async () => {
+		const conversationId = new ObjectId();
+		const messageId = randomUUID();
+		const producerId = randomUUID();
+		await turnWaiting(
+			{ conversationId, messageId, producerId },
+			{ until: new Date(Date.now() + 60_000), reason: "doomed job" }
+		);
+
+		const update = await turnAbandoned(conversationId, messageId, "The turn was abandoned: gone.");
+
+		expect(update).toMatchObject({ state: "failed", error: "The turn was abandoned: gone." });
+		const doc = await stateDoc(conversationId, messageId);
+		expect(doc?.status).toBe("failed");
+		expect(doc?.error).toBe("The turn was abandoned: gone.");
+	});
+
+	it("leaves a terminal state standing and returns null", async () => {
+		const conversationId = new ObjectId();
+		const messageId = randomUUID();
+		const producerId = randomUUID();
+		await turnRunning({ conversationId, messageId, producerId });
+		await turnEnded({ conversationId, messageId, producerId }, { failed: false });
+
+		expect(await turnAbandoned(conversationId, messageId, "too late")).toBeNull();
+		expect((await stateDoc(conversationId, messageId))?.status).toBe("done");
+	});
+
+	it("returns null when the turn never had a state document", async () => {
+		expect(await turnAbandoned(new ObjectId(), randomUUID(), "nothing there")).toBeNull();
 	});
 });
