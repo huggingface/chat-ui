@@ -187,7 +187,7 @@
 				<summary class="cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300">
 					Available Tools ({server.tools.length})
 				</summary>
-				<ul class="mt-2 space-y-1 text-xs">
+				<ul class="mt-2 space-y-1 text-xs wrap-break-word">
 					{#each server.tools as tool}
 						<li class="text-gray-600 dark:text-gray-400">
 							<span class="font-medium text-gray-900 dark:text-gray-100">{tool.name}</span>
