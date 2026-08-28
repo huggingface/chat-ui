@@ -6,6 +6,7 @@
 
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonEdit from "~icons/carbon/edit";
+	import CarbonMachineLearning from "~icons/carbon/machine-learning";
 	import LucideEllipsis from "~icons/lucide/ellipsis";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
@@ -82,17 +83,18 @@
 >
 	{#if conv.mlAssistant}
 		{@const ml = ML_TURN_BADGE[activeGenerations.statusFor(conv.id) ?? "idle"]}
-		<!-- Neutral pill on purpose: the status dot carries the color, and an orange
-		     chip fought with it. Same recipe as the sidebar's count badges. -->
+		<!-- Neutral marker on purpose: the status dot carries the color, and an
+		     orange treatment fought with it. An icon rather than an "ML" chip, so
+		     a run of mode conversations doesn't read as a wall of repeated text. -->
 		<span
-			class="flex flex-none items-center gap-1 rounded-sm bg-gray-500/10 px-1 py-px text-[10px] font-medium text-gray-500 dark:bg-gray-500/20 dark:text-gray-400"
+			class="flex flex-none items-center gap-1 text-gray-400 dark:text-gray-500"
 			title="ML Intern — {ml.label}"
 		>
-			ML
+			<CarbonMachineLearning class="size-3.5" />
 			{#if ml.dot}
 				<span class="size-1.5 rounded-full {ml.dot}"></span>
 			{/if}
-			<span class="sr-only">Intern — {ml.label}</span>
+			<span class="sr-only">ML Intern — {ml.label}</span>
 		</span>
 	{:else if activeGenerations.has(conv.id)}
 		<span
