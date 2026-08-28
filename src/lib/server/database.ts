@@ -346,6 +346,19 @@ export class Database {
 		turnStates
 			.createIndex({ endedAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for turnStates by endedAt"));
+		// Serve the live feed's per-tick owner scan, like the same pair on `generations`.
+		turnStates
+			.createIndex(
+				{ userId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { userId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for turnStates by userId"));
+		turnStates
+			.createIndex(
+				{ sessionId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { sessionId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for turnStates by sessionId"));
 
 		parkedCalls
 			.createIndex({ parkedCallId: 1 }, { unique: true })
