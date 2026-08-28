@@ -9,6 +9,7 @@ interface ConversationListItem {
 	title: string;
 	updatedAt: Date | string;
 	model?: string;
+	mlAssistant?: boolean;
 }
 
 interface UserInfo {
@@ -83,6 +84,7 @@ export const load = async ({ fetch, url }) => {
 			title: conv.title,
 			model: conv.model ?? defaultModel?.id,
 			updatedAt: new Date(conv.updatedAt),
+			mlAssistant: conv.mlAssistant ?? false,
 		} satisfies ConvSidebar;
 	});
 

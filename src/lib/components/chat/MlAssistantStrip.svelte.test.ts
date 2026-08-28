@@ -65,12 +65,12 @@ describe("MlAssistantStrip", () => {
 		expect(style(strip).borderBottomColor).toBe("rgb(236, 236, 238)");
 	});
 
-	it("renders the on state with the preset tool list, Configure link and accent tint", () => {
+	it("renders the on state with the preset tool list and accent tint", () => {
 		const { container } = mount({ enabled: true });
 		const strip = find(container, ".ml-strip");
 
 		expect(strip.textContent).toContain("papers · training · spaces · datasets · eval · hub");
-		expect(container.textContent).toContain("Configure");
+		expect(container.textContent).not.toContain("Configure");
 		expect(style(strip).backgroundColor).toBe("rgb(255, 244, 234)");
 		expect(style(strip).borderBottomColor).toBe("rgb(251, 228, 204)");
 		expect(style(strip).color).toBe(ACCENT_TEXT);
@@ -85,15 +85,14 @@ describe("MlAssistantStrip", () => {
 		expect(strip.fontSize).toBe("13.5px");
 	});
 
-	it("truncates the tool note rather than pushing Configure off a narrow composer", () => {
+	it("truncates the tool note rather than overflowing a narrow composer", () => {
 		const { container } = mount({ enabled: true });
 		container.style.width = "375px";
 		const note = find(container, ".ml-strip span.truncate");
-		const configure = find(container, "button:not(.ml-switch)");
 
 		expect(style(note).textOverflow).toBe("ellipsis");
 		expect(note.scrollWidth).toBeGreaterThan(note.clientWidth);
-		expect(configure.getBoundingClientRect().right).toBeLessThanOrEqual(
+		expect(note.getBoundingClientRect().right).toBeLessThanOrEqual(
 			Math.ceil(find(container, ".ml-strip").getBoundingClientRect().right)
 		);
 	});
@@ -135,7 +134,7 @@ describe("MlAssistantStrip", () => {
 		expect(hidden.opacity).toBe("0");
 	});
 
-	it("collapses the switch and drops Configure once a task is running", () => {
+	it("collapses the switch once a task is running", () => {
 		const { container } = mount({
 			enabled: true,
 			taskRunning: true,
@@ -149,7 +148,6 @@ describe("MlAssistantStrip", () => {
 		expect(slot.width).toBe("0px");
 		expect(slot.marginRight).toBe("-9px");
 		expect(slot.opacity).toBe("0");
-		expect(container.textContent).not.toContain("Configure");
 		expect(container.textContent).not.toContain("papers · training");
 	});
 

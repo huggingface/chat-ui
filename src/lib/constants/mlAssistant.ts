@@ -12,6 +12,9 @@ export const ML_ASSISTANT_TOOLS = ["papers", "training", "spaces", "datasets", "
 export const ML_ASSISTANT_NOTE_OFF =
 	"— tools and prompts for papers, finetuning, demos and datasets";
 
+/** Note beside the "Ask in ML Intern" banner on conversations started without the mode. */
+export const ML_ASSISTANT_PROMO_NOTE = "— takes your question to a new chat with ML tools";
+
 /** Composer placeholder while the mode is on. */
 export const ML_ASSISTANT_PLACEHOLDER = "Describe the ML task — paper URL, model id, or dataset";
 

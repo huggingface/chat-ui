@@ -6,7 +6,10 @@
 	import { get } from "svelte/store";
 	import { loading } from "$lib/stores/loading";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
-	import { useActiveGenerationsStore } from "$lib/stores/activeGenerations.svelte";
+	import {
+		useActiveGenerationsStore,
+		type ParkedTurnStatus,
+	} from "$lib/stores/activeGenerations.svelte";
 	import { useNotificationsStore } from "$lib/stores/notifications.svelte";
 	import type { GenerationStatus } from "$lib/types/Generation";
 
@@ -23,6 +26,10 @@
 		title: string;
 		status: GenerationStatus;
 	}
+	interface ParkedEntry {
+		conversationId: string;
+		status: ParkedTurnStatus;
+	}
 
 	// While a run this tab started is still registering, keep looking this often; its DB
 	// record can lag $loading, which won't re-fire to reopen us.
@@ -38,7 +45,7 @@
 		source = es;
 
 		es.addEventListener("sync", (event) => {
-			let payload: { running: RunningEntry[]; ended: EndedEntry[] };
+			let payload: { running: RunningEntry[]; ended: EndedEntry[]; parked?: ParkedEntry[] };
 			try {
 				payload = JSON.parse((event as MessageEvent).data);
 			} catch {
@@ -46,6 +53,7 @@
 			}
 
 			activeGenerations.setRunning(payload.running.map((run) => run.conversationId));
+			activeGenerations.setParked(payload.parked ?? []);
 			for (const run of payload.running) {
 				if (run.title) convsStore.update(run.conversationId, { title: run.title });
 			}

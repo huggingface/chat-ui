@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy, untrack } from "svelte";
+	import { onDestroy, tick, untrack } from "svelte";
+	import { goto } from "$app/navigation";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
@@ -62,6 +63,7 @@
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideSparkles from "~icons/lucide/sparkles";
 	import MlAssistantStrip from "./MlAssistantStrip.svelte";
+	import MlAssistantPromo from "./MlAssistantPromo.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 	import { planStepsToMlSteps } from "$lib/utils/planProgress";
@@ -528,6 +530,32 @@
 		mlAssistant.toggle(next);
 	}
 
+	// The mode can't be switched on once a conversation starts without it, so the
+	// strip's slot offers the next best thing: a fresh ML Intern chat seeded with
+	// the question. First exchange only — beyond that the conversation has
+	// history worth keeping — and dismissable per conversation.
+	let mlPromoVisible = $derived(
+		ML_ASSISTANT_MODE &&
+			!shared &&
+			!isReadOnly &&
+			!mlModeOn &&
+			!mlTaskRunning &&
+			Boolean(page.params?.id) &&
+			messages.filter((message) => message.from === "user").length === 1 &&
+			!mlAssistant.promoDismissed(page.params?.id)
+	);
+
+	async function askInMlIntern() {
+		if (requireAuthUser()) return;
+		const question = messages.find((message) => message.from === "user")?.content ?? "";
+		await goto(`${base}/`);
+		// Let the home composer's sync effect release the old conversation before
+		// the mode goes on — the release resets the store, which would wipe it.
+		await tick();
+		mlAssistant.toggle(true);
+		if (question) pendingComposerPayload.set({ text: question });
+	}
+
 	let activeRouterExamplePrompt = $state<string | null>(null);
 	// ML Assistant mode brings its own chip set; otherwise use MCP examples when all
 	// base servers are enabled, and router examples when they are not.
@@ -596,6 +624,14 @@
 
 	async function startExample(example: RouterExample) {
 		if (requireAuthUser()) return;
+
+		// ML Intern chips seed the composer instead of dispatching: their prompts
+		// name "this paper/dataset/model", so the user still has details to add.
+		if (mlModeOn) {
+			draft = example.prompt;
+			return;
+		}
+
 		activeRouterExamplePrompt = example.prompt;
 
 		if (browser && example.attachments?.length) {
@@ -973,6 +1009,11 @@
 							statusLabel={mlAssistant.statusLabel}
 							complete={mlAssistant.complete}
 							ontoggle={toggleMlMode}
+						/>
+						<MlAssistantPromo
+							visible={mlPromoVisible}
+							onask={askInMlIntern}
+							ondismiss={() => mlAssistant.dismissPromo(page.params?.id)}
 						/>
 					{/if}
 					<!-- The composer box is a column so the ML Assistant strip can stack on

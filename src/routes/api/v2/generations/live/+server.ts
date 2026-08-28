@@ -4,19 +4,25 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 
 /**
- * Cross-conversation liveness feed. Reports the user's own running generations so
- * the sidebar can show which conversations are generating and toast when a
- * background one finishes — without a per-conversation stream for each.
+ * Cross-conversation liveness feed. Reports the user's own running generations —
+ * plus turns parked on the wait or ask tools — so the sidebar can show each
+ * conversation's status and toast when a background one finishes, without a
+ * per-conversation stream for each.
  *
  * Scoped by `authCondition` against the denormalised user/session on `generations`
- * (no join). SSE: `event: sync {running, ended}` each tick; `event: idle` when the
- * user has no running generations, after which the client closes rather than
- * reconnecting (a plain lifetime-cap close, by contrast, means reconnect).
+ * and `turnStates` (no join). SSE: `event: sync {running, ended, parked}` each
+ * tick; `event: idle` when the user has no running generations AND no parked
+ * turns, after which the client closes rather than reconnecting (a plain
+ * lifetime-cap close, by contrast, means reconnect). A parked turn therefore
+ * holds the feed open: its resume happens server-side with no client action, so
+ * only a live feed can ever report it.
  */
 const TICK_MS = 2_000;
 const MAX_LIFETIME_MS = 5 * 60_000;
 // Release the connection once nothing is running; the client reopens on the next run.
 const IDLE_TICKS_BEFORE_CLOSE = 2;
+// How long a failed turn keeps its sidebar flag (the state doc itself lives a week).
+const FAILED_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export const GET: RequestHandler = async ({ locals, request }) => {
 	let auth: ReturnType<typeof authCondition>;
@@ -59,6 +65,28 @@ export const GET: RequestHandler = async ({ locals, request }) => {
 					)
 					.toArray();
 
+				// Parked turns have no running generation, so they come from the
+				// authoritative turn-state docs instead. Recent failures ride along so
+				// the sidebar can flag a run that died in the background — bounded to a
+				// day because the docs themselves live a week (see the TTL), and a
+				// week-old failure is history, not a status.
+				const parked = await collections.turnStates
+					.find(
+						{
+							...auth,
+							$or: [
+								{ status: { $in: ["waiting", "awaiting_input"] } },
+								{ status: "failed", endedAt: { $gt: new Date(Date.now() - FAILED_WINDOW_MS) } },
+							],
+						},
+						{ projection: { conversationId: 1, status: 1 } }
+					)
+					.toArray();
+				const parkedPayload = parked.map((turn) => ({
+					conversationId: turn.conversationId.toString(),
+					status: turn.status,
+				}));
+
 				const currentIds = new Set(running.map((g) => g.generationId));
 				const endedIds = [...prevRunning].filter((id) => !currentIds.has(id));
 
@@ -84,9 +112,13 @@ export const GET: RequestHandler = async ({ locals, request }) => {
 					}));
 				}
 
-				send("sync", { running: runningPayload, ended: endedPayload });
+				send("sync", { running: runningPayload, ended: endedPayload, parked: parkedPayload });
 				prevRunning = currentIds;
-				idleTicks = currentIds.size === 0 ? idleTicks + 1 : 0;
+				// Failed turns are terminal: they never change server-side, so unlike
+				// the parked states they must not hold the feed open. The last sync
+				// before the idle close already delivered them.
+				const liveParked = parked.some((turn) => turn.status !== "failed");
+				idleTicks = currentIds.size === 0 && !liveParked ? idleTicks + 1 : 0;
 				return idleTicks < IDLE_TICKS_BEFORE_CLOSE;
 			};
 

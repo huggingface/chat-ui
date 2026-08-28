@@ -14,10 +14,11 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 
 	const convs = await collections.conversations
 		.find(authCondition(locals))
-		.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model">>({
+		.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "mlAssistant">>({
 			title: 1,
 			updatedAt: 1,
 			model: 1,
+			mlAssistant: 1,
 		})
 		.sort({ updatedAt: -1 })
 		.skip(p * pageSize)
@@ -32,6 +33,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		updatedAt: conv.updatedAt,
 		model: conv.model,
 		modelId: conv.model, // legacy param iOS
+		...(conv.mlAssistant ? { mlAssistant: true } : {}),
 	}));
 
 	return superjsonResponse({ conversations: res, hasMore });
