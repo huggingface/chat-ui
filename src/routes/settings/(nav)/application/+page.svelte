@@ -96,7 +96,31 @@
 	});
 
 	let themePref = $state<ThemePreference>(browser ? getThemePreference() : "system");
+
+	const taskModelId = $derived((page.data as { taskModelId?: string | null }).taskModelId ?? null);
+	const showTaskModelInBilling = $derived(publicConfig.isHuggingChat && !!page.data.user);
 </script>
+
+{#snippet taskModelRow()}
+	<div class="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between">
+		<div>
+			<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Task model</div>
+			<p class="text-[12px] text-gray-500 dark:text-gray-400">
+				{#if publicConfig.isHuggingChat}
+					Generates conversation titles. Extremely cheap.
+				{:else}
+					Generates conversation titles. Set via <code class="font-mono">TASK_MODEL</code>.
+				{/if}
+			</p>
+		</div>
+		<select
+			disabled
+			class="max-w-full cursor-not-allowed self-start rounded-md border border-gray-300 bg-white px-1 py-1 text-xs text-gray-800 sm:self-auto dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+		>
+			<option>{taskModelId}</option>
+		</select>
+	</div>
+{/snippet}
 
 <div class="flex w-full flex-col gap-4">
 	<h2 class="text-center text-lg font-semibold text-gray-800 md:text-left dark:text-gray-200">
@@ -227,6 +251,10 @@
 						<option value="dark">Dark</option>
 					</select>
 				</div>
+
+				{#if taskModelId && !showTaskModelInBilling}
+					{@render taskModelRow()}
+				{/if}
 			</div>
 		</div>
 
@@ -263,6 +291,9 @@
 							{/if}
 						</div>
 					</div>
+					{#if taskModelId}
+						{@render taskModelRow()}
+					{/if}
 					<!-- Providers Usage -->
 					<div class="flex items-start justify-between py-3">
 						<div>
