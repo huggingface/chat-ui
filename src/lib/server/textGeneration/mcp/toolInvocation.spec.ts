@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ObjectId } from "mongodb";
+import { collections, ready } from "$lib/server/database";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { parseToolArguments } from "./toolArgs";
@@ -152,6 +153,55 @@ describe("executeToolCalls", () => {
 			tool_call_id: "call_1",
 			content: "Error: connection refused",
 		});
+	});
+});
+
+describe("executeToolCalls durable elicitation", () => {
+	it("records awaiting_input when a prompt opens, so the turn stays subscribable", async () => {
+		// An MCP prompt parks the turn on the user exactly like the ask tool, but
+		// this path recorded nothing: the route's ending CAS then read the state
+		// as still-running and marked the turn done, closing every subscription
+		// while the prompt was open — an answer from another tab streamed into
+		// nothing.
+		await ready;
+		const conversationId = new ObjectId();
+		mcpMock.callMcpTool.mockResolvedValue(
+			mcpResult({
+				inputRequired: {
+					inputRequests: {
+						name: {
+							method: "elicitation/create",
+							params: {
+								message: "What is your name?",
+								requestedSchema: {
+									type: "object",
+									properties: { name: { type: "string" } },
+									required: ["name"],
+								},
+							},
+						},
+					},
+				},
+			} as Partial<McpToolTextResponse>)
+		);
+
+		const events = await drain([CALL], {
+			conversationId,
+			generationId: "gen-1",
+			messageId: "assistant-1",
+		});
+
+		// The in-band transition, on the same channel as the prompt itself.
+		const turnStates = events.flatMap((e) =>
+			e.type === "update" && e.update.type === MessageUpdateType.TurnState ? [e.update] : []
+		);
+		expect(turnStates.map((u) => u.state)).toEqual(["awaiting_input"]);
+
+		// And the authoritative document, so the ending CAS misses and the
+		// parked state stands.
+		const doc = await collections.turnStates.findOne({ conversationId, messageId: "assistant-1" });
+		expect(doc?.status).toBe("awaiting_input");
+		expect(doc?.producerId).toBe("gen-1");
 	});
 });
 

@@ -21,6 +21,8 @@
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import ToolUpdate from "./ToolUpdate.svelte";
+	import TurnWaitBanner from "./TurnWaitBanner.svelte";
+	import { turnStateOf } from "$lib/utils/generationState";
 	import ToolCallsSummary from "./ToolCallsSummary.svelte";
 	import ArtifactCard from "./ArtifactCard.svelte";
 	import ElicitationForm from "./ElicitationForm.svelte";
@@ -252,6 +254,15 @@
 		}
 		return out;
 	}
+
+	// The live turn's park, rendered as a countdown from its ABSOLUTE deadline
+	// (clock-skew corrected). Only the last message of the conversation can be
+	// parked; earlier messages' turnState events are history, not liveness.
+	let waitingState = $derived.by(() => {
+		if (!isLast) return undefined;
+		const state = turnStateOf(message);
+		return state?.state === "waiting" && state.until !== undefined ? state : undefined;
+	});
 
 	let blocks = $derived.by(() => {
 		const updates = message.updates ?? [];
@@ -578,6 +589,10 @@
 					{/each}
 				{/if}
 			</div>
+
+			{#if waitingState}
+				<TurnWaitBanner until={waitingState.until ?? 0} reason={waitingState.reason} />
+			{/if}
 		</div>
 
 		{#if message.routerMetadata || (!loading && message.content)}

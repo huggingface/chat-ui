@@ -47,8 +47,16 @@ const MAX_REPLAYED_TOOL_OUTPUT_CHARS = 8000;
  * This is only the ceiling. When the model's context window is known it is
  * lowered to fit (see budgetCharsFor), because on a small-context model a flat
  * history that fit could otherwise be expanded into an overflow.
+ *
+ * Sized for long agentic turns: an ML Assistant turn parks and resumes for
+ * half an hour and its tool transcript IS the working state — at the previous
+ * 100k ceiling one such turn's floor consumed the whole budget and every
+ * turn replayed flat, so the resumed model forgot its own waits, jobs and
+ * answered questions. Real windows bound this anyway (budgetCharsFor);
+ * the absolute ceiling only protects huge-window models from megabyte
+ * requests.
  */
-const HISTORY_BUDGET_CHARS = 100_000;
+const HISTORY_BUDGET_CHARS = 400_000;
 
 /**
  * Characters assumed per token when converting a context window into a
@@ -499,16 +507,33 @@ export async function prepareMessagesWithFiles(
 	// paying only the difference over the floor. A history that already exceeds
 	// the cap leaves nothing to spend, so every turn keeps its flat form and the
 	// request is no larger than it used to be.
-	let budget = budgetCharsFor(options?.contextLengthTokens, options?.maxOutputTokens) - floor;
+	const total = budgetCharsFor(options?.contextLengthTokens, options?.maxOutputTokens);
+	const windowBounded = Boolean(options?.contextLengthTokens && options.contextLengthTokens > 0);
+	let budget = total - floor;
 	const resolved: ChatMessageParam[][] = [...flatForms];
+	// The newest replayable turn is the one a continuation resumes INTO: its
+	// tool transcript is the run's working state (parked waits, submitted jobs,
+	// answered questions), and flattening it decapitates the run — the resumed
+	// model literally forgets what it did. Against the SOFT ceiling (no window
+	// reported) it is therefore judged against the whole budget, not what the
+	// floor left over: history ballast can flatten older turns, never the one
+	// being continued, and over-sending against the soft ceiling is survivable.
+	// A WINDOW-bounded budget is physics, not policy: replay past it fails the
+	// whole request with a provider context error, which is strictly worse than
+	// the flat degradation — so there the newest turn must fit beside the flat
+	// floor like everything else (walking newest-first, it still claims the
+	// budget first).
+	let newestCandidate = true;
+	const newestLimit = windowBounded ? budget : total;
 	for (let i = prepared.length - 1; i >= 0; i -= 1) {
 		const entry = prepared[i];
 		if (Array.isArray(entry)) continue;
 		const upgrade = historyCost(entry.replay) - historyCost(flatForms[i]);
-		// Monotonic: the first turn that doesn't fit stops the walk, so the model
-		// never sees rich history for a stale turn while the turn it is
-		// continuing from is plain prose.
-		if (upgrade > budget) break;
+		// Monotonic past the newest turn: the first older turn that doesn't fit
+		// stops the walk, so the model never sees rich history for a stale turn
+		// while a newer one is plain prose.
+		if (newestCandidate ? upgrade > newestLimit : upgrade > budget) break;
+		newestCandidate = false;
 		budget -= upgrade;
 		resolved[i] = entry.replay;
 	}

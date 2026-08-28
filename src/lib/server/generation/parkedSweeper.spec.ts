@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
-import { sweepParkedCalls } from "./parkedSweeper";
+import { renewClaim, sweepParkedCalls } from "./parkedSweeper";
 import type { ParkedCall } from "$lib/types/ParkedCall";
 
 const park = (over: Partial<ParkedCall> = {}): ParkedCall => ({
@@ -28,6 +28,8 @@ beforeAll(async () => {
 
 afterEach(async () => {
 	await collections.parkedCalls.deleteMany({});
+	await collections.turnStates.deleteMany({});
+	await collections.conversations.deleteMany({ title: "abandoned turn" });
 });
 
 describe("sweepParkedCalls", () => {
@@ -102,5 +104,88 @@ describe("sweepParkedCalls", () => {
 		const row = await collections.parkedCalls.findOne({});
 		expect(row?.status).toBe("abandoned");
 		expect(row?.abandonedReason).toContain("gave up");
+	});
+
+	it("abandonment closes the turn: state fails, and the message reads terminal", async () => {
+		// An abandoned park used to leave the state doc `waiting`: the turn read
+		// alive forever, subscriptions churned on heartbeats, and the client sat
+		// on an "overdue" banner for a wake that could not come.
+		const row = park({ attempts: 3 });
+		await collections.conversations.insertOne({
+			_id: row.conversationId,
+			sessionId: "s",
+			model: "test-org/test-model",
+			title: "abandoned turn",
+			rootMessageId: "u1",
+			messages: [
+				{ id: "u1", from: "user", content: "go", ancestors: [], children: [row.messageId] },
+				{
+					id: row.messageId,
+					from: "assistant",
+					content: "",
+					updates: [],
+					ancestors: ["u1"],
+					children: [],
+				},
+			],
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		} as never);
+		await collections.turnStates.insertOne({
+			_id: new ObjectId(),
+			conversationId: row.conversationId,
+			messageId: row.messageId,
+			producerId: "gen-old",
+			status: "waiting",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		} as never);
+		await collections.parkedCalls.insertOne(row);
+
+		await sweepParkedCalls();
+
+		expect((await collections.parkedCalls.findOne({}))?.status).toBe("abandoned");
+		const state = await collections.turnStates.findOne({ conversationId: row.conversationId });
+		expect(state?.status).toBe("failed");
+		expect(state?.error).toContain("abandoned");
+		// Persisted into the message, with no producer to emit it: the next
+		// snapshot reads terminal — the banner clears and Resume is on offer.
+		const conv = await collections.conversations.findOne({ _id: row.conversationId });
+		const message = conv?.messages.find((m) => m.id === row.messageId);
+		expect(message?.updates?.at(-1)).toMatchObject({ type: "turnState", state: "failed" });
+	});
+});
+
+describe("renewClaim", () => {
+	it("keeps a live resume's row from being stolen when its original lease ages out", async () => {
+		// A resumed ML turn routinely runs longer than the claim lease. The live
+		// resume renews; without the renewal the sweeper would re-claim the row
+		// and launch a SECOND producer onto the same turn — dueling writers,
+		// interleaved turn states (the stuck wait banner), an abandon mid-run.
+		const row = park({
+			status: "resuming",
+			takenAt: new Date(Date.now() - 10 * 60_000),
+			attempts: 1,
+		});
+		await collections.parkedCalls.insertOne(row);
+
+		await renewClaim(row);
+		await sweepParkedCalls();
+
+		const after = await collections.parkedCalls.findOne({});
+		expect(after?.status).toBe("resuming");
+		expect(after?.attempts).toBe(1);
+	});
+
+	it("never revives a row whose resume already finished", async () => {
+		const takenAt = new Date(Date.now() - 60_000);
+		const row = park({ status: "resumed", takenAt, attempts: 1 });
+		await collections.parkedCalls.insertOne(row);
+
+		await renewClaim(row);
+
+		const after = await collections.parkedCalls.findOne({});
+		expect(after?.status).toBe("resumed");
+		expect(after?.takenAt?.getTime()).toBe(takenAt.getTime());
 	});
 });

@@ -478,7 +478,9 @@ describe.sequential("replaying a turn that ended badly", () => {
 			() => new Promise((resolve) => setTimeout(() => resolve({ text: "late" }), 5_000))
 		);
 
-		await sendMessageAndDetach(conv, locals, "Weather?", 3);
+		// One more chunk than before the turnState events existed: the turn now
+		// opens with an in-band `running` transition ahead of the tool call.
+		await sendMessageAndDetach(conv, locals, "Weather?", 4);
 
 		const stored = await reload(conv);
 		const lastAssistant = assistantMessages(stored).at(-1);
@@ -894,9 +896,9 @@ describe.sequential("replay budget", () => {
 	it("degrades the oldest turns to flat text, monotonically, without leaking think markup", async () => {
 		const { conv, locals } = await newConversation();
 		await setReasoningOverride(locals, true);
-		// REPLAY_HISTORY_BUDGET_CHARS is 100k, so three turns of 45k reasoning
-		// force the oldest one over the edge.
-		const big = (tag: string) => `${tag} `.repeat(9_000);
+		// The history budget ceiling is 400k chars, so three turns of ~160k
+		// reasoning force the oldest one over the edge.
+		const big = (tag: string) => `${tag} `.repeat(27_000);
 		scriptRounds([
 			{ reasoning: big("first"), content: "Answer one." },
 			{ reasoning: big("second"), content: "Answer two." },

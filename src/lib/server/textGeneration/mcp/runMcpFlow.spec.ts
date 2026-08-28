@@ -404,6 +404,30 @@ describe("runMcpFlow answers cut by the output limit", () => {
 		const answer = updates.find((u) => u.type === MessageUpdateType.FinalAnswer);
 		expect(answer?.type === MessageUpdateType.FinalAnswer && answer.interrupted).toBe(true);
 	});
+
+	// A stream that dies mid-<think> ends with "stop" (or nothing), not "length" —
+	// the failure is the same think-only non-answer and gets the same retry.
+	it("retries a think-only answer even without a length signal", async () => {
+		scriptRounds([{ reasoning: "half a thought" }, { content: "the recovered answer" }]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(finalAnswer(updates)).toBe("the recovered answer");
+		const retry = requestMessages(1);
+		expect(retry.at(-2)?.role).toBe("assistant");
+		expect(String(retry.at(-1)?.content)).toContain("internal reasoning");
+	});
+
+	it("finalizes a repeated think-only answer as interrupted", async () => {
+		scriptRounds([{ reasoning: "half a thought" }, { reasoning: "another half-thought" }]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		const answer = updates.find((u) => u.type === MessageUpdateType.FinalAnswer);
+		expect(answer?.type === MessageUpdateType.FinalAnswer && answer.interrupted).toBe(true);
+	});
 });
 
 describe("runMcpFlow termination", () => {

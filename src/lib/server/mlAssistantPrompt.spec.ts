@@ -111,6 +111,33 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("hf://docs/hub/jobs-pricing.md");
 	});
 
+	it("makes speed-versus-cost the user's call, not an assumed objective", () => {
+		// Dogfooding: models silently optimised for cost when the user would have
+		// paid more to see the result sooner. The preference is the user's to
+		// state, and the options put to them must span the spectrum.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("not necessarily the user's");
+		expect(jobs).toContain("span the real spectrum");
+	});
+
+	it("front-loads the first status check after a submit", () => {
+		// Dogfooding: models set long waits uniformly, so a job that died on a bad
+		// dependency in its first minute sat undiscovered for twenty.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("failures cluster at the start");
+		expect(jobs).toContain("SHORT wait");
+	});
+
+	it("sends smoke checks to the sandbox first when it is on offer", () => {
+		// Dogfooding: some models smoke-tested via jobs with the sandbox sitting
+		// unused — a queue and an image pull to find a typo. Stated at both
+		// surfaces: the jobs contract and the sandbox rules.
+		expect(inMode([tool("hf_jobs")])).toContain("When hf_sandbox is on offer");
+		expect(inMode([tool("hf_sandbox")])).toContain("go here FIRST");
+	});
+
 	it("sends paper-finding rules with the filesystem tool", () => {
 		// It searched for a paper by title with hub_repo_search — a repo search —
 		// twice, and concluded nothing was there.

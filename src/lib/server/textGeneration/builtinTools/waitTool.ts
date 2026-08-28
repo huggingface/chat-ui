@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
+import { turnWaiting } from "$lib/server/generation/turnState";
 import { logger } from "$lib/server/logger";
 import type { BuiltinTool } from "./types";
 
@@ -22,9 +23,11 @@ const MAX_WAIT_SECONDS = 30 * 60;
  * Parking is cheap per hop and unbounded in aggregate: park, resume, park again
  * is a loop that costs a turn each time and never returns to the user. This is
  * the ceiling on hops in one conversation — the same role the repetition guard
- * plays for tool calls.
+ * plays for tool calls. Sized for the check-early-then-stretch cadence the
+ * tool description asks for: frequent short checks are the intended shape, so
+ * the cap exists to stop a runaway loop, not to ration checks.
  */
-const MAX_WAITS_PER_CONVERSATION = 40;
+const MAX_WAITS_PER_CONVERSATION = 100;
 
 export const waitBuiltin: BuiltinTool = {
 	name: WAIT_TOOL_NAME,
@@ -46,8 +49,12 @@ export const waitBuiltin: BuiltinTool = {
 						minimum: MIN_WAIT_SECONDS,
 						maximum: MAX_WAIT_SECONDS,
 						description:
-							"How long to wait before being woken. Match it to the work: a job that " +
-							"takes an hour is several long waits, not sixty short ones.",
+							"How long to wait before being woken. Check early, then stretch: failures " +
+							"cluster in a run's first minutes (image pull, dependency install, the " +
+							"first training step), so keep the first wait after a submit short — a " +
+							"minute or two — and lengthen later waits as the run proves itself. A " +
+							"short check on a healthy run costs almost nothing; a long wait over a " +
+							"job that died at step one loses the whole gap.",
 					},
 					reason: {
 						type: "string",
@@ -123,6 +130,21 @@ export const waitBuiltin: BuiltinTool = {
 			{ parkedCallId, conversationId: ctx.conversationId.toString(), seconds: clamped, reason },
 			"[wait] turn parked"
 		);
+
+		// The park is a lifecycle transition: record it on the turn state and
+		// send it in-band, so every subscriber learns the absolute deadline from
+		// the same channel that carries the rest of the turn.
+		const stateUpdate = await turnWaiting(
+			{
+				conversationId: ctx.conversationId,
+				messageId: ctx.messageId,
+				producerId: ctx.generationId ?? "",
+				...(ctx.userId ? { userId: ctx.userId } : {}),
+				...(ctx.sessionId ? { sessionId: ctx.sessionId } : {}),
+			},
+			{ until: new Date(now.getTime() + clamped * 1000), reason }
+		);
+		ctx.elicitationSink?.emit(stateUpdate);
 
 		return { awaitingInput: true };
 	},

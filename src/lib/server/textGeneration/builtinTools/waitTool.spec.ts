@@ -74,7 +74,7 @@ describe("the wait tool", () => {
 		// user. This is the same ceiling the repetition guard puts on tool calls.
 		const conversationId = new ObjectId();
 		await collections.parkedCalls.insertMany(
-			Array.from({ length: 40 }, () => ({
+			Array.from({ length: 100 }, () => ({
 				_id: new ObjectId(),
 				parkedCallId: new ObjectId().toString(),
 				conversationId,
@@ -98,7 +98,7 @@ describe("the wait tool", () => {
 
 		expect(outcome).toHaveProperty("error");
 		expect(String((outcome as { error: string }).error)).toContain("limit");
-		expect(await collections.parkedCalls.countDocuments({ conversationId })).toBe(40);
+		expect(await collections.parkedCalls.countDocuments({ conversationId })).toBe(100);
 	});
 
 	it("declines to park where nothing could wake it", async () => {

@@ -1,22 +1,32 @@
 import type { Message } from "$lib/types/Message";
 import {
-	MessageToolUpdateType,
 	MessageUpdateStatus,
 	MessageUpdateType,
+	type MessageTurnStateUpdate,
 } from "$lib/types/MessageUpdate";
 
 /**
- * A parked-and-resumed turn (the `wait` tool) has a lifecycle, not a single
- * ending: every park stamps a `finished` status and every server-side resume
- * stamps a new `started`. "Ever finished" would freeze the message at its
- * first park — reloads would never reattach and resumes would stay invisible
- * to an open page — so the LAST lifecycle event decides.
+ * The last in-band turn state this message carries — the client's authoritative
+ * liveness, delivered and replayed on the same channel as everything else. No
+ * inference over event patterns: the state IS the data (see TurnState.ts).
  */
-export function isAssistantGenerationTerminal(message?: Message): boolean {
-	if (!message || message.from !== "assistant") return true;
+export function turnStateOf(message?: Message): MessageTurnStateUpdate | undefined {
+	if (!message || message.from !== "assistant") return undefined;
+	const updates = message.updates ?? [];
+	for (let i = updates.length - 1; i >= 0; i -= 1) {
+		const update = updates[i];
+		if (update.type === MessageUpdateType.TurnState) return update;
+	}
+	return undefined;
+}
 
-	if (message.interrupted === true) return true;
-
+/**
+ * Messages persisted before turn states carry only lifecycle statuses, whose
+ * LAST event decides (each park stamped `finished`, each resume `started`).
+ * Kept solely for those messages — delete when pre-turn-state conversations
+ * have aged out.
+ */
+function legacyTerminal(message: Message): boolean {
 	const updates = message.updates ?? [];
 	for (let i = updates.length - 1; i >= 0; i -= 1) {
 		const update = updates[i];
@@ -34,6 +44,23 @@ export function isAssistantGenerationTerminal(message?: Message): boolean {
 	return false;
 }
 
+/**
+ * Whether the assistant message is past generation FOR UI PURPOSES — the
+ * loading spinner, scroll following, the stop button. Only a running turn is
+ * non-terminal: a waiting turn reads terminal here (the wait banner is its
+ * affordance, not the spinner), and whether the turn's channel still has
+ * something to say is the separate question `isTurnSubscribable` answers.
+ */
+export function isAssistantGenerationTerminal(message?: Message): boolean {
+	if (!message || message.from !== "assistant") return true;
+
+	if (message.interrupted === true) return true;
+
+	const state = turnStateOf(message);
+	if (state) return state.state !== "running";
+	return legacyTerminal(message);
+}
+
 export function isConversationGenerationActive(messages: Message[]): boolean {
 	const lastAssistant = [...messages].reverse().find((message) => message.from === "assistant");
 	if (!lastAssistant) return false;
@@ -42,33 +69,21 @@ export function isConversationGenerationActive(messages: Message[]): boolean {
 }
 
 /**
- * Matches WAIT_TOOL_NAME in builtinTools/waitTool.ts, which cannot be imported
- * here: that module reaches the database, and this one is shared with the
- * client bundle.
+ * Whether the turn's channel can still deliver events, i.e. whether this tab
+ * should hold a subscription. Running and waiting turns, obviously — the
+ * whole point is that a resume arrives on the held connection. A turn
+ * awaiting input too: an answer (possibly from another tab or device)
+ * continues the same turn log, and the open subscription is how every other
+ * view sees it live.
  */
-const WAIT_TOOL = "wait";
-
-/**
- * Whether this message's last act was parking on the `wait` tool: a wait call
- * with no result yet. While parked the message reads terminal — that run's
- * lifecycle closed with `finished` — but the sweeper will resume it
- * server-side under a new generationId, so a parked message is a nap, not an
- * ending, and a page showing one should keep watching for the resume.
- */
-export function isAssistantParkedOnWait(message?: Message): boolean {
+export function isTurnSubscribable(message?: Message): boolean {
 	if (!message || message.from !== "assistant" || message.interrupted === true) return false;
 
-	const pending = new Set<string>();
-	for (const update of message.updates ?? []) {
-		if (update.type !== MessageUpdateType.Tool) continue;
-		if (update.subtype === MessageToolUpdateType.Call && update.call.name === WAIT_TOOL) {
-			pending.add(update.uuid);
-		} else if (
-			update.subtype === MessageToolUpdateType.Result ||
-			update.subtype === MessageToolUpdateType.Error
-		) {
-			pending.delete(update.uuid);
-		}
+	const state = turnStateOf(message);
+	if (state) {
+		return (
+			state.state === "running" || state.state === "waiting" || state.state === "awaiting_input"
+		);
 	}
-	return pending.size > 0;
+	return !legacyTerminal(message);
 }

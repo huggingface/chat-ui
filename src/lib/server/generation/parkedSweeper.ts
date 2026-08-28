@@ -20,6 +20,7 @@ import type { ParkedCall } from "$lib/types/ParkedCall";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { createGenerationWriter } from "./writer";
 import { applyUpdateToMessage } from "./applyUpdate";
+import { turnAbandoned, turnEnded, turnRunning } from "./turnState";
 import { compressUpdatesForStorage } from "./compressUpdates";
 
 const SWEEP_BATCH = 5;
@@ -39,6 +40,28 @@ function sweepIntervalMs(): number {
  * and `attempts` would never reach the retry ceiling it exists to enforce.
  */
 const CLAIM_LEASE_MS = 5 * 60_000;
+
+/**
+ * A LIVE resume renews its claim on this cadence (see resumeParkedCall), so the
+ * lease only ever expires under a producer that actually died. Well under
+ * CLAIM_LEASE_MS: several consecutive renewals must all fail before a row can
+ * be stolen from a running resume.
+ */
+const LEASE_RENEW_MS = 60_000;
+
+/**
+ * Bump the claim's lease while the resume is still working. Guarded on the
+ * status so a renewal racing the finally's `resumed` write can never revive a
+ * finished row.
+ */
+export async function renewClaim(park: ParkedCall): Promise<void> {
+	const now = new Date();
+	await collections.parkedCalls
+		.updateOne({ _id: park._id, status: "resuming" }, { $set: { takenAt: now, updatedAt: now } })
+		.catch((err) =>
+			logger.warn({ err, parkedCallId: park.parkedCallId }, "[parked] failed to renew claim lease")
+		);
+}
 
 /**
  * Claim one due row. The filter carries the status, so two pods racing on the
@@ -68,6 +91,28 @@ async function abandon(park: ParkedCall, reason: string): Promise<void> {
 		{ _id: park._id },
 		{ $set: { status: "abandoned", abandonedReason: reason, updatedAt: new Date() } }
 	);
+	// Close the turn too: nothing will resume it, and a `waiting` state doc
+	// would read alive forever (see turnAbandoned). Persisting the terminal
+	// state into the message is what lets the next snapshot clear the wait
+	// banner — and makes the failed turn eligible for the Resume affordance.
+	const failedUpdate = await turnAbandoned(
+		park.conversationId,
+		park.messageId,
+		`The turn was abandoned: ${reason}.`
+	);
+	if (failedUpdate) {
+		await collections.conversations
+			.updateOne({ _id: park.conversationId, "messages.id": park.messageId }, {
+				$push: { "messages.$.updates": failedUpdate },
+				$set: { "messages.$.updatedAt": new Date(), updatedAt: new Date() },
+			} as never)
+			.catch((err) =>
+				logger.error(
+					{ err, parkedCallId: park.parkedCallId },
+					"[parked] failed to persist the abandoned turn state"
+				)
+			);
+	}
 }
 
 /**
@@ -112,6 +157,23 @@ async function rebuildIdentity(park: ParkedCall) {
 
 /** Wake one parked turn: inject the tool result it parked on, then let it continue. */
 export async function resumeParkedCall(park: ParkedCall): Promise<void> {
+	// The claim lease exists to recover a resume whose pod DIED — but a live
+	// resumed run routinely outlives it (an ML continuation runs for tens of
+	// minutes). Without renewal the sweeper re-claims the row every
+	// CLAIM_LEASE_MS and launches a second producer onto the same turn:
+	// dueling writers over one seq range, interleaved turn states (a stale
+	// `waiting` landing after the live `running` is the stuck wait banner),
+	// and after MAX_ATTEMPTS the row is abandoned mid-run.
+	const leaseRenewer = setInterval(() => void renewClaim(park), LEASE_RENEW_MS);
+	leaseRenewer.unref?.();
+	try {
+		await resumeParkedCallInner(park);
+	} finally {
+		clearInterval(leaseRenewer);
+	}
+}
+
+async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 	const conv = await collections.conversations.findOne({ _id: park.conversationId });
 	if (!conv) return abandon(park, "conversation is gone");
 
@@ -143,6 +205,7 @@ export async function resumeParkedCall(park: ParkedCall): Promise<void> {
 		generationId,
 		conversationId: conv._id,
 		messageId: message.id,
+		continueFromSeq: message.materializedSeq,
 		...(park.userId ? { userId: park.userId } : {}),
 		...(locals.sessionId ? { sessionId: locals.sessionId } : {}),
 		snapshot: () => ({
@@ -182,8 +245,20 @@ export async function resumeParkedCall(park: ParkedCall): Promise<void> {
 		);
 	};
 
+	// This producer holds the turn from here; the terminal write below is a CAS
+	// that leaves a park recorded mid-run standing. Same vocabulary as the route.
+	const turnKey = {
+		conversationId: conv._id,
+		messageId: message.id,
+		producerId: generationId,
+		...(park.userId ? { userId: park.userId } : {}),
+		...(locals.sessionId ? { sessionId: locals.sessionId } : {}),
+	};
+
 	let hasError = false;
 	try {
+		apply(await turnRunning(turnKey));
+
 		// The result the parked call has been missing. Replay pairs it with the call
 		// by uuid, which is what puts it in the model's history for the next round.
 		apply({
@@ -240,14 +315,20 @@ export async function resumeParkedCall(park: ParkedCall): Promise<void> {
 		// made a reloading client reattach to the already-ended generation in a
 		// refresh loop.
 		apply({ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished });
+		// CAS: misses when the resumed run parked again, and that state stands.
+		const endedUpdate = await turnEnded(turnKey, { failed: false });
+		if (endedUpdate) apply(endedUpdate);
 	} catch (err) {
 		hasError = true;
 		logger.error({ err, parkedCallId: park.parkedCallId }, "[parked] resumed turn failed");
+		const errorMessage = err instanceof Error ? err.message : "The resumed turn failed.";
 		apply({
 			type: MessageUpdateType.Status,
 			status: MessageUpdateStatus.Error,
-			message: err instanceof Error ? err.message : "The resumed turn failed.",
+			message: errorMessage,
 		});
+		const failedUpdate = await turnEnded(turnKey, { failed: true, error: errorMessage });
+		if (failedUpdate) apply(failedUpdate);
 	} finally {
 		await persist();
 		await writer.finish({ status: hasError ? "error" : "completed" });

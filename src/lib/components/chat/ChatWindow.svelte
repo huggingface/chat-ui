@@ -25,6 +25,12 @@
 	import type { Model } from "$lib/types/Model";
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
+	import ResumeBtn from "../ResumeBtn.svelte";
+	import {
+		buildResumeMessage,
+		canResumeAfterFailure,
+		failureDetailOf,
+	} from "$lib/utils/resumeAfterFailure";
 	import file2base64 from "$lib/utils/file2base64";
 	import { base } from "$app/paths";
 	import ChatMessage from "./ChatMessage.svelte";
@@ -393,6 +399,16 @@
 			turnCount: turns.length,
 			lastTurnKey,
 			streamingTurnKey: streaming ? lastTurnKey : null,
+			// Untracked like the terminal check: read once at the streaming flip,
+			// never per token. A park resuming (wait elapsed, question answered)
+			// re-enters streaming on a message that already carries work — a
+			// continuation, not a new reply, so the carry-to-anchor must not
+			// re-run. A fresh reply's message is still empty at the flip.
+			resumedStream: Boolean(
+				streaming &&
+				lastMessage &&
+				untrack(() => lastMessage.content.length > 0 || (lastMessage.updates?.length ?? 0) > 0)
+			),
 		});
 	});
 
@@ -475,6 +491,17 @@
 
 	let mlModeOn = $derived(ML_ASSISTANT_MODE && mlAssistant.enabled);
 	let mlTaskRunning = $derived(ML_ASSISTANT_MODE && mlAssistant.taskStarted);
+	// Resume beats Retry for a failed agentic turn: retry re-runs the whole turn
+	// (duplicating jobs and repos already created), resume continues past the
+	// preserved transcript. ML mode only — elsewhere turns rarely carry work
+	// worth saving — and only when the turn did something (see the util).
+	let canResumeTurn = $derived(
+		mlModeOn && !loading && lastIsError && !!lastMessage && canResumeAfterFailure(lastMessage)
+	);
+	function sendResumeMessage() {
+		if (!lastMessage) return;
+		sendFixRequest(buildResumeMessage(failureDetailOf(lastMessage)));
+	}
 	// Sending with the mode off collapses the strip away for good; sending with it
 	// on keeps the strip, which is where the plan progress lives.
 	let mlStripVisible = $derived(ML_ASSISTANT_MODE && (mlTaskRunning || messages.length === 0));
@@ -904,10 +931,13 @@
 				{#if askQuestion}
 					<AskQuestion conversationId={askQuestion.conversationId} request={askQuestion.request} />
 				{/if}
-				<div class="flex w-full *:mb-3">
+				<div class="flex w-full gap-2 *:mb-3">
 					{#if !loading && lastIsError}
+						{#if canResumeTurn}
+							<ResumeBtn classNames="ml-auto" onClick={sendResumeMessage} />
+						{/if}
 						<RetryBtn
-							classNames="ml-auto"
+							classNames={canResumeTurn ? "" : "ml-auto"}
 							onClick={() => {
 								if (lastMessage && lastMessage.ancestors) {
 									onretry?.({
