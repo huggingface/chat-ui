@@ -42,4 +42,6 @@ export interface FeatureFlags {
 	loginEnabled: boolean;
 	isAdmin: boolean;
 	transcriptionEnabled: boolean;
+	/** Fixed model used for background tasks (e.g. conversation titles); null when tasks follow the conversation's model */
+	taskModelId: string | null;
 }
