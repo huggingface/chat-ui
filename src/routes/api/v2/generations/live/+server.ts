@@ -66,25 +66,36 @@ export const GET: RequestHandler = async ({ locals, request }) => {
 					.toArray();
 
 				// Parked turns have no running generation, so they come from the
-				// authoritative turn-state docs instead. Recent failures ride along so
-				// the sidebar can flag a run that died in the background — bounded to a
-				// day because the docs themselves live a week (see the TTL), and a
-				// week-old failure is history, not a status.
-				const parked = await collections.turnStates
-					.find(
-						{
-							...auth,
-							$or: [
-								{ status: { $in: ["waiting", "awaiting_input"] } },
-								{ status: "failed", endedAt: { $gt: new Date(Date.now() - FAILED_WINDOW_MS) } },
-							],
-						},
-						{ projection: { conversationId: 1, status: 1 } }
-					)
+				// authoritative turn-state docs instead. Only a conversation's LATEST
+				// turn counts: a retry runs as a fresh turn document, and reporting an
+				// older failed one would flag a conversation that has since recovered.
+				// Recent failures ride along so the sidebar can flag a run that died in
+				// the background — bounded to a day because the docs themselves live a
+				// week (see the TTL), and a week-old failure is history, not a status.
+				const turnDocs = await collections.turnStates
+					.find(auth, { projection: { conversationId: 1, status: 1, updatedAt: 1, endedAt: 1 } })
 					.toArray();
+				const latestByConversation = new Map<string, (typeof turnDocs)[number]>();
+				for (const turn of turnDocs) {
+					const key = turn.conversationId.toString();
+					const seen = latestByConversation.get(key);
+					if (!seen || turn.updatedAt > seen.updatedAt) latestByConversation.set(key, turn);
+				}
+				const failedCutoff = Date.now() - FAILED_WINDOW_MS;
+				const parked = [...latestByConversation.values()].filter(
+					(turn) =>
+						turn.status === "waiting" ||
+						turn.status === "awaiting_input" ||
+						(turn.status === "failed" && (turn.endedAt?.getTime() ?? 0) > failedCutoff)
+				);
 				const parkedPayload = parked.map((turn) => ({
 					conversationId: turn.conversationId.toString(),
 					status: turn.status,
+					// Failed flags outlive the feed (failed turns don't hold it open), so
+					// the client needs the deadline to prune them itself.
+					...(turn.status === "failed" && turn.endedAt
+						? { expiresAt: turn.endedAt.getTime() + FAILED_WINDOW_MS }
+						: {}),
 				}));
 
 				const currentIds = new Set(running.map((g) => g.generationId));

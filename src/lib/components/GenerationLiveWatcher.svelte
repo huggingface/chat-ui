@@ -29,6 +29,8 @@
 	interface ParkedEntry {
 		conversationId: string;
 		status: ParkedTurnStatus;
+		/** Epoch ms after which a failed flag stops being shown. */
+		expiresAt?: number;
 	}
 
 	// While a run this tab started is still registering, keep looking this often; its DB
@@ -90,10 +92,18 @@
 		source = null;
 	}
 
+	// Failed flags expire client-side (see pruneExpired): the feed is closed by
+	// the time their window lapses, so only a timer can retire them.
+	const PRUNE_INTERVAL_MS = 60_000;
+
 	onMount(() => {
 		// Catch runs already in flight (e.g. started elsewhere before this load).
 		open();
-		return close;
+		const pruneTimer = setInterval(() => activeGenerations.pruneExpired(), PRUNE_INTERVAL_MS);
+		return () => {
+			clearInterval(pruneTimer);
+			close();
+		};
 	});
 
 	// Reopen when a generation starts in this tab, so navigating away keeps it tracked.
