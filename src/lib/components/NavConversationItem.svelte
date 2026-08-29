@@ -6,15 +6,34 @@
 
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonEdit from "~icons/carbon/edit";
+	import CarbonMachineLearning from "~icons/carbon/machine-learning";
 	import LucideEllipsis from "~icons/lucide/ellipsis";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
 	import EditConversationModal from "$lib/components/EditConversationModal.svelte";
 	import DeleteConversationModal from "$lib/components/DeleteConversationModal.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
-	import { useActiveGenerationsStore } from "$lib/stores/activeGenerations.svelte";
+	import {
+		useActiveGenerationsStore,
+		type LiveTurnStatus,
+	} from "$lib/stores/activeGenerations.svelte";
 
 	const activeGenerations = useActiveGenerationsStore();
+
+	// One entry per turn status an ML Intern row can be in (idle = no live turn).
+	// One hue per state so they read apart at dot size: orange = generating,
+	// blue = needs an answer, red = failed, gray = parked on a timer. The two
+	// states that move (or want the user) pulse; the settled ones hold still.
+	const ML_TURN_BADGE: Record<LiveTurnStatus | "idle", { label: string; dot?: string }> = {
+		running: { label: "Generating…", dot: "animate-pulse bg-[#ea580c] dark:bg-[#fb923c]" },
+		waiting: { label: "Waiting to resume", dot: "bg-gray-400 dark:bg-gray-500" },
+		awaiting_input: {
+			label: "Needs your answer",
+			dot: "animate-pulse bg-blue-500 dark:bg-blue-400",
+		},
+		failed: { label: "Failed", dot: "bg-red-500 dark:bg-red-400" },
+		idle: { label: "Idle" },
+	};
 
 	interface Props {
 		conv: ConvSidebar;
@@ -62,7 +81,22 @@
 	class="group flex h-8 flex-none items-center gap-1.5 rounded-lg pr-1.5 pl-2 text-base text-gray-600 hover:bg-gray-100 max-sm:h-10 sm:text-sm dark:text-gray-300 dark:hover:bg-gray-700
 		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}"
 >
-	{#if activeGenerations.has(conv.id)}
+	{#if conv.mlAssistant}
+		{@const ml = ML_TURN_BADGE[activeGenerations.statusFor(conv.id) ?? "idle"]}
+		<!-- Neutral marker on purpose: the status dot carries the color, and an
+		     orange treatment fought with it. An icon rather than an "ML" chip, so
+		     a run of mode conversations doesn't read as a wall of repeated text. -->
+		<span
+			class="flex flex-none items-center gap-1 text-gray-400 dark:text-gray-500"
+			title="ML Intern — {ml.label}"
+		>
+			<CarbonMachineLearning class="size-3.5" />
+			{#if ml.dot}
+				<span class="size-1.5 rounded-full {ml.dot}"></span>
+			{/if}
+			<span class="sr-only">ML Intern — {ml.label}</span>
+		</span>
+	{:else if activeGenerations.has(conv.id)}
 		<span
 			class="size-1.5 flex-none animate-pulse rounded-full bg-blue-500 dark:bg-blue-400"
 			title="Generating…"

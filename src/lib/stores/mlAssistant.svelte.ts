@@ -1,3 +1,4 @@
+import { SvelteSet } from "svelte/reactivity";
 import type { MlPlanStep, MlPlanStepStatus } from "$lib/types/MlAssistant";
 
 /**
@@ -19,6 +20,21 @@ class MlAssistantStore {
 
 	/** Conversation the state above belongs to, so a different one starts clean. */
 	#conversationKey: string | undefined;
+
+	/**
+	 * Conversations whose "Ask in ML Intern" banner the user closed. Deliberately
+	 * session-scoped and outside `reset()`: the banner only shows on a
+	 * conversation's first exchange, so a dismissal has nothing to outlive.
+	 */
+	#promoDismissed = new SvelteSet<string>();
+
+	promoDismissed(key: string | undefined): boolean {
+		return key !== undefined && this.#promoDismissed.has(key);
+	}
+
+	dismissPromo(key: string | undefined): void {
+		if (key !== undefined) this.#promoDismissed.add(key);
+	}
 
 	/** The switch stops being interactive once the mode is locked in. */
 	get locked() {

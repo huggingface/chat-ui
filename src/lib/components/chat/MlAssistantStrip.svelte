@@ -14,23 +14,9 @@
 		statusLabel: string;
 		complete: boolean;
 		ontoggle: (enabled: boolean) => void;
-		/**
-		 * Opens the preset's tool and prompt configuration. That panel doesn't exist
-		 * yet, so the link renders as designed but does nothing until one is passed.
-		 */
-		onconfigure?: () => void;
 	}
 
-	let {
-		visible,
-		enabled,
-		taskRunning,
-		steps,
-		statusLabel,
-		complete,
-		ontoggle,
-		onconfigure,
-	}: Props = $props();
+	let { visible, enabled, taskRunning, steps, statusLabel, complete, ontoggle }: Props = $props();
 </script>
 
 <div class="ml-strip-collapse" class:is-open={visible} inert={!visible}>
@@ -79,18 +65,6 @@
 			</span>
 		{:else}
 			<span class="truncate text-[#c2c2c8] dark:text-gray-600">{ML_ASSISTANT_NOTE_OFF}</span>
-		{/if}
-
-		<span class="ml-auto"></span>
-
-		{#if enabled && !taskRunning}
-			<button
-				type="button"
-				class="flex-none cursor-pointer text-[13.5px] text-[#7f8cd8] hover:underline"
-				onclick={onconfigure}
-			>
-				Configure
-			</button>
 		{/if}
 	</div>
 </div>

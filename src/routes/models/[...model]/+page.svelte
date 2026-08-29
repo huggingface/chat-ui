@@ -80,6 +80,9 @@
 				title: "New Chat",
 				model: modelId,
 				updatedAt: new Date(),
+				// Latched before the create request, so the sidebar row carries the
+				// mode's designation from the moment it appears.
+				mlAssistant: mlAssistant.taskStarted,
 			});
 			await goto(`${base}/conversation/${conversationId}`, {
 				state: { pendingMessage: message, pendingFilesNonce },

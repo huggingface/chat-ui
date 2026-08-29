@@ -6,7 +6,10 @@
 	import { get } from "svelte/store";
 	import { loading } from "$lib/stores/loading";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
-	import { useActiveGenerationsStore } from "$lib/stores/activeGenerations.svelte";
+	import {
+		useActiveGenerationsStore,
+		type ParkedTurnStatus,
+	} from "$lib/stores/activeGenerations.svelte";
 	import { useNotificationsStore } from "$lib/stores/notifications.svelte";
 	import type { GenerationStatus } from "$lib/types/Generation";
 
@@ -23,6 +26,12 @@
 		title: string;
 		status: GenerationStatus;
 	}
+	interface ParkedEntry {
+		conversationId: string;
+		status: ParkedTurnStatus;
+		/** Epoch ms after which a failed flag stops being shown. */
+		expiresAt?: number;
+	}
 
 	// While a run this tab started is still registering, keep looking this often; its DB
 	// record can lag $loading, which won't re-fire to reopen us.
@@ -38,7 +47,7 @@
 		source = es;
 
 		es.addEventListener("sync", (event) => {
-			let payload: { running: RunningEntry[]; ended: EndedEntry[] };
+			let payload: { running: RunningEntry[]; ended: EndedEntry[]; parked?: ParkedEntry[] };
 			try {
 				payload = JSON.parse((event as MessageEvent).data);
 			} catch {
@@ -46,6 +55,7 @@
 			}
 
 			activeGenerations.setRunning(payload.running.map((run) => run.conversationId));
+			activeGenerations.setParked(payload.parked ?? []);
 			for (const run of payload.running) {
 				if (run.title) convsStore.update(run.conversationId, { title: run.title });
 			}
@@ -82,10 +92,18 @@
 		source = null;
 	}
 
+	// Failed flags expire client-side (see pruneExpired): the feed is closed by
+	// the time their window lapses, so only a timer can retire them.
+	const PRUNE_INTERVAL_MS = 60_000;
+
 	onMount(() => {
 		// Catch runs already in flight (e.g. started elsewhere before this load).
 		open();
-		return close;
+		const pruneTimer = setInterval(() => activeGenerations.pruneExpired(), PRUNE_INTERVAL_MS);
+		return () => {
+			clearInterval(pruneTimer);
+			close();
+		};
 	});
 
 	// Reopen when a generation starts in this tab, so navigating away keeps it tracked.
