@@ -105,6 +105,12 @@ type Round = {
 	content?: string;
 	reasoning?: string;
 	toolCalls?: ScriptedCall[];
+	/**
+	 * Raw delta objects, yielded verbatim before the finish chunk, for rounds
+	 * where the ORDER of reasoning/content/tool_calls matters. Overrides the
+	 * three fields above.
+	 */
+	deltas?: Array<Record<string, unknown>>;
 	/** Defaults to "tool_calls" when the round emits calls, else "stop". */
 	finishReason?: string;
 	/** Throw instead of returning a stream, to script an upstream failure. */
@@ -116,6 +122,13 @@ function chunk(choice: Record<string, unknown>) {
 }
 
 function streamFor(round: Round) {
+	if (round.deltas) {
+		const deltas = round.deltas;
+		return (async function* () {
+			for (const delta of deltas) yield chunk({ delta });
+			yield chunk({ delta: {}, finish_reason: round.finishReason ?? "stop" });
+		})();
+	}
 	return (async function* () {
 		if (round.reasoning) yield chunk({ delta: { reasoning: round.reasoning } });
 		if (round.content) yield chunk({ delta: { content: round.content } });
@@ -273,6 +286,66 @@ describe("runMcpFlow", () => {
 			tool_call_id: "call_1",
 			content: "the tool output",
 		});
+	});
+});
+
+describe("runMcpFlow think-tag balance across tool rounds", () => {
+	const toolCallDelta = {
+		tool_calls: [{ index: 0, id: "call_1", function: { name: "do_thing", arguments: "{}" } }],
+	};
+	const thinkBalance = (text: string) =>
+		(text.match(/<think>/g)?.length ?? 0) - (text.match(/<\/think>/g)?.length ?? 0);
+
+	it("still closes a streamed think block when content arrives after tool-call deltas", async () => {
+		// Reasoning streams (client sees "<think>…"), tool-call deltas mute the
+		// stream, and only then does the content delta close the block. The closer
+		// must still reach the client, or it renders that reasoning as streaming —
+		// and re-expands it — for the rest of the turn.
+		scriptRounds([
+			{
+				deltas: [{ reasoning: "planning the call" }, toolCallDelta, { content: "Calling now." }],
+				finishReason: "tool_calls",
+			},
+			{ content: "done" },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		const streamed = streamedText(updates);
+		expect(streamed).toContain("<think>planning the call");
+		expect(thinkBalance(streamed)).toBe(0);
+	});
+
+	it("closes a streamed think block that tool-call deltas leave open", async () => {
+		scriptRounds([
+			{
+				deltas: [{ reasoning: "planning the call" }, toolCallDelta],
+				finishReason: "tool_calls",
+			},
+			{ content: "done" },
+		]);
+
+		const { updates } = await runFlow();
+
+		expect(thinkBalance(streamedText(updates))).toBe(0);
+	});
+
+	it("streams no stray closer when the opener was never streamed", async () => {
+		// Content streams first, then tool-call deltas mute the stream, then
+		// reasoning opens a think block the client never saw. A bare "</think>"
+		// would render as literal text.
+		scriptRounds([
+			{
+				deltas: [{ content: "Calling now." }, toolCallDelta, { reasoning: "post-call thoughts" }],
+				finishReason: "tool_calls",
+			},
+			{ content: "done" },
+		]);
+
+		const { updates } = await runFlow();
+
+		expect(streamedText(updates)).not.toContain("</think>");
 	});
 });
 

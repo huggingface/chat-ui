@@ -1,6 +1,7 @@
 import ChatMessage from "./ChatMessage.svelte";
 import { render } from "vitest-browser-svelte";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { tick } from "svelte";
 
 beforeEach(() => vi.stubGlobal("fetch", async () => new Response("{}", { status: 200 })));
 afterEach(() => vi.unstubAllGlobals());
@@ -83,5 +84,60 @@ describe("a run still working with nothing streaming", () => {
 		// class, so anything here would be ours doubling up.
 		const { baseElement } = mount([], "<think>weighing the options");
 		expect(spinners(baseElement)).toBe(0);
+	});
+});
+
+describe("collapsed process blocks during streaming", () => {
+	const stream = (token: string) => ({ type: "stream", token });
+	const streamCall = (uuid: string) => ({
+		type: "tool",
+		subtype: "call",
+		uuid,
+		call: { name: "hf_fs", parameters: {} },
+	});
+	const streamResult = (uuid: string) => ({
+		type: "tool",
+		subtype: "result",
+		uuid,
+		result: {
+			status: 0,
+			call: { name: "hf_fs", parameters: {} },
+			outputs: [{ text: "ok" }],
+			display: true,
+		},
+	});
+	const expanded = (el: HTMLElement) => el.querySelectorAll('button[aria-label="Collapse"]');
+
+	it("never expands more than the active block, even after a lost think closer", async () => {
+		// Round 1's reasoning never receives its </think> (the closer can get lost
+		// when tool-call deltas mute the content stream server-side). That stale
+		// block must not shimmer or re-expand each time a later block goes active.
+		const steps = [
+			stream("<think>Reading the repo"),
+			streamCall("u1"),
+			streamResult("u1"),
+			stream("Let me dig into the README."),
+			stream("<think>Checking metadata</think>"),
+			streamCall("u2"),
+			streamResult("u2"),
+			stream("Grabbing the repo metadata too."),
+			stream("<think>Final synthesis"),
+		];
+
+		const updates: unknown[] = [];
+		const screen = mount([]);
+		for (const step of steps) {
+			updates.push(step);
+			await screen.rerender({
+				message: { id: "m1", from: "assistant", content: "", children: [], updates: [...updates] },
+			} as never);
+			await tick();
+			expect(expanded(screen.baseElement as HTMLElement).length).toBeLessThanOrEqual(1);
+		}
+
+		// The active think block streams at the end; it alone is expanded.
+		const open = expanded(screen.baseElement as HTMLElement);
+		expect(open.length).toBe(1);
+		expect(open[0].textContent).toContain("Thinking");
 	});
 });
