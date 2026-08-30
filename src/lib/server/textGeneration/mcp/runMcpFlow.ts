@@ -604,6 +604,12 @@ export async function* runMcpFlow({
 		// Track whether we're inside a <think> block when the upstream streams
 		// provider-specific reasoning tokens (e.g. `reasoning` or `reasoning_content`).
 		let thinkOpen = false;
+		// Whether the CLIENT currently has an unbalanced <think> opener. Diverges
+		// from thinkOpen once tool-call deltas stop the content stream: the close
+		// may then land only in lastAssistantContent, and a client left with an
+		// unclosed block renders that reasoning as still streaming for the rest
+		// of the turn.
+		let clientThinkOpen = false;
 		// Leading whitespace-only reasoning deltas that arrived before the block
 		// opened (thinkOpen still false, so a blank chunk wouldn't otherwise open
 		// one). Held here and flushed once a non-blank delta opens the block, so
@@ -790,6 +796,14 @@ export async function* runMcpFlow({
 						producedOutput = true;
 						yield { type: MessageUpdateType.Stream, token: combined };
 						tokenCount += combined.length;
+						clientThinkOpen = thinkOpen;
+					} else if (clientThinkOpen && !thinkOpen) {
+						// The close landed in `combined` after tool-call deltas already
+						// stopped the content stream. The client saw the opener, so it
+						// must see the closer too, or it renders that reasoning block as
+						// still streaming for the rest of the turn.
+						yield { type: MessageUpdateType.Stream, token: "</think>" };
+						clientThinkOpen = false;
 					}
 				}
 
@@ -815,8 +829,13 @@ export async function* runMcpFlow({
 			// regex matches `<think>` to end-of-string, so an unclosed block would
 			// hide everything that follows.
 			if (thinkOpen) {
-				if (streamedContent) {
+				// Gate on what the client saw, not on streamedContent: a round can
+				// stream content early and open the think block only after tool-call
+				// deltas muted the stream — a bare closer then shows up as literal
+				// "</think>" text.
+				if (clientThinkOpen) {
 					yield { type: MessageUpdateType.Stream, token: "</think>" };
+					clientThinkOpen = false;
 				}
 				lastAssistantContent += "</think>";
 				thinkOpen = false;

@@ -531,9 +531,12 @@
 						{:else}
 							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
 								{#if block.type === "think"}
+									<!-- Only the trailing block can still be streaming: an earlier
+									     unclosed think is a stream artifact (e.g. a lost close marker)
+									     and must not keep shimmering or re-expanding on every render. -->
 									<OpenReasoningResults
 										content={block.content}
-										loading={isLast && loading && !block.closed}
+										loading={isLast && loading && !block.closed && blockIndex === blocks.length - 1}
 									/>
 								{:else}
 									<ToolUpdate tool={block.updates} {loading} />
