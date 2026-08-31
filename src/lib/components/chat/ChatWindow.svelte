@@ -4,9 +4,11 @@
 	import { goto } from "$app/navigation";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
+	import TrackioPane from "./TrackioPane.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
-	import { artifactPanel } from "$lib/stores/artifactPanel.svelte";
+	import { collectTrackioDashboards } from "$lib/utils/trackio";
+	import { sidePane } from "$lib/stores/sidePane.svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import IconCheap from "$lib/components/icons/IconCheap.svelte";
@@ -154,7 +156,7 @@
 		get registry() {
 			return artifactRegistry;
 		},
-		panel: artifactPanel,
+		panel: sidePane,
 		// Deep consumers (e.g. the code-block preview modal) can't render a
 		// meaningful disabled state, so streaming also gates availability here;
 		// the panel gets the handler as a prop and disables on `loading` itself.
@@ -168,7 +170,21 @@
 	$effect(() => {
 		const streaming = artifactRegistry.streaming;
 		if (!streaming || !loading) return;
-		artifactPanel.maybeAutoOpen(streaming.identifier, streaming.version);
+		sidePane.maybeAutoOpen(streaming.identifier, streaming.version);
+	});
+
+	// Trackio dashboards a training run printed into its job logs, read back out
+	// of the tool results on the messages. Derived like the artifact registry, so
+	// reopening the conversation finds the same dashboards.
+	let trackioDashboards = $derived(collectTrackioDashboards(messages));
+
+	// Open the newest dashboard the first time it shows up: the point of the run
+	// is watching it train. Once per URL, so the user can close it and read the
+	// chat while the run continues.
+	$effect(() => {
+		const latest = trackioDashboards.at(-1);
+		if (!latest) return;
+		sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
 	});
 
 	let shareModalOpen = $state(false);
@@ -422,7 +438,7 @@
 		const key = page.params?.id;
 		if (key !== prevConversationKey) {
 			prevConversationKey = key;
-			artifactPanel.reset();
+			sidePane.reset();
 		}
 	});
 
@@ -451,7 +467,7 @@
 		if (!latest) return;
 		autoOpenedSharedArtifact = true;
 		if (!window.matchMedia("(min-width: 768px)").matches) return;
-		artifactPanel.openArtifact(latest.identifier, null);
+		sidePane.openArtifact(latest.identifier, null);
 	});
 
 	const settings = useSettingsStore();
@@ -1222,6 +1238,7 @@
 		canScreenshot={!shared && !isReadOnly && mimeMatchesAllowlist("image/png", activeMimeTypes)}
 		onsend={canSendFix ? sendFixRequest : undefined}
 	/>
+	<TrackioPane />
 </div>
 
 <style>

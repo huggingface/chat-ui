@@ -60,7 +60,10 @@
 				<MlAssistantPlanProgress {steps} {statusLabel} {complete} />
 			</span>
 		{:else if enabled}
-			<span class="truncate font-mono text-xs text-[#7f8cd8]">
+			<!-- Inherits the strip's enabled color, which is also what the suggestion
+			     chips above the composer use — one orange for the whole mode, and dark
+			     mode follows without a second literal. -->
+			<span class="truncate font-mono text-xs">
 				{ML_ASSISTANT_TOOLS.join(" · ")}
 			</span>
 		{:else}
