@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
 import type { MlBudget } from "$lib/types/Conversation";
-import { createMlBudgetGuard } from "./guard";
+import { createMlBudgetGuard, withRequiredDiscriminators } from "./guard";
 import { readMlBudget } from "./budget";
 import { resetPriceCacheForTests } from "./pricing";
 
@@ -30,7 +30,7 @@ afterEach(async () => {
 	createdIds.length = 0;
 });
 
-async function insertConversation(mlBudget: MlBudget): Promise<ObjectId> {
+async function insertConversation(mlBudget?: MlBudget): Promise<ObjectId> {
 	const _id = new ObjectId();
 	createdIds.push(_id);
 	await collections.conversations.insertOne({
@@ -42,7 +42,7 @@ async function insertConversation(mlBudget: MlBudget): Promise<ObjectId> {
 		updatedAt: new Date(),
 		sessionId: `guard-test-${_id.toString()}`,
 		mlAssistant: true,
-		mlBudget,
+		...(mlBudget ? { mlBudget } : {}),
 	});
 	return _id;
 }
@@ -102,6 +102,28 @@ describe.sequential("mlBudget guard: what is gated", () => {
 		const verdict = await before("hf_jobs", { operation: "scheduled run", args: {} });
 		expect(verdict.allow).toBe(false);
 		if (!verdict.allow) expect(verdict.message).toContain("Scheduled jobs");
+	});
+
+	// The observed bypass: submission-shaped args with no operation sailed
+	// through as a "read". Anything the gate cannot recognize fails closed.
+	it("fails closed on a call it cannot classify", { timeout: 15000 }, async () => {
+		const id = await insertConversation(budgetOf(100_000_000));
+		const { before } = makeGuard(id);
+
+		const missingOp = await before("hf_jobs", {
+			args: { command: ["python", "-c", "print(1)"], flavor: "cpu-basic", timeout: 5 },
+		});
+		expect(missingOp.allow).toBe(false);
+		if (!missingOp.allow) expect(missingOp.message).toContain("without an operation");
+
+		const unknownOp = await before("hf_jobs", { operation: "yolo", args: {} });
+		expect(unknownOp.allow).toBe(false);
+		if (!unknownOp.allow) expect(unknownOp.message).toContain('"yolo"');
+
+		const unknownCmd = await before("hf_sandbox", { cmd: "shell", args: [] });
+		expect(unknownCmd.allow).toBe(false);
+
+		expect((await readMlBudget(id))?.reservations).toHaveLength(0);
 	});
 });
 
@@ -180,6 +202,24 @@ describe.sequential("mlBudget guard: pricing the submission", () => {
 		expect(verdict.allow).toBe(false);
 	});
 
+	it(
+		"treats a conversation without a stored budget as a zero grant",
+		{ timeout: 15000 },
+		async () => {
+			const id = await insertConversation();
+			const { before } = makeGuard(id);
+			const verdict = await before("hf_jobs", {
+				operation: "run",
+				args: { flavor: "t4-small", timeout: "10m" },
+			});
+			expect(verdict.allow).toBe(false);
+			if (!verdict.allow) {
+				expect(verdict.message).toContain("no compute budget granted");
+				expect(verdict.message).toContain("setBudgetUsd");
+			}
+		}
+	);
+
 	it("refuses what the remaining budget cannot cover, with the numbers", async () => {
 		const id = await insertConversation(budgetOf(1_000_000));
 		const { before } = makeGuard(id);
@@ -254,5 +294,42 @@ describe.sequential("mlBudget guard: reconciling the outcome", () => {
 		const { guard, ticket } = await reserve(id);
 		await guard.after(ticket, { status: "transport_error" });
 		expect((await readMlBudget(id))?.reservations).toHaveLength(1);
+	});
+});
+
+describe("withRequiredDiscriminators", () => {
+	const tool = (name: string, parameters?: Record<string, unknown>) => ({
+		type: "function" as const,
+		function: { name, ...(parameters ? { parameters } : {}) },
+	});
+	const MAPPING = {
+		hf_jobs: { fnName: "hf_jobs", server: "Hugging Face", tool: "hf_jobs" },
+		hf_sandbox: { fnName: "hf_sandbox", server: "Hugging Face", tool: "hf_sandbox" },
+		hf_fs: { fnName: "hf_fs", server: "Hugging Face", tool: "hf_fs" },
+	};
+
+	it("requires the routing discriminator on the gated tools", () => {
+		const shaped = withRequiredDiscriminators(
+			[
+				tool("hf_jobs", { type: "object", properties: { operation: {}, args: {} } }),
+				tool("hf_sandbox", {
+					type: "object",
+					properties: { cmd: {}, args: {} },
+					required: ["cmd", "args"],
+				}),
+				tool("hf_fs", { type: "object", properties: { operations: {} } }),
+			],
+			MAPPING
+		);
+		expect(shaped[0].function.parameters?.required).toEqual(["operation"]);
+		// Already required: returned untouched, not duplicated.
+		expect(shaped[1].function.parameters?.required).toEqual(["cmd", "args"]);
+		expect(shaped[2].function.parameters?.required).toBeUndefined();
+	});
+
+	it("never mutates the cached originals", () => {
+		const original = tool("hf_jobs", { type: "object", properties: { operation: {} } });
+		withRequiredDiscriminators([original], MAPPING);
+		expect(original.function.parameters?.required).toBeUndefined();
 	});
 });

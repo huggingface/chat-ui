@@ -16,6 +16,9 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import { normalizeElicitationRequest, validateElicitationContent } from "./elicitationSchema";
+import { chosenBudgetUsd } from "$lib/server/askUserQuestion";
+import { setMlBudgetTotal } from "$lib/server/mlBudget/budget";
+import { usdToMicroUsd } from "$lib/utils/mlBudget";
 import { getElicitationTimeoutMs } from "./elicitationConfig";
 import type { McpCallDeadline, McpInputRequired } from "./httpClient";
 import type { InputResponses } from "@modelcontextprotocol/client";
@@ -305,6 +308,25 @@ export async function submitElicitationAnswer({
 		}
 	);
 	if (updated.matchedCount === 0) return { ok: false, status: 409, error: "Already answered." };
+
+	// A chosen option can carry a budget grant (see setBudgetUsd on the select
+	// option type). Applied here — trusted code handling the user's own click —
+	// and never by the model, which can only propose the amount. Guarded on the
+	// mode so an option smuggled into an ordinary conversation grants nothing.
+	if (action === "accept" && doc.pending?.kind === "ask" && validated) {
+		const grantedUsd = chosenBudgetUsd(doc.request, validated);
+		if (grantedUsd !== undefined) {
+			try {
+				await setMlBudgetTotal({
+					conversationId,
+					totalMicroUsd: usdToMicroUsd(grantedUsd),
+					extraFilter: { mlAssistant: true },
+				});
+			} catch (err) {
+				logger.error({ err, elicitationId }, "[ask] failed to apply the granted budget");
+			}
+		}
+	}
 
 	return {
 		ok: true,

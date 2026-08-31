@@ -48,21 +48,20 @@ export function resolvePreprompt({
 	const artifacts = mlAssistant || (artifactsOverride ?? supportsArtifacts);
 	const resolved = artifacts ? injectArtifactsPrompt(base) : base;
 	if (!mlAssistant) return resolved;
-	const withBudget = budget ? `${resolved}\n\n${ML_ASSISTANT_BUDGET_RULES}` : resolved;
+	// The mode is always budget-gated; a conversation without a stored budget is
+	// a zero budget, and the rules — including how to ask for a grant — must
+	// reach the model exactly then.
+	const effective = budget ?? { totalMicroUsd: 0, spentMicroUsd: 0, reservations: [] };
 	// Stamped last, after the artifacts prompt, because the preset reads the User
 	// value back out of it — and stamped here rather than onto the tool preprompt
 	// so it still reaches the model on the plain generation path, which has none.
-	return `${withBudget}\n\n${mlAssistantSessionContext({
+	return `${resolved}\n\n${ML_ASSISTANT_BUDGET_RULES}\n\n${mlAssistantSessionContext({
 		username,
 		timezone,
 		now,
-		...(budget
-			? {
-					budget: {
-						remaining: formatMicroUsd(remainingMicroUsd(budget)),
-						total: formatMicroUsd(budget.totalMicroUsd),
-					},
-				}
-			: {}),
+		budget: {
+			remaining: formatMicroUsd(remainingMicroUsd(effective)),
+			total: formatMicroUsd(effective.totalMicroUsd),
+		},
 	})}`;
 }

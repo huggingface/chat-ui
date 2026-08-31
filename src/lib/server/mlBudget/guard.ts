@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 import { logger } from "$lib/server/logger";
 import { isHfMcpServer } from "$lib/server/mcp/hf";
+import type { McpToolMapping, OpenAiTool } from "$lib/server/mcp/tools";
 import type {
 	GuardedToolCall,
 	GuardOutcome,
@@ -64,9 +65,27 @@ const tokenAfter = (tokens: string[], flag: string): string | undefined => {
 };
 
 /**
+ * Operations that verifiably spend nothing: reading and stopping, which must
+ * work at any budget. Everything not listed here and not a priced submission
+ * fails closed — an operation this gate cannot recognize is one it cannot
+ * bound, and "the server will probably reject it" is not enforcement.
+ */
+const FREE_JOB_OPERATIONS = new Set([
+	"ps",
+	"logs",
+	"inspect",
+	"cancel",
+	"scheduled ps",
+	"scheduled inspect",
+	"scheduled delete",
+	"scheduled suspend",
+	"scheduled resume",
+]);
+const FREE_SANDBOX_COMMANDS = new Set(["status", "terminate", "ps", "kill"]);
+
+/**
  * What this call is about to spend, or a refusal, or null for calls that spend
- * nothing (status, logs, ps, inspect, cancel, terminate, kill — reading and
- * stopping must work at any budget).
+ * nothing.
  */
 function classify(call: GuardedToolCall): GatedSubmission | { blocked: string } | null {
 	if (call.tool === "hf_jobs") {
@@ -77,7 +96,18 @@ function classify(call: GuardedToolCall): GatedSubmission | { blocked: string } 
 					"Scheduled jobs are not available in this session: a recurring run cannot be held to the session budget. Nothing was scheduled. Run the work directly with operation 'run' or 'uv'.",
 			};
 		}
-		if (operation !== "run" && operation !== "uv") return null;
+		if (typeof operation === "string" && FREE_JOB_OPERATIONS.has(operation)) return null;
+		if (operation !== "run" && operation !== "uv") {
+			// Not a budget matter — the call names no operation to route, and a
+			// call this gate cannot recognize it cannot let through unpriced.
+			return {
+				blocked: `hf_jobs was called ${
+					typeof operation === "string"
+						? `with unrecognized operation ${JSON.stringify(operation)}`
+						: "without an operation"
+				}, so it could not be routed. Nothing was submitted and nothing ran. Pass \`operation\` explicitly on every hf_jobs call — 'run' or 'uv' to submit, 'ps'/'logs'/'inspect'/'cancel' to read or stop. Reads are never budget-gated.`,
+			};
+		}
 		const jobArgs = asRecord(call.args.args) ?? {};
 		const flavor = jobArgs.flavor ?? DEFAULT_JOB_FLAVOR;
 		if (typeof flavor !== "string") {
@@ -92,7 +122,17 @@ function classify(call: GuardedToolCall): GatedSubmission | { blocked: string } 
 	}
 
 	if (call.tool === "hf_sandbox") {
-		if (call.args.cmd !== "create") return null;
+		const cmd = call.args.cmd;
+		if (typeof cmd === "string" && FREE_SANDBOX_COMMANDS.has(cmd)) return null;
+		if (cmd !== "create") {
+			return {
+				blocked: `hf_sandbox was called ${
+					typeof cmd === "string"
+						? `with unrecognized command ${JSON.stringify(cmd)}`
+						: "without a command"
+				}, so it could not be routed. Nothing was created. Use 'create' (with --flavor and --timeout), or 'status'/'ps'/'kill'/'terminate' — reads and stops are never budget-gated.`,
+			};
+		}
 		const rawTokens = call.args.args;
 		const tokens = Array.isArray(rawTokens)
 			? rawTokens.filter((t): t is string => typeof t === "string")
@@ -110,6 +150,38 @@ function classify(call: GuardedToolCall): GatedSubmission | { blocked: string } 
 	}
 
 	return null;
+}
+
+/** The discriminator each gated tool routes on. */
+const DISCRIMINATOR_BY_TOOL: Record<string, string> = { hf_jobs: "operation", hf_sandbox: "cmd" };
+
+/**
+ * The Hub's job tool schema marks nothing required, so sloppy models omit the
+ * discriminator and their read calls bounce off the gate's fail-closed path.
+ * Advertise the schema with it required instead: models are steered toward
+ * well-formed calls, and providers that enforce schemas reject the malformed
+ * ones before they reach the gate. Returns fresh objects — the originals come
+ * from a shared cache and must not be mutated.
+ */
+export function withRequiredDiscriminators(
+	tools: OpenAiTool[],
+	mapping: Record<string, McpToolMapping>
+): OpenAiTool[] {
+	return tools.map((tool) => {
+		const entry = mapping[tool.function.name];
+		const field = entry ? DISCRIMINATOR_BY_TOOL[entry.tool] : undefined;
+		const parameters = tool.function.parameters;
+		if (!field || !parameters) return tool;
+		const required = Array.isArray(parameters.required) ? (parameters.required as string[]) : [];
+		if (required.includes(field)) return tool;
+		return {
+			...tool,
+			function: {
+				...tool.function,
+				parameters: { ...parameters, required: [...required, field] },
+			},
+		};
+	});
 }
 
 /** `huggingface.co/jobs/<namespace>/<id>` in a submission response. */
@@ -218,18 +290,20 @@ export function createMlBudgetGuard({
 							remaining
 						)} of the ${formatMicroUsd(
 							reserveResult.budget.totalMicroUsd
-						)} session budget remains. Nothing was submitted. Lower the timeout or pick a cheaper flavor if that honestly fits the task; otherwise put the trade-off to the user, who can also raise the session budget.`,
+						)} session budget remains. Nothing was submitted. If the user agreed to a raise in conversation, that did not change the ledger — only clicking an ask_user_question option that carries setBudgetUsd does. Lower the timeout or pick a cheaper flavor if that honestly fits the task; otherwise ask again with rescope options alongside an option carrying setBudgetUsd for the smallest amount that covers this run.`,
 						update: budgetUpdate(reserveResult.budget),
 					};
 				}
 				case "no_budget":
-					// Only reachable if the budget was removed after this guard was
-					// built; treat as unbudgeted rather than inventing a refusal.
-					logger.warn(
-						{ conversationId: String(conversationId) },
-						"[mlBudget] gated call on a conversation with no budget"
-					);
-					return { allow: true };
+					// A mode conversation without a stored budget (created before
+					// budgets existed) is a zero budget, not an unbudgeted one: spend
+					// authority is granted, never assumed.
+					return {
+						allow: false,
+						message: `Budget check: this session has no compute budget granted yet, so nothing can be submitted. This ${gated.kind} would need a worst case of ${formatMicroUsd(
+							ceiling
+						)}. If the user already agreed to a budget in conversation, that did not change the ledger — a grant only lands when they click an ask_user_question option that carries setBudgetUsd (a dollar amount written into a label does nothing). Ask with such an option, or point them at the budget field in the composer strip.`,
+					};
 			}
 		},
 

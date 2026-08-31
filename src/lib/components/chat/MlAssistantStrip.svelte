@@ -16,9 +16,13 @@
 		complete: boolean;
 		/** Compute budget ledger; absent means the conversation carries none. */
 		budget?: MlBudgetSnapshot;
+		/** Budget being typed for the conversation the next send will create. */
+		draftBudgetUsd?: number;
 		ontoggle: (enabled: boolean) => void;
 		/** Commits a new budget total in whole USD. Absent makes the readout static. */
 		onbudgetchange?: (totalUsd: number) => void;
+		/** Keeps the pre-conversation draft in the caller's hands as it is typed. */
+		ondraftbudgetchange?: (totalUsd: number | undefined) => void;
 	}
 
 	let {
@@ -29,9 +33,17 @@
 		statusLabel,
 		complete,
 		budget,
+		draftBudgetUsd,
 		ontoggle,
 		onbudgetchange,
+		ondraftbudgetchange,
 	}: Props = $props();
+
+	function readDraft(event: Event) {
+		const raw = (event.currentTarget as HTMLInputElement).value.trim();
+		const usd = Number(raw);
+		ondraftbudgetchange?.(raw !== "" && Number.isFinite(usd) && usd > 0 ? usd : undefined);
+	}
 
 	let remainingMicroUsd = $derived(
 		budget ? budget.totalMicroUsd - budget.spentMicroUsd - budget.reservedMicroUsd : 0
@@ -108,6 +120,27 @@
 		{/if}
 
 		<span class="ml-auto"></span>
+
+		{#if enabled && !taskRunning && !budget}
+			<!-- Spend authority is granted here, before any run exists: the next send
+			     creates the conversation with exactly this budget, and $0 means every
+			     submission is refused until the user grants one. Always visible while
+			     the mode is on so authorization is never implicit. -->
+			<label class="flex flex-none items-center gap-1 font-mono text-xs">
+				<span>Budget $</span>
+				<input
+					value={draftBudgetUsd ?? ""}
+					oninput={readDraft}
+					type="number"
+					min="1"
+					max="10000"
+					step="1"
+					placeholder="0"
+					class="w-16 rounded border border-current/30 bg-transparent px-1 py-0 text-right text-xs placeholder:text-current/40"
+					aria-label="Compute budget for this session in dollars"
+				/>
+			</label>
+		{/if}
 
 		{#if enabled && budget}
 			{#if editingBudget}

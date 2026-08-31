@@ -1,8 +1,7 @@
-import type { Conversation, MlBudget } from "$lib/types/Conversation";
+import type { Conversation } from "$lib/types/Conversation";
 import type { McpServerConfig } from "./mcp/httpClient";
+import { hasAuthHeader, isHfMcpServer } from "./mcp/hf";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
-import { config } from "$lib/server/config";
-import { usdToMicroUsd } from "$lib/utils/mlBudget";
 
 /**
  * The ML Assistant preset: the tools and capabilities a conversation gets when it
@@ -42,19 +41,6 @@ export function isMlAssistantConversation(conv: Pick<Conversation, "mlAssistant"
 }
 
 /**
- * Budget a new ML Assistant conversation starts with, from
- * `ML_ASSISTANT_DEFAULT_BUDGET_USD`. Undefined — unset, zero or unparseable —
- * means new conversations carry no budget and the gate stays off, which is the
- * self-hosted default: enforcement is opt-in per deployment.
- */
-export function defaultMlBudget(): MlBudget | undefined {
-	const raw = config.ML_ASSISTANT_DEFAULT_BUDGET_USD;
-	const usd = Number(raw);
-	if (!raw || !Number.isFinite(usd) || usd <= 0) return undefined;
-	return { totalMicroUsd: usdToMicroUsd(usd), spentMicroUsd: 0, reservations: [] };
-}
-
-/**
  * The preset's servers plus the ones already resolved for this request, preset
  * first. Deduplicated by name with the preset winning.
  */
@@ -66,7 +52,21 @@ export function withMlAssistantServers(servers: McpServerConfig[]): McpServerCon
 		ML_ASSISTANT_MCP_SERVERS.map((server) => [server.name, server])
 	);
 	for (const server of servers) {
-		if (!byName.has(server.name)) byName.set(server.name, server);
+		const preset = byName.get(server.name);
+		if (!preset) {
+			byName.set(server.name, server);
+			continue;
+		}
+		// An operator-configured entry that still points at the Hub MCP and
+		// carries its own Authorization header outranks the preset's `?login`
+		// variant: OAuth deployments whose app cannot request the privileged
+		// scopes (read-mcp is official-apps-only) pin a token this way, and the
+		// forwarding overlay never overrides an explicit header anyway. The URL
+		// check stays load-bearing — a same-named entry pointing anywhere else
+		// still cannot shadow the preset, authed or not.
+		if (hasAuthHeader(server.headers) && isHfMcpServer(server.url)) {
+			byName.set(server.name, server);
+		}
 	}
 	return [...byName.values()];
 }

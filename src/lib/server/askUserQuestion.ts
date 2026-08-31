@@ -59,6 +59,11 @@ export const askUserQuestionTool = {
 											type: "string",
 											description: "What picking this means, and its trade-off.",
 										},
+										setBudgetUsd: {
+											type: "number",
+											description:
+												"ML sessions with a compute budget only: if the user picks this option, the session budget is set to this many dollars. The amount is shown to the user beside the option. Use the smallest whole amount that covers the run you are proposing.",
+										},
 									},
 									required: ["label", "description"],
 								},
@@ -104,7 +109,12 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 		const question = asText(q?.question, 300);
 		if (!question) return { ok: false, reason: `question ${index + 1} has no text` };
 
-		const options: Array<{ value: string; label: string; description?: string }> = [];
+		const options: Array<{
+			value: string;
+			label: string;
+			description?: string;
+			setBudgetUsd?: number;
+		}> = [];
 		const rawOptions = Array.isArray(q?.options) ? q.options : [];
 		for (const rawOption of rawOptions) {
 			const option = rawOption as Record<string, unknown>;
@@ -112,12 +122,44 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 			// Keyed by value in the form, so a repeat would break rendering outright.
 			if (!label || options.some((o) => o.value === label)) continue;
 			const description = asText(option?.description, 200);
-			options.push({ value: label, label, ...(description ? { description } : {}) });
+			// Model-proposed, user-applied: the amount survives only if it is a sane
+			// number of dollars, and the UI always shows it beside the option.
+			const rawBudget = option?.setBudgetUsd;
+			const setBudgetUsd =
+				typeof rawBudget === "number" && Number.isFinite(rawBudget) && rawBudget > 0
+					? Math.min(10_000, Math.round(rawBudget * 100) / 100)
+					: undefined;
+			options.push({
+				value: label,
+				label,
+				...(description ? { description } : {}),
+				...(setBudgetUsd !== undefined ? { setBudgetUsd } : {}),
+			});
 		}
 		if (options.length < MIN_OPTIONS) {
 			return { ok: false, reason: `question ${index + 1} needs at least ${MIN_OPTIONS} options` };
 		}
 		if (options.length > MAX_OPTIONS) options.length = MAX_OPTIONS;
+
+		// A budget question whose options wave dollar amounts around without a
+		// single setBudgetUsd is the observed failure mode: the user clicks "$5",
+		// nothing reaches the ledger, and the model proceeds as if authorized.
+		// Bounce it back for correction instead of showing a grant that isn't one.
+		const mentionsBudget = /budget/i.test(
+			`${question} ${asText(q?.header, MAX_HEADER_CHARS) ?? ""}`
+		);
+		const hasDollarOption = options.some((o) =>
+			/\$\s*\d/.test(`${o.label} ${o.description ?? ""}`)
+		);
+		const hasGrantOption = options.some((o) => o.setBudgetUsd !== undefined);
+		if (mentionsBudget && hasDollarOption && !hasGrantOption) {
+			return {
+				ok: false,
+				reason:
+					`question ${index + 1} offers budget amounts without setBudgetUsd — a dollar amount written into a label changes nothing. ` +
+					"Re-issue with setBudgetUsd on every option that changes the budget; options that merely mention costs, or decline a raise, omit it",
+			};
+		}
 
 		fields.push({
 			kind: "select",
@@ -146,6 +188,30 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 	};
 }
 
+/**
+ * The budget the user's answer grants, if any: the amount attached to a chosen
+ * option, never to typed "Other" text. Shared by the trusted apply hook and the
+ * tool-result text so what is applied and what the model is told cannot drift.
+ * With several budget-carrying options chosen, the largest wins.
+ */
+export function chosenBudgetUsd(
+	payload: ElicitationRequestPayload,
+	content: Record<string, unknown>
+): number | undefined {
+	let granted: number | undefined;
+	for (const field of payload.fields ?? []) {
+		if (field.kind !== "select") continue;
+		const value = content[field.name];
+		const chosen = Array.isArray(value) ? value : [value];
+		for (const option of field.options) {
+			if (option.setBudgetUsd === undefined) continue;
+			if (!chosen.includes(option.value)) continue;
+			granted = Math.max(granted ?? 0, option.setBudgetUsd);
+		}
+	}
+	return granted;
+}
+
 export function answerToToolResult(
 	payload: ElicitationRequestPayload,
 	action: "accept" | "decline" | "cancel",
@@ -161,7 +227,10 @@ export function answerToToolResult(
 		const shown = Array.isArray(value) ? value.join(", ") : String(value ?? "");
 		return `${field.description ?? field.title ?? field.name}\n${shown}`;
 	});
-	return `The user answered:\n\n${answered.join("\n\n")}`;
+	const granted = chosenBudgetUsd(payload, content);
+	const budgetLine =
+		granted !== undefined ? `\n\nThe session compute budget is now $${granted.toFixed(2)}.` : "";
+	return `The user answered:\n\n${answered.join("\n\n")}${budgetLine}`;
 }
 
 /** Returns without waiting: nothing holds the run open, so the answer arrives later. */

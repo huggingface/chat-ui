@@ -533,12 +533,14 @@
 			// Loaded state seeds the ledger; the stream's Budget updates take over
 			// from there. The empty-ledger condition covers adoption — the create
 			// flow lands here with reset=false — while still refusing to let a
-			// stale invalidation roll back what the stream already reported.
-			if (startedInMlMode && mlBudget && (reset || mlAssistant.budget === undefined)) {
+			// stale invalidation roll back what the stream already reported. A mode
+			// conversation without a stored budget renders as $0.00: the gate treats
+			// it that way, and the readout must say what the gate will do.
+			if (startedInMlMode && (reset || mlAssistant.budget === undefined)) {
 				mlAssistant.setBudget({
-					totalMicroUsd: mlBudget.totalMicroUsd,
-					spentMicroUsd: mlBudget.spentMicroUsd,
-					reservedMicroUsd: reservedMicroUsd(mlBudget),
+					totalMicroUsd: mlBudget?.totalMicroUsd ?? 0,
+					spentMicroUsd: mlBudget?.spentMicroUsd ?? 0,
+					reservedMicroUsd: mlBudget ? reservedMicroUsd(mlBudget) : 0,
 				});
 			}
 		});
@@ -1048,8 +1050,10 @@
 							statusLabel={mlAssistant.statusLabel}
 							complete={mlAssistant.complete}
 							budget={mlAssistant.budget}
+							draftBudgetUsd={mlAssistant.draftBudgetUsd}
 							ontoggle={toggleMlMode}
 							onbudgetchange={page.params?.id ? changeMlBudget : undefined}
+							ondraftbudgetchange={(usd) => (mlAssistant.draftBudgetUsd = usd)}
 						/>
 						<MlAssistantPromo
 							visible={mlPromoVisible}

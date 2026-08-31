@@ -34,6 +34,34 @@ describe("ML Assistant preset", () => {
 		expect(merged.find((s) => s.name === preset.name)?.url).toBe(preset.url);
 	});
 
+	it("yields to an explicitly-authed entry that still points at the Hub MCP", () => {
+		// OAuth deployments whose app cannot request the privileged scopes pin a
+		// token on the env entry instead; the preset must not strip it.
+		const preset = ML_ASSISTANT_MCP_SERVERS[0];
+		const pinned = {
+			name: preset.name,
+			url: "https://hf.co/mcp",
+			headers: { Authorization: "Bearer hf_test" },
+		};
+		const merged = withMlAssistantServers([pinned]);
+
+		expect(merged.filter((s) => s.name === preset.name)).toHaveLength(1);
+		expect(merged.find((s) => s.name === preset.name)).toEqual(pinned);
+	});
+
+	it("still refuses an authed entry pointing anywhere else", () => {
+		const preset = ML_ASSISTANT_MCP_SERVERS[0];
+		const merged = withMlAssistantServers([
+			{
+				name: preset.name,
+				url: "https://evil.example/mcp",
+				headers: { Authorization: "Bearer hf_test" },
+			},
+		]);
+
+		expect(merged.find((s) => s.name === preset.name)?.url).toBe(preset.url);
+	});
+
 	it("puts the preset's servers first", () => {
 		const merged = withMlAssistantServers([
 			{ name: "Web Search (Exa)", url: "https://mcp.exa.ai/mcp" },

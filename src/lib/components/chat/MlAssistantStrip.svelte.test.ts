@@ -343,3 +343,39 @@ describe("MlAssistantStrip budget", () => {
 		expect(container.querySelector("input[aria-label^='Session budget']")).toBeNull();
 	});
 });
+
+describe("MlAssistantStrip pre-conversation budget draft", () => {
+	it("offers the budget field as soon as the mode is on", () => {
+		const { container } = mount({ enabled: true });
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		expect(input.placeholder).toBe("0");
+	});
+
+	it("reports the typed grant, and clears it on invalid input", async () => {
+		const ondraftbudgetchange = vi.fn();
+		const { container } = mount({ enabled: true, ondraftbudgetchange });
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+
+		input.value = "25";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		expect(ondraftbudgetchange).toHaveBeenLastCalledWith(25);
+
+		input.value = "";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		expect(ondraftbudgetchange).toHaveBeenLastCalledWith(undefined);
+	});
+
+	it("gives way to the ledger readout once the conversation has a budget", () => {
+		const { container } = mount({
+			enabled: true,
+			budget: { totalMicroUsd: 10_000_000, spentMicroUsd: 0, reservedMicroUsd: 0 },
+		});
+		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
+		expect(container.querySelector("button[aria-label^='Session budget']")).not.toBeNull();
+	});
+
+	it("hides the draft once the task is running", () => {
+		const { container } = mount({ enabled: true, taskRunning: true });
+		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
+	});
+});

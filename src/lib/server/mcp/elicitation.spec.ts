@@ -434,3 +434,103 @@ describe("submitElicitationAnswer", () => {
 		expect(result).toMatchObject({ ok: false, status: 409 });
 	});
 });
+
+describe("submitElicitationAnswer budget grants", () => {
+	const budgetAskRow = async (conversationId: ObjectId) => {
+		const elicitationId = crypto.randomUUID();
+		const now = new Date();
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			elicitationId,
+			conversationId,
+			status: "pending",
+			request: {
+				elicitationId,
+				server: "",
+				source: "assistant",
+				mode: "form",
+				message: "Proceed?",
+				fields: [
+					{
+						kind: "select",
+						name: "q1",
+						required: true,
+						multiple: false,
+						allowOther: true,
+						options: [
+							{ value: "Rescope", label: "Rescope" },
+							{ value: "Run in full", label: "Run in full", setBudgetUsd: 4.5 },
+						],
+					},
+				],
+			},
+			pending: { kind: "ask", messageId: "m1", toolCallId: "c1", toolUuid: "u1" },
+			createdAt: now,
+			updatedAt: now,
+		});
+		return elicitationId;
+	};
+
+	const mlConversation = async (mlAssistant: boolean) => {
+		const _id = new ObjectId();
+		await collections.conversations.insertOne({
+			_id,
+			title: "grant test",
+			model: "test-model",
+			messages: [],
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			sessionId: `grant-${_id.toString()}`,
+			...(mlAssistant ? { mlAssistant: true } : {}),
+			...(mlAssistant
+				? { mlBudget: { totalMicroUsd: 0, spentMicroUsd: 0, reservations: [] } }
+				: {}),
+		});
+		return _id;
+	};
+
+	it("applies the chosen option's grant through the trusted path", async () => {
+		const conversationId = await mlConversation(true);
+		const elicitationId = await budgetAskRow(conversationId);
+
+		const result = await submitElicitationAnswer({
+			elicitationId,
+			conversationId,
+			action: "accept",
+			content: { q1: "Run in full" },
+		});
+		expect(result.ok).toBe(true);
+
+		const conv = await collections.conversations.findOne({ _id: conversationId });
+		expect(conv?.mlBudget?.totalMicroUsd).toBe(4_500_000);
+	});
+
+	it("grants nothing for the other option or typed text", async () => {
+		const conversationId = await mlConversation(true);
+		for (const answer of ["Rescope", "run in full please"]) {
+			const elicitationId = await budgetAskRow(conversationId);
+			await submitElicitationAnswer({
+				elicitationId,
+				conversationId,
+				action: "accept",
+				content: { q1: answer },
+			});
+		}
+		const conv = await collections.conversations.findOne({ _id: conversationId });
+		expect(conv?.mlBudget?.totalMicroUsd).toBe(0);
+	});
+
+	it("grants nothing outside ML Assistant conversations", async () => {
+		// An option smuggled into an ordinary conversation must not conjure a budget.
+		const conversationId = await mlConversation(false);
+		const elicitationId = await budgetAskRow(conversationId);
+		await submitElicitationAnswer({
+			elicitationId,
+			conversationId,
+			action: "accept",
+			content: { q1: "Run in full" },
+		});
+		const conv = await collections.conversations.findOne({ _id: conversationId });
+		expect(conv?.mlBudget).toBeUndefined();
+	});
+});

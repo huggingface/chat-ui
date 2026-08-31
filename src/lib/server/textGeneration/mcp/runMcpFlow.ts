@@ -29,7 +29,7 @@ import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
-import { createMlBudgetGuard } from "$lib/server/mlBudget/guard";
+import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { withRateLimitRetry } from "../utils/rateLimitRetry";
 import { getEnabledBuiltinTools, isResearchTool, shouldSkipMcpFlow } from "../builtinTools";
@@ -79,6 +79,14 @@ const MAX_TRUNCATED_TOOL_CALL_RETRIES = 2;
 // marked interrupted.
 const MAX_CUT_ANSWER_RETRIES = 1;
 
+// One more attempt after a final answer that writes a tool call as text markup
+// (<tool_name> tags) instead of making it: nothing ran, the user would see
+// broken markup in place of a working control, and the turn usually hinges on
+// the call actually happening. Observed with GLM-class models whose provider
+// template leaks their native tool syntax into content. A second leak
+// finalizes as-is rather than looping on a model that cannot comply.
+const MAX_LEAKED_TOOL_CALL_RETRIES = 1;
+
 export async function* runMcpFlow({
 	model,
 	conv,
@@ -121,17 +129,17 @@ export async function* runMcpFlow({
 	// doctrine is sent, and they must all agree within a run.
 	const mlAssistant = isMlAssistantConversation(conv);
 
-	// The budget gate exists exactly when the conversation carries a budget.
-	// Settle already ran this turn (textGeneration/index.ts), so the ledger the
-	// guard reserves against is as fresh as it gets.
-	const budgetGuard =
-		mlAssistant && conv.mlBudget
-			? createMlBudgetGuard({
-					conversationId: conv._id,
-					generationId: generationId ?? conv._id.toString(),
-					username: (locals as unknown as { user?: { username?: string } })?.user?.username,
-				})
-			: undefined;
+	// Every mode conversation is gated — one without a stored budget is a zero
+	// budget, not an ungated one. Settle already ran this turn
+	// (textGeneration/index.ts), so the ledger the guard reserves against is as
+	// fresh as it gets.
+	const budgetGuard = mlAssistant
+		? createMlBudgetGuard({
+				conversationId: conv._id,
+				generationId: generationId ?? conv._id.toString(),
+				username: (locals as unknown as { user?: { username?: string } })?.user?.username,
+			})
+		: undefined;
 
 	// Start from env-configured servers
 	let servers = getMcpServers();
@@ -378,9 +386,13 @@ export async function* runMcpFlow({
 				"[mcp] dropped MCP tools shadowed by builtin tools"
 			);
 		}
+		// In the mode, gated tools advertise their routing discriminator as
+		// required — the Hub's own schema doesn't, and calls without one can only
+		// bounce off the budget gate's fail-closed path.
+		const shapedMcpTools = mlAssistant ? withRequiredDiscriminators(mcpTools, mapping) : mcpTools;
 		const oaTools = [
 			...builtinTools.map((tool) => tool.definition),
-			...mcpTools.filter((tool) => !builtinNames.has(tool.function.name)),
+			...shapedMcpTools.filter((tool) => !builtinNames.has(tool.function.name)),
 		];
 		try {
 			logger.info(
@@ -630,6 +642,10 @@ export async function* runMcpFlow({
 		let pendingReasoningWhitespace = "";
 		let truncatedToolCallRetries = 0;
 		let cutAnswerRetries = 0;
+		let leakedToolCallRetries = 0;
+		// For the leaked-markup check: only names that are really callable this
+		// run can make "<name" in a final answer mean a call that never happened.
+		const advertisedToolNames = oaTools.map((tool) => tool.function.name);
 
 		if (resolvedRoute && candidateModelId) {
 			yield {
@@ -1084,6 +1100,30 @@ export async function* runMcpFlow({
 							finishReason === "length"
 								? "[SYSTEM: Your previous response hit the output limit before it finished — most of it was internal reasoning. Give your final answer now, with minimal further reasoning and the answer itself kept concise.]"
 								: "[SYSTEM: Your previous response ended while still inside internal reasoning, so no visible answer was produced. Give your final answer now, with minimal further reasoning and the answer itself kept concise.]",
+					},
+				];
+				continue;
+			}
+			// A tool call written into the reply as markup called nothing: the
+			// round ended with no tool_calls, so whatever the text promises never
+			// happened, and the user would get broken markup instead of a working
+			// control. Retry once with the correction; the retried round's
+			// FinalAnswer replaces the leaked text client-side.
+			const leakedToolName = advertisedToolNames.find((name) =>
+				visibleContent.includes(`<${name}`)
+			);
+			if (leakedToolName && leakedToolCallRetries < MAX_LEAKED_TOOL_CALL_RETRIES) {
+				leakedToolCallRetries += 1;
+				logger.warn(
+					{ loop, tool: leakedToolName, attempt: leakedToolCallRetries },
+					"[mcp] final answer contains tool-call markup; retrying"
+				);
+				messagesOpenAI = [
+					...messagesOpenAI,
+					{ role: "assistant" as const, content: lastAssistantContent },
+					{
+						role: "user" as const,
+						content: `[SYSTEM: Your previous response wrote a tool call as text markup (<${leakedToolName}> tags). That text called nothing — no tool ran, and the user saw broken markup instead of a working control. Respond again: make the call through the function-calling mechanism as a real tool call, and keep tool markup out of your reply text.]`,
 					},
 				];
 				continue;
