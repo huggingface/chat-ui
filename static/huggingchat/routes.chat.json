@@ -2,11 +2,12 @@
 	{
 		"name": "default",
 		"description": "General purpose route for all conversations.",
-		"primary_model": "moonshotai/Kimi-K2.6",
+		"primary_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
 		"fallback_models": [
+			"openai/gpt-oss-120b",
+			"moonshotai/Kimi-K2.6",
 			"zai-org/GLM-4.6",
-			"deepseek-ai/DeepSeek-V3.1",
-			"Qwen/Qwen3-235B-A22B-Instruct-2507"
+			"deepseek-ai/DeepSeek-V3.1"
 		]
 	},
 	{
