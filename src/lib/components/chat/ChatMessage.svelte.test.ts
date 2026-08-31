@@ -140,4 +140,47 @@ describe("collapsed process blocks during streaming", () => {
 		expect(open.length).toBe(1);
 		expect(open[0].textContent).toContain("Thinking");
 	});
+
+	it("keeps the flat rows through mid-turn narration instead of regrouping them", async () => {
+		// Models narrate between tool rounds. That text must not collapse the
+		// previous rows into the "Called N tools" summary mid-turn: the next
+		// round would explode the summary back into rows, which reads as the
+		// collapsed blocks re-expanding. Grouping belongs to the finished turn.
+		const steps = [
+			streamCall("u1"),
+			streamResult("u1"),
+			streamCall("u2"),
+			streamResult("u2"),
+			stream("This is excellent research. Let me search more."),
+			streamCall("u3"),
+			streamResult("u3"),
+			stream("Now I have comprehensive data."),
+			streamCall("u4"),
+		];
+		const summaries = (el: HTMLElement) =>
+			[...el.querySelectorAll("button")].filter((b) =>
+				/^Called \d+ tools?/.test(b.textContent?.trim() ?? "")
+			);
+		const toolRows = (el: HTMLElement) => el.querySelectorAll("code").length;
+
+		const updates: unknown[] = [];
+		const screen = mount([]);
+		let previousRows = 0;
+		for (const step of steps) {
+			updates.push(step);
+			await screen.rerender({
+				message: { id: "m1", from: "assistant", content: "", children: [], updates: [...updates] },
+			} as never);
+			await tick();
+			const el = screen.baseElement as HTMLElement;
+			expect(summaries(el).length).toBe(0);
+			expect(toolRows(el)).toBeGreaterThanOrEqual(previousRows);
+			previousRows = toolRows(el);
+		}
+
+		// Once the turn is over, the finished-turn grouping takes over.
+		await screen.rerender({ loading: false } as never);
+		await tick();
+		expect(summaries(screen.baseElement as HTMLElement).length).toBeGreaterThan(0);
+	});
 });
