@@ -349,6 +349,8 @@ describe("MlAssistantStrip pre-conversation budget draft", () => {
 		const { container } = mount({ enabled: true });
 		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
 		expect(input.placeholder).toBe("0");
+		// No spinner arrows: the value is typed, not stepped.
+		expect(style(input).appearance).toBe("textfield");
 	});
 
 	it("reports the typed grant, and clears it on invalid input", async () => {

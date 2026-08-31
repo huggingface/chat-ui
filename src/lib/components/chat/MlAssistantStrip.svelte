@@ -136,7 +136,7 @@
 					max="10000"
 					step="1"
 					placeholder="0"
-					class="w-16 rounded border border-current/30 bg-transparent px-1 py-0 text-right text-xs placeholder:text-current/40"
+					class="ml-budget-input w-16 rounded border border-current/30 bg-transparent px-1 py-0 text-right text-xs placeholder:text-current/40"
 					aria-label="Compute budget for this session in dollars"
 				/>
 			</label>
@@ -160,7 +160,7 @@
 						min="1"
 						max="10000"
 						step="1"
-						class="w-16 rounded border border-current/30 bg-transparent px-1 py-0 text-right text-xs"
+						class="ml-budget-input w-16 rounded border border-current/30 bg-transparent px-1 py-0 text-right text-xs"
 						aria-label="Session budget in dollars, Enter to save"
 					/>
 				</span>
@@ -213,6 +213,18 @@
 		transition:
 			background 0.35s ease,
 			border-color 0.35s ease;
+	}
+
+	/* Spinner arrows would be the only chrome on the strip's compact money
+	   fields, and the value is typed, not stepped. */
+	.ml-budget-input {
+		appearance: textfield;
+	}
+
+	.ml-budget-input::-webkit-outer-spin-button,
+	.ml-budget-input::-webkit-inner-spin-button {
+		appearance: none;
+		margin: 0;
 	}
 
 	/* The slot owns the switch's footprint in the row; the button is absolutely
