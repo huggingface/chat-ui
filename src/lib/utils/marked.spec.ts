@@ -34,6 +34,26 @@ describe("marked basic rendering", () => {
 	});
 });
 
+describe("marked tables", () => {
+	const table = "| Model | Params |\n| --- | --- |\n| Qwen | 32B |";
+
+	test("emits a table token rather than folding the table into a text token", () => {
+		const tokens = processTokensSync(table, []);
+		expect(tokens).toHaveLength(1);
+		expect(tokens[0].type).toBe("table");
+		expect(tokens[0].type === "table" && tokens[0].html).toContain("<th>Model</th>");
+		expect(tokens[0].type === "table" && tokens[0].html).toContain("<td>Qwen</td>");
+	});
+
+	test("keeps surrounding prose in its own text tokens", () => {
+		// `space` tokens between the blocks also render as (empty) text tokens.
+		const tokens = processTokensSync(`before\n\n${table}\n\nafter`, []).filter(
+			(token) => token.type !== "text" || token.html !== ""
+		);
+		expect(tokens.map((token) => token.type)).toEqual(["text", "table", "text"]);
+	});
+});
+
 describe("marked image renderer", () => {
 	test("renders video extensions as <video>", () => {
 		const html = renderHtml("![](https://example.com/clip.mp4)");

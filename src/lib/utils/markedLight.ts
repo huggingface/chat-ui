@@ -18,7 +18,17 @@ export type TextToken = {
 	html: string | Promise<string>;
 };
 
-export type Token = CodeToken | TextToken;
+/**
+ * GFM tables are split out of the text stream so they can be rendered by
+ * MarkdownTable (scroll container + copy/download/fullscreen controls) instead of
+ * being dropped into the prose flow as bare `<table>` markup.
+ */
+export type TableToken = {
+	type: "table";
+	html: string;
+};
+
+export type Token = CodeToken | TextToken | TableToken;
 
 export type BlockToken = {
 	id: string;

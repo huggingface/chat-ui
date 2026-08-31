@@ -38,7 +38,7 @@ import { escapeHTML, type BlockToken, type Token } from "./markedLight";
 // ./markedLight directly — importing this module eagerly pulls KaTeX +
 // highlight.js into the entry bundle.
 export { escapeHTML, fallbackBlocks } from "./markedLight";
-export type { BlockToken, CodeToken, TextToken, Token } from "./markedLight";
+export type { BlockToken, CodeToken, TableToken, TextToken, Token } from "./markedLight";
 
 const bundledLanguages: [string, LanguageFn][] = [
 	["javascript", javascript],
@@ -437,47 +437,35 @@ function cacheKey(index: number, blockContent: string, sources: SimpleSource[]) 
 	return `${index}-${hashString(blockContent)}|${sourceKey}`;
 }
 
+function renderToken(marked: Marked, token: Tokens.Generic): Token {
+	if (token.type === "code") {
+		return {
+			type: "code" as const,
+			lang: token.lang,
+			code: highlightCode(token.text, token.lang),
+			rawCode: token.text,
+			isClosed: isFencedBlockClosed(token.raw ?? ""),
+		};
+	}
+	// Tables get their own token so MarkdownTable can wrap them in a scroll
+	// container with copy/download/fullscreen controls.
+	if (token.type === "table") {
+		return { type: "table" as const, html: marked.parse(token.raw) as string };
+	}
+	return { type: "text" as const, html: marked.parse(token.raw) };
+}
+
 export async function processTokens(content: string, sources: SimpleSource[]): Promise<Token[]> {
 	const marked = createMarkedInstance(sources);
 	const tokens = marked.lexer(content);
 
-	const processedTokens = await Promise.all(
-		tokens.map(async (token) => {
-			if (token.type === "code") {
-				return {
-					type: "code" as const,
-					lang: token.lang,
-					code: highlightCode(token.text, token.lang),
-					rawCode: token.text,
-					isClosed: isFencedBlockClosed(token.raw ?? ""),
-				};
-			} else {
-				return {
-					type: "text" as const,
-					html: marked.parse(token.raw),
-				};
-			}
-		})
-	);
-
-	return processedTokens;
+	return await Promise.all(tokens.map(async (token) => renderToken(marked, token)));
 }
 
 export function processTokensSync(content: string, sources: SimpleSource[]): Token[] {
 	const marked = createMarkedInstance(sources);
 	const tokens = marked.lexer(content);
-	return tokens.map((token) => {
-		if (token.type === "code") {
-			return {
-				type: "code" as const,
-				lang: token.lang,
-				code: highlightCode(token.text, token.lang),
-				rawCode: token.text,
-				isClosed: isFencedBlockClosed(token.raw ?? ""),
-			};
-		}
-		return { type: "text" as const, html: marked.parse(token.raw) };
-	});
+	return tokens.map((token) => renderToken(marked, token));
 }
 
 /**

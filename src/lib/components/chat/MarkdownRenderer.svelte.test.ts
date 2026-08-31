@@ -63,6 +63,34 @@ describe("MarkdownRenderer", () => {
 		const { baseElement } = render(MarkdownRenderer, { content: "$foo < bar > baz$" });
 		await vi.waitFor(() => expect(baseElement.querySelectorAll(".katex")).toHaveLength(1));
 	});
+	it("renders tables in a scrollable wrapper with copy/download/fullscreen controls", async () => {
+		const { baseElement } = render(MarkdownRenderer, {
+			content: "| Model | Params |\n| --- | --- |\n| Qwen | 32B |",
+		});
+		await vi.waitFor(() => {
+			const table = baseElement.querySelector(".md-table table");
+			expect(table).not.toBeNull();
+			expect(table?.querySelector("th")?.textContent).toBe("Model");
+			expect(table?.querySelector("td")?.textContent).toBe("Qwen");
+		});
+		await expect.element(page.getByRole("button", { name: "Copy table" })).toBeInTheDocument();
+		await expect.element(page.getByRole("button", { name: "Download table" })).toBeInTheDocument();
+		await expect.element(page.getByRole("button", { name: "View fullscreen" })).toBeInTheDocument();
+	});
+	it("opens and closes the fullscreen table view", async () => {
+		const { baseElement } = render(MarkdownRenderer, {
+			content: "| Model | Params |\n| --- | --- |\n| Qwen | 32B |",
+		});
+		await vi.waitFor(() => expect(baseElement.querySelector(".md-table table")).not.toBeNull());
+
+		await page.getByRole("button", { name: "View fullscreen" }).click();
+		const dialog = page.getByRole("dialog", { name: "Table" });
+		await expect.element(dialog).toBeInTheDocument();
+		expect(baseElement.querySelectorAll(".md-table table")).toHaveLength(2);
+
+		await page.getByRole("button", { name: "Exit fullscreen" }).click();
+		await vi.waitFor(() => expect(baseElement.querySelectorAll(".md-table table")).toHaveLength(1));
+	});
 });
 
 describe("MarkdownRenderer streaming", () => {

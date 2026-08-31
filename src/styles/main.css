@@ -207,14 +207,43 @@ body {
 	margin-top: 0.8em;
 }
 
-.prose table {
-	@apply scrollbar-thin block max-w-full scrollbar-thumb-black/10 scrollbar-track-transparent overflow-x-auto scrollbar-thumb-rounded-full dark:scrollbar-thumb-white/10 scrollbar-hover:scrollbar-thumb-black/20 dark:scrollbar-hover:scrollbar-thumb-white/20;
+/* Tables are rendered by MarkdownTable.svelte, which opts its subtree out of `prose`
+   (`not-prose`) so the inline table and its fullscreen copy — portalled outside any
+   prose container — look identical. Everything the cells need is therefore restated
+   here rather than inherited from the typography plugin. */
+.md-table table {
+	@apply m-0 w-full border-collapse text-sm;
 }
 
-/* Prevent columns from squishing on narrow viewports; long content wraps instead of dominating. */
-.prose :is(th, td) {
-	min-width: 6rem;
-	max-width: 16rem;
+/* Opaque, because the fullscreen view makes the header sticky over the scrolling rows. */
+.md-table thead {
+	@apply bg-gray-100 dark:bg-gray-800;
+}
+
+.md-table tbody tr {
+	@apply border-t border-gray-200 dark:border-gray-700;
+}
+
+.md-table :is(th, td) {
+	/* Prevent columns from squishing on narrow viewports; long content wraps instead
+	   of dominating, and the wrapper scrolls horizontally past that. */
+	@apply max-w-64 min-w-24 px-4 py-2 align-top;
+}
+
+.md-table th {
+	@apply text-left font-semibold whitespace-nowrap;
+}
+
+.md-table a {
+	@apply font-medium underline;
+}
+
+.md-table strong {
+	@apply font-medium;
+}
+
+.md-table code {
+	@apply rounded-md bg-gray-200/60 px-[0.4em] py-[0.2em] text-[85%] dark:bg-gray-700;
 }
 
 .prose hr {
