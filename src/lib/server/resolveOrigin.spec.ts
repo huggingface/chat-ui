@@ -38,4 +38,31 @@ describe("resolveExternalOrigin", () => {
 			"https://chat.example.com"
 		);
 	});
+
+	it("strips a trailing slash from PUBLIC_ORIGIN", () => {
+		// A trailing slash is a common way to represent a public URL. Left as-is, it
+		// would survive into `${origin}${base}/login/callback` as a double slash that
+		// doesn't match the OAuth redirect URI registered with the provider.
+		mockConfig.PUBLIC_ORIGIN = "https://chat.example.com/";
+
+		expect(resolveExternalOrigin(new URL("http://127.0.0.1:3000/login"))).toBe(
+			"https://chat.example.com"
+		);
+	});
+
+	it("strips any path/query someone pastes into PUBLIC_ORIGIN by mistake", () => {
+		mockConfig.PUBLIC_ORIGIN = "https://chat.example.com/some/path?x=1";
+
+		expect(resolveExternalOrigin(new URL("http://127.0.0.1:3000/login"))).toBe(
+			"https://chat.example.com"
+		);
+	});
+
+	it("falls back to a trailing-slash trim when PUBLIC_ORIGIN isn't a parseable URL", () => {
+		// Doesn't throw and doesn't silently break the OAuth flow on a malformed config
+		// value -- degrades to the same trailing-slash fix on a best-effort basis.
+		mockConfig.PUBLIC_ORIGIN = "not-a-valid-url/";
+
+		expect(resolveExternalOrigin(new URL("http://127.0.0.1:3000/login"))).toBe("not-a-valid-url");
+	});
 });
