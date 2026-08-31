@@ -147,10 +147,13 @@ export function mlAssistantSessionContext({
 	username,
 	timezone,
 	now = new Date(),
+	budget,
 }: {
 	username?: string;
 	timezone?: string;
 	now?: Date;
+	/** Formatted amounts, e.g. "$7.80" — the caller owns the money arithmetic. */
+	budget?: { remaining: string; total: string };
 }): string {
 	const format = (zone?: string) =>
 		new Intl.DateTimeFormat("en-CA", {
@@ -182,8 +185,28 @@ export function mlAssistantSessionContext({
 	const user = username && username.trim().length > 0 ? username.trim() : "unknown";
 	return `[Session context: Date=${date}, Time=${time}${
 		zone ? `, Timezone=${zone}` : ""
-	}, User=${user}]`;
+	}, User=${user}${budget ? `, Budget=${budget.remaining} remaining of ${budget.total}` : ""}]`;
 }
+
+/**
+ * Sent only when the conversation carries a budget. States the exact formula
+ * the server gate computes, so the model can price a submission before
+ * proposing it and a refusal is never a surprise — the strongest property of
+ * the design is that belief and enforcement share one arithmetic.
+ */
+export const ML_ASSISTANT_BUDGET_RULES = `# Session budget
+
+This session has a hard compute budget, enforced by the server and shown as Budget in the session context line below. It covers hf_jobs submissions and sandboxes.
+
+How it is enforced — the same arithmetic to do yourself before proposing a run:
+
+- Every hf_jobs run or uv submission and every hf_sandbox create reserves its worst case up front: the flavor's per-minute price × the timeout, rounded up to the minute. A job submitted without a timeout counts as the platform default of 30 minutes; without a flavor, as cpu-basic.
+- A submission whose worst case exceeds what remains is refused as a tool error, and nothing is submitted or charged. Do not respond by silently shrinking the task — SCOPE-CHANGING FIXES applies. Resize honestly if that fits the task; otherwise put the choice to the user, who can also raise the budget from the composer.
+- When a job or sandbox finishes, its hold settles to the minutes it actually ran and the rest returns to the budget — but not before. An inflated timeout holds budget hostage until the run ends: set it above your estimate, not at a multiple of it.
+- Sandboxes must be created with explicit --flavor and --timeout. Scheduled jobs are not available in this session.
+- Reading and stopping are never gated: ps, logs, inspect, status, cancel, terminate and kill always work at any balance. Cancelling a run frees the rest of its hold at the next settle.
+
+Put the hold next to the estimate in every pre-flight: "holds $2.00 of budget, expected actual cost ≈ $0.80".`;
 
 /**
  * Doctrine that belongs beside one tool rather than in the prompt: it is sent

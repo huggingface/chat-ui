@@ -11,6 +11,8 @@ import { runMcpFlow } from "./mcp/runMcpFlow";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
+import { settleMlBudget } from "$lib/server/mlBudget/settle";
+import { logger } from "$lib/server/logger";
 import { resolvePreprompt } from "./preprompt";
 
 /** Updates that mean the user has already been shown something for this turn. */
@@ -63,6 +65,24 @@ async function* textGenerationWithoutTitle(
 	// Outside it nothing changes — artifacts stay opt-in per model.
 	const mlAssistant = isMlAssistantConversation(conv);
 
+	// Settle finished jobs before the remaining budget is read anywhere this
+	// turn — the session-context line and the gate must both see refunds land.
+	if (mlAssistant && conv.mlBudget) {
+		try {
+			const token =
+				(ctx.locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
+				(ctx.locals as unknown as { token?: string } | undefined)?.token;
+			conv.mlBudget = await settleMlBudget({
+				conversationId: convId,
+				budget: conv.mlBudget,
+				...(token ? { token } : {}),
+			});
+		} catch (err) {
+			// A failed settle only leaves holds in place — safe to run the turn on.
+			logger.warn({ err: String(err) }, "[mlBudget] settle pass failed; continuing");
+		}
+	}
+
 	const preprompt = resolvePreprompt({
 		conversationPreprompt: conv.preprompt,
 		mlAssistant,
@@ -70,6 +90,7 @@ async function* textGenerationWithoutTitle(
 		supportsArtifacts: ctx.model.supportsArtifacts,
 		username: ctx.username,
 		timezone: (ctx.locals as unknown as { timezone?: string } | undefined)?.timezone,
+		budget: conv.mlBudget,
 	});
 
 	const processedMessages = await preprocessMessages(messages, convId);

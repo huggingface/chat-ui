@@ -344,6 +344,15 @@
 				onPlan: (update) => {
 					if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
 				},
+				onBudget: (update) => {
+					if (ML_ASSISTANT_MODE) {
+						mlAssistant.setBudget({
+							totalMicroUsd: update.totalMicroUsd,
+							spentMicroUsd: update.spentMicroUsd,
+							reservedMicroUsd: update.reservedMicroUsd,
+						});
+					}
+				},
 				onTurnState: (update) => {
 					noteServerNow(update.serverNow);
 				},
@@ -451,6 +460,15 @@
 					onTitle: (title) => convsStore.update(runConvId, { title }),
 					onPlan: (update) => {
 						if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
+					},
+					onBudget: (update) => {
+						if (ML_ASSISTANT_MODE) {
+							mlAssistant.setBudget({
+								totalMicroUsd: update.totalMicroUsd,
+								spentMicroUsd: update.spentMicroUsd,
+								reservedMicroUsd: update.reservedMicroUsd,
+							});
+						}
 					},
 					onTurnState: (update) => {
 						noteServerNow(update.serverNow);

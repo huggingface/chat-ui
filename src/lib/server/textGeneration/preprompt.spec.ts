@@ -143,4 +143,41 @@ describe("resolvePreprompt", () => {
 			})
 		).toBe("You are a pirate.");
 	});
+
+	it("adds the budget rules and the balance only when a budget exists", () => {
+		const budget = {
+			totalMicroUsd: 10_000_000,
+			spentMicroUsd: 1_500_000,
+			reservations: [
+				{
+					key: "gen:a",
+					kind: "job" as const,
+					flavor: "t4-small",
+					priceMicroUsdPerMinute: 6667,
+					timeoutSeconds: 600,
+					ceilingMicroUsd: 1_000_000,
+					createdAt: new Date(),
+				},
+			],
+		};
+		const withBudget = resolvePreprompt({
+			conversationPreprompt: undefined,
+			mlAssistant: true,
+			username: "pngwn",
+			budget,
+		});
+		expect(withBudget).toContain("# Session budget");
+		// total − spent − held = 10.00 − 1.50 − 1.00
+		expect(withBudget).toContain("Budget=$7.50 remaining of $10.00");
+		// Still last, after the rules: the namespace rule reads the tail line.
+		expect(withBudget?.trimEnd().endsWith("]")).toBe(true);
+
+		const withoutBudget = resolvePreprompt({
+			conversationPreprompt: undefined,
+			mlAssistant: true,
+			username: "pngwn",
+		});
+		expect(withoutBudget).not.toContain("# Session budget");
+		expect(withoutBudget).not.toContain("Budget=");
+	});
 });

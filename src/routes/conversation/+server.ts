@@ -12,6 +12,7 @@ import { usageLimits } from "$lib/server/usageLimits";
 import { MetricsServer } from "$lib/server/metrics";
 import superjson from "superjson";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+import { defaultMlBudget } from "$lib/server/mlAssistant";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -81,6 +82,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	// Only builds that ship ML Assistant mode can start a conversation in it.
 	const isMlAssistant = ML_ASSISTANT_MODE && values.mlAssistant === true;
+	const mlBudget = isMlAssistant ? defaultMlBudget() : undefined;
 
 	// use provided preprompt or model preprompt
 	values.preprompt ??= model?.preprompt ?? "";
@@ -115,6 +117,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 		// Only builds that ship ML Assistant mode can mark a conversation with it.
 		...(isMlAssistant ? { mlAssistant: true } : {}),
+		...(isMlAssistant && mlBudget ? { mlBudget } : {}),
 	});
 
 	if (MetricsServer.isEnabled()) {
@@ -146,6 +149,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				shared: false,
 				deployedSpaces: undefined,
 				mlAssistant: isMlAssistant ? true : undefined,
+				mlBudget,
 			}),
 		}),
 		{ headers: { "Content-Type": "application/json" } }

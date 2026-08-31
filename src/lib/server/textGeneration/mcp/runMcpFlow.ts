@@ -29,6 +29,7 @@ import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
+import { createMlBudgetGuard } from "$lib/server/mlBudget/guard";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { withRateLimitRetry } from "../utils/rateLimitRetry";
 import { getEnabledBuiltinTools, isResearchTool, shouldSkipMcpFlow } from "../builtinTools";
@@ -119,6 +120,18 @@ export async function* runMcpFlow({
 	// Read once: the preset decides the servers, the round budget and which tool
 	// doctrine is sent, and they must all agree within a run.
 	const mlAssistant = isMlAssistantConversation(conv);
+
+	// The budget gate exists exactly when the conversation carries a budget.
+	// Settle already ran this turn (textGeneration/index.ts), so the ledger the
+	// guard reserves against is as fresh as it gets.
+	const budgetGuard =
+		mlAssistant && conv.mlBudget
+			? createMlBudgetGuard({
+					conversationId: conv._id,
+					generationId: generationId ?? conv._id.toString(),
+					username: (locals as unknown as { user?: { username?: string } })?.user?.username,
+				})
+			: undefined;
 
 	// Start from env-configured servers
 	let servers = getMcpServers();
@@ -992,6 +1005,7 @@ export async function* runMcpFlow({
 						sessionId: (locals as unknown as { sessionId?: string })?.sessionId,
 					},
 					builtinTools,
+					...(budgetGuard ? { guard: budgetGuard } : {}),
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;

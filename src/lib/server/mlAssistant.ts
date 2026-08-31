@@ -1,6 +1,8 @@
-import type { Conversation } from "$lib/types/Conversation";
+import type { Conversation, MlBudget } from "$lib/types/Conversation";
 import type { McpServerConfig } from "./mcp/httpClient";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+import { config } from "$lib/server/config";
+import { usdToMicroUsd } from "$lib/utils/mlBudget";
 
 /**
  * The ML Assistant preset: the tools and capabilities a conversation gets when it
@@ -37,6 +39,19 @@ export const ML_ASSISTANT_MCP_SERVERS: McpServerConfig[] = [
  */
 export function isMlAssistantConversation(conv: Pick<Conversation, "mlAssistant">): boolean {
 	return ML_ASSISTANT_MODE && conv.mlAssistant === true;
+}
+
+/**
+ * Budget a new ML Assistant conversation starts with, from
+ * `ML_ASSISTANT_DEFAULT_BUDGET_USD`. Undefined — unset, zero or unparseable —
+ * means new conversations carry no budget and the gate stays off, which is the
+ * self-hosted default: enforcement is opt-in per deployment.
+ */
+export function defaultMlBudget(): MlBudget | undefined {
+	const raw = config.ML_ASSISTANT_DEFAULT_BUDGET_USD;
+	const usd = Number(raw);
+	if (!raw || !Number.isFinite(usd) || usd <= 0) return undefined;
+	return { totalMicroUsd: usdToMicroUsd(usd), spentMicroUsd: 0, reservations: [] };
 }
 
 /**

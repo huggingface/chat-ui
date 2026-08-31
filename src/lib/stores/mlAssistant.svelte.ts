@@ -1,5 +1,5 @@
 import { SvelteSet } from "svelte/reactivity";
-import type { MlPlanStep, MlPlanStepStatus } from "$lib/types/MlAssistant";
+import type { MlBudgetSnapshot, MlPlanStep, MlPlanStepStatus } from "$lib/types/MlAssistant";
 
 /**
  * UI state for ML Assistant mode (see `$lib/utils/mlAssistantFlag`).
@@ -17,6 +17,8 @@ class MlAssistantStore {
 	taskStarted = $state(false);
 	/** The plan as reported by the run. Empty until a plan arrives. */
 	steps = $state<MlPlanStep[]>([]);
+	/** Compute budget ledger, when the conversation carries one. */
+	budget = $state<MlBudgetSnapshot | undefined>(undefined);
 
 	/** Conversation the state above belongs to, so a different one starts clean. */
 	#conversationKey: string | undefined;
@@ -95,10 +97,16 @@ class MlAssistantStore {
 		this.steps[index] = { ...step, status };
 	}
 
+	/** Seam for the backend: replaces the budget ledger as reservations and settles stream in. */
+	setBudget(budget: MlBudgetSnapshot | undefined) {
+		this.budget = budget;
+	}
+
 	reset() {
 		this.enabled = false;
 		this.taskStarted = false;
 		this.steps = [];
+		this.budget = undefined;
 	}
 
 	/**
