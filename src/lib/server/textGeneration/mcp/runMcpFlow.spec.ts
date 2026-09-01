@@ -800,3 +800,60 @@ describe("runMcpFlow under the ML Assistant preset", () => {
 		expect(mocks.create).toHaveBeenCalledTimes(100);
 	});
 });
+
+describe("leaked tool-call markup", () => {
+	// Observed with GLM-class models: the provider template leaks the model's
+	// native tool syntax into content, so the "call" is text the user sees and
+	// nothing runs.
+	it("retries once when the final answer writes a tool call as markup", async () => {
+		scriptRounds([
+			{
+				content: 'Let me ask: <do_thing>\n<option label="$5">setBudgetUsd=5</option>\n</do_thing>',
+			},
+			{ content: "Here is a clean answer." },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toBe("Here is a clean answer.");
+		// The nudge names the leaked tool and demands a real call.
+		const nudge = requestMessages(1).at(-1);
+		expect(nudge?.role).toBe("user");
+		expect(String(nudge?.content)).toContain("<do_thing>");
+		expect(String(nudge?.content)).toContain("function-calling mechanism");
+	});
+
+	it("finalizes as-is when the retry leaks again", async () => {
+		scriptRounds([
+			{ content: "First leak: <do_thing></do_thing>" },
+			{ content: "Second leak: <do_thing></do_thing>" },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toContain("Second leak");
+	});
+
+	it("leaves markup for tools that are not in the schema alone", async () => {
+		scriptRounds([{ content: "In HTML you might write <div> or even <some_other_tool>." }]);
+
+		const { updates } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toContain("<some_other_tool>");
+	});
+
+	it("requires a whole tag, not a prefix", async () => {
+		// <do_thing_output> is ordinary content, not a leaked call to do_thing.
+		scriptRounds([{ content: "The result arrives in a <do_thing_output> element." }]);
+
+		const { updates } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toContain("<do_thing_output>");
+	});
+});

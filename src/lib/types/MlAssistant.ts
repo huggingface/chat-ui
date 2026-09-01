@@ -1,6 +1,17 @@
 /** Lifecycle of a single step in an ML Assistant plan. */
 export type MlPlanStepStatus = "pending" | "running" | "done" | "skipped";
 
+/**
+ * What the strip needs to render the compute budget: the ledger totals without
+ * the reservation details. Amounts in integer micro-USD, like `MlBudget`.
+ */
+export interface MlBudgetSnapshot {
+	totalMicroUsd: number;
+	spentMicroUsd: number;
+	/** Sum of open reservation ceilings — held, not yet settled. */
+	reservedMicroUsd: number;
+}
+
 export interface MlPlanStep {
 	/** One or two words naming the step, e.g. "Baseline eval". Used as the dot's accessible name. */
 	label: string;

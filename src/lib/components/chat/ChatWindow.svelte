@@ -69,6 +69,9 @@
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 	import { planStepsToMlSteps } from "$lib/utils/planProgress";
 	import type { PlanState } from "$lib/types/Plan";
+	import type { MlBudget } from "$lib/types/Conversation";
+	import { reservedMicroUsd, usdToMicroUsd } from "$lib/utils/mlBudget";
+	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import {
 		ML_ASSISTANT_EFFORT,
 		ML_ASSISTANT_PLACEHOLDER,
@@ -556,9 +559,14 @@
 	$effect(() => {
 		if (!ML_ASSISTANT_MODE) return;
 		const conversationId = page.params?.id;
-		const { mlAssistant: startedInMlMode, plan } = page.data as {
+		const {
+			mlAssistant: startedInMlMode,
+			plan,
+			mlBudget,
+		} = page.data as {
 			mlAssistant?: boolean;
 			plan?: PlanState;
+			mlBudget?: MlBudget;
 		};
 		untrack(() => {
 			const reset = mlAssistant.syncConversation(conversationId, Boolean(startedInMlMode));
@@ -567,8 +575,41 @@
 			if (reset && startedInMlMode && plan?.steps.length) {
 				mlAssistant.setPlan(planStepsToMlSteps(plan.steps));
 			}
+			// Loaded state seeds the ledger; the stream's Budget updates take over
+			// from there. The empty-ledger condition covers adoption — the create
+			// flow lands here with reset=false — while still refusing to let a
+			// stale invalidation roll back what the stream already reported. A mode
+			// conversation without a stored budget renders as $0.00: the gate treats
+			// it that way, and the readout must say what the gate will do.
+			if (startedInMlMode && (reset || mlAssistant.budget === undefined)) {
+				mlAssistant.setBudget({
+					totalMicroUsd: mlBudget?.totalMicroUsd ?? 0,
+					spentMicroUsd: mlBudget?.spentMicroUsd ?? 0,
+					reservedMicroUsd: mlBudget ? reservedMicroUsd(mlBudget) : 0,
+				});
+			}
 		});
 	});
+
+	const budgetClient = useAPIClient();
+
+	/**
+	 * Commits a new budget total. Optimistic: the strip shows the new total at
+	 * once and rolls back if the server said no.
+	 */
+	function changeMlBudget(totalUsd: number) {
+		const conversationId = page.params?.id;
+		const previous = mlAssistant.budget;
+		if (!conversationId || !previous) return;
+		mlAssistant.setBudget({ ...previous, totalMicroUsd: usdToMicroUsd(totalUsd) });
+		budgetClient
+			.conversations({ id: conversationId })
+			.patch({ mlBudgetTotalUsd: totalUsd })
+			.then(handleResponse)
+			.catch(() => {
+				mlAssistant.setBudget(previous);
+			});
+	}
 
 	let activeRouterExamplePrompt = $state<string | null>(null);
 	// ML Assistant mode brings its own chip set; otherwise use MCP examples when all
@@ -1020,6 +1061,8 @@
 							steps={mlAssistant.steps}
 							statusLabel={mlAssistant.statusLabel}
 							complete={mlAssistant.complete}
+							budget={mlAssistant.budget}
+							onbudgetchange={page.params?.id ? changeMlBudget : undefined}
 						/>
 					{/if}
 					<!-- The composer box is a column so the ML Assistant strip can stack on

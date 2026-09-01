@@ -12,6 +12,7 @@ import { usageLimits } from "$lib/server/usageLimits";
 import { MetricsServer } from "$lib/server/metrics";
 import superjson from "superjson";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+import { usdToMicroUsd } from "$lib/utils/mlBudget";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -24,6 +25,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			model: validateModel(models),
 			preprompt: z.string().optional(),
 			mlAssistant: z.boolean().optional(),
+			mlBudgetUsd: z.number().finite().min(0).max(10_000).optional(),
 		})
 		.safeParse(JSON.parse(body));
 
@@ -81,6 +83,16 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	// Only builds that ship ML Assistant mode can start a conversation in it.
 	const isMlAssistant = ML_ASSISTANT_MODE && values.mlAssistant === true;
+	// Every mode conversation carries a budget, and it is what the user granted
+	// in the composer — nothing more. No grant means $0: the gate refuses every
+	// submission until the user sets one, so spend authority is never implicit.
+	const mlBudget = isMlAssistant
+		? {
+				totalMicroUsd: usdToMicroUsd(values.mlBudgetUsd ?? 0),
+				spentMicroUsd: 0,
+				reservations: [],
+			}
+		: undefined;
 
 	// use provided preprompt or model preprompt
 	values.preprompt ??= model?.preprompt ?? "";
@@ -115,6 +127,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 		// Only builds that ship ML Assistant mode can mark a conversation with it.
 		...(isMlAssistant ? { mlAssistant: true } : {}),
+		...(isMlAssistant && mlBudget ? { mlBudget } : {}),
 	});
 
 	if (MetricsServer.isEnabled()) {
@@ -146,6 +159,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				shared: false,
 				deployedSpaces: undefined,
 				mlAssistant: isMlAssistant ? true : undefined,
+				mlBudget,
 			}),
 		}),
 		{ headers: { "Content-Type": "application/json" } }
