@@ -85,6 +85,35 @@ async function claimDueCall(now: Date): Promise<ParkedCall | null> {
 	return claimed?.value ?? null;
 }
 
+/**
+ * Cut a wait short because the user asked to: they can see what the turn is
+ * waiting for and often know it is worth a look before the timer is up.
+ *
+ * Moving the deadline is the ENTIRE state change. The row stays `waiting`, so
+ * the ordinary claim still decides which pod resumes it and a racing sweeper
+ * cannot produce a second producer for the turn. The caller kicks a sweep
+ * afterwards purely so the user does not sit through the sweep interval.
+ */
+export async function wakeParkedCallEarly(
+	conversationId: ParkedCall["conversationId"],
+	messageId: string
+): Promise<boolean> {
+	const now = new Date();
+	// A pipeline update so the deadline the model asked for is kept in the same
+	// atomic write that overwrites it — the resumed round needs both to say how
+	// much of the wait was skipped.
+	const result = await collections.parkedCalls.updateOne(
+		{ conversationId, messageId, status: "waiting" },
+		[{ $set: { plannedResumeAt: "$resumeAt", resumeAt: now, wokeEarlyAt: now, updatedAt: now } }]
+	);
+	if (result.matchedCount === 0) return false;
+	logger.info(
+		{ conversationId: conversationId.toString(), messageId },
+		"[parked] user asked to wake a parked turn early"
+	);
+	return true;
+}
+
 async function abandon(park: ParkedCall, reason: string): Promise<void> {
 	logger.warn({ parkedCallId: park.parkedCallId, reason }, "[parked] abandoning a parked call");
 	await collections.parkedCalls.updateOne(

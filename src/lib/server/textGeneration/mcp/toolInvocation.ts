@@ -16,6 +16,7 @@ import type { BuiltinTool } from "../builtinTools/types";
 import { openDurableElicitation, type ElicitationSink } from "$lib/server/mcp/elicitation";
 import { turnAwaitingInput } from "$lib/server/generation/turnState";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
+import type { ToolCallGuard } from "./toolGuard";
 import type { Client } from "@modelcontextprotocol/client";
 import type { ObjectId } from "mongodb";
 
@@ -57,6 +58,8 @@ export interface ExecuteToolCallsParams {
 	owner?: { userId?: ObjectId; sessionId?: string };
 	/** Locally-executed tools, dispatched before the MCP mapping lookup. */
 	builtinTools?: BuiltinTool[];
+	/** Policy gate consulted around every MCP dispatch (not builtins) — see toolGuard.ts. */
+	guard?: ToolCallGuard;
 }
 
 export interface ToolCallExecutionResult {
@@ -114,6 +117,7 @@ export async function* executeToolCalls({
 	elicitation,
 	owner,
 	builtinTools,
+	guard,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
@@ -401,6 +405,36 @@ export async function* executeToolCalls({
 			return;
 		}
 		const client = clientMap.get(mappingEntry.server);
+
+		// Consulted before anything leaves the process: a refusal is an ordinary
+		// tool error the model recovers from, and nothing was dispatched.
+		let guardTicket: unknown;
+		if (guard) {
+			const verdict = await guard.before({
+				serverUrl: serverCfg.url,
+				tool: mappingEntry.tool,
+				args: argsObj,
+				callUuid: p.uuid,
+			});
+			if (verdict.update) updatesQueue.push(verdict.update);
+			if (!verdict.allow) {
+				results.push({
+					index,
+					error: verdict.message,
+					uuid: p.uuid,
+					paramsClean: p.paramsClean,
+				});
+				updatesQueue.push({
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid: p.uuid,
+					message: verdict.message,
+				});
+				return;
+			}
+			guardTicket = verdict.ticket;
+		}
+
 		try {
 			logger.debug(
 				{ server: mappingEntry.server, tool: mappingEntry.tool, parameters: p.paramsClean },
@@ -428,6 +462,23 @@ export async function* executeToolCalls({
 				}
 			);
 			if (toolResponse.inputRequired) {
+				// A guarded call must not park: the resume path re-invokes the tool
+				// without consulting any guard, so its booking would go stale and the
+				// re-run would be ungated. Decline the prompt and settle the books.
+				if (guardTicket !== undefined && !guard?.allowParking) {
+					const update = await guard?.after(guardTicket, { status: "elicited" });
+					if (update) updatesQueue.push(update);
+					const message =
+						"The tool asked for interactive input mid-call, which this call is not allowed to wait on. Nothing was charged or submitted. Retry with complete arguments.";
+					results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
+					updatesQueue.push({
+						type: MessageUpdateType.Tool,
+						subtype: MessageToolUpdateType.Error,
+						uuid: p.uuid,
+						message,
+					});
+					return;
+				}
 				const opened = elicitationSink
 					? await openDurableElicitation({
 							sink: elicitationSink,
@@ -483,6 +534,18 @@ export async function* executeToolCalls({
 
 			const { annotated } = processToolOutput(toolResponse.text ?? "");
 
+			if (guardTicket !== undefined) {
+				// Raw text, not the annotated form: the guard parses identifiers out
+				// of it and source markers could split one.
+				const update = await guard?.after(
+					guardTicket,
+					toolResponse.isError
+						? { status: "error", text: toolResponse.text ?? "" }
+						: { status: "success", text: toolResponse.text ?? "" }
+				);
+				if (update) updatesQueue.push(update);
+			}
+
 			if (toolResponse.isError) {
 				const message = annotated.trim() || "The tool reported an error with no message.";
 				logger.warn(
@@ -529,6 +592,12 @@ export async function* executeToolCalls({
 				},
 			});
 		} catch (err) {
+			if (guardTicket !== undefined) {
+				// Whether the server acted is unknown from here — the guard decides
+				// what that means for its books.
+				const update = await guard?.after(guardTicket, { status: "transport_error" });
+				if (update) updatesQueue.push(update);
+			}
 			const errMsg = err instanceof Error ? err.message : String(err);
 			const errName = err instanceof Error ? err.name : "";
 			const isAbortError =

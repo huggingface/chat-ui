@@ -10,8 +10,11 @@
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
+	import CarbonChartLine from "~icons/carbon/chart-line";
 	import LucideTriangleAlert from "~icons/lucide/triangle-alert";
 	import BlockWrapper from "./BlockWrapper.svelte";
+	import { sidePane } from "$lib/stores/sidePane.svelte";
+	import { trackioDashboardsFromToolUpdates } from "$lib/utils/trackio";
 
 	interface Props {
 		tool: MessageToolUpdate[];
@@ -34,6 +37,14 @@
 		return undefined;
 	});
 	let progressLabel = $derived.by(() => formatToolProgressLabel(toolProgress));
+
+	// A training run that syncs to Trackio prints its dashboard URL into the job
+	// output, so the tool group that ran it is also the natural place to get back
+	// to the dashboard after closing the pane.
+	let dashboards = $derived(trackioDashboardsFromToolUpdates(tool));
+	let openDashboardUrl = $derived(
+		sidePane.open && sidePane.view === "trackio" ? sidePane.trackio?.url : undefined
+	);
 
 	const availableTools: ToolFront[] = $derived.by(
 		() => (page.data as { tools?: ToolFront[] } | undefined)?.tools ?? []
@@ -138,6 +149,22 @@
 			{#if isExecuting && toolProgress}
 				<span class="text-xs text-gray-500 dark:text-gray-400">{progressLabel}</span>
 			{/if}
+			{#each dashboards as dashboard (dashboard.url)}
+				<button
+					type="button"
+					class="btn flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs {dashboard.url ===
+					openDashboardUrl
+						? 'border-blue-300 text-blue-700 dark:border-blue-500/40 dark:text-blue-300'
+						: 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'}"
+					title="Open the Trackio dashboard: {dashboard.label}"
+					onclick={() => sidePane.openTrackio(dashboard.url, dashboard.label)}
+				>
+					<CarbonChartLine class="size-3.5 shrink-0" />
+					<span class="truncate">
+						{dashboards.length > 1 ? dashboard.label : "Training dashboard"}
+					</span>
+				</button>
+			{/each}
 		</div>
 
 		<!-- Expandable content -->

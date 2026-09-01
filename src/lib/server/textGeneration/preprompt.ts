@@ -1,5 +1,11 @@
 import { injectArtifactsPrompt } from "./artifacts";
-import { ML_ASSISTANT_PREPROMPT, mlAssistantSessionContext } from "$lib/server/mlAssistantPrompt";
+import {
+	ML_ASSISTANT_BUDGET_RULES,
+	ML_ASSISTANT_PREPROMPT,
+	mlAssistantSessionContext,
+} from "$lib/server/mlAssistantPrompt";
+import type { MlBudget } from "$lib/types/Conversation";
+import { formatMicroUsd, remainingMicroUsd } from "$lib/utils/mlBudget";
 
 export interface PrepromptInput {
 	/** The conversation's stored system prompt. */
@@ -16,6 +22,8 @@ export interface PrepromptInput {
 	timezone?: string;
 	/** Injectable clock, for tests. */
 	now?: Date;
+	/** The conversation's compute budget; presence turns on the budget rules. */
+	budget?: MlBudget;
 }
 
 /**
@@ -34,13 +42,26 @@ export function resolvePreprompt({
 	username,
 	timezone,
 	now,
+	budget,
 }: PrepromptInput): string | undefined {
 	const base = mlAssistant ? ML_ASSISTANT_PREPROMPT : conversationPreprompt;
 	const artifacts = mlAssistant || (artifactsOverride ?? supportsArtifacts);
 	const resolved = artifacts ? injectArtifactsPrompt(base) : base;
 	if (!mlAssistant) return resolved;
+	// The mode is always budget-gated; a conversation without a stored budget is
+	// a zero budget, and the rules — including how to ask for a grant — must
+	// reach the model exactly then.
+	const effective = budget ?? { totalMicroUsd: 0, spentMicroUsd: 0, reservations: [] };
 	// Stamped last, after the artifacts prompt, because the preset reads the User
 	// value back out of it — and stamped here rather than onto the tool preprompt
 	// so it still reaches the model on the plain generation path, which has none.
-	return `${resolved}\n\n${mlAssistantSessionContext({ username, timezone, now })}`;
+	return `${resolved}\n\n${ML_ASSISTANT_BUDGET_RULES}\n\n${mlAssistantSessionContext({
+		username,
+		timezone,
+		now,
+		budget: {
+			remaining: formatMicroUsd(remainingMicroUsd(effective)),
+			total: formatMicroUsd(effective.totalMicroUsd),
+		},
+	})}`;
 }

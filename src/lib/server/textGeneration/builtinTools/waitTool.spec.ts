@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
-import { waitBuiltin } from "./waitTool";
+import { waitBuiltin, waitResumeResultText } from "./waitTool";
 import type { BuiltinToolContext } from "./types";
 
 const ctx = (over: Partial<BuiltinToolContext> = {}): BuiltinToolContext => ({
@@ -108,5 +108,33 @@ describe("the wait tool", () => {
 		);
 		expect(outcome).toHaveProperty("error");
 		expect(await collections.parkedCalls.countDocuments({})).toBe(0);
+	});
+});
+
+describe("the tool result a resumed turn reads", () => {
+	const park = { reason: "the training job", createdAt: new Date(0), resumeAt: new Date(120_000) };
+
+	it("reports the wait it actually served", () => {
+		const text = waitResumeResultText(park);
+		expect(text).toContain("Waited 120s for: the training job.");
+		expect(text).not.toContain("user asked");
+	});
+
+	it("names the wait the user skipped, so the model does not stretch the next one", () => {
+		// Resumed after 12s of a 300s wait, at the user's request.
+		const text = waitResumeResultText({
+			...park,
+			resumeAt: new Date(12_000),
+			wokeEarlyAt: new Date(12_000),
+			plannedResumeAt: new Date(300_000),
+		});
+		expect(text).toContain("Waited 12s");
+		expect(text).toContain("cutting short a 300s wait");
+		expect(text).toContain("size any further wait as you would have without this check");
+	});
+
+	it("still says the wait was cut short when the original deadline was not recorded", () => {
+		const text = waitResumeResultText({ ...park, wokeEarlyAt: new Date(120_000) });
+		expect(text).toContain("cutting short the wait");
 	});
 });

@@ -196,3 +196,59 @@ describe("MlAssistantStrip", () => {
 		});
 	});
 });
+
+describe("MlAssistantStrip budget", () => {
+	const BUDGET = {
+		totalMicroUsd: 10_000_000,
+		spentMicroUsd: 1_500_000,
+		reservedMicroUsd: 1_000_000,
+	};
+
+	it("shows the remaining balance when the conversation carries a budget", () => {
+		const { container } = mount({ budget: BUDGET });
+		const readout = find(container, "button[aria-label^='Session budget']");
+		expect(readout.textContent).toContain("$7.50 left");
+	});
+
+	it("shows no readout without a budget", () => {
+		const { container } = mount();
+		expect(container.querySelector("button[aria-label^='Session budget']")).toBeNull();
+	});
+
+	it("commits an edited total on Enter", async () => {
+		const onbudgetchange = vi.fn();
+		const { container } = mount({ budget: BUDGET, onbudgetchange });
+
+		find(container, "button[aria-label^='Session budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		input.value = "25";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		await Promise.resolve();
+
+		expect(onbudgetchange).toHaveBeenCalledWith(25);
+		// The editor closes back to the readout.
+		expect(container.querySelector("input[aria-label^='Session budget']")).toBeNull();
+	});
+
+	it("abandons the edit on Escape", async () => {
+		const onbudgetchange = vi.fn();
+		const { container } = mount({ budget: BUDGET, onbudgetchange });
+
+		find(container, "button[aria-label^='Session budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+		await Promise.resolve();
+
+		expect(onbudgetchange).not.toHaveBeenCalled();
+	});
+
+	it("stays a static readout when no change handler is given", async () => {
+		const { container } = mount({ budget: BUDGET });
+		find(container, "button[aria-label^='Session budget']").click();
+		await Promise.resolve();
+		expect(container.querySelector("input[aria-label^='Session budget']")).toBeNull();
+	});
+});

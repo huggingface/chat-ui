@@ -1,6 +1,7 @@
 import MlInternPill from "./MlInternPill.svelte";
 import { renderWithApp } from "$lib/components/__tests__/renderWithApp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { flushSync } from "svelte";
 import { writable } from "svelte/store";
 import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 
@@ -143,5 +144,46 @@ describe("MlInternPill", () => {
 			);
 			expect(dialog()).toBeNull();
 		});
+	});
+});
+
+describe("MlInternPill budget draft", () => {
+	beforeEach(() => {
+		mlAssistant.reset();
+	});
+
+	it("offers the budget field as soon as the mode is on, and only then", () => {
+		const { container } = render();
+		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
+
+		mlAssistant.toggle(true);
+		flushSync();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		expect(input.placeholder).toBe("0");
+		// No spinner arrows: the value is typed, not stepped.
+		expect(style(input).appearance).toBe("textfield");
+	});
+
+	it("writes the typed grant to the store, and clears it on invalid input", () => {
+		mlAssistant.toggle(true);
+		const { container } = render();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+
+		input.value = "25";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		expect(mlAssistant.draftBudgetUsd).toBe(25);
+
+		input.value = "-3";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		expect(mlAssistant.draftBudgetUsd).toBeUndefined();
+	});
+
+	it("typing in the field does not toggle the mode off", () => {
+		mlAssistant.toggle(true);
+		const { container } = render();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		input.click();
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		expect(mlAssistant.enabled).toBe(true);
 	});
 });
