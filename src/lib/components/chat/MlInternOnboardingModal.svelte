@@ -77,8 +77,8 @@
 						Set a spending cap
 					</p>
 					<p class="text-sm leading-relaxed">
-						A budget you give ML Intern in the chat is strictly enforced on everything it launches
-						from here, but it is not a guarantee: a job it starts could spend on its own. To make
+						A budget you give ML Intern in the chat is strictly enforced on any Jobs it launches
+						from here, but it is not a guarantee: a Job it starts could spawn on its own Job or use other HF products. To make
 						sure you never overspend, set a budget in your billing settings too.
 					</p>
 					<a
