@@ -155,10 +155,24 @@ export function waitResumeResultText(park: {
 	reason: string;
 	resumeAt: Date;
 	createdAt: Date;
+	wokeEarlyAt?: Date;
+	plannedResumeAt?: Date;
 }): string {
 	const waited = Math.round((park.resumeAt.getTime() - park.createdAt.getTime()) / 1000);
+	const planned = park.plannedResumeAt
+		? Math.round((park.plannedResumeAt.getTime() - park.createdAt.getTime()) / 1000)
+		: undefined;
+	// Naming the skipped wait is the load-bearing part: told only that it is
+	// resumed, the model reads the short gap as "not ready after the wait I
+	// asked for" and stretches the NEXT wait — the opposite of what a user
+	// asking to check early wants.
+	const early = park.wokeEarlyAt
+		? `The user asked you to check early, cutting short ${planned ? `a ${planned}s wait` : "the wait"}. ` +
+			"The short gap is their doing, not a signal about the work — size any further wait as you " +
+			"would have without this check. "
+		: "";
 	return (
-		`Waited ${waited}s for: ${park.reason}. You are now resumed. ` +
+		`Waited ${waited}s for: ${park.reason}. ${early}You are now resumed. ` +
 		"Check the status of what you were waiting for once, then act on what you find — " +
 		"if it is still not ready, wait again rather than polling."
 	);

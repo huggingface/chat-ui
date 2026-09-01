@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
-import { renewClaim, sweepParkedCalls } from "./parkedSweeper";
+import { renewClaim, sweepParkedCalls, wakeParkedCallEarly } from "./parkedSweeper";
 import type { ParkedCall } from "$lib/types/ParkedCall";
 
 const park = (over: Partial<ParkedCall> = {}): ParkedCall => ({
@@ -187,5 +187,44 @@ describe("renewClaim", () => {
 		const after = await collections.parkedCalls.findOne({});
 		expect(after?.status).toBe("resumed");
 		expect(after?.takenAt?.getTime()).toBe(takenAt.getTime());
+	});
+});
+
+describe("wakeParkedCallEarly", () => {
+	it("makes a waiting row due now and records that the user cut the wait short", async () => {
+		const row = park({ resumeAt: new Date(Date.now() + 10 * 60_000) });
+		await collections.parkedCalls.insertOne(row);
+
+		const woken = await wakeParkedCallEarly(row.conversationId, row.messageId);
+
+		expect(woken).toBe(true);
+		const after = await collections.parkedCalls.findOne({});
+		// Still `waiting`: the ordinary claim decides who resumes it, so an early
+		// wake can never race a sweeper into two producers for one turn.
+		expect(after?.status).toBe("waiting");
+		expect(after?.resumeAt.getTime()).toBeLessThanOrEqual(Date.now());
+		expect(after?.wokeEarlyAt).toBeInstanceOf(Date);
+		// The deadline it asked for survives the overwrite, so the resumed round
+		// can tell the model how much of its wait was skipped.
+		expect(after?.plannedResumeAt?.getTime()).toBe(row.resumeAt.getTime());
+	});
+
+	it("only touches the turn it was asked about", async () => {
+		const mine = park({ resumeAt: new Date(Date.now() + 10 * 60_000) });
+		const other = park({ messageId: "msg-2", resumeAt: new Date(Date.now() + 10 * 60_000) });
+		await collections.parkedCalls.insertMany([mine, other]);
+
+		await wakeParkedCallEarly(mine.conversationId, mine.messageId);
+
+		const untouched = await collections.parkedCalls.findOne({ messageId: "msg-2" });
+		expect(untouched?.resumeAt.getTime()).toBe(other.resumeAt.getTime());
+		expect(untouched?.wokeEarlyAt).toBeUndefined();
+	});
+
+	it("reports no wake when the turn is not parked on a timer", async () => {
+		const row = park({ status: "resuming" });
+		await collections.parkedCalls.insertOne(row);
+
+		expect(await wakeParkedCallEarly(row.conversationId, row.messageId)).toBe(false);
 	});
 });
