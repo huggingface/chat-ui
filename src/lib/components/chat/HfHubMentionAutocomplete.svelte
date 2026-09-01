@@ -1,10 +1,6 @@
 <script lang="ts">
 	import type { HfHubResource, HfHubResourceType } from "$lib/utils/hfHubSearch";
 
-	import CarbonModel from "~icons/carbon/machine-learning-model";
-	import CarbonDataTable from "~icons/carbon/data-table";
-	import LucideAppWindow from "~icons/lucide/app-window";
-
 	interface Props {
 		results: HfHubResource[];
 		status: "loading" | "success" | "error";
@@ -27,12 +23,6 @@
 		dataset: "Datasets",
 		space: "Spaces",
 	};
-	const icons = {
-		model: CarbonModel,
-		dataset: CarbonDataTable,
-		space: LucideAppWindow,
-	};
-
 	/**
 	 * Group once, carrying each option's flat index with it. The template used to
 	 * filter three times and recover the index with `indexOf` per row — O(n²) on
@@ -102,7 +92,6 @@
 						{labels[group.type]}
 					</div>
 					{#each group.options as option (option.result.id)}
-						{@const SvelteComponent = icons[group.type]}
 						<button
 							id={`hf-hub-mention-option-${option.index}`}
 							data-result-index={option.index}
@@ -120,18 +109,18 @@
 							onmouseenter={() => onactivechange(option.index)}
 							onclick={() => onselect(option.result)}
 						>
-							<span
-								class="flex size-4 shrink-0 items-center justify-center text-gray-400 dark:text-gray-500"
-								aria-hidden="true"
-							>
-								{#if option.result.type === "space" && option.result.emoji}
-									<span class="hf-hub-space-emoji text-[13px] leading-none"
-										>{option.result.emoji}</span
-									>
-								{:else}
-									<SvelteComponent class="size-3.5" />
-								{/if}
-							</span>
+							<!-- Only Spaces carry a mark, and only their own emoji: a generic
+							     type glyph on every row just repeats the heading above it. The
+							     slot is still reserved for an emoji-less Space so rows inside
+							     the group stay aligned with each other. -->
+							{#if option.result.type === "space"}
+								<span
+									class="hf-hub-space-emoji flex size-4 shrink-0 items-center justify-center text-[13px] leading-none"
+									aria-hidden="true"
+								>
+									{option.result.emoji ?? ""}
+								</span>
+							{/if}
 							<span class="min-w-0 truncate text-gray-800 dark:text-gray-200">
 								{option.result.id}
 							</span>

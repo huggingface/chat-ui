@@ -69,7 +69,7 @@ describe("HfHubMentionAutocomplete", () => {
 		expect(modelsOnly.querySelectorAll("[data-resource-header]")).toHaveLength(1);
 	});
 
-	it("only shows a real Space emoji, and falls back to a type icon", () => {
+	it("marks only Spaces, and only with their own emoji", () => {
 		const { container } = render(HfHubMentionAutocomplete, {
 			...common,
 			results,
@@ -81,13 +81,17 @@ describe("HfHubMentionAutocomplete", () => {
 		expect(
 			container.querySelector('[data-resource-type="dataset"] .hf-hub-space-emoji')
 		).toBeNull();
-		// An emoji-less Space still gets an icon rather than an empty gutter.
+		// No generic type glyphs: the heading above the group already says what
+		// these are, so a per-row icon only repeats it.
+		expect(container.querySelector('[role="option"] svg')).toBeNull();
+		// An emoji-less Space keeps the slot so rows in the group stay aligned.
 		const noEmoji = render(HfHubMentionAutocomplete, {
 			...common,
 			results: [{ id: "org/space", type: "space" as const }],
 			status: "success",
 		}).container;
-		expect(noEmoji.querySelector('[role="option"] svg')).not.toBeNull();
+		expect(noEmoji.querySelectorAll(".hf-hub-space-emoji")).toHaveLength(1);
+		expect(noEmoji.querySelector(".hf-hub-space-emoji")?.textContent?.trim()).toBe("");
 	});
 
 	it("anchors the panel to the caret rather than the composer edges", () => {
