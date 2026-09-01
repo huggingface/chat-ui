@@ -1,5 +1,24 @@
-import { SvelteSet } from "svelte/reactivity";
+import { browser } from "$app/environment";
+import { base } from "$app/paths";
 import type { MlPlanStep, MlPlanStepStatus } from "$lib/types/MlAssistant";
+
+// Namespaced by base path so instances sharing an origin (the collision the MCP
+// server store's keys also guard against) don't read each other's dismissal.
+const PILL_DISMISSED_KEY = `${
+	(base || "")
+		.toLowerCase()
+		.replace(/[^a-z0-9_-]+/g, "-")
+		.replace(/^-+|-+$/g, "") || "app"
+}:ml-intern:pill-dismissed`;
+
+function loadPillDismissed(): boolean {
+	if (!browser) return false;
+	try {
+		return localStorage.getItem(PILL_DISMISSED_KEY) === "1";
+	} catch {
+		return false;
+	}
+}
 
 /**
  * UI state for ML Assistant mode (see `$lib/utils/mlAssistantFlag`).
@@ -22,18 +41,24 @@ class MlAssistantStore {
 	#conversationKey: string | undefined;
 
 	/**
-	 * Conversations whose "Ask in ML Intern" banner the user closed. Deliberately
-	 * session-scoped and outside `reset()`: the banner only shows on a
-	 * conversation's first exchange, so a dismissal has nothing to outlive.
+	 * The composer's "ML Intern" pill was closed. Persisted per browser and
+	 * outside `reset()` — closing the pill means "stop offering me this", which a
+	 * navigation must not undo. Discoverability after that is the announcement
+	 * banner's job.
 	 */
-	#promoDismissed = new SvelteSet<string>();
+	pillDismissed = $state(loadPillDismissed());
 
-	promoDismissed(key: string | undefined): boolean {
-		return key !== undefined && this.#promoDismissed.has(key);
-	}
-
-	dismissPromo(key: string | undefined): void {
-		if (key !== undefined) this.#promoDismissed.add(key);
+	dismissPill(): void {
+		// The pill hosts the mode's only pre-task switch, so it may not disappear
+		// while the switch is on — that would strand the mode enabled.
+		this.toggle(false);
+		this.pillDismissed = true;
+		if (!browser) return;
+		try {
+			localStorage.setItem(PILL_DISMISSED_KEY, "1");
+		} catch {
+			// Storage denied (private mode) — the dismissal still holds for the session.
+		}
 	}
 
 	/** The switch stops being interactive once the mode is locked in. */
