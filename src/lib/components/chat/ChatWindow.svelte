@@ -1,12 +1,14 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy, tick, untrack } from "svelte";
-	import { goto } from "$app/navigation";
+	import { onDestroy, untrack } from "svelte";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
+	import TrackioPane from "./TrackioPane.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
-	import { artifactPanel } from "$lib/stores/artifactPanel.svelte";
+	import { collectTrackioDashboards } from "$lib/utils/trackio";
+	import { collectPaneItems } from "$lib/utils/paneItems";
+	import { sidePane } from "$lib/stores/sidePane.svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import IconCheap from "$lib/components/icons/IconCheap.svelte";
@@ -63,11 +65,13 @@
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideSparkles from "~icons/lucide/sparkles";
 	import MlAssistantStrip from "./MlAssistantStrip.svelte";
-	import MlAssistantPromo from "./MlAssistantPromo.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 	import { planStepsToMlSteps } from "$lib/utils/planProgress";
 	import type { PlanState } from "$lib/types/Plan";
+	import type { MlBudget } from "$lib/types/Conversation";
+	import { reservedMicroUsd, usdToMicroUsd } from "$lib/utils/mlBudget";
+	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import {
 		ML_ASSISTANT_EFFORT,
 		ML_ASSISTANT_PLACEHOLDER,
@@ -154,7 +158,7 @@
 		get registry() {
 			return artifactRegistry;
 		},
-		panel: artifactPanel,
+		panel: sidePane,
 		// Deep consumers (e.g. the code-block preview modal) can't render a
 		// meaningful disabled state, so streaming also gates availability here;
 		// the panel gets the handler as a prop and disables on `loading` itself.
@@ -168,8 +172,18 @@
 	$effect(() => {
 		const streaming = artifactRegistry.streaming;
 		if (!streaming || !loading) return;
-		artifactPanel.maybeAutoOpen(streaming.identifier, streaming.version);
+		sidePane.maybeAutoOpen(streaming.identifier, streaming.version);
 	});
+
+	// Trackio dashboards a training run printed into its job logs, read back out
+	// of the tool results on the messages. Derived like the artifact registry, so
+	// reopening the conversation finds the same dashboards.
+	let trackioDashboards = $derived(collectTrackioDashboards(messages));
+
+	// One ordered list of everything the pane can show, so its next/previous walks
+	// artifacts and dashboards together instead of each view navigating only its
+	// own kind.
+	let paneItems = $derived(collectPaneItems(messages, artifactRegistry, trackioDashboards));
 
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
@@ -422,7 +436,7 @@
 		const key = page.params?.id;
 		if (key !== prevConversationKey) {
 			prevConversationKey = key;
-			artifactPanel.reset();
+			sidePane.reset();
 		}
 	});
 
@@ -439,6 +453,32 @@
 		chatScroll.setComposerHeight(composerHeight);
 	});
 
+	// Open the newest dashboard the first time it shows up: the point of the run
+	// is watching it train. Once per URL, so the user can close it and read the
+	// chat while the run continues.
+	//
+	// Declared after the conversation-switch effect for the same reason the shared
+	// artifact open below is: a conversation -> conversation navigation can deliver
+	// the new messages and the new route param in one flush, and effects run in
+	// declaration order. Above the reset, this would open the destination's
+	// dashboard and record its key, then reset() would close the pane and clear
+	// that key -- and nothing would re-run this, so the dashboard would never open.
+	//
+	// Gated like the other two auto-opens rather than firing on presence. `loading`
+	// is what makes this "a run is happening now": without it, every hard load of
+	// any conversation that ever trained something re-opens the pane, because
+	// reset() clears the once-per-URL keys on each switch — framing a Space that
+	// went to sleep months ago. Desktop-only for the reason the shared-artifact
+	// open below is: on mobile the pane is a fullscreen overlay, and a shared
+	// conversation carries its tool results verbatim, so every viewer on a phone
+	// would arrive with the chat covered.
+	$effect(() => {
+		const latest = trackioDashboards.at(-1);
+		if (!latest || !loading) return;
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
+		sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
+	});
+
 	// Shared conversations containing artifacts usually exist to show one off:
 	// open the most recent artifact on load. Desktop only, since on mobile the
 	// panel is a fullscreen overlay that would hide the conversation entirely.
@@ -451,7 +491,7 @@
 		if (!latest) return;
 		autoOpenedSharedArtifact = true;
 		if (!window.matchMedia("(min-width: 768px)").matches) return;
-		artifactPanel.openArtifact(latest.identifier, null);
+		sidePane.openArtifact(latest.identifier, null);
 	});
 
 	const settings = useSettingsStore();
@@ -504,16 +544,29 @@
 		if (!lastMessage) return;
 		sendFixRequest(buildResumeMessage(failureDetailOf(lastMessage)));
 	}
-	// Sending with the mode off collapses the strip away for good; sending with it
-	// on keeps the strip, which is where the plan progress lives.
-	let mlStripVisible = $derived(ML_ASSISTANT_MODE && (mlTaskRunning || messages.length === 0));
+	// The strip is a task status bar only: it slides in on the send that starts an
+	// ML task and stays for the rest of the conversation. Before that the mode
+	// lives in the composer pill, and a chat started without the mode never shows
+	// either surface.
+	let mlStripVisible = $derived(ML_ASSISTANT_MODE && mlTaskRunning);
+
+	// The pill is the mode's pre-task switch. Empty conversations only — the mode
+	// cannot be joined once a chat has started without it.
+	let mlPillVisible = $derived(
+		ML_ASSISTANT_MODE && !shared && !isReadOnly && !mlTaskRunning && messages.length === 0
+	);
 
 	$effect(() => {
 		if (!ML_ASSISTANT_MODE) return;
 		const conversationId = page.params?.id;
-		const { mlAssistant: startedInMlMode, plan } = page.data as {
+		const {
+			mlAssistant: startedInMlMode,
+			plan,
+			mlBudget,
+		} = page.data as {
 			mlAssistant?: boolean;
 			plan?: PlanState;
+			mlBudget?: MlBudget;
 		};
 		untrack(() => {
 			const reset = mlAssistant.syncConversation(conversationId, Boolean(startedInMlMode));
@@ -522,38 +575,40 @@
 			if (reset && startedInMlMode && plan?.steps.length) {
 				mlAssistant.setPlan(planStepsToMlSteps(plan.steps));
 			}
+			// Loaded state seeds the ledger; the stream's Budget updates take over
+			// from there. The empty-ledger condition covers adoption — the create
+			// flow lands here with reset=false — while still refusing to let a
+			// stale invalidation roll back what the stream already reported. A mode
+			// conversation without a stored budget renders as $0.00: the gate treats
+			// it that way, and the readout must say what the gate will do.
+			if (startedInMlMode && (reset || mlAssistant.budget === undefined)) {
+				mlAssistant.setBudget({
+					totalMicroUsd: mlBudget?.totalMicroUsd ?? 0,
+					spentMicroUsd: mlBudget?.spentMicroUsd ?? 0,
+					reservedMicroUsd: mlBudget ? reservedMicroUsd(mlBudget) : 0,
+				});
+			}
 		});
 	});
 
-	function toggleMlMode(next: boolean) {
-		if (requireAuthUser()) return;
-		mlAssistant.toggle(next);
-	}
+	const budgetClient = useAPIClient();
 
-	// The mode can't be switched on once a conversation starts without it, so the
-	// strip's slot offers the next best thing: a fresh ML Intern chat seeded with
-	// the question. First exchange only — beyond that the conversation has
-	// history worth keeping — and dismissable per conversation.
-	let mlPromoVisible = $derived(
-		ML_ASSISTANT_MODE &&
-			!shared &&
-			!isReadOnly &&
-			!mlModeOn &&
-			!mlTaskRunning &&
-			Boolean(page.params?.id) &&
-			messages.filter((message) => message.from === "user").length === 1 &&
-			!mlAssistant.promoDismissed(page.params?.id)
-	);
-
-	async function askInMlIntern() {
-		if (requireAuthUser()) return;
-		const question = messages.find((message) => message.from === "user")?.content ?? "";
-		await goto(`${base}/`);
-		// Let the home composer's sync effect release the old conversation before
-		// the mode goes on — the release resets the store, which would wipe it.
-		await tick();
-		mlAssistant.toggle(true);
-		if (question) pendingComposerPayload.set({ text: question });
+	/**
+	 * Commits a new budget total. Optimistic: the strip shows the new total at
+	 * once and rolls back if the server said no.
+	 */
+	function changeMlBudget(totalUsd: number) {
+		const conversationId = page.params?.id;
+		const previous = mlAssistant.budget;
+		if (!conversationId || !previous) return;
+		mlAssistant.setBudget({ ...previous, totalMicroUsd: usdToMicroUsd(totalUsd) });
+		budgetClient
+			.conversations({ id: conversationId })
+			.patch({ mlBudgetTotalUsd: totalUsd })
+			.then(handleResponse)
+			.catch(() => {
+				mlAssistant.setBudget(previous);
+			});
 	}
 
 	let activeRouterExamplePrompt = $state<string | null>(null);
@@ -994,8 +1049,8 @@
 					class={{
 						"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
 						"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
-						"border-[#f7ddc2] dark:border-[#54371c]": mlModeOn && mlStripVisible,
-						"dark:border-gray-700": !(mlModeOn && mlStripVisible),
+						"border-[#f7ddc2] dark:border-[#54371c]": mlModeOn && (mlStripVisible || mlPillVisible),
+						"dark:border-gray-700": !(mlModeOn && (mlStripVisible || mlPillVisible)),
 						"opacity-30": isReadOnly,
 						"max-sm:mb-4": focused && isVirtualKeyboard(),
 					}}
@@ -1003,17 +1058,11 @@
 					{#if ML_ASSISTANT_MODE}
 						<MlAssistantStrip
 							visible={mlStripVisible}
-							enabled={mlAssistant.enabled}
-							taskRunning={mlTaskRunning}
 							steps={mlAssistant.steps}
 							statusLabel={mlAssistant.statusLabel}
 							complete={mlAssistant.complete}
-							ontoggle={toggleMlMode}
-						/>
-						<MlAssistantPromo
-							visible={mlPromoVisible}
-							onask={askInMlIntern}
-							ondismiss={() => mlAssistant.dismissPromo(page.params?.id)}
+							budget={mlAssistant.budget}
+							onbudgetchange={page.params?.id ? changeMlBudget : undefined}
 						/>
 					{/if}
 					<!-- The composer box is a column so the ML Assistant strip can stack on
@@ -1058,6 +1107,7 @@
 										disabled={isReadOnly || lastIsError}
 										{modelIsMultimodal}
 										{modelSupportsTools}
+										showMlPill={mlPillVisible}
 										bind:focused
 									/>
 								{/if}
@@ -1218,10 +1268,12 @@
 
 	<ArtifactPanel
 		registry={artifactRegistry}
+		items={paneItems}
 		{loading}
 		canScreenshot={!shared && !isReadOnly && mimeMatchesAllowlist("image/png", activeMimeTypes)}
 		onsend={canSendFix ? sendFixRequest : undefined}
 	/>
+	<TrackioPane items={paneItems} />
 </div>
 
 <style>

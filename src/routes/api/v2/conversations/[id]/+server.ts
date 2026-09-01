@@ -7,6 +7,8 @@ import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
 import { validModelIdSchema } from "$lib/server/models";
 import { applyConversationSettings } from "$lib/server/conversationSettings";
+import { setMlBudgetTotal } from "$lib/server/mlBudget/budget";
+import { usdToMicroUsd } from "$lib/utils/mlBudget";
 import type { TurnStateSnapshot } from "$lib/types/TurnState";
 
 export const GET: RequestHandler = async ({ locals, params, url }) => {
@@ -53,6 +55,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 		shared: conversation.shared,
 		deployedSpaces: "deployedSpaces" in conversation ? conversation.deployedSpaces : undefined,
 		mlAssistant: "mlAssistant" in conversation ? conversation.mlAssistant : undefined,
+		mlBudget: "mlBudget" in conversation ? conversation.mlBudget : undefined,
 		plan: "plan" in conversation ? conversation.plan : undefined,
 		turnState,
 	});
@@ -83,6 +86,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 	const body = await request.json();
 	const title = body?.title as string | undefined;
 	const model = body?.model as string | undefined;
+	const mlBudgetTotalUsd = body?.mlBudgetTotalUsd as number | undefined;
 
 	if (title !== undefined) {
 		if (typeof title !== "string" || title.length === 0 || title.length > 100) {
@@ -96,9 +100,36 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 		}
 	}
 
+	if (mlBudgetTotalUsd !== undefined) {
+		if (
+			typeof mlBudgetTotalUsd !== "number" ||
+			!Number.isFinite(mlBudgetTotalUsd) ||
+			mlBudgetTotalUsd <= 0 ||
+			mlBudgetTotalUsd > 10_000
+		) {
+			error(400, "Budget must be a number of dollars between 0 and 10000");
+		}
+	}
+
 	const id = params.id ?? "";
 	if (!ObjectId.isValid(id)) {
 		error(400, "Invalid conversation ID");
+	}
+
+	if (mlBudgetTotalUsd !== undefined) {
+		// Guarded on mlAssistant so a budget cannot be conjured onto an ordinary
+		// conversation; spend and open holds survive the change untouched.
+		const matched = await setMlBudgetTotal({
+			conversationId: new ObjectId(id),
+			totalMicroUsd: usdToMicroUsd(mlBudgetTotalUsd),
+			extraFilter: { ...authCondition(locals), mlAssistant: true },
+		});
+		if (!matched) {
+			error(404, "Conversation not found");
+		}
+		if (title === undefined && model === undefined) {
+			return superjsonResponse({ success: true });
+		}
 	}
 	// Shared with the legacy handler: a plain $set here would change the pinned
 	// model without recording who produced the existing turns, and the next

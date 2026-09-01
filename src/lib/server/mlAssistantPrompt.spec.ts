@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { ML_ASSISTANT_PREPROMPT, mlAssistantSessionContext } from "./mlAssistantPrompt";
+import {
+	ML_ASSISTANT_BUDGET_RULES,
+	ML_ASSISTANT_PREPROMPT,
+	mlAssistantSessionContext,
+} from "./mlAssistantPrompt";
 import { buildToolPreprompt } from "./textGeneration/utils/toolPrompt";
 import { ARTIFACTS_SYSTEM_PROMPT } from "./textGeneration/artifacts";
 import { askUserQuestionBuiltin } from "./textGeneration/builtinTools/askUserQuestion";
@@ -93,6 +97,14 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("cpu-basic");
 		expect(jobs).toContain("Timeout.");
 		expect(jobs).toContain("push_to_hub");
+	});
+
+	it("requires a name on every submission", () => {
+		// Unnamed jobs land in the user's dashboard as an image tag plus a hash,
+		// indistinguishable from each other. Stated in the preset prompt and
+		// restated on the contract, like the other pre-flight rules.
+		expect(ML_ASSISTANT_PREPROMPT).toContain("Name every job you submit");
+		expect(inMode([tool("hf_jobs")])).toContain("- Name.");
 	});
 
 	it("points at the pricing doc instead of quoting rates", () => {
@@ -203,9 +215,19 @@ describe("ML Assistant system message size", () => {
 		// 18k -> 19k for the hf_jobs submission contract; 19k -> 22k for the citation
 		// hop, paper-finding, web search and cost-to-finish hardware; 22k -> 24k for
 		// headroom alone, not content — at 21,889 the guard fired on every edit,
-		// which makes it noise. That number is ~5,500 tokens, re-sent on every round
-		// of a hundred-round budget: it is the figure to watch, and the next raise
-		// should have to argue for itself against it.
+		// which makes it noise. 24k -> 27k for the session budget rules (~2.6k, now
+		// measured here too, since the mode is always budget-gated and re-sends
+		// them every round) plus the same headroom rule: the grant procedure and
+		// the enforcement formula are what keep an autonomous run from inventing
+		// spend authority. 27k -> 28.5k at the merge with the parallel raise for the
+		// two call shapes that cost whole runs in practice — the uv/run submission
+		// and logs syntax, and the Trackio init/log/finish sequence, there because
+		// the model got them wrong from memory (a wrong kwarg is not a style
+		// question, it is a dead job) and a literal example is the only form of that
+		// rule that works — plus the job-naming rules that landed on the same
+		// section in the same week. That number is ~6,900 tokens, re-sent on every
+		// round of a hundred-round budget: it is the figure to watch, and the next
+		// raise should have to argue for itself against it.
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -225,10 +247,11 @@ describe("ML Assistant system message size", () => {
 				{ mlAssistant: true }
 			),
 			ML_ASSISTANT_PREPROMPT,
+			ML_ASSISTANT_BUDGET_RULES,
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(24_000);
+		expect(composed.length).toBeLessThan(28_500);
 	});
 });
 

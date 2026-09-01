@@ -7,6 +7,7 @@ import {
 } from "$lib/types/MessageUpdate";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
+import { RATE_LIMIT_BACKOFF_MS } from "$lib/server/textGeneration/utils/rateLimitRetry";
 import type { McpFlowResult, RunMcpFlowContext } from "./runMcpFlow";
 
 // ---------------------------------------------------------------------------
@@ -413,7 +414,7 @@ describe("runMcpFlow rate limits", () => {
 		// Fake only the timer pair the backoff sleep uses: the flow crosses real
 		// async boundaries (dynamic import, mocked promises) before it ever
 		// schedules the sleep, and a blanket fake would starve those of event-loop
-		// turns — the CI-only hang this test once had.
+		// turns.
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 		try {
 			scriptRounds([
@@ -422,11 +423,22 @@ describe("runMcpFlow rate limits", () => {
 			]);
 
 			const pending = runFlow();
-			// Alternate fake-clock advances with real event-loop turns until the
-			// retry lands, however late the flow registers its backoff timer.
-			for (let i = 0; i < 200 && mocks.create.mock.calls.length < 2; i += 1) {
-				await vi.advanceTimersByTimeAsync(1_000);
+			let settled = false;
+			const flagSettled = () => {
+				settled = true;
+			};
+			void pending.then(flagSettled, flagSettled);
+			// The backoff sleep is the only fake-timer client here, so its
+			// registration — not a wall-clock budget — is the signal to advance the
+			// clock. A fixed number of advance/yield rounds can be exhausted before a
+			// slow runner even reaches the sleep, leaving its timer to hang forever.
+			// A flow that settles without a timer let the 429 escape; fall through
+			// and let the assertions name that.
+			while (!settled && vi.getTimerCount() === 0) {
 				await new Promise((resolve) => setImmediate(resolve));
+			}
+			if (vi.getTimerCount() > 0) {
+				await vi.advanceTimersByTimeAsync(RATE_LIMIT_BACKOFF_MS[0]);
 			}
 			const { updates, result } = await pending;
 
@@ -786,5 +798,62 @@ describe("runMcpFlow under the ML Assistant preset", () => {
 
 		expect(result).toBe("exhausted");
 		expect(mocks.create).toHaveBeenCalledTimes(100);
+	});
+});
+
+describe("leaked tool-call markup", () => {
+	// Observed with GLM-class models: the provider template leaks the model's
+	// native tool syntax into content, so the "call" is text the user sees and
+	// nothing runs.
+	it("retries once when the final answer writes a tool call as markup", async () => {
+		scriptRounds([
+			{
+				content: 'Let me ask: <do_thing>\n<option label="$5">setBudgetUsd=5</option>\n</do_thing>',
+			},
+			{ content: "Here is a clean answer." },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toBe("Here is a clean answer.");
+		// The nudge names the leaked tool and demands a real call.
+		const nudge = requestMessages(1).at(-1);
+		expect(nudge?.role).toBe("user");
+		expect(String(nudge?.content)).toContain("<do_thing>");
+		expect(String(nudge?.content)).toContain("function-calling mechanism");
+	});
+
+	it("finalizes as-is when the retry leaks again", async () => {
+		scriptRounds([
+			{ content: "First leak: <do_thing></do_thing>" },
+			{ content: "Second leak: <do_thing></do_thing>" },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toContain("Second leak");
+	});
+
+	it("leaves markup for tools that are not in the schema alone", async () => {
+		scriptRounds([{ content: "In HTML you might write <div> or even <some_other_tool>." }]);
+
+		const { updates } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toContain("<some_other_tool>");
+	});
+
+	it("requires a whole tag, not a prefix", async () => {
+		// <do_thing_output> is ordinary content, not a leaked call to do_thing.
+		scriptRounds([{ content: "The result arrives in a <do_thing_output> element." }]);
+
+		const { updates } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toContain("<do_thing_output>");
 	});
 });

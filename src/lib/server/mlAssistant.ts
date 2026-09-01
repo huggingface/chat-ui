@@ -1,5 +1,7 @@
 import type { Conversation } from "$lib/types/Conversation";
 import type { McpServerConfig } from "./mcp/httpClient";
+import { hasAuthHeader, isHfMcpServer } from "./mcp/hf";
+import { getMcpServers } from "./mcp/registry";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 
 /**
@@ -40,6 +42,25 @@ export function isMlAssistantConversation(conv: Pick<Conversation, "mlAssistant"
 }
 
 /**
+ * The Bearer token of an operator-pinned Hub MCP entry, if one is configured.
+ * When such an entry wins the preset merge, jobs launch under it rather than
+ * the user's token — so settlement must query the Jobs API as the same
+ * account, or traceable holds either never resolve (no user token) or 404 as
+ * the wrong account and get charged at their full ceiling.
+ */
+export function pinnedHubToken(): string | undefined {
+	for (const server of withMlAssistantServers(getMcpServers())) {
+		if (!isHfMcpServer(server.url) || !hasAuthHeader(server.headers)) continue;
+		const raw = Object.entries(server.headers ?? {}).find(
+			([key]) => key.toLowerCase() === "authorization"
+		)?.[1];
+		const match = raw ? /^Bearer\s+(\S+)$/i.exec(raw) : null;
+		if (match) return match[1];
+	}
+	return undefined;
+}
+
+/**
  * The preset's servers plus the ones already resolved for this request, preset
  * first. Deduplicated by name with the preset winning.
  */
@@ -51,7 +72,21 @@ export function withMlAssistantServers(servers: McpServerConfig[]): McpServerCon
 		ML_ASSISTANT_MCP_SERVERS.map((server) => [server.name, server])
 	);
 	for (const server of servers) {
-		if (!byName.has(server.name)) byName.set(server.name, server);
+		const preset = byName.get(server.name);
+		if (!preset) {
+			byName.set(server.name, server);
+			continue;
+		}
+		// An operator-configured entry that still points at the Hub MCP and
+		// carries its own Authorization header outranks the preset's `?login`
+		// variant: OAuth deployments whose app cannot request the privileged
+		// scopes (read-mcp is official-apps-only) pin a token this way, and the
+		// forwarding overlay never overrides an explicit header anyway. The URL
+		// check stays load-bearing — a same-named entry pointing anywhere else
+		// still cannot shadow the preset, authed or not.
+		if (hasAuthHeader(server.headers) && isHfMcpServer(server.url)) {
+			byName.set(server.name, server);
+		}
 	}
 	return [...byName.values()];
 }
