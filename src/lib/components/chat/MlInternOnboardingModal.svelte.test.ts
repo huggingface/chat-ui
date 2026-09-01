@@ -27,6 +27,14 @@ describe("MlInternOnboardingModal", () => {
 		expect(text).toContain("not a guarantee");
 	});
 
+	it("is named by its heading for assistive tech", () => {
+		renderWithApp(MlInternOnboardingModal, { close: vi.fn() });
+
+		const id = dialog().getAttribute("aria-labelledby");
+		expect(id).toBeTruthy();
+		expect(document.getElementById(id ?? "")?.textContent).toContain("ML Intern is experimental");
+	});
+
 	it("links out to the Hub's MCP and billing settings in a new tab", () => {
 		renderWithApp(MlInternOnboardingModal, { close: vi.fn() });
 

@@ -19,7 +19,7 @@
      links go to the Hub rather than to in-app settings because the mode runs on
      the Hub's MCP server with the user's own token: which tools it can reach and
      what it can spend are decided on the user's Hugging Face account, not here. -->
-<Modal onclose={close} width="max-w-[440px]! m-4!">
+<Modal onclose={close} labelledBy="ml-intern-onboarding-title" width="max-w-[440px]! m-4!">
 	<div
 		class="flex w-full flex-col gap-6 bg-white bg-linear-to-b to-transparent px-6 pb-6 dark:bg-black dark:from-white/10 dark:to-white/5"
 	>
@@ -31,7 +31,10 @@
 			>
 				<IconFlask class="size-7" />
 			</div>
-			<h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+			<h2
+				id="ml-intern-onboarding-title"
+				class="text-2xl font-semibold text-gray-900 dark:text-gray-100"
+			>
 				ML Intern is experimental
 			</h2>
 			<p class="text-[15px] leading-relaxed text-gray-600 dark:text-gray-300">
@@ -77,9 +80,10 @@
 						Set a spending cap
 					</p>
 					<p class="text-sm leading-relaxed">
-						A budget you give ML Intern in the chat is strictly enforced on everything it launches
-						from here, but it is not a guarantee: a job it starts could spend on its own. To make
-						sure you never overspend, set a budget in your billing settings too.
+						A budget you give ML Intern in the chat is strictly enforced on the Jobs it launches
+						from here, but it is not a guarantee: a Job it starts could launch Jobs of its own or
+						use other Hugging Face products. To make sure you never overspend, set a budget in your
+						billing settings too.
 					</p>
 					<a
 						href={BILLING_SETTINGS_URL}

@@ -117,6 +117,19 @@ describe("MlInternPill", () => {
 			expect(mlAssistant.enabled).toBe(true);
 		});
 
+		it("records Escape once, though the key reaches the modal twice", async () => {
+			const { set, context } = settingsContext(false);
+			const { container } = renderWithApp(MlInternPill, {}, { context });
+			find(container, '[role="switch"]').click();
+			await vi.waitFor(() => expect(dialog()).not.toBeNull());
+
+			// Modal listens on window (capture) and on the dialog itself.
+			dialog()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+			await vi.waitFor(() => expect(dialog()).toBeNull());
+			expect(set).toHaveBeenCalledTimes(1);
+		});
+
 		it("stays quiet once the onboarding has been acknowledged", async () => {
 			const { set, context } = settingsContext(true);
 			const { container } = renderWithApp(MlInternPill, {}, { context });
