@@ -8,8 +8,8 @@ import type { MlPlanStep } from "$lib/types/MlAssistant";
  * computed style rather than class names.
  */
 
-// The mode's fills (switch track, running dot) and its text run two different
-// oranges: vibrant for surfaces, darker for legible text on the pale band.
+// The mode's fills (running dot) and its text run two different oranges:
+// vibrant for surfaces, darker for legible text on the pale band.
 const ACCENT = "rgb(234, 88, 12)";
 const ACCENT_TEXT = "rgb(194, 65, 12)";
 const SUCCESS = "rgb(22, 163, 74)";
@@ -30,12 +30,9 @@ const PLAN: MlPlanStep[] = [
 function mount(props: Partial<Parameters<typeof render<typeof MlAssistantStrip>>[1]> = {}) {
 	return render(MlAssistantStrip, {
 		visible: true,
-		enabled: false,
-		taskRunning: false,
 		steps: [],
 		statusLabel: "",
 		complete: false,
-		ontoggle: () => {},
 		...props,
 	});
 }
@@ -52,32 +49,20 @@ const box = (el: Element) => {
 };
 
 describe("MlAssistantStrip", () => {
-	it("renders the off state with the tool note and no Configure link", () => {
+	it("renders the band with the preset tool list and accent tint", () => {
 		const { container } = mount();
 		const strip = find(container, ".ml-strip");
 
 		expect(strip.textContent).toContain("ML Intern");
-		expect(strip.textContent).toContain(
-			"— tools and prompts for papers, finetuning, demos and datasets"
-		);
-		expect(container.textContent).not.toContain("Configure");
-		expect(style(strip).backgroundColor).toBe("rgba(0, 0, 0, 0)");
-		expect(style(strip).borderBottomColor).toBe("rgb(236, 236, 238)");
-	});
-
-	it("renders the on state with the preset tool list and accent tint", () => {
-		const { container } = mount({ enabled: true });
-		const strip = find(container, ".ml-strip");
-
 		expect(strip.textContent).toContain("papers · training · spaces · datasets · eval · hub");
-		expect(container.textContent).not.toContain("Configure");
+		expect(container.querySelector('[role="switch"]')).toBeNull();
 		expect(style(strip).backgroundColor).toBe("rgb(255, 244, 234)");
 		expect(style(strip).borderBottomColor).toBe("rgb(251, 228, 204)");
 		expect(style(strip).color).toBe(ACCENT_TEXT);
 	});
 
 	it("lays the strip out on the specified spacing", () => {
-		const { container } = mount({ enabled: true });
+		const { container } = mount();
 		const strip = style(find(container, ".ml-strip"));
 
 		expect(strip.padding).toBe("9px 16px");
@@ -86,7 +71,7 @@ describe("MlAssistantStrip", () => {
 	});
 
 	it("truncates the tool note rather than overflowing a narrow composer", () => {
-		const { container } = mount({ enabled: true });
+		const { container } = mount();
 		container.style.width = "375px";
 		const note = find(container, ".ml-strip span.truncate");
 
@@ -95,33 +80,6 @@ describe("MlAssistantStrip", () => {
 		expect(note.getBoundingClientRect().right).toBeLessThanOrEqual(
 			Math.ceil(find(container, ".ml-strip").getBoundingClientRect().right)
 		);
-	});
-
-	it("exposes the mode as a labelled switch", async () => {
-		const ontoggle = vi.fn();
-		const { container } = mount({ enabled: false, ontoggle });
-		const control = container.querySelector(".ml-switch") as HTMLElement;
-
-		expect(control.getAttribute("role")).toBe("switch");
-		expect(control.getAttribute("aria-checked")).toBe("false");
-		expect(control.getAttribute("aria-label")).toBe("ML Intern mode");
-		// Visual size is 26x15, but the control itself has to stay tappable.
-		expect(box(control)).toEqual({ width: 44, height: 44 });
-
-		control.click();
-		expect(ontoggle).toHaveBeenCalledWith(true);
-	});
-
-	it("moves the knob across the track when the mode is on", () => {
-		const off = mount().container;
-		expect(box(find(off, ".ml-switch-track"))).toEqual({ width: 26, height: 15 });
-		expect(box(find(off, ".ml-switch-knob"))).toEqual({ width: 11, height: 11 });
-		expect(style(find(off, ".ml-switch-knob")).left).toBe("2px");
-		expect(style(find(off, ".ml-switch-track")).backgroundColor).toBe("rgb(216, 216, 221)");
-
-		const on = mount({ enabled: true }).container;
-		expect(style(find(on, ".ml-switch-knob")).left).toBe("13px");
-		expect(style(find(on, ".ml-switch-track")).backgroundColor).toBe(ACCENT);
 	});
 
 	it("collapses out of the composer when hidden", () => {
@@ -134,37 +92,15 @@ describe("MlAssistantStrip", () => {
 		expect(hidden.opacity).toBe("0");
 	});
 
-	it("collapses the switch once a task is running", () => {
-		const { container } = mount({
-			enabled: true,
-			taskRunning: true,
-			steps: PLAN,
-			statusLabel: "Training",
-		});
-		const slot = style(find(container, ".ml-switch-slot"));
-
-		// Zero width plus a negative margin that eats the flex gap, so the title
-		// slides all the way left.
-		expect(slot.width).toBe("0px");
-		expect(slot.marginRight).toBe("-9px");
-		expect(slot.opacity).toBe("0");
-		expect(container.textContent).not.toContain("papers · training");
-	});
-
 	it("keeps the tool note until the run reports a plan", () => {
-		const { container } = mount({ enabled: true, taskRunning: true, steps: [] });
+		const { container } = mount({ steps: [] });
 
 		expect(container.textContent).toContain("papers · training · spaces · datasets · eval · hub");
 		expect(container.querySelector(".ml-dot")).toBeNull();
 	});
 
 	it("renders one dot per plan step, styled by status", () => {
-		const { container } = mount({
-			enabled: true,
-			taskRunning: true,
-			steps: PLAN,
-			statusLabel: "Training",
-		});
+		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
 		const dots = [...container.querySelectorAll(".ml-dot")];
 		// Settled steps trade their number for an icon: a tick when done, a slash
 		// when skipped. Unsettled steps keep their number.
@@ -187,12 +123,7 @@ describe("MlAssistantStrip", () => {
 	});
 
 	it("keeps the dots tappable without disturbing the row's 10px rhythm", () => {
-		const { container } = mount({
-			enabled: true,
-			taskRunning: true,
-			steps: PLAN,
-			statusLabel: "Training",
-		});
+		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
 		const hits = [...container.querySelectorAll(".ml-dot-hit")];
 		expect(box(hits[0])).toEqual({ width: 27, height: 44 });
 
@@ -202,12 +133,7 @@ describe("MlAssistantStrip", () => {
 	});
 
 	it("names each dot by its step and status", () => {
-		const { container } = mount({
-			enabled: true,
-			taskRunning: true,
-			steps: PLAN,
-			statusLabel: "Training",
-		});
+		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
 
 		expect(
 			[...container.querySelectorAll(".ml-dot-hit")].map((b) => b.getAttribute("aria-label"))
@@ -221,7 +147,7 @@ describe("MlAssistantStrip", () => {
 
 	it("announces the running step, and turns the label green when the plan is done", () => {
 		const running = find(
-			mount({ enabled: true, taskRunning: true, steps: PLAN, statusLabel: "Training" }).container,
+			mount({ steps: PLAN, statusLabel: "Training" }).container,
 			'[aria-live="polite"]'
 		);
 		expect(running.textContent?.trim()).toBe("Training");
@@ -229,8 +155,6 @@ describe("MlAssistantStrip", () => {
 
 		const done = find(
 			mount({
-				enabled: true,
-				taskRunning: true,
 				steps: PLAN.map((s) => ({ ...s, status: "done" as const })),
 				statusLabel: "Done",
 				complete: true,
@@ -241,24 +165,14 @@ describe("MlAssistantStrip", () => {
 		expect(style(done).color).toBe(SUCCESS);
 	});
 
-	it("keeps the mode announced after the switch collapses", () => {
-		const { container } = mount({
-			enabled: true,
-			taskRunning: true,
-			steps: PLAN,
-			statusLabel: "Training",
-		});
+	it("announces the mode to screen readers despite carrying no control", () => {
+		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
 
 		expect(container.textContent).toContain("ML Intern, mode on");
 	});
 
 	it("reaches a step's description by keyboard focus, not hover alone", async () => {
-		const { container } = mount({
-			enabled: true,
-			taskRunning: true,
-			steps: PLAN,
-			statusLabel: "Training",
-		});
+		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
 		(container.querySelector(".ml-dot-hit") as HTMLElement).focus();
 
 		await vi.waitFor(() => {
@@ -267,12 +181,7 @@ describe("MlAssistantStrip", () => {
 	});
 
 	it("shows a step's description on hover, escaping the composer's overflow", async () => {
-		const { container } = mount({
-			enabled: true,
-			taskRunning: true,
-			steps: PLAN,
-			statusLabel: "Training",
-		});
+		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
 		const trigger = find(container, ".ml-dot-hit");
 		trigger.dispatchEvent(new PointerEvent("pointerenter", { bubbles: true }));
 		trigger.dispatchEvent(new PointerEvent("pointermove", { bubbles: true }));
@@ -296,19 +205,19 @@ describe("MlAssistantStrip budget", () => {
 	};
 
 	it("shows the remaining balance when the conversation carries a budget", () => {
-		const { container } = mount({ enabled: true, budget: BUDGET });
+		const { container } = mount({ budget: BUDGET });
 		const readout = find(container, "button[aria-label^='Session budget']");
 		expect(readout.textContent).toContain("$7.50 left");
 	});
 
 	it("shows no readout without a budget", () => {
-		const { container } = mount({ enabled: true });
+		const { container } = mount();
 		expect(container.querySelector("button[aria-label^='Session budget']")).toBeNull();
 	});
 
 	it("commits an edited total on Enter", async () => {
 		const onbudgetchange = vi.fn();
-		const { container } = mount({ enabled: true, budget: BUDGET, onbudgetchange });
+		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
 		find(container, "button[aria-label^='Session budget']").click();
 		await Promise.resolve();
@@ -325,7 +234,7 @@ describe("MlAssistantStrip budget", () => {
 
 	it("abandons the edit on Escape", async () => {
 		const onbudgetchange = vi.fn();
-		const { container } = mount({ enabled: true, budget: BUDGET, onbudgetchange });
+		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
 		find(container, "button[aria-label^='Session budget']").click();
 		await Promise.resolve();
@@ -337,47 +246,9 @@ describe("MlAssistantStrip budget", () => {
 	});
 
 	it("stays a static readout when no change handler is given", async () => {
-		const { container } = mount({ enabled: true, budget: BUDGET });
+		const { container } = mount({ budget: BUDGET });
 		find(container, "button[aria-label^='Session budget']").click();
 		await Promise.resolve();
 		expect(container.querySelector("input[aria-label^='Session budget']")).toBeNull();
-	});
-});
-
-describe("MlAssistantStrip pre-conversation budget draft", () => {
-	it("offers the budget field as soon as the mode is on", () => {
-		const { container } = mount({ enabled: true });
-		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
-		expect(input.placeholder).toBe("0");
-		// No spinner arrows: the value is typed, not stepped.
-		expect(style(input).appearance).toBe("textfield");
-	});
-
-	it("reports the typed grant, and clears it on invalid input", async () => {
-		const ondraftbudgetchange = vi.fn();
-		const { container } = mount({ enabled: true, ondraftbudgetchange });
-		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
-
-		input.value = "25";
-		input.dispatchEvent(new Event("input", { bubbles: true }));
-		expect(ondraftbudgetchange).toHaveBeenLastCalledWith(25);
-
-		input.value = "";
-		input.dispatchEvent(new Event("input", { bubbles: true }));
-		expect(ondraftbudgetchange).toHaveBeenLastCalledWith(undefined);
-	});
-
-	it("gives way to the ledger readout once the conversation has a budget", () => {
-		const { container } = mount({
-			enabled: true,
-			budget: { totalMicroUsd: 10_000_000, spentMicroUsd: 0, reservedMicroUsd: 0 },
-		});
-		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
-		expect(container.querySelector("button[aria-label^='Session budget']")).not.toBeNull();
-	});
-
-	it("hides the draft once the task is running", () => {
-		const { container } = mount({ enabled: true, taskRunning: true });
-		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
 	});
 });

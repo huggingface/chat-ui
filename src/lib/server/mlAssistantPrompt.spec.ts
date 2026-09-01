@@ -99,6 +99,14 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("push_to_hub");
 	});
 
+	it("requires a name on every submission", () => {
+		// Unnamed jobs land in the user's dashboard as an image tag plus a hash,
+		// indistinguishable from each other. Stated in the preset prompt and
+		// restated on the contract, like the other pre-flight rules.
+		expect(ML_ASSISTANT_PREPROMPT).toContain("Name every job you submit");
+		expect(inMode([tool("hf_jobs")])).toContain("- Name.");
+	});
+
 	it("points at the pricing doc instead of quoting rates", () => {
 		// A price table in a prompt goes stale silently; a pointer does not.
 		expect(inMode([tool("hf_jobs")])).toContain("hf://docs/hub/jobs-pricing.md");

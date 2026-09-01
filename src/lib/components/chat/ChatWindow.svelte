@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy, tick, untrack } from "svelte";
-	import { goto } from "$app/navigation";
+	import { onDestroy, untrack } from "svelte";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
@@ -63,7 +62,6 @@
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideSparkles from "~icons/lucide/sparkles";
 	import MlAssistantStrip from "./MlAssistantStrip.svelte";
-	import MlAssistantPromo from "./MlAssistantPromo.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 	import { planStepsToMlSteps } from "$lib/utils/planProgress";
@@ -507,9 +505,17 @@
 		if (!lastMessage) return;
 		sendFixRequest(buildResumeMessage(failureDetailOf(lastMessage)));
 	}
-	// Sending with the mode off collapses the strip away for good; sending with it
-	// on keeps the strip, which is where the plan progress lives.
-	let mlStripVisible = $derived(ML_ASSISTANT_MODE && (mlTaskRunning || messages.length === 0));
+	// The strip is a task status bar only: it slides in on the send that starts an
+	// ML task and stays for the rest of the conversation. Before that the mode
+	// lives in the composer pill, and a chat started without the mode never shows
+	// either surface.
+	let mlStripVisible = $derived(ML_ASSISTANT_MODE && mlTaskRunning);
+
+	// The pill is the mode's pre-task switch. Empty conversations only — the mode
+	// cannot be joined once a chat has started without it.
+	let mlPillVisible = $derived(
+		ML_ASSISTANT_MODE && !shared && !isReadOnly && !mlTaskRunning && messages.length === 0
+	);
 
 	$effect(() => {
 		if (!ML_ASSISTANT_MODE) return;
@@ -545,37 +551,6 @@
 			}
 		});
 	});
-
-	function toggleMlMode(next: boolean) {
-		if (requireAuthUser()) return;
-		mlAssistant.toggle(next);
-	}
-
-	// The mode can't be switched on once a conversation starts without it, so the
-	// strip's slot offers the next best thing: a fresh ML Intern chat seeded with
-	// the question. First exchange only — beyond that the conversation has
-	// history worth keeping — and dismissable per conversation.
-	let mlPromoVisible = $derived(
-		ML_ASSISTANT_MODE &&
-			!shared &&
-			!isReadOnly &&
-			!mlModeOn &&
-			!mlTaskRunning &&
-			Boolean(page.params?.id) &&
-			messages.filter((message) => message.from === "user").length === 1 &&
-			!mlAssistant.promoDismissed(page.params?.id)
-	);
-
-	async function askInMlIntern() {
-		if (requireAuthUser()) return;
-		const question = messages.find((message) => message.from === "user")?.content ?? "";
-		await goto(`${base}/`);
-		// Let the home composer's sync effect release the old conversation before
-		// the mode goes on — the release resets the store, which would wipe it.
-		await tick();
-		mlAssistant.toggle(true);
-		if (question) pendingComposerPayload.set({ text: question });
-	}
 
 	const budgetClient = useAPIClient();
 
@@ -1035,8 +1010,8 @@
 					class={{
 						"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
 						"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
-						"border-[#f7ddc2] dark:border-[#54371c]": mlModeOn && mlStripVisible,
-						"dark:border-gray-700": !(mlModeOn && mlStripVisible),
+						"border-[#f7ddc2] dark:border-[#54371c]": mlModeOn && (mlStripVisible || mlPillVisible),
+						"dark:border-gray-700": !(mlModeOn && (mlStripVisible || mlPillVisible)),
 						"opacity-30": isReadOnly,
 						"max-sm:mb-4": focused && isVirtualKeyboard(),
 					}}
@@ -1044,21 +1019,11 @@
 					{#if ML_ASSISTANT_MODE}
 						<MlAssistantStrip
 							visible={mlStripVisible}
-							enabled={mlAssistant.enabled}
-							taskRunning={mlTaskRunning}
 							steps={mlAssistant.steps}
 							statusLabel={mlAssistant.statusLabel}
 							complete={mlAssistant.complete}
 							budget={mlAssistant.budget}
-							draftBudgetUsd={mlAssistant.draftBudgetUsd}
-							ontoggle={toggleMlMode}
 							onbudgetchange={page.params?.id ? changeMlBudget : undefined}
-							ondraftbudgetchange={(usd) => (mlAssistant.draftBudgetUsd = usd)}
-						/>
-						<MlAssistantPromo
-							visible={mlPromoVisible}
-							onask={askInMlIntern}
-							ondismiss={() => mlAssistant.dismissPromo(page.params?.id)}
 						/>
 					{/if}
 					<!-- The composer box is a column so the ML Assistant strip can stack on
@@ -1103,6 +1068,7 @@
 										disabled={isReadOnly || lastIsError}
 										{modelIsMultimodal}
 										{modelSupportsTools}
+										showMlPill={mlPillVisible}
 										bind:focused
 									/>
 								{/if}

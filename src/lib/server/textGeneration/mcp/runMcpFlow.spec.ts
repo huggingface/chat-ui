@@ -7,6 +7,7 @@ import {
 } from "$lib/types/MessageUpdate";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
+import { RATE_LIMIT_BACKOFF_MS } from "$lib/server/textGeneration/utils/rateLimitRetry";
 import type { McpFlowResult, RunMcpFlowContext } from "./runMcpFlow";
 
 // ---------------------------------------------------------------------------
@@ -413,7 +414,7 @@ describe("runMcpFlow rate limits", () => {
 		// Fake only the timer pair the backoff sleep uses: the flow crosses real
 		// async boundaries (dynamic import, mocked promises) before it ever
 		// schedules the sleep, and a blanket fake would starve those of event-loop
-		// turns — the CI-only hang this test once had.
+		// turns.
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 		try {
 			scriptRounds([
@@ -422,11 +423,22 @@ describe("runMcpFlow rate limits", () => {
 			]);
 
 			const pending = runFlow();
-			// Alternate fake-clock advances with real event-loop turns until the
-			// retry lands, however late the flow registers its backoff timer.
-			for (let i = 0; i < 200 && mocks.create.mock.calls.length < 2; i += 1) {
-				await vi.advanceTimersByTimeAsync(1_000);
+			let settled = false;
+			const flagSettled = () => {
+				settled = true;
+			};
+			void pending.then(flagSettled, flagSettled);
+			// The backoff sleep is the only fake-timer client here, so its
+			// registration — not a wall-clock budget — is the signal to advance the
+			// clock. A fixed number of advance/yield rounds can be exhausted before a
+			// slow runner even reaches the sleep, leaving its timer to hang forever.
+			// A flow that settles without a timer let the 429 escape; fall through
+			// and let the assertions name that.
+			while (!settled && vi.getTimerCount() === 0) {
 				await new Promise((resolve) => setImmediate(resolve));
+			}
+			if (vi.getTimerCount() > 0) {
+				await vi.advanceTimersByTimeAsync(RATE_LIMIT_BACKOFF_MS[0]);
 			}
 			const { updates, result } = await pending;
 
