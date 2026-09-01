@@ -1,24 +1,4 @@
-import { browser } from "$app/environment";
-import { base } from "$app/paths";
 import type { MlPlanStep, MlPlanStepStatus } from "$lib/types/MlAssistant";
-
-// Namespaced by base path so instances sharing an origin (the collision the MCP
-// server store's keys also guard against) don't read each other's dismissal.
-const PILL_DISMISSED_KEY = `${
-	(base || "")
-		.toLowerCase()
-		.replace(/[^a-z0-9_-]+/g, "-")
-		.replace(/^-+|-+$/g, "") || "app"
-}:ml-intern:pill-dismissed`;
-
-function loadPillDismissed(): boolean {
-	if (!browser) return false;
-	try {
-		return localStorage.getItem(PILL_DISMISSED_KEY) === "1";
-	} catch {
-		return false;
-	}
-}
 
 /**
  * UI state for ML Assistant mode (see `$lib/utils/mlAssistantFlag`).
@@ -39,27 +19,6 @@ class MlAssistantStore {
 
 	/** Conversation the state above belongs to, so a different one starts clean. */
 	#conversationKey: string | undefined;
-
-	/**
-	 * The composer's "ML Intern" pill was closed. Persisted per browser and
-	 * outside `reset()` — closing the pill means "stop offering me this", which a
-	 * navigation must not undo. Discoverability after that is the announcement
-	 * banner's job.
-	 */
-	pillDismissed = $state(loadPillDismissed());
-
-	dismissPill(): void {
-		// The pill hosts the mode's only pre-task switch, so it may not disappear
-		// while the switch is on — that would strand the mode enabled.
-		this.toggle(false);
-		this.pillDismissed = true;
-		if (!browser) return;
-		try {
-			localStorage.setItem(PILL_DISMISSED_KEY, "1");
-		} catch {
-			// Storage denied (private mode) — the dismissal still holds for the session.
-		}
-	}
 
 	/** The switch stops being interactive once the mode is locked in. */
 	get locked() {

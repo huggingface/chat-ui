@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { Switch } from "bits-ui";
-	import CarbonClose from "~icons/carbon/close";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 
@@ -15,10 +14,11 @@
 <!-- The mode's pre-task switch, sitting beside the MCP pill. Only offered while
      the conversation is still empty: once a task starts the status strip takes
      over, and once a chat starts without the mode the composer stays as it is
-     (the mode cannot be joined mid-conversation). -->
+     (the mode cannot be joined mid-conversation). Deliberately not dismissable:
+     this is the mode's only entry point, and nothing could bring it back. -->
 <div
 	class={[
-		"inline-flex h-8 flex-none items-center gap-1.5 rounded-full pr-1 pl-2.5 text-xs font-semibold transition-colors sm:h-7",
+		"inline-flex h-8 flex-none items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold transition-colors sm:h-7",
 		enabled
 			? "bg-[#fff4ea] text-[#c2410c] dark:bg-[#2b1c0e] dark:text-[#fdba74]"
 			: "bg-gray-500/10 text-gray-500 dark:bg-gray-500/15 dark:text-gray-400",
@@ -40,14 +40,6 @@
 			NEW
 		</span>
 	</Switch.Root>
-	<button
-		class="grid size-5 place-items-center rounded-full text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/10 dark:hover:text-gray-300"
-		aria-label="Hide ML Intern"
-		onclick={() => mlAssistant.dismissPill()}
-		type="button"
-	>
-		<CarbonClose class="size-3.5" />
-	</button>
 </div>
 
 <style>

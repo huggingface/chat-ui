@@ -19,9 +19,7 @@ const box = (el: Element) => {
 
 describe("MlInternPill", () => {
 	beforeEach(() => {
-		localStorage.clear();
 		mlAssistant.reset();
-		mlAssistant.pillDismissed = false;
 	});
 
 	it("exposes the mode as a labelled switch carrying the NEW badge", () => {
@@ -61,20 +59,10 @@ describe("MlInternPill", () => {
 		});
 	});
 
-	it("dismisses for good, switching the mode off rather than stranding it on", () => {
-		mlAssistant.toggle(true);
+	it("offers no dismiss control — the pill is the mode's only entry point", () => {
 		const { container } = render(MlInternPill);
 
-		find(container, '[aria-label="Hide ML Intern"]').click();
-
-		expect(mlAssistant.pillDismissed).toBe(true);
-		expect(mlAssistant.enabled).toBe(false);
-		// Persisted, so the pill stays gone across sessions; the storage key is
-		// namespaced by app identity like the MCP store's keys.
-		const stored = Object.keys(localStorage).find((key) =>
-			key.endsWith(":ml-intern:pill-dismissed")
-		);
-		expect(stored).toBeDefined();
-		expect(localStorage.getItem(stored as string)).toBe("1");
+		expect(container.querySelectorAll("button").length).toBe(1);
+		expect(find(container, "button").getAttribute("role")).toBe("switch");
 	});
 });

@@ -509,14 +509,9 @@
 	let mlStripVisible = $derived(ML_ASSISTANT_MODE && mlTaskRunning);
 
 	// The pill is the mode's pre-task switch. Empty conversations only — the mode
-	// cannot be joined once a chat has started without it — and closable for good.
+	// cannot be joined once a chat has started without it.
 	let mlPillVisible = $derived(
-		ML_ASSISTANT_MODE &&
-			!shared &&
-			!isReadOnly &&
-			!mlTaskRunning &&
-			messages.length === 0 &&
-			!mlAssistant.pillDismissed
+		ML_ASSISTANT_MODE && !shared && !isReadOnly && !mlTaskRunning && messages.length === 0
 	);
 
 	$effect(() => {
