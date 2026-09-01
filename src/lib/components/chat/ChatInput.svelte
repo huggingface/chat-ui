@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from "svelte";
+	import { onDestroy, onMount, tick } from "svelte";
 
 	import { afterNavigate } from "$app/navigation";
 
@@ -15,6 +15,7 @@
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
 	import MCPServerManager from "$lib/components/mcp/MCPServerManager.svelte";
 	import IconMCP from "$lib/components/icons/IconMCP.svelte";
+	import HfHubMentionAutocomplete from "./HfHubMentionAutocomplete.svelte";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
@@ -26,6 +27,13 @@
 		disableAllServers,
 	} from "$lib/stores/mcpServers";
 	import { getMcpServerFaviconUrl } from "$lib/utils/favicon";
+	import {
+		findHfHubMention,
+		replaceHfHubMention,
+		searchHfHub,
+		type HfHubMention,
+		type HfHubResource,
+	} from "$lib/utils/hfHubSearch";
 	import { page } from "$app/state";
 
 	interface Props {
@@ -74,6 +82,17 @@
 	let textareaElement: HTMLTextAreaElement | undefined = $state();
 	let isCompositionOn = $state(false);
 	let blurTimeout: ReturnType<typeof setTimeout> | null = $state(null);
+	let hubMention = $state<HfHubMention | null>(null);
+	let hubSearchResults: HfHubResource[] = $state([]);
+	let hubSearchStatus: "idle" | "loading" | "success" | "error" = $state("idle");
+	let activeHubResultIndex = $state(0);
+	let hubSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+	let hubBlurTimeout: ReturnType<typeof setTimeout> | null = null;
+	let hubSearchAbortController: AbortController | null = null;
+	let hubSearchSequence = 0;
+	const isHubMentionOpen = $derived(
+		hubMention !== null && hubMention.query.length > 0 && hubSearchStatus !== "idle"
+	);
 
 	let fileInputEl: HTMLInputElement | undefined = $state();
 	let isUrlModalOpen = $state(false);
@@ -160,6 +179,12 @@
 		void focusTextarea();
 	});
 
+	onDestroy(() => {
+		if (hubSearchTimeout) clearTimeout(hubSearchTimeout);
+		if (hubBlurTimeout) clearTimeout(hubBlurTimeout);
+		hubSearchAbortController?.abort();
+	});
+
 	afterNavigate(() => {
 		void focusTextarea();
 	});
@@ -183,7 +208,107 @@
 		adjustTextareaHeight();
 	});
 
+	function resetHubSearch() {
+		hubSearchSequence += 1;
+		if (hubSearchTimeout) {
+			clearTimeout(hubSearchTimeout);
+			hubSearchTimeout = null;
+		}
+		hubSearchAbortController?.abort();
+		hubSearchAbortController = null;
+		hubMention = null;
+		hubSearchResults = [];
+		hubSearchStatus = "idle";
+		activeHubResultIndex = 0;
+	}
+
+	function updateHubMention(inputValue: string, caret: number | null) {
+		const nextMention = findHfHubMention(inputValue, caret ?? inputValue.length);
+		if (!nextMention?.query || disabled) {
+			resetHubSearch();
+			return;
+		}
+
+		const queryChanged = nextMention.query !== hubMention?.query;
+		hubMention = nextMention;
+		if (!queryChanged) return;
+
+		const sequence = ++hubSearchSequence;
+		if (hubSearchTimeout) clearTimeout(hubSearchTimeout);
+		hubSearchAbortController?.abort();
+		hubSearchAbortController = null;
+		hubSearchResults = [];
+		hubSearchStatus = "loading";
+		activeHubResultIndex = 0;
+
+		hubSearchTimeout = setTimeout(async () => {
+			hubSearchTimeout = null;
+			const controller = new AbortController();
+			hubSearchAbortController = controller;
+
+			try {
+				const results = await searchHfHub(nextMention.query, controller.signal);
+				if (sequence !== hubSearchSequence) return;
+				hubSearchResults = results;
+				hubSearchStatus = "success";
+			} catch (error) {
+				if (controller.signal.aborted || sequence !== hubSearchSequence) return;
+				console.error(error);
+				hubSearchResults = [];
+				hubSearchStatus = "error";
+			} finally {
+				if (hubSearchAbortController === controller) hubSearchAbortController = null;
+			}
+		}, 250);
+	}
+
+	function syncHubMentionFromTextarea() {
+		if (!textareaElement) return;
+		updateHubMention(textareaElement.value, textareaElement.selectionStart);
+	}
+
+	function handleInput(event: Event) {
+		const target = event.currentTarget as HTMLTextAreaElement;
+		updateHubMention(target.value, target.selectionStart);
+	}
+
+	async function selectHubResult(result: HfHubResource) {
+		if (!hubMention) return;
+		const replacement = replaceHfHubMention(value, hubMention, result.id);
+		value = replacement.value;
+		resetHubSearch();
+
+		await tick();
+		textareaElement?.focus();
+		textareaElement?.setSelectionRange(replacement.caret, replacement.caret);
+		adjustTextareaHeight();
+	}
+
 	function handleKeydown(event: KeyboardEvent) {
+		if (isHubMentionOpen && !isCompositionOn) {
+			if (event.key === "ArrowDown" && hubSearchResults.length > 0) {
+				event.preventDefault();
+				activeHubResultIndex = (activeHubResultIndex + 1) % hubSearchResults.length;
+				return;
+			}
+			if (event.key === "ArrowUp" && hubSearchResults.length > 0) {
+				event.preventDefault();
+				activeHubResultIndex =
+					(activeHubResultIndex - 1 + hubSearchResults.length) % hubSearchResults.length;
+				return;
+			}
+			if ((event.key === "Enter" || event.key === "Tab") && hubSearchResults.length > 0) {
+				event.preventDefault();
+				void selectHubResult(hubSearchResults[activeHubResultIndex]);
+				return;
+			}
+			if (event.key === "Escape") {
+				event.preventDefault();
+				resetHubSearch();
+				return;
+			}
+		}
+
 		if (
 			event.key === "Enter" &&
 			!event.shiftKey &&
@@ -205,10 +330,21 @@
 			clearTimeout(blurTimeout);
 			blurTimeout = null;
 		}
+		if (hubBlurTimeout) {
+			clearTimeout(hubBlurTimeout);
+			hubBlurTimeout = null;
+		}
 		focused = true;
+		syncHubMentionFromTextarea();
 	}
 
 	function handleBlur() {
+		if (hubBlurTimeout) clearTimeout(hubBlurTimeout);
+		hubBlurTimeout = setTimeout(() => {
+			hubBlurTimeout = null;
+			resetHubSearch();
+		}, 100);
+
 		if (!isVirtualKeyboard()) {
 			focused = false;
 			return;
@@ -238,24 +374,52 @@
 	     already-sent prompt into the box on reload mid-generation (the value
 	     typed on / travels into this page's history entry across the SPA
 	     navigation, and the restore bypasses the Svelte binding). -->
-	<textarea
-		rows="1"
-		tabindex="0"
-		inputmode="text"
-		autocomplete="off"
-		class="scrollbar-custom max-h-[4lh] w-full resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent px-2.5 py-2.5 outline-hidden focus:ring-0 focus-visible:ring-0 sm:px-3 md:max-h-[8lh]"
-		class:text-gray-400={disabled}
-		bind:value
-		bind:this={textareaElement}
-		onkeydown={handleKeydown}
-		oncompositionstart={() => (isCompositionOn = true)}
-		oncompositionend={() => (isCompositionOn = false)}
-		{placeholder}
-		{disabled}
-		onfocus={handleFocus}
-		onblur={handleBlur}
-		onbeforeinput={requireAuthUser}
-	></textarea>
+	<div class="relative">
+		{#if isHubMentionOpen}
+			<HfHubMentionAutocomplete
+				results={hubSearchResults}
+				status={hubSearchStatus === "idle" ? "loading" : hubSearchStatus}
+				activeIndex={activeHubResultIndex}
+				onselect={(result) => void selectHubResult(result)}
+				onactivechange={(index) => (activeHubResultIndex = index)}
+			/>
+		{/if}
+
+		<textarea
+			rows="1"
+			tabindex="0"
+			inputmode="text"
+			autocomplete="off"
+			aria-autocomplete="list"
+			aria-controls={isHubMentionOpen ? "hf-hub-mention-listbox" : undefined}
+			aria-activedescendant={isHubMentionOpen && hubSearchResults.length > 0
+				? `hf-hub-mention-option-${activeHubResultIndex}`
+				: undefined}
+			class="scrollbar-custom max-h-[4lh] w-full resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent px-2.5 py-2.5 outline-hidden focus:ring-0 focus-visible:ring-0 sm:px-3 md:max-h-[8lh]"
+			class:text-gray-400={disabled}
+			bind:value
+			bind:this={textareaElement}
+			oninput={handleInput}
+			onkeydown={handleKeydown}
+			onkeyup={(event) => {
+				if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+					syncHubMentionFromTextarea();
+				}
+			}}
+			onclick={syncHubMentionFromTextarea}
+			onselect={syncHubMentionFromTextarea}
+			oncompositionstart={() => (isCompositionOn = true)}
+			oncompositionend={() => {
+				isCompositionOn = false;
+				syncHubMentionFromTextarea();
+			}}
+			{placeholder}
+			{disabled}
+			onfocus={handleFocus}
+			onblur={handleBlur}
+			onbeforeinput={requireAuthUser}
+		></textarea>
+	</div>
 
 	{#if !showNoTools}
 		<div
