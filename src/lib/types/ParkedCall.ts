@@ -50,6 +50,13 @@ export interface ParkedCall extends Timestamps {
 	userId?: User["_id"];
 	sessionId?: string;
 
+	/**
+	 * Set when the user asked not to wait out the rest of the timer. The wake
+	 * itself is `resumeAt` moved to now; this records that the wait was cut
+	 * short, which is what the model is told on the round it resumes into.
+	 */
+	wokeEarlyAt?: Date;
+
 	/** Set when a sweeper claims the row, so two pods cannot resume the same turn. */
 	takenAt?: Date;
 	resumedAt?: Date;

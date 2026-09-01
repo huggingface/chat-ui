@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
-import { waitBuiltin } from "./waitTool";
+import { waitBuiltin, waitResumeResultText } from "./waitTool";
 import type { BuiltinToolContext } from "./types";
 
 const ctx = (over: Partial<BuiltinToolContext> = {}): BuiltinToolContext => ({
@@ -108,5 +108,20 @@ describe("the wait tool", () => {
 		);
 		expect(outcome).toHaveProperty("error");
 		expect(await collections.parkedCalls.countDocuments({})).toBe(0);
+	});
+});
+
+describe("the tool result a resumed turn reads", () => {
+	const park = { reason: "the training job", createdAt: new Date(0), resumeAt: new Date(120_000) };
+
+	it("reports the wait it actually served", () => {
+		const text = waitResumeResultText(park);
+		expect(text).toContain("Waited 120s for: the training job.");
+		expect(text).not.toContain("user asked");
+	});
+
+	it("says when the user cut the wait short, so a short wait is not read as its own choice", () => {
+		const text = waitResumeResultText({ ...park, wokeEarlyAt: new Date(120_000) });
+		expect(text).toContain("The user asked you to check on this early");
 	});
 });

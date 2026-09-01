@@ -155,10 +155,16 @@ export function waitResumeResultText(park: {
 	reason: string;
 	resumeAt: Date;
 	createdAt: Date;
+	wokeEarlyAt?: Date;
 }): string {
 	const waited = Math.round((park.resumeAt.getTime() - park.createdAt.getTime()) / 1000);
+	// An early wake is a user action, not a clock: say so, or the model reads a
+	// short wait as its own choice and mis-sizes the next one.
+	const early = park.wokeEarlyAt
+		? "The user asked you to check on this early, so the wait was cut short. "
+		: "";
 	return (
-		`Waited ${waited}s for: ${park.reason}. You are now resumed. ` +
+		`Waited ${waited}s for: ${park.reason}. ${early}You are now resumed. ` +
 		"Check the status of what you were waiting for once, then act on what you find — " +
 		"if it is still not ready, wait again rather than polling."
 	);

@@ -64,7 +64,7 @@
 		message,
 		loading = false,
 		isAuthor: _isAuthor = true,
-		readOnly: _readOnly = false,
+		readOnly = false,
 		isTapped = $bindable(false),
 		alternatives = [],
 		editMsdgId = $bindable(null),
@@ -93,7 +93,6 @@
 	$effect(() => {
 		// referenced to appease linter for currently-unused props
 		void _isAuthor;
-		void _readOnly;
 	});
 	function handleKeyDown(e: KeyboardEvent) {
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -595,7 +594,13 @@
 			</div>
 
 			{#if waitingState}
-				<TurnWaitBanner until={waitingState.until ?? 0} reason={waitingState.reason} />
+				<TurnWaitBanner
+					until={waitingState.until ?? 0}
+					reason={waitingState.reason}
+					conversationId={page.params.id ?? ""}
+					messageId={message.id}
+					canWake={!readOnly}
+				/>
 			{/if}
 		</div>
 
