@@ -10,8 +10,9 @@ import { generate } from "./generate";
 import { runMcpFlow } from "./mcp/runMcpFlow";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
-import { isMlAssistantConversation } from "$lib/server/mlAssistant";
+import { isMlAssistantConversation, pinnedHubToken } from "$lib/server/mlAssistant";
 import { settleMlBudget } from "$lib/server/mlBudget/settle";
+import { reservedMicroUsd } from "$lib/utils/mlBudget";
 import { logger } from "$lib/server/logger";
 import { resolvePreprompt } from "./preprompt";
 
@@ -69,14 +70,30 @@ async function* textGenerationWithoutTitle(
 	// turn — the session-context line and the gate must both see refunds land.
 	if (mlAssistant && conv.mlBudget) {
 		try {
+			// Same effective credential as dispatch: an operator-pinned Hub entry
+			// launched the jobs, so it is what can read them back; the user's own
+			// token otherwise.
 			const token =
+				pinnedHubToken() ??
 				(ctx.locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
 				(ctx.locals as unknown as { token?: string } | undefined)?.token;
-			conv.mlBudget = await settleMlBudget({
+			const settled = await settleMlBudget({
 				conversationId: convId,
 				budget: conv.mlBudget,
 				...(token ? { token } : {}),
 			});
+			// A changed ledger must reach the strip now: the guard only emits on
+			// gated calls, so a turn of text or log reads would otherwise leave the
+			// old hold on screen after the refund landed.
+			if (settled !== conv.mlBudget) {
+				conv.mlBudget = settled;
+				yield {
+					type: MessageUpdateType.Budget,
+					totalMicroUsd: settled.totalMicroUsd,
+					spentMicroUsd: settled.spentMicroUsd,
+					reservedMicroUsd: reservedMicroUsd(settled),
+				};
+			}
 		} catch (err) {
 			// A failed settle only leaves holds in place — safe to run the turn on.
 			logger.warn({ err: String(err) }, "[mlBudget] settle pass failed; continuing");

@@ -31,10 +31,13 @@ export const isHfMcpServer = (urlString: string): boolean => {
 	try {
 		const u = new URL(urlString);
 		const host = u.hostname.toLowerCase();
+		// Trailing slashes are canonicalized away: `https://hf.co/mcp/` dispatches
+		// tools exactly like the bare path, so an exact-path check here would let
+		// a one-character config typo route job submissions around the gate.
 		return (
 			u.protocol === "https:" &&
 			(host === "hf.co" || host === "huggingface.co") &&
-			u.pathname === "/mcp"
+			u.pathname.replace(/\/+$/, "") === "/mcp"
 		);
 	} catch {
 		return false;

@@ -49,8 +49,16 @@ const FALLBACK_PRICES_MICRO_USD_PER_MINUTE: Record<string, number> = {
 };
 
 let livePrices: Map<string, number> | undefined;
-let lastFetchAt = 0;
+let lastSuccessAt = 0;
+let lastAttemptAt = 0;
 let inflight: Promise<void> | undefined;
+
+/**
+ * Minimum gap between fetch attempts once one has failed, so an outage costs
+ * one slow call a minute instead of a 10-second stall on every lookup, while
+ * recovery is still picked up quickly.
+ */
+const RETRY_AFTER_FAILURE_MS = 60_000;
 
 async function refreshLivePrices(): Promise<void> {
 	const res = await fetch(HARDWARE_API_URL, {
@@ -76,17 +84,24 @@ async function refreshLivePrices(): Promise<void> {
 	}
 	if (table.size === 0) throw new Error("hardware API returned no priced flavors");
 	livePrices = table;
-	lastFetchAt = Date.now();
+	lastSuccessAt = Date.now();
 }
 
 /**
  * Per-minute price for a flavor, or undefined for one the gate must refuse.
  * Serves the cached live list, refreshing after the TTL; a failed refresh keeps
- * serving the last good list (prices move rarely and staleness only mis-sizes
- * the refund, never the guarantee).
+ * serving the last good list and retries on a short backoff (prices move rarely
+ * and staleness only mis-sizes the refund, never the guarantee). The baked
+ * snapshot serves only while no live fetch has EVER succeeded: once live data
+ * exists, a flavor absent from it is treated as unpriced rather than restored
+ * at the snapshot's old rate — a retired flavor must fail closed.
  */
 export async function getFlavorPriceMicroUsdPerMinute(flavor: string): Promise<number | undefined> {
-	if (!livePrices || Date.now() - lastFetchAt > PRICE_CACHE_TTL_MS) {
+	const now = Date.now();
+	const expired = now - lastSuccessAt > PRICE_CACHE_TTL_MS;
+	const attemptDue = now - lastAttemptAt > RETRY_AFTER_FAILURE_MS;
+	if ((!livePrices || expired) && attemptDue) {
+		lastAttemptAt = now;
 		inflight ??= refreshLivePrices().finally(() => {
 			inflight = undefined;
 		});
@@ -97,15 +112,16 @@ export async function getFlavorPriceMicroUsdPerMinute(flavor: string): Promise<n
 			if (!livePrices) {
 				logger.warn({ err: String(err) }, "[mlBudget] hardware price fetch failed; using snapshot");
 			}
-			lastFetchAt = Date.now();
 		}
 	}
-	return livePrices?.get(flavor) ?? FALLBACK_PRICES_MICRO_USD_PER_MINUTE[flavor];
+	if (livePrices) return livePrices.get(flavor);
+	return FALLBACK_PRICES_MICRO_USD_PER_MINUTE[flavor];
 }
 
 export function resetPriceCacheForTests(): void {
 	livePrices = undefined;
-	lastFetchAt = 0;
+	lastSuccessAt = 0;
+	lastAttemptAt = 0;
 	inflight = undefined;
 }
 

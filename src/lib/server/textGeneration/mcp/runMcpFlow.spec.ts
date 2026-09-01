@@ -834,4 +834,14 @@ describe("leaked tool-call markup", () => {
 		expect(mocks.create).toHaveBeenCalledTimes(1);
 		expect(finalAnswer(updates)).toContain("<some_other_tool>");
 	});
+
+	it("requires a whole tag, not a prefix", async () => {
+		// <do_thing_output> is ordinary content, not a leaked call to do_thing.
+		scriptRounds([{ content: "The result arrives in a <do_thing_output> element." }]);
+
+		const { updates } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toContain("<do_thing_output>");
+	});
 });

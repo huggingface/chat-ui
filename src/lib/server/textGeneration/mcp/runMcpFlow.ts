@@ -1109,8 +1109,10 @@ export async function* runMcpFlow({
 			// happened, and the user would get broken markup instead of a working
 			// control. Retry once with the correction; the retried round's
 			// FinalAnswer replaces the leaked text client-side.
+			// A whole opening tag, not a prefix: content like <hf_jobs_output> is
+			// ordinary text, not a leaked call to hf_jobs.
 			const leakedToolName = advertisedToolNames.find((name) =>
-				visibleContent.includes(`<${name}`)
+				new RegExp(`<${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s/>]`).test(visibleContent)
 			);
 			if (leakedToolName && leakedToolCallRetries < MAX_LEAKED_TOOL_CALL_RETRIES) {
 				leakedToolCallRetries += 1;

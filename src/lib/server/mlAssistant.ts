@@ -1,6 +1,7 @@
 import type { Conversation } from "$lib/types/Conversation";
 import type { McpServerConfig } from "./mcp/httpClient";
 import { hasAuthHeader, isHfMcpServer } from "./mcp/hf";
+import { getMcpServers } from "./mcp/registry";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 
 /**
@@ -38,6 +39,25 @@ export const ML_ASSISTANT_MCP_SERVERS: McpServerConfig[] = [
  */
 export function isMlAssistantConversation(conv: Pick<Conversation, "mlAssistant">): boolean {
 	return ML_ASSISTANT_MODE && conv.mlAssistant === true;
+}
+
+/**
+ * The Bearer token of an operator-pinned Hub MCP entry, if one is configured.
+ * When such an entry wins the preset merge, jobs launch under it rather than
+ * the user's token — so settlement must query the Jobs API as the same
+ * account, or traceable holds either never resolve (no user token) or 404 as
+ * the wrong account and get charged at their full ceiling.
+ */
+export function pinnedHubToken(): string | undefined {
+	for (const server of withMlAssistantServers(getMcpServers())) {
+		if (!isHfMcpServer(server.url) || !hasAuthHeader(server.headers)) continue;
+		const raw = Object.entries(server.headers ?? {}).find(
+			([key]) => key.toLowerCase() === "authorization"
+		)?.[1];
+		const match = raw ? /^Bearer\s+(\S+)$/i.exec(raw) : null;
+		if (match) return match[1];
+	}
+	return undefined;
 }
 
 /**

@@ -1,7 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const mockedServers = vi.hoisted(() => ({
+	value: [] as Array<{ name: string; url: string; headers?: Record<string, string> }>,
+}));
+vi.mock("./mcp/registry", () => ({ getMcpServers: () => mockedServers.value }));
+
 import {
 	ML_ASSISTANT_MCP_SERVERS,
 	isMlAssistantConversation,
+	pinnedHubToken,
 	withMlAssistantServers,
 } from "./mlAssistant";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
@@ -96,5 +103,29 @@ describe("ML Assistant preset", () => {
 		expect(withMlAssistantServers([]).map((s) => s.name)).toEqual(
 			ML_ASSISTANT_MCP_SERVERS.map((s) => s.name)
 		);
+	});
+});
+
+describe("pinnedHubToken", () => {
+	it("reads the Bearer token off an operator-pinned Hub entry", () => {
+		mockedServers.value = [
+			{ name: "Other", url: "https://other.example/mcp", headers: { Authorization: "Bearer no" } },
+			{
+				name: "Hugging Face",
+				url: "https://hf.co/mcp",
+				headers: { authorization: "Bearer hf_pinned" },
+			},
+		];
+		expect(pinnedHubToken()).toBe("hf_pinned");
+	});
+
+	it("returns nothing without a pinned Hub credential", () => {
+		mockedServers.value = [{ name: "Hugging Face", url: "https://hf.co/mcp" }];
+		expect(pinnedHubToken()).toBeUndefined();
+		mockedServers.value = [
+			// Not a Bearer header: unusable for the REST lookup, so not extracted.
+			{ name: "Hugging Face", url: "https://hf.co/mcp", headers: { Authorization: "Basic abc" } },
+		];
+		expect(pinnedHubToken()).toBeUndefined();
 	});
 });

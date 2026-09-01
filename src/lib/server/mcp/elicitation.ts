@@ -264,7 +264,7 @@ export async function handleElicitationRequest(
 
 export type SubmitResult =
 	| { ok: true; resume: boolean; messageId?: string }
-	| { ok: false; status: 400 | 404 | 409; error: string };
+	| { ok: false; status: 400 | 404 | 409 | 500; error: string };
 
 export async function submitElicitationAnswer({
 	elicitationId,
@@ -294,6 +294,45 @@ export async function submitElicitationAnswer({
 		}
 	}
 
+	// A chosen option can carry a budget grant (see setBudgetUsd on the select
+	// option type). Applied here — trusted code handling the user's own click —
+	// and never by the model, which can only propose the amount. Guarded on the
+	// mode so an option smuggled into an ordinary conversation grants nothing.
+	//
+	// Applied BEFORE the answer is marked resolved: resolving is irreversible,
+	// so a grant that failed after it would leave the client and the resumed
+	// tool result claiming a budget the ledger never got, with no way to answer
+	// again. Failing here keeps the prompt pending and the retry honest. The
+	// residual race — grant applied, then the resolve CAS lost to a concurrent
+	// different answer — needs two competing submissions of one prompt in the
+	// same instant; the phantom-grant failure it replaces needed only a DB blip.
+	if (action === "accept" && doc.pending?.kind === "ask" && validated) {
+		const grantedUsd = chosenBudgetUsd(doc.request, validated);
+		if (grantedUsd !== undefined) {
+			try {
+				const applied = await setMlBudgetTotal({
+					conversationId,
+					totalMicroUsd: usdToMicroUsd(grantedUsd),
+					extraFilter: { mlAssistant: true },
+				});
+				if (!applied) {
+					return {
+						ok: false,
+						status: 500,
+						error: "The budget grant could not be applied. Nothing was recorded — try again.",
+					};
+				}
+			} catch (err) {
+				logger.error({ err, elicitationId }, "[ask] failed to apply the granted budget");
+				return {
+					ok: false,
+					status: 500,
+					error: "The budget grant could not be applied. Nothing was recorded — try again.",
+				};
+			}
+		}
+	}
+
 	// `status: "pending"` makes a double submit a no-op rather than a second, different answer.
 	const updated = await collections.mcpElicitations.updateOne(
 		{ elicitationId, conversationId, status: "pending" },
@@ -308,25 +347,6 @@ export async function submitElicitationAnswer({
 		}
 	);
 	if (updated.matchedCount === 0) return { ok: false, status: 409, error: "Already answered." };
-
-	// A chosen option can carry a budget grant (see setBudgetUsd on the select
-	// option type). Applied here — trusted code handling the user's own click —
-	// and never by the model, which can only propose the amount. Guarded on the
-	// mode so an option smuggled into an ordinary conversation grants nothing.
-	if (action === "accept" && doc.pending?.kind === "ask" && validated) {
-		const grantedUsd = chosenBudgetUsd(doc.request, validated);
-		if (grantedUsd !== undefined) {
-			try {
-				await setMlBudgetTotal({
-					conversationId,
-					totalMicroUsd: usdToMicroUsd(grantedUsd),
-					extraFilter: { mlAssistant: true },
-				});
-			} catch (err) {
-				logger.error({ err, elicitationId }, "[ask] failed to apply the granted budget");
-			}
-		}
-	}
 
 	return {
 		ok: true,

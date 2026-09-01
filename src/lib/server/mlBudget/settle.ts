@@ -97,54 +97,48 @@ export async function settleMlBudget({
 }: {
 	conversationId: ObjectId;
 	budget: MlBudget;
-	/** User's Hub token; without one only orphan-age settles run. */
+	/** Hub token the jobs are readable with; without one only orphan-age settles run. */
 	token?: string;
 	now?: Date;
 }): Promise<MlBudget> {
-	let changed = false;
-
-	for (const reservation of budget.reservations) {
-		if (reservation.jobId && reservation.namespace) {
-			// Traceable: settle only from the API's answer. No token this turn
-			// just means it stays held until a turn that has one.
-			if (!token) continue;
-			const lookup = await lookupJob({
-				namespace: reservation.namespace,
-				jobId: reservation.jobId,
-				token,
-			});
-			if (lookup.state === "terminal" || lookup.state === "gone") {
+	// Concurrent, not serial: this runs before the turn's first token, and each
+	// lookup can spend its full timeout when the API is slow — N holds must cost
+	// one timeout, not N. Open holds are few, so no concurrency cap is needed.
+	const outcomes = await Promise.all(
+		budget.reservations.map(async (reservation) => {
+			if (reservation.jobId && reservation.namespace) {
+				// Traceable: settle only from the API's answer. No token this turn
+				// just means it stays held until a turn that has one.
+				if (!token) return false;
+				const lookup = await lookupJob({
+					namespace: reservation.namespace,
+					jobId: reservation.jobId,
+					token,
+				});
+				if (lookup.state !== "terminal" && lookup.state !== "gone") return false;
 				// A deleted job's runtime is unknowable: charge the ceiling.
 				const actual =
 					lookup.state === "terminal"
 						? actualMicroUsd(reservation, lookup.billedMinutes)
 						: reservation.ceilingMicroUsd;
-				changed =
-					(await settleReservation({
-						conversationId,
-						key: reservation.key,
-						actualMicroUsd: actual,
-					})) || changed;
+				return settleReservation({ conversationId, key: reservation.key, actualMicroUsd: actual });
 			}
-			continue;
-		}
 
-		const deadline =
-			reservation.createdAt.getTime() + reservation.timeoutSeconds * 1000 + ORPHAN_SLACK_MS;
-		if (now.getTime() > deadline) {
+			const deadline =
+				reservation.createdAt.getTime() + reservation.timeoutSeconds * 1000 + ORPHAN_SLACK_MS;
+			if (now.getTime() <= deadline) return false;
 			logger.warn(
 				{ key: reservation.key },
 				"[mlBudget] settling an untraceable reservation at its ceiling"
 			);
-			changed =
-				(await settleReservation({
-					conversationId,
-					key: reservation.key,
-					actualMicroUsd: reservation.ceilingMicroUsd,
-				})) || changed;
-		}
-	}
+			return settleReservation({
+				conversationId,
+				key: reservation.key,
+				actualMicroUsd: reservation.ceilingMicroUsd,
+			});
+		})
+	);
 
-	if (!changed) return budget;
+	if (!outcomes.some(Boolean)) return budget;
 	return (await readMlBudget(conversationId)) ?? budget;
 }

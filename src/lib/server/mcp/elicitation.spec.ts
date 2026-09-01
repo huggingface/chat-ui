@@ -520,17 +520,38 @@ describe("submitElicitationAnswer budget grants", () => {
 		expect(conv?.mlBudget?.totalMicroUsd).toBe(0);
 	});
 
-	it("grants nothing outside ML Assistant conversations", async () => {
-		// An option smuggled into an ordinary conversation must not conjure a budget.
+	it("fails loudly outside ML Assistant conversations, leaving the prompt answerable", async () => {
+		// An option smuggled into an ordinary conversation must not conjure a
+		// budget — and must not resolve as if it had: a resolved answer would
+		// tell the model the grant landed when the ledger never changed.
 		const conversationId = await mlConversation(false);
 		const elicitationId = await budgetAskRow(conversationId);
-		await submitElicitationAnswer({
+		const result = await submitElicitationAnswer({
 			elicitationId,
 			conversationId,
 			action: "accept",
 			content: { q1: "Run in full" },
 		});
+		expect(result).toMatchObject({ ok: false, status: 500 });
 		const conv = await collections.conversations.findOne({ _id: conversationId });
 		expect(conv?.mlBudget).toBeUndefined();
+		const row = await collections.mcpElicitations.findOne({ elicitationId });
+		expect(row?.status).toBe("pending");
+	});
+
+	it("resolves nothing when the grant write cannot land", async () => {
+		// Apply-before-resolve: a failed grant returns retryable and the prompt
+		// stays pending, instead of a resolved answer claiming a phantom budget.
+		const conversationId = new ObjectId(); // no conversation document at all
+		const elicitationId = await budgetAskRow(conversationId);
+		const result = await submitElicitationAnswer({
+			elicitationId,
+			conversationId,
+			action: "accept",
+			content: { q1: "Run in full" },
+		});
+		expect(result).toMatchObject({ ok: false, status: 500 });
+		const row = await collections.mcpElicitations.findOne({ elicitationId });
+		expect(row?.status).toBe("pending");
 	});
 });

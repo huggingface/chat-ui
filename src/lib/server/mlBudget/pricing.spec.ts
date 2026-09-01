@@ -97,3 +97,34 @@ describe("getFlavorPriceMicroUsdPerMinute", () => {
 		expect(await getFlavorPriceMicroUsdPerMinute("quantum-x9000")).toBeUndefined();
 	});
 });
+
+describe("pricing degradation", () => {
+	beforeEach(() => resetPriceCacheForTests());
+	afterEach(() => vi.unstubAllGlobals());
+
+	it("backs off after a failed fetch instead of stalling every lookup", async () => {
+		const fetchMock = vi.fn(async () => {
+			throw new Error("outage");
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		await getFlavorPriceMicroUsdPerMinute("t4-small");
+		await getFlavorPriceMicroUsdPerMinute("cpu-basic");
+		await getFlavorPriceMicroUsdPerMinute("t4-small");
+		// One slow attempt, then the snapshot serves inside the retry window.
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("fails closed on flavors the live list no longer carries", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => ({
+				ok: true,
+				json: async () => [{ name: "t4-small", unitCostMicroUSD: 6667, unitLabel: "minute" }],
+			}))
+		);
+		expect(await getFlavorPriceMicroUsdPerMinute("t4-small")).toBe(6667);
+		// In the snapshot, but retired from the live list: unpriced, not restored
+		// at the snapshot's old rate.
+		expect(await getFlavorPriceMicroUsdPerMinute("cpu-basic")).toBeUndefined();
+	});
+});
