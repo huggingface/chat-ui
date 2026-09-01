@@ -20,6 +20,7 @@ export type MessageUpdate =
 	| MessageRouterMetadataUpdate
 	| MessageElicitationUpdate
 	| MessagePlanUpdate
+	| MessageBudgetUpdate
 	| MessageTurnStateUpdate;
 
 export enum MessageUpdateType {
@@ -33,6 +34,7 @@ export enum MessageUpdateType {
 	RouterMetadata = "routerMetadata",
 	Elicitation = "elicitation",
 	Plan = "plan",
+	Budget = "budget",
 	TurnState = "turnState",
 }
 
@@ -235,4 +237,17 @@ export interface MessagePlanUpdate {
 	/** Model-authored one-line changelog for this update. */
 	explanation?: string;
 	version: number;
+}
+
+/**
+ * Snapshot of the ML Assistant compute budget after a reservation, release or
+ * settle. Display-only: the authoritative state lives on `Conversation.mlBudget`
+ * and every transition is a guarded write there. Amounts in integer micro-USD.
+ */
+export interface MessageBudgetUpdate {
+	type: MessageUpdateType.Budget;
+	totalMicroUsd: number;
+	spentMicroUsd: number;
+	/** Sum of open reservation ceilings — held, not yet settled. */
+	reservedMicroUsd: number;
 }

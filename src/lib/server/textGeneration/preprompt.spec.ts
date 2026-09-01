@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { resolvePreprompt } from "./preprompt";
 import { injectArtifactsPrompt } from "./artifacts";
-import { ML_ASSISTANT_PREPROMPT, mlAssistantSessionContext } from "$lib/server/mlAssistantPrompt";
+import {
+	ML_ASSISTANT_BUDGET_RULES,
+	ML_ASSISTANT_PREPROMPT,
+	mlAssistantSessionContext,
+} from "$lib/server/mlAssistantPrompt";
 
 /**
  * The ML Assistant preset must not change how artifacts resolve for anything
@@ -106,10 +110,13 @@ describe("resolvePreprompt", () => {
 				now,
 			})
 		).toBe(
-			`${injectArtifactsPrompt(ML_ASSISTANT_PREPROMPT)}\n\n${mlAssistantSessionContext({
-				timezone: "UTC",
-				now,
-			})}`
+			`${injectArtifactsPrompt(ML_ASSISTANT_PREPROMPT)}\n\n${ML_ASSISTANT_BUDGET_RULES}\n\n${mlAssistantSessionContext(
+				{
+					timezone: "UTC",
+					now,
+					budget: { remaining: "$0.00", total: "$0.00" },
+				}
+			)}`
 		);
 	});
 
@@ -123,9 +130,10 @@ describe("resolvePreprompt", () => {
 		});
 
 		expect(resolved).toContain("User=pngwn");
-		// After the artifacts prompt, not merely somewhere in the message: the rule
-		// keys off the last line, and artifacts is appended by the same call.
-		expect(resolved?.trimEnd().endsWith("User=pngwn]")).toBe(true);
+		// The bracketed context stays the message's final line: the namespace rule
+		// keys off it, and artifacts is appended by the same call.
+		expect(resolved?.trimEnd().endsWith("]")).toBe(true);
+		expect(resolved?.trimEnd().split("\n").at(-1)).toContain("User=pngwn");
 	});
 
 	it("says the user is unknown rather than leaving the preset to guess", () => {
@@ -142,5 +150,49 @@ describe("resolvePreprompt", () => {
 				username: "pngwn",
 			})
 		).toBe("You are a pirate.");
+	});
+
+	it("carries the live balance in the session context", () => {
+		const budget = {
+			totalMicroUsd: 10_000_000,
+			spentMicroUsd: 1_500_000,
+			reservations: [
+				{
+					key: "gen:a",
+					kind: "job" as const,
+					flavor: "t4-small",
+					priceMicroUsdPerMinute: 6667,
+					timeoutSeconds: 600,
+					ceilingMicroUsd: 1_000_000,
+					createdAt: new Date(),
+				},
+			],
+		};
+		const resolved = resolvePreprompt({
+			conversationPreprompt: undefined,
+			mlAssistant: true,
+			username: "pngwn",
+			budget,
+		});
+		expect(resolved).toContain("# Session budget");
+		// total − spent − held = 10.00 − 1.50 − 1.00
+		expect(resolved).toContain("Budget=$7.50 remaining of $10.00");
+	});
+
+	it("treats a conversation without a stored budget as a zero grant, not an ungated one", () => {
+		const resolved = resolvePreprompt({
+			conversationPreprompt: undefined,
+			mlAssistant: true,
+			username: "pngwn",
+		});
+		expect(resolved).toContain("# Session budget");
+		expect(resolved).toContain("Budget=$0.00 remaining of $0.00");
+
+		const outsideMode = resolvePreprompt({
+			conversationPreprompt: "You are a pirate.",
+			mlAssistant: false,
+		});
+		expect(outsideMode).not.toContain("# Session budget");
+		expect(outsideMode).not.toContain("Budget=");
 	});
 });
