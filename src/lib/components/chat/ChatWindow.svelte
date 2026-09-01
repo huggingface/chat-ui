@@ -3,9 +3,12 @@
 	import { onDestroy, untrack } from "svelte";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
+	import TrackioPane from "./TrackioPane.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
-	import { artifactPanel } from "$lib/stores/artifactPanel.svelte";
+	import { collectTrackioDashboards } from "$lib/utils/trackio";
+	import { collectPaneItems } from "$lib/utils/paneItems";
+	import { sidePane } from "$lib/stores/sidePane.svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import IconCheap from "$lib/components/icons/IconCheap.svelte";
@@ -155,7 +158,7 @@
 		get registry() {
 			return artifactRegistry;
 		},
-		panel: artifactPanel,
+		panel: sidePane,
 		// Deep consumers (e.g. the code-block preview modal) can't render a
 		// meaningful disabled state, so streaming also gates availability here;
 		// the panel gets the handler as a prop and disables on `loading` itself.
@@ -169,8 +172,18 @@
 	$effect(() => {
 		const streaming = artifactRegistry.streaming;
 		if (!streaming || !loading) return;
-		artifactPanel.maybeAutoOpen(streaming.identifier, streaming.version);
+		sidePane.maybeAutoOpen(streaming.identifier, streaming.version);
 	});
+
+	// Trackio dashboards a training run printed into its job logs, read back out
+	// of the tool results on the messages. Derived like the artifact registry, so
+	// reopening the conversation finds the same dashboards.
+	let trackioDashboards = $derived(collectTrackioDashboards(messages));
+
+	// One ordered list of everything the pane can show, so its next/previous walks
+	// artifacts and dashboards together instead of each view navigating only its
+	// own kind.
+	let paneItems = $derived(collectPaneItems(messages, artifactRegistry, trackioDashboards));
 
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
@@ -423,7 +436,7 @@
 		const key = page.params?.id;
 		if (key !== prevConversationKey) {
 			prevConversationKey = key;
-			artifactPanel.reset();
+			sidePane.reset();
 		}
 	});
 
@@ -440,6 +453,32 @@
 		chatScroll.setComposerHeight(composerHeight);
 	});
 
+	// Open the newest dashboard the first time it shows up: the point of the run
+	// is watching it train. Once per URL, so the user can close it and read the
+	// chat while the run continues.
+	//
+	// Declared after the conversation-switch effect for the same reason the shared
+	// artifact open below is: a conversation -> conversation navigation can deliver
+	// the new messages and the new route param in one flush, and effects run in
+	// declaration order. Above the reset, this would open the destination's
+	// dashboard and record its key, then reset() would close the pane and clear
+	// that key -- and nothing would re-run this, so the dashboard would never open.
+	//
+	// Gated like the other two auto-opens rather than firing on presence. `loading`
+	// is what makes this "a run is happening now": without it, every hard load of
+	// any conversation that ever trained something re-opens the pane, because
+	// reset() clears the once-per-URL keys on each switch — framing a Space that
+	// went to sleep months ago. Desktop-only for the reason the shared-artifact
+	// open below is: on mobile the pane is a fullscreen overlay, and a shared
+	// conversation carries its tool results verbatim, so every viewer on a phone
+	// would arrive with the chat covered.
+	$effect(() => {
+		const latest = trackioDashboards.at(-1);
+		if (!latest || !loading) return;
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
+		sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
+	});
+
 	// Shared conversations containing artifacts usually exist to show one off:
 	// open the most recent artifact on load. Desktop only, since on mobile the
 	// panel is a fullscreen overlay that would hide the conversation entirely.
@@ -452,7 +491,7 @@
 		if (!latest) return;
 		autoOpenedSharedArtifact = true;
 		if (!window.matchMedia("(min-width: 768px)").matches) return;
-		artifactPanel.openArtifact(latest.identifier, null);
+		sidePane.openArtifact(latest.identifier, null);
 	});
 
 	const settings = useSettingsStore();
@@ -1229,10 +1268,12 @@
 
 	<ArtifactPanel
 		registry={artifactRegistry}
+		items={paneItems}
 		{loading}
 		canScreenshot={!shared && !isReadOnly && mimeMatchesAllowlist("image/png", activeMimeTypes)}
 		onsend={canSendFix ? sendFixRequest : undefined}
 	/>
+	<TrackioPane items={paneItems} />
 </div>
 
 <style>

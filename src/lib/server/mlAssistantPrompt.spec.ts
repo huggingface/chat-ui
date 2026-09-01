@@ -219,9 +219,15 @@ describe("ML Assistant system message size", () => {
 		// measured here too, since the mode is always budget-gated and re-sends
 		// them every round) plus the same headroom rule: the grant procedure and
 		// the enforcement formula are what keep an autonomous run from inventing
-		// spend authority. That number is ~6,500 tokens, re-sent on every round of
-		// a hundred-round budget: it is the figure to watch, and the next raise
-		// should have to argue for itself against it.
+		// spend authority. 27k -> 28.5k at the merge with the parallel raise for the
+		// two call shapes that cost whole runs in practice — the uv/run submission
+		// and logs syntax, and the Trackio init/log/finish sequence, there because
+		// the model got them wrong from memory (a wrong kwarg is not a style
+		// question, it is a dead job) and a literal example is the only form of that
+		// rule that works — plus the job-naming rules that landed on the same
+		// section in the same week. That number is ~6,900 tokens, re-sent on every
+		// round of a hundred-round budget: it is the figure to watch, and the next
+		// raise should have to argue for itself against it.
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -245,7 +251,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(27_000);
+		expect(composed.length).toBeLessThan(28_500);
 	});
 });
 
