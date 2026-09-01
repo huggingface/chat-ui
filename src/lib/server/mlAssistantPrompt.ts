@@ -94,6 +94,7 @@ Jobs run on remote hardware with ephemeral storage and a wall-clock limit.
 
 - Launching one looks exactly like this — copy the shape: \`{"operation": "uv", "args": {"script": "<the whole script>", "with_deps": ["torch", "trackio"], "flavor": "cpu-basic", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}}}\`. \`uv\` takes a \`script\`; \`run\` is for Docker and needs \`image\` plus a \`command\` array — not interchangeable. Every third-party import goes in \`with_deps\`; nothing but the standard library is there. Reading a job back is \`{"operation": "logs", "args": {"job_id": "<the id the run returned>", "tail": 500}}\` — \`args\` is an object in every operation, never the bare job id.
 - Anything you want to keep must be pushed to the Hub from inside the job. Set push_to_hub=True and an explicit hub_model_id, in the namespace from the session context. Nothing that is only written to local disk survives.
+- Name every job you submit. The user's jobs dashboard lists runs by name, and an unnamed job shows up there as an image tag plus a hash.
 - Smoke-test before you commit real compute: the same script, a handful of steps, the smallest hardware that fits. Run the script-level checks — does it import, does the data load, are the shapes right — in the cheapest place available before any job carries them. Then launch the real run.
 - Submit one job first. Only fan out once you have seen one get past its first steps.
 - Before submitting, print a short pre-flight list in your reply and check it yourself: base model, dataset and split, method, hardware, timeout, and where the result gets pushed. If a line of that list is a guess, stop and settle it first.
@@ -198,6 +199,7 @@ export function mlAssistantSessionContext({
  */
 const HF_JOBS_CONTRACT = `RUNNING JOBS (hf_jobs): a job is remote compute with ephemeral storage, a wall-clock limit, and per-minute billing against the user's credits. These lines go on the pre-flight list you print before submitting, and every one of them has to be true. The list is printed so the user can stop you before the credits are spent, not after.
 
+- Name. Every submission carries a name saying what the run is — method, model, dataset, and whether it is the smoke test or the real thing (sft-qwen3-0.6b-capybara-smoke). Skip it and the job lands in the user's dashboard as an image tag plus a hash, indistinguishable from every other unnamed run. Add further labels where they would help the user filter — the dataset, the base model, the experiment they belong to.
 - Token. Pushing to the Hub from inside a job needs the token passed in explicitly as a secret (HF_TOKEN). Leave it out and the run trains for an hour and then fails at the push, which is the most expensive mistake available here.
 - Hardware. The default flavor is cpu-basic: two CPU cores. A training job that does not name a GPU flavor does not fail, it crawls. Name the flavor, what it costs per hour, and how long you expect the run to take.
 - Timeout. Set it above your estimate of the run, not at it. A timeout shorter than the run loses the run at the end.

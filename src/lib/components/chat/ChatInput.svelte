@@ -15,6 +15,7 @@
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
 	import MCPServerManager from "$lib/components/mcp/MCPServerManager.svelte";
 	import IconMCP from "$lib/components/icons/IconMCP.svelte";
+	import MlInternPill from "./MlInternPill.svelte";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
@@ -39,6 +40,8 @@
 		modelIsMultimodal?: boolean;
 		// Whether the currently selected model supports tool calling (incl. overrides)
 		modelSupportsTools?: boolean;
+		// Offers the ML Intern mode switch beside the MCP pill (empty conversations only)
+		showMlPill?: boolean;
 		children?: import("svelte").Snippet;
 		onPaste?: (e: ClipboardEvent) => void;
 		focused?: boolean;
@@ -55,6 +58,7 @@
 
 		modelIsMultimodal = false,
 		modelSupportsTools = true,
+		showMlPill = false,
 		children,
 		onPaste,
 		focused = $bindable(false),
@@ -257,7 +261,7 @@
 		onbeforeinput={requireAuthUser}
 	></textarea>
 
-	{#if !showNoTools}
+	{#if !showNoTools || showMlPill}
 		<div
 			class={[
 				"-ml-0.5 scrollbar-custom flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pt-1.5 pb-2.5 text-gray-500 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2 dark:text-gray-400",
@@ -469,6 +473,10 @@
 						</div>
 					{/if}
 				</div>
+			{/if}
+
+			{#if showMlPill}
+				<MlInternPill />
 			{/if}
 		</div>
 	{/if}

@@ -5,15 +5,8 @@ import type { RouterExample } from "./routerExamples";
  * preset loads; once the backend serves the preset it should replace this.
  */
 
-/** Tool ids shown in the strip while the mode is on and no task is running. */
+/** Tool ids shown in the strip until the run reports a plan. */
 export const ML_ASSISTANT_TOOLS = ["papers", "training", "spaces", "datasets", "eval", "hub"];
-
-/** Strip note shown while the mode is off. */
-export const ML_ASSISTANT_NOTE_OFF =
-	"— tools and prompts for papers, finetuning, demos and datasets";
-
-/** Note beside the "Ask in ML Intern" banner on conversations started without the mode. */
-export const ML_ASSISTANT_PROMO_NOTE = "— takes your question to a new chat with ML tools";
 
 /** Composer placeholder while the mode is on. */
 export const ML_ASSISTANT_PLACEHOLDER = "Describe the ML task — paper URL, model id, or dataset";

@@ -95,6 +95,14 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("push_to_hub");
 	});
 
+	it("requires a name on every submission", () => {
+		// Unnamed jobs land in the user's dashboard as an image tag plus a hash,
+		// indistinguishable from each other. Stated in the preset prompt and
+		// restated on the contract, like the other pre-flight rules.
+		expect(ML_ASSISTANT_PREPROMPT).toContain("Name every job you submit");
+		expect(inMode([tool("hf_jobs")])).toContain("- Name.");
+	});
+
 	it("points at the pricing doc instead of quoting rates", () => {
 		// A price table in a prompt goes stale silently; a pointer does not.
 		expect(inMode([tool("hf_jobs")])).toContain("hf://docs/hub/jobs-pricing.md");
@@ -207,11 +215,12 @@ describe("ML Assistant system message size", () => {
 		// runs in practice: the uv/run submission and logs syntax, and the Trackio
 		// init/log/finish sequence. Both are there because the model got them wrong
 		// from memory — a wrong kwarg is not a style question, it is a dead job — and
-		// a literal example is the only form of that rule that works. Half the usual
-		// raise, so the headroom stays small enough to keep meaning something. That
-		// number is ~6,125 tokens, re-sent on every round of a hundred-round budget:
-		// it is the figure to watch, and the next raise should have to argue for
-		// itself.
+		// a literal example is the only form of that rule that works. 24.5k -> 25k
+		// only because the job-naming rules landed on the same section in the same
+		// week: neither addition would have needed it alone, and the pair left ~230
+		// chars of headroom, which is the noise case again. That number is ~6,250
+		// tokens, re-sent on every round of a hundred-round budget: it is the figure
+		// to watch, and the next raise should have to argue for itself.
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -234,7 +243,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(24_500);
+		expect(composed.length).toBeLessThan(25_000);
 	});
 });
 
