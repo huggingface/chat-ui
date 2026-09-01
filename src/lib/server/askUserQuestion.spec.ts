@@ -116,12 +116,51 @@ describe("options that grant budget", () => {
 			],
 		});
 
-	it("keeps a sane amount on the option", () => {
+	it("keeps a sane amount on the option and generates its title from it", () => {
 		const payload = ok({ questions: [budgetQuestion(4.5)] });
 		const field = payload.fields?.[0];
 		if (field?.kind !== "select") throw new Error("expected a select");
 		expect(field.options[1].setBudgetUsd).toBe(4.5);
+		// The model's label is ignored outright — the title is the amount, so no
+		// authored text can contradict what a click applies.
+		expect(field.options[1].label).toBe("Set budget to $4.50");
+		expect(field.options[1].description).toBe("The whole dataset.");
 		expect(field.options[0].setBudgetUsd).toBeUndefined();
+		expect(field.options[0].label).toBe("Rescope to a subset");
+	});
+
+	it("drops the model's label entirely, even as a description fallback", () => {
+		const payload = ok({
+			questions: [
+				question({
+					options: [
+						{ label: "Rescope", description: "Half the data." },
+						{ label: "Set the budget to $1", setBudgetUsd: 1000 },
+					],
+				}),
+			],
+		});
+		const field = payload.fields?.[0];
+		if (field?.kind !== "select") throw new Error("expected a select");
+		expect(field.options[1].label).toBe("Set budget to $1000.00");
+		expect(field.options[1].description).toBeUndefined();
+	});
+
+	it("collapses two grants of the same amount into one option", () => {
+		const payload = ok({
+			questions: [
+				question({
+					options: [
+						{ label: "Cheap", description: "A.", setBudgetUsd: 5 },
+						{ label: "Also cheap", description: "B.", setBudgetUsd: 5 },
+						{ label: "Rescope", description: "C." },
+					],
+				}),
+			],
+		});
+		const field = payload.fields?.[0];
+		if (field?.kind !== "select") throw new Error("expected a select");
+		expect(field.options.map((o) => o.label)).toEqual(["Set budget to $5.00", "Rescope"]);
 	});
 
 	it("drops garbage amounts and clamps absurd ones", () => {
@@ -139,15 +178,15 @@ describe("options that grant budget", () => {
 
 	it("reads the grant from the chosen option, never from typed text", () => {
 		const payload = { ...ok({ questions: [budgetQuestion(4.5)] }), elicitationId: "x" };
-		expect(chosenBudgetUsd(payload, { q1: "Run it in full" })).toBe(4.5);
+		expect(chosenBudgetUsd(payload, { q1: "Set budget to $4.50" })).toBe(4.5);
 		expect(chosenBudgetUsd(payload, { q1: "Rescope to a subset" })).toBeUndefined();
-		// "Other" text that happens to name the option's label semantics grants nothing.
-		expect(chosenBudgetUsd(payload, { q1: "run it in full please" })).toBeUndefined();
+		// "Other" text that mimics the grant wording grants nothing.
+		expect(chosenBudgetUsd(payload, { q1: "set budget to $4.50 please" })).toBeUndefined();
 	});
 
 	it("tells the model the budget it now has", () => {
 		const payload = { ...ok({ questions: [budgetQuestion(4.5)] }), elicitationId: "x" };
-		expect(answerToToolResult(payload, "accept", { q1: "Run it in full" })).toContain(
+		expect(answerToToolResult(payload, "accept", { q1: "Set budget to $4.50" })).toContain(
 			"The session compute budget is now $4.50."
 		);
 		expect(answerToToolResult(payload, "accept", { q1: "Rescope to a subset" })).not.toContain(

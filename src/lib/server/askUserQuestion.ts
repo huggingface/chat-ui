@@ -62,7 +62,7 @@ export const askUserQuestionTool = {
 										setBudgetUsd: {
 											type: "number",
 											description:
-												"ML sessions with a compute budget only: if the user picks this option, the session budget is set to this many dollars. The amount is shown to the user beside the option. Use the smallest whole amount that covers the run you are proposing.",
+												"ML sessions with a compute budget only: if the user picks this option, the session budget is set to this many dollars. The option's title is generated from the amount and your label is ignored — put the trade-off in the description. Use the smallest whole amount that covers the run you are proposing.",
 										},
 									},
 									required: ["label", "description"],
@@ -118,17 +118,24 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 		const rawOptions = Array.isArray(q?.options) ? q.options : [];
 		for (const rawOption of rawOptions) {
 			const option = rawOption as Record<string, unknown>;
-			const label = asText(option?.label, 80);
-			// Keyed by value in the form, so a repeat would break rendering outright.
-			if (!label || options.some((o) => o.value === label)) continue;
-			const description = asText(option?.description, 200);
+			const modelLabel = asText(option?.label, 80);
 			// Model-proposed, user-applied: the amount survives only if it is a sane
-			// number of dollars, and the UI always shows it beside the option.
+			// number of dollars.
 			const rawBudget = option?.setBudgetUsd;
 			const setBudgetUsd =
 				typeof rawBudget === "number" && Number.isFinite(rawBudget) && rawBudget > 0
 					? Math.min(10_000, Math.round(rawBudget * 100) / 100)
 					: undefined;
+			// A grant option's title is generated from the amount, and the model's
+			// label is ignored outright — not even salvaged as a description — so
+			// no authored text can say "$1" over a field that applies something
+			// else. The description is the model's one voice on these options.
+			const label =
+				setBudgetUsd !== undefined ? `Set budget to $${setBudgetUsd.toFixed(2)}` : modelLabel;
+			// Keyed by value in the form, so a repeat would break rendering outright.
+			// Canonical grant labels make two same-amount options one option.
+			if (!label || options.some((o) => o.value === label)) continue;
+			const description = asText(option?.description, 200);
 			options.push({
 				value: label,
 				label,
