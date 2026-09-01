@@ -17,8 +17,19 @@ import {
  */
 export type HubSearchStatus = "loading" | "success" | "error" | null;
 
-/** Below this, a query matches most of the Hub and the results are noise. */
-export const MIN_QUERY_LENGTH = 2;
+/**
+ * A bare `@` is not a query, so one character is the floor.
+ *
+ * Review asked for 2-3 here, against five spinner flashes and five requests
+ * while typing `@alice`. Both of those turned out to be separate bugs: the
+ * debounce cancels in-flight typing, so a word typed at speed is one request
+ * either way, and the flash came from setting `loading` before the debounce
+ * rather than when the request goes out. With those fixed, the only thing a
+ * higher floor buys is hiding noisy single-character results — at the cost of
+ * showing nothing to someone who typed one character and stopped, which is
+ * exactly when they wanted the help.
+ */
+export const MIN_QUERY_LENGTH = 1;
 const DEBOUNCE_MS = 250;
 
 export interface HubMentionOptions {

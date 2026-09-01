@@ -32,16 +32,18 @@ describe("HubMentionState", () => {
 		expect(hub.open).toBe(false);
 	});
 
-	it("waits for a query worth searching", async () => {
+	it("searches from the first character, but not on a bare @", async () => {
 		const { hub, search } = makeState();
-		hub.update("hey @a", 6);
+		// A lone `@` is punctuation, not a query.
+		hub.update("hey @", 5);
 		await settle();
 		expect(search).not.toHaveBeenCalled();
 		expect(hub.open).toBe(false);
 
-		hub.update("hey @ab", 7);
+		hub.update("hey @a", 6);
 		await settle();
 		expect(search).toHaveBeenCalledTimes(1);
+		expect(hub.open).toBe(true);
 	});
 
 	it("stays closed during the debounce so typing does not flash the panel", async () => {
