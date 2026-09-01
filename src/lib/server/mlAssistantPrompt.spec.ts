@@ -203,9 +203,15 @@ describe("ML Assistant system message size", () => {
 		// 18k -> 19k for the hf_jobs submission contract; 19k -> 22k for the citation
 		// hop, paper-finding, web search and cost-to-finish hardware; 22k -> 24k for
 		// headroom alone, not content — at 21,889 the guard fired on every edit,
-		// which makes it noise. That number is ~5,500 tokens, re-sent on every round
-		// of a hundred-round budget: it is the figure to watch, and the next raise
-		// should have to argue for itself against it.
+		// which makes it noise. 24k -> 24.5k for the two call shapes that cost whole
+		// runs in practice: the uv/run submission and logs syntax, and the Trackio
+		// init/log/finish sequence. Both are there because the model got them wrong
+		// from memory — a wrong kwarg is not a style question, it is a dead job — and
+		// a literal example is the only form of that rule that works. Half the usual
+		// raise, so the headroom stays small enough to keep meaning something. That
+		// number is ~6,125 tokens, re-sent on every round of a hundred-round budget:
+		// it is the figure to watch, and the next raise should have to argue for
+		// itself.
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -228,7 +234,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(24_000);
+		expect(composed.length).toBeLessThan(24_500);
 	});
 });
 

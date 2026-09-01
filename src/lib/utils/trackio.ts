@@ -19,8 +19,18 @@ import { ToolResultStatus } from "$lib/types/Tool";
  * allowlist to a single host suffix we can reason about.
  */
 
-/** Tools whose output may carry a dashboard URL: the ones that run user code. */
-const TRACKIO_SOURCE_TOOLS = new Set(["hf_jobs", "hf_sandbox"]);
+/**
+ * Tools whose output may carry a dashboard URL: the ones that run user code.
+ *
+ * Matched by family rather than by exact name. The sandbox is several tools —
+ * `hf_sandbox` creates one, `hf_sandbox_exec` runs in it, `hf_sandbox_fs` reads
+ * its files — and a run's Trackio banner surfaces through whichever of them the
+ * model happened to use (observed live: the dashboard URL arrived in an
+ * `hf_sandbox_fs` cat of the training log, because `hf_jobs` was unresponsive
+ * and the whole run moved to the sandbox). An exact-name list silently drops
+ * those, and would drop any future `hf_sandbox_*` too.
+ */
+const TRACKIO_SOURCE_TOOL_REGEX = /^hf_(jobs|sandbox)(_|$)/;
 
 /** `https://<subdomain>.hf.space`, optionally with a path/query. */
 const HF_SPACE_URL_REGEX = /https?:\/\/([a-z0-9][a-z0-9-]*)\.hf\.space(\/[^\s"'<>)\]}]*)?/gi;
@@ -35,6 +45,14 @@ export interface TrackioDashboard {
 	url: string;
 	/** Human label for the pane header: `owner/name` when known, else the subdomain. */
 	label: string;
+	/**
+	 * Message the dashboard was printed in. Set by `collectTrackioDashboards`,
+	 * which walks the conversation and therefore knows the position; absent when
+	 * a single tool group is scanned on its own (the inline chip's case). Used to
+	 * interleave dashboards with artifacts in conversation order — see
+	 * `$lib/utils/paneItems`.
+	 */
+	messageId?: Message["id"];
 }
 
 /**
@@ -128,7 +146,7 @@ export function trackioDashboardsFromToolUpdates(updates: MessageToolUpdate[]): 
 		if (!isMessageToolResultUpdate(update)) continue;
 		const { result } = update;
 		if (result.status !== ToolResultStatus.Success) continue;
-		if (!TRACKIO_SOURCE_TOOLS.has(result.call.name)) continue;
+		if (!TRACKIO_SOURCE_TOOL_REGEX.test(result.call.name)) continue;
 		for (const output of result.outputs) {
 			const text = output["text"];
 			if (typeof text !== "string") continue;
@@ -148,7 +166,7 @@ export function trackioDashboardsFromToolUpdates(updates: MessageToolUpdate[]): 
  * so reopening a conversation rebuilds the same list.
  */
 export function collectTrackioDashboards(
-	messages: Array<Pick<Message, "from" | "updates">>
+	messages: Array<Pick<Message, "id" | "from" | "updates">>
 ): TrackioDashboard[] {
 	const found: TrackioDashboard[] = [];
 	const seen = new Set<string>();
@@ -159,7 +177,7 @@ export function collectTrackioDashboards(
 		for (const dashboard of trackioDashboardsFromToolUpdates(toolUpdates)) {
 			if (seen.has(dashboard.url)) continue;
 			seen.add(dashboard.url);
-			found.push(dashboard);
+			found.push({ ...dashboard, messageId: message.id });
 		}
 	}
 	return found;

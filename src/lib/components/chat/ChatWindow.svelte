@@ -8,6 +8,7 @@
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
 	import { collectTrackioDashboards } from "$lib/utils/trackio";
+	import { collectPaneItems } from "$lib/utils/paneItems";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
@@ -178,14 +179,10 @@
 	// reopening the conversation finds the same dashboards.
 	let trackioDashboards = $derived(collectTrackioDashboards(messages));
 
-	// Open the newest dashboard the first time it shows up: the point of the run
-	// is watching it train. Once per URL, so the user can close it and read the
-	// chat while the run continues.
-	$effect(() => {
-		const latest = trackioDashboards.at(-1);
-		if (!latest) return;
-		sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
-	});
+	// One ordered list of everything the pane can show, so its next/previous walks
+	// artifacts and dashboards together instead of each view navigating only its
+	// own kind.
+	let paneItems = $derived(collectPaneItems(messages, artifactRegistry, trackioDashboards));
 
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
@@ -453,6 +450,22 @@
 
 	$effect(() => {
 		chatScroll.setComposerHeight(composerHeight);
+	});
+
+	// Open the newest dashboard the first time it shows up: the point of the run
+	// is watching it train. Once per URL, so the user can close it and read the
+	// chat while the run continues.
+	//
+	// Declared after the conversation-switch effect for the same reason the shared
+	// artifact open below is: a conversation -> conversation navigation can deliver
+	// the new messages and the new route param in one flush, and effects run in
+	// declaration order. Above the reset, this would open the destination's
+	// dashboard and record its key, then reset() would close the pane and clear
+	// that key -- and nothing would re-run this, so the dashboard would never open.
+	$effect(() => {
+		const latest = trackioDashboards.at(-1);
+		if (!latest) return;
+		sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
 	});
 
 	// Shared conversations containing artifacts usually exist to show one off:
@@ -1234,11 +1247,12 @@
 
 	<ArtifactPanel
 		registry={artifactRegistry}
+		items={paneItems}
 		{loading}
 		canScreenshot={!shared && !isReadOnly && mimeMatchesAllowlist("image/png", activeMimeTypes)}
 		onsend={canSendFix ? sendFixRequest : undefined}
 	/>
-	<TrackioPane />
+	<TrackioPane items={paneItems} />
 </div>
 
 <style>

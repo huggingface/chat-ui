@@ -3,6 +3,7 @@
 	import DOMPurify from "isomorphic-dompurify";
 
 	import type { ArtifactRegistry, ArtifactVersion } from "$lib/utils/artifacts";
+	import type { PaneItem } from "$lib/utils/paneItems";
 	import { artifactFileName, isPreviewableKind } from "$lib/utils/artifacts";
 	import { diffLines, diffStats, renderDiffHtml } from "$lib/utils/artifactDiff";
 	import {
@@ -28,6 +29,7 @@
 	import { page } from "$app/state";
 
 	import SidePane from "./SidePane.svelte";
+	import PaneItemNav from "./PaneItemNav.svelte";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import ExternalLinkModal from "../ExternalLinkModal.svelte";
@@ -48,6 +50,8 @@
 
 	interface Props {
 		registry: ArtifactRegistry;
+		/** Everything the pane can show, for the cross-item nav in the header. */
+		items: PaneItem[];
 		loading?: boolean;
 		/** Whether the current model accepts image attachments (enables screenshot-to-chat) */
 		canScreenshot?: boolean;
@@ -59,7 +63,7 @@
 		onsend?: (text: string) => boolean;
 	}
 
-	let { registry, loading = false, canScreenshot = false, onsend }: Props = $props();
+	let { registry, items, loading = false, canScreenshot = false, onsend }: Props = $props();
 
 	let artifact = $derived(
 		sidePane.identifier ? registry.artifacts.get(sidePane.identifier) : undefined
@@ -495,6 +499,7 @@
 	<header
 		class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
 	>
+		<PaneItemNav {items} />
 		<div class="flex min-w-0 flex-1 items-center gap-2">
 			{#if isStreamingVersion}
 				<EosIconsLoading class="flex-none text-sm text-gray-400" />

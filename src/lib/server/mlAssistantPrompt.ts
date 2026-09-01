@@ -92,6 +92,7 @@ const JOBS = `# Submitting jobs
 
 Jobs run on remote hardware with ephemeral storage and a wall-clock limit.
 
+- Launching one looks exactly like this — copy the shape: \`{"operation": "uv", "args": {"script": "<the whole script>", "with_deps": ["torch", "trackio"], "flavor": "cpu-basic", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}}}\`. \`uv\` takes a \`script\`; \`run\` is for Docker and needs \`image\` plus a \`command\` array — not interchangeable. Every third-party import goes in \`with_deps\`; nothing but the standard library is there. Reading a job back is \`{"operation": "logs", "args": {"job_id": "<the id the run returned>", "tail": 500}}\` — \`args\` is an object in every operation, never the bare job id.
 - Anything you want to keep must be pushed to the Hub from inside the job. Set push_to_hub=True and an explicit hub_model_id, in the namespace from the session context. Nothing that is only written to local disk survives.
 - Smoke-test before you commit real compute: the same script, a handful of steps, the smallest hardware that fits. Run the script-level checks — does it import, does the data load, are the shapes right — in the cheapest place available before any job carries them. Then launch the real run.
 - Submit one job first. Only fan out once you have seen one get past its first steps.
@@ -202,6 +203,7 @@ const HF_JOBS_CONTRACT = `RUNNING JOBS (hf_jobs): a job is remote compute with e
 - Timeout. Set it above your estimate of the run, not at it. A timeout shorter than the run loses the run at the end.
 - Dependencies. State them explicitly, pinned — with the uv --with arguments or an image that already has them. Never build flash-attention from source in a job; it eats the budget and usually fails.
 - Destination. push_to_hub with an explicit hub_model_id in the namespace from the session context, or a mounted bucket volume for checkpoints. Nothing written to the container's own disk survives the job.
+- Metrics. A run worth watching gets a live dashboard: add \`trackio\` to \`with_deps\`, then \`trackio.init(project="<project>", space_id="<namespace>/<space>")\`, \`trackio.log({"loss": ...}, step=n)\`, \`trackio.finish()\`.
 - Data. Mount a large dataset as a volume rather than downloading it into the container.
 - Size. Smoke-test the same script for a handful of steps on the smallest GPU that fits, then launch the real run. Submit one job before you fan out. When hf_sandbox is on offer, the import and data checks have already happened there — a smoke job that dies on a typo was a job submitted too early.
 

@@ -156,11 +156,13 @@
 					openDashboardUrl
 						? 'border-blue-300 text-blue-700 dark:border-blue-500/40 dark:text-blue-300'
 						: 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'}"
-					title="Open the Trackio dashboard for this run"
+					title="Open the Trackio dashboard: {dashboard.label}"
 					onclick={() => sidePane.openTrackio(dashboard.url, dashboard.label)}
 				>
 					<CarbonChartLine class="size-3.5 shrink-0" />
-					<span class="truncate">Training dashboard</span>
+					<span class="truncate">
+						{dashboards.length > 1 ? dashboard.label : "Training dashboard"}
+					</span>
 				</button>
 			{/each}
 		</div>
