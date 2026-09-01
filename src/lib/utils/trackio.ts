@@ -40,6 +40,20 @@ const HF_SPACES_PAGE_REGEX = /https?:\/\/huggingface\.co\/spaces\/([A-Za-z0-9][\
 /** Log lines end in prose, so a URL at the end of a sentence keeps the period out. */
 const TRAILING_PUNCTUATION_REGEX = /[.,;:!?'"“”’)\]}]+$/;
 
+/**
+ * Capability grants for the dashboard iframe (see `TrackioPane`). Exported so
+ * the security contract can be pinned by a test rather than living inline in a
+ * component, where a rewording could widen it unnoticed.
+ *
+ * `allow-same-origin` is the one that needs justifying: a Trackio Space is a
+ * real cross-origin document that needs its own storage and backend, and the
+ * framed origin is never chat-ui's — extraction only ever yields `*.hf.space`.
+ * `allow-downloads` is load-bearing too: the dashboard's own export builds a
+ * blob and clicks a download link, which is inert without it. What stays denied
+ * is the escape hatches — no top-navigation, no popups, no modals.
+ */
+export const TRACKIO_FRAME_SANDBOX = "allow-scripts allow-same-origin allow-forms allow-downloads";
+
 export interface TrackioDashboard {
 	/** Embeddable `https://<owner>-<name>.hf.space` URL. */
 	url: string;
@@ -71,13 +85,16 @@ export function spaceIdToEmbedOrigin(owner: string, name: string): string | unde
 
 /**
  * Whether a URL found on this line is a Trackio dashboard rather than some
- * other Space the job happened to print. Two deterministic signals, either of
- * which is enough: the line names Trackio (which is how Trackio's own init
- * output reads), or the Space itself is named for it (`space_id="user/trackio"`
- * being the documented default).
+ * other Space the job happened to print. One signal: the line names Trackio.
+ * That covers both the shapes this appears in — Trackio's own init output says
+ * so in words, and a Space named for it (`space_id="user/trackio"`, the
+ * documented default) puts the word in the URL itself.
+ *
+ * The Space's name is deliberately NOT a second, independent test: it is parsed
+ * out of this same line, so it can never match where the line does not.
  */
-function isTrackioContext(line: string, spaceSlug: string): boolean {
-	return /trackio/i.test(line) || /trackio/i.test(spaceSlug);
+function isTrackioContext(line: string): boolean {
+	return /trackio/i.test(line);
 }
 
 /** Strip a trailing sentence period etc. that the URL regex swallowed. */
@@ -105,7 +122,7 @@ export function extractTrackioDashboards(text: string): TrackioDashboard[] {
 	for (const line of text.split(/\r?\n/)) {
 		for (const match of line.matchAll(HF_SPACE_URL_REGEX)) {
 			const subdomain = match[1].toLowerCase();
-			if (!isTrackioContext(line, subdomain)) continue;
+			if (!isTrackioContext(line)) continue;
 			// Re-parse rather than trusting the matched substring, so what we frame
 			// is a URL the platform agrees on (and a userinfo-bearing lookalike like
 			// `https://x.hf.space@evil.com` cannot reach the iframe).
@@ -128,7 +145,7 @@ export function extractTrackioDashboards(text: string): TrackioDashboard[] {
 			const name = trimUrl(match[2]);
 			if (!name) continue;
 			const spaceId = `${owner}/${name}`;
-			if (!isTrackioContext(line, spaceId)) continue;
+			if (!isTrackioContext(line)) continue;
 			const origin = spaceIdToEmbedOrigin(owner, name);
 			if (!origin) continue;
 			push(origin, spaceId);

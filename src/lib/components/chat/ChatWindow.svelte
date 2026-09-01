@@ -460,9 +460,19 @@
 	// declaration order. Above the reset, this would open the destination's
 	// dashboard and record its key, then reset() would close the pane and clear
 	// that key -- and nothing would re-run this, so the dashboard would never open.
+	//
+	// Gated like the other two auto-opens rather than firing on presence. `loading`
+	// is what makes this "a run is happening now": without it, every hard load of
+	// any conversation that ever trained something re-opens the pane, because
+	// reset() clears the once-per-URL keys on each switch — framing a Space that
+	// went to sleep months ago. Desktop-only for the reason the shared-artifact
+	// open below is: on mobile the pane is a fullscreen overlay, and a shared
+	// conversation carries its tool results verbatim, so every viewer on a phone
+	// would arrive with the chat covered.
 	$effect(() => {
 		const latest = trackioDashboards.at(-1);
-		if (!latest) return;
+		if (!latest || !loading) return;
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
 		sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
 	});
 

@@ -4,6 +4,7 @@
 	import SidePane from "./SidePane.svelte";
 
 	import type { PaneItem } from "$lib/utils/paneItems";
+	import { TRACKIO_FRAME_SANDBOX } from "$lib/utils/trackio";
 	import PaneItemNav from "./PaneItemNav.svelte";
 
 	import CarbonChartLine from "~icons/carbon/chart-line";
@@ -23,7 +24,6 @@
 	 * `$lib/utils/trackio`). What the sandbox still buys us is the default deny
 	 * on top-level navigation: an embedded Space cannot navigate the tab away.
 	 */
-	const SANDBOX = "allow-scripts allow-same-origin allow-forms allow-downloads";
 
 	interface Props {
 		/**
@@ -180,7 +180,7 @@
 						title="Trackio dashboard"
 						class="relative h-full w-full {resizing ? 'pointer-events-none' : ''}"
 						src={frameUrl}
-						sandbox={SANDBOX}
+						sandbox={TRACKIO_FRAME_SANDBOX}
 						allowfullscreen
 						referrerpolicy="no-referrer"
 					></iframe>
