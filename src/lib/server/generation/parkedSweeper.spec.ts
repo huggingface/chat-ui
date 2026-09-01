@@ -204,6 +204,9 @@ describe("wakeParkedCallEarly", () => {
 		expect(after?.status).toBe("waiting");
 		expect(after?.resumeAt.getTime()).toBeLessThanOrEqual(Date.now());
 		expect(after?.wokeEarlyAt).toBeInstanceOf(Date);
+		// The deadline it asked for survives the overwrite, so the resumed round
+		// can tell the model how much of its wait was skipped.
+		expect(after?.plannedResumeAt?.getTime()).toBe(row.resumeAt.getTime());
 	});
 
 	it("only touches the turn it was asked about", async () => {

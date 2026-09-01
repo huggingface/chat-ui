@@ -99,9 +99,12 @@ export async function wakeParkedCallEarly(
 	messageId: string
 ): Promise<boolean> {
 	const now = new Date();
+	// A pipeline update so the deadline the model asked for is kept in the same
+	// atomic write that overwrites it — the resumed round needs both to say how
+	// much of the wait was skipped.
 	const result = await collections.parkedCalls.updateOne(
 		{ conversationId, messageId, status: "waiting" },
-		{ $set: { resumeAt: now, wokeEarlyAt: now, updatedAt: now } }
+		[{ $set: { plannedResumeAt: "$resumeAt", resumeAt: now, wokeEarlyAt: now, updatedAt: now } }]
 	);
 	if (result.matchedCount === 0) return false;
 	logger.info(

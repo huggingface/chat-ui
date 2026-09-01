@@ -56,6 +56,13 @@ export interface ParkedCall extends Timestamps {
 	 * short, which is what the model is told on the round it resumes into.
 	 */
 	wokeEarlyAt?: Date;
+	/**
+	 * The deadline the model actually asked for, kept when an early wake
+	 * overwrites `resumeAt`. Without it the resumed round cannot tell the model
+	 * how much of its wait was skipped, and a 12s gap out of a 300s wait reads
+	 * as "still not ready after the wait I asked for".
+	 */
+	plannedResumeAt?: Date;
 
 	/** Set when a sweeper claims the row, so two pods cannot resume the same turn. */
 	takenAt?: Date;

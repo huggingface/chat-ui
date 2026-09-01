@@ -11,6 +11,11 @@
 		/** Cutting the wait short is an action, so it needs the live conversation. */
 		conversationId?: string;
 		messageId?: string;
+		/**
+		 * Whether this view may act on the turn: the author's own conversation.
+		 * A shared view is routed by share id, which the wake endpoint cannot
+		 * resolve, so the control must not appear there at all.
+		 */
 		canWake?: boolean;
 	}
 

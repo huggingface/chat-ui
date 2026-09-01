@@ -63,7 +63,7 @@
 	let {
 		message,
 		loading = false,
-		isAuthor: _isAuthor = true,
+		isAuthor = true,
 		readOnly = false,
 		isTapped = $bindable(false),
 		alternatives = [],
@@ -90,10 +90,6 @@
 		}
 	}
 
-	$effect(() => {
-		// referenced to appease linter for currently-unused props
-		void _isAuthor;
-	});
 	function handleKeyDown(e: KeyboardEvent) {
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
 			editFormEl?.requestSubmit();
@@ -599,7 +595,7 @@
 					reason={waitingState.reason}
 					conversationId={page.params.id ?? ""}
 					messageId={message.id}
-					canWake={!readOnly}
+					canWake={isAuthor && !readOnly}
 				/>
 			{/if}
 		</div>

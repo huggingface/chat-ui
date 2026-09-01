@@ -120,8 +120,21 @@ describe("the tool result a resumed turn reads", () => {
 		expect(text).not.toContain("user asked");
 	});
 
-	it("says when the user cut the wait short, so a short wait is not read as its own choice", () => {
+	it("names the wait the user skipped, so the model does not stretch the next one", () => {
+		// Resumed after 12s of a 300s wait, at the user's request.
+		const text = waitResumeResultText({
+			...park,
+			resumeAt: new Date(12_000),
+			wokeEarlyAt: new Date(12_000),
+			plannedResumeAt: new Date(300_000),
+		});
+		expect(text).toContain("Waited 12s");
+		expect(text).toContain("cutting short a 300s wait");
+		expect(text).toContain("size any further wait as you would have without this check");
+	});
+
+	it("still says the wait was cut short when the original deadline was not recorded", () => {
 		const text = waitResumeResultText({ ...park, wokeEarlyAt: new Date(120_000) });
-		expect(text).toContain("The user asked you to check on this early");
+		expect(text).toContain("cutting short the wait");
 	});
 });
