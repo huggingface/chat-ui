@@ -12,6 +12,8 @@ export interface Settings extends Timestamps {
 	shareConversationsWithModelAuthors: boolean;
 	/** One-time welcome modal acknowledgement */
 	welcomeModalSeenAt?: Date | null;
+	/** One-time ML Intern onboarding modal acknowledgement */
+	mlInternOnboardingSeenAt?: Date | null;
 	activeModel: string;
 
 	// model name and system prompts
@@ -89,7 +91,10 @@ export interface Settings extends Timestamps {
 	billingOrganization?: string;
 }
 
-export type SettingsEditable = Omit<Settings, "welcomeModalSeenAt" | "createdAt" | "updatedAt">;
+export type SettingsEditable = Omit<
+	Settings,
+	"welcomeModalSeenAt" | "mlInternOnboardingSeenAt" | "createdAt" | "updatedAt"
+>;
 // TODO: move this to a constant file along with other constants
 export const DEFAULT_SETTINGS = {
 	shareConversationsWithModelAuthors: true,

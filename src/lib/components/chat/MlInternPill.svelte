@@ -1,13 +1,25 @@
 <script lang="ts">
 	import { Switch } from "bits-ui";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { useSettingsStore } from "$lib/stores/settings";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import MlInternOnboardingModal from "./MlInternOnboardingModal.svelte";
+
+	const settings = useSettingsStore();
 
 	let enabled = $derived(mlAssistant.enabled);
+	let onboardingOpen = $state(false);
 
 	function ontoggle(next: boolean) {
 		if (requireAuthUser()) return;
 		mlAssistant.toggle(next);
+		// The mode stays on underneath: the modal is advice, not a confirmation step.
+		if (next && !$settings.mlInternOnboardingSeen) onboardingOpen = true;
+	}
+
+	function closeOnboarding() {
+		onboardingOpen = false;
+		settings.instantSet({ mlInternOnboardingSeen: true });
 	}
 </script>
 
@@ -44,6 +56,10 @@
 		</span>
 	</Switch.Root>
 </div>
+
+{#if onboardingOpen}
+	<MlInternOnboardingModal close={closeOnboarding} />
+{/if}
 
 <style>
 	:global(.ml-pill-switch) {

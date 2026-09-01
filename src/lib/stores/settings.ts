@@ -8,6 +8,7 @@ type SettingsStore = {
 	shareConversationsWithModelAuthors: boolean;
 	welcomeModalSeen: boolean;
 	welcomeModalSeenAt: Date | null;
+	mlInternOnboardingSeen: boolean;
 	activeModel: string;
 	customPrompts: Record<string, string>;
 	customPromptsEnabled: Record<string, boolean>;

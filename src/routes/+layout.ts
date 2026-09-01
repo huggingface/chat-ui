@@ -24,6 +24,7 @@ interface UserInfo {
 interface SettingsResponse {
 	welcomeModalSeen: boolean;
 	welcomeModalSeenAt: Date | null;
+	mlInternOnboardingSeen: boolean;
 	shareConversationsWithModelAuthors: boolean;
 	activeModel: string;
 	streamingMode: "raw" | "smooth";
