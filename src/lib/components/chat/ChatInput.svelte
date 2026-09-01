@@ -27,13 +27,10 @@
 		disableAllServers,
 	} from "$lib/stores/mcpServers";
 	import { getMcpServerFaviconUrl } from "$lib/utils/favicon";
-	import {
-		findHfHubMention,
-		replaceHfHubMention,
-		searchHfHub,
-		type HfHubMention,
-		type HfHubResource,
-	} from "$lib/utils/hfHubSearch";
+	import { type HfHubResource } from "$lib/utils/hfHubSearch";
+	import { HubMentionState } from "$lib/utils/hubMention.svelte";
+	import { getCaretCoordinates } from "$lib/utils/caretCoordinates";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { page } from "$app/state";
 
 	interface Props {
@@ -82,17 +79,35 @@
 	let textareaElement: HTMLTextAreaElement | undefined = $state();
 	let isCompositionOn = $state(false);
 	let blurTimeout: ReturnType<typeof setTimeout> | null = $state(null);
-	let hubMention = $state<HfHubMention | null>(null);
-	let hubSearchResults: HfHubResource[] = $state([]);
-	let hubSearchStatus: "idle" | "loading" | "success" | "error" = $state("idle");
-	let activeHubResultIndex = $state(0);
-	let hubSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 	let hubBlurTimeout: ReturnType<typeof setTimeout> | null = null;
-	let hubSearchAbortController: AbortController | null = null;
-	let hubSearchSequence = 0;
-	const isHubMentionOpen = $derived(
-		hubMention !== null && hubMention.query.length > 0 && hubSearchStatus !== "idle"
-	);
+
+	// Hub mentions reach out to huggingface.co, so they are a HuggingChat
+	// feature: a self-hosted deployment must not send a prefix of whatever the
+	// user typed to a third party, and an air-gapped one cannot anyway.
+	const publicConfig = usePublicConfig();
+	const hub = new HubMentionState({ enabled: publicConfig.isHuggingChat });
+	const isHubMentionOpen = $derived(hub.open);
+
+	/** Panel anchor: the `@` of the mention being edited, in composer space. */
+	let hubAnchor = $state({ left: 0, bottom: 0 });
+	/** Panel width, kept in step with the `w-72` on the listbox. */
+	const HUB_PANEL_WIDTH = 288;
+	function updateHubAnchor() {
+		const mention = hub.mention;
+		if (!textareaElement || !mention) return;
+		const caret = getCaretCoordinates(textareaElement, mention.start);
+		const parent =
+			textareaElement.offsetParent instanceof HTMLElement ? textareaElement.offsetParent : null;
+		// Clamped so a mention typed near the right edge of a wide composer does
+		// not push the panel off it.
+		const maxLeft = Math.max(0, (parent?.clientWidth ?? 0) - HUB_PANEL_WIDTH);
+		hubAnchor = {
+			left: Math.min(Math.max(0, textareaElement.offsetLeft + caret.left), maxLeft),
+			// Measured from the composer's bottom edge so the panel sits just above
+			// the line the mention is on, clearing its glyphs.
+			bottom: parent ? parent.clientHeight - (textareaElement.offsetTop + caret.top) + 4 : 0,
+		};
+	}
 
 	let fileInputEl: HTMLInputElement | undefined = $state();
 	let isUrlModalOpen = $state(false);
@@ -180,9 +195,8 @@
 	});
 
 	onDestroy(() => {
-		if (hubSearchTimeout) clearTimeout(hubSearchTimeout);
 		if (hubBlurTimeout) clearTimeout(hubBlurTimeout);
-		hubSearchAbortController?.abort();
+		hub.destroy();
 	});
 
 	afterNavigate(() => {
@@ -208,75 +222,30 @@
 		adjustTextareaHeight();
 	});
 
-	function resetHubSearch() {
-		hubSearchSequence += 1;
-		if (hubSearchTimeout) {
-			clearTimeout(hubSearchTimeout);
-			hubSearchTimeout = null;
-		}
-		hubSearchAbortController?.abort();
-		hubSearchAbortController = null;
-		hubMention = null;
-		hubSearchResults = [];
-		hubSearchStatus = "idle";
-		activeHubResultIndex = 0;
-	}
-
-	function updateHubMention(inputValue: string, caret: number | null) {
-		const nextMention = findHfHubMention(inputValue, caret ?? inputValue.length);
-		if (!nextMention?.query || disabled) {
-			resetHubSearch();
-			return;
-		}
-
-		const queryChanged = nextMention.query !== hubMention?.query;
-		hubMention = nextMention;
-		if (!queryChanged) return;
-
-		const sequence = ++hubSearchSequence;
-		if (hubSearchTimeout) clearTimeout(hubSearchTimeout);
-		hubSearchAbortController?.abort();
-		hubSearchAbortController = null;
-		hubSearchResults = [];
-		hubSearchStatus = "loading";
-		activeHubResultIndex = 0;
-
-		hubSearchTimeout = setTimeout(async () => {
-			hubSearchTimeout = null;
-			const controller = new AbortController();
-			hubSearchAbortController = controller;
-
-			try {
-				const results = await searchHfHub(nextMention.query, controller.signal);
-				if (sequence !== hubSearchSequence) return;
-				hubSearchResults = results;
-				hubSearchStatus = "success";
-			} catch (error) {
-				if (controller.signal.aborted || sequence !== hubSearchSequence) return;
-				console.error(error);
-				hubSearchResults = [];
-				hubSearchStatus = "error";
-			} finally {
-				if (hubSearchAbortController === controller) hubSearchAbortController = null;
-			}
-		}, 250);
-	}
-
 	function syncHubMentionFromTextarea() {
 		if (!textareaElement) return;
-		updateHubMention(textareaElement.value, textareaElement.selectionStart);
+		hub.update(textareaElement.value, textareaElement.selectionStart);
+		updateHubAnchor();
 	}
 
 	function handleInput(event: Event) {
 		const target = event.currentTarget as HTMLTextAreaElement;
-		updateHubMention(target.value, target.selectionStart);
+		if (disabled) return;
+		hub.update(target.value, target.selectionStart);
+		updateHubAnchor();
 	}
 
+	// The textarea reports its own edits; a programmatic write (ChatWindow
+	// clearing the draft on submit) reports nothing, so the panel has to notice
+	// the mention it was tracking is gone.
+	$effect(() => {
+		hub.syncValue(value);
+	});
+
 	async function selectHubResult(result: HfHubResource) {
-		if (!hubMention) return;
-		const replacement = replaceHfHubMention(value, hubMention, result.id);
+		const replacement = hub.accept(value, result);
+		if (!replacement) return;
 		value = replacement.value;
-		resetHubSearch();
 
 		await tick();
 		textareaElement?.focus();
@@ -286,25 +255,33 @@
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (isHubMentionOpen && !isCompositionOn) {
-			if (event.key === "ArrowDown" && hubSearchResults.length > 0) {
+			if (event.key === "ArrowDown" && hub.results.length > 0) {
 				event.preventDefault();
-				activeHubResultIndex = (activeHubResultIndex + 1) % hubSearchResults.length;
+				hub.move(1);
 				return;
 			}
-			if (event.key === "ArrowUp" && hubSearchResults.length > 0) {
+			if (event.key === "ArrowUp" && hub.results.length > 0) {
 				event.preventDefault();
-				activeHubResultIndex =
-					(activeHubResultIndex - 1 + hubSearchResults.length) % hubSearchResults.length;
+				hub.move(-1);
 				return;
 			}
-			if ((event.key === "Enter" || event.key === "Tab") && hubSearchResults.length > 0) {
+			// Tab accepts the first result outright; Enter only accepts once the
+			// user has arrowed into the list. Otherwise `ping @john` would be
+			// rewritten and the send swallowed by whatever the Hub matched, and on
+			// a phone Enter is the newline key with no Escape to back out with.
+			if (event.key === "Tab" && !event.shiftKey && hub.results.length > 0) {
 				event.preventDefault();
-				void selectHubResult(hubSearchResults[activeHubResultIndex]);
+				void selectHubResult(hub.activeResult ?? hub.results[0]);
+				return;
+			}
+			if (event.key === "Enter" && !event.shiftKey && hub.activeResult) {
+				event.preventDefault();
+				void selectHubResult(hub.activeResult);
 				return;
 			}
 			if (event.key === "Escape") {
 				event.preventDefault();
-				resetHubSearch();
+				hub.dismiss();
 				return;
 			}
 		}
@@ -335,14 +312,16 @@
 			hubBlurTimeout = null;
 		}
 		focused = true;
-		syncHubMentionFromTextarea();
+		// Deliberately does NOT open the panel: focusing a restored draft that
+		// happens to end in an @token would fire a request and hijack Enter
+		// before the user has typed anything.
 	}
 
 	function handleBlur() {
 		if (hubBlurTimeout) clearTimeout(hubBlurTimeout);
 		hubBlurTimeout = setTimeout(() => {
 			hubBlurTimeout = null;
-			resetHubSearch();
+			hub.reset();
 		}, 100);
 
 		if (!isVirtualKeyboard()) {
@@ -377,11 +356,12 @@
 	<div class="relative">
 		{#if isHubMentionOpen}
 			<HfHubMentionAutocomplete
-				results={hubSearchResults}
-				status={hubSearchStatus === "idle" ? "loading" : hubSearchStatus}
-				activeIndex={activeHubResultIndex}
+				results={hub.results}
+				status={hub.status ?? "loading"}
+				activeIndex={hub.activeIndex}
+				caretAnchor={hubAnchor}
 				onselect={(result) => void selectHubResult(result)}
-				onactivechange={(index) => (activeHubResultIndex = index)}
+				onactivechange={(index) => hub.setActiveIndex(index)}
 			/>
 		{/if}
 
@@ -390,10 +370,12 @@
 			tabindex="0"
 			inputmode="text"
 			autocomplete="off"
+			role="combobox"
 			aria-autocomplete="list"
+			aria-expanded={isHubMentionOpen}
 			aria-controls={isHubMentionOpen ? "hf-hub-mention-listbox" : undefined}
-			aria-activedescendant={isHubMentionOpen && hubSearchResults.length > 0
-				? `hf-hub-mention-option-${activeHubResultIndex}`
+			aria-activedescendant={isHubMentionOpen && hub.activeIndex >= 0
+				? `hf-hub-mention-option-${hub.activeIndex}`
 				: undefined}
 			class="scrollbar-custom max-h-[4lh] w-full resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent px-2.5 py-2.5 outline-hidden focus:ring-0 focus-visible:ring-0 sm:px-3 md:max-h-[8lh]"
 			class:text-gray-400={disabled}
@@ -402,7 +384,12 @@
 			oninput={handleInput}
 			onkeydown={handleKeydown}
 			onkeyup={(event) => {
-				if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+				// Vertical arrows are only intercepted once results exist; while the
+				// search is in flight they move the caret like any other key, so the
+				// tracked mention has to follow them too.
+				if (
+					["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)
+				) {
 					syncHubMentionFromTextarea();
 				}
 			}}

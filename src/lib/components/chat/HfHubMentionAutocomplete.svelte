@@ -1,28 +1,54 @@
 <script lang="ts">
 	import type { HfHubResource, HfHubResourceType } from "$lib/utils/hfHubSearch";
 
+	import CarbonModel from "~icons/carbon/machine-learning-model";
+	import CarbonDataTable from "~icons/carbon/data-table";
+	import LucideAppWindow from "~icons/lucide/app-window";
+
 	interface Props {
 		results: HfHubResource[];
 		status: "loading" | "success" | "error";
 		activeIndex: number;
+		/**
+		 * Where the `@` sits, relative to the composer box. The panel is anchored
+		 * to the mention rather than to the composer's edges, so it reads as an
+		 * autocomplete for that word instead of a dropdown for the whole input.
+		 */
+		caretAnchor: { left: number; bottom: number };
 		onselect: (result: HfHubResource) => void;
 		onactivechange: (index: number) => void;
 	}
 
-	let { results, status, activeIndex, onselect, onactivechange }: Props = $props();
+	let { results, status, activeIndex, caretAnchor, onselect, onactivechange }: Props = $props();
 	let listboxElement: HTMLDivElement | undefined = $state();
 
-	const resourceTypes: HfHubResourceType[] = ["model", "dataset", "space"];
 	const labels: Record<HfHubResourceType, string> = {
 		model: "Models",
 		dataset: "Datasets",
 		space: "Spaces",
 	};
-	const headerClasses: Record<HfHubResourceType, string> = {
-		model: "bg-blue-100 text-blue-950 dark:bg-blue-900 dark:text-blue-50",
-		dataset: "bg-red-100 text-red-950 dark:bg-red-900 dark:text-red-50",
-		space: "bg-orange-100 text-orange-950 dark:bg-orange-900 dark:text-orange-50",
+	const icons = {
+		model: CarbonModel,
+		dataset: CarbonDataTable,
+		space: LucideAppWindow,
 	};
+
+	/**
+	 * Group once, carrying each option's flat index with it. The template used to
+	 * filter three times and recover the index with `indexOf` per row — O(n²) on
+	 * every arrow key, and dependent on object identity, so it would break if the
+	 * list were ever copied.
+	 */
+	let groups = $derived(
+		(["model", "dataset", "space"] as HfHubResourceType[])
+			.map((type) => ({
+				type,
+				options: results
+					.map((result, index) => ({ result, index }))
+					.filter((option) => option.result.type === type),
+			}))
+			.filter((group) => group.options.length > 0)
+	);
 
 	$effect(() => {
 		void activeIndex;
@@ -32,69 +58,87 @@
 	});
 </script>
 
-<div
-	bind:this={listboxElement}
-	id="hf-hub-mention-listbox"
-	role="listbox"
-	aria-label="Hugging Face Hub suggestions"
-	class="absolute right-2 bottom-full left-2 z-30 mb-2 scrollbar-custom max-h-80 overflow-y-auto rounded-xl border border-gray-200 bg-white text-sm text-gray-900 shadow-xl dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100"
->
+<!-- The live region is a sibling of the listbox, not a child: a listbox may only
+     own options and groups, and a live region inserted at the same moment as its
+     content is usually not announced at all. -->
+<div class="sr-only" role="status" aria-live="polite">
 	{#if status === "loading"}
-		<div class="px-3 py-2 text-gray-500 dark:text-gray-400" role="status">
-			Searching the Hugging Face Hub…
-		</div>
+		Searching the Hugging Face Hub
 	{:else if status === "error"}
-		<div class="px-3 py-2 text-gray-500 dark:text-gray-400" role="status">
-			Couldn’t search the Hugging Face Hub
-		</div>
+		Couldn’t search the Hugging Face Hub
 	{:else if results.length === 0}
-		<div class="px-3 py-2 text-gray-500 dark:text-gray-400" role="status">
-			No matching models, datasets, or Spaces
-		</div>
+		No matching models, datasets, or Spaces
 	{:else}
-		{#each resourceTypes as type}
-			{@const group = results.filter((result) => result.type === type)}
-			{#if group.length > 0}
-				<div
-					data-resource-header={type}
-					class={[
-						"border-t border-gray-200 px-4 py-2 text-sm font-semibold first:border-t-0 dark:border-gray-800",
-						headerClasses[type],
-					]}
-				>
-					{labels[type]}
-				</div>
-				{#each group as result (result.id)}
-					{@const resultIndex = results.indexOf(result)}
-					<button
-						id={`hf-hub-mention-option-${resultIndex}`}
-						data-result-index={resultIndex}
-						data-resource-type={result.type}
-						type="button"
-						role="option"
-						aria-selected={resultIndex === activeIndex}
-						class={[
-							"flex min-h-11 w-full items-center gap-2 border-t border-gray-200 px-4 py-2.5 text-left font-mono text-[15px] tracking-tight focus:outline-hidden dark:border-gray-800",
-							resultIndex === activeIndex
-								? "bg-blue-600 text-white dark:bg-blue-600"
-								: "hover:bg-blue-50 dark:hover:bg-gray-900",
-						]}
-						onpointerdown={(event) => event.preventDefault()}
-						onmouseenter={() => onactivechange(resultIndex)}
-						onclick={() => onselect(result)}
+		{results.length} suggestions available
+	{/if}
+</div>
+
+<div
+	class="pointer-events-none absolute z-30"
+	style="left: {caretAnchor.left}px; bottom: {caretAnchor.bottom}px;"
+>
+	<div
+		bind:this={listboxElement}
+		id="hf-hub-mention-listbox"
+		role="listbox"
+		aria-label="Hugging Face Hub suggestions"
+		class="pointer-events-auto scrollbar-custom max-h-64 w-72 max-w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 text-[13px] shadow-lg dark:border-gray-700 dark:bg-gray-900"
+	>
+		{#if status === "loading"}
+			<p class="px-2.5 py-1.5 text-gray-400 dark:text-gray-500">Searching…</p>
+		{:else if status === "error"}
+			<p class="px-2.5 py-1.5 text-gray-400 dark:text-gray-500">Hub search unavailable</p>
+		{:else if results.length === 0}
+			<p class="px-2.5 py-1.5 text-gray-400 dark:text-gray-500">No matches</p>
+		{:else}
+			{#each groups as group (group.type)}
+				<!-- Kept per review: the type is what disambiguates two repos that share
+				     a name. Quiet enough to read as a divider rather than a row. -->
+				<div role="group" aria-label={labels[group.type]}>
+					<div
+						data-resource-header={group.type}
+						class="px-2.5 pt-2 pb-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase dark:text-gray-500"
 					>
-						{#if result.type === "space" && result.emoji}
+						{labels[group.type]}
+					</div>
+					{#each group.options as option (option.result.id)}
+						{@const SvelteComponent = icons[group.type]}
+						<button
+							id={`hf-hub-mention-option-${option.index}`}
+							data-result-index={option.index}
+							data-resource-type={option.result.type}
+							type="button"
+							role="option"
+							aria-selected={option.index === activeIndex}
+							class={[
+								"flex w-full items-center gap-2 px-2.5 py-1 text-left focus:outline-hidden",
+								option.index === activeIndex
+									? "bg-gray-100 dark:bg-gray-800"
+									: "hover:bg-gray-50 dark:hover:bg-gray-800/60",
+							]}
+							onpointerdown={(event) => event.preventDefault()}
+							onmouseenter={() => onactivechange(option.index)}
+							onclick={() => onselect(option.result)}
+						>
 							<span
-								class="hf-hub-space-emoji w-5 shrink-0 text-base leading-none"
+								class="flex size-4 shrink-0 items-center justify-center text-gray-400 dark:text-gray-500"
 								aria-hidden="true"
 							>
-								{result.emoji}
+								{#if option.result.type === "space" && option.result.emoji}
+									<span class="hf-hub-space-emoji text-[13px] leading-none"
+										>{option.result.emoji}</span
+									>
+								{:else}
+									<SvelteComponent class="size-3.5" />
+								{/if}
 							</span>
-						{/if}
-						<span class="min-w-0 truncate">{result.id}</span>
-					</button>
-				{/each}
-			{/if}
-		{/each}
-	{/if}
+							<span class="min-w-0 truncate text-gray-800 dark:text-gray-200">
+								{option.result.id}
+							</span>
+						</button>
+					{/each}
+				</div>
+			{/each}
+		{/if}
+	</div>
 </div>
