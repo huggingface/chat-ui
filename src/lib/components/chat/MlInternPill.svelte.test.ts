@@ -3,8 +3,10 @@ import { render } from "vitest-browser-svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 
-// Vibrant accent, shared with the strip: switch track and NEW badge.
+// Vibrant accent for surfaces (switch track), darker orange for anything that
+// has to carry legible white text (NEW badge) — same split as the strip.
 const ACCENT = "rgb(234, 88, 12)";
+const ACCENT_TEXT = "rgb(194, 65, 12)";
 
 const find = (root: ParentNode, selector: string): HTMLElement => {
 	const el = root.querySelector<HTMLElement>(selector);
@@ -34,8 +36,16 @@ describe("MlInternPill", () => {
 		const badge = [...control.querySelectorAll("span")].find((s) =>
 			s.textContent?.includes("NEW")
 		) as HTMLElement;
-		expect(style(badge).backgroundColor).toBe(ACCENT);
+		expect(style(badge).backgroundColor).toBe(ACCENT_TEXT);
 		expect(style(badge).color).toBe("rgb(255, 255, 255)");
+	});
+
+	it("keeps the switch tappable across the pill's full height", () => {
+		const { container } = render(MlInternPill);
+		const pill = container.firstElementChild as HTMLElement;
+		const control = find(container, '[role="switch"]');
+
+		expect(box(control).height).toBe(box(pill).height);
 	});
 
 	it("draws an off switch on the specified geometry", () => {
