@@ -88,6 +88,7 @@ describe("GET /api/v2/user/settings", () => {
 		expect(data).toMatchObject({
 			welcomeModalSeen: false,
 			welcomeModalSeenAt: null,
+			mlInternOnboardingSeen: false,
 			streamingMode: "smooth",
 			directPaste: false,
 			shareConversationsWithModelAuthors: true,
@@ -222,6 +223,24 @@ describe("POST /api/v2/user/settings", () => {
 		const stored = await collections.settings.findOne({ userId: user._id });
 		expect(stored).not.toBeNull();
 		expect(stored?.welcomeModalSeenAt).toBeInstanceOf(Date);
+	});
+
+	it("records the ML Intern onboarding acknowledgement independently of the welcome modal", async () => {
+		const { user, locals } = await createTestUser();
+
+		await testRequest(settingsPOST, {
+			path: "/api/v2/user/settings",
+			locals,
+			...jsonBody({ mlInternOnboardingSeen: true, activeModel: "test-model" }),
+		});
+
+		const stored = await collections.settings.findOne({ userId: user._id });
+		expect(stored?.mlInternOnboardingSeenAt).toBeInstanceOf(Date);
+		expect(stored?.welcomeModalSeenAt).toBeUndefined();
+
+		const res = await testRequest(settingsGET, { path: "/api/v2/user/settings", locals });
+		const data = await parseResponse<Record<string, unknown>>(res);
+		expect(data).toMatchObject({ mlInternOnboardingSeen: true, welcomeModalSeen: false });
 	});
 
 	it("validates body with Zod and applies defaults for missing fields", async () => {

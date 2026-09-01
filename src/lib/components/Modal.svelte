@@ -13,6 +13,8 @@
 		disableFly?: boolean;
 		/** When false, clicking backdrop will not close the modal */
 		closeOnBackdrop?: boolean;
+		/** id of the element naming the dialog, typically its heading */
+		labelledBy?: string;
 		onclose?: () => void;
 		children?: import("svelte").Snippet;
 	}
@@ -23,6 +25,7 @@
 		closeButton = false,
 		disableFly = false,
 		closeOnBackdrop = true,
+		labelledBy,
 		onclose,
 	}: Props = $props();
 
@@ -77,6 +80,7 @@
 			<div
 				role="dialog"
 				tabindex="-1"
+				aria-labelledby={labelledBy}
 				bind:this={modalEl}
 				onkeydown={handleKeydown}
 				class={[
@@ -95,6 +99,7 @@
 			<div
 				role="dialog"
 				tabindex="-1"
+				aria-labelledby={labelledBy}
 				bind:this={modalEl}
 				onkeydown={handleKeydown}
 				in:fly={{ y: 100 }}

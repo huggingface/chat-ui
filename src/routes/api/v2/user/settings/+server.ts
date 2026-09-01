@@ -14,6 +14,7 @@ const settingsSchema = z.object({
 		.boolean()
 		.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
 	welcomeModalSeen: z.boolean().optional(),
+	mlInternOnboardingSeen: z.boolean().optional(),
 	activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 	customPrompts: z.record(z.string()).default({}),
 	customPromptsEnabled: z.record(z.boolean()).default({}),
@@ -57,6 +58,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 	return superjsonResponse({
 		welcomeModalSeen: !!settings?.welcomeModalSeenAt,
 		welcomeModalSeenAt: settings?.welcomeModalSeenAt ?? null,
+		mlInternOnboardingSeen: !!settings?.mlInternOnboardingSeenAt,
 
 		activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
 		streamingMode,
@@ -86,7 +88,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	requireAuth(locals);
 	const body = await request.json();
 
-	const { welcomeModalSeen, ...parsedSettings } = settingsSchema.parse(body);
+	const { welcomeModalSeen, mlInternOnboardingSeen, ...parsedSettings } =
+		settingsSchema.parse(body);
 	const streamingMode = resolveStreamingMode(parsedSettings);
 
 	if (config.isHuggingChat) {
@@ -106,6 +109,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			$set: {
 				...settings,
 				...(welcomeModalSeen && { welcomeModalSeenAt: new Date() }),
+				...(mlInternOnboardingSeen && { mlInternOnboardingSeenAt: new Date() }),
 				updatedAt: new Date(),
 			},
 			$setOnInsert: {
