@@ -41,6 +41,27 @@ describe("HfHubMentionAutocomplete", () => {
 		expect(onselect).toHaveBeenCalledWith(results[2]);
 	});
 
+	it("uses Hub category colors and only shows real Space emoji", () => {
+		const { container } = render(HfHubMentionAutocomplete, {
+			results,
+			status: "success",
+			activeIndex: 0,
+			onselect: () => {},
+			onactivechange: () => {},
+		});
+
+		const headers = container.querySelectorAll<HTMLElement>("[data-resource-header]");
+		expect(headers).toHaveLength(3);
+		expect(headers[0].className).toContain("bg-blue-100");
+		expect(headers[1].className).toContain("bg-red-100");
+		expect(headers[2].className).toContain("bg-orange-100");
+		expect(container.querySelectorAll(".hf-hub-space-emoji")).toHaveLength(1);
+		expect(container.querySelector('[data-resource-type="model"] .hf-hub-space-emoji')).toBeNull();
+		expect(
+			container.querySelector('[data-resource-type="dataset"] .hf-hub-space-emoji')
+		).toBeNull();
+	});
+
 	it("shows useful loading, empty, and error states", () => {
 		const common = { activeIndex: 0, onselect: () => {}, onactivechange: () => {} };
 		const loading = render(HfHubMentionAutocomplete, {
