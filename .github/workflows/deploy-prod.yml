@@ -48,6 +48,7 @@ jobs:
             INCLUDE_DB=false
             APP_BASE=/chat
             PUBLIC_COMMIT_SHA=${{ env.GITHUB_SHA_SHORT }}
+            ML_ASSISTANT_MODE=true
   deploy:
     name: Deploy on prod
     runs-on: ubuntu-latest
