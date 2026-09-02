@@ -35,7 +35,7 @@ export const mlAssistantExamples: RouterExample[] = [
 	{
 		title: "Reproduce a paper",
 		prompt:
-			"Reproduce the results of https://huggingface.co/papers/2609.01343 at small scale and report where they diverge.",
+			"Reproduce SMELT: Scaling Laws for Compute-Matched MoE Looped Transformers (https://huggingface.co/papers/2609.01343) at small scale and report where they diverge.",
 	},
 	{
 		title: "Finetune a model",
