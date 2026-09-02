@@ -264,7 +264,7 @@
 	{#if !showNoTools || showMlPill}
 		<div
 			class={[
-				"-ml-0.5 scrollbar-custom flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pt-1.5 pb-2.5 text-gray-500 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2 dark:text-gray-400",
+				"-ml-0.5 scrollbar-custom flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-1.5 px-3 pt-1.5 pb-2.5 text-gray-500 max-md:flex-nowrap max-md:overflow-x-auto dark:text-gray-400",
 			]}
 		>
 			{#if showFileUpload}
