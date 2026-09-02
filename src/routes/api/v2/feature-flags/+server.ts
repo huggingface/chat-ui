@@ -3,6 +3,7 @@ import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
 import { loginEnabled } from "$lib/server/auth";
 import { config } from "$lib/server/config";
 import type { FeatureFlags } from "$lib/server/api/types";
+import { mlAssistantModelIds } from "$lib/server/mlAssistantModels";
 
 export const GET: RequestHandler = async ({ locals }) => {
 	// Mirror the title-generation resolution (generateFromDefaultEndpoint): the
@@ -26,5 +27,6 @@ export const GET: RequestHandler = async ({ locals }) => {
 		isAdmin: locals.isAdmin,
 		transcriptionEnabled: !!config.get("TRANSCRIPTION_MODEL"),
 		taskModelId,
+		mlAssistantModels: mlAssistantModelIds(),
 	} satisfies FeatureFlags);
 };
