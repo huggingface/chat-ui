@@ -262,6 +262,33 @@ describe("MlAssistantStrip budget", () => {
 		expect(input.value).toBe("25.75");
 	});
 
+	it("takes the field's rejected characters back out of the field", async () => {
+		// The sanitized value can equal what is already in state ("10" + "a" is
+		// still "10"), and a value that does not change cannot re-render the DOM.
+		const { container } = mount({ budget: BUDGET, onbudgetchange: vi.fn() });
+
+		find(container, "button[aria-label^='Session budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		expect(input.value).toBe("10");
+
+		input.value = "10a";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		await Promise.resolve();
+		expect(input.value).toBe("10");
+	});
+
+	it("leaves room for the widest total the ceiling allows", async () => {
+		const { container } = mount({ budget: BUDGET, onbudgetchange: vi.fn() });
+
+		find(container, "button[aria-label^='Session budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		// "10000.00" — a five-character cap would have blocked "1000.50".
+		expect(input.maxLength).toBe(8);
+		expect(input.inputMode).toBe("decimal");
+	});
+
 	it("commits zero, which pauses spend rather than abandoning the edit", async () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });

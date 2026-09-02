@@ -24,6 +24,8 @@
 
 	/** Matches the server's ceiling on a budget total (PATCH /api/v2/conversations/[id]). */
 	const MAX_BUDGET_USD = 10_000;
+	/** Room for the widest figure the ceiling allows — "10000.00" — and no more. */
+	const maxlength = `${MAX_BUDGET_USD}.00`.length;
 
 	let editingBudget = $state(false);
 	let budgetDraft = $state("");
@@ -108,9 +110,9 @@
 						oninput={(e) => (budgetDraft = sanitizeDraft(e.currentTarget.value))}
 						onblur={() => (editingBudget = false)}
 						type="text"
-						inputmode="numeric"
+						inputmode="decimal"
 						autocomplete="off"
-						maxlength="5"
+						{maxlength}
 						style:width={`${Math.max(budgetDraft.length, 1)}ch`}
 						class="ml-budget-input min-w-[1ch] border-0 bg-transparent p-0 text-right font-mono text-xs text-current tabular-nums outline-none"
 						aria-label="Session budget in dollars, Enter to save"
