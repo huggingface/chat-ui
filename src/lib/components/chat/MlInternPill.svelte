@@ -39,7 +39,9 @@
      this is the mode's only entry point, and nothing could bring it back. -->
 <div
 	class={[
-		"inline-flex h-8 flex-none items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold transition-colors sm:h-7",
+		// Horizontal padding matches the gap above/below the 17px track (and the
+		// ~16px badge): 7.5px at h-8, 5.5px at h-7. px-2.5 left the ends looking loose.
+		"inline-flex h-8 flex-none items-center gap-1.5 rounded-full px-2 text-xs font-semibold transition-colors sm:h-7 sm:px-1.5",
 		// Keyboard focus lands on the inner switch button; ring the whole pill so
 		// the indicator follows its rounded shape instead of the button's box.
 		"has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-blue-500/60 dark:has-focus-visible:outline-blue-400/60",
@@ -50,7 +52,7 @@
 >
 	<!-- h-full so the tap target is the pill's full height, not the 17px track. -->
 	<Switch.Root
-		class="ml-pill-switch flex h-full cursor-pointer items-center gap-1.5 whitespace-nowrap select-none"
+		class="ml-pill-switch flex h-full cursor-pointer items-center gap-1.25 whitespace-nowrap select-none"
 		checked={enabled}
 		onCheckedChange={ontoggle}
 		aria-label="ML Intern mode"
