@@ -38,10 +38,9 @@
 			<Switch.Thumb class="ml-pill-knob" />
 		</span>
 		ML Intern
-		<!-- The darker text-orange, not the surface accent: white 10px text on
-		     #ea580c is 3.56:1, on #c2410c it clears the 4.5:1 floor. -->
+		<!-- Tinted accent with orange text, like the MCP pill's inner button. -->
 		<span
-			class="rounded-md bg-[#c2410c] px-[5px] py-[3px] text-[10px] leading-none font-bold tracking-wide text-white"
+			class="rounded-md bg-[#ea580c]/20 px-[5px] py-[3px] text-[10px] leading-none font-bold tracking-wide text-[#c2410c] dark:bg-[#ea580c]/25 dark:text-[#fdba74]"
 		>
 			NEW
 		</span>

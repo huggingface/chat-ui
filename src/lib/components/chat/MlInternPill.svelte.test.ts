@@ -3,8 +3,8 @@ import { render } from "vitest-browser-svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 
-// Vibrant accent for surfaces (switch track), darker orange for anything that
-// has to carry legible white text (NEW badge) — same split as the strip.
+// Vibrant accent for surfaces (switch track, the NEW badge's tint), darker
+// orange for text on light ground (the badge label) — same split as the strip.
 const ACCENT = "rgb(234, 88, 12)";
 const ACCENT_TEXT = "rgb(194, 65, 12)";
 
@@ -36,8 +36,10 @@ describe("MlInternPill", () => {
 		const badge = [...control.querySelectorAll("span")].find((s) =>
 			s.textContent?.includes("NEW")
 		) as HTMLElement;
-		expect(style(badge).backgroundColor).toBe(ACCENT_TEXT);
-		expect(style(badge).color).toBe("rgb(255, 255, 255)");
+		// A 20% tint of the accent: Tailwind emits color-mix(), which Chromium
+		// resolves to an oklab() colour but keeps the alpha channel verbatim.
+		expect(style(badge).backgroundColor).toMatch(/\/ 0\.2\)$/);
+		expect(style(badge).color).toBe(ACCENT_TEXT);
 	});
 
 	it("keeps the switch tappable across the pill's full height", () => {
