@@ -19,6 +19,9 @@
 <div
 	class={[
 		"inline-flex h-8 flex-none items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold transition-colors sm:h-7",
+		// Keyboard focus lands on the inner switch button; ring the whole pill so
+		// the indicator follows its rounded shape instead of the button's box.
+		"has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-blue-500/60 dark:has-focus-visible:outline-blue-400/60",
 		enabled
 			? "bg-[#fff4ea] text-[#c2410c] dark:bg-[#2b1c0e] dark:text-[#fdba74]"
 			: "bg-gray-500/10 text-gray-500 dark:bg-gray-500/15 dark:text-gray-400",
@@ -46,9 +49,12 @@
 </div>
 
 <style>
+	/* The pill draws the focus ring (see has-focus-visible: below), so the
+	   button's own rectangular UA outline would only double it up. */
 	:global(.ml-pill-switch) {
 		padding: 0;
 		border: 0;
+		outline: 0;
 		background: transparent;
 		color: inherit;
 	}
@@ -75,11 +81,6 @@
 
 	:global(.dark) .ml-pill-track.is-on {
 		background: #3b5ce0;
-	}
-
-	:global(.ml-pill-switch:focus-visible) .ml-pill-track {
-		outline: 2px solid #ea580c;
-		outline-offset: 2px;
 	}
 
 	:global(.ml-pill-knob) {
