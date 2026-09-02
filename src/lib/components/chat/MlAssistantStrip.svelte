@@ -24,8 +24,6 @@
 
 	/** Matches the server's ceiling on a budget total (PATCH /api/v2/conversations/[id]). */
 	const MAX_BUDGET_USD = 10_000;
-	/** Room for the widest figure the ceiling allows — "10000.00" — and no more. */
-	const maxlength = `${MAX_BUDGET_USD}.00`.length;
 
 	let editingBudget = $state(false);
 	let budgetDraft = $state("");
@@ -36,10 +34,19 @@
 		editingBudget = true;
 	}
 
-	/** Digits and at most one two-decimal fraction — money, typed as you'd say it. */
+	/** Room for the widest figure the ceiling allows — "10000.00" — and no more. */
+	const MAX_DRAFT_CHARS = `${MAX_BUDGET_USD}.00`.length;
+
+	/**
+	 * Digits and at most one two-decimal fraction — money, typed as you'd say it.
+	 * The length cap lives here rather than in a maxlength attribute: the UA
+	 * truncates a paste before the input event fires, so "ab12.34" would arrive
+	 * as "ab12." and lose its cents to the letters.
+	 */
 	function sanitizeDraft(raw: string): string {
 		const [whole, ...rest] = raw.replace(/[^0-9.]/g, "").split(".");
-		return rest.length ? `${whole}.${rest.join("").slice(0, 2)}` : whole;
+		const clean = rest.length ? `${whole}.${rest.join("").slice(0, 2)}` : whole;
+		return clean.slice(0, MAX_DRAFT_CHARS);
 	}
 
 	function commitBudget() {
@@ -112,7 +119,6 @@
 						type="text"
 						inputmode="decimal"
 						autocomplete="off"
-						{maxlength}
 						style:width={`${Math.max(budgetDraft.length, 1)}ch`}
 						class="ml-budget-input min-w-[1ch] border-0 bg-transparent p-0 text-right font-mono text-xs text-current tabular-nums outline-none"
 						aria-label="Session budget in dollars, Enter to save"

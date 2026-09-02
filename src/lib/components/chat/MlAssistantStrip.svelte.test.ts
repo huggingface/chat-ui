@@ -278,15 +278,32 @@ describe("MlAssistantStrip budget", () => {
 		expect(input.value).toBe("10");
 	});
 
-	it("leaves room for the widest total the ceiling allows", async () => {
+	it("keeps a pasted figure's cents, and caps the cleaned figure at the widest total", async () => {
+		// A maxlength attribute would have the UA cut the paste before the
+		// sanitizer sees it, so the letters would cost the cents. The cap has to
+		// apply to the cleaned figure instead. insertText goes through the UA's
+		// own truncation, which a direct value assignment would bypass.
 		const { container } = mount({ budget: BUDGET, onbudgetchange: vi.fn() });
 
 		find(container, "button[aria-label^='Session budget']").click();
 		await Promise.resolve();
 		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
-		// "10000.00" — a five-character cap would have blocked "1000.50".
-		expect(input.maxLength).toBe(8);
 		expect(input.inputMode).toBe("decimal");
+
+		const paste = async (text: string) => {
+			input.focus();
+			input.select();
+			document.execCommand("insertText", false, text);
+			await Promise.resolve();
+		};
+
+		await paste("abcd12.34");
+		expect(input.value).toBe("12.34");
+		// "10000.00" — a five-character cap would have blocked "1000.50".
+		await paste("1000.50");
+		expect(input.value).toBe("1000.50");
+		await paste("123456789");
+		expect(input.value).toBe("12345678");
 	});
 
 	it("commits zero, which pauses spend rather than abandoning the edit", async () => {
