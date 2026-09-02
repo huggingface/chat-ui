@@ -107,6 +107,20 @@ describe("HubMentionState", () => {
 		expect(hub.mention).toBeNull();
 	});
 
+	it("stays open when the caret is inside the mention rather than at its end", async () => {
+		// `end` runs to the end of the token, past the caret, so a naive
+		// slice(start, end) check reads the tail as a mention that went missing
+		// and closes the panel on every mid-token caret.
+		const { hub } = makeState();
+		hub.update("Try @distilbert/distilbert-base", 12);
+		await settle();
+		expect(hub.open).toBe(true);
+
+		hub.syncValue("Try @distilbert/distilbert-base");
+		expect(hub.open).toBe(true);
+		expect(hub.mention?.query).toBe("distilb");
+	});
+
 	it("does not re-open for a mention it just completed", async () => {
 		const { hub } = makeState();
 		hub.update("compare @distilb", 16);

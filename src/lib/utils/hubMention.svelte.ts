@@ -116,7 +116,11 @@ export class HubMentionState {
 	syncValue(value: string): void {
 		const mention = this.mention;
 		if (!mention) return;
-		if (value.slice(mention.start, mention.end) !== `@${mention.query}`) this.reset();
+		// Only the head is ours to check. `end` runs past the caret to the end of
+		// the token, so slicing to it picks up a tail the query never contains and
+		// every mid-token caret would look like a mention that had gone missing.
+		const head = mention.start + 1 + mention.query.length;
+		if (value.slice(mention.start, head) !== `@${mention.query}`) this.reset();
 	}
 
 	/** Move the highlight, wrapping, and treat the list as explicitly entered. */
