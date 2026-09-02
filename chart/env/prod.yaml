@@ -87,8 +87,11 @@ envVars:
   # (2026-09-02). GLM-5.3-Flash on together recalled 5/5 at 924k tokens; Kimi-K3 on
   # baseten 6/6 at 1,046k (fireworks-ai is the alternate: 6/6, slower prefill);
   # GLM-5.3 degrades above ~800k on every provider — novita was the best of them.
+  # DeepSeek-V4-Pro-0813 on together 5/5 at 911k (fireworks-ai equal; novita and
+  # baseten 0/4 at 761k); DeepSeek-V4-Flash-0731 on novita 5/5 at 911k (together
+  # and baseten 0/4 at 761k, deepinfra 0/5 at 910k).
   ML_ASSISTANT_MODELS: >
-    [{"id": "zai-org/GLM-5.3-Flash", "provider": "together"}, {"id": "moonshotai/Kimi-K3", "provider": "baseten"}, {"id": "zai-org/GLM-5.3", "provider": "novita"}]
+    [{"id": "zai-org/GLM-5.3-Flash", "provider": "together"}, {"id": "moonshotai/Kimi-K3", "provider": "baseten"}, {"id": "zai-org/GLM-5.3", "provider": "novita"}, {"id": "deepseek-ai/DeepSeek-V4-Pro-0813", "provider": "together"}, {"id": "deepseek-ai/DeepSeek-V4-Flash-0731", "provider": "novita"}]
   MCP_SERVERS: >
     [{"name": "Web Search (Exa)", "url": "https://mcp.exa.ai/mcp?tools=web_search_exa,get_code_context_exa,crawling_exa"}, {"name": "Hugging Face", "url": "https://hf.co/mcp?login"}]
   MCP_TOOL_TIMEOUT_MS: "120000"
