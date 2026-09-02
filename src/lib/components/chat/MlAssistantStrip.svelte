@@ -12,7 +12,7 @@
 		complete: boolean;
 		/** Compute budget ledger; absent means the conversation carries none. */
 		budget?: MlBudgetSnapshot;
-		/** Commits a new budget total in whole USD. Absent makes the readout static. */
+		/** Commits a new budget total in USD, cents included. Absent makes the readout static. */
 		onbudgetchange?: (totalUsd: number) => void;
 	}
 
@@ -21,6 +21,9 @@
 	let remainingMicroUsd = $derived(
 		budget ? budget.totalMicroUsd - budget.spentMicroUsd - budget.reservedMicroUsd : 0
 	);
+
+	/** Matches the server's ceiling on a budget total (PATCH /api/v2/conversations/[id]). */
+	const MAX_BUDGET_USD = 10_000;
 
 	let editingBudget = $state(false);
 	let budgetDraft = $state("");
@@ -31,11 +34,20 @@
 		editingBudget = true;
 	}
 
+	/** Digits and at most one two-decimal fraction — money, typed as you'd say it. */
+	function sanitizeDraft(raw: string): string {
+		const [whole, ...rest] = raw.replace(/[^0-9.]/g, "").split(".");
+		return rest.length ? `${whole}.${rest.join("").slice(0, 2)}` : whole;
+	}
+
 	function commitBudget() {
-		const totalUsd = Number(budgetDraft);
+		const draft = budgetDraft.trim();
+		const totalUsd = Number(draft);
 		editingBudget = false;
-		if (!Number.isFinite(totalUsd) || totalUsd <= 0) return;
-		onbudgetchange?.(totalUsd);
+		// Zero is a real setting — it pauses spend without discarding the ledger —
+		// so only an empty field, a bare ".", or an out-of-range figure abandons.
+		if (!draft || !Number.isFinite(totalUsd) || totalUsd < 0 || totalUsd > MAX_BUDGET_USD) return;
+		onbudgetchange?.(Math.round(totalUsd * 100) / 100);
 	}
 
 	/** The editor exists only while open, so focus belongs to mount. */
@@ -76,32 +88,45 @@
 
 		{#if budget}
 			{#if editingBudget}
+				<!-- Shaped like the readout it replaces — same pill, same mono figures,
+				     same "$… left" reading — so opening and committing an edit never
+				     shifts the strip. A text field on purpose: type=number drags in the
+				     UA validation bubble and spinner arrows, neither of which belongs on
+				     a one-figure inline edit. -->
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<span
-					class="flex flex-none items-center gap-1 font-mono text-xs"
+					class="ml-budget-pill flex h-5 flex-none items-center gap-px rounded-full border border-current/30 bg-current/10 pr-2.5 pl-2 font-mono text-xs tabular-nums"
 					onkeydown={(e) => {
 						if (e.key === "Enter") commitBudget();
 						if (e.key === "Escape") editingBudget = false;
 					}}
 				>
-					$<input
+					<span aria-hidden="true">$</span>
+					<input
 						use:focusOnMount
 						bind:value={budgetDraft}
+						oninput={(e) => (budgetDraft = sanitizeDraft(e.currentTarget.value))}
 						onblur={() => (editingBudget = false)}
-						type="number"
-						min="1"
-						max="10000"
-						step="1"
-						class="ml-budget-input w-16 rounded border border-current/30 bg-transparent px-1 py-0 text-right text-xs"
+						type="text"
+						inputmode="numeric"
+						autocomplete="off"
+						maxlength="5"
+						style:width={`${Math.max(budgetDraft.length, 1)}ch`}
+						class="ml-budget-input min-w-[1ch] border-0 bg-transparent p-0 text-right font-mono text-xs text-current tabular-nums outline-none"
 						aria-label="Session budget in dollars, Enter to save"
 					/>
+					<span class="pl-1 opacity-70">left</span>
 				</span>
 			{:else}
 				<button
 					type="button"
 					class={[
-						"flex-none font-mono text-xs tabular-nums",
-						onbudgetchange ? "cursor-pointer hover:underline" : "cursor-default",
+						// Same height, radius and padding as the editor pill it swaps with,
+						// so opening the editor tints a shape that is already there.
+						"flex h-5 flex-none items-center rounded-full border border-transparent px-2 font-mono text-xs tabular-nums",
+						onbudgetchange
+							? "cursor-pointer hover:border-current/20 hover:bg-current/10"
+							: "cursor-default",
 						remainingMicroUsd <= 0 ? "font-semibold text-red-600 dark:text-red-400" : "",
 					]}
 					onclick={openBudgetEditor}
@@ -141,16 +166,11 @@
 		opacity: 1;
 	}
 
-	/* Spinner arrows would be the only chrome on the strip's compact money
-	   field, and the value is typed, not stepped. */
-	.ml-budget-input {
-		appearance: textfield;
-	}
-
-	.ml-budget-input::-webkit-outer-spin-button,
-	.ml-budget-input::-webkit-inner-spin-button {
-		appearance: none;
-		margin: 0;
+	/* The field itself is chromeless, so focus has to show on the pill around it —
+	   and in the strip's own orange (currentColor), not the UA's blue. */
+	.ml-budget-pill:focus-within {
+		border-color: currentColor;
+		box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
 	}
 
 	@media (prefers-reduced-motion: reduce) {

@@ -245,6 +245,72 @@ describe("MlAssistantStrip budget", () => {
 		expect(onbudgetchange).not.toHaveBeenCalled();
 	});
 
+	it("edits in a chromeless text field rather than a number input", async () => {
+		// type=number would put the UA's validation bubble and spinner arrows on a
+		// pill the strip styles itself, so the field takes digits as plain text.
+		const { container } = mount({ budget: BUDGET, onbudgetchange: vi.fn() });
+
+		find(container, "button[aria-label^='Session budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		expect(input.type).toBe("text");
+
+		input.value = "2a5.7.59";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		await Promise.resolve();
+		// Letters dropped, and the fraction kept to one point and two places.
+		expect(input.value).toBe("25.75");
+	});
+
+	it("commits zero, which pauses spend rather than abandoning the edit", async () => {
+		const onbudgetchange = vi.fn();
+		const { container } = mount({ budget: BUDGET, onbudgetchange });
+
+		find(container, "button[aria-label^='Session budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		input.value = "0";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		await Promise.resolve();
+
+		expect(onbudgetchange).toHaveBeenCalledWith(0);
+	});
+
+	it("commits cents", async () => {
+		const onbudgetchange = vi.fn();
+		const { container } = mount({ budget: BUDGET, onbudgetchange });
+
+		find(container, "button[aria-label^='Session budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		input.value = "1.50";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		await Promise.resolve();
+
+		expect(onbudgetchange).toHaveBeenCalledWith(1.5);
+	});
+
+	it("abandons an empty or over-ceiling figure instead of committing it", async () => {
+		const onbudgetchange = vi.fn();
+		const { container } = mount({ budget: BUDGET, onbudgetchange });
+
+		const type = async (value: string) => {
+			find(container, "button[aria-label^='Session budget']").click();
+			await Promise.resolve();
+			const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+			input.value = value;
+			input.dispatchEvent(new Event("input", { bubbles: true }));
+			input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+			await Promise.resolve();
+		};
+
+		await type("");
+		await type("10001");
+		expect(onbudgetchange).not.toHaveBeenCalled();
+	});
+
 	it("stays a static readout when no change handler is given", async () => {
 		const { container } = mount({ budget: BUDGET });
 		find(container, "button[aria-label^='Session budget']").click();
