@@ -23,7 +23,7 @@
 		"prepare": "husky"
 	},
 	"devDependencies": {
-		"@faker-js/faker": "^8.4.1",
+		"@faker-js/faker": "^10.5.0",
 		"@iconify-json/carbon": "^1.1.16",
 		"@iconify-json/eos-icons": "^1.1.6",
 		"@iconify-json/lucide": "^1.2.77",
