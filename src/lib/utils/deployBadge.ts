@@ -45,7 +45,6 @@ a {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 6px 16px rgba(0, 0, 0, 0.06);
   color: #111827;
   font: 500 11px/1 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  letter-spacing: 0.01em;
   text-decoration: none;
   white-space: nowrap;
   opacity: 0.72;
