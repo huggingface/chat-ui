@@ -680,8 +680,9 @@
 	async function startExample(example: RouterExample) {
 		if (requireAuthUser()) return;
 
-		// ML Intern chips seed the composer instead of dispatching: their prompts
-		// name "this paper/dataset/model", so the user still has details to add.
+		// ML Intern chips seed the composer instead of dispatching. Their prompts
+		// are complete, but they name one specific paper, model or dataset, and a
+		// task at this price is one the user should read before it starts.
 		if (mlModeOn) {
 			draft = example.prompt;
 			return;
