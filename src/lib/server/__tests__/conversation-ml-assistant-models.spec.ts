@@ -33,6 +33,7 @@ import {
 } from "$lib/server/api/__tests__/testHelpers";
 import { POST as createConversation } from "../../../routes/conversation/+server";
 import { PATCH as patchConversation } from "../../../routes/conversation/[id]/+server";
+import { PATCH as patchConversationV2 } from "../../../routes/api/v2/conversations/[id]/+server";
 
 beforeAll(async () => {
 	await ready;
@@ -95,6 +96,30 @@ describe.sequential("ML Intern conversations run on the fixed model set", () => 
 				locals,
 				params: { id: conv._id.toString() },
 				request: new Request("http://localhost/conversation", {
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ model }),
+				}),
+			} as never);
+
+		await expect(patch("omni")).rejects.toMatchObject({ status: 400 });
+		expect((await collections.conversations.findOne({ _id: conv._id }))?.model).toBe(conv.model);
+
+		const ok = await patch("moonshotai/Kimi-K3");
+		expect(ok.status).toBe(200);
+		expect((await collections.conversations.findOne({ _id: conv._id }))?.model).toBe(
+			"moonshotai/Kimi-K3"
+		);
+	});
+
+	it("guards the v2 endpoint the same way", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { mlAssistant: true });
+		const patch = (model: string) =>
+			patchConversationV2({
+				locals,
+				params: { id: conv._id.toString() },
+				request: new Request("http://localhost/api/v2/conversations/x", {
 					method: "PATCH",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ model }),

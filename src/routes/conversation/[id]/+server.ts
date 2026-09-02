@@ -25,7 +25,7 @@ import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
-import { mlAssistantModelIds, mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
+import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
 import { compressUpdatesForStorage } from "$lib/server/generation/compressUpdates";
@@ -857,14 +857,6 @@ export async function PATCH({ request, locals, params }) {
 
 	if (!conv) {
 		error(404, "Conversation not found");
-	}
-
-	if (
-		values.model !== undefined &&
-		isMlAssistantConversation(conv) &&
-		!mlAssistantModelIds().includes(values.model)
-	) {
-		error(400, "This model is not available for ML Intern conversations");
 	}
 
 	await applyConversationSettings({ _id: convId }, values);

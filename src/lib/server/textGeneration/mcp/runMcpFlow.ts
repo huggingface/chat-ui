@@ -466,7 +466,7 @@ export async function* runMcpFlow({
 		// reply allowance this request will actually ask for.
 		const parameters = {
 			...targetModel.parameters,
-			...(mlAssistant ? mlAssistantModelEntry(targetModel.id ?? targetModel.name)?.parameters : {}),
+			...(mlAssistant ? mlAssistantModelEntry(targetModel.id || targetModel.name)?.parameters : {}),
 			...assistant?.generateSettings,
 		} as Record<string, unknown>;
 		const catalogMaxTokens =

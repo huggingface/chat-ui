@@ -43,19 +43,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	// Only builds that ship ML Assistant mode can start a conversation in it.
 	const isMlAssistant = ML_ASSISTANT_MODE && values.mlAssistant === true;
-	// The mode runs on its own fixed set (ML_ASSISTANT_MODELS): whatever the
-	// composer had selected — the router alias included — is replaced by the
-	// set's default when it isn't listed, so a stale client can't route the
-	// mode onto an unverified model.
-	if (isMlAssistant) {
-		const resolved = resolveMlAssistantModel(values.model);
-		if (!resolved) {
-			error(400, "ML Intern has no models configured");
-		}
-		values.model = resolved;
-	}
 
-	const model = models.find((m) => (m.id || m.name) === values.model);
+	let model = models.find((m) => (m.id || m.name) === values.model);
 
 	if (!model) {
 		error(400, "Invalid model");
@@ -90,6 +79,20 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		rootMessageId = conversation.rootMessageId ?? rootMessageId;
 		values.model = conversation.model;
 		values.preprompt = conversation.preprompt;
+	}
+
+	// The mode runs on its own fixed set (ML_ASSISTANT_MODELS): whatever was
+	// requested — the router alias, or a shared conversation's model — is
+	// replaced by the set's default when it isn't listed, so neither a stale
+	// client nor an import can route the mode onto an unverified model. After
+	// the share import, which is the last thing that can change the model.
+	if (isMlAssistant) {
+		const resolved = resolveMlAssistantModel(values.model);
+		if (!resolved) {
+			error(400, "ML Intern has no models configured");
+		}
+		values.model = resolved;
+		model = models.find((m) => (m.id || m.name) === resolved) ?? model;
 	}
 
 	if (model.unlisted) {

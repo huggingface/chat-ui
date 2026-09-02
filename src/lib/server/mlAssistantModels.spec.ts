@@ -20,28 +20,51 @@ import {
 	mlAssistantProviderFor,
 	parseMlAssistantModels,
 	resolveMlAssistantModel,
-	setMlAssistantKnownModelIds,
+	setMlAssistantCatalog,
 } from "./mlAssistantModels";
 
-const CATALOG = ["zai-org/GLM-5.3-Flash", "moonshotai/Kimi-K3", "zai-org/GLM-5.3", "omni"];
+const CATALOG = [
+	{ id: "zai-org/GLM-5.3-Flash" },
+	{ id: "moonshotai/Kimi-K3" },
+	{ id: "zai-org/GLM-5.3" },
+	{ id: "omni", isRouter: true },
+];
 
 describe("parseMlAssistantModels", () => {
 	it("keeps entries in order, first is the default", () => {
 		const entries = parseMlAssistantModels(
-			`[{id:"zai-org/GLM-5.3-Flash", provider:"together"}, {id:"moonshotai/Kimi-K3"}]`,
+			`[{id:"zai-org/GLM-5.3-Flash", provider:"together"}, {id:"moonshotai/Kimi-K3", provider:"baseten"}]`,
 			CATALOG
 		);
 		expect(entries.map((e) => e.id)).toEqual(["zai-org/GLM-5.3-Flash", "moonshotai/Kimi-K3"]);
 		expect(entries[0].provider).toBe("together");
-		expect(entries[1].provider).toBeUndefined();
+		expect(entries[1].provider).toBe("baseten");
+	});
+
+	it("rejects the whole value when an entry has no provider", () => {
+		expect(
+			parseMlAssistantModels(
+				`[{id:"zai-org/GLM-5.3-Flash", provider:"together"}, {id:"moonshotai/Kimi-K3"}]`,
+				CATALOG
+			)
+		).toEqual([]);
+	});
+
+	it("drops the router alias even though it is in the catalog", () => {
+		expect(
+			parseMlAssistantModels(
+				`[{id:"omni", provider:"together"}, {id:"zai-org/GLM-5.3", provider:"novita"}]`,
+				CATALOG
+			).map((e) => e.id)
+		).toEqual(["zai-org/GLM-5.3"]);
 	});
 
 	it("drops unknown models instead of failing, and dedupes", () => {
 		const entries = parseMlAssistantModels(
-			`[{id:"nope/missing"}, {id:"moonshotai/Kimi-K3"}, {id:"moonshotai/Kimi-K3", provider:"baseten"}]`,
+			`[{id:"nope/missing", provider:"x"}, {id:"moonshotai/Kimi-K3", provider:"together"}, {id:"moonshotai/Kimi-K3", provider:"baseten"}]`,
 			CATALOG
 		);
-		expect(entries).toEqual([{ id: "moonshotai/Kimi-K3" }]);
+		expect(entries).toEqual([{ id: "moonshotai/Kimi-K3", provider: "together" }]);
 	});
 
 	it("returns nothing for empty or malformed input", () => {
@@ -53,12 +76,16 @@ describe("parseMlAssistantModels", () => {
 
 	it("accepts the backtick-wrapped .env convention", () => {
 		expect(
-			parseMlAssistantModels('`[{id:"moonshotai/Kimi-K3"}]`', CATALOG).map((e) => e.id)
+			parseMlAssistantModels('`[{id:"moonshotai/Kimi-K3", provider:"together"}]`', CATALOG).map(
+				(e) => e.id
+			)
 		).toEqual(["moonshotai/Kimi-K3"]);
 	});
 
 	it("accepts any id when no catalog is given", () => {
-		expect(parseMlAssistantModels(`[{id:"anything"}]`).map((e) => e.id)).toEqual(["anything"]);
+		expect(parseMlAssistantModels(`[{id:"anything", provider:"p"}]`).map((e) => e.id)).toEqual([
+			"anything",
+		]);
 	});
 });
 
@@ -69,7 +96,7 @@ describe("configured set", () => {
 			{id:"zai-org/GLM-5.3-Flash", provider:"together", parameters:{max_tokens: 49152}},
 			{id:"moonshotai/Kimi-K3", provider:"fireworks-ai"},
 		]`;
-		setMlAssistantKnownModelIds(() => CATALOG);
+		setMlAssistantCatalog(() => CATALOG);
 	});
 
 	it("exposes ids in configured order", () => {
@@ -92,13 +119,13 @@ describe("configured set", () => {
 
 	it("re-parses when the env value changes", () => {
 		expect(mlAssistantModelIds()).toHaveLength(2);
-		mocked.env = `[{id:"zai-org/GLM-5.3"}]`;
+		mocked.env = `[{id:"zai-org/GLM-5.3", provider:"novita"}]`;
 		expect(mlAssistantModelIds()).toEqual(["zai-org/GLM-5.3"]);
 	});
 
 	it("is empty when the build does not ship the mode", () => {
 		mocked.mode = false;
-		setMlAssistantKnownModelIds(() => CATALOG);
+		setMlAssistantCatalog(() => CATALOG);
 		expect(mlAssistantModelIds()).toEqual([]);
 		expect(resolveMlAssistantModel("zai-org/GLM-5.3-Flash")).toBeUndefined();
 	});

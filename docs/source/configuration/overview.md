@@ -90,7 +90,9 @@ When the build ships ML Assistant mode, its conversations run on a fixed model s
 rather than whatever the composer has selected. Each entry pins the inference
 provider the model was verified on for long tool loops (`npm run probe-model` runs
 that verification); the user's provider preference and `auto` are ignored for mode
-conversations, and the router alias can't be listed. The first entry is the default.
+conversations, and the router alias is rejected. The first entry is the default. The
+provider pin is a Hugging Face router feature, so self-hosted deployments get the model set
+without it.
 
 ```ini
 ML_ASSISTANT_MODELS=`[
@@ -99,7 +101,8 @@ ML_ASSISTANT_MODELS=`[
 ]`
 ```
 
-Leave it empty and the mode refuses to start a conversation.
+Leave it empty and the composer hides the switch; a request that still asks for the mode is
+refused.
 
 ## User Authentication
 

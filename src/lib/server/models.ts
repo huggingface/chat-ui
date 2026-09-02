@@ -5,7 +5,7 @@ import { z } from "zod";
 import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints";
 
 import JSON5 from "json5";
-import { setMlAssistantKnownModelIds } from "./mlAssistantModels";
+import { setMlAssistantCatalog } from "./mlAssistantModels";
 import { logger } from "$lib/server/logger";
 import { preservesReasoningByDefault } from "$lib/server/reasoningPolicy";
 import { makeRouterEndpoint } from "$lib/server/router/endpoint";
@@ -439,7 +439,7 @@ if (!building) {
 	}
 
 	models = newModels;
-	setMlAssistantKnownModelIds(() => models.map((model) => model.id));
+	setMlAssistantCatalog(() => models.map((model) => ({ id: model.id, isRouter: model.isRouter })));
 	defaultModel = models[0];
 	taskModel = resolveTaskModel(models);
 	validModelIdSchema = createValidModelIdSchema(models);

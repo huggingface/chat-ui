@@ -151,7 +151,7 @@
 								>
 									{model.displayName}
 								</h3>
-								{#if index === 0 && (model.isRouter || mlModelsOnly) && !isActive}
+								{#if ((index === 0 && model.isRouter) || (mlModelsOnly && model.id === data.mlAssistantModels[0])) && !isActive}
 									<span
 										class="rounded-sm border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 uppercase dark:border-gray-700 dark:text-gray-400"
 									>

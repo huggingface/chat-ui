@@ -25,7 +25,7 @@
  *
  * Suites (default `standard`): each provider the router lists for the model
  * (or --provider) runs every step. Sizes are prompt tokens; `%` of the
- * provider's context window.
+ * provider's whole context window, clamped so prompt plus reply still fits.
  *   quick     tool@100k, recall@300k
  *   standard  tool@100k, recall@300k, recall@75%, recall@90%
  *
@@ -617,7 +617,8 @@ function resolveSize(
 	if (size.endsWith("%")) {
 		const window = contextLength ?? 131072;
 		const pct = Number(size.slice(0, -1)) / 100;
-		return Math.floor((window - maxTokens) * pct);
+		// Of the whole window, clamped only so prompt plus reply still fits.
+		return Math.min(Math.floor(window * pct), window - maxTokens);
 	}
 	const n = Number(size);
 	if (contextLength && n > contextLength - maxTokens) return undefined;
