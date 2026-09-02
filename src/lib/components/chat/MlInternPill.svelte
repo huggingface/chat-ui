@@ -39,7 +39,12 @@
      this is the mode's only entry point, and nothing could bring it back. -->
 <div
 	class={[
-		"inline-flex h-8 flex-none items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold transition-colors sm:h-7",
+		// Horizontal padding matches the gap above/below the 17px track (and the
+		// ~16px badge): 7.5px at h-8, 5.5px at h-7. px-2.5 left the ends looking loose.
+		"inline-flex h-8 flex-none items-center gap-1.5 rounded-full px-2 text-xs font-semibold transition-colors sm:h-7 sm:px-1.5",
+		// Keyboard focus lands on the inner switch button; ring the whole pill so
+		// the indicator follows its rounded shape instead of the button's box.
+		"has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-blue-500/60 dark:has-focus-visible:outline-blue-400/60",
 		enabled
 			? "bg-[#fff4ea] text-[#c2410c] dark:bg-[#2b1c0e] dark:text-[#fdba74]"
 			: "bg-gray-500/10 text-gray-500 dark:bg-gray-500/15 dark:text-gray-400",
@@ -47,7 +52,7 @@
 >
 	<!-- h-full so the tap target is the pill's full height, not the 17px track. -->
 	<Switch.Root
-		class="ml-pill-switch flex h-full cursor-pointer items-center gap-1.5 whitespace-nowrap select-none"
+		class="ml-pill-switch flex h-full cursor-pointer items-center gap-1.25 whitespace-nowrap select-none"
 		checked={enabled}
 		onCheckedChange={ontoggle}
 		aria-label="ML Intern mode"
@@ -56,10 +61,9 @@
 			<Switch.Thumb class="ml-pill-knob" />
 		</span>
 		ML Intern
-		<!-- The darker text-orange, not the surface accent: white 10px text on
-		     #ea580c is 3.56:1, on #c2410c it clears the 4.5:1 floor. -->
+		<!-- Tinted accent with orange text, like the MCP pill's inner button. -->
 		<span
-			class="rounded-md bg-[#c2410c] px-[5px] py-[3px] text-[10px] leading-none font-bold tracking-wide text-white"
+			class="rounded-md bg-[#ea580c]/20 px-[5px] py-[3px] text-[10px] leading-none font-bold text-[#c2410c] dark:bg-[#ea580c]/25 dark:text-[#fdba74]"
 		>
 			NEW
 		</span>
@@ -92,9 +96,12 @@
 {/if}
 
 <style>
+	/* The pill draws the focus ring (see has-focus-visible: below), so the
+	   button's own rectangular UA outline would only double it up. */
 	:global(.ml-pill-switch) {
 		padding: 0;
 		border: 0;
+		outline: 0;
 		background: transparent;
 		color: inherit;
 	}
@@ -121,11 +128,6 @@
 
 	:global(.dark) .ml-pill-track.is-on {
 		background: #3b5ce0;
-	}
-
-	:global(.ml-pill-switch:focus-visible) .ml-pill-track {
-		outline: 2px solid #ea580c;
-		outline-offset: 2px;
 	}
 
 	:global(.ml-pill-knob) {
