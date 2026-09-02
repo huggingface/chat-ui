@@ -24,12 +24,6 @@
 		onboardingOpen = false;
 		settings.instantSet({ mlInternOnboardingSeen: true });
 	}
-
-	function readDraftBudget(event: Event) {
-		const raw = (event.currentTarget as HTMLInputElement).value.trim();
-		const usd = Number(raw);
-		mlAssistant.draftBudgetUsd = raw !== "" && Number.isFinite(usd) && usd > 0 ? usd : undefined;
-	}
 </script>
 
 <!-- The mode's pre-task switch, sitting beside the MCP pill. Only offered while
@@ -68,27 +62,6 @@
 			NEW
 		</span>
 	</Switch.Root>
-
-	{#if enabled}
-		<!-- Spend authority is granted here, before any run exists: the next send
-		     creates the conversation with exactly this budget, and $0 means every
-		     submission is refused until the user grants one. Outside the switch so
-		     typing a number cannot toggle the mode. -->
-		<label class="flex flex-none items-center gap-0.5 font-mono text-[11px] font-normal">
-			<span>$</span>
-			<input
-				value={mlAssistant.draftBudgetUsd ?? ""}
-				oninput={readDraftBudget}
-				type="number"
-				min="1"
-				max="10000"
-				step="1"
-				placeholder="0"
-				class="ml-pill-budget w-11 rounded border border-current/30 bg-transparent px-1 py-0 text-right text-[11px] placeholder:text-current/40"
-				aria-label="Compute budget for this session in dollars"
-			/>
-		</label>
-	{/if}
 </div>
 
 {#if onboardingOpen}
@@ -144,18 +117,6 @@
 
 	:global(.ml-pill-knob[data-state="checked"]) {
 		left: 15px;
-	}
-
-	/* Spinner arrows would be the only chrome on the pill's compact money
-	   field, and the value is typed, not stepped. */
-	.ml-pill-budget {
-		appearance: textfield;
-	}
-
-	.ml-pill-budget::-webkit-outer-spin-button,
-	.ml-pill-budget::-webkit-inner-spin-button {
-		appearance: none;
-		margin: 0;
 	}
 
 	@media (prefers-reduced-motion: reduce) {

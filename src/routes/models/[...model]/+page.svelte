@@ -52,11 +52,6 @@
 					// The composer latches the mode before handing the message over, so
 					// the conversation this creates is marked with it from the start.
 					mlAssistant: mlAssistant.taskStarted,
-					// The budget granted in the strip travels with the create: absent
-					// means $0, and the gate refuses every submission until one is set.
-					...(mlAssistant.taskStarted && mlAssistant.draftBudgetUsd !== undefined
-						? { mlBudgetUsd: mlAssistant.draftBudgetUsd }
-						: {}),
 				}),
 			});
 
