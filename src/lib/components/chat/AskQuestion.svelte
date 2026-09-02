@@ -231,6 +231,16 @@
 						value={otherText[select.name] ?? ""}
 						oninput={(event) =>
 							(otherText = { ...otherText, [select.name]: event.currentTarget.value })}
+						onkeydown={(event) => {
+							if (event.key === "Enter" && !event.isComposing) {
+								event.preventDefault();
+								if (isLast) {
+									void finish("accept");
+								} else {
+									advance();
+								}
+							}
+						}}
 						maxlength={MAX_OTHER_CHARS}
 						disabled={submitting}
 						placeholder="Tell us what you had in mind"
