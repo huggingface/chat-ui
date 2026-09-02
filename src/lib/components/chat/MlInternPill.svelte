@@ -63,7 +63,7 @@
 		ML Intern
 		<!-- Tinted accent with orange text, like the MCP pill's inner button. -->
 		<span
-			class="rounded-md bg-[#ea580c]/20 px-[5px] py-[3px] text-[10px] leading-none font-bold tracking-wide text-[#c2410c] dark:bg-[#ea580c]/25 dark:text-[#fdba74]"
+			class="rounded-md bg-[#ea580c]/20 px-[5px] py-[3px] text-[10px] leading-none font-bold text-[#c2410c] dark:bg-[#ea580c]/25 dark:text-[#fdba74]"
 		>
 			NEW
 		</span>

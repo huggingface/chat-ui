@@ -145,7 +145,7 @@
 		>
 			<!-- Section Headers -->
 			<h3
-				class="px-3 pt-2 pb-1 text-xs font-semibold tracking-wide text-gray-600 md:text-left dark:text-gray-400"
+				class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-600 md:text-left dark:text-gray-400"
 			>
 				Models
 			</h3>
