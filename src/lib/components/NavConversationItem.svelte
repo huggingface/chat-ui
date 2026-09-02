@@ -6,7 +6,7 @@
 
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonEdit from "~icons/carbon/edit";
-	import CarbonMachineLearning from "~icons/carbon/machine-learning";
+	import BiRobot from "~icons/bi/robot";
 	import LucideEllipsis from "~icons/lucide/ellipsis";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
@@ -83,17 +83,17 @@
 >
 	{#if conv.mlAssistant}
 		{@const ml = ML_TURN_BADGE[activeGenerations.statusFor(conv.id) ?? "idle"]}
-		<!-- The mode's own gold, in the strip's palette, on a tinted tile: at 14px
-		     a bare glyph in this orange read as a mis-tinted icon rather than a
-		     mark, and the tile is what carries the color while the glyph stays
-		     legible. An icon rather than an "ML" chip, so a run of mode
-		     conversations doesn't read as a wall of repeated text. The status dot
-		     keeps its own hue — it sits outside the tile, so the two no longer
-		     compete for the same 14 pixels. -->
-		<span class="flex flex-none items-center gap-1" title="ML Intern — {ml.label}">
-			<span class="ml-nav-mark flex size-[18px] items-center justify-center rounded-[5px]">
-				<CarbonMachineLearning class="size-3" />
-			</span>
+		<!-- The mode's own gold, in the strip's palette. A filled glyph rather than
+		     an outline: at 14px a hairline robot in this orange reads as a
+		     mis-tinted icon, where a solid one reads as a mark. An icon rather
+		     than an "ML" chip, so a run of mode conversations doesn't read as a
+		     wall of repeated text. The status dot keeps its own hue and sits
+		     beside the mark, so the two never compete for the same pixels. -->
+		<span
+			class="flex flex-none items-center gap-1 text-[#c2410c] dark:text-[#fdba74]"
+			title="ML Intern — {ml.label}"
+		>
+			<BiRobot class="size-[15px]" />
 			{#if ml.dot}
 				<span class="size-1.5 rounded-full {ml.dot}"></span>
 			{/if}
@@ -214,24 +214,3 @@
 		}}
 	/>
 {/if}
-
-<style>
-	/* The mode's gold, lifted off the row by a warm vertical wash and a hairline
-	   top highlight — the same trick as the composer strip's budget pill, at tile
-	   size. Deliberately low-saturation: these tiles repeat down the sidebar. */
-	.ml-nav-mark {
-		color: #c2410c;
-		background-image: linear-gradient(to bottom, #ffedd5, #fed7aa);
-		box-shadow:
-			inset 0 0 0 1px rgba(234, 88, 12, 0.2),
-			inset 0 1px 0 rgba(255, 255, 255, 0.65);
-	}
-
-	:global(.dark) .ml-nav-mark {
-		color: #fdba74;
-		background-image: linear-gradient(to bottom, rgba(234, 88, 12, 0.32), rgba(234, 88, 12, 0.12));
-		box-shadow:
-			inset 0 0 0 1px rgba(253, 186, 116, 0.18),
-			inset 0 1px 0 rgba(253, 186, 116, 0.16);
-	}
-</style>
