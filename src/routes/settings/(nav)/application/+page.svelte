@@ -269,7 +269,8 @@
 						<div>
 							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Billing</div>
 							<p class="text-[12px] text-gray-500 dark:text-gray-400">
-								Select between personal or organization billing (for eligible organizations).
+								Select between personal or organization billing for inference (for eligible
+								organizations).
 							</p>
 						</div>
 						<div class="flex items-center">
