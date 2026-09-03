@@ -171,6 +171,38 @@ describe("a question from the assistant", () => {
 		expect(sent[0]).toMatchObject({ content: { q1: "SQLite" } });
 	});
 
+	it("sends a typed answer when Enter is pressed on the last question", async () => {
+		const { baseElement } = mount([ask("q1", "Which database?")]);
+		rowFor(baseElement, "Something else")?.click();
+
+		await vi.waitFor(() => expect(baseElement.querySelector('input[type="text"]')).not.toBeNull());
+		const input = baseElement.querySelector<HTMLInputElement>('input[type="text"]');
+		if (input) {
+			input.value = "SQLite";
+			input.dispatchEvent(new Event("input", { bubbles: true }));
+			input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		}
+
+		await vi.waitFor(() => expect(sent).toHaveLength(1));
+		expect(sent[0]).toMatchObject({ content: { q1: "SQLite" } });
+	});
+
+	it("advances to the next question when Enter is pressed before the last one", async () => {
+		const { baseElement } = mount([ask("q1", "Which database?"), ask("q2", "Which host?")]);
+		rowFor(baseElement, "Something else")?.click();
+
+		await vi.waitFor(() => expect(baseElement.querySelector('input[type="text"]')).not.toBeNull());
+		const input = baseElement.querySelector<HTMLInputElement>('input[type="text"]');
+		if (input) {
+			input.value = "SQLite";
+			input.dispatchEvent(new Event("input", { bubbles: true }));
+			input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		}
+
+		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which host?"));
+		expect(sent).toHaveLength(0);
+	});
+
 	it("suppresses the browser's own focus outline, as every other input here does", async () => {
 		const { baseElement } = mount([ask("q1", "Which database?")]);
 		rowFor(baseElement, "Something else")?.click();
