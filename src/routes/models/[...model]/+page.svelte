@@ -38,13 +38,20 @@
 		try {
 			loading = true;
 
+			// The mode runs on its own fixed set; the server enforces this too.
+			const model =
+				mlAssistant.taskStarted &&
+				data.mlAssistantModels.length > 0 &&
+				!data.mlAssistantModels.includes(modelId)
+					? data.mlAssistantModels[0]
+					: modelId;
 			const res = await fetch(`${base}/conversation`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					model: modelId,
+					model,
 					preprompt:
 						($settings.customPromptsEnabled?.[modelId] ?? true)
 							? $settings.customPrompts[modelId]
@@ -78,7 +85,7 @@
 			convsStore.prepend({
 				id: conversationId,
 				title: "New Chat",
-				model: modelId,
+				model,
 				updatedAt: new Date(),
 				// Latched before the create request, so the sidebar row carries the
 				// mode's designation from the moment it appears.

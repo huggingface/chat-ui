@@ -29,6 +29,7 @@ import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
+import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { withRateLimitRetry } from "../utils/rateLimitRetry";
@@ -463,10 +464,11 @@ export async function* runMcpFlow({
 
 		// Hoisted above the message prep so the history budget can reserve the
 		// reply allowance this request will actually ask for.
-		const parameters = { ...targetModel.parameters, ...assistant?.generateSettings } as Record<
-			string,
-			unknown
-		>;
+		const parameters = {
+			...targetModel.parameters,
+			...(mlAssistant ? mlAssistantModelEntry(targetModel.id || targetModel.name)?.parameters : {}),
+			...assistant?.generateSettings,
+		} as Record<string, unknown>;
 		const catalogMaxTokens =
 			(parameters?.max_tokens as number | undefined) ??
 			(parameters?.max_new_tokens as number | undefined) ??

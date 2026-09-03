@@ -25,6 +25,7 @@ import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
+import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
 import { compressUpdatesForStorage } from "$lib/server/generation/compressUpdates";
@@ -670,7 +671,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					// Inference provider preference (HuggingChat only, skip for router models)
 					provider:
 						config.isHuggingChat && !model.isRouter
-							? userSettings?.providerOverrides?.[model.id]
+							? isMlAssistantConversation(conv)
+								? mlAssistantProviderFor(model.id, userSettings?.providerOverrides?.[model.id])
+								: userSettings?.providerOverrides?.[model.id]
 							: undefined,
 					// Thinking-effort override (only forwarded for reasoning-capable models;
 					// per-user override can force-enable on self-hosted). The ML Assistant
