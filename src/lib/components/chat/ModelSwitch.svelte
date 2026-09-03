@@ -5,6 +5,7 @@
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import type { Model } from "$lib/types/Model";
+	import { error } from "$lib/stores/errors";
 
 	interface Props {
 		models: Model[];
@@ -15,13 +16,11 @@
 
 	const convsStore = useConversationsStore();
 
-	let selectedModelId = $state("");
-
-	$effect.pre(() => {
-		selectedModelId = models.map((m) => m.id).includes(currentModel.id)
+	let selectedModelId = $derived(
+		models.some((m) => m.id === currentModel.id)
 			? currentModel.id
-			: models[0].id;
-	});
+			: (models[0]?.id ?? currentModel.id)
+	);
 
 	async function handleModelChange() {
 		if (!page.params.id) return;
@@ -36,12 +35,19 @@
 			});
 
 			if (!response.ok) {
-				throw new Error("Failed to update model");
+				let message = "Failed to update model";
+				try {
+					message = ((await response.json()) as { message?: string }).message ?? message;
+				} catch {
+					// not JSON
+				}
+				throw new Error(message);
 			}
 
 			await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
-		} catch (error) {
-			console.error(error);
+		} catch (err) {
+			console.error(err);
+			error.set((err as Error).message);
 		}
 	}
 </script>
@@ -57,7 +63,7 @@
 			bind:value={selectedModelId}
 			class="rounded-md bg-gray-100 px-2 py-1 max-sm:max-w-32 dark:bg-gray-900"
 		>
-			{#each models as model}
+			{#each models as model (model.id)}
 				<option value={model.id}>{model.name}</option>
 			{/each}
 		</select>

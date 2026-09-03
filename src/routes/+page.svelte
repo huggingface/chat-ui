@@ -47,6 +47,10 @@
 			} else {
 				model = data.models[0].id;
 			}
+			// The mode runs on its own fixed set; the server enforces this too.
+			if (mlAssistant.taskStarted && data.mlAssistantModels.length > 0) {
+				model = data.mlAssistantModels.includes(model) ? model : data.mlAssistantModels[0];
+			}
 			const res = await fetch(`${base}/conversation`, {
 				method: "POST",
 				headers: {

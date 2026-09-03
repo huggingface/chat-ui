@@ -552,8 +552,24 @@
 
 	// The pill is the mode's pre-task switch. Empty conversations only — the mode
 	// cannot be joined once a chat has started without it.
+	// With no set configured the send would fail; no switch is better than a
+	// dead end.
+	let mlModelSet = $derived(
+		ML_ASSISTANT_MODE
+			? ((page.data as { mlAssistantModels?: string[] }).mlAssistantModels ?? [])
+			: []
+	);
 	let mlPillVisible = $derived(
-		ML_ASSISTANT_MODE && !shared && !isReadOnly && !mlTaskRunning && messages.length === 0
+		ML_ASSISTANT_MODE &&
+			!shared &&
+			!isReadOnly &&
+			!mlTaskRunning &&
+			messages.length === 0 &&
+			mlModelSet.length > 0
+	);
+	// A mode conversation whose model left the set can only move within the set.
+	let switchableModels = $derived(
+		mlTaskRunning ? models.filter((m) => mlModelSet.includes(m.id)) : models
 	);
 
 	$effect(() => {
@@ -910,7 +926,7 @@
 							</div>
 						{/each}
 						{#if isReadOnly}
-							<ModelSwitch {models} {currentModel} />
+							<ModelSwitch models={switchableModels} {currentModel} />
 						{/if}
 					</div>
 				{:else if pending}
