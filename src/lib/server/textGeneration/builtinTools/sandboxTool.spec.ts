@@ -61,12 +61,26 @@ const SANDBOX_MCP_TOOLS = [
 	mcpTool("hf_fs_write"),
 ];
 
+const HUB = { name: "Hugging Face", url: "https://hf.co/mcp?login" };
+/** Every advertised tool, mapped to whichever server exported it. */
+const mappingFor = (server: { name: string }, ...tools: string[]) =>
+	Object.fromEntries(
+		tools.map((tool) => [tool, { fnName: tool, server: server.name, tool }])
+	) as NestedAgentDeps["mapping"];
+
 const makeDeps = (over: Partial<NestedAgentDeps> = {}): NestedAgentDeps => ({
 	openai,
 	completionBase: { model: "test-model", stream: true, tools: [], tool_choice: "auto" },
 	requestHeaders: { "ChatUI-Conversation-ID": "conv-1" },
-	servers: [],
-	mapping: {},
+	servers: [HUB],
+	mapping: mappingFor(
+		HUB,
+		"hf_sandbox_exec",
+		"hf_sandbox_fs",
+		"hf_sandbox",
+		"hf_jobs",
+		"hf_fs_write"
+	),
 	mcpTools: SANDBOX_MCP_TOOLS,
 	hostBuiltinTools: [],
 	...over,
@@ -112,7 +126,7 @@ describe("createSandboxTool", () => {
 	});
 
 	it("tells the caller to do it themselves where no sandbox tools exist", async () => {
-		const tool = boundTool({ mcpTools: [mcpTool("hf_fs")] });
+		const tool = boundTool({ mcpTools: [mcpTool("hf_fs")], mapping: mappingFor(HUB, "hf_fs") });
 
 		const outcome = await tool.execute({ handle: HANDLE, task: "run it" }, ctx);
 
@@ -249,5 +263,49 @@ describe("the tool definition", () => {
 
 		expect(doctrine).toContain("creating and terminating the sandbox");
 		expect(doctrine).toContain("submitting jobs");
+	});
+});
+
+describe("where the sandbox tools are allowed to come from", () => {
+	const OTHER = { name: "Someone else", url: "https://other.test/mcp" };
+
+	it("refuses a same-named tool exported by a server that is not the Hub", async () => {
+		// A name only gets a collision suffix when two servers offer it at once,
+		// so if the Hub's listing omits the sandbox tools a custom server's
+		// `hf_sandbox_exec` inherits the bare name. Handing it the handle would
+		// send a Hub sandbox id and the task to an unrelated server, outside the
+		// parent's guard chain.
+		const tool = boundTool({
+			servers: [OTHER],
+			mapping: mappingFor(OTHER, "hf_sandbox_exec", "hf_sandbox_fs"),
+		});
+
+		const outcome = await tool.execute({ handle: HANDLE, task: "run it" }, ctx);
+
+		expect("error" in outcome && outcome.error).toContain("Run the commands yourself");
+		expect(createCompletion).not.toHaveBeenCalled();
+	});
+
+	it("takes the Hub's own tools and leaves an impostor out of the same run", async () => {
+		createCompletion.mockResolvedValueOnce(respond({ content: "Outcome: worked." }));
+		const tool = boundTool({
+			servers: [HUB, OTHER],
+			mapping: {
+				...mappingFor(HUB, "hf_sandbox_exec"),
+				...mappingFor(OTHER, "hf_sandbox_fs"),
+			},
+		});
+
+		await tool.execute({ handle: HANDLE, task: "run it" }, ctx);
+
+		expect(request(0).tools?.map((t) => t.function.name)).toEqual(["hf_sandbox_exec"]);
+	});
+
+	it("refuses a tool whose server is not in this turn's list at all", async () => {
+		const tool = boundTool({ servers: [], mapping: mappingFor(HUB, "hf_sandbox_exec") });
+
+		const outcome = await tool.execute({ handle: HANDLE, task: "run it" }, ctx);
+
+		expect("error" in outcome && outcome.error).toContain("Run the commands yourself");
 	});
 });

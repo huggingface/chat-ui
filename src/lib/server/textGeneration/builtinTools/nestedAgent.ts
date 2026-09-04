@@ -69,6 +69,17 @@ export interface NestedAgentSpec {
 	/** The single user message the run starts from. */
 	task: string;
 	allowedTools: ReadonlySet<string>;
+	/**
+	 * Where an allowlisted MCP tool has to come from, when the name alone is not
+	 * proof. Any selected server may export a tool called `hf_sandbox_exec`, and
+	 * a name only gets a collision suffix when two servers offer it at once — so
+	 * if the Hub's listing omits it or fails, a custom server's tool inherits the
+	 * bare name and clears a name-only allowlist. The sub-agent would then hand
+	 * that server a Hub sandbox handle, outside the parent's guard chain.
+	 *
+	 * Omitted where an agent's tools legitimately span servers and are read-only.
+	 */
+	requireToolServer?: (server: McpServerConfig) => boolean;
 	maxIterations: number;
 	truncateOutput(text: string): string;
 	/** Injected to steer the loop when it has to stop or is going in circles. */
@@ -131,10 +142,20 @@ export async function runNestedAgent(
 ): Promise<BuiltinToolResult> {
 	const allowedBuiltins = deps.hostBuiltinTools.filter((tool) => spec.allowedTools.has(tool.name));
 	const builtinNames = new Set(allowedBuiltins.map((tool) => tool.name));
+	// Builtins run in this process, so provenance is not a question for them.
+	const serversByName = new Map(deps.servers.map((server) => [server.name, server]));
+	const fromAllowedServer = (fnName: string): boolean => {
+		if (!spec.requireToolServer) return true;
+		const server = serversByName.get(deps.mapping[fnName]?.server ?? "");
+		return server ? spec.requireToolServer(server) : false;
+	};
 	const nestedTools: OpenAiTool[] = [
 		...allowedBuiltins.map((tool) => tool.definition),
 		...deps.mcpTools.filter(
-			(tool) => spec.allowedTools.has(tool.function.name) && !builtinNames.has(tool.function.name)
+			(tool) =>
+				spec.allowedTools.has(tool.function.name) &&
+				!builtinNames.has(tool.function.name) &&
+				fromAllowedServer(tool.function.name)
 		),
 	];
 	if (nestedTools.length === 0) return { error: spec.failure.noTools };

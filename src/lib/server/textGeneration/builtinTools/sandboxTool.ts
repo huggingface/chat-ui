@@ -1,3 +1,4 @@
+import { isHfMcpServer } from "$lib/server/mcp/hf";
 import type { OpenAiTool } from "$lib/server/mcp/tools";
 import {
 	makeTruncator,
@@ -145,6 +146,10 @@ async function runSandboxTask(
 			.filter(Boolean)
 			.join("\n\n"),
 		allowedTools: SANDBOX_ALLOWED_TOOLS,
+		// The names are the Hub's, and so must be the server: a custom MCP server
+		// exporting `hf_sandbox_exec` would otherwise be handed the handle and the
+		// task, and dispatched to without the parent's guard chain.
+		requireToolServer: (server) => isHfMcpServer(server.url),
 		maxIterations: MAX_SANDBOX_ITERATIONS,
 		truncateOutput: truncateSandboxToolOutput,
 		stop: {
