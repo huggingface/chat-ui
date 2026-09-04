@@ -882,6 +882,21 @@ describe("leaked tool-call markup", () => {
 		expect(finalAnswer(updates)).toContain("<some_other_tool>");
 	});
 
+	it.each([
+		'args</arg_key><arg_value>{"job_id": "6a99c12c", "tail": 60, "operation": "logs"}</arg_value></tool_call>',
+		'args</arg_key><arg_value>{"job_id": "6a99c5ca", "tail": 40}</arg_value><arg_key>operation</arg_key><arg_value>logs</arg_value></tool_call>',
+		'<think>The logs call failed. Retry.</think>{"args": {"job_id": "x", "tail": 80}, "operation": "logs"}</arg_value></tool_call>',
+		'<arg_value>{"job_id": "x", "operation": "logs", "tail": 80}</arg_value></tool_call>',
+	])("catches the leak tail %#, exactly as the provider streamed it", async (leak) => {
+		scriptRounds([{ content: leak }, { content: "Here is a clean answer." }]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toBe("Here is a clean answer.");
+	});
+
 	it("retries when a half-parsed leak carries no tool name", async () => {
 		// What together's GLM-5.3-Flash actually leaked: the provider consumed
 		// `<tool_call>hf_jobs<arg_key>` and streamed the rest as content, so the
@@ -902,6 +917,23 @@ describe("leaked tool-call markup", () => {
 		const nudge = requestMessages(1).at(-1);
 		expect(String(nudge?.content)).toContain("</tool_call>");
 		expect(String(nudge?.content)).toContain("function-calling mechanism");
+	});
+
+	it("leaves an answer that documents the syntax alone", async () => {
+		// A single closing tag turns up in an answer about tool calling, or one
+		// quoting sample XML. Discarding it would replace a correct answer with an
+		// instruction to make a call nobody asked for.
+		scriptRounds([
+			{
+				content:
+					"Providers close the block with </tool_call>, and Hermes-style templates use </function> instead.",
+			},
+		]);
+
+		const { updates } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toContain("</tool_call>");
 	});
 
 	it("leaves prose that only mentions the syntax alone", async () => {

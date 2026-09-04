@@ -92,10 +92,17 @@ const MAX_CUT_ANSWER_RETRIES = 1;
 // finalizes as-is rather than looping on a model that cannot comply.
 const MAX_LEAKED_TOOL_CALL_RETRIES = 1;
 /**
- * Closing markers of the `<tool_call>name<arg_key>k</arg_key><arg_value>v</arg_value>`
- * dialect, for a leak that carries no advertised tool name to match on.
+ * The `<tool_call>name<arg_key>k</arg_key><arg_value>v</arg_value>` dialect, for
+ * a leak that carries no advertised tool name to match on.
+ *
+ * Two adjacent tags, never one: a single `</function>` or `</tool_call>` appears
+ * in an answer that documents this syntax or quotes sample XML, and treating
+ * that as a leak would throw the answer away and tell the model to make a call
+ * it was never asked for. The pairs below are the structure a half-parsed call
+ * leaves behind and are not something prose produces.
  */
-const LEAKED_CALL_MARKUP = /<\/(?:tool_call|arg_key|arg_value|function)>/;
+const LEAKED_CALL_MARKUP =
+	/<\/arg_key>\s*<arg_value>|<\/arg_value>\s*(?:<arg_key>|<\/(?:tool_call|function)>)|<\/function>\s*<\/tool_call>/;
 
 export async function* runMcpFlow({
 	model,

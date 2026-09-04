@@ -135,6 +135,30 @@ describe("repeated tool call guard", () => {
 		expect(third.dispatched).toBe(false);
 	});
 
+	it("keeps two servers exporting the same tool name apart", async () => {
+		// Colliding names are suffixed for the model but the server tool name is
+		// unchanged, so keying on that would let one server's failures refuse the
+		// first attempt at the other.
+		const guard = createRepeatedCallGuard();
+		const args = { cmd: "exec" };
+		const onServer = (fnName: string) => ({
+			serverUrl: `https://${fnName}.test/mcp`,
+			tool: "hf_sandbox_exec",
+			fnName,
+			args,
+			callUuid: `uuid-${Math.random()}`,
+		});
+		for (let i = 0; i < 2; i += 1) {
+			const verdict = await guard.before(onServer("hf_sandbox_exec"));
+			if (verdict.allow) await guard.after(verdict.ticket, failed(rejection));
+		}
+
+		// Asked before the refusal that would reset the count: the other server has
+		// to be untouched by those two failures, not merely past a decayed one.
+		expect((await guard.before(onServer("hf_sandbox_exec_other"))).allow).toBe(true);
+		expect((await guard.before(onServer("hf_sandbox_exec"))).allow).toBe(false);
+	});
+
 	it("keeps different arguments apart", async () => {
 		const guard = createRepeatedCallGuard();
 
