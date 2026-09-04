@@ -41,7 +41,13 @@ const PROPERTY_DESCRIPTIONS: Record<string, Record<string, string>> = {
 		args: 'Grammar tokens, one per array element: ["put", "hf://models/<owner>/<name>/README.md", "-m", "<message>"].',
 	},
 	hf_jobs: {
-		args: 'Arguments for this operation as a JSON object — the one Hub tool that takes an object rather than a token list. Submission keys the API requires: `timeout` as a duration string ("20m"), `secrets` as an object, `flavor`, and for `uv` a `script`.',
+		args:
+			"Arguments for this operation as a JSON object — the one Hub tool that takes an object rather than a token list. " +
+			'Submitting with uv: {"script": "<the whole script>", "with_deps": ["trl"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}}. ' +
+			'Submitting with run (Docker): {"image": "python:3.12", "command": ["python", "train.py"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}} — `command` is an array, not a string. ' +
+			"The Hub's Jobs documentation describes the `hf jobs` CLI, not this API, so translate its flags rather than copying them: " +
+			'`--timeout 6h` is "timeout": "6h", a string and never a number; a repeated `--secrets FOO` is "secrets": {"FOO": "$FOO"}, an object and never an array; ' +
+			'`-v SRC:/mnt` is "volumes": ["hf://datasets/<owner>/<name>:/data"], strings and never objects.',
 	},
 };
 

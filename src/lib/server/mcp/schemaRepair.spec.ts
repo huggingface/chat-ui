@@ -82,6 +82,31 @@ describe("withRepairedToolSchemas", () => {
 		expect(args).toContain("timeout");
 	});
 
+	it("gives run the literal shape uv already had, and maps the CLI flags onto it", () => {
+		// Six of the seven parameter rejections in the traces were on `run`, and
+		// every one was a type the Hub's CLI docs express as a flag: --timeout 6h
+		// sent as a number, a repeated --secrets as an array, -v as an object.
+		const jobs: OpenAiTool = {
+			type: "function",
+			function: {
+				name: "hf_jobs",
+				parameters: { type: "object", properties: { args: { type: "object" } } },
+			},
+		};
+		const [repaired] = withRepairedToolSchemas([jobs], mapping("hf_jobs", "hf_jobs"), HUB);
+		const args = (
+			repaired.function.parameters?.properties as Record<string, { description: string }>
+		).args.description;
+
+		expect(args).toContain('"image"');
+		expect(args).toContain('"command"');
+		expect(args).toContain("never a number");
+		expect(args).toContain("never an array");
+		expect(args).toContain("never objects");
+		// The docs will keep being CLI-shaped, so the mapping has to be stated.
+		expect(args).toContain("hf jobs");
+	});
+
 	it("keeps everything else about the schema", () => {
 		const [repaired] = withRepairedToolSchemas(
 			[sandboxExec()],

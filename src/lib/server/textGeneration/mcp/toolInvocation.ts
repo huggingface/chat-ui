@@ -6,6 +6,7 @@ import { ToolResultStatus } from "$lib/types/Tool";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import type { McpToolMapping } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
+import type { McpClientKind } from "$lib/server/mcp/client";
 import {
 	callMcpTool,
 	getMcpToolTimeoutMs,
@@ -60,6 +61,8 @@ export interface ExecuteToolCallsParams {
 	builtinTools?: BuiltinTool[];
 	/** Policy gate consulted around every MCP dispatch (not builtins) — see toolGuard.ts. */
 	guard?: ToolCallGuard;
+	/** Identity these calls introduce themselves to the server with. */
+	clientKind?: McpClientKind;
 }
 
 export interface ToolCallExecutionResult {
@@ -118,6 +121,7 @@ export async function* executeToolCalls({
 	owner,
 	builtinTools,
 	guard,
+	clientKind,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
@@ -449,6 +453,7 @@ export async function* executeToolCalls({
 					client,
 					signal: abortSignal,
 					timeoutMs: effectiveTimeoutMs,
+					...(clientKind ? { clientKind } : {}),
 					...(elicitationSink ? { elicitation: { sink: elicitationSink, toolUuid: p.uuid } } : {}),
 					onProgress: (progress) => {
 						updatesQueue.push({

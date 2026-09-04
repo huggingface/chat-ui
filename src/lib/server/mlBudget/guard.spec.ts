@@ -49,11 +49,12 @@ async function insertConversation(mlBudget?: MlBudget): Promise<ObjectId> {
 
 const HF_URL = "https://hf.co/mcp?login";
 
-function makeGuard(conversationId: ObjectId, callCounter = { n: 0 }) {
+function makeGuard(conversationId: ObjectId, callCounter = { n: 0 }, token?: string) {
 	const guard = createMlBudgetGuard({
 		conversationId,
 		generationId: "gen-1",
 		username: "testuser",
+		...(token ? { token } : {}),
 	});
 	const before = (tool: string, args: Record<string, unknown>, serverUrl = HF_URL) =>
 		guard.before({ serverUrl, tool, fnName: tool, args, callUuid: `uuid-${++callCounter.n}` });
@@ -331,5 +332,96 @@ describe("withRequiredDiscriminators", () => {
 		const original = tool("hf_jobs", { type: "object", properties: { operation: {} } });
 		withRequiredDiscriminators([original], MAPPING);
 		expect(original.function.parameters?.required).toBeUndefined();
+	});
+});
+
+describe.sequential("mlBudget guard: settling when something stops", () => {
+	it("tickets a terminate so its success can reconcile the ledger", async () => {
+		const id = await insertConversation(budgetOf(10_000_000));
+		const { before } = makeGuard(id);
+
+		const verdict = await before("hf_sandbox", {
+			cmd: "terminate",
+			args: ["terminate", "hfsb2:x:y"],
+		});
+
+		// Not gated — stops never are — but ticketed, because `after` only runs
+		// for a call that issued one, and this is the moment a hold ends.
+		expect(verdict.allow).toBe(true);
+		if (verdict.allow) expect(verdict.ticket).toEqual({ kind: "release" });
+	});
+
+	it("tickets a job cancel the same way", async () => {
+		const id = await insertConversation(budgetOf(10_000_000));
+		const { before } = makeGuard(id);
+
+		const verdict = await before("hf_jobs", { operation: "cancel", args: { job_id: "abc" } });
+
+		expect(verdict.allow).toBe(true);
+		if (verdict.allow) expect(verdict.ticket).toEqual({ kind: "release" });
+	});
+
+	it("leaves an ordinary read unticketed, so nothing settles on a log call", async () => {
+		const id = await insertConversation(budgetOf(10_000_000));
+		const { before } = makeGuard(id);
+
+		const verdict = await before("hf_jobs", { operation: "logs", args: { job_id: "abc" } });
+
+		expect(verdict.allow).toBe(true);
+		if (verdict.allow) expect(verdict.ticket).toBeUndefined();
+	});
+
+	it("settles a finished sandbox on terminate instead of waiting for the next turn", async () => {
+		const id = await insertConversation(budgetOf(10_000_000));
+		const { guard, before } = makeGuard(id, { n: 0 }, "hf_test_token");
+		const created = await before("hf_sandbox", {
+			cmd: "create",
+			args: ["create", "--flavor", "cpu-basic", "--timeout", "1h"],
+		});
+		if (!created.allow) throw new Error("expected the create to be allowed");
+		// The handle the sandbox came back with, so the hold becomes traceable.
+		await guard.after(created.ticket, {
+			status: "success",
+			text: "Sandbox ready: hfsb2:testuser:6a99a386e686246ca699f46f",
+		});
+		expect((await readMlBudget(id))?.reservations).toHaveLength(1);
+
+		// The Jobs API now reports it finished after a minute.
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => ({
+				ok: true,
+				status: 200,
+				json: async () => ({ status: { stage: "COMPLETED" }, billedMinutes: 1 }),
+			}))
+		);
+		const stop = await before("hf_sandbox", {
+			cmd: "terminate",
+			args: ["terminate", "hfsb2:testuser:6a99a386e686246ca699f46f"],
+		});
+		if (!stop.allow) throw new Error("expected the terminate to be allowed");
+		const update = await guard.after(stop.ticket, { status: "success", text: "terminated" });
+
+		const budget = await readMlBudget(id);
+		expect(budget?.reservations).toHaveLength(0);
+		// The strip has to hear about it while the turn is still running.
+		expect(update).toMatchObject({ type: MessageUpdateType.Budget });
+	});
+
+	it("keeps the hold when the terminate itself failed", async () => {
+		const id = await insertConversation(budgetOf(10_000_000));
+		const { guard, before } = makeGuard(id, { n: 0 }, "hf_test_token");
+		const created = await before("hf_sandbox", {
+			cmd: "create",
+			args: ["create", "--flavor", "cpu-basic", "--timeout", "1h"],
+		});
+		if (!created.allow) throw new Error("expected the create to be allowed");
+
+		const stop = await before("hf_sandbox", { cmd: "terminate", args: ["terminate", "h"] });
+		if (!stop.allow) throw new Error("expected the terminate to be allowed");
+		const update = await guard.after(stop.ticket, { status: "error", text: "no such sandbox" });
+
+		expect(update).toBeUndefined();
+		expect((await readMlBudget(id))?.reservations).toHaveLength(1);
 	});
 });

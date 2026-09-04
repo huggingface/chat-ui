@@ -1,18 +1,12 @@
-import type { OpenAI } from "openai";
-import type {
-	ChatCompletionCreateParamsNonStreaming,
-	ChatCompletionCreateParamsStreaming,
-	ChatCompletionMessageParam,
-} from "openai/resources/chat/completions";
-import { logger } from "$lib/server/logger";
 import { GITHUB_FIND_EXAMPLES, GITHUB_LIST_REPOS, GITHUB_READ_FILE } from "$lib/server/github";
-import type { McpToolMapping, OpenAiTool } from "$lib/server/mcp/tools";
-import type { McpServerConfig } from "$lib/server/mcp/httpClient";
-import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
-import { executeToolCalls, type NormalizedToolCall } from "../mcp/toolInvocation";
-import { parseToolArguments } from "../mcp/toolArgs";
-import { stripLoneSurrogates } from "../utils/loneSurrogates";
-import { isRateLimitError, withUpstreamRetry } from "../utils/upstreamRetry";
+import type { OpenAiTool } from "$lib/server/mcp/tools";
+import {
+	makeTruncator,
+	runNestedAgent,
+	type NestedAgentBuiltinTool,
+	type NestedAgentDeps,
+	type NestedCompletionBase,
+} from "./nestedAgent";
 import {
 	buildResearchSystemPrompt,
 	RESEARCH_CONTEXT_MAX_PROMPT,
@@ -52,55 +46,23 @@ const RESEARCH_ALLOWED_TOOLS: ReadonlySet<string> = new Set([
 
 export const MAX_RESEARCH_ITERATIONS = 60;
 
-// Fractions of the model's usable context (window minus the completion
-// reserve) at which the budget prompts fire — the source fired at 170k/190k
-// of an assumed 200k window, which these reproduce when no reserve is set.
-const CONTEXT_WARN_FRACTION = 0.85;
-const CONTEXT_MAX_FRACTION = 0.95;
-const FALLBACK_CONTEXT_WINDOW = 200_000;
-
 // Head/tail split preserved from the source: the head carries the finding,
 // the tail carries the footer/totals a long listing usually ends with.
 const TOOL_OUTPUT_MAX_CHARS = 8000;
 const TOOL_OUTPUT_HEAD = 4800;
 const TOOL_OUTPUT_TAIL = 3200;
 
-const NESTED_CALL_TIMEOUT_MS = 120_000;
+export const truncateResearchToolOutput = makeTruncator(
+	TOOL_OUTPUT_MAX_CHARS,
+	TOOL_OUTPUT_HEAD,
+	TOOL_OUTPUT_TAIL
+);
 
-export function truncateResearchToolOutput(output: string): string {
-	if (output.length <= TOOL_OUTPUT_MAX_CHARS) return output;
-	// Both slice points can land mid-surrogate-pair; see loneSurrogates.ts for
-	// why one such character 400s every request that carries the message.
-	return stripLoneSurrogates(
-		output.slice(0, TOOL_OUTPUT_HEAD) + "\n...(truncated)...\n" + output.slice(-TOOL_OUTPUT_TAIL)
-	);
-}
+export type ResearchCompletionBase = NestedCompletionBase;
 
-export type ResearchCompletionBase = Omit<ChatCompletionCreateParamsStreaming, "messages"> & {
-	reasoning_effort?: "low" | "medium" | "high";
-};
+export type ResearchRuntimeDeps = NestedAgentDeps;
 
-export interface ResearchRuntimeDeps {
-	openai: OpenAI;
-	/**
-	 * The main loop's request base. The nested loop swaps stream/tools/messages
-	 * and inherits everything else — model, sampling, reasoning effort. ml-intern
-	 * downgraded max/xhigh reasoning to "high" for this sub-call; this codebase's
-	 * effort type already tops out at "high", so inheriting is the cap.
-	 */
-	completionBase: ResearchCompletionBase;
-	requestHeaders: Record<string, string>;
-	servers: McpServerConfig[];
-	mapping: Record<string, McpToolMapping>;
-	mcpTools: OpenAiTool[];
-	/** Every builtin offered this turn, research itself included; filtered by the allowlist here. */
-	hostBuiltinTools: BuiltinTool[];
-	contextLengthTokens?: number;
-}
-
-export interface ResearchBuiltinTool extends BuiltinTool {
-	bind(deps: ResearchRuntimeDeps): void;
-}
+export type ResearchBuiltinTool = NestedAgentBuiltinTool;
 
 export function isResearchTool(tool: BuiltinTool): tool is ResearchBuiltinTool {
 	return tool.name === RESEARCH_TOOL_NAME && "bind" in tool;
@@ -153,16 +115,6 @@ const definition: OpenAiTool = {
 	},
 };
 
-/** JSON with object keys sorted at every depth, so arg order can't defeat the repetition check. */
-const stableStringify = (value: unknown): string =>
-	JSON.stringify(value, (_key, val: unknown) =>
-		val && typeof val === "object" && !Array.isArray(val)
-			? Object.fromEntries(
-					Object.entries(val as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))
-				)
-			: val
-	) ?? "";
-
 export function createResearchTool(): ResearchBuiltinTool {
 	// Definition and enablement are static; the request plumbing (client,
 	// sampling params, the turn's listed MCP tools) only exists inside
@@ -192,280 +144,52 @@ async function runResearch(
 	if (!task) return { error: "No research task provided." };
 	if (!deps) return { error: "Research tool not initialized for this request." };
 
-	const allowedBuiltins = deps.hostBuiltinTools.filter((tool) =>
-		RESEARCH_ALLOWED_TOOLS.has(tool.name)
-	);
-	const builtinNames = new Set(allowedBuiltins.map((tool) => tool.name));
-	const nestedTools: OpenAiTool[] = [
-		...allowedBuiltins.map((tool) => tool.definition),
-		...deps.mcpTools.filter(
-			(tool) =>
-				RESEARCH_ALLOWED_TOOLS.has(tool.function.name) && !builtinNames.has(tool.function.name)
-		),
-	];
-	if (nestedTools.length === 0) {
-		return { error: "No research tools are available in this deployment." };
-	}
-	const availableNames = new Set(nestedTools.map((tool) => tool.function.name));
-
-	let messages: ChatCompletionMessageParam[] = [
-		{ role: "system", content: buildResearchSystemPrompt(availableNames) },
+	return runNestedAgent(
 		{
-			role: "user",
-			content: context ? `Context: ${context}\n\nResearch task: ${task}` : `Research task: ${task}`,
-		},
-	];
-
-	// The parent's tool set and tool_choice never reach the sub-agent; stream
-	// is overridden per request below.
-	const base = { ...deps.completionBase };
-	delete base.tools;
-	delete base.tool_choice;
-
-	// Budget thresholds are fractions of the USABLE window: what remains after
-	// reserving the completion allowance every request asks for. Without the
-	// reservation, a large max_tokens lets a request exceed the window between
-	// the 85% nudge and the 95% stop — an unrecoverable provider error instead
-	// of a forced summary. The floor guards a degenerate reserve that would
-	// leave no room to research at all.
-	const windowTokens = deps.contextLengthTokens ?? FALLBACK_CONTEXT_WINDOW;
-	const completionReserve = typeof base.max_tokens === "number" ? base.max_tokens : 0;
-	const usableTokens = Math.max(windowTokens - completionReserve, Math.floor(windowTokens / 4));
-	const contextWarnAt = Math.floor(usableTokens * CONTEXT_WARN_FRACTION);
-	const contextMaxAt = Math.floor(usableTokens * CONTEXT_MAX_FRACTION);
-
-	const complete = async (withTools: boolean) => {
-		const request: ChatCompletionCreateParamsNonStreaming = {
-			...base,
-			stream: false,
-			messages,
-			// Omitting `tools` entirely is what forces the final summary: the
-			// budget prompt alone is a suggestion the model can ignore; an
-			// absent tool list is a constraint it can't.
-			...(withTools ? { tools: nestedTools, tool_choice: "auto" as const } : {}),
-		};
-		return deps.openai.chat.completions.create(request, {
-			signal: ctx.abortSignal,
-			headers: deps.requestHeaders,
-			timeout: NESTED_CALL_TIMEOUT_MS,
-		});
-	};
-
-	const emitProgress = (iteration: number, message: string) => {
-		ctx.elicitationSink?.emit({
-			type: MessageUpdateType.Tool,
-			subtype: MessageToolUpdateType.Progress,
-			uuid: ctx.uuid,
-			progress: iteration,
-			total: MAX_RESEARCH_ITERATIONS,
-			message,
-		});
-	};
-
-	// A throttle or a brief router outage mid-run must not discard the
-	// iterations already spent; the run is minutes long anyway, so it absorbs
-	// the backoff itself. Only when the schedule runs out does the error surface
-	// — with instructions to wait, so the model reaches for the wait tool
-	// instead of hammering research again.
-	const completeWithRetry = (withTools: boolean, iteration: number) =>
-		withUpstreamRetry(() => complete(withTools), {
-			signal: ctx.abortSignal,
-			onBackoff: (attempt, delayMs, err) => {
-				logger.warn(
-					{ attempt, delayMs, iteration, err: String(err) },
-					"[research] upstream failure; backing off in-loop"
-				);
-				const cause = isRateLimitError(err) ? "Rate limited" : "Upstream error";
-				emitProgress(iteration, `${cause} — retrying in ${Math.round(delayMs / 1000)}s`);
-			},
-		});
-
-	const forcedSummary = async (
-		stopPrompt: string,
-		failureText: string
-	): Promise<BuiltinToolResult> => {
-		messages = [...messages, { role: "user", content: stopPrompt }];
-		try {
-			const response = await completeWithRetry(false, MAX_RESEARCH_ITERATIONS);
-			const content = response.choices[0]?.message?.content ?? "";
-			return content ? { resultText: content } : { error: failureText };
-		} catch (err) {
-			logger.warn({ err: String(err) }, "[research] forced summary call failed");
-			return { error: failureText };
-		}
-	};
-
-	let totalTokens = 0;
-	let warned = false;
-	const callCounts = new Map<string, number>();
-	let repetitionNudged = false;
-	let lengthCutRetries = 0;
-
-	emitProgress(0, "Starting research sub-agent");
-
-	for (let iteration = 0; iteration < MAX_RESEARCH_ITERATIONS; iteration += 1) {
-		if (ctx.abortSignal?.aborted) return { error: "Aborted by user" };
-
-		if (totalTokens >= contextMaxAt) {
-			logger.warn({ totalTokens, iteration }, "[research] context max reached; forcing summary");
-			emitProgress(iteration, "Context limit reached — wrapping up");
-			return forcedSummary(
-				RESEARCH_CONTEXT_MAX_PROMPT,
-				"Research context exhausted and no summary was produced."
-			);
-		}
-		if (!warned && totalTokens >= contextWarnAt) {
-			warned = true;
-			messages = [...messages, { role: "user", content: RESEARCH_CONTEXT_WARN_PROMPT }];
-		}
-
-		let response: Awaited<ReturnType<typeof complete>>;
-		try {
-			response = await completeWithRetry(true, iteration);
-		} catch (err) {
-			if (ctx.abortSignal?.aborted) return { error: "Aborted by user" };
-			const message = err instanceof Error ? err.message : String(err);
-			logger.warn({ err: message, iteration }, "[research] sub-agent LLM call failed");
-			if (isRateLimitError(err)) {
-				return {
-					error:
-						"Research is rate-limited and in-loop retries were exhausted. " +
-						"Call wait for at least 120 seconds, then call research again with the same task.",
-				};
-			}
-			return { error: `Research agent LLM error: ${message}` };
-		}
-
-		totalTokens =
-			response.usage?.total_tokens ??
-			// No usage from this provider: a rough absolute estimate keeps the
-			// budget stop functional instead of never firing.
-			Math.ceil(JSON.stringify(messages).length / 4);
-
-		const msg = response.choices[0]?.message;
-		const finishReason = response.choices[0]?.finish_reason;
-		const toolCalls = msg?.tool_calls ?? [];
-		if (!msg || toolCalls.length === 0) {
-			// Cut by the output limit is not a finished summary — with reasoning
-			// models it usually died mid-think. Nudge it to answer within budget;
-			// after two cuts, surface whatever content exists rather than looping.
-			if (finishReason === "length" && lengthCutRetries < 2) {
-				lengthCutRetries += 1;
-				logger.warn(
-					{ iteration, attempt: lengthCutRetries },
-					"[research] response cut by the output limit; nudging to finish"
-				);
-				messages = [
-					...messages,
-					{
-						role: "assistant",
-						content:
-							msg?.content?.trim() || "(Response cut off by the output limit mid-reasoning.)",
-					},
-					{
-						role: "user",
-						content:
-							"[SYSTEM: Your previous response hit the output limit before it finished. Continue: finish the step or produce the summary now, with minimal further reasoning.]",
-					},
-				];
-				continue;
-			}
-			const content = msg?.content ?? "";
-			emitProgress(iteration + 1, "Research complete");
-			return content
-				? { resultText: content }
-				: { error: "Research completed but no summary was generated." };
-		}
-
-		// Wire-safe rebuild: only role/content/tool_calls go back. The raw
-		// message can carry provider fields (reasoning_content and friends)
-		// that OpenAI-compatible backends reject when echoed; content is
-		// omitted when empty because some backends 400 on empty text next to
-		// tool_calls.
-		messages = [
-			...messages,
-			{
-				role: "assistant",
-				tool_calls: toolCalls,
-				...(typeof msg.content === "string" && msg.content.trim().length > 0
-					? { content: msg.content }
-					: {}),
-			},
-		];
-
-		const allowedCalls: NormalizedToolCall[] = [];
-		const refusals: ChatCompletionMessageParam[] = [];
-		let sawRepetition = false;
-		for (const call of toolCalls) {
-			const name = call.function?.name ?? "";
-			if (!availableNames.has(name)) {
-				refusals.push({
-					role: "tool",
-					tool_call_id: call.id,
-					content: `Tool '${name}' not available for research.`,
-				});
-				continue;
-			}
-			const rawArguments = call.function?.arguments ?? "";
-			const key = `${name}|${stableStringify(parseToolArguments(rawArguments) ?? rawArguments)}`;
-			const count = (callCounts.get(key) ?? 0) + 1;
-			callCounts.set(key, count);
-			if (count >= 3) sawRepetition = true;
-			allowedCalls.push({ id: call.id, name, arguments: rawArguments });
-		}
-
-		let toolMessages: ChatCompletionMessageParam[] = [];
-		if (allowedCalls.length > 0) {
-			emitProgress(
-				iteration + 1,
-				allowedCalls.map((call) => `▸ ${call.name} ${call.arguments.slice(0, 80)}`).join("  ")
-			);
-			const exec = executeToolCalls({
-				calls: allowedCalls,
-				mapping: deps.mapping,
-				servers: deps.servers,
-				parseArgs: parseToolArguments,
-				toPrimitive: (value) =>
-					typeof value === "string" || typeof value === "number" || typeof value === "boolean"
-						? value
-						: undefined,
-				processToolOutput: (text) => ({ annotated: text, sources: [] }),
-				abortSignal: ctx.abortSignal,
-				builtinTools: allowedBuiltins,
-				// No `elicitation`: the sub-agent has no chat to ask, so an
-				// input-required response comes back as an ordinary tool error.
-			});
-			for await (const event of exec) {
-				// The sub-agent's raw Call/Result updates stay internal — the
-				// whole point is that only the summary reaches the outer
-				// conversation. Progress is reported on the research call itself.
-				if (event.type === "complete") {
-					toolMessages = event.summary.toolMessages;
-				}
-			}
-		}
-
-		messages = [
-			...messages,
-			...refusals,
-			...toolMessages.map((message) =>
-				message.role === "tool" && typeof message.content === "string"
-					? { ...message, content: truncateResearchToolOutput(message.content) }
-					: message
+			label: "research",
+			displayName: "Research",
+			systemPrompt: buildResearchSystemPrompt(
+				availableResearchToolNames(deps, RESEARCH_ALLOWED_TOOLS)
 			),
-		];
-
-		if (sawRepetition && !repetitionNudged) {
-			repetitionNudged = true;
-			logger.warn({ iteration }, "[research] repetition guard activated");
-			messages = [...messages, { role: "user", content: RESEARCH_REPETITION_PROMPT }];
-		}
-	}
-
-	logger.warn({}, "[research] iteration limit reached; extracting summary");
-	emitProgress(MAX_RESEARCH_ITERATIONS, "Iteration limit reached — extracting summary");
-	return forcedSummary(
-		RESEARCH_ITERATION_LIMIT_PROMPT,
-		`Research agent hit the iteration limit (${MAX_RESEARCH_ITERATIONS}) and no summary was produced — try a more focused task.`
+			task: context ? `Context: ${context}\n\nResearch task: ${task}` : `Research task: ${task}`,
+			allowedTools: RESEARCH_ALLOWED_TOOLS,
+			maxIterations: MAX_RESEARCH_ITERATIONS,
+			truncateOutput: truncateResearchToolOutput,
+			stop: {
+				contextWarn: RESEARCH_CONTEXT_WARN_PROMPT,
+				contextMax: RESEARCH_CONTEXT_MAX_PROMPT,
+				iterationLimit: RESEARCH_ITERATION_LIMIT_PROMPT,
+				repetition: RESEARCH_REPETITION_PROMPT,
+			},
+			failure: {
+				noTools: "No research tools are available in this deployment.",
+				contextMax: "Research context exhausted and no summary was produced.",
+				iterationLimit: `Research agent hit the iteration limit (${MAX_RESEARCH_ITERATIONS}) and no summary was produced — try a more focused task.`,
+				noSummary: "Research completed but no summary was generated.",
+				rateLimited:
+					"Research is rate-limited and in-loop retries were exhausted. " +
+					"Call wait for at least 120 seconds, then call research again with the same task.",
+			},
+			progress: { start: "Starting research sub-agent", done: "Research complete" },
+		},
+		ctx,
+		deps
 	);
+}
+
+/**
+ * The allowlisted tools this deployment actually offers. The research system
+ * prompt names them, so it has to be built from what exists rather than from
+ * the allowlist: an absent Exa server or GITHUB_TOKEN must not be advertised.
+ */
+function availableResearchToolNames(
+	deps: ResearchRuntimeDeps,
+	allowed: ReadonlySet<string>
+): Set<string> {
+	const builtins = deps.hostBuiltinTools.filter((tool) => allowed.has(tool.name));
+	const names = new Set(builtins.map((tool) => tool.name));
+	for (const tool of deps.mcpTools) {
+		if (allowed.has(tool.function.name)) names.add(tool.function.name);
+	}
+	return names;
 }

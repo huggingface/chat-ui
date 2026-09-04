@@ -40,6 +40,7 @@ describe("getEnabledBuiltinTools", () => {
 			"update_plan",
 			"wait",
 			"research",
+			"sandbox_task",
 		]);
 	});
 

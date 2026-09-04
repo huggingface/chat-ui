@@ -14,7 +14,7 @@ import { buildToolPreprompt } from "../utils/toolPrompt";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
 import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
-import { hasTruncatedToolCall, parseToolArguments } from "./toolArgs";
+import { hasTruncatedToolCall, parseToolArguments, withParseableArguments } from "./toolArgs";
 import type { TextGenerationContext } from "../types";
 import {
 	hasAuthHeader,
@@ -28,7 +28,11 @@ import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
-import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
+import {
+	isMlAssistantConversation,
+	pinnedHubToken,
+	withMlAssistantServers,
+} from "$lib/server/mlAssistant";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { createRepeatedCallGuard } from "./repeatedCallGuard";
@@ -37,7 +41,7 @@ import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
 import { composeGuards } from "./toolGuard";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { withUpstreamRetry } from "../utils/upstreamRetry";
-import { getEnabledBuiltinTools, isResearchTool, shouldSkipMcpFlow } from "../builtinTools";
+import { getEnabledBuiltinTools, isNestedAgentTool, shouldSkipMcpFlow } from "../builtinTools";
 import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
 
 export type RunMcpFlowContext = Pick<
@@ -155,6 +159,12 @@ export async function* runMcpFlow({
 				conversationId: conv._id,
 				generationId: generationId ?? conv._id.toString(),
 				username: (locals as unknown as { user?: { username?: string } })?.user?.username,
+				// Same credential the turn-start settle pass uses: an operator-pinned
+				// Hub entry launched the work, so it is what can read it back.
+				token:
+					pinnedHubToken() ??
+					(locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
+					(locals as unknown as { token?: string } | undefined)?.token,
 			})
 		: undefined;
 
@@ -620,12 +630,12 @@ export async function* runMcpFlow({
 			...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
 		};
 
-		// The research builtin runs a nested tool loop and needs the request
-		// plumbing this turn resolved — client, sampling params, the listed
-		// MCP tools — which only exists here. Its definition and enablement
-		// stayed in builtinTools/; only the runtime binding lives at the
-		// call site.
-		builtinTools.find(isResearchTool)?.bind({
+		// Sub-agent builtins run nested tool loops and need the request plumbing
+		// this turn resolved — client, sampling params, the listed MCP tools —
+		// which only exists here. Their definitions and enablement stay in
+		// builtinTools/; only the runtime binding lives at the call site, and it
+		// is the same binding for all of them.
+		const nestedAgentDeps = {
 			openai,
 			completionBase,
 			requestHeaders: {
@@ -640,7 +650,10 @@ export async function* runMcpFlow({
 			mcpTools,
 			hostBuiltinTools: builtinTools,
 			contextLengthTokens: targetContextLength,
-		});
+		};
+		for (const tool of builtinTools) {
+			if (isNestedAgentTool(tool)) tool.bind(nestedAgentDeps);
+		}
 
 		const toPrimitive = (value: unknown) => {
 			if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
@@ -1026,7 +1039,9 @@ export async function* runMcpFlow({
 				// OpenAI-compatible backends 400 on empty text next to tool_calls.
 				const assistantToolMessage: ChatCompletionMessageParam & { reasoning_content?: string } = {
 					role: "assistant",
-					tool_calls: toolCalls,
+					// Never the raw calls: one unparseable payload in the history 400s
+					// every later request of this turn. See withParseableArguments.
+					tool_calls: withParseableArguments(toolCalls),
 					...(assistantContentForToolMsg.trim().length > 0
 						? { content: assistantContentForToolMsg }
 						: {}),
@@ -1062,6 +1077,9 @@ export async function* runMcpFlow({
 					},
 					builtinTools,
 					guard,
+					// So a server operator can tell autonomous, job-shaped mode traffic
+					// from ordinary chat: the name is sent once, at initialize.
+					...(mlAssistant ? { clientKind: "intern" as const } : {}),
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;
