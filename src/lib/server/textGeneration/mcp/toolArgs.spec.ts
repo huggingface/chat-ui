@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hasTruncatedToolCall, parseToolArguments } from "./toolArgs";
+import { hasTruncatedToolCall, parseToolArguments, withParseableArguments } from "./toolArgs";
 
 describe("parseToolArguments", () => {
 	it("decodes a well-formed object", () => {
@@ -66,5 +66,44 @@ describe("hasTruncatedToolCall", () => {
 
 	it("reports a call cut off before its name arrived", () => {
 		expect(hasTruncatedToolCall("length", [{ arguments: "" }])).toBe(true);
+	});
+});
+
+describe("withParseableArguments", () => {
+	const call = (args: string) => ({
+		id: "t1",
+		type: "function" as const,
+		function: { name: "ask_user_question", arguments: args },
+	});
+
+	it("replaces the payload that killed a turn in production", () => {
+		// GLM emitted a bare "{" on a round that finished with tool_calls, so the
+		// truncation guard had no reason to fire. Echoed back, it made the
+		// provider reject every later request with
+		// `400 Invalid JSON in tool call arguments: '{'`.
+		const [out] = withParseableArguments([call("{")]);
+
+		expect(out.function.arguments).toBe("{}");
+	});
+
+	it("keeps the call rather than dropping it, so its result is not orphaned", () => {
+		const [out] = withParseableArguments([call("not json at all")]);
+
+		expect(out.id).toBe("t1");
+		expect(out.function.name).toBe("ask_user_question");
+	});
+
+	it("leaves valid arguments byte-exact", () => {
+		const raw = '{"question":"Which split?","options":["train","test"]}';
+
+		const [out] = withParseableArguments([call(raw)]);
+
+		expect(out.function.arguments).toBe(raw);
+	});
+
+	it("does not touch calls it has no argument for", () => {
+		const bare = { id: "t2", type: "function" as const, function: { name: "wait" } };
+
+		expect(withParseableArguments([bare])[0]).toBe(bare);
 	});
 });

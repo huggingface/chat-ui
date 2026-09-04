@@ -14,7 +14,7 @@ import { buildToolPreprompt } from "../utils/toolPrompt";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
 import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
-import { hasTruncatedToolCall, parseToolArguments } from "./toolArgs";
+import { hasTruncatedToolCall, parseToolArguments, withParseableArguments } from "./toolArgs";
 import type { TextGenerationContext } from "../types";
 import {
 	hasAuthHeader,
@@ -1029,7 +1029,9 @@ export async function* runMcpFlow({
 				// OpenAI-compatible backends 400 on empty text next to tool_calls.
 				const assistantToolMessage: ChatCompletionMessageParam & { reasoning_content?: string } = {
 					role: "assistant",
-					tool_calls: toolCalls,
+					// Never the raw calls: one unparseable payload in the history 400s
+					// every later request of this turn. See withParseableArguments.
+					tool_calls: withParseableArguments(toolCalls),
 					...(assistantContentForToolMsg.trim().length > 0
 						? { content: assistantContentForToolMsg }
 						: {}),

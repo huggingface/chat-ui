@@ -9,7 +9,7 @@ import type { McpToolMapping, OpenAiTool } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { executeToolCalls, type NormalizedToolCall } from "../mcp/toolInvocation";
-import { parseToolArguments } from "../mcp/toolArgs";
+import { parseToolArguments, withParseableArguments } from "../mcp/toolArgs";
 import { stripLoneSurrogates } from "../utils/loneSurrogates";
 import { isRateLimitError, withUpstreamRetry } from "../utils/upstreamRetry";
 import type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
@@ -307,7 +307,9 @@ export async function runNestedAgent(
 			...messages,
 			{
 				role: "assistant",
-				tool_calls: toolCalls,
+				// Same guard as the parent loop: an unparseable payload echoed back
+				// 400s every later request of the run. See withParseableArguments.
+				tool_calls: withParseableArguments(toolCalls),
 				...(typeof msg.content === "string" && msg.content.trim().length > 0
 					? { content: msg.content }
 					: {}),
