@@ -37,7 +37,11 @@ const mocks = vi.hoisted(() => ({
 	callMcpTool: vi.fn(),
 }));
 
-vi.mock("openai", () => ({
+// Only the client is stubbed. The SDK's error classes stay real: the retry
+// predicate identifies a dead connection by class, so a mocked-away
+// APIConnectionError would make every upstream failure unrecognizable.
+vi.mock("openai", async (importOriginal) => ({
+	...(await importOriginal<typeof import("openai")>()),
 	OpenAI: class {
 		chat = { completions: { create: mocks.create } };
 	},

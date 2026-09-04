@@ -56,7 +56,7 @@ function makeGuard(conversationId: ObjectId, callCounter = { n: 0 }) {
 		username: "testuser",
 	});
 	const before = (tool: string, args: Record<string, unknown>, serverUrl = HF_URL) =>
-		guard.before({ serverUrl, tool, args, callUuid: `uuid-${++callCounter.n}` });
+		guard.before({ serverUrl, tool, fnName: tool, args, callUuid: `uuid-${++callCounter.n}` });
 	return { guard, before };
 }
 

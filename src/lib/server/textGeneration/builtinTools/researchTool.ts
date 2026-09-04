@@ -12,7 +12,7 @@ import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpda
 import { executeToolCalls, type NormalizedToolCall } from "../mcp/toolInvocation";
 import { parseToolArguments } from "../mcp/toolArgs";
 import { stripLoneSurrogates } from "../utils/loneSurrogates";
-import { isRateLimitError, withRateLimitRetry } from "../utils/rateLimitRetry";
+import { isRateLimitError, withUpstreamRetry } from "../utils/upstreamRetry";
 import {
 	buildResearchSystemPrompt,
 	RESEARCH_CONTEXT_MAX_PROMPT,
@@ -262,19 +262,21 @@ async function runResearch(
 		});
 	};
 
-	// A 429 mid-run must not discard the iterations already spent; the run is
-	// minutes long anyway, so it absorbs the backoff itself. Only when the
-	// schedule runs out does the error surface — with instructions to wait, so
-	// the model reaches for the wait tool instead of hammering research again.
+	// A throttle or a brief router outage mid-run must not discard the
+	// iterations already spent; the run is minutes long anyway, so it absorbs
+	// the backoff itself. Only when the schedule runs out does the error surface
+	// — with instructions to wait, so the model reaches for the wait tool
+	// instead of hammering research again.
 	const completeWithRetry = (withTools: boolean, iteration: number) =>
-		withRateLimitRetry(() => complete(withTools), {
+		withUpstreamRetry(() => complete(withTools), {
 			signal: ctx.abortSignal,
-			onBackoff: (attempt, delayMs) => {
+			onBackoff: (attempt, delayMs, err) => {
 				logger.warn(
-					{ attempt, delayMs, iteration },
-					"[research] rate limited; backing off in-loop"
+					{ attempt, delayMs, iteration, err: String(err) },
+					"[research] upstream failure; backing off in-loop"
 				);
-				emitProgress(iteration, `Rate limited — retrying in ${Math.round(delayMs / 1000)}s`);
+				const cause = isRateLimitError(err) ? "Rate limited" : "Upstream error";
+				emitProgress(iteration, `${cause} — retrying in ${Math.round(delayMs / 1000)}s`);
 			},
 		});
 
