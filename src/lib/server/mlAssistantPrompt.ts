@@ -99,7 +99,7 @@ Jobs run on remote hardware with ephemeral storage and a wall-clock limit.
 - Name every job you submit. The user's jobs dashboard lists runs by name, and an unnamed job shows up there as an image tag plus a hash.
 - Smoke-test before you commit real compute: the same script, a handful of steps, the smallest hardware that fits. Run the script-level checks — does it import, does the data load, are the shapes right — in the cheapest place available before any job carries them. Then launch the real run.
 - Submit one job first. Only fan out once you have seen one get past its first steps.
-- Before submitting, print a short pre-flight list in your reply and check it yourself: base model, dataset and split, method, hardware, timeout, and where the result gets pushed. If a line of that list is a guess, stop and settle it first.
+- Before submitting, print a short pre-flight list in your reply and check it yourself: base model, dataset and split, method, hardware, timeout, metrics, and where the result gets pushed. If a line of that list is a guess, stop and settle it first. The metrics line is \`trackio\` for anything that trains, or why this run does not need it.
 - After submitting, report the job id and follow it up rather than declaring success at submission time.`;
 
 const ARTIFACTS_VS_JOBS = `# Scripts: artifact or payload
@@ -234,7 +234,7 @@ const HF_JOBS_CONTRACT = `RUNNING JOBS (hf_jobs): a job is remote compute with e
 - Timeout. Set it above your estimate of the run, not at it. A timeout shorter than the run loses the run at the end.
 - Dependencies. State them explicitly, pinned — with the uv --with arguments or an image that already has them. Never build flash-attention from source in a job; it eats the budget and usually fails.
 - Destination. push_to_hub with an explicit hub_model_id in the namespace from the session context, or a mounted bucket volume for checkpoints. Nothing written to the container's own disk survives the job.
-- Metrics. A run worth watching gets a live dashboard: add \`trackio\` to \`with_deps\`, then \`trackio.init(project="<project>", space_id="<namespace>/<space>")\`, \`trackio.log({"loss": ...}, step=n)\`, \`trackio.finish()\`.
+- Metrics. Every training run gets a live dashboard, not only the ones you judge worth watching: without one, a loss that went flat in the first minutes costs the whole timeout to discover. Add \`trackio\` to \`with_deps\`, then \`trackio.init(project="<project>", space_id="<namespace>/<space>")\`, \`trackio.log({"loss": ...}, step=n)\`, \`trackio.finish()\`. Name the Space on the pre-flight list so the user can open it while the run goes.
 - Data. Mount a large dataset as a volume rather than downloading it into the container.
 - Size. Smoke-test the same script for a handful of steps on the smallest GPU that fits, then launch the real run. Submit one job before you fan out. When hf_sandbox is on offer, the import and data checks have already happened there — a smoke job that dies on a typo was a job submitted too early.
 
@@ -245,6 +245,8 @@ Estimate before you submit. The smoke test gives you measured steps per second, 
 After submitting, report the job id and its URL, then follow it with the logs operation — and make the first check soon, with a SHORT wait, because failures cluster at the start: a wrong dependency or a bad column name shows up in the first minute, and a twenty-minute wait over it is twenty minutes lost. Once the run has proven itself, lengthen the waits to match the time remaining. A submitted job is not a finished one, and a job that failed says why in its logs — read them before you change anything.`;
 
 const HF_SANDBOX_RULES = `SANDBOXES (hf_sandbox): a sandbox is a machine you run commands in directly, which makes it the right place for the fast checks — does the script import, does the dataset load, are the shapes what you think. A job queues, pulls an image, and only then tells you about a typo; a sandbox tells you in seconds. When you have this tool, the fast checks go here FIRST, every time — not in a smoke job out of habit. A job's queue time is the wrong price for finding a typo.
+
+These tools and hf_jobs take different argument shapes, and mixing them is the most common rejected call. Here \`cmd\` only selects the operation and everything else is a token in the \`args\` array — the timeout among them, as the pair \`--timeout 55\` — while hf_jobs takes an object with \`timeout\` as a key inside it. Each tool's own parameter descriptions carry its exact grammar; read those rather than reasoning across from the sibling.
 
 It is experimental, and whether it is available depends on the account and how this deployment is configured. So treat it as an optimisation, never a dependency: if creating one fails — 403 or anything else — do not retry it, do not look for another way in, and do not tell the user the task is blocked. Run the same check as a small hf_jobs run instead and carry on. A smoke-test job is slower, not worse.`;
 

@@ -180,6 +180,24 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(inMode([tool("hf_jobs")])).not.toContain("SANDBOXES (hf_sandbox)");
 	});
 
+	it("puts metrics on the pre-flight list, not only in the bullets", () => {
+		// The list is the part the model prints and checks itself. Trackio guidance
+		// sat in a bullet for weeks and was never acted on unprompted: hardware,
+		// timeout and destination were on the list, metrics was not.
+		expect(ML_ASSISTANT_PREPROMPT).toContain("timeout, metrics, and where the result gets pushed");
+		expect(inMode([tool("hf_jobs")])).toContain("Every training run gets a live dashboard");
+	});
+
+	it("separates the two argument shapes where the sandbox tools are described", () => {
+		// hf_jobs takes `args` as an object with a `timeout` key; the sandbox tools
+		// take a token list where it is `--timeout 55`. Reasoning across from the
+		// sibling is the single largest class of rejected call in the traces.
+		const sandbox = inMode([tool("hf_sandbox")]);
+
+		expect(sandbox).toContain("--timeout 55");
+		expect(sandbox).toContain("hf_jobs takes an object");
+	});
+
 	it("guides web search only where web search exists", () => {
 		// The mode replaces the generic tool preprompt, SEARCH paragraph included,
 		// so a deployment with Exa configured would otherwise get none.

@@ -31,8 +31,12 @@ import { withoutContentLength } from "$lib/server/undiciCompat";
 import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
+import { createRepeatedCallGuard } from "./repeatedCallGuard";
+import { withRepairedToolSchemas } from "$lib/server/mcp/schemaRepair";
+import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
+import { composeGuards } from "./toolGuard";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
-import { withRateLimitRetry } from "../utils/rateLimitRetry";
+import { withUpstreamRetry } from "../utils/upstreamRetry";
 import { getEnabledBuiltinTools, isResearchTool, shouldSkipMcpFlow } from "../builtinTools";
 import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
 
@@ -87,6 +91,18 @@ const MAX_CUT_ANSWER_RETRIES = 1;
 // template leaks their native tool syntax into content. A second leak
 // finalizes as-is rather than looping on a model that cannot comply.
 const MAX_LEAKED_TOOL_CALL_RETRIES = 1;
+/**
+ * The `<tool_call>name<arg_key>k</arg_key><arg_value>v</arg_value>` dialect, for
+ * a leak that carries no advertised tool name to match on.
+ *
+ * Two adjacent tags, never one: a single `</function>` or `</tool_call>` appears
+ * in an answer that documents this syntax or quotes sample XML, and treating
+ * that as a leak would throw the answer away and tell the model to make a call
+ * it was never asked for. The pairs below are the structure a half-parsed call
+ * leaves behind and are not something prose produces.
+ */
+const LEAKED_CALL_MARKUP =
+	/<\/arg_key>\s*<arg_value>|<\/arg_value>\s*(?:<arg_key>|<\/(?:tool_call|function)>)|<\/function>\s*<\/tool_call>/;
 
 export async function* runMcpFlow({
 	model,
@@ -141,6 +157,10 @@ export async function* runMcpFlow({
 				username: (locals as unknown as { user?: { username?: string } })?.user?.username,
 			})
 		: undefined;
+
+	// Built here so it spans the turn's rounds; chained below, once the tool
+	// mapping the schema check reads exists.
+	const repeatedCallGuard = createRepeatedCallGuard();
 
 	// Start from env-configured servers
 	let servers = getMcpServers();
@@ -390,7 +410,21 @@ export async function* runMcpFlow({
 		// In the mode, gated tools advertise their routing discriminator as
 		// required — the Hub's own schema doesn't, and calls without one can only
 		// bounce off the budget gate's fail-closed path.
-		const shapedMcpTools = mlAssistant ? withRequiredDiscriminators(mcpTools, mapping) : mcpTools;
+		const gatedMcpTools = mlAssistant ? withRequiredDiscriminators(mcpTools, mapping) : mcpTools;
+		// Applied to every conversation, mode or not: the Hub tools whose real
+		// interface is a grammar in prose misfire the same way whoever is calling
+		// them. See mcp/schemaRepair.ts for what the traces showed.
+		const shapedMcpTools = withRepairedToolSchemas(gatedMcpTools, mapping, servers);
+		// Cheapest first, and only the last link may book anything (see
+		// composeGuards): a repeat of a call that already failed the same way, then
+		// arguments that cannot satisfy the tool's own schema, then the budget.
+		// The first two run for every conversation — getting a tool's arguments
+		// wrong is not a mode-specific failure.
+		const guard = [
+			repeatedCallGuard,
+			createSchemaPreflightGuard(mapping),
+			...(budgetGuard ? [budgetGuard] : []),
+		].reduce(composeGuards);
 		const oaTools = [
 			...builtinTools.map((tool) => tool.definition),
 			...shapedMcpTools.filter((tool) => !builtinNames.has(tool.function.name)),
@@ -680,8 +714,9 @@ export async function* runMcpFlow({
 			};
 
 			// A turn several productive rounds deep must not die on one throttled
-			// request; absorb router 429s that outlast the SDK's quick retries.
-			const completionStream: Stream<ChatCompletionChunk> = await withRateLimitRetry(
+			// request, or on a gateway that has no backend ready for a moment;
+			// absorb what outlasts the SDK's quick retries.
+			const completionStream: Stream<ChatCompletionChunk> = await withUpstreamRetry(
 				() =>
 					openai.chat.completions.create(completionRequest, {
 						signal: abortSignal,
@@ -695,8 +730,11 @@ export async function* runMcpFlow({
 					}),
 				{
 					signal: abortSignal,
-					onBackoff: (attempt, delayMs) =>
-						logger.warn({ loop, attempt, delayMs }, "[mcp] rate limited; backing off in-loop"),
+					onBackoff: (attempt, delayMs, err) =>
+						logger.warn(
+							{ loop, attempt, delayMs, err: String(err) },
+							"[mcp] upstream failure; backing off in-loop"
+						),
 				}
 			);
 
@@ -914,9 +952,9 @@ export async function* runMcpFlow({
 						{ loop },
 						"[mcp] missing tool_call id in stream; retrying non-stream to recover ids"
 					);
-					// Same throttle absorption as the streaming call above: this recovery
-					// request is mid-round, where a surfaced 429 costs the whole turn.
-					const nonStream = await withRateLimitRetry(
+					// Same absorption as the streaming call above: this recovery
+					// request is mid-round, where a surfaced failure costs the whole turn.
+					const nonStream = await withUpstreamRetry(
 						() =>
 							openai.chat.completions.create(
 								{ ...completionBase, messages: messagesOpenAI, stream: false },
@@ -933,10 +971,10 @@ export async function* runMcpFlow({
 							),
 						{
 							signal: abortSignal,
-							onBackoff: (attempt, delayMs) =>
+							onBackoff: (attempt, delayMs, err) =>
 								logger.warn(
-									{ loop, attempt, delayMs },
-									"[mcp] rate limited on id recovery; backing off in-loop"
+									{ loop, attempt, delayMs, err: String(err) },
+									"[mcp] upstream failure on id recovery; backing off in-loop"
 								),
 						}
 					);
@@ -1023,7 +1061,7 @@ export async function* runMcpFlow({
 						sessionId: (locals as unknown as { sessionId?: string })?.sessionId,
 					},
 					builtinTools,
-					...(budgetGuard ? { guard: budgetGuard } : {}),
+					guard,
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;
@@ -1116,10 +1154,21 @@ export async function* runMcpFlow({
 			const leakedToolName = advertisedToolNames.find((name) =>
 				new RegExp(`<${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s/>]`).test(visibleContent)
 			);
-			if (leakedToolName && leakedToolCallRetries < MAX_LEAKED_TOOL_CALL_RETRIES) {
+			// The name is not always there to find. GLM-class templates write it as
+			// plain text after `<tool_call>`, so a provider that half-parses the
+			// block strips the name along with the opening tag and leaks the tail —
+			// `args</arg_key><arg_value>{…}</arg_value></tool_call>`, which names
+			// nothing this loop advertises. The closing markers are what survive, so
+			// they are what this matches; an opening tag alone stays ordinary text,
+			// which keeps prose that merely mentions the syntax out of it.
+			const leakedMarkup = !leakedToolName && LEAKED_CALL_MARKUP.test(visibleContent);
+			if (
+				(leakedToolName || leakedMarkup) &&
+				leakedToolCallRetries < MAX_LEAKED_TOOL_CALL_RETRIES
+			) {
 				leakedToolCallRetries += 1;
 				logger.warn(
-					{ loop, tool: leakedToolName, attempt: leakedToolCallRetries },
+					{ loop, tool: leakedToolName ?? "(unnamed)", attempt: leakedToolCallRetries },
 					"[mcp] final answer contains tool-call markup; retrying"
 				);
 				messagesOpenAI = [
@@ -1127,7 +1176,7 @@ export async function* runMcpFlow({
 					{ role: "assistant" as const, content: lastAssistantContent },
 					{
 						role: "user" as const,
-						content: `[SYSTEM: Your previous response wrote a tool call as text markup (<${leakedToolName}> tags). That text called nothing — no tool ran, and the user saw broken markup instead of a working control. Respond again: make the call through the function-calling mechanism as a real tool call, and keep tool markup out of your reply text.]`,
+						content: `[SYSTEM: Your previous response wrote a tool call as text markup (${leakedToolName ? `<${leakedToolName}> tags` : "tool-call tags such as <arg_value> and </tool_call>"}). That text called nothing — no tool ran, and the user saw broken markup instead of a working control. Respond again: make the call through the function-calling mechanism as a real tool call, and keep tool markup out of your reply text.]`,
 					},
 				];
 				continue;

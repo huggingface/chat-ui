@@ -12,6 +12,8 @@ export interface GuardedToolCall {
 	serverUrl: string;
 	/** Tool name as the server knows it (unsanitized). */
 	tool: string;
+	/** Name the model called, and the key into this request's tool mapping. */
+	fnName: string;
 	args: Record<string, unknown>;
 	/**
 	 * The dispatch uuid, unique per execution. Deliberately not the provider's
@@ -46,4 +48,42 @@ export interface ToolCallGuard {
 	 * the resume path bypasses guards, so a gated call must never enter it.
 	 */
 	allowParking: boolean;
+}
+
+/**
+ * Both guards, `first` consulted first. A refusal from `first` short-circuits,
+ * so `second` never sees the call — which is why `first` must be a guard whose
+ * `before` acquires nothing: it is the one that can be skipped without a
+ * release, and the one whose ticket is dropped when `second` refuses.
+ *
+ * Only `second` may emit updates from `before`; a refusal there discards
+ * nothing of `first`'s because `first` booked nothing to discard.
+ */
+export function composeGuards(first: ToolCallGuard, second: ToolCallGuard): ToolCallGuard {
+	type Tickets = { first: unknown; second: unknown };
+	return {
+		allowParking: first.allowParking && second.allowParking,
+		async before(call) {
+			const firstVerdict = await first.before(call);
+			if (!firstVerdict.allow) return firstVerdict;
+			const secondVerdict = await second.before(call);
+			if (!secondVerdict.allow) return secondVerdict;
+			return {
+				allow: true,
+				ticket: { first: firstVerdict.ticket, second: secondVerdict.ticket } satisfies Tickets,
+				update: secondVerdict.update,
+			};
+		},
+		async after(ticket, outcome) {
+			const { first: firstTicket, second: secondTicket } = ticket as Tickets;
+			// Same rule executeToolCalls applies: an allow without a ticket means
+			// the guard took no interest in this call, and its `after` is written
+			// to read a ticket it never issued. The composite always has a ticket
+			// of its own, so without this a guard that opted out would be handed
+			// `undefined` and throw on a call that worked.
+			if (firstTicket !== undefined) await first.after(firstTicket, outcome);
+			if (secondTicket === undefined) return undefined;
+			return second.after(secondTicket, outcome);
+		},
+	};
 }

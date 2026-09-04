@@ -413,6 +413,7 @@ export async function* executeToolCalls({
 			const verdict = await guard.before({
 				serverUrl: serverCfg.url,
 				tool: mappingEntry.tool,
+				fnName: p.call.name,
 				args: argsObj,
 				callUuid: p.uuid,
 			});

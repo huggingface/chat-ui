@@ -7,7 +7,8 @@ import {
 } from "$lib/types/MessageUpdate";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
-import { RATE_LIMIT_BACKOFF_MS } from "$lib/server/textGeneration/utils/rateLimitRetry";
+import { RETRY_BACKOFF_MS } from "$lib/server/textGeneration/utils/upstreamRetry";
+import { APIConnectionError } from "openai";
 import type { McpFlowResult, RunMcpFlowContext } from "./runMcpFlow";
 
 // ---------------------------------------------------------------------------
@@ -40,7 +41,11 @@ const mocks = vi.hoisted(() => ({
 // The gate itself is real; only the build flag behind it is forced on.
 vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
 
-vi.mock("openai", () => ({
+// Only the client is stubbed. The SDK's error classes stay real: the retry
+// predicate identifies a dead connection by class, so a mocked-away
+// APIConnectionError would make every upstream failure unrecognizable.
+vi.mock("openai", async (importOriginal) => ({
+	...(await importOriginal<typeof import("openai")>()),
 	OpenAI: class {
 		chat = { completions: { create: mocks.create } };
 	},
@@ -409,18 +414,17 @@ describe("runMcpFlow truncated tool calls", () => {
 	});
 });
 
-describe("runMcpFlow rate limits", () => {
-	it("absorbs a router 429 with backoff instead of failing a turn mid-flight", async () => {
+describe("runMcpFlow transient upstream failures", () => {
+	// Scripts `upstream` for the first round and a clean answer for the second,
+	// then drives the backoff sleep to completion.
+	const runAbsorbing = async (upstream: Error) => {
 		// Fake only the timer pair the backoff sleep uses: the flow crosses real
 		// async boundaries (dynamic import, mocked promises) before it ever
 		// schedules the sleep, and a blanket fake would starve those of event-loop
 		// turns.
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 		try {
-			scriptRounds([
-				{ error: Object.assign(new Error('429 "Rate limit exceeded"'), { status: 429 }) },
-				{ content: "the answer" },
-			]);
+			scriptRounds([{ error: upstream }, { content: "the answer" }]);
 
 			const pending = runFlow();
 			let settled = false;
@@ -432,29 +436,60 @@ describe("runMcpFlow rate limits", () => {
 			// registration — not a wall-clock budget — is the signal to advance the
 			// clock. A fixed number of advance/yield rounds can be exhausted before a
 			// slow runner even reaches the sleep, leaving its timer to hang forever.
-			// A flow that settles without a timer let the 429 escape; fall through
-			// and let the assertions name that.
+			// A flow that settles without a timer let the failure escape; fall
+			// through and let the assertions name that.
 			while (!settled && vi.getTimerCount() === 0) {
 				await new Promise((resolve) => setImmediate(resolve));
 			}
 			if (vi.getTimerCount() > 0) {
-				await vi.advanceTimersByTimeAsync(RATE_LIMIT_BACKOFF_MS[0]);
+				await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_MS[0]);
 			}
-			const { updates, result } = await pending;
-
-			expect(result).toBe("completed");
-			expect(finalAnswer(updates)).toBe("the answer");
-			expect(mocks.create).toHaveBeenCalledTimes(2);
+			return await pending;
 		} finally {
 			vi.useRealTimers();
 		}
+	};
+
+	it("absorbs a router 429 with backoff instead of failing a turn mid-flight", async () => {
+		const { updates, result } = await runAbsorbing(
+			Object.assign(new Error('429 "Rate limit exceeded"'), { status: 429 })
+		);
+
+		expect(result).toBe("completed");
+		expect(finalAnswer(updates)).toBe("the answer");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
 	});
 
-	it("still surfaces a non-429 upstream failure", async () => {
-		scriptRounds([{ error: new Error("boom") }]);
+	it("absorbs a 503 from a router with no backend ready", async () => {
+		// The failure that ended two turns of a six-hour run: the same request
+		// succeeds unchanged seconds later, so surfacing it discards the turn.
+		const { updates, result } = await runAbsorbing(
+			Object.assign(new Error("503 no available server"), { status: 503 })
+		);
+
+		expect(result).toBe("completed");
+		expect(finalAnswer(updates)).toBe("the answer");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+	});
+
+	it("absorbs a connection that never reached the router", async () => {
+		// A DNS blip on the machine running chat-ui arrives as APIConnectionError,
+		// with no status to match on.
+		const { updates, result } = await runAbsorbing(
+			new APIConnectionError({ message: "Connection error." })
+		);
+
+		expect(result).toBe("completed");
+		expect(finalAnswer(updates)).toBe("the answer");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+	});
+
+	it("still surfaces a failure that a retry cannot fix", async () => {
+		scriptRounds([{ error: Object.assign(new Error("400 bad request"), { status: 400 }) }]);
 		const { result } = await runFlow();
 		// Fails before any output: the flow falls back rather than erroring the turn.
 		expect(result).toBe("not_applicable");
+		expect(mocks.create).toHaveBeenCalledTimes(1);
 	});
 });
 
@@ -845,6 +880,73 @@ describe("leaked tool-call markup", () => {
 
 		expect(mocks.create).toHaveBeenCalledTimes(1);
 		expect(finalAnswer(updates)).toContain("<some_other_tool>");
+	});
+
+	it.each([
+		'args</arg_key><arg_value>{"job_id": "6a99c12c", "tail": 60, "operation": "logs"}</arg_value></tool_call>',
+		'args</arg_key><arg_value>{"job_id": "6a99c5ca", "tail": 40}</arg_value><arg_key>operation</arg_key><arg_value>logs</arg_value></tool_call>',
+		'<think>The logs call failed. Retry.</think>{"args": {"job_id": "x", "tail": 80}, "operation": "logs"}</arg_value></tool_call>',
+		'<arg_value>{"job_id": "x", "operation": "logs", "tail": 80}</arg_value></tool_call>',
+	])("catches the leak tail %#, exactly as the provider streamed it", async (leak) => {
+		scriptRounds([{ content: leak }, { content: "Here is a clean answer." }]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toBe("Here is a clean answer.");
+	});
+
+	it("retries when a half-parsed leak carries no tool name", async () => {
+		// What together's GLM-5.3-Flash actually leaked: the provider consumed
+		// `<tool_call>hf_jobs<arg_key>` and streamed the rest as content, so the
+		// name a tag-based check needs is not in the text at all.
+		scriptRounds([
+			{
+				content:
+					'args</arg_key><arg_value>{"job_id": "6a99c12c", "tail": 60, "operation": "logs"}</arg_value></tool_call>',
+			},
+			{ content: "Here is a clean answer." },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toBe("Here is a clean answer.");
+		const nudge = requestMessages(1).at(-1);
+		expect(String(nudge?.content)).toContain("</tool_call>");
+		expect(String(nudge?.content)).toContain("function-calling mechanism");
+	});
+
+	it("leaves an answer that documents the syntax alone", async () => {
+		// A single closing tag turns up in an answer about tool calling, or one
+		// quoting sample XML. Discarding it would replace a correct answer with an
+		// instruction to make a call nobody asked for.
+		scriptRounds([
+			{
+				content:
+					"Providers close the block with </tool_call>, and Hermes-style templates use </function> instead.",
+			},
+		]);
+
+		const { updates } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toContain("</tool_call>");
+	});
+
+	it("leaves prose that only mentions the syntax alone", async () => {
+		// An answer about the markup opens tags without closing them; only a
+		// closing marker means a call the provider half-parsed.
+		scriptRounds([
+			{ content: "The template writes <tool_call> and then <arg_key> for each argument." },
+		]);
+
+		const { updates } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toContain("<arg_key>");
 	});
 
 	it("requires a whole tag, not a prefix", async () => {
