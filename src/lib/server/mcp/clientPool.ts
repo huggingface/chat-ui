@@ -1,6 +1,6 @@
 import { StreamableHTTPClientTransport, SSEClientTransport } from "@modelcontextprotocol/client";
 import type { Client } from "@modelcontextprotocol/client";
-import { createMcpClient } from "./client";
+import { createMcpClient, type McpClientKind } from "./client";
 import type { McpServerConfig } from "./httpClient";
 import { mcpFetch } from "$lib/server/urlSafety";
 
@@ -57,20 +57,24 @@ function ensureSweeper() {
 	sweeper.unref?.();
 }
 
-function keyOf(server: McpServerConfig, isolation?: string) {
+function keyOf(server: McpServerConfig, isolation?: string, kind: McpClientKind = "session") {
 	const headers = Object.entries(server.headers ?? {})
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([k, v]) => `${k}:${v}`)
 		.join("|\u0000|");
-	return `${server.url}|${headers}|${isolation ?? ""}`;
+	// The kind is part of the key, not decoration: it is sent once at initialize,
+	// so a connection opened as one identity would otherwise be handed to a
+	// caller that means to be the other, and the server would see the wrong name.
+	return `${server.url}|${headers}|${isolation ?? ""}|${kind}`;
 }
 
 export async function getClient(
 	server: McpServerConfig,
 	signal?: AbortSignal,
-	isolation?: string
+	isolation?: string,
+	kind: McpClientKind = "session"
 ): Promise<Client> {
-	const key = keyOf(server, isolation);
+	const key = keyOf(server, isolation, kind);
 	const existing = pool.get(key);
 	if (existing) {
 		if (Date.now() - existing.lastUsedAt <= PING_AFTER_IDLE_MS) {
@@ -90,7 +94,7 @@ export async function getClient(
 	}
 
 	let firstError: unknown;
-	const client = createMcpClient();
+	const client = createMcpClient(kind);
 	const url = new URL(server.url);
 	// Pooled clients outlive the request that created them, so never bind the per-request
 	// abort signal to the transport. Per-call cancellation goes through RequestOptions instead.
@@ -184,12 +188,13 @@ export function evictFromPool(server: McpServerConfig, isolation?: string): Clie
 export async function getAttributableClient(
 	server: McpServerConfig,
 	conversationId: string,
-	signal?: AbortSignal
+	signal?: AbortSignal,
+	kind: McpClientKind = "session"
 ): Promise<{ client: Client; isolation?: string }> {
 	const isolation = `conversation:${conversationId}`;
-	if (!pool.has(keyOf(server, isolation))) {
-		const shared = await getClient(server, signal);
+	if (!pool.has(keyOf(server, isolation, kind))) {
+		const shared = await getClient(server, signal, undefined, kind);
 		if (shared.getProtocolEra() === "modern") return { client: shared };
 	}
-	return { client: await getClient(server, signal, isolation), isolation };
+	return { client: await getClient(server, signal, isolation, kind), isolation };
 }

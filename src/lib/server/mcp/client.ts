@@ -8,13 +8,26 @@ import { isElicitationEnabled } from "./elicitationConfig";
  * reads as form-only and the server SDK then refuses to send a URL elicitation at all.
  */
 export function mcpClientCapabilities(kind: McpClientKind): ClientCapabilities {
-	return kind === "session" && isElicitationEnabled() ? { elicitation: { form: {}, url: {} } } : {};
+	return CLIENT_INFO[kind].elicits && isElicitationEnabled()
+		? { elicitation: { form: {}, url: {} } }
+		: {};
 }
 
-// Servers can tell these apart, so a health probe stays distinguishable from a session.
+/**
+ * Servers can tell these apart, so a health probe stays distinguishable from a
+ * session — and ML Intern from ordinary chat, which is the whole point of the
+ * third: its traffic is autonomous, long-running and job-shaped, and a server
+ * operator asked to be able to see it separately.
+ *
+ * `elicits` rather than a name check: whether a client declares the elicitation
+ * capability is a property of what is behind it (a chat that can answer), not
+ * of what it is called, and a new kind that forgot to set it would silently
+ * lose every prompt.
+ */
 const CLIENT_INFO = {
-	session: { name: "chat-ui-mcp", version: "0.1.0" },
-	health: { name: "chat-ui-health-check", version: "1.0.0" },
+	session: { name: "chat-ui-mcp", version: "0.1.0", elicits: true },
+	intern: { name: "chat-ui-intern", version: "0.1.0", elicits: true },
+	health: { name: "chat-ui-health-check", version: "1.0.0", elicits: false },
 } as const;
 
 export type McpClientKind = keyof typeof CLIENT_INFO;
@@ -26,15 +39,19 @@ export type McpClientKind = keyof typeof CLIENT_INFO;
  */
 export function createMcpClient(kind: McpClientKind = "session"): Client {
 	const capabilities = mcpClientCapabilities(kind);
-	const client = new Client(CLIENT_INFO[kind], {
-		capabilities,
-		// The SDK defaults to `legacy`, i.e. never negotiating. Probe instead, and let the
-		// probe fall back on its own for the 2025-era servers that are still the majority.
-		versionNegotiation: { mode: "auto" },
-		// A 2026-era prompt outlives this call, so the driver must not block our handler
-		// waiting for one. `callMcpTool` opts each call into receiving `input_required`.
-		inputRequired: { autoFulfill: false },
-	});
+	const { name, version } = CLIENT_INFO[kind];
+	const client = new Client(
+		{ name, version },
+		{
+			capabilities,
+			// The SDK defaults to `legacy`, i.e. never negotiating. Probe instead, and let the
+			// probe fall back on its own for the 2025-era servers that are still the majority.
+			versionNegotiation: { mode: "auto" },
+			// A 2026-era prompt outlives this call, so the driver must not block our handler
+			// waiting for one. `callMcpTool` opts each call into receiving `input_required`.
+			inputRequired: { autoFulfill: false },
+		}
+	);
 
 	if (capabilities.elicitation) {
 		// Imported on demand, or every module building a client drags in a Mongo connection.

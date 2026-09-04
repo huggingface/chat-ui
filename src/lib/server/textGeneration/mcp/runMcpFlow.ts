@@ -1077,6 +1077,9 @@ export async function* runMcpFlow({
 					},
 					builtinTools,
 					guard,
+					// So a server operator can tell autonomous, job-shaped mode traffic
+					// from ordinary chat: the name is sent once, at initialize.
+					...(mlAssistant ? { clientKind: "intern" as const } : {}),
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;
