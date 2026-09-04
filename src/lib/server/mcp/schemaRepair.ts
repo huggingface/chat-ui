@@ -1,3 +1,5 @@
+import { isHfMcpServer } from "./hf";
+import type { McpServerConfig } from "./httpClient";
 import type { McpToolMapping, OpenAiTool } from "./tools";
 
 /**
@@ -54,10 +56,18 @@ const PROPERTY_DESCRIPTIONS: Record<string, Record<string, string>> = {
  */
 export function withRepairedToolSchemas(
 	tools: OpenAiTool[],
-	mapping: Record<string, McpToolMapping>
+	mapping: Record<string, McpToolMapping>,
+	servers: McpServerConfig[]
 ): OpenAiTool[] {
+	// A tool name is not proof of where it came from: a user-configured server is
+	// free to export its own `hf_jobs`, and rewriting its description with the
+	// Hub's grammar would teach the model to call it wrongly.
+	const hubServerNames = new Set(
+		servers.filter((server) => isHfMcpServer(server.url)).map((server) => server.name)
+	);
 	return tools.map((tool) => {
-		const serverTool = mapping[tool.function.name]?.tool;
+		const entry = mapping[tool.function.name];
+		const serverTool = entry && hubServerNames.has(entry.server) ? entry.tool : undefined;
 		const repairs = serverTool ? PROPERTY_DESCRIPTIONS[serverTool] : undefined;
 		const parameters = tool.function.parameters;
 		if (!repairs || !parameters) return tool;

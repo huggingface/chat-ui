@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { withRepairedToolSchemas } from "./schemaRepair";
 import type { McpToolMapping, OpenAiTool } from "./tools";
+import type { McpServerConfig } from "./httpClient";
+
+const HUB: McpServerConfig[] = [{ name: "Hugging Face", url: "https://hf.co/mcp?login" }];
 
 const mapping = (fnName: string, tool: string): Record<string, McpToolMapping> => ({
 	[fnName]: { fnName, server: "Hugging Face", tool },
@@ -28,7 +31,8 @@ describe("withRepairedToolSchemas", () => {
 	it("says what cmd is for, since its own description reads as the command to run", () => {
 		const [repaired] = withRepairedToolSchemas(
 			[sandboxExec()],
-			mapping("hf_sandbox_exec", "hf_sandbox_exec")
+			mapping("hf_sandbox_exec", "hf_sandbox_exec"),
+			HUB
 		);
 		const props = repaired.function.parameters?.properties as Record<
 			string,
@@ -44,7 +48,8 @@ describe("withRepairedToolSchemas", () => {
 	it("puts the timeout token where it belongs, and names the tool it is confused with", () => {
 		const [repaired] = withRepairedToolSchemas(
 			[sandboxExec()],
-			mapping("hf_sandbox_exec", "hf_sandbox_exec")
+			mapping("hf_sandbox_exec", "hf_sandbox_exec"),
+			HUB
 		);
 		const args = (
 			repaired.function.parameters?.properties as Record<string, { description: string }>
@@ -68,7 +73,7 @@ describe("withRepairedToolSchemas", () => {
 				},
 			},
 		};
-		const [repaired] = withRepairedToolSchemas([jobs], mapping("hf_jobs", "hf_jobs"));
+		const [repaired] = withRepairedToolSchemas([jobs], mapping("hf_jobs", "hf_jobs"), HUB);
 		const args = (
 			repaired.function.parameters?.properties as Record<string, { description: string }>
 		).args.description;
@@ -80,7 +85,8 @@ describe("withRepairedToolSchemas", () => {
 	it("keeps everything else about the schema", () => {
 		const [repaired] = withRepairedToolSchemas(
 			[sandboxExec()],
-			mapping("hf_sandbox_exec", "hf_sandbox_exec")
+			mapping("hf_sandbox_exec", "hf_sandbox_exec"),
+			HUB
 		);
 		const params = repaired.function.parameters as Record<string, unknown>;
 		const props = params.properties as Record<string, Record<string, unknown>>;
@@ -96,7 +102,7 @@ describe("withRepairedToolSchemas", () => {
 		const original = sandboxExec();
 		const before = JSON.stringify(original);
 
-		withRepairedToolSchemas([original], mapping("hf_sandbox_exec", "hf_sandbox_exec"));
+		withRepairedToolSchemas([original], mapping("hf_sandbox_exec", "hf_sandbox_exec"), HUB);
 
 		expect(JSON.stringify(original)).toBe(before);
 	});
@@ -109,7 +115,11 @@ describe("withRepairedToolSchemas", () => {
 				parameters: { properties: { query: { type: "string" } } },
 			},
 		};
-		const [out] = withRepairedToolSchemas([other], mapping("web_search_exa", "web_search_exa"));
+		const [out] = withRepairedToolSchemas(
+			[other],
+			mapping("web_search_exa", "web_search_exa"),
+			HUB
+		);
 
 		expect(out).toBe(other);
 	});
@@ -124,14 +134,36 @@ describe("withRepairedToolSchemas", () => {
 				parameters: { type: "object", properties: { args: { type: "array" } } },
 			},
 		};
-		const [out] = withRepairedToolSchemas([renamed], mapping("hf_sandbox_exec", "hf_sandbox_exec"));
+		const [out] = withRepairedToolSchemas(
+			[renamed],
+			mapping("hf_sandbox_exec", "hf_sandbox_exec"),
+			HUB
+		);
 		const props = out.function.parameters?.properties as Record<string, unknown>;
 
 		expect(Object.keys(props)).toEqual(["args"]);
 	});
 
+	it("leaves a same-named tool on another server alone", () => {
+		// A user-configured server may export its own hf_sandbox_exec. Teaching the
+		// model the Hub's grammar for it would produce malformed calls, so the
+		// repair keys on where the tool came from, not on what it is called.
+		const elsewhere: McpServerConfig[] = [{ name: "Other", url: "https://other.test/mcp" }];
+		const [out] = withRepairedToolSchemas(
+			[sandboxExec()],
+			{ hf_sandbox_exec: { fnName: "hf_sandbox_exec", server: "Other", tool: "hf_sandbox_exec" } },
+			elsewhere
+		);
+
+		expect(out).toBe(sandboxExec.call(null) && out);
+		expect(
+			(out.function.parameters?.properties as Record<string, { description: string }>).cmd
+				.description
+		).toBe("Command to execute.");
+	});
+
 	it("ignores a tool the mapping does not cover", () => {
-		const [out] = withRepairedToolSchemas([sandboxExec()], {});
+		const [out] = withRepairedToolSchemas([sandboxExec()], {}, HUB);
 		expect(out).toEqual(sandboxExec());
 	});
 });

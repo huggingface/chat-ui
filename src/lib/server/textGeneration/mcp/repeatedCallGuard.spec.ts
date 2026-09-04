@@ -230,6 +230,29 @@ describe("composeGuards", () => {
 		expect(third.allow).toBe(false);
 	});
 
+	it("never calls after on a guard that allowed without a ticket", async () => {
+		// The budget guard allows ungated tools with no ticket at all, and its
+		// after() reads one. executeToolCalls skips it on that basis; the composite
+		// has a ticket of its own, so it has to apply the same rule itself or turn
+		// a working call into a throw.
+		let afterCalls = 0;
+		const optsOut: ToolCallGuard = {
+			allowParking: true,
+			before: async () => ({ allow: true }),
+			after: async () => {
+				afterCalls += 1;
+				return undefined;
+			},
+		};
+		const composed = composeGuards(createRepeatedCallGuard(), optsOut);
+
+		const verdict = await composed.before(call("t", { a: 1 }));
+		if (!verdict.allow) throw new Error("expected the call to be allowed");
+		await composed.after(verdict.ticket, worked);
+
+		expect(afterCalls).toBe(0);
+	});
+
 	it("parks only when both guards allow it", async () => {
 		const noParking: ToolCallGuard = { ...allowAll(), allowParking: false };
 		expect(composeGuards(createRepeatedCallGuard(), noParking).allowParking).toBe(false);

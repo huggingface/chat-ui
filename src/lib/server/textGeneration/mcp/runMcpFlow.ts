@@ -414,7 +414,7 @@ export async function* runMcpFlow({
 		// Applied to every conversation, mode or not: the Hub tools whose real
 		// interface is a grammar in prose misfire the same way whoever is calling
 		// them. See mcp/schemaRepair.ts for what the traces showed.
-		const shapedMcpTools = withRepairedToolSchemas(gatedMcpTools, mapping);
+		const shapedMcpTools = withRepairedToolSchemas(gatedMcpTools, mapping, servers);
 		// Cheapest first, and only the last link may book anything (see
 		// composeGuards): a repeat of a call that already failed the same way, then
 		// arguments that cannot satisfy the tool's own schema, then the budget.

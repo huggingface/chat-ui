@@ -76,7 +76,13 @@ export function composeGuards(first: ToolCallGuard, second: ToolCallGuard): Tool
 		},
 		async after(ticket, outcome) {
 			const { first: firstTicket, second: secondTicket } = ticket as Tickets;
-			await first.after(firstTicket, outcome);
+			// Same rule executeToolCalls applies: an allow without a ticket means
+			// the guard took no interest in this call, and its `after` is written
+			// to read a ticket it never issued. The composite always has a ticket
+			// of its own, so without this a guard that opted out would be handed
+			// `undefined` and throw on a call that worked.
+			if (firstTicket !== undefined) await first.after(firstTicket, outcome);
+			if (secondTicket === undefined) return undefined;
 			return second.after(secondTicket, outcome);
 		},
 	};
