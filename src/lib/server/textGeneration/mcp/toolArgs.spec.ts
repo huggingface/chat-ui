@@ -102,7 +102,11 @@ describe("withParseableArguments", () => {
 	});
 
 	it("does not touch calls it has no argument for", () => {
-		const bare = { id: "t2", type: "function" as const, function: { name: "wait" } };
+		const bare = {
+			id: "t2",
+			type: "function" as const,
+			function: { name: "wait", arguments: undefined },
+		};
 
 		expect(withParseableArguments([bare])[0]).toBe(bare);
 	});

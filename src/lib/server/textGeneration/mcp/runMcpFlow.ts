@@ -28,7 +28,11 @@ import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
-import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
+import {
+	isMlAssistantConversation,
+	pinnedHubToken,
+	withMlAssistantServers,
+} from "$lib/server/mlAssistant";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { createRepeatedCallGuard } from "./repeatedCallGuard";
@@ -155,6 +159,12 @@ export async function* runMcpFlow({
 				conversationId: conv._id,
 				generationId: generationId ?? conv._id.toString(),
 				username: (locals as unknown as { user?: { username?: string } })?.user?.username,
+				// Same credential the turn-start settle pass uses: an operator-pinned
+				// Hub entry launched the work, so it is what can read it back.
+				token:
+					pinnedHubToken() ??
+					(locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
+					(locals as unknown as { token?: string } | undefined)?.token,
 			})
 		: undefined;
 
