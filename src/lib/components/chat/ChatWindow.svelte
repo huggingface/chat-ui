@@ -1070,7 +1070,7 @@
 					class={{
 						"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
 						"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
-						"border-[#f7ddc2] dark:border-[#54371c]": mlModeOn && (mlStripVisible || mlPillVisible),
+						"border-[#e2ddd6] dark:border-[#2c2c2c]": mlModeOn && (mlStripVisible || mlPillVisible),
 						"dark:border-gray-700": !(mlModeOn && (mlStripVisible || mlPillVisible)),
 						"opacity-30": isReadOnly,
 						"max-sm:mb-4": focused && isVirtualKeyboard(),
@@ -1080,7 +1080,6 @@
 						<MlAssistantStrip
 							visible={mlStripVisible}
 							steps={mlAssistant.steps}
-							statusLabel={mlAssistant.statusLabel}
 							complete={mlAssistant.complete}
 							budget={mlAssistant.budget}
 							onbudgetchange={page.params?.id ? changeMlBudget : undefined}

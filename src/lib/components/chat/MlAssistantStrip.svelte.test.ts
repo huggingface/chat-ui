@@ -8,11 +8,11 @@ import type { MlPlanStep } from "$lib/types/MlAssistant";
  * computed style rather than class names.
  */
 
-// The mode's fills (running dot) and its text run two different oranges:
-// vibrant for surfaces, darker for legible text on the pale band.
-const ACCENT = "rgb(234, 88, 12)";
-const ACCENT_TEXT = "rgb(194, 65, 12)";
-const SUCCESS = "rgb(22, 163, 74)";
+// Orange is ink on a neutral surface: one solid for glyphs and connectors, a
+// darker ink for text that has to stay legible.
+const ORANGE_SOLID = "rgb(232, 98, 42)";
+const ORANGE_INK = "rgb(196, 81, 26)";
+const TEXT_FAINT = "rgb(120, 113, 108)";
 
 const step = (
 	label: string,
@@ -31,7 +31,6 @@ function mount(props: Partial<Parameters<typeof render<typeof MlAssistantStrip>>
 	return render(MlAssistantStrip, {
 		visible: true,
 		steps: [],
-		statusLabel: "",
 		complete: false,
 		...props,
 	});
@@ -49,25 +48,25 @@ const box = (el: Element) => {
 };
 
 describe("MlAssistantStrip", () => {
-	it("renders the band with the preset tool list and accent tint", () => {
+	it("carries orange as ink on a neutral surface, not as a tint", () => {
 		const { container } = mount();
 		const strip = find(container, ".ml-strip");
 
 		expect(strip.textContent).toContain("ML Intern");
 		expect(strip.textContent).toContain("papers · training · spaces · datasets · eval · hub");
 		expect(container.querySelector('[role="switch"]')).toBeNull();
-		expect(style(strip).backgroundColor).toBe("rgb(255, 244, 234)");
-		expect(style(strip).borderBottomColor).toBe("rgb(251, 228, 204)");
-		expect(style(strip).color).toBe(ACCENT_TEXT);
+		expect(style(strip).backgroundColor).toBe("rgb(255, 255, 255)");
+		expect(style(strip).borderBottomColor).toBe("rgb(236, 236, 234)");
+		expect(style(find(container, ".ml-strip > span")).color).toBe(ORANGE_INK);
 	});
 
 	it("lays the strip out on the specified spacing", () => {
 		const { container } = mount();
 		const strip = style(find(container, ".ml-strip"));
 
-		expect(strip.padding).toBe("9px 16px");
-		expect(strip.gap).toBe("9px");
-		expect(strip.fontSize).toBe("13.5px");
+		expect(strip.padding).toBe("0px 10px 0px 20px");
+		expect(strip.gap).toBe("14px");
+		expect(strip.height).toBe("44px");
 	});
 
 	it("truncates the tool note rather than overflowing a narrow composer", () => {
@@ -84,7 +83,7 @@ describe("MlAssistantStrip", () => {
 
 	it("collapses out of the composer when hidden", () => {
 		const shown = style(find(mount().container, ".ml-strip-collapse"));
-		expect(shown.maxHeight).toBe("56px");
+		expect(shown.maxHeight).toBe("44px");
 		expect(shown.opacity).toBe("1");
 
 		const hidden = style(find(mount({ visible: false }).container, ".ml-strip-collapse"));
@@ -96,47 +95,52 @@ describe("MlAssistantStrip", () => {
 		const { container } = mount({ steps: [] });
 
 		expect(container.textContent).toContain("papers · training · spaces · datasets · eval · hub");
-		expect(container.querySelector(".ml-dot")).toBeNull();
+		expect(container.querySelector(".ml-step-hit")).toBeNull();
 	});
 
-	it("renders one dot per plan step, styled by status", () => {
-		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
-		const dots = [...container.querySelectorAll(".ml-dot")];
-		// Settled steps trade their number for an icon: a tick when done, a slash
-		// when skipped. Unsettled steps keep their number.
-		expect(dots.map((d) => d.textContent?.trim())).toEqual(["", "", "3", "4"]);
-		expect(dots[0].querySelector("svg")).not.toBeNull();
-		expect(dots[1].querySelector("svg")).not.toBeNull();
-		expect(dots[2].querySelector("svg")).toBeNull();
-		expect(box(dots[0])).toEqual({ width: 22, height: 22 });
+	it("draws each step as a 16px glyph, with no glyph for running", () => {
+		// The design defines done, skipped and to-do only; an in-progress icon is
+		// listed as a follow-up, so a running step reads as to-do and the tally
+		// carries the progress.
+		const { container } = mount({ steps: PLAN });
+		const glyphs = [...container.querySelectorAll(".ml-step-hit > span")];
 
-		const [done, skipped, running, pending] = dots.map(style);
-		expect(done.backgroundColor).toBe(SUCCESS);
-		// Washed out via pre-blended solids, not element opacity, so the connector
-		// line cannot show through a translucent dot.
-		expect(skipped.backgroundColor).toBe("rgb(244, 240, 239)");
-		expect(skipped.opacity).toBe("1");
-		expect(running.backgroundColor).toBe(ACCENT);
-		expect(running.animationName).toContain("mlpulse");
-		expect(pending.backgroundColor).toBe("rgb(255, 255, 255)");
-		expect(pending.borderTopColor).toBe("rgb(220, 220, 226)");
+		expect(glyphs).toHaveLength(4);
+		expect(box(glyphs[0])).toEqual({ width: 16, height: 16 });
+		expect(style(glyphs[0]).backgroundColor).toBe(ORANGE_SOLID);
+		expect(glyphs[0].querySelector("svg")).not.toBeNull();
+		expect(style(glyphs[1]).borderTopColor).toBe(ORANGE_SOLID);
+		expect(glyphs[1].querySelector("svg")).toBeNull();
+		// Running and pending are the same hollow ring.
+		expect(style(glyphs[2]).borderTopColor).toBe("rgb(207, 203, 197)");
+		expect(style(glyphs[3]).borderTopColor).toBe("rgb(207, 203, 197)");
 	});
 
-	it("keeps the dots tappable without disturbing the row's 10px rhythm", () => {
-		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
-		const hits = [...container.querySelectorAll(".ml-dot-hit")];
-		expect(box(hits[0])).toEqual({ width: 27, height: 44 });
+	it("colours each connector after the step before it", () => {
+		const { container } = mount({ steps: PLAN });
+		const connectors = [...container.querySelectorAll('[aria-hidden="true"]')].filter(
+			(el) => Math.round(el.getBoundingClientRect().width) === 12
+		);
 
-		const dots = [...container.querySelectorAll(".ml-dot")];
-		const gap = dots[1].getBoundingClientRect().left - dots[0].getBoundingClientRect().right;
-		expect(Math.round(gap)).toBe(10);
+		expect(connectors).toHaveLength(3);
+		// After done and after skipped, both settled; after running, not.
+		expect(style(connectors[0]).backgroundColor).toBe(ORANGE_SOLID);
+		expect(style(connectors[1]).backgroundColor).toBe(ORANGE_SOLID);
+		expect(style(connectors[2]).backgroundColor).toBe("rgb(224, 221, 216)");
 	});
 
-	it("names each dot by its step and status", () => {
-		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
+	it("keeps the steps tappable without widening the 16px glyph", () => {
+		const { container } = mount({ steps: PLAN });
+		const hits = [...container.querySelectorAll(".ml-step-hit")];
+
+		expect(box(hits[0])).toEqual({ width: 16, height: 44 });
+	});
+
+	it("names each step by its label and status", () => {
+		const { container } = mount({ steps: PLAN });
 
 		expect(
-			[...container.querySelectorAll(".ml-dot-hit")].map((b) => b.getAttribute("aria-label"))
+			[...container.querySelectorAll(".ml-step-hit")].map((b) => b.getAttribute("aria-label"))
 		).toEqual([
 			"Research — done",
 			"Baseline eval — skipped",
@@ -145,49 +149,46 @@ describe("MlAssistantStrip", () => {
 		]);
 	});
 
-	it("announces the running step, and turns the label green when the plan is done", () => {
-		const running = find(
-			mount({ steps: PLAN, statusLabel: "Training" }).container,
-			'[aria-live="polite"]'
-		);
-		expect(running.textContent?.trim()).toBe("Training");
-		expect(style(running).color).toBe(ACCENT_TEXT);
+	it("counts settled steps while running, and says Done when complete", () => {
+		// Skipped counts as settled: two of four are behind us.
+		const running = find(mount({ steps: PLAN }).container, '[aria-live="polite"]');
+		expect(running.textContent?.trim()).toBe("2 of 4");
+		expect(style(running).color).toBe(TEXT_FAINT);
 
 		const done = find(
 			mount({
 				steps: PLAN.map((s) => ({ ...s, status: "done" as const })),
-				statusLabel: "Done",
 				complete: true,
 			}).container,
 			'[aria-live="polite"]'
 		);
 		expect(done.textContent?.trim()).toBe("Done");
-		expect(style(done).color).toBe(SUCCESS);
+		expect(style(done).color).toBe(ORANGE_INK);
 	});
 
 	it("announces the mode to screen readers despite carrying no control", () => {
-		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
+		const { container } = mount({ steps: PLAN });
 
 		expect(container.textContent).toContain("ML Intern, mode on");
 	});
 
 	it("reaches a step's description by keyboard focus, not hover alone", async () => {
-		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
-		(container.querySelector(".ml-dot-hit") as HTMLElement).focus();
+		const { container } = mount({ steps: PLAN });
+		(container.querySelector(".ml-step-hit") as HTMLElement).focus();
 
 		await vi.waitFor(() => {
-			expect(find(document, ".ml-dot-tooltip").textContent).toContain("Research description");
+			expect(find(document, ".ml-step-tooltip").textContent).toContain("Research description");
 		});
 	});
 
 	it("shows a step's description on hover, escaping the composer's overflow", async () => {
-		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
-		const trigger = find(container, ".ml-dot-hit");
+		const { container } = mount({ steps: PLAN });
+		const trigger = find(container, ".ml-step-hit");
 		trigger.dispatchEvent(new PointerEvent("pointerenter", { bubbles: true }));
 		trigger.dispatchEvent(new PointerEvent("pointermove", { bubbles: true }));
 
 		await vi.waitFor(() => {
-			const tip = find(document, ".ml-dot-tooltip");
+			const tip = find(document, ".ml-step-tooltip");
 			expect(tip.textContent).toContain("Research");
 			expect(tip.textContent).toContain("Research description");
 			// Portalled out of the strip, which is clipped by the composer box.

@@ -1,61 +1,103 @@
 <script lang="ts">
 	import { Tooltip } from "bits-ui";
-	import LucideCheck from "~icons/lucide/check";
-	import LucideSlash from "~icons/lucide/slash";
 	import type { MlPlanStep } from "$lib/types/MlAssistant";
 
 	interface Props {
 		steps: MlPlanStep[];
-		/** Status label for the running step, or "Done" once the plan finishes. */
-		statusLabel: string;
 		complete: boolean;
 	}
 
-	let { steps, statusLabel, complete }: Props = $props();
+	let { steps, complete }: Props = $props();
 
-	/** Skipped steps are settled, so they count toward the collapsed tally. */
+	/** Skipped steps are settled, so they count toward the tally the design shows. */
 	let settled = $derived(
 		steps.filter((step) => step.status === "done" || step.status === "skipped").length
 	);
 
+	/**
+	 * The design has three step states; the plan has four. `running` has no glyph
+	 * of its own (the designer listed one as a follow-up), so it renders as
+	 * to-do — reached, not yet settled — and the tally carries the progress.
+	 */
+	type Glyph = "done" | "skipped" | "todo";
+	function glyphFor(step: MlPlanStep): Glyph {
+		if (step.status === "done") return "done";
+		if (step.status === "skipped") return "skipped";
+		return "todo";
+	}
+
+	/** A connector takes the colour of the step before it. */
+	function connectorSettled(index: number): boolean {
+		return glyphFor(steps[index - 1]) !== "todo";
+	}
+
 	// Tap opens the tooltip on touch, where hover never fires. One index rather
-	// than one flag per dot so opening a second dot closes the first.
+	// than one flag per step so opening a second closes the first.
 	let openStep = $state(-1);
 
-	// None of the dot glyphs clear 4.5:1 by design (they are decorative), so this
-	// label is the accessible carrier of each step's name and status — the visible
-	// numeral/icon never makes it redundant.
+	// The glyphs are decorative and do not clear 4.5:1, so this label is the
+	// accessible carrier of each step's name and status.
 	function accessibleName(step: MlPlanStep) {
 		return `${step.label} — ${step.status}`;
 	}
 </script>
 
-<div class="flex min-w-0 items-center gap-3">
+<div class="flex min-w-0 items-center gap-[14px]">
 	<Tooltip.Provider delayDuration={80} disableHoverableContent>
-		<div class="ml-dot-row hidden items-center gap-[10px] @sm:flex">
+		<div class="flex flex-none items-center">
 			{#each steps as step, index (index)}
+				{@const glyph = glyphFor(step)}
+				{#if index > 0}
+					<span
+						aria-hidden="true"
+						class="h-[1.5px] w-[12px] flex-none {connectorSettled(index)
+							? 'bg-[#e8622a]'
+							: 'bg-[#e0ddd8] dark:bg-[#333333]'}"
+					></span>
+				{/if}
 				<Tooltip.Root
 					open={openStep === index}
 					onOpenChange={(open) => (openStep = open ? index : -1)}
 					disableCloseOnTriggerClick
 				>
 					<Tooltip.Trigger
-						class="ml-dot-hit"
+						class="ml-step-hit"
 						aria-label={accessibleName(step)}
 						onclick={() => (openStep = openStep === index ? -1 : index)}
 					>
-						<span class="ml-dot" data-status={step.status}>
-							{#if step.status === "done"}
-								<LucideCheck class="ml-dot-icon" aria-hidden="true" />
-							{:else if step.status === "skipped"}
-								<LucideSlash class="ml-dot-icon ml-dot-slash" aria-hidden="true" />
-							{:else}
-								{index + 1}
-							{/if}
-						</span>
+						{#if glyph === "done"}
+							<span
+								class="grid size-4 flex-none place-items-center rounded-full bg-[#e8622a]"
+								aria-hidden="true"
+							>
+								<svg
+									viewBox="0 0 12 12"
+									class="size-[9px]"
+									fill="none"
+									stroke="#fff"
+									stroke-width="2.4"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<path d="M2 6.5l2.5 2.5L10 3.5" />
+								</svg>
+							</span>
+						{:else if glyph === "skipped"}
+							<span
+								class="grid size-4 flex-none place-items-center rounded-full border-[1.5px] border-[#e8622a]"
+								aria-hidden="true"
+							>
+								<span class="h-[1.5px] w-[7px] rounded-[1px] bg-[#e8622a]"></span>
+							</span>
+						{:else}
+							<span
+								class="size-4 flex-none rounded-full border-[1.5px] border-[#cfcbc5] dark:border-[#444444]"
+								aria-hidden="true"
+							></span>
+						{/if}
 					</Tooltip.Trigger>
 					<Tooltip.Portal>
-						<Tooltip.Content class="ml-dot-tooltip" side="top" sideOffset={10}>
+						<Tooltip.Content class="ml-step-tooltip" side="top" sideOffset={10}>
 							<span class="font-semibold">{step.label}</span>
 							<span> — </span>
 							<span class="opacity-65">{step.description}</span>
@@ -66,169 +108,41 @@
 		</div>
 	</Tooltip.Provider>
 
-	<!-- What the dots say, in the width of two characters. The dots are the first
-	     thing to go: they cost the most room and say the least once the status
-	     text is already naming the running step. -->
-	<span
-		class="flex-none font-mono text-[13.5px] leading-none tabular-nums @sm:hidden"
-		aria-hidden="true"
-	>
-		{settled}/{steps.length}
-	</span>
-
 	<span
 		class={[
-			// Truncates rather than wrapping or pushing: whitespace-nowrap without a
-			// min-w-0 ancestor is what let this overlap the budget.
-			"hidden min-w-0 truncate text-[13.5px] leading-none font-medium @md:block",
-			complete ? "text-[#16a34a] dark:text-[#4ade80]" : "text-[#c2410c] dark:text-[#fdba74]",
+			"flex-none text-[13px] leading-none whitespace-nowrap",
+			complete
+				? "font-semibold text-[#c4511a] dark:text-[#f0a468]"
+				: "font-medium text-[#78716c] dark:text-[#a8a29e]",
 		]}
 		aria-live="polite"
 		aria-atomic="true"
 	>
-		{statusLabel}
+		{complete ? "Done" : `${settled} of ${steps.length}`}
 	</span>
 </div>
 
 <style>
-	/* 27x44 hit target that leaves the 22px dot's footprint untouched, so the row
-	   still lays out on the designed 10px gap. */
-	:global(.ml-dot-hit) {
+	/* Keeps the 16px glyph's footprint so the row lays out on the designed
+	   12px connectors, while giving touch a 44px-tall target. */
+	:global(.ml-step-hit) {
 		display: grid;
 		place-items: center;
-		width: 27px;
+		width: 16px;
 		height: 44px;
-		margin: -11px -2.5px;
+		margin: -14px 0;
 		padding: 0;
 		border: 0;
 		background: transparent;
 	}
 
-	:global(.ml-dot-hit:focus-visible) {
-		outline: 2px solid #ea580c;
-		outline-offset: -8px;
+	:global(.ml-step-hit:focus-visible) {
+		outline: 1.5px solid #e8622a;
+		outline-offset: -12px;
 		border-radius: 8px;
 	}
 
-	/* Stepper connector behind the dots, ending under the outer dots' centers. */
-	.ml-dot-row {
-		position: relative;
-	}
-
-	.ml-dot-row::before {
-		content: "";
-		position: absolute;
-		top: 50%;
-		left: 11px;
-		right: 11px;
-		height: 1.5px;
-		transform: translateY(-50%);
-		border-radius: 1px;
-		background: #f2cda4;
-		pointer-events: none;
-	}
-
-	:global(.dark) .ml-dot-row::before {
-		background: #7a4f24;
-	}
-
-	.ml-dot {
-		position: relative;
-		display: grid;
-		place-items: center;
-		box-sizing: border-box;
-		width: 22px;
-		height: 22px;
-		border-radius: 50%;
-		font-family: var(--font-mono, ui-monospace, monospace);
-		font-size: 11px;
-		font-weight: 500;
-		line-height: 1;
-		transition:
-			background 0.3s,
-			border-color 0.3s,
-			color 0.3s;
-	}
-
-	.ml-dot[data-status="pending"] {
-		background: #fff;
-		border: 1px solid #dcdce2;
-		color: #b0b0b8;
-	}
-
-	.ml-dot[data-status="running"] {
-		background: #ea580c;
-		border: 1px solid #ea580c;
-		color: #fff;
-		animation: mlpulse 1.5s ease-in-out infinite;
-	}
-
-	.ml-dot[data-status="done"] {
-		background: #16a34a;
-		border: 1px solid #16a34a;
-		color: #fff;
-	}
-
-	:global(.ml-dot-icon) {
-		width: 13px;
-		height: 13px;
-	}
-
-	/* On the path, not the svg: the icon inlines stroke-width="2" as a
-	   presentation attribute per path, which beats anything inherited from the
-	   root. Thickened well past 2 so the strokes stay legible at dot size. */
-	:global(.ml-dot-icon path) {
-		stroke-width: 3.5;
-	}
-
-	/* The slash spans lucide's full viewBox diagonal, so it runs smaller and
-	   thicker than the check to sit at the same visual weight. */
-	:global(.ml-dot-slash) {
-		width: 10px;
-		height: 10px;
-		/* The wide stroke overshoots the path's endpoints; without this the
-		   rounded caps clip against the viewBox. */
-		overflow: visible;
-	}
-
-	:global(.ml-dot-slash path) {
-		stroke-width: 6;
-	}
-
-	/* Washed out via pre-blended solids, not element opacity — a translucent dot
-	   would let the connector line show through. Border and text stay a notch
-	   above the band so a skipped dot reads muted, not missing. */
-	.ml-dot[data-status="skipped"] {
-		background: #f4f0ef;
-		border: 1px solid #d9d5d1;
-		color: #aeafbb;
-	}
-
-	/* Solid (the strip's own band color) so the connector line cannot show
-	   through, staying in step if the band is ever retinted. */
-	:global(.dark) .ml-dot[data-status="pending"] {
-		background: var(--ml-strip-band, #2b1c0e);
-		border-color: #3a3a42;
-		color: #7a7a84;
-	}
-
-	:global(.dark) .ml-dot[data-status="skipped"] {
-		background: #282222;
-		border-color: #46403a;
-		color: #6a6e7d;
-	}
-
-	@keyframes mlpulse {
-		0%,
-		100% {
-			box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.45);
-		}
-		50% {
-			box-shadow: 0 0 0 5px rgba(234, 88, 12, 0);
-		}
-	}
-
-	:global(.ml-dot-tooltip) {
+	:global(.ml-step-tooltip) {
 		z-index: 50;
 		background: #1a1a1f;
 		color: #fff;
@@ -254,10 +168,7 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.ml-dot[data-status="running"] {
-			animation: none;
-		}
-		:global(.ml-dot-tooltip) {
+		:global(.ml-step-tooltip) {
 			animation: none;
 		}
 	}
