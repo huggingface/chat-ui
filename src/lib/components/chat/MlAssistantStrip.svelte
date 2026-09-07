@@ -116,12 +116,14 @@
 		<span class="ml-auto"></span>
 
 		{#if dashboard}
+			<span aria-hidden="true" class="-my-[9px] w-px flex-none self-stretch bg-current/20"></span>
+
 			<button
 				type="button"
 				disabled={!dashboardLive}
 				class={[
 					// Same height and radius as the budget pill beside it.
-					"flex h-5 flex-none items-center gap-1 rounded-full border border-transparent px-2 text-xs",
+					"flex h-5 flex-none items-center gap-1 rounded-full border border-transparent px-2 font-mono text-xs",
 					dashboardLive
 						? "cursor-pointer hover:border-current/20 hover:bg-current/10"
 						: "cursor-default opacity-60",
@@ -146,6 +148,7 @@
 		{/if}
 
 		{#if budget}
+			<span aria-hidden="true" class="-my-[9px] w-px flex-none self-stretch bg-current/20"></span>
 			{#if editingBudget}
 				<!-- Shaped like the readout it replaces — same pill, same mono figures,
 				     same "$… left" reading — so opening and committing an edit never
