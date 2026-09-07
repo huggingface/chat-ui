@@ -7,15 +7,11 @@
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
 	import { formatToolProgressCount, formatToolProgressLines } from "$lib/utils/toolProgress";
-	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
-	import CarbonChartLine from "~icons/carbon/chart-line";
 	import LucideTriangleAlert from "~icons/lucide/triangle-alert";
 	import BlockWrapper from "./BlockWrapper.svelte";
-	import { sidePane } from "$lib/stores/sidePane.svelte";
-	import { trackioDashboardsFromToolUpdates } from "$lib/utils/trackio";
 
 	interface Props {
 		tool: MessageToolUpdate[];
@@ -43,16 +39,6 @@
 	// A training run that syncs to Trackio prints its dashboard URL into the job
 	// output, so the tool group that ran it is also the natural place to get back
 	// to the dashboard after closing the pane.
-	let dashboards = $derived(trackioDashboardsFromToolUpdates(tool));
-	$effect(() => {
-		for (const dashboard of dashboards) {
-			if (dashboard.spaceId) trackioStatus.watch(dashboard.url, dashboard.spaceId);
-		}
-	});
-
-	let openDashboardUrl = $derived(
-		sidePane.open && sidePane.view === "trackio" ? sidePane.trackio?.url : undefined
-	);
 
 	const availableTools: ToolFront[] = $derived.by(
 		() => (page.data as { tools?: ToolFront[] } | undefined)?.tools ?? []
@@ -166,42 +152,6 @@
 					{/each}
 				</div>
 			{/if}
-			{#each dashboards as dashboard (dashboard.url)}
-				<!-- Only a dashboard named before it exists needs polling; one found in a
-				     log was printed by trackio.init, so it is already up. -->
-				{@const status = dashboard.spaceId ? trackioStatus.status(dashboard.url) : "live"}
-				{@const live = status === "live"}
-				<button
-					type="button"
-					disabled={!live}
-					class="btn flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs {!live
-						? 'border-gray-200 text-gray-400 dark:border-gray-700 dark:text-gray-500'
-						: dashboard.url === openDashboardUrl
-							? 'border-blue-300 text-blue-700 dark:border-blue-500/40 dark:text-blue-300'
-							: 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'}"
-					title={live
-						? `Open the Trackio dashboard: ${dashboard.label}`
-						: status === "failed"
-							? "This dashboard never came up"
-							: "The dashboard is still starting"}
-					onclick={() => live && sidePane.openTrackio(dashboard.url, dashboard.label)}
-				>
-					<CarbonChartLine
-						class="size-3.5 shrink-0 {status === 'building' ? 'animate-pulse' : ''}"
-					/>
-					<span class="truncate">
-						{dashboards.length > 1 ? dashboard.label : "Training dashboard"}
-					</span>
-					<!-- A chip with no state reads as broken rather than pending: the Space
-					     is created by trackio at init, so it is legitimately absent until
-					     the run gets there, and saying so is the whole point of polling. -->
-					{#if status !== "live"}
-						<span class="shrink-0 text-gray-400 dark:text-gray-500">
-							{status === "failed" ? "· unavailable" : "· starting"}
-						</span>
-					{/if}
-				</button>
-			{/each}
 		</div>
 
 		<!-- Expandable content -->

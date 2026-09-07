@@ -7,6 +7,7 @@
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
 	import { collectTrackioDashboards } from "$lib/utils/trackio";
+	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
 	import { collectPaneItems } from "$lib/utils/paneItems";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 
@@ -475,6 +476,9 @@
 	$effect(() => {
 		const latest = trackioDashboards.at(-1);
 		if (!latest || !loading) return;
+		// A dashboard named before it exists (create_trackio) is not framable until
+		// the run reaches trackio.init; opening it early frames a 404.
+		if (latest.spaceId && trackioStatus.status(latest.url) !== "live") return;
 		if (!window.matchMedia("(min-width: 768px)").matches) return;
 		sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
 	});
@@ -1080,6 +1084,7 @@
 							complete={mlAssistant.complete}
 							budget={mlAssistant.budget}
 							onbudgetchange={page.params?.id ? changeMlBudget : undefined}
+							dashboard={trackioDashboards.at(-1)}
 						/>
 					{/if}
 					<!-- The composer box is a column so the ML Assistant strip can stack on

@@ -2,7 +2,11 @@
 	import MlAssistantPlanProgress from "./MlAssistantPlanProgress.svelte";
 	import { ML_ASSISTANT_TOOLS } from "$lib/constants/mlAssistant";
 	import type { MlBudgetSnapshot, MlPlanStep } from "$lib/types/MlAssistant";
-	import { formatMicroUsd, MICRO_USD_PER_USD } from "$lib/utils/mlBudget";
+	import { formatMicroUsd, formatMicroUsdCompact, MICRO_USD_PER_USD } from "$lib/utils/mlBudget";
+	import IconSparkline from "../icons/IconSparkline.svelte";
+	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
+	import { sidePane } from "$lib/stores/sidePane.svelte";
+	import type { TrackioDashboard } from "$lib/utils/trackio";
 
 	interface Props {
 		/** Collapses the strip out of the composer when false, rather than unmounting it. */
@@ -14,9 +18,21 @@
 		budget?: MlBudgetSnapshot;
 		/** Commits a new budget total in USD, cents included. Absent makes the readout static. */
 		onbudgetchange?: (totalUsd: number) => void;
+		/** The run's newest Trackio dashboard, if it has named one. */
+		dashboard?: TrackioDashboard;
 	}
 
-	let { visible, steps, statusLabel, complete, budget, onbudgetchange }: Props = $props();
+	let { visible, steps, statusLabel, complete, budget, onbudgetchange, dashboard }: Props =
+		$props();
+
+	$effect(() => {
+		if (dashboard?.spaceId) trackioStatus.watch(dashboard.url, dashboard.spaceId);
+	});
+
+	let dashboardStatus = $derived(
+		dashboard?.spaceId ? trackioStatus.status(dashboard.url) : ("live" as const)
+	);
+	let dashboardLive = $derived(dashboardStatus === "live");
 
 	let remainingMicroUsd = $derived(
 		budget ? budget.totalMicroUsd - budget.spentMicroUsd - budget.reservedMicroUsd : 0
@@ -68,7 +84,7 @@
 <!-- Status surface only: the strip appears once a task locks the mode onto the
      conversation, and the mode's on/off switch lives in the composer pill
      (MlInternPill.svelte), so the one control here is the budget readout. -->
-<div class="ml-strip-collapse" class:is-open={visible} inert={!visible}>
+<div class="ml-strip-collapse @container" class:is-open={visible} inert={!visible}>
 	<div
 		class="ml-strip flex items-center gap-[9px] border-b border-[#fbe4cc] bg-[#fff4ea] px-4 py-[9px] text-[13.5px] text-[#c2410c] dark:border-[#54371c] dark:bg-[#2b1c0e] dark:text-[#fdba74]"
 	>
@@ -94,6 +110,36 @@
 		{/if}
 
 		<span class="ml-auto"></span>
+
+		{#if dashboard}
+			<button
+				type="button"
+				disabled={!dashboardLive}
+				class={[
+					// Same height and radius as the budget pill beside it.
+					"flex h-5 flex-none items-center gap-1 rounded-full border border-transparent px-2 text-xs",
+					dashboardLive
+						? "cursor-pointer hover:border-current/20 hover:bg-current/10"
+						: "cursor-default opacity-60",
+				]}
+				title={dashboardLive
+					? `Open the training dashboard: ${dashboard.label}`
+					: dashboardStatus === "failed"
+						? "The training dashboard never came up"
+						: "The training dashboard starts with the run"}
+				aria-label={dashboardLive
+					? `Open the training dashboard: ${dashboard.label}`
+					: "Training dashboard, still starting"}
+				onclick={() => dashboardLive && sidePane.openTrackio(dashboard.url, dashboard.label)}
+			>
+				<IconSparkline
+					classNames="size-3.5 shrink-0 {dashboardStatus === 'building' ? 'animate-pulse' : ''}"
+				/>
+				<!-- Icon-only in a narrow strip: it already carries plan progress and
+				     the budget, and this label is the first thing that can go. -->
+				<span class="hidden @sm:inline">Metrics</span>
+			</button>
+		{/if}
 
 		{#if budget}
 			{#if editingBudget}
@@ -147,7 +193,8 @@
 						budget.totalMicroUsd
 					)} remaining${onbudgetchange ? ". Edit budget" : ""}`}
 				>
-					{formatMicroUsd(remainingMicroUsd)} left
+					<span class="@sm:hidden">{formatMicroUsdCompact(remainingMicroUsd)}</span>
+					<span class="hidden @sm:inline">{formatMicroUsd(remainingMicroUsd)} left</span>
 				</button>
 			{/if}
 		{/if}

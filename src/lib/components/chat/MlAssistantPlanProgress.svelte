@@ -63,7 +63,9 @@
 
 	<span
 		class={[
-			"text-[13.5px] leading-none font-medium whitespace-nowrap",
+			// Dropped in a narrow strip: the dots still carry progress, and this is
+			// the longest thing competing with the budget and metrics pills.
+			"hidden text-[13.5px] leading-none font-medium whitespace-nowrap @xs:inline",
 			complete ? "text-[#16a34a] dark:text-[#4ade80]" : "text-[#c2410c] dark:text-[#fdba74]",
 		]}
 		aria-live="polite"
