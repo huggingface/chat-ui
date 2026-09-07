@@ -9,8 +9,6 @@ const POLL_MS = 5_000;
  */
 const GIVE_UP_MS = 30 * 60 * 1000;
 
-type Tracked = { status: TrackioSpaceStatus; since: number };
-
 /**
  * Polls whether a Trackio Space is up.
  *
@@ -18,31 +16,32 @@ type Tracked = { status: TrackioSpaceStatus; since: number };
  * which happens after the image pull, the installs and the imports — so the
  * chip is known long before it can be framed. Polling is server-side and never
  * enters the model's context.
+ *
+ * `status` is a pure read and `watch` is what starts the polling, because a
+ * getter that started it would be mutating state inside a template expression.
  */
 class TrackioStatusStore {
-	#byUrl = $state<Record<string, Tracked>>({});
+	#byUrl = $state<Record<string, TrackioSpaceStatus>>({});
 	#timers = new Map<string, ReturnType<typeof setInterval>>();
 
-	status(url: string, spaceId: string): TrackioSpaceStatus {
-		this.#ensure(url, spaceId);
-		return this.#byUrl[url]?.status ?? "missing";
+	status(url: string): TrackioSpaceStatus {
+		return this.#byUrl[url] ?? "missing";
 	}
 
-	#ensure(url: string, spaceId: string) {
+	/** Idempotent: call it from an effect for every dashboard that needs polling. */
+	watch(url: string, spaceId: string) {
 		if (this.#timers.has(url)) return;
-		this.#byUrl = { ...this.#byUrl, [url]: { status: "missing", since: Date.now() } };
+		const startedAt = Date.now();
 		const poll = async () => {
-			const tracked = this.#byUrl[url];
-			if (!tracked) return;
-			if (Date.now() - tracked.since > GIVE_UP_MS) return this.#stop(url, "failed");
+			if (Date.now() - startedAt > GIVE_UP_MS) return this.#stop(url, "failed");
 			try {
 				const response = await fetch(
 					`${base}/api/v2/trackio/status?space=${encodeURIComponent(spaceId)}`
 				);
 				if (!response.ok) return;
 				const { json } = (await response.json()) as { json: { status: TrackioSpaceStatus } };
-				this.#byUrl = { ...this.#byUrl, [url]: { ...tracked, status: json.status } };
-				// Live and failed are both terminal for polling: nothing more to learn.
+				this.#byUrl = { ...this.#byUrl, [url]: json.status };
+				// Live and failed are both terminal: nothing more to learn by asking.
 				if (json.status === "live" || json.status === "failed") this.#stop(url, json.status);
 			} catch {
 				// Offline or a blip: the next tick tries again.
@@ -56,8 +55,7 @@ class TrackioStatusStore {
 		const timer = this.#timers.get(url);
 		if (timer) clearInterval(timer);
 		this.#timers.delete(url);
-		const tracked = this.#byUrl[url];
-		if (tracked) this.#byUrl = { ...this.#byUrl, [url]: { ...tracked, status } };
+		this.#byUrl = { ...this.#byUrl, [url]: status };
 	}
 }
 

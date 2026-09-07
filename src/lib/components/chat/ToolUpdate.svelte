@@ -44,6 +44,12 @@
 	// output, so the tool group that ran it is also the natural place to get back
 	// to the dashboard after closing the pane.
 	let dashboards = $derived(trackioDashboardsFromToolUpdates(tool));
+	$effect(() => {
+		for (const dashboard of dashboards) {
+			if (dashboard.spaceId) trackioStatus.watch(dashboard.url, dashboard.spaceId);
+		}
+	});
+
 	let openDashboardUrl = $derived(
 		sidePane.open && sidePane.view === "trackio" ? sidePane.trackio?.url : undefined
 	);
@@ -163,9 +169,7 @@
 			{#each dashboards as dashboard (dashboard.url)}
 				<!-- Only a dashboard named before it exists needs polling; one found in a
 				     log was printed by trackio.init, so it is already up. -->
-				{@const status = dashboard.spaceId
-					? trackioStatus.status(dashboard.url, dashboard.spaceId)
-					: "live"}
+				{@const status = dashboard.spaceId ? trackioStatus.status(dashboard.url) : "live"}
 				{@const live = status === "live"}
 				<button
 					type="button"
