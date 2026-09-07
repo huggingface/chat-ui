@@ -41,7 +41,7 @@ describe("getEnabledBuiltinTools", () => {
 			"wait",
 			"research",
 			"sandbox_task",
-			"watch_job",
+			"check_job",
 		]);
 	});
 

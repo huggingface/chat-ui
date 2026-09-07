@@ -122,7 +122,7 @@ describe("registration", () => {
 			"github_read_file",
 			"research",
 			"sandbox_task",
-			"watch_job",
+			"check_job",
 		]);
 	});
 
@@ -142,7 +142,7 @@ describe("registration", () => {
 			"wait",
 			"research",
 			"sandbox_task",
-			"watch_job",
+			"check_job",
 		]);
 	});
 });
