@@ -186,10 +186,20 @@
 							: "The dashboard is still starting"}
 					onclick={() => live && sidePane.openTrackio(dashboard.url, dashboard.label)}
 				>
-					<CarbonChartLine class="size-3.5 shrink-0" />
+					<CarbonChartLine
+						class="size-3.5 shrink-0 {status === 'building' ? 'animate-pulse' : ''}"
+					/>
 					<span class="truncate">
 						{dashboards.length > 1 ? dashboard.label : "Training dashboard"}
 					</span>
+					<!-- A chip with no state reads as broken rather than pending: the Space
+					     is created by trackio at init, so it is legitimately absent until
+					     the run gets there, and saying so is the whole point of polling. -->
+					{#if status !== "live"}
+						<span class="shrink-0 text-gray-400 dark:text-gray-500">
+							{status === "failed" ? "· unavailable" : "· starting"}
+						</span>
+					{/if}
 				</button>
 			{/each}
 		</div>
