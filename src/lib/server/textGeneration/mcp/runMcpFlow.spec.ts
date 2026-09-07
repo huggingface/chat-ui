@@ -683,6 +683,7 @@ describe("runMcpFlow offering the question tool", () => {
 			"wait",
 			"research",
 			"sandbox_task",
+			"watch_job",
 		]);
 	});
 

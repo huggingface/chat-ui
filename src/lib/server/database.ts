@@ -13,6 +13,7 @@ import type { Generation, GenerationEvent } from "$lib/types/Generation";
 import type { TurnState } from "$lib/types/TurnState";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { ParkedCall } from "$lib/types/ParkedCall";
+import type { NestedAgentCall } from "$lib/types/NestedAgentCall";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
@@ -143,6 +144,7 @@ export class Database {
 		const turnStates = db.collection<TurnState>("turnStates");
 		const mcpElicitations = db.collection<McpElicitation>("mcpElicitations");
 		const parkedCalls = db.collection<ParkedCall>("parkedCalls");
+		const nestedAgentCalls = db.collection<NestedAgentCall>("nestedAgentCalls");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
@@ -176,6 +178,7 @@ export class Database {
 			turnStates,
 			mcpElicitations,
 			parkedCalls,
+			nestedAgentCalls,
 			settings,
 			users,
 			sessions,
@@ -206,6 +209,7 @@ export class Database {
 			turnStates,
 			mcpElicitations,
 			parkedCalls,
+			nestedAgentCalls,
 			settings,
 			users,
 			sessions,
@@ -337,6 +341,16 @@ export class Database {
 		generationEvents
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for generationEvents by createdAt"));
+
+		// Sub-agent call debugging: read by turn, and expired on the same 24h
+		// clock as generationEvents — long enough to investigate a run that just
+		// happened, short enough that it never becomes storage anyone budgets for.
+		nestedAgentCalls
+			.createIndex({ conversationId: 1, messageId: 1, createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating turn-scoped index for nestedAgentCalls"));
+		nestedAgentCalls
+			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for nestedAgentCalls by createdAt"));
 
 		// One state document per turn; the unique key is what makes the upsert in
 		// turnState.ts race-safe. Ended turns expire like ended generations do.

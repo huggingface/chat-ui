@@ -122,6 +122,7 @@ describe("registration", () => {
 			"github_read_file",
 			"research",
 			"sandbox_task",
+			"watch_job",
 		]);
 	});
 
@@ -135,6 +136,13 @@ describe("registration", () => {
 			getEnabledBuiltinTools({ conv: { _id: new ObjectId(), mlAssistant: true } }).map(
 				(t) => t.name
 			)
-		).toEqual(["ask_user_question", "update_plan", "wait", "research", "sandbox_task"]);
+		).toEqual([
+			"ask_user_question",
+			"update_plan",
+			"wait",
+			"research",
+			"sandbox_task",
+			"watch_job",
+		]);
 	});
 });

@@ -6,12 +6,14 @@ import { createPlanTool } from "./planTool";
 import { waitBuiltin } from "./waitTool";
 import { createResearchTool } from "./researchTool";
 import { createSandboxTool } from "./sandboxTool";
+import { createJobWatcherTool } from "./jobWatcherTool";
 import type { BuiltinTool } from "./types";
 
 export type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
 export { PLAN_TOOL_NAME } from "./planTool";
 export { RESEARCH_TOOL_NAME, isResearchTool } from "./researchTool";
 export { SANDBOX_TOOL_NAME, isSandboxTool } from "./sandboxTool";
+export { JOB_WATCHER_TOOL_NAME, isJobWatcherTool } from "./jobWatcherTool";
 export { isNestedAgentTool } from "./nestedAgent";
 
 /**
@@ -36,6 +38,7 @@ export function getEnabledBuiltinTools(params: {
 		...githubGroundingBuiltins(),
 		createResearchTool(),
 		createSandboxTool(),
+		createJobWatcherTool(),
 	];
 }
 

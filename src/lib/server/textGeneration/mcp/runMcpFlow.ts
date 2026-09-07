@@ -647,7 +647,10 @@ export async function* runMcpFlow({
 			},
 			servers,
 			mapping,
-			mcpTools,
+			// The repaired descriptions, not the raw ones: the sandbox sub-agent
+			// is the heaviest caller of the hf_sandbox_* grammar these rewrites
+			// exist for, and it was the only caller not receiving them.
+			mcpTools: shapedMcpTools,
 			hostBuiltinTools: builtinTools,
 			contextLengthTokens: targetContextLength,
 		};

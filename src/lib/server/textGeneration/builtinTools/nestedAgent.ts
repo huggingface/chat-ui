@@ -8,7 +8,10 @@ import { logger } from "$lib/server/logger";
 import type { McpToolMapping, OpenAiTool } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
+import { recordNestedAgentCalls } from "./nestedAgentCallLog";
 import { executeToolCalls, type NormalizedToolCall } from "../mcp/toolInvocation";
+import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
+import { composeGuards, type ToolCallGuard } from "../mcp/toolGuard";
 import { parseToolArguments, withParseableArguments } from "../mcp/toolArgs";
 import { stripLoneSurrogates } from "../utils/loneSurrogates";
 import { isRateLimitError, withUpstreamRetry } from "../utils/upstreamRetry";
@@ -80,6 +83,18 @@ export interface NestedAgentSpec {
 	 * Omitted where an agent's tools legitimately span servers and are read-only.
 	 */
 	requireToolServer?: (server: McpServerConfig) => boolean;
+	/**
+	 * An extra gate on this agent's calls, composed after the schema preflight
+	 * every sub-agent gets.
+	 *
+	 * The allowlist is by tool name, which cannot express a restriction that
+	 * lives in an argument — `hf_jobs` reads a run or submits one depending on
+	 * its `operation`. An agent that needs the reading half and must never have
+	 * the spending half expresses that here. Never the budget guard: the
+	 * invariant is that a sub-agent holds nothing that spends, not that it books
+	 * its spending correctly.
+	 */
+	guard?: ToolCallGuard;
 	maxIterations: number;
 	truncateOutput(text: string): string;
 	/** Injected to steer the loop when it has to stop or is going in circles. */
@@ -160,6 +175,12 @@ export async function runNestedAgent(
 	];
 	if (nestedTools.length === 0) return { error: spec.failure.noTools };
 	const availableNames = new Set(nestedTools.map((tool) => tool.function.name));
+	// Compiled once per run, not per iteration: the validators are cached per tool.
+	// Preflight first — it books nothing, so short-circuiting on it releases
+	// nothing, which is the ordering composeGuards requires.
+	const preflightGuard = spec.guard
+		? composeGuards(createSchemaPreflightGuard(deps.mapping), spec.guard)
+		: createSchemaPreflightGuard(deps.mapping);
 
 	let messages: ChatCompletionMessageParam[] = [
 		{ role: "system", content: spec.systemPrompt },
@@ -339,6 +360,7 @@ export async function runNestedAgent(
 
 		const allowedCalls: NormalizedToolCall[] = [];
 		const refusals: ChatCompletionMessageParam[] = [];
+		const repeatCounts = new Map<string, number>();
 		let sawRepetition = false;
 		for (const call of toolCalls) {
 			const name = call.function?.name ?? "";
@@ -355,6 +377,7 @@ export async function runNestedAgent(
 			const count = (callCounts.get(key) ?? 0) + 1;
 			callCounts.set(key, count);
 			if (count >= REPETITION_THRESHOLD) sawRepetition = true;
+			repeatCounts.set(call.id, count);
 			allowedCalls.push({ id: call.id, name, arguments: rawArguments });
 		}
 
@@ -376,6 +399,11 @@ export async function runNestedAgent(
 				processToolOutput: (text) => ({ annotated: text, sources: [] }),
 				abortSignal: ctx.abortSignal,
 				builtinTools: allowedBuiltins,
+				// Preflight only. The budget guard stays absent by design — the
+				// allowlist is what keeps a sub-agent from spending — but checking
+				// a call against its own schema is not a policy, it is the round
+				// trip and the iteration this run would otherwise lose.
+				guard: preflightGuard,
 				// No `elicitation`: the sub-agent has no chat to ask, so an
 				// input-required response comes back as an ordinary tool error.
 			});
@@ -398,6 +426,23 @@ export async function runNestedAgent(
 					: message
 			),
 		];
+
+		// Refusals never reach executeToolCalls, so they are recorded here or not
+		// at all — and a name the sub-agent cannot call is exactly the kind of
+		// wasted iteration this log exists to count.
+		recordNestedAgentCalls(
+			ctx,
+			spec.label,
+			iteration,
+			allowedCalls.map((call) => ({
+				id: call.id,
+				name: call.name,
+				arguments: call.arguments,
+				repeatCount: repeatCounts.get(call.id) ?? 1,
+			})),
+			toolMessages,
+			refusals
+		);
 
 		if (sawRepetition && !repetitionNudged) {
 			repetitionNudged = true;

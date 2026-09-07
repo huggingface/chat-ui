@@ -150,6 +150,55 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(inMode([tool("hf_sandbox")])).toContain("go here FIRST");
 	});
 
+	it("keeps the smoke test on the real flavor and the real shape", () => {
+		// Dogfooding: the sandbox-first rule had displaced the GPU smoke job, and a
+		// cpu-basic sandbox on torch+cpu cannot surface an OOM or a usable
+		// steps-per-second. One SFT paid for that twice — batch 8 OOM'd on a T4,
+		// then OOM'd again on an L4 because the answer to an OOM was read as a
+		// bigger GPU rather than a smaller batch — and then overran its timeout
+		// because the estimate came from hardware that never ran the real shape.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("same flavor, batch size and sequence length as the real run");
+		expect(jobs).toContain("shrink the step count, never the shape");
+		expect(jobs).toContain("The smoke test on the real flavor gives you measured steps per second");
+		expect(ML_ASSISTANT_PREPROMPT).toContain("Memory and speed cannot");
+	});
+
+	it("says the sandbox cannot stand in for the GPU smoke test", () => {
+		// The other half of the same incident: "fast checks go here FIRST" read as
+		// permission to skip the GPU smoke entirely. Both rules ship together or
+		// the boundary is ambiguous again.
+		expect(inMode([tool("hf_sandbox")])).toContain("cannot do is stand in for the GPU smoke test");
+	});
+
+	it("pins dependencies to a resolved current release, not a remembered one", () => {
+		// The model's library knowledge is months stale, so a pin from memory dies
+		// at import. Unpinned is not the fix either: a floating trackio resolved to
+		// a different version than the Space had been provisioned against, and
+		// 1h44m of metrics went to an ephemeral disk without an error.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("pin to the CURRENT release, never the version you remember");
+		expect(jobs).toContain("pip index versions <package>");
+		expect(jobs).toContain("Unpinned is not the safe middle");
+	});
+
+	it("requires a fresh Space and a verified metric, not just a successful init", () => {
+		// Dogfooding: a 1h44m SFT logged zero metrics and reported success the whole
+		// way. init() created the Space and the bucket, printed a full banner and
+		// returned — while the Space it was pointed at, provisioned by an older
+		// trackio, 500'd every /api/bulk_log and 403'd the bucket fallback. Both
+		// halves are load-bearing: a fresh Space avoids the broken one, and reading
+		// a metric back is the only check that catches a 500/403 pair.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("Give each project its OWN Space");
+		expect(jobs).toContain("is not evidence that anything is recording");
+		expect(jobs).toContain("read one metric back off the dashboard");
+		expect(jobs).toContain("confirm the dashboard has rows in it");
+	});
+
 	it("sends paper-finding rules with the filesystem tool", () => {
 		// It searched for a paper by title with hub_repo_search — a repo search —
 		// twice, and concluded nothing was there.
@@ -246,6 +295,22 @@ describe("ML Assistant system message size", () => {
 		// section in the same week. That number is ~6,900 tokens, re-sent on every
 		// round of a hundred-round budget: it is the figure to watch, and the next
 		// raise should have to argue for itself against it.
+		//
+		// 28.5k -> 30.5k for the two rules a live run proved cost whole runs. The
+		// smoke test had drifted to "the smallest hardware that fits" plus a CPU
+		// sandbox, which cannot surface an OOM or a steps-per-second worth
+		// extrapolating: one SFT OOM'd at batch 8 on a T4, OOM'd again at batch 8 on
+		// an L4, then overran a 90m timeout on a ~1h44m run — three submissions and
+		// a budget raise for one finetune. And unpinned deps let the trackio client
+		// float away from the Space that was provisioned against it, which silently
+		// dropped 1h44m of metrics. Both are argued for by cost-per-incident, not
+		// by wanting the words. The same run also bought the trackio rules that
+		// followed — its own Space per project, and reading a metric back rather
+		// than trusting a successful init.
+		//
+		// 30.5k -> 32k for headroom, not content: the rules above landed at 30,495
+		// against a 30,500 ceiling, and a guard with five characters of slack fires
+		// on every edit, which is the state that made it noise at 21,889.
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -269,7 +334,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(28_500);
+		expect(composed.length).toBeLessThan(32_000);
 	});
 });
 

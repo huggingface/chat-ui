@@ -132,6 +132,29 @@ describe("withRepairedToolSchemas", () => {
 		expect(JSON.stringify(original)).toBe(before);
 	});
 
+	it("is what the sandbox sub-agent is handed, not the raw schema", () => {
+		// Dogfooding: runMcpFlow repaired the parent's tool list and passed the
+		// sub-agent the unrepaired one — so the heaviest caller of this grammar
+		// was the only caller not getting the rewrite. A live run then spent its
+		// first sandbox iteration on `cmd: Invalid input: expected "exec"`, the
+		// single largest rejection class these repairs exist for.
+		//
+		// Pinned as a property of the repaired output rather than by reaching
+		// into runMcpFlow: what matters is that the description the sub-agent
+		// reads actually says what `cmd` is.
+		const [repaired] = withRepairedToolSchemas(
+			[sandboxExec()],
+			mapping("hf_sandbox_exec", "hf_sandbox_exec"),
+			HUB
+		);
+		const properties = repaired.function.parameters?.properties as Record<
+			string,
+			{ description?: string }
+		>;
+
+		expect(properties.cmd.description).toContain('Always the literal "exec"');
+	});
+
 	it("leaves a tool with no repair exactly as it was", () => {
 		const other: OpenAiTool = {
 			type: "function",
