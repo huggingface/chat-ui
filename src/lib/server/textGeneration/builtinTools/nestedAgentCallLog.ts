@@ -4,21 +4,13 @@ import { logger } from "$lib/server/logger";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import type { NestedAgentCall } from "$lib/types/NestedAgentCall";
 
-/**
- * Enough of a command to recognise it — and to tell two polls of the same log
- * file apart from two different commands, which is the question this answers.
- */
 const ARGUMENTS_MAX = 600;
 const ERROR_MAX = 600;
 
 /**
- * Values that must never reach the database. Sandbox commands carry live
- * credentials — the Hub redacts HF_TOKEN in its own job logs for this reason —
- * and this log is built from the same strings.
- *
- * Ordered longest-context-first: the `Bearer <token>` and `KEY=<value>` forms
- * are matched before the bare-token pattern, so the surrounding context is
- * consumed rather than leaving a naked assignment behind.
+ * Sandbox commands carry live credentials. Ordered longest-context-first, so
+ * `Bearer <token>` and `KEY=<value>` are consumed whole rather than leaving a
+ * naked assignment behind.
  */
 const SECRET_PATTERNS: RegExp[] = [
 	/\bBearer\s+[A-Za-z0-9._~+/-]{8,}=*/gi,
@@ -36,17 +28,10 @@ function clamp(text: string, max: number): string {
 	return clean.length > max ? `${clean.slice(0, max)}…` : clean;
 }
 
-/** What the sub-agent loop knows about one call before it is dispatched. */
 export interface LoggedCall {
 	id: string;
 	name: string;
-	/** Raw JSON arguments as the model produced them — the real payload. */
 	arguments: string;
-	/**
-	 * How many times this exact (name, arguments) pair has been seen in this
-	 * sub-agent run, including this one. 1 is a first call; anything higher is
-	 * the loop that the repetition guard eventually fires on.
-	 */
 	repeatCount: number;
 }
 
@@ -57,17 +42,9 @@ interface RecordContext {
 }
 
 /**
- * Records one iteration's sub-agent tool calls for debugging.
- *
- * Built from the loop's own inputs rather than from the emitted Call/Result
- * updates: those carry `ToolCall.parameters`, which drops every non-primitive
- * value, so a sandbox command arrives as `{}` — and a log that cannot show
- * which command repeated cannot answer the question it exists for. Status and
- * error text come from the executor's own tool messages, which are keyed by
- * call id and carry the server's rejection verbatim.
- *
- * Fire-and-forget: this is diagnostics, and a logging failure must never
- * change how the sub-agent runs. Nothing is awaited and nothing throws.
+ * Built from the loop's own inputs, not the emitted Call/Result updates, whose
+ * `ToolCall.parameters` drops non-primitives. Fire-and-forget: a logging
+ * failure must never change how the sub-agent runs.
  */
 export function recordNestedAgentCalls(
 	ctx: RecordContext,
@@ -91,7 +68,7 @@ export function recordNestedAgentCalls(
 		.catch((err) => logger.warn({ err, label }, "[nested-agent-log] insert failed"));
 }
 
-/** The executor reports a failed call as a tool message whose content starts with "Error: ". */
+/** How executeToolCalls reports a failed call. */
 const ERROR_PREFIX = "Error: ";
 
 function buildRows(
@@ -129,8 +106,7 @@ function buildRows(
 			arguments: clamp(call.arguments, ARGUMENTS_MAX),
 			repeatCount: call.repeatCount,
 		};
-		// A call the executor never answered was cut short rather than run, and
-		// the iteration was spent either way.
+		// Cut short rather than run — the iteration was spent either way.
 		if (content === undefined) {
 			return { ...row, status: "error" as const, error: "no result observed for this call" };
 		}

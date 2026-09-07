@@ -234,11 +234,8 @@ describe("the sandbox sub-agent's boundary", () => {
 });
 
 describe("what the sandbox is allowed to run", () => {
-	// Dogfooding: a live run handed the training smoke to the sub-agent, which
-	// ran it at ~8.5 min/step on cpu-basic and then spent iterations 15-26
-	// polling the log — the cap was consumed watching a step that measures
-	// nothing about the GPU the real run uses. The prompt had never said the
-	// machine has no GPU, and its detach rule read as licence to poll.
+	// A live run smoke-tested training in the sandbox at ~8.5 min/step, then
+	// spent its remaining iterations polling the log.
 	it("says the machine is CPU-only and where the line falls", () => {
 		expect(SANDBOX_SYSTEM_PROMPT).toContain("This machine has CPU only");
 		expect(SANDBOX_SYSTEM_PROMPT).toContain("up to the first optimizer step");
@@ -251,8 +248,7 @@ describe("what the sandbox is allowed to run", () => {
 	});
 
 	it("tells a repeating agent to stop polling rather than change the command", () => {
-		// The nudge fired at iteration 23 of the polling loop and the loop carried
-		// on: "change something" is not actionable when the repetition is a wait.
+		// "Change something" is not actionable when the repetition is a wait.
 		expect(SANDBOX_REPETITION_PROMPT).toContain("polling a long-running command");
 		expect(SANDBOX_REPETITION_PROMPT).toContain("report it unfinished");
 	});

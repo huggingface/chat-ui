@@ -342,9 +342,7 @@ export class Database {
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for generationEvents by createdAt"));
 
-		// Sub-agent call debugging: read by turn, and expired on the same 24h
-		// clock as generationEvents — long enough to investigate a run that just
-		// happened, short enough that it never becomes storage anyone budgets for.
+		// Expired on the same 24h clock as generationEvents.
 		nestedAgentCalls
 			.createIndex({ conversationId: 1, messageId: 1, createdAt: 1 })
 			.catch((e) => logger.error(e, "Error creating turn-scoped index for nestedAgentCalls"));

@@ -151,12 +151,7 @@ describe("ML Assistant tool-keyed doctrine", () => {
 	});
 
 	it("keeps the smoke test on the real flavor and the real shape", () => {
-		// Dogfooding: the sandbox-first rule had displaced the GPU smoke job, and a
-		// cpu-basic sandbox on torch+cpu cannot surface an OOM or a usable
-		// steps-per-second. One SFT paid for that twice — batch 8 OOM'd on a T4,
-		// then OOM'd again on an L4 because the answer to an OOM was read as a
-		// bigger GPU rather than a smaller batch — and then overran its timeout
-		// because the estimate came from hardware that never ran the real shape.
+		// A cpu-basic sandbox surfaces neither an OOM nor a usable steps-per-second.
 		const jobs = inMode([tool("hf_jobs")]);
 
 		expect(jobs).toContain("same flavor, batch size and sequence length as the real run");
@@ -173,10 +168,7 @@ describe("ML Assistant tool-keyed doctrine", () => {
 	});
 
 	it("pins dependencies to a resolved current release, not a remembered one", () => {
-		// The model's library knowledge is months stale, so a pin from memory dies
-		// at import. Unpinned is not the fix either: a floating trackio resolved to
-		// a different version than the Space had been provisioned against, and
-		// 1h44m of metrics went to an ephemeral disk without an error.
+		// A pin from memory dies at import; unpinned drifts from whatever it has to match.
 		const jobs = inMode([tool("hf_jobs")]);
 
 		expect(jobs).toContain("pin to the CURRENT release, never the version you remember");
@@ -185,12 +177,8 @@ describe("ML Assistant tool-keyed doctrine", () => {
 	});
 
 	it("requires a fresh Space and a verified metric, not just a successful init", () => {
-		// Dogfooding: a 1h44m SFT logged zero metrics and reported success the whole
-		// way. init() created the Space and the bucket, printed a full banner and
-		// returned — while the Space it was pointed at, provisioned by an older
-		// trackio, 500'd every /api/bulk_log and 403'd the bucket fallback. Both
-		// halves are load-bearing: a fresh Space avoids the broken one, and reading
-		// a metric back is the only check that catches a 500/403 pair.
+		// init() succeeds and reports a live dashboard against a Space that 500s
+		// every write; reading a metric back is what catches it.
 		const jobs = inMode([tool("hf_jobs")]);
 
 		expect(jobs).toContain("Give each project its OWN Space");

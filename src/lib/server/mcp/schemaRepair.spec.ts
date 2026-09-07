@@ -133,15 +133,7 @@ describe("withRepairedToolSchemas", () => {
 	});
 
 	it("is what the sandbox sub-agent is handed, not the raw schema", () => {
-		// Dogfooding: runMcpFlow repaired the parent's tool list and passed the
-		// sub-agent the unrepaired one — so the heaviest caller of this grammar
-		// was the only caller not getting the rewrite. A live run then spent its
-		// first sandbox iteration on `cmd: Invalid input: expected "exec"`, the
-		// single largest rejection class these repairs exist for.
-		//
-		// Pinned as a property of the repaired output rather than by reaching
-		// into runMcpFlow: what matters is that the description the sub-agent
-		// reads actually says what `cmd` is.
+		// Pinned on the repaired output rather than by reaching into runMcpFlow.
 		const [repaired] = withRepairedToolSchemas(
 			[sandboxExec()],
 			mapping("hf_sandbox_exec", "hf_sandbox_exec"),

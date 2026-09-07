@@ -12,9 +12,6 @@ const tool = createJobWatcherTool();
 
 describe("the job watcher's boundary", () => {
 	it("holds hf_jobs and nothing else", () => {
-		// It exists to take an hour of polling out of the parent's context, not to
-		// gain any new power: submitting stays where the budget gate and the
-		// pre-flight list the user sees are.
 		const params = tool.definition.function.parameters as { required?: string[] };
 
 		expect(tool.name).toBe(JOB_WATCHER_TOOL_NAME);
@@ -23,8 +20,6 @@ describe("the job watcher's boundary", () => {
 	});
 
 	it("is recognised as a nested-agent tool so runMcpFlow binds it", () => {
-		// A sub-agent whose deps are never bound fails at call time with
-		// "not initialized", which reads like a deployment problem and is not.
 		expect(isJobWatcherTool(tool)).toBe(true);
 		expect("bind" in tool).toBe(true);
 	});
@@ -55,16 +50,11 @@ describe("what the watcher is told", () => {
 	});
 
 	it("tells it not to spend iterations waiting", () => {
-		// The failure this agent must not repeat: the sandbox agent spent twelve
-		// iterations polling a run it could not make finish.
 		expect(JOB_WATCHER_SYSTEM_PROMPT).toContain("You cannot make the job finish");
 		expect(JOB_WATCHER_SYSTEM_PROMPT).toContain("has nothing new to say");
 	});
 
 	it("tells the parent this covers the smoke job too", () => {
-		// The regression that prompted it: moving the smoke test onto real hardware
-		// put the parent back in a submit-poll-read loop, which is the context
-		// pollution the sandbox sub-agent had just removed.
 		const doctrine = JOB_WATCHER_DELEGATION_DOCTRINE(JOB_WATCHER_TOOL_NAME);
 
 		expect(doctrine).toContain("smoke test");
@@ -72,8 +62,6 @@ describe("what the watcher is told", () => {
 	});
 
 	it("stops sooner than the sandbox agent", () => {
-		// Reading twenty times is waiting, not working, and waiting is the
-		// caller's call to make with the verdict in hand.
 		expect(MAX_JOB_WATCHER_ITERATIONS).toBeLessThan(30);
 	});
 });

@@ -34,10 +34,6 @@ function rowsFrom(
 
 describe("nested agent call log", () => {
 	it("keeps the real command, not the lossy update parameters", () => {
-		// The bug this replaced: rows were built from ToolCall.parameters, which
-		// drops non-primitive values, so every sandbox command landed as `{}` —
-		// and a log that cannot show which command repeated cannot answer the
-		// question it exists for.
 		const args = '{"cmd":"exec","args":["exec","sbx-1","tail -5 /tmp/run2.log"]}';
 		const rows = rowsFrom([call("c1", "hf_sandbox_exec", args)], [ok("c1")]);
 
@@ -46,9 +42,6 @@ describe("nested agent call log", () => {
 	});
 
 	it("records the repeat count that makes a polling loop visible", () => {
-		// The failure mode that spends a whole iteration budget without a single
-		// error: the same successful call, over and over, waiting on something
-		// slow. Errors alone never reveal it.
 		const args = '{"cmd":"exec","args":["exec","sbx-1","tail /tmp/run2.log"]}';
 		const rows = rowsFrom([call("c1", "hf_sandbox_exec", args, 7)], [ok("c1")]);
 
@@ -56,9 +49,6 @@ describe("nested agent call log", () => {
 	});
 
 	it("keeps the server's rejection text verbatim", () => {
-		// Previously dropped: failures arrive as MessageToolUpdateType.Error, which
-		// the update-based build did not handle, so every real rejection was
-		// recorded as a generic "no result observed".
 		const rows = rowsFrom(
 			[call("c1", "hf_sandbox_exec", "{}")],
 			[err("c1", 'Input validation error: cmd: Invalid input: expected "exec"')]
@@ -69,8 +59,6 @@ describe("nested agent call log", () => {
 	});
 
 	it("never writes a credential into the database", () => {
-		// Sandbox commands carry live tokens; the Hub redacts them in its own job
-		// logs. This log is built from the same strings, so it redacts too.
 		const args = JSON.stringify({
 			args: [
 				"exec",
@@ -87,8 +75,6 @@ describe("nested agent call log", () => {
 	});
 
 	it("redacts assignments without swallowing the command around them", () => {
-		// Over-redaction would defeat the point: the command still has to be
-		// recognisable once the secret is gone.
 		const out = redactSecrets("python train.py --token=hf_SecretValue123 --epochs 3");
 
 		expect(out).not.toContain("hf_SecretValue123");
@@ -124,7 +110,6 @@ describe("nested agent call log", () => {
 	});
 
 	it("never throws into the sub-agent loop when the insert fails", () => {
-		// Diagnostics must not change how the agent runs.
 		insertMany.mockClear();
 		insertMany.mockRejectedValueOnce(new Error("mongo down"));
 		expect(() =>

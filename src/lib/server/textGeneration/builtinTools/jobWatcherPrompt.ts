@@ -1,16 +1,6 @@
 /**
- * The job-watcher sub-agent's model-facing text.
- *
- * Written for the pollution the sandbox sub-agent did not cover. Watching a job
- * is the same shape as the sandbox loop — call, read, decide, call again — but
- * it ran in the parent, where each poll re-prefills the whole conversation and
- * every log tail stays in it for the rest of the run. One observed message held
- * six hf_jobs calls and two waits and reached 18,675 characters before the run
- * had trained anything.
- *
- * The split from the sandbox agent is deliberate: this one changes nothing at
- * all. It cannot submit, cancel or edit, so its whole contract is to watch and
- * to say what happened.
+ * The job-watcher sub-agent's model-facing text. Unlike the sandbox agent this
+ * one changes nothing: its whole contract is to watch and say what happened.
  */
 
 export const JOB_WATCHER_SYSTEM_PROMPT = `You are a sub-agent watching one Hugging Face job that is already running. You have one tool, hf_jobs, and you may only read with it: 'logs' to read output, 'inspect' for status and configuration, 'ps' to list. You cannot submit a job, cancel one, or change anything. Do not try; the attempt is refused and the iteration is spent.

@@ -18,33 +18,18 @@ import {
 import { createReadOnlyJobsGuard } from "./readOnlyJobsGuard";
 import type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
 
-/**
- * The job-watcher sub-agent: an hour of polling behind one tool call.
- *
- * Same shape as the sandbox agent and for the same reason, one level up. The
- * sandbox loop was moved out of the parent in #2563; watching a job was not,
- * and it is the larger of the two — job logs carry progress bars and
- * tracebacks, and the parent re-prefills all of it on every poll.
- */
+/** The job-watcher sub-agent: an hour of polling behind one tool call. */
 
 export const JOB_WATCHER_TOOL_NAME = "watch_job";
 
-/**
- * One tool, and only its reading operations — enforced by the guard below, not
- * by this set, because `hf_jobs` decides between reading a run and submitting
- * one on an argument. The name alone cannot express the restriction.
- */
+/** Reading operations only, enforced by the guard below — see readOnlyJobsGuard. */
 const JOB_WATCHER_ALLOWED_TOOLS: ReadonlySet<string> = new Set(["hf_jobs"]);
 
-/**
- * Lower than the sandbox's 30. A watcher that has read twenty times has not
- * been working, it has been waiting — and waiting is the caller's decision,
- * made with the verdict in hand.
- */
+/** Lower than the sandbox's 30: reading twenty times is waiting, not working. */
 export const MAX_JOB_WATCHER_ITERATIONS = 20;
 
-// Tail-weighted like the sandbox's, and harder: a job log is mostly progress
-// bars, and everything that decides the verdict is at the end.
+// Harder tail-weighted than the sandbox's: a job log is mostly progress bars,
+// and the traceback and exit status are at the end.
 const TOOL_OUTPUT_MAX_CHARS = 6000;
 const TOOL_OUTPUT_HEAD = 1200;
 const TOOL_OUTPUT_TAIL = 4800;
@@ -141,12 +126,9 @@ async function runJobWatcher(
 			.filter(Boolean)
 			.join("\n\n"),
 		allowedTools: JOB_WATCHER_ALLOWED_TOOLS,
-		// The Hub's tool, so the Hub's server: a custom MCP server exporting
-		// `hf_jobs` would otherwise be handed the job id and dispatched to.
+		// A custom MCP server exporting `hf_jobs` would otherwise be handed the
+		// job id and dispatched to.
 		requireToolServer: (server) => isHfMcpServer(server.url),
-		// The operation-level half of the allowlist. Without it, delegating
-		// `hf_jobs` would hand a sub-agent the ability to submit compute outside
-		// the budget gate and outside the pre-flight list the user is shown.
 		guard: createReadOnlyJobsGuard("hf_jobs"),
 		maxIterations: MAX_JOB_WATCHER_ITERATIONS,
 		truncateOutput: truncateJobWatcherOutput,

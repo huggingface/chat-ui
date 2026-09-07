@@ -18,10 +18,7 @@ describe("read-only jobs guard", () => {
 	});
 
 	it("refuses the ones that spend", async () => {
-		// The whole reason the watcher can exist: a sub-agent's calls bypass the
-		// parent's budget gate, so it must hold nothing that can book compute.
-		// The allowlist is by tool name and `hf_jobs` decides this on an argument,
-		// so the restriction has to live here.
+		// Sub-agent calls bypass the parent's budget gate.
 		for (const operation of ["uv", "run", "cancel", "scheduled uv"]) {
 			const verdict = await guard.before(call("hf_jobs", { operation }));
 			expect(verdict.allow).toBe(false);
@@ -29,8 +26,6 @@ describe("read-only jobs guard", () => {
 	});
 
 	it("fails closed on an operation it has never heard of", async () => {
-		// A spending operation added upstream must be refused by default rather
-		// than inherited silently.
 		expect((await guard.before(call("hf_jobs", { operation: "teleport" }))).allow).toBe(false);
 		expect((await guard.before(call("hf_jobs", {}))).allow).toBe(false);
 		expect((await guard.before(call("hf_jobs", { operation: 7 }))).allow).toBe(false);

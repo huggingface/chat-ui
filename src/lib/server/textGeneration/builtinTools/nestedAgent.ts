@@ -84,15 +84,9 @@ export interface NestedAgentSpec {
 	 */
 	requireToolServer?: (server: McpServerConfig) => boolean;
 	/**
-	 * An extra gate on this agent's calls, composed after the schema preflight
-	 * every sub-agent gets.
-	 *
-	 * The allowlist is by tool name, which cannot express a restriction that
-	 * lives in an argument — `hf_jobs` reads a run or submits one depending on
-	 * its `operation`. An agent that needs the reading half and must never have
-	 * the spending half expresses that here. Never the budget guard: the
-	 * invariant is that a sub-agent holds nothing that spends, not that it books
-	 * its spending correctly.
+	 * An extra gate, composed after the schema preflight. For a restriction the
+	 * name-based allowlist cannot express — never the budget guard, whose
+	 * absence the allowlist is what compensates for.
 	 */
 	guard?: ToolCallGuard;
 	maxIterations: number;
@@ -175,9 +169,7 @@ export async function runNestedAgent(
 	];
 	if (nestedTools.length === 0) return { error: spec.failure.noTools };
 	const availableNames = new Set(nestedTools.map((tool) => tool.function.name));
-	// Compiled once per run, not per iteration: the validators are cached per tool.
-	// Preflight first — it books nothing, so short-circuiting on it releases
-	// nothing, which is the ordering composeGuards requires.
+	// Preflight first: it books nothing, which is the ordering composeGuards requires.
 	const preflightGuard = spec.guard
 		? composeGuards(createSchemaPreflightGuard(deps.mapping), spec.guard)
 		: createSchemaPreflightGuard(deps.mapping);
@@ -427,9 +419,7 @@ export async function runNestedAgent(
 			),
 		];
 
-		// Refusals never reach executeToolCalls, so they are recorded here or not
-		// at all — and a name the sub-agent cannot call is exactly the kind of
-		// wasted iteration this log exists to count.
+		// Refusals never reach executeToolCalls, so they are recorded here or not at all.
 		recordNestedAgentCalls(
 			ctx,
 			spec.label,

@@ -1,18 +1,11 @@
 import type { GuardVerdict, ToolCallGuard } from "../mcp/toolGuard";
 
 /**
- * Confines a delegated `hf_jobs` to the operations that only read.
+ * Confines a delegated `hf_jobs` to its reading operations.
  *
- * The nested-agent invariant is that a sub-agent's allowlist holds nothing that
- * spends or creates, because its calls bypass the parent's budget gate. But
- * `hf_jobs` is a single tool whose `operation` argument decides between reading
- * a run and submitting one, so a name-based allowlist cannot express "logs but
- * not uv". This does it at the argument level instead, and it is what lets the
- * watcher exist at all.
- *
- * Fail-closed: an operation that is absent, malformed, or simply not on the
- * list is refused. A new spending operation added upstream is therefore refused
- * by default rather than silently permitted.
+ * A sub-agent's allowlist is by tool name, and `hf_jobs` decides between
+ * reading a run and submitting one on an argument — so the restriction has to
+ * live here. Fail-closed, so an operation added upstream is refused by default.
  */
 const READ_ONLY_OPERATIONS: ReadonlySet<string> = new Set([
 	"logs",
@@ -22,12 +15,11 @@ const READ_ONLY_OPERATIONS: ReadonlySet<string> = new Set([
 	"scheduled inspect",
 ]);
 
-/** Names the operations so the sub-agent can correct itself rather than retry blindly. */
 const ALLOWED_LIST = [...READ_ONLY_OPERATIONS].map((op) => `'${op}'`).join(", ");
 
 export function createReadOnlyJobsGuard(toolName: string): ToolCallGuard {
 	return {
-		// Nothing is booked, so nothing needs releasing and a refusal costs nothing.
+		// Books nothing, so nothing needs releasing.
 		allowParking: true,
 		async before(call): Promise<GuardVerdict> {
 			if (call.fnName !== toolName) return { allow: true };
