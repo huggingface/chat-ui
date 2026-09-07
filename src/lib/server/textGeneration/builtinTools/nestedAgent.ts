@@ -11,11 +11,6 @@ import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpda
 import { recordNestedAgentCalls } from "./nestedAgentCallLog";
 import { executeToolCalls, type NormalizedToolCall } from "../mcp/toolInvocation";
 import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
-import {
-	extractTrackioDashboards,
-	relayTrackioDashboards,
-	type TrackioDashboard,
-} from "$lib/utils/trackio";
 import { composeGuards, type ToolCallGuard } from "../mcp/toolGuard";
 import { parseToolArguments, withParseableArguments } from "../mcp/toolArgs";
 import { stripLoneSurrogates } from "../utils/loneSurrogates";
@@ -174,19 +169,6 @@ export async function runNestedAgent(
 	];
 	if (nestedTools.length === 0) return { error: spec.failure.noTools };
 	const availableNames = new Set(nestedTools.map((tool) => tool.function.name));
-	// The Trackio banner is printed in the output only this sub-agent sees, so
-	// the URL is collected here and relayed on the summary — see
-	// relayTrackioDashboards for why the summary itself is not trusted for it.
-	const dashboards: TrackioDashboard[] = [];
-	const seenDashboards = new Set<string>();
-	const collectDashboards = (text: string) => {
-		for (const dashboard of extractTrackioDashboards(text)) {
-			if (seenDashboards.has(dashboard.url)) continue;
-			seenDashboards.add(dashboard.url);
-			dashboards.push(dashboard);
-		}
-	};
-
 	// Preflight first: it books nothing, which is the ordering composeGuards requires.
 	const preflightGuard = spec.guard
 		? composeGuards(createSchemaPreflightGuard(deps.mapping), spec.guard)
@@ -269,9 +251,7 @@ export async function runNestedAgent(
 		try {
 			const response = await completeWithRetry(false, spec.maxIterations);
 			const content = response.choices[0]?.message?.content ?? "";
-			return content
-				? { resultText: relayTrackioDashboards(content, dashboards) }
-				: { error: failureText };
+			return content ? { resultText: content } : { error: failureText };
 		} catch (err) {
 			logger.warn({ err: String(err) }, `[${spec.label}] forced summary call failed`);
 			return { error: failureText };
@@ -349,9 +329,7 @@ export async function runNestedAgent(
 			}
 			const content = msg?.content ?? "";
 			emitProgress(iteration + 1, spec.progress.done);
-			return content
-				? { resultText: relayTrackioDashboards(content, dashboards) }
-				: { error: spec.failure.noSummary };
+			return content ? { resultText: content } : { error: spec.failure.noSummary };
 		}
 
 		// Wire-safe rebuild: only role/content/tool_calls go back. The raw
@@ -429,12 +407,6 @@ export async function runNestedAgent(
 				if (event.type === "complete") {
 					toolMessages = event.summary.toolMessages;
 				}
-			}
-		}
-
-		for (const message of toolMessages) {
-			if (message.role === "tool" && typeof message.content === "string") {
-				collectDashboards(message.content);
 			}
 		}
 

@@ -193,12 +193,13 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("Unpinned is not the safe middle");
 	});
 
-	it("requires a fresh Space and a verified metric, not just a successful init", () => {
+	it("names the dashboard through create_trackio, and verifies a metric lands", () => {
 		// init() succeeds and reports a live dashboard against a Space that 500s
 		// every write; reading a metric back is what catches it.
 		const jobs = inMode([tool("hf_jobs")]);
 
-		expect(jobs).toContain("Give each project its OWN Space");
+		expect(jobs).toContain("Call `create_trackio` first");
+		expect(jobs).toContain("use that id unchanged");
 		expect(jobs).toContain("is not evidence that anything is recording");
 		expect(jobs).toContain("read one metric back off the dashboard");
 		expect(jobs).toContain("confirm the dashboard has rows in it");

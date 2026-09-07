@@ -7,6 +7,7 @@ import { waitBuiltin } from "./waitTool";
 import { createResearchTool } from "./researchTool";
 import { createSandboxTool } from "./sandboxTool";
 import { createJobCheckTool } from "./jobCheckTool";
+import { createTrackioTool } from "./createTrackioTool";
 import type { BuiltinTool } from "./types";
 
 export type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
@@ -14,6 +15,7 @@ export { PLAN_TOOL_NAME } from "./planTool";
 export { RESEARCH_TOOL_NAME, isResearchTool } from "./researchTool";
 export { SANDBOX_TOOL_NAME, isSandboxTool } from "./sandboxTool";
 export { JOB_CHECK_TOOL_NAME, isJobCheckTool } from "./jobCheckTool";
+export { CREATE_TRACKIO_TOOL_NAME } from "./createTrackioTool";
 export { isNestedAgentTool } from "./nestedAgent";
 
 /**
@@ -24,6 +26,8 @@ export { isNestedAgentTool } from "./nestedAgent";
  */
 export function getEnabledBuiltinTools(params: {
 	conv: Pick<Conversation, "_id" | "plan" | "mlAssistant">;
+	/** Hub namespace to name a Trackio Space in; absent when the run has no user. */
+	namespace?: string;
 }): BuiltinTool[] {
 	if (!isMlAssistantConversation(params.conv)) return [];
 	// The GitHub tools carry a second condition of their own — they withhold
@@ -39,6 +43,7 @@ export function getEnabledBuiltinTools(params: {
 		createResearchTool(),
 		createSandboxTool(),
 		createJobCheckTool(),
+		createTrackioTool(() => params.namespace),
 	];
 }
 

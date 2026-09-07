@@ -123,6 +123,7 @@ describe("registration", () => {
 			"research",
 			"sandbox_task",
 			"check_job",
+			"create_trackio",
 		]);
 	});
 
@@ -143,6 +144,7 @@ describe("registration", () => {
 			"research",
 			"sandbox_task",
 			"check_job",
+			"create_trackio",
 		]);
 	});
 });

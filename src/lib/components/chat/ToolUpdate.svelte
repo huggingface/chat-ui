@@ -7,6 +7,7 @@
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
 	import { formatToolProgressCount, formatToolProgressLines } from "$lib/utils/toolProgress";
+	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
@@ -160,14 +161,26 @@
 				</div>
 			{/if}
 			{#each dashboards as dashboard (dashboard.url)}
+				<!-- Only a dashboard named before it exists needs polling; one found in a
+				     log was printed by trackio.init, so it is already up. -->
+				{@const status = dashboard.spaceId
+					? trackioStatus.status(dashboard.url, dashboard.spaceId)
+					: "live"}
+				{@const live = status === "live"}
 				<button
 					type="button"
-					class="btn flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs {dashboard.url ===
-					openDashboardUrl
-						? 'border-blue-300 text-blue-700 dark:border-blue-500/40 dark:text-blue-300'
-						: 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'}"
-					title="Open the Trackio dashboard: {dashboard.label}"
-					onclick={() => sidePane.openTrackio(dashboard.url, dashboard.label)}
+					disabled={!live}
+					class="btn flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs {!live
+						? 'border-gray-200 text-gray-400 dark:border-gray-700 dark:text-gray-500'
+						: dashboard.url === openDashboardUrl
+							? 'border-blue-300 text-blue-700 dark:border-blue-500/40 dark:text-blue-300'
+							: 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'}"
+					title={live
+						? `Open the Trackio dashboard: ${dashboard.label}`
+						: status === "failed"
+							? "This dashboard never came up"
+							: "The dashboard is still starting"}
+					onclick={() => live && sidePane.openTrackio(dashboard.url, dashboard.label)}
 				>
 					<CarbonChartLine class="size-3.5 shrink-0" />
 					<span class="truncate">

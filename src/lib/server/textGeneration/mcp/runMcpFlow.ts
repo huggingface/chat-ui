@@ -145,7 +145,10 @@ export async function* runMcpFlow({
 		}
 		return false;
 	};
-	const builtinTools = getEnabledBuiltinTools({ conv });
+	const builtinTools = getEnabledBuiltinTools({
+		conv,
+		namespace: (locals as unknown as { user?: { username?: string } })?.user?.username,
+	});
 	// Read once: the preset decides the servers, the round budget and which tool
 	// doctrine is sent, and they must all agree within a run.
 	const mlAssistant = isMlAssistantConversation(conv);
