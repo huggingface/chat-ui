@@ -112,6 +112,23 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(inMode([tool("hf_jobs")])).toContain("hf://docs/hub/jobs-pricing.md");
 	});
 
+	it("counts queue time toward time-to-finish, and stops defaulting to l4", () => {
+		// Measured scheduling waits: CPU and a10g-small are immediate, but ~10% of
+		// l4x1 runs wait >17min on node-pool spin-up, which the hourly rate hides.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("Queue time is part of time-to-finish");
+		expect(jobs).toContain("prefer an a10g over an l4");
+		expect(jobs).toContain("a10g-small or a10g-large for a small finetune");
+		expect(jobs).not.toContain("a10g-large or l4x1 for a small finetune");
+	});
+
+	it("keeps the queue figures as shape rather than numbers to quote", () => {
+		// They are a 24h/7d snapshot with no live source behind them, so they date
+		// the same way the prices the neighbouring rule refuses to quote do.
+		expect(inMode([tool("hf_jobs")])).toContain("not as numbers to quote to the user");
+	});
+
 	it("reasons about hardware in cost to finish, not cost per hour", () => {
 		// Every job in the first real run went to the cheapest flavor, because the
 		// doctrine said "smallest" and never said "how long". Cheapest per hour is
