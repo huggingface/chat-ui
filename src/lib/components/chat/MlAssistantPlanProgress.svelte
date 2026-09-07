@@ -13,6 +13,11 @@
 
 	let { steps, statusLabel, complete }: Props = $props();
 
+	/** Skipped steps are settled, so they count toward the collapsed tally. */
+	let settled = $derived(
+		steps.filter((step) => step.status === "done" || step.status === "skipped").length
+	);
+
 	// Tap opens the tooltip on touch, where hover never fires. One index rather
 	// than one flag per dot so opening a second dot closes the first.
 	let openStep = $state(-1);
@@ -25,9 +30,9 @@
 	}
 </script>
 
-<div class="flex items-center gap-3">
+<div class="flex min-w-0 items-center gap-3">
 	<Tooltip.Provider delayDuration={80} disableHoverableContent>
-		<div class="ml-dot-row flex items-center gap-[10px]">
+		<div class="ml-dot-row hidden items-center gap-[10px] @sm:flex">
 			{#each steps as step, index (index)}
 				<Tooltip.Root
 					open={openStep === index}
@@ -61,11 +66,21 @@
 		</div>
 	</Tooltip.Provider>
 
+	<!-- What the dots say, in the width of two characters. The dots are the first
+	     thing to go: they cost the most room and say the least once the status
+	     text is already naming the running step. -->
+	<span
+		class="flex-none font-mono text-[13.5px] leading-none tabular-nums @sm:hidden"
+		aria-hidden="true"
+	>
+		{settled}/{steps.length}
+	</span>
+
 	<span
 		class={[
-			// Dropped in a narrow strip: the dots still carry progress, and this is
-			// the longest thing competing with the budget and metrics pills.
-			"hidden text-[13.5px] leading-none font-medium whitespace-nowrap @xs:inline",
+			// Truncates rather than wrapping or pushing: whitespace-nowrap without a
+			// min-w-0 ancestor is what let this overlap the budget.
+			"hidden min-w-0 truncate text-[13.5px] leading-none font-medium @md:block",
 			complete ? "text-[#16a34a] dark:text-[#4ade80]" : "text-[#c2410c] dark:text-[#fdba74]",
 		]}
 		aria-live="polite"

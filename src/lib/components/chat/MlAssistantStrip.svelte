@@ -90,8 +90,12 @@
 	>
 		<!-- Label text must clear 4.5:1 on the band: #c2410c on #fff4ea is 4.78:1 with
 		     little headroom — retint band and text together, not separately. -->
+		<!-- Two visual spellings, one accessible name: without aria-hidden a screen
+		     reader reads both, since the narrow one is hidden by CSS, not removed. -->
 		<span class="flex-none font-semibold">
-			ML Intern<span class="sr-only">, mode on</span>
+			<span class="hidden @xs:inline" aria-hidden="true">ML Intern</span>
+			<span class="@xs:hidden" aria-hidden="true">ML</span>
+			<span class="sr-only">ML Intern, mode on</span>
 		</span>
 
 		<!-- The plan replaces the tool note, but only once there is a plan to show:
@@ -137,7 +141,7 @@
 				/>
 				<!-- Icon-only in a narrow strip: it already carries plan progress and
 				     the budget, and this label is the first thing that can go. -->
-				<span class="hidden @sm:inline">Metrics</span>
+				<span class="hidden @lg:inline">Metrics</span>
 			</button>
 		{/if}
 
@@ -193,8 +197,8 @@
 						budget.totalMicroUsd
 					)} remaining${onbudgetchange ? ". Edit budget" : ""}`}
 				>
-					<span class="@sm:hidden">{formatMicroUsdCompact(remainingMicroUsd)}</span>
-					<span class="hidden @sm:inline">{formatMicroUsd(remainingMicroUsd)} left</span>
+					<span class="@lg:hidden">{formatMicroUsdCompact(remainingMicroUsd)}</span>
+					<span class="hidden @lg:inline">{formatMicroUsd(remainingMicroUsd)} left</span>
 				</button>
 			{/if}
 		{/if}
