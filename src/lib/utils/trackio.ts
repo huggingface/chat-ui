@@ -32,6 +32,22 @@ import { ToolResultStatus } from "$lib/types/Tool";
  */
 const TRACKIO_SOURCE_TOOL_REGEX = /^hf_(jobs|sandbox)(_|$)/;
 
+/**
+ * Sub-agent tools, whose result is a summary the sub-agent's model wrote — so
+ * a URL in it is prose, not tool output, and is not adopted. What is adopted is
+ * the relay line below, which chat-ui appends from the raw source-tool output
+ * the sub-agent actually received.
+ */
+const NESTED_AGENT_TOOL_REGEX = /^(sandbox_task|check_job)$/;
+
+/**
+ * Marks a line chat-ui wrote itself. `relayTrackioDashboards` strips any line
+ * matching this from the model's text before appending its own, so a summary
+ * cannot smuggle a dashboard by imitating the format.
+ */
+const RELAY_PREFIX = "[trackio dashboard] ";
+const RELAY_LINE_REGEX = /^\s*\[trackio dashboard\]\s.*$/gim;
+
 /** `https://<subdomain>.hf.space`, optionally with a path/query. */
 const HF_SPACE_URL_REGEX = /https?:\/\/([a-z0-9][a-z0-9-]*)\.hf\.space(\/[^\s"'<>)\]}]*)?/gi;
 /** The Hub-facing page for the same Space, which Trackio prints in some versions. */
@@ -108,7 +124,10 @@ function trimUrl(raw: string): string {
  * together, so an unrelated Space URL elsewhere in a long log is not adopted
  * just because the word "trackio" shows up somewhere in the same output.
  */
-export function extractTrackioDashboards(text: string): TrackioDashboard[] {
+export function extractTrackioDashboards(
+	text: string,
+	{ relayLinesOnly = false }: { relayLinesOnly?: boolean } = {}
+): TrackioDashboard[] {
 	if (!text || !/trackio/i.test(text)) return [];
 	const found: TrackioDashboard[] = [];
 	const seen = new Set<string>();
@@ -120,6 +139,7 @@ export function extractTrackioDashboards(text: string): TrackioDashboard[] {
 	};
 
 	for (const line of text.split(/\r?\n/)) {
+		if (relayLinesOnly && !line.trimStart().startsWith(RELAY_PREFIX)) continue;
 		for (const match of line.matchAll(HF_SPACE_URL_REGEX)) {
 			const subdomain = match[1].toLowerCase();
 			if (!isTrackioContext(line)) continue;
@@ -163,11 +183,13 @@ export function trackioDashboardsFromToolUpdates(updates: MessageToolUpdate[]): 
 		if (!isMessageToolResultUpdate(update)) continue;
 		const { result } = update;
 		if (result.status !== ToolResultStatus.Success) continue;
-		if (!TRACKIO_SOURCE_TOOL_REGEX.test(result.call.name)) continue;
+		const isSource = TRACKIO_SOURCE_TOOL_REGEX.test(result.call.name);
+		const isNested = NESTED_AGENT_TOOL_REGEX.test(result.call.name);
+		if (!isSource && !isNested) continue;
 		for (const output of result.outputs) {
 			const text = output["text"];
 			if (typeof text !== "string") continue;
-			for (const dashboard of extractTrackioDashboards(text)) {
+			for (const dashboard of extractTrackioDashboards(text, { relayLinesOnly: isNested })) {
 				if (seen.has(dashboard.url)) continue;
 				seen.add(dashboard.url);
 				found.push(dashboard);
@@ -198,4 +220,20 @@ export function collectTrackioDashboards(
 		}
 	}
 	return found;
+}
+
+/**
+ * Appends the dashboards a sub-agent's tools printed to the summary it returns.
+ *
+ * A sub-agent reads the raw `hf_jobs`/`hf_sandbox_*` output that carries the
+ * Trackio banner, and returns only a summary — so the URL never reaches the
+ * conversation and the pane never opens. This relays it without trusting the
+ * summary: `dashboards` come from the raw output chat-ui saw, and any line
+ * imitating the relay format is stripped from the model's text first.
+ */
+export function relayTrackioDashboards(summary: string, dashboards: TrackioDashboard[]): string {
+	const cleaned = summary.replace(RELAY_LINE_REGEX, "").trimEnd();
+	if (dashboards.length === 0) return cleaned;
+	const lines = dashboards.map((d) => `${RELAY_PREFIX}${d.label}: ${d.url}`);
+	return [cleaned, "", ...lines].join("\n");
 }

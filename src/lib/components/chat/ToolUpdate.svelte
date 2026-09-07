@@ -6,7 +6,7 @@
 		isMessageToolProgressUpdate,
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
-	import { formatToolProgressLabel } from "$lib/utils/toolProgress";
+	import { formatToolProgressCount, formatToolProgressLines } from "$lib/utils/toolProgress";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
@@ -36,7 +36,8 @@
 		}
 		return undefined;
 	});
-	let progressLabel = $derived.by(() => formatToolProgressLabel(toolProgress));
+	let progressCount = $derived.by(() => formatToolProgressCount(toolProgress));
+	let progressLines = $derived.by(() => formatToolProgressLines(toolProgress));
 
 	// A training run that syncs to Trackio prints its dashboard URL into the job
 	// output, so the tool group that ran it is also the natural place to get back
@@ -140,14 +141,23 @@
 				>
 					{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
 				</code>
+				{#if isExecuting && progressCount}
+					<span class="shrink-0 text-xs text-gray-500 tabular-nums dark:text-gray-400"
+						>({progressCount})</span
+					>
+				{/if}
 				<CarbonChevronRight
 					class="size-3.5 shrink-0 transition-all duration-200 group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
 						? 'rotate-90 text-gray-600 dark:text-gray-300'
 						: 'text-gray-400'}"
 				/>
 			</button>
-			{#if isExecuting && toolProgress}
-				<span class="text-xs text-gray-500 dark:text-gray-400">{progressLabel}</span>
+			{#if isExecuting && progressLines.length}
+				<div class="flex min-w-0 flex-col gap-0.5">
+					{#each progressLines as line (line)}
+						<span class="truncate text-xs text-gray-500 dark:text-gray-400">{line}</span>
+					{/each}
+				</div>
 			{/if}
 			{#each dashboards as dashboard (dashboard.url)}
 				<button
