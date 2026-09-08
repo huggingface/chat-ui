@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Switch } from "bits-ui";
+	import { untrack } from "svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
@@ -13,9 +14,19 @@
 	function ontoggle(next: boolean) {
 		if (requireAuthUser()) return;
 		mlAssistant.toggle(next);
-		// The mode stays on underneath: the modal is advice, not a confirmation step.
-		if (next && !$settings.mlInternOnboardingSeen) onboardingOpen = true;
 	}
+
+	// First time the mode goes on (from the switch or the home-screen card), open the
+	// onboarding. Edge-triggered, so a pill mounted with the mode already on stays quiet.
+	let wasEnabled: boolean | undefined;
+	$effect(() => {
+		const on = enabled;
+		const seen = $settings.mlInternOnboardingSeen;
+		untrack(() => {
+			if (on && wasEnabled === false && !seen) onboardingOpen = true;
+			wasEnabled = on;
+		});
+	});
 
 	function closeOnboarding() {
 		// Escape reaches Modal's window and dialog handlers before the unmount
