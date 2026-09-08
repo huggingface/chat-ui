@@ -118,6 +118,19 @@ describe("MlInternPill", () => {
 			expect(mlAssistant.enabled).toBe(true);
 		});
 
+		it("opens the onboarding when the mode is switched on from outside the pill", async () => {
+			const { set, context } = settingsContext(false);
+			renderWithApp(MlInternPill, {}, { context });
+			expect(dialog()).toBeNull();
+
+			// The home-screen spotlight's CTA flips the store directly.
+			mlAssistant.toggle(true);
+
+			await vi.waitFor(() => expect(dialog()).not.toBeNull());
+			expect(dialog()?.textContent).toContain("ML Intern is experimental");
+			expect(set).not.toHaveBeenCalled();
+		});
+
 		it("records Escape once, though the key reaches the modal twice", async () => {
 			const { set, context } = settingsContext(false);
 			const { container } = renderWithApp(MlInternPill, {}, { context });

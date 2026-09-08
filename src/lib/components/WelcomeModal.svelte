@@ -2,6 +2,7 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 
 	const publicConfig = usePublicConfig();
 
@@ -30,6 +31,14 @@
 				<Logo classNames="mr-2 size-12 dark:invert" />
 				{publicConfig.PUBLIC_APP_NAME}
 			</h2> -->
+			{#if ML_ASSISTANT_MODE && publicConfig.isHuggingChat}
+				<!-- Launch label, in the corner the "Now with MCP!" badge used to take. -->
+				<div
+					class="absolute right-3 bottom-3 rounded-lg border border-[#ea580c]/30 bg-[#ea580c]/20 px-2 py-0.5 text-sm font-semibold text-[#fdba74]"
+				>
+					Now with ML Intern!
+				</div>
+			{/if}
 		</div>
 
 		<div class="text-gray-700 dark:text-gray-200">
