@@ -17,6 +17,7 @@ import {
 	releaseReservation,
 	reserveMlBudget,
 } from "./budget";
+import { settleMlBudget } from "./settle";
 import { ceilingMicroUsd, getFlavorPriceMicroUsdPerMinute, parseTimeoutSeconds } from "./pricing";
 
 /**
@@ -39,11 +40,29 @@ const DEFAULT_JOB_TIMEOUT_SECONDS = 1800;
 /** Jobs launched without an explicit flavor run on cpu-basic. */
 const DEFAULT_JOB_FLAVOR = "cpu-basic";
 
-interface Ticket {
+interface HoldTicket {
 	key: string;
 	kind: "job" | "sandbox";
 	/** Namespace the submission targeted, when its arguments said so. */
 	namespace?: string;
+}
+
+/**
+ * Carried by a stop — `hf_sandbox terminate`, `hf_jobs cancel` — which reserves
+ * nothing itself. It exists so the settle pass can run the moment something the
+ * budget is holding for actually stops, rather than waiting for the next turn.
+ */
+interface ReleaseTicket {
+	kind: "release";
+}
+
+type Ticket = HoldTicket | ReleaseTicket;
+
+/** The calls that stop something this gate may be holding a reservation for. */
+function isStopCall(call: GuardedToolCall): boolean {
+	if (call.tool === "hf_jobs") return call.args.operation === "cancel";
+	if (call.tool === "hf_sandbox") return call.args.cmd === "terminate";
+	return false;
 }
 
 interface GatedSubmission {
@@ -219,11 +238,14 @@ export function createMlBudgetGuard({
 	conversationId,
 	generationId,
 	username,
+	token,
 }: {
 	conversationId: ObjectId;
 	generationId: string;
 	/** Fallback namespace for job ids reported without one. */
 	username?: string;
+	/** Hub credential the Jobs API is read with, for settling a stop mid-turn. */
+	token?: string;
 }): ToolCallGuard {
 	return {
 		// The resume path re-invokes a parked tool without consulting any guard,
@@ -233,7 +255,15 @@ export function createMlBudgetGuard({
 		async before(call: GuardedToolCall): Promise<GuardVerdict> {
 			if (!isHfMcpServer(call.serverUrl)) return { allow: true };
 			const gated = classify(call);
-			if (gated === null) return { allow: true };
+			// Stops are never gated, but their success is the one moment in a turn
+			// when a hold is known to be over. Ticketing them is what lets `after`
+			// reconcile without waiting for the next generation — a turn that
+			// cycles sandboxes would otherwise hold every ceiling it ever booked.
+			if (gated === null) {
+				return isStopCall(call)
+					? { allow: true, ticket: { kind: "release" } satisfies ReleaseTicket }
+					: { allow: true };
+			}
 			if ("blocked" in gated) return { allow: false, message: gated.blocked };
 
 			const timeoutSeconds = parseTimeoutSeconds(gated.timeoutRaw);
@@ -309,6 +339,29 @@ export function createMlBudgetGuard({
 
 		async after(rawTicket: unknown, outcome: GuardOutcome) {
 			const ticket = rawTicket as Ticket;
+			if (ticket.kind === "release") {
+				// Only on success: a terminate that failed stopped nothing, and the
+				// hold is still describing something that may still be running.
+				if (outcome.status !== "success") return undefined;
+				try {
+					const current = await readMlBudget(conversationId);
+					if (!current) return undefined;
+					// The whole ledger, not just this stop's reservation: the pass
+					// already knows how to ask the Jobs API what actually ran, and a
+					// sibling that finished earlier in this turn settles for free.
+					// A stop the API has not caught up with yet simply does not
+					// settle here — the next generation's pass gets it.
+					const settled = await settleMlBudget({
+						conversationId,
+						budget: current,
+						...(token ? { token } : {}),
+					});
+					return settled === current ? undefined : budgetUpdate(settled);
+				} catch (err) {
+					logger.warn({ err: String(err) }, "[mlBudget] settle-on-stop failed; next turn will");
+					return undefined;
+				}
+			}
 			try {
 				switch (outcome.status) {
 					case "success": {
