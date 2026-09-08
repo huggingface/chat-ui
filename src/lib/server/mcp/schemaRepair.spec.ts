@@ -132,6 +132,21 @@ describe("withRepairedToolSchemas", () => {
 		expect(JSON.stringify(original)).toBe(before);
 	});
 
+	it("is what the sandbox sub-agent is handed, not the raw schema", () => {
+		// Pinned on the repaired output rather than by reaching into runMcpFlow.
+		const [repaired] = withRepairedToolSchemas(
+			[sandboxExec()],
+			mapping("hf_sandbox_exec", "hf_sandbox_exec"),
+			HUB
+		);
+		const properties = repaired.function.parameters?.properties as Record<
+			string,
+			{ description?: string }
+		>;
+
+		expect(properties.cmd.description).toContain('Always the literal "exec"');
+	});
+
 	it("leaves a tool with no repair exactly as it was", () => {
 		const other: OpenAiTool = {
 			type: "function",

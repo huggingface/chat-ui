@@ -19,6 +19,8 @@ const {
 	SANDBOX_TOOL_NAME,
 } = await import("./sandboxTool");
 const { createResearchTool } = await import("./researchTool");
+const { SANDBOX_SYSTEM_PROMPT, SANDBOX_REPETITION_PROMPT, SANDBOX_DELEGATION_DOCTRINE } =
+	await import("./sandboxPrompt");
 type NestedAgentDeps = import("./nestedAgent").NestedAgentDeps;
 type OpenAiTool = import("$lib/server/mcp/tools").OpenAiTool;
 
@@ -228,6 +230,34 @@ describe("the sandbox sub-agent's boundary", () => {
 		const outcome = await boundTool().execute({ handle: HANDLE, task: "do everything" }, ctx);
 
 		expect("error" in outcome && outcome.error).toContain("too broad");
+	});
+});
+
+describe("what the sandbox is allowed to run", () => {
+	// A live run smoke-tested training in the sandbox at ~8.5 min/step, then
+	// spent its remaining iterations polling the log.
+	it("says the machine is CPU-only and where the line falls", () => {
+		expect(SANDBOX_SYSTEM_PROMPT).toContain("This machine has CPU only");
+		expect(SANDBOX_SYSTEM_PROMPT).toContain("up to the first optimizer step");
+		expect(SANDBOX_SYSTEM_PROMPT).toContain("smoke job on the real flavor");
+	});
+
+	it("refuses the polling loop the detach rule used to invite", () => {
+		expect(SANDBOX_SYSTEM_PROMPT).toContain("poll a log to see whether it finished");
+		expect(SANDBOX_SYSTEM_PROMPT).toContain("Every poll spends an iteration");
+	});
+
+	it("tells a repeating agent to stop polling rather than change the command", () => {
+		// "Change something" is not actionable when the repetition is a wait.
+		expect(SANDBOX_REPETITION_PROMPT).toContain("polling a long-running command");
+		expect(SANDBOX_REPETITION_PROMPT).toContain("report it unfinished");
+	});
+
+	it("tells the parent not to delegate training in the first place", () => {
+		expect(SANDBOX_DELEGATION_DOCTRINE("sandbox_task")).toContain(
+			"Do not hand it the training run"
+		);
+		expect(SANDBOX_DELEGATION_DOCTRINE("sandbox_task")).toContain("CPU-only");
 	});
 });
 

@@ -41,6 +41,8 @@ describe("getEnabledBuiltinTools", () => {
 			"wait",
 			"research",
 			"sandbox_task",
+			"check_job",
+			"create_trackio",
 		]);
 	});
 

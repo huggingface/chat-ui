@@ -19,6 +19,17 @@ export function formatMicroUsd(microUsd: number): string {
 	return `${sign}$${(cents / 100).toFixed(2)}`;
 }
 
+/**
+ * The narrowest form of a budget, for the collapsed strip: whole dollars,
+ * rounded UP. Ceiling rather than floor so a run with 88 cents left reads as
+ * "$1" rather than "$0" — at this width the figure answers "is there budget",
+ * and the exact number is a hover and an edit away.
+ */
+export function formatMicroUsdCompact(microUsd: number): string {
+	const sign = microUsd < 0 ? "-" : "";
+	return `${sign}$${Math.ceil(Math.abs(microUsd) / MICRO_USD_PER_USD)}`;
+}
+
 export function usdToMicroUsd(usd: number): number {
 	return Math.round(usd * MICRO_USD_PER_USD);
 }

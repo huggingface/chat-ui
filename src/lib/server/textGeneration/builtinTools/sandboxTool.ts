@@ -71,11 +71,14 @@ const definition: OpenAiTool = {
 			"files it changed, the names it touched, or the one error that stopped it.\n\n" +
 			"Use it for:\n" +
 			"- Getting a script to import and run before you submit it as a job\n" +
-			"- Smoke-testing a training script on a tiny slice\n" +
-			"- Debugging a failure whose fix is edit-and-rerun\n" +
-			"- Checking data shapes, versions or environment inside the sandbox\n\n" +
-			"It cannot create or terminate sandboxes, submit jobs, or write to the Hub — do those " +
-			"yourself. A single command you want to look at is not worth delegating; a loop is.",
+			"- Checking data shapes, columns, versions or environment inside the sandbox\n" +
+			"- Validating a trainer config resolves, up to but not including the first step\n" +
+			"- Debugging a failure whose fix is edit-and-rerun\n\n" +
+			"The sandbox is CPU-only, so do not send it training: a step there measures nothing " +
+			"about the GPU the real run uses and is slow enough to eat the whole delegation. That " +
+			"check is a smoke job on the real flavor. It also cannot create or terminate " +
+			"sandboxes, submit jobs, or write to the Hub — do those yourself. A single command you " +
+			"want to look at is not worth delegating; a loop is.",
 		parameters: {
 			type: "object",
 			properties: {
@@ -89,9 +92,10 @@ const definition: OpenAiTool = {
 					type: "string",
 					description:
 						"What to achieve, and what would prove it. Name the paths involved and the check " +
-						"that counts. Example: 'Make /data/train.py import cleanly and complete 2 steps on " +
-						"the first 100 rows of the dataset at /data/train.jsonl. It works when the script " +
-						"prints a loss for step 2.'",
+						"that counts. Example: 'Make /data/train.py import cleanly against the dataset at " +
+						"/data/train.jsonl, and confirm the columns and tokenized shapes are what the " +
+						"trainer expects. It works when the script reaches the trainer setup and prints " +
+						"the batch shape without erroring.'",
 				},
 				context: {
 					type: "string",
