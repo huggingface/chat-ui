@@ -4,31 +4,21 @@
 
 	interface Props {
 		steps: MlPlanStep[];
+		/** Present-tense label for the running step; empty when none is running. */
+		statusLabel: string;
 		complete: boolean;
 	}
 
-	let { steps, complete }: Props = $props();
+	let { steps, statusLabel, complete }: Props = $props();
 
-	/** Skipped steps are settled, so they count toward the tally the design shows. */
-	let settled = $derived(
-		steps.filter((step) => step.status === "done" || step.status === "skipped").length
-	);
+	// The design's "Step 3 of 5" is placeholder copy: the slot carries the running
+	// step's own label. Its type and colour are the design's.
+	let statusText = $derived(complete ? "Done" : statusLabel);
 
-	/**
-	 * The design has three step states; the plan has four. `running` has no glyph
-	 * of its own (the designer listed one as a follow-up), so it renders as
-	 * to-do — reached, not yet settled — and the tally carries the progress.
-	 */
-	type Glyph = "done" | "skipped" | "todo";
-	function glyphFor(step: MlPlanStep): Glyph {
-		if (step.status === "done") return "done";
-		if (step.status === "skipped") return "skipped";
-		return "todo";
-	}
-
-	/** A connector takes the colour of the step before it. */
+	/** A connector takes the colour of the step before it; running is not settled. */
 	function connectorSettled(index: number): boolean {
-		return glyphFor(steps[index - 1]) !== "todo";
+		const before = steps[index - 1].status;
+		return before === "done" || before === "skipped";
 	}
 
 	// Tap opens the tooltip on touch, where hover never fires. One index rather
@@ -36,81 +26,92 @@
 	let openStep = $state(-1);
 
 	// The glyphs are decorative and do not clear 4.5:1, so this label is the
-	// accessible carrier of each step's name and status.
-	function accessibleName(step: MlPlanStep) {
-		return `${step.label} — ${step.status}`;
+	// accessible carrier of each step's position, name and status.
+	function accessibleName(step: MlPlanStep, index: number) {
+		return `Step ${index + 1}, ${step.label} — ${step.status}`;
 	}
 </script>
 
 <div class="flex min-w-0 items-center gap-[14px]">
 	<Tooltip.Provider delayDuration={80} disableHoverableContent>
-		<div class="flex flex-none items-center">
+		<div
+			role="list"
+			class="ml-step-row flex flex-none items-center gap-[3px] @min-[240px]:gap-1 @min-[560px]:gap-0"
+		>
 			{#each steps as step, index (index)}
-				{@const glyph = glyphFor(step)}
 				{#if index > 0}
+					<!-- Connectors are the first thing to go: below 560 the chain carries
+					     its own gap instead. -->
 					<span
 						aria-hidden="true"
-						class="h-[1.5px] w-[12px] flex-none {connectorSettled(index)
+						class="hidden h-[1.5px] w-[12px] flex-none @min-[560px]:block {connectorSettled(index)
 							? 'bg-[#e8622a]'
 							: 'bg-[#e0ddd8] dark:bg-[#333333]'}"
 					></span>
 				{/if}
-				<Tooltip.Root
-					open={openStep === index}
-					onOpenChange={(open) => (openStep = open ? index : -1)}
-					disableCloseOnTriggerClick
-				>
-					<Tooltip.Trigger
-						class="ml-step-hit"
-						aria-label={accessibleName(step)}
-						onclick={() => (openStep = openStep === index ? -1 : index)}
+				<span role="listitem" class="contents">
+					<Tooltip.Root
+						open={openStep === index}
+						onOpenChange={(open) => (openStep = open ? index : -1)}
+						disableCloseOnTriggerClick
 					>
-						{#if glyph === "done"}
-							<span
-								class="grid size-4 flex-none place-items-center rounded-full bg-[#e8622a]"
-								aria-hidden="true"
-							>
-								<svg
-									viewBox="0 0 12 12"
-									class="size-[9px]"
-									fill="none"
-									stroke="#fff"
-									stroke-width="2.4"
-									stroke-linecap="round"
-									stroke-linejoin="round"
+						<Tooltip.Trigger
+							class="ml-step-hit"
+							aria-label={accessibleName(step, index)}
+							aria-current={step.status === "running" ? "step" : undefined}
+							onclick={() => (openStep = openStep === index ? -1 : index)}
+						>
+							{#if step.status === "done"}
+								<span class="ml-step-glyph grid place-items-center rounded-full bg-[#e8622a]">
+									<!-- A dot is a filled circle and nothing else; the check needs
+									     room the 8px and 6px sizes do not have. -->
+									<svg
+										viewBox="0 0 12 12"
+										class="hidden size-[9px] @min-[340px]:block"
+										fill="none"
+										stroke="#fff"
+										stroke-width="2.4"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<path d="M2 6.5l2.5 2.5L10 3.5" />
+									</svg>
+								</span>
+							{:else if step.status === "skipped"}
+								<span
+									class="ml-step-glyph grid place-items-center rounded-full border-[1.5px] border-[#e8622a]"
 								>
-									<path d="M2 6.5l2.5 2.5L10 3.5" />
-								</svg>
-							</span>
-						{:else if glyph === "skipped"}
-							<span
-								class="grid size-4 flex-none place-items-center rounded-full border-[1.5px] border-[#e8622a]"
-								aria-hidden="true"
-							>
-								<span class="h-[1.5px] w-[7px] rounded-[1px] bg-[#e8622a]"></span>
-							</span>
-						{:else}
-							<span
-								class="size-4 flex-none rounded-full border-[1.5px] border-[#cfcbc5] dark:border-[#444444]"
-								aria-hidden="true"
-							></span>
-						{/if}
-					</Tooltip.Trigger>
-					<Tooltip.Portal>
-						<Tooltip.Content class="ml-step-tooltip" side="top" sideOffset={10}>
-							<span class="font-semibold">{step.label}</span>
-							<span> — </span>
-							<span class="opacity-65">{step.description}</span>
-						</Tooltip.Content>
-					</Tooltip.Portal>
-				</Tooltip.Root>
+									<span
+										class="hidden h-[1.5px] w-[7px] rounded-[1px] bg-[#e8622a] @min-[340px]:block"
+									></span>
+								</span>
+							{:else if step.status === "running"}
+								<!-- Core plus a ring that breathes past the slot; the chain's
+								     gaps absorb the overflow, so it takes no margin. -->
+								<span class="ml-step-glyph ml-step-running"></span>
+							{:else}
+								<span
+									class="ml-step-glyph rounded-full border-[1.5px] border-[#cfcbc5] dark:border-[#444444]"
+								></span>
+							{/if}
+						</Tooltip.Trigger>
+						<Tooltip.Portal>
+							<Tooltip.Content class="ml-step-tooltip" side="top" sideOffset={10}>
+								<span class="font-semibold">{step.label}</span>
+								<span> — </span>
+								<span class="opacity-65">{step.description}</span>
+							</Tooltip.Content>
+						</Tooltip.Portal>
+					</Tooltip.Root>
+				</span>
 			{/each}
 		</div>
 	</Tooltip.Provider>
 
 	<span
 		class={[
-			"flex-none text-[13px] leading-none whitespace-nowrap",
+			"hidden flex-none text-[13px] leading-none whitespace-nowrap @min-[480px]:block",
 			complete
 				? "font-semibold text-[#c4511a] dark:text-[#f0a468]"
 				: "font-medium text-[#78716c] dark:text-[#a8a29e]",
@@ -118,17 +119,43 @@
 		aria-live="polite"
 		aria-atomic="true"
 	>
-		{complete ? "Done" : `${settled} of ${steps.length}`}
+		{statusText}
 	</span>
 </div>
 
 <style>
-	/* Keeps the 16px glyph's footprint so the row lays out on the designed
-	   12px connectors, while giving touch a 44px-tall target. */
+	/* One size drives the glyph, its hit target and the pulse, so a breakpoint
+	   moves them together. */
+	.ml-step-row {
+		--step: 6px;
+	}
+
+	@container (min-width: 240px) {
+		.ml-step-row {
+			--step: 8px;
+		}
+	}
+
+	@container (min-width: 340px) {
+		.ml-step-row {
+			--step: 16px;
+		}
+	}
+
+	/* box-sizing keeps a 1.5px ring the same size as a filled dot. */
+	.ml-step-glyph {
+		box-sizing: border-box;
+		flex: none;
+		width: var(--step);
+		height: var(--step);
+	}
+
+	/* Keeps the glyph's own footprint so the row lays out on the designed
+	   spacing, while giving touch a 44px-tall target. */
 	:global(.ml-step-hit) {
 		display: grid;
 		place-items: center;
-		width: 16px;
+		width: var(--step);
 		height: 44px;
 		margin: -14px 0;
 		padding: 0;
@@ -140,6 +167,41 @@
 		outline: 1.5px solid #e8622a;
 		outline-offset: -12px;
 		border-radius: 8px;
+	}
+
+	.ml-step-running {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ml-step-running::before {
+		content: "";
+		position: absolute;
+		inset: 0;
+		border-radius: 50%;
+		background: #e8622a;
+		animation: ml-step-pulse 1.4s ease-out infinite;
+	}
+
+	.ml-step-running::after {
+		content: "";
+		width: calc(var(--step) / 2);
+		height: calc(var(--step) / 2);
+		border-radius: 50%;
+		background: #e8622a;
+	}
+
+	@keyframes ml-step-pulse {
+		0% {
+			transform: scale(0.55);
+			opacity: 0.55;
+		}
+		100% {
+			transform: scale(1.5);
+			opacity: 0;
+		}
 	}
 
 	:global(.ml-step-tooltip) {
@@ -167,7 +229,13 @@
 		}
 	}
 
+	/* A soft halo instead of a breath — the running step still reads as itself. */
 	@media (prefers-reduced-motion: reduce) {
+		.ml-step-running::before {
+			animation: none;
+			transform: none;
+			opacity: 0.2;
+		}
 		:global(.ml-step-tooltip) {
 			animation: none;
 		}

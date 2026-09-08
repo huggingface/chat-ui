@@ -20,16 +20,14 @@ export function formatMicroUsd(microUsd: number): string {
 }
 
 /**
- * The narrowest honest form of a budget, for the mobile strip: whole dollars,
- * rounded down so it never reads as more money than is left. Anything under a
- * dollar keeps its cents, because "$0" and "nearly a dollar" are different
- * answers to "can I still run this".
+ * The narrowest form of a budget, for the collapsed strip: whole dollars,
+ * rounded UP. Ceiling rather than floor so a run with 88 cents left reads as
+ * "$1" rather than "$0" — at this width the figure answers "is there budget",
+ * and the exact number is a hover and an edit away.
  */
 export function formatMicroUsdCompact(microUsd: number): string {
 	const sign = microUsd < 0 ? "-" : "";
-	const abs = Math.abs(microUsd);
-	if (abs < MICRO_USD_PER_USD) return formatMicroUsd(microUsd);
-	return `${sign}$${Math.floor(abs / MICRO_USD_PER_USD)}`;
+	return `${sign}$${Math.ceil(Math.abs(microUsd) / MICRO_USD_PER_USD)}`;
 }
 
 export function usdToMicroUsd(usd: number): number {

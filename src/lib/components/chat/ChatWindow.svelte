@@ -1080,6 +1080,7 @@
 						<MlAssistantStrip
 							visible={mlStripVisible}
 							steps={mlAssistant.steps}
+							statusLabel={mlAssistant.statusLabel}
 							complete={mlAssistant.complete}
 							budget={mlAssistant.budget}
 							onbudgetchange={page.params?.id ? changeMlBudget : undefined}

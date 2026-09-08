@@ -2,7 +2,7 @@
 	import MlAssistantPlanProgress from "./MlAssistantPlanProgress.svelte";
 	import { ML_ASSISTANT_TOOLS } from "$lib/constants/mlAssistant";
 	import type { MlBudgetSnapshot, MlPlanStep } from "$lib/types/MlAssistant";
-	import { formatMicroUsd, MICRO_USD_PER_USD } from "$lib/utils/mlBudget";
+	import { formatMicroUsd, formatMicroUsdCompact, MICRO_USD_PER_USD } from "$lib/utils/mlBudget";
 	import IconSparkline from "../icons/IconSparkline.svelte";
 	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
@@ -12,6 +12,7 @@
 		/** Collapses the strip out of the composer when false, rather than unmounting it. */
 		visible: boolean;
 		steps: MlPlanStep[];
+		statusLabel: string;
 		complete: boolean;
 		/** Compute budget ledger; absent means the conversation carries none. */
 		budget?: MlBudgetSnapshot;
@@ -21,7 +22,8 @@
 		dashboard?: TrackioDashboard;
 	}
 
-	let { visible, steps, complete, budget, onbudgetchange, dashboard }: Props = $props();
+	let { visible, steps, statusLabel, complete, budget, onbudgetchange, dashboard }: Props =
+		$props();
 
 	$effect(() => {
 		if (dashboard?.spaceId) trackioStatus.watch(dashboard.url, dashboard.spaceId);
@@ -86,18 +88,26 @@
 	<!-- Orange as ink on a neutral surface: the old peach band was tint-on-tint,
 	     which flattened the orange it was carrying. -->
 	<div
-		class="ml-strip flex h-[44px] items-center gap-[14px] border-b border-[#ececea] bg-white pr-[10px] pl-[20px] dark:border-[#262626] dark:bg-[#141414]"
+		class="ml-strip flex h-[44px] items-center gap-[10px] border-b border-[#ececea] bg-white pr-2 pl-[14px] @min-[340px]:gap-[14px] @min-[340px]:pr-[10px] @min-[340px]:pl-[20px] dark:border-[#262626] dark:bg-[#141414]"
 	>
-		<span
-			class="flex-none text-[13px] leading-none font-semibold text-[#c4511a] dark:text-[#f0a468]"
-		>
-			ML Intern<span class="sr-only">, mode on</span>
+		<span class="flex-none">
+			<!-- Two spellings, one accessible name: the narrow one is hidden by CSS,
+			     not removed, so both would otherwise be read out. -->
+			<span aria-hidden="true" class="block size-2 rounded-[2px] bg-[#e8622a] @min-[240px]:hidden"
+			></span>
+			<span
+				aria-hidden="true"
+				class="hidden text-[13px] leading-none font-semibold text-[#c4511a] @min-[240px]:inline dark:text-[#f0a468]"
+			>
+				ML Intern
+			</span>
+			<span class="sr-only">ML Intern, mode on</span>
 		</span>
 
 		<!-- The plan replaces the tool note, but only once there is a plan to show:
 		     a run that has not reported its steps yet would otherwise leave a gap. -->
 		{#if steps.length}
-			<MlAssistantPlanProgress {steps} {complete} />
+			<MlAssistantPlanProgress {steps} {statusLabel} {complete} />
 		{:else}
 			<span class="min-w-0 truncate text-[13px] leading-none text-[#78716c] dark:text-[#a8a29e]">
 				{ML_ASSISTANT_TOOLS.join(" · ")}
@@ -114,7 +124,7 @@
 					"ml-control flex flex-none items-center justify-center gap-[6px] px-2 py-[5px]",
 					// Below the comfortable width the label goes and the icon keeps a
 					// round 28px target, rather than a stub of the pill it was.
-					"size-7 rounded-full @min-[560px]:size-auto @min-[560px]:rounded-[6px]",
+					"size-7 rounded-full @min-[480px]:size-auto @min-[480px]:rounded-[6px]",
 					"text-[13px] leading-none font-medium text-[#57534e] dark:text-[#a8a29e]",
 					dashboardLive
 						? "cursor-pointer hover:bg-black/5 hover:text-[#1c1917] dark:hover:bg-white/[.07] dark:hover:text-[#f5f5f4]"
@@ -135,7 +145,7 @@
 				/>
 				<!-- The one thing this design collapses: below a comfortable width the
 				     label goes and the icon keeps a round hit target. -->
-				<span class="hidden @min-[560px]:inline">Metrics</span>
+				<span class="hidden @min-[480px]:inline">Metrics</span>
 			</button>
 		{/if}
 
@@ -144,7 +154,7 @@
 				<!-- Negative margin pulls its neighbours to 8px, inside the 14px group gap. -->
 				<span
 					aria-hidden="true"
-					class="mx-[-6px] h-[14px] w-px flex-none bg-[#e5e3df] dark:bg-[#2e2e2e]"
+					class="hidden h-[14px] w-px flex-none bg-[#e5e3df] @min-[340px]:mx-[-6px] @min-[340px]:block dark:bg-[#2e2e2e]"
 				></span>
 			{/if}
 			{#if editingBudget}
@@ -182,7 +192,7 @@
 					class={[
 						// Same padding and radius as the editor it swaps with, so opening
 						// the edit never shifts the strip.
-						"ml-control flex flex-none items-center rounded-[6px] px-2 py-[5px]",
+						"ml-control flex flex-none items-center rounded-[6px] px-[6px] py-[5px] @min-[240px]:px-2",
 						"font-mono text-[13px] leading-none font-medium tabular-nums",
 						remainingMicroUsd <= 0
 							? "font-semibold text-red-600 dark:text-red-400"
@@ -201,7 +211,11 @@
 						budget.totalMicroUsd
 					)} remaining${onbudgetchange ? ". Edit budget" : ""}`}
 				>
-					{formatMicroUsd(remainingMicroUsd)} left
+					<span class="@min-[340px]:hidden">{formatMicroUsdCompact(remainingMicroUsd)}</span>
+					<span class="hidden @min-[340px]:inline @min-[480px]:hidden"
+						>{formatMicroUsd(remainingMicroUsd)}</span
+					>
+					<span class="hidden @min-[480px]:inline">{formatMicroUsd(remainingMicroUsd)} left</span>
 				</button>
 			{/if}
 		{/if}

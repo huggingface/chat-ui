@@ -27,10 +27,14 @@ const PLAN: MlPlanStep[] = [
 	step("Deploy", "pending", "Deploying"),
 ];
 
+const BUDGET = { totalMicroUsd: 10_000_000, spentMicroUsd: 1_500_000, reservedMicroUsd: 1_000_000 };
+const DASHBOARD = { url: "https://x.hf.space", label: "x/y" };
+
 function mount(props: Partial<Parameters<typeof render<typeof MlAssistantStrip>>[1]> = {}) {
 	return render(MlAssistantStrip, {
 		visible: true,
 		steps: [],
+		statusLabel: "",
 		complete: false,
 		...props,
 	});
@@ -41,7 +45,7 @@ const find = (root: ParentNode, selector: string): HTMLElement => {
 	if (!el) throw new Error(`no element matching ${selector}`);
 	return el;
 };
-const style = (el: Element) => getComputedStyle(el);
+const style = (el: Element, pseudo?: string) => getComputedStyle(el, pseudo);
 const box = (el: Element) => {
 	const r = el.getBoundingClientRect();
 	return { width: Math.round(r.width), height: Math.round(r.height) };
@@ -57,7 +61,10 @@ describe("MlAssistantStrip", () => {
 		expect(container.querySelector('[role="switch"]')).toBeNull();
 		expect(style(strip).backgroundColor).toBe("rgb(255, 255, 255)");
 		expect(style(strip).borderBottomColor).toBe("rgb(236, 236, 234)");
-		expect(style(find(container, ".ml-strip > span")).color).toBe(ORANGE_INK);
+		const label = [...container.querySelectorAll("span")].find(
+			(el) => el.textContent?.trim() === "ML Intern"
+		);
+		expect(label && style(label).color).toBe(ORANGE_INK);
 	});
 
 	it("lays the strip out on the specified spacing", () => {
@@ -98,26 +105,40 @@ describe("MlAssistantStrip", () => {
 		expect(container.querySelector(".ml-step-hit")).toBeNull();
 	});
 
-	it("draws each step as a 16px glyph, with no glyph for running", () => {
-		// The design defines done, skipped and to-do only; an in-progress icon is
-		// listed as a follow-up, so a running step reads as to-do and the tally
-		// carries the progress.
-		const { container } = mount({ steps: PLAN });
-		const glyphs = [...container.querySelectorAll(".ml-step-hit > span")];
+	/** Container queries key off the strip's own width, so tests must set one. */
+	function mountAt(width: number, props = {}) {
+		const rendered = mount({ steps: PLAN, statusLabel: "Training", ...props });
+		rendered.container.style.width = `${width}px`;
+		return rendered;
+	}
+
+	it("draws done, skipped and to-do as 16px glyphs at full width", () => {
+		const { container } = mountAt(700);
+		const glyphs = [...container.querySelectorAll(".ml-step-glyph")];
 
 		expect(glyphs).toHaveLength(4);
 		expect(box(glyphs[0])).toEqual({ width: 16, height: 16 });
 		expect(style(glyphs[0]).backgroundColor).toBe(ORANGE_SOLID);
 		expect(glyphs[0].querySelector("svg")).not.toBeNull();
 		expect(style(glyphs[1]).borderTopColor).toBe(ORANGE_SOLID);
-		expect(glyphs[1].querySelector("svg")).toBeNull();
-		// Running and pending are the same hollow ring.
-		expect(style(glyphs[2]).borderTopColor).toBe("rgb(207, 203, 197)");
 		expect(style(glyphs[3]).borderTopColor).toBe("rgb(207, 203, 197)");
 	});
 
+	it("gives the running step a core and a breathing ring", () => {
+		const { container } = mountAt(700);
+		const running = find(container, ".ml-step-running");
+
+		// The ring is a pseudo-element, so its animation is what identifies it.
+		expect(style(running, "::before").animationName).toContain("ml-step-pulse");
+		expect(style(running, "::before").animationDuration).toBe("1.4s");
+		expect(style(running, "::before").backgroundColor).toBe(ORANGE_SOLID);
+		// Core is half the slot and static.
+		expect(style(running, "::after").width).toBe("8px");
+		expect(style(running, "::after").animationName).toBe("none");
+	});
+
 	it("colours each connector after the step before it", () => {
-		const { container } = mount({ steps: PLAN });
+		const { container } = mountAt(700);
 		const connectors = [...container.querySelectorAll('[aria-hidden="true"]')].filter(
 			(el) => Math.round(el.getBoundingClientRect().width) === 12
 		);
@@ -129,11 +150,32 @@ describe("MlAssistantStrip", () => {
 		expect(style(connectors[2]).backgroundColor).toBe("rgb(224, 221, 216)");
 	});
 
-	it("keeps the steps tappable without widening the 16px glyph", () => {
-		const { container } = mount({ steps: PLAN });
-		const hits = [...container.querySelectorAll(".ml-step-hit")];
+	it("collapses on its own width, down to the 184px floor", () => {
+		// The ladder from the handoff: connectors, then the status text and the
+		// Metrics label, then the dots shrink.
+		const seen = (width: number) => {
+			const { container } = mountAt(width, { budget: BUDGET, dashboard: DASHBOARD });
+			const px = (el: Element | null) => (el ? Math.round(el.getBoundingClientRect().width) : 0);
+			return {
+				connectors: [...container.querySelectorAll('[aria-hidden="true"]')].filter(
+					(el) => px(el) === 12
+				).length,
+				status: style(find(container, '[aria-live="polite"]')).display,
+				glyph: px(container.querySelector(".ml-step-glyph")),
+				metricsLabel: [...container.querySelectorAll("span")].some(
+					(el) => el.textContent === "Metrics" && style(el).display !== "none"
+				),
+			};
+		};
 
-		expect(box(hits[0])).toEqual({ width: 16, height: 44 });
+		expect(seen(700)).toMatchObject({ connectors: 3, glyph: 16, metricsLabel: true });
+		expect(seen(500)).toMatchObject({ connectors: 0, glyph: 16, metricsLabel: true });
+		expect(seen(400)).toMatchObject({ connectors: 0, glyph: 16, metricsLabel: false });
+		expect(seen(300)).toMatchObject({ connectors: 0, glyph: 8, metricsLabel: false });
+		expect(seen(200)).toMatchObject({ connectors: 0, glyph: 6, metricsLabel: false });
+
+		expect(seen(500).status).not.toBe("none");
+		expect(seen(400).status).toBe("none");
 	});
 
 	it("names each step by its label and status", () => {
@@ -142,17 +184,19 @@ describe("MlAssistantStrip", () => {
 		expect(
 			[...container.querySelectorAll(".ml-step-hit")].map((b) => b.getAttribute("aria-label"))
 		).toEqual([
-			"Research — done",
-			"Baseline eval — skipped",
-			"Training — running",
-			"Deploy — pending",
+			"Step 1, Research — done",
+			"Step 2, Baseline eval — skipped",
+			"Step 3, Training — running",
+			"Step 4, Deploy — pending",
 		]);
 	});
 
-	it("counts settled steps while running, and says Done when complete", () => {
-		// Skipped counts as settled: two of four are behind us.
-		const running = find(mount({ steps: PLAN }).container, '[aria-live="polite"]');
-		expect(running.textContent?.trim()).toBe("2 of 4");
+	it("names the running step, and says Done when the plan completes", () => {
+		const running = find(
+			mount({ steps: PLAN, statusLabel: "Training" }).container,
+			'[aria-live="polite"]'
+		);
+		expect(running.textContent?.trim()).toBe("Training");
 		expect(style(running).color).toBe(TEXT_FAINT);
 
 		const done = find(
