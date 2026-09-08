@@ -8,7 +8,7 @@ import { logger } from "$lib/server/logger";
 import type { McpToolMapping, OpenAiTool } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
-import { recordNestedAgentCalls } from "./nestedAgentCallLog";
+import { recordNestedAgentCalls, type LoggedCall } from "./nestedAgentCallLog";
 import { executeToolCalls, type NormalizedToolCall } from "../mcp/toolInvocation";
 import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
 import { composeGuards, type ToolCallGuard } from "../mcp/toolGuard";
@@ -351,25 +351,31 @@ export async function runNestedAgent(
 		];
 
 		const allowedCalls: NormalizedToolCall[] = [];
+		const refusedCalls: LoggedCall[] = [];
 		const refusals: ChatCompletionMessageParam[] = [];
 		const repeatCounts = new Map<string, number>();
 		let sawRepetition = false;
 		for (const call of toolCalls) {
 			const name = call.function?.name ?? "";
+			const rawArguments = call.function?.arguments ?? "";
+			// Counted before the allowlist splits them: a refused call repeated is
+			// the loop this log exists to make visible, and it never reaches the
+			// executor to be counted later.
+			const key = `${name}|${stableStringify(parseToolArguments(rawArguments) ?? rawArguments)}`;
+			const count = (callCounts.get(key) ?? 0) + 1;
+			callCounts.set(key, count);
+			if (count >= REPETITION_THRESHOLD) sawRepetition = true;
+			repeatCounts.set(call.id, count);
+
 			if (!availableNames.has(name)) {
 				refusals.push({
 					role: "tool",
 					tool_call_id: call.id,
 					content: `Tool '${name}' not available for ${spec.label}.`,
 				});
+				refusedCalls.push({ id: call.id, name, arguments: rawArguments, repeatCount: count });
 				continue;
 			}
-			const rawArguments = call.function?.arguments ?? "";
-			const key = `${name}|${stableStringify(parseToolArguments(rawArguments) ?? rawArguments)}`;
-			const count = (callCounts.get(key) ?? 0) + 1;
-			callCounts.set(key, count);
-			if (count >= REPETITION_THRESHOLD) sawRepetition = true;
-			repeatCounts.set(call.id, count);
 			allowedCalls.push({ id: call.id, name, arguments: rawArguments });
 		}
 
@@ -420,7 +426,8 @@ export async function runNestedAgent(
 			),
 		];
 
-		// Refusals never reach executeToolCalls, so they are recorded here or not at all.
+		// Refusals never reach executeToolCalls, so they carry their own name,
+		// arguments and count rather than being reconstructed from the message.
 		recordNestedAgentCalls(
 			ctx,
 			spec.label,
@@ -432,7 +439,7 @@ export async function runNestedAgent(
 				repeatCount: repeatCounts.get(call.id) ?? 1,
 			})),
 			toolMessages,
-			refusals
+			refusedCalls
 		);
 
 		if (sawRepetition && !repetitionNudged) {

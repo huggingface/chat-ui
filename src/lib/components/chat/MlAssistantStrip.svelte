@@ -26,7 +26,9 @@
 		$props();
 
 	$effect(() => {
-		if (dashboard?.spaceId) trackioStatus.watch(dashboard.url, dashboard.spaceId);
+		if (!dashboard?.spaceId) return;
+		// Teardown matters: without it the interval outlives the conversation.
+		return trackioStatus.watch(dashboard.url, dashboard.spaceId);
 	});
 
 	let dashboardStatus = $derived(

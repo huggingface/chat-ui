@@ -160,7 +160,7 @@ describe("MlAssistantStrip", () => {
 				connectors: [...container.querySelectorAll('[aria-hidden="true"]')].filter(
 					(el) => px(el) === 12
 				).length,
-				status: style(find(container, '[aria-live="polite"]')).display,
+				status: style(find(container, ".ml-status")).display,
 				glyph: px(container.querySelector(".ml-step-glyph")),
 				metricsLabel: [...container.querySelectorAll("span")].some(
 					(el) => el.textContent === "Metrics" && style(el).display !== "none"
@@ -192,10 +192,11 @@ describe("MlAssistantStrip", () => {
 	});
 
 	it("names the running step, and says Done when the plan completes", () => {
-		const running = find(
-			mount({ steps: PLAN, statusLabel: "Training" }).container,
-			'[aria-live="polite"]'
-		);
+		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
+
+		// The live region is always present, even where the visible copy is not.
+		expect(find(container, '[aria-live="polite"]').textContent?.trim()).toBe("Training");
+		const running = find(container, ".ml-status");
 		expect(running.textContent?.trim()).toBe("Training");
 		expect(style(running).color).toBe(TEXT_FAINT);
 
@@ -204,10 +205,22 @@ describe("MlAssistantStrip", () => {
 				steps: PLAN.map((s) => ({ ...s, status: "done" as const })),
 				complete: true,
 			}).container,
-			'[aria-live="polite"]'
+			".ml-status"
 		);
 		expect(done.textContent?.trim()).toBe("Done");
 		expect(style(done).color).toBe(ORANGE_INK);
+	});
+
+	it("keeps a live region at every width, including where the text is hidden", () => {
+		// Hiding the only aria-live region is how a responsive layout stops
+		// announcing exactly on the screens most likely to need it.
+		const { container } = mount({ steps: PLAN, statusLabel: "Training" });
+		container.style.width = "300px";
+
+		expect(style(find(container, ".ml-status")).display).toBe("none");
+		const live = find(container, '[aria-live="polite"]');
+		expect(style(live).display).not.toBe("none");
+		expect(live.textContent?.trim()).toBe("Training");
 	});
 
 	it("announces the mode to screen readers despite carrying no control", () => {

@@ -22,6 +22,12 @@ const definition: OpenAiTool = {
 						"What is being trained, in a few words — used for the project name and the " +
 						"Space, e.g. 'smollm2-capybara-sft'.",
 				},
+				namespace: {
+					type: "string",
+					description:
+						"Hub namespace to create the Space in. Only needed when the tool says it has " +
+						"none for this conversation: call hf_whoami and pass what it returns.",
+				},
 			},
 			required: ["project"],
 		},
@@ -55,14 +61,25 @@ export function createTrackioTool(namespace: () => string | undefined): BuiltinT
 	};
 }
 
-function reserve(args: Record<string, unknown>, namespace: string | undefined): BuiltinToolResult {
+/** `owner`, as the Hub spells one: no slash, no spaces. */
+const NAMESPACE = /^[A-Za-z0-9][\w.-]*$/;
+
+function reserve(args: Record<string, unknown>, sessionNamespace?: string): BuiltinToolResult {
 	const project = typeof args.project === "string" ? args.project.trim() : "";
 	if (!project) return { error: "No project name provided." };
+
+	const given = typeof args.namespace === "string" ? args.namespace.trim() : "";
+	if (given && !NAMESPACE.test(given)) {
+		return { error: `"${given}" is not a Hub namespace — it is an owner, with no slash.` };
+	}
+	// The session's namespace is captured when the tool is built, so a run that
+	// started without one can only be rescued by being handed one.
+	const namespace = given || sessionNamespace;
 	if (!namespace) {
 		return {
 			error:
 				"No Hugging Face namespace for this conversation, so the dashboard cannot be named. " +
-				"Call hf_whoami, or ask the user which namespace to use.",
+				"Call hf_whoami and call this again with its namespace in the `namespace` argument.",
 		};
 	}
 
@@ -78,7 +95,8 @@ function reserve(args: Record<string, unknown>, namespace: string | undefined): 
 			`Use these exact values, unchanged:`,
 			`  trackio.init(project=${JSON.stringify(project)}, space_id=${JSON.stringify(spaceId)})`,
 			"",
-			`Add "trackio" to the job's dependencies. The Space is created by trackio itself on the`,
+			`Add trackio to the job's dependencies at the current release — resolve it and pin that`,
+			`exact version, the same as every other dependency. The Space is created by trackio on the`,
 			`first init, so it appears once the run reaches that line — the user's dashboard is`,
 			`already pointed at it and fills in from there.`,
 		].join("\n"),

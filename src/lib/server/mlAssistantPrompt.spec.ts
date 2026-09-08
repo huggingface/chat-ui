@@ -201,7 +201,11 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("Call `create_trackio` first");
 		expect(jobs).toContain("use that id unchanged");
 		expect(jobs).toContain("is not evidence that anything is recording");
-		expect(jobs).toContain("read one metric back off the dashboard");
+		// Checkable with the tools this run actually has: the warning is in the job
+		// log, which check_job and hf_jobs both read. Reading a metric back off the
+		// Space is not — nothing here can call the Trackio API.
+		expect(jobs).toContain("could not be sent");
+		expect(jobs).toContain("saved locally");
 		expect(jobs).toContain("confirm the dashboard has rows in it");
 	});
 

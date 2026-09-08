@@ -109,15 +109,18 @@
 		</div>
 	</Tooltip.Provider>
 
+	<!-- The live region is always in the tree: the visible copy is hidden below
+	     480, and a status that only announces at wide widths announces nothing on
+	     the layouts most likely to need it. -->
+	<span class="sr-only" aria-live="polite" aria-atomic="true">{statusText}</span>
 	<span
+		aria-hidden="true"
 		class={[
-			"hidden flex-none text-[13px] leading-none whitespace-nowrap @min-[480px]:block",
+			"ml-status hidden flex-none text-[13px] leading-none whitespace-nowrap @min-[480px]:block",
 			complete
 				? "font-semibold text-[#c4511a] dark:text-[#f0a468]"
 				: "font-medium text-[#78716c] dark:text-[#a8a29e]",
 		]}
-		aria-live="polite"
-		aria-atomic="true"
 	>
 		{statusText}
 	</span>

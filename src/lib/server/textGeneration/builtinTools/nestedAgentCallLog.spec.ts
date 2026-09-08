@@ -25,10 +25,10 @@ const err = (id: string, text: string): ChatCompletionMessageParam =>
 function rowsFrom(
 	calls: Parameters<typeof recordNestedAgentCalls>[3],
 	toolMessages: ChatCompletionMessageParam[] = [],
-	refusals: ChatCompletionMessageParam[] = []
+	refused: Parameters<typeof recordNestedAgentCalls>[5] = []
 ) {
 	insertMany.mockClear();
-	recordNestedAgentCalls(ctx, "sandbox", 3, calls, toolMessages, refusals);
+	recordNestedAgentCalls(ctx, "sandbox", 3, calls, toolMessages, refused);
 	return (insertMany.mock.calls[0]?.[0] ?? []) as Array<Record<string, unknown>>;
 }
 
@@ -74,6 +74,28 @@ describe("nested agent call log", () => {
 		expect(serialized).toContain("<redacted>");
 	});
 
+	it("redacts a quoted secret whole, not just its first word", () => {
+		// Reported in review: a value class that stops at whitespace leaves most of
+		// `PASSWORD="correct horse battery staple"` in the database.
+		const out = redactSecrets('PASSWORD="correct horse battery staple" --epochs 3');
+
+		expect(out).not.toContain("horse");
+		expect(out).not.toContain("staple");
+		expect(out).toContain("--epochs 3");
+	});
+
+	it("redacts a credential passed as a CLI flag", () => {
+		// The other reported gap: whitespace-separated flags matched nothing.
+		expect(redactSecrets("train --password hunter2 --epochs 3")).not.toContain("hunter2");
+		expect(redactSecrets("train --api-key=abcdefgh12345 --epochs 3")).not.toContain("abcdefgh");
+		expect(redactSecrets("train --password hunter2 --epochs 3")).toContain("--epochs 3");
+	});
+
+	it("leaves an ordinary command alone", () => {
+		const cmd = "python train.py --epochs 3 --lr 0.001 --batch-size 8";
+		expect(redactSecrets(cmd)).toBe(cmd);
+	});
+
 	it("redacts assignments without swallowing the command around them", () => {
 		const out = redactSecrets("python train.py --token=hf_SecretValue123 --epochs 3");
 
@@ -95,12 +117,15 @@ describe("nested agent call log", () => {
 		expect(rows[0]).toMatchObject({ status: "error", error: "no result observed for this call" });
 	});
 
-	it("records a refused tool name, which reaches no executor", () => {
-		const rows = rowsFrom([], [], [
-			ok("c1", "Tool 'hf_jobs' not available for sandbox."),
-		] as ChatCompletionMessageParam[]);
+	it("records a refused call with its arguments and repeat count", () => {
+		// A refusal never reaches the executor, so it carries its own metadata —
+		// otherwise a refusal loop, the thing this log exists to surface, reads as
+		// a series of unrelated first attempts.
+		const rows = rowsFrom([], [], [call("c1", "hf_jobs", '{"operation":"uv"}', 3)]);
 
-		expect(rows[0]).toMatchObject({ toolName: "hf_jobs", status: "error" });
+		expect(rows[0]).toMatchObject({ toolName: "hf_jobs", status: "error", repeatCount: 3 });
+		expect(rows[0].arguments).toContain("uv");
+		expect(rows[0].error).toContain("not available");
 	});
 
 	it("writes nothing when the iteration made no calls", () => {
