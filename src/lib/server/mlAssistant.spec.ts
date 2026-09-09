@@ -145,9 +145,9 @@ describe("mlAssistantBillingNamespace", () => {
 		expect(mlAssistantBillingNamespace(undefined)).toBeUndefined();
 	});
 
-	it("stands down when an operator-pinned Hub entry launches the work", () => {
-		// Jobs then run as the operator's account, which cannot write to the
-		// user's organisations; a namespace it lacks would 403 every submission.
+	it("holds when an operator-pinned Hub entry is configured", () => {
+		// Whether that credential may bill the organisation is the Hub's call: a
+		// refused submission is loud, a silently redirected charge is not.
 		mockedServers.value = [
 			{
 				name: "Hugging Face",
@@ -155,6 +155,6 @@ describe("mlAssistantBillingNamespace", () => {
 				headers: { Authorization: "Bearer hf_pinned" },
 			},
 		];
-		expect(mlAssistantBillingNamespace({ billingOrganization: "acme" })).toBeUndefined();
+		expect(mlAssistantBillingNamespace({ billingOrganization: "acme" })).toBe("acme");
 	});
 });

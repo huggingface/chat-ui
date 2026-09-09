@@ -63,17 +63,17 @@ export function pinnedHubToken(): string | undefined {
 /**
  * The organisation this request's Hub compute is billed to, if any.
  *
- * The user's billing setting — the one inference sends as X-HF-Bill-To — unless
- * an operator-pinned Hub entry is what launches the work. Jobs then run as the
- * operator's account, which has no standing in the user's organisations, and a
- * namespace it cannot write to would turn every submission into a 403.
+ * Deliberately blind to how the Hub server authenticates. An operator-pinned
+ * token may or may not belong to the organisation the user picked, and a guess
+ * is wrong in one direction or the other: a namespace the credential cannot
+ * write to fails loudly at submission, where a suppressed setting bills the
+ * wrong account in silence. The Hub is the authority on the first; only the
+ * setting can prevent the second.
  */
 export function mlAssistantBillingNamespace(
 	locals: { billingOrganization?: string } | undefined
 ): string | undefined {
-	const organization = locals?.billingOrganization?.trim();
-	if (!organization) return undefined;
-	return pinnedHubToken() === undefined ? organization : undefined;
+	return locals?.billingOrganization?.trim() || undefined;
 }
 
 /**

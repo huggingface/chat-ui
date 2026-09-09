@@ -13,7 +13,11 @@ import type { Stream } from "openai/streaming";
 import { buildToolPreprompt } from "../utils/toolPrompt";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
-import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
+import {
+	executeToolCalls,
+	withRewrittenArguments,
+	type NormalizedToolCall,
+} from "./toolInvocation";
 import { hasTruncatedToolCall, parseToolArguments, withParseableArguments } from "./toolArgs";
 import type { TextGenerationContext } from "../types";
 import {
@@ -1021,6 +1025,16 @@ export async function* runMcpFlow({
 						})) as NormalizedToolCall[];
 				}
 
+				if (rewriteArgs) {
+					calls = withRewrittenArguments(calls, {
+						mapping,
+						servers,
+						builtinTools,
+						parseArgs,
+						rewrite: rewriteArgs,
+					});
+				}
+
 				// Include the assistant message with tool_calls so the next round
 				// sees both the calls and their outputs, matching MCP branch behavior.
 				const toolCalls: ChatCompletionMessageToolCall[] = calls.map((call) => ({
@@ -1090,7 +1104,6 @@ export async function* runMcpFlow({
 					},
 					builtinTools,
 					guard,
-					...(rewriteArgs ? { rewriteArgs } : {}),
 					// So a server operator can tell autonomous, job-shaped mode traffic
 					// from ordinary chat: the name is sent once, at initialize.
 					...(mlAssistant ? { clientKind: "intern" as const } : {}),

@@ -76,17 +76,32 @@ describe("hub billing rewrite: sandboxes", () => {
 		expect(args.args).toHaveLength(5);
 	});
 
-	it("replaces the value of a --namespace the model wrote", () => {
+	it("replaces a --namespace the model wrote", () => {
 		const args = {
 			cmd: "create",
 			args: ["create", "--namespace", "pngwn", "--flavor", "cpu-basic"],
 		};
 		expect(apply("hf_sandbox", args).args).toEqual([
 			"create",
-			"--namespace",
-			"acme",
 			"--flavor",
 			"cpu-basic",
+			"--namespace",
+			"acme",
+		]);
+	});
+
+	it("collapses repeated --namespace flags to one", () => {
+		// The Hub's parser takes the option once; a duplicate is rejected outright.
+		const args = {
+			cmd: "create",
+			args: ["create", "--namespace", "pngwn", "--flavor", "cpu-basic", "--namespace", "acme"],
+		};
+		expect(apply("hf_sandbox", args).args).toEqual([
+			"create",
+			"--flavor",
+			"cpu-basic",
+			"--namespace",
+			"acme",
 		]);
 	});
 

@@ -59,17 +59,25 @@ function withSandboxNamespace(
 	// Only create decides who pays: every later command carries a handle that
 	// already names the namespace (hfsb2:<namespace>:<id>).
 	if (args.cmd !== "create" || !Array.isArray(args.args)) return args;
-	const tokens = [...(args.args as unknown[])];
-	const at = tokens.indexOf("--namespace");
-	if (at < 0) return { ...args, args: [...tokens, "--namespace", namespace] };
-	if (namesNamespace(tokens[at + 1]) && tokens[at + 1] !== namespace) {
+	// The server's parser takes this option once and rejects a repeat, so every
+	// occurrence goes and exactly one comes back.
+	const given = args.args as unknown[];
+	const tokens: unknown[] = [];
+	const wanted: unknown[] = [];
+	for (let i = 0; i < given.length; i++) {
+		if (given[i] !== "--namespace") {
+			tokens.push(given[i]);
+			continue;
+		}
+		if (i + 1 < given.length) wanted.push(given[++i]);
+	}
+	if (wanted.some((value) => namesNamespace(value) && value !== namespace)) {
 		logger.debug(
-			{ tool: "hf_sandbox", wanted: tokens[at + 1], namespace },
+			{ tool: "hf_sandbox", wanted, namespace },
 			"[mcp] billing namespace replaces the model's"
 		);
 	}
-	tokens[at + 1] = namespace;
-	return { ...args, args: tokens };
+	return { ...args, args: [...tokens, "--namespace", namespace] };
 }
 
 /** Hub servers only: a custom server may export its own `hf_jobs`, whose namespace is not ours. */
