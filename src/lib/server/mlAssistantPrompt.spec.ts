@@ -210,12 +210,12 @@ describe("ML Assistant tool-keyed doctrine", () => {
 	});
 
 	it("sends paper-finding rules with the filesystem tool", () => {
-		// It searched for a paper by title with hub_repo_search — a repo search —
-		// twice, and concluded nothing was there.
+		// It searched for a paper by title with a repo search — twice — and
+		// concluded nothing was there.
 		const fs = inMode([tool("hf_fs")]);
 
 		expect(fs).toContain("papers live at hf://papers");
-		expect(fs).toContain("hub_repo_search searches REPOSITORIES");
+		expect(fs).toContain("searches REPOSITORIES");
 		expect(inMode([tool("hf_jobs")])).not.toContain("papers live at hf://papers");
 	});
 

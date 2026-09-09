@@ -6,6 +6,7 @@ const mockedServers = vi.hoisted(() => ({
 vi.mock("./mcp/registry", () => ({ getMcpServers: () => mockedServers.value }));
 
 import {
+	ML_ASSISTANT_HF_MCP_URL,
 	ML_ASSISTANT_MCP_SERVERS,
 	isMlAssistantConversation,
 	pinnedHubToken,
@@ -43,7 +44,9 @@ describe("ML Assistant preset", () => {
 
 	it("yields to an explicitly-authed entry that still points at the Hub MCP", () => {
 		// OAuth deployments whose app cannot request the privileged scopes pin a
-		// token on the env entry instead; the preset must not strip it.
+		// token on the env entry instead; the preset must not strip it. It wins
+		// for its credential only: the mode's tool set still comes from the
+		// intern bouquet.
 		const preset = ML_ASSISTANT_MCP_SERVERS[0];
 		const pinned = {
 			name: preset.name,
@@ -53,7 +56,21 @@ describe("ML Assistant preset", () => {
 		const merged = withMlAssistantServers([pinned]);
 
 		expect(merged.filter((s) => s.name === preset.name)).toHaveLength(1);
-		expect(merged.find((s) => s.name === preset.name)).toEqual(pinned);
+		expect(merged.find((s) => s.name === preset.name)).toEqual({
+			...pinned,
+			url: "https://hf.co/mcp?bouquet=intern",
+		});
+	});
+
+	it("keeps a bouquet the operator chose on a pinned entry", () => {
+		const preset = ML_ASSISTANT_MCP_SERVERS[0];
+		const pinned = {
+			name: preset.name,
+			url: "https://hf.co/mcp?bouquet=all",
+			headers: { Authorization: "Bearer hf_test" },
+		};
+
+		expect(withMlAssistantServers([pinned]).find((s) => s.name === preset.name)).toEqual(pinned);
 	});
 
 	it("still refuses an authed entry pointing anywhere else", () => {
@@ -95,8 +112,14 @@ describe("ML Assistant preset", () => {
 		// no login control, so the mode's Hub tools would run anonymously. It is
 		// worse than a local mistake: the preset wins the name collision, so it
 		// would replace the ?login entry prod and dev already configure.
-		const hf = ML_ASSISTANT_MCP_SERVERS.find((server) => server.url.includes("hf.co"));
-		expect(hf && isStrictHfMcpLogin(hf.url)).toBe(true);
+		expect(isStrictHfMcpLogin(ML_ASSISTANT_HF_MCP_URL)).toBe(true);
+		expect(ML_ASSISTANT_MCP_SERVERS.map((server) => server.url)).toContain(ML_ASSISTANT_HF_MCP_URL);
+	});
+
+	it("runs the Hub server on the intern bouquet", () => {
+		// The bouquet is the mode's tool set — the Hub server resolves it per
+		// request, so the mode picks up preset changes without a deploy here.
+		expect(new URL(ML_ASSISTANT_HF_MCP_URL).searchParams.get("bouquet")).toBe("intern");
 	});
 
 	it("adds the preset even when nothing was selected", () => {
