@@ -8,6 +8,7 @@ vi.mock("./mcp/registry", () => ({ getMcpServers: () => mockedServers.value }));
 import {
 	ML_ASSISTANT_MCP_SERVERS,
 	isMlAssistantConversation,
+	mlAssistantBillingNamespace,
 	pinnedHubToken,
 	withMlAssistantServers,
 } from "./mlAssistant";
@@ -127,5 +128,33 @@ describe("pinnedHubToken", () => {
 			{ name: "Hugging Face", url: "https://hf.co/mcp", headers: { Authorization: "Basic abc" } },
 		];
 		expect(pinnedHubToken()).toBeUndefined();
+	});
+});
+
+describe("mlAssistantBillingNamespace", () => {
+	it("is the user's billing organisation, trimmed", () => {
+		mockedServers.value = [{ name: "Hugging Face", url: "https://hf.co/mcp?login" }];
+		expect(mlAssistantBillingNamespace({ billingOrganization: " acme " })).toBe("acme");
+	});
+
+	it("is nothing when the user bills their own account", () => {
+		mockedServers.value = [];
+		expect(mlAssistantBillingNamespace({ billingOrganization: "" })).toBeUndefined();
+		expect(mlAssistantBillingNamespace({ billingOrganization: "   " })).toBeUndefined();
+		expect(mlAssistantBillingNamespace({})).toBeUndefined();
+		expect(mlAssistantBillingNamespace(undefined)).toBeUndefined();
+	});
+
+	it("stands down when an operator-pinned Hub entry launches the work", () => {
+		// Jobs then run as the operator's account, which cannot write to the
+		// user's organisations; a namespace it lacks would 403 every submission.
+		mockedServers.value = [
+			{
+				name: "Hugging Face",
+				url: "https://hf.co/mcp",
+				headers: { Authorization: "Bearer hf_pinned" },
+			},
+		];
+		expect(mlAssistantBillingNamespace({ billingOrganization: "acme" })).toBeUndefined();
 	});
 });

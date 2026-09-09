@@ -9,7 +9,11 @@ import type { McpToolMapping, OpenAiTool } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { recordNestedAgentCalls, type LoggedCall } from "./nestedAgentCallLog";
-import { executeToolCalls, type NormalizedToolCall } from "../mcp/toolInvocation";
+import {
+	executeToolCalls,
+	type NormalizedToolCall,
+	type ToolArgsRewrite,
+} from "../mcp/toolInvocation";
 import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
 import { composeGuards, type ToolCallGuard } from "../mcp/toolGuard";
 import { parseToolArguments, withParseableArguments } from "../mcp/toolArgs";
@@ -61,6 +65,12 @@ export interface NestedAgentDeps {
 	/** Every builtin offered this turn; filtered by the spec's allowlist here. */
 	hostBuiltinTools: BuiltinTool[];
 	contextLengthTokens?: number;
+	/**
+	 * The parent's argument rewrite. Unlike the budget guard it is not withheld
+	 * here: it decides which namespace a job lives in, and a sub-agent reading
+	 * the parent's jobs has to look where they were put.
+	 */
+	rewriteArgs?: ToolArgsRewrite;
 }
 
 export interface NestedAgentSpec {
@@ -403,6 +413,7 @@ export async function runNestedAgent(
 				// a call against its own schema is not a policy, it is the round
 				// trip and the iteration this run would otherwise lose.
 				guard: preflightGuard,
+				...(deps.rewriteArgs ? { rewriteArgs: deps.rewriteArgs } : {}),
 				// No `elicitation`: the sub-agent has no chat to ask, so an
 				// input-required response comes back as an ordinary tool error.
 			});

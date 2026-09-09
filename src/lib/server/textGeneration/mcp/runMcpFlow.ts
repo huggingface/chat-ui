@@ -30,9 +30,11 @@ import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import {
 	isMlAssistantConversation,
+	mlAssistantBillingNamespace,
 	pinnedHubToken,
 	withMlAssistantServers,
 } from "$lib/server/mlAssistant";
+import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { createRepeatedCallGuard } from "./repeatedCallGuard";
@@ -170,6 +172,11 @@ export async function* runMcpFlow({
 					(locals as unknown as { token?: string } | undefined)?.token,
 			})
 		: undefined;
+
+	// A job bills the namespace it runs under, so the billing setting travels as
+	// an argument rather than a header — see mcp/hubBilling.ts.
+	const billingNamespace = mlAssistant ? mlAssistantBillingNamespace(locals) : undefined;
+	const rewriteArgs = billingNamespace ? createHubBillingRewrite(billingNamespace) : undefined;
 
 	// Built here so it spans the turn's rounds; chained below, once the tool
 	// mapping the schema check reads exists.
@@ -655,6 +662,7 @@ export async function* runMcpFlow({
 			mcpTools: shapedMcpTools,
 			hostBuiltinTools: builtinTools,
 			contextLengthTokens: targetContextLength,
+			...(rewriteArgs ? { rewriteArgs } : {}),
 		};
 		for (const tool of builtinTools) {
 			if (isNestedAgentTool(tool)) tool.bind(nestedAgentDeps);
@@ -1082,6 +1090,7 @@ export async function* runMcpFlow({
 					},
 					builtinTools,
 					guard,
+					...(rewriteArgs ? { rewriteArgs } : {}),
 					// So a server operator can tell autonomous, job-shaped mode traffic
 					// from ordinary chat: the name is sent once, at initialize.
 					...(mlAssistant ? { clientKind: "intern" as const } : {}),

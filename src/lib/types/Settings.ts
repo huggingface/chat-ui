@@ -85,8 +85,9 @@ export interface Settings extends Timestamps {
 	hapticsEnabled: boolean;
 
 	/**
-	 * Organization to bill inference requests to (HuggingChat only).
-	 * Stores the org's preferred_username. If empty/undefined, bills to personal account.
+	 * Organization to bill inference requests, and the jobs and sandboxes ML Intern
+	 * launches, to (HuggingChat only). Stores the org's preferred_username. If
+	 * empty/undefined, bills to personal account.
 	 */
 	billingOrganization?: string;
 }

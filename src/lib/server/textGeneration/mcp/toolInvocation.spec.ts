@@ -4,7 +4,7 @@ import { collections, ready } from "$lib/server/database";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { parseToolArguments } from "./toolArgs";
-import type { NormalizedToolCall } from "./toolInvocation";
+import type { NormalizedToolCall, ToolArgsRewrite } from "./toolInvocation";
 import type { BuiltinTool } from "../builtinTools/types";
 import type { McpToolTextResponse } from "$lib/server/mcp/httpClient";
 import type { ChatCompletionToolMessageParam } from "openai/resources/chat/completions";
@@ -43,7 +43,8 @@ async function drain(
 	calls: NormalizedToolCall[],
 	elicitation?: { conversationId: ObjectId; generationId?: string; messageId?: string },
 	builtinTools?: BuiltinTool[],
-	guard?: import("./toolGuard").ToolCallGuard
+	guard?: import("./toolGuard").ToolCallGuard,
+	rewriteArgs?: ToolArgsRewrite
 ) {
 	const events = [];
 	for await (const event of executeToolCalls({
@@ -56,6 +57,7 @@ async function drain(
 		...(elicitation ? { elicitation } : {}),
 		...(builtinTools ? { builtinTools } : {}),
 		...(guard ? { guard } : {}),
+		...(rewriteArgs ? { rewriteArgs } : {}),
 	})) {
 		events.push(event);
 	}
@@ -535,5 +537,55 @@ describe("executeToolCalls with a guard", () => {
 			(e) => e.type === "update" && e.update.type === MessageUpdateType.Budget
 		);
 		expect(budgets).toHaveLength(2);
+	});
+});
+
+describe("executeToolCalls: argument rewrite", () => {
+	const stamp: ToolArgsRewrite = ({ serverUrl, tool, args }) => ({
+		...args,
+		via: `${tool}@${serverUrl}`,
+	});
+
+	it("rewrites before the guard, the server and the Call update see the arguments", async () => {
+		// One set of arguments everywhere: a guard pricing what the server will
+		// not receive, or a UI showing what the server did not, is the bug this
+		// ordering prevents.
+		const seen: Array<Record<string, unknown>> = [];
+		const guard: import("./toolGuard").ToolCallGuard = {
+			allowParking: true,
+			async before(call) {
+				seen.push(call.args);
+				return { allow: true };
+			},
+			async after() {
+				return undefined;
+			},
+		};
+		const events = await drain([CALL], undefined, undefined, guard, stamp);
+
+		const expected = { a: 1, via: "do_thing@https://example.test/mcp" };
+		expect(seen).toEqual([expected]);
+		expect(mcpMock.callMcpTool.mock.calls[0][2]).toEqual(expected);
+		const call = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Call);
+		expect(call?.subtype === MessageToolUpdateType.Call && call.call.parameters).toEqual(expected);
+	});
+
+	it("leaves builtins alone", async () => {
+		// A builtin runs in this process; the rewrite is for what a server reads.
+		const received: Array<Record<string, unknown>> = [];
+		const builtin: BuiltinTool = {
+			name: "do_thing",
+			definition: { type: "function", function: { name: "do_thing" } },
+			execute: async (args) => {
+				received.push(args);
+				return { resultText: "done" };
+			},
+		};
+		const rewrite = vi.fn(stamp);
+		await drain([CALL], undefined, [builtin], undefined, rewrite);
+
+		expect(rewrite).not.toHaveBeenCalled();
+		expect(received).toEqual([{ a: 1 }]);
+		expect(mcpMock.callMcpTool).not.toHaveBeenCalled();
 	});
 });

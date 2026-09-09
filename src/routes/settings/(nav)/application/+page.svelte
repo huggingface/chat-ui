@@ -17,6 +17,7 @@
 	import { browser } from "$app/environment";
 	import { getThemePreference, setTheme, type ThemePreference } from "$lib/switchTheme";
 	import { supportsHaptics } from "$lib/utils/haptics";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 
 	const publicConfig = usePublicConfig();
 	let settings = useSettingsStore();
@@ -269,8 +270,9 @@
 						<div>
 							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Billing</div>
 							<p class="text-[12px] text-gray-500 dark:text-gray-400">
-								Select between personal or organization billing for inference (for eligible
-								organizations).
+								Select between personal or organization billing for inference{ML_ASSISTANT_MODE
+									? " and for the jobs and sandboxes ML Intern runs"
+									: ""} (for eligible organizations).
 							</p>
 						</div>
 						<div class="flex items-center">

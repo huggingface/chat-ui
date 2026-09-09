@@ -61,6 +61,22 @@ export function pinnedHubToken(): string | undefined {
 }
 
 /**
+ * The organisation this request's Hub compute is billed to, if any.
+ *
+ * The user's billing setting — the one inference sends as X-HF-Bill-To — unless
+ * an operator-pinned Hub entry is what launches the work. Jobs then run as the
+ * operator's account, which has no standing in the user's organisations, and a
+ * namespace it cannot write to would turn every submission into a 403.
+ */
+export function mlAssistantBillingNamespace(
+	locals: { billingOrganization?: string } | undefined
+): string | undefined {
+	const organization = locals?.billingOrganization?.trim();
+	if (!organization) return undefined;
+	return pinnedHubToken() === undefined ? organization : undefined;
+}
+
+/**
  * The preset's servers plus the ones already resolved for this request, preset
  * first. Deduplicated by name with the preset winning.
  */

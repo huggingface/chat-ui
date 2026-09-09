@@ -35,6 +35,17 @@ export interface NormalizedToolCall {
 	arguments: string;
 }
 
+/**
+ * Rewrites a call's arguments before the guards, the server and the UI's Call
+ * update see them, for policy the server can only read from the arguments (see
+ * mcp/hubBilling.ts). Returning the same object means no change.
+ */
+export type ToolArgsRewrite = (call: {
+	serverUrl: string;
+	tool: string;
+	args: Record<string, unknown>;
+}) => Record<string, unknown>;
+
 export interface ExecuteToolCallsParams {
 	calls: NormalizedToolCall[];
 	mapping: Record<string, McpToolMapping>;
@@ -61,6 +72,8 @@ export interface ExecuteToolCallsParams {
 	builtinTools?: BuiltinTool[];
 	/** Policy gate consulted around every MCP dispatch (not builtins) — see toolGuard.ts. */
 	guard?: ToolCallGuard;
+	/** Applied to every MCP dispatch (not builtins) before the guard sees it. */
+	rewriteArgs?: ToolArgsRewrite;
 	/** Identity these calls introduce themselves to the server with. */
 	clientKind?: McpClientKind;
 }
@@ -121,12 +134,14 @@ export async function* executeToolCalls({
 	owner,
 	builtinTools,
 	guard,
+	rewriteArgs,
 	clientKind,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
 	const serverLookup = serverMap(servers);
+	const builtinByName = new Map((builtinTools ?? []).map((tool) => [tool.name, tool]));
 	// Pre-emit call + ETA updates and prepare tasks
 	type TaskResult = {
 		index: number;
@@ -140,7 +155,13 @@ export async function* executeToolCalls({
 	};
 
 	const prepared = calls.map((call) => {
-		const argsObj = parseArgs(call.arguments);
+		let argsObj = parseArgs(call.arguments);
+		// Before paramsClean, so the Call update shows what the server receives.
+		const mappingEntry = builtinByName.has(call.name) ? undefined : mapping[call.name];
+		const serverCfg = mappingEntry ? serverLookup.get(mappingEntry.server) : undefined;
+		if (rewriteArgs && argsObj && mappingEntry && serverCfg) {
+			argsObj = rewriteArgs({ serverUrl: serverCfg.url, tool: mappingEntry.tool, args: argsObj });
+		}
 		const paramsClean: Record<string, Primitive> = {};
 		for (const [k, v] of Object.entries(argsObj ?? {})) {
 			const prim = toPrimitive(v);
@@ -248,7 +269,6 @@ export async function* executeToolCalls({
 		emit: (update) => updatesQueue.push(update),
 	};
 
-	const builtinByName = new Map((builtinTools ?? []).map((tool) => [tool.name, tool]));
 	// Positional, not success-conditional: which parking call survives must not depend
 	// on a race between concurrent tasks.
 	const parkingCalls = prepared.filter((p) => builtinByName.get(p.call.name)?.mayPark);

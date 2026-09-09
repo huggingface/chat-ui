@@ -10,7 +10,11 @@ import { generate } from "./generate";
 import { runMcpFlow } from "./mcp/runMcpFlow";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
-import { isMlAssistantConversation, pinnedHubToken } from "$lib/server/mlAssistant";
+import {
+	isMlAssistantConversation,
+	mlAssistantBillingNamespace,
+	pinnedHubToken,
+} from "$lib/server/mlAssistant";
 import { settleMlBudget } from "$lib/server/mlBudget/settle";
 import { reservedMicroUsd } from "$lib/utils/mlBudget";
 import { logger } from "$lib/server/logger";
@@ -108,6 +112,9 @@ async function* textGenerationWithoutTitle(
 		username: ctx.username,
 		timezone: (ctx.locals as unknown as { timezone?: string } | undefined)?.timezone,
 		budget: conv.mlBudget,
+		// The same resolution the dispatch rewrite uses, so the prompt never
+		// names a payer the calls will not carry.
+		billTo: mlAssistant ? mlAssistantBillingNamespace(ctx.locals) : undefined,
 	});
 
 	const processedMessages = await preprocessMessages(messages, convId);
