@@ -5,6 +5,7 @@ import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
 import type { McpElicitation, PendingMcpCall } from "$lib/types/McpElicitation";
 import type {
+	AnsweredElicitation,
 	ElicitationAction,
 	ElicitationRequestPayload,
 	ElicitationResolution,
@@ -264,7 +265,24 @@ export async function handleElicitationRequest(
 
 export type SubmitResult =
 	| { ok: true; resume: boolean; messageId?: string }
-	| { ok: false; status: 400 | 404 | 409 | 500; error: string };
+	| { ok: false; status: 400 | 404 | 500; error: string }
+	| { ok: false; status: 409; error: string; answered?: AnsweredElicitation };
+
+/**
+ * Every continuation claims the turn as `running` before it does anything, so a turn still
+ * parked on its question is one nobody has continued: the answer landed, and that is all.
+ */
+async function answeredPrompt(doc: McpElicitation): Promise<AnsweredElicitation> {
+	const action = doc.action ?? "cancel";
+	if (!doc.pending) return { action, resume: false };
+	const turn = await collections.turnStates
+		.findOne(
+			{ conversationId: doc.conversationId, messageId: doc.pending.messageId },
+			{ projection: { status: 1 } }
+		)
+		.catch(() => null);
+	return { action, resume: turn?.status === "awaiting_input", messageId: doc.pending.messageId };
+}
 
 export async function submitElicitationAnswer({
 	elicitationId,
@@ -280,7 +298,17 @@ export async function submitElicitationAnswer({
 	// Scoped by conversation: holding an id is not authority to answer someone else's prompt.
 	const doc = await collections.mcpElicitations.findOne({ elicitationId, conversationId });
 	if (!doc) return { ok: false, status: 404, error: "Unknown elicitation." };
-	if (doc.status !== "pending") return { ok: false, status: 409, error: "Already answered." };
+	if (doc.status !== "pending") {
+		const answered = await answeredPrompt(doc);
+		return {
+			ok: false,
+			status: 409,
+			error: answered.resume
+				? "Already answered. Continuing with that answer."
+				: "Already answered.",
+			answered,
+		};
+	}
 	if (doc.expiresAt && doc.expiresAt.getTime() <= Date.now()) {
 		return { ok: false, status: 409, error: "This request has expired." };
 	}

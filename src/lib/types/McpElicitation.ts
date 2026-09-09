@@ -69,6 +69,18 @@ export type ElicitationAction = "accept" | "decline" | "cancel";
 /** `withdrawn` is the server giving up on its own request, which it usually does first. */
 export type ElicitationResolution = "user" | "expired" | "aborted" | "withdrawn";
 
+/**
+ * Sent with the 409 a repeat answer gets. `resume` is true when the call the prompt parked
+ * was never continued: the page that answered lost its cue (a reload, a closed tab, a run
+ * that died before persisting), so the transcript shows the question open again and this
+ * answer is the only thing that can start the continuation.
+ */
+export interface AnsweredElicitation {
+	action: ElicitationAction;
+	resume: boolean;
+	messageId?: string;
+}
+
 /** Every string here is server-authored, so it is display text and never markup. */
 export interface ElicitationRequestPayload {
 	elicitationId: string;

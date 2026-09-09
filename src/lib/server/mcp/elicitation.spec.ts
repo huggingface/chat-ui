@@ -353,8 +353,51 @@ describe("submitElicitationAnswer", () => {
 		return elicitationId;
 	};
 
+	/** A 2026-era prompt: nothing waits on it, so the answer must start the continuation. */
+	const durableRow = async (turn: "awaiting_input" | "running") => {
+		const elicitationId = crypto.randomUUID();
+		const messageId = crypto.randomUUID();
+		const now = new Date();
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			elicitationId,
+			conversationId,
+			status: "pending",
+			request: {
+				elicitationId,
+				source: "assistant",
+				server: "",
+				mode: "form",
+				message: "",
+				fields: [
+					{
+						kind: "select",
+						name: "q1",
+						required: true,
+						multiple: false,
+						options: [{ value: "a", label: "A" }],
+					},
+				],
+			},
+			pending: { kind: "ask", messageId, toolCallId: "call-1", toolUuid: "tool-1" },
+			createdAt: now,
+			updatedAt: now,
+		});
+		await collections.turnStates.insertOne({
+			_id: new ObjectId(),
+			conversationId,
+			messageId,
+			status: turn,
+			producerId: "gen-1",
+			createdAt: now,
+			updatedAt: now,
+		});
+		return { elicitationId, messageId };
+	};
+
 	beforeEach(async () => {
 		await collections.mcpElicitations.deleteMany({});
+		await collections.turnStates.deleteMany({});
 	});
 
 	it("records a validated answer", async () => {
@@ -418,7 +461,69 @@ describe("submitElicitationAnswer", () => {
 			action: "decline",
 		});
 
-		expect(second).toMatchObject({ ok: false, status: 409 });
+		// A blocking prompt was unblocked by the first write; there is nothing to continue.
+		expect(second).toMatchObject({
+			ok: false,
+			status: 409,
+			answered: { action: "accept", resume: false },
+		});
+	});
+
+	it("tells a repeat answer to continue a call the first one never did", async () => {
+		// The page that answered lost its cue (reloaded, closed, or its run died before it
+		// persisted), so the transcript shows the question open again and the user answers
+		// it a second time. The turn is still parked on the question: nobody picked up
+		// the answer, and the repeat is the only thing that can.
+		const { elicitationId, messageId } = await durableRow("awaiting_input");
+
+		const first = await submitElicitationAnswer({
+			elicitationId,
+			conversationId,
+			action: "accept",
+			content: { q1: "a" },
+		});
+		expect(first).toEqual({ ok: true, resume: true, messageId });
+
+		const repeat = await submitElicitationAnswer({
+			elicitationId,
+			conversationId,
+			action: "decline",
+		});
+
+		expect(repeat).toMatchObject({
+			ok: false,
+			status: 409,
+			answered: { action: "accept", resume: true, messageId },
+		});
+		// The earlier answer stands: the repeat continues it, it does not replace it.
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			action: "accept",
+			content: { q1: "a" },
+		});
+	});
+
+	it("leaves a continuation that already started alone", async () => {
+		const { elicitationId, messageId } = await durableRow("awaiting_input");
+		await submitElicitationAnswer({
+			elicitationId,
+			conversationId,
+			action: "accept",
+			content: { q1: "a" },
+		});
+		// Every continuation claims the turn as running first.
+		await collections.turnStates.updateOne({ messageId }, { $set: { status: "running" } });
+
+		const repeat = await submitElicitationAnswer({
+			elicitationId,
+			conversationId,
+			action: "decline",
+		});
+
+		expect(repeat).toMatchObject({
+			ok: false,
+			status: 409,
+			answered: { action: "accept", resume: false, messageId },
+		});
 	});
 
 	it("refuses an answer after the server stopped waiting", async () => {

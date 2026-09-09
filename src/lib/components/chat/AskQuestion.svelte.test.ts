@@ -2,6 +2,13 @@ import AskQuestion from "./AskQuestion.svelte";
 import { render } from "vitest-browser-svelte";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import type { ElicitationField, ElicitationRequestPayload } from "$lib/types/McpElicitation";
+import {
+	pendingQuestions,
+	registerQuestion,
+	unregisterQuestion,
+} from "$lib/stores/pendingQuestion";
+import { elicitationToResume } from "$lib/stores/elicitationResume";
+import { get } from "svelte/store";
 
 let sent: Array<Record<string, unknown>>;
 
@@ -31,17 +38,19 @@ const ask = (name: string, question: string, over: Partial<ElicitationField> = {
 		...over,
 	}) as ElicitationField;
 
-const mount = (fields: ElicitationField[]) => {
-	const request: ElicitationRequestPayload = {
-		elicitationId: "11111111-1111-4111-8111-111111111111",
-		source: "assistant",
-		server: "",
-		mode: "form",
-		message: "",
-		fields,
-	};
-	return render(AskQuestion, { conversationId: "abc", request });
-};
+const ELICITATION_ID = "11111111-1111-4111-8111-111111111111";
+
+const requestFor = (fields: ElicitationField[]): ElicitationRequestPayload => ({
+	elicitationId: ELICITATION_ID,
+	source: "assistant",
+	server: "",
+	mode: "form",
+	message: "",
+	fields,
+});
+
+const mount = (fields: ElicitationField[]) =>
+	render(AskQuestion, { conversationId: "abc", request: requestFor(fields) });
 
 const rows = (el: HTMLElement) => [
 	...el.querySelectorAll<HTMLButtonElement>("button[aria-pressed]"),
@@ -201,5 +210,62 @@ describe("a question from the assistant", () => {
 		await vi.waitFor(() => expect(sent).toHaveLength(1));
 		expect(sent[0]).toMatchObject({ action: "decline" });
 		expect(sent[0]).not.toHaveProperty("content");
+	});
+});
+
+describe("a question that was answered before", () => {
+	const refuse = (body: Record<string, unknown>) =>
+		vi.stubGlobal("fetch", async () => new Response(JSON.stringify(body), { status: 409 }));
+
+	/** As the transcript form does when it re-opens the question after a reload. */
+	const mountRegistered = (fields: ElicitationField[]) => {
+		const request = requestFor(fields);
+		registerQuestion("abc", request);
+		return render(AskQuestion, { conversationId: "abc", request });
+	};
+
+	afterEach(() => {
+		unregisterQuestion(ELICITATION_ID);
+		elicitationToResume.set(null);
+	});
+
+	it("stops asking and continues the call the earlier answer never did", async () => {
+		// The row was resolved by an answer whose page lost its cue, so the transcript shows
+		// the question open again; a second answer is refused, but it must not dead-end.
+		refuse({
+			message: "Already answered. Continuing with that answer.",
+			answered: { action: "accept", resume: true, messageId: "m1" },
+		});
+		const { baseElement } = mountRegistered([ask("q1", "Which database?")]);
+		rowFor(baseElement, "Postgres")?.click();
+		button(baseElement, "Send")?.click();
+
+		await vi.waitFor(() => expect(get(pendingQuestions)).toHaveLength(0));
+		expect(get(elicitationToResume)).toEqual({
+			conversationId: "abc",
+			elicitationId: ELICITATION_ID,
+			messageId: "m1",
+		});
+		expect(baseElement.textContent).not.toContain("Already answered");
+	});
+
+	it("stops asking, and nothing more, when the call was already continued", async () => {
+		refuse({ message: "Already answered.", answered: { action: "accept", resume: false } });
+		const { baseElement } = mountRegistered([ask("q1", "Which database?")]);
+		button(baseElement, "Skip")?.click();
+
+		await vi.waitFor(() => expect(get(pendingQuestions)).toHaveLength(0));
+		expect(get(elicitationToResume)).toBeNull();
+	});
+
+	it("shows any other refusal and keeps the question open", async () => {
+		refuse({ message: "This request has expired." });
+		const { baseElement } = mountRegistered([ask("q1", "Which database?")]);
+		rowFor(baseElement, "Postgres")?.click();
+		button(baseElement, "Send")?.click();
+
+		await vi.waitFor(() => expect(baseElement.textContent).toContain("This request has expired."));
+		expect(get(pendingQuestions)).toHaveLength(1);
+		expect(get(elicitationToResume)).toBeNull();
 	});
 });
