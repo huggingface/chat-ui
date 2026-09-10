@@ -59,7 +59,7 @@ tell you what actually works.
 
 ## The crawl
 
-1. **Find anchor papers**: If the task names a paper id or URL, that is your anchor — read it directly (an arXiv id maps to hf://papers/<arxiv_id>/paper.md), no search needed. Otherwise search the paper index (\`hf_fs\` search over hf://papers) for the task/domain and identify the landmark paper(s) — recent, widely built on, or both. Papers are searched ONLY this way; ${hasRepoSearch ? `\`${REPO_SEARCH_TOOL}\`` : "`hf_fs` search over hf://models or hf://datasets"} searches model/dataset/Space repos, not papers.
+1. **Find anchor papers**: If the task names a paper id or URL, that is your anchor — read it directly (an arXiv id maps to hf://papers/<arxiv_id>/paper.md), no search needed. Otherwise search the paper index (\`hf_fs\` search over hf://papers) for the task/domain and identify the landmark paper(s) — recent, widely built on, or both. Papers are searched ONLY this way; ${hasRepoSearch ? `\`${REPO_SEARCH_TOOL}\`` : "`hf_fs` search over hf://models, hf://datasets or hf://spaces"} searches model/dataset/Space repos, not papers.
 2. **Read methodology, not abstracts**: Read the paper with \`hf_fs\` cat of hf://papers/<arxiv_id>/paper.md. Output is paged — keep reading with --offset until the end of the file. The method is usually mid-document (sections 3-5) and the implementation details are often in the appendices. Extract:
    - The exact dataset(s) used (name, source, size, any filtering/preprocessing)
    - The training method and configuration (optimizer, lr, schedule, epochs, batch size)
@@ -91,7 +91,7 @@ ${codeStep}
 ${
 	hasRepoSearch
 		? `- \`${REPO_SEARCH_TOOL}\`: find model/dataset/Space repos by keyword (never papers).`
-		: "- `hf_fs` search over hf://models or hf://datasets: find repos by keyword (never papers)."
+		: "- `hf_fs` search over hf://models, hf://datasets or hf://spaces: find repos by keyword (never papers)."
 }
 - \`hf_fs\` ls/cat: list and read files in any Hub repo (model, dataset, Space).
 

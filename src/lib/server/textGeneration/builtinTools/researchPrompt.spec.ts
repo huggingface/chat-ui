@@ -13,6 +13,6 @@ describe("buildResearchSystemPrompt", () => {
 		// sub-agent a failed round to find that out.
 		const bouquet = buildResearchSystemPrompt(new Set(["hf_fs", "hub_repo_details"]));
 		expect(bouquet).not.toContain("hub_repo_search");
-		expect(bouquet).toContain("`hf_fs` search over hf://models or hf://datasets");
+		expect(bouquet).toContain("`hf_fs` search over hf://models, hf://datasets or hf://spaces");
 	});
 });
