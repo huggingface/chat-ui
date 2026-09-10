@@ -85,7 +85,7 @@
 						own or use other Hugging Face products. To make sure you never overspend, set a budget
 						in your billing settings too. Jobs and sandboxes are charged to the organization you
 						bill in HuggingChat's settings if you have picked one, and to your own account
-						otherwise.
+						otherwise; Spaces, dashboards and repositories stay under your own account either way.
 					</p>
 					<a
 						href={BILLING_SETTINGS_URL}

@@ -77,6 +77,20 @@ export function mlAssistantBillingNamespace(
 }
 
 /**
+ * The namespace this request's Hub compute runs under and is charged to: the
+ * billing organisation, else the user's own account.
+ *
+ * Personal is a choice too. Without a namespace of its own to enforce, a run
+ * the model addressed to some organisation would go through and charge an
+ * account the user never picked.
+ */
+export function mlAssistantPayerNamespace(
+	locals: { billingOrganization?: string; user?: { username?: string } } | undefined
+): string | undefined {
+	return mlAssistantBillingNamespace(locals) ?? (locals?.user?.username?.trim() || undefined);
+}
+
+/**
  * The preset's servers plus the ones already resolved for this request, preset
  * first. Deduplicated by name with the preset winning.
  */

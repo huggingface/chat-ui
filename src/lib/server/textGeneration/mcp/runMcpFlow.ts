@@ -34,7 +34,7 @@ import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import {
 	isMlAssistantConversation,
-	mlAssistantBillingNamespace,
+	mlAssistantPayerNamespace,
 	pinnedHubToken,
 	withMlAssistantServers,
 } from "$lib/server/mlAssistant";
@@ -179,8 +179,14 @@ export async function* runMcpFlow({
 
 	// A job bills the namespace it runs under, so the billing setting travels as
 	// an argument rather than a header — see mcp/hubBilling.ts.
-	const billingNamespace = mlAssistant ? mlAssistantBillingNamespace(locals) : undefined;
-	const rewriteArgs = billingNamespace ? createHubBillingRewrite(billingNamespace) : undefined;
+	const payer = mlAssistant ? mlAssistantPayerNamespace(locals) : undefined;
+	const rewriteArgs = payer ? createHubBillingRewrite(payer) : undefined;
+	if (mlAssistant) {
+		logger.info(
+			{ conversationId: conv._id.toString(), payer: payer ?? null },
+			"[mcp] Hub compute for this run bills to"
+		);
+	}
 
 	// Built here so it spans the turn's rounds; chained below, once the tool
 	// mapping the schema check reads exists.

@@ -57,12 +57,26 @@
 	let billingOrgs = $state<BillingOrg[]>([]);
 	let billingOrgsLoading = $state(false);
 	let billingOrgsError = $state<string | null>(null);
+	let billingOrgSaving = $state(false);
 
 	function getBillingOrganization() {
 		return $settings.billingOrganization ?? "";
 	}
-	function setBillingOrganization(v: string) {
-		settings.update((s) => ({ ...s, billingOrganization: v }));
+	// Saved at once and awaited, not debounced with the rest: who gets charged
+	// is not a preference to coalesce, and the server may refuse the target.
+	async function setBillingOrganization(v: string) {
+		const previous = getBillingOrganization();
+		if (v === previous) return;
+		billingOrgSaving = true;
+		billingOrgsError = null;
+		try {
+			if (!(await settings.instantSet({ billingOrganization: v }))) {
+				billingOrgsError = "Could not save this billing choice";
+				await settings.instantSet({ billingOrganization: previous });
+			}
+		} finally {
+			billingOrgSaving = false;
+		}
 	}
 
 	onMount(async () => {
@@ -86,7 +100,7 @@
 				billingOrgs = data.organizations ?? [];
 				// Update settings if current billing org was cleared by server
 				if (data.currentBillingOrg !== getBillingOrganization()) {
-					setBillingOrganization(data.currentBillingOrg ?? "");
+					await setBillingOrganization(data.currentBillingOrg ?? "");
 				}
 			} catch {
 				billingOrgsError = "Failed to load billing options";
@@ -270,20 +284,23 @@
 						<div>
 							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Billing</div>
 							<p class="text-[12px] text-gray-500 dark:text-gray-400">
-								Select between personal or organization billing for inference{ML_ASSISTANT_MODE
-									? " and for the jobs and sandboxes ML Intern runs"
-									: ""} (for eligible organizations).
+								Bill inference{ML_ASSISTANT_MODE
+									? ", and the Jobs and sandboxes ML Intern launches,"
+									: ""} to your personal account or to an eligible organization. Other Hub products, such
+								as Spaces and repositories, are not affected.
 							</p>
 						</div>
 						<div class="flex items-center">
 							{#if billingOrgsLoading}
 								<span class="text-xs text-gray-500 dark:text-gray-400">Loading...</span>
-							{:else if billingOrgsError}
-								<span class="text-xs text-red-500">{billingOrgsError}</span>
 							{:else}
+								{#if billingOrgsError}
+									<span class="mr-2 text-xs text-red-500">{billingOrgsError}</span>
+								{/if}
 								<select
-									class="rounded-md border border-gray-300 bg-white px-1 py-1 text-xs text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+									class="rounded-md border border-gray-300 bg-white px-1 py-1 text-xs text-gray-800 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
 									value={getBillingOrganization()}
+									disabled={billingOrgSaving}
 									onchange={(e) => setBillingOrganization(e.currentTarget.value)}
 								>
 									<option value="">Personal</option>

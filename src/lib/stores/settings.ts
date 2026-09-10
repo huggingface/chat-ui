@@ -27,7 +27,8 @@ type SettingsStore = {
 };
 
 type SettingsStoreWritable = Writable<SettingsStore> & {
-	instantSet: (settings: Partial<SettingsStore>) => Promise<void>;
+	/** Saves now, unlike `set`; resolves to whether the server accepted the change. */
+	instantSet: (settings: Partial<SettingsStore>) => Promise<boolean>;
 	initValue: <K extends keyof SettingsStore>(
 		key: K,
 		nestedKey: string,
@@ -136,14 +137,15 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 			}, 300);
 		}
 	}
-	async function instantSet(settings: Partial<SettingsStore>) {
+	async function instantSet(settings: Partial<SettingsStore>): Promise<boolean> {
 		baseStore.update((s) => ({
 			...s,
 			...settings,
 		}));
 
-		if (browser) {
-			await fetch(`${base}/settings`, {
+		if (!browser) return true;
+		try {
+			const response = await fetch(`${base}/settings`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -153,6 +155,9 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 					...settings,
 				}),
 			});
+			return response.ok;
+		} catch {
+			return false;
 		}
 	}
 

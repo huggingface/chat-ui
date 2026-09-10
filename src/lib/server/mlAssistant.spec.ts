@@ -9,6 +9,7 @@ import {
 	ML_ASSISTANT_MCP_SERVERS,
 	isMlAssistantConversation,
 	mlAssistantBillingNamespace,
+	mlAssistantPayerNamespace,
 	pinnedHubToken,
 	withMlAssistantServers,
 } from "./mlAssistant";
@@ -156,5 +157,27 @@ describe("mlAssistantBillingNamespace", () => {
 			},
 		];
 		expect(mlAssistantBillingNamespace({ billingOrganization: "acme" })).toBe("acme");
+	});
+});
+
+describe("mlAssistantPayerNamespace", () => {
+	it("is the billing organisation when there is one", () => {
+		expect(
+			mlAssistantPayerNamespace({ billingOrganization: "acme", user: { username: "pngwn" } })
+		).toBe("acme");
+	});
+
+	it("is the user's own account under Personal", () => {
+		// Enforced, not defaulted: a run the model addressed to some organisation
+		// must not charge an account the user never picked.
+		expect(
+			mlAssistantPayerNamespace({ billingOrganization: "", user: { username: "pngwn" } })
+		).toBe("pngwn");
+		expect(mlAssistantPayerNamespace({ user: { username: " pngwn " } })).toBe("pngwn");
+	});
+
+	it("is nothing when neither is known", () => {
+		expect(mlAssistantPayerNamespace({ user: {} })).toBeUndefined();
+		expect(mlAssistantPayerNamespace(undefined)).toBeUndefined();
 	});
 });
