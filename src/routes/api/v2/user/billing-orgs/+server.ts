@@ -32,19 +32,40 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 		const settings = await collections.settings.findOne(authCondition(locals));
 		const currentBillingOrg = settings?.billingOrganization;
+		const currentBillingResourceGroup = settings?.billingResourceGroup;
 
 		const billingOrgs = (data.orgs ?? [])
 			.filter((org: { canPay?: boolean; plan?: string }) => org.plan || org.canPay === true)
-			.map((org: { sub: string; name: string; preferred_username: string }) => ({
-				sub: org.sub,
-				name: org.name,
-				preferred_username: org.preferred_username,
-			}));
+			.map(
+				(org: {
+					sub: string;
+					name: string;
+					preferred_username: string;
+					resourceGroups?: Array<{ sub: string; name: string; role: string }>;
+				}) => ({
+					sub: org.sub,
+					name: org.name,
+					preferred_username: org.preferred_username,
+					resourceGroups: (org.resourceGroups ?? []).map((group) => ({
+						sub: group.sub,
+						name: group.name,
+						role: group.role,
+					})),
+				})
+			);
 
-		const isCurrentOrgValid =
-			!currentBillingOrg ||
-			billingOrgs.some(
-				(org: { preferred_username: string }) => org.preferred_username === currentBillingOrg
+		const selectedOrg = currentBillingOrg
+			? billingOrgs.find(
+					(org: { preferred_username: string }) => org.preferred_username === currentBillingOrg
+				)
+			: undefined;
+		const isCurrentOrgValid = !currentBillingOrg || Boolean(selectedOrg);
+		const isCurrentResourceGroupValid =
+			!currentBillingResourceGroup ||
+			Boolean(
+				selectedOrg?.resourceGroups.some(
+					(group: { sub: string }) => group.sub === currentBillingResourceGroup
+				)
 			);
 
 		if (!isCurrentOrgValid && currentBillingOrg) {
@@ -52,7 +73,15 @@ export const GET: RequestHandler = async ({ locals }) => {
 				`Clearing invalid billingOrganization '${currentBillingOrg}' for user ${locals.user._id}`
 			);
 			await collections.settings.updateOne(authCondition(locals), {
-				$unset: { billingOrganization: "" },
+				$unset: { billingOrganization: "", billingResourceGroup: "" },
+				$set: { updatedAt: new Date() },
+			});
+		} else if (!isCurrentResourceGroupValid && currentBillingResourceGroup) {
+			logger.info(
+				`Clearing invalid billingResourceGroup '${currentBillingResourceGroup}' for user ${locals.user._id}`
+			);
+			await collections.settings.updateOne(authCondition(locals), {
+				$unset: { billingResourceGroup: "" },
 				$set: { updatedAt: new Date() },
 			});
 		}
@@ -61,6 +90,8 @@ export const GET: RequestHandler = async ({ locals }) => {
 			userCanPay: data.canPay ?? false,
 			organizations: billingOrgs,
 			currentBillingOrg: isCurrentOrgValid ? currentBillingOrg : undefined,
+			currentBillingResourceGroup:
+				isCurrentOrgValid && isCurrentResourceGroupValid ? currentBillingResourceGroup : undefined,
 		});
 	} catch (err) {
 		// Re-throw SvelteKit HttpErrors

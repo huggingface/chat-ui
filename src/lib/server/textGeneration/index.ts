@@ -12,7 +12,7 @@ import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
 import {
 	isMlAssistantConversation,
-	mlAssistantBillingNamespace,
+	mlAssistantBillingLabel,
 	pinnedHubToken,
 } from "$lib/server/mlAssistant";
 import { settleMlBudget } from "$lib/server/mlBudget/settle";
@@ -114,7 +114,7 @@ async function* textGenerationWithoutTitle(
 		budget: conv.mlBudget,
 		// The same resolution the dispatch rewrite uses, so the prompt never
 		// names a payer the calls will not carry.
-		billTo: mlAssistant ? mlAssistantBillingNamespace(ctx.locals) : undefined,
+		billTo: mlAssistant ? mlAssistantBillingLabel(ctx.locals) : undefined,
 	});
 
 	const processedMessages = await preprocessMessages(messages, convId);

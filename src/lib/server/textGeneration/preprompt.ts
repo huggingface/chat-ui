@@ -24,7 +24,7 @@ export interface PrepromptInput {
 	now?: Date;
 	/** The conversation's compute budget; presence turns on the budget rules. */
 	budget?: MlBudget;
-	/** Organization the mode's jobs and sandboxes are billed to; stamped as BillTo. */
+	/** Organization or resource group the mode's compute is billed to; stamped as BillTo. */
 	billTo?: string;
 }
 

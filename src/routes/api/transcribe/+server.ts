@@ -2,6 +2,7 @@ import { error, json } from "@sveltejs/kit";
 import { config } from "$lib/server/config";
 import { getApiToken } from "$lib/server/apiToken";
 import { logger } from "$lib/server/logger";
+import { inferenceBillingTarget } from "$lib/server/billing";
 
 const MAX_AUDIO_SIZE = 25 * 1024 * 1024; // 25MB
 const TRANSCRIPTION_TIMEOUT = 60000; // 60 seconds
@@ -65,7 +66,9 @@ export async function POST({ request, locals }) {
 				Authorization: `Bearer ${token}`,
 				"Content-Type": contentType,
 				// Bill to organization if configured
-				...(locals?.billingOrganization ? { "X-HF-Bill-To": locals.billingOrganization } : {}),
+				...(inferenceBillingTarget(locals)
+					? { "X-HF-Bill-To": inferenceBillingTarget(locals) }
+					: {}),
 			},
 			body: audioBuffer,
 			signal: controller.signal,

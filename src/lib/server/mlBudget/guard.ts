@@ -45,6 +45,8 @@ interface HoldTicket {
 	kind: "job" | "sandbox";
 	/** Namespace the submission targeted, when its arguments said so. */
 	namespace?: string;
+	/** Resource group receiving cost attribution, when selected. */
+	resourceGroupId?: string;
 }
 
 /**
@@ -70,6 +72,7 @@ interface GatedSubmission {
 	flavor: string;
 	timeoutRaw: unknown;
 	namespace?: string;
+	resourceGroupId?: string;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | undefined =>
@@ -137,6 +140,9 @@ function classify(call: GuardedToolCall): GatedSubmission | { blocked: string } 
 			flavor,
 			timeoutRaw: jobArgs.timeout ?? DEFAULT_JOB_TIMEOUT_SECONDS,
 			...(typeof jobArgs.namespace === "string" ? { namespace: jobArgs.namespace } : {}),
+			...(typeof jobArgs.resource_group_id === "string"
+				? { resourceGroupId: jobArgs.resource_group_id }
+				: {}),
 		};
 	}
 
@@ -165,7 +171,14 @@ function classify(call: GuardedToolCall): GatedSubmission | { blocked: string } 
 			};
 		}
 		const namespace = tokenAfter(tokens, "--namespace");
-		return { kind: "sandbox", flavor, timeoutRaw: timeout, ...(namespace ? { namespace } : {}) };
+		const resourceGroupId = tokenAfter(tokens, "--resource-group-id");
+		return {
+			kind: "sandbox",
+			flavor,
+			timeoutRaw: timeout,
+			...(namespace ? { namespace } : {}),
+			...(resourceGroupId ? { resourceGroupId } : {}),
+		};
 	}
 
 	return null;
@@ -297,6 +310,7 @@ export function createMlBudgetGuard({
 					ceilingMicroUsd: ceiling,
 					createdAt: new Date(),
 					...(gated.namespace ? { namespace: gated.namespace } : {}),
+					...(gated.resourceGroupId ? { resourceGroupId: gated.resourceGroupId } : {}),
 				},
 			});
 
@@ -307,6 +321,7 @@ export function createMlBudgetGuard({
 						key: `${generationId}:${call.callUuid}`,
 						kind: gated.kind,
 						...(gated.namespace ? { namespace: gated.namespace } : {}),
+						...(gated.resourceGroupId ? { resourceGroupId: gated.resourceGroupId } : {}),
 					};
 					return { allow: true, ticket, update: budgetUpdate(reserveResult.budget) };
 				}

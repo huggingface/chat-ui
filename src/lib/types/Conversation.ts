@@ -88,6 +88,7 @@ export interface MlBudgetReservation {
 	/** Set once the submission response yielded a job id; unset means the job may never have started. */
 	jobId?: string;
 	namespace?: string;
+	resourceGroupId?: string;
 }
 
 export interface DeployedSpace {

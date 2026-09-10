@@ -22,6 +22,11 @@ import type { ToolArgsRewrite } from "$lib/server/textGeneration/mcp/toolInvocat
 /** hf_jobs operations that create a job, and so decide who is charged for it. */
 const SUBMITTING_OPERATIONS = new Set(["run", "uv", "scheduled run", "scheduled uv"]);
 
+export interface HubBillingTarget {
+	namespace: string;
+	resourceGroupId?: string;
+}
+
 const asRecord = (value: unknown): Record<string, unknown> | undefined =>
 	typeof value === "object" && value !== null && !Array.isArray(value)
 		? (value as Record<string, unknown>)
@@ -32,8 +37,9 @@ const namesNamespace = (value: unknown): value is string =>
 
 function withJobsNamespace(
 	args: Record<string, unknown>,
-	namespace: string
+	target: HubBillingTarget
 ): Record<string, unknown> {
+	const { namespace, resourceGroupId } = target;
 	// Without an operation the budget gate refuses the call; leave it whole so
 	// the refusal describes what the model actually sent.
 	if (typeof args.operation !== "string") return args;
@@ -49,13 +55,17 @@ function withJobsNamespace(
 			"[mcp] billing namespace replaces the model's"
 		);
 	}
-	return { ...args, args: { ...inner, namespace } };
+	const rewritten: Record<string, unknown> = { ...inner, namespace };
+	if (resourceGroupId) rewritten.resource_group_id = resourceGroupId;
+	else delete rewritten.resource_group_id;
+	return { ...args, args: rewritten };
 }
 
 function withSandboxNamespace(
 	args: Record<string, unknown>,
-	namespace: string
+	target: HubBillingTarget
 ): Record<string, unknown> {
+	const { namespace, resourceGroupId } = target;
 	// Only create decides who pays: every later command carries a handle that
 	// already names the namespace (hfsb2:<namespace>:<id>).
 	if (args.cmd !== "create" || !Array.isArray(args.args)) return args;
@@ -64,28 +74,45 @@ function withSandboxNamespace(
 	const given = args.args as unknown[];
 	const tokens: unknown[] = [];
 	const wanted: unknown[] = [];
+	const wantedResourceGroups: unknown[] = [];
 	for (let i = 0; i < given.length; i++) {
-		if (given[i] !== "--namespace") {
+		if (given[i] !== "--namespace" && given[i] !== "--resource-group-id") {
 			tokens.push(given[i]);
 			continue;
 		}
-		if (i + 1 < given.length) wanted.push(given[++i]);
+		const flag = given[i];
+		if (i + 1 < given.length) {
+			const value = given[++i];
+			if (flag === "--namespace") wanted.push(value);
+			else wantedResourceGroups.push(value);
+		}
 	}
-	if (wanted.some((value) => namesNamespace(value) && value !== namespace)) {
+	if (
+		wanted.some((value) => namesNamespace(value) && value !== namespace) ||
+		wantedResourceGroups.some((value) => namesNamespace(value) && value !== resourceGroupId)
+	) {
 		logger.debug(
-			{ tool: "hf_sandbox", wanted, namespace },
+			{ tool: "hf_sandbox", wanted, wantedResourceGroups, namespace, resourceGroupId },
 			"[mcp] billing namespace replaces the model's"
 		);
 	}
-	return { ...args, args: [...tokens, "--namespace", namespace] };
+	return {
+		...args,
+		args: [
+			...tokens,
+			"--namespace",
+			namespace,
+			...(resourceGroupId ? ["--resource-group-id", resourceGroupId] : []),
+		],
+	};
 }
 
 /** Hub servers only: a custom server may export its own `hf_jobs`, whose namespace is not ours. */
-export function createHubBillingRewrite(namespace: string): ToolArgsRewrite {
+export function createHubBillingRewrite(target: HubBillingTarget): ToolArgsRewrite {
 	return ({ serverUrl, tool, args }) => {
 		if (!isHfMcpServer(serverUrl)) return args;
-		if (tool === "hf_jobs") return withJobsNamespace(args, namespace);
-		if (tool === "hf_sandbox") return withSandboxNamespace(args, namespace);
+		if (tool === "hf_jobs") return withJobsNamespace(args, target);
+		if (tool === "hf_sandbox") return withSandboxNamespace(args, target);
 		return args;
 	};
 }

@@ -53,16 +53,45 @@
 	let OPENAI_BASE_URL = $state<string | null>(null);
 
 	// Billing organization state
-	type BillingOrg = { sub: string; name: string; preferred_username: string };
+	type BillingResourceGroup = { sub: string; name: string; role: string };
+	type BillingOrg = {
+		sub: string;
+		name: string;
+		preferred_username: string;
+		resourceGroups: BillingResourceGroup[];
+	};
 	let billingOrgs = $state<BillingOrg[]>([]);
 	let billingOrgsLoading = $state(false);
 	let billingOrgsError = $state<string | null>(null);
 
-	function getBillingOrganization() {
-		return $settings.billingOrganization ?? "";
+	function getBillingSelection() {
+		if ($settings.billingOrganization && $settings.billingResourceGroup) {
+			return `resource-group:${$settings.billingResourceGroup}`;
+		}
+		return $settings.billingOrganization ? `organization:${$settings.billingOrganization}` : "";
 	}
-	function setBillingOrganization(v: string) {
-		settings.update((s) => ({ ...s, billingOrganization: v }));
+	function setBillingSelection(value: string) {
+		if (value.startsWith("resource-group:")) {
+			const resourceGroupId = value.slice("resource-group:".length);
+			const organization = billingOrgs.find((org) =>
+				org.resourceGroups.some((group) => group.sub === resourceGroupId)
+			);
+			if (!organization) return;
+			settings.update((s) => ({
+				...s,
+				billingOrganization: organization.preferred_username,
+				billingResourceGroup: resourceGroupId,
+			}));
+			return;
+		}
+		const organization = value.startsWith("organization:")
+			? value.slice("organization:".length)
+			: "";
+		settings.update((s) => ({
+			...s,
+			billingOrganization: organization,
+			billingResourceGroup: "",
+		}));
 	}
 
 	onMount(async () => {
@@ -82,11 +111,19 @@
 					userCanPay: boolean;
 					organizations: BillingOrg[];
 					currentBillingOrg?: string;
+					currentBillingResourceGroup?: string;
 				};
 				billingOrgs = data.organizations ?? [];
 				// Update settings if current billing org was cleared by server
-				if (data.currentBillingOrg !== getBillingOrganization()) {
-					setBillingOrganization(data.currentBillingOrg ?? "");
+				if (
+					data.currentBillingOrg !== ($settings.billingOrganization || undefined) ||
+					data.currentBillingResourceGroup !== ($settings.billingResourceGroup || undefined)
+				) {
+					settings.update((s) => ({
+						...s,
+						billingOrganization: data.currentBillingOrg ?? "",
+						billingResourceGroup: data.currentBillingResourceGroup ?? "",
+					}));
 				}
 			} catch {
 				billingOrgsError = "Failed to load billing options";
@@ -270,7 +307,7 @@
 						<div>
 							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Billing</div>
 							<p class="text-[12px] text-gray-500 dark:text-gray-400">
-								Select between personal or organization billing for inference{ML_ASSISTANT_MODE
+								Select personal, organization, or resource group billing for inference{ML_ASSISTANT_MODE
 									? " and for the jobs and sandboxes ML Intern runs"
 									: ""} (for eligible organizations).
 							</p>
@@ -283,12 +320,17 @@
 							{:else}
 								<select
 									class="rounded-md border border-gray-300 bg-white px-1 py-1 text-xs text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-									value={getBillingOrganization()}
-									onchange={(e) => setBillingOrganization(e.currentTarget.value)}
+									value={getBillingSelection()}
+									onchange={(e) => setBillingSelection(e.currentTarget.value)}
 								>
 									<option value="">Personal</option>
 									{#each billingOrgs as org}
-										<option value={org.preferred_username}>{org.name}</option>
+										<option value={`organization:${org.preferred_username}`}>{org.name}</option>
+										{#each org.resourceGroups as group}
+											<option value={`resource-group:${group.sub}`}>
+												{org.name} / {group.name}
+											</option>
+										{/each}
 									{/each}
 								</select>
 							{/if}
@@ -308,8 +350,8 @@
 							</p>
 						</div>
 						<a
-							href={getBillingOrganization()
-								? `https://huggingface.co/organizations/${getBillingOrganization()}/settings/inference-providers/overview`
+							href={$settings.billingOrganization
+								? `https://huggingface.co/organizations/${$settings.billingOrganization}/settings/inference-providers/overview`
 								: "https://huggingface.co/settings/inference-providers/overview"}
 							target="_blank"
 							class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium whitespace-nowrap text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"

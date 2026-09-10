@@ -34,7 +34,7 @@ import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import {
 	isMlAssistantConversation,
-	mlAssistantBillingNamespace,
+	mlAssistantBillingTarget,
 	pinnedHubToken,
 	withMlAssistantServers,
 } from "$lib/server/mlAssistant";
@@ -49,6 +49,7 @@ import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { withUpstreamRetry } from "../utils/upstreamRetry";
 import { getEnabledBuiltinTools, isNestedAgentTool, shouldSkipMcpFlow } from "../builtinTools";
 import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
+import { inferenceBillingTarget } from "$lib/server/billing";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -179,8 +180,8 @@ export async function* runMcpFlow({
 
 	// A job bills the namespace it runs under, so the billing setting travels as
 	// an argument rather than a header — see mcp/hubBilling.ts.
-	const billingNamespace = mlAssistant ? mlAssistantBillingNamespace(locals) : undefined;
-	const rewriteArgs = billingNamespace ? createHubBillingRewrite(billingNamespace) : undefined;
+	const billingTarget = mlAssistant ? mlAssistantBillingTarget(locals) : undefined;
+	const rewriteArgs = billingTarget ? createHubBillingRewrite(billingTarget) : undefined;
 
 	// Built here so it spans the turn's rounds; chained below, once the tool
 	// mapping the schema check reads exists.
@@ -484,8 +485,8 @@ export async function* runMcpFlow({
 			fetch: captureProviderFetch,
 			defaultHeaders: {
 				// Bill to organization if configured (HuggingChat only)
-				...(config.isHuggingChat && locals?.billingOrganization
-					? { "X-HF-Bill-To": locals.billingOrganization }
+				...(config.isHuggingChat && inferenceBillingTarget(locals)
+					? { "X-HF-Bill-To": inferenceBillingTarget(locals) }
 					: {}),
 			},
 		});
