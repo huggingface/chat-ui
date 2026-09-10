@@ -3,7 +3,11 @@ import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
 import type { MlBudget } from "$lib/types/Conversation";
-import { createMlBudgetGuard, withRequiredDiscriminators } from "./guard";
+import {
+	createMlAssistantOnlyComputeGuard,
+	createMlBudgetGuard,
+	withRequiredDiscriminators,
+} from "./guard";
 import { readMlBudget } from "./budget";
 import { resetPriceCacheForTests } from "./pricing";
 
@@ -100,9 +104,11 @@ describe.sequential("mlBudget guard: what is gated", () => {
 	it("refuses scheduled jobs outright", { timeout: 15000 }, async () => {
 		const id = await insertConversation(budgetOf(100_000_000));
 		const { before } = makeGuard(id);
-		const verdict = await before("hf_jobs", { operation: "scheduled run", args: {} });
-		expect(verdict.allow).toBe(false);
-		if (!verdict.allow) expect(verdict.message).toContain("Scheduled jobs");
+		for (const operation of ["scheduled run", "scheduled uv", "scheduled resume"]) {
+			const verdict = await before("hf_jobs", { operation, args: {} });
+			expect(verdict.allow).toBe(false);
+			if (!verdict.allow) expect(verdict.message).toContain("Scheduled jobs");
+		}
 	});
 
 	// The observed bypass: submission-shaped args with no operation sailed
@@ -125,6 +131,53 @@ describe.sequential("mlBudget guard: what is gated", () => {
 		expect(unknownCmd.allow).toBe(false);
 
 		expect((await readMlBudget(id))?.reservations).toHaveLength(0);
+	});
+});
+
+describe("compute guard outside ML Intern", () => {
+	const guard = createMlAssistantOnlyComputeGuard();
+	const before = (tool: string, args: Record<string, unknown>, serverUrl = HF_URL) =>
+		guard.before({ serverUrl, tool, fnName: tool, args, callUuid: "outside-mode" });
+
+	it("refuses Hub job submissions without affecting reads or stops", async () => {
+		for (const args of [
+			{ operation: "run", args: { flavor: "cpu-basic", timeout: "10m" } },
+			{ operation: "uv", args: { flavor: "cpu-basic", timeout: "10m" } },
+			{ operation: "scheduled resume", args: { id: "schedule" } },
+		]) {
+			const submission = await before("hf_jobs", args);
+			expect(submission.allow).toBe(false);
+			if (!submission.allow) expect(submission.message).toContain("ML Intern");
+		}
+
+		for (const args of [
+			{ operation: "logs", args: { job_id: "job" } },
+			{ operation: "cancel", args: { job_id: "job" } },
+		]) {
+			expect((await before("hf_jobs", args)).allow).toBe(true);
+		}
+	});
+
+	it("refuses Hub sandbox creation without blocking existing-sandbox work", async () => {
+		const creation = await before("hf_sandbox", {
+			cmd: "create",
+			args: ["create", "--flavor", "cpu-basic", "--timeout", "10m"],
+		});
+		expect(creation.allow).toBe(false);
+
+		for (const [tool, args] of [
+			["hf_sandbox_exec", { cmd: "exec", args: ["handle", "python", "-c", "1"] }],
+			["hf_sandbox_fs", { cmd: "cat", args: ["handle", "/tmp/out"] }],
+			["hf_sandbox", { cmd: "terminate", args: ["terminate", "handle"] }],
+		] as const) {
+			expect((await before(tool, args)).allow).toBe(true);
+		}
+	});
+
+	it("does not affect same-named tools on another MCP server", async () => {
+		expect(
+			(await before("hf_jobs", { operation: "run", args: {} }, "https://example.test/mcp")).allow
+		).toBe(true);
 	});
 });
 

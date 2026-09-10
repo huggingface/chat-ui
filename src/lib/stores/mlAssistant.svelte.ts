@@ -4,15 +4,15 @@ import type { MlBudgetSnapshot, MlPlanStep, MlPlanStepStatus } from "$lib/types/
  * UI state for ML Assistant mode (see `$lib/utils/mlAssistantFlag`).
  *
  * The mode is a property of the conversation: it can be toggled freely until the
- * first message goes out, and is locked for the rest of the conversation after
- * that. Plan steps are pushed in by whatever drives the run — nothing here
- * invents or advances them, so with no plan source the strip stays on its tool
- * note and the progress row never appears.
+ * first message is accepted by the server, and is locked for the rest of the
+ * conversation after that. Plan steps are pushed in by whatever drives the run —
+ * nothing here invents or advances them, so with no plan source the strip stays
+ * on its tool note and the progress row never appears.
  */
 class MlAssistantStore {
 	/** Preset toggle. Editable until `taskStarted`. */
 	enabled = $state(false);
-	/** Latched by `startTask()` on the send that begins an ML run. */
+	/** Latched after the server creates the conversation for an ML run. */
 	taskStarted = $state(false);
 	/** The plan as reported by the run. Empty until a plan arrives. */
 	steps = $state<MlPlanStep[]>([]);
@@ -50,20 +50,14 @@ class MlAssistantStore {
 		this.enabled = next;
 	}
 
-	/** Called on the send that starts an ML task. No-op unless the mode is on. */
-	startTask() {
-		if (!this.enabled) return;
-		this.taskStarted = true;
-	}
-
-	/**
-	 * Undoes `startTask` when the send it was latched for never produced a
-	 * conversation. Without this a failed create leaves the composer locked in a
-	 * task that does not exist, with no way to switch the mode back off.
-	 */
-	abortTask() {
-		this.taskStarted = false;
-		this.steps = [];
+	/** Applies the mode the server persisted for a successfully created conversation. */
+	confirmCreation(startedInMode: boolean) {
+		this.enabled = startedInMode;
+		this.taskStarted = startedInMode;
+		if (!startedInMode) {
+			this.steps = [];
+			this.budget = undefined;
+		}
 	}
 
 	/**

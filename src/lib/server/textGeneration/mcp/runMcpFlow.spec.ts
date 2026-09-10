@@ -769,6 +769,47 @@ describe("runMcpFlow offering the plan tool", () => {
 	});
 });
 
+describe("runMcpFlow Hub compute boundary", () => {
+	const hubCall = (tool: string, args: Record<string, unknown>) => ({
+		serverUrl: "https://hf.co/mcp?login",
+		tool,
+		fnName: tool,
+		args,
+		callUuid: "guard-probe",
+	});
+
+	it("installs the no-create guard outside ML Intern", async () => {
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+		await runFlow();
+
+		const guard = mocks.executeToolCalls.mock.calls[0][0].guard;
+		expect((await guard.before(hubCall("hf_jobs", { operation: "uv", args: {} }))).allow).toBe(
+			false
+		);
+		expect((await guard.before(hubCall("hf_jobs", { operation: "logs", args: {} }))).allow).toBe(
+			true
+		);
+	});
+
+	it("keeps existing-sandbox tools available inside ML Intern", async () => {
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+		await runFlow({
+			conv: { _id: new ObjectId(), mlAssistant: true },
+		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		const guard = mocks.executeToolCalls.mock.calls[0][0].guard;
+		expect((await guard.before(hubCall("hf_sandbox_exec", { cmd: "exec", args: [] }))).allow).toBe(
+			true
+		);
+	});
+});
+
 describe("runMcpFlow under the ML Assistant preset", () => {
 	const inMlMode = { conv: { _id: new ObjectId(), mlAssistant: true } } as unknown as Parameters<
 		typeof runMcpFlow
