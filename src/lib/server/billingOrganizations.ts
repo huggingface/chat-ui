@@ -21,8 +21,12 @@ interface UserInfoOrganization {
 	preferred_username: string;
 	canPay?: boolean;
 	plan?: string;
+	roleInOrg?: string;
 	resourceGroups?: BillingResourceGroup[];
 }
+
+const canSubmitComputeToResourceGroup = (groupRole: string, organizationRole?: string): boolean =>
+	organizationRole === "admin" || groupRole === "admin" || groupRole === "write";
 
 /**
  * The organisations this user may bill through the app, and whether they may
@@ -44,11 +48,13 @@ export async function fetchBillableOrganizations(
 		userCanPay: data.canPay ?? false,
 		organizations: (data.orgs ?? [])
 			.filter((org) => org.plan || org.canPay === true)
-			.map(({ sub, name, preferred_username, resourceGroups }) => ({
+			.map(({ sub, name, preferred_username, roleInOrg, resourceGroups }) => ({
 				sub,
 				name,
 				preferred_username,
-				resourceGroups: (resourceGroups ?? []).map(({ sub, name, role }) => ({ sub, name, role })),
+				resourceGroups: (resourceGroups ?? [])
+					.filter((group) => canSubmitComputeToResourceGroup(group.role, roleInOrg))
+					.map(({ sub, name, role }) => ({ sub, name, role })),
 			})),
 	};
 }
@@ -74,6 +80,9 @@ export async function assertBillableOrganization(
 		error(400, `Organization "${organization}" cannot be billed from this account.`);
 	}
 	if (resourceGroup && !selected.resourceGroups.some((group) => group.sub === resourceGroup)) {
-		error(400, `Resource group "${resourceGroup}" is not one of yours in "${organization}".`);
+		error(
+			400,
+			`Resource group "${resourceGroup}" cannot submit billed compute in "${organization}".`
+		);
 	}
 }

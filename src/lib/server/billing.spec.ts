@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inferenceBillingTarget } from "./billing";
+import { billingTarget, inferenceBillingHeaders, inferenceBillingTarget } from "./billing";
 
 describe("inferenceBillingTarget", () => {
 	it("uses the organization root when no resource group is selected", () => {
@@ -19,5 +19,20 @@ describe("inferenceBillingTarget", () => {
 		expect(
 			inferenceBillingTarget({ billingResourceGroup: "65f000000000000000000001" })
 		).toBeUndefined();
+	});
+
+	it("derives every inference representation from one normalized target", () => {
+		const locals = {
+			billingOrganization: " acme ",
+			billingResourceGroup: " 65f000000000000000000001 ",
+		};
+		expect(billingTarget(locals)).toEqual({
+			organization: "acme",
+			resourceGroupId: "65f000000000000000000001",
+		});
+		expect(inferenceBillingHeaders(locals)).toEqual({
+			"X-HF-Bill-To": "65f000000000000000000001",
+		});
+		expect(inferenceBillingHeaders(undefined)).toEqual({});
 	});
 });

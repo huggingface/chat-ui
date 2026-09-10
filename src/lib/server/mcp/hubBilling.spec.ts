@@ -59,6 +59,21 @@ describe("hub billing rewrite: jobs", () => {
 		}
 	});
 
+	it("does not add the submission-only resource group to reads", () => {
+		const rewriteToGroup = createHubBillingRewrite({
+			namespace: "acme",
+			resourceGroupId: "65f000000000000000000001",
+		});
+		for (const operation of ["ps", "logs", "inspect", "cancel"]) {
+			const out = rewriteToGroup({
+				serverUrl: HF_URL,
+				tool: "hf_jobs",
+				args: { operation, args: { job_id: "abc" } },
+			});
+			expect(out.args).toEqual({ job_id: "abc", namespace: "acme" });
+		}
+	});
+
 	it("keeps a namespace the model named on a read", () => {
 		// A job launched before the setting changed lives elsewhere, and its URL says where.
 		const args = { operation: "logs", args: { job_id: "abc", namespace: "pngwn" } };

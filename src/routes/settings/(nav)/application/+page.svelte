@@ -94,9 +94,7 @@
 	}
 	// Saved at once and awaited, not debounced with the rest: who gets charged
 	// is not a preference to coalesce, and the server may refuse the target.
-	async function setBillingSelection(value: string) {
-		const next = parseBillingSelection(value);
-		if (!next) return;
+	async function saveBillingSelection(next: BillingSelection) {
 		const previous: BillingSelection = {
 			billingOrganization: $settings.billingOrganization ?? "",
 			billingResourceGroup: $settings.billingResourceGroup ?? "",
@@ -117,6 +115,10 @@
 		} finally {
 			billingOrgSaving = false;
 		}
+	}
+	async function setBillingSelection(value: string) {
+		const next = parseBillingSelection(value);
+		if (next) await saveBillingSelection(next);
 	}
 
 	onMount(async () => {
@@ -144,7 +146,7 @@
 					data.currentBillingOrg !== ($settings.billingOrganization || undefined) ||
 					data.currentBillingResourceGroup !== ($settings.billingResourceGroup || undefined)
 				) {
-					await settings.instantSet({
+					await saveBillingSelection({
 						billingOrganization: data.currentBillingOrg ?? "",
 						billingResourceGroup: data.currentBillingResourceGroup ?? "",
 					});

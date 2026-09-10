@@ -49,7 +49,7 @@ import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { withUpstreamRetry } from "../utils/upstreamRetry";
 import { getEnabledBuiltinTools, isNestedAgentTool, shouldSkipMcpFlow } from "../builtinTools";
 import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
-import { inferenceBillingTarget } from "$lib/server/billing";
+import { inferenceBillingHeaders } from "$lib/server/billing";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -491,9 +491,7 @@ export async function* runMcpFlow({
 			fetch: captureProviderFetch,
 			defaultHeaders: {
 				// Bill to organization if configured (HuggingChat only)
-				...(config.isHuggingChat && inferenceBillingTarget(locals)
-					? { "X-HF-Bill-To": inferenceBillingTarget(locals) }
-					: {}),
+				...(config.isHuggingChat ? inferenceBillingHeaders(locals) : {}),
 			},
 		});
 

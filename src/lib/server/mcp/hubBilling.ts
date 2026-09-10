@@ -56,8 +56,12 @@ function withJobsNamespace(
 		);
 	}
 	const rewritten: Record<string, unknown> = { ...inner, namespace };
-	if (resourceGroupId) rewritten.resource_group_id = resourceGroupId;
-	else delete rewritten.resource_group_id;
+	// Resource groups attribute newly-created compute. Read and cancellation
+	// schemas accept only the namespace that already owns the job.
+	if (submitting) {
+		if (resourceGroupId) rewritten.resource_group_id = resourceGroupId;
+		else delete rewritten.resource_group_id;
+	}
 	return { ...args, args: rewritten };
 }
 

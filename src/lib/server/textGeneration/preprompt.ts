@@ -24,8 +24,10 @@ export interface PrepromptInput {
 	now?: Date;
 	/** The conversation's compute budget; presence turns on the budget rules. */
 	budget?: MlBudget;
-	/** Organization or resource group the mode's compute is billed to; stamped as BillTo. */
+	/** Organization namespace the mode's compute runs under; stamped as BillTo. */
 	billTo?: string;
+	/** Resource group within BillTo used for cost attribution. */
+	billingResourceGroup?: string;
 }
 
 /**
@@ -46,6 +48,7 @@ export function resolvePreprompt({
 	now,
 	budget,
 	billTo,
+	billingResourceGroup,
 }: PrepromptInput): string | undefined {
 	const base = mlAssistant ? ML_ASSISTANT_PREPROMPT : conversationPreprompt;
 	const artifacts = mlAssistant || (artifactsOverride ?? supportsArtifacts);
@@ -67,5 +70,6 @@ export function resolvePreprompt({
 			total: formatMicroUsd(effective.totalMicroUsd),
 		},
 		billTo,
+		billingResourceGroup,
 	})}`;
 }

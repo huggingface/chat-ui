@@ -9,7 +9,6 @@ import {
 	isMlAssistantConversation,
 	ML_ASSISTANT_HF_MCP_URL,
 	ML_ASSISTANT_MCP_SERVERS,
-	mlAssistantBillingLabel,
 	mlAssistantBillingNamespace,
 	mlAssistantBillingTarget,
 	mlAssistantPayerTarget,
@@ -196,12 +195,6 @@ describe("mlAssistantBillingTarget", () => {
 			namespace: "acme",
 			resourceGroupId: "65f000000000000000000001",
 		});
-		expect(
-			mlAssistantBillingLabel({
-				billingOrganization: "acme",
-				billingResourceGroup: "65f000000000000000000001",
-			})
-		).toBe("acme (resource group 65f000000000000000000001)");
 	});
 
 	it("ignores an orphaned resource group without an organization", () => {

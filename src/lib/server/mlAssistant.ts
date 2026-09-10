@@ -4,6 +4,7 @@ import { hasAuthHeader, isHfMcpServer } from "./mcp/hf";
 import { getMcpServers } from "./mcp/registry";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 import type { HubBillingTarget } from "$lib/server/mcp/hubBilling";
+import { billingTarget } from "$lib/server/billing";
 
 /**
  * The ML Assistant preset: the tools and capabilities a conversation gets when it
@@ -97,28 +98,19 @@ export function pinnedHubToken(): string | undefined {
 export function mlAssistantBillingNamespace(
 	locals: { billingOrganization?: string } | undefined
 ): string | undefined {
-	return locals?.billingOrganization?.trim() || undefined;
+	return billingTarget(locals)?.organization;
 }
 
 /** Trusted Jobs/Sandbox payer selected in the user's settings. */
 export function mlAssistantBillingTarget(
 	locals: { billingOrganization?: string; billingResourceGroup?: string } | undefined
 ): HubBillingTarget | undefined {
-	const namespace = mlAssistantBillingNamespace(locals);
-	if (!namespace) return undefined;
-	const resourceGroupId = locals?.billingResourceGroup?.trim();
-	return { namespace, ...(resourceGroupId ? { resourceGroupId } : {}) };
-}
-
-/** Human-readable payer stamped into ML Intern's session context. */
-export function mlAssistantBillingLabel(
-	locals: { billingOrganization?: string; billingResourceGroup?: string } | undefined
-): string | undefined {
-	const target = mlAssistantBillingTarget(locals);
+	const target = billingTarget(locals);
 	if (!target) return undefined;
-	return target.resourceGroupId
-		? `${target.namespace} (resource group ${target.resourceGroupId})`
-		: target.namespace;
+	return {
+		namespace: target.organization,
+		...(target.resourceGroupId ? { resourceGroupId: target.resourceGroupId } : {}),
+	};
 }
 
 /**
