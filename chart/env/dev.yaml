@@ -91,6 +91,11 @@ envVars:
   MODELS: >
     [
       { "id": "omni", "supportsArtifacts": true },
+      { "id": "deepseek-ai/DeepSeek-V4.1-Flash", "description": "Native multimodal 552B MoE for agentic coding, adjustable thinking, and 1M context.", "parameters": { "max_tokens": 49152 }, "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "zai-org/GLM-4.5", "description": "Flagship GLM agent model unifying advanced reasoning, coding, and tool-using capabilities.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "swiss-ai/Apertus-v1.5-70B", "description": "Open Swiss multimodal model, massively multilingual with 256K context.", "supportsArtifacts": true },
+      { "id": "swiss-ai/Apertus-v1.5-8B", "description": "Compact open Swiss multilingual model with image and audio input." },
+      { "id": "swiss-ai/Apertus-8B-Instruct-2509", "description": "Open, multilingual, trained on compliant data transparent global assistant." },
       { "id": "deepseek-ai/DeepSeek-V4-Flash-Vision-Exp", "description": "Experimental vision-language V4-Flash for multimodal agents and adjustable thinking.", "parameters": { "max_tokens": 49152 }, "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "inclusionAI/Ling-3.0-flash-VL", "description": "Vision-language Ling-3.0-flash MoE for image, video, and GUI agent tasks.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "inclusionAI/Ling-3.0-flash-Fin", "description": "Finance-tuned Ling-3.0-flash for grounded research, valuation, and spreadsheet workflows.", "supportsReasoning": true, "supportsArtifacts": true },
