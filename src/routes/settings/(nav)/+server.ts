@@ -4,6 +4,7 @@ import { authCondition } from "$lib/server/auth";
 import { config } from "$lib/server/config";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
 import { resolveStreamingMode } from "$lib/utils/messageUpdates";
+import { assertBillableOrganization } from "$lib/server/billingOrganizations";
 
 const settingsSchema = z
 	.object({
@@ -48,6 +49,21 @@ export async function POST({ request, locals }) {
 		parsedSettings.multimodalOverrides = {};
 		parsedSettings.toolsOverrides = {};
 		parsedSettings.reasoningOverrides = {};
+	}
+
+	// A change of billing target is checked with the Hub; a resave of the same
+	// value is not, so ordinary settings edits never wait on it.
+	if (config.isHuggingChat && parsedSettings.billingOrganization) {
+		const current = await collections.settings.findOne(authCondition(locals), {
+			projection: { billingOrganization: 1, billingResourceGroup: 1 },
+		});
+		const resourceGroup = parsedSettings.billingResourceGroup || undefined;
+		if (
+			current?.billingOrganization !== parsedSettings.billingOrganization ||
+			(current?.billingResourceGroup || undefined) !== resourceGroup
+		) {
+			await assertBillableOrganization(locals, parsedSettings.billingOrganization, resourceGroup);
+		}
 	}
 
 	const settings = {

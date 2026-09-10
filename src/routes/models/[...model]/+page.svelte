@@ -2,7 +2,7 @@
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import { goto, replaceState } from "$app/navigation";
-	import { onMount, tick } from "svelte";
+	import { onDestroy, onMount, tick } from "svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
@@ -12,8 +12,14 @@
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { storePendingFiles } from "$lib/utils/pendingFiles";
-	import { sanitizeUrlParam } from "$lib/utils/urlParams";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
+	import {
+		LINK_PARAM_NAMES,
+		linkPromptNeedsConfirmation,
+		readLinkPromptRequest,
+		type LinkPromptRequest,
+	} from "$lib/utils/linkParams";
+	import LinkPromptModal from "$lib/components/LinkPromptModal.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 
 	let { data } = $props();
@@ -104,55 +110,31 @@
 		}
 	}
 
-	onMount(async () => {
+	/** A deep link waiting on the user's say-so; see LinkPromptModal. */
+	let linkRequest = $state<LinkPromptRequest | null>(null);
+
+	onMount(() => {
 		try {
-			// Check if auth is required before processing any query params
-			const hasQ = page.url.searchParams.has("q");
-			const hasPrompt = page.url.searchParams.has("prompt");
-			const hasAttachments = page.url.searchParams.has("attachments");
+			const request = readLinkPromptRequest(page.url.searchParams);
+			if (request) {
+				// Redirects to login and comes back to this URL, params included.
+				if (requireAuthUser()) return;
 
-			if ((hasQ || hasPrompt || hasAttachments) && requireAuthUser()) {
-				return; // Redirecting to login, will return to this URL after
-			}
+				// The request lives in memory from here on. Strip it from the URL so a
+				// reload or Back/Forward cannot replay it.
+				const url = new URL(page.url);
+				for (const name of LINK_PARAM_NAMES) url.searchParams.delete(name);
+				tick().then(() => {
+					replaceState(url, page.state);
+				});
 
-			// Handle attachments parameter first
-			if (hasAttachments) {
-				const result = await loadAttachmentsFromUrls(page.url.searchParams);
-				files = result.files;
-
-				// Show errors if any
-				if (result.errors.length > 0) {
-					console.error("Failed to load some attachments:", result.errors);
-					error.set(
-						`Failed to load ${result.errors.length} attachment(s). Check console for details.`
-					);
+				// A link that sends, or one that brings in content we do not publish
+				// ourselves, is shown to the user first. Nothing is fetched before then.
+				if (linkPromptNeedsConfirmation(request)) {
+					linkRequest = request;
+				} else {
+					void applyLinkRequest(request);
 				}
-
-				// Clean up URL
-				const url = new URL(page.url);
-				url.searchParams.delete("attachments");
-				history.replaceState({}, "", url);
-			}
-
-			const query = sanitizeUrlParam(page.url.searchParams.get("q"));
-			if (query) {
-				void createConversation(query);
-				const url = new URL(page.url);
-				url.searchParams.delete("q");
-				tick().then(() => {
-					replaceState(url, page.state);
-				});
-				return;
-			}
-
-			const promptQuery = sanitizeUrlParam(page.url.searchParams.get("prompt"));
-			if (promptQuery && !draft) {
-				draft = promptQuery;
-				const url = new URL(page.url);
-				url.searchParams.delete("prompt");
-				tick().then(() => {
-					replaceState(url, page.state);
-				});
 			}
 		} catch (err) {
 			console.error("Failed to process URL parameters:", err);
@@ -160,6 +142,40 @@
 
 		settings.instantSet({ activeModel: modelId });
 	});
+
+	// A confirmed request can still be loading attachments when the user moves
+	// on. Once this page is gone it must neither attach nor send: a send from
+	// here navigates, and would pull the user back into a conversation they
+	// never saw being created.
+	let unmounted = false;
+	onDestroy(() => {
+		unmounted = true;
+	});
+
+	/** Runs once the user confirmed, or straight away when nothing needed confirming. */
+	async function applyLinkRequest(request: LinkPromptRequest) {
+		linkRequest = null;
+		try {
+			if (request.attachmentUrls.length > 0) {
+				const result = await loadAttachmentsFromUrls(request.attachmentUrls.map((url) => url.href));
+				if (unmounted) return;
+				files = result.files;
+				if (result.errors.length > 0) {
+					console.error("Failed to load some attachments:", result.errors);
+					error.set(
+						`Failed to load ${result.errors.length} attachment(s). Check console for details.`
+					);
+				}
+			}
+			if (request.send && request.prompt) {
+				await createConversation(request.prompt);
+			} else if (request.prompt && !draft) {
+				draft = request.prompt;
+			}
+		} catch (err) {
+			console.error("Failed to process URL parameters:", err);
+		}
+	}
 </script>
 
 <svelte:head>
@@ -194,3 +210,14 @@
 	bind:files
 	bind:draft
 />
+<!-- A first visit also opens the layout's welcome modal. One dialog at a time:
+     the request waits in memory until that one is dismissed. -->
+{#if linkRequest && $settings.welcomeModalSeen}
+	{@const request = linkRequest}
+	<LinkPromptModal
+		{request}
+		modelName={modelId}
+		onconfirm={() => applyLinkRequest(request)}
+		oncancel={() => (linkRequest = null)}
+	/>
+{/if}

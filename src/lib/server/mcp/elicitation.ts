@@ -3,8 +3,10 @@ import { ObjectId } from "mongodb";
 import type { Client } from "@modelcontextprotocol/client";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
+import { isTurnAlive } from "$lib/server/generation/turnLog";
 import type { McpElicitation, PendingMcpCall } from "$lib/types/McpElicitation";
 import type {
+	AnsweredElicitation,
 	ElicitationAction,
 	ElicitationRequestPayload,
 	ElicitationResolution,
@@ -108,6 +110,7 @@ async function abandon(
 				$set: {
 					status: "resolved",
 					action: "cancel",
+					resolution,
 					resolvedAt: new Date(),
 					updatedAt: new Date(),
 				},
@@ -264,7 +267,38 @@ export async function handleElicitationRequest(
 
 export type SubmitResult =
 	| { ok: true; resume: boolean; messageId?: string }
-	| { ok: false; status: 400 | 404 | 409 | 500; error: string };
+	| { ok: false; status: 400 | 404 | 500; error: string }
+	| { ok: false; status: 409; error: string; answered?: AnsweredElicitation };
+
+/**
+ * Whether anything has picked up a durable prompt's answer. A producer holding the turn, or a
+ * parked call being claimed, is a continuation under way; the Resolved update in the parked
+ * message is one that ran, however it ended. The turn-state document is deliberately not the
+ * judge: a continuation that died leaves it at `running` for good (the reaper never moves
+ * it), which would read as continued forever.
+ */
+async function continued(
+	conversationId: ObjectId,
+	elicitationId: string,
+	messageId: string
+): Promise<boolean> {
+	const turn = await isTurnAlive(conversationId, messageId);
+	if (turn.alive && turn.status !== "awaiting_input") return true;
+	const conversation = await collections.conversations.findOne(
+		{ _id: conversationId, "messages.id": messageId },
+		{ projection: { "messages.$": 1 } }
+	);
+	return (conversation?.messages[0]?.updates ?? []).some(
+		(update) =>
+			update.type === MessageUpdateType.Elicitation &&
+			update.subtype === MessageElicitationUpdateType.Resolved &&
+			update.elicitationId === elicitationId
+	);
+}
+
+/** See `McpElicitation.resolution` for how rows that predate it are read. */
+const answeredByUser = (doc: McpElicitation): boolean =>
+	doc.resolution ? doc.resolution === "user" : doc.action !== "cancel";
 
 export async function submitElicitationAnswer({
 	elicitationId,
@@ -280,8 +314,39 @@ export async function submitElicitationAnswer({
 	// Scoped by conversation: holding an id is not authority to answer someone else's prompt.
 	const doc = await collections.mcpElicitations.findOne({ elicitationId, conversationId });
 	if (!doc) return { ok: false, status: 404, error: "Unknown elicitation." };
-	if (doc.status !== "pending") return { ok: false, status: 409, error: "Already answered." };
-	if (doc.expiresAt && doc.expiresAt.getTime() <= Date.now()) {
+
+	/** Set when this answer replaces a close nothing consumed; the write below keys on it. */
+	let replaces: Date | undefined;
+	if (doc.status !== "pending") {
+		// A blocking prompt was unblocked by whatever closed it; there is nothing to pick up.
+		if (!doc.pending) return { ok: false, status: 409, error: "Already answered." };
+		let done: boolean;
+		try {
+			done = await continued(conversationId, elicitationId, doc.pending.messageId);
+		} catch (err) {
+			logger.error({ err, elicitationId }, "[mcp] could not tell whether an answer was continued");
+			// Not a refusal: one that carries `answered` makes the composer drop the question.
+			return { ok: false, status: 500, error: "Could not check the earlier answer. Try again." };
+		}
+		if (done || answeredByUser(doc)) {
+			const answered: AnsweredElicitation = {
+				action: doc.action ?? "cancel",
+				resume: !done,
+				messageId: doc.pending.messageId,
+			};
+			return {
+				ok: false,
+				status: 409,
+				error: answered.resume
+					? "Already answered. Continuing with that answer."
+					: "Already answered.",
+				answered,
+			};
+		}
+		// Closed by the system, never continued: nothing consumed that cancel, so the user's
+		// answer is the first real one and takes its place.
+		replaces = doc.updatedAt;
+	} else if (doc.expiresAt && doc.expiresAt.getTime() <= Date.now()) {
 		return { ok: false, status: 409, error: "This request has expired." };
 	}
 
@@ -333,17 +398,25 @@ export async function submitElicitationAnswer({
 		}
 	}
 
-	// `status: "pending"` makes a double submit a no-op rather than a second, different answer.
+	// Keyed on the state this answer saw, so a double submit is a no-op rather than a second,
+	// different answer, and a replacement lands only on the close it was replacing.
+	const now = new Date();
 	const updated = await collections.mcpElicitations.updateOne(
-		{ elicitationId, conversationId, status: "pending" },
+		{
+			elicitationId,
+			conversationId,
+			...(replaces ? { status: "resolved", updatedAt: replaces } : { status: "pending" }),
+		},
 		{
 			$set: {
 				status: "resolved",
 				action,
-				resolvedAt: new Date(),
-				updatedAt: new Date(),
+				resolution: "user",
+				resolvedAt: now,
+				updatedAt: now,
 				...(validated ? { content: validated } : {}),
 			},
+			...(replaces && !validated ? { $unset: { content: "" } } : {}),
 		}
 	);
 	if (updated.matchedCount === 0) return { ok: false, status: 409, error: "Already answered." };

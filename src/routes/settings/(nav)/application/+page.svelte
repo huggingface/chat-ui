@@ -63,6 +63,7 @@
 	let billingOrgs = $state<BillingOrg[]>([]);
 	let billingOrgsLoading = $state(false);
 	let billingOrgsError = $state<string | null>(null);
+	let billingOrgSaving = $state(false);
 
 	function getBillingSelection() {
 		if ($settings.billingOrganization && $settings.billingResourceGroup) {
@@ -70,28 +71,52 @@
 		}
 		return $settings.billingOrganization ? `organization:${$settings.billingOrganization}` : "";
 	}
-	function setBillingSelection(value: string) {
+	type BillingSelection = { billingOrganization: string; billingResourceGroup: string };
+	function parseBillingSelection(value: string): BillingSelection | undefined {
 		if (value.startsWith("resource-group:")) {
 			const resourceGroupId = value.slice("resource-group:".length);
 			const organization = billingOrgs.find((org) =>
 				org.resourceGroups.some((group) => group.sub === resourceGroupId)
 			);
-			if (!organization) return;
-			settings.update((s) => ({
-				...s,
-				billingOrganization: organization.preferred_username,
-				billingResourceGroup: resourceGroupId,
-			}));
+			return organization
+				? {
+						billingOrganization: organization.preferred_username,
+						billingResourceGroup: resourceGroupId,
+					}
+				: undefined;
+		}
+		return {
+			billingOrganization: value.startsWith("organization:")
+				? value.slice("organization:".length)
+				: "",
+			billingResourceGroup: "",
+		};
+	}
+	// Saved at once and awaited, not debounced with the rest: who gets charged
+	// is not a preference to coalesce, and the server may refuse the target.
+	async function setBillingSelection(value: string) {
+		const next = parseBillingSelection(value);
+		if (!next) return;
+		const previous: BillingSelection = {
+			billingOrganization: $settings.billingOrganization ?? "",
+			billingResourceGroup: $settings.billingResourceGroup ?? "",
+		};
+		if (
+			next.billingOrganization === previous.billingOrganization &&
+			next.billingResourceGroup === previous.billingResourceGroup
+		) {
 			return;
 		}
-		const organization = value.startsWith("organization:")
-			? value.slice("organization:".length)
-			: "";
-		settings.update((s) => ({
-			...s,
-			billingOrganization: organization,
-			billingResourceGroup: "",
-		}));
+		billingOrgSaving = true;
+		billingOrgsError = null;
+		try {
+			if (!(await settings.instantSet(next))) {
+				billingOrgsError = "Could not save this billing choice";
+				await settings.instantSet(previous);
+			}
+		} finally {
+			billingOrgSaving = false;
+		}
 	}
 
 	onMount(async () => {
@@ -119,11 +144,10 @@
 					data.currentBillingOrg !== ($settings.billingOrganization || undefined) ||
 					data.currentBillingResourceGroup !== ($settings.billingResourceGroup || undefined)
 				) {
-					settings.update((s) => ({
-						...s,
+					await settings.instantSet({
 						billingOrganization: data.currentBillingOrg ?? "",
 						billingResourceGroup: data.currentBillingResourceGroup ?? "",
-					}));
+					});
 				}
 			} catch {
 				billingOrgsError = "Failed to load billing options";
@@ -307,20 +331,23 @@
 						<div>
 							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Billing</div>
 							<p class="text-[12px] text-gray-500 dark:text-gray-400">
-								Select personal, organization, or resource group billing for inference{ML_ASSISTANT_MODE
-									? " and for the jobs and sandboxes ML Intern runs"
-									: ""} (for eligible organizations).
+								Bill inference{ML_ASSISTANT_MODE
+									? ", and the Jobs and sandboxes ML Intern launches,"
+									: ""} to your personal account, to an eligible organization, or to one of its resource
+								groups. Other Hub products, such as Spaces and repositories, are not affected.
 							</p>
 						</div>
 						<div class="flex items-center">
 							{#if billingOrgsLoading}
 								<span class="text-xs text-gray-500 dark:text-gray-400">Loading...</span>
-							{:else if billingOrgsError}
-								<span class="text-xs text-red-500">{billingOrgsError}</span>
 							{:else}
+								{#if billingOrgsError}
+									<span class="mr-2 text-xs text-red-500">{billingOrgsError}</span>
+								{/if}
 								<select
-									class="rounded-md border border-gray-300 bg-white px-1 py-1 text-xs text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+									class="rounded-md border border-gray-300 bg-white px-1 py-1 text-xs text-gray-800 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
 									value={getBillingSelection()}
+									disabled={billingOrgSaving}
 									onchange={(e) => setBillingSelection(e.currentTarget.value)}
 								>
 									<option value="">Personal</option>

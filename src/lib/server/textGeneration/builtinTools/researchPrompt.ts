@@ -20,6 +20,8 @@ import { GITHUB_FIND_EXAMPLES, GITHUB_LIST_REPOS, GITHUB_READ_FILE } from "$lib/
 const WEB_SEARCH_TOOL = "web_search_exa";
 const WEB_CRAWL_TOOL = "crawling_exa";
 const WEB_CODE_TOOL = "get_code_context_exa";
+// Not in the Hub's intern bouquet; `hf_fs` search over hf://models covers it there.
+const REPO_SEARCH_TOOL = "hub_repo_search";
 
 /**
  * Sections that reference a tool are included only when that tool is offered,
@@ -32,6 +34,7 @@ export function buildResearchSystemPrompt(availableTools: ReadonlySet<string>): 
 	const hasWebCode = availableTools.has(WEB_CODE_TOOL);
 	const hasGithub =
 		availableTools.has(GITHUB_FIND_EXAMPLES) && availableTools.has(GITHUB_READ_FILE);
+	const hasRepoSearch = availableTools.has(REPO_SEARCH_TOOL);
 
 	const successorSearchTools = hasWebSearch
 		? `\`${WEB_SEARCH_TOOL}\` (the anchor's title plus terms like "builds on" or "improves") and \`hf_fs\` paper search (the method's distinctive terms)`
@@ -56,7 +59,7 @@ tell you what actually works.
 
 ## The crawl
 
-1. **Find anchor papers**: If the task names a paper id or URL, that is your anchor — read it directly (an arXiv id maps to hf://papers/<arxiv_id>/paper.md), no search needed. Otherwise search the paper index (\`hf_fs\` search over hf://papers) for the task/domain and identify the landmark paper(s) — recent, widely built on, or both. Papers are searched ONLY this way; \`hub_repo_search\` searches model/dataset/Space repos, not papers.
+1. **Find anchor papers**: If the task names a paper id or URL, that is your anchor — read it directly (an arXiv id maps to hf://papers/<arxiv_id>/paper.md), no search needed. Otherwise search the paper index (\`hf_fs\` search over hf://papers) for the task/domain and identify the landmark paper(s) — recent, widely built on, or both. Papers are searched ONLY this way; ${hasRepoSearch ? `\`${REPO_SEARCH_TOOL}\`` : "`hf_fs` search over hf://models, hf://datasets or hf://spaces"} searches model/dataset/Space repos, not papers.
 2. **Read methodology, not abstracts**: Read the paper with \`hf_fs\` cat of hf://papers/<arxiv_id>/paper.md. Output is paged — keep reading with --offset until the end of the file. The method is usually mid-document (sections 3-5) and the implementation details are often in the appendices. Extract:
    - The exact dataset(s) used (name, source, size, any filtering/preprocessing)
    - The training method and configuration (optimizer, lr, schedule, epochs, batch size)
@@ -76,7 +79,7 @@ ${codeStep}
 		`# How to use your tools
 
 ## Papers (USE FIRST)
-- \`hf_fs\` search over hf://papers: search the paper index. The ONLY paper search — never \`hub_repo_search\`.
+- \`hf_fs\` search over hf://papers: search the paper index. The ONLY paper search${hasRepoSearch ? ` — never \`${REPO_SEARCH_TOOL}\`` : ""}.
 - \`hf_fs\` cat of hf://papers/<arxiv_id>/paper.md: read a paper. Paged — continue with --offset until the end. Bibliography (with cited arXiv ids) is at the very end.
 
 ## Dataset & repo inspection
@@ -85,7 +88,11 @@ ${codeStep}
   - SFT: needs "messages", "text", or "prompt"/"completion"
   - DPO: needs "prompt", "chosen", "rejected"
   - GRPO: needs "prompt" only
-- \`hub_repo_search\`: find model/dataset/Space repos by keyword (never papers).
+${
+	hasRepoSearch
+		? `- \`${REPO_SEARCH_TOOL}\`: find model/dataset/Space repos by keyword (never papers).`
+		: "- `hf_fs` search over hf://models, hf://datasets or hf://spaces: find repos by keyword (never papers)."
+}
 - \`hf_fs\` ls/cat: list and read files in any Hub repo (model, dataset, Space).
 
 ## Documentation
