@@ -205,9 +205,6 @@
 		if (requireAuthUser() || loading || !draft) return;
 		tap();
 		chatScroll.notifySend();
-		// Latches the mode onto the conversation, so the strip stays and swaps its
-		// tool note for the plan progress row. No-op when the mode is off.
-		mlAssistant.startTask();
 		onmessage?.(draft);
 		draft = "";
 	};
@@ -551,9 +548,9 @@
 		if (!lastMessage) return;
 		sendFixRequest(buildResumeMessage(failureDetailOf(lastMessage)));
 	}
-	// The strip is a task status bar only: it slides in on the send that starts an
-	// ML task and stays for the rest of the conversation. Before that the mode
-	// lives in the composer pill, and a chat started without the mode never shows
+	// The strip is a task status bar only: it slides in once the server confirms
+	// the new conversation is an ML task and stays for the rest of it. Before that
+	// the mode lives in the composer pill, and a chat started without the mode never shows
 	// either surface.
 	let mlStripVisible = $derived(ML_ASSISTANT_MODE && mlTaskRunning);
 

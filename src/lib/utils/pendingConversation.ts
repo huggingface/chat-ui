@@ -1,4 +1,5 @@
 import { browser } from "$app/environment";
+import superjson from "superjson";
 import type { Message } from "$lib/types/Message";
 import type { DeployedSpace, MlBudget } from "$lib/types/Conversation";
 import type { PlanState } from "$lib/types/Plan";
@@ -47,6 +48,27 @@ export function seedPendingConversation(id: string, data: ConversationData): voi
 	if (pending.size > MAX_ENTRIES) {
 		const oldest = pending.keys().next().value;
 		if (oldest !== undefined) pending.delete(oldest);
+	}
+}
+
+/**
+ * Decodes and seeds the conversation embedded in POST /conversation.
+ * Returning the decoded payload lets the caller use the server-persisted mode
+ * as the source of truth for UI state and optimistic sidebar metadata.
+ */
+export function seedCreatedConversation(
+	id: string,
+	serialized: unknown
+): ConversationData | undefined {
+	if (typeof serialized !== "string") return undefined;
+	try {
+		const data = superjson.parse<ConversationData>(serialized);
+		if (!data || data.id !== id || !Array.isArray(data.messages)) return undefined;
+		seedPendingConversation(id, data);
+		return data;
+	} catch {
+		// Malformed seed: the page load falls back to a normal fetch.
+		return undefined;
 	}
 }
 

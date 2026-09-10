@@ -98,7 +98,6 @@ const FREE_JOB_OPERATIONS = new Set([
 	"scheduled inspect",
 	"scheduled delete",
 	"scheduled suspend",
-	"scheduled resume",
 ]);
 const FREE_SANDBOX_COMMANDS = new Set(["status", "terminate", "ps", "kill"]);
 
@@ -109,10 +108,14 @@ const FREE_SANDBOX_COMMANDS = new Set(["status", "terminate", "ps", "kill"]);
 function classify(call: GuardedToolCall): GatedSubmission | { blocked: string } | null {
 	if (call.tool === "hf_jobs") {
 		const operation = call.args.operation;
-		if (operation === "scheduled run" || operation === "scheduled uv") {
+		if (
+			operation === "scheduled run" ||
+			operation === "scheduled uv" ||
+			operation === "scheduled resume"
+		) {
 			return {
 				blocked:
-					"Scheduled jobs are not available in this session: a recurring run cannot be held to the session budget. Nothing was scheduled. Run the work directly with operation 'run' or 'uv'.",
+					"Scheduled jobs are not available in this session: a recurring run cannot be held to the session budget. Nothing was scheduled or resumed. Run the work directly with operation 'run' or 'uv'.",
 			};
 		}
 		if (typeof operation === "string" && FREE_JOB_OPERATIONS.has(operation)) return null;
@@ -169,6 +172,31 @@ function classify(call: GuardedToolCall): GatedSubmission | { blocked: string } 
 	}
 
 	return null;
+}
+
+/**
+ * Prevents Hub compute from starting outside ML Intern, where no session
+ * budget exists. Operations on already-running compute stay available so an
+ * ordinary chat can inspect or clean up existing work; unknown operations on
+ * the launch tools fail closed because they cannot be proven free.
+ */
+export function createMlAssistantOnlyComputeGuard(): ToolCallGuard {
+	return {
+		allowParking: true,
+		async before(call): Promise<GuardVerdict> {
+			if (!isHfMcpServer(call.serverUrl)) return { allow: true };
+			const classified = classify(call);
+			if (classified === null) return { allow: true };
+			return {
+				allow: false,
+				message:
+					"Refused: Hugging Face jobs and sandboxes can only be started from an ML Intern conversation, where a session budget and billing target are enforced. Start a fresh chat with ML Intern enabled. Nothing was submitted or created.",
+			};
+		},
+		async after() {
+			return undefined;
+		},
+	};
 }
 
 /** The discriminator each gated tool routes on. */
