@@ -9,7 +9,12 @@ import type { McpToolMapping, OpenAiTool } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { recordNestedAgentCalls, type LoggedCall } from "./nestedAgentCallLog";
-import { executeToolCalls, type NormalizedToolCall } from "../mcp/toolInvocation";
+import {
+	executeToolCalls,
+	withRewrittenArguments,
+	type NormalizedToolCall,
+	type ToolArgsRewrite,
+} from "../mcp/toolInvocation";
 import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
 import { composeGuards, type ToolCallGuard } from "../mcp/toolGuard";
 import { parseToolArguments, withParseableArguments } from "../mcp/toolArgs";
@@ -61,6 +66,12 @@ export interface NestedAgentDeps {
 	/** Every builtin offered this turn; filtered by the spec's allowlist here. */
 	hostBuiltinTools: BuiltinTool[];
 	contextLengthTokens?: number;
+	/**
+	 * The parent's argument rewrite. Unlike the budget guard it is not withheld
+	 * here: it decides which namespace a job lives in, and a sub-agent reading
+	 * the parent's jobs has to look where they were put.
+	 */
+	rewriteArgs?: ToolArgsRewrite;
 }
 
 export interface NestedAgentSpec {
@@ -132,6 +143,19 @@ export function makeTruncator(maxChars: number, head: number, tail: number) {
 			output.slice(0, head) + "\n...(truncated)...\n" + output.slice(-tail)
 		);
 	};
+}
+
+/** The model's calls carrying the arguments the executor was handed, where those differ. */
+function withDispatchedArguments<T extends { id: string; function?: { arguments?: string } }>(
+	calls: T[],
+	dispatched: NormalizedToolCall[]
+): T[] {
+	const byId = new Map(dispatched.map((call) => [call.id, call.arguments]));
+	return calls.map((call) => {
+		const rewritten = byId.get(call.id);
+		if (rewritten === undefined || rewritten === call.function?.arguments) return call;
+		return { ...call, function: { ...call.function, arguments: rewritten } };
+	});
 }
 
 /** JSON with object keys sorted at every depth, so arg order can't defeat the repetition check. */
@@ -332,25 +356,7 @@ export async function runNestedAgent(
 			return content ? { resultText: content } : { error: spec.failure.noSummary };
 		}
 
-		// Wire-safe rebuild: only role/content/tool_calls go back. The raw
-		// message can carry provider fields (reasoning_content and friends)
-		// that OpenAI-compatible backends reject when echoed; content is
-		// omitted when empty because some backends 400 on empty text next to
-		// tool_calls.
-		messages = [
-			...messages,
-			{
-				role: "assistant",
-				// Same guard as the parent loop: an unparseable payload echoed back
-				// 400s every later request of the run. See withParseableArguments.
-				tool_calls: withParseableArguments(toolCalls),
-				...(typeof msg.content === "string" && msg.content.trim().length > 0
-					? { content: msg.content }
-					: {}),
-			},
-		];
-
-		const allowedCalls: NormalizedToolCall[] = [];
+		let allowedCalls: NormalizedToolCall[] = [];
 		const refusedCalls: LoggedCall[] = [];
 		const refusals: ChatCompletionMessageParam[] = [];
 		const repeatCounts = new Map<string, number>();
@@ -378,6 +384,30 @@ export async function runNestedAgent(
 			}
 			allowedCalls.push({ id: call.id, name, arguments: rawArguments });
 		}
+		if (deps.rewriteArgs) {
+			allowedCalls = withRewrittenArguments(allowedCalls, {
+				mapping: deps.mapping,
+				servers: deps.servers,
+				builtinTools: allowedBuiltins,
+				parseArgs: parseToolArguments,
+				rewrite: deps.rewriteArgs,
+			});
+		}
+
+		// Wire-safe rebuild: only role/content/tool_calls go back. The raw
+		// message can carry provider fields (reasoning_content and friends)
+		// that OpenAI-compatible backends reject when echoed; content is
+		// omitted when empty because some backends 400 on empty text next to
+		// tool_calls. Allowed calls echo the arguments the executor was handed.
+		const assistantTurn: ChatCompletionMessageParam = {
+			role: "assistant",
+			// Same guard as the parent loop: an unparseable payload echoed back
+			// 400s every later request of the run. See withParseableArguments.
+			tool_calls: withParseableArguments(withDispatchedArguments(toolCalls, allowedCalls)),
+			...(typeof msg.content === "string" && msg.content.trim().length > 0
+				? { content: msg.content }
+				: {}),
+		};
 
 		let toolMessages: ChatCompletionMessageParam[] = [];
 		if (allowedCalls.length > 0) {
@@ -403,6 +433,7 @@ export async function runNestedAgent(
 				// a call against its own schema is not a policy, it is the round
 				// trip and the iteration this run would otherwise lose.
 				guard: preflightGuard,
+				...(deps.rewriteArgs ? { rewriteArgs: deps.rewriteArgs } : {}),
 				// No `elicitation`: the sub-agent has no chat to ask, so an
 				// input-required response comes back as an ordinary tool error.
 			});
@@ -418,6 +449,7 @@ export async function runNestedAgent(
 
 		messages = [
 			...messages,
+			assistantTurn,
 			...refusals,
 			...toolMessages.map((message) =>
 				message.role === "tool" && typeof message.content === "string"

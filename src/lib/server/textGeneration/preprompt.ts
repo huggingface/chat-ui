@@ -24,6 +24,8 @@ export interface PrepromptInput {
 	now?: Date;
 	/** The conversation's compute budget; presence turns on the budget rules. */
 	budget?: MlBudget;
+	/** Organization the mode's jobs and sandboxes are billed to; stamped as BillTo. */
+	billTo?: string;
 }
 
 /**
@@ -43,6 +45,7 @@ export function resolvePreprompt({
 	timezone,
 	now,
 	budget,
+	billTo,
 }: PrepromptInput): string | undefined {
 	const base = mlAssistant ? ML_ASSISTANT_PREPROMPT : conversationPreprompt;
 	const artifacts = mlAssistant || (artifactsOverride ?? supportsArtifacts);
@@ -63,5 +66,6 @@ export function resolvePreprompt({
 			remaining: formatMicroUsd(remainingMicroUsd(effective)),
 			total: formatMicroUsd(effective.totalMicroUsd),
 		},
+		billTo,
 	})}`;
 }

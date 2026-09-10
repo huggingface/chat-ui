@@ -4,7 +4,7 @@ import { collections, ready } from "$lib/server/database";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { parseToolArguments } from "./toolArgs";
-import type { NormalizedToolCall } from "./toolInvocation";
+import type { NormalizedToolCall, ToolArgsRewrite } from "./toolInvocation";
 import type { BuiltinTool } from "../builtinTools/types";
 import type { McpToolTextResponse } from "$lib/server/mcp/httpClient";
 import type { ChatCompletionToolMessageParam } from "openai/resources/chat/completions";
@@ -26,7 +26,8 @@ vi.mock("../../logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-const { executeToolCalls, isValidJsonObject } = await import("./toolInvocation");
+const { executeToolCalls, isValidJsonObject, withRewrittenArguments } =
+	await import("./toolInvocation");
 
 const SERVERS = [{ name: "hf", url: "https://example.test/mcp" }];
 const MAPPING = { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } };
@@ -535,5 +536,69 @@ describe("executeToolCalls with a guard", () => {
 			(e) => e.type === "update" && e.update.type === MessageUpdateType.Budget
 		);
 		expect(budgets).toHaveLength(2);
+	});
+});
+
+describe("withRewrittenArguments", () => {
+	const stamp: ToolArgsRewrite = ({ serverUrl, tool, args }) => ({
+		...args,
+		via: `${tool}@${serverUrl}`,
+	});
+	const options = {
+		mapping: MAPPING,
+		servers: SERVERS,
+		parseArgs: parseToolArguments,
+	};
+
+	it("re-serialises a call the rewrite changed", () => {
+		const [call] = withRewrittenArguments([CALL], { ...options, rewrite: stamp });
+
+		expect(call.id).toBe(CALL.id);
+		expect(call.name).toBe(CALL.name);
+		expect(JSON.parse(call.arguments)).toEqual({ a: 1, via: "do_thing@https://example.test/mcp" });
+	});
+
+	it("keeps a call the rewrite left alone, string and all", () => {
+		// Identity is the no-change signal; the original string stays byte for byte.
+		const spaced: NormalizedToolCall = { ...CALL, arguments: '{ "a" : 1 }' };
+		const [call] = withRewrittenArguments([spaced], { ...options, rewrite: ({ args }) => args });
+
+		expect(call).toBe(spaced);
+	});
+
+	it("skips builtins, unmapped tools and undecodable arguments", () => {
+		const rewrite = vi.fn(stamp);
+		const builtin: BuiltinTool = {
+			name: "do_thing",
+			definition: { type: "function", function: { name: "do_thing" } },
+			execute: async () => ({ resultText: "done" }),
+		};
+		const unmapped: NormalizedToolCall = { id: "call_2", name: "nope", arguments: "{}" };
+		const broken: NormalizedToolCall = { id: "call_3", name: "do_thing", arguments: '{"broken":' };
+
+		expect(
+			withRewrittenArguments([CALL], { ...options, builtinTools: [builtin], rewrite })
+		).toEqual([CALL]);
+		expect(withRewrittenArguments([unmapped, broken], { ...options, rewrite })).toEqual([
+			unmapped,
+			broken,
+		]);
+		expect(rewrite).not.toHaveBeenCalled();
+	});
+
+	it("is what the executor persists and dispatches", async () => {
+		// The point of rewriting the call rather than the dispatch: history,
+		// the persisted Call update and the server all carry the same arguments.
+		const calls = withRewrittenArguments([CALL], { ...options, rewrite: stamp });
+		const events = await drain(calls);
+
+		const expected = { a: 1, via: "do_thing@https://example.test/mcp" };
+		expect(mcpMock.callMcpTool.mock.calls[0][2]).toEqual(expected);
+		const call = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Call);
+		expect(
+			call?.subtype === MessageToolUpdateType.Call && call.argumentsRaw
+				? JSON.parse(call.argumentsRaw)
+				: undefined
+		).toEqual(expected);
 	});
 });

@@ -4,6 +4,7 @@ import { config } from "$lib/server/config";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { logger } from "$lib/server/logger";
+import { fetchBillableOrganizations } from "$lib/server/billingOrganizations";
 
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!config.isHuggingChat) {
@@ -19,33 +20,17 @@ export const GET: RequestHandler = async ({ locals }) => {
 	}
 
 	try {
-		const response = await fetch("https://huggingface.co/oauth/userinfo", {
-			headers: { Authorization: `Bearer ${locals.token}` },
-		});
-
-		if (!response.ok) {
-			logger.error(`Failed to fetch billing orgs: ${response.status}`);
+		const billable = await fetchBillableOrganizations(locals.token);
+		if (!billable) {
 			error(502, "Failed to fetch billing information");
 		}
-
-		const data = await response.json();
 
 		const settings = await collections.settings.findOne(authCondition(locals));
 		const currentBillingOrg = settings?.billingOrganization;
 
-		const billingOrgs = (data.orgs ?? [])
-			.filter((org: { canPay?: boolean; plan?: string }) => org.plan || org.canPay === true)
-			.map((org: { sub: string; name: string; preferred_username: string }) => ({
-				sub: org.sub,
-				name: org.name,
-				preferred_username: org.preferred_username,
-			}));
-
 		const isCurrentOrgValid =
 			!currentBillingOrg ||
-			billingOrgs.some(
-				(org: { preferred_username: string }) => org.preferred_username === currentBillingOrg
-			);
+			billable.organizations.some((org) => org.preferred_username === currentBillingOrg);
 
 		if (!isCurrentOrgValid && currentBillingOrg) {
 			logger.info(
@@ -58,8 +43,8 @@ export const GET: RequestHandler = async ({ locals }) => {
 		}
 
 		return superjsonResponse({
-			userCanPay: data.canPay ?? false,
-			organizations: billingOrgs,
+			userCanPay: billable.userCanPay,
+			organizations: billable.organizations,
 			currentBillingOrg: isCurrentOrgValid ? currentBillingOrg : undefined,
 		});
 	} catch (err) {

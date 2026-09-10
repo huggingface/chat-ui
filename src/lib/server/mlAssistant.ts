@@ -61,6 +61,36 @@ export function pinnedHubToken(): string | undefined {
 }
 
 /**
+ * The organisation this request's Hub compute is billed to, if any.
+ *
+ * Deliberately blind to how the Hub server authenticates. An operator-pinned
+ * token may or may not belong to the organisation the user picked, and a guess
+ * is wrong in one direction or the other: a namespace the credential cannot
+ * write to fails loudly at submission, where a suppressed setting bills the
+ * wrong account in silence. The Hub is the authority on the first; only the
+ * setting can prevent the second.
+ */
+export function mlAssistantBillingNamespace(
+	locals: { billingOrganization?: string } | undefined
+): string | undefined {
+	return locals?.billingOrganization?.trim() || undefined;
+}
+
+/**
+ * The namespace this request's Hub compute runs under and is charged to: the
+ * billing organisation, else the user's own account.
+ *
+ * Personal is a choice too. Without a namespace of its own to enforce, a run
+ * the model addressed to some organisation would go through and charge an
+ * account the user never picked.
+ */
+export function mlAssistantPayerNamespace(
+	locals: { billingOrganization?: string; user?: { username?: string } } | undefined
+): string | undefined {
+	return mlAssistantBillingNamespace(locals) ?? (locals?.user?.username?.trim() || undefined);
+}
+
+/**
  * The preset's servers plus the ones already resolved for this request, preset
  * first. Deduplicated by name with the preset winning.
  */

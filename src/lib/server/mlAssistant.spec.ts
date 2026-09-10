@@ -8,6 +8,8 @@ vi.mock("./mcp/registry", () => ({ getMcpServers: () => mockedServers.value }));
 import {
 	ML_ASSISTANT_MCP_SERVERS,
 	isMlAssistantConversation,
+	mlAssistantBillingNamespace,
+	mlAssistantPayerNamespace,
 	pinnedHubToken,
 	withMlAssistantServers,
 } from "./mlAssistant";
@@ -127,5 +129,55 @@ describe("pinnedHubToken", () => {
 			{ name: "Hugging Face", url: "https://hf.co/mcp", headers: { Authorization: "Basic abc" } },
 		];
 		expect(pinnedHubToken()).toBeUndefined();
+	});
+});
+
+describe("mlAssistantBillingNamespace", () => {
+	it("is the user's billing organisation, trimmed", () => {
+		mockedServers.value = [{ name: "Hugging Face", url: "https://hf.co/mcp?login" }];
+		expect(mlAssistantBillingNamespace({ billingOrganization: " acme " })).toBe("acme");
+	});
+
+	it("is nothing when the user bills their own account", () => {
+		mockedServers.value = [];
+		expect(mlAssistantBillingNamespace({ billingOrganization: "" })).toBeUndefined();
+		expect(mlAssistantBillingNamespace({ billingOrganization: "   " })).toBeUndefined();
+		expect(mlAssistantBillingNamespace({})).toBeUndefined();
+		expect(mlAssistantBillingNamespace(undefined)).toBeUndefined();
+	});
+
+	it("holds when an operator-pinned Hub entry is configured", () => {
+		// Whether that credential may bill the organisation is the Hub's call: a
+		// refused submission is loud, a silently redirected charge is not.
+		mockedServers.value = [
+			{
+				name: "Hugging Face",
+				url: "https://hf.co/mcp",
+				headers: { Authorization: "Bearer hf_pinned" },
+			},
+		];
+		expect(mlAssistantBillingNamespace({ billingOrganization: "acme" })).toBe("acme");
+	});
+});
+
+describe("mlAssistantPayerNamespace", () => {
+	it("is the billing organisation when there is one", () => {
+		expect(
+			mlAssistantPayerNamespace({ billingOrganization: "acme", user: { username: "pngwn" } })
+		).toBe("acme");
+	});
+
+	it("is the user's own account under Personal", () => {
+		// Enforced, not defaulted: a run the model addressed to some organisation
+		// must not charge an account the user never picked.
+		expect(
+			mlAssistantPayerNamespace({ billingOrganization: "", user: { username: "pngwn" } })
+		).toBe("pngwn");
+		expect(mlAssistantPayerNamespace({ user: { username: " pngwn " } })).toBe("pngwn");
+	});
+
+	it("is nothing when neither is known", () => {
+		expect(mlAssistantPayerNamespace({ user: {} })).toBeUndefined();
+		expect(mlAssistantPayerNamespace(undefined)).toBeUndefined();
 	});
 });

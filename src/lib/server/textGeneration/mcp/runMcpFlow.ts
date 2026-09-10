@@ -13,7 +13,11 @@ import type { Stream } from "openai/streaming";
 import { buildToolPreprompt } from "../utils/toolPrompt";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
-import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
+import {
+	executeToolCalls,
+	withRewrittenArguments,
+	type NormalizedToolCall,
+} from "./toolInvocation";
 import { hasTruncatedToolCall, parseToolArguments, withParseableArguments } from "./toolArgs";
 import type { TextGenerationContext } from "../types";
 import {
@@ -30,9 +34,11 @@ import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import {
 	isMlAssistantConversation,
+	mlAssistantPayerNamespace,
 	pinnedHubToken,
 	withMlAssistantServers,
 } from "$lib/server/mlAssistant";
+import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { createRepeatedCallGuard } from "./repeatedCallGuard";
@@ -170,6 +176,17 @@ export async function* runMcpFlow({
 					(locals as unknown as { token?: string } | undefined)?.token,
 			})
 		: undefined;
+
+	// A job bills the namespace it runs under, so the billing setting travels as
+	// an argument rather than a header — see mcp/hubBilling.ts.
+	const payer = mlAssistant ? mlAssistantPayerNamespace(locals) : undefined;
+	const rewriteArgs = payer ? createHubBillingRewrite(payer) : undefined;
+	if (mlAssistant) {
+		logger.info(
+			{ conversationId: conv._id.toString(), payer: payer ?? null },
+			"[mcp] Hub compute for this run bills to"
+		);
+	}
 
 	// Built here so it spans the turn's rounds; chained below, once the tool
 	// mapping the schema check reads exists.
@@ -655,6 +672,7 @@ export async function* runMcpFlow({
 			mcpTools: shapedMcpTools,
 			hostBuiltinTools: builtinTools,
 			contextLengthTokens: targetContextLength,
+			...(rewriteArgs ? { rewriteArgs } : {}),
 		};
 		for (const tool of builtinTools) {
 			if (isNestedAgentTool(tool)) tool.bind(nestedAgentDeps);
@@ -1011,6 +1029,16 @@ export async function* runMcpFlow({
 							name: c?.name ?? "",
 							arguments: c?.arguments ?? "",
 						})) as NormalizedToolCall[];
+				}
+
+				if (rewriteArgs) {
+					calls = withRewrittenArguments(calls, {
+						mapping,
+						servers,
+						builtinTools,
+						parseArgs,
+						rewrite: rewriteArgs,
+					});
 				}
 
 				// Include the assistant message with tool_calls so the next round

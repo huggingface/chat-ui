@@ -13,7 +13,7 @@ declare global {
 			user?: User;
 			isAdmin: boolean;
 			token?: string;
-			/** Organization to bill inference requests to (from settings) */
+			/** Organization to bill inference, and ML Intern's Jobs and sandboxes, to (from settings) */
 			billingOrganization?: string;
 		}
 

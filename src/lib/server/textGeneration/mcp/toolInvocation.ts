@@ -35,6 +35,52 @@ export interface NormalizedToolCall {
 	arguments: string;
 }
 
+/**
+ * Rewrites a call's arguments for policy the server can only read from the
+ * arguments (see mcp/hubBilling.ts). Returning the same object means no change.
+ */
+export type ToolArgsRewrite = (call: {
+	serverUrl: string;
+	tool: string;
+	args: Record<string, unknown>;
+}) => Record<string, unknown>;
+
+/**
+ * The calls with `rewrite` applied to each one bound for an MCP server.
+ *
+ * Applied to the calls themselves, ahead of everything that reads them — the
+ * assistant tool_calls message the model sees next round, the `argumentsRaw`
+ * the Call update persists and replay prefers, the guards, the dispatch — so no
+ * consumer describes arguments the server never received. A call the rewrite
+ * leaves alone keeps its argument string byte for byte; undecodable arguments
+ * are left for the executor to refuse.
+ */
+export function withRewrittenArguments(
+	calls: NormalizedToolCall[],
+	{
+		mapping,
+		servers,
+		builtinTools,
+		parseArgs,
+		rewrite,
+	}: Pick<ExecuteToolCallsParams, "mapping" | "servers" | "builtinTools" | "parseArgs"> & {
+		rewrite: ToolArgsRewrite;
+	}
+): NormalizedToolCall[] {
+	const serverLookup = serverMap(servers);
+	const builtinNames = new Set((builtinTools ?? []).map((tool) => tool.name));
+	return calls.map((call) => {
+		if (builtinNames.has(call.name)) return call;
+		const entry = mapping[call.name];
+		const server = entry ? serverLookup.get(entry.server) : undefined;
+		if (!entry || !server) return call;
+		const args = parseArgs(call.arguments);
+		if (!args) return call;
+		const rewritten = rewrite({ serverUrl: server.url, tool: entry.tool, args });
+		return rewritten === args ? call : { ...call, arguments: JSON.stringify(rewritten) };
+	});
+}
+
 export interface ExecuteToolCallsParams {
 	calls: NormalizedToolCall[];
 	mapping: Record<string, McpToolMapping>;

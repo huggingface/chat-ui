@@ -422,3 +422,43 @@ describe("ML Assistant tool preprompt", () => {
 		expect(inMode([])).toBe("");
 	});
 });
+
+describe("ML Assistant billing", () => {
+	const now = new Date("2026-08-24T09:07:00Z");
+
+	it("stamps who pays after the user, only when someone other than the user does", () => {
+		expect(
+			mlAssistantSessionContext({ username: "pngwn", timezone: "UTC", now, billTo: "acme" })
+		).toBe("[Session context: Date=2026-08-24, Time=09:07, Timezone=UTC, User=pngwn, BillTo=acme]");
+		expect(mlAssistantSessionContext({ username: "pngwn", timezone: "UTC", now })).not.toContain(
+			"BillTo="
+		);
+		expect(
+			mlAssistantSessionContext({ username: "pngwn", timezone: "UTC", now, billTo: "  " })
+		).not.toContain("BillTo=");
+	});
+
+	it("keeps the budget last, after the payer", () => {
+		const stamped = mlAssistantSessionContext({
+			username: "pngwn",
+			now,
+			billTo: "acme",
+			budget: { remaining: "$7.80", total: "$10.00" },
+		});
+		expect(stamped).toContain("User=pngwn, BillTo=acme, Budget=$7.80 remaining of $10.00]");
+	});
+
+	it("tells the model what BillTo changes and what it does not", () => {
+		// Namespace for compute, not for outputs: the push destination stays the user.
+		expect(ML_ASSISTANT_PREPROMPT).toContain("BillTo");
+		expect(ML_ASSISTANT_PREPROMPT).toContain("where you push does not change");
+	});
+
+	it("puts who pays on the jobs pre-flight list and beside the sandbox rules", () => {
+		const jobs = inMode([tool("hf_jobs")]);
+		expect(jobs).toContain("- Who pays.");
+		expect(jobs).toContain("BillTo from the session context if set, else User");
+		const sandbox = inMode([tool("hf_sandbox")]);
+		expect(sandbox).toContain("A sandbox is a job and bills like one");
+	});
+});
