@@ -1,6 +1,10 @@
 import { base } from "$app/paths";
 import { elicitationToResume } from "$lib/stores/elicitationResume";
-import type { ElicitationAction, ElicitationValue } from "$lib/types/McpElicitation";
+import type {
+	AnsweredElicitation,
+	ElicitationAction,
+	ElicitationValue,
+} from "$lib/types/McpElicitation";
 
 /** Shared, so neither answer path can forget to ask for the parked run to be continued. */
 export async function sendElicitationAnswer({
@@ -13,7 +17,7 @@ export async function sendElicitationAnswer({
 	elicitationId: string;
 	action: ElicitationAction;
 	content?: Record<string, ElicitationValue>;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<{ ok: true } | { ok: false; error: string; answered?: true }> {
 	let res: Response;
 	try {
 		res = await fetch(`${base}/conversation/${conversationId}/elicitation`, {
@@ -27,23 +31,29 @@ export async function sendElicitationAnswer({
 	}
 
 	const body = await res.json().catch(() => null);
-	if (!res.ok) {
-		const message = (body as { message?: unknown } | null)?.message;
-		return {
-			ok: false,
-			error: typeof message === "string" ? message : "Could not send your answer.",
-		};
-	}
 
 	// A parked call has nothing waiting on it, so answering only records the answer — the
 	// run that continues it has to be started.
-	const parsed = body as { resume?: boolean; messageId?: string } | null;
-	if (parsed?.resume) {
+	const queueResume = (messageId?: string) =>
 		elicitationToResume.set({
 			conversationId,
 			elicitationId,
-			...(parsed.messageId ? { messageId: parsed.messageId } : {}),
+			...(messageId ? { messageId } : {}),
 		});
+
+	if (!res.ok) {
+		const parsed = body as { message?: unknown; answered?: AnsweredElicitation } | null;
+		// An earlier answer stands but never continued the call: the page that sent it lost
+		// its cue, so this attempt is what starts the continuation instead.
+		if (parsed?.answered?.resume) queueResume(parsed.answered.messageId);
+		return {
+			ok: false,
+			error: typeof parsed?.message === "string" ? parsed.message : "Could not send your answer.",
+			...(parsed?.answered ? { answered: true } : {}),
+		};
 	}
+
+	const parsed = body as { resume?: boolean; messageId?: string } | null;
+	if (parsed?.resume) queueResume(parsed.messageId);
 	return { ok: true };
 }

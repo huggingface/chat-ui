@@ -104,7 +104,10 @@
 		});
 		submitting = false;
 		if (!result.ok) {
-			error = result.error;
+			// The answer that stands is the earlier one, so there is nothing left to ask; the
+			// transcript row settles when the continuation reports it.
+			if (result.answered) unregisterQuestion(request.elicitationId);
+			else error = result.error;
 			return;
 		}
 		// Mirror a budget grant into the strip right away — the server applied it
