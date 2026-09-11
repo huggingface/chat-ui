@@ -196,3 +196,27 @@ describe("resolvePreprompt", () => {
 		expect(outsideMode).not.toContain("Budget=");
 	});
 });
+
+describe("resolvePreprompt: who pays", () => {
+	it("stamps the billing organisation into the session context, in the mode only", () => {
+		const inMode = resolvePreprompt({
+			conversationPreprompt: undefined,
+			mlAssistant: true,
+			username: "pngwn",
+			billTo: "acme",
+			billingResourceGroup: "65f000000000000000000001",
+		});
+		expect(inMode?.trimEnd().split("\n").at(-1)).toContain(
+			"User=pngwn, BillTo=acme, BillingResourceGroup=65f000000000000000000001"
+		);
+
+		expect(
+			resolvePreprompt({
+				conversationPreprompt: "You are a pirate.",
+				mlAssistant: false,
+				username: "pngwn",
+				billTo: "acme",
+			})
+		).toBe("You are a pirate.");
+	});
+});

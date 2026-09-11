@@ -6,7 +6,7 @@
 
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonEdit from "~icons/carbon/edit";
-	import CarbonMachineLearning from "~icons/carbon/machine-learning";
+	import BiRobot from "~icons/bi/robot";
 	import LucideEllipsis from "~icons/lucide/ellipsis";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
@@ -83,14 +83,17 @@
 >
 	{#if conv.mlAssistant}
 		{@const ml = ML_TURN_BADGE[activeGenerations.statusFor(conv.id) ?? "idle"]}
-		<!-- Neutral marker on purpose: the status dot carries the color, and an
-		     orange treatment fought with it. An icon rather than an "ML" chip, so
-		     a run of mode conversations doesn't read as a wall of repeated text. -->
+		<!-- The mode's own gold, in the strip's palette. A filled glyph rather than
+		     an outline: at 14px a hairline robot in this orange reads as a
+		     mis-tinted icon, where a solid one reads as a mark. An icon rather
+		     than an "ML" chip, so a run of mode conversations doesn't read as a
+		     wall of repeated text. The status dot keeps its own hue and sits
+		     beside the mark, so the two never compete for the same pixels. -->
 		<span
-			class="flex flex-none items-center gap-1 text-gray-400 dark:text-gray-500"
+			class="flex flex-none items-center gap-1 text-[#c2410c] dark:text-[#fdba74]"
 			title="ML Intern — {ml.label}"
 		>
-			<CarbonMachineLearning class="size-3.5" />
+			<BiRobot class="size-[15px]" />
 			{#if ml.dot}
 				<span class="size-1.5 rounded-full {ml.dot}"></span>
 			{/if}

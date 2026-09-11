@@ -3,6 +3,8 @@ import type { McpServerConfig } from "./mcp/httpClient";
 import { hasAuthHeader, isHfMcpServer } from "./mcp/hf";
 import { getMcpServers } from "./mcp/registry";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+import type { HubBillingTarget } from "$lib/server/mcp/hubBilling";
+import { billingTarget } from "$lib/server/billing";
 
 /**
  * The ML Assistant preset: the tools and capabilities a conversation gets when it
@@ -18,19 +20,42 @@ import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
  */
 
 /**
+ * The Hub MCP server's tool preset for the mode (hf-mcp-server >= 0.4.18):
+ * filesystem read and write, sandboxes, jobs, repo details, create_repo and
+ * whoami — no repo search, no dynamic Space. Resolved server-side on every
+ * request, so the URL keeps tracking the preset as it changes.
+ */
+const ML_ASSISTANT_HF_BOUQUET = "intern";
+
+/**
+ * `login` stays alongside the bouquet: `isStrictHfMcpLogin` keys on it, and it
+ * is what gates both the user's HF token being forwarded to the server and the
+ * login control on the server card. Without it the mode's Hub tools run
+ * anonymously — no whoami, no jobs, no writes — and because the preset wins the
+ * name collision, it would override the correctly configured entry that prod
+ * and dev already ship rather than merely getting itself wrong.
+ */
+export const ML_ASSISTANT_HF_MCP_URL = `https://huggingface.co/mcp?login&bouquet=${ML_ASSISTANT_HF_BOUQUET}`;
+
+/**
  * MCP servers always available in the mode. Merged over the user's selection by
  * name, so a same-named entry of theirs cannot shadow one of these.
- *
- * The `?login` endpoint, not the bare one: `isStrictHfMcpLogin` matches on the
- * exact URL, and it is what gates both the user's HF token being forwarded to
- * the server and the login control on the server card. Without it the mode's
- * Hub tools run anonymously — no whoami, no jobs, no writes — and because the
- * preset wins the name collision, it would override the correctly configured
- * entry that prod and dev already ship rather than merely getting itself wrong.
  */
 export const ML_ASSISTANT_MCP_SERVERS: McpServerConfig[] = [
-	{ name: "Hugging Face", url: "https://hf.co/mcp?login" },
+	{ name: "Hugging Face", url: ML_ASSISTANT_HF_MCP_URL },
 ];
+
+/**
+ * A pinned entry outranks the preset for its credential, not its tool set: the
+ * mode still runs on the intern bouquet unless the operator chose one of their
+ * own.
+ */
+function withMlAssistantBouquet(url: string): string {
+	const u = new URL(url);
+	if (u.searchParams.has("bouquet")) return url;
+	u.searchParams.set("bouquet", ML_ASSISTANT_HF_BOUQUET);
+	return u.toString();
+}
 
 /**
  * Whether this conversation runs under the preset. Gated on the build flag too,
@@ -61,6 +86,54 @@ export function pinnedHubToken(): string | undefined {
 }
 
 /**
+ * The organisation this request's Hub compute is billed to, if any.
+ *
+ * Deliberately blind to how the Hub server authenticates. An operator-pinned
+ * token may or may not belong to the organisation the user picked, and a guess
+ * is wrong in one direction or the other: a namespace the credential cannot
+ * write to fails loudly at submission, where a suppressed setting bills the
+ * wrong account in silence. The Hub is the authority on the first; only the
+ * setting can prevent the second.
+ */
+export function mlAssistantBillingNamespace(
+	locals: { billingOrganization?: string } | undefined
+): string | undefined {
+	return billingTarget(locals)?.organization;
+}
+
+/** Trusted Jobs/Sandbox payer selected in the user's settings. */
+export function mlAssistantBillingTarget(
+	locals: { billingOrganization?: string; billingResourceGroup?: string } | undefined
+): HubBillingTarget | undefined {
+	const target = billingTarget(locals);
+	if (!target) return undefined;
+	return {
+		namespace: target.organization,
+		...(target.resourceGroupId ? { resourceGroupId: target.resourceGroupId } : {}),
+	};
+}
+
+/**
+ * The target this request's Hub compute runs under and is charged to: the
+ * billing organisation, with its resource group when one is selected, else the
+ * user's own account.
+ *
+ * Personal is a choice too. Without a namespace of its own to enforce, a run
+ * the model addressed to some organisation would go through and charge an
+ * account the user never picked.
+ */
+export function mlAssistantPayerTarget(
+	locals:
+		| { billingOrganization?: string; billingResourceGroup?: string; user?: { username?: string } }
+		| undefined
+): HubBillingTarget | undefined {
+	const selected = mlAssistantBillingTarget(locals);
+	if (selected) return selected;
+	const username = locals?.user?.username?.trim();
+	return username ? { namespace: username } : undefined;
+}
+
+/**
  * The preset's servers plus the ones already resolved for this request, preset
  * first. Deduplicated by name with the preset winning.
  */
@@ -85,7 +158,7 @@ export function withMlAssistantServers(servers: McpServerConfig[]): McpServerCon
 		// check stays load-bearing — a same-named entry pointing anywhere else
 		// still cannot shadow the preset, authed or not.
 		if (hasAuthHeader(server.headers) && isHfMcpServer(server.url)) {
-			byName.set(server.name, server);
+			byName.set(server.name, { ...server, url: withMlAssistantBouquet(server.url) });
 		}
 	}
 	return [...byName.values()];

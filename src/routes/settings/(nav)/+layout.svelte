@@ -23,6 +23,8 @@
 	import { browser } from "$app/environment";
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { debounce } from "$lib/utils/debounce";
+	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 
 	interface Props {
 		data: LayoutData;
@@ -101,6 +103,17 @@
 	let modelFilter = $state("");
 	const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ");
 	let queryTokens = $derived(normalize(modelFilter).trim().split(/\s+/).filter(Boolean));
+
+	// With the ML Intern switch on, only the mode's fixed set is offered, in its
+	// configured order — anything else would be swapped for the default on send.
+	let mlModelsOnly = $derived(ML_ASSISTANT_MODE && mlAssistant.enabled);
+	let browsableModels = $derived(
+		mlModelsOnly
+			? data.mlAssistantModels
+					.map((id) => data.models.find((el) => el.id === id))
+					.filter((el): el is (typeof data.models)[number] => el !== undefined)
+			: data.models
+	);
 </script>
 
 <div
@@ -161,12 +174,17 @@
 				/>
 			</div>
 
-			{#each data.models
+			{#if mlModelsOnly}
+				<p class="px-3 pb-2 text-xs text-gray-500 dark:text-gray-400">
+					ML Intern mode is on, so only its models are listed.
+				</p>
+			{/if}
+			{#each browsableModels
 				.filter((el) => !el.unlisted)
 				.filter((el) => {
 					const haystack = normalize(`${el.id} ${el.name ?? ""} ${el.displayName ?? ""}`);
 					return queryTokens.every((q) => haystack.includes(q));
-				}) as model}
+				}) as model (model.id)}
 				<button
 					type="button"
 					onclick={() => goto(`${base}/settings/${model.id}`)}

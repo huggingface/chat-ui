@@ -39,7 +39,7 @@
 			</h2>
 			<p class="text-[15px] leading-relaxed text-gray-600 dark:text-gray-300">
 				It plans and runs machine-learning work for you on Hugging Face. Two settings on your
-				account make a real difference to how well that goes.
+				account can improve your experience.
 			</p>
 		</div>
 
@@ -80,10 +80,11 @@
 						Set a spending cap
 					</p>
 					<p class="text-sm leading-relaxed">
-						A budget you give ML Intern in the chat is strictly enforced on the Jobs it launches
-						from here, but it is not a guarantee: a Job it starts could launch Jobs of its own or
-						use other Hugging Face products. To make sure you never overspend, set a budget in your
-						billing settings too.
+						A budget you give ML Intern in the chat is strictly enforced on the Jobs it launches,
+						but it is not a complete guarantee: those Jobs can start their own or use other Hugging
+						Face products, so set a budget in your billing settings too. Jobs and sandboxes bill to
+						the organization set in HuggingChat's settings, or to you otherwise; Spaces, dashboards
+						and repositories always stay on your account.
 					</p>
 					<a
 						href={BILLING_SETTINGS_URL}

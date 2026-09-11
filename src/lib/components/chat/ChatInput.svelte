@@ -415,11 +415,12 @@
 	{#if !showNoTools || showMlPill}
 		<div
 			class={[
-				"-ml-0.5 scrollbar-custom flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-1.5 px-3 pt-1.5 pb-2.5 text-gray-500 max-md:flex-nowrap max-md:overflow-x-auto dark:text-gray-400",
+				// Stops short of the trailing action buttons; ChatWindow reports their width.
+				"-ml-0.5 scrollbar-custom flex max-w-[calc(100%-var(--composer-actions-width,40px))] flex-wrap items-center justify-start gap-1.5 px-3 pt-1.5 pb-2.5 text-gray-500 max-md:flex-nowrap max-md:overflow-x-auto max-md:mask-r-from-85% dark:text-gray-400",
 			]}
 		>
 			{#if showFileUpload}
-				<div class="flex items-center">
+				<div class="flex shrink-0 items-center">
 					<input
 						bind:this={fileInputEl}
 						disabled={loading}
@@ -580,7 +581,7 @@
 
 					{#if $enabledServersCount > 0}
 						<div
-							class="ml-1.5 inline-flex h-8 items-center gap-1.5 rounded-full bg-blue-600/10 pr-1 pl-2 text-xs font-semibold text-blue-700 sm:h-7 dark:bg-blue-600/20 dark:text-blue-400"
+							class="ml-1.5 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-blue-600/10 pr-1 pl-2 text-xs font-semibold text-blue-700 sm:h-7 dark:bg-blue-600/20 dark:text-blue-400"
 							class:grayscale={!modelSupportsTools}
 							class:opacity-60={!modelSupportsTools}
 							class:cursor-help={!modelSupportsTools}
@@ -601,7 +602,7 @@
 											<img
 												src={getMcpServerFaviconUrl(server.url)}
 												alt=""
-												class="size-4 rounded-sm bg-white p-px shadow-xs ring-1 ring-black/5 dark:bg-gray-900 dark:ring-white/10"
+												class="size-4 shrink-0 rounded-sm bg-white p-px shadow-xs ring-1 ring-black/5 dark:bg-gray-900 dark:ring-white/10"
 											/>
 										{/each}
 										{#if selectedServers.length > 3}

@@ -44,4 +44,6 @@ export interface FeatureFlags {
 	transcriptionEnabled: boolean;
 	/** Fixed model used for background tasks (e.g. conversation titles); null when tasks follow the conversation's model */
 	taskModelId: string | null;
+	/** Models ML Intern conversations may use, in order; the first is the default. Empty when the mode is off. */
+	mlAssistantModels: string[];
 }

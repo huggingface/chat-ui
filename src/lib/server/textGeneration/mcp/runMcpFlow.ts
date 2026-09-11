@@ -13,8 +13,12 @@ import type { Stream } from "openai/streaming";
 import { buildToolPreprompt } from "../utils/toolPrompt";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
-import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
-import { hasTruncatedToolCall, parseToolArguments } from "./toolArgs";
+import {
+	executeToolCalls,
+	withRewrittenArguments,
+	type NormalizedToolCall,
+} from "./toolInvocation";
+import { hasTruncatedToolCall, parseToolArguments, withParseableArguments } from "./toolArgs";
 import type { TextGenerationContext } from "../types";
 import {
 	hasAuthHeader,
@@ -28,12 +32,24 @@ import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
-import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
+import {
+	isMlAssistantConversation,
+	mlAssistantPayerTarget,
+	pinnedHubToken,
+	withMlAssistantServers,
+} from "$lib/server/mlAssistant";
+import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
+import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
+import { createRepeatedCallGuard } from "./repeatedCallGuard";
+import { withRepairedToolSchemas } from "$lib/server/mcp/schemaRepair";
+import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
+import { composeGuards } from "./toolGuard";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
-import { withRateLimitRetry } from "../utils/rateLimitRetry";
-import { getEnabledBuiltinTools, isResearchTool, shouldSkipMcpFlow } from "../builtinTools";
+import { withUpstreamRetry } from "../utils/upstreamRetry";
+import { getEnabledBuiltinTools, isNestedAgentTool, shouldSkipMcpFlow } from "../builtinTools";
 import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
+import { inferenceBillingHeaders } from "$lib/server/billing";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -86,6 +102,18 @@ const MAX_CUT_ANSWER_RETRIES = 1;
 // template leaks their native tool syntax into content. A second leak
 // finalizes as-is rather than looping on a model that cannot comply.
 const MAX_LEAKED_TOOL_CALL_RETRIES = 1;
+/**
+ * The `<tool_call>name<arg_key>k</arg_key><arg_value>v</arg_value>` dialect, for
+ * a leak that carries no advertised tool name to match on.
+ *
+ * Two adjacent tags, never one: a single `</function>` or `</tool_call>` appears
+ * in an answer that documents this syntax or quotes sample XML, and treating
+ * that as a leak would throw the answer away and tell the model to make a call
+ * it was never asked for. The pairs below are the structure a half-parsed call
+ * leaves behind and are not something prose produces.
+ */
+const LEAKED_CALL_MARKUP =
+	/<\/arg_key>\s*<arg_value>|<\/arg_value>\s*(?:<arg_key>|<\/(?:tool_call|function)>)|<\/function>\s*<\/tool_call>/;
 
 export async function* runMcpFlow({
 	model,
@@ -124,7 +152,10 @@ export async function* runMcpFlow({
 		}
 		return false;
 	};
-	const builtinTools = getEnabledBuiltinTools({ conv });
+	const builtinTools = getEnabledBuiltinTools({
+		conv,
+		namespace: (locals as unknown as { user?: { username?: string } })?.user?.username,
+	});
 	// Read once: the preset decides the servers, the round budget and which tool
 	// doctrine is sent, and they must all agree within a run.
 	const mlAssistant = isMlAssistantConversation(conv);
@@ -138,8 +169,29 @@ export async function* runMcpFlow({
 				conversationId: conv._id,
 				generationId: generationId ?? conv._id.toString(),
 				username: (locals as unknown as { user?: { username?: string } })?.user?.username,
+				// Same credential the turn-start settle pass uses: an operator-pinned
+				// Hub entry launched the work, so it is what can read it back.
+				token:
+					pinnedHubToken() ??
+					(locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
+					(locals as unknown as { token?: string } | undefined)?.token,
 			})
 		: undefined;
+
+	// A job bills the namespace it runs under, so the billing setting travels as
+	// an argument rather than a header — see mcp/hubBilling.ts.
+	const payer = mlAssistant ? mlAssistantPayerTarget(locals) : undefined;
+	const rewriteArgs = payer ? createHubBillingRewrite(payer) : undefined;
+	if (mlAssistant) {
+		logger.info(
+			{ conversationId: conv._id.toString(), payer: payer ?? null },
+			"[mcp] Hub compute for this run bills to"
+		);
+	}
+
+	// Built here so it spans the turn's rounds; chained below, once the tool
+	// mapping the schema check reads exists.
+	const repeatedCallGuard = createRepeatedCallGuard();
 
 	// Start from env-configured servers
 	let servers = getMcpServers();
@@ -389,7 +441,21 @@ export async function* runMcpFlow({
 		// In the mode, gated tools advertise their routing discriminator as
 		// required — the Hub's own schema doesn't, and calls without one can only
 		// bounce off the budget gate's fail-closed path.
-		const shapedMcpTools = mlAssistant ? withRequiredDiscriminators(mcpTools, mapping) : mcpTools;
+		const gatedMcpTools = mlAssistant ? withRequiredDiscriminators(mcpTools, mapping) : mcpTools;
+		// Applied to every conversation, mode or not: the Hub tools whose real
+		// interface is a grammar in prose misfire the same way whoever is calling
+		// them. See mcp/schemaRepair.ts for what the traces showed.
+		const shapedMcpTools = withRepairedToolSchemas(gatedMcpTools, mapping, servers);
+		// Cheapest first, and only the last link may book anything (see
+		// composeGuards): a repeat of a call that already failed the same way, then
+		// arguments that cannot satisfy the tool's own schema, then the budget.
+		// The first two run for every conversation — getting a tool's arguments
+		// wrong is not a mode-specific failure.
+		const guard = [
+			repeatedCallGuard,
+			createSchemaPreflightGuard(mapping),
+			...(budgetGuard ? [budgetGuard] : []),
+		].reduce(composeGuards);
 		const oaTools = [
 			...builtinTools.map((tool) => tool.definition),
 			...shapedMcpTools.filter((tool) => !builtinNames.has(tool.function.name)),
@@ -425,9 +491,7 @@ export async function* runMcpFlow({
 			fetch: captureProviderFetch,
 			defaultHeaders: {
 				// Bill to organization if configured (HuggingChat only)
-				...(config.isHuggingChat && locals?.billingOrganization
-					? { "X-HF-Bill-To": locals.billingOrganization }
-					: {}),
+				...(config.isHuggingChat ? inferenceBillingHeaders(locals) : {}),
 			},
 		});
 
@@ -463,10 +527,11 @@ export async function* runMcpFlow({
 
 		// Hoisted above the message prep so the history budget can reserve the
 		// reply allowance this request will actually ask for.
-		const parameters = { ...targetModel.parameters, ...assistant?.generateSettings } as Record<
-			string,
-			unknown
-		>;
+		const parameters = {
+			...targetModel.parameters,
+			...(mlAssistant ? mlAssistantModelEntry(targetModel.id || targetModel.name)?.parameters : {}),
+			...assistant?.generateSettings,
+		} as Record<string, unknown>;
 		const catalogMaxTokens =
 			(parameters?.max_tokens as number | undefined) ??
 			(parameters?.max_new_tokens as number | undefined) ??
@@ -584,12 +649,12 @@ export async function* runMcpFlow({
 			...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
 		};
 
-		// The research builtin runs a nested tool loop and needs the request
-		// plumbing this turn resolved — client, sampling params, the listed
-		// MCP tools — which only exists here. Its definition and enablement
-		// stayed in builtinTools/; only the runtime binding lives at the
-		// call site.
-		builtinTools.find(isResearchTool)?.bind({
+		// Sub-agent builtins run nested tool loops and need the request plumbing
+		// this turn resolved — client, sampling params, the listed MCP tools —
+		// which only exists here. Their definitions and enablement stay in
+		// builtinTools/; only the runtime binding lives at the call site, and it
+		// is the same binding for all of them.
+		const nestedAgentDeps = {
 			openai,
 			completionBase,
 			requestHeaders: {
@@ -601,10 +666,16 @@ export async function* runMcpFlow({
 			},
 			servers,
 			mapping,
-			mcpTools,
+			// Repaired, not raw: the sandbox sub-agent is the heaviest caller of the
+			// hf_sandbox_* grammar these rewrites exist for.
+			mcpTools: shapedMcpTools,
 			hostBuiltinTools: builtinTools,
 			contextLengthTokens: targetContextLength,
-		});
+			...(rewriteArgs ? { rewriteArgs } : {}),
+		};
+		for (const tool of builtinTools) {
+			if (isNestedAgentTool(tool)) tool.bind(nestedAgentDeps);
+		}
 
 		const toPrimitive = (value: unknown) => {
 			if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
@@ -678,8 +749,9 @@ export async function* runMcpFlow({
 			};
 
 			// A turn several productive rounds deep must not die on one throttled
-			// request; absorb router 429s that outlast the SDK's quick retries.
-			const completionStream: Stream<ChatCompletionChunk> = await withRateLimitRetry(
+			// request, or on a gateway that has no backend ready for a moment;
+			// absorb what outlasts the SDK's quick retries.
+			const completionStream: Stream<ChatCompletionChunk> = await withUpstreamRetry(
 				() =>
 					openai.chat.completions.create(completionRequest, {
 						signal: abortSignal,
@@ -693,8 +765,11 @@ export async function* runMcpFlow({
 					}),
 				{
 					signal: abortSignal,
-					onBackoff: (attempt, delayMs) =>
-						logger.warn({ loop, attempt, delayMs }, "[mcp] rate limited; backing off in-loop"),
+					onBackoff: (attempt, delayMs, err) =>
+						logger.warn(
+							{ loop, attempt, delayMs, err: String(err) },
+							"[mcp] upstream failure; backing off in-loop"
+						),
 				}
 			);
 
@@ -912,9 +987,9 @@ export async function* runMcpFlow({
 						{ loop },
 						"[mcp] missing tool_call id in stream; retrying non-stream to recover ids"
 					);
-					// Same throttle absorption as the streaming call above: this recovery
-					// request is mid-round, where a surfaced 429 costs the whole turn.
-					const nonStream = await withRateLimitRetry(
+					// Same absorption as the streaming call above: this recovery
+					// request is mid-round, where a surfaced failure costs the whole turn.
+					const nonStream = await withUpstreamRetry(
 						() =>
 							openai.chat.completions.create(
 								{ ...completionBase, messages: messagesOpenAI, stream: false },
@@ -931,10 +1006,10 @@ export async function* runMcpFlow({
 							),
 						{
 							signal: abortSignal,
-							onBackoff: (attempt, delayMs) =>
+							onBackoff: (attempt, delayMs, err) =>
 								logger.warn(
-									{ loop, attempt, delayMs },
-									"[mcp] rate limited on id recovery; backing off in-loop"
+									{ loop, attempt, delayMs, err: String(err) },
+									"[mcp] upstream failure on id recovery; backing off in-loop"
 								),
 						}
 					);
@@ -953,6 +1028,16 @@ export async function* runMcpFlow({
 							name: c?.name ?? "",
 							arguments: c?.arguments ?? "",
 						})) as NormalizedToolCall[];
+				}
+
+				if (rewriteArgs) {
+					calls = withRewrittenArguments(calls, {
+						mapping,
+						servers,
+						builtinTools,
+						parseArgs,
+						rewrite: rewriteArgs,
+					});
 				}
 
 				// Include the assistant message with tool_calls so the next round
@@ -986,7 +1071,9 @@ export async function* runMcpFlow({
 				// OpenAI-compatible backends 400 on empty text next to tool_calls.
 				const assistantToolMessage: ChatCompletionMessageParam & { reasoning_content?: string } = {
 					role: "assistant",
-					tool_calls: toolCalls,
+					// Never the raw calls: one unparseable payload in the history 400s
+					// every later request of this turn. See withParseableArguments.
+					tool_calls: withParseableArguments(toolCalls),
 					...(assistantContentForToolMsg.trim().length > 0
 						? { content: assistantContentForToolMsg }
 						: {}),
@@ -1021,7 +1108,10 @@ export async function* runMcpFlow({
 						sessionId: (locals as unknown as { sessionId?: string })?.sessionId,
 					},
 					builtinTools,
-					...(budgetGuard ? { guard: budgetGuard } : {}),
+					guard,
+					// So a server operator can tell autonomous, job-shaped mode traffic
+					// from ordinary chat: the name is sent once, at initialize.
+					...(mlAssistant ? { clientKind: "intern" as const } : {}),
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;
@@ -1114,10 +1204,21 @@ export async function* runMcpFlow({
 			const leakedToolName = advertisedToolNames.find((name) =>
 				new RegExp(`<${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s/>]`).test(visibleContent)
 			);
-			if (leakedToolName && leakedToolCallRetries < MAX_LEAKED_TOOL_CALL_RETRIES) {
+			// The name is not always there to find. GLM-class templates write it as
+			// plain text after `<tool_call>`, so a provider that half-parses the
+			// block strips the name along with the opening tag and leaks the tail —
+			// `args</arg_key><arg_value>{…}</arg_value></tool_call>`, which names
+			// nothing this loop advertises. The closing markers are what survive, so
+			// they are what this matches; an opening tag alone stays ordinary text,
+			// which keeps prose that merely mentions the syntax out of it.
+			const leakedMarkup = !leakedToolName && LEAKED_CALL_MARKUP.test(visibleContent);
+			if (
+				(leakedToolName || leakedMarkup) &&
+				leakedToolCallRetries < MAX_LEAKED_TOOL_CALL_RETRIES
+			) {
 				leakedToolCallRetries += 1;
 				logger.warn(
-					{ loop, tool: leakedToolName, attempt: leakedToolCallRetries },
+					{ loop, tool: leakedToolName ?? "(unnamed)", attempt: leakedToolCallRetries },
 					"[mcp] final answer contains tool-call markup; retrying"
 				);
 				messagesOpenAI = [
@@ -1125,7 +1226,7 @@ export async function* runMcpFlow({
 					{ role: "assistant" as const, content: lastAssistantContent },
 					{
 						role: "user" as const,
-						content: `[SYSTEM: Your previous response wrote a tool call as text markup (<${leakedToolName}> tags). That text called nothing — no tool ran, and the user saw broken markup instead of a working control. Respond again: make the call through the function-calling mechanism as a real tool call, and keep tool markup out of your reply text.]`,
+						content: `[SYSTEM: Your previous response wrote a tool call as text markup (${leakedToolName ? `<${leakedToolName}> tags` : "tool-call tags such as <arg_value> and </tool_call>"}). That text called nothing — no tool ran, and the user saw broken markup instead of a working control. Respond again: make the call through the function-calling mechanism as a real tool call, and keep tool markup out of your reply text.]`,
 					},
 				];
 				continue;

@@ -20,7 +20,9 @@ import { ToolResultStatus } from "$lib/types/Tool";
  */
 
 /**
- * Tools whose output may carry a dashboard URL: the ones that run user code.
+ * Tools whose output may carry a dashboard URL: the ones that run user code,
+ * plus `create_trackio`, whose output is written by chat-ui itself and is
+ * therefore the one URL here that never passed through the model at all.
  *
  * Matched by family rather than by exact name. The sandbox is several tools —
  * `hf_sandbox` creates one, `hf_sandbox_exec` runs in it, `hf_sandbox_fs` reads
@@ -30,7 +32,7 @@ import { ToolResultStatus } from "$lib/types/Tool";
  * and the whole run moved to the sandbox). An exact-name list silently drops
  * those, and would drop any future `hf_sandbox_*` too.
  */
-const TRACKIO_SOURCE_TOOL_REGEX = /^hf_(jobs|sandbox)(_|$)/;
+const TRACKIO_SOURCE_TOOL_REGEX = /^(hf_(jobs|sandbox)(_|$)|create_trackio$)/;
 
 /** `https://<subdomain>.hf.space`, optionally with a path/query. */
 const HF_SPACE_URL_REGEX = /https?:\/\/([a-z0-9][a-z0-9-]*)\.hf\.space(\/[^\s"'<>)\]}]*)?/gi;
@@ -59,6 +61,12 @@ export interface TrackioDashboard {
 	url: string;
 	/** Human label for the pane header: `owner/name` when known, else the subdomain. */
 	label: string;
+	/**
+	 * `owner/name`, when the source named it that way. Only a dashboard named
+	 * before it exists — `create_trackio` — needs its readiness polled; one found
+	 * in a log was printed by `trackio.init`, so it is already up.
+	 */
+	spaceId?: string;
 	/**
 	 * Message the dashboard was printed in. Set by `collectTrackioDashboards`,
 	 * which walks the conversation and therefore knows the position; absent when
@@ -113,10 +121,10 @@ export function extractTrackioDashboards(text: string): TrackioDashboard[] {
 	const found: TrackioDashboard[] = [];
 	const seen = new Set<string>();
 
-	const push = (url: string, label: string) => {
+	const push = (url: string, label: string, spaceId?: string) => {
 		if (seen.has(url)) return;
 		seen.add(url);
-		found.push({ url, label });
+		found.push({ url, label, ...(spaceId ? { spaceId } : {}) });
 	};
 
 	for (const line of text.split(/\r?\n/)) {
@@ -148,7 +156,7 @@ export function extractTrackioDashboards(text: string): TrackioDashboard[] {
 			if (!isTrackioContext(line)) continue;
 			const origin = spaceIdToEmbedOrigin(owner, name);
 			if (!origin) continue;
-			push(origin, spaceId);
+			push(origin, spaceId, spaceId);
 		}
 	}
 

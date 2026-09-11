@@ -7,6 +7,7 @@
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
 	import { collectTrackioDashboards } from "$lib/utils/trackio";
+	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
 	import { collectPaneItems } from "$lib/utils/paneItems";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 
@@ -67,6 +68,9 @@
 	import MlAssistantStrip from "./MlAssistantStrip.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import MlInternSpotlight from "./MlInternSpotlight.svelte";
+	import { useConversationsStore } from "$lib/stores/conversations.svelte";
+	import { MediaQuery } from "svelte/reactivity";
 	import { planStepsToMlSteps } from "$lib/utils/planProgress";
 	import type { PlanState } from "$lib/types/Plan";
 	import type { MlBudget } from "$lib/types/Conversation";
@@ -475,6 +479,9 @@
 	$effect(() => {
 		const latest = trackioDashboards.at(-1);
 		if (!latest || !loading) return;
+		// A dashboard named before it exists (create_trackio) is not framable until
+		// the run reaches trackio.init; opening it early frames a 404.
+		if (latest.spaceId && trackioStatus.status(latest.url) !== "live") return;
 		if (!window.matchMedia("(min-width: 768px)").matches) return;
 		sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
 	});
@@ -552,8 +559,60 @@
 
 	// The pill is the mode's pre-task switch. Empty conversations only — the mode
 	// cannot be joined once a chat has started without it.
+	// With no set configured the send would fail; no switch is better than a
+	// dead end.
+	let mlModelSet = $derived(
+		ML_ASSISTANT_MODE
+			? ((page.data as { mlAssistantModels?: string[] }).mlAssistantModels ?? [])
+			: []
+	);
 	let mlPillVisible = $derived(
-		ML_ASSISTANT_MODE && !shared && !isReadOnly && !mlTaskRunning && messages.length === 0
+		ML_ASSISTANT_MODE &&
+			!shared &&
+			!isReadOnly &&
+			!mlTaskRunning &&
+			messages.length === 0 &&
+			mlModelSet.length > 0
+	);
+
+	// ML Intern launch card under the home-screen logo (HuggingChat only). Temporary,
+	// so its dismissal lives in localStorage rather than in a settings field. Off on
+	// short viewports, and while the recorder replaces the composer: the pill (and
+	// with it the first-run onboarding its CTA relies on) is unmounted then.
+	const convsStore = useConversationsStore();
+	const shortViewport = new MediaQuery("(max-height: 560px)");
+	const ML_SPOTLIGHT_KEY = "mlInternSpotlightDismissed";
+	// Hidden until the browser has been asked, so SSR and hydration agree.
+	let mlSpotlightDismissed = $state(true);
+	$effect(() => {
+		mlSpotlightDismissed = localStorage.getItem(ML_SPOTLIGHT_KEY) === "1";
+	});
+	let mlSpotlightVisible = $derived(
+		publicConfig.isHuggingChat &&
+			mlPillVisible &&
+			page.route.id === "/" &&
+			!mlAssistant.enabled &&
+			!mlSpotlightDismissed &&
+			!shortViewport.current &&
+			!isRecording &&
+			!isTranscribing &&
+			!convsStore.list.some((conv) => conv.mlAssistant)
+	);
+
+	function dismissMlSpotlight() {
+		mlSpotlightDismissed = true;
+		localStorage.setItem(ML_SPOTLIGHT_KEY, "1");
+	}
+
+	/** The card's CTA: switches the mode on, as the pill would, and retires the card. */
+	function tryMlIntern() {
+		if (requireAuthUser()) return;
+		mlAssistant.toggle(true);
+		dismissMlSpotlight();
+	}
+	// A mode conversation whose model left the set can only move within the set.
+	let switchableModels = $derived(
+		mlTaskRunning ? models.filter((m) => mlModelSet.includes(m.id)) : models
 	);
 
 	$effect(() => {
@@ -680,8 +739,9 @@
 	async function startExample(example: RouterExample) {
 		if (requireAuthUser()) return;
 
-		// ML Intern chips seed the composer instead of dispatching: their prompts
-		// name "this paper/dataset/model", so the user still has details to add.
+		// ML Intern chips seed the composer instead of dispatching. Their prompts
+		// are complete, but they name one specific paper, model or dataset, and a
+		// task at this price is one the user should read before it starts.
 		if (mlModeOn) {
 			draft = example.prompt;
 			return;
@@ -821,7 +881,7 @@
 				<IconShare />
 			</button>
 		{/if}
-		{#if featureAnnouncement && showFeatureAnnouncement}
+		{#if featureAnnouncement && showFeatureAnnouncement && !mlSpotlightVisible}
 			<FeatureAnnouncementToast announcement={featureAnnouncement} />
 		{/if}
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -909,7 +969,7 @@
 							</div>
 						{/each}
 						{#if isReadOnly}
-							<ModelSwitch {models} {currentModel} />
+							<ModelSwitch models={switchableModels} {currentModel} />
 						{/if}
 					</div>
 				{:else if pending}
@@ -934,7 +994,11 @@
 						onmessage={(content) => {
 							onmessage?.(content);
 						}}
-					/>
+					>
+						{#if mlSpotlightVisible}
+							<MlInternSpotlight ontry={tryMlIntern} ondismiss={dismissMlSpotlight} />
+						{/if}
+					</ChatIntroduction>
 				{/if}
 			</div>
 
@@ -1049,11 +1113,12 @@
 					class={{
 						"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
 						"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
-						"border-[#f7ddc2] dark:border-[#54371c]": mlModeOn && (mlStripVisible || mlPillVisible),
+						"border-[#e2ddd6] dark:border-[#2c2c2c]": mlModeOn && (mlStripVisible || mlPillVisible),
 						"dark:border-gray-700": !(mlModeOn && (mlStripVisible || mlPillVisible)),
 						"opacity-30": isReadOnly,
 						"max-sm:mb-4": focused && isVirtualKeyboard(),
 					}}
+					style:--composer-actions-width={transcriptionEnabled && !loading ? "84px" : "44px"}
 				>
 					{#if ML_ASSISTANT_MODE}
 						<MlAssistantStrip
@@ -1063,6 +1128,7 @@
 							complete={mlAssistant.complete}
 							budget={mlAssistant.budget}
 							onbudgetchange={page.params?.id ? changeMlBudget : undefined}
+							dashboard={trackioDashboards.at(-1)}
 						/>
 					{/if}
 					<!-- The composer box is a column so the ML Assistant strip can stack on

@@ -24,7 +24,7 @@ describe("MlInternOnboardingModal", () => {
 		expect(text).toContain("Set a spending cap");
 		// Honest about the limit: enforced in the chat, but not a hard guarantee.
 		expect(text).toContain("strictly enforced");
-		expect(text).toContain("not a guarantee");
+		expect(text).toContain("not a complete guarantee");
 	});
 
 	it("is named by its heading for assistive tech", () => {

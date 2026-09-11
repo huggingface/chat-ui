@@ -38,7 +38,12 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		content: parsed.data.content,
 	});
 
-	if (!result.ok) error(result.status, result.error);
+	if (!result.ok) {
+		if (result.status === 409 && result.answered) {
+			return json({ ok: false, message: result.error, answered: result.answered }, { status: 409 });
+		}
+		error(result.status, result.error);
+	}
 
 	// A parked 2026-era call resumes on a fresh run; a blocking one is already unblocked.
 	return json({ ok: true, resume: result.resume, messageId: result.messageId });

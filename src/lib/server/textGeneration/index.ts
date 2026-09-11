@@ -10,7 +10,11 @@ import { generate } from "./generate";
 import { runMcpFlow } from "./mcp/runMcpFlow";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
-import { isMlAssistantConversation, pinnedHubToken } from "$lib/server/mlAssistant";
+import {
+	isMlAssistantConversation,
+	mlAssistantBillingTarget,
+	pinnedHubToken,
+} from "$lib/server/mlAssistant";
 import { settleMlBudget } from "$lib/server/mlBudget/settle";
 import { reservedMicroUsd } from "$lib/utils/mlBudget";
 import { logger } from "$lib/server/logger";
@@ -100,6 +104,7 @@ async function* textGenerationWithoutTitle(
 		}
 	}
 
+	const promptBillingTarget = mlAssistant ? mlAssistantBillingTarget(ctx.locals) : undefined;
 	const preprompt = resolvePreprompt({
 		conversationPreprompt: conv.preprompt,
 		mlAssistant,
@@ -108,6 +113,10 @@ async function* textGenerationWithoutTitle(
 		username: ctx.username,
 		timezone: (ctx.locals as unknown as { timezone?: string } | undefined)?.timezone,
 		budget: conv.mlBudget,
+		// The same target the dispatch rewrite uses. BillTo remains the valid Hub
+		// namespace; the resource group is a separate attribution field.
+		billTo: promptBillingTarget?.namespace,
+		billingResourceGroup: promptBillingTarget?.resourceGroupId,
 	});
 
 	const processedMessages = await preprocessMessages(messages, convId);

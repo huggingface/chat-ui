@@ -14,10 +14,16 @@
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
-	import { sanitizeUrlParam } from "$lib/utils/urlParams";
-	import { onMount, tick } from "svelte";
+	import { onDestroy, onMount, tick } from "svelte";
 	import { loading } from "$lib/stores/loading.js";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
+	import {
+		LINK_PARAM_NAMES,
+		linkPromptNeedsConfirmation,
+		readLinkPromptRequest,
+		type LinkPromptRequest,
+	} from "$lib/utils/linkParams";
+	import LinkPromptModal from "$lib/components/LinkPromptModal.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 
@@ -28,6 +34,8 @@
 	let hasModels = $derived(Boolean(data.models?.length));
 	let files: File[] = $state([]);
 	let draft = $state("");
+	/** A deep link waiting on the user's say-so; see LinkPromptModal. */
+	let linkRequest = $state<LinkPromptRequest | null>(null);
 
 	const settings = useSettingsStore();
 
@@ -47,6 +55,10 @@
 			} else {
 				model = data.models[0].id;
 			}
+			// The mode runs on its own fixed set; the server enforces this too.
+			if (mlAssistant.taskStarted && data.mlAssistantModels.length > 0) {
+				model = data.mlAssistantModels.includes(model) ? model : data.mlAssistantModels[0];
+			}
 			const res = await fetch(`${base}/conversation`, {
 				method: "POST",
 				headers: {
@@ -61,11 +73,6 @@
 					// The composer latches the mode before handing the message over, so
 					// the conversation this creates is marked with it from the start.
 					mlAssistant: mlAssistant.taskStarted,
-					// The budget granted in the strip travels with the create: absent
-					// means $0, and the gate refuses every submission until one is set.
-					...(mlAssistant.taskStarted && mlAssistant.draftBudgetUsd !== undefined
-						? { mlBudgetUsd: mlAssistant.draftBudgetUsd }
-						: {}),
 				}),
 			});
 
@@ -132,60 +139,66 @@
 		}
 	}
 
-	onMount(async () => {
+	onMount(() => {
 		try {
-			// Check if auth is required before processing any query params
-			const hasQ = page.url.searchParams.has("q");
-			const hasPrompt = page.url.searchParams.has("prompt");
-			const hasAttachments = page.url.searchParams.has("attachments");
+			const request = readLinkPromptRequest(page.url.searchParams);
+			if (!request) return;
+			// Redirects to login and comes back to this URL, params included.
+			if (requireAuthUser()) return;
 
-			if ((hasQ || hasPrompt || hasAttachments) && requireAuthUser()) {
-				return; // Redirecting to login, will return to this URL after
+			// The request lives in memory from here on. Strip it from the URL so a
+			// reload or Back/Forward cannot replay it.
+			const url = new URL(page.url);
+			for (const name of LINK_PARAM_NAMES) url.searchParams.delete(name);
+			tick().then(() => {
+				replaceState(url, page.state);
+			});
+
+			// A link that sends, or one that brings in content we do not publish
+			// ourselves, is shown to the user first. Nothing is fetched before then.
+			if (linkPromptNeedsConfirmation(request)) {
+				linkRequest = request;
+			} else {
+				void applyLinkRequest(request);
 			}
+		} catch (err) {
+			console.error("Failed to process URL parameters:", err);
+		}
+	});
 
-			// Handle attachments parameter first
-			if (hasAttachments) {
-				const result = await loadAttachmentsFromUrls(page.url.searchParams);
+	// A confirmed request can still be loading attachments when the user moves
+	// on. Once this page is gone it must neither attach nor send: a send from
+	// here navigates, and would pull the user back into a conversation they
+	// never saw being created.
+	let unmounted = false;
+	onDestroy(() => {
+		unmounted = true;
+	});
+
+	/** Runs once the user confirmed, or straight away when nothing needed confirming. */
+	async function applyLinkRequest(request: LinkPromptRequest) {
+		linkRequest = null;
+		try {
+			if (request.attachmentUrls.length > 0) {
+				const result = await loadAttachmentsFromUrls(request.attachmentUrls.map((url) => url.href));
+				if (unmounted) return;
 				files = result.files;
-
-				// Show errors if any
 				if (result.errors.length > 0) {
 					console.error("Failed to load some attachments:", result.errors);
 					error.set(
 						`Failed to load ${result.errors.length} attachment(s). Check console for details.`
 					);
 				}
-
-				// Clean up URL
-				const url = new URL(page.url);
-				url.searchParams.delete("attachments");
-				history.replaceState({}, "", url);
 			}
-
-			const query = sanitizeUrlParam(page.url.searchParams.get("q"));
-			if (query) {
-				void createConversation(query);
-				const url = new URL(page.url);
-				url.searchParams.delete("q");
-				tick().then(() => {
-					replaceState(url, page.state);
-				});
-				return;
-			}
-
-			const promptQuery = sanitizeUrlParam(page.url.searchParams.get("prompt"));
-			if (promptQuery && !draft) {
-				draft = promptQuery;
-				const url = new URL(page.url);
-				url.searchParams.delete("prompt");
-				tick().then(() => {
-					replaceState(url, page.state);
-				});
+			if (request.send && request.prompt) {
+				await createConversation(request.prompt);
+			} else if (request.prompt && !draft) {
+				draft = request.prompt;
 			}
 		} catch (err) {
 			console.error("Failed to process URL parameters:", err);
 		}
-	});
+	}
 
 	let currentModel = $derived(findCurrentModel(data.models, data.oldModels, $settings.activeModel));
 </script>
@@ -203,6 +216,16 @@
 		bind:files
 		bind:draft
 	/>
+	<!-- A first visit also opens the layout's welcome modal. One dialog at a time:
+	     the request waits in memory until that one is dismissed. -->
+	{#if linkRequest && $settings.welcomeModalSeen}
+		{@const request = linkRequest}
+		<LinkPromptModal
+			{request}
+			onconfirm={() => applyLinkRequest(request)}
+			oncancel={() => (linkRequest = null)}
+		/>
+	{/if}
 {:else}
 	<div class="mx-auto my-20 max-w-xl rounded-xl border p-6 text-center dark:border-gray-700">
 		<h2 class="mb-2 text-xl font-semibold">No models available</h2>

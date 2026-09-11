@@ -7,6 +7,7 @@ import {
 	retainClient,
 	releaseClient,
 } from "./clientPool";
+import type { McpClientKind } from "./client";
 import { withElicitationContext, type ElicitationSink } from "./elicitation";
 import { config } from "$lib/server/config";
 
@@ -142,6 +143,7 @@ export async function callMcpTool(
 		onProgress,
 		elicitation,
 		resume,
+		clientKind = "session",
 	}: {
 		timeoutMs?: number;
 		signal?: AbortSignal;
@@ -149,6 +151,8 @@ export async function callMcpTool(
 		onProgress?: (progress: McpToolProgress) => void;
 		/** Omit and any `elicitation/create` on this connection is declined. */
 		elicitation?: { sink: ElicitationSink; toolUuid: string };
+		/** Identity this connection introduces itself with at initialize. */
+		clientKind?: McpClientKind;
 		/** Answers to a previous `input_required`, replayed verbatim to continue that call. */
 		resume?: { inputResponses: InputResponses; requestState?: string };
 	} = {}
@@ -163,10 +167,16 @@ export async function callMcpTool(
 	// be interrupted for input needs a connection its prompts can be attributed on, so the
 	// preloaded shared client is not reused for one.
 	const scoped = elicitation
-		? await getAttributableClient(server, elicitation.sink.conversationId.toString(), signal)
+		? await getAttributableClient(
+				server,
+				elicitation.sink.conversationId.toString(),
+				signal,
+				clientKind
+			)
 		: undefined;
 	const isolation = scoped?.isolation;
-	let activeClient = scoped?.client ?? client ?? (await getClient(server, signal));
+	let activeClient =
+		scoped?.client ?? client ?? (await getClient(server, signal, undefined, clientKind));
 
 	const deadline = createCallDeadline(timeoutMs, signal);
 
@@ -239,7 +249,7 @@ export async function callMcpTool(
 				if (attempt > 0) {
 					await new Promise((resolve) => setTimeout(resolve, 1_000 * attempt));
 				}
-				activeClient = await getClient(server, signal, isolation);
+				activeClient = await getClient(server, signal, isolation, clientKind);
 			} finally {
 				releaseClient(currentClient);
 			}

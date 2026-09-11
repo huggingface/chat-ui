@@ -18,12 +18,6 @@ class MlAssistantStore {
 	steps = $state<MlPlanStep[]>([]);
 	/** Compute budget ledger, when the conversation carries one. */
 	budget = $state<MlBudgetSnapshot | undefined>(undefined);
-	/**
-	 * Budget the user typed into the strip before the conversation exists. Sent
-	 * with the create request; a conversation created without one starts at $0
-	 * and every submission is refused until the user grants a budget.
-	 */
-	draftBudgetUsd = $state<number | undefined>(undefined);
 
 	/** Conversation the state above belongs to, so a different one starts clean. */
 	#conversationKey: string | undefined;
@@ -97,7 +91,6 @@ class MlAssistantStore {
 		this.taskStarted = false;
 		this.steps = [];
 		this.budget = undefined;
-		this.draftBudgetUsd = undefined;
 	}
 
 	/**

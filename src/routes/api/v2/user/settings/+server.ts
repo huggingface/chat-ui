@@ -7,29 +7,7 @@ import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { defaultModel, models, validateModel } from "$lib/server/models";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
 import { resolveStreamingMode } from "$lib/utils/messageUpdates";
-import { z } from "zod";
-
-const settingsSchema = z.object({
-	shareConversationsWithModelAuthors: z
-		.boolean()
-		.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
-	welcomeModalSeen: z.boolean().optional(),
-	mlInternOnboardingSeen: z.boolean().optional(),
-	activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
-	customPrompts: z.record(z.string()).default({}),
-	customPromptsEnabled: z.record(z.boolean()).default({}),
-	multimodalOverrides: z.record(z.boolean()).default({}),
-	toolsOverrides: z.record(z.boolean()).default({}),
-	artifactsOverrides: z.record(z.boolean()).default({}),
-	providerOverrides: z.record(z.string()).default({}),
-	reasoningEffortOverrides: z.record(z.enum(["low", "medium", "high"])).default({}),
-	reasoningOverrides: z.record(z.boolean()).default({}),
-	streamingMode: z.enum(["raw", "smooth"]).optional(),
-	directPaste: z.boolean().default(false),
-	hapticsEnabled: z.boolean().default(true),
-	hidePromptExamples: z.record(z.boolean()).default({}),
-	billingOrganization: z.string().optional(),
-});
+import { assertBillingTargetChange, parseSettingsPayload } from "$lib/server/settingsValidation";
 
 export const GET: RequestHandler = async ({ locals }) => {
 	requireAuth(locals);
@@ -81,6 +59,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		reasoningEffortOverrides: settings?.reasoningEffortOverrides ?? {},
 		reasoningOverrides: config.isHuggingChat ? {} : (settings?.reasoningOverrides ?? {}),
 		billingOrganization: settings?.billingOrganization ?? undefined,
+		billingResourceGroup: settings?.billingResourceGroup ?? undefined,
 	});
 };
 
@@ -89,7 +68,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.json();
 
 	const { welcomeModalSeen, mlInternOnboardingSeen, ...parsedSettings } =
-		settingsSchema.parse(body);
+		parseSettingsPayload(body);
 	const streamingMode = resolveStreamingMode(parsedSettings);
 
 	if (config.isHuggingChat) {
@@ -97,6 +76,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		parsedSettings.toolsOverrides = {};
 		parsedSettings.reasoningOverrides = {};
 	}
+
+	await assertBillingTargetChange(locals, parsedSettings);
 
 	const settings = {
 		...parsedSettings,

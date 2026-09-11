@@ -6,8 +6,12 @@ const mockedServers = vi.hoisted(() => ({
 vi.mock("./mcp/registry", () => ({ getMcpServers: () => mockedServers.value }));
 
 import {
-	ML_ASSISTANT_MCP_SERVERS,
 	isMlAssistantConversation,
+	ML_ASSISTANT_HF_MCP_URL,
+	ML_ASSISTANT_MCP_SERVERS,
+	mlAssistantBillingNamespace,
+	mlAssistantBillingTarget,
+	mlAssistantPayerTarget,
 	pinnedHubToken,
 	withMlAssistantServers,
 } from "./mlAssistant";
@@ -43,7 +47,9 @@ describe("ML Assistant preset", () => {
 
 	it("yields to an explicitly-authed entry that still points at the Hub MCP", () => {
 		// OAuth deployments whose app cannot request the privileged scopes pin a
-		// token on the env entry instead; the preset must not strip it.
+		// token on the env entry instead; the preset must not strip it. It wins
+		// for its credential only: the mode's tool set still comes from the
+		// intern bouquet.
 		const preset = ML_ASSISTANT_MCP_SERVERS[0];
 		const pinned = {
 			name: preset.name,
@@ -53,7 +59,21 @@ describe("ML Assistant preset", () => {
 		const merged = withMlAssistantServers([pinned]);
 
 		expect(merged.filter((s) => s.name === preset.name)).toHaveLength(1);
-		expect(merged.find((s) => s.name === preset.name)).toEqual(pinned);
+		expect(merged.find((s) => s.name === preset.name)).toEqual({
+			...pinned,
+			url: "https://hf.co/mcp?bouquet=intern",
+		});
+	});
+
+	it("keeps a bouquet the operator chose on a pinned entry", () => {
+		const preset = ML_ASSISTANT_MCP_SERVERS[0];
+		const pinned = {
+			name: preset.name,
+			url: "https://hf.co/mcp?bouquet=all",
+			headers: { Authorization: "Bearer hf_test" },
+		};
+
+		expect(withMlAssistantServers([pinned]).find((s) => s.name === preset.name)).toEqual(pinned);
 	});
 
 	it("still refuses an authed entry pointing anywhere else", () => {
@@ -95,8 +115,14 @@ describe("ML Assistant preset", () => {
 		// no login control, so the mode's Hub tools would run anonymously. It is
 		// worse than a local mistake: the preset wins the name collision, so it
 		// would replace the ?login entry prod and dev already configure.
-		const hf = ML_ASSISTANT_MCP_SERVERS.find((server) => server.url.includes("hf.co"));
-		expect(hf && isStrictHfMcpLogin(hf.url)).toBe(true);
+		expect(isStrictHfMcpLogin(ML_ASSISTANT_HF_MCP_URL)).toBe(true);
+		expect(ML_ASSISTANT_MCP_SERVERS.map((server) => server.url)).toContain(ML_ASSISTANT_HF_MCP_URL);
+	});
+
+	it("runs the Hub server on the intern bouquet", () => {
+		// The bouquet is the mode's tool set — the Hub server resolves it per
+		// request, so the mode picks up preset changes without a deploy here.
+		expect(new URL(ML_ASSISTANT_HF_MCP_URL).searchParams.get("bouquet")).toBe("intern");
 	});
 
 	it("adds the preset even when nothing was selected", () => {
@@ -127,5 +153,84 @@ describe("pinnedHubToken", () => {
 			{ name: "Hugging Face", url: "https://hf.co/mcp", headers: { Authorization: "Basic abc" } },
 		];
 		expect(pinnedHubToken()).toBeUndefined();
+	});
+});
+
+describe("mlAssistantBillingNamespace", () => {
+	it("is the user's billing organisation, trimmed", () => {
+		mockedServers.value = [{ name: "Hugging Face", url: "https://hf.co/mcp?login" }];
+		expect(mlAssistantBillingNamespace({ billingOrganization: " acme " })).toBe("acme");
+	});
+
+	it("is nothing when the user bills their own account", () => {
+		mockedServers.value = [];
+		expect(mlAssistantBillingNamespace({ billingOrganization: "" })).toBeUndefined();
+		expect(mlAssistantBillingNamespace({ billingOrganization: "   " })).toBeUndefined();
+		expect(mlAssistantBillingNamespace({})).toBeUndefined();
+		expect(mlAssistantBillingNamespace(undefined)).toBeUndefined();
+	});
+
+	it("holds when an operator-pinned Hub entry is configured", () => {
+		// Whether that credential may bill the organisation is the Hub's call: a
+		// refused submission is loud, a silently redirected charge is not.
+		mockedServers.value = [
+			{
+				name: "Hugging Face",
+				url: "https://hf.co/mcp",
+				headers: { Authorization: "Bearer hf_pinned" },
+			},
+		];
+		expect(mlAssistantBillingNamespace({ billingOrganization: "acme" })).toBe("acme");
+	});
+});
+
+describe("mlAssistantBillingTarget", () => {
+	it("carries the organization and selected resource group", () => {
+		expect(
+			mlAssistantBillingTarget({
+				billingOrganization: " acme ",
+				billingResourceGroup: " 65f000000000000000000001 ",
+			})
+		).toEqual({
+			namespace: "acme",
+			resourceGroupId: "65f000000000000000000001",
+		});
+	});
+
+	it("ignores an orphaned resource group without an organization", () => {
+		expect(
+			mlAssistantBillingTarget({ billingResourceGroup: "65f000000000000000000001" })
+		).toBeUndefined();
+	});
+});
+
+describe("mlAssistantPayerTarget", () => {
+	it("is the billing organisation, with its resource group, when one is selected", () => {
+		expect(
+			mlAssistantPayerTarget({ billingOrganization: "acme", user: { username: "pngwn" } })
+		).toEqual({ namespace: "acme" });
+		expect(
+			mlAssistantPayerTarget({
+				billingOrganization: "acme",
+				billingResourceGroup: "65f000000000000000000001",
+				user: { username: "pngwn" },
+			})
+		).toEqual({ namespace: "acme", resourceGroupId: "65f000000000000000000001" });
+	});
+
+	it("is the user's own account under Personal", () => {
+		// Enforced, not defaulted: a run the model addressed to some organisation
+		// must not charge an account the user never picked.
+		expect(
+			mlAssistantPayerTarget({ billingOrganization: "", user: { username: "pngwn" } })
+		).toEqual({ namespace: "pngwn" });
+		expect(mlAssistantPayerTarget({ user: { username: " pngwn " } })).toEqual({
+			namespace: "pngwn",
+		});
+	});
+
+	it("is nothing when neither is known", () => {
+		expect(mlAssistantPayerTarget({ user: {} })).toBeUndefined();
+		expect(mlAssistantPayerTarget(undefined)).toBeUndefined();
 	});
 });

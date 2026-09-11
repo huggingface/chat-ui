@@ -1,3 +1,9 @@
+<script module lang="ts">
+	// Modals can overlap: one opens while another is still fading out. The app
+	// behind them stays inert until the last one is gone.
+	let openModals = 0;
+</script>
+
 <script lang="ts">
 	import { onDestroy, onMount } from "svelte";
 	import { cubicOut } from "svelte/easing";
@@ -50,6 +56,7 @@
 	}
 
 	onMount(() => {
+		openModals += 1;
 		document.getElementById("app")?.setAttribute("inert", "true");
 		modalEl?.focus();
 		tap();
@@ -59,7 +66,8 @@
 
 	onDestroy(() => {
 		if (!browser) return;
-		document.getElementById("app")?.removeAttribute("inert");
+		openModals -= 1;
+		if (openModals === 0) document.getElementById("app")?.removeAttribute("inert");
 		window.removeEventListener("keydown", handleKeydown, { capture: true });
 	});
 </script>

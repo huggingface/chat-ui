@@ -104,9 +104,11 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 		if (
 			typeof mlBudgetTotalUsd !== "number" ||
 			!Number.isFinite(mlBudgetTotalUsd) ||
-			mlBudgetTotalUsd <= 0 ||
+			mlBudgetTotalUsd < 0 ||
 			mlBudgetTotalUsd > 10_000
 		) {
+			// Zero is allowed: it pauses spend on the conversation while keeping the
+			// ledger's spend and open holds intact.
 			error(400, "Budget must be a number of dollars between 0 and 10000");
 		}
 	}

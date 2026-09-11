@@ -34,6 +34,7 @@ describe("trackio dashboard extraction", () => {
 			{
 				url: "https://abidlabs-trackio-mnist-smoke.hf.space",
 				label: "abidlabs/trackio-mnist-smoke",
+				spaceId: "abidlabs/trackio-mnist-smoke",
 			},
 		]);
 	});
