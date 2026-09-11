@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createHubBillingRewrite } from "./hubBilling";
 
 const HF_URL = "https://hf.co/mcp?login";
-const rewrite = createHubBillingRewrite("acme");
+const rewrite = createHubBillingRewrite({ namespace: "acme" });
 const apply = (tool: string, args: Record<string, unknown>, serverUrl = HF_URL) =>
 	rewrite({ serverUrl, tool, args });
 
@@ -26,10 +26,50 @@ describe("hub billing rewrite: jobs", () => {
 		}
 	});
 
+	it("adds the selected resource group to submissions", () => {
+		const rewriteToGroup = createHubBillingRewrite({
+			namespace: "acme",
+			resourceGroupId: "65f000000000000000000001",
+		});
+		const out = rewriteToGroup({
+			serverUrl: HF_URL,
+			tool: "hf_jobs",
+			args: { operation: "run", args: { command: ["echo", "hi"] } },
+		});
+		expect(out.args).toEqual({
+			command: ["echo", "hi"],
+			namespace: "acme",
+			resource_group_id: "65f000000000000000000001",
+		});
+	});
+
+	it("removes a model-supplied resource group when organization root is selected", () => {
+		const out = apply("hf_jobs", {
+			operation: "run",
+			args: { namespace: "acme", resource_group_id: "other" },
+		});
+		expect(out.args).toEqual({ namespace: "acme" });
+	});
+
 	it("fills in the namespace on a read that names none", () => {
 		// The org's jobs live in the org's namespace; a bare id would 404 under the user.
 		for (const operation of ["ps", "logs", "inspect", "cancel"]) {
 			const out = apply("hf_jobs", { operation, args: { job_id: "abc" } });
+			expect(out.args).toEqual({ job_id: "abc", namespace: "acme" });
+		}
+	});
+
+	it("does not add the submission-only resource group to reads", () => {
+		const rewriteToGroup = createHubBillingRewrite({
+			namespace: "acme",
+			resourceGroupId: "65f000000000000000000001",
+		});
+		for (const operation of ["ps", "logs", "inspect", "cancel"]) {
+			const out = rewriteToGroup({
+				serverUrl: HF_URL,
+				tool: "hf_jobs",
+				args: { operation, args: { job_id: "abc" } },
+			});
 			expect(out.args).toEqual({ job_id: "abc", namespace: "acme" });
 		}
 	});
@@ -88,6 +128,36 @@ describe("hub billing rewrite: sandboxes", () => {
 			"--namespace",
 			"acme",
 		]);
+	});
+
+	it("creates under the selected resource group", () => {
+		const rewriteToGroup = createHubBillingRewrite({
+			namespace: "acme",
+			resourceGroupId: "65f000000000000000000001",
+		});
+		const out = rewriteToGroup({
+			serverUrl: HF_URL,
+			tool: "hf_sandbox",
+			args: {
+				cmd: "create",
+				args: ["create", "--resource-group-id", "other", "--namespace", "other-org"],
+			},
+		});
+		expect(out.args).toEqual([
+			"create",
+			"--namespace",
+			"acme",
+			"--resource-group-id",
+			"65f000000000000000000001",
+		]);
+	});
+
+	it("removes a model-supplied resource group when organization root is selected", () => {
+		const args = {
+			cmd: "create",
+			args: ["create", "--resource-group-id", "other"],
+		};
+		expect(apply("hf_sandbox", args).args).toEqual(["create", "--namespace", "acme"]);
 	});
 
 	it("collapses repeated --namespace flags to one", () => {

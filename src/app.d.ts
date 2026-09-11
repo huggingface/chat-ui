@@ -15,6 +15,8 @@ declare global {
 			token?: string;
 			/** Organization to bill inference, and ML Intern's Jobs and sandboxes, to (from settings) */
 			billingOrganization?: string;
+			/** Enterprise resource group within billingOrganization used for cost attribution. */
+			billingResourceGroup?: string;
 		}
 
 		interface Error {

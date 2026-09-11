@@ -628,6 +628,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 				// Add billing organization to locals for the endpoint to use
 				locals.billingOrganization = userSettings?.billingOrganization;
+				locals.billingResourceGroup = userSettings?.billingResourceGroup;
 
 				let parkedAgain = false;
 				if (resumeElicitationId) {

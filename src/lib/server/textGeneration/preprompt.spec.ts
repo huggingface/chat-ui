@@ -204,8 +204,11 @@ describe("resolvePreprompt: who pays", () => {
 			mlAssistant: true,
 			username: "pngwn",
 			billTo: "acme",
+			billingResourceGroup: "65f000000000000000000001",
 		});
-		expect(inMode?.trimEnd().split("\n").at(-1)).toContain("User=pngwn, BillTo=acme");
+		expect(inMode?.trimEnd().split("\n").at(-1)).toContain(
+			"User=pngwn, BillTo=acme, BillingResourceGroup=65f000000000000000000001"
+		);
 
 		expect(
 			resolvePreprompt({

@@ -448,6 +448,19 @@ describe("ML Assistant billing", () => {
 		expect(stamped).toContain("User=pngwn, BillTo=acme, Budget=$7.80 remaining of $10.00]");
 	});
 
+	it("keeps BillTo a valid namespace and stamps the resource group separately", () => {
+		const stamped = mlAssistantSessionContext({
+			username: "pngwn",
+			now,
+			billTo: "acme",
+			billingResourceGroup: "65f000000000000000000001",
+		});
+		expect(stamped).toContain(
+			"User=pngwn, BillTo=acme, BillingResourceGroup=65f000000000000000000001"
+		);
+		expect(stamped).not.toContain("BillTo=acme (");
+	});
+
 	it("tells the model what BillTo changes and what it does not", () => {
 		// Namespace for compute, not for outputs: the push destination stays the user.
 		expect(ML_ASSISTANT_PREPROMPT).toContain("BillTo");

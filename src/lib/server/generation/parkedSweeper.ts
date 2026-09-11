@@ -179,6 +179,9 @@ async function rebuildIdentity(park: ParkedCall) {
 			...(settings?.billingOrganization
 				? { billingOrganization: settings.billingOrganization }
 				: {}),
+			...(settings?.billingResourceGroup
+				? { billingResourceGroup: settings.billingResourceGroup }
+				: {}),
 		} as unknown as App.Locals,
 		settings,
 		tokenExpired: tokenExpired || !token?.value,

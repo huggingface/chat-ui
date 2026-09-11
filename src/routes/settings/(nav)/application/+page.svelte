@@ -53,30 +53,72 @@
 	let OPENAI_BASE_URL = $state<string | null>(null);
 
 	// Billing organization state
-	type BillingOrg = { sub: string; name: string; preferred_username: string };
+	type BillingResourceGroup = { sub: string; name: string; role: string };
+	type BillingOrg = {
+		sub: string;
+		name: string;
+		preferred_username: string;
+		resourceGroups: BillingResourceGroup[];
+	};
 	let billingOrgs = $state<BillingOrg[]>([]);
 	let billingOrgsLoading = $state(false);
 	let billingOrgsError = $state<string | null>(null);
 	let billingOrgSaving = $state(false);
 
-	function getBillingOrganization() {
-		return $settings.billingOrganization ?? "";
+	function getBillingSelection() {
+		if ($settings.billingOrganization && $settings.billingResourceGroup) {
+			return `resource-group:${$settings.billingResourceGroup}`;
+		}
+		return $settings.billingOrganization ? `organization:${$settings.billingOrganization}` : "";
+	}
+	type BillingSelection = { billingOrganization: string; billingResourceGroup: string };
+	function parseBillingSelection(value: string): BillingSelection | undefined {
+		if (value.startsWith("resource-group:")) {
+			const resourceGroupId = value.slice("resource-group:".length);
+			const organization = billingOrgs.find((org) =>
+				org.resourceGroups.some((group) => group.sub === resourceGroupId)
+			);
+			return organization
+				? {
+						billingOrganization: organization.preferred_username,
+						billingResourceGroup: resourceGroupId,
+					}
+				: undefined;
+		}
+		return {
+			billingOrganization: value.startsWith("organization:")
+				? value.slice("organization:".length)
+				: "",
+			billingResourceGroup: "",
+		};
 	}
 	// Saved at once and awaited, not debounced with the rest: who gets charged
 	// is not a preference to coalesce, and the server may refuse the target.
-	async function setBillingOrganization(v: string) {
-		const previous = getBillingOrganization();
-		if (v === previous) return;
+	async function saveBillingSelection(next: BillingSelection) {
+		const previous: BillingSelection = {
+			billingOrganization: $settings.billingOrganization ?? "",
+			billingResourceGroup: $settings.billingResourceGroup ?? "",
+		};
+		if (
+			next.billingOrganization === previous.billingOrganization &&
+			next.billingResourceGroup === previous.billingResourceGroup
+		) {
+			return;
+		}
 		billingOrgSaving = true;
 		billingOrgsError = null;
 		try {
-			if (!(await settings.instantSet({ billingOrganization: v }))) {
+			if (!(await settings.instantSet(next))) {
 				billingOrgsError = "Could not save this billing choice";
-				await settings.instantSet({ billingOrganization: previous });
+				await settings.instantSet(previous);
 			}
 		} finally {
 			billingOrgSaving = false;
 		}
+	}
+	async function setBillingSelection(value: string) {
+		const next = parseBillingSelection(value);
+		if (next) await saveBillingSelection(next);
 	}
 
 	onMount(async () => {
@@ -96,11 +138,18 @@
 					userCanPay: boolean;
 					organizations: BillingOrg[];
 					currentBillingOrg?: string;
+					currentBillingResourceGroup?: string;
 				};
 				billingOrgs = data.organizations ?? [];
 				// Update settings if current billing org was cleared by server
-				if (data.currentBillingOrg !== getBillingOrganization()) {
-					await setBillingOrganization(data.currentBillingOrg ?? "");
+				if (
+					data.currentBillingOrg !== ($settings.billingOrganization || undefined) ||
+					data.currentBillingResourceGroup !== ($settings.billingResourceGroup || undefined)
+				) {
+					await saveBillingSelection({
+						billingOrganization: data.currentBillingOrg ?? "",
+						billingResourceGroup: data.currentBillingResourceGroup ?? "",
+					});
 				}
 			} catch {
 				billingOrgsError = "Failed to load billing options";
@@ -286,8 +335,8 @@
 							<p class="text-[12px] text-gray-500 dark:text-gray-400">
 								Bill inference{ML_ASSISTANT_MODE
 									? ", and the Jobs and sandboxes ML Intern launches,"
-									: ""} to your personal account or to an eligible organization. Other Hub products, such
-								as Spaces and repositories, are not affected.
+									: ""} to your personal account, to an eligible organization, or to one of its resource
+								groups. Other Hub products, such as Spaces and repositories, are not affected.
 							</p>
 						</div>
 						<div class="flex items-center">
@@ -299,13 +348,18 @@
 								{/if}
 								<select
 									class="rounded-md border border-gray-300 bg-white px-1 py-1 text-xs text-gray-800 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-									value={getBillingOrganization()}
+									value={getBillingSelection()}
 									disabled={billingOrgSaving}
-									onchange={(e) => setBillingOrganization(e.currentTarget.value)}
+									onchange={(e) => setBillingSelection(e.currentTarget.value)}
 								>
 									<option value="">Personal</option>
 									{#each billingOrgs as org}
-										<option value={org.preferred_username}>{org.name}</option>
+										<option value={`organization:${org.preferred_username}`}>{org.name}</option>
+										{#each org.resourceGroups as group}
+											<option value={`resource-group:${group.sub}`}>
+												{org.name} / {group.name}
+											</option>
+										{/each}
 									{/each}
 								</select>
 							{/if}
@@ -325,8 +379,8 @@
 							</p>
 						</div>
 						<a
-							href={getBillingOrganization()
-								? `https://huggingface.co/organizations/${getBillingOrganization()}/settings/inference-providers/overview`
+							href={$settings.billingOrganization
+								? `https://huggingface.co/organizations/${$settings.billingOrganization}/settings/inference-providers/overview`
 								: "https://huggingface.co/settings/inference-providers/overview"}
 							target="_blank"
 							class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium whitespace-nowrap text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"

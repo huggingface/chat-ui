@@ -34,7 +34,7 @@ import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import {
 	isMlAssistantConversation,
-	mlAssistantPayerNamespace,
+	mlAssistantPayerTarget,
 	pinnedHubToken,
 	withMlAssistantServers,
 } from "$lib/server/mlAssistant";
@@ -49,6 +49,7 @@ import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { withUpstreamRetry } from "../utils/upstreamRetry";
 import { getEnabledBuiltinTools, isNestedAgentTool, shouldSkipMcpFlow } from "../builtinTools";
 import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
+import { inferenceBillingHeaders } from "$lib/server/billing";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -179,7 +180,7 @@ export async function* runMcpFlow({
 
 	// A job bills the namespace it runs under, so the billing setting travels as
 	// an argument rather than a header — see mcp/hubBilling.ts.
-	const payer = mlAssistant ? mlAssistantPayerNamespace(locals) : undefined;
+	const payer = mlAssistant ? mlAssistantPayerTarget(locals) : undefined;
 	const rewriteArgs = payer ? createHubBillingRewrite(payer) : undefined;
 	if (mlAssistant) {
 		logger.info(
@@ -490,9 +491,7 @@ export async function* runMcpFlow({
 			fetch: captureProviderFetch,
 			defaultHeaders: {
 				// Bill to organization if configured (HuggingChat only)
-				...(config.isHuggingChat && locals?.billingOrganization
-					? { "X-HF-Bill-To": locals.billingOrganization }
-					: {}),
+				...(config.isHuggingChat ? inferenceBillingHeaders(locals) : {}),
 			},
 		});
 

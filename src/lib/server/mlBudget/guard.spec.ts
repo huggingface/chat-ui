@@ -243,7 +243,12 @@ describe.sequential("mlBudget guard: reconciling the outcome", () => {
 		const { guard, before } = makeGuard(id);
 		const verdict = await before("hf_jobs", {
 			operation: "uv",
-			args: { flavor: "t4-small", timeout: "10m", namespace: "my-org" },
+			args: {
+				flavor: "t4-small",
+				timeout: "10m",
+				namespace: "my-org",
+				resource_group_id: "65f000000000000000000001",
+			},
 		});
 		if (!verdict.allow || verdict.ticket === undefined) throw new Error("expected a ticket");
 		return { guard, ticket: verdict.ticket };
@@ -259,6 +264,7 @@ describe.sequential("mlBudget guard: reconciling the outcome", () => {
 		const budget = await readMlBudget(id);
 		expect(budget?.reservations[0].jobId).toBe("0123456789abcdef01234567");
 		expect(budget?.reservations[0].namespace).toBe("my-org");
+		expect(budget?.reservations[0].resourceGroupId).toBe("65f000000000000000000001");
 	});
 
 	it("reads a sandbox handle", { timeout: 15000 }, async () => {

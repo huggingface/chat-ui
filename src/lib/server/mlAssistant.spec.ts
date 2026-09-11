@@ -6,11 +6,12 @@ const mockedServers = vi.hoisted(() => ({
 vi.mock("./mcp/registry", () => ({ getMcpServers: () => mockedServers.value }));
 
 import {
+	isMlAssistantConversation,
 	ML_ASSISTANT_HF_MCP_URL,
 	ML_ASSISTANT_MCP_SERVERS,
-	isMlAssistantConversation,
 	mlAssistantBillingNamespace,
-	mlAssistantPayerNamespace,
+	mlAssistantBillingTarget,
+	mlAssistantPayerTarget,
 	pinnedHubToken,
 	withMlAssistantServers,
 } from "./mlAssistant";
@@ -183,24 +184,53 @@ describe("mlAssistantBillingNamespace", () => {
 	});
 });
 
-describe("mlAssistantPayerNamespace", () => {
-	it("is the billing organisation when there is one", () => {
+describe("mlAssistantBillingTarget", () => {
+	it("carries the organization and selected resource group", () => {
 		expect(
-			mlAssistantPayerNamespace({ billingOrganization: "acme", user: { username: "pngwn" } })
-		).toBe("acme");
+			mlAssistantBillingTarget({
+				billingOrganization: " acme ",
+				billingResourceGroup: " 65f000000000000000000001 ",
+			})
+		).toEqual({
+			namespace: "acme",
+			resourceGroupId: "65f000000000000000000001",
+		});
+	});
+
+	it("ignores an orphaned resource group without an organization", () => {
+		expect(
+			mlAssistantBillingTarget({ billingResourceGroup: "65f000000000000000000001" })
+		).toBeUndefined();
+	});
+});
+
+describe("mlAssistantPayerTarget", () => {
+	it("is the billing organisation, with its resource group, when one is selected", () => {
+		expect(
+			mlAssistantPayerTarget({ billingOrganization: "acme", user: { username: "pngwn" } })
+		).toEqual({ namespace: "acme" });
+		expect(
+			mlAssistantPayerTarget({
+				billingOrganization: "acme",
+				billingResourceGroup: "65f000000000000000000001",
+				user: { username: "pngwn" },
+			})
+		).toEqual({ namespace: "acme", resourceGroupId: "65f000000000000000000001" });
 	});
 
 	it("is the user's own account under Personal", () => {
 		// Enforced, not defaulted: a run the model addressed to some organisation
 		// must not charge an account the user never picked.
 		expect(
-			mlAssistantPayerNamespace({ billingOrganization: "", user: { username: "pngwn" } })
-		).toBe("pngwn");
-		expect(mlAssistantPayerNamespace({ user: { username: " pngwn " } })).toBe("pngwn");
+			mlAssistantPayerTarget({ billingOrganization: "", user: { username: "pngwn" } })
+		).toEqual({ namespace: "pngwn" });
+		expect(mlAssistantPayerTarget({ user: { username: " pngwn " } })).toEqual({
+			namespace: "pngwn",
+		});
 	});
 
 	it("is nothing when neither is known", () => {
-		expect(mlAssistantPayerNamespace({ user: {} })).toBeUndefined();
-		expect(mlAssistantPayerNamespace(undefined)).toBeUndefined();
+		expect(mlAssistantPayerTarget({ user: {} })).toBeUndefined();
+		expect(mlAssistantPayerTarget(undefined)).toBeUndefined();
 	});
 });
