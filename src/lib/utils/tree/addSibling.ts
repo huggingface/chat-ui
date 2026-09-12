@@ -15,20 +15,18 @@ export function addSibling<T>(conv: Tree<T>, message: NewNode<T>, siblingId: Tre
 		throw new Error("The sibling message doesn't exist");
 	}
 
-	if (!sibling.ancestors || sibling.ancestors?.length === 0) {
-		throw new Error("The sibling message is the root message, therefore we can't add a sibling");
-	}
-
 	const messageId = v4();
+
+	const siblingAncestors = sibling.ancestors ?? [];
 
 	conv.messages.push({
 		...message,
 		id: messageId,
-		ancestors: sibling.ancestors,
+		ancestors: siblingAncestors,
 		children: [],
 	} as TreeNode<T>);
 
-	const nearestAncestorId = sibling.ancestors[sibling.ancestors.length - 1];
+	const nearestAncestorId = siblingAncestors[siblingAncestors.length - 1];
 	const nearestAncestor = conv.messages.find((m) => m.id === nearestAncestorId);
 
 	if (nearestAncestor) {
