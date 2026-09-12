@@ -51,6 +51,16 @@ npm run dev -- --open
 
 You now have Chat UI running locally. Open the browser and start chatting.
 
+## Firewall / Network Access
+
+If you run Chat UI inside a restrictive network or corporate firewall, allowlist the endpoints used by your configuration:
+
+- **Model API**: the host in `OPENAI_BASE_URL`. For the default Hugging Face Inference Providers router this is `https://router.huggingface.co`; Chat UI calls `${OPENAI_BASE_URL}/models` for discovery and `${OPENAI_BASE_URL}/chat/completions` for chat requests.
+- **MongoDB**: the host in `MONGODB_URL` when you are not using the embedded database.
+- **Optional MCP servers**: any URL you put in `MCP_SERVERS`, for example `https://mcp.exa.ai/mcp` or `https://hf.co/mcp`.
+
+No other outbound hosts are required for a default Chat UI install.
+
 ## Database Options
 
 Chat history, users, settings, files, and stats all live in MongoDB. You can point Chat UI at any MongoDB 6/7 deployment.
