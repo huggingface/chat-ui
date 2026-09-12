@@ -12,7 +12,7 @@ import { config } from "$lib/server/config";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 import { dev } from "$app/environment";
-import { redirect, type Cookies } from "@sveltejs/kit";
+import { type Cookies } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
@@ -580,5 +580,9 @@ export async function triggerOauthFlow({ url, locals, cookies }: RequestEvent): 
 		{ sessionId: locals.sessionId, next, url, cookies }
 	);
 
-	throw redirect(302, authorizationUrl);
+	// Return a real 302 response instead of `throw redirect(...)`: this
+	// function is called from the handle hook, where a thrown Redirect that
+	// crosses an unawaited promise boundary becomes an unhandled rejection
+	// and kills the Node process (observed in prod with scanner requests).
+	return new Response(null, { status: 302, headers: { location: authorizationUrl } });
 }
