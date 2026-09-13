@@ -357,9 +357,24 @@ describe("withRequiredDiscriminators", () => {
 		function: { name, ...(parameters ? { parameters } : {}) },
 	});
 	const MAPPING = {
-		hf_jobs: { fnName: "hf_jobs", server: "Hugging Face", tool: "hf_jobs" },
-		hf_sandbox: { fnName: "hf_sandbox", server: "Hugging Face", tool: "hf_sandbox" },
-		hf_fs: { fnName: "hf_fs", server: "Hugging Face", tool: "hf_fs" },
+		hf_jobs: {
+			fnName: "hf_jobs",
+			server: "Hugging Face",
+			serverUrl: "https://hf.co/mcp",
+			tool: "hf_jobs",
+		},
+		hf_sandbox: {
+			fnName: "hf_sandbox",
+			server: "Hugging Face",
+			serverUrl: "https://hf.co/mcp",
+			tool: "hf_sandbox",
+		},
+		hf_fs: {
+			fnName: "hf_fs",
+			server: "Hugging Face",
+			serverUrl: "https://hf.co/mcp",
+			tool: "hf_fs",
+		},
 	};
 
 	it("requires the routing discriminator on the gated tools", () => {
@@ -385,6 +400,37 @@ describe("withRequiredDiscriminators", () => {
 		const original = tool("hf_jobs", { type: "object", properties: { operation: {} } });
 		withRequiredDiscriminators([original], MAPPING);
 		expect(original.function.parameters?.required).toBeUndefined();
+	});
+
+	it("leaves a same-named tool on a non-Hub server untouched", () => {
+		const original = tool("custom_jobs", {
+			type: "object",
+			properties: { operation: {}, payload: {} },
+		});
+		const [shaped] = withRequiredDiscriminators([original], {
+			custom_jobs: {
+				fnName: "custom_jobs",
+				server: "custom",
+				serverUrl: "https://other.example/mcp",
+				tool: "hf_jobs",
+			},
+		});
+
+		expect(shaped).toBe(original);
+		expect(shaped?.function.parameters?.required).toBeUndefined();
+	});
+
+	it("fails closed when the mapping has no server URL", () => {
+		const original = tool("hf_jobs", {
+			type: "object",
+			properties: { operation: {}, args: {} },
+		});
+		const [shaped] = withRequiredDiscriminators([original], {
+			hf_jobs: { fnName: "hf_jobs", server: "Hugging Face", tool: "hf_jobs" },
+		});
+
+		expect(shaped).toBe(original);
+		expect(shaped?.function.parameters?.required).toBeUndefined();
 	});
 });
 

@@ -216,7 +216,10 @@ export function withRequiredDiscriminators(
 ): OpenAiTool[] {
 	return tools.map((tool) => {
 		const entry = mapping[tool.function.name];
-		const field = entry ? DISCRIMINATOR_BY_TOOL[entry.tool] : undefined;
+		const field =
+			entry && entry.serverUrl !== undefined && isHfMcpServer(entry.serverUrl)
+				? DISCRIMINATOR_BY_TOOL[entry.tool]
+				: undefined;
 		const parameters = tool.function.parameters;
 		if (!field || !parameters) return tool;
 		const required = Array.isArray(parameters.required) ? (parameters.required as string[]) : [];
