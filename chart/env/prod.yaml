@@ -79,9 +79,9 @@ envVars:
   LLM_ROUTER_ARCH_BASE_URL: "https://router.huggingface.co/v1"
   LLM_ROUTER_ROUTES_PATH: "build/client/chat/huggingchat/routes.chat.json"
   LLM_ROUTER_ENABLE_MULTIMODAL: "true"
-  LLM_ROUTER_MULTIMODAL_MODEL: "moonshotai/Kimi-K2.6"
+  LLM_ROUTER_MULTIMODAL_MODEL: "deepseek-ai/DeepSeek-V4.1-Flash"
   LLM_ROUTER_ENABLE_TOOLS: "true"
-  LLM_ROUTER_TOOLS_MODEL: "moonshotai/Kimi-K2.6"
+  LLM_ROUTER_TOOLS_MODEL: "deepseek-ai/DeepSeek-V4.1-Flash"
   TRANSCRIPTION_MODEL: "openai/whisper-large-v3-turbo"
   # ML Intern model set: provider pinned per model from scripts/probe-model.ts runs
   # (2026-09-02). GLM-5.3-Flash on together recalled 5/5 at 924k tokens; Kimi-K3 on
