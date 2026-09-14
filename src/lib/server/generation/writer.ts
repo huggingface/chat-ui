@@ -81,6 +81,13 @@ export interface CreateGenerationWriterParams {
 	messageId: Message["id"];
 	userId?: User["_id"];
 	sessionId?: string;
+	/**
+	 * Floor for the turn-continued sequence, normally the message's persisted
+	 * `materializedSeq`. Covers turns whose earlier events predate turn-scoped
+	 * logging (they can't be found by the max-seq read), so a resumed producer
+	 * still numbers past every cursor a client can hold.
+	 */
+	continueFromSeq?: number;
 	/** Read synchronously at materialisation time so the snapshot and the seq it is stamped with describe the same instant. */
 	snapshot: () => GenerationSnapshot;
 }
@@ -95,8 +102,26 @@ const NOOP_WRITER: GenerationWriter = {
 export async function createGenerationWriter(
 	params: CreateGenerationWriterParams
 ): Promise<GenerationWriter> {
-	const { generationId, conversationId, messageId, userId, sessionId, snapshot } = params;
+	const { generationId, conversationId, messageId, userId, sessionId, continueFromSeq, snapshot } =
+		params;
 	const now = new Date();
+
+	// The event log is turn-scoped: a resumed producer continues the sequence
+	// where the durable log ends, so a subscriber's (messageId, fromSeq) cursor
+	// stays meaningful across every producer the turn ever has. Reading the max
+	// here is race-free because the parked-call lease guarantees one writer per
+	// turn at a time.
+	let baseSeq = continueFromSeq ?? 0;
+	try {
+		const lastEvent = await collections.generationEvents
+			.find({ conversationId, messageId }, { projection: { seq: 1 } })
+			.sort({ seq: -1 })
+			.limit(1)
+			.next();
+		if (lastEvent && lastEvent.seq > baseSeq) baseSeq = lastEvent.seq;
+	} catch (err) {
+		logger.error({ err, generationId }, "[generation] failed to read turn max seq");
+	}
 
 	try {
 		await collections.generations.insertOne({
@@ -115,14 +140,16 @@ export async function createGenerationWriter(
 		});
 	} catch (err) {
 		// A run that cannot register must not take the generation down with it —
-		// the caller still streams and still persists the old way.
+		// the caller still streams and still persists the old way. currentSeq
+		// reports the turn's floor, not 0: callers persist it as the reattach
+		// cursor, and regressing a resumed turn's cursor would replay history.
 		logger.error({ err, generationId }, "[generation] failed to register run; events disabled");
-		return NOOP_WRITER;
+		return { ...NOOP_WRITER, currentSeq: () => baseSeq };
 	}
 
 	registerActiveRun(generationId, { conversationId, messageId });
 
-	let seq = 0;
+	let seq = baseSeq;
 	let pending: GenerationEvent[] = [];
 	let flushTimer: ReturnType<typeof setTimeout> | undefined;
 	let finished = false;
@@ -139,6 +166,8 @@ export async function createGenerationWriter(
 	const nextEvent = (event: MessageUpdate): GenerationEvent => ({
 		_id: new ObjectId(),
 		generationId,
+		conversationId,
+		messageId,
 		seq: ++seq,
 		event,
 		createdAt: new Date(),

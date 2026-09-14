@@ -2,6 +2,8 @@ import { error, json } from "@sveltejs/kit";
 import { config } from "$lib/server/config";
 import { getApiToken } from "$lib/server/apiToken";
 import { logger } from "$lib/server/logger";
+import { inferenceBillingHeaders } from "$lib/server/billing";
+import { loadBillingSettings } from "$lib/server/billingSettings";
 
 const MAX_AUDIO_SIZE = 25 * 1024 * 1024; // 25MB
 const TRANSCRIPTION_TIMEOUT = 60000; // 60 seconds
@@ -52,6 +54,8 @@ export async function POST({ request, locals }) {
 			throw error(413, "Audio file too large (max 25MB)");
 		}
 
+		if (config.isHuggingChat) await loadBillingSettings(locals);
+
 		const baseUrl =
 			config.get("TRANSCRIPTION_BASE_URL") || "https://router.huggingface.co/hf-inference/models";
 		const apiUrl = `${baseUrl}/${transcriptionModel}`;
@@ -64,8 +68,7 @@ export async function POST({ request, locals }) {
 			headers: {
 				Authorization: `Bearer ${token}`,
 				"Content-Type": contentType,
-				// Bill to organization if configured
-				...(locals?.billingOrganization ? { "X-HF-Bill-To": locals.billingOrganization } : {}),
+				...inferenceBillingHeaders(locals),
 			},
 			body: audioBuffer,
 			signal: controller.signal,

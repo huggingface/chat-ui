@@ -1,9 +1,11 @@
 /**
- * Reattach stream endpoint (P3): GET /conversation/:id/stream.
+ * Reattach stream endpoint: GET /conversation/:id/stream.
  *
- * Replays a run's events from a cursor, tails for new ones, and ends when the run is
+ * Replays a TURN's events from a cursor, tails for new ones, and ends when the turn is
  * terminal — so a returning tab or second device resumes a live generation at the token
- * it left off, cross-pod, without polling or reloading the conversation.
+ * it left off, cross-pod, without polling or reloading the conversation. The log is
+ * turn-scoped: events are keyed by (conversationId, messageId), which the seeds below
+ * must stamp exactly as the writer does, or the endpoint's replay query matches nothing.
  */
 import { test, expect, E2E_APP_URL, SESSION_COOKIE_NAME } from "./fixtures.ts";
 import { ObjectId, type Db } from "mongodb";
@@ -91,7 +93,7 @@ async function seedRun(
 	db: Db,
 	sessionId: string,
 	opts: { tokenCount: number; status: "running" | "completed" | "interrupted" }
-): Promise<{ convId: string; generationId: string }> {
+): Promise<{ convId: string; generationId: string; messageId: string }> {
 	const now = new Date();
 	const systemId = randomUUID();
 	const userId = randomUUID();
@@ -145,6 +147,8 @@ async function seedRun(
 			Array.from({ length: opts.tokenCount }, (_, i) => ({
 				_id: new ObjectId(),
 				generationId,
+				conversationId,
+				messageId: assistantId,
 				seq: i + 1,
 				event: { type: "stream", token: `tok${i} ` },
 				createdAt: now,
@@ -152,7 +156,7 @@ async function seedRun(
 		);
 	}
 
-	return { convId: conversationId.toString(), generationId };
+	return { convId: conversationId.toString(), generationId, messageId: assistantId };
 }
 
 test("replays all events from the start, then ends on a terminal run", async ({ db, session }) => {
@@ -204,10 +208,11 @@ test("waits for a temporarily invisible sequence before advancing the cursor", a
 	session,
 }) => {
 	test.setTimeout(30_000);
-	const { convId, generationId } = await seedRun(db, session.sessionId, {
+	const { convId, generationId, messageId } = await seedRun(db, session.sessionId, {
 		tokenCount: 0,
 		status: "running",
 	});
+	const conversationId = new ObjectId(convId);
 	const now = new Date();
 
 	// Model an unordered insert becoming visible non-atomically: seq 3 can be
@@ -216,6 +221,8 @@ test("waits for a temporarily invisible sequence before advancing the cursor", a
 		{
 			_id: new ObjectId(),
 			generationId,
+			conversationId,
+			messageId,
 			seq: 1,
 			event: { type: "stream", token: "one " },
 			createdAt: now,
@@ -223,6 +230,8 @@ test("waits for a temporarily invisible sequence before advancing the cursor", a
 		{
 			_id: new ObjectId(),
 			generationId,
+			conversationId,
+			messageId,
 			seq: 3,
 			event: { type: "stream", token: "three " },
 			createdAt: now,
@@ -242,6 +251,8 @@ test("waits for a temporarily invisible sequence before advancing the cursor", a
 	await db.collection("generationEvents").insertOne({
 		_id: new ObjectId(),
 		generationId,
+		conversationId,
+		messageId,
 		seq: 2,
 		event: { type: "stream", token: "two " },
 		createdAt: new Date(),
@@ -369,6 +380,8 @@ test("preserves text at a compressed-marker reattach boundary", async ({ db, ses
 	await db.collection("generationEvents").insertOne({
 		_id: new ObjectId(),
 		generationId,
+		conversationId,
+		messageId: assistantId,
 		seq: 3,
 		event: { type: "stream", token: continuation },
 		createdAt: now,
@@ -384,6 +397,7 @@ test("tails a live generation to completion (writer → endpoint)", async ({
 	api,
 	session,
 	mockOpenAI,
+	db,
 }) => {
 	test.setTimeout(60_000);
 	const { conversationId, rootMessageId } = await api.createConversation();
@@ -410,11 +424,25 @@ test("tails a live generation to completion (writer → endpoint)", async ({
 		}
 	})();
 
-	// Reattach as a separate viewer (no generationId → newest run), from the start.
+	// Reattach as a separate viewer. The subscription is keyed by the TURN, so
+	// resolve the assistant message the POST created — what a returning tab
+	// reads from its conversation load — and subscribe from the start.
+	let messageId = "";
+	for (let attempt = 0; attempt < 100 && !messageId; attempt++) {
+		const conv = (await db
+			.collection("conversations")
+			.findOne({ _id: new ObjectId(conversationId) })) as {
+			messages?: { id: string; from: string }[];
+		} | null;
+		messageId = conv?.messages?.filter((m) => m.from === "assistant").at(-1)?.id ?? "";
+		if (!messageId) await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+	expect(messageId, "the POST should persist its assistant message").not.toBe("");
+
 	const { frames } = await collectFrames({
 		convId: conversationId,
 		secret: session.secret,
-		query: "fromSeq=0",
+		query: `messageId=${messageId}&fromSeq=0`,
 		until: (f) => f.event === "end",
 		timeoutMs: 40_000,
 	});

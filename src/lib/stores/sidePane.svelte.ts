@@ -2,19 +2,30 @@ import { browser } from "$app/environment";
 
 // Loose absolute bounds for a resized width; the real visual bounds are
 // proportional (each pane keeps at least 20% of the chat/panel split, see
-// ArtifactPanel), so neither side can be dragged into oblivion.
-export const ARTIFACT_PANEL_MIN_WIDTH = 300;
-export const ARTIFACT_PANEL_MAX_WIDTH = 2400;
-/** Default split when the user hasn't resized: the panel takes 60%, the chat keeps 40% */
-export const ARTIFACT_PANEL_DEFAULT_FRACTION = "60%";
+// SidePane), so neither side can be dragged into oblivion.
+export const SIDE_PANE_MIN_WIDTH = 300;
+export const SIDE_PANE_MAX_WIDTH = 2400;
+/** Default split when the user hasn't resized: the pane takes 60%, the chat keeps 40% */
+export const SIDE_PANE_DEFAULT_FRACTION = "60%";
+
+/** Which view owns the pane. One slot, so the views are mutually exclusive. */
+export type SidePaneView = "artifact" | "trackio";
 
 /**
- * UI state for the artifact side panel. Artifact content itself is derived
- * from the conversation messages (see `collectArtifacts`); this store only
- * tracks what the panel is showing.
+ * UI state for the side pane. Its content is always derived from the
+ * conversation messages — artifacts via `collectArtifacts`, Trackio dashboards
+ * via `collectTrackioDashboards` — so this store only tracks what is showing
+ * and how wide it is.
+ *
+ * The geometry (width, resize, open/close) is shared by every view; the fields
+ * below it are still artifact-specific and would be worth splitting per view
+ * once a second view needs state of its own.
  */
-class ArtifactPanelStore {
+class SidePaneStore {
 	open = $state(false);
+	view = $state<SidePaneView>("artifact");
+	/** The framed Trackio dashboard, when `view` is "trackio". */
+	trackio = $state<{ url: string; label: string } | null>(null);
 	identifier = $state<string | null>(null);
 	/** 1-based version to display; null follows the latest version (including streaming growth) */
 	version = $state<number | null>(null);
@@ -57,6 +68,7 @@ class ArtifactPanelStore {
 			this.tab = "preview";
 			this.userPinnedTab = false;
 		}
+		this.view = "artifact";
 		this.identifier = identifier;
 		this.version = version;
 		this.open = true;
@@ -71,13 +83,32 @@ class ArtifactPanelStore {
 		this.openArtifact(identifier, null);
 	}
 
+	openTrackio(url: string, label: string) {
+		this.view = "trackio";
+		this.trackio = { url, label };
+		this.open = true;
+		this.revealNonce += 1;
+	}
+
+	/**
+	 * Open a dashboard the first time it appears, once per URL — a dashboard is
+	 * live for the whole run, so re-opening it on every log poll would fight the
+	 * user closing the pane to read the chat.
+	 */
+	maybeAutoOpenTrackio(url: string, label: string) {
+		const key = `trackio:${url}`;
+		if (this.autoOpenedKeys.has(key)) return;
+		this.autoOpenedKeys.add(key);
+		this.openTrackio(url, label);
+	}
+
 	selectTab(tab: "preview" | "code") {
 		this.tab = tab;
 		this.userPinnedTab = true;
 	}
 
 	setWidth(px: number) {
-		this.widthPx = Math.min(ARTIFACT_PANEL_MAX_WIDTH, Math.max(ARTIFACT_PANEL_MIN_WIDTH, px));
+		this.widthPx = Math.min(SIDE_PANE_MAX_WIDTH, Math.max(SIDE_PANE_MIN_WIDTH, px));
 	}
 
 	/** Back to the default 40/60 chat/panel split */
@@ -92,6 +123,8 @@ class ArtifactPanelStore {
 	/** Full reset, used when switching conversations. */
 	reset() {
 		this.open = false;
+		this.view = "artifact";
+		this.trackio = null;
 		this.identifier = null;
 		this.version = null;
 		this.tab = "preview";
@@ -102,4 +135,4 @@ class ArtifactPanelStore {
 	}
 }
 
-export const artifactPanel = new ArtifactPanelStore();
+export const sidePane = new SidePaneStore();

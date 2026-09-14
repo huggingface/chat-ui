@@ -9,6 +9,7 @@ interface ConversationListItem {
 	title: string;
 	updatedAt: Date | string;
 	model?: string;
+	mlAssistant?: boolean;
 }
 
 interface UserInfo {
@@ -23,6 +24,7 @@ interface UserInfo {
 interface SettingsResponse {
 	welcomeModalSeen: boolean;
 	welcomeModalSeenAt: Date | null;
+	mlInternOnboardingSeen: boolean;
 	shareConversationsWithModelAuthors: boolean;
 	activeModel: string;
 	streamingMode: "raw" | "smooth";
@@ -38,6 +40,7 @@ interface SettingsResponse {
 	reasoningEffortOverrides: Record<string, "low" | "medium" | "high">;
 	reasoningOverrides: Record<string, boolean>;
 	billingOrganization?: string;
+	billingResourceGroup?: string;
 }
 
 export const load = async ({ fetch, url }) => {
@@ -83,6 +86,7 @@ export const load = async ({ fetch, url }) => {
 			title: conv.title,
 			model: conv.model ?? defaultModel?.id,
 			updatedAt: new Date(conv.updatedAt),
+			mlAssistant: conv.mlAssistant ?? false,
 		} satisfies ConvSidebar;
 	});
 

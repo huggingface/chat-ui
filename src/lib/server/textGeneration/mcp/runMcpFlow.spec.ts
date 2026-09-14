@@ -6,6 +6,9 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
+import { RETRY_BACKOFF_MS } from "$lib/server/textGeneration/utils/upstreamRetry";
+import { APIConnectionError } from "openai";
 import type { McpFlowResult, RunMcpFlowContext } from "./runMcpFlow";
 
 // ---------------------------------------------------------------------------
@@ -38,7 +41,11 @@ const mocks = vi.hoisted(() => ({
 // The gate itself is real; only the build flag behind it is forced on.
 vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
 
-vi.mock("openai", () => ({
+// Only the client is stubbed. The SDK's error classes stay real: the retry
+// predicate identifies a dead connection by class, so a mocked-away
+// APIConnectionError would make every upstream failure unrecognizable.
+vi.mock("openai", async (importOriginal) => ({
+	...(await importOriginal<typeof import("openai")>()),
 	OpenAI: class {
 		chat = { completions: { create: mocks.create } };
 	},
@@ -104,6 +111,12 @@ type Round = {
 	content?: string;
 	reasoning?: string;
 	toolCalls?: ScriptedCall[];
+	/**
+	 * Raw delta objects, yielded verbatim before the finish chunk, for rounds
+	 * where the ORDER of reasoning/content/tool_calls matters. Overrides the
+	 * three fields above.
+	 */
+	deltas?: Array<Record<string, unknown>>;
 	/** Defaults to "tool_calls" when the round emits calls, else "stop". */
 	finishReason?: string;
 	/** Throw instead of returning a stream, to script an upstream failure. */
@@ -115,6 +128,13 @@ function chunk(choice: Record<string, unknown>) {
 }
 
 function streamFor(round: Round) {
+	if (round.deltas) {
+		const deltas = round.deltas;
+		return (async function* () {
+			for (const delta of deltas) yield chunk({ delta });
+			yield chunk({ delta: {}, finish_reason: round.finishReason ?? "stop" });
+		})();
+	}
 	return (async function* () {
 		if (round.reasoning) yield chunk({ delta: { reasoning: round.reasoning } });
 		if (round.content) yield chunk({ delta: { content: round.content } });
@@ -275,6 +295,66 @@ describe("runMcpFlow", () => {
 	});
 });
 
+describe("runMcpFlow think-tag balance across tool rounds", () => {
+	const toolCallDelta = {
+		tool_calls: [{ index: 0, id: "call_1", function: { name: "do_thing", arguments: "{}" } }],
+	};
+	const thinkBalance = (text: string) =>
+		(text.match(/<think>/g)?.length ?? 0) - (text.match(/<\/think>/g)?.length ?? 0);
+
+	it("still closes a streamed think block when content arrives after tool-call deltas", async () => {
+		// Reasoning streams (client sees "<think>…"), tool-call deltas mute the
+		// stream, and only then does the content delta close the block. The closer
+		// must still reach the client, or it renders that reasoning as streaming —
+		// and re-expands it — for the rest of the turn.
+		scriptRounds([
+			{
+				deltas: [{ reasoning: "planning the call" }, toolCallDelta, { content: "Calling now." }],
+				finishReason: "tool_calls",
+			},
+			{ content: "done" },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		const streamed = streamedText(updates);
+		expect(streamed).toContain("<think>planning the call");
+		expect(thinkBalance(streamed)).toBe(0);
+	});
+
+	it("closes a streamed think block that tool-call deltas leave open", async () => {
+		scriptRounds([
+			{
+				deltas: [{ reasoning: "planning the call" }, toolCallDelta],
+				finishReason: "tool_calls",
+			},
+			{ content: "done" },
+		]);
+
+		const { updates } = await runFlow();
+
+		expect(thinkBalance(streamedText(updates))).toBe(0);
+	});
+
+	it("streams no stray closer when the opener was never streamed", async () => {
+		// Content streams first, then tool-call deltas mute the stream, then
+		// reasoning opens a think block the client never saw. A bare "</think>"
+		// would render as literal text.
+		scriptRounds([
+			{
+				deltas: [{ content: "Calling now." }, toolCallDelta, { reasoning: "post-call thoughts" }],
+				finishReason: "tool_calls",
+			},
+			{ content: "done" },
+		]);
+
+		const { updates } = await runFlow();
+
+		expect(streamedText(updates)).not.toContain("</think>");
+	});
+});
+
 describe("runMcpFlow truncated tool calls", () => {
 	it("retries with an assistant turn when a tool-only round is cut off", async () => {
 		scriptRounds([
@@ -331,6 +411,142 @@ describe("runMcpFlow truncated tool calls", () => {
 		expect(mocks.executeToolCalls).not.toHaveBeenCalled();
 		expect(mocks.create).toHaveBeenCalledTimes(3);
 		expect(finalAnswer(updates)).toContain("output limit");
+	});
+});
+
+describe("runMcpFlow transient upstream failures", () => {
+	// Scripts `upstream` for the first round and a clean answer for the second,
+	// then drives the backoff sleep to completion.
+	const runAbsorbing = async (upstream: Error) => {
+		// Fake only the timer pair the backoff sleep uses: the flow crosses real
+		// async boundaries (dynamic import, mocked promises) before it ever
+		// schedules the sleep, and a blanket fake would starve those of event-loop
+		// turns.
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		try {
+			scriptRounds([{ error: upstream }, { content: "the answer" }]);
+
+			const pending = runFlow();
+			let settled = false;
+			const flagSettled = () => {
+				settled = true;
+			};
+			void pending.then(flagSettled, flagSettled);
+			// The backoff sleep is the only fake-timer client here, so its
+			// registration — not a wall-clock budget — is the signal to advance the
+			// clock. A fixed number of advance/yield rounds can be exhausted before a
+			// slow runner even reaches the sleep, leaving its timer to hang forever.
+			// A flow that settles without a timer let the failure escape; fall
+			// through and let the assertions name that.
+			while (!settled && vi.getTimerCount() === 0) {
+				await new Promise((resolve) => setImmediate(resolve));
+			}
+			if (vi.getTimerCount() > 0) {
+				await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_MS[0]);
+			}
+			return await pending;
+		} finally {
+			vi.useRealTimers();
+		}
+	};
+
+	it("absorbs a router 429 with backoff instead of failing a turn mid-flight", async () => {
+		const { updates, result } = await runAbsorbing(
+			Object.assign(new Error('429 "Rate limit exceeded"'), { status: 429 })
+		);
+
+		expect(result).toBe("completed");
+		expect(finalAnswer(updates)).toBe("the answer");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+	});
+
+	it("absorbs a 503 from a router with no backend ready", async () => {
+		// The failure that ended two turns of a six-hour run: the same request
+		// succeeds unchanged seconds later, so surfacing it discards the turn.
+		const { updates, result } = await runAbsorbing(
+			Object.assign(new Error("503 no available server"), { status: 503 })
+		);
+
+		expect(result).toBe("completed");
+		expect(finalAnswer(updates)).toBe("the answer");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+	});
+
+	it("absorbs a connection that never reached the router", async () => {
+		// A DNS blip on the machine running chat-ui arrives as APIConnectionError,
+		// with no status to match on.
+		const { updates, result } = await runAbsorbing(
+			new APIConnectionError({ message: "Connection error." })
+		);
+
+		expect(result).toBe("completed");
+		expect(finalAnswer(updates)).toBe("the answer");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+	});
+
+	it("still surfaces a failure that a retry cannot fix", async () => {
+		scriptRounds([{ error: Object.assign(new Error("400 bad request"), { status: 400 }) }]);
+		const { result } = await runFlow();
+		// Fails before any output: the flow falls back rather than erroring the turn.
+		expect(result).toBe("not_applicable");
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("runMcpFlow answers cut by the output limit", () => {
+	it("retries once when the final answer dies mid-reasoning instead of finalizing the half-thought", async () => {
+		scriptRounds([
+			{ reasoning: "the method is defined as", finishReason: "length" },
+			{ content: "the recovered answer" },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(finalAnswer(updates)).toBe("the recovered answer");
+		const retry = requestMessages(1);
+		// Reasoning-only rounds leave no prose; the synthesized assistant turn keeps
+		// the nudge from being a second consecutive user message.
+		expect(retry.at(-2)?.role).toBe("assistant");
+		expect(String(retry.at(-2)?.content ?? "")).not.toHaveLength(0);
+		expect(String(retry.at(-1)?.content)).toContain("output limit");
+	});
+
+	it("finalizes as interrupted when the retry is cut too", async () => {
+		scriptRounds([
+			{ reasoning: "first half-thought", finishReason: "length" },
+			{ reasoning: "second half-thought", finishReason: "length" },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		const answer = updates.find((u) => u.type === MessageUpdateType.FinalAnswer);
+		expect(answer?.type === MessageUpdateType.FinalAnswer && answer.interrupted).toBe(true);
+	});
+
+	// A stream that dies mid-<think> ends with "stop" (or nothing), not "length" —
+	// the failure is the same think-only non-answer and gets the same retry.
+	it("retries a think-only answer even without a length signal", async () => {
+		scriptRounds([{ reasoning: "half a thought" }, { content: "the recovered answer" }]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(finalAnswer(updates)).toBe("the recovered answer");
+		const retry = requestMessages(1);
+		expect(retry.at(-2)?.role).toBe("assistant");
+		expect(String(retry.at(-1)?.content)).toContain("internal reasoning");
+	});
+
+	it("finalizes a repeated think-only answer as interrupted", async () => {
+		scriptRounds([{ reasoning: "half a thought" }, { reasoning: "another half-thought" }]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		const answer = updates.find((u) => u.type === MessageUpdateType.FinalAnswer);
+		expect(answer?.type === MessageUpdateType.FinalAnswer && answer.interrupted).toBe(true);
 	});
 });
 
@@ -461,7 +677,15 @@ describe("runMcpFlow offering the question tool", () => {
 		scriptRounds([{ content: "the answer" }]);
 		const { result } = await runFlow(inMlMode);
 		expect(result).toBe("completed");
-		expect(toolNames()).toEqual(["ask_user_question", "update_plan", "wait"]);
+		expect(toolNames()).toEqual([
+			"ask_user_question",
+			"update_plan",
+			"wait",
+			"research",
+			"sandbox_task",
+			"check_job",
+			"create_trackio",
+		]);
 	});
 
 	it("still skips the flow outside the mode when no MCP server is selected", async () => {
@@ -570,6 +794,33 @@ describe("runMcpFlow under the ML Assistant preset", () => {
 		expect(systemPrompt()).not.toContain("USING TOOLS:");
 	});
 
+	it("floors the completion budget so reasoning turns are not cut mid-think", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow(inMlMode);
+		expect(mocks.create.mock.calls[0][0].max_tokens).toBe(ML_ASSISTANT_MIN_COMPLETION_TOKENS);
+	});
+
+	it("clamps the completion floor to half a small model window", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow({
+			...inMlMode,
+			model: {
+				id: "small/model",
+				name: "small/model",
+				supportsTools: true,
+				parameters: {},
+				contextLength: 16_384,
+			},
+		} as unknown as Parameters<typeof runMcpFlow>[0]);
+		expect(mocks.create.mock.calls[0][0].max_tokens).toBe(8_192);
+	});
+
+	it("leaves the catalog completion budget alone outside the mode", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow();
+		expect(mocks.create.mock.calls[0][0].max_tokens).toBeUndefined();
+	});
+
 	it("keeps working past the round budget an ordinary conversation stops at", async () => {
 		const toolRound: Round = { toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] };
 		scriptRounds([...Array.from({ length: 11 }, () => toolRound), { content: "done" }]);
@@ -590,5 +841,129 @@ describe("runMcpFlow under the ML Assistant preset", () => {
 
 		expect(result).toBe("exhausted");
 		expect(mocks.create).toHaveBeenCalledTimes(100);
+	});
+});
+
+describe("leaked tool-call markup", () => {
+	// Observed with GLM-class models: the provider template leaks the model's
+	// native tool syntax into content, so the "call" is text the user sees and
+	// nothing runs.
+	it("retries once when the final answer writes a tool call as markup", async () => {
+		scriptRounds([
+			{
+				content: 'Let me ask: <do_thing>\n<option label="$5">setBudgetUsd=5</option>\n</do_thing>',
+			},
+			{ content: "Here is a clean answer." },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toBe("Here is a clean answer.");
+		// The nudge names the leaked tool and demands a real call.
+		const nudge = requestMessages(1).at(-1);
+		expect(nudge?.role).toBe("user");
+		expect(String(nudge?.content)).toContain("<do_thing>");
+		expect(String(nudge?.content)).toContain("function-calling mechanism");
+	});
+
+	it("finalizes as-is when the retry leaks again", async () => {
+		scriptRounds([
+			{ content: "First leak: <do_thing></do_thing>" },
+			{ content: "Second leak: <do_thing></do_thing>" },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toContain("Second leak");
+	});
+
+	it("leaves markup for tools that are not in the schema alone", async () => {
+		scriptRounds([{ content: "In HTML you might write <div> or even <some_other_tool>." }]);
+
+		const { updates } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toContain("<some_other_tool>");
+	});
+
+	it.each([
+		'args</arg_key><arg_value>{"job_id": "6a99c12c", "tail": 60, "operation": "logs"}</arg_value></tool_call>',
+		'args</arg_key><arg_value>{"job_id": "6a99c5ca", "tail": 40}</arg_value><arg_key>operation</arg_key><arg_value>logs</arg_value></tool_call>',
+		'<think>The logs call failed. Retry.</think>{"args": {"job_id": "x", "tail": 80}, "operation": "logs"}</arg_value></tool_call>',
+		'<arg_value>{"job_id": "x", "operation": "logs", "tail": 80}</arg_value></tool_call>',
+	])("catches the leak tail %#, exactly as the provider streamed it", async (leak) => {
+		scriptRounds([{ content: leak }, { content: "Here is a clean answer." }]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toBe("Here is a clean answer.");
+	});
+
+	it("retries when a half-parsed leak carries no tool name", async () => {
+		// What together's GLM-5.3-Flash actually leaked: the provider consumed
+		// `<tool_call>hf_jobs<arg_key>` and streamed the rest as content, so the
+		// name a tag-based check needs is not in the text at all.
+		scriptRounds([
+			{
+				content:
+					'args</arg_key><arg_value>{"job_id": "6a99c12c", "tail": 60, "operation": "logs"}</arg_value></tool_call>',
+			},
+			{ content: "Here is a clean answer." },
+		]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toBe("Here is a clean answer.");
+		const nudge = requestMessages(1).at(-1);
+		expect(String(nudge?.content)).toContain("</tool_call>");
+		expect(String(nudge?.content)).toContain("function-calling mechanism");
+	});
+
+	it("leaves an answer that documents the syntax alone", async () => {
+		// A single closing tag turns up in an answer about tool calling, or one
+		// quoting sample XML. Discarding it would replace a correct answer with an
+		// instruction to make a call nobody asked for.
+		scriptRounds([
+			{
+				content:
+					"Providers close the block with </tool_call>, and Hermes-style templates use </function> instead.",
+			},
+		]);
+
+		const { updates } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toContain("</tool_call>");
+	});
+
+	it("leaves prose that only mentions the syntax alone", async () => {
+		// An answer about the markup opens tags without closing them; only a
+		// closing marker means a call the provider half-parsed.
+		scriptRounds([
+			{ content: "The template writes <tool_call> and then <arg_key> for each argument." },
+		]);
+
+		const { updates } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toContain("<arg_key>");
+	});
+
+	it("requires a whole tag, not a prefix", async () => {
+		// <do_thing_output> is ordinary content, not a leaked call to do_thing.
+		scriptRounds([{ content: "The result arrives in a <do_thing_output> element." }]);
+
+		const { updates } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toContain("<do_thing_output>");
 	});
 });

@@ -120,6 +120,10 @@ describe("registration", () => {
 			"github_list_repos",
 			"github_find_examples",
 			"github_read_file",
+			"research",
+			"sandbox_task",
+			"check_job",
+			"create_trackio",
 		]);
 	});
 
@@ -133,6 +137,14 @@ describe("registration", () => {
 			getEnabledBuiltinTools({ conv: { _id: new ObjectId(), mlAssistant: true } }).map(
 				(t) => t.name
 			)
-		).toEqual(["ask_user_question", "update_plan", "wait"]);
+		).toEqual([
+			"ask_user_question",
+			"update_plan",
+			"wait",
+			"research",
+			"sandbox_task",
+			"check_job",
+			"create_trackio",
+		]);
 	});
 });

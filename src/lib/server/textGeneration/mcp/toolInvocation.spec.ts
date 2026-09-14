@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ObjectId } from "mongodb";
+import { collections, ready } from "$lib/server/database";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { parseToolArguments } from "./toolArgs";
-import type { NormalizedToolCall } from "./toolInvocation";
+import type { NormalizedToolCall, ToolArgsRewrite } from "./toolInvocation";
 import type { BuiltinTool } from "../builtinTools/types";
 import type { McpToolTextResponse } from "$lib/server/mcp/httpClient";
 import type { ChatCompletionToolMessageParam } from "openai/resources/chat/completions";
@@ -25,7 +26,8 @@ vi.mock("../../logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-const { executeToolCalls, isValidJsonObject } = await import("./toolInvocation");
+const { executeToolCalls, isValidJsonObject, withRewrittenArguments } =
+	await import("./toolInvocation");
 
 const SERVERS = [{ name: "hf", url: "https://example.test/mcp" }];
 const MAPPING = { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } };
@@ -41,7 +43,8 @@ const processToolOutput = (text: string) => ({ annotated: text, sources: [] });
 async function drain(
 	calls: NormalizedToolCall[],
 	elicitation?: { conversationId: ObjectId; generationId?: string; messageId?: string },
-	builtinTools?: BuiltinTool[]
+	builtinTools?: BuiltinTool[],
+	guard?: import("./toolGuard").ToolCallGuard
 ) {
 	const events = [];
 	for await (const event of executeToolCalls({
@@ -53,6 +56,7 @@ async function drain(
 		processToolOutput,
 		...(elicitation ? { elicitation } : {}),
 		...(builtinTools ? { builtinTools } : {}),
+		...(guard ? { guard } : {}),
 	})) {
 		events.push(event);
 	}
@@ -152,6 +156,55 @@ describe("executeToolCalls", () => {
 			tool_call_id: "call_1",
 			content: "Error: connection refused",
 		});
+	});
+});
+
+describe("executeToolCalls durable elicitation", () => {
+	it("records awaiting_input when a prompt opens, so the turn stays subscribable", async () => {
+		// An MCP prompt parks the turn on the user exactly like the ask tool, but
+		// this path recorded nothing: the route's ending CAS then read the state
+		// as still-running and marked the turn done, closing every subscription
+		// while the prompt was open — an answer from another tab streamed into
+		// nothing.
+		await ready;
+		const conversationId = new ObjectId();
+		mcpMock.callMcpTool.mockResolvedValue(
+			mcpResult({
+				inputRequired: {
+					inputRequests: {
+						name: {
+							method: "elicitation/create",
+							params: {
+								message: "What is your name?",
+								requestedSchema: {
+									type: "object",
+									properties: { name: { type: "string" } },
+									required: ["name"],
+								},
+							},
+						},
+					},
+				},
+			} as Partial<McpToolTextResponse>)
+		);
+
+		const events = await drain([CALL], {
+			conversationId,
+			generationId: "gen-1",
+			messageId: "assistant-1",
+		});
+
+		// The in-band transition, on the same channel as the prompt itself.
+		const turnStates = events.flatMap((e) =>
+			e.type === "update" && e.update.type === MessageUpdateType.TurnState ? [e.update] : []
+		);
+		expect(turnStates.map((u) => u.state)).toEqual(["awaiting_input"]);
+
+		// And the authoritative document, so the ending CAS misses and the
+		// parked state stands.
+		const doc = await collections.turnStates.findOne({ conversationId, messageId: "assistant-1" });
+		expect(doc?.status).toBe("awaiting_input");
+		expect(doc?.producerId).toBe("gen-1");
 	});
 });
 
@@ -356,5 +409,196 @@ describe("builtin tool dispatch", () => {
 			tool_call_id: "call_plan",
 			content: "Error: db down",
 		});
+	});
+});
+
+describe("executeToolCalls with a guard", () => {
+	function fakeGuard(overrides: Partial<import("./toolGuard").ToolCallGuard> = {}) {
+		const before = vi.fn(async () => ({ allow: true }) as const);
+		const after = vi.fn(async () => undefined);
+		return {
+			guard: { allowParking: false, before, after, ...overrides },
+			before,
+			after,
+		};
+	}
+
+	it("consults the guard before dispatch and honors a refusal", async () => {
+		const { guard, before, after } = fakeGuard({
+			before: vi.fn(async () => ({ allow: false, message: "over budget" }) as const),
+		});
+		const events = await drain([CALL], undefined, undefined, guard);
+
+		expect(mcpMock.callMcpTool).not.toHaveBeenCalled();
+		expect(after).not.toHaveBeenCalled();
+		expect(before).toBeDefined();
+		expect(toolMessagesOf(events)).toEqual([
+			{ role: "tool", tool_call_id: "call_1", content: "Error: over budget" },
+		]);
+		const error = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Error);
+		expect(error).toBeDefined();
+	});
+
+	it("hands the guard the raw server-side call, not the sanitized name", async () => {
+		const { guard, before } = fakeGuard();
+		await drain([CALL], undefined, undefined, guard);
+		expect(before).toHaveBeenCalledWith(
+			expect.objectContaining({
+				serverUrl: "https://example.test/mcp",
+				tool: "do_thing",
+				args: { a: 1 },
+			})
+		);
+	});
+
+	it("reports a success outcome with the raw response text", async () => {
+		mcpMock.callMcpTool.mockResolvedValue(mcpResult({ text: "job 123 started" }));
+		const { guard, after } = fakeGuard({
+			before: vi.fn(async () => ({ allow: true, ticket: { key: "k" } }) as const),
+		});
+		await drain([CALL], undefined, undefined, guard);
+		expect(after).toHaveBeenCalledWith(
+			{ key: "k" },
+			{ status: "success", text: "job 123 started" }
+		);
+	});
+
+	it("reports an isError outcome", async () => {
+		mcpMock.callMcpTool.mockResolvedValue(mcpResult({ text: "bad image", isError: true }));
+		const { guard, after } = fakeGuard({
+			before: vi.fn(async () => ({ allow: true, ticket: { key: "k" } }) as const),
+		});
+		await drain([CALL], undefined, undefined, guard);
+		expect(after).toHaveBeenCalledWith({ key: "k" }, { status: "error", text: "bad image" });
+	});
+
+	it("reports a transport failure", async () => {
+		mcpMock.callMcpTool.mockRejectedValue(new Error("socket hang up"));
+		const { guard, after } = fakeGuard({
+			before: vi.fn(async () => ({ allow: true, ticket: { key: "k" } }) as const),
+		});
+		await drain([CALL], undefined, undefined, guard);
+		expect(after).toHaveBeenCalledWith({ key: "k" }, { status: "transport_error" });
+	});
+
+	it("skips the after hook for unticketed calls", async () => {
+		const { guard, after } = fakeGuard();
+		await drain([CALL], undefined, undefined, guard);
+		expect(after).not.toHaveBeenCalled();
+	});
+
+	it("declines elicitation on a ticketed call instead of parking it", async () => {
+		mcpMock.callMcpTool.mockResolvedValue(
+			mcpResult({
+				inputRequired: {
+					inputRequests: {
+						dataset: {
+							method: "elicitation/create",
+							params: {
+								message: "which dataset?",
+								requestedSchema: { type: "object", properties: {} },
+							},
+						},
+					},
+				},
+			} as Partial<McpToolTextResponse>)
+		);
+		const { guard, after } = fakeGuard({
+			before: vi.fn(async () => ({ allow: true, ticket: { key: "k" } }) as const),
+		});
+		const events = await drain(
+			[CALL],
+			{ conversationId: new ObjectId(), messageId: "m1" },
+			undefined,
+			guard
+		);
+
+		expect(after).toHaveBeenCalledWith({ key: "k" }, { status: "elicited" });
+		expect(summaryOf(events).awaitingInput).toBeUndefined();
+		expect(toolMessagesOf(events)[0].content).toContain("Nothing was charged");
+	});
+
+	it("streams the budget updates the guard returns", async () => {
+		const budgetUpdate = {
+			type: MessageUpdateType.Budget,
+			totalMicroUsd: 10,
+			spentMicroUsd: 1,
+			reservedMicroUsd: 2,
+		} as const;
+		const { guard } = fakeGuard({
+			before: vi.fn(
+				async () => ({ allow: true, ticket: { key: "k" }, update: budgetUpdate }) as const
+			),
+			after: vi.fn(async () => budgetUpdate),
+		});
+		const events = await drain([CALL], undefined, undefined, guard);
+		const budgets = events.filter(
+			(e) => e.type === "update" && e.update.type === MessageUpdateType.Budget
+		);
+		expect(budgets).toHaveLength(2);
+	});
+});
+
+describe("withRewrittenArguments", () => {
+	const stamp: ToolArgsRewrite = ({ serverUrl, tool, args }) => ({
+		...args,
+		via: `${tool}@${serverUrl}`,
+	});
+	const options = {
+		mapping: MAPPING,
+		servers: SERVERS,
+		parseArgs: parseToolArguments,
+	};
+
+	it("re-serialises a call the rewrite changed", () => {
+		const [call] = withRewrittenArguments([CALL], { ...options, rewrite: stamp });
+
+		expect(call.id).toBe(CALL.id);
+		expect(call.name).toBe(CALL.name);
+		expect(JSON.parse(call.arguments)).toEqual({ a: 1, via: "do_thing@https://example.test/mcp" });
+	});
+
+	it("keeps a call the rewrite left alone, string and all", () => {
+		// Identity is the no-change signal; the original string stays byte for byte.
+		const spaced: NormalizedToolCall = { ...CALL, arguments: '{ "a" : 1 }' };
+		const [call] = withRewrittenArguments([spaced], { ...options, rewrite: ({ args }) => args });
+
+		expect(call).toBe(spaced);
+	});
+
+	it("skips builtins, unmapped tools and undecodable arguments", () => {
+		const rewrite = vi.fn(stamp);
+		const builtin: BuiltinTool = {
+			name: "do_thing",
+			definition: { type: "function", function: { name: "do_thing" } },
+			execute: async () => ({ resultText: "done" }),
+		};
+		const unmapped: NormalizedToolCall = { id: "call_2", name: "nope", arguments: "{}" };
+		const broken: NormalizedToolCall = { id: "call_3", name: "do_thing", arguments: '{"broken":' };
+
+		expect(
+			withRewrittenArguments([CALL], { ...options, builtinTools: [builtin], rewrite })
+		).toEqual([CALL]);
+		expect(withRewrittenArguments([unmapped, broken], { ...options, rewrite })).toEqual([
+			unmapped,
+			broken,
+		]);
+		expect(rewrite).not.toHaveBeenCalled();
+	});
+
+	it("is what the executor persists and dispatches", async () => {
+		// The point of rewriting the call rather than the dispatch: history,
+		// the persisted Call update and the server all carry the same arguments.
+		const calls = withRewrittenArguments([CALL], { ...options, rewrite: stamp });
+		const events = await drain(calls);
+
+		const expected = { a: 1, via: "do_thing@https://example.test/mcp" };
+		expect(mcpMock.callMcpTool.mock.calls[0][2]).toEqual(expected);
+		const call = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Call);
+		expect(
+			call?.subtype === MessageToolUpdateType.Call && call.argumentsRaw
+				? JSON.parse(call.argumentsRaw)
+				: undefined
+		).toEqual(expected);
 	});
 });

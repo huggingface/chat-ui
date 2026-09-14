@@ -16,6 +16,7 @@ import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
 import { withoutContentLength } from "$lib/server/undiciCompat";
+import { inferenceBillingHeaders } from "$lib/server/billing";
 // uuid import removed (no tool call ids)
 
 export const endpointOAIParametersSchema = z.object({
@@ -157,7 +158,7 @@ export async function endpointOai(
 						? { Authorization: `Bearer ${locals.token}` }
 						: {}),
 					// Bill to organization if configured
-					...(locals?.billingOrganization ? { "X-HF-Bill-To": locals.billingOrganization } : {}),
+					...inferenceBillingHeaders(locals),
 				},
 				signal: abortSignal,
 			});
@@ -259,9 +260,7 @@ export async function endpointOai(
 								? { Authorization: `Bearer ${locals.token}` }
 								: {}),
 							// Bill to organization if configured
-							...(locals?.billingOrganization
-								? { "X-HF-Bill-To": locals.billingOrganization }
-								: {}),
+							...inferenceBillingHeaders(locals),
 						},
 						signal: abortSignal,
 					}
@@ -279,9 +278,7 @@ export async function endpointOai(
 								? { Authorization: `Bearer ${locals.token}` }
 								: {}),
 							// Bill to organization if configured
-							...(locals?.billingOrganization
-								? { "X-HF-Bill-To": locals.billingOrganization }
-								: {}),
+							...inferenceBillingHeaders(locals),
 						},
 						signal: abortSignal,
 					}

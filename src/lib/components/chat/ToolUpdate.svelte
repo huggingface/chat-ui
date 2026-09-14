@@ -6,10 +6,11 @@
 		isMessageToolProgressUpdate,
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
-	import { formatToolProgressLabel } from "$lib/utils/toolProgress";
+	import { formatToolProgressCount, formatToolProgressLines } from "$lib/utils/toolProgress";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
+	import LucideTriangleAlert from "~icons/lucide/triangle-alert";
 	import BlockWrapper from "./BlockWrapper.svelte";
 
 	interface Props {
@@ -32,7 +33,12 @@
 		}
 		return undefined;
 	});
-	let progressLabel = $derived.by(() => formatToolProgressLabel(toolProgress));
+	let progressCount = $derived.by(() => formatToolProgressCount(toolProgress));
+	let progressLines = $derived.by(() => formatToolProgressLines(toolProgress));
+
+	// A training run that syncs to Trackio prints its dashboard URL into the job
+	// output, so the tool group that ran it is also the natural place to get back
+	// to the dashboard after closing the pane.
 
 	const availableTools: ToolFront[] = $derived.by(
 		() => (page.data as { tools?: ToolFront[] } | undefined)?.tools ?? []
@@ -109,14 +115,16 @@
 				onclick={() => (isOpen = !isOpen)}
 				aria-label={isOpen ? "Collapse" : "Expand"}
 			>
+				<!-- Errors here are often recoverable (the model retries or works around
+				     them), so the header stays in the same muted gray as every other
+				     state; the amber icon is the only signal until the row is expanded. -->
+				{#if toolError}
+					<LucideTriangleAlert class="size-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
+				{/if}
 				<span
-					class="shrink-0 text-sm font-medium transition-colors {toolError
-						? `group-hover/header:text-red-700 dark:group-hover/header:text-red-300 ${
-								isOpen ? 'text-red-700 dark:text-red-300' : 'text-red-600 dark:text-red-400'
-							}`
-						: `group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 ${
-								isOpen ? 'text-gray-600 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400'
-							}`}"
+					class="shrink-0 text-sm font-medium transition-colors group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
+						? 'text-gray-600 dark:text-gray-300'
+						: 'text-gray-500 dark:text-gray-400'}"
 					class:router-shimmer={isExecuting}
 				>
 					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
@@ -126,14 +134,23 @@
 				>
 					{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
 				</code>
+				{#if isExecuting && progressCount}
+					<span class="shrink-0 text-xs text-gray-500 tabular-nums dark:text-gray-400"
+						>({progressCount})</span
+					>
+				{/if}
 				<CarbonChevronRight
 					class="size-3.5 shrink-0 transition-all duration-200 group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
 						? 'rotate-90 text-gray-600 dark:text-gray-300'
 						: 'text-gray-400'}"
 				/>
 			</button>
-			{#if isExecuting && toolProgress}
-				<span class="text-xs text-gray-500 dark:text-gray-400">{progressLabel}</span>
+			{#if isExecuting && progressLines.length}
+				<div class="flex min-w-0 flex-col gap-0.5">
+					{#each progressLines as line (line)}
+						<span class="truncate text-xs text-gray-500 dark:text-gray-400">{line}</span>
+					{/each}
+				</div>
 			{/if}
 		</div>
 
@@ -153,11 +170,11 @@
 						</div>
 					{:else if update.subtype === MessageToolUpdateType.Error}
 						<div class="space-y-1">
-							<div class="text-[10px] font-semibold text-red-500 uppercase dark:text-red-400">
+							<div class="text-[10px] font-semibold text-amber-600 uppercase dark:text-amber-400">
 								Error
 							</div>
 							<pre
-								class="rounded-lg bg-red-50 p-2 font-mono text-xs break-all whitespace-pre-wrap text-red-600 dark:bg-red-900/20 dark:text-red-400">{update.message}</pre>
+								class="rounded-lg bg-amber-50 p-2 font-mono text-xs break-all whitespace-pre-wrap text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{update.message}</pre>
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Success && update.result.display}
 						<div class="space-y-1">
@@ -194,11 +211,11 @@
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
 						<div class="space-y-1">
-							<div class="text-[10px] font-semibold text-red-500 uppercase dark:text-red-400">
+							<div class="text-[10px] font-semibold text-amber-600 uppercase dark:text-amber-400">
 								Error
 							</div>
 							<pre
-								class="rounded-lg bg-red-50 p-2 font-mono text-xs break-all whitespace-pre-wrap text-red-600 dark:bg-red-900/20 dark:text-red-400">{update
+								class="rounded-lg bg-amber-50 p-2 font-mono text-xs break-all whitespace-pre-wrap text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{update
 									.result.message}</pre>
 						</div>
 					{/if}

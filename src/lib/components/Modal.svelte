@@ -1,3 +1,9 @@
+<script module lang="ts">
+	// Modals can overlap: one opens while another is still fading out. The app
+	// behind them stays inert until the last one is gone.
+	let openModals = 0;
+</script>
+
 <script lang="ts">
 	import { onDestroy, onMount } from "svelte";
 	import { cubicOut } from "svelte/easing";
@@ -13,6 +19,8 @@
 		disableFly?: boolean;
 		/** When false, clicking backdrop will not close the modal */
 		closeOnBackdrop?: boolean;
+		/** id of the element naming the dialog, typically its heading */
+		labelledBy?: string;
 		onclose?: () => void;
 		children?: import("svelte").Snippet;
 	}
@@ -23,6 +31,7 @@
 		closeButton = false,
 		disableFly = false,
 		closeOnBackdrop = true,
+		labelledBy,
 		onclose,
 	}: Props = $props();
 
@@ -47,6 +56,7 @@
 	}
 
 	onMount(() => {
+		openModals += 1;
 		document.getElementById("app")?.setAttribute("inert", "true");
 		modalEl?.focus();
 		tap();
@@ -56,7 +66,8 @@
 
 	onDestroy(() => {
 		if (!browser) return;
-		document.getElementById("app")?.removeAttribute("inert");
+		openModals -= 1;
+		if (openModals === 0) document.getElementById("app")?.removeAttribute("inert");
 		window.removeEventListener("keydown", handleKeydown, { capture: true });
 	});
 </script>
@@ -77,6 +88,7 @@
 			<div
 				role="dialog"
 				tabindex="-1"
+				aria-labelledby={labelledBy}
 				bind:this={modalEl}
 				onkeydown={handleKeydown}
 				class={[
@@ -95,6 +107,7 @@
 			<div
 				role="dialog"
 				tabindex="-1"
+				aria-labelledby={labelledBy}
 				bind:this={modalEl}
 				onkeydown={handleKeydown}
 				in:fly={{ y: 100 }}

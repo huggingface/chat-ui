@@ -25,12 +25,14 @@ import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
+import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
 import { compressUpdatesForStorage } from "$lib/server/generation/compressUpdates";
 import { applyUpdateToMessage } from "$lib/server/generation/applyUpdate";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
+import { turnEnded, turnRunning } from "$lib/server/generation/turnState";
 import { clampStoppedContent } from "$lib/server/stopTruncation";
 import { MetricsServer } from "$lib/server/metrics";
 import { randomUUID } from "$lib/utils/randomUuid";
@@ -461,6 +463,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				generationId: effectiveGenerationId,
 				conversationId: convId,
 				messageId: messageToWriteTo.id,
+				continueFromSeq: messageToWriteTo.materializedSeq,
 				userId: locals.user?._id,
 				sessionId: locals.sessionId,
 				snapshot: () => ({
@@ -607,12 +610,25 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				});
 			};
 
+			// This producer holds the turn from here: record it and say so in-band.
+			// The wait/ask tools move the state on mid-run when they park, and the
+			// terminal write below is a CAS that leaves such a park standing.
+			const turnKey = {
+				conversationId: convId,
+				messageId: messageToWriteTo.id,
+				producerId: effectiveGenerationId,
+				...(locals.user?._id ? { userId: locals.user._id } : {}),
+				...(locals.sessionId ? { sessionId: locals.sessionId } : {}),
+			};
+			await update(await turnRunning(turnKey));
+
 			try {
 				// Fetch user settings once for all overrides and billing org
 				const userSettings = await collections.settings.findOne(authCondition(locals));
 
 				// Add billing organization to locals for the endpoint to use
 				locals.billingOrganization = userSettings?.billingOrganization;
+				locals.billingResourceGroup = userSettings?.billingResourceGroup;
 
 				let parkedAgain = false;
 				if (resumeElicitationId) {
@@ -656,7 +672,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					// Inference provider preference (HuggingChat only, skip for router models)
 					provider:
 						config.isHuggingChat && !model.isRouter
-							? userSettings?.providerOverrides?.[model.id]
+							? isMlAssistantConversation(conv)
+								? mlAssistantProviderFor(model.id, userSettings?.providerOverrides?.[model.id])
+								: userSettings?.providerOverrides?.[model.id]
 							: undefined,
 					// Thinking-effort override (only forwarded for reasoning-capable models;
 					// per-user override can force-enable on self-hosted). The ML Assistant
@@ -753,6 +771,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					status: MessageUpdateStatus.Finished,
 				});
 			}
+
+			// CAS: misses when a park moved the state on mid-run, and the parked
+			// state (waiting / awaiting_input) stands — nothing is emitted.
+			const endedUpdate = await turnEnded(turnKey, {
+				failed: hasError,
+				...(hasError ? { error: "The turn ended on an error." } : {}),
+			});
+			if (endedUpdate) await update(endedUpdate);
 
 			await persistConversation();
 			await writer.finish({

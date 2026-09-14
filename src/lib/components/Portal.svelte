@@ -19,6 +19,15 @@
 	});
 </script>
 
-<div bind:this={el} class="contents">
-	{@render children?.()}
+<!--
+	The outer div is the node Svelte owns for this component, and it never
+	moves. Tearing a block down walks the DOM from that node to the block's end
+	anchor; a node that was moved into body makes the walk run along body
+	instead and remove every later sibling there, other portals included. So
+	only the inner div goes to body, and this component removes it itself.
+-->
+<div class="contents">
+	<div bind:this={el} class="contents">
+		{@render children?.()}
+	</div>
 </div>

@@ -1,6 +1,9 @@
 import type { Filter, UpdateResult } from "mongodb";
+import { error } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
+import { isMlAssistantConversation } from "$lib/server/mlAssistant";
+import { mlAssistantModelIds } from "$lib/server/mlAssistantModels";
 
 /** The mutable conversation settings both PATCH endpoints expose. */
 export interface ConversationSettingsUpdate {
@@ -32,7 +35,7 @@ export interface ConversationSettingsUpdate {
  *
  * Callers own authorization: pass a filter that already scopes to the caller.
  */
-export function applyConversationSettings(
+export async function applyConversationSettings(
 	filter: Filter<Conversation>,
 	values: ConversationSettingsUpdate
 ): Promise<UpdateResult> {
@@ -46,6 +49,20 @@ export function applyConversationSettings(
 
 	if (values.model === undefined) {
 		return collections.conversations.updateOne(filter, { $set: updateValues });
+	}
+
+	// Here, not in the endpoints: an ML Intern conversation may only move within
+	// the mode's fixed set, and a guard that lives in one handler is exactly how
+	// the other one came to bypass it.
+	const current = await collections.conversations.findOne(filter, {
+		projection: { mlAssistant: 1 },
+	});
+	if (
+		current &&
+		isMlAssistantConversation(current) &&
+		!mlAssistantModelIds().includes(values.model)
+	) {
+		error(400, "This model is not available for ML Intern conversations");
 	}
 
 	const newModel = values.model;

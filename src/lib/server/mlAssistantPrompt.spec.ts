@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { ML_ASSISTANT_PREPROMPT, mlAssistantSessionContext } from "./mlAssistantPrompt";
+import {
+	ML_ASSISTANT_BUDGET_RULES,
+	ML_ASSISTANT_PREPROMPT,
+	mlAssistantSessionContext,
+} from "./mlAssistantPrompt";
 import { buildToolPreprompt } from "./textGeneration/utils/toolPrompt";
 import { ARTIFACTS_SYSTEM_PROMPT } from "./textGeneration/artifacts";
 import { askUserQuestionBuiltin } from "./textGeneration/builtinTools/askUserQuestion";
@@ -26,7 +30,7 @@ describe("ML Assistant preprompt", () => {
 	it("keeps every section that carries a rule", () => {
 		for (const heading of [
 			"# Your knowledge of the HF libraries is outdated",
-			"# Reading a paper you are about to implement",
+			"# Reproducing or implementing a paper",
 			"# Mistakes you WILL make without checking",
 			"# Before you propose a training or evaluation run",
 			"# Audit the data before you use it",
@@ -95,9 +99,34 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("push_to_hub");
 	});
 
+	it("requires a name on every submission", () => {
+		// Unnamed jobs land in the user's dashboard as an image tag plus a hash,
+		// indistinguishable from each other. Stated in the preset prompt and
+		// restated on the contract, like the other pre-flight rules.
+		expect(ML_ASSISTANT_PREPROMPT).toContain("Name every job you submit");
+		expect(inMode([tool("hf_jobs")])).toContain("- Name.");
+	});
+
 	it("points at the pricing doc instead of quoting rates", () => {
 		// A price table in a prompt goes stale silently; a pointer does not.
 		expect(inMode([tool("hf_jobs")])).toContain("hf://docs/hub/jobs-pricing.md");
+	});
+
+	it("counts queue time toward time-to-finish, and stops defaulting to l4", () => {
+		// Measured scheduling waits: CPU and a10g-small are immediate, but ~10% of
+		// l4x1 runs wait >17min on node-pool spin-up, which the hourly rate hides.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("Queue time is part of time-to-finish");
+		expect(jobs).toContain("prefer an a10g over an l4");
+		expect(jobs).toContain("a10g-small or a10g-large for a small finetune");
+		expect(jobs).not.toContain("a10g-large or l4x1 for a small finetune");
+	});
+
+	it("keeps the queue figures as shape rather than numbers to quote", () => {
+		// They are a 24h/7d snapshot with no live source behind them, so they date
+		// the same way the prices the neighbouring rule refuses to quote do.
+		expect(inMode([tool("hf_jobs")])).toContain("not as numbers to quote to the user");
 	});
 
 	it("reasons about hardware in cost to finish, not cost per hour", () => {
@@ -111,13 +140,82 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("hf://docs/hub/jobs-pricing.md");
 	});
 
+	it("makes speed-versus-cost the user's call, not an assumed objective", () => {
+		// Dogfooding: models silently optimised for cost when the user would have
+		// paid more to see the result sooner. The preference is the user's to
+		// state, and the options put to them must span the spectrum.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("not necessarily the user's");
+		expect(jobs).toContain("span the real spectrum");
+	});
+
+	it("front-loads the first status check after a submit", () => {
+		// Dogfooding: models set long waits uniformly, so a job that died on a bad
+		// dependency in its first minute sat undiscovered for twenty.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("failures cluster at the start");
+		expect(jobs).toContain("SHORT wait");
+	});
+
+	it("sends smoke checks to the sandbox first when it is on offer", () => {
+		// Dogfooding: some models smoke-tested via jobs with the sandbox sitting
+		// unused — a queue and an image pull to find a typo. Stated at both
+		// surfaces: the jobs contract and the sandbox rules.
+		expect(inMode([tool("hf_jobs")])).toContain("When hf_sandbox is on offer");
+		expect(inMode([tool("hf_sandbox")])).toContain("go here FIRST");
+	});
+
+	it("keeps the smoke test on the real flavor and the real shape", () => {
+		// A cpu-basic sandbox surfaces neither an OOM nor a usable steps-per-second.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("same flavor, batch size and sequence length as the real run");
+		expect(jobs).toContain("shrink the step count, never the shape");
+		expect(jobs).toContain("The smoke test on the real flavor gives you measured steps per second");
+		expect(ML_ASSISTANT_PREPROMPT).toContain("Memory and speed cannot");
+	});
+
+	it("says the sandbox cannot stand in for the GPU smoke test", () => {
+		// The other half of the same incident: "fast checks go here FIRST" read as
+		// permission to skip the GPU smoke entirely. Both rules ship together or
+		// the boundary is ambiguous again.
+		expect(inMode([tool("hf_sandbox")])).toContain("cannot do is stand in for the GPU smoke test");
+	});
+
+	it("pins dependencies to a resolved current release, not a remembered one", () => {
+		// A pin from memory dies at import; unpinned drifts from whatever it has to match.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("pin to the CURRENT release, never the version you remember");
+		expect(jobs).toContain("pip index versions <package>");
+		expect(jobs).toContain("Unpinned is not the safe middle");
+	});
+
+	it("names the dashboard through create_trackio, and verifies a metric lands", () => {
+		// init() succeeds and reports a live dashboard against a Space that 500s
+		// every write; reading a metric back is what catches it.
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("Call `create_trackio` first");
+		expect(jobs).toContain("use that id unchanged");
+		expect(jobs).toContain("is not evidence that anything is recording");
+		// Checkable with the tools this run actually has: the warning is in the job
+		// log, which check_job and hf_jobs both read. Reading a metric back off the
+		// Space is not — nothing here can call the Trackio API.
+		expect(jobs).toContain("could not be sent");
+		expect(jobs).toContain("saved locally");
+		expect(jobs).toContain("confirm the dashboard has rows in it");
+	});
+
 	it("sends paper-finding rules with the filesystem tool", () => {
-		// It searched for a paper by title with hub_repo_search — a repo search —
-		// twice, and concluded nothing was there.
+		// It searched for a paper by title with a repo search — twice — and
+		// concluded nothing was there.
 		const fs = inMode([tool("hf_fs")]);
 
 		expect(fs).toContain("papers live at hf://papers");
-		expect(fs).toContain("hub_repo_search searches REPOSITORIES");
+		expect(fs).toContain("searches REPOSITORIES");
 		expect(inMode([tool("hf_jobs")])).not.toContain("papers live at hf://papers");
 	});
 
@@ -139,6 +237,24 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(sandbox).toContain("hf_jobs");
 		expect(sandbox).toContain("do not retry");
 		expect(inMode([tool("hf_jobs")])).not.toContain("SANDBOXES (hf_sandbox)");
+	});
+
+	it("puts metrics on the pre-flight list, not only in the bullets", () => {
+		// The list is the part the model prints and checks itself. Trackio guidance
+		// sat in a bullet for weeks and was never acted on unprompted: hardware,
+		// timeout and destination were on the list, metrics was not.
+		expect(ML_ASSISTANT_PREPROMPT).toContain("timeout, metrics, and where the result gets pushed");
+		expect(inMode([tool("hf_jobs")])).toContain("Every training run gets a live dashboard");
+	});
+
+	it("separates the two argument shapes where the sandbox tools are described", () => {
+		// hf_jobs takes `args` as an object with a `timeout` key; the sandbox tools
+		// take a token list where it is `--timeout 55`. Reasoning across from the
+		// sibling is the single largest class of rejected call in the traces.
+		const sandbox = inMode([tool("hf_sandbox")]);
+
+		expect(sandbox).toContain("--timeout 55");
+		expect(sandbox).toContain("hf_jobs takes an object");
 	});
 
 	it("guides web search only where web search exists", () => {
@@ -176,9 +292,35 @@ describe("ML Assistant system message size", () => {
 		// 18k -> 19k for the hf_jobs submission contract; 19k -> 22k for the citation
 		// hop, paper-finding, web search and cost-to-finish hardware; 22k -> 24k for
 		// headroom alone, not content — at 21,889 the guard fired on every edit,
-		// which makes it noise. That number is ~5,500 tokens, re-sent on every round
-		// of a hundred-round budget: it is the figure to watch, and the next raise
-		// should have to argue for itself against it.
+		// which makes it noise. 24k -> 27k for the session budget rules (~2.6k, now
+		// measured here too, since the mode is always budget-gated and re-sends
+		// them every round) plus the same headroom rule: the grant procedure and
+		// the enforcement formula are what keep an autonomous run from inventing
+		// spend authority. 27k -> 28.5k at the merge with the parallel raise for the
+		// two call shapes that cost whole runs in practice — the uv/run submission
+		// and logs syntax, and the Trackio init/log/finish sequence, there because
+		// the model got them wrong from memory (a wrong kwarg is not a style
+		// question, it is a dead job) and a literal example is the only form of that
+		// rule that works — plus the job-naming rules that landed on the same
+		// section in the same week. That number is ~6,900 tokens, re-sent on every
+		// round of a hundred-round budget: it is the figure to watch, and the next
+		// raise should have to argue for itself against it.
+		//
+		// 28.5k -> 30.5k for the two rules a live run proved cost whole runs. The
+		// smoke test had drifted to "the smallest hardware that fits" plus a CPU
+		// sandbox, which cannot surface an OOM or a steps-per-second worth
+		// extrapolating: one SFT OOM'd at batch 8 on a T4, OOM'd again at batch 8 on
+		// an L4, then overran a 90m timeout on a ~1h44m run — three submissions and
+		// a budget raise for one finetune. And unpinned deps let the trackio client
+		// float away from the Space that was provisioned against it, which silently
+		// dropped 1h44m of metrics. Both are argued for by cost-per-incident, not
+		// by wanting the words. The same run also bought the trackio rules that
+		// followed — its own Space per project, and reading a metric back rather
+		// than trusting a successful init.
+		//
+		// 30.5k -> 32k for headroom, not content: the rules above landed at 30,495
+		// against a 30,500 ceiling, and a guard with five characters of slack fires
+		// on every edit, which is the state that made it noise at 21,889.
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -198,10 +340,11 @@ describe("ML Assistant system message size", () => {
 				{ mlAssistant: true }
 			),
 			ML_ASSISTANT_PREPROMPT,
+			ML_ASSISTANT_BUDGET_RULES,
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(24_000);
+		expect(composed.length).toBeLessThan(32_000);
 	});
 });
 
@@ -277,5 +420,58 @@ describe("ML Assistant tool preprompt", () => {
 
 	it("says nothing when there are no tools", () => {
 		expect(inMode([])).toBe("");
+	});
+});
+
+describe("ML Assistant billing", () => {
+	const now = new Date("2026-08-24T09:07:00Z");
+
+	it("stamps who pays after the user, only when someone other than the user does", () => {
+		expect(
+			mlAssistantSessionContext({ username: "pngwn", timezone: "UTC", now, billTo: "acme" })
+		).toBe("[Session context: Date=2026-08-24, Time=09:07, Timezone=UTC, User=pngwn, BillTo=acme]");
+		expect(mlAssistantSessionContext({ username: "pngwn", timezone: "UTC", now })).not.toContain(
+			"BillTo="
+		);
+		expect(
+			mlAssistantSessionContext({ username: "pngwn", timezone: "UTC", now, billTo: "  " })
+		).not.toContain("BillTo=");
+	});
+
+	it("keeps the budget last, after the payer", () => {
+		const stamped = mlAssistantSessionContext({
+			username: "pngwn",
+			now,
+			billTo: "acme",
+			budget: { remaining: "$7.80", total: "$10.00" },
+		});
+		expect(stamped).toContain("User=pngwn, BillTo=acme, Budget=$7.80 remaining of $10.00]");
+	});
+
+	it("keeps BillTo a valid namespace and stamps the resource group separately", () => {
+		const stamped = mlAssistantSessionContext({
+			username: "pngwn",
+			now,
+			billTo: "acme",
+			billingResourceGroup: "65f000000000000000000001",
+		});
+		expect(stamped).toContain(
+			"User=pngwn, BillTo=acme, BillingResourceGroup=65f000000000000000000001"
+		);
+		expect(stamped).not.toContain("BillTo=acme (");
+	});
+
+	it("tells the model what BillTo changes and what it does not", () => {
+		// Namespace for compute, not for outputs: the push destination stays the user.
+		expect(ML_ASSISTANT_PREPROMPT).toContain("BillTo");
+		expect(ML_ASSISTANT_PREPROMPT).toContain("where you push does not change");
+	});
+
+	it("puts who pays on the jobs pre-flight list and beside the sandbox rules", () => {
+		const jobs = inMode([tool("hf_jobs")]);
+		expect(jobs).toContain("- Who pays.");
+		expect(jobs).toContain("BillTo from the session context if set, else User");
+		const sandbox = inMode([tool("hf_sandbox")]);
+		expect(sandbox).toContain("A sandbox is a job and bills like one");
 	});
 });

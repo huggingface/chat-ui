@@ -31,7 +31,7 @@
 		class="rounded-2xl border border-gray-200/80 bg-white/85 p-4 shadow-md shadow-black/5 backdrop-blur-md dark:border-gray-700/60 dark:bg-gray-800/85 dark:shadow-black/20"
 	>
 		<div
-			class="flex items-center gap-1.5 text-xs font-semibold tracking-wider text-blue-600 uppercase dark:text-blue-400"
+			class="flex items-center gap-1.5 text-xs font-semibold text-blue-600 uppercase dark:text-blue-400"
 		>
 			<IconSparkles class="size-3.5" />
 			New

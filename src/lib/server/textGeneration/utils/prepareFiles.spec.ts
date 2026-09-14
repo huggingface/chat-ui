@@ -215,12 +215,12 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 	});
 
 	it("degrades the oldest turns to flat messages once the replay budget is spent", async () => {
-		// Each turn carries ~7×8k of tool output, so two turns exceed the 100k
+		// Each turn carries ~28×8k of tool output, so two turns exceed the 400k
 		// budget: the newest keeps its tool history, the oldest goes flat.
 		const bigTurn = (prefix: string): EndpointMessage => ({
 			from: "assistant",
 			content: `${prefix} done`,
-			updates: Array.from({ length: 7 }, (_, i) => [
+			updates: Array.from({ length: 28 }, (_, i) => [
 				callUpdate(`${prefix}${i}`, "search", { q: String(i) }),
 				resultUpdate(`${prefix}${i}`, "search", "x".repeat(8000)),
 			]).flat(),
@@ -235,39 +235,72 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		});
 		expect(prepared[0]).toEqual({ role: "assistant", content: "old done" });
 		expect(prepared[1]).toEqual({ role: "user", content: "next" });
-		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(7);
+		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(28);
 	});
 
-	it("charges plain messages against the budget, so a long history leaves less room for replay", async () => {
-		// One tool turn that fits the budget on its own. Preceded by a user turn
-		// large enough to consume the budget by itself, it must flatten: the cap
-		// covers the whole outgoing history, not just the replayed part, or a
-		// conversation that already fills a context window would still be handed
-		// another budget's worth on top.
-		const toolTurn: EndpointMessage = {
+	it("charges plain messages against the budget, but ballast can never flatten the newest turn", async () => {
+		// The cap covers the whole outgoing history, so a user turn large enough
+		// to consume the budget flattens OLDER tool turns. The newest replayable
+		// turn is exempt: it is the turn a continuation resumes into, and its
+		// transcript is the run's working state — only a window that could not
+		// carry it at all may degrade it (see the newest-candidate rule).
+		const toolTurn = (id: string): EndpointMessage => ({
 			from: "assistant",
-			content: "done",
-			updates: [callUpdate("c1", "search", { q: "x" }), resultUpdate("c1", "search", "result")],
-		};
-
-		const withoutBallast = await prepareMessagesWithFiles(
-			[{ from: "user", content: "hi" }, toolTurn, { from: "user", content: "next" }],
-			imageProcessor,
-			false,
-			{ replayToolHistory: true }
-		);
-		expect(withoutBallast.filter((m) => m.role === "tool")).toHaveLength(1);
+			content: `${id} done`,
+			updates: [callUpdate(id, "search", { q: "x" }), resultUpdate(id, "search", `${id} result`)],
+		});
 
 		const withBallast = await prepareMessagesWithFiles(
-			[{ from: "user", content: "x".repeat(120_000) }, toolTurn, { from: "user", content: "next" }],
+			[
+				{ from: "user", content: "x".repeat(450_000) },
+				toolTurn("older"),
+				{ from: "user", content: "next" },
+				toolTurn("newest"),
+			],
 			imageProcessor,
 			false,
 			{ replayToolHistory: true }
 		);
-		expect(withBallast.filter((m) => m.role === "tool")).toHaveLength(0);
-		// Degraded, never dropped — the user's own text is untouched.
+		const toolMessages = withBallast.filter((m) => m.role === "tool");
+		expect(toolMessages).toHaveLength(1);
+		expect(String(toolMessages[0]?.content)).toContain("newest result");
+		// The older turn degraded, never dropped — and the user's text is untouched.
+		expect(withBallast).toContainEqual({ role: "assistant", content: "older done" });
 		expect(withBallast.filter((m) => m.role === "user")).toHaveLength(2);
-		expect(withBallast).toContainEqual({ role: "assistant", content: "done" });
+	});
+
+	it("keeps a failed turn's replay through a resume message, dangling call repaired", async () => {
+		// The resume-after-failure shape: the newest assistant turn died mid-tool-call
+		// and a user message follows it asking the model to continue. The exemption is
+		// positional (newest assistant candidate), so the trailing user message must
+		// not cost the failed turn its transcript — that transcript is exactly the
+		// work resume exists to preserve — and the call that never recorded a result
+		// must replay as an explicit interruption, not be dropped or 400 the request.
+		const prepared = await prepareMessagesWithFiles(
+			[
+				{ from: "user", content: "x".repeat(450_000) },
+				{
+					from: "assistant",
+					content: "",
+					updates: [
+						callUpdate("done1", "create_repo", { name: "repo" }),
+						resultUpdate("done1", "create_repo", "created pngwn/repo"),
+						callUpdate("dangling", "hf_jobs", { command: "run" }),
+					],
+				},
+				{ from: "user", content: "Your previous turn failed partway through. Continue." },
+			],
+			imageProcessor,
+			false,
+			{ replayToolHistory: true }
+		);
+		const toolMessages = prepared.filter((m) => m.role === "tool");
+		expect(toolMessages).toHaveLength(2);
+		expect(String(toolMessages[0]?.content)).toContain("created pngwn/repo");
+		expect(String(toolMessages[1]?.content)).toBe(
+			"Error: interrupted before a result was recorded"
+		);
+		expect(prepared.at(-1)?.role).toBe("user");
 	});
 
 	describe("context-aware budget", () => {
@@ -333,6 +366,35 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 
 			expect(await replayed(undefined)).toBe(12);
 			expect(await replayed(98_304)).toBe(0);
+		});
+
+		it("fits the newest turn beside the flat floor when the window is real", async () => {
+			// Codex review: ~60k of flat floor plus an ~80k replay upgrade passed a
+			// ~96k window budget, because the newest-turn exemption judged the
+			// upgrade against the whole budget — sending ~140k characters the
+			// provider rejects outright, failing the turn. Against a real window
+			// the newest turn must fit beside the floor; the ballast exemption is
+			// soft-ceiling only (see the ballast test above).
+			const ballasted: EndpointMessage[] = [
+				{ from: "user", content: "y".repeat(60_000) },
+				bigTurn,
+				{ from: "user", content: "next" },
+			];
+			const replayedTools = async (contextLengthTokens?: number) =>
+				(
+					await prepareMessagesWithFiles(ballasted, imageProcessor, false, {
+						replayToolHistory: true,
+						contextLengthTokens,
+					})
+				).filter((m) => m.role === "tool").length;
+
+			// Room for floor and replay together: the transcript survives.
+			expect(await replayedTools(131_072)).toBe(10);
+			// The upgrade alone fits the ~96k budget, floor + upgrade does not:
+			// degrade rather than send a request the model cannot accept.
+			expect(await replayedTools(40_000)).toBe(0);
+			// No window reported: the soft-ceiling ballast exemption still holds.
+			expect(await replayedTools(undefined)).toBe(10);
 		});
 
 		it("sends the pre-replay shape when the window is smaller than the reserve", async () => {
@@ -476,8 +538,9 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 	});
 
 	it("never expands an older turn when a newer turn already fell back to flat", async () => {
-		// The newest turn alone exceeds the 100k budget, so it goes flat; the
-		// older turn must then go flat too, even though it would fit on its own.
+		// The newest turn alone exceeds the whole 400k ceiling — the one case
+		// that may degrade it — so it goes flat; the older turn must then go
+		// flat too, even though it would fit on its own.
 		const turn = (prefix: string, calls: number): EndpointMessage => ({
 			from: "assistant",
 			content: `${prefix} done`,
@@ -489,7 +552,7 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		const messages: EndpointMessage[] = [
 			turn("old", 2),
 			{ from: "user", content: "next" },
-			turn("new", 14),
+			turn("new", 60),
 		];
 		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
 			replayToolHistory: true,
@@ -514,7 +577,7 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		const huge: EndpointMessage = {
 			from: "assistant",
 			content: "new done",
-			updates: Array.from({ length: 14 }, (_, i) => [
+			updates: Array.from({ length: 60 }, (_, i) => [
 				callUpdate(`new${i}`, "search", { q: String(i) }),
 				resultUpdate(`new${i}`, "search", "x".repeat(8000)),
 			]).flat(),
@@ -606,13 +669,13 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 	});
 
 	it("attachReasoning spends the same replay budget, oldest turns first, without leaking <think> in the fallback", async () => {
-		// Two turns of ~60k reasoning exceed the 100k budget: the newest keeps
+		// Two turns of ~250k reasoning exceed the 400k budget: the newest keeps
 		// reasoning_content, the oldest falls back to a <think>-stripped flat
 		// shape (not the raw string) so models that must never see historical
 		// thoughts (e.g. Gemma) don't get them just because the budget ran out.
 		const bigReasoningTurn = (n: number): EndpointMessage => ({
 			from: "assistant",
-			content: `<think>${"x".repeat(60_000)}</think>answer ${n}`,
+			content: `<think>${"x".repeat(250_000)}</think>answer ${n}`,
 		});
 		const messages: EndpointMessage[] = [bigReasoningTurn(1), bigReasoningTurn(2)];
 		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
@@ -719,7 +782,7 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 	it("strips <think> from the replayToolHistory budget fallback instead of leaking it raw", async () => {
 		const bigTurn = (n: number): EndpointMessage => ({
 			from: "assistant",
-			content: `<think>${"x".repeat(60_000)}</think>answer ${n}`,
+			content: `<think>${"x".repeat(250_000)}</think>answer ${n}`,
 			updates: [
 				callUpdate(`c${n}`, "search", { q: String(n) }),
 				resultUpdate(`c${n}`, "search", "x".repeat(60_000)),
@@ -729,8 +792,8 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
 			replayToolHistory: true,
 		});
-		// turn 1 (oldest) fell back to flat because turn 2 alone (~68k of
-		// reasoning + capped tool output) already spends most of the 100k
+		// turn 1 (oldest) fell back to flat because turn 2 alone (~258k of
+		// reasoning + capped tool output) already spends most of the 400k
 		// budget: it must be plain content with no reasoning_content leaking
 		// through, and no raw <think> tag either.
 		const flatCandidates = prepared.filter(

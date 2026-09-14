@@ -21,6 +21,8 @@
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import ToolUpdate from "./ToolUpdate.svelte";
+	import TurnWaitBanner from "./TurnWaitBanner.svelte";
+	import { turnStateOf } from "$lib/utils/generationState";
 	import ToolCallsSummary from "./ToolCallsSummary.svelte";
 	import ArtifactCard from "./ArtifactCard.svelte";
 	import ElicitationForm from "./ElicitationForm.svelte";
@@ -61,8 +63,8 @@
 	let {
 		message,
 		loading = false,
-		isAuthor: _isAuthor = true,
-		readOnly: _readOnly = false,
+		isAuthor = true,
+		readOnly = false,
 		isTapped = $bindable(false),
 		alternatives = [],
 		editMsdgId = $bindable(null),
@@ -88,11 +90,6 @@
 		}
 	}
 
-	$effect(() => {
-		// referenced to appease linter for currently-unused props
-		void _isAuthor;
-		void _readOnly;
-	});
 	function handleKeyDown(e: KeyboardEvent) {
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
 			editFormEl?.requestSubmit();
@@ -253,6 +250,15 @@
 		return out;
 	}
 
+	// The live turn's park, rendered as a countdown from its ABSOLUTE deadline
+	// (clock-skew corrected). Only the last message of the conversation can be
+	// parked; earlier messages' turnState events are history, not liveness.
+	let waitingState = $derived.by(() => {
+		if (!isLast) return undefined;
+		const state = turnStateOf(message);
+		return state?.state === "waiting" && state.until !== undefined ? state : undefined;
+	});
+
 	let blocks = $derived.by(() => {
 		const updates = message.updates ?? [];
 		const res: Block[] = [];
@@ -398,10 +404,7 @@
 		return units;
 	});
 
-	// Still mid-process (thinking / calling tools, no answer yet) → render the
-	// blocks flat like today. Once the final answer starts streaming the last
-	// block becomes text, so this flips to false and the nested summary takes over.
-	/** Reasoning and a running tool animate; a finished tool and a settled question do not. */
+	/** Reasoning, a running tool and growing text animate; a finished tool and a settled question do not. */
 	let trailingBlockShowsProgress = $derived.by(() => {
 		const last = blocks.at(-1);
 		if (!last) return false;
@@ -411,18 +414,22 @@
 				(update) => isMessageToolResultUpdate(update) || isMessageToolErrorUpdate(update)
 			);
 		}
+		if (last.type === "text") return last.content.trim().length > 0;
 		return false;
 	});
 
+	// A streaming turn with process blocks renders them flat for its whole
+	// duration — mid-turn narration between tool rounds must not regroup the
+	// rows into the collapsed summary, or every new round visibly "re-expands"
+	// them. The nested summary takes over only once the turn is over.
 	let isProcessStreaming = $derived.by(() => {
 		if (!isLast || !loading) return false;
-		const last = blocks.at(-1);
-		return (
-			!!last &&
-			(last.type === "think" ||
-				last.type === "tool" ||
-				last.type === "elicitation" ||
-				last.type === "plan")
+		return blocks.some(
+			(block) =>
+				block.type === "think" ||
+				block.type === "tool" ||
+				block.type === "elicitation" ||
+				block.type === "plan"
 		);
 	});
 
@@ -493,8 +500,8 @@
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
 				{#if isProcessStreaming}
-					<!-- Streaming the thinking / tool phase: render every block flat and
-					     inline, exactly like today. Nesting kicks in once the answer starts. -->
+					<!-- A streaming turn that used thinking / tools: every block renders flat
+					     and inline until the turn ends, then the nested summary takes over. -->
 					{#each blocks as block, blockIndex (block.type === "tool" ? `tool-${block.uuid}-${blockIndex}` : block.type === "plan" ? `plan-${block.update.version}` : `block-${blockIndex}`)}
 						{#if block.type === "text"}
 							{#if block.content.trim().length > 0}
@@ -520,9 +527,12 @@
 						{:else}
 							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
 								{#if block.type === "think"}
+									<!-- Only the trailing block can still be streaming: an earlier
+									     unclosed think is a stream artifact (e.g. a lost close marker)
+									     and must not keep shimmering or re-expanding on every render. -->
 									<OpenReasoningResults
 										content={block.content}
-										loading={isLast && loading && !block.closed}
+										loading={isLast && loading && !block.closed && blockIndex === blocks.length - 1}
 									/>
 								{:else}
 									<ToolUpdate tool={block.updates} {loading} />
@@ -578,6 +588,16 @@
 					{/each}
 				{/if}
 			</div>
+
+			{#if waitingState}
+				<TurnWaitBanner
+					until={waitingState.until ?? 0}
+					reason={waitingState.reason}
+					conversationId={page.params.id ?? ""}
+					messageId={message.id}
+					canWake={isAuthor && !readOnly}
+				/>
+			{/if}
 		</div>
 
 		{#if message.routerMetadata || (!loading && message.content)}

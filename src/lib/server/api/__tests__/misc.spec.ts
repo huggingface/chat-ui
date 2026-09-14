@@ -27,10 +27,12 @@ describe("GET /api/v2/feature-flags", () => {
 		expect(data).toHaveProperty("loginEnabled");
 		expect(data).toHaveProperty("isAdmin");
 		expect(data).toHaveProperty("transcriptionEnabled");
+		expect(data).toHaveProperty("taskModelId");
 		expect(typeof data.enableAssistants).toBe("boolean");
 		expect(typeof data.loginEnabled).toBe("boolean");
 		expect(typeof data.isAdmin).toBe("boolean");
 		expect(typeof data.transcriptionEnabled).toBe("boolean");
+		expect(data.taskModelId === null || typeof data.taskModelId === "string").toBe(true);
 	});
 
 	it("reflects isAdmin from locals for non-admin user", async () => {

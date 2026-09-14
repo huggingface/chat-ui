@@ -35,10 +35,8 @@
 	import { loading } from "$lib/stores/loading.js";
 	import { streamStart } from "$lib/utils/haptics";
 	import { requireAuthUser } from "$lib/utils/auth.js";
-	import {
-		isConversationGenerationActive,
-		isAssistantGenerationTerminal,
-	} from "$lib/utils/generationState";
+	import { isConversationGenerationActive, isTurnSubscribable } from "$lib/utils/generationState";
+	import { noteServerNow } from "$lib/utils/clockSkew.svelte";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
@@ -164,6 +162,12 @@
 			pending = true;
 			resuming = Boolean(resumeElicitationId);
 			writeMessageInFlight = true;
+			// This tab may hold an open turn subscription (e.g. through an
+			// awaiting-input park it is now answering). The POST response will
+			// carry the continuation's updates; keeping the subscription too
+			// would apply every event twice.
+			reattachController?.abort();
+			reattachController = undefined;
 			// Create the controller before any await: a Stop click during file
 			// encoding or MCP hydration must abort THIS request, not whichever
 			// stale controller a previous generation left behind.
@@ -340,6 +344,18 @@
 				onPlan: (update) => {
 					if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
 				},
+				onBudget: (update) => {
+					if (ML_ASSISTANT_MODE) {
+						mlAssistant.setBudget({
+							totalMicroUsd: update.totalMicroUsd,
+							spentMicroUsd: update.spentMicroUsd,
+							reservedMicroUsd: update.reservedMicroUsd,
+						});
+					}
+				},
+				onTurnState: (update) => {
+					noteServerNow(update.serverNow);
+				},
 				onError: (update) => {
 					if (update.statusCode === 402) {
 						showSubscribeModal = true;
@@ -410,17 +426,15 @@
 		}
 	}
 
-	// Stream a run this tab did not start (a returning tab, a second device, a run still
+	// Stream a turn this tab did not start (a returning tab, a second device, a run still
 	// in flight at load) into its message via the shared consumer. Resumes at the message's
-	// materialized cursor so no content is replayed twice.
+	// materialized cursor so no content is replayed twice. The subscription is keyed by the
+	// TURN, not the producer: a parked wait keeps the same connection, and the sweeper's
+	// resumed run continues the same sequence — there is no new identity to discover.
 	async function reattachToRun() {
 		if (!browser || writeMessageInFlight || reattachController) return;
 		const lastAssistant = messages.findLast((m) => m.from === "assistant");
-		if (
-			!lastAssistant ||
-			!lastAssistant.generationId ||
-			isAssistantGenerationTerminal(lastAssistant)
-		) {
+		if (!lastAssistant || !lastAssistant.generationId || !isTurnSubscribable(lastAssistant)) {
 			return;
 		}
 
@@ -430,7 +444,7 @@
 		const streamingMode = resolveStreamingMode($settings);
 
 		const url = new URL(`${base}/conversation/${runConvId}/stream`, window.location.href);
-		url.searchParams.set("generationId", lastAssistant.generationId);
+		url.searchParams.set("messageId", lastAssistant.id);
 		url.searchParams.set("fromSeq", String(lastAssistant.materializedSeq ?? 0));
 
 		try {
@@ -446,6 +460,18 @@
 					onTitle: (title) => convsStore.update(runConvId, { title }),
 					onPlan: (update) => {
 						if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
+					},
+					onBudget: (update) => {
+						if (ML_ASSISTANT_MODE) {
+							mlAssistant.setBudget({
+								totalMicroUsd: update.totalMicroUsd,
+								spentMicroUsd: update.spentMicroUsd,
+								reservedMicroUsd: update.reservedMicroUsd,
+							});
+						}
+					},
+					onTurnState: (update) => {
+						noteServerNow(update.serverNow);
 					},
 					onError: (update) => {
 						$error = update.message ?? "An error has occurred";
@@ -657,6 +683,14 @@
 		} else if (!pending) {
 			$loading = false;
 		}
+	});
+
+	// No discovery here, by design: the reattach subscription is keyed by the
+	// TURN and stays open across parks and questions, so resumes and answers
+	// arrive on the held connection. The turn state travels in-band; the only
+	// thing this tab notes from it is the clock-skew reference.
+	$effect(() => {
+		noteServerNow(data.turnState?.serverNow);
 	});
 
 	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages

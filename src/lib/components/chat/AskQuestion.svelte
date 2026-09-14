@@ -8,6 +8,9 @@
 	} from "$lib/types/McpElicitation";
 	import { sendElicitationAnswer } from "$lib/utils/sendElicitationAnswer";
 	import { unregisterQuestion } from "$lib/stores/pendingQuestion";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { usdToMicroUsd } from "$lib/utils/mlBudget";
 
 	interface Props {
 		conversationId: string;
@@ -101,8 +104,33 @@
 		});
 		submitting = false;
 		if (!result.ok) {
-			error = result.error;
+			// The answer that stands is the earlier one, so there is nothing left to ask; the
+			// transcript row settles when the continuation reports it.
+			if (result.answered) unregisterQuestion(request.elicitationId);
+			else error = result.error;
 			return;
+		}
+		// Mirror a budget grant into the strip right away — the server applied it
+		// as part of accepting this answer, and the next stream update is a whole
+		// tool round away. Same rule as the server: chosen options only.
+		if (action === "accept" && ML_ASSISTANT_MODE && mlAssistant.budget) {
+			let grantedUsd: number | undefined;
+			for (const f of fields) {
+				if (f.kind !== "select") continue;
+				const value = content[f.name];
+				const values = Array.isArray(value) ? value : [value];
+				for (const option of f.options) {
+					if (option.setBudgetUsd !== undefined && values.includes(option.value)) {
+						grantedUsd = Math.max(grantedUsd ?? 0, option.setBudgetUsd);
+					}
+				}
+			}
+			if (grantedUsd !== undefined) {
+				mlAssistant.setBudget({
+					...mlAssistant.budget,
+					totalMicroUsd: usdToMicroUsd(grantedUsd),
+				});
+			}
 		}
 		// Only this question: another may still be open behind it.
 		unregisterQuestion(request.elicitationId);
@@ -163,6 +191,13 @@
 								>{option.description}</span
 							>
 						{/if}
+						{#if option.setBudgetUsd !== undefined}
+							<!-- From the option's own metadata, never its label: what this
+							     shows is exactly what the server applies if it is picked. -->
+							<span class="block text-xs font-medium text-amber-700 dark:text-amber-400">
+								Sets session budget to ${option.setBudgetUsd.toFixed(2)}
+							</span>
+						{/if}
 					</span>
 				</button>
 			{/each}
@@ -199,6 +234,16 @@
 						value={otherText[select.name] ?? ""}
 						oninput={(event) =>
 							(otherText = { ...otherText, [select.name]: event.currentTarget.value })}
+						onkeydown={(event) => {
+							if (event.key === "Enter" && !event.isComposing) {
+								event.preventDefault();
+								if (isLast) {
+									void finish("accept");
+								} else {
+									advance();
+								}
+							}
+						}}
 						maxlength={MAX_OTHER_CHARS}
 						disabled={submitting}
 						placeholder="Tell us what you had in mind"

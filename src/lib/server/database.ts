@@ -10,8 +10,10 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Generation, GenerationEvent } from "$lib/types/Generation";
+import type { TurnState } from "$lib/types/TurnState";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { ParkedCall } from "$lib/types/ParkedCall";
+import type { NestedAgentCall } from "$lib/types/NestedAgentCall";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
@@ -139,8 +141,10 @@ export class Database {
 		const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
 		const generations = db.collection<Generation>("generations");
 		const generationEvents = db.collection<GenerationEvent>("generationEvents");
+		const turnStates = db.collection<TurnState>("turnStates");
 		const mcpElicitations = db.collection<McpElicitation>("mcpElicitations");
 		const parkedCalls = db.collection<ParkedCall>("parkedCalls");
+		const nestedAgentCalls = db.collection<NestedAgentCall>("nestedAgentCalls");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
@@ -171,8 +175,10 @@ export class Database {
 			abortedGenerations,
 			generations,
 			generationEvents,
+			turnStates,
 			mcpElicitations,
 			parkedCalls,
+			nestedAgentCalls,
 			settings,
 			users,
 			sessions,
@@ -200,8 +206,10 @@ export class Database {
 			abortedGenerations,
 			generations,
 			generationEvents,
+			turnStates,
 			mcpElicitations,
 			parkedCalls,
+			nestedAgentCalls,
 			settings,
 			users,
 			sessions,
@@ -324,9 +332,45 @@ export class Database {
 			.catch((e) =>
 				logger.error(e, "Error creating index for generationEvents by generationId and seq")
 			);
+		// The turn-scoped replay/tail scan, and the max-seq read a resumed producer
+		// seeds its counter from. Not unique: legacy events lack the keys, and the
+		// parked-call lease is what guarantees a single writer.
+		generationEvents
+			.createIndex({ conversationId: 1, messageId: 1, seq: 1 })
+			.catch((e) => logger.error(e, "Error creating turn-scoped index for generationEvents"));
 		generationEvents
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for generationEvents by createdAt"));
+
+		// Expired on the same 24h clock as generationEvents.
+		nestedAgentCalls
+			.createIndex({ conversationId: 1, messageId: 1, createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating turn-scoped index for nestedAgentCalls"));
+		nestedAgentCalls
+			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for nestedAgentCalls by createdAt"));
+
+		// One state document per turn; the unique key is what makes the upsert in
+		// turnState.ts race-safe. Ended turns expire like ended generations do.
+		turnStates
+			.createIndex({ conversationId: 1, messageId: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating unique turn index for turnStates"));
+		turnStates
+			.createIndex({ endedAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for turnStates by endedAt"));
+		// Serve the live feed's per-tick owner scan, like the same pair on `generations`.
+		turnStates
+			.createIndex(
+				{ userId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { userId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for turnStates by userId"));
+		turnStates
+			.createIndex(
+				{ sessionId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { sessionId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for turnStates by sessionId"));
 
 		parkedCalls
 			.createIndex({ parkedCallId: 1 }, { unique: true })

@@ -7,28 +7,7 @@ import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { defaultModel, models, validateModel } from "$lib/server/models";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
 import { resolveStreamingMode } from "$lib/utils/messageUpdates";
-import { z } from "zod";
-
-const settingsSchema = z.object({
-	shareConversationsWithModelAuthors: z
-		.boolean()
-		.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
-	welcomeModalSeen: z.boolean().optional(),
-	activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
-	customPrompts: z.record(z.string()).default({}),
-	customPromptsEnabled: z.record(z.boolean()).default({}),
-	multimodalOverrides: z.record(z.boolean()).default({}),
-	toolsOverrides: z.record(z.boolean()).default({}),
-	artifactsOverrides: z.record(z.boolean()).default({}),
-	providerOverrides: z.record(z.string()).default({}),
-	reasoningEffortOverrides: z.record(z.enum(["low", "medium", "high"])).default({}),
-	reasoningOverrides: z.record(z.boolean()).default({}),
-	streamingMode: z.enum(["raw", "smooth"]).optional(),
-	directPaste: z.boolean().default(false),
-	hapticsEnabled: z.boolean().default(true),
-	hidePromptExamples: z.record(z.boolean()).default({}),
-	billingOrganization: z.string().optional(),
-});
+import { assertBillingTargetChange, parseSettingsPayload } from "$lib/server/settingsValidation";
 
 export const GET: RequestHandler = async ({ locals }) => {
 	requireAuth(locals);
@@ -57,6 +36,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 	return superjsonResponse({
 		welcomeModalSeen: !!settings?.welcomeModalSeenAt,
 		welcomeModalSeenAt: settings?.welcomeModalSeenAt ?? null,
+		mlInternOnboardingSeen: !!settings?.mlInternOnboardingSeenAt,
 
 		activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
 		streamingMode,
@@ -79,6 +59,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		reasoningEffortOverrides: settings?.reasoningEffortOverrides ?? {},
 		reasoningOverrides: config.isHuggingChat ? {} : (settings?.reasoningOverrides ?? {}),
 		billingOrganization: settings?.billingOrganization ?? undefined,
+		billingResourceGroup: settings?.billingResourceGroup ?? undefined,
 	});
 };
 
@@ -86,7 +67,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	requireAuth(locals);
 	const body = await request.json();
 
-	const { welcomeModalSeen, ...parsedSettings } = settingsSchema.parse(body);
+	const { welcomeModalSeen, mlInternOnboardingSeen, ...parsedSettings } =
+		parseSettingsPayload(body);
 	const streamingMode = resolveStreamingMode(parsedSettings);
 
 	if (config.isHuggingChat) {
@@ -94,6 +76,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		parsedSettings.toolsOverrides = {};
 		parsedSettings.reasoningOverrides = {};
 	}
+
+	await assertBillingTargetChange(locals, parsedSettings);
 
 	const settings = {
 		...parsedSettings,
@@ -106,6 +90,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			$set: {
 				...settings,
 				...(welcomeModalSeen && { welcomeModalSeenAt: new Date() }),
+				...(mlInternOnboardingSeen && { mlInternOnboardingSeenAt: new Date() }),
 				updatedAt: new Date(),
 			},
 			$setOnInsert: {

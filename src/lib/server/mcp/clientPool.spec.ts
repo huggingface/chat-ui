@@ -6,9 +6,10 @@ const built = vi.hoisted(() => ({
 }));
 
 vi.mock("./client", () => ({
-	createMcpClient: () => {
+	createMcpClient: (kind = "session") => {
 		const client = {
 			closed: false,
+			kind,
 			getProtocolEra: () => built.era,
 			async connect() {},
 			async close() {
@@ -98,5 +99,42 @@ describe("a connection a prompt has to be attributed on", () => {
 
 		expect(a.client).toBe(b.client);
 		expect(a.isolation).toBeUndefined();
+	});
+});
+
+describe("clients of different kinds", () => {
+	beforeEach(() => {
+		built.clients.length = 0;
+		built.era = "modern";
+	});
+
+	it("never share a connection, because the name is sent once at initialize", async () => {
+		const session = await getClient(SERVER, undefined, undefined, "session");
+		const intern = await getClient(SERVER, undefined, undefined, "intern");
+
+		// Handing an intern caller a connection that introduced itself as
+		// chat-ui-mcp would report the wrong name for every call it makes.
+		expect(intern).not.toBe(session);
+		expect((session as unknown as { kind: string }).kind).toBe("session");
+		expect((intern as unknown as { kind: string }).kind).toBe("intern");
+	});
+
+	it("still pools within a kind", async () => {
+		// Its own server: the pool is module-level and outlives a test, so a
+		// shared URL would answer from an earlier case's connection.
+		const server = { name: "Own", url: "https://pool-within-kind.example/mcp" };
+
+		const first = await getClient(server, undefined, undefined, "intern");
+		const second = await getClient(server, undefined, undefined, "intern");
+
+		expect(second).toBe(first);
+		expect(built.clients).toHaveLength(1);
+	});
+
+	it("keeps the kind when a prompt needs an attributable connection", async () => {
+		built.era = "legacy";
+		const { client } = await getAttributableClient(SERVER, "conv-1", undefined, "intern");
+
+		expect((client as unknown as { kind: string }).kind).toBe("intern");
 	});
 });

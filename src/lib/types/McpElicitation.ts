@@ -43,7 +43,18 @@ export type ElicitationField =
 			description?: string;
 			required: boolean;
 			multiple: boolean;
-			options: Array<{ value: string; label: string; description?: string }>;
+			options: Array<{
+				value: string;
+				label: string;
+				description?: string;
+				/**
+				 * ML Assistant sessions only: choosing this option sets the session
+				 * compute budget to this many dollars. Applied by trusted server code
+				 * when the user submits the answer — never by the model — and always
+				 * rendered next to the option so the label cannot hide the amount.
+				 */
+				setBudgetUsd?: number;
+			}>;
 			/** Offers an "Other" choice whose value is typed rather than picked. */
 			allowOther?: boolean;
 			minItems?: number;
@@ -57,6 +68,18 @@ export type ElicitationAction = "accept" | "decline" | "cancel";
 
 /** `withdrawn` is the server giving up on its own request, which it usually does first. */
 export type ElicitationResolution = "user" | "expired" | "aborted" | "withdrawn";
+
+/**
+ * Sent with the 409 a repeat answer to a durable prompt gets. `resume` is true when the call
+ * the prompt parked was never continued: the page that answered lost its cue (a reload, a closed tab, a run
+ * that died before persisting), so the transcript shows the question open again and this
+ * answer is the only thing that can start the continuation.
+ */
+export interface AnsweredElicitation {
+	action: ElicitationAction;
+	resume: boolean;
+	messageId?: string;
+}
 
 /** Every string here is server-authored, so it is display text and never markup. */
 export interface ElicitationRequestPayload {
@@ -82,6 +105,12 @@ export interface McpElicitation extends Timestamps {
 	status: "pending" | "resolved";
 	request: ElicitationRequestPayload;
 	action?: ElicitationAction;
+	/**
+	 * Who closed it. Absent on rows written before this was recorded; for those a durable
+	 * prompt's `cancel` is read as the system's, since a user's cancel that nothing consumed
+	 * loses nothing by being answerable again.
+	 */
+	resolution?: ElicitationResolution;
 	content?: Record<string, ElicitationValue>;
 	/** Absent for a 2026-era prompt: nothing is waiting, so nothing expires. */
 	expiresAt?: Date;

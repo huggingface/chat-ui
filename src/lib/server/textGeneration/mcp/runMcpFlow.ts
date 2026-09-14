@@ -13,8 +13,12 @@ import type { Stream } from "openai/streaming";
 import { buildToolPreprompt } from "../utils/toolPrompt";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
-import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
-import { hasTruncatedToolCall, parseToolArguments } from "./toolArgs";
+import {
+	executeToolCalls,
+	withRewrittenArguments,
+	type NormalizedToolCall,
+} from "./toolInvocation";
+import { hasTruncatedToolCall, parseToolArguments, withParseableArguments } from "./toolArgs";
 import type { TextGenerationContext } from "../types";
 import {
 	hasAuthHeader,
@@ -28,9 +32,24 @@ import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
-import { isMlAssistantConversation, withMlAssistantServers } from "$lib/server/mlAssistant";
-import { getEnabledBuiltinTools, shouldSkipMcpFlow } from "../builtinTools";
+import {
+	isMlAssistantConversation,
+	mlAssistantPayerTarget,
+	pinnedHubToken,
+	withMlAssistantServers,
+} from "$lib/server/mlAssistant";
+import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
+import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
+import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
+import { createRepeatedCallGuard } from "./repeatedCallGuard";
+import { withRepairedToolSchemas } from "$lib/server/mcp/schemaRepair";
+import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
+import { composeGuards } from "./toolGuard";
+import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
+import { withUpstreamRetry } from "../utils/upstreamRetry";
+import { getEnabledBuiltinTools, isNestedAgentTool, shouldSkipMcpFlow } from "../builtinTools";
 import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
+import { inferenceBillingHeaders } from "$lib/server/billing";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -69,6 +88,33 @@ const ML_ASSISTANT_MAX_TOOL_ROUNDS = 100;
 // Each retry costs a tool round, so give up quickly and answer without the tool.
 const MAX_TRUNCATED_TOOL_CALL_RETRIES = 2;
 
+// One more attempt after a final answer ends before any visible content —
+// cut by the output limit, or a stream that died mid-<think> with no "length"
+// signal. If the nudged retry is cut too, the budget is simply too small for
+// this answer and retrying again just burns rounds — finalize what exists,
+// marked interrupted.
+const MAX_CUT_ANSWER_RETRIES = 1;
+
+// One more attempt after a final answer that writes a tool call as text markup
+// (<tool_name> tags) instead of making it: nothing ran, the user would see
+// broken markup in place of a working control, and the turn usually hinges on
+// the call actually happening. Observed with GLM-class models whose provider
+// template leaks their native tool syntax into content. A second leak
+// finalizes as-is rather than looping on a model that cannot comply.
+const MAX_LEAKED_TOOL_CALL_RETRIES = 1;
+/**
+ * The `<tool_call>name<arg_key>k</arg_key><arg_value>v</arg_value>` dialect, for
+ * a leak that carries no advertised tool name to match on.
+ *
+ * Two adjacent tags, never one: a single `</function>` or `</tool_call>` appears
+ * in an answer that documents this syntax or quotes sample XML, and treating
+ * that as a leak would throw the answer away and tell the model to make a call
+ * it was never asked for. The pairs below are the structure a half-parsed call
+ * leaves behind and are not something prose produces.
+ */
+const LEAKED_CALL_MARKUP =
+	/<\/arg_key>\s*<arg_value>|<\/arg_value>\s*(?:<arg_key>|<\/(?:tool_call|function)>)|<\/function>\s*<\/tool_call>/;
+
 export async function* runMcpFlow({
 	model,
 	conv,
@@ -106,10 +152,46 @@ export async function* runMcpFlow({
 		}
 		return false;
 	};
-	const builtinTools = getEnabledBuiltinTools({ conv });
+	const builtinTools = getEnabledBuiltinTools({
+		conv,
+		namespace: (locals as unknown as { user?: { username?: string } })?.user?.username,
+	});
 	// Read once: the preset decides the servers, the round budget and which tool
 	// doctrine is sent, and they must all agree within a run.
 	const mlAssistant = isMlAssistantConversation(conv);
+
+	// Every mode conversation is gated — one without a stored budget is a zero
+	// budget, not an ungated one. Settle already ran this turn
+	// (textGeneration/index.ts), so the ledger the guard reserves against is as
+	// fresh as it gets.
+	const budgetGuard = mlAssistant
+		? createMlBudgetGuard({
+				conversationId: conv._id,
+				generationId: generationId ?? conv._id.toString(),
+				username: (locals as unknown as { user?: { username?: string } })?.user?.username,
+				// Same credential the turn-start settle pass uses: an operator-pinned
+				// Hub entry launched the work, so it is what can read it back.
+				token:
+					pinnedHubToken() ??
+					(locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
+					(locals as unknown as { token?: string } | undefined)?.token,
+			})
+		: undefined;
+
+	// A job bills the namespace it runs under, so the billing setting travels as
+	// an argument rather than a header — see mcp/hubBilling.ts.
+	const payer = mlAssistant ? mlAssistantPayerTarget(locals) : undefined;
+	const rewriteArgs = payer ? createHubBillingRewrite(payer) : undefined;
+	if (mlAssistant) {
+		logger.info(
+			{ conversationId: conv._id.toString(), payer: payer ?? null },
+			"[mcp] Hub compute for this run bills to"
+		);
+	}
+
+	// Built here so it spans the turn's rounds; chained below, once the tool
+	// mapping the schema check reads exists.
+	const repeatedCallGuard = createRepeatedCallGuard();
 
 	// Start from env-configured servers
 	let servers = getMcpServers();
@@ -356,9 +438,27 @@ export async function* runMcpFlow({
 				"[mcp] dropped MCP tools shadowed by builtin tools"
 			);
 		}
+		// In the mode, gated tools advertise their routing discriminator as
+		// required — the Hub's own schema doesn't, and calls without one can only
+		// bounce off the budget gate's fail-closed path.
+		const gatedMcpTools = mlAssistant ? withRequiredDiscriminators(mcpTools, mapping) : mcpTools;
+		// Applied to every conversation, mode or not: the Hub tools whose real
+		// interface is a grammar in prose misfire the same way whoever is calling
+		// them. See mcp/schemaRepair.ts for what the traces showed.
+		const shapedMcpTools = withRepairedToolSchemas(gatedMcpTools, mapping, servers);
+		// Cheapest first, and only the last link may book anything (see
+		// composeGuards): a repeat of a call that already failed the same way, then
+		// arguments that cannot satisfy the tool's own schema, then the budget.
+		// The first two run for every conversation — getting a tool's arguments
+		// wrong is not a mode-specific failure.
+		const guard = [
+			repeatedCallGuard,
+			createSchemaPreflightGuard(mapping),
+			...(budgetGuard ? [budgetGuard] : []),
+		].reduce(composeGuards);
 		const oaTools = [
 			...builtinTools.map((tool) => tool.definition),
-			...mcpTools.filter((tool) => !builtinNames.has(tool.function.name)),
+			...shapedMcpTools.filter((tool) => !builtinNames.has(tool.function.name)),
 		];
 		try {
 			logger.info(
@@ -391,9 +491,7 @@ export async function* runMcpFlow({
 			fetch: captureProviderFetch,
 			defaultHeaders: {
 				// Bill to organization if configured (HuggingChat only)
-				...(config.isHuggingChat && locals?.billingOrganization
-					? { "X-HF-Bill-To": locals.billingOrganization }
-					: {}),
+				...(config.isHuggingChat ? inferenceBillingHeaders(locals) : {}),
 			},
 		});
 
@@ -429,14 +527,28 @@ export async function* runMcpFlow({
 
 		// Hoisted above the message prep so the history budget can reserve the
 		// reply allowance this request will actually ask for.
-		const parameters = { ...targetModel.parameters, ...assistant?.generateSettings } as Record<
-			string,
-			unknown
-		>;
-		const maxTokens =
+		const parameters = {
+			...targetModel.parameters,
+			...(mlAssistant ? mlAssistantModelEntry(targetModel.id || targetModel.name)?.parameters : {}),
+			...assistant?.generateSettings,
+		} as Record<string, unknown>;
+		const catalogMaxTokens =
 			(parameters?.max_tokens as number | undefined) ??
 			(parameters?.max_new_tokens as number | undefined) ??
 			(parameters?.max_completion_tokens as number | undefined);
+		const targetContextLength = (targetModel as unknown as { contextLength?: number })
+			.contextLength;
+		// The preset floors the reply allowance — see the constant for why. The
+		// floor never claims more than half the model's window: prompt plus reply
+		// must fit it, and a backend that enforces the sum would reject the very
+		// first request of a small-window model. A catalog value above the floor
+		// still wins. The research sub-agent inherits this through completionBase.
+		const clampedFloor = targetContextLength
+			? Math.min(ML_ASSISTANT_MIN_COMPLETION_TOKENS, Math.floor(targetContextLength / 2))
+			: ML_ASSISTANT_MIN_COMPLETION_TOKENS;
+		const maxTokens = mlAssistant
+			? Math.max(catalogMaxTokens ?? 0, clampedFloor)
+			: catalogMaxTokens;
 
 		let messagesOpenAI: ChatCompletionMessageParam[] = await prepareMessagesWithFiles(
 			messages,
@@ -454,7 +566,7 @@ export async function* runMcpFlow({
 				// the alias itself has none, and the candidate is what serves this
 				// request. Tool schemas are prepended after this returns, which is
 				// part of what CONTEXT_RESERVE_TOKENS holds back.
-				contextLengthTokens: (targetModel as unknown as { contextLength?: number }).contextLength,
+				contextLengthTokens: targetContextLength,
 				maxOutputTokens: maxTokens,
 			}
 		);
@@ -537,6 +649,34 @@ export async function* runMcpFlow({
 			...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
 		};
 
+		// Sub-agent builtins run nested tool loops and need the request plumbing
+		// this turn resolved — client, sampling params, the listed MCP tools —
+		// which only exists here. Their definitions and enablement stay in
+		// builtinTools/; only the runtime binding lives at the call site, and it
+		// is the same binding for all of them.
+		const nestedAgentDeps = {
+			openai,
+			completionBase,
+			requestHeaders: {
+				"ChatUI-Conversation-ID": conv._id.toString(),
+				"X-use-cache": "false",
+				...(config.USE_USER_TOKEN === "true" && locals?.token
+					? { Authorization: `Bearer ${locals.token}` }
+					: {}),
+			},
+			servers,
+			mapping,
+			// Repaired, not raw: the sandbox sub-agent is the heaviest caller of the
+			// hf_sandbox_* grammar these rewrites exist for.
+			mcpTools: shapedMcpTools,
+			hostBuiltinTools: builtinTools,
+			contextLengthTokens: targetContextLength,
+			...(rewriteArgs ? { rewriteArgs } : {}),
+		};
+		for (const tool of builtinTools) {
+			if (isNestedAgentTool(tool)) tool.bind(nestedAgentDeps);
+		}
+
 		const toPrimitive = (value: unknown) => {
 			if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
 				return value;
@@ -560,12 +700,23 @@ export async function* runMcpFlow({
 		// Track whether we're inside a <think> block when the upstream streams
 		// provider-specific reasoning tokens (e.g. `reasoning` or `reasoning_content`).
 		let thinkOpen = false;
+		// Whether the CLIENT currently has an unbalanced <think> opener. Diverges
+		// from thinkOpen once tool-call deltas stop the content stream: the close
+		// may then land only in lastAssistantContent, and a client left with an
+		// unclosed block renders that reasoning as still streaming for the rest
+		// of the turn.
+		let clientThinkOpen = false;
 		// Leading whitespace-only reasoning deltas that arrived before the block
 		// opened (thinkOpen still false, so a blank chunk wouldn't otherwise open
 		// one). Held here and flushed once a non-blank delta opens the block, so
 		// the persisted trace stays byte-exact instead of silently dropping them.
 		let pendingReasoningWhitespace = "";
 		let truncatedToolCallRetries = 0;
+		let cutAnswerRetries = 0;
+		let leakedToolCallRetries = 0;
+		// For the leaked-markup check: only names that are really callable this
+		// run can make "<name" in a final answer mean a call that never happened.
+		const advertisedToolNames = oaTools.map((tool) => tool.function.name);
 
 		if (resolvedRoute && candidateModelId) {
 			yield {
@@ -597,17 +748,28 @@ export async function* runMcpFlow({
 				messages: messagesOpenAI,
 			};
 
-			const completionStream: Stream<ChatCompletionChunk> = await openai.chat.completions.create(
-				completionRequest,
+			// A turn several productive rounds deep must not die on one throttled
+			// request, or on a gateway that has no backend ready for a moment;
+			// absorb what outlasts the SDK's quick retries.
+			const completionStream: Stream<ChatCompletionChunk> = await withUpstreamRetry(
+				() =>
+					openai.chat.completions.create(completionRequest, {
+						signal: abortSignal,
+						headers: {
+							"ChatUI-Conversation-ID": conv._id.toString(),
+							"X-use-cache": "false",
+							...(config.USE_USER_TOKEN === "true" && locals?.token
+								? { Authorization: `Bearer ${locals.token}` }
+								: {}),
+						},
+					}),
 				{
 					signal: abortSignal,
-					headers: {
-						"ChatUI-Conversation-ID": conv._id.toString(),
-						"X-use-cache": "false",
-						...(config.USE_USER_TOKEN === "true" && locals?.token
-							? { Authorization: `Bearer ${locals.token}` }
-							: {}),
-					},
+					onBackoff: (attempt, delayMs, err) =>
+						logger.warn(
+							{ loop, attempt, delayMs, err: String(err) },
+							"[mcp] upstream failure; backing off in-loop"
+						),
 				}
 			);
 
@@ -738,6 +900,14 @@ export async function* runMcpFlow({
 						producedOutput = true;
 						yield { type: MessageUpdateType.Stream, token: combined };
 						tokenCount += combined.length;
+						clientThinkOpen = thinkOpen;
+					} else if (clientThinkOpen && !thinkOpen) {
+						// The close landed in `combined` after tool-call deltas already
+						// stopped the content stream. The client saw the opener, so it
+						// must see the closer too, or it renders that reasoning block as
+						// still streaming for the rest of the turn.
+						yield { type: MessageUpdateType.Stream, token: "</think>" };
+						clientThinkOpen = false;
 					}
 				}
 
@@ -763,8 +933,13 @@ export async function* runMcpFlow({
 			// regex matches `<think>` to end-of-string, so an unclosed block would
 			// hide everything that follows.
 			if (thinkOpen) {
-				if (streamedContent) {
+				// Gate on what the client saw, not on streamedContent: a round can
+				// stream content early and open the think block only after tool-call
+				// deltas muted the stream — a bare closer then shows up as literal
+				// "</think>" text.
+				if (clientThinkOpen) {
 					yield { type: MessageUpdateType.Stream, token: "</think>" };
+					clientThinkOpen = false;
 				}
 				lastAssistantContent += "</think>";
 				thinkOpen = false;
@@ -812,17 +987,30 @@ export async function* runMcpFlow({
 						{ loop },
 						"[mcp] missing tool_call id in stream; retrying non-stream to recover ids"
 					);
-					const nonStream = await openai.chat.completions.create(
-						{ ...completionBase, messages: messagesOpenAI, stream: false },
+					// Same absorption as the streaming call above: this recovery
+					// request is mid-round, where a surfaced failure costs the whole turn.
+					const nonStream = await withUpstreamRetry(
+						() =>
+							openai.chat.completions.create(
+								{ ...completionBase, messages: messagesOpenAI, stream: false },
+								{
+									signal: abortSignal,
+									headers: {
+										"ChatUI-Conversation-ID": conv._id.toString(),
+										"X-use-cache": "false",
+										...(config.USE_USER_TOKEN === "true" && locals?.token
+											? { Authorization: `Bearer ${locals.token}` }
+											: {}),
+									},
+								}
+							),
 						{
 							signal: abortSignal,
-							headers: {
-								"ChatUI-Conversation-ID": conv._id.toString(),
-								"X-use-cache": "false",
-								...(config.USE_USER_TOKEN === "true" && locals?.token
-									? { Authorization: `Bearer ${locals.token}` }
-									: {}),
-							},
+							onBackoff: (attempt, delayMs, err) =>
+								logger.warn(
+									{ loop, attempt, delayMs, err: String(err) },
+									"[mcp] upstream failure on id recovery; backing off in-loop"
+								),
 						}
 					);
 					const tc = nonStream.choices?.[0]?.message?.tool_calls ?? [];
@@ -840,6 +1028,16 @@ export async function* runMcpFlow({
 							name: c?.name ?? "",
 							arguments: c?.arguments ?? "",
 						})) as NormalizedToolCall[];
+				}
+
+				if (rewriteArgs) {
+					calls = withRewrittenArguments(calls, {
+						mapping,
+						servers,
+						builtinTools,
+						parseArgs,
+						rewrite: rewriteArgs,
+					});
 				}
 
 				// Include the assistant message with tool_calls so the next round
@@ -873,7 +1071,9 @@ export async function* runMcpFlow({
 				// OpenAI-compatible backends 400 on empty text next to tool_calls.
 				const assistantToolMessage: ChatCompletionMessageParam & { reasoning_content?: string } = {
 					role: "assistant",
-					tool_calls: toolCalls,
+					// Never the raw calls: one unparseable payload in the history 400s
+					// every later request of this turn. See withParseableArguments.
+					tool_calls: withParseableArguments(toolCalls),
 					...(assistantContentForToolMsg.trim().length > 0
 						? { content: assistantContentForToolMsg }
 						: {}),
@@ -908,6 +1108,10 @@ export async function* runMcpFlow({
 						sessionId: (locals as unknown as { sessionId?: string })?.sessionId,
 					},
 					builtinTools,
+					guard,
+					// So a server operator can tell autonomous, job-shaped mode traffic
+					// from ordinary chat: the name is sent once, at initialize.
+					...(mlAssistant ? { clientKind: "intern" as const } : {}),
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;
@@ -955,6 +1159,78 @@ export async function* runMcpFlow({
 				lastAssistantContent += "</think>";
 				thinkOpen = false;
 			}
+			// A response cut by the output limit is not an answer. With a reasoning
+			// model it usually ends inside the <think> block, so finalizing it
+			// reports a half-thought as a finished turn. The same failure arrives
+			// without the "length" signal when the stream dies mid-think, so a
+			// think-only response counts as cut regardless of finish_reason. Retry
+			// once, telling the model to answer with its remaining budget; a second
+			// cut finalizes as interrupted rather than pretending completion.
+			const visibleContent = lastAssistantContent
+				.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, "")
+				.trim();
+			const thinkOnlyAnswer = visibleContent.length === 0 && lastAssistantContent.trim().length > 0;
+			const cutMidAnswer =
+				(finishReason === "length" || thinkOnlyAnswer) && !discardedTruncatedToolCalls;
+			if (cutMidAnswer && cutAnswerRetries < MAX_CUT_ANSWER_RETRIES) {
+				cutAnswerRetries += 1;
+				logger.warn(
+					{ loop, attempt: cutAnswerRetries, finishReason, thinkOnlyAnswer },
+					"[mcp] response ended before a visible answer; retrying"
+				);
+				messagesOpenAI = [
+					...messagesOpenAI,
+					{
+						role: "assistant" as const,
+						content: visibleContent || "(Response ended mid-reasoning, before a visible answer.)",
+					},
+					{
+						role: "user" as const,
+						content:
+							finishReason === "length"
+								? "[SYSTEM: Your previous response hit the output limit before it finished — most of it was internal reasoning. Give your final answer now, with minimal further reasoning and the answer itself kept concise.]"
+								: "[SYSTEM: Your previous response ended while still inside internal reasoning, so no visible answer was produced. Give your final answer now, with minimal further reasoning and the answer itself kept concise.]",
+					},
+				];
+				continue;
+			}
+			// A tool call written into the reply as markup called nothing: the
+			// round ended with no tool_calls, so whatever the text promises never
+			// happened, and the user would get broken markup instead of a working
+			// control. Retry once with the correction; the retried round's
+			// FinalAnswer replaces the leaked text client-side.
+			// A whole opening tag, not a prefix: content like <hf_jobs_output> is
+			// ordinary text, not a leaked call to hf_jobs.
+			const leakedToolName = advertisedToolNames.find((name) =>
+				new RegExp(`<${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s/>]`).test(visibleContent)
+			);
+			// The name is not always there to find. GLM-class templates write it as
+			// plain text after `<tool_call>`, so a provider that half-parses the
+			// block strips the name along with the opening tag and leaks the tail —
+			// `args</arg_key><arg_value>{…}</arg_value></tool_call>`, which names
+			// nothing this loop advertises. The closing markers are what survive, so
+			// they are what this matches; an opening tag alone stays ordinary text,
+			// which keeps prose that merely mentions the syntax out of it.
+			const leakedMarkup = !leakedToolName && LEAKED_CALL_MARKUP.test(visibleContent);
+			if (
+				(leakedToolName || leakedMarkup) &&
+				leakedToolCallRetries < MAX_LEAKED_TOOL_CALL_RETRIES
+			) {
+				leakedToolCallRetries += 1;
+				logger.warn(
+					{ loop, tool: leakedToolName ?? "(unnamed)", attempt: leakedToolCallRetries },
+					"[mcp] final answer contains tool-call markup; retrying"
+				);
+				messagesOpenAI = [
+					...messagesOpenAI,
+					{ role: "assistant" as const, content: lastAssistantContent },
+					{
+						role: "user" as const,
+						content: `[SYSTEM: Your previous response wrote a tool call as text markup (${leakedToolName ? `<${leakedToolName}> tags` : "tool-call tags such as <arg_value> and </tool_call>"}). That text called nothing — no tool ran, and the user saw broken markup instead of a working control. Respond again: make the call through the function-calling mechanism as a real tool call, and keep tool markup out of your reply text.]`,
+					},
+				];
+				continue;
+			}
 			// Without this the turn finalizes empty and the route reports a bare
 			// "No output was generated" instead of what actually happened.
 			if (discardedTruncatedToolCalls && lastAssistantContent.trim().length === 0) {
@@ -967,7 +1243,7 @@ export async function* runMcpFlow({
 			yield {
 				type: MessageUpdateType.FinalAnswer,
 				text: lastAssistantContent,
-				interrupted: false,
+				interrupted: cutMidAnswer,
 			};
 			logger.info(
 				{ length: lastAssistantContent.length, loop },
