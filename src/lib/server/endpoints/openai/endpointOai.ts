@@ -75,44 +75,55 @@ export async function endpointOai(
 		throw new Error("Failed to import OpenAI", { cause: e });
 	}
 
-	// Store router metadata if captured
-	let routerMetadata: { route?: string; model?: string; provider?: string } = {};
+	type RouterMetadata = { route?: string; model?: string; provider?: string };
 
-	// Custom fetch wrapper to capture response headers for router metadata
-	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
-		const response = await fetch(url, withoutContentLength(init));
+	// One client per request, so the router metadata read off the response
+	// headers belongs to that request alone. The endpoint is shared by every
+	// generation on this model: with a single client, a request finishing its
+	// stream would read whatever headers the most recent response — anyone's —
+	// carried, and a response without the headers would replay the previous
+	// one's. Constructing the client is cheap; nothing is pooled on it.
+	const createClient = () => {
+		let routerMetadata: RouterMetadata = {};
 
-		// Capture router headers if present (fallback for non-streaming)
-		const routeHeader = response.headers.get("X-Router-Route");
-		const modelHeader = response.headers.get("X-Router-Model");
-		const providerHeader = response.headers.get("x-inference-provider");
+		// Custom fetch wrapper to capture response headers for router metadata
+		const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
+			const response = await fetch(url, withoutContentLength(init));
 
-		if (routeHeader && modelHeader) {
-			routerMetadata = {
-				route: routeHeader,
-				model: modelHeader,
-				provider: providerHeader || undefined,
-			};
-		} else if (providerHeader) {
-			// Even without router metadata, capture provider info
-			routerMetadata = {
-				provider: providerHeader,
-			};
-		}
+			// Capture router headers if present (fallback for non-streaming)
+			const routeHeader = response.headers.get("X-Router-Route");
+			const modelHeader = response.headers.get("X-Router-Model");
+			const providerHeader = response.headers.get("x-inference-provider");
 
-		return response;
+			if (routeHeader && modelHeader) {
+				routerMetadata = {
+					route: routeHeader,
+					model: modelHeader,
+					provider: providerHeader || undefined,
+				};
+			} else if (providerHeader) {
+				// Even without router metadata, capture provider info
+				routerMetadata = {
+					provider: providerHeader,
+				};
+			}
+
+			return response;
+		};
+
+		const openai = new OpenAI({
+			apiKey: apiKey || "sk-",
+			baseURL,
+			defaultHeaders: {
+				...(config.PUBLIC_APP_NAME === "HuggingChat" && { "User-Agent": "huggingchat" }),
+				...defaultHeaders,
+			},
+			defaultQuery,
+			fetch: customFetch,
+		});
+
+		return { openai, getRouterMetadata: (): RouterMetadata => routerMetadata };
 	};
-
-	const openai = new OpenAI({
-		apiKey: apiKey || "sk-",
-		baseURL,
-		defaultHeaders: {
-			...(config.PUBLIC_APP_NAME === "HuggingChat" && { "User-Agent": "huggingchat" }),
-			...defaultHeaders,
-		},
-		defaultQuery,
-		fetch: customFetch,
-	});
 
 	const imageProcessor = makeImageProcessor(multimodal.image);
 
@@ -149,6 +160,7 @@ export async function endpointOai(
 				presence_penalty: parameters?.presence_penalty,
 			};
 
+			const { openai } = createClient();
 			const openAICompletion = await openai.completions.create(body, {
 				body: { ...body, ...extraBody },
 				headers: {
@@ -178,6 +190,8 @@ export async function endpointOai(
 			reasoningEffort,
 			reasoningOverride,
 		}) => {
+			const { openai, getRouterMetadata } = createClient();
+
 			// Hoisted above the message prep so the history budget can reserve the
 			// reply allowance this request will actually ask for.
 			const parameters = { ...model.parameters, ...generateSettings };
@@ -265,7 +279,7 @@ export async function endpointOai(
 						signal: abortSignal,
 					}
 				);
-				return openAIChatToTextGenerationStream(openChatAICompletion, () => routerMetadata);
+				return openAIChatToTextGenerationStream(openChatAICompletion, getRouterMetadata);
 			} else {
 				const openChatAICompletion = await openai.chat.completions.create(
 					body as ChatCompletionCreateParamsNonStreaming,
@@ -283,7 +297,7 @@ export async function endpointOai(
 						signal: abortSignal,
 					}
 				);
-				return openAIChatToTextGenerationSingle(openChatAICompletion, () => routerMetadata);
+				return openAIChatToTextGenerationSingle(openChatAICompletion, getRouterMetadata);
 			}
 		};
 	} else {
