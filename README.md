@@ -56,6 +56,8 @@ You now have Chat UI running locally. Open the browser and start chatting.
 If you run Chat UI inside a restrictive network or corporate firewall, allowlist the endpoints used by your configuration:
 
 - **Model API**: the host in `OPENAI_BASE_URL`. For the default Hugging Face Inference Providers router this is `https://router.huggingface.co`; Chat UI calls `${OPENAI_BASE_URL}/models` for discovery and `${OPENAI_BASE_URL}/chat/completions` for chat requests.
+- **Model avatars**: `https://huggingface.co` with the default router. Models with an organization prefix are rendered from `https://huggingface.co/api/avatars/<organization>`, and the browser blocks those images if the host is unreachable.
+- **Transcription**: the host in `TRANSCRIPTION_BASE_URL`, which defaults to `https://router.huggingface.co/hf-inference/models`, when voice input is enabled with `TRANSCRIPTION_MODEL`.
 - **MongoDB**: the host in `MONGODB_URL` when you are not using the embedded database.
 - **Optional MCP servers**: any URL you put in `MCP_SERVERS`, for example `https://mcp.exa.ai/mcp` or `https://hf.co/mcp`.
 
