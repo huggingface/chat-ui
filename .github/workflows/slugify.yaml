@@ -12,20 +12,25 @@ on:
         description: "Slugified value"
         value: ${{ jobs.generate-slug.outputs.slug }}
 
+permissions: {}
+
 jobs:
   generate-slug:
+    permissions: {}
     runs-on: ubuntu-latest
     outputs:
       slug: ${{ steps.slugify.outputs.slug }}
 
     steps:
       - name: Setup Go
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.21"
 
       - name: Generate slug
         id: slugify
+        env:
+          INPUT_VALUE: ${{ inputs.value }}
         run: |
           # Create working directory
           mkdir -p $HOME/slugify
@@ -62,7 +67,7 @@ jobs:
           go build -o slugify main.go
 
           # Generate slug
-          VALUE="${{ inputs.value }}"
+          VALUE="$INPUT_VALUE"
           echo "Input value: $VALUE"
 
           SLUG=$(./slugify "$VALUE")
