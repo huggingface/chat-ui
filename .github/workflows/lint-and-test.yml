@@ -6,15 +6,19 @@ on:
     branches:
       - main
 
+permissions: {}
+
 jobs:
   lint:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
           cache: "npm"
@@ -26,6 +30,8 @@ jobs:
           npm run check
 
   test:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     # Browsers and their system deps are baked in; do not add `playwright install`.
     container:
@@ -33,8 +39,8 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
           cache: "npm"
@@ -44,7 +50,7 @@ jobs:
       # kills whole suites at collection time with an "unlock file ... not locked by this
       # process" error. Caching the binary removes that failure mode.
       - name: Cache mongodb-memory-server binaries
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-container
@@ -70,14 +76,16 @@ jobs:
         run: npm run test:client
 
   e2e:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # Newer than the other jobs on purpose: the e2e servers under tests/ are
           # TypeScript run directly by node via --experimental-strip-types, which
@@ -89,7 +97,7 @@ jobs:
       # tests/fixtures.ts). Same cache key as the unit-test job so they share the
       # downloaded mongod binary.
       - name: Cache mongodb-memory-server binaries
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-container
@@ -111,7 +119,7 @@ jobs:
       - name: "Tests (e2e)"
         run: npm run test:e2e
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
@@ -119,11 +127,13 @@ jobs:
           retention-days: 7
 
   build-check:
+    permissions:
+      contents: read
     runs-on:
       group: aws-general-8-plus
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build Docker image
         run: |
           docker build \
