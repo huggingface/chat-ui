@@ -9,6 +9,7 @@ import {
 import type { RequestEvent } from "@sveltejs/kit";
 import { addHours, addWeeks, differenceInMinutes, subMinutes } from "date-fns";
 import { config } from "$lib/server/config";
+import { resolveExternalOrigin } from "$lib/server/resolveOrigin";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 import { dev } from "$app/environment";
@@ -298,7 +299,7 @@ async function getOIDCClient(settings: OIDCSettings, url: URL): Promise<BaseClie
 		// See https://datatracker.ietf.org/doc/draft-ietf-oauth-client-id-metadata-document/
 		client_config.client_id = new URL(
 			`${base}/.well-known/oauth-cimd`,
-			config.PUBLIC_ORIGIN || url.origin
+			resolveExternalOrigin(url)
 		).toString();
 	}
 
@@ -550,7 +551,10 @@ export async function authenticateRequest(
 export async function triggerOauthFlow({ url, locals, cookies }: RequestEvent): Promise<Response> {
 	// const referer = request.headers.get("referer");
 	// let redirectURI = `${(referer ? new URL(referer) : url).origin}${base}/login/callback`;
-	let redirectURI = `${url.origin}${base}/login/callback`;
+	// Prefer PUBLIC_ORIGIN over the request's own origin: behind a reverse proxy, or when
+	// serving over plain HTTP, `url.origin` can disagree with the externally-visible origin
+	// the OIDC provider is configured to redirect back to (see #2489).
+	let redirectURI = `${resolveExternalOrigin(url)}${base}/login/callback`;
 
 	// TODO: Handle errors if provider is not responding
 
