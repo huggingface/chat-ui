@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    uses: huggingface/doc-builder/.github/workflows/build_main_documentation.yml@899185857f31747d2e8a3b5c6139920971997bd8
+    uses: huggingface/doc-builder/.github/workflows/build_main_documentation.yml@47c6b5880f408881e68ca60fed8c1de1e454eb01
     with:
       commit_sha: ${{ github.sha }}
       package: chat-ui

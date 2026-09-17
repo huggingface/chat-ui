@@ -18,16 +18,16 @@ jobs:
       url: https://${{ needs.branch-slug.outputs.slug }}.chat-dev.huggingface.tech/chat/
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Login to Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Inject slug/short variables
-        uses: rlespinasse/github-slug-action@v4.5.0
+        uses: rlespinasse/github-slug-action@v5.7.1
 
       - name: Set GITHUB_SHA_SHORT from PR
         if: env.GITHUB_EVENT_PULL_REQUEST_HEAD_SHA_SHORT != null
@@ -35,7 +35,7 @@ jobs:
 
       - name: Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             huggingface/chat-ui
@@ -46,7 +46,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and Publish HuggingChat image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
