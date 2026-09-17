@@ -17,6 +17,7 @@ import {
 	pickToolsCapableModel,
 } from "./toolsRoute";
 import { getConfiguredMultimodalModelId } from "./multimodal";
+import { findFreeUserMultimodalModel, getFreeUserModel, resolveUserTier } from "./userTier";
 
 const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
@@ -165,44 +166,70 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 
 		// Multimodal bypass: if enabled and images detected, route to multimodal model
 		if (routerMultimodalEnabled && hasImageInput) {
-			let multimodalCandidate: string | undefined;
+			const multimodalCandidates: string[] = [];
 			try {
 				const all = await getModels();
-				multimodalCandidate = getConfiguredMultimodalModelId(all);
+				// A multimodal-capable free-user model also serves free users' image requests
+				// (with the regular multimodal model kept as fallback); with a text-only free
+				// model the tier is irrelevant and never resolved.
+				const freeUserMultimodal = findFreeUserMultimodalModel(all);
+				if (freeUserMultimodal && (await resolveUserTier(params.locals)) === "free") {
+					const freeCandidate = freeUserMultimodal.id ?? freeUserMultimodal.name;
+					if (freeCandidate) multimodalCandidates.push(freeCandidate);
+				}
+				const configured = getConfiguredMultimodalModelId(all);
+				if (configured && !multimodalCandidates.includes(configured)) {
+					multimodalCandidates.push(configured);
+				}
 			} catch (e) {
 				logger.warn({ err: String(e) }, "[router] failed to load models for multimodal lookup");
 			}
-			if (!multimodalCandidate) {
+			if (multimodalCandidates.length === 0) {
 				throw new Error(
 					"Router multimodal is enabled but LLM_ROUTER_MULTIMODAL_MODEL is not correctly configured. Remove the image or configure a multimodal model via LLM_ROUTER_MULTIMODAL_MODEL."
 				);
 			}
 
-			try {
-				logger.info(
-					{ route: MULTIMODAL_ROUTE, model: multimodalCandidate },
-					"[router] multimodal input detected; routing to multimodal model"
-				);
-				const ep = await createCandidateEndpoint(multimodalCandidate);
-				const gen = await ep({ ...params });
-				return metadataThenStream(gen, multimodalCandidate, MULTIMODAL_ROUTE);
-			} catch (e) {
-				const { message, statusCode } = extractUpstreamError(e);
-				logger.error(
-					{
-						route: MULTIMODAL_ROUTE,
-						model: multimodalCandidate,
-						err: message,
-						...(statusCode && { status: statusCode }),
-					},
-					"[router] multimodal model failed"
-				);
-				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+			let lastMultimodalErr: unknown = undefined;
+			for (const multimodalCandidate of multimodalCandidates) {
+				try {
+					logger.info(
+						{ route: MULTIMODAL_ROUTE, model: multimodalCandidate },
+						"[router] multimodal input detected; routing to multimodal model"
+					);
+					const ep = await createCandidateEndpoint(multimodalCandidate);
+					const gen = await ep({ ...params });
+					return metadataThenStream(gen, multimodalCandidate, MULTIMODAL_ROUTE);
+				} catch (e) {
+					lastMultimodalErr = e;
+					const { message, statusCode } = extractUpstreamError(e);
+					logger.warn(
+						{
+							route: MULTIMODAL_ROUTE,
+							model: multimodalCandidate,
+							err: message,
+							...(statusCode && { status: statusCode }),
+						},
+						"[router] multimodal candidate failed"
+					);
+				}
 			}
+			const { message, statusCode } = extractUpstreamError(lastMultimodalErr);
+			logger.error(
+				{ route: MULTIMODAL_ROUTE, err: message, ...(statusCode && { status: statusCode }) },
+				"[router] multimodal model failed"
+			);
+			throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 		}
 
-		// Tools bypass: if enabled and tools are active, route to tools model
-		if (routerToolsEnabled && hasToolsActive) {
+		// Resolved after the multimodal bypass, which is tier-independent — image requests
+		// never pay for the billing lookup.
+		const tier = await resolveUserTier(params.locals);
+
+		// Tools bypass: if enabled and tools are active, route to tools model. Free users skip
+		// the bypass and go through the candidate loop below instead, which pins them to the
+		// free-tier model with the agentic route's models as fallbacks.
+		if (routerToolsEnabled && hasToolsActive && tier !== "free") {
 			let toolsModel: ProcessedModel | undefined;
 			try {
 				const all = await getModels();
@@ -249,13 +276,24 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		});
 
 		const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || routerModel.id;
-		const { candidates } = resolveRouteModels(routeSelection.routeName, routes, fallbackModel);
+		let { candidates } = resolveRouteModels(routeSelection.routeName, routes, fallbackModel);
+
+		// Free-tier users try the cheap model first and keep the route's normal candidates as
+		// fallbacks; the route name stays semantic for the UI badge.
+		if (tier === "free") {
+			const freeUserModel = getFreeUserModel();
+			candidates = [freeUserModel, ...candidates.filter((c) => c !== freeUserModel)];
+			logger.info(
+				{ route: routeSelection.routeName, model: freeUserModel },
+				"[router] free-tier user; pinning to free-tier model"
+			);
+		}
 
 		let lastErr: unknown = undefined;
 		for (const candidate of candidates) {
 			try {
 				logger.info(
-					{ route: routeSelection.routeName, model: candidate },
+					{ route: routeSelection.routeName, model: candidate, tier },
 					"[router] trying candidate"
 				);
 				const ep = await createCandidateEndpoint(candidate);
