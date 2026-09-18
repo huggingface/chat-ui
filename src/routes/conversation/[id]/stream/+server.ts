@@ -20,9 +20,10 @@ import { logger } from "$lib/server/logger";
  * learning a new identity. Works from any tab, device, or pod.
  *
  * SSE: `event: update` carries a MessageUpdate tagged `id: <seq>`, so
- * EventSource resumes via Last-Event-ID on reconnect; `event: end {status}` is
- * terminal and the client closes; a plain close (lifetime cap / transient)
- * means reconnect — lossless by construction, the cursor is turn-scoped.
+ * EventSource resumes via Last-Event-ID on reconnect; `event: heartbeat` marks
+ * an idle tick; `event: end {status}` is terminal and the client closes; a
+ * plain close (lifetime cap / transient) means reconnect — lossless by
+ * construction, the cursor is turn-scoped.
  */
 const TAIL_INTERVAL_MS = 250;
 // Cap the connection so it churns rather than ageing behind a proxy; the client reconnects.
@@ -75,7 +76,10 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 				enc(`id: ${seq}\nevent: update\ndata: ${JSON.stringify(event)}\n\n`);
 			const sendEnd = (status: string) =>
 				enc(`event: end\ndata: ${JSON.stringify({ status })}\n\n`);
-			const sendHeartbeat = () => enc(": heartbeat\n\n");
+			// A named event, not an SSE comment: comments never reach JavaScript, and the
+			// client's stall watchdog needs to see an idle turn is still connected. The
+			// `data` line is required — an event with an empty data buffer is never dispatched.
+			const sendHeartbeat = () => enc("event: heartbeat\ndata: {}\n\n");
 
 			if (!messageId || !(await latestTurnGeneration(convId, messageId))) {
 				sendEnd("gone");
