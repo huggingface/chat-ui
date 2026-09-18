@@ -584,10 +584,13 @@
 				delayMs = reconnectBackoffMs(failures);
 			}
 			if (!active() || writeMessageInFlight || reattachController) return;
-			await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
 		} finally {
 			if (resyncController === controller) resyncController = undefined;
 		}
+		// Released before the reload, not after: the reload re-subscribes, and if that
+		// subscription is refused while this is still marked in flight, its own recovery
+		// would find a resync "running", do nothing, and the retries would stop.
+		await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
 	}
 
 	function reconnectTurn() {
