@@ -26,7 +26,7 @@ export interface TurnLiveness {
 	alive: boolean;
 	/**
 	 * The newest producer's terminal status once the turn is over ("gone" when
-	 * it never had one); "running" or "parked" while it is alive.
+	 * it never had one); "running", "finalizing", or "parked" while it is alive.
 	 */
 	status: string;
 }
@@ -44,7 +44,9 @@ export async function isTurnAlive(
 	messageId: Message["id"]
 ): Promise<TurnLiveness> {
 	const newest = await latestTurnGeneration(conversationId, messageId);
-	if (newest?.status === "running") return { alive: true, status: "running" };
+	if (newest?.status === "running" || newest?.status === "finalizing") {
+		return { alive: true, status: newest.status };
+	}
 
 	const parked = await collections.parkedCalls.countDocuments({
 		conversationId,

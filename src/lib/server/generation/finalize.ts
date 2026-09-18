@@ -20,9 +20,9 @@ export function unregisterActiveRun(generationId: string): void {
 }
 
 // The message flag — not just the generation status — is what every existing reader
-// treats as terminal, so both must move together. Flip the generation first, guarded on
-// `status: "running"`, so only one caller (a reaper on any pod, or the owner's shutdown)
-// wins the claim; mark the message only on that win.
+// treats as terminal. Claim the run as `finalizing` first, then publish the terminal
+// status only after the message is marked. A reaper can resume a stale finalizing run
+// if this process dies between those writes.
 export async function markGenerationInterrupted(
 	generationId: string,
 	run: ActiveRun
@@ -30,11 +30,19 @@ export async function markGenerationInterrupted(
 	const now = new Date();
 	const claim = await collections.generations.updateOne(
 		{ generationId, status: "running" },
-		{ $set: { status: "interrupted", endedAt: now, updatedAt: now } }
+		{ $set: { status: "finalizing", updatedAt: now } }
 	);
-	// Lost the claim: the run completed or errored elsewhere first. Marking the message now
-	// would flag a finished answer as stopped, so leave it untouched.
-	if (claim.matchedCount === 0) return;
+	if (claim.matchedCount === 0) {
+		const interrupted = await collections.generations.findOne({
+			generationId,
+			conversationId: run.conversationId,
+			messageId: run.messageId,
+			status: "finalizing",
+		});
+		// The run completed or errored elsewhere. Marking its message now would flag a
+		// finished answer as stopped, so only resume an interrupted finalization.
+		if (!interrupted) return;
+	}
 	await collections.conversations.updateOne(
 		{
 			_id: run.conversationId,
@@ -69,6 +77,10 @@ export async function markGenerationInterrupted(
 		.catch((err) =>
 			logger.error({ err, generationId }, "[generation] failed to close pending elicitations")
 		);
+	await collections.generations.updateOne(
+		{ generationId, status: "finalizing" },
+		{ $set: { status: "interrupted", endedAt: now, updatedAt: now } }
+	);
 }
 
 export async function finalizeActiveRunsOnExit(): Promise<void> {
