@@ -20,7 +20,9 @@ import { logger } from "$lib/server/logger";
  * learning a new identity. Works from any tab, device, or pod.
  *
  * SSE: `event: update` carries a MessageUpdate tagged `id: <seq>`, so
- * EventSource resumes via Last-Event-ID on reconnect; `event: end {status}` is
+ * EventSource resumes via Last-Event-ID on reconnect; `event: caughtUp` marks
+ * the end of each connection's replay (sent even when it was empty), so the
+ * client can apply the backlog unpaced; `event: end {status}` is
  * terminal and the client closes; a plain close (lifetime cap / transient)
  * means reconnect — lossless by construction, the cursor is turn-scoped.
  */
@@ -73,6 +75,9 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 			const enc = (s: string) => controller.enqueue(encoder.encode(s));
 			const sendUpdate = (seq: number, event: unknown) =>
 				enc(`id: ${seq}\nevent: update\ndata: ${JSON.stringify(event)}\n\n`);
+			// The empty `data:` line is required: EventSource never dispatches an event
+			// that has no data field. No `id:`, so Last-Event-ID stays on the last update.
+			const sendCaughtUp = () => enc("event: caughtUp\ndata:\n\n");
 			const sendEnd = (status: string) =>
 				enc(`event: end\ndata: ${JSON.stringify({ status })}\n\n`);
 			const sendHeartbeat = () => enc(": heartbeat\n\n");
@@ -141,6 +146,7 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 
 			try {
 				await drain();
+				sendCaughtUp();
 
 				while (!signal.aborted && Date.now() < deadline) {
 					const { alive, status } = await isTurnAlive(convId, turnMessageId);
