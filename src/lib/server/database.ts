@@ -316,6 +316,11 @@ export class Database {
 				logger.error(e, "Error creating index for generations by status and lastHeartbeatAt")
 			);
 		generations
+			.createIndex({ status: 1, updatedAt: 1 })
+			.catch((e) =>
+				logger.error(e, "Error creating index for generations by status and updatedAt")
+			);
+		generations
 			.createIndex(
 				{ endedAt: 1 },
 				{
