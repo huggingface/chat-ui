@@ -13,6 +13,7 @@ import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { waitResumeResultText } from "$lib/server/textGeneration/builtinTools/waitTool";
 import { ToolResultStatus } from "$lib/types/Tool";
 import {
+	MessageElicitationUpdateType,
 	MessageToolUpdateType,
 	MessageUpdateStatus,
 	MessageUpdateType,
@@ -72,6 +73,53 @@ export function isDocumentTooLarge(err: unknown): boolean {
 	// bson serialises into a fixed 17 MiB buffer and overruns it with Node's own
 	// bounds error, before the driver's size checks run.
 	return err instanceof RangeError && "code" in err && err.code === "ERR_OUT_OF_RANGE";
+}
+
+/**
+ * Questions an unsaved run left open would still take an answer, and the answer
+ * starts a run into the same unwritable document. Expiry is the one close an
+ * answer cannot replace (submitElicitationAnswer lets a user's answer stand in
+ * for any other close nothing consumed); the TTL index removes the row later.
+ */
+async function expireUnsavedPrompts(
+	park: ParkedCall,
+	generationId: string
+): Promise<MessageUpdate[]> {
+	const closed: MessageUpdate[] = [];
+	try {
+		const open = await collections.mcpElicitations
+			.find(
+				{
+					conversationId: park.conversationId,
+					generationId,
+					"pending.messageId": park.messageId,
+					status: "pending",
+				},
+				{ projection: { elicitationId: 1 } }
+			)
+			.toArray();
+		for (const { _id, elicitationId } of open) {
+			const now = new Date();
+			const result = await collections.mcpElicitations.updateOne(
+				{ _id, status: "pending" },
+				{ $set: { expiresAt: now, updatedAt: now } }
+			);
+			if (result.matchedCount === 0) continue;
+			closed.push({
+				type: MessageUpdateType.Elicitation,
+				subtype: MessageElicitationUpdateType.Resolved,
+				elicitationId,
+				action: "cancel",
+				resolution: "expired",
+			});
+		}
+	} catch (err) {
+		logger.error(
+			{ err, parkedCallId: park.parkedCallId },
+			"[parked] failed to expire questions of an unsaved turn"
+		);
+	}
+	return closed;
 }
 
 /**
@@ -456,6 +504,7 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 						"[parked] failed to abandon parked calls of an unsaved turn"
 					)
 				);
+			for (const closed of await expireUnsavedPrompts(park, generationId)) apply(closed);
 			apply({
 				type: MessageUpdateType.Status,
 				status: MessageUpdateStatus.Error,

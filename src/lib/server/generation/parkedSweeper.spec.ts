@@ -9,11 +9,14 @@ import {
 	wakeParkedCallEarly,
 } from "./parkedSweeper";
 import { turnWaiting } from "./turnState";
+import { submitElicitationAnswer } from "$lib/server/mcp/elicitation";
 import type { ParkedCall } from "$lib/types/ParkedCall";
+import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { Message } from "$lib/types/Message";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { ToolResultStatus } from "$lib/types/Tool";
 import {
+	MessageElicitationUpdateType,
 	MessageToolUpdateType,
 	MessageUpdateStatus,
 	MessageUpdateType,
@@ -180,6 +183,7 @@ afterEach(async () => {
 	await collections.turnStates.deleteMany({});
 	await collections.generations.deleteMany({});
 	await collections.generationEvents.deleteMany({});
+	await collections.mcpElicitations.deleteMany({});
 	await collections.conversations.deleteMany({ title: { $in: ["abandoned turn", RESUMED_TITLE] } });
 });
 
@@ -454,6 +458,54 @@ describe("resuming a parked wait", () => {
 		const state = await collections.turnStates.findOne({ conversationId: row.conversationId });
 		expect(state?.status).toBe("failed");
 		expect(state?.waitUntil).toBeUndefined();
+	});
+
+	it("a too-large save closes the question the resumed run asked, so no answer can resume it", async () => {
+		// The question lives in mcpElicitations, not parkedCalls. Left open, an
+		// answer starts a fresh run into the same unwritable document.
+		const row = park();
+		await seedParkedTurn(row, { padBytes: NEAR_LIMIT_PAD });
+		const question = (elicitationId: string, generationId: string): McpElicitation => ({
+			_id: new ObjectId(),
+			elicitationId,
+			conversationId: row.conversationId,
+			generationId,
+			status: "pending",
+			request: { elicitationId, server: "assistant", mode: "form", message: "Which?", fields: [] },
+			pending: { kind: "ask", messageId: row.messageId, toolCallId: "call-2", toolUuid: "uuid-2" },
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+		// Another run's question on the same message: not this run's to close.
+		await collections.mcpElicitations.insertOne(question("q-other", "gen-other"));
+		generation.run = async function* (ctx) {
+			yield { type: MessageUpdateType.Stream, token: BIG_ANSWER };
+			await collections.mcpElicitations.insertOne(question("q-mine", ctx.generationId ?? ""));
+		};
+
+		await sweepParkedCalls();
+
+		const answer = (elicitationId: string) =>
+			submitElicitationAnswer({
+				elicitationId,
+				conversationId: row.conversationId,
+				action: "accept",
+				content: {},
+			});
+		expect(await answer("q-mine")).toMatchObject({ ok: false, status: 409 });
+		expect(await answer("q-other")).toMatchObject({ ok: true });
+		// The open form closes for anyone watching or reattaching.
+		const events = await collections.generationEvents
+			.find({ generationId: generation.runs[0].generationId })
+			.toArray();
+		expect(events.map((e) => e.event)).toContainEqual(
+			expect.objectContaining({
+				type: MessageUpdateType.Elicitation,
+				subtype: MessageElicitationUpdateType.Resolved,
+				elicitationId: "q-mine",
+				resolution: "expired",
+			})
+		);
 	});
 });
 
