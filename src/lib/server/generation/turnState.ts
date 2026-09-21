@@ -185,3 +185,31 @@ export async function turnEnded(
 	}
 	return buildUpdate(status, outcome.error ? { error: outcome.error } : {});
 }
+
+/**
+ * The turn ran but its work can never be saved (the conversation is past
+ * MongoDB's document limit). Fails it from whatever state this producer left
+ * it in: `done` would claim work the conversation does not hold, and a park
+ * recorded mid-run would resume into the same unwritable document. CAS on the
+ * producer, so a turn another producer has taken since stands.
+ */
+export async function turnUnsaved(
+	key: TurnKey,
+	error: string
+): Promise<MessageTurnStateUpdate | null> {
+	const now = new Date();
+	try {
+		const result = await collections.turnStates.updateOne(
+			{ conversationId: key.conversationId, messageId: key.messageId, producerId: key.producerId },
+			{
+				$set: { status: "failed" satisfies TurnStatus, endedAt: now, updatedAt: now, error },
+				$unset: { waitUntil: "", waitReason: "" },
+			}
+		);
+		if (result.matchedCount === 0) return null;
+	} catch (err) {
+		logger.error({ err }, "[turnState] failed to record an unsaved turn");
+		return null;
+	}
+	return buildUpdate("failed", { error });
+}
