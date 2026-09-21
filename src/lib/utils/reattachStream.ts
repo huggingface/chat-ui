@@ -1,5 +1,9 @@
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 
+/** In-band marker for the server's `caughtUp` frame: everything before it was replay. */
+export const CAUGHT_UP = Symbol("caughtUp");
+export type ReattachFrame = MessageUpdate | typeof CAUGHT_UP;
+
 // The server tails every 250 ms and sends a heartbeat on every idle tick, so this
 // much silence means the connection is dead, not quiet.
 const STALL_MS = 10_000;
@@ -18,28 +22,32 @@ export class ReattachClosedError extends Error {
 }
 
 export interface ReattachStream {
-	updates: AsyncGenerator<MessageUpdate>;
+	updates: AsyncGenerator<ReattachFrame>;
 	/** Drop the connection and resume after the last delivered sequence. */
 	resubscribe: () => void;
 }
 
 /**
- * Adapt the reattach SSE endpoint to an async iterator of MessageUpdates for
- * {@link consumeMessageUpdates}. Surfaces only `update` frames; stops on `end`
- * or abort, and throws {@link ReattachClosedError} once the queue is drained if
- * the browser gives up on the connection.
+ * Adapt the reattach SSE endpoint to an async iterator for
+ * {@link consumeReattachStream}. Surfaces only `update` frames and the
+ * `caughtUp` marker; stops on `end` or abort, and throws
+ * {@link ReattachClosedError} once the queue is drained if the browser gives up
+ * on the connection.
  *
  * Every reconnect happens UNDER the queue, from the last sequence this
  * subscription delivered, so the consumer sees one gapless stream. That is the
  * only cursor that can be trusted mid-turn: the message's `materializedSeq` is
  * as old as the snapshot it was loaded with.
+ *
+ * The server marks the end of EVERY connection's replay, so a re-subscribed
+ * connection yields `CAUGHT_UP` again; the consumer acts on the first only.
  */
 export function reattachStream(
 	url: string,
 	signal: AbortSignal,
 	{ stallMs = STALL_MS }: { stallMs?: number } = {}
 ): ReattachStream {
-	const queue: MessageUpdate[] = [];
+	const queue: ReattachFrame[] = [];
 	let source: EventSource | null = null;
 	let started = false;
 	let done = false;
@@ -100,6 +108,13 @@ export function reattachStream(
 			notify();
 		});
 
+		es.addEventListener("caughtUp", () => {
+			if (!live()) return;
+			lastFrameAt = Date.now();
+			queue.push(CAUGHT_UP);
+			notify();
+		});
+
 		es.addEventListener("heartbeat", () => {
 			if (live()) lastFrameAt = Date.now();
 		});
@@ -129,7 +144,7 @@ export function reattachStream(
 		);
 	};
 
-	async function* iterate(): AsyncGenerator<MessageUpdate> {
+	async function* iterate(): AsyncGenerator<ReattachFrame> {
 		if (signal.aborted) return;
 		started = true;
 		signal.addEventListener("abort", finish, { once: true });

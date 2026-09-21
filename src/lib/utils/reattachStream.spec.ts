@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
-import { ReattachClosedError, reattachStream } from "./reattachStream";
+import {
+	CAUGHT_UP,
+	ReattachClosedError,
+	reattachStream,
+	type ReattachFrame,
+} from "./reattachStream";
 
 type Listener = (event: unknown) => void;
 
@@ -58,9 +63,10 @@ const latest = () => {
 	return source;
 };
 
-async function tokenOf(next: Promise<IteratorResult<MessageUpdate>>): Promise<string | undefined> {
+async function tokenOf(next: Promise<IteratorResult<ReattachFrame>>): Promise<string | undefined> {
 	const { value, done } = await next;
 	if (done) return undefined;
+	if (value === CAUGHT_UP) return "<caughtUp>";
 	return value.type === MessageUpdateType.Stream ? value.token : `<${value.type}>`;
 }
 
@@ -103,6 +109,59 @@ describe("reattachStream", () => {
 		latest().update(6, "after");
 
 		expect(await tokenOf(first)).toBe("after");
+	});
+
+	test("yields the caughtUp marker in order, and ignores events it does not know", async () => {
+		const { updates } = reattachStream(URL_FROM_5, new AbortController().signal);
+
+		const first = updates.next();
+		latest().open();
+		latest().update(6, "replayed");
+		latest().emit("caughtUp", { data: "" });
+		latest().emit("heartbeat", { data: "{}" });
+		latest().emit("somethingNew", { data: "{}" });
+		latest().update(7, "live");
+		latest().emit("end", { data: JSON.stringify({ status: "completed" }) });
+
+		const received: (string | undefined)[] = [];
+		for (let next = first; ; next = updates.next()) {
+			const token = await tokenOf(next);
+			if (token === undefined) break;
+			received.push(token);
+		}
+
+		expect(received).toEqual(["replayed", "<caughtUp>", "live"]);
+		expect(latest().readyState).toBe(FakeEventSource.CLOSED);
+	});
+
+	test("a re-subscribed connection yields its own caughtUp marker", async () => {
+		const { updates } = reattachStream(URL_FROM_5, new AbortController().signal);
+
+		const first = updates.next();
+		latest().update(6, "a");
+		latest().emit("caughtUp", { data: "" });
+		expect(await tokenOf(first)).toBe("a");
+		expect(await tokenOf(updates.next())).toBe("<caughtUp>");
+
+		const pending = updates.next();
+		await vi.advanceTimersByTimeAsync(10_000);
+		expect(sources()).toHaveLength(2);
+
+		latest().update(7, "b");
+		latest().emit("caughtUp", { data: "" });
+		expect(await tokenOf(pending)).toBe("b");
+		expect(await tokenOf(updates.next())).toBe("<caughtUp>");
+	});
+
+	test("caughtUp counts as a frame for the stall watchdog", async () => {
+		const { updates } = reattachStream(URL_FROM_5, new AbortController().signal);
+		void updates.next();
+
+		await vi.advanceTimersByTimeAsync(6_000);
+		latest().emit("caughtUp", { data: "" });
+		await vi.advanceTimersByTimeAsync(6_000);
+
+		expect(sources()).toHaveLength(1);
 	});
 
 	test("re-subscribes from the last delivered sequence after 10s of silence", async () => {

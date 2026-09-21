@@ -15,13 +15,10 @@
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
-	import {
-		fetchMessageUpdates,
-		resolveStreamingMode,
-		applyStreamingMode,
-	} from "$lib/utils/messageUpdates";
+	import { fetchMessageUpdates, resolveStreamingMode } from "$lib/utils/messageUpdates";
 	import { elicitationToResume } from "$lib/stores/elicitationResume";
 	import { consumeMessageUpdates } from "$lib/utils/consumeMessageUpdates";
+	import { consumeReattachStream } from "$lib/utils/consumeReattachStream";
 	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { enabledServers, mcpServersLoaded } from "$lib/stores/mcpServers";
@@ -498,36 +495,32 @@
 		let closed: ReattachClosedError | undefined;
 
 		try {
-			await consumeMessageUpdates(
-				applyStreamingMode(stream.updates, streamingMode),
-				lastAssistant,
-				{
-					streamingMode,
-					maxUpdateTime: updateDebouncer.maxUpdateTime,
-					isAborted: () => controller.signal.aborted,
-					onAbort: () => controller.abort(),
-					onStreamStart: () => {},
-					onTitle: (title) => convsStore.update(runConvId, { title }),
-					onPlan: (update) => {
-						if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
-					},
-					onBudget: (update) => {
-						if (ML_ASSISTANT_MODE) {
-							mlAssistant.setBudget({
-								totalMicroUsd: update.totalMicroUsd,
-								spentMicroUsd: update.spentMicroUsd,
-								reservedMicroUsd: update.reservedMicroUsd,
-							});
-						}
-					},
-					onTurnState: (update) => {
-						noteServerNow(update.serverNow);
-					},
-					onError: (update) => {
-						$error = update.message ?? "An error has occurred";
-					},
-				}
-			);
+			await consumeReattachStream(stream.updates, lastAssistant, {
+				streamingMode,
+				maxUpdateTime: updateDebouncer.maxUpdateTime,
+				isAborted: () => controller.signal.aborted,
+				onAbort: () => controller.abort(),
+				onStreamStart: () => {},
+				onTitle: (title) => convsStore.update(runConvId, { title }),
+				onPlan: (update) => {
+					if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
+				},
+				onBudget: (update) => {
+					if (ML_ASSISTANT_MODE) {
+						mlAssistant.setBudget({
+							totalMicroUsd: update.totalMicroUsd,
+							spentMicroUsd: update.spentMicroUsd,
+							reservedMicroUsd: update.reservedMicroUsd,
+						});
+					}
+				},
+				onTurnState: (update) => {
+					noteServerNow(update.serverNow);
+				},
+				onError: (update) => {
+					$error = update.message ?? "An error has occurred";
+				},
+			});
 		} catch (err) {
 			if (err instanceof ReattachClosedError) closed = err;
 			else console.error(err);
