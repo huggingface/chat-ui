@@ -40,6 +40,37 @@
 		budget ? budget.totalMicroUsd - budget.spentMicroUsd - budget.reservedMicroUsd : 0
 	);
 
+	// Every mode conversation starts at $0.00 and chatting never touches the
+	// budget, so "never granted" must not read as the alarm "ran out" does.
+	let budgetUngranted = $derived(
+		!!budget &&
+			budget.totalMicroUsd === 0 &&
+			budget.spentMicroUsd === 0 &&
+			budget.reservedMicroUsd === 0
+	);
+
+	let budgetTitle = $derived.by(() => {
+		if (!budget) return undefined;
+		if (budgetUngranted) {
+			return `Compute budget: none set. Only Jobs and sandboxes use it; chatting is free.${
+				onbudgetchange ? " Click to set." : ""
+			}`;
+		}
+		return `Compute budget: ${formatMicroUsd(remainingMicroUsd)} of ${formatMicroUsd(
+			budget.totalMicroUsd
+		)} remaining (${formatMicroUsd(budget.spentMicroUsd)} spent, ${formatMicroUsd(
+			budget.reservedMicroUsd
+		)} held by running jobs)${onbudgetchange ? ". Click to change." : ""}`;
+	});
+
+	let budgetLabel = $derived.by(() => {
+		if (!budget) return undefined;
+		if (budgetUngranted) return `Compute budget: none set${onbudgetchange ? ". Set budget" : ""}`;
+		return `Compute budget: ${formatMicroUsd(remainingMicroUsd)} of ${formatMicroUsd(
+			budget.totalMicroUsd
+		)} remaining${onbudgetchange ? ". Edit budget" : ""}`;
+	});
+
 	/** Matches the server's ceiling on a budget total (PATCH /api/v2/conversations/[id]). */
 	const MAX_BUDGET_USD = 10_000;
 
@@ -184,7 +215,7 @@
 						autocomplete="off"
 						style:width={`${Math.max(budgetDraft.length, 1)}ch`}
 						class="ml-budget-input min-w-[1ch] border-0 bg-transparent p-0 pb-px text-right font-mono text-[13px] font-medium text-[#1c1917] tabular-nums outline-none dark:text-[#f5f5f4]"
-						aria-label="Session budget in dollars, Enter to save"
+						aria-label="Compute budget in dollars, Enter to save"
 					/>
 					<span class="pl-1 text-[#a8a29e] dark:text-[#78716c]">left</span>
 				</span>
@@ -196,22 +227,18 @@
 						// the edit never shifts the strip.
 						"ml-control flex flex-none items-center rounded-[6px] px-[6px] py-[5px] @min-[240px]:px-2",
 						"font-mono text-[13px] leading-none font-medium tabular-nums",
-						remainingMicroUsd <= 0
-							? "font-semibold text-red-600 dark:text-red-400"
-							: "text-[#c4511a] dark:text-[#f0a468]",
+						budgetUngranted
+							? "text-[#57534e] dark:text-[#a8a29e]"
+							: remainingMicroUsd <= 0
+								? "font-semibold text-red-600 dark:text-red-400"
+								: "text-[#c4511a] dark:text-[#f0a468]",
 						onbudgetchange
 							? "cursor-text hover:bg-black/5 dark:hover:bg-white/[.07]"
 							: "cursor-default",
 					]}
 					onclick={openBudgetEditor}
-					title={`Compute budget: ${formatMicroUsd(remainingMicroUsd)} of ${formatMicroUsd(
-						budget.totalMicroUsd
-					)} remaining (${formatMicroUsd(budget.spentMicroUsd)} spent, ${formatMicroUsd(
-						budget.reservedMicroUsd
-					)} held by running jobs)${onbudgetchange ? ". Click to change." : ""}`}
-					aria-label={`Session budget: ${formatMicroUsd(remainingMicroUsd)} of ${formatMicroUsd(
-						budget.totalMicroUsd
-					)} remaining${onbudgetchange ? ". Edit budget" : ""}`}
+					title={budgetTitle}
+					aria-label={budgetLabel}
 				>
 					<span class="@min-[340px]:hidden">{formatMicroUsdCompact(remainingMicroUsd)}</span>
 					<span class="hidden @min-[340px]:inline @min-[480px]:hidden"
