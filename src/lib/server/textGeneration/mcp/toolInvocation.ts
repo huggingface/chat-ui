@@ -589,11 +589,13 @@ export async function* executeToolCalls({
 			if (guardTicket !== undefined) {
 				// Raw text, not the annotated form: the guard parses identifiers out
 				// of it and source markers could split one.
+				const outcome = {
+					text: toolResponse.text ?? "",
+					...(toolResponse.structured !== undefined ? { structured: toolResponse.structured } : {}),
+				};
 				const update = await guard?.after(
 					guardTicket,
-					toolResponse.isError
-						? { status: "error", text: toolResponse.text ?? "" }
-						: { status: "success", text: toolResponse.text ?? "" }
+					toolResponse.isError ? { status: "error", ...outcome } : { status: "success", ...outcome }
 				);
 				if (update) updatesQueue.push(update);
 			}
