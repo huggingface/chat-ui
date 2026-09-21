@@ -22,9 +22,10 @@ import { logger } from "$lib/server/logger";
  * SSE: `event: update` carries a MessageUpdate tagged `id: <seq>`, so
  * EventSource resumes via Last-Event-ID on reconnect; `event: caughtUp` marks
  * the end of each connection's replay (sent even when it was empty), so the
- * client can apply the backlog unpaced; `event: end {status}` is
- * terminal and the client closes; a plain close (lifetime cap / transient)
- * means reconnect — lossless by construction, the cursor is turn-scoped.
+ * client can apply the backlog unpaced; `event: heartbeat` marks an idle tick;
+ * `event: end {status}` is terminal and the client closes; a plain close
+ * (lifetime cap / transient) means reconnect — lossless by construction, the
+ * cursor is turn-scoped.
  */
 const TAIL_INTERVAL_MS = 250;
 // Cap the connection so it churns rather than ageing behind a proxy; the client reconnects.
@@ -85,7 +86,10 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 			const sendCaughtUp = () => enc("event: caughtUp\ndata:\n\n");
 			const sendEnd = (status: string) =>
 				enc(`event: end\ndata: ${JSON.stringify({ status })}\n\n`);
-			const sendHeartbeat = () => enc(": heartbeat\n\n");
+			// A named event, not an SSE comment: comments never reach JavaScript, and the
+			// client's stall watchdog needs to see an idle turn is still connected. The
+			// `data` line is required — an event with an empty data buffer is never dispatched.
+			const sendHeartbeat = () => enc("event: heartbeat\ndata: {}\n\n");
 
 			if (!messageId || !(await latestTurnGeneration(convId, messageId))) {
 				sendEnd("gone");
