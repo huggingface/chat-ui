@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { MongoInvalidArgumentError, MongoServerError } from "mongodb";
 import { collections } from "$lib/server/database";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
@@ -21,7 +22,7 @@ import type { ParkedCall } from "$lib/types/ParkedCall";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { createGenerationWriter } from "./writer";
 import { applyUpdateToMessage } from "./applyUpdate";
-import { turnAbandoned, turnEnded, turnRunning } from "./turnState";
+import { turnAbandoned, turnEnded, turnRunning, turnUnsaved } from "./turnState";
 import { compressUpdatesForStorage } from "./compressUpdates";
 
 const SWEEP_BATCH = 5;
@@ -50,10 +51,33 @@ const CLAIM_LEASE_MS = 5 * 60_000;
  */
 const LEASE_RENEW_MS = 60_000;
 
+const TOO_LARGE_REASON = "the conversation is too large to save (MongoDB's 16 MiB document limit)";
+const TOO_LARGE_ERROR =
+	"This conversation has grown too large to save, so the work from this turn could not be kept. " +
+	"Start a new conversation to continue.";
+
+/**
+ * A conversation write MongoDB will refuse however often it is retried. Matched
+ * on `code`: an update's write error carries no `codeName`.
+ */
+export function isDocumentTooLarge(err: unknown): boolean {
+	if (err instanceof MongoServerError) {
+		// 10334 BSONObjectTooLarge (the document, or the command carrying it);
+		// 17419 an update whose result would outgrow the limit.
+		return err.code === 10334 || err.code === 17419;
+	}
+	if (err instanceof MongoInvalidArgumentError) {
+		return /larger than the maximum size/i.test(err.message);
+	}
+	// bson serialises into a fixed 17 MiB buffer and overruns it with Node's own
+	// bounds error, before the driver's size checks run.
+	return err instanceof RangeError && "code" in err && err.code === "ERR_OUT_OF_RANGE";
+}
+
 /**
  * Bump the claim's lease while the resume is still working. Guarded on the
- * status so a renewal racing the finally's `resumed` write can never revive a
- * finished row.
+ * status so a renewal racing the `resumed` write can never revive a finished
+ * row.
  */
 export async function renewClaim(park: ParkedCall): Promise<void> {
 	const now = new Date();
@@ -292,28 +316,43 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 	try {
 		apply(await turnRunning(turnKey));
 
-		// The result the parked call has been missing. Replay pairs it with the call
-		// by uuid, which is what puts it in the model's history for the next round.
-		apply({
-			type: MessageUpdateType.Tool,
-			subtype: MessageToolUpdateType.Result,
-			uuid: park.toolUuid,
-			result: {
-				status: ToolResultStatus.Success,
-				call: { name: "wait", parameters: {} },
-				outputs: [
-					{
-						text:
-							waitResumeResultText(park) +
-							(tokenExpired
-								? " NOTE: the signed-in session expired while you waited, so Hub tools may " +
-									"be unauthenticated. If one fails that way, say so rather than retrying."
-								: ""),
-					},
-				] as unknown as Record<string, unknown>[],
-				display: true,
-			},
-		});
+		// A re-claim after a pod died mid-resume finds the result already stored,
+		// followed by whatever that run did next; the turn carries on from there.
+		const delivered = (message.updates ?? []).some(
+			(u) =>
+				u.type === MessageUpdateType.Tool &&
+				(u.subtype === MessageToolUpdateType.Result || u.subtype === MessageToolUpdateType.Error) &&
+				u.uuid === park.toolUuid
+		);
+		if (delivered) {
+			logger.info(
+				{ parkedCallId: park.parkedCallId, attempt: park.attempts },
+				"[parked] wait result already delivered; continuing the stored turn"
+			);
+		} else {
+			// The result the parked call has been missing. Replay pairs it with the call
+			// by uuid, which is what puts it in the model's history for the next round.
+			apply({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: park.toolUuid,
+				result: {
+					status: ToolResultStatus.Success,
+					call: { name: "wait", parameters: {} },
+					outputs: [
+						{
+							text:
+								waitResumeResultText(park) +
+								(tokenExpired
+									? " NOTE: the signed-in session expired while you waited, so Hub tools may " +
+										"be unauthenticated. If one fails that way, say so rather than retrying."
+									: ""),
+						},
+					] as unknown as Record<string, unknown>[],
+					display: true,
+				},
+			});
+		}
 
 		const ctx: TextGenerationContext = {
 			model,
@@ -364,13 +403,69 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 		});
 		const failedUpdate = await turnEnded(turnKey, { failed: true, error: errorMessage });
 		if (failedUpdate) apply(failedUpdate);
-	} finally {
-		await persist();
-		await writer.finish({ status: hasError ? "error" : "completed" });
-		await collections.parkedCalls.updateOne(
+	}
+
+	// Settled before the save: the run is over, so a re-claim could only repeat
+	// it, re-billing every model and tool call. A save that throws, or a pod
+	// that dies inside it, must not hand the row back to the lease.
+	await collections.parkedCalls
+		.updateOne(
 			{ _id: park._id },
 			{ $set: { status: "resumed", resumedAt: new Date(), updatedAt: new Date() } }
+		)
+		.catch((err) =>
+			logger.error({ err, parkedCallId: park.parkedCallId }, "[parked] failed to settle the row")
 		);
+
+	try {
+		await persist();
+	} catch (err) {
+		if (!isDocumentTooLarge(err)) {
+			logger.error(
+				{ err, parkedCallId: park.parkedCallId, conversationId: conv._id.toString() },
+				"[parked] failed to save the resumed turn"
+			);
+		} else {
+			hasError = true;
+			logger.error(
+				{ err, parkedCallId: park.parkedCallId, conversationId: conv._id.toString() },
+				"[parked] conversation too large to save; abandoning the resumed turn"
+			);
+			// Parks this run recorded too: each would resume into the same
+			// unwritable document and spend a whole run before failing here again.
+			await collections.parkedCalls
+				.updateMany(
+					{
+						$or: [
+							{ _id: park._id },
+							{
+								conversationId: park.conversationId,
+								messageId: park.messageId,
+								generationId,
+								status: "waiting",
+							},
+						],
+					},
+					{
+						$set: { status: "abandoned", abandonedReason: TOO_LARGE_REASON, updatedAt: new Date() },
+					}
+				)
+				.catch((abandonErr) =>
+					logger.error(
+						{ err: abandonErr, parkedCallId: park.parkedCallId },
+						"[parked] failed to abandon parked calls of an unsaved turn"
+					)
+				);
+			apply({
+				type: MessageUpdateType.Status,
+				status: MessageUpdateStatus.Error,
+				message: TOO_LARGE_ERROR,
+			});
+			const failedUpdate = await turnUnsaved(turnKey, TOO_LARGE_ERROR);
+			if (failedUpdate) apply(failedUpdate);
+		}
+	} finally {
+		await writer.finish({ status: hasError ? "error" : "completed" });
 	}
 }
 
