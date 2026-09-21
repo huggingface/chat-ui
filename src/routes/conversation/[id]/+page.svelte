@@ -15,13 +15,10 @@
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
-	import {
-		fetchMessageUpdates,
-		resolveStreamingMode,
-		applyStreamingMode,
-	} from "$lib/utils/messageUpdates";
+	import { fetchMessageUpdates, resolveStreamingMode } from "$lib/utils/messageUpdates";
 	import { elicitationToResume } from "$lib/stores/elicitationResume";
 	import { consumeMessageUpdates } from "$lib/utils/consumeMessageUpdates";
+	import { consumeReattachStream } from "$lib/utils/consumeReattachStream";
 	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { enabledServers, mcpServersLoaded } from "$lib/stores/mcpServers";
@@ -448,8 +445,8 @@
 		url.searchParams.set("fromSeq", String(lastAssistant.materializedSeq ?? 0));
 
 		try {
-			await consumeMessageUpdates(
-				applyStreamingMode(reattachStream(url.toString(), controller.signal), streamingMode),
+			await consumeReattachStream(
+				reattachStream(url.toString(), controller.signal),
 				lastAssistant,
 				{
 					streamingMode,

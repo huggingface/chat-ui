@@ -20,7 +20,9 @@ import { logger } from "$lib/server/logger";
  * learning a new identity. Works from any tab, device, or pod.
  *
  * SSE: `event: update` carries a MessageUpdate tagged `id: <seq>`, so
- * EventSource resumes via Last-Event-ID on reconnect; `event: end {status}` is
+ * EventSource resumes via Last-Event-ID on reconnect; `event: caughtUp` marks
+ * the end of each connection's replay (sent even when it was empty), so the
+ * client can apply the backlog unpaced; `event: end {status}` is
  * terminal and the client closes; a plain close (lifetime cap / transient)
  * means reconnect — lossless by construction, the cursor is turn-scoped.
  */
@@ -32,6 +34,11 @@ const REPLAY_BATCH = 500;
 // permanent hole and skipped (see createGapTracker) — generous against insert
 // reordering (~40 polls), tiny against a turn that runs for an hour.
 const GAP_TOLERANCE_MS = 10_000;
+// How long a gap in the initial replay may hold back `caughtUp`. Reordering clears
+// within a poll or two, so the whole backlog lands before the marker; a permanent
+// hole does not, and must not outlast the client's wait for the marker
+// (CAUGHT_UP_WAIT_MS) or the replay before the hole is paced again too.
+const CAUGHT_UP_GAP_WAIT_MS = 1_000;
 
 export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 	const convId = new ObjectId(z.string().parse(params.id));
@@ -73,6 +80,9 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 			const enc = (s: string) => controller.enqueue(encoder.encode(s));
 			const sendUpdate = (seq: number, event: unknown) =>
 				enc(`id: ${seq}\nevent: update\ndata: ${JSON.stringify(event)}\n\n`);
+			// The empty `data:` line is required: EventSource never dispatches an event
+			// that has no data field. No `id:`, so Last-Event-ID stays on the last update.
+			const sendCaughtUp = () => enc("event: caughtUp\ndata:\n\n");
 			const sendEnd = (status: string) =>
 				enc(`event: end\ndata: ${JSON.stringify({ status })}\n\n`);
 			const sendHeartbeat = () => enc(": heartbeat\n\n");
@@ -85,6 +95,14 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 			const turnMessageId = messageId;
 
 			const gap = createGapTracker(GAP_TOLERANCE_MS);
+			let heldByGap = false;
+			let caughtUp = false;
+			const caughtUpBy = Date.now() + CAUGHT_UP_GAP_WAIT_MS;
+			const markCaughtUp = () => {
+				if (caughtUp || (heldByGap && Date.now() < caughtUpBy)) return;
+				caughtUp = true;
+				sendCaughtUp();
+			};
 			const drain = async (): Promise<number> => {
 				let emitted = 0;
 				for (;;) {
@@ -119,8 +137,10 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 						emitted++;
 						gap.advanced();
 					}
+					heldByGap = sawGap;
 					if (sawGap || batch.length < REPLAY_BATCH) break;
 				}
+				markCaughtUp();
 				return emitted;
 			};
 

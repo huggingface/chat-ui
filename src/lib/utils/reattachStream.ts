@@ -1,16 +1,20 @@
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 
+/** In-band marker for the server's `caughtUp` frame: everything before it was replay. */
+export const CAUGHT_UP = Symbol("caughtUp");
+export type ReattachFrame = MessageUpdate | typeof CAUGHT_UP;
+
 /**
- * Adapt the reattach SSE endpoint to an async iterator of MessageUpdates for
- * {@link consumeMessageUpdates}. EventSource auto-reconnects and resends the last
- * event id, so this only surfaces `update` frames and stops on `end` or abort.
+ * Adapt the reattach SSE endpoint to an async iterator for {@link consumeReattachStream}.
+ * EventSource auto-reconnects and resends the last event id, so this only surfaces
+ * `update` frames and the `caughtUp` marker, and stops on `end` or abort.
  */
 export async function* reattachStream(
 	url: string,
 	signal: AbortSignal
-): AsyncGenerator<MessageUpdate> {
+): AsyncGenerator<ReattachFrame> {
 	const source = new EventSource(url);
-	const queue: MessageUpdate[] = [];
+	const queue: ReattachFrame[] = [];
 	let done = false;
 	let wake: (() => void) | null = null;
 	const notify = () => {
@@ -24,6 +28,10 @@ export async function* reattachStream(
 		} catch {
 			// ignore a malformed frame rather than tear down the stream
 		}
+		notify();
+	});
+	source.addEventListener("caughtUp", () => {
+		queue.push(CAUGHT_UP);
 		notify();
 	});
 
