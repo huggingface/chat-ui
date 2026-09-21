@@ -87,6 +87,31 @@ describe("a run still working with nothing streaming", () => {
 	});
 });
 
+describe("assistant message files", () => {
+	it("renders the same content attached twice", () => {
+		const file = { type: "hash", value: "a".repeat(64), mime: "text/plain", name: "metrics.txt" };
+		const { baseElement } = render(ChatMessage, {
+			message: {
+				id: "m1",
+				from: "assistant",
+				content: "Done.",
+				children: [],
+				updates: [],
+				files: [file, { ...file }],
+			},
+			loading: false,
+			isLast: true,
+			isAuthor: true,
+			readOnly: false,
+		} as never);
+
+		const names = Array.from(baseElement.querySelectorAll("dd")).map((dd) =>
+			dd.textContent?.trim()
+		);
+		expect(names).toEqual(["metrics.txt", "metrics.txt"]);
+	});
+});
+
 describe("collapsed process blocks during streaming", () => {
 	const stream = (token: string) => ({ type: "stream", token });
 	const streamCall = (uuid: string) => ({

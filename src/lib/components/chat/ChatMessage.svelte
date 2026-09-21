@@ -487,7 +487,8 @@
 		>
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
-					{#each message.files as file (file.value)}
+					<!-- Not keyed by hash alone: it is the content hash, and the same content can be attached twice (each_key_duplicate). -->
+					{#each message.files as file, i (`${file.value}-${i}`)}
 						<UploadedFile {file} canClose={false} />
 					{/each}
 				</div>
