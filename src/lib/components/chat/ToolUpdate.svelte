@@ -147,7 +147,8 @@
 			</button>
 			{#if isExecuting && progressLines.length}
 				<div class="flex min-w-0 flex-col gap-0.5">
-					{#each progressLines as line (line)}
+					<!-- Keyed by position: the text is model-provided and parallel calls repeat it (each_key_duplicate). -->
+					{#each progressLines as line, i (i)}
 						<span class="truncate text-xs text-gray-500 dark:text-gray-400">{line}</span>
 					{/each}
 				</div>

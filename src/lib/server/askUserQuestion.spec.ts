@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { MAX_OTHER_CHARS } from "$lib/types/McpElicitation";
 import { normalizeAskUserQuestion, answerToToolResult, chosenBudgetUsd } from "./askUserQuestion";
+import { validateElicitationContent } from "./mcp/elicitationSchema";
 
 const question = (over: Record<string, unknown> = {}) => ({
 	question: "Which database?",
@@ -83,6 +85,124 @@ describe("a question that cannot be put to anyone", () => {
 		rejects({ questions: [question({ options: [{ label: "Only one", description: "x" }] })] });
 		rejects({ questions: [question({ question: "   " })] });
 		rejects({ questions: Array.from({ length: 5 }, () => question()) });
+	});
+});
+
+describe("long model-authored text", () => {
+	// The 2026-09 panel repro: 185 characters of question, descriptions well past the old 200.
+	const longQuestion =
+		"Before I start the fine-tuning run, which evaluation should I use to decide whether the " +
+		"new checkpoint is actually better than the base model on your support-ticket data?";
+	const longDescription =
+		"Hold out 10% of the labelled tickets and report accuracy and macro-F1 per category, " +
+		"which is quick and cheap but only tells you about categories you already have enough " +
+		"examples of, so rare categories will look noisy and the comparison may flatter the base.";
+
+	it("reaches the panel whole, with nothing cut or marked as cut", () => {
+		const header = "Evaluation method";
+		const label = "Held-out split of the labelled support tickets";
+		const payload = ok({
+			questions: [
+				question({
+					question: longQuestion,
+					header,
+					options: [
+						{ label, description: longDescription },
+						{ label: "LLM judge", description: "d".repeat(4_000) },
+					],
+				}),
+			],
+		});
+		const field = payload.fields?.[0];
+		if (field?.kind !== "select") throw new Error("expected a select");
+
+		expect(field.description).toBe(longQuestion);
+		expect(field.title).toBe(header);
+		expect(field.options[0]).toMatchObject({ label, value: label, description: longDescription });
+		expect(field.options[1].description).toHaveLength(4_000);
+		expect(JSON.stringify(payload)).not.toContain("…");
+	});
+
+	const refusal = (args: unknown) => {
+		const result = normalizeAskUserQuestion(args);
+		if (result.ok) throw new Error("expected a refusal");
+		return result.reason;
+	};
+
+	it("is refused past the ceiling, saying where and how to fix it", () => {
+		expect(refusal({ questions: [question({ question: "q".repeat(4_001) })] })).toBe(
+			"question 1 is 4001 characters, over the 4000 limit — ask it in a sentence or two"
+		);
+		expect(refusal({ questions: [question(), question({ header: "h".repeat(501) })] })).toBe(
+			"question 2's header is 501 characters, over the 500 limit — name the decision in a word or two"
+		);
+		expect(
+			refusal({
+				questions: [
+					question({
+						options: [
+							{ label: "Postgres", description: "Relational." },
+							{ label: "l".repeat(501), description: "Document." },
+						],
+					}),
+				],
+			})
+		).toBe(
+			"question 1 option 2's label is 501 characters, over the 500 limit — keep the label to a few words and move the detail into its description"
+		);
+		expect(
+			refusal({
+				questions: [
+					question({
+						options: [
+							{ label: "Postgres", description: "d".repeat(4_001) },
+							{ label: "Mongo", description: "Document." },
+						],
+					}),
+				],
+			})
+		).toBe(
+			"question 1 option 1's description is 4001 characters, over the 4000 limit — say what picking it means in a sentence or two"
+		);
+	});
+
+	it("measures what is shown, so stripped control characters do not count", () => {
+		const padded = `${"​".repeat(600)}Postgres`;
+		const payload = ok({
+			questions: [
+				question({
+					options: [
+						{ label: padded, description: "Relational." },
+						{ label: "Mongo", description: "Document." },
+					],
+				}),
+			],
+		});
+		const field = payload.fields?.[0];
+		if (field?.kind !== "select") throw new Error("expected a select");
+		expect(field.options[0].label).toBe("Postgres");
+	});
+
+	it("leaves every allowed answer small enough to send", () => {
+		// Labels are the answer's values: four multi-picks of the longest labels, each with a
+		// typed answer, must still clear the answer ceiling.
+		const labels = (q: number) => Array.from({ length: 4 }, (_, i) => `${q}${i}`.padEnd(500, "x"));
+		const payload = ok({
+			questions: Array.from({ length: 4 }, (_, q) =>
+				question({
+					multiSelect: true,
+					options: labels(q).map((label) => ({ label, description: "d" })),
+				})
+			),
+		});
+		const content = Object.fromEntries(
+			(payload.fields ?? []).map((field, q) => [
+				field.name,
+				[...labels(q), "o".repeat(MAX_OTHER_CHARS)],
+			])
+		);
+
+		expect(validateElicitationContent(payload.fields ?? [], content)).toMatchObject({ ok: true });
 	});
 });
 
@@ -251,6 +371,35 @@ describe("budget questions must carry real grants", () => {
 			],
 		});
 		expect(result.ok).toBe(false);
+	});
+
+	// What labels-only leaves open: the raise lives in the description, nothing funds it,
+	// and the question is shown. The model must not come away thinking the click paid.
+	it("tells the model an unfunded raise changed nothing, rather than rejecting the question", () => {
+		const payload = {
+			...ok({
+				questions: [
+					question({
+						question: "Raise the budget for this run?",
+						options: [
+							{ label: "Raise the budget", description: "Set it to $5." },
+							{ label: "Keep it as is", description: "I will rescope instead." },
+						],
+					}),
+				],
+			}),
+			elicitationId: "x",
+		};
+
+		const result = answerToToolResult(payload, "accept", { q1: "Raise the budget" });
+
+		expect(result).toContain("did not change the session compute budget");
+		expect(result).not.toContain("budget is now");
+	});
+
+	it("says nothing about the budget for a question that is not about it", () => {
+		const payload = { ...ok({ questions: [question()] }), elicitationId: "x" };
+		expect(answerToToolResult(payload, "accept", { q1: "Postgres" })).not.toContain("budget");
 	});
 
 	it("passes once at least one option carries the grant", () => {

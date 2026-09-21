@@ -1084,7 +1084,13 @@
 
 			<div class="w-full">
 				{#if askQuestion}
-					<AskQuestion conversationId={askQuestion.conversationId} request={askQuestion.request} />
+					<!-- Keyed: the next waiting question must not inherit this one's step and picks. -->
+					{#key askQuestion.request.elicitationId}
+						<AskQuestion
+							conversationId={askQuestion.conversationId}
+							request={askQuestion.request}
+						/>
+					{/key}
 				{/if}
 				<div class="flex w-full gap-2 *:mb-3">
 					{#if !loading && lastIsError}

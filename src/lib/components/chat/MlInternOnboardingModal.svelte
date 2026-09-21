@@ -77,14 +77,19 @@
 				</div>
 				<div class="flex flex-col gap-1.5">
 					<p class="text-[15px] leading-snug font-semibold text-gray-900 dark:text-gray-100">
-						Set a spending cap
+						Cap what ML Intern can spend
 					</p>
 					<p class="text-sm leading-relaxed">
-						A budget you give ML Intern in the chat is strictly enforced on the Jobs it launches,
-						but it is not a complete guarantee: those Jobs can start their own or use other Hugging
-						Face products, so set a budget in your billing settings too. Jobs and sandboxes bill to
-						the organization set in HuggingChat's settings, or to you otherwise; Spaces, dashboards
-						and repositories always stay on your account.
+						ML Intern runs Jobs and sandboxes on Hugging Face compute, paid for with your Hugging
+						Face credits. The compute budget you set in the chat caps that spend for this
+						conversation. It does not cover anything those Jobs start themselves, or other Hugging
+						Face products. Account-wide, your credit balance is the ceiling: Jobs stop when it runs
+						out. Enterprise organizations can also set a spend limit on a resource group. Chatting
+						with the model does not use the compute budget.
+					</p>
+					<p class="text-sm leading-relaxed">
+						Jobs and sandboxes bill to the organization set in HuggingChat's settings, or to you
+						otherwise; Spaces, dashboards and repositories always stay on your account.
 					</p>
 					<a
 						href={BILLING_SETTINGS_URL}
@@ -92,7 +97,7 @@
 						rel="noopener noreferrer"
 						class="inline-flex items-center gap-1 self-start text-sm font-medium text-[#c2410c] underline decoration-[#c2410c]/30 underline-offset-2 hover:decoration-[#c2410c] dark:text-[#fdba74] dark:decoration-[#fdba74]/30 dark:hover:decoration-[#fdba74]"
 					>
-						Open billing settings
+						Open Hugging Face billing
 						<CarbonArrowUpRight class="size-3.5" />
 					</a>
 				</div>

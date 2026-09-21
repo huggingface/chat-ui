@@ -264,22 +264,100 @@ describe("MlAssistantStrip budget", () => {
 
 	it("shows the remaining balance when the conversation carries a budget", () => {
 		const { container } = mount({ budget: BUDGET });
-		const readout = find(container, "button[aria-label^='Session budget']");
+		const readout = find(container, "button[aria-label^='Compute budget']");
 		expect(readout.textContent).toContain("$7.50 left");
 	});
 
 	it("shows no readout without a budget", () => {
 		const { container } = mount();
-		expect(container.querySelector("button[aria-label^='Session budget']")).toBeNull();
+		expect(container.querySelector("button[aria-label^='Compute budget']")).toBeNull();
+	});
+
+	const UNGRANTED = { totalMicroUsd: 0, spentMicroUsd: 0, reservedMicroUsd: 0 };
+	const EXHAUSTED = {
+		totalMicroUsd: 5_000_000,
+		spentMicroUsd: 4_000_000,
+		reservedMicroUsd: 1_000_000,
+	};
+	const NEUTRAL_INK = "rgb(87, 83, 78)";
+	// Tailwind 4 ships red-600 as oklch, and computed style reports it unconverted.
+	const RED = "oklch(0.577 0.245 27.325)";
+
+	it("reads neutral, not red, when no budget has ever been granted", () => {
+		// Every mode conversation starts at $0.00 and chatting is free, so an
+		// alarm colour here reads as "the intern is running on nothing".
+		const { container } = mount({ budget: UNGRANTED });
+		const readout = find(container, "button[aria-label^='Compute budget']");
+
+		expect(readout.textContent).toContain("$0.00 left");
+		expect(style(readout).color).toBe(NEUTRAL_INK);
+		expect(style(readout).fontWeight).toBe("500");
+	});
+
+	it("turns red once a granted budget is used up", () => {
+		const { container } = mount({ budget: EXHAUSTED });
+		const readout = find(container, "button[aria-label^='Compute budget']");
+
+		expect(style(readout).color).toBe(RED);
+		expect(style(readout).fontWeight).toBe("600");
+	});
+
+	it("stays red when the total is lowered to zero under money already spent", () => {
+		// Zero pauses spend without discarding the ledger: that is a budget the
+		// gate will refuse against, not one that was never set.
+		const { container } = mount({
+			budget: { totalMicroUsd: 0, spentMicroUsd: 1_500_000, reservedMicroUsd: 0 },
+		});
+
+		expect(style(find(container, "button[aria-label^='Compute budget']")).color).toBe(RED);
+	});
+
+	it("keeps the orange ink while a granted budget has money left", () => {
+		const { container } = mount({ budget: BUDGET });
+
+		expect(style(find(container, "button[aria-label^='Compute budget']")).color).toBe(ORANGE_INK);
+	});
+
+	it("explains an ungranted budget on hover, and offers the click only when it works", () => {
+		const explanation =
+			"Compute budget: none set. Only Jobs and sandboxes use it; chatting is free.";
+
+		const fixed = find(
+			mount({ budget: UNGRANTED }).container,
+			"button[aria-label^='Compute budget']"
+		);
+		expect(fixed.title).toBe(explanation);
+		expect(fixed.getAttribute("aria-label")).toBe("Compute budget: none set");
+
+		const editable = find(
+			mount({ budget: UNGRANTED, onbudgetchange: vi.fn() }).container,
+			"button[aria-label^='Compute budget']"
+		);
+		expect(editable.title).toBe(`${explanation} Click to set.`);
+		expect(editable.getAttribute("aria-label")).toBe("Compute budget: none set. Set budget");
+	});
+
+	it("itemises a granted budget on hover", () => {
+		const readout = find(
+			mount({ budget: BUDGET, onbudgetchange: vi.fn() }).container,
+			"button[aria-label^='Compute budget']"
+		);
+
+		expect(readout.title).toBe(
+			"Compute budget: $7.50 of $10.00 remaining ($1.50 spent, $1.00 held by running jobs). Click to change."
+		);
+		expect(readout.getAttribute("aria-label")).toBe(
+			"Compute budget: $7.50 of $10.00 remaining. Edit budget"
+		);
 	});
 
 	it("commits an edited total on Enter", async () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
-		find(container, "button[aria-label^='Session budget']").click();
+		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
-		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
 		input.value = "25";
 		input.dispatchEvent(new Event("input", { bubbles: true }));
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
@@ -287,16 +365,16 @@ describe("MlAssistantStrip budget", () => {
 
 		expect(onbudgetchange).toHaveBeenCalledWith(25);
 		// The editor closes back to the readout.
-		expect(container.querySelector("input[aria-label^='Session budget']")).toBeNull();
+		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
 	});
 
 	it("abandons the edit on Escape", async () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
-		find(container, "button[aria-label^='Session budget']").click();
+		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
-		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 		await Promise.resolve();
 
@@ -308,9 +386,9 @@ describe("MlAssistantStrip budget", () => {
 		// pill the strip styles itself, so the field takes digits as plain text.
 		const { container } = mount({ budget: BUDGET, onbudgetchange: vi.fn() });
 
-		find(container, "button[aria-label^='Session budget']").click();
+		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
-		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
 		expect(input.type).toBe("text");
 
 		input.value = "2a5.7.59";
@@ -325,9 +403,9 @@ describe("MlAssistantStrip budget", () => {
 		// still "10"), and a value that does not change cannot re-render the DOM.
 		const { container } = mount({ budget: BUDGET, onbudgetchange: vi.fn() });
 
-		find(container, "button[aria-label^='Session budget']").click();
+		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
-		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
 		expect(input.value).toBe("10");
 
 		input.value = "10a";
@@ -343,9 +421,9 @@ describe("MlAssistantStrip budget", () => {
 		// own truncation, which a direct value assignment would bypass.
 		const { container } = mount({ budget: BUDGET, onbudgetchange: vi.fn() });
 
-		find(container, "button[aria-label^='Session budget']").click();
+		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
-		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
 		expect(input.inputMode).toBe("decimal");
 
 		const paste = async (text: string) => {
@@ -368,9 +446,9 @@ describe("MlAssistantStrip budget", () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
-		find(container, "button[aria-label^='Session budget']").click();
+		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
-		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
 		input.value = "0";
 		input.dispatchEvent(new Event("input", { bubbles: true }));
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
@@ -383,9 +461,9 @@ describe("MlAssistantStrip budget", () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
-		find(container, "button[aria-label^='Session budget']").click();
+		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
-		const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
 		input.value = "1.50";
 		input.dispatchEvent(new Event("input", { bubbles: true }));
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
@@ -399,9 +477,9 @@ describe("MlAssistantStrip budget", () => {
 		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
 		const type = async (value: string) => {
-			find(container, "button[aria-label^='Session budget']").click();
+			find(container, "button[aria-label^='Compute budget']").click();
 			await Promise.resolve();
-			const input = find(container, "input[aria-label^='Session budget']") as HTMLInputElement;
+			const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
 			input.value = value;
 			input.dispatchEvent(new Event("input", { bubbles: true }));
 			input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
@@ -415,8 +493,8 @@ describe("MlAssistantStrip budget", () => {
 
 	it("stays a static readout when no change handler is given", async () => {
 		const { container } = mount({ budget: BUDGET });
-		find(container, "button[aria-label^='Session budget']").click();
+		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
-		expect(container.querySelector("input[aria-label^='Session budget']")).toBeNull();
+		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
 	});
 });

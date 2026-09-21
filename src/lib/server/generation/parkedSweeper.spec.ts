@@ -1,8 +1,50 @@
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
-import { renewClaim, sweepParkedCalls, wakeParkedCallEarly } from "./parkedSweeper";
+import {
+	isDocumentTooLarge,
+	renewClaim,
+	resumeParkedCall,
+	sweepParkedCalls,
+	wakeParkedCallEarly,
+} from "./parkedSweeper";
+import { turnWaiting } from "./turnState";
+import { submitElicitationAnswer } from "$lib/server/mcp/elicitation";
 import type { ParkedCall } from "$lib/types/ParkedCall";
+import type { McpElicitation } from "$lib/types/McpElicitation";
+import type { Message } from "$lib/types/Message";
+import type { TextGenerationContext } from "$lib/server/textGeneration/types";
+import { ToolResultStatus } from "$lib/types/Tool";
+import {
+	MessageElicitationUpdateType,
+	MessageToolUpdateType,
+	MessageUpdateStatus,
+	MessageUpdateType,
+	type MessageUpdate,
+} from "$lib/types/MessageUpdate";
+
+/**
+ * The model is stubbed: what is under test is what the sweeper does around a
+ * run (delivery, settling the row, the save), not what a run produces.
+ */
+const generation = vi.hoisted(() => ({
+	runs: [] as TextGenerationContext[],
+	run: undefined as undefined | ((ctx: TextGenerationContext) => AsyncGenerator<MessageUpdate>),
+}));
+vi.mock(import("$lib/server/textGeneration"), async (importOriginal) => ({
+	...(await importOriginal()),
+	textGeneration: (ctx: TextGenerationContext) => {
+		generation.runs.push(ctx);
+		return (generation.run ?? answers("Checked: the job finished."))(ctx);
+	},
+}));
+
+function answers(text: string) {
+	return async function* (): AsyncGenerator<MessageUpdate> {
+		yield { type: MessageUpdateType.Stream, token: text };
+		yield { type: MessageUpdateType.FinalAnswer, text, interrupted: false };
+	};
+}
 
 const park = (over: Partial<ParkedCall> = {}): ParkedCall => ({
 	_id: new ObjectId(),
@@ -22,14 +64,127 @@ const park = (over: Partial<ParkedCall> = {}): ParkedCall => ({
 	...over,
 });
 
+const RESUMED_TITLE = "resumed turn";
+
+const waitCall = (row: ParkedCall): MessageUpdate => ({
+	type: MessageUpdateType.Tool,
+	subtype: MessageToolUpdateType.Call,
+	uuid: row.toolUuid,
+	call: { name: "wait", parameters: { seconds: 60, reason: row.reason } },
+});
+
+const waitResult = (row: ParkedCall): MessageUpdate => ({
+	type: MessageUpdateType.Tool,
+	subtype: MessageToolUpdateType.Result,
+	uuid: row.toolUuid,
+	result: {
+		status: ToolResultStatus.Success,
+		call: { name: "wait", parameters: {} },
+		outputs: [{ text: `Waited 60s for: ${row.reason}. You are now resumed.` }],
+		display: true,
+	},
+});
+
+/**
+ * A conversation parked on `row`'s wait, as the wait tool leaves it: the call
+ * stored with no result, and the turn state `waiting`. `padBytes` pads the
+ * user message so the document sits that close under MongoDB's 16 MiB limit.
+ */
+async function seedParkedTurn(
+	row: ParkedCall,
+	{ updates = [waitCall(row)], padBytes = 0 }: { updates?: MessageUpdate[]; padBytes?: number } = {}
+) {
+	await collections.conversations.insertOne({
+		_id: row.conversationId,
+		sessionId: "s",
+		model: "test-org/test-model",
+		title: RESUMED_TITLE,
+		rootMessageId: "u1",
+		messages: [
+			{
+				id: "u1",
+				from: "user",
+				content: padBytes > 0 ? "x".repeat(padBytes) : "train it",
+				ancestors: [],
+				children: [row.messageId],
+			},
+			{
+				id: row.messageId,
+				from: "assistant",
+				content: "",
+				updates,
+				ancestors: ["u1"],
+				children: [],
+			},
+		],
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	} as never);
+	await collections.turnStates.insertOne({
+		_id: new ObjectId(),
+		conversationId: row.conversationId,
+		messageId: row.messageId,
+		producerId: "gen-old",
+		status: "waiting",
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	} as never);
+	await collections.parkedCalls.insertOne(row);
+}
+
+async function storedAssistant(row: ParkedCall): Promise<Message | undefined> {
+	const conv = await collections.conversations.findOne({ _id: row.conversationId });
+	return conv?.messages.find((m) => m.id === row.messageId);
+}
+
+const resultsFor = (message: Pick<Message, "updates"> | undefined, uuid: string) =>
+	(message?.updates ?? []).filter(
+		(u) =>
+			u.type === MessageUpdateType.Tool &&
+			(u.subtype === MessageToolUpdateType.Result || u.subtype === MessageToolUpdateType.Error) &&
+			u.uuid === uuid
+	);
+
+/** Hands the lease back as if the claiming pod died, so the next sweep may take the row. */
+async function expireLease(row: ParkedCall) {
+	await collections.parkedCalls.updateOne(
+		{ _id: row._id },
+		{ $set: { takenAt: new Date(Date.now() - 10 * 60_000) } }
+	);
+}
+
+/** Fails conversation writes whose `$set` touches `field`; every other write goes through. */
+function failConversationWrite(field: string, err: Error) {
+	const updateOne = collections.conversations.updateOne.bind(collections.conversations);
+	return vi
+		.spyOn(collections.conversations, "updateOne")
+		.mockImplementation(((filter: never, update: { $set?: Record<string, unknown> }) =>
+			update.$set && field in update.$set
+				? Promise.reject(err)
+				: updateOne(filter, update as never)) as never);
+}
+
+/** Headroom that fits the seeded turn but not a run's output on top of it. */
+const NEAR_LIMIT_PAD = 16 * 1024 * 1024 - 64 * 1024;
+const BIG_ANSWER = "y".repeat(256 * 1024);
+
 beforeAll(async () => {
 	await ready;
 });
 
+beforeEach(() => {
+	generation.runs = [];
+	generation.run = undefined;
+});
+
 afterEach(async () => {
+	vi.restoreAllMocks();
 	await collections.parkedCalls.deleteMany({});
 	await collections.turnStates.deleteMany({});
-	await collections.conversations.deleteMany({ title: "abandoned turn" });
+	await collections.generations.deleteMany({});
+	await collections.generationEvents.deleteMany({});
+	await collections.mcpElicitations.deleteMany({});
+	await collections.conversations.deleteMany({ title: { $in: ["abandoned turn", RESUMED_TITLE] } });
 });
 
 describe("sweepParkedCalls", () => {
@@ -153,6 +308,266 @@ describe("sweepParkedCalls", () => {
 		const conv = await collections.conversations.findOne({ _id: row.conversationId });
 		const message = conv?.messages.find((m) => m.id === row.messageId);
 		expect(message?.updates?.at(-1)).toMatchObject({ type: "turnState", state: "failed" });
+	});
+});
+
+describe("resuming a parked wait", () => {
+	it("delivers the wait result once, runs the turn, and settles the row", async () => {
+		const row = park();
+		await seedParkedTurn(row);
+
+		await sweepParkedCalls();
+
+		expect(generation.runs).toHaveLength(1);
+		expect((await collections.parkedCalls.findOne({ _id: row._id }))?.status).toBe("resumed");
+		const message = await storedAssistant(row);
+		expect(resultsFor(message, row.toolUuid)).toHaveLength(1);
+		expect(message?.content).toBe("Checked: the job finished.");
+		const state = await collections.turnStates.findOne({ conversationId: row.conversationId });
+		expect(state?.status).toBe("done");
+	});
+
+	it("a re-claimed resume continues the stored turn without a second result", async () => {
+		// The pod that first resumed this wait died after its result was stored:
+		// the row sits in `resuming` until the lease runs out, then a sweep
+		// takes it again. That second attempt used to deliver the result again.
+		const row = park({ status: "resuming", attempts: 1 });
+		await seedParkedTurn(row, { updates: [waitCall(row), waitResult(row)] });
+		await expireLease(row);
+
+		await sweepParkedCalls();
+
+		expect(generation.runs).toHaveLength(1);
+		// What the model continues from: its call, answered exactly once.
+		const history = generation.runs[0].messages.find((m) => m.id === row.messageId);
+		expect(resultsFor(history, row.toolUuid)).toHaveLength(1);
+		expect(resultsFor(await storedAssistant(row), row.toolUuid)).toHaveLength(1);
+		expect((await collections.parkedCalls.findOne({ _id: row._id }))?.status).toBe("resumed");
+	});
+
+	it("resuming the same park twice still leaves one result", async () => {
+		const row = park({ status: "resuming", attempts: 1, takenAt: new Date() });
+		await seedParkedTurn(row);
+
+		await resumeParkedCall(row);
+		await resumeParkedCall(row);
+
+		expect(generation.runs).toHaveLength(2);
+		expect(resultsFor(await storedAssistant(row), row.toolUuid)).toHaveLength(1);
+	});
+
+	it("a save that throws still settles the row, so no sweep runs the turn again", async () => {
+		const row = park();
+		await seedParkedTurn(row);
+		failConversationWrite("messages", new Error("connection reset by peer"));
+
+		await sweepParkedCalls();
+		vi.restoreAllMocks();
+		await expireLease(row);
+		await sweepParkedCalls();
+
+		expect(generation.runs).toHaveLength(1);
+		const after = await collections.parkedCalls.findOne({ _id: row._id });
+		expect(after?.status).toBe("resumed");
+		expect(after?.attempts).toBe(1);
+		// The writer still closed the run instead of leaving it to the reaper.
+		const run = await collections.generations.findOne({
+			generationId: generation.runs[0].generationId,
+		});
+		expect(run?.status).toBe("completed");
+	});
+
+	it("a failure before the run starts is still retried, up to the attempt ceiling", async () => {
+		// Only a save that cannot succeed skips the retry. A transient failure
+		// before anything ran keeps the lease-and-attempts recovery.
+		const row = park();
+		await seedParkedTurn(row);
+		failConversationWrite("messages.$.generationId", new Error("connection reset by peer"));
+
+		await sweepParkedCalls();
+		expect(await collections.parkedCalls.findOne({ _id: row._id })).toMatchObject({
+			status: "resuming",
+			attempts: 1,
+		});
+		for (let i = 0; i < 3; i += 1) {
+			await expireLease(row);
+			await sweepParkedCalls();
+		}
+
+		expect(generation.runs).toHaveLength(0);
+		const after = await collections.parkedCalls.findOne({ _id: row._id });
+		expect(after?.status).toBe("abandoned");
+		expect(after?.abandonedReason).toBe("gave up after 4 attempts");
+	});
+
+	it("a conversation too large to save abandons the park and fails the turn, once", async () => {
+		const row = park();
+		await seedParkedTurn(row, { padBytes: NEAR_LIMIT_PAD });
+		generation.run = answers(BIG_ANSWER);
+
+		await sweepParkedCalls();
+		await expireLease(row);
+		await sweepParkedCalls();
+
+		expect(generation.runs).toHaveLength(1);
+		const after = await collections.parkedCalls.findOne({ _id: row._id });
+		expect(after?.status).toBe("abandoned");
+		expect(after?.abandonedReason).toContain("too large to save");
+		const state = await collections.turnStates.findOne({ conversationId: row.conversationId });
+		expect(state?.status).toBe("failed");
+		expect(state?.error).toContain("too large to save");
+		// The conversation cannot take the failure, so the user reads it from the
+		// turn's event log: live, or replayed on reattach.
+		const events = await collections.generationEvents
+			.find({ generationId: generation.runs[0].generationId })
+			.sort({ seq: 1 })
+			.toArray();
+		expect(events.at(-1)?.event).toMatchObject({ type: "turnState", state: "failed" });
+		expect(events.map((e) => e.event)).toContainEqual(
+			expect.objectContaining({ type: "status", status: MessageUpdateStatus.Error })
+		);
+	});
+
+	it("a too-large save also abandons the wait the resumed run parked on", async () => {
+		// Left waiting, the new park resumes into the same unwritable document
+		// and spends a whole run before failing again.
+		const row = park();
+		await seedParkedTurn(row, { padBytes: NEAR_LIMIT_PAD });
+		const nextPark = park({
+			conversationId: row.conversationId,
+			resumeAt: new Date(Date.now() + 60_000),
+		});
+		generation.run = async function* (ctx) {
+			yield { type: MessageUpdateType.Stream, token: BIG_ANSWER };
+			await collections.parkedCalls.insertOne({ ...nextPark, generationId: ctx.generationId });
+			yield await turnWaiting(
+				{
+					conversationId: row.conversationId,
+					messageId: row.messageId,
+					producerId: ctx.generationId ?? "",
+				},
+				{ until: nextPark.resumeAt, reason: nextPark.reason }
+			);
+		};
+
+		await sweepParkedCalls();
+
+		expect((await collections.parkedCalls.findOne({ _id: nextPark._id }))?.status).toBe(
+			"abandoned"
+		);
+		const state = await collections.turnStates.findOne({ conversationId: row.conversationId });
+		expect(state?.status).toBe("failed");
+		expect(state?.waitUntil).toBeUndefined();
+	});
+
+	it("a too-large save closes the question the resumed run asked, so no answer can resume it", async () => {
+		// The question lives in mcpElicitations, not parkedCalls. Left open, an
+		// answer starts a fresh run into the same unwritable document.
+		const row = park();
+		await seedParkedTurn(row, { padBytes: NEAR_LIMIT_PAD });
+		const question = (elicitationId: string, generationId: string): McpElicitation => ({
+			_id: new ObjectId(),
+			elicitationId,
+			conversationId: row.conversationId,
+			generationId,
+			status: "pending",
+			request: { elicitationId, server: "assistant", mode: "form", message: "Which?", fields: [] },
+			pending: { kind: "ask", messageId: row.messageId, toolCallId: "call-2", toolUuid: "uuid-2" },
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+		// Another run's question on the same message: not this run's to close.
+		await collections.mcpElicitations.insertOne(question("q-other", "gen-other"));
+		generation.run = async function* (ctx) {
+			yield { type: MessageUpdateType.Stream, token: BIG_ANSWER };
+			await collections.mcpElicitations.insertOne(question("q-mine", ctx.generationId ?? ""));
+		};
+
+		await sweepParkedCalls();
+
+		const answer = (elicitationId: string) =>
+			submitElicitationAnswer({
+				elicitationId,
+				conversationId: row.conversationId,
+				action: "accept",
+				content: {},
+			});
+		expect(await answer("q-mine")).toMatchObject({ ok: false, status: 409 });
+		expect(await answer("q-other")).toMatchObject({ ok: true });
+		// The open form closes for anyone watching or reattaching.
+		const events = await collections.generationEvents
+			.find({ generationId: generation.runs[0].generationId })
+			.toArray();
+		expect(events.map((e) => e.event)).toContainEqual(
+			expect.objectContaining({
+				type: MessageUpdateType.Elicitation,
+				subtype: MessageElicitationUpdateType.Resolved,
+				elicitationId: "q-mine",
+				resolution: "expired",
+			})
+		);
+	});
+});
+
+describe("isDocumentTooLarge", () => {
+	// Real errors from the test mongod and the driver, not hand-built shapes:
+	// a mismatch here is exactly how a size failure would slip back into retries.
+	const id = new ObjectId();
+	afterEach(async () => {
+		await collections.conversations.deleteMany({ _id: id });
+	});
+
+	const failureOf = async (write: () => Promise<unknown>) => {
+		try {
+			await write();
+		} catch (err) {
+			return err;
+		}
+		throw new Error("expected the write to fail");
+	};
+
+	it("recognises every way a write past the document limit fails", async () => {
+		await collections.conversations.insertOne({
+			_id: id,
+			title: "x".repeat(NEAR_LIMIT_PAD),
+		} as never);
+
+		const oversizedCommand = await failureOf(() =>
+			collections.conversations.updateOne(
+				{ _id: id },
+				{ $set: { title: "x".repeat(16 * 1024 * 1024 + 256 * 1024) } }
+			)
+		);
+		const outgrowsLimit = await failureOf(() =>
+			collections.conversations.updateOne({ _id: id }, {
+				$push: { messages: { id: "m", content: BIG_ANSWER } },
+			} as never)
+		);
+		const overSerializerBuffer = await failureOf(() =>
+			collections.conversations.updateOne(
+				{ _id: id },
+				{ $set: { title: "x".repeat(18 * 1024 * 1024) } }
+			)
+		);
+		const bulkInsert = await failureOf(() =>
+			collections.conversations.insertMany([{ title: "x".repeat(17 * 1024 * 1024) } as never])
+		);
+
+		expect(isDocumentTooLarge(oversizedCommand)).toBe(true);
+		expect(isDocumentTooLarge(outgrowsLimit)).toBe(true);
+		expect(isDocumentTooLarge(overSerializerBuffer)).toBe(true);
+		expect(isDocumentTooLarge(bulkInsert)).toBe(true);
+	});
+
+	it("leaves other failures to the ordinary retry", async () => {
+		await collections.conversations.insertOne({ _id: id, title: "t" } as never);
+		const duplicateKey = await failureOf(() =>
+			collections.conversations.insertOne({ _id: id, title: "t" } as never)
+		);
+
+		expect(isDocumentTooLarge(duplicateKey)).toBe(false);
+		expect(isDocumentTooLarge(new Error("connection reset by peer"))).toBe(false);
+		expect(isDocumentTooLarge(new RangeError("Invalid array length"))).toBe(false);
 	});
 });
 

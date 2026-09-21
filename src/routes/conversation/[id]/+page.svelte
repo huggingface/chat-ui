@@ -2,7 +2,7 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { consumePendingFiles } from "$lib/utils/pendingFiles";
 	import { isAborted } from "$lib/stores/isAborted";
-	import { onMount, untrack } from "svelte";
+	import { onDestroy, onMount, untrack } from "svelte";
 	import { page } from "$app/state";
 	import { beforeNavigate, replaceState } from "$app/navigation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
@@ -15,19 +15,22 @@
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
-	import {
-		fetchMessageUpdates,
-		resolveStreamingMode,
-		applyStreamingMode,
-	} from "$lib/utils/messageUpdates";
+	import { fetchMessageUpdates, resolveStreamingMode } from "$lib/utils/messageUpdates";
 	import { elicitationToResume } from "$lib/stores/elicitationResume";
 	import { consumeMessageUpdates } from "$lib/utils/consumeMessageUpdates";
+	import { consumeReattachStream } from "$lib/utils/consumeReattachStream";
 	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { enabledServers, mcpServersLoaded } from "$lib/stores/mcpServers";
 	import { get } from "svelte/store";
 	import { browser } from "$app/environment";
-	import { reattachStream } from "$lib/utils/reattachStream";
+	import { ReattachClosedError, reattachStream } from "$lib/utils/reattachStream";
+	import {
+		isTransportFailure,
+		reconnectAction,
+		reconnectBackoffMs,
+		waitUntilReachable,
+	} from "$lib/utils/streamReconnect";
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
@@ -35,7 +38,11 @@
 	import { loading } from "$lib/stores/loading.js";
 	import { streamStart } from "$lib/utils/haptics";
 	import { requireAuthUser } from "$lib/utils/auth.js";
-	import { isConversationGenerationActive, isTurnSubscribable } from "$lib/utils/generationState";
+	import {
+		isAssistantGenerationTerminal,
+		isConversationGenerationActive,
+		isTurnSubscribable,
+	} from "$lib/utils/generationState";
 	import { noteServerNow } from "$lib/utils/clockSkew.svelte";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
@@ -74,6 +81,14 @@
 	// Active reattach to a run this tab did not start. Aborted on navigation, stop, and
 	// conversation change.
 	let reattachController: AbortController | undefined;
+	let resubscribeReattach: (() => void) | undefined;
+	// Consecutive reattach connections the server refused; paces the next attempt.
+	let reattachFailures = 0;
+	let resyncController: AbortController | undefined;
+	let retryResyncNow: (() => void) | undefined;
+	let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+	// Tab visible, bfcache restore and network back tend to fire together on wake-up.
+	const RECONNECT_DEBOUNCE_MS = 300;
 
 	let files: File[] = $state([]);
 
@@ -155,6 +170,14 @@
 		isRetry?: boolean;
 		resumeElicitationId?: string;
 	}): Promise<void> {
+		let streamedMessage: Message | undefined;
+		let postLostInTransit = false;
+		// The POST went away while the turn was (or may be) still running: the run carries
+		// on server-side, so this is a lost transport, not an ended or failed turn.
+		const droppedMidTurn = () =>
+			!$isAborted &&
+			(postLostInTransit ||
+				(streamedMessage !== undefined && !isAssistantGenerationTerminal(streamedMessage)));
 		try {
 			stopRequestedFor = null;
 			$isAborted = false;
@@ -168,6 +191,9 @@
 			// would apply every event twice.
 			reattachController?.abort();
 			reattachController = undefined;
+			resyncController?.abort();
+			// A new turn must not inherit the refusals of the one before it.
+			reattachFailures = 0;
 			// Create the controller before any await: a Stop click during file
 			// encoding or MCP hydration must abort THIS request, not whichever
 			// stale controller a previous generation left behind.
@@ -319,6 +345,10 @@
 			).catch((err) => {
 				// A user abort rejects the fetch; that is not an error worth a toast
 				if (!$isAborted && !(err instanceof DOMException && err.name === "AbortError")) {
+					// The toast stays: the send may really have failed. But the server persists
+					// the turn before it answers, so it may also be running with nobody watching,
+					// and the plain reload below would redirect home while the network is down.
+					postLostInTransit = isTransportFailure(err);
 					error.set(err.message);
 				}
 			});
@@ -330,6 +360,7 @@
 			// unconditional clear here would wipe that restored queue.
 			if (base64Files.length > 0) files = [];
 
+			streamedMessage = messageToWriteTo;
 			await consumeMessageUpdates(messageUpdatesIterator, messageToWriteTo, {
 				streamingMode,
 				maxUpdateTime: updateDebouncer.maxUpdateTime,
@@ -376,6 +407,8 @@
 		} catch (err) {
 			if ($isAborted || (err instanceof DOMException && err.name === "AbortError")) {
 				// User-initiated abort, not an error
+			} else if (droppedMidTurn()) {
+				// Recovered in the finally block; a toast would report a failure that isn't one.
 			} else if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
 			} else if (err instanceof Error && err.message.includes("429")) {
@@ -421,7 +454,12 @@
 				if (stoppedHere) {
 					await waitForTerminalPersist(convId);
 				}
-				await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
+				if (droppedMidTurn()) {
+					// Not awaited: it retries for as long as the network is down.
+					void resyncTurn();
+				} else {
+					await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
+				}
 			}
 		}
 	}
@@ -431,6 +469,11 @@
 	// materialized cursor so no content is replayed twice. The subscription is keyed by the
 	// TURN, not the producer: a parked wait keeps the same connection, and the sweeper's
 	// resumed run continues the same sequence — there is no new identity to discover.
+	//
+	// Only call this on a freshly loaded snapshot. `materializedSeq` matches the content
+	// the snapshot came with; once live events have been applied the message is ahead of
+	// it, and resuming from it replays text. Anything reconnecting mid-turn goes through
+	// resubscribeReattach (same subscription, its own cursor) or resyncTurn (new snapshot).
 	async function reattachToRun() {
 		if (!browser || writeMessageInFlight || reattachController) return;
 		const lastAssistant = messages.findLast((m) => m.from === "assistant");
@@ -447,48 +490,129 @@
 		url.searchParams.set("messageId", lastAssistant.id);
 		url.searchParams.set("fromSeq", String(lastAssistant.materializedSeq ?? 0));
 
+		const stream = reattachStream(url.toString(), controller.signal);
+		resubscribeReattach = stream.resubscribe;
+		let closed: ReattachClosedError | undefined;
+
 		try {
-			await consumeMessageUpdates(
-				applyStreamingMode(reattachStream(url.toString(), controller.signal), streamingMode),
-				lastAssistant,
-				{
-					streamingMode,
-					maxUpdateTime: updateDebouncer.maxUpdateTime,
-					isAborted: () => controller.signal.aborted,
-					onAbort: () => controller.abort(),
-					onStreamStart: () => {},
-					onTitle: (title) => convsStore.update(runConvId, { title }),
-					onPlan: (update) => {
-						if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
-					},
-					onBudget: (update) => {
-						if (ML_ASSISTANT_MODE) {
-							mlAssistant.setBudget({
-								totalMicroUsd: update.totalMicroUsd,
-								spentMicroUsd: update.spentMicroUsd,
-								reservedMicroUsd: update.reservedMicroUsd,
-							});
-						}
-					},
-					onTurnState: (update) => {
-						noteServerNow(update.serverNow);
-					},
-					onError: (update) => {
-						$error = update.message ?? "An error has occurred";
-					},
-				}
-			);
+			await consumeReattachStream(stream.updates, lastAssistant, {
+				streamingMode,
+				maxUpdateTime: updateDebouncer.maxUpdateTime,
+				isAborted: () => controller.signal.aborted,
+				onAbort: () => controller.abort(),
+				onStreamStart: () => {},
+				onTitle: (title) => convsStore.update(runConvId, { title }),
+				onPlan: (update) => {
+					if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
+				},
+				onBudget: (update) => {
+					if (ML_ASSISTANT_MODE) {
+						mlAssistant.setBudget({
+							totalMicroUsd: update.totalMicroUsd,
+							spentMicroUsd: update.spentMicroUsd,
+							reservedMicroUsd: update.reservedMicroUsd,
+						});
+					}
+				},
+				onTurnState: (update) => {
+					noteServerNow(update.serverNow);
+				},
+				onError: (update) => {
+					$error = update.message ?? "An error has occurred";
+				},
+			});
 		} catch (err) {
-			console.error(err);
+			if (err instanceof ReattachClosedError) closed = err;
+			else console.error(err);
 		} finally {
 			const aborted = controller.signal.aborted;
-			if (reattachController === controller) reattachController = undefined;
+			if (reattachController === controller) {
+				reattachController = undefined;
+				resubscribeReattach = undefined;
+			}
 			// Reconcile with the canonical message once the run ends. Skip on abort
 			// (navigation/stop refresh themselves) or if we have moved conversations.
 			if (!aborted && convId === runConvId) {
-				await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
+				if (closed) {
+					// Paced: an endpoint that keeps refusing would otherwise spin
+					// reload → subscribe → refused as fast as the network allows.
+					reattachFailures = closed.opened ? 1 : reattachFailures + 1;
+					void resyncTurn(reconnectBackoffMs(reattachFailures));
+				} else {
+					reattachFailures = 0;
+					await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
+				}
 			}
 		}
+	}
+
+	// Recovery for a turn that lost its stream: wait until the conversation is reachable,
+	// then reload it and let the sync effect re-subscribe or show the turn ended. The
+	// probe comes first because a load that fails redirects home, which must not happen
+	// on a network blip.
+	async function resyncTurn(initialDelayMs = 0) {
+		if (!browser) return;
+		if (resyncController) {
+			retryResyncNow?.();
+			return;
+		}
+
+		const controller = new AbortController();
+		resyncController = controller;
+		const runConvId = convId;
+		// Released the moment it is aborted, not when the loop unwinds: a recovery requested
+		// in between would find a resync "running", do nothing, and never start.
+		const release = () => {
+			if (resyncController !== controller) return;
+			resyncController = undefined;
+			retryResyncNow = undefined;
+		};
+		controller.signal.addEventListener("abort", release, { once: true });
+
+		const wait = waitUntilReachable({
+			signal: controller.signal,
+			initialDelayMs,
+			probe: async (signal) => {
+				const response = await fetch(`${base}/api/v2/conversations/${runConvId}`, { signal });
+				// Only the status matters, and the body can be the whole conversation.
+				void response.body?.cancel();
+				return response.status < 500;
+			},
+		});
+		retryResyncNow = wait.retryNow;
+		const reachable = await wait.done;
+
+		// Also released before the reload, not after: the reload re-subscribes, and if that
+		// subscription is refused while this is still marked in flight, its own recovery
+		// would find a resync "running", do nothing, and the retries would stop.
+		release();
+		controller.signal.removeEventListener("abort", release);
+		if (!reachable || convId !== runConvId || writeMessageInFlight || reattachController) return;
+		await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
+	}
+
+	function reconnectTurn() {
+		const action = reconnectAction({
+			lastAssistant: messages.findLast((m) => m.from === "assistant"),
+			writeInFlight: writeMessageInFlight,
+			subscribed: reattachController !== undefined,
+			resyncing: resyncController !== undefined,
+		});
+		if (action === "resubscribe") resubscribeReattach?.();
+		else if (action === "resync") void resyncTurn();
+	}
+
+	function scheduleReconnect() {
+		clearTimeout(reconnectTimer);
+		reconnectTimer = setTimeout(reconnectTurn, RECONNECT_DEBOUNCE_MS);
+	}
+
+	function handleVisibilityChange() {
+		if (document.visibilityState === "visible") scheduleReconnect();
+	}
+
+	function handlePageShow(event: PageTransitionEvent) {
+		if (event.persisted) scheduleReconnect();
 	}
 
 	// Poll the conversation API until the last assistant message is terminal
@@ -528,6 +652,7 @@
 		messageUpdatesAbortController.abort();
 		reattachController?.abort();
 		reattachController = undefined;
+		resyncController?.abort();
 
 		// Mark the last assistant message as interrupted locally so
 		// isConversationGenerationActive() immediately returns false,
@@ -659,6 +784,10 @@
 		const dataChanged = newMessages !== _lastSyncedMessages;
 
 		if (convChanged || (dataChanged && untrack(() => !pending))) {
+			if (convChanged) {
+				reattachFailures = 0;
+				resyncController?.abort();
+			}
 			messages = newMessages;
 			rootMessageId = data.rootMessageId;
 			_lastSyncedConvId = currentConvId;
@@ -713,6 +842,13 @@
 		messageUpdatesAbortController.abort();
 		reattachController?.abort();
 		reattachController = undefined;
+		resyncController?.abort();
+		clearTimeout(reconnectTimer);
+	});
+
+	onDestroy(() => {
+		clearTimeout(reconnectTimer);
+		resyncController?.abort();
 	});
 
 	let title = $derived.by(() => {
@@ -728,7 +864,8 @@
 	);
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} ononline={scheduleReconnect} onpageshow={handlePageShow} />
+<svelte:document onvisibilitychange={handleVisibilityChange} />
 
 <svelte:head>
 	<title>{title}</title>

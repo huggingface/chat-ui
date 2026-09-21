@@ -11,7 +11,14 @@ import { ObjectId } from "mongodb";
 import { randomUUID } from "crypto";
 import { collections, ready } from "$lib/server/database";
 import { createGenerationWriter } from "./writer";
-import { turnAbandoned, turnAwaitingInput, turnEnded, turnRunning, turnWaiting } from "./turnState";
+import {
+	turnAbandoned,
+	turnAwaitingInput,
+	turnEnded,
+	turnRunning,
+	turnUnsaved,
+	turnWaiting,
+} from "./turnState";
 import { turnEventsAfter } from "./turnLog";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 
@@ -184,5 +191,37 @@ describe("turnAbandoned", () => {
 
 	it("returns null when the turn never had a state document", async () => {
 		expect(await turnAbandoned(new ObjectId(), randomUUID(), "nothing there")).toBeNull();
+	});
+});
+
+describe("turnUnsaved", () => {
+	it("fails the producer's turn whether it ended done or parked again", async () => {
+		const conversationId = new ObjectId();
+		const producerId = randomUUID();
+		const done = { conversationId, messageId: randomUUID(), producerId };
+		const parked = { conversationId, messageId: randomUUID(), producerId };
+		await turnRunning(done);
+		await turnEnded(done, { failed: false });
+		await turnWaiting(parked, { until: new Date(Date.now() + 60_000), reason: "next check" });
+
+		expect(await turnUnsaved(done, "not saved")).toMatchObject({
+			state: "failed",
+			error: "not saved",
+		});
+		expect(await turnUnsaved(parked, "not saved")).toMatchObject({ state: "failed" });
+
+		expect((await stateDoc(conversationId, done.messageId))?.status).toBe("failed");
+		const parkedDoc = await stateDoc(conversationId, parked.messageId);
+		expect(parkedDoc?.status).toBe("failed");
+		expect(parkedDoc?.waitUntil).toBeUndefined();
+	});
+
+	it("leaves a turn another producer has taken since", async () => {
+		const conversationId = new ObjectId();
+		const messageId = randomUUID();
+		await turnRunning({ conversationId, messageId, producerId: "next-producer" });
+
+		expect(await turnUnsaved({ conversationId, messageId, producerId: "old" }, "x")).toBeNull();
+		expect((await stateDoc(conversationId, messageId))?.status).toBe("running");
 	});
 });
