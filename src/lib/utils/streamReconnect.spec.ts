@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { Message } from "$lib/types/Message";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { TurnStatus } from "$lib/types/TurnState";
-import { reconnectAction, reconnectBackoffMs } from "./streamReconnect";
+import { isTransportFailure, reconnectAction, reconnectBackoffMs } from "./streamReconnect";
 
 const turnState = (state: TurnStatus): MessageUpdate => ({
 	type: MessageUpdateType.TurnState,
@@ -93,5 +93,19 @@ describe("reconnectBackoffMs", () => {
 		expect([0, 1, 2, 3, 4, 5, 6, 7, 20].map(reconnectBackoffMs)).toEqual([
 			0, 1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000, 30_000,
 		]);
+	});
+});
+
+describe("isTransportFailure", () => {
+	test("is true only for the TypeError fetch rejects with when the connection fails", () => {
+		expect(isTransportFailure(new TypeError("Failed to fetch"))).toBe(true);
+		expect(isTransportFailure(new TypeError("Load failed"))).toBe(true);
+	});
+
+	test("is false for HTTP errors, aborts, and non-errors", () => {
+		expect(isTransportFailure(new Error("Request failed with status code 429"))).toBe(false);
+		expect(isTransportFailure(new DOMException("aborted", "AbortError"))).toBe(false);
+		expect(isTransportFailure("Failed to fetch")).toBe(false);
+		expect(isTransportFailure(undefined)).toBe(false);
 	});
 });

@@ -41,3 +41,13 @@ export function reconnectBackoffMs(failures: number): number {
 	if (failures <= 0) return 0;
 	return Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** (failures - 1));
 }
+
+/**
+ * `fetch()` rejects with a TypeError only when the transport failed (offline,
+ * connection reset, DNS). An HTTP or validation failure is thrown by us as a
+ * plain Error, and an abort is a DOMException — neither means the request may
+ * have reached the server and left a turn running.
+ */
+export function isTransportFailure(err: unknown): boolean {
+	return err instanceof TypeError;
+}

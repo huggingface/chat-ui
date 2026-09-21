@@ -28,7 +28,11 @@
 	import { get } from "svelte/store";
 	import { browser } from "$app/environment";
 	import { ReattachClosedError, reattachStream } from "$lib/utils/reattachStream";
-	import { reconnectAction, reconnectBackoffMs } from "$lib/utils/streamReconnect";
+	import {
+		isTransportFailure,
+		reconnectAction,
+		reconnectBackoffMs,
+	} from "$lib/utils/streamReconnect";
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
@@ -169,12 +173,13 @@
 		resumeElicitationId?: string;
 	}): Promise<void> {
 		let streamedMessage: Message | undefined;
-		// The POST stream went away while the turn was still running: the run carries
+		let postLostInTransit = false;
+		// The POST went away while the turn was (or may be) still running: the run carries
 		// on server-side, so this is a lost transport, not an ended or failed turn.
 		const droppedMidTurn = () =>
 			!$isAborted &&
-			streamedMessage !== undefined &&
-			!isAssistantGenerationTerminal(streamedMessage);
+			(postLostInTransit ||
+				(streamedMessage !== undefined && !isAssistantGenerationTerminal(streamedMessage)));
 		try {
 			stopRequestedFor = null;
 			$isAborted = false;
@@ -340,6 +345,10 @@
 			).catch((err) => {
 				// A user abort rejects the fetch; that is not an error worth a toast
 				if (!$isAborted && !(err instanceof DOMException && err.name === "AbortError")) {
+					// The toast stays: the send may really have failed. But the server persists
+					// the turn before it answers, so it may also be running with nobody watching,
+					// and the plain reload below would redirect home while the network is down.
+					postLostInTransit = isTransportFailure(err);
 					error.set(err.message);
 				}
 			});
