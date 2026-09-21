@@ -34,6 +34,11 @@ const REPLAY_BATCH = 500;
 // permanent hole and skipped (see createGapTracker) — generous against insert
 // reordering (~40 polls), tiny against a turn that runs for an hour.
 const GAP_TOLERANCE_MS = 10_000;
+// How long a gap in the initial replay may hold back `caughtUp`. Reordering clears
+// within a poll or two, so the whole backlog lands before the marker; a permanent
+// hole does not, and must not outlast the client's wait for the marker
+// (CAUGHT_UP_WAIT_MS) or the replay before the hole is paced again too.
+const CAUGHT_UP_GAP_WAIT_MS = 1_000;
 
 export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 	const convId = new ObjectId(z.string().parse(params.id));
@@ -90,6 +95,14 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 			const turnMessageId = messageId;
 
 			const gap = createGapTracker(GAP_TOLERANCE_MS);
+			let heldByGap = false;
+			let caughtUp = false;
+			const caughtUpBy = Date.now() + CAUGHT_UP_GAP_WAIT_MS;
+			const markCaughtUp = () => {
+				if (caughtUp || (heldByGap && Date.now() < caughtUpBy)) return;
+				caughtUp = true;
+				sendCaughtUp();
+			};
 			const drain = async (): Promise<number> => {
 				let emitted = 0;
 				for (;;) {
@@ -124,8 +137,10 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 						emitted++;
 						gap.advanced();
 					}
+					heldByGap = sawGap;
 					if (sawGap || batch.length < REPLAY_BATCH) break;
 				}
+				markCaughtUp();
 				return emitted;
 			};
 
@@ -146,7 +161,6 @@ export const GET: RequestHandler = async ({ params, locals, url, request }) => {
 
 			try {
 				await drain();
-				sendCaughtUp();
 
 				while (!signal.aborted && Date.now() < deadline) {
 					const { alive, status } = await isTurnAlive(convId, turnMessageId);

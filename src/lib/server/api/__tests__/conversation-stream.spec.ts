@@ -73,9 +73,9 @@ async function openStream(
 	const frames: Frame[] = [];
 	let text = "";
 
-	/** Read until a frame named `event` has arrived (or the stream closes). */
-	const readUntil = async (event: string): Promise<Frame[]> => {
-		while (!frames.some((f) => f.event === event)) {
+	/** Read until `count` frames named `event` have arrived (or the stream closes). */
+	const readUntil = async (event: string, count = 1): Promise<Frame[]> => {
+		while (frames.filter((f) => f.event === event).length < count) {
 			const { done, value } = await reader.read();
 			if (done) break;
 			text += value;
@@ -145,6 +145,51 @@ describe("GET /conversation/[id]/stream", () => {
 			"update",
 			"end",
 		]);
+	});
+
+	it("holds the marker until a reordering gap in the backlog has cleared", async () => {
+		const locals = createTestLocals();
+		const conv = await createTestConversation(locals);
+		const messageId = randomUUID();
+		const generationId = await startTurn(conv._id, messageId);
+		await appendEvents(conv._id, messageId, generationId, 1, [token("one "), token("two ")]);
+		// seq 3 is not visible yet: an unordered multi-document insert in flight.
+		await appendEvents(conv._id, messageId, generationId, 4, [token("four "), token("five")]);
+
+		const stream = await openStream(locals, conv._id, { messageId, fromSeq: "0" });
+		await stream.readUntil("update", 2);
+		await appendEvents(conv._id, messageId, generationId, 3, [token("three ")]);
+		await stream.readUntil("caughtUp");
+
+		expect(stream.frames.map((f) => f.id ?? f.event)).toEqual([
+			"1",
+			"2",
+			"3",
+			"4",
+			"5",
+			"caughtUp",
+		]);
+
+		await endTurn(generationId);
+		await stream.readUntil("end");
+		expect(stream.frames.filter((f) => f.event === "caughtUp")).toHaveLength(1);
+	});
+
+	it("does not hold the marker for a hole that stays open", async () => {
+		const locals = createTestLocals();
+		const conv = await createTestConversation(locals);
+		const messageId = randomUUID();
+		const generationId = await startTurn(conv._id, messageId);
+		await appendEvents(conv._id, messageId, generationId, 1, [token("one "), token("two ")]);
+		await appendEvents(conv._id, messageId, generationId, 4, [token("four")]);
+
+		const stream = await openStream(locals, conv._id, { messageId, fromSeq: "0" });
+		await stream.readUntil("caughtUp");
+		expect(stream.frames.map((f) => f.id ?? f.event)).toEqual(["1", "2", "caughtUp"]);
+
+		await endTurn(generationId);
+		await stream.readUntil("end");
+		expect(stream.frames.filter((f) => f.event === "caughtUp")).toHaveLength(1);
 	});
 
 	it("sends the marker when there is nothing to replay", async () => {

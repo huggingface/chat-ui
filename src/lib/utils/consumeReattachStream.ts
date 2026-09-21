@@ -7,7 +7,8 @@ import { CAUGHT_UP, type ReattachFrame } from "./reattachStream";
 /**
  * How long replayed updates are held waiting for the `caughtUp` marker. A server that
  * predates the marker never sends it; past this the held updates take the configured
- * streaming mode, exactly as every update did before the marker existed.
+ * streaming mode, exactly as every update did before the marker existed. Keep it above
+ * the stream endpoint's CAUGHT_UP_GAP_WAIT_MS, which may delay the marker that long.
  */
 export const CAUGHT_UP_WAIT_MS = 2000;
 
