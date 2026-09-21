@@ -39,6 +39,18 @@ const submit = async (baseElement: HTMLElement) => {
 	return sent[0].content as Record<string, unknown> | undefined;
 };
 
+describe("an answer to an MCP server's prompt", () => {
+	it("does not carry the tool selection, whose headers can hold credentials", async () => {
+		// Only the model's own questions are continued from the answer request; here nothing
+		// server-side would read it.
+		const { baseElement } = mount([{ kind: "string", name: "name", required: false }]);
+		await submit(baseElement);
+
+		expect(sent[0]).not.toHaveProperty("selectedMcpServers");
+		expect(sent[0]).not.toHaveProperty("selectedMcpServerNames");
+	});
+});
+
 describe("an optional checkbox nobody touched", () => {
 	const notify: ElicitationField = {
 		kind: "boolean",

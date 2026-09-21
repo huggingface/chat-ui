@@ -14,6 +14,21 @@ const bodySchema = z.object({
 	content: z
 		.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]))
 		.optional(),
+	/**
+	 * The browser's tool selection, in the message route's shape. The turn an answer continues
+	 * runs from here rather than from a message request, which is where it used to arrive.
+	 */
+	selectedMcpServerNames: z.array(z.string()).optional(),
+	selectedMcpServers: z
+		.array(
+			z.object({
+				name: z.string(),
+				url: z.string(),
+				headers: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
+			})
+		)
+		.optional(),
+	timezone: z.string().optional(),
 });
 
 /** Separate from the generation stream: the run holding the tool call may be on another pod. */
@@ -47,7 +62,24 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	const serverResumes = result.ok
 		? result.resume && result.pendingKind === "ask"
 		: result.status === 409 && result.answered?.resume === true && result.pendingKind === "ask";
-	if (serverResumes) await kickAnsweredAsk(conversationId, parsed.data.elicitationId);
+	if (serverResumes) {
+		const { selectedMcpServerNames, selectedMcpServers, timezone } = parsed.data;
+		await kickAnsweredAsk(conversationId, parsed.data.elicitationId, {
+			...(selectedMcpServerNames ? { selectedServerNames: selectedMcpServerNames } : {}),
+			...(selectedMcpServers
+				? {
+						selectedServers: selectedMcpServers.map((server) => ({
+							name: server.name,
+							url: server.url,
+							...(server.headers?.length
+								? { headers: Object.fromEntries(server.headers.map((h) => [h.key, h.value])) }
+								: {}),
+						})),
+					}
+				: {}),
+			...(timezone ? { timezone } : {}),
+		});
+	}
 
 	if (!result.ok) {
 		if (result.status === 409 && result.answered) {

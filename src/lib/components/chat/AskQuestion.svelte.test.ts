@@ -10,6 +10,22 @@ import {
 import { elicitationToResume } from "$lib/stores/elicitationResume";
 import { get } from "svelte/store";
 
+vi.mock("$lib/stores/mcpServers", async () => {
+	const { readable } = await import("svelte/store");
+	return {
+		mcpServersLoaded: readable(true),
+		enabledServers: readable([
+			{
+				id: "custom-1",
+				name: "Mine",
+				url: "https://mine.test/mcp",
+				type: "custom",
+				headers: [{ key: "Authorization", value: "Bearer browser-held" }],
+			},
+		]),
+	};
+});
+
 let sent: Array<Record<string, unknown>>;
 
 beforeEach(() => {
@@ -91,6 +107,27 @@ describe("a question from the assistant", () => {
 
 		await vi.waitFor(() => expect(sent).toHaveLength(1));
 		expect(sent[0]).toMatchObject({ action: "accept", content: { q1: "Postgres", q2: "Mongo" } });
+	});
+
+	it("sends the browser's tool selection with the answer", async () => {
+		// The server continues the turn from this request, so this is the only place the
+		// selection can reach it; custom servers and their headers exist only in the browser.
+		const { baseElement } = mount([ask("q1", "Which database?")]);
+		rowFor(baseElement, "Postgres")?.click();
+		button(baseElement, "Send")?.click();
+
+		await vi.waitFor(() => expect(sent).toHaveLength(1));
+		expect(sent[0]).toMatchObject({
+			selectedMcpServerNames: ["Mine"],
+			selectedMcpServers: [
+				{
+					name: "Mine",
+					url: "https://mine.test/mcp",
+					headers: [{ key: "Authorization", value: "Bearer browser-held" }],
+				},
+			],
+		});
+		expect(typeof sent[0].timezone).toBe("string");
 	});
 
 	// Rendered one per test: two mounts share a document, so the helpers would find the

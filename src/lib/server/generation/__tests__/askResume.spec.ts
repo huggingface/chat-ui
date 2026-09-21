@@ -26,7 +26,11 @@ import {
 	type Round,
 } from "$lib/server/textGeneration/__tests__/replayHarness";
 
-const mocks = vi.hoisted(() => ({ create: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+	create: vi.fn(),
+	/** The servers each run resolved its tools from, in order. */
+	toolServers: [] as Array<Array<{ name: string; url: string; headers?: Record<string, string> }>>,
+}));
 
 vi.mock("openai", async (importOriginal) => ({
 	...(await importOriginal<typeof import("openai")>()),
@@ -36,7 +40,7 @@ vi.mock("openai", async (importOriginal) => ({
 }));
 vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
 vi.mock("$lib/server/mcp/registry", () => ({
-	getMcpServers: () => [],
+	getMcpServers: () => [{ name: "Configured", url: "https://configured.test/mcp" }],
 	loadMcpServersOnStartup: () => [],
 }));
 vi.mock("$lib/server/urlSafety", async (importOriginal) => ({
@@ -44,7 +48,10 @@ vi.mock("$lib/server/urlSafety", async (importOriginal) => ({
 	isValidUrl: () => true,
 }));
 vi.mock("$lib/server/mcp/tools", () => ({
-	getOpenAiToolsForMcp: async () => ({ tools: [], mapping: {} }),
+	getOpenAiToolsForMcp: async (servers: (typeof mocks.toolServers)[number]) => {
+		mocks.toolServers.push(servers);
+		return { tools: [], mapping: {} };
+	},
 	resetMcpToolsCache: () => {},
 }));
 vi.mock("$lib/server/mcp/httpClient", () => ({
@@ -257,6 +264,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
 	mocks.create.mockReset();
+	mocks.toolServers.length = 0;
 });
 
 afterEach(async () => {
@@ -340,8 +348,11 @@ describe("an answered question", () => {
 		expect([first.status, second.status, oldClient.answered.status].sort()).toEqual([
 			200, 409, 409,
 		]);
-		// Nothing streamed: the old client falls through to the turn's subscription.
-		expect(oldClient.body).toBe("");
+		// Whoever took the claim ran the turn, and nobody else did. Usually that is the answer
+		// endpoint and the old client is streamed nothing; when its request gets there first
+		// it runs the turn itself, as it always has, and the endpoint's attempt is the miss.
+		const streamedToOldClient = oldClient.body.includes("Postgres");
+		expect(oldClient.body === "" || streamedToOldClient).toBe(true);
 		expect(mocks.create).toHaveBeenCalledTimes(2);
 		const message = lastAssistant(await reload(conv));
 		expect(settlements(message, elicitationId)).toHaveLength(1);
@@ -372,6 +383,82 @@ describe("an answered question", () => {
 		release();
 		await turnIs(conv, parked.id, "done");
 		expect(mocks.create).toHaveBeenCalledTimes(2);
+	});
+
+	it("runs on the tools the answering browser has selected", async () => {
+		// The selection used to arrive with the client's resume request. Without it the
+		// resumed round drops servers only the browser knows and brings back ones the user
+		// switched off, so the model finds its tools changed halfway through a turn.
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "Postgres it is." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+
+		await answerOverHttp(conv, locals, elicitationId, {
+			action: "accept",
+			content: { q1: "Postgres" },
+			selectedMcpServerNames: ["Mine"],
+			selectedMcpServers: [
+				{
+					name: "Mine",
+					url: "https://mine.test/mcp",
+					headers: [{ key: "Authorization", value: "Bearer browser-held" }],
+				},
+			],
+			timezone: "Europe/Paris",
+		});
+		await turnIs(conv, parked.id, "done");
+
+		const resumed = mocks.toolServers.at(-1) ?? [];
+		expect(resumed.map((server) => server.name)).toContain("Mine");
+		expect(resumed.map((server) => server.name)).not.toContain("Configured");
+		expect(resumed.find((server) => server.name === "Mine")?.headers).toEqual({
+			Authorization: "Bearer browser-held",
+		});
+		// In the request only: the row is the one place this could have been parked.
+		expect(
+			JSON.stringify(await collections.mcpElicitations.findOne({ elicitationId }))
+		).not.toContain("browser-held");
+	});
+
+	it("can be stopped from another pod while it waits on the model", async () => {
+		// A Stop served elsewhere reaches this process only as a marker in the database, and
+		// the generation loop looks at its cached copy only between model outputs.
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		mocks.create.mockImplementation(
+			(_body: unknown, options?: { signal?: AbortSignal }) =>
+				new Promise((_resolve, reject) => {
+					options?.signal?.addEventListener("abort", () =>
+						reject(Object.assign(new Error("Request was aborted."), { name: "AbortError" }))
+					);
+				})
+		);
+
+		await answerOverHttp(conv, locals, elicitationId);
+		await vi.waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2), { timeout: 10_000 });
+		const now = new Date();
+		await collections.abortedGenerations.insertOne({
+			_id: new ObjectId(),
+			conversationId: conv._id,
+			createdAt: now,
+			updatedAt: now,
+		});
+		await turnIs(conv, parked.id, "done");
+
+		const message = lastAssistant(await reload(conv));
+		expect(message.interrupted).toBe(true);
+		expect(
+			(await collections.generations.find({ conversationId: conv._id }).toArray()).map(
+				(generation) => generation.status
+			)
+		).toContain("interrupted");
+		// Consumed, or it would trip the watcher of this conversation's next turn.
+		expect(await collections.abortedGenerations.countDocuments({ conversationId: conv._id })).toBe(
+			0
+		);
 	});
 
 	it("follows the same path when the user declines", async () => {
@@ -417,6 +504,8 @@ describe("the sweep for answers nothing continued", () => {
 		await Promise.all([sweepAnsweredAsks(), sweepAnsweredAsks()]);
 		await turnIs(conv, parked.id, "done");
 
+		// No browser, so no selection: the configured servers, as a parked wait resumes on.
+		expect((mocks.toolServers.at(-1) ?? []).map((server) => server.name)).toContain("Configured");
 		expect(mocks.create).toHaveBeenCalledTimes(2);
 		expect(toolResultsIn(outgoing(1))[0]).toContain("Postgres");
 		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({

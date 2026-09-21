@@ -29,8 +29,10 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { Message } from "$lib/types/Message";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
+import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { createGenerationWriter } from "./writer";
 import { isTurnAlive } from "./turnLog";
+import { clearStaleStopMarker, watchStopMarker } from "./stopMarker";
 import { applyUpdateToMessage } from "./applyUpdate";
 import { rebuildIdentity } from "./parkedSweeper";
 import {
@@ -144,6 +146,19 @@ async function abandon(row: McpElicitation, reason: string): Promise<void> {
 	}
 }
 
+/**
+ * The tool selection the answering browser holds, as the message route receives it. It
+ * travels with the answer rather than being recorded when the question parks: a custom
+ * server's headers can carry the user's credentials, which live in their browser and are
+ * never written to the database. So the sweep has none, and a turn it recovers runs on the
+ * configured servers plus the preset, as a parked wait's resume does.
+ */
+export interface AskResumeSelection {
+	selectedServerNames?: string[];
+	selectedServers?: McpServerConfig[];
+	timezone?: string;
+}
+
 export type AskResumeOutcome =
 	/** Another caller holds or has consumed the claim; nothing was done here. */
 	| "not_claimed"
@@ -165,9 +180,11 @@ export type AskResumeOutcome =
 export async function resumeAnsweredAsk({
 	conversationId,
 	elicitationId,
+	selection,
 }: {
 	conversationId: ObjectId;
 	elicitationId: string;
+	selection?: AskResumeSelection;
 }): Promise<{ outcome: AskResumeOutcome; run?: Promise<void> }> {
 	// Asks only: a parked MCP call is re-issued against a server that may exist only in the
 	// browser's configuration, so its continuation still starts from the route.
@@ -226,11 +243,25 @@ export async function resumeAnsweredAsk({
 		...(conv.sessionId ? { sessionId: conv.sessionId } : {}),
 	});
 
+	// Without it the resumed round loses servers only the browser knows and regains ones the
+	// user switched off, so the model can find its tools changed mid-turn.
+	if (selection?.selectedServerNames || selection?.selectedServers) {
+		(locals as unknown as Record<string, unknown>).mcp = {
+			selectedServerNames: selection.selectedServerNames,
+			selectedServers: selection.selectedServers ?? [],
+		};
+	}
+	if (selection?.timezone) {
+		(locals as unknown as Record<string, unknown>).timezone = selection.timezone;
+	}
+
 	const generationId = randomUUID();
 	const initialContent = message.content;
 	const promptedAt = new Date();
 	const abortController = new AbortController();
 	const conversationKey = conversationId.toString();
+
+	await clearStaleStopMarker(conversationId);
 
 	// The browser finds a running turn through the last assistant message's generationId
 	// (see parkedSweeper). A reaper-set `interrupted` would make the message unsubscribable.
@@ -335,6 +366,7 @@ export async function resumeAnsweredAsk({
 
 	const run = (async () => {
 		AbortRegistry.getInstance().register(conversationKey, abortController);
+		const stopWatching = watchStopMarker(conversationId, abortController);
 		let failure: string | undefined;
 		try {
 			try {
@@ -394,6 +426,7 @@ export async function resumeAnsweredAsk({
 			if (endedUpdate) apply(endedUpdate);
 		} finally {
 			const aborted = abortController.signal.aborted;
+			stopWatching();
 			AbortRegistry.getInstance().unregister(conversationKey, abortController);
 			await persist().catch((err) =>
 				logger.error({ err, elicitationId }, "[ask] failed to save the resumed turn")
@@ -524,10 +557,15 @@ export async function sweepAnsweredAsks(): Promise<void> {
 /** Start the continuation and return once the answer is stored; never throws. */
 export async function kickAnsweredAsk(
 	conversationId: ObjectId,
-	elicitationId: string
+	elicitationId: string,
+	selection?: AskResumeSelection
 ): Promise<AskResumeOutcome | "failed"> {
 	try {
-		const { outcome, run } = await resumeAnsweredAsk({ conversationId, elicitationId });
+		const { outcome, run } = await resumeAnsweredAsk({
+			conversationId,
+			elicitationId,
+			...(selection ? { selection } : {}),
+		});
 		run?.catch((err) => logger.error({ err, elicitationId }, "[ask] resumed turn crashed"));
 		return outcome;
 	} catch (err) {

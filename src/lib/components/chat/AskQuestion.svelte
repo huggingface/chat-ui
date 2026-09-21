@@ -101,6 +101,7 @@
 			elicitationId: request.elicitationId,
 			action,
 			...(action === "accept" ? { content } : {}),
+			withToolSelection: true,
 		});
 		submitting = false;
 		if (!result.ok) {
