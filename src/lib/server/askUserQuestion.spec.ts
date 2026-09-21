@@ -211,7 +211,46 @@ describe("budget questions must carry real grants", () => {
 			],
 		});
 		expect(result.ok).toBe(false);
-		if (!result.ok) expect(result.reason).toContain("setBudgetUsd");
+		if (!result.ok) {
+			expect(result.reason).toContain("setBudgetUsd");
+			expect(result.reason).toContain("goes in its description, not its label");
+		}
+	});
+
+	// 131 of 1,835 asks were bounced, many for options like these: the label grants
+	// nothing and claims nothing, the description just says what the choice costs.
+	it("passes a budget question that only states costs in descriptions", () => {
+		const payload = ok({
+			questions: [
+				question({
+					question: "The run does not fit the remaining budget. How should I proceed?",
+					header: "Budget",
+					options: [
+						{ label: "Halve the dataset", description: "Fits: holds about $1.20 of the $2 left." },
+						{ label: "Use a smaller GPU", description: "t4-small at $0.40/hr, roughly $0.80." },
+					],
+				}),
+			],
+		});
+		const field = payload.fields?.[0];
+		if (field?.kind !== "select") throw new Error("expected a select");
+		expect(field.options.map((o) => o.label)).toEqual(["Halve the dataset", "Use a smaller GPU"]);
+		expect(field.options[0].description).toContain("$1.20");
+	});
+
+	it("still bounces a dollar label when the descriptions are what look clean", () => {
+		const result = normalizeAskUserQuestion({
+			questions: [
+				question({
+					question: "Raise the budget for this run?",
+					options: [
+						{ label: "Raise to $5", description: "Covers the full run." },
+						{ label: "Keep it as is", description: "I will rescope instead." },
+					],
+				}),
+			],
+		});
+		expect(result.ok).toBe(false);
 	});
 
 	it("passes once at least one option carries the grant", () => {
