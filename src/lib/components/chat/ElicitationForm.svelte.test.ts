@@ -202,6 +202,40 @@ describe('an "Other" answer', () => {
 	});
 });
 
+describe("an MCP form written at its limits", () => {
+	it("shows the message, description and options whole, in the transcript", () => {
+		// The server refuses anything longer, so this is the most a form can ask the user to read.
+		const message = `${"Please read this before choosing. ".repeat(60)}End of message.`;
+		const description = `${"What the field is for. ".repeat(43)}End of description.`;
+		const label = `${"Option ".repeat(27)}end`;
+		const { baseElement } = render(ElicitationForm, {
+			conversationId: "abc",
+			request: {
+				...formWith([
+					{
+						kind: "select",
+						name: "pick",
+						title: "Pick",
+						description,
+						required: true,
+						multiple: false,
+						options: [
+							{ value: "a", label },
+							{ value: "b", label: "B" },
+						],
+					},
+				]),
+				message,
+			},
+		});
+
+		const text = baseElement.textContent ?? "";
+		expect(text).toContain(message);
+		expect(text).toContain(description);
+		expect([...baseElement.querySelectorAll("option")].map((o) => o.textContent)).toContain(label);
+	});
+});
+
 describe("a question the model asked", () => {
 	const question: ElicitationField = {
 		kind: "select",
@@ -254,6 +288,39 @@ describe("a question the model asked", () => {
 
 		expect(baseElement.textContent).toContain("Answered");
 		expect(get(pendingQuestions)).toHaveLength(0);
+	});
+
+	it("wraps a long header in the answered row instead of pushing the answer out", async () => {
+		const header = "Which evaluation to trust for the support-ticket fine-tune before launching it";
+		const request = { ...formWith([{ ...question, title: header }]), source: "assistant" as const };
+		const { baseElement } = render(ElicitationForm, {
+			conversationId: "abc",
+			request,
+			resolved: {
+				type: MessageUpdateType.Elicitation,
+				subtype: MessageElicitationUpdateType.Resolved,
+				elicitationId: request.elicitationId,
+				action: "accept",
+				resolution: "user",
+				content: { q1: "S3" },
+			},
+		});
+		const row = baseElement.querySelector<HTMLElement>("button[aria-label]");
+		row?.click();
+
+		await vi.waitFor(() => expect(baseElement.querySelector("dt")).not.toBeNull());
+		const list = baseElement.querySelector("dl");
+		const dt = baseElement.querySelector("dt");
+		const dd = baseElement.querySelector("dd");
+		if (!list || !dt || !dd) throw new Error("no answer row");
+		// Phone width, where the header alone is wider than the row.
+		list.style.width = "320px";
+
+		expect(dt.textContent?.trim()).toBe(header);
+		expect(dt.getBoundingClientRect().width).toBeLessThanOrEqual(0.4 * 320 + 1);
+		expect(dd.getBoundingClientRect().right).toBeLessThanOrEqual(
+			list.getBoundingClientRect().right
+		);
 	});
 
 	it("does not let a later question hide one still waiting", async () => {
