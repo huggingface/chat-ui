@@ -9,7 +9,12 @@ import { MessageElicitationUpdateType, MessageUpdateType } from "$lib/types/Mess
 const MAX_QUESTIONS = 4;
 const MAX_OPTIONS = 4;
 const MIN_OPTIONS = 2;
-const MAX_HEADER_CHARS = 12;
+/** Shown whole, so these only turn away the absurd — over them the call is refused, never cut. */
+const MAX_TEXT_CHARS = 4_000;
+// A label is also the answer's value: every question fully picked at this length must stay
+// under validateElicitationContent's answer ceiling, or the user could not send it.
+const MAX_LABEL_CHARS = 500;
+const MAX_HEADER_CHARS = MAX_LABEL_CHARS;
 
 export const ASK_USER_QUESTION_TOOL_NAME = "ask_user_question";
 
@@ -23,7 +28,10 @@ export const askUserQuestionTool = {
 			"lead to materially different work — which framing, which scope, which of several " +
 			"approaches. Prefer it to asking in prose, which cannot be answered with a click. " +
 			"Not for something you can look up, a choice with an obvious default, or anything " +
-			"the user has already told you.",
+			"the user has already told you. " +
+			"It is shown in a small panel, often on a phone, and everything you write is shown in " +
+			"full: ask in a sentence or two, keep each label to a few words, and put the detail " +
+			"and trade-off in the option's description.",
 		parameters: {
 			type: "object",
 			properties: {
@@ -37,11 +45,13 @@ export const askUserQuestionTool = {
 						properties: {
 							question: {
 								type: "string",
-								description: "The complete question, ending in a question mark.",
+								description:
+									"The complete question in a sentence or two, ending in a question mark.",
 							},
 							header: {
 								type: "string",
-								description: `Short label shown as a chip, at most ${MAX_HEADER_CHARS} characters.`,
+								description:
+									'Short label naming the decision, around 12 characters (e.g. "Database").',
 							},
 							multiSelect: {
 								type: "boolean",
@@ -54,10 +64,15 @@ export const askUserQuestionTool = {
 								items: {
 									type: "object",
 									properties: {
-										label: { type: "string", description: "The choice, in a few words." },
+										label: {
+											type: "string",
+											description:
+												"The choice, in a few words — details belong in the description.",
+										},
 										description: {
 											type: "string",
-											description: "What picking this means, and its trade-off.",
+											description:
+												"What picking this means, and its trade-off, in a sentence or two.",
 										},
 										setBudgetUsd: {
 											type: "number",
@@ -78,13 +93,54 @@ export const askUserQuestionTool = {
 	},
 };
 
+// Model-authored, so the same display rules as server-authored text apply.
+const cleanText = (value: unknown): string =>
+	typeof value === "string" ? value.replace(/[\p{Cc}\p{Cf}]/gu, "").trim() : "";
+
+/** Never cut: `tooLong` turns over-long text away before anything reads it. */
 const asText = (value: unknown, max: number): string | undefined => {
-	if (typeof value !== "string") return undefined;
-	// Model-authored, so the same display rules as server-authored text apply.
-	const cleaned = value.replace(/[\p{Cc}\p{Cf}]/gu, "").trim();
-	if (!cleaned) return undefined;
-	return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
+	const cleaned = cleanText(value);
+	return cleaned && cleaned.length <= max ? cleaned : undefined;
 };
+
+/** Why a question cannot be shown as written, phrased for the model to fix and re-issue. */
+function tooLong(q: Record<string, unknown> | null, n: number): string | undefined {
+	const over = (value: unknown, max: number, what: string, fix: string) => {
+		const length = cleanText(value).length;
+		return length > max
+			? `${what} is ${length} characters, over the ${max} limit — ${fix}`
+			: undefined;
+	};
+	const found =
+		over(q?.question, MAX_TEXT_CHARS, `question ${n}`, "ask it in a sentence or two") ??
+		over(
+			q?.header,
+			MAX_HEADER_CHARS,
+			`question ${n}'s header`,
+			"name the decision in a word or two"
+		);
+	if (found) return found;
+	const rawOptions = Array.isArray(q?.options) ? q.options : [];
+	for (const [i, rawOption] of rawOptions.entries()) {
+		const option = rawOption as Record<string, unknown> | null;
+		const what = `question ${n} option ${i + 1}`;
+		const problem =
+			over(
+				option?.label,
+				MAX_LABEL_CHARS,
+				`${what}'s label`,
+				"keep the label to a few words and move the detail into its description"
+			) ??
+			over(
+				option?.description,
+				MAX_TEXT_CHARS,
+				`${what}'s description`,
+				"say what picking it means in a sentence or two"
+			);
+		if (problem) return problem;
+	}
+	return undefined;
+}
 
 export type NormalizedAsk =
 	| { ok: true; payload: Omit<ElicitationRequestPayload, "elicitationId"> }
@@ -106,7 +162,9 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 	const fields: ElicitationField[] = [];
 	for (const [index, raw] of questions.entries()) {
 		const q = raw as Record<string, unknown> | null;
-		const question = asText(q?.question, 300);
+		const lengthProblem = tooLong(q, index + 1);
+		if (lengthProblem) return { ok: false, reason: lengthProblem };
+		const question = asText(q?.question, MAX_TEXT_CHARS);
 		if (!question) return { ok: false, reason: `question ${index + 1} has no text` };
 
 		const options: Array<{
@@ -118,7 +176,7 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 		const rawOptions = Array.isArray(q?.options) ? q.options : [];
 		for (const rawOption of rawOptions) {
 			const option = rawOption as Record<string, unknown>;
-			const modelLabel = asText(option?.label, 80);
+			const modelLabel = asText(option?.label, MAX_LABEL_CHARS);
 			// Model-proposed, user-applied: the amount survives only if it is a sane
 			// number of dollars.
 			const rawBudget = option?.setBudgetUsd;
@@ -135,7 +193,7 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 			// Keyed by value in the form, so a repeat would break rendering outright.
 			// Canonical grant labels make two same-amount options one option.
 			if (!label || options.some((o) => o.value === label)) continue;
-			const description = asText(option?.description, 200);
+			const description = asText(option?.description, MAX_TEXT_CHARS);
 			options.push({
 				value: label,
 				label,

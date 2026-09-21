@@ -314,7 +314,9 @@
 						<dl class="rounded-lg bg-gray-100 p-2 text-xs dark:bg-gray-800/70">
 							{#each Object.entries(answered) as [name, value] (name)}
 								<div class="flex gap-2 py-px">
-									<dt class="shrink-0 font-medium text-gray-500 dark:text-gray-400">
+									<dt
+										class="max-w-2/5 shrink-0 font-medium break-words text-gray-500 dark:text-gray-400"
+									>
 										{labelFor(name)}
 									</dt>
 									<dd class="min-w-0 break-words text-gray-700 dark:text-gray-300">
