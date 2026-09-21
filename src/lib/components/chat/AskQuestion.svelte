@@ -277,7 +277,7 @@
 								<!-- From the option's own metadata, never its label: what this
 							     shows is exactly what the server applies if it is picked. -->
 								<span class="block text-xs font-medium text-amber-700 dark:text-amber-400">
-									Sets session budget to ${option.setBudgetUsd.toFixed(2)}
+									Sets compute budget to ${option.setBudgetUsd.toFixed(2)}
 								</span>
 							{/if}
 						</span>

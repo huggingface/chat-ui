@@ -18,13 +18,20 @@ describe("MlInternOnboardingModal", () => {
 	it("names the mode as experimental and covers both account settings", () => {
 		renderWithApp(MlInternOnboardingModal, { close: vi.fn() });
 
-		const text = dialog().textContent ?? "";
+		// Source line wraps land in textContent; the copy is asserted as it reads.
+		const text = (dialog().textContent ?? "").replace(/\s+/g, " ");
 		expect(text).toContain("ML Intern is experimental");
 		expect(text).toContain("Enable all MCP tools");
-		expect(text).toContain("Set a spending cap");
-		// Honest about the limit: enforced in the chat, but not a hard guarantee.
-		expect(text).toContain("strictly enforced");
-		expect(text).toContain("not a complete guarantee");
+		expect(text).toContain("Cap what ML Intern can spend");
+		// A personal account has no spend limit to set on the billing page, so the
+		// copy has to name what is actually charged and what actually stops it.
+		expect(text).toContain("paid for with your Hugging Face credits");
+		expect(text).toContain("your credit balance is the ceiling");
+		expect(text).not.toContain("set a budget in your billing settings");
+		// Honest about the limit: the chat's cap does not reach everything.
+		expect(text).toContain("does not cover anything those Jobs start themselves");
+		expect(text).toContain("Chatting with the model does not use the compute budget");
+		expect(text).toContain("bill to the organization set in HuggingChat's settings");
 	});
 
 	it("is named by its heading for assistive tech", () => {
@@ -50,7 +57,7 @@ describe("MlInternOnboardingModal", () => {
 			"Open MCP settings"
 		);
 		expect(linkTo("https://huggingface.co/settings/billing").textContent).toContain(
-			"Open billing settings"
+			"Open Hugging Face billing"
 		);
 	});
 
