@@ -225,7 +225,7 @@ async function abandon(park: ParkedCall, reason: string): Promise<void> {
  * An expired token is not a reason to drop the turn: the model is told, in the
  * tool result, so it can say so rather than failing opaquely on the first call.
  */
-async function rebuildIdentity(park: ParkedCall) {
+export async function rebuildIdentity(park: Pick<ParkedCall, "userId" | "sessionId">) {
 	const user = park.userId
 		? ((await collections.users.findOne({ _id: park.userId })) ?? undefined)
 		: undefined;

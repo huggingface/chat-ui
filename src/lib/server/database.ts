@@ -398,6 +398,22 @@ export class Database {
 			.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for mcpElicitations by expiresAt"));
 
+		// Answered questions: the sweep for ones nothing continued, and the per-conversation
+		// lookup the message route makes before every ML turn. Partial, because rows with a
+		// parked call never expire and only the model's own questions are ever looked up.
+		mcpElicitations
+			.createIndex(
+				{ status: 1, resolvedAt: 1 },
+				{ partialFilterExpression: { "pending.kind": "ask" } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for mcpElicitations by resolvedAt"));
+		mcpElicitations
+			.createIndex(
+				{ conversationId: 1, status: 1 },
+				{ partialFilterExpression: { "pending.kind": "ask" } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for mcpElicitations by conversationId"));
+
 		sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch((e) => logger.error(e));
 		settings
 			.createIndex({ sessionId: 1 }, { unique: true, sparse: true })

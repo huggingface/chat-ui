@@ -133,12 +133,14 @@ export async function turnAwaitingInput(key: TurnKey): Promise<MessageTurnStateU
 export async function turnAbandoned(
 	conversationId: Conversation["_id"],
 	messageId: Message["id"],
-	error: string
+	error: string,
+	/** The parked state the caller was meant to resume, plus `running` for a resume that died. */
+	from: TurnStatus[] = ["waiting", "running"]
 ): Promise<MessageTurnStateUpdate | null> {
 	const now = new Date();
 	try {
 		const result = await collections.turnStates.updateOne(
-			{ conversationId, messageId, status: { $in: ["waiting", "running"] } },
+			{ conversationId, messageId, status: { $in: from } },
 			{ $set: { status: "failed" satisfies TurnStatus, endedAt: now, updatedAt: now, error } }
 		);
 		if (result.matchedCount === 0) return null;
@@ -147,6 +149,30 @@ export async function turnAbandoned(
 		return null;
 	}
 	return buildUpdate("failed", { error });
+}
+
+/**
+ * The question a turn parked on was answered, but the conversation had moved on, so the
+ * answer went on record without a run. Closes the turn: `awaiting_input` would otherwise
+ * read alive forever. CAS on that state only — a producer that took the turn meanwhile
+ * owns its ending. Like turnAbandoned, the caller persists the returned update itself.
+ */
+export async function turnAnsweredWithoutRun(
+	conversationId: Conversation["_id"],
+	messageId: Message["id"]
+): Promise<MessageTurnStateUpdate | null> {
+	const now = new Date();
+	try {
+		const result = await collections.turnStates.updateOne(
+			{ conversationId, messageId, status: "awaiting_input" },
+			{ $set: { status: "done" satisfies TurnStatus, endedAt: now, updatedAt: now } }
+		);
+		if (result.matchedCount === 0) return null;
+	} catch (err) {
+		logger.error({ err }, "[turnState] failed to close an answered turn");
+		return null;
+	}
+	return buildUpdate("done");
 }
 
 /**
