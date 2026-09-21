@@ -67,12 +67,12 @@ export const askUserQuestionTool = {
 										label: {
 											type: "string",
 											description:
-												"The choice, in a few words — details belong in the description.",
+												"The choice, in a few words — details belong in the description. In a budget question, a label that names a dollar amount must carry setBudgetUsd.",
 										},
 										description: {
 											type: "string",
 											description:
-												"What picking this means, and its trade-off, in a sentence or two.",
+												"What picking this means, and its trade-off, in a sentence or two. What the choice costs goes here, not in the label.",
 										},
 										setBudgetUsd: {
 											type: "number",
@@ -210,19 +210,20 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 		// single setBudgetUsd is the observed failure mode: the user clicks "$5",
 		// nothing reaches the ledger, and the model proceeds as if authorized.
 		// Bounce it back for correction instead of showing a grant that isn't one.
+		// Labels only: the label is what a click appears to grant. A description
+		// that states what a choice costs is information, and rejecting it sent
+		// 7% of asks back for a re-issue that had nothing to fix.
 		const mentionsBudget = /budget/i.test(
 			`${question} ${asText(q?.header, MAX_HEADER_CHARS) ?? ""}`
 		);
-		const hasDollarOption = options.some((o) =>
-			/\$\s*\d/.test(`${o.label} ${o.description ?? ""}`)
-		);
+		const hasDollarLabel = options.some((o) => /\$\s*\d/.test(o.label));
 		const hasGrantOption = options.some((o) => o.setBudgetUsd !== undefined);
-		if (mentionsBudget && hasDollarOption && !hasGrantOption) {
+		if (mentionsBudget && hasDollarLabel && !hasGrantOption) {
 			return {
 				ok: false,
 				reason:
-					`question ${index + 1} offers budget amounts without setBudgetUsd — a dollar amount written into a label changes nothing. ` +
-					"Re-issue with setBudgetUsd on every option that changes the budget; options that merely mention costs, or decline a raise, omit it",
+					`question ${index + 1} puts a dollar amount in an option label without setBudgetUsd — a dollar amount written into a label changes nothing. ` +
+					"Re-issue with setBudgetUsd on every option that changes the budget; an option that declines a raise omits it, and what a choice costs goes in its description, not its label",
 			};
 		}
 
@@ -293,8 +294,19 @@ export function answerToToolResult(
 		return `${field.description ?? field.title ?? field.name}\n${shown}`;
 	});
 	const granted = chosenBudgetUsd(payload, content);
+	// The validator reads labels only, so a raise can still be described in an option's
+	// description ("Set it to $5") with no setBudgetUsd behind it — and a model bounced for
+	// a dollar label can get there just by moving the amount. Nothing is rejected for that;
+	// instead the model is never left to assume the click granted anything.
+	const aboutBudget = (payload.fields ?? []).some((field) =>
+		/budget/i.test(`${field.title ?? ""} ${field.description ?? ""}`)
+	);
 	const budgetLine =
-		granted !== undefined ? `\n\nThe session compute budget is now $${granted.toFixed(2)}.` : "";
+		granted !== undefined
+			? `\n\nThe session compute budget is now $${granted.toFixed(2)}.`
+			: aboutBudget
+				? "\n\nThis answer did not change the session compute budget: only an option carrying setBudgetUsd does."
+				: "";
 	return `The user answered:\n\n${answered.join("\n\n")}${budgetLine}`;
 }
 

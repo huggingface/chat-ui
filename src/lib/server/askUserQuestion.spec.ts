@@ -331,7 +331,75 @@ describe("budget questions must carry real grants", () => {
 			],
 		});
 		expect(result.ok).toBe(false);
-		if (!result.ok) expect(result.reason).toContain("setBudgetUsd");
+		if (!result.ok) {
+			expect(result.reason).toContain("setBudgetUsd");
+			expect(result.reason).toContain("goes in its description, not its label");
+		}
+	});
+
+	// 131 of 1,835 asks were bounced, many for options like these: the label grants
+	// nothing and claims nothing, the description just says what the choice costs.
+	it("passes a budget question that only states costs in descriptions", () => {
+		const payload = ok({
+			questions: [
+				question({
+					question: "The run does not fit the remaining budget. How should I proceed?",
+					header: "Budget",
+					options: [
+						{ label: "Halve the dataset", description: "Fits: holds about $1.20 of the $2 left." },
+						{ label: "Use a smaller GPU", description: "t4-small at $0.40/hr, roughly $0.80." },
+					],
+				}),
+			],
+		});
+		const field = payload.fields?.[0];
+		if (field?.kind !== "select") throw new Error("expected a select");
+		expect(field.options.map((o) => o.label)).toEqual(["Halve the dataset", "Use a smaller GPU"]);
+		expect(field.options[0].description).toContain("$1.20");
+	});
+
+	it("still bounces a dollar label when the descriptions are what look clean", () => {
+		const result = normalizeAskUserQuestion({
+			questions: [
+				question({
+					question: "Raise the budget for this run?",
+					options: [
+						{ label: "Raise to $5", description: "Covers the full run." },
+						{ label: "Keep it as is", description: "I will rescope instead." },
+					],
+				}),
+			],
+		});
+		expect(result.ok).toBe(false);
+	});
+
+	// What labels-only leaves open: the raise lives in the description, nothing funds it,
+	// and the question is shown. The model must not come away thinking the click paid.
+	it("tells the model an unfunded raise changed nothing, rather than rejecting the question", () => {
+		const payload = {
+			...ok({
+				questions: [
+					question({
+						question: "Raise the budget for this run?",
+						options: [
+							{ label: "Raise the budget", description: "Set it to $5." },
+							{ label: "Keep it as is", description: "I will rescope instead." },
+						],
+					}),
+				],
+			}),
+			elicitationId: "x",
+		};
+
+		const result = answerToToolResult(payload, "accept", { q1: "Raise the budget" });
+
+		expect(result).toContain("did not change the session compute budget");
+		expect(result).not.toContain("budget is now");
+	});
+
+	it("says nothing about the budget for a question that is not about it", () => {
+		const payload = { ...ok({ questions: [question()] }), elicitationId: "x" };
+		expect(answerToToolResult(payload, "accept", { q1: "Postgres" })).not.toContain("budget");
 	});
 
 	it("passes once at least one option carries the grant", () => {
