@@ -51,3 +51,86 @@ export function reconnectBackoffMs(failures: number): number {
 export function isTransportFailure(err: unknown): boolean {
 	return err instanceof TypeError;
 }
+
+const PROBE_TIMEOUT_MS = 10_000;
+
+export interface ReachabilityWait {
+	/** True once a probe succeeded; false if `signal` aborted first. */
+	done: Promise<boolean>;
+	/** Skip the current backoff, or give up on a probe that may be hanging, and try again now. */
+	retryNow: () => void;
+}
+
+/**
+ * Probe until the server answers, backing off between failures. Every probe is
+ * abortable and time-bounded: this runs exactly when the network is unreliable,
+ * and a request stuck on a half-open connection would otherwise never settle,
+ * so the loop would never reach its backoff, a wake-up could not hurry it, and
+ * nothing could cancel it.
+ */
+export function waitUntilReachable({
+	probe,
+	signal,
+	initialDelayMs = 0,
+	probeTimeoutMs = PROBE_TIMEOUT_MS,
+}: {
+	probe: (signal: AbortSignal) => Promise<boolean>;
+	signal: AbortSignal;
+	initialDelayMs?: number;
+	probeTimeoutMs?: number;
+}): ReachabilityWait {
+	let interrupt: (() => void) | undefined;
+	let hurried = false;
+
+	const pause = (ms: number) =>
+		new Promise<void>((resolve) => {
+			const finish = () => {
+				clearTimeout(timer);
+				signal.removeEventListener("abort", finish);
+				interrupt = undefined;
+				resolve();
+			};
+			const timer = setTimeout(finish, ms);
+			signal.addEventListener("abort", finish, { once: true });
+			interrupt = finish;
+		});
+
+	const attempt = async (): Promise<boolean> => {
+		const controller = new AbortController();
+		const cancel = () => controller.abort();
+		const timer = setTimeout(cancel, probeTimeoutMs);
+		signal.addEventListener("abort", cancel, { once: true });
+		interrupt = cancel;
+		// Raced, not just signalled: the loop must move on even if `probe` ignores its signal.
+		const cancelled = new Promise<boolean>((resolve) =>
+			controller.signal.addEventListener("abort", () => resolve(false), { once: true })
+		);
+		try {
+			return await Promise.race([probe(controller.signal).catch(() => false), cancelled]);
+		} finally {
+			clearTimeout(timer);
+			signal.removeEventListener("abort", cancel);
+			interrupt = undefined;
+		}
+	};
+
+	const run = async (): Promise<boolean> => {
+		let delayMs = initialDelayMs;
+		for (let failures = 1; !signal.aborted; failures += 1) {
+			if (delayMs > 0) await pause(delayMs);
+			if (signal.aborted) return false;
+			hurried = false;
+			if (await attempt()) return !signal.aborted;
+			delayMs = hurried ? 0 : reconnectBackoffMs(failures);
+		}
+		return false;
+	};
+
+	return {
+		done: run(),
+		retryNow: () => {
+			hurried = true;
+			interrupt?.();
+		},
+	};
+}

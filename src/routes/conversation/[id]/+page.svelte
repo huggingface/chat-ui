@@ -32,6 +32,7 @@
 		isTransportFailure,
 		reconnectAction,
 		reconnectBackoffMs,
+		waitUntilReachable,
 	} from "$lib/utils/streamReconnect";
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
@@ -194,6 +195,8 @@
 			reattachController?.abort();
 			reattachController = undefined;
 			resyncController?.abort();
+			// A new turn must not inherit the refusals of the one before it.
+			reattachFailures = 0;
 			// Create the controller before any await: a Stop click during file
 			// encoding or MCP hydration must abort THIS request, not whichever
 			// stale controller a previous generation left behind.
@@ -564,41 +567,34 @@
 		const controller = new AbortController();
 		resyncController = controller;
 		const runConvId = convId;
-		const client = useAPIClient();
-		const active = () => !controller.signal.aborted && convId === runConvId;
-		const pause = (ms: number) =>
-			new Promise<void>((resolve) => {
-				const finish = () => {
-					clearTimeout(timer);
-					controller.signal.removeEventListener("abort", finish);
-					retryResyncNow = undefined;
-					resolve();
-				};
-				const timer = setTimeout(finish, ms);
-				controller.signal.addEventListener("abort", finish, { once: true });
-				retryResyncNow = finish;
-			});
+		// Released the moment it is aborted, not when the loop unwinds: a recovery requested
+		// in between would find a resync "running", do nothing, and never start.
+		const release = () => {
+			if (resyncController !== controller) return;
+			resyncController = undefined;
+			retryResyncNow = undefined;
+		};
+		controller.signal.addEventListener("abort", release, { once: true });
 
-		try {
-			let delayMs = initialDelayMs;
-			for (let failures = 1; active(); failures += 1) {
-				if (delayMs > 0) await pause(delayMs);
-				if (!active()) return;
-				const status = await client
-					.conversations({ id: runConvId })
-					.get()
-					.then((response) => response.status)
-					.catch(() => 0);
-				if (status !== 0 && status < 500) break;
-				delayMs = reconnectBackoffMs(failures);
-			}
-			if (!active() || writeMessageInFlight || reattachController) return;
-		} finally {
-			if (resyncController === controller) resyncController = undefined;
-		}
-		// Released before the reload, not after: the reload re-subscribes, and if that
+		const wait = waitUntilReachable({
+			signal: controller.signal,
+			initialDelayMs,
+			probe: async (signal) => {
+				const response = await fetch(`${base}/api/v2/conversations/${runConvId}`, { signal });
+				// Only the status matters, and the body can be the whole conversation.
+				void response.body?.cancel();
+				return response.status < 500;
+			},
+		});
+		retryResyncNow = wait.retryNow;
+		const reachable = await wait.done;
+
+		// Also released before the reload, not after: the reload re-subscribes, and if that
 		// subscription is refused while this is still marked in flight, its own recovery
 		// would find a resync "running", do nothing, and the retries would stop.
+		release();
+		controller.signal.removeEventListener("abort", release);
+		if (!reachable || convId !== runConvId || writeMessageInFlight || reattachController) return;
 		await Promise.all([safeInvalidate(UrlDependency.Conversation), convsStore.refresh()]);
 	}
 
@@ -795,7 +791,10 @@
 		const dataChanged = newMessages !== _lastSyncedMessages;
 
 		if (convChanged || (dataChanged && untrack(() => !pending))) {
-			if (convChanged) reattachFailures = 0;
+			if (convChanged) {
+				reattachFailures = 0;
+				resyncController?.abort();
+			}
 			messages = newMessages;
 			rootMessageId = data.rootMessageId;
 			_lastSyncedConvId = currentConvId;
