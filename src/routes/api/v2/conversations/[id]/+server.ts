@@ -26,12 +26,14 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 	const lastAssistant = [...conversation.messages]
 		.reverse()
 		.find((message) => message.from === "assistant");
-	// Share views resolve with a string id; ObjectId accepts both forms.
-	const turnStateDoc = lastAssistant
-		? await collections.turnStates
-				.findOne({ conversationId: new ObjectId(conversation._id), messageId: lastAssistant.id })
-				.catch(() => null)
-		: null;
+	// Share views resolve with a seven-character string id, which cannot be
+	// converted to an ObjectId. Only ObjectId-backed conversations can have turn state.
+	const turnStateDoc =
+		lastAssistant && ObjectId.isValid(conversation._id)
+			? await collections.turnStates
+					.findOne({ conversationId: new ObjectId(conversation._id), messageId: lastAssistant.id })
+					.catch(() => null)
+			: null;
 	const turnState: TurnStateSnapshot | undefined = turnStateDoc
 		? {
 				messageId: turnStateDoc.messageId,
