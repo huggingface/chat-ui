@@ -65,7 +65,7 @@ jobs:
           go build -o slugify main.go
 
           # Generate slug
-          VALUE="${{ inputs.value }}"
+          VALUE="${INPUTS_VALUE}"
           echo "Input value: $VALUE"
 
           SLUG=$(./slugify "$VALUE")
@@ -73,3 +73,5 @@ jobs:
 
           # Export
           echo "slug=$SLUG" >> $GITHUB_OUTPUT
+        env:
+          INPUTS_VALUE: ${{ inputs.value }}

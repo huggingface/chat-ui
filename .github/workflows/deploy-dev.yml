@@ -33,7 +33,7 @@ jobs:
 
       - name: Set GITHUB_SHA_SHORT from PR
         if: env.GITHUB_EVENT_PULL_REQUEST_HEAD_SHA_SHORT != null
-        run: echo "GITHUB_SHA_SHORT=${{ env.GITHUB_EVENT_PULL_REQUEST_HEAD_SHA_SHORT }}" >> $GITHUB_ENV
+        run: echo "GITHUB_SHA_SHORT=${GITHUB_EVENT_PULL_REQUEST_HEAD_SHA_SHORT}" >> $GITHUB_ENV
 
       - name: Docker metadata
         id: meta
