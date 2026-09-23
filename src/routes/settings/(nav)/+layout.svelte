@@ -25,6 +25,7 @@
 	import { debounce } from "$lib/utils/debounce";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+	import { uniqueModelsById } from "$lib/utils/models";
 
 	interface Props {
 		data: LayoutData;
@@ -107,12 +108,13 @@
 	// With the ML Intern switch on, only the mode's fixed set is offered, in its
 	// configured order — anything else would be swapped for the default on send.
 	let mlModelsOnly = $derived(ML_ASSISTANT_MODE && mlAssistant.enabled);
+	let uniqueModels = $derived(uniqueModelsById(data.models));
 	let browsableModels = $derived(
 		mlModelsOnly
 			? data.mlAssistantModels
-					.map((id) => data.models.find((el) => el.id === id))
+					.map((id) => uniqueModels.find((el) => el.id === id))
 					.filter((el): el is (typeof data.models)[number] => el !== undefined)
-			: data.models
+			: uniqueModels
 	);
 </script>
 

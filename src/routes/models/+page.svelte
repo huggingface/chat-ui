@@ -13,6 +13,7 @@
 	import IconCheap from "$lib/components/icons/IconCheap.svelte";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { uniqueModelsById } from "$lib/utils/models";
 	import { goto } from "$app/navigation";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
@@ -34,12 +35,13 @@
 	// With the ML Intern switch on, only the mode's fixed set is offered, in its
 	// configured order — anything else would be swapped for the default on send.
 	let mlModelsOnly = $derived(ML_ASSISTANT_MODE && mlAssistant.enabled);
+	let uniqueModels = $derived(uniqueModelsById(data.models));
 	let browsableModels = $derived(
 		mlModelsOnly
 			? data.mlAssistantModels
-					.map((id) => data.models.find((el) => el.id === id))
+					.map((id) => uniqueModels.find((el) => el.id === id))
 					.filter((el): el is (typeof data.models)[number] => el !== undefined)
-			: data.models
+			: uniqueModels
 	);
 
 	// Filtered models list
