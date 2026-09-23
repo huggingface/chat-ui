@@ -1,7 +1,5 @@
 name: Build and Publish Image
 
-permissions:
-  packages: write
 
 on:
   push:
@@ -17,8 +15,13 @@ on:
   release:
     types: [published, edited]
 
+permissions: {}
+
 jobs:
   build-and-publish-image-with-db:
+    permissions:
+      contents: read
+      packages: write
     runs-on:
       group: aws-general-8-plus
     steps:
@@ -80,6 +83,9 @@ jobs:
             INCLUDE_DB=true
             PUBLIC_COMMIT_SHA=${{ env.GITHUB_SHA_SHORT }}
   build-and-publish-image-nodb:
+    permissions:
+      contents: read
+      packages: write
     runs-on:
       group: aws-general-8-plus
     steps:

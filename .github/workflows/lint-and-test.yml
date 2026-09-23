@@ -6,8 +6,12 @@ on:
     branches:
       - main
 
+permissions: {}
+
 jobs:
   lint:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -26,6 +30,8 @@ jobs:
           npm run check
 
   test:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     # Browsers and their system deps are baked in; do not add `playwright install`.
     container:
@@ -70,6 +76,8 @@ jobs:
         run: npm run test:client
 
   e2e:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.61.1-noble
@@ -119,6 +127,8 @@ jobs:
           retention-days: 7
 
   build-check:
+    permissions:
+      contents: read
     runs-on:
       group: aws-general-8-plus
     timeout-minutes: 10

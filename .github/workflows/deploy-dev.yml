@@ -10,6 +10,8 @@ jobs:
       value: ${{ github.head_ref }}
 
   deploy-dev:
+    permissions:
+      contents: read
     if: contains(github.event.pull_request.labels.*.name, 'preview')
     runs-on: ubuntu-latest
     needs: branch-slug
