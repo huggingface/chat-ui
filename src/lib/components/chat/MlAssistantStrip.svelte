@@ -157,7 +157,7 @@
 		{#if steps.length}
 			<MlAssistantPlanProgress {steps} {statusLabel} {complete} />
 		{:else}
-			<span class="min-w-0 truncate text-[13px] leading-none text-[#78716c] dark:text-[#a8a29e]">
+			<span class="min-w-0 truncate text-[13px] leading-normal text-[#78716c] dark:text-[#a8a29e]">
 				{ML_ASSISTANT_TOOLS.join(" · ")}
 			</span>
 		{/if}
