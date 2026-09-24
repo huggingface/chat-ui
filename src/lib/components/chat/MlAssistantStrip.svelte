@@ -16,7 +16,7 @@
 		complete: boolean;
 		/** Compute budget ledger; absent means the conversation carries none. */
 		budget?: MlBudgetSnapshot;
-		/** Commits a new budget total in USD, cents included. Absent makes the readout static. */
+		/** Commits a new budget total in USD (micro-dollar precision). Absent makes the readout static. */
 		onbudgetchange?: (totalUsd: number) => void;
 		/** The run's newest Trackio dashboard, if it has named one. */
 		dashboard?: TrackioDashboard;
@@ -76,10 +76,18 @@
 
 	let editingBudget = $state(false);
 	let budgetDraft = $state("");
+	let initialDraft = "";
 
+	/**
+	 * The editor reads "$… left", so it edits what is left, not the total: typing
+	 * $0 after a run has spent a cent must mean "nothing more", not a total of $0
+	 * that leaves the ledger at -$0.01. Seeded with the same cents the readout shows.
+	 */
 	function openBudgetEditor() {
 		if (!budget || !onbudgetchange) return;
-		budgetDraft = String(budget.totalMicroUsd / MICRO_USD_PER_USD);
+		const cents = Math.max(0, Math.ceil(remainingMicroUsd / 10_000));
+		budgetDraft = String(cents / 100);
+		initialDraft = budgetDraft;
 		editingBudget = true;
 	}
 
@@ -100,12 +108,19 @@
 
 	function commitBudget() {
 		const draft = budgetDraft.trim();
-		const totalUsd = Number(draft);
+		const leftUsd = Number(draft);
 		editingBudget = false;
 		// Zero is a real setting — it pauses spend without discarding the ledger —
-		// so only an empty field, a bare ".", or an out-of-range figure abandons.
-		if (!draft || !Number.isFinite(totalUsd) || totalUsd < 0 || totalUsd > MAX_BUDGET_USD) return;
-		onbudgetchange?.(Math.round(totalUsd * 100) / 100);
+		// so only an empty field, a bare ".", or an unchanged figure abandons. An
+		// unchanged commit would otherwise nudge the total by the readout's rounding.
+		if (!budget || !draft || draft === initialDraft || !Number.isFinite(leftUsd) || leftUsd < 0) {
+			return;
+		}
+		// Spent and held money stays committed; the new total sits on top of it.
+		const committedMicroUsd = budget.spentMicroUsd + budget.reservedMicroUsd;
+		const totalMicroUsd = Math.round(leftUsd * 100) * 10_000 + committedMicroUsd;
+		if (totalMicroUsd > MAX_BUDGET_USD * MICRO_USD_PER_USD) return;
+		onbudgetchange?.(totalMicroUsd / MICRO_USD_PER_USD);
 	}
 
 	/** The editor exists only while open, so focus belongs to mount. */
@@ -198,7 +213,7 @@
 				     a one-figure inline edit. -->
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<span
-					class="ml-budget-pill flex flex-none items-center gap-px rounded-[6px] px-2 py-[5px] font-mono text-[13px] leading-none font-medium text-[#c4511a] tabular-nums dark:text-[#f0a468]"
+					class="ml-budget-pill flex flex-none items-baseline rounded-[6px] bg-black/5 px-2 py-[5px] font-mono text-[13px] leading-none font-medium text-[#c4511a] tabular-nums dark:bg-white/[.07] dark:text-[#f0a468]"
 					onkeydown={(e) => {
 						if (e.key === "Enter") commitBudget();
 						if (e.key === "Escape") editingBudget = false;
@@ -214,7 +229,7 @@
 						inputmode="decimal"
 						autocomplete="off"
 						style:width={`${Math.max(budgetDraft.length, 1)}ch`}
-						class="ml-budget-input min-w-[1ch] border-0 bg-transparent p-0 pb-px text-right font-mono text-[13px] font-medium text-[#1c1917] tabular-nums outline-none dark:text-[#f5f5f4]"
+						class="ml-budget-input m-0 h-[13px] min-w-[1ch] border-0 bg-transparent p-0 text-right font-mono text-[13px] leading-none font-medium text-inherit tabular-nums outline-none"
 						aria-label="Compute budget in dollars, Enter to save"
 					/>
 					<span class="pl-1 text-[#a8a29e] dark:text-[#78716c]">left</span>
@@ -293,9 +308,11 @@
 			0 0 0 3.5px #f0a468;
 	}
 
-	/* The field is chromeless; the underline is what says it is editable. */
+	/* The field is chromeless; the underline is what says it is editable. Drawn
+	   as a shadow, not a border, so it adds no height and the figure stays on the
+	   same baseline as the "$" and "left" around it. */
 	.ml-budget-pill:focus-within :global(.ml-budget-input) {
-		border-bottom: 1.5px solid currentColor;
+		box-shadow: 0 1.5px 0 currentColor;
 		caret-color: currentColor;
 	}
 

@@ -351,7 +351,7 @@ describe("MlAssistantStrip budget", () => {
 		);
 	});
 
-	it("commits an edited total on Enter", async () => {
+	it("commits an edited amount left on Enter, on top of what is spent and held", async () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
@@ -363,7 +363,8 @@ describe("MlAssistantStrip budget", () => {
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 
-		expect(onbudgetchange).toHaveBeenCalledWith(25);
+		// $1.50 spent and $1.00 held stay committed under the $25 left.
+		expect(onbudgetchange).toHaveBeenCalledWith(27.5);
 		// The editor closes back to the readout.
 		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
 	});
@@ -406,12 +407,12 @@ describe("MlAssistantStrip budget", () => {
 		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
 		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
-		expect(input.value).toBe("10");
+		expect(input.value).toBe("7.5");
 
-		input.value = "10a";
+		input.value = "7.5a";
 		input.dispatchEvent(new Event("input", { bubbles: true }));
 		await Promise.resolve();
-		expect(input.value).toBe("10");
+		expect(input.value).toBe("7.5");
 	});
 
 	it("keeps a pasted figure's cents, and caps the cleaned figure at the widest total", async () => {
@@ -442,7 +443,7 @@ describe("MlAssistantStrip budget", () => {
 		expect(input.value).toBe("12345678");
 	});
 
-	it("commits zero, which pauses spend rather than abandoning the edit", async () => {
+	it("commits zero left, which pauses spend rather than abandoning the edit", async () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
@@ -454,7 +455,57 @@ describe("MlAssistantStrip budget", () => {
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 
-		expect(onbudgetchange).toHaveBeenCalledWith(0);
+		// A total of exactly what is spent and held: nothing left, never below it.
+		expect(onbudgetchange).toHaveBeenCalledWith(2.5);
+	});
+
+	it("lands on $0.00 left, not -$0.01, when zeroed under sub-cent spend", async () => {
+		const onbudgetchange = vi.fn();
+		const budget = { totalMicroUsd: 5_000_000, spentMicroUsd: 4_321, reservedMicroUsd: 0 };
+		const { container } = mount({ budget, onbudgetchange });
+
+		find(container, "button[aria-label^='Compute budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		input.value = "0";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		await Promise.resolve();
+
+		expect(onbudgetchange).toHaveBeenCalledWith(0.004321);
+	});
+
+	it("seeds the editor with what is left, and an unchanged commit changes nothing", async () => {
+		const onbudgetchange = vi.fn();
+		// $5.00 total, a sub-cent spend: the readout rounds up to $5.00 left.
+		const budget = { totalMicroUsd: 5_000_000, spentMicroUsd: 4_321, reservedMicroUsd: 0 };
+		const { container } = mount({ budget, onbudgetchange });
+
+		find(container, "button[aria-label^='Compute budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		expect(input.value).toBe("5");
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		await Promise.resolve();
+
+		// Committing the rounded figure would have nudged the total up by the rounding.
+		expect(onbudgetchange).not.toHaveBeenCalled();
+	});
+
+	it("inks the editing figure like its $ and keeps them on one baseline", async () => {
+		const { container } = mount({ budget: BUDGET, onbudgetchange: vi.fn() });
+
+		find(container, "button[aria-label^='Compute budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		const dollar = input.previousElementSibling as HTMLElement;
+
+		expect(style(input).color).toBe(ORANGE_INK);
+		expect(style(dollar).color).toBe(ORANGE_INK);
+		// The focus underline is a shadow, so it adds no height to the field.
+		expect(style(input).borderBottomWidth).toBe("0px");
+		const bottom = (el: Element) => Math.round(el.getBoundingClientRect().bottom);
+		expect(Math.abs(bottom(input) - bottom(dollar))).toBeLessThanOrEqual(1);
 	});
 
 	it("commits cents", async () => {
@@ -469,7 +520,7 @@ describe("MlAssistantStrip budget", () => {
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 
-		expect(onbudgetchange).toHaveBeenCalledWith(1.5);
+		expect(onbudgetchange).toHaveBeenCalledWith(4);
 	});
 
 	it("abandons an empty or over-ceiling figure instead of committing it", async () => {
@@ -488,6 +539,8 @@ describe("MlAssistantStrip budget", () => {
 
 		await type("");
 		await type("10001");
+		// Under the ceiling as typed, over it once the $2.50 committed is added.
+		await type("9999");
 		expect(onbudgetchange).not.toHaveBeenCalled();
 	});
 
