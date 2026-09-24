@@ -39,7 +39,17 @@ export function mergedStreamToken(
 }
 
 const FLUSH_INTERVAL_MS = 200;
-const MATERIALIZE_MS = 3_000;
+
+// How often a run's progress is written onto its message. Configurable only so the e2e
+// suite can observe several windows without streaming for tens of seconds.
+function materializeMs(): number {
+	const raw = config.GENERATION_MATERIALIZE_MS;
+	if (raw) {
+		const parsed = parseInt(raw, 10);
+		if (!isNaN(parsed) && parsed > 0) return parsed;
+	}
+	return 3_000;
+}
 
 // Must stay well below the reaper's stale threshold (see reaper.ts), or a live run
 // gets reaped between beats. Configurable only so tests can scale both down together.
@@ -239,7 +249,7 @@ export async function createGenerationWriter(
 
 	const materializeTimer = setInterval(() => {
 		void materialize();
-	}, MATERIALIZE_MS);
+	}, materializeMs());
 	materializeTimer.unref?.();
 
 	return {

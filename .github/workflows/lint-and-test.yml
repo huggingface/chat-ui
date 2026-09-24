@@ -82,6 +82,12 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 20
+    # The suite runs on one worker (see playwright.config.ts), so the only way to
+    # parallelise it is across jobs: each shard boots its own app and database.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
 
     steps:
       - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
@@ -117,12 +123,12 @@ jobs:
           fi
 
       - name: "Tests (e2e)"
-        run: npm run test:e2e
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
 
