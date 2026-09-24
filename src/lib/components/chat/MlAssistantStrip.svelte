@@ -227,9 +227,10 @@
 						onblur={() => (editingBudget = false)}
 						type="text"
 						inputmode="decimal"
+						placeholder=" "
 						autocomplete="off"
-						style:width={`${Math.max(budgetDraft.length, 1)}ch`}
-						class="ml-budget-input m-0 h-[13px] min-w-[1ch] border-0 bg-transparent p-0 text-right font-mono text-[13px] leading-none font-medium text-inherit tabular-nums outline-none"
+						style:width={budgetDraft ? `${budgetDraft.length}ch` : "1px"}
+						class="ml-budget-input m-0 h-[13px] border-0 bg-transparent p-0 text-right font-mono text-[13px] leading-none font-medium text-inherit tabular-nums outline-none"
 						aria-label="Compute budget in dollars, Enter to save"
 					/>
 					<span class="pl-1 text-[#a8a29e] dark:text-[#78716c]">left</span>
@@ -310,8 +311,10 @@
 
 	/* The field is chromeless; the underline is what says it is editable. Drawn
 	   as a shadow, not a border, so it adds no height and the figure stays on the
-	   same baseline as the "$" and "left" around it. */
-	.ml-budget-pill:focus-within :global(.ml-budget-input) {
+	   same baseline as the "$" and "left" around it. An emptied field (the
+	   single-space placeholder showing) shrinks to the caret with no underline,
+	   so nothing trails the "$". */
+	.ml-budget-pill:focus-within :global(.ml-budget-input:not(:placeholder-shown)) {
 		box-shadow: 0 1.5px 0 currentColor;
 		caret-color: currentColor;
 	}
