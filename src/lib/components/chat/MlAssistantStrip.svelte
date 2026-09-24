@@ -81,12 +81,12 @@
 	/**
 	 * The editor reads "$… left", so it edits what is left, not the total: typing
 	 * $0 after a run has spent a cent must mean "nothing more", not a total of $0
-	 * that leaves the ledger at -$0.01. Seeded with the same cents the readout shows.
+	 * that leaves the ledger at -$0.01. Seeded with the same cents the readout shows, spelled the same way ("1.20", not "1.2").
 	 */
 	function openBudgetEditor() {
 		if (!budget || !onbudgetchange) return;
 		const cents = Math.max(0, Math.ceil(remainingMicroUsd / 10_000));
-		budgetDraft = String(cents / 100);
+		budgetDraft = (cents / 100).toFixed(2);
 		initialDraft = budgetDraft;
 		editingBudget = true;
 	}

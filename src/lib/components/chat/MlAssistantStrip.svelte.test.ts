@@ -407,12 +407,12 @@ describe("MlAssistantStrip budget", () => {
 		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
 		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
-		expect(input.value).toBe("7.5");
+		expect(input.value).toBe("7.50");
 
-		input.value = "7.5a";
+		input.value = "7.50a";
 		input.dispatchEvent(new Event("input", { bubbles: true }));
 		await Promise.resolve();
-		expect(input.value).toBe("7.5");
+		expect(input.value).toBe("7.50");
 	});
 
 	it("keeps a pasted figure's cents, and caps the cleaned figure at the widest total", async () => {
@@ -484,7 +484,7 @@ describe("MlAssistantStrip budget", () => {
 		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
 		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
-		expect(input.value).toBe("5");
+		expect(input.value).toBe("5.00");
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 
