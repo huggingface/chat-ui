@@ -351,7 +351,7 @@ describe("MlAssistantStrip budget", () => {
 		);
 	});
 
-	it("commits an edited total on Enter", async () => {
+	it("commits an edited amount left on Enter, on top of what is spent and held", async () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
@@ -363,6 +363,7 @@ describe("MlAssistantStrip budget", () => {
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 
+		// Only the amount left goes up; the server adds spent and held.
 		expect(onbudgetchange).toHaveBeenCalledWith(25);
 		// The editor closes back to the readout.
 		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
@@ -406,12 +407,12 @@ describe("MlAssistantStrip budget", () => {
 		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
 		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
-		expect(input.value).toBe("10");
+		expect(input.value).toBe("7.50");
 
-		input.value = "10a";
+		input.value = "7.50a";
 		input.dispatchEvent(new Event("input", { bubbles: true }));
 		await Promise.resolve();
-		expect(input.value).toBe("10");
+		expect(input.value).toBe("7.50");
 	});
 
 	it("keeps a pasted figure's cents, and caps the cleaned figure at the widest total", async () => {
@@ -442,7 +443,7 @@ describe("MlAssistantStrip budget", () => {
 		expect(input.value).toBe("12345678");
 	});
 
-	it("commits zero, which pauses spend rather than abandoning the edit", async () => {
+	it("commits zero left, which pauses spend rather than abandoning the edit", async () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
@@ -451,6 +452,55 @@ describe("MlAssistantStrip budget", () => {
 		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
 		input.value = "0";
 		input.dispatchEvent(new Event("input", { bubbles: true }));
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		await Promise.resolve();
+
+		expect(onbudgetchange).toHaveBeenCalledWith(0);
+	});
+
+	it("lands on $0.00 left, not -$0.01, when zeroed under sub-cent spend", async () => {
+		const onbudgetchange = vi.fn();
+		const budget = { totalMicroUsd: 5_000_000, spentMicroUsd: 4_321, reservedMicroUsd: 0 };
+		const { container } = mount({ budget, onbudgetchange });
+
+		find(container, "button[aria-label^='Compute budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		input.value = "0";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		await Promise.resolve();
+
+		expect(onbudgetchange).toHaveBeenCalledWith(0);
+	});
+
+	it("seeds the editor with what is left, and an unchanged commit changes nothing", async () => {
+		const onbudgetchange = vi.fn();
+		// $5.00 total, a sub-cent spend: the readout rounds up to $5.00 left.
+		const budget = { totalMicroUsd: 5_000_000, spentMicroUsd: 4_321, reservedMicroUsd: 0 };
+		const { container } = mount({ budget, onbudgetchange });
+
+		find(container, "button[aria-label^='Compute budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		expect(input.value).toBe("5.00");
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		await Promise.resolve();
+
+		// Committing the rounded figure would have nudged the total up by the rounding.
+		expect(onbudgetchange).not.toHaveBeenCalled();
+	});
+
+	it("commits the prefilled zero when the balance is already negative", async () => {
+		const onbudgetchange = vi.fn();
+		// A total lowered under money already spent: -$0.50 left, opened as "0.00".
+		const budget = { totalMicroUsd: 1_000_000, spentMicroUsd: 1_500_000, reservedMicroUsd: 0 };
+		const { container } = mount({ budget, onbudgetchange });
+
+		find(container, "button[aria-label^='Compute budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		expect(input.value).toBe("0.00");
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 

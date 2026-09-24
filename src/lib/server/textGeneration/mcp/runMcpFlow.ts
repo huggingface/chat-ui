@@ -41,6 +41,8 @@ import {
 import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
+import { readMlBudget } from "$lib/server/mlBudget/budget";
+import { appendToLastToolMessage, budgetChangeNote } from "$lib/server/mlBudget/budgetNote";
 import { createRepeatedCallGuard } from "./repeatedCallGuard";
 import { withRepairedToolSchemas } from "$lib/server/mcp/schemaRepair";
 import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
@@ -177,6 +179,10 @@ export async function* runMcpFlow({
 					(locals as unknown as { token?: string } | undefined)?.token,
 			})
 		: undefined;
+
+	// The total the model was last told: the session-context line's, which the
+	// preprompt read from this same ledger after the turn-start settle.
+	let budgetTotalSeen = conv.mlBudget?.totalMicroUsd ?? 0;
 
 	// A job bills the namespace it runs under, so the billing setting travels as
 	// an argument rather than a header — see mcp/hubBilling.ts.
@@ -1129,6 +1135,19 @@ export async function* runMcpFlow({
 							assistantToolMessage,
 							...(event.summary.toolMessages ?? []),
 						];
+						if (budgetGuard) {
+							try {
+								const budget = await readMlBudget(conv._id);
+								const note = budgetChangeNote(budgetTotalSeen, budget);
+								if (note) {
+									messagesOpenAI = appendToLastToolMessage(messagesOpenAI, note);
+									budgetTotalSeen = budget?.totalMicroUsd ?? 0;
+								}
+							} catch (err) {
+								// The gate still reads the live ledger; only the model's view lags.
+								logger.warn({ err: String(err) }, "[mlBudget] mid-turn budget read failed");
+							}
+						}
 						toolMsgCount = event.summary.toolMessages?.length ?? 0;
 						toolRunCount = event.summary.toolRuns?.length ?? 0;
 						logger.info(

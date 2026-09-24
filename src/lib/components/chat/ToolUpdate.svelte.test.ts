@@ -46,3 +46,21 @@ describe("ToolUpdate progress lines", () => {
 		expect(progressRows(screen.baseElement as HTMLElement)).toEqual([line, line]);
 	});
 });
+
+describe("ToolUpdate status icon", () => {
+	const result = (status: "success" | "error") => ({
+		type: "tool",
+		subtype: "result",
+		uuid: "u1",
+		result: { status, call: call.call, outputs: [], message: "boom", display: true },
+	});
+	const icon = (el: Element, label: string) => el.querySelector(`svg[aria-label='${label}']`);
+
+	it("warns instead of checking when the result itself is an error", () => {
+		const { baseElement } = render(ToolUpdate, { tool: [call, result("error")] } as never);
+
+		expect(icon(baseElement, "Failed")).not.toBeNull();
+		expect(icon(baseElement, "Succeeded")).toBeNull();
+		expect(baseElement.textContent).toContain("Error calling tool");
+	});
+});
