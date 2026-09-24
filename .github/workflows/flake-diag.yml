@@ -1,0 +1,28 @@
+name: Flake diag (temporary)
+on:
+  pull_request:
+permissions: {}
+jobs:
+  diag:
+    if: github.head_ref == 'e2e-webkit-flake-diag'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
+      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - name: Repeat flaky test
+        env:
+          SCROLL_DIAG: "1"
+        run: npx playwright test tests/scroll-anchoring.spec.ts:89 --project=webkit --repeat-each=20 --retries=0 --reporter=list || true

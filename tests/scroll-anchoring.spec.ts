@@ -12,6 +12,65 @@ import { test, expect } from "./fixtures.ts";
 const CONTAINER = '[aria-label="Conversation messages"]';
 const ANCHOR_OFFSET_PX = 50;
 
+// TEMPORARY diagnostics for the webkit jump-button flake.
+test.beforeEach(async ({ page }) => {
+	if (!process.env.SCROLL_DIAG) return;
+	await page.addInitScript((selector: string) => {
+		const log: string[] = [];
+		(window as unknown as { __scrollLog: string[] }).__scrollLog = log;
+		const t = () => performance.now().toFixed(1);
+		const desc = Object.getOwnPropertyDescriptor(Element.prototype, "scrollTop");
+		if (desc?.set && desc.get) {
+			const get = desc.get;
+			const set = desc.set;
+			Object.defineProperty(Element.prototype, "scrollTop", {
+				configurable: true,
+				get() {
+					return get.call(this);
+				},
+				set(v: number) {
+					const before = get.call(this);
+					set.call(this, v);
+					if ((this as Element).matches?.(selector))
+						log.push(
+							`${t()} WRITE ${before.toFixed(1)} -> ${v.toFixed(1)} = ${get.call(this).toFixed(1)}`
+						);
+				},
+			});
+		}
+		const hook = () => {
+			const el = document.querySelector(selector);
+			if (!(el instanceof HTMLElement)) return void setTimeout(hook, 50);
+			el.addEventListener("scroll", () =>
+				log.push(
+					`${t()} SCROLL top=${el.scrollTop.toFixed(1)} h=${el.scrollHeight} ch=${el.clientHeight} anchor=${el.style.overflowAnchor}`
+				)
+			);
+			for (const type of ["wheel", "mousedown", "mouseup", "click", "focusin", "focusout"])
+				el.addEventListener(
+					type,
+					(e) => log.push(`${t()} ${type} target=${(e.target as Element).tagName}`),
+					true
+				);
+			new MutationObserver((m) => log.push(`${t()} MUT x${m.length}`)).observe(el, {
+				childList: true,
+				subtree: true,
+				characterData: true,
+			});
+		};
+		document.addEventListener("DOMContentLoaded", hook);
+	}, CONTAINER);
+});
+
+test.afterEach(async ({ page }, testInfo) => {
+	if (!process.env.SCROLL_DIAG || testInfo.status === testInfo.expectedStatus) return;
+	const log = await page.evaluate(
+		() => (window as unknown as { __scrollLog: string[] }).__scrollLog ?? []
+	);
+	const body = log.slice(-600).join("\n");
+	console.log(`SCROLL_DIAG_BEGIN\n${body}\nSCROLL_DIAG_END`);
+});
+
 /** Several viewports of history so the anchor position is reachable. The
  * seeded reply needs a terminal update, or the app reads it as a generation
  * still in flight and disables sending. */
@@ -179,6 +238,11 @@ test("read mode past the reservation, wheel-up stays put, the jump button re-eng
 	expect(later.scrollHeight).toBeGreaterThan(detached.scrollHeight);
 
 	// The jump-to-bottom button is the way back; it re-attaches to the live bottom.
+	await page.evaluate(() =>
+		(window as unknown as { __scrollLog?: string[] }).__scrollLog?.push(
+			`${performance.now().toFixed(1)} ---- CLICK JUMP ----`
+		)
+	);
 	await page.getByRole("button", { name: "Scroll to bottom" }).click();
 	await expect
 		.poll(
