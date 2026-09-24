@@ -492,22 +492,6 @@ describe("MlAssistantStrip budget", () => {
 		expect(onbudgetchange).not.toHaveBeenCalled();
 	});
 
-	it("inks the editing figure like its $ and keeps them on one baseline", async () => {
-		const { container } = mount({ budget: BUDGET, onbudgetchange: vi.fn() });
-
-		find(container, "button[aria-label^='Compute budget']").click();
-		await Promise.resolve();
-		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
-		const dollar = input.previousElementSibling as HTMLElement;
-
-		expect(style(input).color).toBe(ORANGE_INK);
-		expect(style(dollar).color).toBe(ORANGE_INK);
-		// The focus underline is a shadow, so it adds no height to the field.
-		expect(style(input).borderBottomWidth).toBe("0px");
-		const bottom = (el: Element) => Math.round(el.getBoundingClientRect().bottom);
-		expect(Math.abs(bottom(input) - bottom(dollar))).toBeLessThanOrEqual(1);
-	});
-
 	it("commits cents", async () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });

@@ -11,6 +11,7 @@
 	import { page } from "$app/state";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import LucideTriangleAlert from "~icons/lucide/triangle-alert";
+	import LucideCheck from "~icons/lucide/check";
 	import BlockWrapper from "./BlockWrapper.svelte";
 
 	interface Props {
@@ -23,7 +24,15 @@
 	let isOpen = $state(false);
 
 	let toolFnName = $derived(tool.find(isMessageToolCallUpdate)?.call.name);
-	let toolError = $derived(tool.some(isMessageToolErrorUpdate));
+	// A result can come back with an error status as well as a separate error
+	// update; either way the call failed and must not earn the checkmark.
+	let toolError = $derived(
+		tool.some(
+			(update) =>
+				isMessageToolErrorUpdate(update) ||
+				(isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error)
+		)
+	);
 	let toolDone = $derived(tool.some(isMessageToolResultUpdate));
 	let isExecuting = $derived(!toolDone && !toolError && loading);
 	let toolProgress = $derived.by(() => {
@@ -117,9 +126,17 @@
 			>
 				<!-- Errors here are often recoverable (the model retries or works around
 				     them), so the header stays in the same muted gray as every other
-				     state; the amber icon is the only signal until the row is expanded. -->
+				     state; the icon is the only signal until the row is expanded. -->
 				{#if toolError}
-					<LucideTriangleAlert class="size-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
+					<LucideTriangleAlert
+						class="size-3.5 shrink-0 text-amber-500 dark:text-amber-400"
+						aria-label="Failed"
+					/>
+				{:else if toolDone}
+					<LucideCheck
+						class="size-3.5 shrink-0 text-green-600 dark:text-green-400"
+						aria-label="Succeeded"
+					/>
 				{/if}
 				<span
 					class="shrink-0 text-sm font-medium transition-colors group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
