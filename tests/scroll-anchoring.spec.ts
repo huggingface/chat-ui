@@ -214,18 +214,34 @@ test("read mode past the reservation, wheel-up stays put, the jump button re-eng
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 	const beforeWheel = (await containerGeometry(page)).scrollTop;
 	await page.mouse.wheel(0, -400);
+	// WebKit's wheel animation can pause a full frame budget between steps, so
+	// "settled" means unchanged for a while, not two equal reads in a row.
 	let settled = await containerGeometry(page);
+	let settledSince = Date.now();
 	await expect
 		.poll(
 			async () => {
 				const now = await containerGeometry(page);
-				const stable = now.scrollTop === settled.scrollTop && now.scrollTop < beforeWheel;
-				settled = now;
-				return stable;
+				if (now.scrollTop !== settled.scrollTop) {
+					settled = now;
+					settledSince = Date.now();
+				}
+				return now.scrollTop < beforeWheel && Date.now() - settledSince >= 600;
 			},
-			{ timeout: 5_000, intervals: [150], message: "wheel moved the view and it settled" }
+			{ timeout: 5_000, intervals: [100], message: "wheel moved the view and it settled" }
 		)
 		.toBe(true);
+	const variant = process.env.DIAG_VARIANT ?? "0";
+	if (variant === "1") await page.waitForTimeout(1000);
+	if (variant === "2")
+		await page.evaluate(() => {
+			(window as unknown as { __diagScrollTo: boolean }).__diagScrollTo = true;
+		});
+	if (variant === "3")
+		await page.evaluate((selector: string) => {
+			const el = document.querySelector(selector);
+			if (el instanceof HTMLElement) el.scrollTop = el.scrollTop - 1;
+		}, CONTAINER);
 
 	const detached = await containerGeometry(page);
 	await page.waitForTimeout(700); // many more chunks arrive

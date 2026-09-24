@@ -295,7 +295,9 @@ export class StickToBottomController {
 		const clamped = Math.min(Math.max(top, 0), max);
 		const before = this.container.scrollTop;
 		if (Math.abs(before - clamped) < 0.5) return;
-		this.container.scrollTop = clamped;
+		if ((window as unknown as { __diagScrollTo?: boolean }).__diagScrollTo)
+			this.container.scrollTo({ top: clamped, behavior: "instant" });
+		else this.container.scrollTop = clamped;
 		// Move the baselines NOW: the scroll event for this write must read as
 		// zero movement, and if a user scroll lands in the same frame the
 		// browser coalesces both into one event at the user's final position —
