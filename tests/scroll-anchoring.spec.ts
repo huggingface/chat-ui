@@ -231,17 +231,6 @@ test("read mode past the reservation, wheel-up stays put, the jump button re-eng
 			{ timeout: 5_000, intervals: [100], message: "wheel moved the view and it settled" }
 		)
 		.toBe(true);
-	const variant = process.env.DIAG_VARIANT ?? "0";
-	if (variant === "1") await page.waitForTimeout(1000);
-	if (variant === "2")
-		await page.evaluate(() => {
-			(window as unknown as { __diagScrollTo: boolean }).__diagScrollTo = true;
-		});
-	if (variant === "3")
-		await page.evaluate((selector: string) => {
-			const el = document.querySelector(selector);
-			if (el instanceof HTMLElement) el.scrollTop = el.scrollTop - 1;
-		}, CONTAINER);
 
 	const detached = await containerGeometry(page);
 	await page.waitForTimeout(700); // many more chunks arrive
@@ -254,6 +243,32 @@ test("read mode past the reservation, wheel-up stays put, the jump button re-eng
 	expect(later.scrollHeight).toBeGreaterThan(detached.scrollHeight);
 
 	// The jump-to-bottom button is the way back; it re-attaches to the live bottom.
+	const variant = process.env.DIAG_VARIANT ?? "0";
+	if (variant === "1")
+		await page.evaluate((selector: string) => {
+			const el = document.querySelector(selector);
+			if (!(el instanceof HTMLElement)) return;
+			const prev = el.style.overflowY;
+			el.style.overflowY = "hidden";
+			void el.scrollHeight;
+			el.style.overflowY = prev;
+			void el.scrollHeight;
+		}, CONTAINER);
+	if (variant === "2") {
+		const size = page.viewportSize();
+		if (size) {
+			await page.setViewportSize({ width: size.width, height: size.height + 1 });
+			await page.setViewportSize(size);
+		}
+	}
+	if (variant === "3")
+		await page.evaluate(async (selector: string) => {
+			const el = document.querySelector(selector);
+			if (!(el instanceof HTMLElement)) return;
+			el.style.willChange = "transform";
+			await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+			el.style.willChange = "";
+		}, CONTAINER);
 	await page.evaluate(() =>
 		(window as unknown as { __scrollLog?: string[] }).__scrollLog?.push(
 			`${performance.now().toFixed(1)} ---- CLICK JUMP ----`
