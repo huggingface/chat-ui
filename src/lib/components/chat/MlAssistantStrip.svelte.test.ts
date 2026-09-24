@@ -363,8 +363,8 @@ describe("MlAssistantStrip budget", () => {
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 
-		// $1.50 spent and $1.00 held stay committed under the $25 left.
-		expect(onbudgetchange).toHaveBeenCalledWith(27.5);
+		// Only the amount left goes up; the server adds spent and held.
+		expect(onbudgetchange).toHaveBeenCalledWith(25);
 		// The editor closes back to the readout.
 		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
 	});
@@ -455,8 +455,7 @@ describe("MlAssistantStrip budget", () => {
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 
-		// A total of exactly what is spent and held: nothing left, never below it.
-		expect(onbudgetchange).toHaveBeenCalledWith(2.5);
+		expect(onbudgetchange).toHaveBeenCalledWith(0);
 	});
 
 	it("lands on $0.00 left, not -$0.01, when zeroed under sub-cent spend", async () => {
@@ -472,7 +471,7 @@ describe("MlAssistantStrip budget", () => {
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 
-		expect(onbudgetchange).toHaveBeenCalledWith(0.004321);
+		expect(onbudgetchange).toHaveBeenCalledWith(0);
 	});
 
 	it("seeds the editor with what is left, and an unchanged commit changes nothing", async () => {
@@ -505,7 +504,7 @@ describe("MlAssistantStrip budget", () => {
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 
-		expect(onbudgetchange).toHaveBeenCalledWith(1.5);
+		expect(onbudgetchange).toHaveBeenCalledWith(0);
 	});
 
 	it("commits cents", async () => {
@@ -520,7 +519,7 @@ describe("MlAssistantStrip budget", () => {
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 
-		expect(onbudgetchange).toHaveBeenCalledWith(4);
+		expect(onbudgetchange).toHaveBeenCalledWith(1.5);
 	});
 
 	it("abandons an empty or over-ceiling figure instead of committing it", async () => {
@@ -539,8 +538,6 @@ describe("MlAssistantStrip budget", () => {
 
 		await type("");
 		await type("10001");
-		// Under the ceiling as typed, over it once the $2.50 committed is added.
-		await type("9999");
 		expect(onbudgetchange).not.toHaveBeenCalled();
 	});
 

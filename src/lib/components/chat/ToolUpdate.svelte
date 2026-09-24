@@ -126,15 +126,18 @@
 			>
 				<!-- Errors here are often recoverable (the model retries or works around
 				     them), so the header stays in the same muted gray as every other
-				     state; the icon is the only signal until the row is expanded. -->
+				     state; the icon is the only signal until the row is expanded.
+				     role="img" is what gets a bare svg's aria-label announced. -->
 				{#if toolError}
 					<LucideTriangleAlert
 						class="size-3.5 shrink-0 text-amber-500 dark:text-amber-400"
+						role="img"
 						aria-label="Failed"
 					/>
 				{:else if toolDone}
 					<LucideCheck
 						class="size-3.5 shrink-0 text-green-600 dark:text-green-400"
+						role="img"
 						aria-label="Succeeded"
 					/>
 				{/if}

@@ -2,7 +2,7 @@
 	import MlAssistantPlanProgress from "./MlAssistantPlanProgress.svelte";
 	import { ML_ASSISTANT_TOOLS } from "$lib/constants/mlAssistant";
 	import type { MlBudgetSnapshot, MlPlanStep } from "$lib/types/MlAssistant";
-	import { formatMicroUsd, formatMicroUsdCompact, MICRO_USD_PER_USD } from "$lib/utils/mlBudget";
+	import { formatMicroUsd, formatMicroUsdCompact } from "$lib/utils/mlBudget";
 	import IconSparkline from "../icons/IconSparkline.svelte";
 	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
@@ -16,8 +16,8 @@
 		complete: boolean;
 		/** Compute budget ledger; absent means the conversation carries none. */
 		budget?: MlBudgetSnapshot;
-		/** Commits a new budget total in USD (micro-dollar precision). Absent makes the readout static. */
-		onbudgetchange?: (totalUsd: number) => void;
+		/** Commits a new amount left in USD, cents included; the server adds spent and held. Absent makes the readout static. */
+		onbudgetchange?: (leftUsd: number) => void;
 		/** The run's newest Trackio dashboard, if it has named one. */
 		dashboard?: TrackioDashboard;
 	}
@@ -117,11 +117,11 @@
 		// no-op: it is how the user lifts the ledger back to exactly zero left.
 		const unchanged = draft === initialDraft && remainingMicroUsd >= 0;
 		if (!budget || !draft || unchanged || !Number.isFinite(leftUsd) || leftUsd < 0) return;
-		// Spent and held money stays committed; the new total sits on top of it.
-		const committedMicroUsd = budget.spentMicroUsd + budget.reservedMicroUsd;
-		const totalMicroUsd = Math.round(leftUsd * 100) * 10_000 + committedMicroUsd;
-		if (totalMicroUsd > MAX_BUDGET_USD * MICRO_USD_PER_USD) return;
-		onbudgetchange?.(totalMicroUsd / MICRO_USD_PER_USD);
+		// Only the figure goes up: the server adds spent and held against its live
+		// ledger, which a snapshot here could lag. Its own ceiling check covers the
+		// total, so this one only bounds what was typed.
+		if (leftUsd > MAX_BUDGET_USD) return;
+		onbudgetchange?.(Math.round(leftUsd * 100) / 100);
 	}
 
 	/** The editor exists only while open, so focus belongs to mount. */
