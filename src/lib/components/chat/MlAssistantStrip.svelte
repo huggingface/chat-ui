@@ -34,7 +34,23 @@
 	let dashboardStatus = $derived(
 		dashboard?.spaceId ? trackioStatus.status(dashboard.url) : ("live" as const)
 	);
-	let dashboardLive = $derived(dashboardStatus === "live");
+	// Openable unless the Hub has said otherwise: a status lookup that failed
+	// (rate limit, Hub error) must not lock the user out of a dashboard that may
+	// be up — the pane shows its own "starting" state until the frame paints.
+	let dashboardLive = $derived(dashboardStatus === "live" || dashboardStatus === "unknown");
+	// The button toggles: a second click on the dashboard it opened closes it.
+	let dashboardShowing = $derived(
+		!!dashboard &&
+			sidePane.open &&
+			sidePane.view === "trackio" &&
+			sidePane.trackio?.url === dashboard.url
+	);
+
+	function toggleDashboard() {
+		if (!dashboard || !dashboardLive) return;
+		if (dashboardShowing) sidePane.close();
+		else sidePane.openTrackio(dashboard.url, dashboard.label);
+	}
 
 	let remainingMicroUsd = $derived(
 		budget ? budget.totalMicroUsd - budget.spentMicroUsd - budget.reservedMicroUsd : 0
@@ -179,15 +195,18 @@
 						? "cursor-pointer hover:bg-black/5 hover:text-[#1c1917] dark:hover:bg-white/[.07] dark:hover:text-[#f5f5f4]"
 						: "cursor-default opacity-60",
 				]}
-				title={dashboardLive
-					? `Open the training dashboard: ${dashboard.label}`
-					: dashboardStatus === "failed"
-						? "The training dashboard never came up"
-						: "The training dashboard starts with the run"}
+				title={dashboardShowing
+					? `Close the training dashboard: ${dashboard.label}`
+					: dashboardLive
+						? `Open the training dashboard: ${dashboard.label}`
+						: dashboardStatus === "failed"
+							? "The training dashboard never came up"
+							: "The training dashboard starts with the run"}
 				aria-label={dashboardLive
-					? `Open the training dashboard: ${dashboard.label}`
+					? `Training dashboard: ${dashboard.label}`
 					: "Training dashboard, still starting"}
-				onclick={() => dashboardLive && sidePane.openTrackio(dashboard.url, dashboard.label)}
+				aria-pressed={dashboardLive ? dashboardShowing : undefined}
+				onclick={toggleDashboard}
 			>
 				<IconSparkline
 					classNames="size-[14px] shrink-0 {dashboardStatus === 'building' ? 'animate-pulse' : ''}"

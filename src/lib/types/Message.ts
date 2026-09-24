@@ -1,3 +1,4 @@
+import type { TrackioDashboardView } from "$lib/utils/trackioView";
 import type { InferenceProvider } from "@huggingface/inference";
 import type { MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
@@ -30,6 +31,8 @@ export type Message = Partial<Timestamps> & {
 	 * or the hash of the file stored on the server
 	 **/
 	files?: MessageFile[];
+	/** Trackio dashboard views the user attached to this message (ML Intern). */
+	dashboardViews?: TrackioDashboardView[];
 	interrupted?: boolean;
 
 	// Router metadata when using llm-router

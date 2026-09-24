@@ -8,6 +8,7 @@ import { createResearchTool } from "./researchTool";
 import { createSandboxTool } from "./sandboxTool";
 import { createJobCheckTool } from "./jobCheckTool";
 import { createTrackioTool } from "./createTrackioTool";
+import { createReadTrackioTool } from "./readTrackioTool";
 import type { BuiltinTool } from "./types";
 
 export type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
@@ -16,6 +17,7 @@ export { RESEARCH_TOOL_NAME, isResearchTool } from "./researchTool";
 export { SANDBOX_TOOL_NAME, isSandboxTool } from "./sandboxTool";
 export { JOB_CHECK_TOOL_NAME, isJobCheckTool } from "./jobCheckTool";
 export { CREATE_TRACKIO_TOOL_NAME } from "./createTrackioTool";
+export { READ_TRACKIO_TOOL_NAME } from "./readTrackioTool";
 export { isNestedAgentTool } from "./nestedAgent";
 
 /**
@@ -25,9 +27,12 @@ export { isNestedAgentTool } from "./nestedAgent";
  * mode) there are no builtin tools at all.
  */
 export function getEnabledBuiltinTools(params: {
-	conv: Pick<Conversation, "_id" | "plan" | "mlAssistant">;
+	conv: Pick<Conversation, "_id" | "plan" | "mlAssistant"> &
+		Partial<Pick<Conversation, "messages">>;
 	/** Hub namespace to name a Trackio Space in; absent when the run has no user. */
 	namespace?: string;
+	/** The user's Hub token, for reading a private dashboard. */
+	hfToken?: string;
 }): BuiltinTool[] {
 	if (!isMlAssistantConversation(params.conv)) return [];
 	// The GitHub tools carry a second condition of their own — they withhold
@@ -44,6 +49,10 @@ export function getEnabledBuiltinTools(params: {
 		createSandboxTool(),
 		createJobCheckTool(),
 		createTrackioTool(() => params.namespace),
+		createReadTrackioTool(
+			() => params.conv.messages ?? [],
+			() => params.hfToken
+		),
 	];
 }
 

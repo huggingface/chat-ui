@@ -1,11 +1,18 @@
 import { logger } from "$lib/server/logger";
 
-/** Hub runtime stages that mean the dashboard can be framed. */
-const LIVE_STAGES = new Set(["RUNNING", "RUNNING_APP_STARTING", "RUNNING_BUILDING"]);
+/**
+ * Hub runtime stages that mean the dashboard can be framed. A sleeping Space
+ * counts: framing it is what wakes it.
+ */
+const LIVE_STAGES = new Set(["RUNNING", "RUNNING_APP_STARTING", "RUNNING_BUILDING", "SLEEPING"]);
 /** Stages from which it will never become live without someone intervening. */
 const DEAD_STAGES = new Set(["BUILD_ERROR", "RUNTIME_ERROR", "CONFIG_ERROR", "PAUSED", "STOPPED"]);
 
-export type TrackioSpaceStatus = "missing" | "building" | "live" | "failed";
+/**
+ * `unknown` is a lookup that failed (rate limit, Hub error), not a Space that
+ * did: the dashboard may be fine, so it stays openable and polling continues.
+ */
+export type TrackioSpaceStatus = "missing" | "building" | "live" | "failed" | "unknown";
 
 /**
  * Space names must be unique per project and stable across a conversation, so
@@ -61,7 +68,7 @@ export async function fetchTrackioSpaceStatus(
 		if (response.status === 404) return "missing";
 		if (!response.ok) {
 			logger.warn({ spaceId, status: response.status }, "[trackio] space status lookup failed");
-			return "building";
+			return "unknown";
 		}
 		const stage = ((await response.json()) as SpaceRuntime).runtime?.stage ?? "";
 		if (LIVE_STAGES.has(stage)) return "live";
@@ -70,6 +77,6 @@ export async function fetchTrackioSpaceStatus(
 	} catch (err) {
 		// A lookup that failed is not a Space that failed; the caller polls again.
 		logger.warn({ err, spaceId }, "[trackio] space status lookup threw");
-		return "building";
+		return "unknown";
 	}
 }

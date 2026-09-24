@@ -2,6 +2,7 @@ import type { Message } from "$lib/types/Message";
 import type { EndpointMessage } from "./endpoints";
 import { downloadFile } from "../files/downloadFile";
 import type { ObjectId } from "mongodb";
+import { withTrackioViewContext } from "$lib/utils/trackioView";
 
 export async function preprocessMessages(
 	messages: Message[],
@@ -10,6 +11,7 @@ export async function preprocessMessages(
 	return Promise.resolve(messages)
 		.then((msgs) => downloadFiles(msgs, convId))
 		.then((msgs) => injectClipboardFiles(msgs))
+		.then(injectTrackioViews)
 		.then(stripEmptyInitialSystemMessage);
 }
 
@@ -38,6 +40,15 @@ async function injectClipboardFiles(messages: EndpointMessage[]) {
 				files: message.files?.filter((file) => file.mime !== "application/vnd.chatui.clipboard"),
 			};
 		})
+	);
+}
+
+/** A user message's attached dashboard views become text the model reads with it. */
+function injectTrackioViews(messages: EndpointMessage[]): EndpointMessage[] {
+	return messages.map((message) =>
+		message.from === "user" && message.dashboardViews?.length
+			? { ...message, content: withTrackioViewContext(message.content, message.dashboardViews) }
+			: message
 	);
 }
 

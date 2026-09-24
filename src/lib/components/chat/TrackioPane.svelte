@@ -11,6 +11,10 @@
 	import CarbonCloseLarge from "~icons/carbon/close-large";
 	import CarbonLaunch from "~icons/carbon/launch";
 	import CarbonRenew from "~icons/carbon/renew";
+	import LucideMessageSquarePlus from "~icons/lucide/message-square-plus";
+	import { pendingComposerPayload } from "$lib/stores/pendingComposerPayload";
+	import { useIsDesktop } from "$lib/utils/isDesktop.svelte";
+	import { parseTrackioView, TRACKIO_VIEW_PROTOCOL } from "$lib/utils/trackioView";
 
 	/**
 	 * Live Trackio dashboard for a training run, framed in the side pane.
@@ -78,7 +82,7 @@
 	let frameUrl = $derived.by(() => {
 		if (!dashboard) return undefined;
 		try {
-			const url = new URL(dashboard.url);
+			const url = new URL(dashboard.viewUrl ?? dashboard.url);
 			url.searchParams.set("sidebar", "hidden");
 			url.searchParams.set("__theme", isDark ? "dark" : "light");
 			return url.toString();
@@ -93,25 +97,138 @@
 	 * the frame is showing a build page that will never become the app.
 	 */
 	let reloadNonce = $state(0);
+
+	/**
+	 * "Add to chat". Trackio 0.39+ announces itself to the page framing it
+	 * (`ready`) and answers `getState` with its current view; older dashboards
+	 * stay silent, so the button only appears once one has spoken. Messages count
+	 * only from this frame's window at the dashboard's own origin.
+	 */
+	let frame = $state<HTMLIFrameElement>();
+	let viewReady = $state(false);
+	let capturing = $state(false);
+	let captureError = $state<string | null>(null);
+	let dashboardOrigin = $derived.by(() => {
+		try {
+			return dashboard ? new URL(dashboard.url).origin : undefined;
+		} catch {
+			return undefined;
+		}
+	});
+
+	const isDesktop = useIsDesktop();
+	const STATE_TIMEOUT_MS = 2000;
+	let requestSeq = 0;
+	const waiting = new Map<number, (state: unknown) => void>();
+
+	$effect(() => {
+		// A new frame is a new document: nothing it said before counts.
+		void frameUrl;
+		void reloadNonce;
+		viewReady = false;
+		captureError = null;
+	});
+
+	$effect(() => {
+		const onMessage = (event: MessageEvent) => {
+			if (!frame || event.source !== frame.contentWindow || event.origin !== dashboardOrigin)
+				return;
+			const msg = event.data as {
+				protocol?: unknown;
+				type?: unknown;
+				id?: unknown;
+				state?: unknown;
+			};
+			if (!msg || msg.protocol !== TRACKIO_VIEW_PROTOCOL) return;
+			viewReady = true;
+			if (typeof msg.id !== "number") return;
+			const resolve = waiting.get(msg.id);
+			if (!resolve) return;
+			waiting.delete(msg.id);
+			resolve(msg.type === "state" ? msg.state : null);
+		};
+		window.addEventListener("message", onMessage);
+		return () => window.removeEventListener("message", onMessage);
+	});
+
+	function requestViewState(): Promise<unknown> {
+		const target = frame?.contentWindow;
+		if (!target || !dashboardOrigin) return Promise.resolve(null);
+		const id = ++requestSeq;
+		const origin = dashboardOrigin;
+		return new Promise((resolve) => {
+			const timer = setTimeout(() => {
+				waiting.delete(id);
+				resolve(null);
+			}, STATE_TIMEOUT_MS);
+			waiting.set(id, (state) => {
+				clearTimeout(timer);
+				resolve(state);
+			});
+			target.postMessage({ protocol: TRACKIO_VIEW_PROTOCOL, type: "getState", id }, origin);
+		});
+	}
+
+	/** Covers a `ready` sent before this pane was listening. */
+	function probeOnLoad() {
+		if (!viewReady) void requestViewState();
+	}
+
+	async function addViewToChat() {
+		if (!dashboard || capturing) return;
+		capturing = true;
+		captureError = null;
+		try {
+			const raw = await requestViewState();
+			const view = raw ? parseTrackioView(raw, dashboard.url) : null;
+			if (!view) {
+				captureError = "The dashboard did not answer. Try again once it has loaded.";
+				return;
+			}
+			pendingComposerPayload.set({ dashboardViews: [view] });
+			// On mobile the pane overlays the chat; close it so the chip is visible.
+			if (!isDesktop.current) sidePane.close();
+		} finally {
+			capturing = false;
+		}
+	}
 </script>
 
 {#if sidePane.open && sidePane.view === "trackio" && dashboard}
 	<SidePane label="Training dashboard">
 		{#snippet children(resizing)}
 			<header
-				class="relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
+				class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
 			>
 				<PaneItemNav {items} />
 				<div class="flex min-w-0 flex-1 items-baseline gap-2">
-					<h2 class="flex-none text-sm font-semibold text-gray-800 dark:text-gray-200">
+					<h2 class="min-w-0 truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
 						Training dashboard
 					</h2>
-					<span class="truncate font-mono text-xs text-gray-400 dark:text-gray-500">
+					<span
+						class="truncate font-mono text-xs text-gray-400 @max-[380px]:hidden dark:text-gray-500"
+					>
 						{dashboard.label}
 					</span>
 				</div>
 
 				<div class="flex flex-none items-center gap-0.5 text-gray-500 dark:text-gray-400">
+					{#if viewReady}
+						<button
+							type="button"
+							class="mr-1 btn gap-1.5 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:border-[#c4511a]/40 hover:text-[#c4511a] disabled:opacity-60 dark:border-gray-700 dark:text-gray-300 dark:hover:border-[#f0a468]/40 dark:hover:text-[#f0a468]"
+							title={captureError ??
+								"Attach what you are looking at — runs, zoomed range, charts on screen — to your next message"}
+							aria-label="Add to chat"
+							disabled={capturing}
+							onclick={addViewToChat}
+						>
+							<LucideMessageSquarePlus class="size-3.5" />
+							<!-- The pane can be dragged narrow on any screen, so its own width
+							     decides, not the viewport's. -->
+							<span class="hidden @min-[420px]:inline">Add to chat</span>
+						</button>
+					{/if}
 					<button
 						type="button"
 						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
@@ -180,6 +297,8 @@
 						title="Trackio dashboard"
 						class="relative h-full w-full {resizing ? 'pointer-events-none' : ''}"
 						src={frameUrl}
+						bind:this={frame}
+						onload={probeOnLoad}
 						sandbox={TRACKIO_FRAME_SANDBOX}
 						allowfullscreen
 						referrerpolicy="no-referrer"

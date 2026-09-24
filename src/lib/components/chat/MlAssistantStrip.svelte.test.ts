@@ -2,6 +2,7 @@ import MlAssistantStrip from "./MlAssistantStrip.svelte";
 import { render } from "vitest-browser-svelte";
 import { describe, expect, it, vi } from "vitest";
 import type { MlPlanStep } from "$lib/types/MlAssistant";
+import { sidePane } from "$lib/stores/sidePane.svelte";
 
 /**
  * The design handoff pins exact colours, sizes and timings, so these assert
@@ -546,5 +547,22 @@ describe("MlAssistantStrip budget", () => {
 		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
 		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
+	});
+});
+
+describe("MlAssistantStrip dashboard button", () => {
+	it("opens the dashboard, and closes it on a second click", async () => {
+		sidePane.reset();
+		const { container } = mount({ dashboard: DASHBOARD });
+		const button = find(container, "button[aria-label^='Training dashboard']");
+
+		button.click();
+		await Promise.resolve();
+		expect(sidePane.open).toBe(true);
+		expect(sidePane.trackio?.url).toBe(DASHBOARD.url);
+
+		button.click();
+		await Promise.resolve();
+		expect(sidePane.open).toBe(false);
 	});
 });

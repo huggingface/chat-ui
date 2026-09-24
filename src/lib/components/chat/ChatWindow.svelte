@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy, untrack } from "svelte";
+	import { onDestroy, tick, untrack } from "svelte";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import TrackioPane from "./TrackioPane.svelte";
@@ -49,6 +49,8 @@
 	import ShareConversationModal from "../ShareConversationModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import UploadedFile from "./UploadedFile.svelte";
+	import TrackioViewChip from "./TrackioViewChip.svelte";
+	import { MAX_VIEWS_PER_MESSAGE, type TrackioDashboardView } from "$lib/utils/trackioView";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { error } from "$lib/stores/errors";
 	import ModelSwitch from "./ModelSwitch.svelte";
@@ -112,6 +114,8 @@
 		models: Model[];
 		preprompt?: string | undefined;
 		files?: File[];
+		/** Trackio dashboard views attached to the next message. */
+		dashboardViews?: TrackioDashboardView[];
 		onmessage?: (content: string) => void;
 		onstop?: () => void;
 		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
@@ -130,6 +134,7 @@
 		models,
 		preprompt = undefined,
 		files = $bindable([]),
+		dashboardViews = $bindable([]),
 		draft = $bindable(""),
 		onmessage,
 		onstop,
@@ -298,18 +303,21 @@
 		if (requireAuthUser() || loading) return false;
 		tap();
 		chatScroll.notifySend();
-		// Queued attachments belong to the user's next message, not to this
+		// Queued attachments (and dashboard views) belong to the user's next message, not to this
 		// machine-composed one. The send handler snapshots the bound `files`
 		// synchronously before its first await, so emptying around the call is
 		// enough to keep them out of the request — and it skips clearing them
 		// post-send when it consumed none (see writeMessage), so the restored
 		// queue survives.
 		const queuedFiles = files;
+		const queuedViews = dashboardViews;
 		files = [];
+		dashboardViews = [];
 		try {
 			onmessage?.(text);
 		} finally {
 			files = queuedFiles;
+			dashboardViews = queuedViews;
 		}
 		return true;
 	}
@@ -433,15 +441,16 @@
 		});
 	});
 
-	// Conversation switch also resets the artifact panel. This used to
+	// Conversation switch swaps the side pane to the destination's own state:
+	// closed for one not visited yet, or as the user left it. This used to
 	// piggyback on a first-message-id heuristic that misfired when the first
 	// message was edited; the route param is the real signal.
 	let prevConversationKey = page.params?.id;
 	$effect(() => {
 		const key = page.params?.id;
 		if (key !== prevConversationKey) {
+			sidePane.switchConversation(prevConversationKey, key);
 			prevConversationKey = key;
-			sidePane.reset();
 		}
 	});
 
@@ -536,6 +545,7 @@
 	);
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
+	let composerForm = $state<HTMLFormElement>();
 
 	// --- ML Assistant mode (build flag, see $lib/utils/mlAssistantFlag) --------
 
@@ -734,6 +744,18 @@
 		if (pending.text) {
 			const currentDraft = untrack(() => draft);
 			draft = currentDraft.trim() ? `${currentDraft}\n\n${pending.text}` : pending.text;
+		}
+		if (pending.dashboardViews?.length) {
+			dashboardViews = [...untrack(() => dashboardViews), ...pending.dashboardViews].slice(
+				-MAX_VIEWS_PER_MESSAGE
+			);
+			// Straight to typing the question about it; not on touch, where
+			// focusing raises the keyboard over the chip.
+			if (!isVirtualKeyboard()) {
+				void tick().then(() =>
+					composerForm?.querySelector("textarea")?.focus({ preventScroll: true })
+				);
+			}
 		}
 		pendingComposerPayload.set(undefined);
 	});
@@ -1118,6 +1140,7 @@
 					{/if}
 				</div>
 				<form
+					bind:this={composerForm}
 					tabindex="-1"
 					aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
 					onsubmit={(e) => {
@@ -1144,6 +1167,21 @@
 							onbudgetchange={page.params?.id ? changeMlBudget : undefined}
 							dashboard={trackioDashboards.at(-1)}
 						/>
+					{/if}
+					{#if dashboardViews.length}
+						<!-- Inside the box, above the text: these go with the message typed
+						     below them, unlike uploads, which sit outside. -->
+						<div class="flex flex-wrap gap-1.5 px-3 pt-2.5" data-exclude-from-copy>
+							{#each dashboardViews as view, index (view.capturedAt + index)}
+								<TrackioViewChip
+									{view}
+									onopen={() => sidePane.openTrackio(view.dashboardUrl, view.project, view.viewUrl)}
+									onremove={() => {
+										dashboardViews = dashboardViews.filter((_, i) => i !== index);
+									}}
+								/>
+							{/each}
+						</div>
 					{/if}
 					<!-- The composer box is a column so the ML Assistant strip can stack on
 					     top; this row is the composer proper and keeps its own layout. -->
