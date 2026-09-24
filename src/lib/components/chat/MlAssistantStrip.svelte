@@ -113,9 +113,10 @@
 		// Zero is a real setting — it pauses spend without discarding the ledger —
 		// so only an empty field, a bare ".", or an unchanged figure abandons. An
 		// unchanged commit would otherwise nudge the total by the readout's rounding.
-		if (!budget || !draft || draft === initialDraft || !Number.isFinite(leftUsd) || leftUsd < 0) {
-			return;
-		}
+		// A negative balance opens clamped to "0.00", and that commit is not a
+		// no-op: it is how the user lifts the ledger back to exactly zero left.
+		const unchanged = draft === initialDraft && remainingMicroUsd >= 0;
+		if (!budget || !draft || unchanged || !Number.isFinite(leftUsd) || leftUsd < 0) return;
 		// Spent and held money stays committed; the new total sits on top of it.
 		const committedMicroUsd = budget.spentMicroUsd + budget.reservedMicroUsd;
 		const totalMicroUsd = Math.round(leftUsd * 100) * 10_000 + committedMicroUsd;

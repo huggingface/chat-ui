@@ -492,6 +492,22 @@ describe("MlAssistantStrip budget", () => {
 		expect(onbudgetchange).not.toHaveBeenCalled();
 	});
 
+	it("commits the prefilled zero when the balance is already negative", async () => {
+		const onbudgetchange = vi.fn();
+		// A total lowered under money already spent: -$0.50 left, opened as "0.00".
+		const budget = { totalMicroUsd: 1_000_000, spentMicroUsd: 1_500_000, reservedMicroUsd: 0 };
+		const { container } = mount({ budget, onbudgetchange });
+
+		find(container, "button[aria-label^='Compute budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		expect(input.value).toBe("0.00");
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		await Promise.resolve();
+
+		expect(onbudgetchange).toHaveBeenCalledWith(1.5);
+	});
+
 	it("commits cents", async () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });
