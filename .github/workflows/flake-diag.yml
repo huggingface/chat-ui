@@ -25,4 +25,4 @@ jobs:
       - name: Repeat flaky test
         env:
           SCROLL_DIAG: "1"
-        run: npx playwright test tests/scroll-anchoring.spec.ts:89 --project=webkit --repeat-each=20 --retries=0 --reporter=list || true
+        run: npx playwright test tests/scroll-anchoring.spec.ts -g "jump button re-engages" --project=webkit --repeat-each=20 --retries=0 --reporter=list || true
