@@ -63,12 +63,12 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.afterEach(async ({ page }, testInfo) => {
-	if (!process.env.SCROLL_DIAG || testInfo.status === testInfo.expectedStatus) return;
+	if (!process.env.SCROLL_DIAG) return;
 	const log = await page.evaluate(
 		() => (window as unknown as { __scrollLog: string[] }).__scrollLog ?? []
 	);
 	const body = log.slice(-600).join("\n");
-	console.log(`SCROLL_DIAG_BEGIN\n${body}\nSCROLL_DIAG_END`);
+	console.log(`SCROLL_DIAG_BEGIN status=${testInfo.status}\n${body}\nSCROLL_DIAG_END`);
 });
 
 /** Several viewports of history so the anchor position is reachable. The
