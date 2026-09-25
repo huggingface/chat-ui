@@ -34,9 +34,19 @@ export interface MlService extends Timestamps {
 	origin: MlRegistryOrigin;
 	startedAt?: Date;
 	endedAt?: Date;
-	/** poller bookkeeping, declared now so the poller adds no migration */
+	/** poller bookkeeping, a row with no nextPollAt is finished, stopped or waiting for a token */
 	lastPolledAt?: Date;
 	nextPollAt?: Date;
+	/** one entry per stage change the poller saw, newest last, capped */
+	stageHistory?: { stage: string; at: Date }[];
+	/** consecutive failed lookups, cleared by a successful one */
+	pollFailures?: number;
+	/** set when the poller gave the row up for good */
+	pollStoppedReason?: string;
+	/** since when no usable hub token could be found for the conversation, cleared on the next poll */
+	tokenMissingSince?: Date;
+	/** the stage the model was last told about, written by the event path, never by the poller */
+	lastReportedStage?: string;
 	/** the budget reservation key, generationId:callUuid */
 	reservationKey?: string;
 	hubUrl: string;
