@@ -49,7 +49,8 @@ export class MlRegistryStore {
 
 	get summary(): MlRegistrySummary {
 		return {
-			rows: this.services.length + this.artefacts.length + this.files.length,
+			// files join the count once the pane lists them
+			rows: this.services.length + this.artefacts.length,
 			open: this.openServices.length,
 			running: this.services.filter((service) => service.stage === "RUNNING").length,
 		};

@@ -64,7 +64,8 @@ describe("mlRegistry store", () => {
 
 	it("fetches once on watch and reports the payload", async () => {
 		const net = fakeFetch();
-		net.answer(payload([service()]));
+		const file = { name: "train.py", version: 1, size: 3, updatedAt: new Date(0) };
+		net.answer({ ...payload([service()]), files: [file] });
 		const store = new MlRegistryStore(net.fetcher);
 
 		store.watch("conv-1", { live: false });
@@ -75,6 +76,8 @@ describe("mlRegistry store", () => {
 		expect(store.loaded).toBe(true);
 		expect(store.services).toHaveLength(1);
 		expect(store.services[0].createdAt).toBeInstanceOf(Date);
+		expect(store.files).toEqual([file]);
+		// the pane does not list files yet, so they do not make the control appear
 		expect(store.summary).toEqual({ rows: 1, open: 1, running: 1 });
 	});
 
