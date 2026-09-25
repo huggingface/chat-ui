@@ -222,7 +222,7 @@ describe.sequential("GET /api/v2/conversations/[id]/registry", () => {
 		expect(settled).not.toHaveProperty("heldMicroUsd");
 	});
 
-	it("lists the conversation's sub-agent runs without their calls or summary, and its sources", async () => {
+	it("lists the conversation's research runs without their calls or summary, and its sources", async () => {
 		const { locals } = await createTestUser();
 		const conv = await createTestConversation(locals);
 		const other = await createTestConversation(locals);
@@ -244,6 +244,18 @@ describe.sequential("GET /api/v2/conversations/[id]/registry", () => {
 			},
 		]);
 		await run.finish({ status: "completed", summary: "found it", iterations: 1 });
+		for (const [label, tool] of [
+			["sandbox", "sandbox_task"],
+			["job-check", "check_job"],
+		]) {
+			await startAgentRun({
+				conversationId: conv._id,
+				label,
+				displayName: label,
+				task: "t",
+				parent: { tool, toolUuid: `${tool}-1` },
+			}).finish({ status: "completed", summary: "s", iterations: 1 });
+		}
 		await recordSources(other._id, PARENT_READER, [
 			{ url: "https://example.com", group: "example.com", kind: "web", opened: true },
 		]);

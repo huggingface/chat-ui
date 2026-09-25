@@ -332,10 +332,6 @@
 				<span
 					class="ml-service-meta mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-xs text-[#78716c] dark:text-[#a8a29e]"
 				>
-					<span title="Started by the {run.parent.tool} call">
-						via <span class="font-mono">{run.parent.tool}</span>
-					</span>
-					<span aria-hidden="true">·</span>
 					<span class="tabular-nums">{plural(run.callCount, "call")}</span>
 					{#if elapsed}
 						<span aria-hidden="true">·</span>
@@ -575,8 +571,7 @@
 					</h3>
 					{#if serviceRows.length === 0}
 						<p class="ml-registry-empty">
-							No jobs, sandboxes or sub-agent runs yet. They appear here as the intern launches
-							them.
+							No jobs, sandboxes or research runs yet. They appear here as the intern launches them.
 						</p>
 					{:else}
 						{#if settled.active.length}

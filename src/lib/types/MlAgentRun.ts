@@ -25,7 +25,7 @@ export interface MlAgentRunCall {
 }
 
 /**
- * one sub-agent run, research, sandbox_task or check_job, the durable record the pane reads
+ * one sub-agent run, research, sandbox_task or check_job, the durable record of it
  * its own collection and not mlServices, the poller would claim a row there and look it up as a hub job
  */
 export interface MlAgentRun {

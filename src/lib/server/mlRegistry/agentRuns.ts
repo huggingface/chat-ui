@@ -159,12 +159,18 @@ export async function interruptAgentRuns(
 	);
 }
 
-/** the rows without their calls and summary, the pane asks for those one run at a time */
+// sandbox and job-check runs only spare the parent context, they are recorded but not listed
+const LISTED_LABELS = ["research"];
+
+/** the listed rows without their calls and summary, the pane asks for those one run at a time */
 export function listMlAgentRuns(
 	conversationId: ObjectId
 ): Promise<Omit<MlAgentRun, "calls" | "summary">[]> {
 	return collections.mlAgentRuns
-		.find({ conversationId }, { projection: { calls: 0, summary: 0 } })
+		.find(
+			{ conversationId, label: { $in: LISTED_LABELS } },
+			{ projection: { calls: 0, summary: 0 } }
+		)
 		.sort({ startedAt: 1, _id: 1 })
 		.toArray();
 }

@@ -293,7 +293,7 @@ describe("MlRegistryPane", () => {
 		const { container } = mount(payload({ services: [], artefacts: [] }));
 		const empties = all(container, ".ml-registry-empty").map(text);
 		expect(empties).toHaveLength(4);
-		expect(empties[0]).toMatch(/^No jobs, sandboxes or sub-agent runs yet/);
+		expect(empties[0]).toMatch(/^No jobs, sandboxes or research runs yet/);
 		expect(empties[1]).toMatch(/^Nothing on the Hub yet/);
 		expect(empties[2]).toMatch(/^No files yet/);
 		expect(empties[3]).toMatch(/^No sources yet/);
@@ -619,12 +619,12 @@ describe("MlRegistryPane sub-agent runs and sources", () => {
 		callCount: 7,
 		sourceCount: 3,
 	};
-	const LIVE_SANDBOX: MlRegistryAgentRun = {
+	const LIVE_RUN: MlRegistryAgentRun = {
 		id: "65f000000000000000000002",
-		label: "sandbox",
-		displayName: "Sandbox",
-		taskPreview: "Task: run the smoke test",
-		parent: { tool: "sandbox_task", toolUuid: "tool-2" },
+		label: "research",
+		displayName: "Research",
+		taskPreview: "Research task: compare LoRA ranks for a 360M model",
+		parent: { tool: "research", toolUuid: "tool-2" },
 		status: "running",
 		startedAt: at(-42_000),
 		iterations: 2,
@@ -634,13 +634,11 @@ describe("MlRegistryPane sub-agent runs and sources", () => {
 	const FAILED: MlRegistryAgentRun = {
 		...RESEARCH,
 		id: "65f000000000000000000003",
-		label: "job-check",
-		displayName: "Job check",
-		taskPreview: "Checking for: why the job errored",
-		parent: { tool: "check_job", toolUuid: "tool-3" },
+		taskPreview: "Research task: find why DPO loss diverges",
+		parent: { tool: "research", toolUuid: "tool-3" },
 		status: "failed",
 		failure: "iteration_limit",
-		error: "Job check agent hit the iteration limit",
+		error: "Research agent hit the iteration limit",
 		startedAt: at(-3 * 60_000),
 		endedAt: at(-60_000),
 		sourceCount: 0,
@@ -712,7 +710,7 @@ describe("MlRegistryPane sub-agent runs and sources", () => {
 		mount(
 			payload({
 				services: [COMPLETED, RUNNING],
-				agentRuns: [RESEARCH, LIVE_SANDBOX, FAILED],
+				agentRuns: [RESEARCH, LIVE_RUN, FAILED],
 				artefacts: [],
 				sources: SOURCES,
 				...over,
@@ -752,7 +750,7 @@ describe("MlRegistryPane sub-agent runs and sources", () => {
 		const idOf = (row: Element) => row.id || row.className.split(" ")[0];
 		const [active] = all(container, ".ml-registry-list");
 		expect([...active.children].map(idOf)).toEqual([
-			`ml-run-${LIVE_SANDBOX.id}`,
+			`ml-run-${LIVE_RUN.id}`,
 			"ml-service",
 			"ml-service",
 		]);
@@ -771,7 +769,7 @@ describe("MlRegistryPane sub-agent runs and sources", () => {
 		expect(text(find(container, "header h2 + span"))).toBe("2 running");
 	});
 
-	it("shows a run's name, status, task, parent call, calls, time and what it read", async () => {
+	it("shows a run's name, status, calls, time and what it read", async () => {
 		serveRun();
 		const { container } = mountRuns();
 		await tick();
@@ -784,13 +782,13 @@ describe("MlRegistryPane sub-agent runs and sources", () => {
 		expect(style(badge).color).toBe(GREEN_INK);
 		expect(text(research.querySelector(".ml-file-toggle"))).not.toContain(RESEARCH.taskPreview);
 		expect(text(research.querySelector(".ml-service-meta"))).toBe(
-			"via research · 7 calls · 1m 05s · 2 sources read"
+			"7 calls · 1m 05s · 2 sources read"
 		);
 
-		const live = runRow(container, LIVE_SANDBOX.id);
+		const live = runRow(container, LIVE_RUN.id);
 		expect(text(live.querySelector(".ml-stage"))).toBe("running");
 		expect(live.querySelector(".ml-live-dot")).not.toBeNull();
-		expect(text(live.querySelector(".ml-service-meta"))).toBe("via sandbox_task · 3 calls · 42s");
+		expect(text(live.querySelector(".ml-service-meta"))).toBe("3 calls · 42s");
 
 		const failed = runRow(container, FAILED.id);
 		expect(find(failed, ".ml-stage").dataset.tone).toBe("error");
@@ -802,15 +800,15 @@ describe("MlRegistryPane sub-agent runs and sources", () => {
 	it("keeps an interrupted run in view, since the agent never got its result", async () => {
 		serveRun();
 		const { container } = mountRuns({
-			agentRuns: [{ ...LIVE_SANDBOX, status: "interrupted", endedAt: at(-30_000) }],
+			agentRuns: [{ ...LIVE_RUN, status: "interrupted", endedAt: at(-30_000) }],
 		});
 		await tick();
 
-		const stuck = runRow(container, LIVE_SANDBOX.id);
+		const stuck = runRow(container, LIVE_RUN.id);
 		expect(stuck.closest("#ml-registry-settled")).toBeNull();
 		expect(text(stuck.querySelector(".ml-stage"))).toBe("interrupted");
 		expect(stuck.querySelector(".ml-live-dot")).toBeNull();
-		expect(text(stuck.querySelector(".ml-service-meta"))).toBe("via sandbox_task · 3 calls · 12s");
+		expect(text(stuck.querySelector(".ml-service-meta"))).toBe("3 calls · 12s");
 	});
 
 	it("expands a run to its task, summary, calls and sources, fetched only when opened", async () => {
