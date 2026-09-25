@@ -351,6 +351,9 @@ export const ML_ASSISTANT_TOOL_DOCTRINE = {
 	largeResults: `WHEN RESULTS ARE LARGE: Job logs, dataset previews and file listings can be long. Read them, then carry forward the part that matters — the failing line, the column names, the final metric — instead of restating the whole output back to the user.`,
 } as const;
 
+/** every tool a contract exists for, the harness stamp hashes all of them */
+export const ML_ASSISTANT_DOCTRINE_TOOLS = TOOL_DOCTRINE.map(({ tool }) => tool);
+
 /** The contracts for whichever of these tools this run actually has. */
 export function mlAssistantToolDoctrineBlocks(
 	toolNames: string[],
