@@ -1,7 +1,11 @@
 import ToolUpdate from "./ToolUpdate.svelte";
+import MlRegistryPane from "./MlRegistryPane.svelte";
 import { render } from "vitest-browser-svelte";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { tick } from "svelte";
+import superjson from "superjson";
+import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
+import { sidePane } from "$lib/stores/sidePane.svelte";
 
 const call = {
 	type: "tool",
@@ -91,5 +95,78 @@ describe("ToolUpdate stored output", () => {
 		await expect.element(image).toHaveAttribute("src", `data:image/png;base64,${onePixelPng}`);
 		const blocks = Array.from(screen.baseElement.querySelectorAll("pre")).map((b) => b.textContent);
 		expect(blocks).toEqual(["{}", "plotted"]);
+	});
+});
+
+describe("ToolUpdate virtual file chips", () => {
+	const submit = {
+		...call,
+		call: { name: "hf_jobs", parameters: { operation: "uv" } },
+		fileRefs: [{ ref: "v-file://train.py@v2", name: "train.py", version: 2 }],
+	};
+	const versions = [3, 2, 1].map((version) => ({
+		version,
+		size: 9,
+		origin: version === 1 ? "write" : "edit",
+		createdAt: new Date(version * 1000),
+	}));
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		sidePane.reset();
+		mlRegistry.reset();
+	});
+
+	it("names the version the call sent and opens the files list at it", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: RequestInfo | URL) => {
+				const url = new URL(String(input));
+				if (!url.pathname.endsWith("/files/train.py")) return new Response("{}", { status: 500 });
+				const version = url.searchParams.get("version");
+				const body = version
+					? { name: "train.py", ...versions[3 - Number(version)], content: `print(${version})\n` }
+					: { name: "train.py", versions };
+				return new Response(superjson.stringify(body), { status: 200 });
+			})
+		);
+		mlRegistry.bind("conv-1");
+		mlRegistry.apply({
+			services: [],
+			artefacts: [],
+			files: [{ name: "train.py", version: 3, size: 9, updatedAt: new Date(3000) }],
+			serverNow: Date.now(),
+		});
+		const pane = render(MlRegistryPane);
+		const card = render(ToolUpdate, { tool: [submit] } as never);
+
+		const chip = card.container.querySelector<HTMLButtonElement>("button.tool-file-ref");
+		expect(chip?.textContent?.trim()).toBe("train.py v2");
+		chip?.click();
+
+		expect(sidePane.open).toBe(true);
+		expect(sidePane.view).toBe("registry");
+		expect(sidePane.registryFocus).toEqual({ name: "train.py", version: 2 });
+		await vi.waitFor(() => {
+			const row = pane.container.querySelector(".ml-version[data-version='2']");
+			expect(row?.querySelector(".ml-version-toggle")?.getAttribute("aria-pressed")).toBe("true");
+			expect(row?.querySelector(".ml-file-code .diff-add")?.textContent).toBe("+ print(2)");
+		});
+		expect(pane.container.querySelector(".ml-file-toggle")?.getAttribute("aria-expanded")).toBe(
+			"true"
+		);
+	});
+
+	it("shows the version without a way to open it where there is no registry, as on a share", () => {
+		const { container } = render(ToolUpdate, { tool: [submit] } as never);
+
+		expect(container.querySelector("button.tool-file-ref")).toBeNull();
+		expect(container.querySelector("span.tool-file-ref")?.textContent?.trim()).toBe("train.py v2");
+	});
+
+	it("shows no chip for a call that carried no reference", () => {
+		mlRegistry.bind("conv-1");
+		const { container } = render(ToolUpdate, { tool: [call] } as never);
+		expect(container.querySelector(".tool-file-ref")).toBeNull();
 	});
 });

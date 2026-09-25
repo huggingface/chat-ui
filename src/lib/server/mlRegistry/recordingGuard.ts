@@ -10,6 +10,7 @@ import type {
 	GuardVerdict,
 	ToolCallGuard,
 } from "$lib/server/textGeneration/mcp/toolGuard";
+import type { MlFileRef } from "$lib/types/MlFile";
 import type { MlServiceKind } from "$lib/types/MlService";
 import { fileUri, fileUrl, parseHfUri, repoUri, repoUrl } from "./hubUri";
 import {
@@ -33,12 +34,12 @@ type SubmissionTicket = {
 	flavor?: string;
 	timeoutSeconds?: number;
 	namespace?: string;
+	scriptRefs?: MlFileRef[];
 };
 
-type Ticket =
-	| SubmissionTicket
-	| { kind: "repo"; callUuid: string; uri: string }
-	| { kind: "file"; callUuid: string; uri: string };
+type FileTicket = { kind: "file"; callUuid: string; uri: string; fromFile?: MlFileRef };
+
+type Ticket = SubmissionTicket | { kind: "repo"; callUuid: string; uri: string } | FileTicket;
 
 const JOB_ID = /^[0-9a-f]{24}$/;
 const NAMESPACE = "[A-Za-z0-9][\\w.-]*";
@@ -58,6 +59,8 @@ const asNumber = (value: unknown): number | undefined =>
 	typeof value === "number" && Number.isFinite(value) ? value : undefined;
 const stringTokens = (value: unknown): string[] =>
 	Array.isArray(value) ? value.filter((t): t is string => typeof t === "string") : [];
+const fileRefsOf = (call: GuardedToolCall): MlFileRef[] =>
+	(call.fileRefs ?? []).map(({ name, version }) => ({ name, version }));
 
 /** name is an alias for labels.name on jobs */
 function submissionName(call: GuardedToolCall): string | undefined {
@@ -103,6 +106,7 @@ export function createMlRecordingGuard({
 			if (!gated || "blocked" in gated) return undefined;
 			const name = submissionName(call);
 			const timeoutSeconds = parseTimeoutSeconds(gated.timeoutRaw);
+			const scriptRefs = fileRefsOf(call);
 			return {
 				kind: gated.kind,
 				callUuid: call.callUuid,
@@ -111,6 +115,7 @@ export function createMlRecordingGuard({
 				...(name ? { name } : {}),
 				...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
 				...(gated.namespace ? { namespace: gated.namespace } : {}),
+				...(scriptRefs.length ? { scriptRefs } : {}),
 			};
 		}
 		if (call.tool === "create_repo") {
@@ -119,7 +124,10 @@ export function createMlRecordingGuard({
 		}
 		if (call.tool === "hf_fs_write" && call.args.cmd === "put") {
 			const uri = stringTokens(call.args.args).find((token) => token.startsWith("hf://"));
-			return uri ? { kind: "file", callUuid: call.callUuid, uri } : undefined;
+			if (!uri) return undefined;
+			// content is the one slot a put expands
+			const [fromFile] = fileRefsOf(call);
+			return { kind: "file", callUuid: call.callUuid, uri, ...(fromFile ? { fromFile } : {}) };
 		}
 		return undefined;
 	}
@@ -175,6 +183,7 @@ export function createMlRecordingGuard({
 			namespace: jobNamespace,
 			reservationKey: ticket.reservationKey,
 			toolUuid: ticket.callUuid,
+			...(ticket.scriptRefs ? { scriptRefs: ticket.scriptRefs } : {}),
 			...provenance,
 		};
 		if (ticket.kind === "job") {
@@ -228,7 +237,7 @@ export function createMlRecordingGuard({
 		});
 	}
 
-	async function recordFile(ticket: { uri: string; callUuid: string }, outcome: GuardOutcome) {
+	async function recordFile(ticket: FileTicket, outcome: GuardOutcome) {
 		if (outcome.status !== "success") return;
 		const root = asRecord(outcome.structured);
 		const parsed = parseHfUri(asString(root?.uri) ?? ticket.uri);
@@ -254,6 +263,7 @@ export function createMlRecordingGuard({
 			uri: fileUri(withPath),
 			url: fileUrl(withPath),
 			...(commit ? { commit } : {}),
+			...(ticket.fromFile ? { fromFile: ticket.fromFile } : {}),
 			toolUuid: ticket.callUuid,
 			...provenance,
 		});

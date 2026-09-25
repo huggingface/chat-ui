@@ -269,9 +269,15 @@ Picking hardware: the number that matters is cost to FINISH, not cost per hour. 
 
 Queue time is part of time-to-finish and is not in the hourly rate, and the small flavors are not equal on it. CPU and a10g-small schedule effectively immediately, a10g-large within about half a minute. l4x1 is the exception among them: its median is seconds, but roughly one run in ten waits more than a quarter of an hour and the worst wait hours — so prefer an a10g over an l4 for a small finetune unless you need something only the L4 has. The dedicated big-GPU clusters usually start within a minute, RTX PRO 6000 excepted, where about a quarter of runs wait past ten minutes. Waits are mildest overnight UTC and worst through the morning. These are scheduling waits, with image pull and container start on top, and they move: treat them as the shape of the risk when you pick a flavor and size a timeout, not as numbers to quote to the user.
 
-Estimate before you submit. The smoke test on the real flavor gives you measured steps per second, so the real run's wall-clock is arithmetic — do it, and put the estimate and what it will cost on the pre-flight list every time. Cost to finish is your default objective, not necessarily the user's: some want the answer sooner at a worse price, and that preference is theirs to state, not yours to assume. If the run will take more than about half an hour, or a faster flavor would materially change when it lands, put the choice to the user with ask_user_question and make the options span the real spectrum — the cost-efficient flavor and a genuinely faster one, each with its wall-clock and price: "about 4 hours on a T4, roughly $1.60" against "about 1.5 hours on an A10G, roughly $1.50" is a decision they can make in one click. Below that, take the sensible default and say which you took.
+Estimate before you submit. The smoke test on the real flavor gives you measured steps per second, so the real run's wall-clock is arithmetic — do it, and put the estimate and what it will cost on the pre-flight list every time. Cost to finish is your default objective, not necessarily the user's: some want the answer sooner at a worse price, and that preference is theirs to state, not yours to assume. If the run will take more than about half an hour, or a faster flavor would materially change when it lands, put the choice to the user with ask_user_question and make the options span the real spectrum — the cost-efficient flavor and a genuinely faster one, each with its wall-clock and price: "about 4 hours on a T4, roughly $1.60" against "about 1.5 hours on an A10G, roughly $1.50" is a decision they can make in one click. Below that, take the sensible default and say which you took.`;
 
-After submitting, report the job id and its URL, then wait and delegate the reading rather than pulling logs into this conversation — every tail you read here stays in it for the rest of the run, and a smoke job's tracebacks are the ones you least want in it. Make the first check soon, with a SHORT wait, because failures cluster at the start: a wrong dependency or a bad column name shows up in the first minute, and a twenty-minute wait over it is twenty minutes lost. That first check is also where you confirm the dashboard has rows in it, not merely that the job is running. Once the run has proven itself, lengthen the waits to match the time remaining. A submitted job is not a finished one, and a job that failed says why in its logs — read them before you change anything.`;
+const AFTER_SUBMIT = `After submitting, report the job id and its URL, then wait and delegate the reading rather than pulling logs into this conversation — every tail you read here stays in it for the rest of the run, and a smoke job's tracebacks are the ones you least want in it.`;
+
+const JOB_FAILED = `A submitted job is not a finished one, and a job that failed says why in its logs — read them before you change anything.`;
+
+const AFTER_SUBMIT_POLLED = `${AFTER_SUBMIT} Make the first check soon, with a SHORT wait, because failures cluster at the start: a wrong dependency or a bad column name shows up in the first minute, and a twenty-minute wait over it is twenty minutes lost. That first check is also where you confirm the dashboard has rows in it, not merely that the job is running. Once the run has proven itself, lengthen the waits to match the time remaining. ${JOB_FAILED}`;
+
+const AFTER_SUBMIT_WATCHED = `${AFTER_SUBMIT} The harness watches every job and sandbox you launch and wakes you the moment one ends or fails, so a crash in the first minute reaches you in the first minute: size each wait for when you next need to act, the time the run is expected to take from here, not to catch a failure — you do not need short first waits for that. One early check still earns its place: a crash wakes you, metrics that silently never reach the dashboard do not. So a few minutes into training, read the run once with check_job and confirm the dashboard has rows in it, not merely that the job is running. ${JOB_FAILED}`;
 
 const HF_SANDBOX_RULES = `SANDBOXES (hf_sandbox): a sandbox is a machine you run commands in directly, which makes it the right place for the fast checks — does the script import, does the dataset load, are the shapes what you think. A job queues, pulls an image, and only then tells you about a typo; a sandbox tells you in seconds. When you have this tool, the fast checks go here FIRST, every time — not in a smoke job out of habit. A job's queue time is the wrong price for finding a typo. What it cannot do is stand in for the GPU smoke test: it has no GPU, so it tells you the script imports and the columns are right, and nothing at all about whether the batch fits in memory or how fast a step is. A sandbox is a job and bills like one, under BillTo when set; its handle, hfsb2:<namespace>:<id>, says where.
 
@@ -289,9 +295,21 @@ const HF_FS_FINDING_RULES = `FINDING PAPERS AND DOCS (hf_fs): papers live at hf:
 
 const WEB_SEARCH_RULES = `SEARCHING THE WEB (web_search_exa): for what the Hub does not hold — an author's implementation on their own site, a post describing a trick a paper leaves out, an error nobody has written a doc for. Use 3-6 precise keywords, and prefer the primary source over a summary of it. It is not where you look up a model, dataset or paper that lives on the Hub: those have their own tools, and those results are authoritative where a search result is hearsay.`;
 
+interface ToolDoctrineOptions {
+	/** whether a job or sandbox ending wakes a parked wait */
+	serviceEvents: boolean;
+}
+
 /** Keyed by tool name as the model sees it in the schema. */
-const TOOL_DOCTRINE: ReadonlyArray<{ tool: string; text: string }> = [
-	{ tool: "hf_jobs", text: HF_JOBS_CONTRACT },
+const TOOL_DOCTRINE: ReadonlyArray<{
+	tool: string;
+	text: string | ((options: ToolDoctrineOptions) => string);
+}> = [
+	{
+		tool: "hf_jobs",
+		text: ({ serviceEvents }) =>
+			`${HF_JOBS_CONTRACT}\n\n${serviceEvents ? AFTER_SUBMIT_WATCHED : AFTER_SUBMIT_POLLED}`,
+	},
 	{ tool: "hf_fs", text: HF_FS_FINDING_RULES },
 	{ tool: "hf_fs_write", text: HF_FS_WRITE_RULES },
 	{ tool: "hf_sandbox", text: HF_SANDBOX_RULES },
@@ -320,6 +338,11 @@ export const ML_ASSISTANT_TOOL_DOCTRINE = {
 } as const;
 
 /** The contracts for whichever of these tools this run actually has. */
-export function mlAssistantToolDoctrineBlocks(toolNames: string[]): string[] {
-	return TOOL_DOCTRINE.filter(({ tool }) => toolNames.includes(tool)).map(({ text }) => text);
+export function mlAssistantToolDoctrineBlocks(
+	toolNames: string[],
+	options: ToolDoctrineOptions
+): string[] {
+	return TOOL_DOCTRINE.filter(({ tool }) => toolNames.includes(tool)).map(({ text }) =>
+		typeof text === "function" ? text(options) : text
+	);
 }

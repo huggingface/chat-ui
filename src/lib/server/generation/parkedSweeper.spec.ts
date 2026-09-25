@@ -145,6 +145,15 @@ const resultsFor = (message: Pick<Message, "updates"> | undefined, uuid: string)
 			u.uuid === uuid
 	);
 
+async function storedWaitResult(row: ParkedCall): Promise<string> {
+	const [result] = resultsFor(await storedAssistant(row), row.toolUuid);
+	return result?.type === MessageUpdateType.Tool &&
+		result.subtype === MessageToolUpdateType.Result &&
+		result.result.status === ToolResultStatus.Success
+		? String(result.result.outputs[0]?.text)
+		: "";
+}
+
 /** Hands the lease back as if the claiming pod died, so the next sweep may take the row. */
 async function expireLease(row: ParkedCall) {
 	await collections.parkedCalls.updateOne(
@@ -325,6 +334,48 @@ describe("resuming a parked wait", () => {
 		expect(message?.content).toBe("Checked: the job finished.");
 		const state = await collections.turnStates.findOne({ conversationId: row.conversationId });
 		expect(state?.status).toBe("done");
+	});
+
+	it("a wait woken by a job's end tells the model what ended, in the harness's words", async () => {
+		const row = park({
+			plannedResumeAt: new Date(Date.now() + 20 * 60_000),
+			wokeByHarnessAt: new Date(),
+			serviceEvents: [
+				{
+					serviceId: new ObjectId(),
+					kind: "job",
+					jobId: "0123456789abcdef01234567",
+					name: "sft-smoke",
+					flavor: "a10g-small",
+					from: "RUNNING",
+					to: "ERROR",
+					ranSeconds: 137,
+					at: new Date(),
+				},
+			],
+		});
+		await seedParkedTurn(row);
+
+		await sweepParkedCalls();
+
+		const text = await storedWaitResult(row);
+		expect(text).toContain("because a job you started changed state");
+		expect(text).toContain("Job sft-smoke (a10g-small, id 0123456789abcdef01234567) failed: ERROR");
+		expect(text).not.toContain("The user asked you to check early");
+	});
+
+	it("a wait the user woke keeps the user's wording", async () => {
+		const row = park({
+			plannedResumeAt: new Date(Date.now() + 20 * 60_000),
+			wokeEarlyAt: new Date(),
+		});
+		await seedParkedTurn(row);
+
+		await sweepParkedCalls();
+
+		const text = await storedWaitResult(row);
+		expect(text).toContain("The user asked you to check early");
+		expect(text).not.toContain("changed state");
 	});
 
 	it("a re-claimed resume continues the stored turn without a second result", async () => {
@@ -622,6 +673,21 @@ describe("wakeParkedCallEarly", () => {
 		// The deadline it asked for survives the overwrite, so the resumed round
 		// can tell the model how much of its wait was skipped.
 		expect(after?.plannedResumeAt?.getTime()).toBe(row.resumeAt.getTime());
+	});
+
+	it("keeps the deadline the model asked for when a job's end already moved it", async () => {
+		const asked = new Date(Date.now() + 20 * 60_000);
+		const row = park({
+			resumeAt: new Date(Date.now() + 5_000),
+			plannedResumeAt: asked,
+			wokeByHarnessAt: new Date(),
+		});
+		await collections.parkedCalls.insertOne(row);
+
+		await wakeParkedCallEarly(row.conversationId, row.messageId);
+
+		const after = await collections.parkedCalls.findOne({});
+		expect(after?.plannedResumeAt?.getTime()).toBe(asked.getTime());
 	});
 
 	it("only touches the turn it was asked about", async () => {
