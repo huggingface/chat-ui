@@ -69,6 +69,35 @@ describe("ToolUpdate status icon", () => {
 	});
 });
 
+describe("ToolUpdate stored output", () => {
+	const onePixelPng =
+		"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+	const stored = {
+		type: "tool",
+		subtype: "result",
+		uuid: "u1",
+		result: {
+			status: "success",
+			call: { name: "sandbox_task", parameters: {} },
+			outputs: [
+				{ text: "plotted", content: [{ type: "image", data: onePixelPng, mimeType: "image/png" }] },
+			],
+			display: true,
+		},
+	};
+
+	it("renders the image and text a stripped output kept, and no metadata block", async () => {
+		const screen = render(ToolUpdate, { tool: [call, stored] } as never);
+
+		await screen.getByRole("button", { name: "Expand" }).click();
+
+		const image = screen.getByRole("img", { name: "Tool result image 1" });
+		await expect.element(image).toHaveAttribute("src", `data:image/png;base64,${onePixelPng}`);
+		const blocks = Array.from(screen.baseElement.querySelectorAll("pre")).map((b) => b.textContent);
+		expect(blocks).toEqual(["{}", "plotted"]);
+	});
+});
+
 describe("ToolUpdate virtual file chips", () => {
 	const submit = {
 		...call,

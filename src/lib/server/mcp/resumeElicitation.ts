@@ -13,6 +13,7 @@ import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { McpServerConfig } from "./httpClient";
 import { ASK_USER_QUESTION_TOOL_NAME, answerToToolResult } from "$lib/server/askUserQuestion";
+import { slimToolOutput } from "$lib/server/generation/compressUpdates";
 
 /**
  * Re-issue the tool call a durable prompt parked, now that it has an answer.
@@ -158,12 +159,12 @@ export async function resumeParkedToolCall({
 						status: ToolResultStatus.Success,
 						call: { name: pending.tool, parameters: {} },
 						outputs: [
-							{
+							slimToolOutput({
 								text: response.text ?? "",
 								structured: response.structured,
 								content: response.content,
-							},
-						] as unknown as Record<string, unknown>[],
+							}),
+						],
 						display: true,
 					},
 				};
