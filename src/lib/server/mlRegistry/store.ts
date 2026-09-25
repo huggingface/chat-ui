@@ -169,6 +169,23 @@ export async function deleteMlRegistry(conversationIds: ObjectId[]): Promise<voi
 	]);
 }
 
+/** every path that tells the model about an ended row records it here so it is told once */
+export async function markServicesReported(
+	services: readonly Pick<MlService, "_id" | "stage">[]
+): Promise<void> {
+	const byStage = new Map<string, ObjectId[]>();
+	for (const { _id, stage } of services) byStage.set(stage, [...(byStage.get(stage) ?? []), _id]);
+	await Promise.all(
+		[...byStage].map(([stage, ids]) =>
+			// a row that moved on since it was read is not marked for a stage it no longer has
+			collections.mlServices.updateMany(
+				{ _id: { $in: ids }, stage },
+				{ $set: { lastReportedStage: stage } }
+			)
+		)
+	);
+}
+
 export function listMlServices(conversationId: ObjectId): Promise<MlService[]> {
 	return collections.mlServices.find({ conversationId }).sort({ createdAt: 1, _id: 1 }).toArray();
 }
