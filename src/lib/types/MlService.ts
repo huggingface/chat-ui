@@ -46,8 +46,9 @@ export interface MlService extends Timestamps {
 	/** since when no usable hub token could be found for the conversation, cleared on the next poll */
 	tokenMissingSince?: Date;
 	/**
-	 * the stage the model was last told about, written by whatever told it, the event path or
-	 * the session state block, never by the poller, an ended row matching it is not listed again
+	 * the stage the model was last told about, UNTRACKED once told the poller gave the row up,
+	 * written by whatever told it, the event path or the session state block, never by the
+	 * poller, an ended row matching it is not listed again
 	 */
 	lastReportedStage?: string;
 	/** the budget reservation key, generationId:callUuid */

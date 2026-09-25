@@ -202,17 +202,33 @@ describe("renderSessionStateBlock", () => {
 			stage: "COMPLETED",
 			lastReportedStage: "RUNNING",
 		});
-		const stoppedAndTold = service({
-			name: "stopped",
+		const untrackedAndTold = service({
+			name: "untracked-told",
 			pollStoppedReason: "50 consecutive failed lookups",
-			lastReportedStage: "RUNNING",
+			lastReportedStage: "UNTRACKED",
 		});
 
-		const block = renderBlock({ services: [running, reported, endedSinceTold, stoppedAndTold] });
+		const block = renderBlock({
+			services: [running, reported, endedSinceTold, untrackedAndTold],
+		});
 
 		const rows = linesOf(block?.text).filter((line) => line.startsWith("- job"));
 		expect(rows.map((row) => row.split(" · ")[0])).toEqual(["- job running", "- job ended-since"]);
-		expect(block?.ended).toEqual([{ _id: endedSinceTold._id, stage: "COMPLETED" }]);
+		expect(block?.ended).toEqual([
+			{ _id: endedSinceTold._id, stage: "COMPLETED", reported: "COMPLETED" },
+		]);
+	});
+
+	it("still lists a row the poller gave up on after its running stage was reported", () => {
+		const untracked = service({
+			pollStoppedReason: "past its timeout and the last lookup failed",
+			lastReportedStage: "RUNNING",
+		});
+
+		const block = renderBlock({ services: [untracked] });
+
+		expect(block?.text).toContain("· no longer tracked, last seen RUNNING ·");
+		expect(block?.ended).toEqual([{ _id: untracked._id, stage: "RUNNING", reported: "UNTRACKED" }]);
 	});
 
 	it("renders nothing once every ended service has been reported and nothing else is left", () => {
@@ -258,7 +274,9 @@ describe("renderSessionStateBlock", () => {
 		expect(linesOf(block?.text).at(-1)).toBe(`…and ${80 - rows.length} more`);
 		const newestFirst = [...ended].reverse();
 		expect(block?.ended).toEqual(
-			newestFirst.slice(0, rows.length).map(({ _id }) => ({ _id, stage: "ERROR" }))
+			newestFirst
+				.slice(0, rows.length)
+				.map(({ _id }) => ({ _id, stage: "ERROR", reported: "ERROR" }))
 		);
 	});
 
@@ -465,7 +483,7 @@ describe("buildSessionStateBlock", () => {
 		const row = service({ conversationId: conv._id, name: "moved-on", stage: "COMPLETED" });
 		await collections.mlServices.insertOne(row);
 
-		await markSessionStateRead([{ _id: row._id, stage: "ERROR" }]);
+		await markSessionStateRead([{ _id: row._id, stage: "ERROR", reported: "ERROR" }]);
 
 		expect(await collections.mlServices.findOne({ _id: row._id })).not.toHaveProperty(
 			"lastReportedStage"
@@ -474,9 +492,28 @@ describe("buildSessionStateBlock", () => {
 	});
 
 	it("swallows a failed write so the turn goes on and the rows repeat", async () => {
-		vi.spyOn(collections.mlServices, "updateMany").mockRejectedValue(new Error("write conflict"));
+		vi.spyOn(collections.mlServices, "bulkWrite").mockRejectedValue(new Error("write conflict"));
 		await expect(
-			markSessionStateRead([{ _id: new ObjectId(), stage: "ERROR" }])
+			markSessionStateRead([{ _id: new ObjectId(), stage: "ERROR", reported: "ERROR" }])
 		).resolves.toBeUndefined();
+	});
+
+	it("reports a row the poller gave up on once, even when its running stage was already told", async () => {
+		const row = service({
+			conversationId: conv._id,
+			name: "gave-up",
+			lastReportedStage: "RUNNING",
+			pollStoppedReason: "past its timeout with no usable Hub token",
+		});
+		await collections.mlServices.insertOne(row);
+
+		const first = await buildSessionStateBlock(conv, NOW);
+		expect(first?.text).toContain("- job gave-up · no longer tracked, last seen RUNNING");
+		await markSessionStateRead(first?.ended ?? []);
+
+		expect((await collections.mlServices.findOne({ _id: row._id }))?.lastReportedStage).toBe(
+			"UNTRACKED"
+		);
+		expect(await buildSessionStateBlock(conv, NOW)).toBeUndefined();
 	});
 });

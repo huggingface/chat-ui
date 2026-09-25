@@ -22,6 +22,8 @@ import {
 	markServicesReported,
 	sandboxHandle,
 	UNKNOWN_STAGE,
+	UNTRACKED_STAGE,
+	type ServiceReport,
 } from "./store";
 
 export const SESSION_STATE_MAX_CHARS = 3_000;
@@ -41,7 +43,7 @@ export interface SessionState {
 export interface SessionStateBlock {
 	text: string;
 	/** ended rows the text lists, marked once read so each is listed once */
-	ended: Pick<MlService, "_id" | "stage">[];
+	ended: ServiceReport[];
 }
 
 interface Section {
@@ -58,15 +60,20 @@ const formatSize = (bytes: number) =>
 	bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
 
 // the poller only gives a row up once it is past its timeout or cannot be read at all
-const isEnded = (service: MlService) =>
-	isTerminalStage(service.stage) || service.pollStoppedReason !== undefined;
+const isUntracked = (service: MlService) =>
+	service.pollStoppedReason !== undefined && !isTerminalStage(service.stage);
+
+const isEnded = (service: MlService) => isTerminalStage(service.stage) || isUntracked(service);
+
+// a stage marked while the row still ran must not hide that the poller later gave it up
+const reportedAs = (service: MlService) => (isUntracked(service) ? UNTRACKED_STAGE : service.stage);
 
 const endTime = (service: MlService) => (service.endedAt ?? service.updatedAt).getTime();
 
 function serviceStatus(service: MlService, now: Date): string {
 	const lastSeen = service.stage === UNKNOWN_STAGE ? "" : `, last seen ${service.stage}`;
 	// a row stopped for want of a token keeps tokenMissingSince so stopped is checked first
-	if (service.pollStoppedReason && !isTerminalStage(service.stage)) {
+	if (isUntracked(service)) {
 		return `no longer tracked${lastSeen}`;
 	}
 	if (service.tokenMissingSince) return `status unknown: the user's session expired${lastSeen}`;
@@ -154,7 +161,7 @@ export function renderSessionStateBlock({
 		.filter((service) => !isEnded(service))
 		.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 	const ended = services
-		.filter((service) => isEnded(service) && service.lastReportedStage !== service.stage)
+		.filter((service) => isEnded(service) && service.lastReportedStage !== reportedAs(service))
 		.sort((a, b) => endTime(b) - endTime(a));
 
 	const endedSection: Section = {
@@ -182,7 +189,11 @@ export function renderSessionStateBlock({
 	return {
 		text,
 		// a row the cap cut stays unreported and comes up in a later block
-		ended: ended.slice(0, endedShown).map(({ _id, stage }) => ({ _id, stage })),
+		ended: ended.slice(0, endedShown).map((service) => ({
+			_id: service._id,
+			stage: service.stage,
+			reported: reportedAs(service),
+		})),
 	};
 }
 

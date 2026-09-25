@@ -936,7 +936,9 @@ describe("runMcpFlow session state block", () => {
 		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
 
 		expect(mocks.markServicesReported).toHaveBeenCalledTimes(1);
-		expect(mocks.markServicesReported).toHaveBeenCalledWith([{ _id: ended._id, stage: "ERROR" }]);
+		expect(mocks.markServicesReported).toHaveBeenCalledWith([
+			{ _id: ended._id, stage: "ERROR", reported: "ERROR" },
+		]);
 	});
 
 	it("leaves the ended jobs to the next block when the request fails before the model reads it", async () => {

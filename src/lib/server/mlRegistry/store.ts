@@ -8,6 +8,9 @@ import type { MlService, MlServiceKind } from "$lib/types/MlService";
 
 export const UNKNOWN_STAGE = "UNKNOWN";
 
+/** what a row the poller gave up on was reported as, never a stage the hub returns */
+export const UNTRACKED_STAGE = "UNTRACKED";
+
 export const hubJobUrl = (namespace: string, jobId: string): string =>
 	`https://huggingface.co/jobs/${namespace}/${jobId}`;
 
@@ -169,20 +172,22 @@ export async function deleteMlRegistry(conversationIds: ObjectId[]): Promise<voi
 	]);
 }
 
+export interface ServiceReport {
+	_id: ObjectId;
+	/** the stage the row had when it was read, a row that moved on since is not marked */
+	stage: string;
+	/** the stage, or UNTRACKED_STAGE for a row the poller gave up on */
+	reported: string;
+}
+
 /** every path that tells the model about an ended row records it here so it is told once */
-export async function markServicesReported(
-	services: readonly Pick<MlService, "_id" | "stage">[]
-): Promise<void> {
-	const byStage = new Map<string, ObjectId[]>();
-	for (const { _id, stage } of services) byStage.set(stage, [...(byStage.get(stage) ?? []), _id]);
-	await Promise.all(
-		[...byStage].map(([stage, ids]) =>
-			// a row that moved on since it was read is not marked for a stage it no longer has
-			collections.mlServices.updateMany(
-				{ _id: { $in: ids }, stage },
-				{ $set: { lastReportedStage: stage } }
-			)
-		)
+export async function markServicesReported(reports: readonly ServiceReport[]): Promise<void> {
+	if (reports.length === 0) return;
+	await collections.mlServices.bulkWrite(
+		reports.map(({ _id, stage, reported }) => ({
+			updateOne: { filter: { _id, stage }, update: { $set: { lastReportedStage: reported } } },
+		})),
+		{ ordered: false }
 	);
 }
 
