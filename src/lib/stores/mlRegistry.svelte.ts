@@ -1,5 +1,11 @@
+import { SvelteMap } from "svelte/reactivity";
 import { handleResponse, useAPIClient } from "$lib/APIClient";
-import type { MlFileListing } from "$lib/types/MlFile";
+import type {
+	MlFileListing,
+	MlFileVersionContent,
+	MlFileVersionListing,
+	MlFileVersions,
+} from "$lib/types/MlFile";
 import type {
 	MlRegistryArtefact,
 	MlRegistryPayload,
@@ -12,6 +18,11 @@ import { isServiceOpen } from "$lib/utils/mlRegistry";
 export const ML_REGISTRY_POLL_MS = 5_000;
 
 type FetchFn = typeof globalThis.fetch;
+
+export type FileLoad<T> =
+	{ status: "loading" } | { status: "ready"; value: T } | { status: "error" };
+
+const contentKey = (name: string, version: number) => `${version}:${name}`;
 
 /**
  * what the harness recorded for a conversation, read from the registry endpoint and nothing else
@@ -29,6 +40,12 @@ export class MlRegistryStore {
 
 	/** the conversation the rows belong to, undefined once it is left */
 	conversationId = $state<string | undefined>(undefined);
+
+	/** by file name, refetched once the registry lists a newer version */
+	#versions = new SvelteMap<string, FileLoad<MlFileVersionListing[]>>();
+	/** by version and name, a version never changes so it is fetched once */
+	#contents = new SvelteMap<string, FileLoad<string>>();
+	#fileRequests = new Map<string, Promise<void>>();
 
 	#live = false;
 	#watching = false;
@@ -49,8 +66,7 @@ export class MlRegistryStore {
 
 	get summary(): MlRegistrySummary {
 		return {
-			// files join the count once the pane lists them
-			rows: this.services.length + this.artefacts.length,
+			rows: this.services.length + this.artefacts.length + this.files.length,
 			open: this.openServices.length,
 			running: this.services.filter((service) => service.stage === "RUNNING").length,
 		};
@@ -96,6 +112,83 @@ export class MlRegistryStore {
 		return this.#inflight;
 	}
 
+	fileVersions(name: string): FileLoad<MlFileVersionListing[]> | undefined {
+		return this.#versions.get(name);
+	}
+
+	fileContent(name: string, version: number): FileLoad<string> | undefined {
+		return this.#contents.get(contentKey(name, version));
+	}
+
+	/** a stale list stays on show while the newer one loads, a failed load is asked again */
+	loadFileVersions(name: string): Promise<void> {
+		const latest = this.#latestVersion(name);
+		const cached = this.#versions.get(name);
+		if (cached?.status === "ready" && (cached.value[0]?.version ?? 0) >= latest) {
+			return Promise.resolve();
+		}
+		return this.#request(`versions:${name}`, async (conversationId, client) => {
+			if (cached?.status !== "ready") this.#versions.set(name, { status: "loading" });
+			try {
+				const response = await client.conversations({ id: conversationId }).files(name).get();
+				const payload = handleResponse(response) as MlFileVersions;
+				return () => {
+					this.#versions.set(name, { status: "ready", value: payload.versions });
+					// a poll that listed a newer version mid flight was coalesced into this request
+					return this.#latestVersion(name) > latest ? this.loadFileVersions(name) : undefined;
+				};
+			} catch {
+				return () => {
+					if (cached?.status !== "ready") this.#versions.set(name, { status: "error" });
+				};
+			}
+		});
+	}
+
+	loadFileContent(name: string, version: number): Promise<void> {
+		const key = contentKey(name, version);
+		if (this.#contents.get(key)?.status === "ready") return Promise.resolve();
+		return this.#request(`content:${key}`, async (conversationId, client) => {
+			this.#contents.set(key, { status: "loading" });
+			try {
+				const response = await client
+					.conversations({ id: conversationId })
+					.files(name)
+					.get({ query: { version } });
+				const payload = handleResponse(response) as MlFileVersionContent;
+				return () => void this.#contents.set(key, { status: "ready", value: payload.content });
+			} catch {
+				return () => void this.#contents.set(key, { status: "error" });
+			}
+		});
+	}
+
+	/** one request per key at a time, and an answer that lands after a reset lands nowhere */
+	#request(
+		key: string,
+		run: (
+			conversationId: string,
+			client: ReturnType<typeof useAPIClient>
+		) => Promise<() => void | Promise<void>>
+	): Promise<void> {
+		const conversationId = this.conversationId;
+		if (!conversationId) return Promise.resolve();
+		const pending = this.#fileRequests.get(key);
+		if (pending) return pending;
+		const epoch = this.#epoch;
+		const request = run(conversationId, this.#client()).then((settle) => {
+			if (this.#epoch !== epoch) return;
+			this.#fileRequests.delete(key);
+			return settle();
+		});
+		this.#fileRequests.set(key, request);
+		return request;
+	}
+
+	#latestVersion(name: string): number {
+		return this.files.find((file) => file.name === name)?.version ?? 0;
+	}
+
 	apply(payload: MlRegistryPayload): void {
 		this.services = payload.services;
 		this.artefacts = payload.artefacts;
@@ -115,6 +208,9 @@ export class MlRegistryStore {
 		this.services = [];
 		this.artefacts = [];
 		this.files = [];
+		this.#versions.clear();
+		this.#contents.clear();
+		this.#fileRequests.clear();
 		this.serverNow = undefined;
 		this.loaded = false;
 	}
@@ -141,9 +237,12 @@ export class MlRegistryStore {
 		this.#timer = undefined;
 	}
 
+	#client() {
+		return useAPIClient(this.#fetcher ? { fetch: this.#fetcher } : {});
+	}
+
 	async #load(conversationId: string): Promise<MlRegistryPayload> {
-		const client = useAPIClient(this.#fetcher ? { fetch: this.#fetcher } : {});
-		const response = await client.conversations({ id: conversationId }).registry.get();
+		const response = await this.#client().conversations({ id: conversationId }).registry.get();
 		return handleResponse(response) as MlRegistryPayload;
 	}
 }

@@ -93,6 +93,7 @@ describe.sequential("GET /api/v2/conversations/[id]/registry", () => {
 			flavor: "a10g-small",
 			timeoutSeconds: 3600,
 			reservationKey: "gen-1:call-1",
+			scriptRefs: [{ name: "train.py", version: 2 }],
 		});
 		await recordDispatchedService({
 			conversationId: other._id,
@@ -113,6 +114,7 @@ describe.sequential("GET /api/v2/conversations/[id]/registry", () => {
 			uri: "hf://models/pngwn/sft-smoke/README.md",
 			url: "https://huggingface.co/pngwn/sft-smoke/blob/main/README.md",
 			commit: "abcdef0123456789",
+			fromFile: { name: "README.md", version: 1 },
 		});
 		await writeMlFileVersion({
 			conversationId: conv._id,
@@ -140,6 +142,7 @@ describe.sequential("GET /api/v2/conversations/[id]/registry", () => {
 			flavor: "a10g-small",
 			origin: "dispatched",
 			hubUrl: `https://huggingface.co/jobs/pngwn/${JOB_ID}`,
+			scriptRefs: [{ name: "train.py", version: 2 }],
 		});
 		expect(typeof payload.services[0].id).toBe("string");
 		expect(payload.services[0]).not.toHaveProperty("_id");
@@ -150,6 +153,7 @@ describe.sequential("GET /api/v2/conversations/[id]/registry", () => {
 			["model", "hf://models/pngwn/sft-smoke", undefined],
 			["file", "hf://models/pngwn/sft-smoke/README.md", "abcdef0123456789"],
 		]);
+		expect(payload.artefacts[1].fromFile).toEqual({ name: "README.md", version: 1 });
 		expect(payload.artefacts.every((a) => typeof a.id === "string")).toBe(true);
 
 		expect(payload.files).toEqual([

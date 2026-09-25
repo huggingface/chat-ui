@@ -169,6 +169,7 @@ type ExtraConfigKeys =
 	| "ML_ASSISTANT_VIRTUAL_FILES"
 	| "ML_ASSISTANT_SERVICE_POLLER"
 	| "ML_ASSISTANT_SERVICE_POLL_INTERVAL_MS"
+	| "ML_ASSISTANT_SERVICE_EVENTS"
 	| "HISTORY_SLIDING_WINDOW";
 
 type ConfigProxy = ConfigManager & { [K in ConfigKey | ExtraConfigKeys]: string };
