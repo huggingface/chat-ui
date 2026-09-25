@@ -1,4 +1,5 @@
 import { browser } from "$app/environment";
+import type { MlFileRef } from "$lib/types/MlFile";
 
 // Loose absolute bounds for a resized width; the real visual bounds are
 // proportional (each pane keeps at least 20% of the chat/panel split, see
@@ -26,6 +27,8 @@ class SidePaneStore {
 	view = $state<SidePaneView>("artifact");
 	/** The framed Trackio dashboard, when `view` is "trackio". */
 	trackio = $state<{ url: string; label: string } | null>(null);
+	/** the file version the registry view scrolls to and opens */
+	registryFocus = $state<MlFileRef | null>(null);
 	identifier = $state<string | null>(null);
 	/** 1-based version to display; null follows the latest version (including streaming growth) */
 	version = $state<number | null>(null);
@@ -103,8 +106,9 @@ class SidePaneStore {
 	}
 
 	/** a list, not an item, so it has no place in the item nav */
-	openRegistry() {
+	openRegistry(focus: MlFileRef | null = null) {
 		this.view = "registry";
+		this.registryFocus = focus && { name: focus.name, version: focus.version };
 		this.open = true;
 		this.revealNonce += 1;
 	}
@@ -132,6 +136,7 @@ class SidePaneStore {
 		this.open = false;
 		this.view = "artifact";
 		this.trackio = null;
+		this.registryFocus = null;
 		this.identifier = null;
 		this.version = null;
 		this.tab = "preview";

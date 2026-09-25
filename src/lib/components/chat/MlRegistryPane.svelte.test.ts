@@ -2,8 +2,10 @@ import MlRegistryPane from "./MlRegistryPane.svelte";
 import { render } from "vitest-browser-svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import superjson from "superjson";
+import { tick } from "svelte";
 import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 import { sidePane } from "$lib/stores/sidePane.svelte";
+import type { MlFileListing, MlFileVersionListing } from "$lib/types/MlFile";
 import type {
 	MlRegistryArtefact,
 	MlRegistryPayload,
@@ -287,9 +289,10 @@ describe("MlRegistryPane", () => {
 	it("shows an empty state per section", () => {
 		const { container } = mount(payload({ services: [], artefacts: [] }));
 		const empties = all(container, ".ml-registry-empty").map(text);
-		expect(empties).toHaveLength(2);
+		expect(empties).toHaveLength(3);
 		expect(empties[0]).toMatch(/^No jobs or sandboxes yet/);
 		expect(empties[1]).toMatch(/^Nothing on the Hub yet/);
+		expect(empties[2]).toMatch(/^No files yet/);
 		expect(container.querySelector(".ml-registry-list")).toBeNull();
 	});
 
@@ -328,5 +331,246 @@ describe("MlRegistryPane", () => {
 		await landed(3);
 		expect(fetch).toHaveBeenCalledTimes(3);
 		stop();
+	});
+});
+
+describe("MlRegistryPane files", () => {
+	const TRAIN = [
+		"import torch\nlr = 1e-4\nprint(lr)\n",
+		"import torch\nlr = 3e-4\nprint(lr)\n",
+		"import torch\nlr = 3e-4\nepochs = 3\nprint(lr)\n",
+	];
+	const SOURCE = `hfsb2:pngwn:${"4".repeat(24)}:/work/train.py`;
+	const VERSIONS: Record<string, MlFileVersionListing[]> = {
+		"train.py": [
+			{
+				version: 3,
+				size: 3277,
+				origin: "import",
+				source: SOURCE,
+				agent: "sandbox_task",
+				summary: "add epochs",
+				createdAt: at(-5 * 60_000),
+			},
+			{ version: 2, size: 36, origin: "edit", summary: "raise lr", createdAt: at(-30 * 60_000) },
+			{ version: 1, size: 36, origin: "write", createdAt: at(-2 * 3_600_000) },
+		],
+	};
+	const CONTENTS: Record<string, string[]> = { "train.py": TRAIN };
+	const FILES: MlFileListing[] = [
+		{ name: "configs/sft.yaml", version: 1, size: 812, updatedAt: at(-3 * 3_600_000) },
+		{ name: "train.py", version: 3, size: 3277, updatedAt: at(-5 * 60_000), summary: "add epochs" },
+	];
+	const RAN_V3 = service({ ...RUNNING, scriptRefs: [{ name: "train.py", version: 3 }] });
+	const RAN_V2 = service({ ...ERRORED, scriptRefs: [{ name: "train.py", version: 2 }] });
+
+	function serveFiles(): string[] {
+		const calls: string[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: RequestInfo | URL) => {
+				const url = new URL(String(input));
+				const [, rest] = url.pathname.split("/files/");
+				if (rest === undefined) return new Response("{}", { status: 500 });
+				calls.push(`${decodeURIComponent(rest)}${url.search}`);
+				const name = decodeURIComponent(rest);
+				const version = url.searchParams.get("version");
+				const body =
+					version === null
+						? { name, versions: VERSIONS[name] }
+						: {
+								name,
+								...VERSIONS[name].find((entry) => entry.version === Number(version)),
+								content: CONTENTS[name][Number(version) - 1],
+							};
+				return new Response(superjson.stringify(body), { status: 200 });
+			})
+		);
+		return calls;
+	}
+
+	const mountFiles = () =>
+		mount(payload({ services: [RAN_V3, COMPLETED, RAN_V2], artefacts: [], files: FILES }));
+	const fileRow = (root: ParentNode, name: string) =>
+		all(root, ".ml-file").find((row) => text(row.querySelector(".ml-file-name")) === name) ??
+		(() => {
+			throw new Error(`no file row ${name}`);
+		})();
+	const versionRow = (root: ParentNode, version: number) =>
+		find(root, `.ml-version[data-version='${version}']`);
+	const openFile = async (root: ParentNode, name: string) => {
+		find(fileRow(root, name), ".ml-file-toggle").click();
+		await vi.waitFor(() => expect(fileRow(root, name).querySelector(".ml-version")).not.toBeNull());
+	};
+	const codeOf = async (row: HTMLElement) => {
+		await vi.waitFor(() => expect(row.querySelector(".ml-file-code")).not.toBeNull());
+		return find(row, ".ml-file-code");
+	};
+
+	beforeEach(() => {
+		vi.useFakeTimers({ toFake: ["Date"] });
+		vi.setSystemTime(NOW);
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+		sidePane.reset();
+		mlRegistry.reset();
+	});
+
+	it("lists each file with its latest version, size, age and summary", () => {
+		serveFiles();
+		const { container } = mountFiles();
+
+		expect(text(find(container, "#ml-registry-files"))).toBe("Files 2");
+		const rows = all(container, ".ml-file");
+		expect(rows.map((row) => text(row.querySelector(".ml-file-name")))).toEqual([
+			"configs/sft.yaml",
+			"train.py",
+		]);
+		const train = rows[1];
+		expect(text(train.querySelector(".ml-file-latest"))).toBe("v3");
+		expect(text(train.querySelector(".ml-file-meta"))).toBe("3.2 KB · updated 5m ago");
+		expect(text(train.querySelector(".ml-file-summary"))).toBe("add epochs");
+		expect(rows[0].querySelector(".ml-file-summary")).toBeNull();
+		expect(find(train, ".ml-file-toggle").getAttribute("aria-expanded")).toBe("false");
+	});
+
+	it("asks for a file's versions only once it is opened, and for no content until one is picked", async () => {
+		const calls = serveFiles();
+		const { container } = mountFiles();
+		expect(calls).toEqual([]);
+
+		await openFile(container, "train.py");
+
+		expect(find(fileRow(container, "train.py"), ".ml-file-toggle").ariaExpanded).toBe("true");
+		expect(all(container, ".ml-version").map((row) => row.dataset.version)).toEqual([
+			"3",
+			"2",
+			"1",
+		]);
+		expect(calls).toEqual(["train.py"]);
+		expect(container.querySelector(".ml-file-code")).toBeNull();
+	});
+
+	it("says how each version came about and which jobs ran it", async () => {
+		serveFiles();
+		const { container } = mountFiles();
+		await openFile(container, "train.py");
+
+		const v3 = versionRow(container, 3);
+		expect(text(v3.querySelector(".ml-version-origin"))).toBe("imported");
+		expect(text(v3.querySelector(".ml-version-agent"))).toBe("sandbox_task");
+		expect(text(v3.querySelector(".ml-version-summary"))).toBe("add epochs");
+		expect(text(v3.querySelector(".ml-version-source"))).toBe(`from ${SOURCE}`);
+		expect(text(versionRow(container, 2).querySelector(".ml-version-origin"))).toBe("edited");
+		expect(versionRow(container, 2).querySelector(".ml-version-agent")).toBeNull();
+		expect(text(versionRow(container, 1).querySelector(".ml-version-origin"))).toBe("written");
+
+		const jobsOf = (version: number) =>
+			all(versionRow(container, version), ".ml-version-jobs li").map((li) => [
+				text(li.querySelector("a")),
+				li.querySelector<HTMLElement>(".ml-stage")?.dataset.tone,
+			]);
+		expect(jobsOf(3)).toEqual([["sft-smoke", "running"]]);
+		expect(jobsOf(2)).toEqual([["22222222", "error"]]);
+		expect(jobsOf(1)).toEqual([]);
+		const link = find(versionRow(container, 3), ".ml-version-jobs a") as HTMLAnchorElement;
+		expect(link.href).toBe(RAN_V3.hubUrl);
+	});
+
+	it("shows what a version changed against the one before, with counts, and the whole file on request", async () => {
+		const calls = serveFiles();
+		const { container } = mountFiles();
+		await openFile(container, "train.py");
+
+		find(versionRow(container, 2), ".ml-version-toggle").click();
+		const row = versionRow(container, 2);
+		const code = await codeOf(row);
+
+		expect(find(row, ".ml-version-toggle").getAttribute("aria-pressed")).toBe("true");
+		expect(code.classList.contains("diff-view")).toBe(true);
+		expect(all(code, ".diff-del").map(text)).toEqual(["- lr = 1e-4"]);
+		expect(all(code, ".diff-add").map(text)).toEqual(["+ lr = 3e-4"]);
+		expect(text(row.querySelector(".ml-file-view-stats"))).toBe("+1 −1");
+		expect(text(row.querySelector(".ml-file-view-bar"))).toContain("v1 → v2");
+		expect(calls.filter((call) => call.includes("?"))).toEqual([
+			"train.py?version=2",
+			"train.py?version=1",
+		]);
+
+		const toggle = all(row, ".ml-file-view-toggle button");
+		expect(toggle.map((button) => [text(button), button.getAttribute("aria-pressed")])).toEqual([
+			["Changes", "true"],
+			["Whole file", "false"],
+		]);
+		toggle[1].click();
+		await vi.waitFor(() => expect(code.querySelector(".diff-line")).toBeNull());
+		expect(code.classList.contains("diff-view")).toBe(false);
+		expect(code.textContent).toBe(TRAIN[1]);
+	});
+
+	it("shows the first version in full, with nothing to compare it to", async () => {
+		const calls = serveFiles();
+		const { container } = mountFiles();
+		await openFile(container, "train.py");
+
+		find(versionRow(container, 1), ".ml-version-toggle").click();
+		const row = versionRow(container, 1);
+		const code = await codeOf(row);
+
+		expect(code.textContent).toBe(TRAIN[0]);
+		expect(code.querySelector(".diff-line")).toBeNull();
+		expect(row.querySelector(".ml-file-view-toggle")).toBeNull();
+		expect(text(row.querySelector(".ml-file-view-bar"))).toBe("The first version, in full");
+		expect(calls.filter((call) => call.includes("?"))).toEqual(["train.py?version=1"]);
+	});
+
+	it("names the script version each job ran and opens it under Files", async () => {
+		serveFiles();
+		const { container } = mountFiles();
+
+		const chips = all(container, ".ml-service .ml-file-ref");
+		expect(chips.map(text)).toEqual(["train.py v3", "train.py v2"]);
+		chips[1].click();
+
+		const row = await vi.waitFor(() => versionRow(container, 2));
+		await codeOf(row);
+		expect(find(row, ".ml-version-toggle").getAttribute("aria-pressed")).toBe("true");
+		expect(versionRow(container, 3).querySelector(".ml-file-code")).toBeNull();
+	});
+
+	it("keeps file ages moving when nothing is running", async () => {
+		vi.useRealTimers();
+		vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+		vi.setSystemTime(NOW);
+		serveFiles();
+		const { container } = mount(payload({ services: [COMPLETED], artefacts: [], files: FILES }));
+		const meta = () => text(fileRow(container, "train.py").querySelector(".ml-file-meta"));
+		expect(meta()).toBe("3.2 KB · updated 5m ago");
+
+		await tick();
+		vi.advanceTimersByTime(3 * 60_000);
+
+		await vi.waitFor(() => expect(meta()).toBe("3.2 KB · updated 8m ago"));
+	});
+
+	it("says so when the versions cannot be read, and tries again", async () => {
+		serveFiles();
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response("{}", { status: 500 }))
+		);
+		const { container } = mountFiles();
+		find(fileRow(container, "train.py"), ".ml-file-toggle").click();
+		await vi.waitFor(() =>
+			expect(text(fileRow(container, "train.py").querySelector(".ml-file-note"))).toMatch(
+				/^Could not load the versions/
+			)
+		);
+
+		serveFiles();
+		find(fileRow(container, "train.py"), ".ml-file-retry").click();
+		await vi.waitFor(() => expect(all(container, ".ml-version")).toHaveLength(3));
 	});
 });

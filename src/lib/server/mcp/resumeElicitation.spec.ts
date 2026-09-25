@@ -152,6 +152,33 @@ describe("resuming a parked tool call", () => {
 		expect(result?.result.outputs[0]?.text).toBe("all done");
 	});
 
+	it("returns the result without the parts that repeat its text", async () => {
+		const image = { type: "image", data: "aGk=", mimeType: "image/png" };
+		calls.queue.push({
+			text: "all done",
+			isError: false,
+			structured: { done: true },
+			content: [{ type: "text", text: "all done" }, image],
+		});
+		const conversationId = new ObjectId();
+		const id = await park(conversationId, "second", "asked-twice", { sure: "yes" });
+
+		const done = await resumeParkedToolCall({
+			conversationId,
+			elicitationId: id,
+			extraServers: SERVERS,
+		});
+
+		const result = done.updates.find((u) => u.type === "tool" && u.subtype === "result");
+		expect(result).toMatchObject({
+			result: {
+				call: { name: "confirm_twice", parameters: {} },
+				outputs: [{ text: "all done", content: [image] }],
+			},
+		});
+		expect(result).not.toHaveProperty("result.outputs.0.structured");
+	});
+
 	it("surfaces a failing tool call as an error on the same block", async () => {
 		calls.queue.push({ text: "it broke", isError: true });
 		const conversationId = new ObjectId();

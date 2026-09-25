@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 import type { Conversation } from "./Conversation";
 import type { Message } from "./Message";
+import type { MlFileRef } from "./MlFile";
 import type { MlRegistryOrigin, MlService } from "./MlService";
 import type { Timestamps } from "./Timestamps";
 
@@ -20,6 +21,8 @@ export interface MlArtefact extends Timestamps {
 	origin: MlRegistryOrigin;
 	/** latest commit that wrote it, files only */
 	commit?: string;
+	/** the virtual file version that latest commit uploaded, files only */
+	fromFile?: MlFileRef;
 	serviceId?: MlService["_id"];
 	messageId?: Message["id"];
 	generationId?: string;

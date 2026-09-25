@@ -497,6 +497,50 @@ describe("executeToolCalls with a guard", () => {
 		);
 	});
 
+	it("streams the result without the parts that repeat its text, and the guard still gets them", async () => {
+		const structured = { job: { id: "0123456789abcdef01234567", status: "RUNNING" } };
+		const image = { type: "image", data: "aGk=", mimeType: "image/png" };
+		mcpMock.callMcpTool.mockResolvedValue(
+			mcpResult({
+				text: "job started",
+				structured,
+				content: [{ type: "text", text: "job started" }, image],
+			})
+		);
+		const { guard, after } = fakeGuard({
+			before: vi.fn(async () => ({ allow: true, ticket: { key: "k" } }) as const),
+		});
+
+		const events = await drain([CALL], undefined, undefined, guard);
+
+		expect(after).toHaveBeenCalledWith(
+			{ key: "k" },
+			{ status: "success", text: "job started", structured }
+		);
+		const result = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Result);
+		expect(result).toMatchObject({
+			result: {
+				status: ToolResultStatus.Success,
+				call: { name: "do_thing", parameters: {} },
+				outputs: [{ text: "job started", content: [image] }],
+			},
+		});
+		if (result?.subtype === MessageToolUpdateType.Result) {
+			expect(result.result).not.toHaveProperty("outputs.0.structured");
+		}
+	});
+
+	it("streams structured when the tool answered with nothing else", async () => {
+		const structured = { job: { id: "0123456789abcdef01234567" } };
+		mcpMock.callMcpTool.mockResolvedValue(mcpResult({ structured, content: [] }));
+
+		const events = await drain([CALL]);
+
+		const result = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Result);
+		expect(result).toMatchObject({ result: { outputs: [{ text: "", structured }] } });
+		expect(result).not.toHaveProperty("result.outputs.0.content");
+	});
+
 	it("reports a transport failure", async () => {
 		mcpMock.callMcpTool.mockRejectedValue(new Error("socket hang up"));
 		const { guard, after } = fakeGuard({
@@ -806,6 +850,38 @@ describe("virtual file expansion at dispatch", () => {
 		const [message] = toolMessagesOf(events);
 		expect(String(message.content)).toContain("v-file://train.py (v2)");
 		expect(summaryOf(events).toolRuns).toHaveLength(0);
+	});
+
+	it("hands the guard the expanded arguments and the versions they came from", async () => {
+		const { expandVirtualFiles } = await seeded();
+		const before = vi.fn(
+			async (_call: import("./toolGuard").GuardedToolCall) => ({ allow: true }) as const
+		);
+		const guard = { allowParking: false, before, after: vi.fn(async () => undefined) };
+
+		await drainExpanding(
+			[
+				{
+					id: "call_1",
+					name: "hf_jobs",
+					arguments: '{"operation":"uv","args":{"script":"v-file://train.py@v1"}}',
+				},
+				{ id: "call_2", name: "hf_jobs", arguments: '{"operation":"uv","args":{"script":"x"}}' },
+			],
+			expandVirtualFiles,
+			{ guard }
+		);
+
+		const calls = before.mock.calls.map(([call]) => call);
+		expect(calls).toContainEqual(
+			expect.objectContaining({
+				args: { operation: "uv", args: { script: "print(1)" } },
+				fileRefs: [{ ref: "v-file://train.py@v1", name: "train.py", version: 1 }],
+			})
+		);
+		const inline = calls.find((call) => JSON.stringify(call.args).includes('"x"'));
+		expect(inline).toBeDefined();
+		expect(inline).not.toHaveProperty("fileRefs");
 	});
 
 	it("never expands the arguments of a builtin tool", async () => {
