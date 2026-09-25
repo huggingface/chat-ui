@@ -14,6 +14,8 @@ import type { TurnState } from "$lib/types/TurnState";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { ParkedCall } from "$lib/types/ParkedCall";
 import type { NestedAgentCall } from "$lib/types/NestedAgentCall";
+import type { MlService } from "$lib/types/MlService";
+import type { MlArtefact } from "$lib/types/MlArtefact";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
@@ -145,6 +147,8 @@ export class Database {
 		const mcpElicitations = db.collection<McpElicitation>("mcpElicitations");
 		const parkedCalls = db.collection<ParkedCall>("parkedCalls");
 		const nestedAgentCalls = db.collection<NestedAgentCall>("nestedAgentCalls");
+		const mlServices = db.collection<MlService>("mlServices");
+		const mlArtefacts = db.collection<MlArtefact>("mlArtefacts");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
@@ -179,6 +183,8 @@ export class Database {
 			mcpElicitations,
 			parkedCalls,
 			nestedAgentCalls,
+			mlServices,
+			mlArtefacts,
 			settings,
 			users,
 			sessions,
@@ -210,6 +216,8 @@ export class Database {
 			mcpElicitations,
 			parkedCalls,
 			nestedAgentCalls,
+			mlServices,
+			mlArtefacts,
 			settings,
 			users,
 			sessions,
@@ -349,6 +357,20 @@ export class Database {
 		nestedAgentCalls
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for nestedAgentCalls by createdAt"));
+
+		// no ttl, these rows are the durable record of what a session created
+		mlServices
+			.createIndex({ conversationId: 1, kind: 1, jobId: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating unique index for mlServices by job"));
+		mlServices
+			.createIndex({ conversationId: 1, createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for mlServices by conversationId"));
+		mlArtefacts
+			.createIndex({ conversationId: 1, uri: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating unique index for mlArtefacts by uri"));
+		mlArtefacts
+			.createIndex({ conversationId: 1, createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for mlArtefacts by conversationId"));
 
 		// One state document per turn; the unique key is what makes the upsert in
 		// turnState.ts race-safe. Ended turns expire like ended generations do.

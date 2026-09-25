@@ -68,7 +68,7 @@ function isStopCall(call: GuardedToolCall): boolean {
 	return false;
 }
 
-interface GatedSubmission {
+export interface GatedSubmission {
 	kind: "job" | "sandbox";
 	flavor: string;
 	timeoutRaw: unknown;
@@ -82,7 +82,7 @@ const asRecord = (value: unknown): Record<string, unknown> | undefined =>
 		: undefined;
 
 /** Value following a `--flag` token in a sandbox-style argument list. */
-const tokenAfter = (tokens: string[], flag: string): string | undefined => {
+export const tokenAfter = (tokens: string[], flag: string): string | undefined => {
 	const at = tokens.indexOf(flag);
 	return at >= 0 ? tokens[at + 1] : undefined;
 };
@@ -110,7 +110,9 @@ const FREE_SANDBOX_COMMANDS = new Set(["status", "terminate", "ps", "kill"]);
  * What this call is about to spend, or a refusal, or null for calls that spend
  * nothing.
  */
-function classify(call: GuardedToolCall): GatedSubmission | { blocked: string } | null {
+export function classifySubmission(
+	call: GuardedToolCall
+): GatedSubmission | { blocked: string } | null {
 	if (call.tool === "hf_jobs") {
 		const operation = call.args.operation;
 		if (operation === "scheduled run" || operation === "scheduled uv") {
@@ -246,7 +248,7 @@ export function createMlBudgetGuard({
 
 		async before(call: GuardedToolCall): Promise<GuardVerdict> {
 			if (!isHfMcpServer(call.serverUrl)) return { allow: true };
-			const gated = classify(call);
+			const gated = classifySubmission(call);
 			// Stops are never gated, but their success is the one moment in a turn
 			// when a hold is known to be over. Ticketing them is what lets `after`
 			// reconcile without waiting for the next generation — a turn that
