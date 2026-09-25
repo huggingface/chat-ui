@@ -173,7 +173,10 @@ describe("edit_file", () => {
 
 		const texts = outcomes.map(textOf);
 		expect(texts.filter((text) => text.includes("v2 (was v1)"))).toHaveLength(1);
-		expect(texts.filter((text) => text.includes("moved from v1 to v2"))).toHaveLength(1);
+		// the loser either read v1 and lost the insert, or read after the winner wrote v2
+		expect(texts.filter((text) => /moved from v1 to v2|is at v2, not v1/.test(text))).toHaveLength(
+			1
+		);
 		const versions = await collections.mlFiles
 			.find({ conversationId: conv._id })
 			.sort({ version: 1 })
