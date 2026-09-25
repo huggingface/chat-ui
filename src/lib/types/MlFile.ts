@@ -39,3 +39,27 @@ export interface MlFileListing {
 	updatedAt: Date;
 	summary?: string;
 }
+
+/** a virtual file version named by a job that ran it or a hub file written from it */
+export interface MlFileRef {
+	name: string;
+	version: number;
+}
+
+/** one version without its content, as the files endpoint lists it */
+export type MlFileVersionListing = Pick<
+	MlFile,
+	"version" | "size" | "origin" | "source" | "agent" | "summary" | "createdAt" | "messageId"
+>;
+
+export interface MlFileVersions {
+	name: string;
+	/** newest first */
+	versions: MlFileVersionListing[];
+}
+
+/** what the files endpoint returns for one version */
+export interface MlFileVersionContent extends MlFileVersionListing {
+	name: string;
+	content: string;
+}

@@ -32,7 +32,7 @@ export interface MlRegistryPayload {
 
 /** what the strip control needs, counted once in the store */
 export interface MlRegistrySummary {
-	/** services and artefacts, the control hides at zero, files join once the pane lists them */
+	/** services, artefacts and files, the control hides at zero */
 	rows: number;
 	/** services the Hub would still bill */
 	open: number;

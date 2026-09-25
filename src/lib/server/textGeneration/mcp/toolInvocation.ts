@@ -530,6 +530,7 @@ export async function* executeToolCalls({
 				tool: mappingEntry.tool,
 				fnName: p.call.name,
 				args: argsObj,
+				...(p.fileRefs ? { fileRefs: p.fileRefs } : {}),
 				callUuid: p.uuid,
 			});
 			if (verdict.update) updatesQueue.push(verdict.update);

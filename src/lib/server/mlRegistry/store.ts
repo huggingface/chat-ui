@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import type { MlArtefact, MlArtefactKind } from "$lib/types/MlArtefact";
+import type { MlFileRef } from "$lib/types/MlFile";
 import type { MlService, MlServiceKind } from "$lib/types/MlService";
 
 // every write is an upsert keyed on the external id, so a retried round or a discovery racing a
@@ -38,6 +39,7 @@ export interface DispatchedService extends Provenance {
 	/** defaults to the job page */
 	hubUrl?: string;
 	reservationKey?: string;
+	scriptRefs?: MlFileRef[];
 }
 
 /** what the reply said overrides whatever was there */
@@ -100,14 +102,28 @@ export interface ArtefactRecord extends Provenance {
 	uri: string;
 	url: string;
 	commit?: string;
+	fromFile?: MlFileRef;
 	serviceId?: ObjectId;
 }
 
-/** a repeat write moves the commit, or clears it when the reply named none, who first made it stays */
+/** a repeat write moves or clears commit and fromFile, who first made it stays */
 export async function recordArtefact(artefact: ArtefactRecord): Promise<void> {
 	const now = new Date();
-	const { conversationId, uri, kind, url, commit, serviceId, messageId, generationId, toolUuid } =
-		artefact;
+	const {
+		conversationId,
+		uri,
+		kind,
+		url,
+		commit,
+		fromFile,
+		serviceId,
+		messageId,
+		generationId,
+		toolUuid,
+	} = artefact;
+	const unset: { commit?: ""; fromFile?: "" } = {};
+	if (!commit) unset.commit = "";
+	if (!fromFile) unset.fromFile = "";
 	await collections.mlArtefacts.updateOne(
 		{ conversationId, uri },
 		{
@@ -117,9 +133,9 @@ export async function recordArtefact(artefact: ArtefactRecord): Promise<void> {
 				url,
 				origin: "dispatched",
 				updatedAt: now,
-				...compact({ commit, serviceId }),
+				...compact({ commit, fromFile, serviceId }),
 			},
-			...(commit ? {} : { $unset: { commit: "" } }),
+			...(Object.keys(unset).length ? { $unset: unset } : {}),
 		},
 		{ upsert: true }
 	);

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import superjson from "superjson";
+import type { MlFileVersionListing } from "$lib/types/MlFile";
 import type { MlRegistryPayload, MlRegistryService } from "$lib/types/MlRegistry";
 
 vi.mock("$app/environment", () => ({ browser: false, dev: true, building: false }));
@@ -77,8 +78,17 @@ describe("mlRegistry store", () => {
 		expect(store.services).toHaveLength(1);
 		expect(store.services[0].createdAt).toBeInstanceOf(Date);
 		expect(store.files).toEqual([file]);
-		// the pane does not list files yet, so they do not make the control appear
-		expect(store.summary).toEqual({ rows: 1, open: 1, running: 1 });
+		expect(store.summary).toEqual({ rows: 2, open: 1, running: 1 });
+	});
+
+	it("counts files among the rows, so a conversation with only files shows the control", () => {
+		const store = new MlRegistryStore(fakeFetch().fetcher);
+		store.bind("conv-1");
+		store.apply({
+			...payload(),
+			files: [{ name: "train.py", version: 3, size: 9, updatedAt: new Date(0) }],
+		});
+		expect(store.summary).toEqual({ rows: 1, open: 0, running: 0 });
 	});
 
 	it("forgets the conversation on reset", () => {
@@ -234,5 +244,162 @@ describe("mlRegistry store", () => {
 		expect(store.loaded).toBe(false);
 		await vi.advanceTimersByTimeAsync(ML_REGISTRY_POLL_MS);
 		expect(store.loaded).toBe(true);
+	});
+});
+
+describe("mlRegistry store: file versions and content", () => {
+	const listing = (version: number): MlFileVersionListing => ({
+		version,
+		size: 9,
+		origin: version === 1 ? "write" : "edit",
+		createdAt: new Date(version),
+	});
+
+	function fileServer(files: Record<string, string[]>) {
+		const calls: string[] = [];
+		let failing = false;
+		let suspended: Array<() => void> | undefined;
+		const fetcher = (async (input: RequestInfo | URL) => {
+			const url = new URL(String(input));
+			calls.push(`${url.pathname}${url.search}`);
+			const name = decodeURIComponent(url.pathname.split("/files/")[1] ?? "");
+			const contents = files[name];
+			const version = url.searchParams.get("version");
+			const body = version
+				? { name, ...listing(Number(version)), content: contents?.[Number(version) - 1] }
+				: { name, versions: (contents ?? []).map((_, i) => listing(i + 1)).reverse() };
+			if (suspended) await new Promise<void>((resolve) => suspended?.push(resolve));
+			if (failing) throw new TypeError("offline");
+			if (!contents) return new Response("{}", { status: 404 });
+			return new Response(superjson.stringify(body), { status: 200 });
+		}) as typeof fetch;
+		return {
+			fetcher,
+			calls,
+			fail: (value: boolean) => (failing = value),
+			suspend: () => (suspended = []),
+			release: () => {
+				const waiting = suspended ?? [];
+				suspended = undefined;
+				waiting.forEach((resume) => resume());
+			},
+		};
+	}
+
+	function bound(server: ReturnType<typeof fileServer>, latest: Record<string, number>) {
+		const store = new MlRegistryStore(server.fetcher);
+		store.bind("conv-1");
+		store.apply({
+			...payload(),
+			files: Object.entries(latest).map(([name, version]) => ({
+				name,
+				version,
+				size: 9,
+				updatedAt: new Date(0),
+			})),
+		});
+		return store;
+	}
+
+	it("fetches a file's versions once, and again only when the registry lists a newer one", async () => {
+		const table = { "train.py": ["a", "b"] };
+		const server = fileServer(table);
+		const store = bound(server, { "train.py": 2 });
+
+		const first = store.loadFileVersions("train.py");
+		expect(store.fileVersions("train.py")).toEqual({ status: "loading" });
+		await first;
+		await store.loadFileVersions("train.py");
+
+		expect(server.calls).toEqual(["/api/v2/conversations/conv-1/files/train.py"]);
+		expect(store.fileVersions("train.py")).toEqual({
+			status: "ready",
+			value: [listing(2), listing(1)],
+		});
+
+		table["train.py"].push("c");
+		store.apply({
+			...payload(),
+			files: [{ name: "train.py", version: 3, size: 9, updatedAt: new Date(0) }],
+		});
+		const refetch = store.loadFileVersions("train.py");
+		expect(store.fileVersions("train.py")?.status).toBe("ready");
+		await refetch;
+
+		expect(server.calls).toHaveLength(2);
+		const versions = store.fileVersions("train.py");
+		expect(versions?.status === "ready" && versions.value.map((v) => v.version)).toEqual([3, 2, 1]);
+	});
+
+	it("asks again when a poll lists a newer version while an older answer is in flight", async () => {
+		const table = { "train.py": ["a", "b"] };
+		const server = fileServer(table);
+		const store = bound(server, { "train.py": 2 });
+
+		server.suspend();
+		const first = store.loadFileVersions("train.py");
+		table["train.py"].push("c");
+		store.apply({
+			...payload(),
+			files: [{ name: "train.py", version: 3, size: 9, updatedAt: new Date(0) }],
+		});
+		const coalesced = store.loadFileVersions("train.py");
+		server.release();
+		await Promise.all([first, coalesced]);
+
+		expect(server.calls).toHaveLength(2);
+		const versions = store.fileVersions("train.py");
+		expect(versions?.status === "ready" && versions.value.map((v) => v.version)).toEqual([3, 2, 1]);
+	});
+
+	it("fetches each version's content once, by version, and never with the registry poll", async () => {
+		const server = fileServer({ "configs/sft.yaml": ["lr: 1\n", "lr: 2\n"] });
+		const store = bound(server, { "configs/sft.yaml": 2 });
+
+		await Promise.all([
+			store.loadFileContent("configs/sft.yaml", 2),
+			store.loadFileContent("configs/sft.yaml", 2),
+		]);
+		await store.loadFileContent("configs/sft.yaml", 1);
+		await store.loadFileContent("configs/sft.yaml", 2);
+
+		expect(server.calls).toEqual([
+			"/api/v2/conversations/conv-1/files/configs/sft.yaml?version=2",
+			"/api/v2/conversations/conv-1/files/configs/sft.yaml?version=1",
+		]);
+		expect(store.fileContent("configs/sft.yaml", 2)).toEqual({ status: "ready", value: "lr: 2\n" });
+		expect(store.fileContent("configs/sft.yaml", 1)).toEqual({ status: "ready", value: "lr: 1\n" });
+		expect(store.fileContent("configs/sft.yaml", 3)).toBeUndefined();
+	});
+
+	it("marks a failed load and asks again when told to", async () => {
+		const server = fileServer({ "train.py": ["a"] });
+		const store = bound(server, { "train.py": 1 });
+		server.fail(true);
+
+		await store.loadFileVersions("train.py");
+		await store.loadFileContent("train.py", 1);
+		expect(store.fileVersions("train.py")).toEqual({ status: "error" });
+		expect(store.fileContent("train.py", 1)).toEqual({ status: "error" });
+
+		server.fail(false);
+		await store.loadFileContent("train.py", 1);
+		expect(store.fileContent("train.py", 1)).toEqual({ status: "ready", value: "a" });
+	});
+
+	it("forgets the cache on reset and drops an answer that lands after it", async () => {
+		const server = fileServer({ "train.py": ["a"] });
+		const store = bound(server, { "train.py": 1 });
+		await store.loadFileContent("train.py", 1);
+
+		server.suspend();
+		const late = store.loadFileVersions("train.py");
+		store.reset();
+		store.bind("conv-2");
+		server.release();
+		await late;
+
+		expect(store.fileContent("train.py", 1)).toBeUndefined();
+		expect(store.fileVersions("train.py")).toBeUndefined();
 	});
 });

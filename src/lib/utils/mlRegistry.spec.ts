@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { MlRegistryArtefact, MlRegistryService } from "$lib/types/MlRegistry";
 import {
+	fileLanguage,
+	formatAgo,
+	formatBytes,
 	formatElapsed,
+	formatFileRef,
 	groupArtefacts,
 	hubLabel,
 	isServiceOpen,
 	pathWithin,
 	serviceDisplayName,
 	serviceElapsed,
+	servicesForFileVersion,
 	sortServices,
 	stageBadge,
 } from "./mlRegistry";
@@ -184,5 +189,59 @@ describe("hubLabel", () => {
 		expect(hubLabel("hf://spaces/pngwn/trackio")).toBe("pngwn/trackio");
 		expect(hubLabel("hf://datasets/pngwn/gone/data.parquet")).toBe("pngwn/gone/data.parquet");
 		expect(hubLabel("not-a-uri")).toBe("not-a-uri");
+	});
+});
+
+describe("servicesForFileVersion", () => {
+	it("keeps the services whose script was that version, running first", () => {
+		const done = service({
+			id: "done",
+			stage: "COMPLETED",
+			scriptRefs: [{ name: "train.py", version: 2 }],
+		});
+		const running = service({
+			id: "running",
+			createdAt: at(-60_000),
+			scriptRefs: [{ name: "train.py", version: 2 }],
+		});
+		const other = service({ id: "other", scriptRefs: [{ name: "train.py", version: 1 }] });
+		const inline = service({ id: "inline" });
+
+		const ran = servicesForFileVersion([done, other, inline, running], {
+			name: "train.py",
+			version: 2,
+		});
+
+		expect(ran.map((s) => s.id)).toEqual(["running", "done"]);
+		expect(servicesForFileVersion([done], { name: "eval.py", version: 2 })).toEqual([]);
+	});
+});
+
+describe("file formatting", () => {
+	it("names a version the way the tool card and the pane show it", () => {
+		expect(formatFileRef({ name: "configs/sft.yaml", version: 12 })).toBe("configs/sft.yaml v12");
+	});
+
+	it("gives sizes in bytes, then KB with one decimal under 10", () => {
+		expect(formatBytes(812)).toBe("812 B");
+		expect(formatBytes(3277)).toBe("3.2 KB");
+		expect(formatBytes(240 * 1024)).toBe("240 KB");
+		expect(formatBytes(3 * 1024 * 1024)).toBe("3.0 MB");
+	});
+
+	it("says how long ago in one coarse unit", () => {
+		expect(formatAgo(10_000)).toBe("just now");
+		expect(formatAgo(5 * 60_000)).toBe("5m ago");
+		expect(formatAgo(3 * 3_600_000 + 59 * 60_000)).toBe("3h ago");
+		expect(formatAgo(2 * 86_400_000)).toBe("2d ago");
+		expect(formatAgo(-5_000)).toBe("just now");
+	});
+
+	it("highlights by extension and leaves anything unknown plain", () => {
+		expect(fileLanguage("train.py")).toBe("python");
+		expect(fileLanguage("configs/sft.YML")).toBe("yaml");
+		expect(fileLanguage("run.sh")).toBe("bash");
+		expect(fileLanguage("pyproject.toml")).toBe("plaintext");
+		expect(fileLanguage("Dockerfile")).toBe("plaintext");
 	});
 });
