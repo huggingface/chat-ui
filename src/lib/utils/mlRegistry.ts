@@ -254,20 +254,29 @@ export function sourcePath(source: Pick<MlRegistrySource, "url" | "kind">): stri
 	}
 }
 
+export interface ReaderSources {
+	/** what this reader opened, most recent first */
+	opened: MlRegistrySource[];
+	/** what only came back to this reader in search results, even if another reader opened it */
+	found: MlRegistrySource[];
+}
+
 /** the sources of each reader, the run detail lists what that run read */
-export function sourcesByReader(
-	sources: readonly MlRegistrySource[]
-): Map<string, MlRegistrySource[]> {
-	const byReader = new Map<string, MlRegistrySource[]>();
+export function sourcesByReader(sources: readonly MlRegistrySource[]): Map<string, ReaderSources> {
+	const byReader = new Map<string, ReaderSources>();
 	for (const source of sources) {
 		for (const reader of source.readBy) {
-			const list = byReader.get(reader);
-			if (list) list.push(source);
-			else byReader.set(reader, [source]);
+			let entry = byReader.get(reader);
+			if (!entry) {
+				entry = { opened: [], found: [] };
+				byReader.set(reader, entry);
+			}
+			(source.openedBy.includes(reader) ? entry.opened : entry.found).push(source);
 		}
 	}
-	for (const list of byReader.values()) {
-		list.sort((a, b) => Number(b.opened) - Number(a.opened) || byLastSeen(a, b));
+	for (const entry of byReader.values()) {
+		entry.opened.sort(byLastSeen);
+		entry.found.sort(byLastSeen);
 	}
 	return byReader;
 }
@@ -280,12 +289,12 @@ export interface SourceReader {
 	runId?: string;
 }
 
-/** who read a source, the main agent by name and each sub-agent run by its label */
+/** readers by name, the main agent as main and each sub-agent run by its label */
 export function sourceReaders(
-	source: Pick<MlRegistrySource, "readBy">,
+	readers: readonly string[],
 	runs: readonly MlRegistryAgentRun[]
 ): SourceReader[] {
-	return source.readBy.map((reader) => {
+	return readers.map((reader) => {
 		if (reader === PARENT_READER) {
 			return { key: reader, label: "main", title: "Read by the main agent" };
 		}

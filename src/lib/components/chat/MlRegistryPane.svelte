@@ -217,7 +217,7 @@
 		`${count} ${count === 1 ? one : many}`;
 </script>
 
-{#snippet sourceItem(source: MlRegistrySource)}
+{#snippet sourceItem(source: MlRegistrySource, readers: readonly string[])}
 	<li class="ml-source flex min-w-0 items-baseline gap-2 py-[3px] pl-3 text-xs">
 		<span class="block min-w-0 flex-1">
 			<a
@@ -236,7 +236,7 @@
 			{/if}
 		</span>
 		<span class="flex flex-none flex-wrap justify-end gap-1">
-			{#each sourceReaders(source, mlRegistry.agentRuns) as reader (reader.key)}
+			{#each sourceReaders(readers, mlRegistry.agentRuns) as reader (reader.key)}
 				{#if reader.runId}
 					{@const runId = reader.runId}
 					<button
@@ -396,8 +396,8 @@
 									{@const badge = runBadge(run, turnLive)}
 									{@const elapsed = runElapsed(run, now, turnLive)}
 									{@const isOpen = openRuns.has(run.id)}
-									{@const read = readByRun.get(run.id) ?? []}
-									{@const opened = read.filter((source) => source.opened)}
+									{@const opened = readByRun.get(run.id)?.opened ?? []}
+									{@const foundOnly = readByRun.get(run.id)?.found.length ?? 0}
 									<li class="ml-run" id={runRowId(run.id)} data-stage={badge.tone}>
 										<button
 											type="button"
@@ -543,7 +543,7 @@
 												{:else}
 													<p class="ml-file-note" role="status">Loading the run…</p>
 												{/if}
-												{#if read.length}
+												{#if opened.length || foundOnly}
 													<div>
 														<h4 class="ml-run-label">
 															Sources
@@ -571,10 +571,10 @@
 																{/each}
 															</ul>
 														{/if}
-														{#if read.length > opened.length}
+														{#if foundOnly}
 															<p class="ml-file-note">
-																{plural(read.length - opened.length, "more link")} only in its search
-																results, listed under Sources.
+																{plural(foundOnly, "more link")} only in its search results, listed under
+																Sources.
 															</p>
 														{/if}
 													</div>
@@ -938,7 +938,7 @@
 													aria-label="Pages read on {group.label}"
 												>
 													{#each group.opened as source (source.id)}
-														{@render sourceItem(source)}
+														{@render sourceItem(source, source.openedBy)}
 													{/each}
 												</ul>
 											{/if}
@@ -950,7 +950,7 @@
 													aria-label="Links to {group.label} only in search results"
 												>
 													{#each group.found as source (source.id)}
-														{@render sourceItem(source)}
+														{@render sourceItem(source, source.readBy)}
 													{/each}
 												</ul>
 											{/if}

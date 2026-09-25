@@ -636,6 +636,7 @@ describe("MlRegistryPane sub-agent runs and sources", () => {
 		kind: "web",
 		opened: true,
 		readBy: [RESEARCH.id],
+		openedBy: over.opened === false ? [] : (over.readBy ?? [RESEARCH.id]),
 		firstSeenAt: at(-9 * 60_000),
 		lastSeenAt: at(-9 * 60_000),
 		count: 1,
@@ -878,6 +879,34 @@ describe("MlRegistryPane sub-agent runs and sources", () => {
 			["SPAN", "main"],
 			["BUTTON", "research"],
 		]);
+	});
+
+	it("never credits a page to a reader that only found it in search results", async () => {
+		serveRun();
+		const foundByResearch = source({
+			id: "s6",
+			url: "https://arxiv.org/abs/2401.00001",
+			readBy: ["parent", RESEARCH.id],
+			openedBy: ["parent"],
+		});
+		const { container } = mountRuns(false, { sources: [...SOURCES, foundByResearch] });
+		await tick();
+
+		const research = runRow(container, RESEARCH.id);
+		expect(text(research.querySelector(".ml-service-meta"))).toContain("2 sources read");
+		find(research, ".ml-file-toggle").click();
+		await vi.waitFor(() => expect(research.querySelector(".ml-run-sources")).not.toBeNull());
+		expect(all(research, ".ml-run-sources a").map((a) => a.getAttribute("href"))).not.toContain(
+			foundByResearch.url
+		);
+
+		const arxiv = groupRow(container, "arxiv.org");
+		find(arxiv, ".ml-file-toggle").click();
+		await tick();
+		const row = all(arxiv, ".ml-source").find(
+			(li) => li.querySelector("a")?.getAttribute("href") === foundByResearch.url
+		);
+		expect(all(row ?? document.body, ".ml-source-reader").map(text)).toEqual(["main"]);
 	});
 
 	it("goes from a source's reader to the run that read it", async () => {

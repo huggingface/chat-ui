@@ -277,6 +277,7 @@ describe.sequential("GET /api/v2/conversations/[id]/registry", () => {
 				title: "OmniParser V2",
 				opened: true,
 				readBy: [run.id],
+				openedBy: [run.id],
 				count: 1,
 				firstSeenAt: expect.any(Date),
 				lastSeenAt: expect.any(Date),

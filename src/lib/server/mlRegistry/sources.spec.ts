@@ -167,6 +167,7 @@ describe("recordSources", () => {
 			opened: false,
 			title: "Post",
 			readBy: [PARENT_READER],
+			openedBy: [],
 			count: 2,
 		});
 		expect(row.firstSeenAt).toBeInstanceOf(Date);
@@ -182,6 +183,18 @@ describe("recordSources", () => {
 		const [row] = await listMlSources(conversationId);
 		expect(row.opened).toBe(true);
 		expect(row.count).toBe(3);
+	});
+
+	it("credits the open to the reader that opened it, not one that only found it", async () => {
+		const conversationId = newConversationId();
+		await recordSources(conversationId, PARENT_READER, [page(false)]);
+		await recordSources(conversationId, RUN_ID, [page(true)]);
+		await recordSources(conversationId, PARENT_READER, [page(false)]);
+
+		const [row] = await listMlSources(conversationId);
+		expect(row.opened).toBe(true);
+		expect(row.readBy).toEqual([PARENT_READER, RUN_ID]);
+		expect(row.openedBy).toEqual([RUN_ID]);
 	});
 
 	it("keeps each reader once and moves lastSeenAt", async () => {

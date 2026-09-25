@@ -13,6 +13,7 @@ import {
 	sortServiceRows,
 	sourcePath,
 	sourceReaders,
+	sourcesByReader,
 	formatAgo,
 	formatBytes,
 	formatElapsed,
@@ -353,6 +354,7 @@ const source = (overrides: Partial<MlRegistrySource> = {}): MlRegistrySource => 
 	kind: "web",
 	opened: true,
 	readBy: ["parent"],
+	openedBy: overrides.opened === false ? [] : (overrides.readBy ?? ["parent"]),
 	firstSeenAt: at(0),
 	lastSeenAt: at(0),
 	count: 1,
@@ -416,8 +418,15 @@ describe("sources", () => {
 		);
 	});
 
+	it("lists what each reader opened apart from what only came back to it", () => {
+		const found = source({ id: "p", readBy: ["parent", "run-1"], openedBy: ["run-1"] });
+		const byReader = sourcesByReader([found, source({ id: "q", readBy: ["run-1"] })]);
+		expect(byReader.get("parent")).toEqual({ opened: [], found: [found] });
+		expect(byReader.get("run-1")?.opened.map((s) => s.id)).toEqual(["p", "q"]);
+	});
+
 	it("names the main agent and each run that read a source", () => {
-		const readers = sourceReaders(source({ readBy: ["parent", "run-1", "gone"] }), [run()]);
+		const readers = sourceReaders(["parent", "run-1", "gone"], [run()]);
 		expect(readers.map((reader) => reader.label)).toEqual(["main", "research", "sub-agent"]);
 		expect(readers[1].title).toContain("research sub-agent");
 	});

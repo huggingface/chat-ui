@@ -21,8 +21,10 @@ export interface MlSource {
 	kind: MlSourceKind;
 	/** false while the url only came back in search results, a later read flips it and nothing flips it back */
 	opened: boolean;
-	/** PARENT_READER or an mlAgentRuns id, each once */
+	/** PARENT_READER or an mlAgentRuns id, each once, everyone it came back to */
 	readBy: string[];
+	/** the readers in readBy that opened it, a search hit leaves a reader out */
+	openedBy: string[];
 	firstSeenAt: Date;
 	lastSeenAt: Date;
 	/** every call that returned it, reads and search results alike */

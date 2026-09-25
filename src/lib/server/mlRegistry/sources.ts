@@ -150,14 +150,19 @@ export async function recordSources(
 			updateOne: {
 				filter: { conversationId, url },
 				update: {
-					// opened is written by exactly one of the two, a search hit never unsets a read
-					$setOnInsert: { group, kind, firstSeenAt: now, ...(opened ? {} : { opened: false }) },
+					// opened and openedBy are written by exactly one of the two, a search hit never unsets a read
+					$setOnInsert: {
+						group,
+						kind,
+						firstSeenAt: now,
+						...(opened ? {} : { opened: false, openedBy: [] }),
+					},
 					$set: {
 						lastSeenAt: now,
 						...(opened ? { opened: true } : {}),
 						...(title ? { title } : {}),
 					},
-					$addToSet: { readBy },
+					$addToSet: opened ? { readBy, openedBy: readBy } : { readBy },
 					$inc: { count },
 				},
 				upsert: true,
