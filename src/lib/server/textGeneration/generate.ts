@@ -226,13 +226,17 @@ export async function* generate(
 				new Date().getTime() - lastReasoningUpdate.getTime() > 4000
 			) {
 				lastReasoningUpdate = new Date();
-				try {
-					generateSummaryOfReasoning(reasoningBuffer, model.id, locals).then((summary) => {
+				// Fire-and-forget: the summary lands in `status` whenever it
+				// arrives. The rejection must be handled here — a try/catch
+				// around the call only covers synchronous throws, and an
+				// unhandled rejection takes the whole Node process down.
+				generateSummaryOfReasoning(reasoningBuffer, model.id, locals)
+					.then((summary) => {
 						status = summary;
+					})
+					.catch((e) => {
+						logger.error(e, "Error generating summary of reasoning");
 					});
-				} catch (e) {
-					logger.error(e, "Error generating summary of reasoning");
-				}
 			}
 
 			yield {
