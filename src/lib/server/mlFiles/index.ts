@@ -1,12 +1,14 @@
 export {
 	ML_FILE_MAX_BYTES,
 	countLines,
+	deleteMlFilesOf,
 	listMlFiles,
 	readMlFile,
 	validateMlFileContent,
 	validateMlFileName,
 	writeMlFileVersion,
 	type MlFileListing,
+	type MlFileVersionConflict,
 	type WrittenMlFile,
 } from "./store";
 export { applyFileEdits, summarizeChanges, type FileEdit } from "./edits";

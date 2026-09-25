@@ -2,6 +2,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
 import {
+	deleteMlFilesOf,
 	listMlFiles,
 	ML_FILE_MAX_BYTES,
 	readMlFile,
@@ -133,6 +134,49 @@ describe("the mlFiles store", () => {
 		]);
 		expect(listing[1].updatedAt).toBeInstanceOf(Date);
 		expect(await listMlFiles(new ObjectId())).toEqual([]);
+	});
+
+	it("lands a pinned write only on top of the version it was derived from", async () => {
+		await writeMlFileVersion({ conversationId, name: "p.py", content: "1", origin: "write" });
+		await writeMlFileVersion({ conversationId, name: "p.py", content: "2", origin: "write" });
+
+		const stale = await writeMlFileVersion({
+			conversationId,
+			name: "p.py",
+			content: "from v1",
+			origin: "edit",
+			baseVersion: 1,
+		});
+		expect(stale).toEqual({ conflict: true, latestVersion: 2 });
+
+		const fresh = await writeMlFileVersion({
+			conversationId,
+			name: "p.py",
+			content: "from v2",
+			origin: "edit",
+			baseVersion: 2,
+		});
+		expect(fresh).toMatchObject({ version: 3 });
+		expect((await readMlFile(conversationId, "p.py"))?.content).toBe("from v2");
+	});
+
+	it("deletes every version of every file a conversation owns, and nothing else", async () => {
+		const other = new ObjectId();
+		await writeMlFileVersion({ conversationId, name: "a.py", content: "1", origin: "write" });
+		await writeMlFileVersion({ conversationId, name: "a.py", content: "2", origin: "edit" });
+		await writeMlFileVersion({ conversationId, name: "b.py", content: "3", origin: "write" });
+		await writeMlFileVersion({
+			conversationId: other,
+			name: "a.py",
+			content: "4",
+			origin: "write",
+		});
+
+		await deleteMlFilesOf([conversationId]);
+
+		expect(await listMlFiles(conversationId)).toEqual([]);
+		expect((await listMlFiles(other)).map((file) => file.name)).toEqual(["a.py"]);
+		await deleteMlFilesOf([]);
 	});
 
 	it("survives two concurrent writes of the same name without losing one", async () => {

@@ -145,6 +145,31 @@ describe("edit_file", () => {
 		expect(versions).toBe(1);
 	});
 
+	it("keeps one of two concurrent edits and refuses the other instead of losing it", async () => {
+		const { conv, write, edit } = tools();
+		await write.execute({ name: "train.py", content: "lr = 1\nsteps = 1\n" }, ctx);
+
+		const outcomes = await Promise.all([
+			edit.execute(
+				{ name: "train.py", edits: [{ old: "lr = 1", new: "lr = 2" }], expected_version: 1 },
+				ctx
+			),
+			edit.execute(
+				{ name: "train.py", edits: [{ old: "steps = 1", new: "steps = 2" }], expected_version: 1 },
+				ctx
+			),
+		]);
+
+		const texts = outcomes.map(textOf);
+		expect(texts.filter((text) => text.includes("v2 (was v1)"))).toHaveLength(1);
+		expect(texts.filter((text) => text.includes("moved from v1 to v2"))).toHaveLength(1);
+		const versions = await collections.mlFiles
+			.find({ conversationId: conv._id })
+			.sort({ version: 1 })
+			.toArray();
+		expect(versions.map((row) => row.version)).toEqual([1, 2]);
+	});
+
 	it("refuses a stale expected_version", async () => {
 		const { write, edit } = tools();
 		await write.execute({ name: "train.py", content: "a" }, ctx);

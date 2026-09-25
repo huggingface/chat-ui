@@ -3,6 +3,7 @@ import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
 import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { resolveConversation } from "$lib/server/api/utils/resolveConversation";
 import { collections } from "$lib/server/database";
+import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
 import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
 import { validModelIdSchema } from "$lib/server/models";
@@ -76,6 +77,7 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 	if (res.deletedCount === 0) {
 		error(404, "Conversation not found");
 	}
+	await deleteMlFilesOf([new ObjectId(id)]);
 
 	return superjsonResponse({ success: true });
 };

@@ -280,7 +280,15 @@ async function editFile(
 		origin: "edit",
 		summary: parsed.data.summary,
 		attribution: attribution(ctx),
+		baseVersion: current.version,
 	});
+	if ("conflict" in written) {
+		return {
+			error:
+				`${current.name} moved from v${current.version} to v${written.latestVersion} while this edit was ` +
+				`being applied, so it was not written. ${READ_FILE_TOOL_NAME} it and edit against the current version.`,
+		};
+	}
 	logger.info(
 		{
 			conversationId: conv._id.toString(),

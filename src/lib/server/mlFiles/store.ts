@@ -96,27 +96,51 @@ const trimSummary = (summary: unknown): string | undefined => {
 		: trimmed;
 };
 
-/** appends a version, name and content are validated by the caller so a refusal names the argument */
-export async function writeMlFileVersion(params: {
+export interface MlFileVersionConflict {
+	conflict: true;
+	latestVersion: number;
+}
+
+interface WriteMlFileParams {
 	conversationId: ObjectId;
 	name: string;
 	content: string;
 	origin: MlFile["origin"];
 	summary?: string;
 	attribution?: MlFileAttribution;
-}): Promise<WrittenMlFile> {
-	const { conversationId, name, content, origin } = params;
+}
+
+async function latestMlFileVersion(conversationId: ObjectId, name: string): Promise<number> {
+	const latest = await collections.mlFiles.findOne(
+		{ conversationId, name },
+		{ sort: { version: -1 }, projection: { version: 1 } }
+	);
+	return latest?.version ?? 0;
+}
+
+/** appends a version, name and content are validated by the caller so a refusal names the argument */
+export function writeMlFileVersion(params: WriteMlFileParams): Promise<WrittenMlFile>;
+/**
+ * with baseVersion the new version is baseVersion + 1 or nothing, the unique index
+ * is what makes an edit derived from one version unable to land on top of another
+ */
+export function writeMlFileVersion(
+	params: WriteMlFileParams & { baseVersion: number }
+): Promise<WrittenMlFile | MlFileVersionConflict>;
+export async function writeMlFileVersion(
+	params: WriteMlFileParams & { baseVersion?: number }
+): Promise<WrittenMlFile | MlFileVersionConflict> {
+	const { conversationId, name, content, origin, baseVersion } = params;
 	const size = Buffer.byteLength(content, "utf8");
 	const sha256 = createHash("sha256").update(content).digest("hex");
 	const summary = trimSummary(params.summary);
-	// parallel calls in one round can write the same name, the unique index makes the
-	// loser retry on the next number
+	// parallel calls in one round can write the same name, an unpinned write retries on
+	// the next number and a pinned one reports the conflict
 	for (let attempt = 0; ; attempt += 1) {
-		const latest = await collections.mlFiles.findOne(
-			{ conversationId, name },
-			{ sort: { version: -1 }, projection: { version: 1 } }
-		);
-		const version = (latest?.version ?? 0) + 1;
+		const version =
+			baseVersion !== undefined
+				? baseVersion + 1
+				: (await latestMlFileVersion(conversationId, name)) + 1;
 		try {
 			await collections.mlFiles.insertOne({
 				conversationId,
@@ -137,9 +161,22 @@ export async function writeMlFileVersion(params: {
 			return { name, version, size, lineCount: countLines(content), sha256 };
 		} catch (err) {
 			const duplicate = err instanceof MongoServerError && err.code === DUPLICATE_KEY;
-			if (!duplicate || attempt >= 2) throw err;
+			if (!duplicate) throw err;
+			if (baseVersion !== undefined) {
+				return {
+					conflict: true,
+					latestVersion: await latestMlFileVersion(conversationId, name),
+				};
+			}
+			if (attempt >= 2) throw err;
 		}
 	}
+}
+
+/** a conversation owns its files, so every path that deletes one calls this */
+export async function deleteMlFilesOf(conversationIds: ObjectId[]): Promise<void> {
+	if (conversationIds.length === 0) return;
+	await collections.mlFiles.deleteMany({ conversationId: { $in: conversationIds } });
 }
 
 export async function readMlFile(

@@ -1,5 +1,6 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
+import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
 import { config } from "$lib/server/config";
 import { models, validModelIdSchema } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
@@ -870,6 +871,7 @@ export async function DELETE({ locals, params }) {
 	}
 
 	await collections.conversations.deleteOne({ _id: conv._id });
+	await deleteMlFilesOf([conv._id]);
 
 	return new Response();
 }
