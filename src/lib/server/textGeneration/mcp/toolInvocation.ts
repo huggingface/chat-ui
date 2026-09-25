@@ -16,6 +16,7 @@ import { getClient } from "$lib/server/mcp/clientPool";
 import type { BuiltinTool } from "../builtinTools/types";
 import { openDurableElicitation, type ElicitationSink } from "$lib/server/mcp/elicitation";
 import { turnAwaitingInput } from "$lib/server/generation/turnState";
+import { slimToolOutput } from "$lib/server/generation/compressUpdates";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { ResolvedVirtualFileRef, VirtualFileExpander } from "$lib/server/mlFiles/expand";
 import type { ToolCallGuard } from "./toolGuard";
@@ -449,7 +450,7 @@ export async function* executeToolCalls({
 					uuid: p.uuid,
 					result: {
 						status: ToolResultStatus.Success,
-						call: { name: p.call.name, parameters: p.paramsClean },
+						call: { name: p.call.name, parameters: {} },
 						outputs: [{ text: outcome.resultText } as unknown as Record<string, unknown>],
 						display: true,
 					},
@@ -700,13 +701,13 @@ export async function* executeToolCalls({
 				uuid: p.uuid,
 				result: {
 					status: ToolResultStatus.Success,
-					call: { name: p.call.name, parameters: p.paramsClean },
+					call: { name: p.call.name, parameters: {} },
 					outputs: [
-						{
+						slimToolOutput({
 							text: annotated ?? "",
 							structured: toolResponse.structured,
 							content: toolResponse.content,
-						} as unknown as Record<string, unknown>,
+						}),
 					],
 					display: true,
 				},
