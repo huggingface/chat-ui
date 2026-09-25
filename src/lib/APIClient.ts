@@ -110,6 +110,11 @@ export function useAPIClient({
 						fetcher,
 						`${baseUrl}/conversations/${params.id}/files/${name.split("/").map(encodeURIComponent).join("/")}`
 					),
+				runs: (runId: string) =>
+					endpoint(
+						fetcher,
+						`${baseUrl}/conversations/${params.id}/runs/${encodeURIComponent(runId)}`
+					),
 			}),
 			// client.conversations.get(), .delete()
 			{

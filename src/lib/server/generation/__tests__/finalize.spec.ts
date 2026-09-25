@@ -55,6 +55,7 @@ describe.sequential("markGenerationInterrupted", () => {
 			collections.conversations.deleteMany({}),
 			collections.generations.deleteMany({}),
 			collections.mcpElicitations.deleteMany({}),
+			collections.mlAgentRuns.deleteMany({}),
 		]);
 	});
 
@@ -139,5 +140,43 @@ describe.sequential("markGenerationInterrupted", () => {
 		expect(await collections.mcpElicitations.findOne({ elicitationId: durable })).toMatchObject({
 			status: "pending",
 		});
+	});
+
+	it("interrupts the sub-agent runs the dead run left running, and only those", async () => {
+		const { conversationId, messageId, generationId } = await seed({ status: "running" });
+		const run = (
+			task: string,
+			over: { status?: "running" | "completed"; generationId?: string; conversationId?: ObjectId }
+		) => ({
+			_id: new ObjectId(),
+			conversationId: over.conversationId ?? conversationId,
+			label: "research",
+			displayName: "Research",
+			task,
+			parent: { tool: "research", toolUuid: task, generationId: over.generationId ?? generationId },
+			status: over.status ?? ("running" as const),
+			startedAt: new Date(),
+			iterations: 1,
+			calls: [],
+			callCount: 0,
+			sourceCount: 0,
+		});
+		await collections.mlAgentRuns.insertMany([
+			run("live", {}),
+			run("done", { status: "completed" }),
+			run("other-turn", { generationId: randomUUID() }),
+			run("other-chat", { conversationId: new ObjectId() }),
+		]);
+
+		await markGenerationInterrupted(generationId, { conversationId, messageId });
+
+		const byTask = Object.fromEntries(
+			(await collections.mlAgentRuns.find({}).toArray()).map((r) => [r.task, r])
+		);
+		expect(byTask.live.status).toBe("interrupted");
+		expect(byTask.live.endedAt).toBeInstanceOf(Date);
+		expect(byTask.done.status).toBe("completed");
+		expect(byTask["other-turn"].status).toBe("running");
+		expect(byTask["other-chat"].status).toBe("running");
 	});
 });

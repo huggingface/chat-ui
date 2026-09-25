@@ -7,9 +7,12 @@ import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 import { sidePane } from "$lib/stores/sidePane.svelte";
 import type { MlFileListing, MlFileVersionListing } from "$lib/types/MlFile";
 import type {
+	MlAgentRunDetail,
+	MlRegistryAgentRun,
 	MlRegistryArtefact,
 	MlRegistryPayload,
 	MlRegistryService,
+	MlRegistrySource,
 } from "$lib/types/MlRegistry";
 
 const NOW = Date.UTC(2026, 8, 25, 12, 0, 0);
@@ -151,8 +154,8 @@ describe("MlRegistryPane", () => {
 		expect(closed.container.querySelector("aside, [role=dialog]")).toBeNull();
 
 		const { container } = mount();
-		const pane = find(container, "[aria-label='Services and artefacts']");
-		expect(text(pane.querySelector("h2"))).toBe("Services and artefacts");
+		const pane = find(container, "[aria-label='Services and artifacts']");
+		expect(text(pane.querySelector("h2"))).toBe("Services and artifacts");
 	});
 
 	it("closes from its own header", () => {
@@ -289,10 +292,11 @@ describe("MlRegistryPane", () => {
 	it("shows an empty state per section", () => {
 		const { container } = mount(payload({ services: [], artefacts: [] }));
 		const empties = all(container, ".ml-registry-empty").map(text);
-		expect(empties).toHaveLength(3);
-		expect(empties[0]).toMatch(/^No jobs or sandboxes yet/);
+		expect(empties).toHaveLength(4);
+		expect(empties[0]).toMatch(/^No jobs, sandboxes or research runs yet/);
 		expect(empties[1]).toMatch(/^Nothing on the Hub yet/);
 		expect(empties[2]).toMatch(/^No files yet/);
+		expect(empties[3]).toMatch(/^No sources yet/);
 		expect(container.querySelector(".ml-registry-list")).toBeNull();
 	});
 
@@ -396,11 +400,18 @@ describe("MlRegistryPane files", () => {
 		(() => {
 			throw new Error(`no file row ${name}`);
 		})();
-	const versionRow = (root: ParentNode, version: number) =>
-		find(root, `.ml-version[data-version='${version}']`);
-	const openFile = async (root: ParentNode, name: string) => {
-		find(fileRow(root, name), ".ml-file-toggle").click();
-		await vi.waitFor(() => expect(fileRow(root, name).querySelector(".ml-version")).not.toBeNull());
+	const pill = (root: ParentNode, name: string, version: number) =>
+		find(fileRow(root, name), `.ml-version-pill[data-version='${version}']`);
+	const pressed = (root: ParentNode, name: string) =>
+		all(fileRow(root, name), ".ml-version-pill[aria-pressed='true']").map(text);
+	const panel = (root: ParentNode, name: string) => find(fileRow(root, name), ".ml-version");
+	const described = async (root: ParentNode, name: string, version: number) => {
+		await vi.waitFor(() => {
+			const shown = panel(root, name);
+			expect(shown.dataset.version).toBe(String(version));
+			expect(shown.querySelector(".ml-version-origin")).not.toBeNull();
+		});
+		return panel(root, name);
 	};
 	const codeOf = async (row: HTMLElement) => {
 		await vi.waitFor(() => expect(row.querySelector(".ml-file-code")).not.toBeNull());
@@ -418,7 +429,7 @@ describe("MlRegistryPane files", () => {
 		mlRegistry.reset();
 	});
 
-	it("lists each file with its latest version, size, age and summary", () => {
+	it("lists each file with its size, age and a pill per version, newest first", () => {
 		serveFiles();
 		const { container } = mountFiles();
 
@@ -428,67 +439,69 @@ describe("MlRegistryPane files", () => {
 			"configs/sft.yaml",
 			"train.py",
 		]);
-		const train = rows[1];
-		expect(text(train.querySelector(".ml-file-latest"))).toBe("v3");
-		expect(text(train.querySelector(".ml-file-meta"))).toBe("3.2 KB · updated 5m ago");
-		expect(text(train.querySelector(".ml-file-summary"))).toBe("add epochs");
-		expect(rows[0].querySelector(".ml-file-summary")).toBeNull();
-		expect(find(train, ".ml-file-toggle").getAttribute("aria-expanded")).toBe("false");
+		expect(all(rows[1], ".ml-version-pill").map(text)).toEqual(["v3", "v2", "v1"]);
+		expect(all(rows[0], ".ml-version-pill").map(text)).toEqual(["v1"]);
+		expect(text(rows[1].querySelector(".ml-file-meta"))).toBe("3.2 KB · updated 5m ago");
+		expect(text(rows[1])).not.toContain("add epochs");
+		expect(find(rows[1], ".ml-file-toggle").getAttribute("aria-expanded")).toBe("false");
+		expect(pressed(container, "train.py")).toEqual([]);
 	});
 
-	it("asks for a file's versions only once it is opened, and for no content until one is picked", async () => {
+	it("opens a file on its latest version, and only then asks for its versions and content", async () => {
 		const calls = serveFiles();
 		const { container } = mountFiles();
 		expect(calls).toEqual([]);
 
-		await openFile(container, "train.py");
+		find(fileRow(container, "train.py"), ".ml-file-toggle").click();
+		await described(container, "train.py", 3);
 
 		expect(find(fileRow(container, "train.py"), ".ml-file-toggle").ariaExpanded).toBe("true");
-		expect(all(container, ".ml-version").map((row) => row.dataset.version)).toEqual([
-			"3",
-			"2",
-			"1",
-		]);
-		expect(calls).toEqual(["train.py"]);
-		expect(container.querySelector(".ml-file-code")).toBeNull();
+		expect(pressed(container, "train.py")).toEqual(["v3"]);
+		await codeOf(panel(container, "train.py"));
+		expect(calls).toEqual(
+			expect.arrayContaining(["train.py", "train.py?version=3", "train.py?version=2"])
+		);
 	});
 
-	it("says how each version came about and which jobs ran it", async () => {
+	it("says how the picked version came about and which jobs ran it", async () => {
 		serveFiles();
 		const { container } = mountFiles();
-		await openFile(container, "train.py");
+		const jobsOf = (row: HTMLElement) =>
+			all(row, ".ml-version-jobs li").map((li) => [
+				text(li.querySelector("a")),
+				li.querySelector<HTMLElement>(".ml-stage")?.dataset.tone,
+			]);
 
-		const v3 = versionRow(container, 3);
+		find(fileRow(container, "train.py"), ".ml-file-toggle").click();
+		const v3 = await described(container, "train.py", 3);
 		expect(text(v3.querySelector(".ml-version-origin"))).toBe("imported");
 		expect(text(v3.querySelector(".ml-version-agent"))).toBe("sandbox_task");
 		expect(text(v3.querySelector(".ml-version-summary"))).toBe("add epochs");
 		expect(text(v3.querySelector(".ml-version-source"))).toBe(`from ${SOURCE}`);
-		expect(text(versionRow(container, 2).querySelector(".ml-version-origin"))).toBe("edited");
-		expect(versionRow(container, 2).querySelector(".ml-version-agent")).toBeNull();
-		expect(text(versionRow(container, 1).querySelector(".ml-version-origin"))).toBe("written");
+		expect(jobsOf(v3)).toEqual([["sft-smoke", "running"]]);
+		expect((find(v3, ".ml-version-jobs a") as HTMLAnchorElement).href).toBe(RAN_V3.hubUrl);
 
-		const jobsOf = (version: number) =>
-			all(versionRow(container, version), ".ml-version-jobs li").map((li) => [
-				text(li.querySelector("a")),
-				li.querySelector<HTMLElement>(".ml-stage")?.dataset.tone,
-			]);
-		expect(jobsOf(3)).toEqual([["sft-smoke", "running"]]);
-		expect(jobsOf(2)).toEqual([["22222222", "error"]]);
-		expect(jobsOf(1)).toEqual([]);
-		const link = find(versionRow(container, 3), ".ml-version-jobs a") as HTMLAnchorElement;
-		expect(link.href).toBe(RAN_V3.hubUrl);
+		pill(container, "train.py", 2).click();
+		const v2 = await described(container, "train.py", 2);
+		expect(text(v2.querySelector(".ml-version-origin"))).toBe("edited");
+		expect(v2.querySelector(".ml-version-agent")).toBeNull();
+		expect(jobsOf(v2)).toEqual([["22222222", "error"]]);
+
+		pill(container, "train.py", 1).click();
+		const v1 = await described(container, "train.py", 1);
+		expect(text(v1.querySelector(".ml-version-origin"))).toBe("written");
+		expect(jobsOf(v1)).toEqual([]);
 	});
 
 	it("shows what a version changed against the one before, with counts, and the whole file on request", async () => {
 		const calls = serveFiles();
 		const { container } = mountFiles();
-		await openFile(container, "train.py");
 
-		find(versionRow(container, 2), ".ml-version-toggle").click();
-		const row = versionRow(container, 2);
+		pill(container, "train.py", 2).click();
+		const row = await described(container, "train.py", 2);
 		const code = await codeOf(row);
 
-		expect(find(row, ".ml-version-toggle").getAttribute("aria-pressed")).toBe("true");
+		expect(pressed(container, "train.py")).toEqual(["v2"]);
 		expect(code.classList.contains("diff-view")).toBe(true);
 		expect(all(code, ".diff-del").map(text)).toEqual(["- lr = 1e-4"]);
 		expect(all(code, ".diff-add").map(text)).toEqual(["+ lr = 3e-4"]);
@@ -513,10 +526,9 @@ describe("MlRegistryPane files", () => {
 	it("shows the first version in full, with nothing to compare it to", async () => {
 		const calls = serveFiles();
 		const { container } = mountFiles();
-		await openFile(container, "train.py");
 
-		find(versionRow(container, 1), ".ml-version-toggle").click();
-		const row = versionRow(container, 1);
+		pill(container, "train.py", 1).click();
+		const row = await described(container, "train.py", 1);
 		const code = await codeOf(row);
 
 		expect(code.textContent).toBe(TRAIN[0]);
@@ -524,6 +536,25 @@ describe("MlRegistryPane files", () => {
 		expect(row.querySelector(".ml-file-view-toggle")).toBeNull();
 		expect(text(row.querySelector(".ml-file-view-bar"))).toBe("The first version, in full");
 		expect(calls.filter((call) => call.includes("?"))).toEqual(["train.py?version=1"]);
+	});
+
+	it("closes when the picked pill or the row is clicked again, and reopens on the latest", async () => {
+		serveFiles();
+		const { container } = mountFiles();
+
+		pill(container, "train.py", 2).click();
+		await described(container, "train.py", 2);
+		pill(container, "train.py", 2).click();
+		await tick();
+		expect(fileRow(container, "train.py").querySelector(".ml-version")).toBeNull();
+		expect(pressed(container, "train.py")).toEqual([]);
+
+		const toggle = find(fileRow(container, "train.py"), ".ml-file-toggle");
+		toggle.click();
+		await described(container, "train.py", 3);
+		toggle.click();
+		await tick();
+		expect(fileRow(container, "train.py").querySelector(".ml-version")).toBeNull();
 	});
 
 	it("names the script version each job ran and opens it under Files", async () => {
@@ -534,10 +565,9 @@ describe("MlRegistryPane files", () => {
 		expect(chips.map(text)).toEqual(["train.py v3", "train.py v2"]);
 		chips[1].click();
 
-		const row = await vi.waitFor(() => versionRow(container, 2));
+		const row = await described(container, "train.py", 2);
 		await codeOf(row);
-		expect(find(row, ".ml-version-toggle").getAttribute("aria-pressed")).toBe("true");
-		expect(versionRow(container, 3).querySelector(".ml-file-code")).toBeNull();
+		expect(pressed(container, "train.py")).toEqual(["v2"]);
 	});
 
 	it("keeps file ages moving when nothing is running", async () => {
@@ -571,6 +601,388 @@ describe("MlRegistryPane files", () => {
 
 		serveFiles();
 		find(fileRow(container, "train.py"), ".ml-file-retry").click();
-		await vi.waitFor(() => expect(all(container, ".ml-version")).toHaveLength(3));
+		await described(container, "train.py", 3);
+	});
+});
+
+describe("MlRegistryPane sub-agent runs and sources", () => {
+	const RESEARCH: MlRegistryAgentRun = {
+		id: "65f000000000000000000001",
+		label: "research",
+		displayName: "Research",
+		taskPreview: "Research task: find a working SFT recipe for SmolLM2",
+		parent: { tool: "research", toolUuid: "tool-1", messageId: "msg-1" },
+		status: "completed",
+		startedAt: at(-10 * 60_000),
+		endedAt: at(-10 * 60_000 + 65_000),
+		iterations: 5,
+		callCount: 7,
+		sourceCount: 3,
+	};
+	const LIVE_RUN: MlRegistryAgentRun = {
+		id: "65f000000000000000000002",
+		label: "research",
+		displayName: "Research",
+		taskPreview: "Research task: compare LoRA ranks for a 360M model",
+		parent: { tool: "research", toolUuid: "tool-2" },
+		status: "running",
+		startedAt: at(-42_000),
+		iterations: 2,
+		callCount: 3,
+		sourceCount: 0,
+	};
+	const FAILED: MlRegistryAgentRun = {
+		...RESEARCH,
+		id: "65f000000000000000000003",
+		taskPreview: "Research task: find why DPO loss diverges",
+		parent: { tool: "research", toolUuid: "tool-3" },
+		status: "failed",
+		failure: "iteration_limit",
+		error: "Research agent hit the iteration limit",
+		startedAt: at(-3 * 60_000),
+		endedAt: at(-60_000),
+		sourceCount: 0,
+	};
+	const DETAIL: MlAgentRunDetail = {
+		...RESEARCH,
+		task: "Context: the user wants to fine-tune SmolLM2\n\nResearch task: find a working SFT recipe for SmolLM2",
+		summary: "Use TRL SFTTrainer with packing.\nThe example is examples/scripts/sft.py.",
+		calls: [
+			{ tool: "hf_fs", args: '{"operations":[{"cmd":"cat"}]}', status: "success" },
+			{ tool: "crawling_exa", args: '{"urls":["https://x"]}', status: "error", error: "timeout" },
+		],
+	};
+
+	const source = (
+		over: Partial<MlRegistrySource> & { id: string; url: string }
+	): MlRegistrySource => ({
+		group: "arxiv.org",
+		kind: "web",
+		opened: true,
+		readBy: [RESEARCH.id],
+		openedBy: over.opened === false ? [] : (over.readBy ?? [RESEARCH.id]),
+		firstSeenAt: at(-9 * 60_000),
+		lastSeenAt: at(-9 * 60_000),
+		count: 1,
+		...over,
+	});
+	const SOURCES: MlRegistrySource[] = [
+		source({ id: "s1", url: "https://arxiv.org/abs/2502.16161", title: "OmniParser V2" }),
+		source({
+			id: "s2",
+			url: "https://arxiv.org/abs/2305.14233",
+			readBy: ["parent", RESEARCH.id],
+			lastSeenAt: at(-60_000),
+		}),
+		source({ id: "s3", url: "https://arxiv.org/abs/9999.00001", opened: false }),
+		source({
+			id: "s4",
+			url: "https://huggingface.co/papers/2502.16161",
+			group: "Hugging Face papers",
+			kind: "paper",
+			title: "OmniParser V2 on the Hub",
+			readBy: ["parent"],
+		}),
+		source({
+			id: "s5",
+			url: "https://github.com/huggingface/trl/blob/HEAD/examples/scripts/sft.py",
+			group: "huggingface/trl",
+			kind: "github",
+			opened: false,
+		}),
+	];
+
+	function serveRun(detail: MlAgentRunDetail = DETAIL): string[] {
+		const calls: string[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: RequestInfo | URL) => {
+				const url = new URL(String(input));
+				if (!url.pathname.includes("/runs/")) return new Response("{}", { status: 500 });
+				calls.push(url.pathname);
+				return new Response(superjson.stringify(detail), { status: 200 });
+			})
+		);
+		return calls;
+	}
+
+	const mountRuns = (over: Partial<MlRegistryPayload> = {}) =>
+		mount(
+			payload({
+				services: [COMPLETED, RUNNING],
+				agentRuns: [RESEARCH, LIVE_RUN, FAILED],
+				artefacts: [],
+				sources: SOURCES,
+				...over,
+			})
+		);
+	const runRow = (root: ParentNode, id: string) => find(root, `#ml-run-${id}`);
+	const openEnded = async (root: ParentNode) => {
+		find(root, ".ml-settled-toggle").click();
+		await tick();
+	};
+	const groupRow = (root: ParentNode, label: string) =>
+		all(root, ".ml-source-group").find(
+			(row) => text(row.querySelector(".ml-source-label")) === label
+		) ??
+		(() => {
+			throw new Error(`no source group ${label}`);
+		})();
+
+	beforeEach(() => {
+		vi.useFakeTimers({ toFake: ["Date"] });
+		vi.setSystemTime(NOW);
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+		sidePane.reset();
+		mlRegistry.reset();
+	});
+
+	it("lists runs among the services, and folds what ended and was reported under them", async () => {
+		serveRun();
+		const { container } = mountRuns({
+			services: [COMPLETED, RUNNING, { ...ERRORED, lastReportedStage: "ERROR" }],
+		});
+		await tick();
+
+		const idOf = (row: Element) => row.id || row.className.split(" ")[0];
+		const [active] = all(container, ".ml-registry-list");
+		expect([...active.children].map(idOf)).toEqual([
+			`ml-run-${LIVE_RUN.id}`,
+			"ml-service",
+			"ml-service",
+		]);
+		const toggle = find(container, ".ml-settled-toggle");
+		expect(text(toggle)).toBe("3 ended");
+		expect(toggle.getAttribute("aria-expanded")).toBe("false");
+		expect(container.querySelector("#ml-registry-settled")).toBeNull();
+
+		await openEnded(container);
+		expect([...find(container, "#ml-registry-settled").children].map(idOf)).toEqual([
+			`ml-run-${FAILED.id}`,
+			`ml-run-${RESEARCH.id}`,
+			"ml-service",
+		]);
+		expect(text(find(container, "#ml-registry-services"))).toBe("Services 6");
+		expect(text(find(container, "header h2 + span"))).toBe("2 running");
+	});
+
+	it("shows a run's name, status, calls, time and what it read", async () => {
+		serveRun();
+		const { container } = mountRuns();
+		await tick();
+		await openEnded(container);
+
+		const research = runRow(container, RESEARCH.id);
+		expect(text(research.querySelector(".ml-file-toggle span"))).toContain("Research");
+		const badge = find(research, ".ml-stage");
+		expect(badge.dataset.tone).toBe("completed");
+		expect(style(badge).color).toBe(GREEN_INK);
+		expect(text(research.querySelector(".ml-file-toggle"))).not.toContain(RESEARCH.taskPreview);
+		expect(text(research.querySelector(".ml-service-meta"))).toBe(
+			"7 calls · 1m 05s · 2 sources read"
+		);
+
+		const live = runRow(container, LIVE_RUN.id);
+		expect(text(live.querySelector(".ml-stage"))).toBe("running");
+		expect(live.querySelector(".ml-live-dot")).not.toBeNull();
+		expect(text(live.querySelector(".ml-service-meta"))).toBe("3 calls · 42s");
+
+		const failed = runRow(container, FAILED.id);
+		expect(find(failed, ".ml-stage").dataset.tone).toBe("error");
+		const note = find(failed, ".ml-run-note");
+		expect(text(note)).toBe("hit its step limit");
+		expect(style(note).color).toBe(RED_INK);
+	});
+
+	it("keeps an interrupted run in view, since the agent never got its result", async () => {
+		serveRun();
+		const { container } = mountRuns({
+			agentRuns: [{ ...LIVE_RUN, status: "interrupted", endedAt: at(-30_000) }],
+		});
+		await tick();
+
+		const stuck = runRow(container, LIVE_RUN.id);
+		expect(stuck.closest("#ml-registry-settled")).toBeNull();
+		expect(text(stuck.querySelector(".ml-stage"))).toBe("interrupted");
+		expect(stuck.querySelector(".ml-live-dot")).toBeNull();
+		expect(text(stuck.querySelector(".ml-service-meta"))).toBe("3 calls · 12s");
+	});
+
+	it("expands a run to its task, summary, calls and sources, fetched only when opened", async () => {
+		const calls = serveRun();
+		const { container } = mountRuns();
+		await tick();
+		await openEnded(container);
+		expect(calls).toEqual([]);
+
+		const research = runRow(container, RESEARCH.id);
+		const toggle = find(research, ".ml-file-toggle");
+		expect(toggle.getAttribute("aria-expanded")).toBe("false");
+		toggle.click();
+		await vi.waitFor(() => expect(research.querySelector(".ml-run-summary")).not.toBeNull());
+
+		expect(toggle.getAttribute("aria-expanded")).toBe("true");
+		expect(calls).toEqual([`/api/v2/conversations/conv-1/runs/${RESEARCH.id}`]);
+		const detail = find(research, ".ml-run-detail");
+		const labels = all(detail, ".ml-run-label").map(text);
+		expect(labels).toEqual(["Task", "Summary", "Calls 7", "Sources 2"]);
+		expect(find(detail, ".ml-run-text").textContent).toBe(DETAIL.task);
+		expect(find(detail, ".ml-run-summary").textContent).toBe(DETAIL.summary);
+
+		const callRows = all(detail, ".ml-run-calls li");
+		expect(callRows.map((row) => row.dataset.status)).toEqual(["success", "error"]);
+		expect(text(callRows[0])).toBe('hf_fs {"operations":[{"cmd":"cat"}]}');
+		expect(text(callRows[1].querySelector(".ml-run-note"))).toBe("timeout");
+		expect(text(detail)).toContain("5 later calls not kept.");
+
+		const read = all(detail, ".ml-run-sources a");
+		expect(read.map((a) => [text(a), a.getAttribute("href")])).toEqual([
+			["/abs/2305.14233", "https://arxiv.org/abs/2305.14233"],
+			["OmniParser V2", "https://arxiv.org/abs/2502.16161"],
+		]);
+		expect(
+			read.every(
+				(a) =>
+					a.getAttribute("target") === "_blank" && a.getAttribute("rel") === "noopener noreferrer"
+			)
+		).toBe(true);
+		expect(text(detail)).toContain("2 more links only in its search results");
+
+		toggle.click();
+		await tick();
+		expect(research.querySelector(".ml-run-detail")).toBeNull();
+	});
+
+	it("says so when a run cannot be read, and tries again", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response("{}", { status: 500 }))
+		);
+		const { container } = mountRuns();
+		await tick();
+		await openEnded(container);
+		const research = runRow(container, RESEARCH.id);
+		find(research, ".ml-file-toggle").click();
+		await vi.waitFor(() => expect(text(research)).toContain("Could not load the run."));
+
+		const calls = serveRun();
+		find(research, ".ml-file-retry").click();
+		await vi.waitFor(() => expect(research.querySelector(".ml-run-summary")).not.toBeNull());
+		expect(calls).toHaveLength(1);
+	});
+
+	it("groups sources, most read first, each with how many were read and found", async () => {
+		serveRun();
+		const { container } = mountRuns();
+		await tick();
+
+		expect(text(find(container, "#ml-registry-sources"))).toBe("Sources 5");
+		const groups = all(container, ".ml-source-group");
+		expect(
+			groups.map((row) => [row.dataset.kind, text(row.querySelector(".ml-file-toggle"))])
+		).toEqual([
+			["web", "arxiv.org 2 read 1 found"],
+			["paper", "Hugging Face papers 1 read"],
+			["github", "huggingface/trl 1 found"],
+		]);
+		expect(container.querySelector(".ml-source")).toBeNull();
+	});
+
+	it("expands a group to its paths, read first, search-only results apart and dimmed", async () => {
+		serveRun();
+		const { container } = mountRuns();
+		await tick();
+
+		const arxiv = groupRow(container, "arxiv.org");
+		find(arxiv, ".ml-file-toggle").click();
+		await tick();
+
+		const [readList, foundList] = all(arxiv, ".ml-source-paths");
+		expect(readList.dataset.found).toBeUndefined();
+		expect(all(readList, ".ml-source-link").map(text)).toEqual([
+			"/abs/2305.14233",
+			"OmniParser V2",
+		]);
+		expect(text(find(readList, ".ml-source-path"))).toBe("/abs/2502.16161");
+		expect(text(find(arxiv, ".ml-source-found-heading"))).toBe("Only in search results");
+		expect(foundList.dataset.found).toBe("true");
+		const dimmed = find(foundList, ".ml-source-link");
+		expect(dimmed.getAttribute("href")).toBe("https://arxiv.org/abs/9999.00001");
+		expect(style(dimmed).color).not.toBe(style(find(readList, ".ml-source-link")).color);
+
+		const readers = all(readList.children[0], ".ml-source-reader");
+		expect(readers.map((reader) => [reader.tagName, text(reader)])).toEqual([
+			["SPAN", "main"],
+			["BUTTON", "research"],
+		]);
+	});
+
+	it("never credits a page to a reader that only found it in search results", async () => {
+		serveRun();
+		const foundByResearch = source({
+			id: "s6",
+			url: "https://arxiv.org/abs/2401.00001",
+			readBy: ["parent", RESEARCH.id],
+			openedBy: ["parent"],
+		});
+		const { container } = mountRuns({ sources: [...SOURCES, foundByResearch] });
+		await tick();
+		await openEnded(container);
+
+		const research = runRow(container, RESEARCH.id);
+		expect(text(research.querySelector(".ml-service-meta"))).toContain("2 sources read");
+		find(research, ".ml-file-toggle").click();
+		await vi.waitFor(() => expect(research.querySelector(".ml-run-sources")).not.toBeNull());
+		expect(all(research, ".ml-run-sources a").map((a) => a.getAttribute("href"))).not.toContain(
+			foundByResearch.url
+		);
+
+		const arxiv = groupRow(container, "arxiv.org");
+		find(arxiv, ".ml-file-toggle").click();
+		await tick();
+		const row = all(arxiv, ".ml-source").find(
+			(li) => li.querySelector("a")?.getAttribute("href") === foundByResearch.url
+		);
+		expect(all(row ?? document.body, ".ml-source-reader").map(text)).toEqual(["main"]);
+	});
+
+	it("goes from a source's reader to the run that read it", async () => {
+		serveRun();
+		const { container } = mountRuns();
+		await tick();
+		const arxiv = groupRow(container, "arxiv.org");
+		find(arxiv, ".ml-file-toggle").click();
+		await tick();
+
+		find(arxiv, "button.ml-source-reader").click();
+		await vi.waitFor(() =>
+			expect(runRow(container, RESEARCH.id).querySelector(".ml-run-summary")).not.toBeNull()
+		);
+		const research = runRow(container, RESEARCH.id);
+		expect(research.closest("#ml-registry-settled")).not.toBeNull();
+		expect(find(research, ".ml-file-toggle").getAttribute("aria-expanded")).toBe("true");
+	});
+
+	it("renders a payload from a server that predates runs and sources", async () => {
+		const { container } = mount(payload({ agentRuns: undefined, sources: undefined }));
+		await tick();
+		expect(container.querySelector(".ml-run")).toBeNull();
+		expect(text(find(container, "#ml-registry-sources"))).toBe("Sources");
+	});
+
+	it("fits a phone width without scrolling sideways", async () => {
+		serveRun();
+		const { container } = mountRuns();
+		await tick();
+		await openEnded(container);
+		const scroller = find(container, ".ml-registry");
+		scroller.style.width = "340px";
+		find(groupRow(container, "arxiv.org"), ".ml-file-toggle").click();
+		find(runRow(container, RESEARCH.id), ".ml-file-toggle").click();
+		await vi.waitFor(() => expect(container.querySelector(".ml-run-summary")).not.toBeNull());
+		expect(scroller.scrollWidth).toBeLessThanOrEqual(scroller.clientWidth);
 	});
 });

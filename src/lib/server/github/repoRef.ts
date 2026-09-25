@@ -1,3 +1,5 @@
+import { encodePath } from "./client";
+
 /**
  * Repo argument parsing, shared by all three tools so that `repo` means one
  * thing everywhere.
@@ -54,3 +56,7 @@ export function parseRepo(repo: unknown, org?: unknown): ParsedRepo {
 }
 
 export const repoSlug = ({ owner, repo }: RepoRef): string => `${owner}/${repo}`;
+
+/** a find and a later read of the same ref name one page */
+export const blobUrl = (ref: RepoRef, gitRef: string, path: string): string =>
+	`https://github.com/${repoSlug(ref)}/blob/${encodeURIComponent(gitRef)}/${encodePath(path)}`;

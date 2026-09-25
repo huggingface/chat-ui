@@ -7,7 +7,7 @@ import {
 	MISSING_TOKEN_MESSAGE,
 } from "./client";
 import { notebookToMarkdown } from "./notebook";
-import { parseRepo, repoSlug } from "./repoRef";
+import { blobUrl, parseRepo, repoSlug } from "./repoRef";
 import type { GithubToolResult } from "./types";
 
 /**
@@ -256,10 +256,11 @@ export async function readFile(
 
 	const header = `**${slug} — ${path}**${ref === "HEAD" ? "" : ` (ref: ${ref})`}`;
 
+	const read = { repo: slug, url: blobUrl(parsed.ref, ref, path), opened: true };
 	// Said plainly rather than rendered as one blank line, which reads as a failed
 	// read and invites the model to try again.
 	if (!rendered) {
-		return { text: `${header}\n\nThe file is empty.`, isError: false };
+		return { text: `${header}\n\nThe file is empty.`, isError: false, files: [read] };
 	}
 
 	const lines = splitLines(rendered);
@@ -311,5 +312,6 @@ export async function readFile(
 	return {
 		text: `${header}\n\n${fence}${language}\n${body}\n${fence}\n\n${footer.join(" ")}`,
 		isError: false,
+		files: [read],
 	};
 }

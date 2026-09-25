@@ -62,6 +62,8 @@ import { loadSessionJobLabels } from "$lib/server/mlRegistry/sessionLabel";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
+import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
+import { PARENT_READER } from "$lib/types/MlSource";
 import { mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
 import { markHarnessEventDelivered, pendingHarnessEvent } from "$lib/server/mlRegistry/midTurn";
 import {
@@ -242,6 +244,9 @@ export async function* runMcpFlow({
 					(locals as unknown as { user?: { username?: string } })?.user?.username,
 				...(jobLabels ? { jobLabels } : {}),
 			})
+		: undefined;
+	const sourcesGuardFor = mlAssistant
+		? (readBy: string) => createMlSourcesGuard({ conversationId: conv._id, readBy })
 		: undefined;
 	if (mlAssistant) {
 		logger.info(
@@ -522,6 +527,7 @@ export async function* runMcpFlow({
 			repeatedCallGuard,
 			createSchemaPreflightGuard(mapping),
 			...(recordingGuard ? [recordingGuard] : []),
+			...(sourcesGuardFor ? [sourcesGuardFor(PARENT_READER)] : []),
 			...(budgetGuard ? [budgetGuard] : []),
 		].reduce(composeGuards);
 		const oaTools = [
@@ -758,6 +764,7 @@ export async function* runMcpFlow({
 			contextLengthTokens: targetContextLength,
 			...(rewriteArgs ? { rewriteArgs } : {}),
 			...(expandVirtualFiles ? { expandVirtualFiles } : {}),
+			...(sourcesGuardFor ? { sourcesGuard: sourcesGuardFor } : {}),
 		};
 		for (const tool of builtinTools) {
 			if (isNestedAgentTool(tool)) tool.bind(nestedAgentDeps);

@@ -336,7 +336,13 @@ export async function finishElicitationResume(
 ): Promise<void> {
 	const now = new Date();
 	await collections.mcpElicitations.updateOne(
-		{ _id: row._id, "resume.status": "resuming", "resume.takenAt": row.resume?.takenAt },
+		// attempts as well as takenAt, a successor can claim within the same millisecond
+		{
+			_id: row._id,
+			"resume.status": "resuming",
+			"resume.takenAt": row.resume?.takenAt,
+			"resume.attempts": row.resume?.attempts,
+		},
 		{
 			$set: {
 				...(outcome.abandoned
@@ -593,7 +599,12 @@ export async function releaseElicitationResume(
 ): Promise<void> {
 	await collections.mcpElicitations
 		.updateOne(
-			{ _id: row._id, "resume.status": "resuming", "resume.takenAt": row.resume?.takenAt },
+			{
+				_id: row._id,
+				"resume.status": "resuming",
+				"resume.takenAt": row.resume?.takenAt,
+				"resume.attempts": row.resume?.attempts,
+			},
 			{
 				$set: { "resume.takenAt": new Date(0) },
 				...(uncounted ? { $inc: { "resume.attempts": -1 } } : {}),

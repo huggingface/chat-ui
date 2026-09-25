@@ -42,11 +42,13 @@
 	let registryLabel = $derived(
 		registry && registry.open > 0 ? `${registry.open} running` : "Services"
 	);
-	let registryTitle = $derived(
-		registry && registry.open > 0
-			? `Services and artefacts: ${registry.open} running. Open the list`
-			: "Services and artefacts: open the list"
-	);
+	let registryShown = $derived(sidePane.open && sidePane.view === "registry");
+	let registryTitle = $derived.by(() => {
+		const verb = registryShown ? "close" : "open";
+		return registry && registry.open > 0
+			? `Services and artifacts: ${registry.open} running. ${verb === "close" ? "Close" : "Open"} the list`
+			: `Services and artifacts: ${verb} the list`;
+	});
 
 	$effect(() => {
 		if (!dashboard?.spaceId) return;
@@ -202,7 +204,8 @@
 				]}
 				title={registryTitle}
 				aria-label={registryTitle}
-				onclick={() => sidePane.openRegistry()}
+				aria-expanded={registryShown}
+				onclick={() => (registryShown ? sidePane.close() : sidePane.openRegistry())}
 			>
 				<span class="relative flex size-[14px] flex-none items-center justify-center">
 					<CarbonBox class="size-[14px]" />
