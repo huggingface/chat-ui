@@ -6,6 +6,7 @@ import {
 	MessageUpdateType,
 } from "$lib/types/MessageUpdate";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
+import { ToolResultStatus } from "$lib/types/Tool";
 
 const call = (uuid: string): MessageUpdate => ({
 	type: MessageUpdateType.Tool,
@@ -106,5 +107,91 @@ describe("compressUpdatesForStorage", () => {
 
 	it("handles an absent updates array", () => {
 		expect(compressUpdatesForStorage(undefined)).toEqual([]);
+	});
+
+	describe("tool results", () => {
+		const image = { type: "image", data: "aGk=", mimeType: "image/png" };
+		const textBlock = { type: "text", text: "Job started: 0123" };
+		const storedAsToday = (content: unknown[] = [textBlock, image]): MessageUpdate => ({
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Result,
+			uuid: "a",
+			result: {
+				status: ToolResultStatus.Success,
+				call: { name: "hf_jobs", parameters: { operation: "run", script: "print(1)" } },
+				outputs: [
+					{
+						text: "Job started: 0123",
+						structured: { job: { id: "0123", status: "RUNNING" } },
+						content,
+					},
+				],
+				display: true,
+			},
+		});
+
+		it("keeps the text, the images and the tool name, and nothing that repeats them", () => {
+			expect(compressUpdatesForStorage([storedAsToday()])).toEqual([
+				{
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Result,
+					uuid: "a",
+					result: {
+						status: ToolResultStatus.Success,
+						call: { name: "hf_jobs", parameters: {} },
+						outputs: [{ text: "Job started: 0123", content: [image] }],
+						display: true,
+					},
+				},
+			]);
+		});
+
+		it("omits content when only text blocks were in it", () => {
+			const [stored] = compressUpdatesForStorage([storedAsToday([textBlock])]) ?? [];
+
+			expect(stored).toMatchObject({ result: { outputs: [{ text: "Job started: 0123" }] } });
+			expect(JSON.stringify(stored)).not.toContain('"content"');
+		});
+
+		it("is a no-op on a message it already stored", () => {
+			const once = compressUpdatesForStorage([call("a"), storedAsToday()]);
+			expect(compressUpdatesForStorage(once)).toEqual(once);
+		});
+
+		it("empties the call parameters on an error result too", () => {
+			const failed: MessageUpdate = {
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: "a",
+				result: {
+					status: ToolResultStatus.Error,
+					call: { name: "hf_jobs", parameters: { script: "print(1)" } },
+					message: "quota exceeded",
+				},
+			};
+
+			expect(compressUpdatesForStorage([failed])).toEqual([
+				{ ...failed, result: { ...failed.result, call: { name: "hf_jobs", parameters: {} } } },
+			]);
+		});
+
+		it("leaves the call update and the live update it was given alone", () => {
+			const fullCall: MessageUpdate = {
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Call,
+				uuid: "a",
+				call: { name: "hf_jobs", parameters: { operation: "run", script: "print(1)" } },
+				argumentsRaw: '{"operation":"run","script":"print(1)"}',
+				reasoning: "Start the job.",
+				content: "Starting it now.",
+				fileRefs: [{ ref: "v-file://train.py@v1", name: "train.py", version: 1 }],
+			};
+			const live = storedAsToday();
+
+			const [storedCall] = compressUpdatesForStorage([fullCall, live]) ?? [];
+
+			expect(storedCall).toEqual(fullCall);
+			expect(live).toEqual(storedAsToday());
+		});
 	});
 });

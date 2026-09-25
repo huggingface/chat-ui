@@ -4,8 +4,10 @@ import {
 	MessageUpdateStatus,
 	MessageUpdateType,
 	type MessageStreamUpdate,
+	type MessageToolResultUpdate,
 } from "$lib/types/MessageUpdate";
 import type { Message } from "$lib/types/Message";
+import { ToolResultStatus } from "$lib/types/Tool";
 
 /**
  * A conversation is one MongoDB document, and Mongo caps a document at 16MB.
@@ -23,12 +25,40 @@ import type { Message } from "$lib/types/Message";
  */
 const MAX_PERSISTED_UPDATES = 5_000;
 
+const isTextBlock = (block: unknown): boolean =>
+	typeof block === "object" && block !== null && (block as { type?: unknown }).type === "text";
+
+/** structured and the text blocks both repeat the text */
+export function slimToolOutput(output: Record<string, unknown>): Record<string, unknown> {
+	const slim = { ...output };
+	delete slim.structured;
+	if (Array.isArray(slim.content)) {
+		// the tool card renders images from the blocks that are left
+		const blocks = slim.content.filter((block) => !isTextBlock(block));
+		if (blocks.length > 0) slim.content = blocks;
+		else delete slim.content;
+	}
+	return slim;
+}
+
+function slimToolResult(update: MessageToolResultUpdate): MessageToolResultUpdate {
+	// parameters repeat the call update, the trackio strip reads call.name off the result
+	const call = { ...update.result.call, parameters: {} };
+	return {
+		...update,
+		result:
+			update.result.status === ToolResultStatus.Success
+				? { ...update.result, call, outputs: update.result.outputs.map(slimToolOutput) }
+				: { ...update.result, call },
+	};
+}
+
 /**
  * Shape a message's updates for storage: drop keepalives and live-only progress,
- * and replace each stream token with a length marker (content is stored
- * separately), preserving ordering without duplicating text. Shared by the full
- * save and the writer's incremental materialise so both persist the same thing
- * under materializedSeq.
+ * slim tool results, and replace each stream token with a length marker (content
+ * is stored separately), preserving ordering without duplicating text. Shared by
+ * the full save and the writer's incremental materialise so both persist the same
+ * thing under materializedSeq.
  *
  * Only what is *persisted* changes. Everything still streams to the connected
  * client as it always did.
@@ -40,6 +70,10 @@ export function compressUpdatesForStorage(updates: Message["updates"]): Message[
 			continue;
 		}
 		if (u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Progress) {
+			continue;
+		}
+		if (u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Result) {
+			kept.push(slimToolResult(u));
 			continue;
 		}
 		if (u.type !== MessageUpdateType.Stream) {

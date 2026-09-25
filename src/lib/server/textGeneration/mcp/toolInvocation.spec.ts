@@ -497,6 +497,39 @@ describe("executeToolCalls with a guard", () => {
 		);
 	});
 
+	it("streams the result without the parts that repeat its text, and the guard still gets them", async () => {
+		const structured = { job: { id: "0123456789abcdef01234567", status: "RUNNING" } };
+		const image = { type: "image", data: "aGk=", mimeType: "image/png" };
+		mcpMock.callMcpTool.mockResolvedValue(
+			mcpResult({
+				text: "job started",
+				structured,
+				content: [{ type: "text", text: "job started" }, image],
+			})
+		);
+		const { guard, after } = fakeGuard({
+			before: vi.fn(async () => ({ allow: true, ticket: { key: "k" } }) as const),
+		});
+
+		const events = await drain([CALL], undefined, undefined, guard);
+
+		expect(after).toHaveBeenCalledWith(
+			{ key: "k" },
+			{ status: "success", text: "job started", structured }
+		);
+		const result = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Result);
+		expect(result).toMatchObject({
+			result: {
+				status: ToolResultStatus.Success,
+				call: { name: "do_thing", parameters: {} },
+				outputs: [{ text: "job started", content: [image] }],
+			},
+		});
+		if (result?.subtype === MessageToolUpdateType.Result) {
+			expect(result.result).not.toHaveProperty("outputs.0.structured");
+		}
+	});
+
 	it("reports a transport failure", async () => {
 		mcpMock.callMcpTool.mockRejectedValue(new Error("socket hang up"));
 		const { guard, after } = fakeGuard({
