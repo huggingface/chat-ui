@@ -20,6 +20,7 @@ import { composeGuards, type ToolCallGuard } from "../mcp/toolGuard";
 import { parseToolArguments, withParseableArguments } from "../mcp/toolArgs";
 import { stripLoneSurrogates } from "../utils/loneSurrogates";
 import { isRateLimitError, withUpstreamRetry } from "../utils/upstreamRetry";
+import type { VirtualFileExpander } from "$lib/server/mlFiles/expand";
 import type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
 
 /**
@@ -72,6 +73,8 @@ export interface NestedAgentDeps {
 	 * the parent's jobs has to look where they were put.
 	 */
 	rewriteArgs?: ToolArgsRewrite;
+	/** the parent expansion, a sub-agent writing into a sandbox passes a reference the same way */
+	expandVirtualFiles?: VirtualFileExpander;
 }
 
 export interface NestedAgentSpec {
@@ -428,6 +431,7 @@ export async function runNestedAgent(
 				processToolOutput: (text) => ({ annotated: text, sources: [] }),
 				abortSignal: ctx.abortSignal,
 				builtinTools: allowedBuiltins,
+				...(deps.expandVirtualFiles ? { expandVirtualFiles: deps.expandVirtualFiles } : {}),
 				// Preflight only. The budget guard stays absent by design — the
 				// allowlist is what keeps a sub-agent from spending — but checking
 				// a call against its own schema is not a policy, it is the round

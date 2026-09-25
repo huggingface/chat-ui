@@ -17,6 +17,7 @@ import type { BuiltinTool } from "../builtinTools/types";
 import { openDurableElicitation, type ElicitationSink } from "$lib/server/mcp/elicitation";
 import { turnAwaitingInput } from "$lib/server/generation/turnState";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
+import type { ResolvedVirtualFileRef, VirtualFileExpander } from "$lib/server/mlFiles/expand";
 import type { ToolCallGuard } from "./toolGuard";
 import type { Client } from "@modelcontextprotocol/client";
 import type { ObjectId } from "mongodb";
@@ -88,6 +89,11 @@ export interface ExecuteToolCallsParams {
 	/** Returns `null` when the call's argument string could not be decoded — see `toolArgs.ts`. */
 	parseArgs: (raw: unknown) => Record<string, unknown> | null;
 	resolveFileRef?: FileRefResolver;
+	/**
+	 * expands v-file references in the dispatched arguments only, applied like resolveFileRef
+	 * after the persisted parameters are taken
+	 */
+	expandVirtualFiles?: VirtualFileExpander;
 	toPrimitive: (value: unknown) => Primitive | undefined;
 	processToolOutput: (text: string) => {
 		annotated: string;
@@ -157,6 +163,7 @@ export async function* executeToolCalls({
 	servers,
 	parseArgs,
 	resolveFileRef,
+	expandVirtualFiles,
 	toPrimitive,
 	processToolOutput,
 	abortSignal,
@@ -185,20 +192,57 @@ export async function* executeToolCalls({
 		paramsClean: Record<string, Primitive>;
 	};
 
-	const prepared = calls.map((call) => {
-		const argsObj = parseArgs(call.arguments);
+	const builtinByName = new Map((builtinTools ?? []).map((tool) => [tool.name, tool]));
+
+	type Prepared = {
+		call: NormalizedToolCall;
+		argsObj: Record<string, unknown> | null;
+		paramsClean: Record<string, Primitive>;
+		uuid: string;
+		fileRefs?: ResolvedVirtualFileRef[];
+		/** a reference that did not resolve, refused before any guard sees the call */
+		refusal?: string;
+	};
+	const prepared: Prepared[] = [];
+	for (const call of calls) {
+		let argsObj = parseArgs(call.arguments);
 		const paramsClean: Record<string, Primitive> = {};
 		for (const [k, v] of Object.entries(argsObj ?? {})) {
 			const prim = toPrimitive(v);
 			if (prim !== undefined) paramsClean[k] = prim;
 		}
+		let fileRefs: ResolvedVirtualFileRef[] | undefined;
+		let refusal: string | undefined;
 		// Attach any resolved image payloads _after_ computing paramsClean so that
 		// logging / status updates continue to show only the lightweight primitive
 		// arguments (e.g. "image_1") while the full data: URLs or image blobs are
 		// only sent to the MCP tool server.
-		if (argsObj) attachFileRefsToArgs(argsObj, resolveFileRef);
-		return { call, argsObj, paramsClean, uuid: randomUUID() };
-	});
+		if (argsObj) {
+			attachFileRefsToArgs(argsObj, resolveFileRef);
+			const entry = builtinByName.has(call.name) ? undefined : mapping[call.name];
+			const server = entry ? serverLookup.get(entry.server) : undefined;
+			if (expandVirtualFiles && entry && server) {
+				const expansion = await expandVirtualFiles({
+					serverUrl: server.url,
+					tool: entry.tool,
+					args: argsObj,
+				});
+				if ("error" in expansion) refusal = expansion.error;
+				else {
+					argsObj = expansion.args;
+					if (expansion.fileRefs.length > 0) fileRefs = expansion.fileRefs;
+				}
+			}
+		}
+		prepared.push({
+			call,
+			argsObj,
+			paramsClean,
+			uuid: randomUUID(),
+			...(fileRefs ? { fileRefs } : {}),
+			...(refusal ? { refusal } : {}),
+		});
+	}
 
 	for (const [index, p] of prepared.entries()) {
 		yield {
@@ -212,6 +256,7 @@ export async function* executeToolCalls({
 				...(p.call.arguments?.trim() && isValidJsonObject(p.call.arguments)
 					? { argumentsRaw: p.call.arguments }
 					: {}),
+				...(p.fileRefs ? { fileRefs: p.fileRefs } : {}),
 				...(index === 0 && roundReasoning?.trim() ? { reasoning: roundReasoning } : {}),
 				// Preamble text is trimmed (unlike reasoning, which stays
 				// byte-exact): replay compares it against the trim-normalized
@@ -294,7 +339,6 @@ export async function* executeToolCalls({
 		emit: (update) => updatesQueue.push(update),
 	};
 
-	const builtinByName = new Map((builtinTools ?? []).map((tool) => [tool.name, tool]));
 	// Positional, not success-conditional: which parking call survives must not depend
 	// on a race between concurrent tasks.
 	const parkingCalls = prepared.filter((p) => builtinByName.get(p.call.name)?.mayPark);
@@ -455,6 +499,20 @@ export async function* executeToolCalls({
 			return;
 		}
 		const client = clientMap.get(mappingEntry.server);
+
+		// before the guard, a budget guard books its hold in before and there is nothing to
+		// hold for a call that cannot be sent, script also accepts a URL so a literal would
+		// start a job that bills and fails
+		if (p.refusal) {
+			results.push({ index, error: p.refusal, uuid: p.uuid, paramsClean: p.paramsClean });
+			updatesQueue.push({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Error,
+				uuid: p.uuid,
+				message: p.refusal,
+			});
+			return;
+		}
 
 		// Consulted before anything leaves the process: a refusal is an ordinary
 		// tool error the model recovers from, and nothing was dispatched.
