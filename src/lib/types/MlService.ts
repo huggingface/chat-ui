@@ -45,10 +45,13 @@ export interface MlService extends Timestamps {
 	pollStoppedReason?: string;
 	/** since when no usable hub token could be found for the conversation, cleared on the next poll */
 	tokenMissingSince?: Date;
+	/** the stage just before the row ended, the from of its event */
+	stageBeforeEnd?: string;
+	/** set when the row ended and the model has not been told yet */
+	eventPendingSince?: Date;
 	/**
-	 * the stage the model was last told about, UNTRACKED once told the poller gave the row up,
-	 * written by whatever told it, the event path or the session state block, never by the
-	 * poller, an ended row matching it is not listed again
+	 * the stage the model was last told about, or an end judged not news, UNTRACKED once the
+	 * state block told it the poller gave the row up, an ended row matching it is not listed again
 	 */
 	lastReportedStage?: string;
 	/** the budget reservation key, generationId:callUuid */
@@ -58,4 +61,20 @@ export interface MlService extends Timestamps {
 	generationId?: string;
 	/** the dispatch uuid, not the provider tool call id */
 	toolUuid?: string;
+}
+
+/** a terminal change the model is told about, ids and numbers only, its text is built on resume */
+export interface ServiceEvent {
+	serviceId: MlService["_id"];
+	kind: MlServiceKind;
+	jobId: string;
+	handle?: string;
+	name?: string;
+	flavor?: string;
+	/** UNKNOWN when the poller never read a stage before the end */
+	from: string;
+	to: string;
+	/** absent when no start was ever recorded */
+	ranSeconds?: number;
+	at: Date;
 }

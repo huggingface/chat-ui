@@ -185,7 +185,14 @@ export async function markServicesReported(reports: readonly ServiceReport[]): P
 	if (reports.length === 0) return;
 	await collections.mlServices.bulkWrite(
 		reports.map(({ _id, stage, reported }) => ({
-			updateOne: { filter: { _id, stage }, update: { $set: { lastReportedStage: reported } } },
+			updateOne: {
+				filter: { _id, stage },
+				// an event still pending would tell the model a second time from a parked wait
+				update: {
+					$set: { lastReportedStage: reported },
+					$unset: { eventPendingSince: "" as const },
+				},
+			},
 		})),
 		{ ordered: false }
 	);

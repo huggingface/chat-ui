@@ -177,7 +177,17 @@ export async function wakeParkedCallEarly(
 	// much of the wait was skipped.
 	const result = await collections.parkedCalls.updateOne(
 		{ conversationId, messageId, status: "waiting" },
-		[{ $set: { plannedResumeAt: "$resumeAt", resumeAt: now, wokeEarlyAt: now, updatedAt: now } }]
+		[
+			{
+				$set: {
+					// a harness wake may already have moved resumeAt
+					plannedResumeAt: { $ifNull: ["$plannedResumeAt", "$resumeAt"] },
+					resumeAt: now,
+					wokeEarlyAt: now,
+					updatedAt: now,
+				},
+			},
+		]
 	);
 	if (result.matchedCount === 0) return false;
 	logger.info(

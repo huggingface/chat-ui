@@ -20,6 +20,7 @@ const {
 	renderSessionStateBlock,
 	SESSION_STATE_MAX_CHARS,
 } = await import("./stateBlock");
+const { claimServiceEvents } = await import("./events");
 
 const NOW = new Date(Date.UTC(2026, 8, 25, 14, 5, 0));
 const ago = (ms: number) => new Date(NOW.getTime() - ms);
@@ -496,6 +497,26 @@ describe("buildSessionStateBlock", () => {
 		await expect(
 			markSessionStateRead([{ _id: new ObjectId(), stage: "ERROR", reported: "ERROR" }])
 		).resolves.toBeUndefined();
+	});
+
+	it("takes an ended job out of the event path once the block has told the model", async () => {
+		const row = service({
+			conversationId: conv._id,
+			name: "sft-v2",
+			stage: "ERROR",
+			endedAt: ago(MIN),
+			eventPendingSince: ago(MIN),
+		});
+		await collections.mlServices.insertOne(row);
+
+		const block = await buildSessionStateBlock(conv, NOW);
+		expect(block?.text).toContain("- job sft-v2 · ERROR");
+		await markSessionStateRead(block?.ended ?? []);
+
+		const stored = await collections.mlServices.findOne({ _id: row._id });
+		expect(stored?.lastReportedStage).toBe("ERROR");
+		expect(stored).not.toHaveProperty("eventPendingSince");
+		expect(await claimServiceEvents(conv._id, NOW)).toEqual([]);
 	});
 
 	it("reports a row the poller gave up on once, even when its running stage was already told", async () => {
