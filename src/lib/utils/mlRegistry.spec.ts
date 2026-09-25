@@ -7,6 +7,7 @@ import {
 	formatElapsed,
 	formatFileRef,
 	groupArtefacts,
+	harnessEventLabel,
 	hubLabel,
 	isServiceOpen,
 	pathWithin,
@@ -77,6 +78,29 @@ describe("serviceDisplayName", () => {
 		expect(serviceDisplayName(service({ name: "sft-smoke" }))).toBe("sft-smoke");
 		expect(serviceDisplayName(service({ name: "  " }))).toBe("01234567");
 		expect(serviceDisplayName(service())).toBe("01234567");
+	});
+});
+
+describe("harnessEventLabel", () => {
+	const event = { jobId: "0123456789abcdef01234567", name: "sft-smoke", ranSeconds: 137 };
+
+	it("says how the service ended and after how long", () => {
+		expect(harnessEventLabel({ ...event, to: "ERROR" })).toBe("sft-smoke failed after 2m 17s");
+		expect(harnessEventLabel({ ...event, to: "COMPLETED" })).toBe(
+			"sft-smoke completed after 2m 17s"
+		);
+		expect(harnessEventLabel({ ...event, to: "CANCELED" })).toBe(
+			"sft-smoke cancelled after 2m 17s"
+		);
+		expect(harnessEventLabel({ ...event, to: "DELETED", ranSeconds: undefined })).toBe(
+			"sft-smoke deleted"
+		);
+	});
+
+	it("names an unnamed service by its short id and a stage it does not know as ended", () => {
+		expect(harnessEventLabel({ ...event, name: undefined, to: "TIMEOUT" })).toBe(
+			"01234567 ended after 2m 17s"
+		);
 	});
 });
 

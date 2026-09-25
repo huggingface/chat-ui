@@ -159,16 +159,28 @@ export async function deliverServiceEvents(
 	}
 }
 
+/** read without claiming, for a caller that stores the events before it marks them */
+export const pendingServiceEvents = pendingFor;
+
+/** the rows this call marked, one another caller marked first was told there as well */
+export async function markServiceEventsReported(
+	services: MlService[],
+	now = new Date()
+): Promise<MlService[]> {
+	const marked: MlService[] = [];
+	for (const service of services) {
+		const { filter, update } = markReported(service, now);
+		const { modifiedCount } = await collections.mlServices.updateOne(filter, update);
+		if (modifiedCount === 1) marked.push(service);
+	}
+	return marked;
+}
+
 /** for a wait about to park, a crash after the claim loses the line, an ended job is listed once */
 export async function claimServiceEvents(
 	conversationId: ObjectId,
 	now = new Date()
 ): Promise<ServiceEvent[]> {
-	const claimed: ServiceEvent[] = [];
-	for (const service of await pendingFor(conversationId)) {
-		const { filter, update } = markReported(service, now);
-		const { modifiedCount } = await collections.mlServices.updateOne(filter, update);
-		if (modifiedCount === 1) claimed.push(serviceEventFrom(service, now));
-	}
-	return claimed;
+	const claimed = await markServiceEventsReported(await pendingFor(conversationId), now);
+	return claimed.map((service) => serviceEventFrom(service, now));
 }

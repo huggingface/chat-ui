@@ -2,6 +2,7 @@ import type { Message } from "$lib/types/Message";
 import {
 	MessageUpdateType,
 	type MessageElicitationResolvedUpdate,
+	type MessageHarnessEventUpdate,
 	type MessagePlanUpdate,
 	type MessageToolUpdate,
 	type MessageUpdate,
@@ -10,6 +11,7 @@ import type { ElicitationRequestPayload } from "$lib/types/McpElicitation";
 import {
 	isMessageElicitationRequestUpdate,
 	isMessageElicitationResolvedUpdate,
+	isMessageHarnessEventUpdate,
 	isMessagePlanUpdate,
 	isMessageToolUpdate,
 } from "./messageUpdates";
@@ -32,7 +34,8 @@ export type MessageBlock =
 	| { type: "tool"; uuid: string; updates: MessageToolUpdate[] }
 	| { type: "artifact"; op: ArtifactOperation; opIndex: number }
 	| ElicitationBlock
-	| { type: "plan"; update: MessagePlanUpdate };
+	| { type: "plan"; update: MessagePlanUpdate }
+	| { type: "harnessEvent"; update: MessageHarnessEventUpdate };
 
 type ToolBlock = Extract<MessageBlock, { type: "tool" }>;
 
@@ -142,6 +145,8 @@ function applyCardUpdate(res: MessageBlock[], update: MessageUpdate): void {
 		const planIdx = res.findIndex((b) => b.type === "plan");
 		if (planIdx !== -1) res.splice(planIdx, 1);
 		res.push({ type: "plan", update });
+	} else if (isMessageHarnessEventUpdate(update)) {
+		res.push({ type: "harnessEvent", update });
 	}
 }
 

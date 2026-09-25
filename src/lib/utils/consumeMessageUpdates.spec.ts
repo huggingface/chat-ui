@@ -66,6 +66,47 @@ describe("consumeMessageUpdates", () => {
 		expect(renderedText(message)).toBe(message.content);
 	});
 
+	it("keeps a harness event at its place among the tool updates", async () => {
+		const message: Message = {
+			id: "00000000-0000-4000-8000-000000000000",
+			from: "assistant",
+			content: "",
+			updates: [],
+		};
+		const event: MessageUpdate = {
+			type: MessageUpdateType.HarnessEvent,
+			events: [
+				{
+					serviceId: "svc",
+					kind: "job",
+					jobId: "0123456789abcdef01234567",
+					from: "RUNNING",
+					to: "ERROR",
+					at: 0,
+				},
+			],
+			text: "[Harness event, not part of this tool result]",
+			afterToolUuid: "u1",
+		};
+
+		await consumeMessageUpdates(
+			fromArray([
+				{ type: MessageUpdateType.Stream, token: "Checking." },
+				event,
+				{ type: MessageUpdateType.Stream, token: " Reading the logs." },
+			]),
+			message,
+			context()
+		);
+
+		expect(message.updates?.map((u) => u.type)).toEqual([
+			MessageUpdateType.Stream,
+			MessageUpdateType.HarnessEvent,
+			MessageUpdateType.Stream,
+		]);
+		expect(message.updates?.[1]).toEqual(event);
+	});
+
 	it("continues merging ordinary live stream tokens", async () => {
 		const message: Message = {
 			id: "00000000-0000-4000-8000-000000000000",

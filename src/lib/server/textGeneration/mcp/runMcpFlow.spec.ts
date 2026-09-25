@@ -40,6 +40,10 @@ const mocks = vi.hoisted(() => ({
 	listMlArtefacts: vi.fn(async (): Promise<unknown[]> => []),
 	listMlFiles: vi.fn(async (): Promise<unknown[]> => []),
 	markServicesReported: vi.fn(async () => undefined),
+	pendingHarnessEvent: vi.fn<(conversationId: unknown, afterToolUuid: string) => Promise<unknown>>(
+		async () => undefined
+	),
+	markHarnessEventDelivered: vi.fn(async () => undefined),
 }));
 
 // The gate itself is real; only the build flag behind it is forced on.
@@ -111,6 +115,10 @@ vi.mock("$lib/server/mlRegistry/store", async (importOriginal) => ({
 	listMlServices: mocks.listMlServices,
 	listMlArtefacts: mocks.listMlArtefacts,
 	markServicesReported: mocks.markServicesReported,
+}));
+vi.mock("$lib/server/mlRegistry/midTurn", () => ({
+	pendingHarnessEvent: mocks.pendingHarnessEvent,
+	markHarnessEventDelivered: mocks.markHarnessEventDelivered,
 }));
 vi.mock("$lib/server/mlFiles/store", async (importOriginal) => ({
 	...(await importOriginal<typeof import("$lib/server/mlFiles/store")>()),
@@ -264,6 +272,10 @@ beforeEach(() => {
 	}
 	mocks.markServicesReported.mockReset();
 	mocks.markServicesReported.mockResolvedValue(undefined);
+	mocks.pendingHarnessEvent.mockReset();
+	mocks.pendingHarnessEvent.mockResolvedValue(undefined);
+	mocks.markHarnessEventDelivered.mockReset();
+	mocks.markHarnessEventDelivered.mockResolvedValue(undefined);
 	scriptToolResults();
 });
 
@@ -1008,6 +1020,179 @@ describe("runMcpFlow session state block", () => {
 		expect(result).toBe("completed");
 		expect(lastUserText(0)).toBe("hello");
 	});
+});
+
+describe("runMcpFlow mid-turn service events", () => {
+	const mlConv = () =>
+		({ _id: new ObjectId(), mlAssistant: true }) as unknown as Parameters<
+			typeof runMcpFlow
+		>[0]["conv"];
+	const inMode = () => ({ conv: mlConv() }) as Partial<Parameters<typeof runMcpFlow>[0]>;
+
+	const EVENT_TEXT =
+		"[Harness event, not part of this tool result]\nJob sft-smoke (a10g-small) failed: ERROR after 2m17s. Read its logs with check_job before changing anything.";
+	const eventUpdate = (afterToolUuid: string) => ({
+		type: MessageUpdateType.HarnessEvent,
+		events: [
+			{
+				serviceId: "svc",
+				kind: "job",
+				jobId: "0123456789abcdef01234567",
+				name: "sft-smoke",
+				from: "RUNNING",
+				to: "ERROR",
+				ranSeconds: 137,
+				at: 0,
+			},
+		],
+		text: EVENT_TEXT,
+		afterToolUuid,
+	});
+	const services = [{ jobId: "0123456789abcdef01234567" }];
+	const pendingOnce = () =>
+		mocks.pendingHarnessEvent.mockImplementationOnce(async (_id, uuid) => ({
+			update: eventUpdate(uuid),
+			services,
+		}));
+	const harnessUpdates = (updates: MessageUpdate[]) =>
+		updates.filter((u) => u.type === MessageUpdateType.HarnessEvent);
+
+	it("appends the event to the round's last tool result before the next request", async () => {
+		pendingOnce();
+		scriptRounds([
+			{
+				toolCalls: [
+					{ id: "call_1", name: "do_thing", arguments: "{}" },
+					{ id: "call_2", name: "do_thing", arguments: "{}" },
+				],
+			},
+			{ content: "reading the logs" },
+		]);
+
+		const { updates, result } = await runFlow(inMode());
+
+		expect(result).toBe("completed");
+		expect(mocks.pendingHarnessEvent).toHaveBeenCalledTimes(1);
+		expect(mocks.pendingHarnessEvent.mock.calls[0][1]).toBe("call_2");
+		expect(harnessUpdates(updates)).toEqual([eventUpdate("call_2")]);
+		const next = requestMessages(1);
+		expect(next.at(-2)).toEqual({ role: "tool", tool_call_id: "call_1", content: "tool ok" });
+		expect(next.at(-1)).toEqual({
+			role: "tool",
+			tool_call_id: "call_2",
+			content: `tool ok\n\n${EVENT_TEXT}`,
+		});
+		expect(mocks.markHarnessEventDelivered).toHaveBeenCalledWith(expect.anything(), services);
+	});
+
+	it("emits the update before it clears the rows", async () => {
+		pendingOnce();
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+		const order: string[] = [];
+		mocks.markHarnessEventDelivered.mockImplementation(async () => {
+			order.push("mark");
+		});
+
+		const generator = runMcpFlow({ ...context(), ...inMode() } as Parameters<typeof runMcpFlow>[0]);
+		for (let step = await generator.next(); !step.done; step = await generator.next()) {
+			order.push(step.value.type);
+		}
+
+		const emitted = order.indexOf(MessageUpdateType.HarnessEvent);
+		expect(emitted).toBeGreaterThan(-1);
+		expect(order.indexOf("mark")).toBeGreaterThan(emitted);
+	});
+
+	it("looks once per round and changes nothing while no end is pending", async () => {
+		const toolRound: Round = { toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] };
+		scriptRounds([toolRound, toolRound, toolRound, { content: "done" }]);
+
+		const { updates } = await runFlow(inMode());
+
+		expect(mocks.pendingHarnessEvent).toHaveBeenCalledTimes(3);
+		expect(harnessUpdates(updates)).toEqual([]);
+		expect(mocks.markHarnessEventDelivered).not.toHaveBeenCalled();
+		expect(requestMessages(3).at(-1)).toMatchObject({ role: "tool", content: "tool ok" });
+	});
+
+	it("delivers each end in the round it is found and once only", async () => {
+		pendingOnce();
+		const toolRound: Round = { toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] };
+		scriptRounds([toolRound, toolRound, { content: "done" }]);
+
+		const { updates } = await runFlow(inMode());
+
+		expect(harnessUpdates(updates)).toHaveLength(1);
+		expect(mocks.markHarnessEventDelivered).toHaveBeenCalledTimes(1);
+		expect(String(requestMessages(1).at(-1)?.content)).toContain(EVENT_TEXT);
+		expect(requestMessages(2).at(-1)).toMatchObject({ role: "tool", content: "tool ok" });
+	});
+
+	it("delivers nothing when the model answers without calling a tool", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow(inMode());
+		expect(mocks.pendingHarnessEvent).not.toHaveBeenCalled();
+	});
+
+	it("leaves the events for the next run when no completion follows the round", async () => {
+		const toolRound: Round = { toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] };
+		scriptRounds(Array.from({ length: 100 }, () => toolRound));
+
+		const { result } = await runFlow(inMode());
+
+		expect(result).toBe("exhausted");
+		expect(mocks.pendingHarnessEvent).toHaveBeenCalledTimes(99);
+	});
+
+	it("leaves the events to the wait when the round parks", async () => {
+		mocks.executeToolCalls.mockImplementation(async function* () {
+			yield {
+				type: "update",
+				update: {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Call,
+					uuid: "call_1",
+					call: { name: "wait", parameters: {} },
+				},
+			};
+			yield { type: "complete", summary: { toolMessages: [], toolRuns: [], awaitingInput: true } };
+		});
+		scriptRounds([{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] }]);
+
+		const { result } = await runFlow(inMode());
+
+		expect(result).toBe("awaiting_input");
+		expect(mocks.pendingHarnessEvent).not.toHaveBeenCalled();
+	});
+
+	it("delivers nothing outside the mode", async () => {
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+		await runFlow();
+		expect(mocks.pendingHarnessEvent).not.toHaveBeenCalled();
+	});
+
+	it.each([["ML_ASSISTANT_SERVICE_EVENTS"], ["ML_ASSISTANT_SERVICE_POLLER"]] as const)(
+		"delivers nothing with %s off",
+		async (key) => {
+			scriptRounds([
+				{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+				{ content: "done" },
+			]);
+			config[key] = "false";
+			try {
+				await runFlow(inMode());
+			} finally {
+				config[key] = "";
+			}
+			expect(mocks.pendingHarnessEvent).not.toHaveBeenCalled();
+		}
+	);
 });
 
 describe("leaked tool-call markup", () => {

@@ -25,6 +25,8 @@ import {
 	createTestUser,
 } from "$lib/server/api/__tests__/testHelpers";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
+import type { MlService } from "$lib/types/MlService";
+import { ObjectId } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 import type { MessageToolCallUpdate } from "$lib/types/MessageUpdate";
@@ -42,6 +44,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("$lib/server/textGeneration/utils/historyWindowFlag", () => ({
 	historyWindowEnabled: () => mocks.slidingWindow,
 }));
+
+// only conversations created with mlAssistant run the preset, the rest are unaffected
+vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
 
 // Only the client is stubbed. The SDK's error classes stay real: the retry
 // predicate identifies a dead connection by class, so a mocked-away
@@ -311,10 +316,11 @@ afterEach(async () => {
  * creates. Starting from a legacy (rootMessageId-less) conversation would send
  * the route down its one-time conversion path instead of the normal one.
  */
-async function newConversation() {
+async function newConversation(overrides: Partial<Conversation> = {}) {
 	const { locals } = await createTestUser();
 	const rootId = crypto.randomUUID();
 	const conv = await createTestConversation(locals, {
+		...overrides,
 		model: MODEL_ID,
 		title: "t",
 		rootMessageId: rootId,
@@ -1169,6 +1175,127 @@ describe.sequential("history stored in either shape", () => {
 		const history = (messages: ChatMessage[]) => messages.filter((m) => m.role !== "system");
 		expect(history(fromRounds), describeMessages(fromRounds)).toEqual(history(fromLegacy));
 		expect(history(fromRounds).filter((m) => m.tool_calls)).toHaveLength(2);
+	});
+});
+
+describe.sequential("a job that ends while the turn is busy", () => {
+	const HEADER = "[Harness event, not part of this tool result]";
+
+	function endJobDuringTool(conv: Conversation, text: string) {
+		let ended = false;
+		mocks.callMcpTool.mockImplementation(async () => {
+			if (!ended) {
+				ended = true;
+				const now = new Date();
+				await collections.mlServices.insertOne({
+					_id: new ObjectId(),
+					conversationId: conv._id,
+					kind: "job",
+					jobId: "0123456789abcdef01234567",
+					namespace: "testuser",
+					name: "sft-smoke",
+					flavor: "a10g-small",
+					stage: "ERROR",
+					stageBeforeEnd: "RUNNING",
+					origin: "dispatched",
+					hubUrl: "https://huggingface.co/jobs/testuser/0123456789abcdef01234567",
+					startedAt: new Date(now.getTime() - 137_000),
+					endedAt: now,
+					eventPendingSince: now,
+					createdAt: new Date(now.getTime() - 200_000),
+					updatedAt: now,
+				} satisfies MlService);
+			}
+			return { text, isError: false, structured: undefined, content: [{ type: "text", text }] };
+		});
+	}
+
+	/** provider ids are replaced on replay, so pairs are compared by the order they appear in */
+	function withPositionalIds(messages: ChatMessage[]): ChatMessage[] {
+		const ids = new Map<string, string>();
+		const named = (id: string) => ids.get(id) ?? ids.set(id, `id${ids.size}`).get(id) ?? id;
+		return messages.map(
+			(m) =>
+				({
+					...m,
+					...(m.tool_calls
+						? { tool_calls: m.tool_calls.map((call) => ({ ...call, id: named(call.id) })) }
+						: {}),
+					...(m.tool_call_id ? { tool_call_id: named(m.tool_call_id) } : {}),
+				}) as ChatMessage
+		);
+	}
+
+	const history = (messages: ChatMessage[]) => messages.filter((m) => m.role !== "system");
+
+	it("rebuilds the prompt the model read live, from either stored shape", async () => {
+		const { conv, locals } = await newConversation({ mlAssistant: true });
+		endJobDuringTool(conv, "18°C, sunny");
+		scriptRounds([
+			{
+				content: "Checking both.",
+				toolCalls: [
+					{ id: "call_one11111", name: "get_weather", arguments: '{"city":"Paris"}' },
+					{ id: "call_two22222", name: "get_forecast", arguments: '{"city":"Paris"}' },
+				],
+			},
+			{ content: "The smoke job failed, reading its logs next." },
+			{ content: "Follow-up." },
+			{ content: "Follow-up again." },
+		]);
+
+		await sendMessage(conv, locals, "Weather and forecast for Paris?");
+		const live = history(outgoing(1));
+		const lastResult = String(live.at(-1)?.content);
+		expect(lastResult.startsWith(`18°C, sunny\n\n${HEADER}\nJob sft-smoke`)).toBe(true);
+		expect(lastResult).toContain("failed: ERROR after 2m17s");
+		expect(live.at(-2)).toMatchObject({ role: "tool", content: "18°C, sunny" });
+
+		const converted = await reload(conv);
+		const [turn] = assistantMessages(converted);
+		expect(turn.contentShape).toBe(2);
+		const events = (turn.updates ?? []).filter((u) => u.type === MessageUpdateType.HarnessEvent);
+		expect(events).toHaveLength(1);
+		const [service] = await collections.mlServices.find({ conversationId: conv._id }).toArray();
+		expect(service.eventPendingSince).toBeUndefined();
+
+		await sendMessage(converted, locals, "Thanks?");
+		const fromRounds = history(outgoing(2));
+		expect(
+			withPositionalIds(fromRounds.slice(0, live.length)),
+			describeMessages(fromRounds)
+		).toEqual(withPositionalIds(live));
+
+		await collections.conversations.updateOne(
+			{ _id: conv._id, "messages.id": turn.id },
+			{ $set: { "messages.$": toLegacyShape(turn) } }
+		);
+		const legacy = await reload(conv);
+		await retryMessage(legacy, locals, assistantMessages(legacy)[1].id);
+		const fromLegacy = history(outgoing(3));
+		expect(fromLegacy.slice(0, live.length + 1), describeMessages(fromLegacy)).toEqual(
+			fromRounds.slice(0, live.length + 1)
+		);
+	});
+
+	it("keeps the event whole when the replay cap cuts the output it follows", async () => {
+		mocks.slidingWindow = false;
+		const { conv, locals } = await newConversation({ mlAssistant: true });
+		const output = "y".repeat(9_000);
+		endJobDuringTool(conv, output);
+		scriptRounds([
+			{ toolCalls: [{ id: "call_one11111", name: "get_weather", arguments: '{"city":"Paris"}' }] },
+			{ content: "It failed." },
+			{ content: "Follow-up." },
+		]);
+
+		await sendMessage(conv, locals, "Weather?");
+		const liveEvent = String(outgoing(1).at(-1)?.content).slice(output.length);
+		await sendMessage(await reload(conv), locals, "Thanks?");
+
+		const replayed = outgoing(2).find((m) => m.role === "tool");
+		expect(String(replayed?.content)).toBe(`${"y".repeat(8000)}\n[...truncated]${liveEvent}`);
+		expect(liveEvent.startsWith(`\n\n${HEADER}\n`)).toBe(true);
 	});
 });
 

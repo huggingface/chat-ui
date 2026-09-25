@@ -1363,3 +1363,106 @@ describe("sliding history window", () => {
 		});
 	});
 });
+
+describe("harness events in replay", () => {
+	const EVENT_TEXT =
+		"[Harness event, not part of this tool result]\nJob sft-smoke (a10g-small) failed: ERROR after 2m17s. Read its logs with check_job before changing anything.";
+	const eventUpdate = (afterToolUuid: string) =>
+		({
+			type: MessageUpdateType.HarnessEvent,
+			events: [
+				{
+					serviceId: "svc",
+					kind: "job",
+					jobId: "0123456789abcdef01234567",
+					name: "sft-smoke",
+					from: "RUNNING",
+					to: "ERROR",
+					ranSeconds: 137,
+					at: 0,
+				},
+			],
+			text: EVENT_TEXT,
+			afterToolUuid,
+		}) satisfies MessageUpdate;
+
+	const withEvent = (output = "18°C, sunny"): HistoryMessage[] => [
+		user("u0", "weather and forecast?"),
+		{
+			id: "a0",
+			from: "assistant",
+			content: "Sunny all week.",
+			contentShape: 2,
+			updates: [
+				callUpdate("w1", "get_weather", { city: "Paris" }),
+				callUpdate("w2", "get_weather", { city: "Lyon" }),
+				resultUpdate("w1", "get_weather", "12°C, rain"),
+				resultUpdate("w2", "get_weather", output),
+				eventUpdate("w2"),
+				callUpdate("f1", "get_forecast", { city: "Paris" }),
+				resultUpdate("f1", "get_forecast", "sunny all week"),
+			],
+		},
+	];
+	const legacyOf = (messages: HistoryMessage[]): HistoryMessage[] =>
+		messages.map((m) => {
+			if (m.from !== "assistant") return m;
+			const legacy = { ...m };
+			delete legacy.contentShape;
+			return legacy;
+		});
+
+	it("appends the text to the result of the call it followed, in either stored shape", async () => {
+		const rounds = await prepareMessagesWithFiles(withEvent(), imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const legacy = await prepareMessagesWithFiles(legacyOf(withEvent()), imageProcessor, false, {
+			replayToolHistory: true,
+		});
+
+		expect(rounds).toEqual(legacy);
+		expect(rounds.map((m) => m.role)).toEqual([
+			"user",
+			"assistant",
+			"tool",
+			"tool",
+			"assistant",
+			"tool",
+			"assistant",
+		]);
+		expect(textOf(rounds[2])).toBe("12°C, rain");
+		expect(textOf(rounds[3])).toBe(`18°C, sunny\n\n${EVENT_TEXT}`);
+		expect(textOf(rounds[5])).toBe("sunny all week");
+	});
+
+	it("caps the output and never the event when the legacy budget applies", async () => {
+		const output = "y".repeat(9_000);
+		const replayed = await prepareMessagesWithFiles(withEvent(output), imageProcessor, false, {
+			replayToolHistory: true,
+			slidingWindow: false,
+		});
+
+		expect(textOf(replayed[3])).toBe(`${"y".repeat(8000)}\n[...truncated]\n\n${EVENT_TEXT}`);
+	});
+
+	it("keeps the event inside its round's unit", async () => {
+		const units = await unitsOf(withEvent());
+		const without = await unitsOf(
+			withEvent().map((m) =>
+				m.from === "assistant"
+					? { ...m, updates: m.updates?.filter((u) => u.type !== MessageUpdateType.HarnessEvent) }
+					: m
+			)
+		);
+
+		expect(units.map((unit) => unit.messages.length)).toEqual(
+			without.map((unit) => unit.messages.length)
+		);
+		const round = units.find((unit) =>
+			unit.messages.some((m) => typeof m.content === "string" && m.content.includes(EVENT_TEXT))
+		);
+		expect(round?.rounds).toBe(1);
+		expect(round?.start).toEqual({ messageId: "a0", round: 0 });
+		expect(textOf(round?.messages.at(-1))).toContain(EVENT_TEXT);
+	});
+});

@@ -8,7 +8,7 @@ import {
 	toolRounds,
 } from "$lib/utils/messageShape";
 import type { Message } from "$lib/types/Message";
-import { MessageUpdateType } from "$lib/types/MessageUpdate";
+import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import {
 	assistantMessage,
 	convertingTurns,
@@ -320,6 +320,52 @@ describe("what a converted message stores", () => {
 		expect(calls(once).map((u) => u.call.parameters)).toEqual([{}, {}]);
 		expect(messageForStorage(once)).toEqual(once);
 		expect(convertFinishedMessage(once)).toBe(once);
+	});
+});
+
+describe("a turn told of a service end between rounds", () => {
+	const event = (afterToolUuid: string): MessageUpdate => ({
+		type: MessageUpdateType.HarnessEvent,
+		events: [
+			{
+				serviceId: "svc",
+				kind: "job",
+				jobId: "0123456789abcdef01234567",
+				from: "RUNNING",
+				to: "ERROR",
+				at: 0,
+			},
+		],
+		text: "[Harness event, not part of this tool result]\nJob 0123456789abcdef01234567 failed: ERROR.",
+		afterToolUuid,
+	});
+
+	it("stores the event where it was emitted, after its round's results and before the next round", () => {
+		const first = toolRound({ reasoning: "Plan.", text: "Let me check." });
+		const second = toolRound({ reasoning: "Now the forecast." });
+		const calls = toolRounds(first);
+		const told = event(calls[0].calls[0].uuid);
+		const message = assistantMessage([
+			...first,
+			told,
+			...second,
+			...finalAnswer("Done.", "Sunny."),
+		]);
+
+		const stored = messageForStorage(message);
+
+		expect(stored.contentShape).toBe(2);
+		const updates = stored.updates ?? [];
+		const at = updates.indexOf(told);
+		expect(at).toBeGreaterThan(-1);
+		const rounds = toolRounds(updates);
+		expect(at).toBeGreaterThan(rounds[0].start);
+		expect(at).toBeLessThan(rounds[1].start);
+		expect(roundTexts(stored)).toEqual([
+			{ reasoning: "Plan.", content: "Let me check." },
+			{ reasoning: "Now the forecast.", content: undefined },
+		]);
+		expect(rebuildLegacyContent(stored)).toEqual({ content: message.content });
 	});
 });
 
