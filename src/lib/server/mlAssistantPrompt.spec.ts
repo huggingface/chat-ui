@@ -20,8 +20,8 @@ const tool = (name: string): OpenAiTool =>
 const HF_TOOLS = [tool("hf_jobs"), tool("hf_fs"), tool("hub_repo_details")];
 
 /** The preset's system message, as `runMcpFlow` asks for it. */
-const inMode = (tools: OpenAiTool[]) =>
-	buildToolPreprompt(tools, undefined, undefined, { mlAssistant: true });
+const inMode = (tools: OpenAiTool[], { serviceEvents = false } = {}) =>
+	buildToolPreprompt(tools, undefined, undefined, { mlAssistant: true, serviceEvents });
 
 describe("ML Assistant preprompt", () => {
 	it("ships text that does not depend on the model or a template engine", () => {
@@ -204,13 +204,25 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("span the real spectrum");
 	});
 
-	it("front-loads the first status check after a submit", () => {
+	it("front-loads the first status check after a submit where nothing wakes a wait", () => {
 		// Dogfooding: models set long waits uniformly, so a job that died on a bad
 		// dependency in its first minute sat undiscovered for twenty.
 		const jobs = inMode([tool("hf_jobs")]);
 
 		expect(jobs).toContain("failures cluster at the start");
 		expect(jobs).toContain("SHORT wait");
+		expect(jobs).not.toContain("wakes you the moment");
+	});
+
+	it("sizes waits for the work where the harness wakes the turn on a job's end", () => {
+		const jobs = inMode([tool("hf_jobs")], { serviceEvents: true });
+
+		expect(jobs).toContain("wakes you the moment one ends or fails");
+		expect(jobs).toContain("you do not need short first waits");
+		expect(jobs).toContain("confirm the dashboard has rows in it");
+		expect(jobs).toContain("read them before you change anything");
+		expect(jobs).not.toContain("SHORT wait");
+		expect(jobs).not.toContain("failures cluster at the start");
 	});
 
 	it("sends smoke checks to the sandbox first when it is on offer", () => {
