@@ -11,6 +11,8 @@ export type Message = Partial<Timestamps> & {
 
 	// Optional server or client-side reasoning content (<think> blocks)
 	reasoning?: string;
+	/** 2 when a finished turn keeps round text on its calls and only its answer in content */
+	contentShape?: 2;
 	score?: -1 | 0 | 1;
 
 	/**

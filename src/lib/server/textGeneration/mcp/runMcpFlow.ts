@@ -50,6 +50,13 @@ import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
+import {
+	buildSessionStateBlock,
+	injectSessionState,
+	markSessionStateRead,
+	mlStateBlockEnabled,
+	type SessionStateBlock,
+} from "$lib/server/mlRegistry/stateBlock";
 import { readMlBudget } from "$lib/server/mlBudget/budget";
 import { appendToLastToolMessage, budgetChangeNote } from "$lib/server/mlBudget/budgetNote";
 import { createRepeatedCallGuard } from "./repeatedCallGuard";
@@ -644,6 +651,14 @@ export async function* runMcpFlow({
 		if (conv.plan && builtinTools.some((tool) => tool.name === PLAN_TOOL_NAME)) {
 			messagesOpenAI = injectPlanState(messagesOpenAI, conv.plan);
 		}
+		let unreadEnded: SessionStateBlock["ended"] = [];
+		if (mlStateBlockEnabled(conv)) {
+			const block = await buildSessionStateBlock(conv);
+			if (block) {
+				messagesOpenAI = injectSessionState(messagesOpenAI, block.text);
+				unreadEnded = block.ended;
+			}
+		}
 
 		// Work around servers that reject `system` role
 		if (
@@ -971,6 +986,12 @@ export async function* runMcpFlow({
 			if (checkAborted()) {
 				logger.info({ loop }, "[mcp] aborting after stream completed");
 				return "aborted";
+			}
+
+			// marked only after a completion read the block, a failed request lists the rows again
+			if (unreadEnded.length > 0) {
+				await markSessionStateRead(unreadEnded);
+				unreadEnded = [];
 			}
 
 			// Auto-close any unclosed <think> block so reasoning from this loop

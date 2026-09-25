@@ -130,11 +130,21 @@ Report the numbers you observed, including the runs that failed. Never present a
 
 Include the Hub URL of everything you created. Keep the prose short; the user is reading for what happened and what it cost.`;
 
+const SESSION_STATE = `# Session state
+
+The user's latest message can end with a [SESSION STATE] block, written by the harness when a turn starts or resumes. It is authoritative, as of its timestamp, for every job and sandbox that has not ended and for every repo and file; anything started after that is not in it yet. A job that ended is listed once, the first time the block reaches you after it ended, and never again, so note its outcome then. Take job ids, sandbox handles, repo ids and file names from it rather than searching back through the conversation. Do not call hf_jobs ps or inspect to learn a stage it already shows; logs and whether a run is healthy are still check_job.`;
+
 /**
  * the preset system prompt, sections in the order they are read, virtualFiles follows the
- * switch in mlFiles/enabled.ts
+ * switch in mlFiles/enabled.ts and stateBlock the one in mlRegistry/stateBlock.ts
  */
-export function mlAssistantPreprompt({ virtualFiles }: { virtualFiles: boolean }): string {
+export function mlAssistantPreprompt({
+	virtualFiles,
+	stateBlock,
+}: {
+	virtualFiles: boolean;
+	stateBlock: boolean;
+}): string {
 	return [
 		IDENTITY,
 		OUTDATED_KNOWLEDGE,
@@ -147,10 +157,14 @@ export function mlAssistantPreprompt({ virtualFiles }: { virtualFiles: boolean }
 		virtualFiles ? SCRIPTS_ARE_FILES : ARTIFACTS_VS_JOBS,
 		RECOVERY,
 		FINISHING,
+		...(stateBlock ? [SESSION_STATE] : []),
 	].join("\n\n");
 }
 
-export const ML_ASSISTANT_PREPROMPT = mlAssistantPreprompt({ virtualFiles: true });
+export const ML_ASSISTANT_PREPROMPT = mlAssistantPreprompt({
+	virtualFiles: true,
+	stateBlock: true,
+});
 
 /**
  * The session context line, stamped at the very end of the system prompt.

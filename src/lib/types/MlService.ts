@@ -52,7 +52,10 @@ export interface MlService extends Timestamps {
 	stageBeforeEnd?: string;
 	/** set when the row ended and the model has not been told yet */
 	eventPendingSince?: Date;
-	/** the stage the model was last told about, or an end judged not news */
+	/**
+	 * the stage the model was last told about, or an end judged not news, UNTRACKED once the
+	 * state block told it the poller gave the row up, an ended row matching it is not listed again
+	 */
 	lastReportedStage?: string;
 	/** the budget reservation key, generationId:callUuid */
 	reservationKey?: string;

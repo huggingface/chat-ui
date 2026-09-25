@@ -17,6 +17,7 @@ import { ToolResultStatus } from "$lib/types/Tool";
 import type { StoredHistoryWindow } from "$lib/types/Conversation";
 import type { ObjectId } from "mongodb";
 import { isValidJsonObject } from "$lib/server/textGeneration/mcp/toolInvocation";
+import { ROUNDS_SHAPE, rebuildLegacyContent, toolRounds } from "$lib/utils/messageShape";
 import {
 	answeredQuestion,
 	CHARS_PER_TOKEN,
@@ -76,8 +77,6 @@ function toToolCallId(uuid: string, used: Set<string>): string {
 	return candidate;
 }
 
-const isToolCallUpdate = (u: MessageUpdate): u is MessageToolCallUpdate =>
-	u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Call;
 const isToolResultUpdate = (u: MessageUpdate): u is MessageToolResultUpdate =>
 	u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Result;
 const isToolErrorUpdate = (u: MessageUpdate): u is MessageToolErrorUpdate =>
@@ -125,23 +124,41 @@ function splitReasoning(
 	return { visible: visible.trim(), parts };
 }
 
+interface TurnRound {
+	calls: MessageToolCallUpdate[];
+	/** byte exact, see splitReasoning */
+	reasoning: string;
+	/** visible text streamed before the calls, trimmed */
+	content: string;
+}
+
 /**
- * Rebuild a past assistant turn from its persisted tool updates so follow-up
- * requests see the tool calls and their outputs instead of a flat text
- * summary. Rounds are inferred from update order — a Call update arriving
- * after any Result/Error starts a new round, matching how the live loop emits
- * one batch of calls per completion round. Each call's `tool_call_id` is
- * always the normalized id from toToolCallId, even though the original
- * provider-issued id may also be persisted (see MessageToolCallUpdate):
- * emitting it unconditionally keeps one code path and satisfies every
- * provider's id-shape requirements, including Mistral-family templates.
+ * either stored shape, cut on the live loop boundaries so a history window can drop whole rounds
+ * without separating a tool result from its call
  */
-function replayAssistantTurn(
+function turnRounds(message: EndpointMessage): {
+	rounds: TurnRound[];
+	final: { content: string; reasoning: string };
+} {
+	const rounds = toolRounds(message.updates ?? []).map(({ calls }) => ({
+		calls,
+		reasoning: calls.find((u) => u.reasoning?.trim())?.reasoning ?? "",
+		content: (calls.find((u) => u.content?.trim())?.content ?? "").trim(),
+	}));
+	if (message.contentShape === ROUNDS_SHAPE) {
+		return {
+			rounds,
+			final: { content: message.content.trim(), reasoning: message.reasoning ?? "" },
+		};
+	}
+	return { rounds, final: legacyFinalAnswer(message, rounds) };
+}
+
+/** the original shape keeps every round think block and preamble in content too */
+function legacyFinalAnswer(
 	message: EndpointMessage,
-	includeReasoning: boolean,
-	capToolOutputs: boolean
-): AssistantReplayMessage[] {
-	const updates = message.updates ?? [];
+	rounds: TurnRound[]
+): { content: string; reasoning: string } {
 	const { visible, parts } = splitReasoning(message.content, message.reasoning);
 	// `parts` holds every recovered reasoning block across the whole turn, and
 	// `remainingVisible` the full visible text: when tools ran, the
@@ -153,82 +170,12 @@ function replayAssistantTurn(
 	// final answer.
 	const remainingParts = [...parts];
 	let remainingVisible = visible;
-	// null, not an empty-content message, when a turn was interrupted before
-	// producing any final text or reasoning (e.g. aborted mid-tool-call): an
-	// empty trailing `{role: "assistant", content: ""}` with nothing else
-	// attached represents an assistant turn that never happened, and strict
-	// providers can reject it outright.
-	const buildFinalMessage = (): AssistantReplayMessage | null => {
-		const reasoning = remainingParts.join("\n");
-		const content = remainingVisible.trim();
-		const hasReasoning = includeReasoning && reasoning.length > 0;
-		if (content.length === 0 && !hasReasoning) return null;
-		return {
-			role: "assistant",
-			content,
-			...(hasReasoning ? { reasoning_content: reasoning } : {}),
-		};
-	};
-
-	const callUpdates = updates.filter(isToolCallUpdate);
-	if (callUpdates.length === 0) {
-		const finalMessage = buildFinalMessage();
-		return finalMessage ? [finalMessage] : [];
-	}
-
-	const outputsByUuid = new Map<string, string>();
-	const rounds: MessageToolCallUpdate[][] = [];
-	let round: MessageToolCallUpdate[] = [];
-	let roundHasOutcome = false;
-	for (const update of updates) {
-		if (isToolCallUpdate(update)) {
-			if (roundHasOutcome && round.length > 0) {
-				rounds.push(round);
-				round = [];
-				roundHasOutcome = false;
-			}
-			round.push(update);
-		} else if (isToolResultUpdate(update)) {
-			const result = update.result;
-			const firstOutput =
-				result.status === ToolResultStatus.Success ? result.outputs[0] : undefined;
-			outputsByUuid.set(
-				update.uuid,
-				result.status === ToolResultStatus.Success
-					? typeof firstOutput?.text === "string"
-						? firstOutput.text
-						: JSON.stringify(firstOutput ?? "")
-					: `Error: ${result.message}`
-			);
-			roundHasOutcome = true;
-		} else if (isToolErrorUpdate(update)) {
-			outputsByUuid.set(update.uuid, `Error: ${update.message}`);
-			roundHasOutcome = true;
-		}
-	}
-	if (round.length > 0) {
-		rounds.push(round);
-	}
-
-	const usedIds = new Set<string>();
-	const idByUuid = new Map(callUpdates.map((u) => [u.uuid, toToolCallId(u.uuid, usedIds)]));
-
-	const replayed: AssistantReplayMessage[] = [];
-	for (const callsInRound of rounds) {
-		// Reasoning and preamble text persisted on the round's Call update go
-		// back on this round's message and are deduped out of the final
-		// answer's blocks. Kept byte-exact (trim only tests for emptiness): see
-		// splitReasoning for why reasoning fidelity matters; the same
-		// unmodified-echo principle is applied to preamble text for symmetry
-		// and so the dedup below matches reliably.
-		const roundReasoning = includeReasoning
-			? (callsInRound.find((u) => u.reasoning?.trim())?.reasoning ?? "")
-			: "";
-		if (roundReasoning) {
-			const exact = remainingParts.indexOf(roundReasoning);
+	for (const round of rounds) {
+		if (round.reasoning) {
+			const exact = remainingParts.indexOf(round.reasoning);
 			if (exact !== -1) {
 				remainingParts.splice(exact, 1);
-			} else if (remainingParts.length > 0 && roundReasoning.includes(remainingParts[0])) {
+			} else if (remainingParts.length > 0 && round.reasoning.includes(remainingParts[0])) {
 				// Positional fallback only, never a scan of the whole array: parts
 				// are chronologically ordered and rounds are processed oldest-first,
 				// so the earliest still-unconsumed part is the only one that can be
@@ -247,8 +194,7 @@ function replayAssistantTurn(
 		// the final message. Trimmed on both sides (persistence trims too)
 		// because `remainingVisible` comes from splitReasoning trim-normalized;
 		// visible text has no byte-exactness requirement, unlike reasoning.
-		const roundContent = (callsInRound.find((u) => u.content?.trim())?.content ?? "").trim();
-		if (roundContent && remainingVisible.startsWith(roundContent)) {
+		if (round.content && remainingVisible.startsWith(round.content)) {
 			// Prefix-only, deliberately: rounds consume the visible text in
 			// chronological order, so a streamed preamble is always the next
 			// prefix. A persisted preamble that is NOT a prefix was never merged
@@ -257,8 +203,77 @@ function replayAssistantTurn(
 			// indexOf match could only hit identical text belonging to the final
 			// answer — removing that would reorder the conversation. The failure
 			// mode of not matching is mild duplication, which is safer.
-			remainingVisible = remainingVisible.slice(roundContent.length).trimStart();
+			remainingVisible = remainingVisible.slice(round.content.length).trimStart();
 		}
+	}
+	return { content: remainingVisible.trim(), reasoning: remainingParts.join("\n") };
+}
+
+/**
+ * Rebuild a past assistant turn from its persisted tool updates so follow-up
+ * requests see the tool calls and their outputs instead of a flat text
+ * summary. Rounds are inferred from update order — a Call update arriving
+ * after any Result/Error starts a new round, matching how the live loop emits
+ * one batch of calls per completion round. Each call's `tool_call_id` is
+ * always the normalized id from toToolCallId, even though the original
+ * provider-issued id may also be persisted (see MessageToolCallUpdate):
+ * emitting it unconditionally keeps one code path and satisfies every
+ * provider's id-shape requirements, including Mistral-family templates.
+ */
+function replayAssistantTurn(
+	message: EndpointMessage,
+	includeReasoning: boolean,
+	capToolOutputs: boolean
+): AssistantReplayMessage[] {
+	const updates = message.updates ?? [];
+	const { rounds, final } = turnRounds(message);
+	// null, not an empty-content message, when a turn was interrupted before
+	// producing any final text or reasoning (e.g. aborted mid-tool-call): an
+	// empty trailing `{role: "assistant", content: ""}` with nothing else
+	// attached represents an assistant turn that never happened, and strict
+	// providers can reject it outright.
+	const buildFinalMessage = (): AssistantReplayMessage | null => {
+		const hasReasoning = includeReasoning && final.reasoning.length > 0;
+		if (final.content.length === 0 && !hasReasoning) return null;
+		return {
+			role: "assistant",
+			content: final.content,
+			...(hasReasoning ? { reasoning_content: final.reasoning } : {}),
+		};
+	};
+
+	if (rounds.length === 0) {
+		const finalMessage = buildFinalMessage();
+		return finalMessage ? [finalMessage] : [];
+	}
+
+	const outputsByUuid = new Map<string, string>();
+	for (const update of updates) {
+		if (isToolResultUpdate(update)) {
+			const result = update.result;
+			const firstOutput =
+				result.status === ToolResultStatus.Success ? result.outputs[0] : undefined;
+			outputsByUuid.set(
+				update.uuid,
+				result.status === ToolResultStatus.Success
+					? typeof firstOutput?.text === "string"
+						? firstOutput.text
+						: JSON.stringify(firstOutput ?? "")
+					: `Error: ${result.message}`
+			);
+		} else if (isToolErrorUpdate(update)) {
+			outputsByUuid.set(update.uuid, `Error: ${update.message}`);
+		}
+	}
+
+	const usedIds = new Set<string>();
+	const idByUuid = new Map(
+		rounds.flatMap(({ calls }) => calls).map((u) => [u.uuid, toToolCallId(u.uuid, usedIds)])
+	);
+
+	const replayed: AssistantReplayMessage[] = [];
+	for (const { calls: callsInRound, reasoning, content: roundContent } of rounds) {
+		const roundReasoning = includeReasoning ? reasoning : "";
 		// `content` is included only when a preamble was actually persisted
 		// (messages recorded before this field existed have none); omitted
 		// otherwise since some OpenAI-compatible backends reject empty text
@@ -455,6 +470,8 @@ async function prepareEntries(
 						: Boolean(options?.attachReasoning)) &&
 					reasoningProducerMatches(message, options?.currentProducerModel);
 
+				// flat forms need every round text, which the rounds shape keeps out of content
+				const legacy = rebuildLegacyContent(message);
 				if (options?.replayToolHistory) {
 					// The budget-fallback `flat` must still strip <think>, not just
 					// drop the reasoning_content/tool-replay enrichments: the raw
@@ -464,14 +481,14 @@ async function prepareEntries(
 					// replay budget.
 					const flat: ChatMessageParam = {
 						role: "assistant",
-						content: stripThink(message.content),
+						content: stripThink(legacy.content),
 					};
 					return {
 						replay: replayAssistantTurn(message, wantsReasoning, capToolOutputs),
 						flat,
 					};
 				}
-				const { visible, parts } = splitReasoning(message.content, message.reasoning);
+				const { visible, parts } = splitReasoning(legacy.content, legacy.reasoning);
 				const reasoning = parts.join("\n");
 				if (!wantsReasoning || reasoning.length === 0) {
 					// Either nothing to attach, or attachment is disabled/gated:

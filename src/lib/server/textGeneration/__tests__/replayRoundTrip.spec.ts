@@ -29,6 +29,7 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 import type { MessageToolCallUpdate } from "$lib/types/MessageUpdate";
 import { streamFor, describeMessages, type ChatMessage, type Round } from "./replayHarness";
+import { toLegacyShape } from "$lib/utils/messageShape";
 
 // ── Scripted edges ────────────────────────────────────────────────────────────
 
@@ -232,6 +233,37 @@ async function sendMessageAndDetach(
 		if (done) return;
 	}
 	await reader.cancel();
+}
+
+/** a retry replays exactly the history the message was answered from */
+async function retryMessage(conv: Conversation, locals: App.Locals, messageId: string) {
+	const form = new FormData();
+	form.set(
+		"data",
+		JSON.stringify({
+			id: messageId,
+			is_retry: true,
+			selectedMcpServers: [{ name: "mock", url: "https://mock.test/mcp", headers: [] }],
+		})
+	);
+	const response = await POST({
+		request: new Request(`http://localhost/conversation/${conv._id}`, {
+			method: "POST",
+			body: form,
+		}),
+		locals,
+		params: { id: conv._id.toString() },
+		getClientAddress: () => "127.0.0.1",
+	} as never);
+	if (response.status !== 200) {
+		throw new Error(`POST returned ${response.status}: ${await response.text()}`);
+	}
+	const reader = response.body?.getReader();
+	if (!reader) throw new Error("no response body");
+	for (;;) {
+		const { done } = await reader.read();
+		if (done) break;
+	}
 }
 
 /** The messages array sent on the nth upstream completion request (0-indexed). */
@@ -483,8 +515,14 @@ describe.sequential("replaying a turn that ended badly", () => {
 			{ content: "Never reached." },
 			{ content: "Next turn." },
 		]);
-		// never settles, a late result would resume the detached run inside a later test
-		mocks.callMcpTool.mockImplementation(() => new Promise(() => {}));
+		// held past the detach below so the Result update is never emitted
+		let releaseTool: (value: unknown) => void = () => {};
+		mocks.callMcpTool.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					releaseTool = resolve;
+				})
+		);
 
 		// One more chunk than before the turnState events existed: the turn now
 		// opens with an in-band `running` transition ahead of the tool call.
@@ -493,6 +531,7 @@ describe.sequential("replaying a turn that ended badly", () => {
 		const stored = await reload(conv);
 		const lastAssistant = assistantMessages(stored).at(-1);
 		expect(callUpdatesOf(lastAssistant as Message).length).toBeGreaterThan(0);
+		expect(lastAssistant?.contentShape).toBeUndefined();
 
 		scriptToolResult({ text: "fine now" });
 		await sendMessage(stored, locals, "Try again?");
@@ -502,6 +541,17 @@ describe.sequential("replaying a turn that ended badly", () => {
 		// Fabricating an empty success here would teach the model the tool
 		// returned nothing, rather than that it never finished.
 		expect(String(toolMessage?.content)).toContain("interrupted");
+
+		// end the detached run here, or its next request lands in a later test
+		releaseTool({ text: "late", isError: false, content: [] });
+		await vi.waitFor(async () =>
+			expect(
+				await collections.generations.countDocuments({
+					conversationId: conv._id,
+					status: "running",
+				})
+			).toBe(0)
+		);
 	});
 
 	it("replays an MCP error result as an error, not as a successful empty output", async () => {
@@ -1051,7 +1101,7 @@ describe.sequential("replay budget", () => {
 		expect(current.historyWindow).toEqual({ messageId: third?.id, round: 0, limitChars: 774_144 });
 	});
 
-	it("stores each round's reasoning exactly twice, so growth stays bounded", async () => {
+	it("stores each round's reasoning once, so growth stays bounded", async () => {
 		const { conv, locals } = await newConversation();
 		await setReasoningOverride(locals, true);
 		const trace = "UNIQUE-REASONING-MARKER";
@@ -1070,11 +1120,55 @@ describe.sequential("replay budget", () => {
 		const serialized = JSON.stringify(stored);
 		const occurrences = serialized.split(trace).length - 1;
 
-		// Once inline in `content` as <think>, once on the round's Call update.
-		// A third copy means something started duplicating per-round state, which
-		// on a long tool-heavy conversation is what walks a document into the
-		// 16MB BSON ceiling and makes it unsaveable.
-		expect(occurrences, `reasoning appeared ${occurrences}x in the stored document`).toBe(2);
+		// a second copy is what walks a long tool heavy conversation into the 16MB ceiling
+		expect(occurrences, `reasoning appeared ${occurrences}x in the stored document`).toBe(1);
+		expect(assistantMessages(stored)[0]).toMatchObject({ content: "It is 18°C.", contentShape: 2 });
+	});
+});
+
+describe.sequential("history stored in either shape", () => {
+	it("replays a finished turn the same whether it was converted or not", async () => {
+		const { conv, locals } = await newConversation();
+		await setReasoningOverride(locals, true);
+		scriptRounds([
+			{
+				reasoning: "First I need the current weather.",
+				content: "\n\nLet me check that.\n\n",
+				toolCalls: [{ id: "call_one11111", name: "get_weather", arguments: '{"city":"Paris"}' }],
+			},
+			{
+				reasoning: "Now the forecast.",
+				toolCalls: [{ id: "call_two22222", name: "get_forecast", arguments: '{"city":"Paris"}' }],
+			},
+			{ reasoning: "I have both.", content: "Sunny now and all week." },
+			{ content: "Follow-up." },
+			{ content: "Follow-up again." },
+		]);
+
+		await sendMessage(conv, locals, "Weather and forecast for Paris?");
+		const converted = await reload(conv);
+		const [turn] = assistantMessages(converted);
+		expect(turn).toMatchObject({
+			contentShape: 2,
+			content: "Sunny now and all week.",
+			reasoning: "I have both.",
+		});
+
+		await sendMessage(converted, locals, "Thanks?");
+		const fromRounds = outgoing(3);
+
+		await collections.conversations.updateOne(
+			{ _id: conv._id, "messages.id": turn.id },
+			{ $set: { "messages.$": toLegacyShape(turn) } }
+		);
+		const legacy = await reload(conv);
+		expect(assistantMessages(legacy)[0].contentShape).toBeUndefined();
+		await retryMessage(legacy, locals, assistantMessages(legacy)[1].id);
+		const fromLegacy = outgoing(4);
+
+		const history = (messages: ChatMessage[]) => messages.filter((m) => m.role !== "system");
+		expect(history(fromRounds), describeMessages(fromRounds)).toEqual(history(fromLegacy));
+		expect(history(fromRounds).filter((m) => m.tool_calls)).toHaveLength(2);
 	});
 });
 

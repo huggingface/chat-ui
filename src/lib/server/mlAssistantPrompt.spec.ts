@@ -112,7 +112,7 @@ describe("ML Assistant virtual files", () => {
 	});
 
 	it("goes back to the inline shape when the switch is off, naming no tool the model lacks", () => {
-		const off = mlAssistantPreprompt({ virtualFiles: false });
+		const off = mlAssistantPreprompt({ virtualFiles: false, stateBlock: true });
 		expect(off).not.toContain("v-file://");
 		expect(off).not.toContain("write_file");
 		expect(off).toContain("# Scripts: artifact or payload");
@@ -129,6 +129,33 @@ describe("ML Assistant virtual files", () => {
 		expect(withTools).toContain("exactly three places");
 		expect(withTools).toContain("comes back with import_file");
 		expect(inMode(HF_TOOLS)).not.toContain("VIRTUAL FILES:");
+	});
+});
+
+describe("ML Assistant session state", () => {
+	it("gives the block its own section, away from the job rules", () => {
+		const prompt = ML_ASSISTANT_PREPROMPT;
+		expect(prompt).toContain("# Session state");
+		expect(prompt.indexOf("# Session state")).toBeGreaterThan(prompt.indexOf("# Finishing"));
+	});
+
+	it("makes the block the source for ids and stages, and check_job the one for logs", () => {
+		const prompt = ML_ASSISTANT_PREPROMPT;
+		expect(prompt).toContain("[SESSION STATE] block");
+		expect(prompt).toContain(
+			"authoritative, as of its timestamp, for every job and sandbox that has not ended and for every repo and file"
+		);
+		expect(prompt).toContain("A job that ended is listed once");
+		expect(prompt).toContain("rather than searching back through the conversation");
+		expect(prompt).toContain("Do not call hf_jobs ps or inspect to learn a stage it already shows");
+		expect(prompt).toContain("anything started after that is not in it yet");
+		expect(prompt).toContain("are still check_job");
+	});
+
+	it("says nothing about a block the turn will not carry when the switch is off", () => {
+		const off = mlAssistantPreprompt({ virtualFiles: true, stateBlock: false });
+		expect(off).not.toContain("SESSION STATE");
+		expect(off).not.toContain("# Session state");
 	});
 });
 
@@ -391,6 +418,9 @@ describe("ML Assistant system message size", () => {
 		// 32k to 34k for virtual files, the scripts section plus the write_file guidance, argued
 		// by what they remove, 930 hf_jobs uv calls in the ten largest conversations each re-sent
 		// a whole script averaging 3.7k characters and a 30 character reference now replaces it
+		//
+		// 34k to 35k for the session state section, argued by the hf_jobs ps and inspect calls and
+		// the reads back through old tool results it replaces, it landed at 34,079
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -415,7 +445,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(34_000);
+		expect(composed.length).toBeLessThan(35_000);
 	});
 });
 
