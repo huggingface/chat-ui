@@ -211,6 +211,10 @@ test("read mode past the reservation, wheel-up stays put, the jump button re-eng
 	// wheel scrolling, so wait for the position to settle before measuring.
 	const box = await page.locator(CONTAINER).boundingBox();
 	if (!box) throw new Error("scroll container has no box");
+	if (process.env.DIAG_VARIANT === "1")
+		await page.evaluate((selector: string) => {
+			document.querySelector(selector)?.addEventListener("wheel", () => {}, { passive: false });
+		}, CONTAINER);
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 	const beforeWheel = (await containerGeometry(page)).scrollTop;
 	await page.mouse.wheel(0, -400);
@@ -243,32 +247,6 @@ test("read mode past the reservation, wheel-up stays put, the jump button re-eng
 	expect(later.scrollHeight).toBeGreaterThan(detached.scrollHeight);
 
 	// The jump-to-bottom button is the way back; it re-attaches to the live bottom.
-	const variant = process.env.DIAG_VARIANT ?? "0";
-	if (variant === "1")
-		await page.evaluate((selector: string) => {
-			const el = document.querySelector(selector);
-			if (!(el instanceof HTMLElement)) return;
-			const prev = el.style.overflowY;
-			el.style.overflowY = "hidden";
-			void el.scrollHeight;
-			el.style.overflowY = prev;
-			void el.scrollHeight;
-		}, CONTAINER);
-	if (variant === "2") {
-		const size = page.viewportSize();
-		if (size) {
-			await page.setViewportSize({ width: size.width, height: size.height + 1 });
-			await page.setViewportSize(size);
-		}
-	}
-	if (variant === "3")
-		await page.evaluate(async (selector: string) => {
-			const el = document.querySelector(selector);
-			if (!(el instanceof HTMLElement)) return;
-			el.style.willChange = "transform";
-			await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-			el.style.willChange = "";
-		}, CONTAINER);
 	await page.evaluate(() =>
 		(window as unknown as { __scrollLog?: string[] }).__scrollLog?.push(
 			`${performance.now().toFixed(1)} ---- CLICK JUMP ----`
