@@ -27,6 +27,8 @@ import {
 	isExaMcpServer,
 } from "$lib/server/mcp/hf";
 import { buildImageRefResolver } from "./fileRefs";
+import { createVirtualFileExpander } from "$lib/server/mlFiles/expand";
+import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
@@ -398,6 +400,9 @@ export async function* runMcpFlow({
 	}
 
 	const resolveFileRef = buildImageRefResolver(messages);
+	const expandVirtualFiles = mlVirtualFilesEnabled(conv)
+		? createVirtualFileExpander(conv._id)
+		: undefined;
 	const imageProcessor = makeImageProcessor({
 		supportedMimeTypes: ["image/png", "image/jpeg"],
 		preferredMimeType: "image/jpeg",
@@ -451,7 +456,9 @@ export async function* runMcpFlow({
 		// Applied to every conversation, mode or not: the Hub tools whose real
 		// interface is a grammar in prose misfire the same way whoever is calling
 		// them. See mcp/schemaRepair.ts for what the traces showed.
-		const shapedMcpTools = withRepairedToolSchemas(gatedMcpTools, mapping, servers);
+		const shapedMcpTools = withRepairedToolSchemas(gatedMcpTools, mapping, servers, {
+			virtualFiles: expandVirtualFiles !== undefined,
+		});
 		// Cheapest first, and only the last link may book anything (see
 		// composeGuards): a repeat of a call that already failed the same way, then
 		// arguments that cannot satisfy the tool's own schema, then the budget.
@@ -678,6 +685,7 @@ export async function* runMcpFlow({
 			hostBuiltinTools: builtinTools,
 			contextLengthTokens: targetContextLength,
 			...(rewriteArgs ? { rewriteArgs } : {}),
+			...(expandVirtualFiles ? { expandVirtualFiles } : {}),
 		};
 		for (const tool of builtinTools) {
 			if (isNestedAgentTool(tool)) tool.bind(nestedAgentDeps);
@@ -1097,6 +1105,7 @@ export async function* runMcpFlow({
 					servers,
 					parseArgs,
 					resolveFileRef,
+					...(expandVirtualFiles ? { expandVirtualFiles } : {}),
 					toPrimitive,
 					processToolOutput,
 					abortSignal,

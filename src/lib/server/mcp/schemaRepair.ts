@@ -22,34 +22,59 @@ import type { McpToolMapping, OpenAiTool } from "./tools";
  * that stops being true degrades to noise rather than to a broken call.
  */
 
+export interface SchemaRepairOptions {
+	/**
+	 * whether v-file references expand at dispatch this run, the repair runs for every
+	 * conversation and a model outside the mode taught the form would send the server a literal
+	 */
+	virtualFiles?: boolean;
+}
+
 /** Keyed by tool name as the server knows it, then by property. */
-const PROPERTY_DESCRIPTIONS: Record<string, Record<string, string>> = {
-	hf_sandbox_exec: {
-		cmd: 'Always the literal "exec" — a selector, not the command you want to run. The shell command is an element of `args`.',
-		args: 'Grammar tokens, one per array element — never one joined string: ["exec", "<handle>", "<shell command>", "--timeout", "55"]. Options are tokens too: the execution timeout is the pair `--timeout 55` inside this array (30s default, 55s ceiling), never a top-level property. `hf_jobs` is the tool whose `args` is an object; this one is a list.',
-	},
-	hf_sandbox: {
-		cmd: "Which sandbox operation to run. The handle and every option belong in `args`.",
-		args: 'Grammar tokens, one per array element: ["create", "--flavor", "cpu-basic", "--timeout", "1h"]. The sandbox lifetime is the token pair `--timeout <duration>` here, not a top-level property.',
-	},
-	hf_sandbox_fs: {
-		cmd: "Which file operation to run. The handle, the path and every option belong in `args`.",
-		args: 'Grammar tokens, one per array element: ["cat", "<handle>", "/data/train.py", "--max-bytes", "80000"]. The handle comes before the path.',
-	},
-	hf_fs_write: {
-		cmd: "Which write operation to run. The URI and every option belong in `args`; file data goes in `content`, not here.",
-		args: 'Grammar tokens, one per array element: ["put", "hf://models/<owner>/<name>/README.md", "-m", "<message>"].',
-	},
-	hf_jobs: {
-		args:
-			"Arguments for this operation as a JSON object — the one Hub tool that takes an object rather than a token list. " +
-			'Submitting with uv: {"script": "<the whole script>", "with_deps": ["trl"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}}. ' +
-			'Submitting with run (Docker): {"image": "python:3.12", "command": ["python", "train.py"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}} — `command` is an array, not a string. ' +
-			"The Hub's Jobs documentation describes the `hf jobs` CLI, not this API, so translate its flags rather than copying them: " +
-			'`--timeout 6h` is "timeout": "6h", a string and never a number; a repeated `--secrets FOO` is "secrets": {"FOO": "$FOO"}, an object and never an array; ' +
-			'`-v SRC:/mnt` is "volumes": ["hf://datasets/<owner>/<name>:/data"], strings and never objects.',
-	},
-};
+function propertyDescriptions(
+	options: SchemaRepairOptions
+): Record<string, Record<string, string>> {
+	const virtualFiles = options.virtualFiles ?? false;
+	return {
+		hf_sandbox_exec: {
+			cmd: 'Always the literal "exec" — a selector, not the command you want to run. The shell command is an element of `args`.',
+			args: 'Grammar tokens, one per array element — never one joined string: ["exec", "<handle>", "<shell command>", "--timeout", "55"]. Options are tokens too: the execution timeout is the pair `--timeout 55` inside this array (30s default, 55s ceiling), never a top-level property. `hf_jobs` is the tool whose `args` is an object; this one is a list.',
+		},
+		hf_sandbox: {
+			cmd: "Which sandbox operation to run. The handle and every option belong in `args`.",
+			args: 'Grammar tokens, one per array element: ["create", "--flavor", "cpu-basic", "--timeout", "1h"]. The sandbox lifetime is the token pair `--timeout <duration>` here, not a top-level property.',
+		},
+		hf_sandbox_fs: {
+			cmd: "Which file operation to run. The handle, the path and every option belong in `args`.",
+			args:
+				'Grammar tokens, one per array element: ["cat", "<handle>", "/data/train.py", "--max-bytes", "80000"]. The handle comes before the path.' +
+				(virtualFiles
+					? ' Writing a virtual file into the sandbox: ["write", "<handle>", "/work/train.py", "--text", "v-file://train.py"] — the token after --text may be a v-file:// reference, which is expanded to the file\'s content before the call is sent.'
+					: ""),
+		},
+		hf_fs_write: {
+			cmd: "Which write operation to run. The URI and every option belong in `args`; file data goes in `content`, not here.",
+			args: 'Grammar tokens, one per array element: ["put", "hf://models/<owner>/<name>/README.md", "-m", "<message>"].',
+			...(virtualFiles
+				? {
+						content:
+							'File content for put. UTF-8 text by default; base64 when args includes --base64. For a virtual file, pass the reference "v-file://<name>" (or "v-file://<name>@v3") as the whole value and the file\'s content is sent in its place.',
+					}
+				: {}),
+		},
+		hf_jobs: {
+			args:
+				"Arguments for this operation as a JSON object — the one Hub tool that takes an object rather than a token list. " +
+				(virtualFiles
+					? 'Submitting with uv: {"script": "v-file://train.py", "with_deps": ["trl"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}} — `script` is a v-file:// reference to a file you wrote with write_file (expanded to its content before the call is sent), never the script pasted inline. '
+					: 'Submitting with uv: {"script": "<the whole script>", "with_deps": ["trl"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}}. ') +
+				'Submitting with run (Docker): {"image": "python:3.12", "command": ["python", "train.py"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}} — `command` is an array, not a string. ' +
+				"The Hub's Jobs documentation describes the `hf jobs` CLI, not this API, so translate its flags rather than copying them: " +
+				'`--timeout 6h` is "timeout": "6h", a string and never a number; a repeated `--secrets FOO` is "secrets": {"FOO": "$FOO"}, an object and never an array; ' +
+				'`-v SRC:/mnt` is "volumes": ["hf://datasets/<owner>/<name>:/data"], strings and never objects.',
+		},
+	};
+}
 
 /**
  * The advertised tools with those descriptions applied. Returns fresh objects —
@@ -63,7 +88,8 @@ const PROPERTY_DESCRIPTIONS: Record<string, Record<string, string>> = {
 export function withRepairedToolSchemas(
 	tools: OpenAiTool[],
 	mapping: Record<string, McpToolMapping>,
-	servers: McpServerConfig[]
+	servers: McpServerConfig[],
+	options: SchemaRepairOptions = {}
 ): OpenAiTool[] {
 	// A tool name is not proof of where it came from: a user-configured server is
 	// free to export its own `hf_jobs`, and rewriting its description with the
@@ -71,10 +97,11 @@ export function withRepairedToolSchemas(
 	const hubServerNames = new Set(
 		servers.filter((server) => isHfMcpServer(server.url)).map((server) => server.name)
 	);
+	const descriptions = propertyDescriptions(options);
 	return tools.map((tool) => {
 		const entry = mapping[tool.function.name];
 		const serverTool = entry && hubServerNames.has(entry.server) ? entry.tool : undefined;
-		const repairs = serverTool ? PROPERTY_DESCRIPTIONS[serverTool] : undefined;
+		const repairs = serverTool ? descriptions[serverTool] : undefined;
 		const parameters = tool.function.parameters;
 		if (!repairs || !parameters) return tool;
 

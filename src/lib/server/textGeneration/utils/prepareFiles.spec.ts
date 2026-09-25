@@ -117,6 +117,32 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		}
 	});
 
+	it("replays a virtual-file call with the reference the model wrote, never the expanded content", async () => {
+		const raw = '{"operation":"uv","args":{"script":"v-file://train.py","flavor":"cpu-basic"}}';
+		const messages: EndpointMessage[] = [
+			{ from: "user", content: "train it" },
+			{
+				from: "assistant",
+				content: "Submitted.",
+				updates: [
+					{
+						...callUpdate("u1", "hf_jobs", { operation: "uv" }),
+						argumentsRaw: raw,
+						fileRefs: [{ ref: "v-file://train.py", name: "train.py", version: 4 }],
+					},
+					resultUpdate("u1", "hf_jobs", "job started"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const assistant = prepared[1];
+		if (assistant.role !== "assistant" || !assistant.tool_calls) throw new Error("no tool_calls");
+		expect(assistant.tool_calls[0].function.arguments).toBe(raw);
+		expect(JSON.stringify(prepared)).not.toContain("fileRefs");
+	});
+
 	it("groups parallel calls of one round into a single assistant message", async () => {
 		const messages: EndpointMessage[] = [
 			{

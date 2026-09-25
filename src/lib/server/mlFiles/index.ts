@@ -16,3 +16,9 @@ export {
 	parseVirtualFileRef,
 	type VirtualFileRef,
 } from "./refs";
+export {
+	createVirtualFileExpander,
+	type ResolvedVirtualFileRef,
+	type VirtualFileExpander,
+	type VirtualFileExpansion,
+} from "./expand";

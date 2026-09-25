@@ -11,35 +11,22 @@ import {
 	summarizeChanges,
 	validateMlFileContent,
 	validateMlFileName,
-	VIRTUAL_FILE_SCHEME,
 	writeMlFileVersion,
 	type MlFileListing,
 } from "$lib/server/mlFiles";
+import {
+	EDIT_FILE_TOOL_NAME,
+	READ_FILE_TOOL_NAME,
+	VIRTUAL_FILE_REFERENCE_RULES as REFERENCE_RULES,
+	VIRTUAL_FILES_TOOL_PREPROMPT,
+	WRITE_FILE_TOOL_NAME,
+} from "$lib/server/mlFiles/prompt";
 import type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
 
-/**
- * The model's scripts, held by the harness. Measured over the ten largest ML
- * Intern conversations, 65% of file-write bytes rewrote a path already written
- * and each of 930 job submissions re-sent a whole script, only 20-30% of it new
- * since the last one. These tools let the model write once, edit by
- * search-and-replace, and hand a `v-file://` reference to the Hub tools, which
- * the dispatch path expands (see mlFiles/expand.ts).
- */
+export { EDIT_FILE_TOOL_NAME, READ_FILE_TOOL_NAME, WRITE_FILE_TOOL_NAME };
 
-export const WRITE_FILE_TOOL_NAME = "write_file";
-export const EDIT_FILE_TOOL_NAME = "edit_file";
-export const READ_FILE_TOOL_NAME = "read_file";
-
-/** Past this the model is told how to page, rather than being handed a wall. */
 const READ_MAX_CHARS = 40_000;
 const MAX_EDITS_PER_CALL = 50;
-
-const REFERENCE_RULES =
-	`Pass a file to a Hub tool as the reference ${VIRTUAL_FILE_SCHEME}<name> in place of the ` +
-	`content, and the server sends the file's latest version; ${VIRTUAL_FILE_SCHEME}<name>@v3 pins ` +
-	`version 3. It works in exactly three places: hf_jobs "script", hf_fs_write "content", and ` +
-	`the token after --text in hf_sandbox_fs write. The reference must be the whole value, ` +
-	`not part of a longer string.`;
 
 const writeDefinition: OpenAiTool = {
 	type: "function",
@@ -371,9 +358,8 @@ async function readFile(
 }
 
 /**
- * Bound to the conversation at creation rather than read off the call context:
- * a sub-agent run has no chat context, and when these tools reach sub-agents
- * the files must still land in the parent conversation.
+ * bound at creation rather than read off the call context, a sub-agent run has no
+ * chat context and its files must still land in the parent conversation
  */
 export function createFileTools(conv: Pick<Conversation, "_id">): BuiltinTool[] {
 	return [
@@ -381,15 +367,7 @@ export function createFileTools(conv: Pick<Conversation, "_id">): BuiltinTool[] 
 			name: WRITE_FILE_TOOL_NAME,
 			definition: writeDefinition,
 			exemptFromToolRestraint: true,
-			preprompt:
-				`VIRTUAL FILES: every script you run is a virtual file. Write it once with ${WRITE_FILE_TOOL_NAME}, ` +
-				`change it with ${EDIT_FILE_TOOL_NAME} (search-and-replace, not a rewrite), and find it again with ` +
-				`${READ_FILE_TOOL_NAME}, which lists your files when called with no name. ${REFERENCE_RULES} ` +
-				`So a job is {"operation": "uv", "args": {"script": "${VIRTUAL_FILE_SCHEME}train.py", ...}}, an upload is ` +
-				`hf_fs_write put <uri> with content "${VIRTUAL_FILE_SCHEME}train.py", and a sandbox copy is ` +
-				`hf_sandbox_fs write <handle> /work/train.py --text ${VIRTUAL_FILE_SCHEME}train.py. Never paste a script ` +
-				`you have already written into a tool call; fix the file and resubmit the reference. Tool results ` +
-				`never echo file content back, so do not expect them to.`,
+			preprompt: VIRTUAL_FILES_TOOL_PREPROMPT,
 			execute: (args, ctx) => writeFile(conv, args, ctx),
 		},
 		{
