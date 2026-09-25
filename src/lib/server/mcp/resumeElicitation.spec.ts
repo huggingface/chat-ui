@@ -275,6 +275,22 @@ describe("resuming the model's own question", () => {
 		expect(result.result.outputs[0].text).toContain("S3");
 	});
 
+	it("continues from the row its caller claimed, not from a second read", async () => {
+		// The claim is the only thing that makes a continuation exclusive, and it returns the
+		// row. A lookup here would be a read any number of callers could make at once.
+		const conversationId = new ObjectId();
+		const id = await parkAsk(conversationId, "accept", { q1: "S3" });
+		const { claimElicitationResume } = await import("./elicitation");
+		const claimed = await claimElicitationResume(conversationId, id);
+		if (!claimed) throw new Error("expected the claim");
+		await collections.mcpElicitations.deleteOne({ elicitationId: id });
+
+		const outcome = await resumeParkedToolCall({ conversationId, elicitationId: id, claimed });
+
+		expect(outcome).toMatchObject({ resumed: true });
+		expect(outcome.updates.filter(isMessageElicitationResolvedUpdate)).toHaveLength(1);
+	});
+
 	it("settles the prompt so a reloaded transcript stops showing it open", async () => {
 		const conversationId = new ObjectId();
 		const id = await parkAsk(conversationId, "accept", { q1: "S3" });

@@ -339,3 +339,45 @@ describe("where the sandbox tools are allowed to come from", () => {
 		expect("error" in outcome && outcome.error).toContain("Run the commands yourself");
 	});
 });
+
+describe("virtual files inside the sandbox sub-agent", () => {
+	it("passes the parent's expander through to its own dispatch", async () => {
+		const { callMcpTool } = await import("$lib/server/mcp/httpClient");
+		vi.mocked(callMcpTool).mockClear();
+		vi.mocked(callMcpTool).mockResolvedValue({ text: "written", isError: false });
+		const expandVirtualFiles = vi.fn(
+			async ({ args }: { serverUrl: string; tool: string; args: Record<string, unknown> }) => ({
+				args: { ...args, args: ["write", HANDLE, "/work/train.py", "--text", "print(2)"] },
+				fileRefs: [{ ref: "v-file://train.py", name: "train.py", version: 2 }],
+			})
+		);
+		createCompletion
+			.mockResolvedValueOnce(
+				respond({
+					toolCalls: [
+						{
+							id: "t1",
+							name: "hf_sandbox_fs",
+							arguments: `{"cmd":"write","args":["write","${HANDLE}","/work/train.py","--text","v-file://train.py"]}`,
+						},
+					],
+				})
+			)
+			.mockResolvedValueOnce(respond({ content: "Outcome: worked." }));
+
+		await boundTool({ expandVirtualFiles }).execute({ handle: HANDLE, task: "copy it in" }, ctx);
+
+		expect(expandVirtualFiles).toHaveBeenCalledWith({
+			serverUrl: HUB.url,
+			tool: "hf_sandbox_fs",
+			args: {
+				cmd: "write",
+				args: ["write", HANDLE, "/work/train.py", "--text", "v-file://train.py"],
+			},
+		});
+		expect(vi.mocked(callMcpTool).mock.calls[0][2]).toEqual({
+			cmd: "write",
+			args: ["write", HANDLE, "/work/train.py", "--text", "print(2)"],
+		});
+	});
+});

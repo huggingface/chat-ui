@@ -10,6 +10,12 @@ import {
 } from "./testHelpers";
 
 import { GET, DELETE, PATCH } from "../../../../routes/api/v2/conversations/[id]/+server";
+import {
+	listMlArtefacts,
+	listMlServices,
+	recordArtefact,
+	recordDispatchedService,
+} from "$lib/server/mlRegistry/store";
 
 async function parseResponse<T = unknown>(res: Response): Promise<T> {
 	return superjson.parse(await res.text()) as T;
@@ -140,6 +146,34 @@ describe.sequential("DELETE /api/v2/conversations/[id]", () => {
 
 		const found = await collections.conversations.findOne({ _id: conv._id });
 		expect(found).toBeNull();
+	});
+
+	it("takes the conversation's registry rows with it and no one else's", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { title: "To Delete" });
+		const other = await createTestConversation(locals, { title: "Kept" });
+		for (const conversationId of [conv._id, other._id]) {
+			await recordDispatchedService({
+				conversationId,
+				kind: "job",
+				jobId: "0123456789abcdef01234567",
+				namespace: "testuser",
+				stage: "RUNNING",
+			});
+			await recordArtefact({
+				conversationId,
+				kind: "dataset",
+				uri: "hf://datasets/testuser/demo",
+				url: "https://huggingface.co/datasets/testuser/demo",
+			});
+		}
+
+		await DELETE({ locals, params: { id: conv._id.toString() } } as never);
+
+		expect(await listMlServices(conv._id)).toHaveLength(0);
+		expect(await listMlArtefacts(conv._id)).toHaveLength(0);
+		expect(await listMlServices(other._id)).toHaveLength(1);
+		expect(await listMlArtefacts(other._id)).toHaveLength(1);
 	});
 
 	it("throws 404 for non-existent conversation", async () => {
@@ -297,5 +331,94 @@ describe.sequential("PATCH /api/v2/conversations/[id]", () => {
 		} catch (e: unknown) {
 			expect((e as { status: number }).status).toBe(401);
 		}
+	});
+});
+
+describe.sequential("PATCH /api/v2/conversations/[id] mlBudgetLeftUsd", () => {
+	afterEach(async () => {
+		await cleanupTestData();
+	});
+
+	const patchLeft = (locals: App.Locals, id: ObjectId, body: Record<string, unknown>) =>
+		PATCH({
+			locals,
+			params: { id: id.toString() },
+			request: new Request("http://localhost", {
+				method: "PATCH",
+				body: JSON.stringify(body),
+				headers: { "Content-Type": "application/json" },
+			}),
+		} as never);
+
+	const ledger = {
+		totalMicroUsd: 1_000_000,
+		spentMicroUsd: 4_321,
+		reservations: [
+			{
+				key: "g:c1",
+				kind: "job" as const,
+				flavor: "cpu-basic",
+				priceMicroUsdPerMinute: 20_000,
+				timeoutSeconds: 600,
+				ceilingMicroUsd: 200_000,
+				createdAt: new Date(),
+			},
+		],
+	};
+
+	it("sets the total to left plus the live spent and held", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, {
+			mlAssistant: true,
+			mlBudget: ledger,
+		} as never);
+
+		const res = await patchLeft(locals, conv._id, { mlBudgetLeftUsd: 0 });
+
+		expect(res.status).toBe(200);
+		const data = await parseResponse<{
+			mlBudget: { totalMicroUsd: number; spentMicroUsd: number; reservedMicroUsd: number };
+		}>(res);
+		// Zero left lands on exactly zero, sub-cent spend included.
+		expect(data.mlBudget).toEqual({
+			totalMicroUsd: 204_321,
+			spentMicroUsd: 4_321,
+			reservedMicroUsd: 200_000,
+		});
+		const stored = await collections.conversations.findOne({ _id: conv._id });
+		expect(stored?.mlBudget?.totalMicroUsd).toBe(204_321);
+		expect(stored?.mlBudget?.reservations).toHaveLength(1);
+	});
+
+	it("rejects a total that would pass the ceiling once committed money is added", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, {
+			mlAssistant: true,
+			mlBudget: ledger,
+		} as never);
+
+		await expect(patchLeft(locals, conv._id, { mlBudgetLeftUsd: 10_000 })).rejects.toMatchObject({
+			status: 400,
+		});
+		const stored = await collections.conversations.findOne({ _id: conv._id });
+		expect(stored?.mlBudget?.totalMicroUsd).toBe(1_000_000);
+	});
+
+	it("will not conjure a budget onto an ordinary conversation", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals);
+
+		await expect(patchLeft(locals, conv._id, { mlBudgetLeftUsd: 5 })).rejects.toMatchObject({
+			status: 404,
+		});
+	});
+
+	it("rejects setting both the total and what is left", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { mlAssistant: true } as never);
+
+		await expect(
+			patchLeft(locals, conv._id, { mlBudgetLeftUsd: 1, mlBudgetTotalUsd: 1 })
+		).rejects.toMatchObject({ status: 400 });
 	});
 });

@@ -27,6 +27,8 @@ import {
 	isExaMcpServer,
 } from "$lib/server/mcp/hf";
 import { buildImageRefResolver } from "./fileRefs";
+import { createVirtualFileExpander } from "$lib/server/mlFiles/expand";
+import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
@@ -34,7 +36,7 @@ import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import {
 	isMlAssistantConversation,
-	mlAssistantPayerNamespace,
+	mlAssistantPayerTarget,
 	pinnedHubToken,
 	withMlAssistantServers,
 } from "$lib/server/mlAssistant";
@@ -45,6 +47,9 @@ import {
 	createMlBudgetGuard,
 	withRequiredDiscriminators,
 } from "$lib/server/mlBudget/guard";
+import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
+import { readMlBudget } from "$lib/server/mlBudget/budget";
+import { appendToLastToolMessage, budgetChangeNote } from "$lib/server/mlBudget/budgetNote";
 import { createRepeatedCallGuard } from "./repeatedCallGuard";
 import { withRepairedToolSchemas } from "$lib/server/mcp/schemaRepair";
 import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
@@ -54,6 +59,7 @@ import { withUpstreamRetry } from "../utils/upstreamRetry";
 import { getEnabledBuiltinTools, isNestedAgentTool, shouldSkipMcpFlow } from "../builtinTools";
 import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+import { inferenceBillingHeaders } from "$lib/server/billing";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -184,10 +190,24 @@ export async function* runMcpFlow({
 			? createMlAssistantOnlyComputeGuard()
 			: undefined;
 
+	// The total the model was last told: the session-context line's, which the
+	// preprompt read from this same ledger after the turn-start settle.
+	let budgetTotalSeen = conv.mlBudget?.totalMicroUsd ?? 0;
+
 	// A job bills the namespace it runs under, so the billing setting travels as
 	// an argument rather than a header — see mcp/hubBilling.ts.
-	const payer = mlAssistant ? mlAssistantPayerNamespace(locals) : undefined;
+	const payer = mlAssistant ? mlAssistantPayerTarget(locals) : undefined;
 	const rewriteArgs = payer ? createHubBillingRewrite(payer) : undefined;
+	const recordingGuard = mlAssistant
+		? createMlRecordingGuard({
+				conversationId: conv._id,
+				generationId: generationId ?? conv._id.toString(),
+				messageId,
+				namespace:
+					payer?.namespace ??
+					(locals as unknown as { user?: { username?: string } })?.user?.username,
+			})
+		: undefined;
 	if (mlAssistant) {
 		logger.info(
 			{ conversationId: conv._id.toString(), payer: payer ?? null },
@@ -398,6 +418,9 @@ export async function* runMcpFlow({
 	}
 
 	const resolveFileRef = buildImageRefResolver(messages);
+	const expandVirtualFiles = mlVirtualFilesEnabled(conv)
+		? createVirtualFileExpander(conv._id)
+		: undefined;
 	const imageProcessor = makeImageProcessor({
 		supportedMimeTypes: ["image/png", "image/jpeg"],
 		preferredMimeType: "image/jpeg",
@@ -451,7 +474,9 @@ export async function* runMcpFlow({
 		// Applied to every conversation, mode or not: the Hub tools whose real
 		// interface is a grammar in prose misfire the same way whoever is calling
 		// them. See mcp/schemaRepair.ts for what the traces showed.
-		const shapedMcpTools = withRepairedToolSchemas(gatedMcpTools, mapping, servers);
+		const shapedMcpTools = withRepairedToolSchemas(gatedMcpTools, mapping, servers, {
+			virtualFiles: expandVirtualFiles !== undefined,
+		});
 		// Cheapest first, and only the last link may book anything (see
 		// composeGuards): a repeat of a call that already failed the same way, then
 		// arguments that cannot satisfy the tool's own schema, then the compute
@@ -460,6 +485,7 @@ export async function* runMcpFlow({
 		const guard = [
 			repeatedCallGuard,
 			createSchemaPreflightGuard(mapping),
+			...(recordingGuard ? [recordingGuard] : []),
 			...(computeGuard ? [computeGuard] : []),
 		].reduce(composeGuards);
 		const oaTools = [
@@ -497,9 +523,7 @@ export async function* runMcpFlow({
 			fetch: captureProviderFetch,
 			defaultHeaders: {
 				// Bill to organization if configured (HuggingChat only)
-				...(config.isHuggingChat && locals?.billingOrganization
-					? { "X-HF-Bill-To": locals.billingOrganization }
-					: {}),
+				...(config.isHuggingChat ? inferenceBillingHeaders(locals) : {}),
 			},
 		});
 
@@ -680,6 +704,7 @@ export async function* runMcpFlow({
 			hostBuiltinTools: builtinTools,
 			contextLengthTokens: targetContextLength,
 			...(rewriteArgs ? { rewriteArgs } : {}),
+			...(expandVirtualFiles ? { expandVirtualFiles } : {}),
 		};
 		for (const tool of builtinTools) {
 			if (isNestedAgentTool(tool)) tool.bind(nestedAgentDeps);
@@ -1099,6 +1124,7 @@ export async function* runMcpFlow({
 					servers,
 					parseArgs,
 					resolveFileRef,
+					...(expandVirtualFiles ? { expandVirtualFiles } : {}),
 					toPrimitive,
 					processToolOutput,
 					abortSignal,
@@ -1137,6 +1163,19 @@ export async function* runMcpFlow({
 							assistantToolMessage,
 							...(event.summary.toolMessages ?? []),
 						];
+						if (computeGuard) {
+							try {
+								const budget = await readMlBudget(conv._id);
+								const note = budgetChangeNote(budgetTotalSeen, budget);
+								if (note) {
+									messagesOpenAI = appendToLastToolMessage(messagesOpenAI, note);
+									budgetTotalSeen = budget?.totalMicroUsd ?? 0;
+								}
+							} catch (err) {
+								// The gate still reads the live ledger; only the model's view lags.
+								logger.warn({ err: String(err) }, "[mlBudget] mid-turn budget read failed");
+							}
+						}
 						toolMsgCount = event.summary.toolMessages?.length ?? 0;
 						toolRunCount = event.summary.toolRuns?.length ?? 0;
 						logger.info(

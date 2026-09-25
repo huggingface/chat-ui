@@ -74,6 +74,7 @@
 	import { planStepsToMlSteps } from "$lib/utils/planProgress";
 	import type { PlanState } from "$lib/types/Plan";
 	import type { MlBudget } from "$lib/types/Conversation";
+	import type { MlBudgetSnapshot } from "$lib/types/MlAssistant";
 	import { reservedMicroUsd, usdToMicroUsd } from "$lib/utils/mlBudget";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import {
@@ -650,18 +651,25 @@
 	const budgetClient = useAPIClient();
 
 	/**
-	 * Commits a new budget total. Optimistic: the strip shows the new total at
-	 * once and rolls back if the server said no.
+	 * Commits a new amount left. The server turns it into a total against the
+	 * live ledger; the strip shows the expected figure at once, takes the
+	 * server's ledger when it answers, and rolls back if the server said no.
 	 */
-	function changeMlBudget(totalUsd: number) {
+	function changeMlBudget(leftUsd: number) {
 		const conversationId = page.params?.id;
 		const previous = mlAssistant.budget;
 		if (!conversationId || !previous) return;
-		mlAssistant.setBudget({ ...previous, totalMicroUsd: usdToMicroUsd(totalUsd) });
+		mlAssistant.setBudget({
+			...previous,
+			totalMicroUsd: usdToMicroUsd(leftUsd) + previous.spentMicroUsd + previous.reservedMicroUsd,
+		});
 		budgetClient
 			.conversations({ id: conversationId })
-			.patch({ mlBudgetTotalUsd: totalUsd })
+			.patch({ mlBudgetLeftUsd: leftUsd })
 			.then(handleResponse)
+			.then((res: { mlBudget?: MlBudgetSnapshot } | null) => {
+				if (res?.mlBudget) mlAssistant.setBudget(res.mlBudget);
+			})
 			.catch(() => {
 				mlAssistant.setBudget(previous);
 			});
@@ -1081,7 +1089,13 @@
 
 			<div class="w-full">
 				{#if askQuestion}
-					<AskQuestion conversationId={askQuestion.conversationId} request={askQuestion.request} />
+					<!-- Keyed: the next waiting question must not inherit this one's step and picks. -->
+					{#key askQuestion.request.elicitationId}
+						<AskQuestion
+							conversationId={askQuestion.conversationId}
+							request={askQuestion.request}
+						/>
+					{/key}
 				{/if}
 				<div class="flex w-full gap-2 *:mb-3">
 					{#if !loading && lastIsError}

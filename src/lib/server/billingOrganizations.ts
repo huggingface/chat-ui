@@ -1,16 +1,32 @@
 import { error } from "@sveltejs/kit";
 import { logger } from "$lib/server/logger";
 
+export interface BillingResourceGroup {
+	sub: string;
+	name: string;
+	role: string;
+}
+
 export interface BillingOrganization {
 	sub: string;
 	name: string;
 	preferred_username: string;
+	/** Enterprise resource groups the user belongs to in this organisation. */
+	resourceGroups: BillingResourceGroup[];
 }
 
-interface UserInfoOrganization extends BillingOrganization {
+interface UserInfoOrganization {
+	sub: string;
+	name: string;
+	preferred_username: string;
 	canPay?: boolean;
 	plan?: string;
+	roleInOrg?: string;
+	resourceGroups?: BillingResourceGroup[];
 }
+
+const canSubmitComputeToResourceGroup = (groupRole: string, organizationRole?: string): boolean =>
+	organizationRole === "admin" || groupRole === "admin" || groupRole === "write";
 
 /**
  * The organisations this user may bill through the app, and whether they may
@@ -32,7 +48,14 @@ export async function fetchBillableOrganizations(
 		userCanPay: data.canPay ?? false,
 		organizations: (data.orgs ?? [])
 			.filter((org) => org.plan || org.canPay === true)
-			.map(({ sub, name, preferred_username }) => ({ sub, name, preferred_username })),
+			.map(({ sub, name, preferred_username, roleInOrg, resourceGroups }) => ({
+				sub,
+				name,
+				preferred_username,
+				resourceGroups: (resourceGroups ?? [])
+					.filter((group) => canSubmitComputeToResourceGroup(group.role, roleInOrg))
+					.map(({ sub, name, role }) => ({ sub, name, role })),
+			})),
 	};
 }
 
@@ -46,12 +69,20 @@ export async function fetchBillableOrganizations(
  */
 export async function assertBillableOrganization(
 	locals: Pick<App.Locals, "token">,
-	organization: string
+	organization: string,
+	resourceGroup?: string
 ): Promise<void> {
 	if (!locals.token) error(401, "Log in again to change who is billed.");
 	const billable = await fetchBillableOrganizations(locals.token);
 	if (!billable) error(502, "Could not verify billing eligibility with Hugging Face.");
-	if (!billable.organizations.some((org) => org.preferred_username === organization)) {
+	const selected = billable.organizations.find((org) => org.preferred_username === organization);
+	if (!selected) {
 		error(400, `Organization "${organization}" cannot be billed from this account.`);
+	}
+	if (resourceGroup && !selected.resourceGroups.some((group) => group.sub === resourceGroup)) {
+		error(
+			400,
+			`Resource group "${resourceGroup}" cannot submit billed compute in "${organization}".`
+		);
 	}
 }

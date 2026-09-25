@@ -5,6 +5,9 @@ import { collections, ready } from "$lib/server/database";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { TurnStatus } from "$lib/types/TurnState";
 import {
+	RESUME_LEASE_MS,
+	claimElicitationResume,
+	finishElicitationResume,
 	handleElicitationRequest,
 	submitElicitationAnswer,
 	withElicitationContext,
@@ -545,7 +548,12 @@ describe("submitElicitationAnswer", () => {
 			// persisted), so the transcript shows the question open again and the user answers
 			// it a second time. Nothing picked up the answer, and the repeat is what can.
 			const { elicitationId, messageId } = await durableRow();
-			expect(await answer(elicitationId)).toEqual({ ok: true, resume: true, messageId });
+			expect(await answer(elicitationId)).toEqual({
+				ok: true,
+				resume: true,
+				messageId,
+				pendingKind: "ask",
+			});
 
 			const repeat = await submitElicitationAnswer({
 				elicitationId,
@@ -637,7 +645,12 @@ describe("submitElicitationAnswer", () => {
 			// cancel nobody consumed. The user's answer is the first real one.
 			const { elicitationId, messageId } = await durableRow({ closedBy: "aborted" });
 
-			expect(await answer(elicitationId)).toEqual({ ok: true, resume: true, messageId });
+			expect(await answer(elicitationId)).toEqual({
+				ok: true,
+				resume: true,
+				messageId,
+				pendingKind: "ask",
+			});
 			expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
 				status: "resolved",
 				action: "accept",
@@ -649,7 +662,12 @@ describe("submitElicitationAnswer", () => {
 		it("reads a cancel from before resolutions were recorded as the system's", async () => {
 			const { elicitationId, messageId } = await durableRow({ closedBy: "legacy" });
 
-			expect(await answer(elicitationId)).toEqual({ ok: true, resume: true, messageId });
+			expect(await answer(elicitationId)).toEqual({
+				ok: true,
+				resume: true,
+				messageId,
+				pendingKind: "ask",
+			});
 		});
 
 		it("keeps a system close that a continuation already consumed", async () => {
@@ -659,6 +677,50 @@ describe("submitElicitationAnswer", () => {
 				ok: false,
 				status: 409,
 				answered: { action: "cancel", resume: false, messageId },
+			});
+		});
+
+		it("reads a live claim as a continuation under way", async () => {
+			// The server's own resume holds the claim before any of the other signs exist: no
+			// producer registered yet, nothing in the message. A repeat answer in that window
+			// must not be told to start a second continuation.
+			const { elicitationId, messageId } = await durableRow();
+			await answer(elicitationId);
+			expect(await claimElicitationResume(conversationId, elicitationId)).not.toBeNull();
+
+			const repeat = await submitElicitationAnswer({
+				elicitationId,
+				conversationId,
+				action: "decline",
+			});
+
+			expect(repeat).toMatchObject({
+				ok: false,
+				status: 409,
+				answered: { action: "accept", resume: false, messageId },
+			});
+		});
+
+		it("asks again once a claim has outlived any live holder", async () => {
+			const { elicitationId, messageId } = await durableRow();
+			await answer(elicitationId);
+			await claimElicitationResume(conversationId, elicitationId);
+			await collections.mcpElicitations.updateOne(
+				{ elicitationId },
+				{ $set: { "resume.takenAt": new Date(Date.now() - RESUME_LEASE_MS - 1_000) } }
+			);
+
+			const repeat = await submitElicitationAnswer({
+				elicitationId,
+				conversationId,
+				action: "decline",
+			});
+
+			expect(repeat).toMatchObject({
+				ok: false,
+				status: 409,
+				answered: { action: "accept", resume: true, messageId },
+				pendingKind: "ask",
 			});
 		});
 
@@ -681,6 +743,117 @@ describe("submitElicitationAnswer", () => {
 			expect(repeat).toMatchObject({ ok: false, status: 500 });
 			expect(repeat).not.toHaveProperty("answered");
 		});
+	});
+});
+
+describe("claiming an answered prompt's continuation", () => {
+	const conversationId = new ObjectId();
+
+	const answeredRow = async (over: Partial<McpElicitation> = {}) => {
+		const elicitationId = crypto.randomUUID();
+		const now = new Date();
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			elicitationId,
+			conversationId,
+			status: "resolved",
+			action: "accept",
+			resolution: "user",
+			resolvedAt: now,
+			request: { elicitationId, source: "assistant", server: "", mode: "form", message: "" },
+			pending: { kind: "ask", messageId: "m1", toolCallId: "c1", toolUuid: "u1" },
+			createdAt: now,
+			updatedAt: now,
+			...over,
+		});
+		return elicitationId;
+	};
+
+	beforeEach(async () => {
+		await collections.mcpElicitations.deleteMany({});
+	});
+
+	it("has one winner however many callers race for it", async () => {
+		const elicitationId = await answeredRow();
+
+		const claims = await Promise.all(
+			Array.from({ length: 8 }, () => claimElicitationResume(conversationId, elicitationId))
+		);
+
+		expect(claims.filter(Boolean)).toHaveLength(1);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "resuming", attempts: 1 },
+		});
+	});
+
+	it("refuses a prompt nobody has answered, and one from another conversation", async () => {
+		const open = await answeredRow({ status: "pending", action: undefined });
+		const theirs = await answeredRow();
+
+		expect(await claimElicitationResume(conversationId, open)).toBeNull();
+		expect(await claimElicitationResume(new ObjectId(), theirs)).toBeNull();
+	});
+
+	it("stays taken once consumed, even after the lease would have lapsed", async () => {
+		const elicitationId = await answeredRow();
+		const row = await claimElicitationResume(conversationId, elicitationId);
+		if (!row) throw new Error("expected the claim");
+		await finishElicitationResume(row);
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId },
+			{ $set: { "resume.takenAt": new Date(0) } }
+		);
+
+		expect(await claimElicitationResume(conversationId, elicitationId)).toBeNull();
+	});
+
+	it("does not let a holder that stalled past its lease consume its successor's claim", async () => {
+		const elicitationId = await answeredRow();
+		const stale = await claimElicitationResume(conversationId, elicitationId);
+		if (!stale) throw new Error("expected the claim");
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId },
+			{ $set: { "resume.takenAt": new Date(Date.now() - RESUME_LEASE_MS - 1_000) } }
+		);
+		const successor = await claimElicitationResume(conversationId, elicitationId);
+		expect(successor?.resume?.attempts).toBe(2);
+
+		await finishElicitationResume(stale);
+
+		expect((await collections.mcpElicitations.findOne({ elicitationId }))?.resume?.status).toBe(
+			"resuming"
+		);
+	});
+
+	it("moves updatedAt, so an answer replacing a system close cannot land under a claim", async () => {
+		const closedAt = new Date(Date.now() - 5_000);
+		const elicitationId = await answeredRow({
+			action: "cancel",
+			resolution: "aborted",
+			updatedAt: closedAt,
+		});
+
+		await claimElicitationResume(conversationId, elicitationId);
+
+		const row = await collections.mcpElicitations.findOne({ elicitationId });
+		expect(row?.updatedAt.getTime()).toBeGreaterThan(closedAt.getTime());
+	});
+
+	it("can be restricted to the model's own questions", async () => {
+		const mcp = await answeredRow({
+			pending: {
+				server: "Mock",
+				tool: "t",
+				args: {},
+				inputKey: "k",
+				messageId: "m1",
+				toolCallId: "c1",
+				toolUuid: "u1",
+			},
+		});
+
+		expect(await claimElicitationResume(conversationId, mcp, "ask")).toBeNull();
+		expect(await claimElicitationResume(conversationId, mcp)).not.toBeNull();
 	});
 });
 

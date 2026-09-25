@@ -4,7 +4,7 @@ import type { Client } from "@modelcontextprotocol/client";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
 import { isTurnAlive } from "$lib/server/generation/turnLog";
-import type { McpElicitation, PendingMcpCall } from "$lib/types/McpElicitation";
+import type { ElicitationResume, McpElicitation, PendingMcpCall } from "$lib/types/McpElicitation";
 import type {
 	AnsweredElicitation,
 	ElicitationAction,
@@ -266,22 +266,105 @@ export async function handleElicitationRequest(
 }
 
 export type SubmitResult =
-	| { ok: true; resume: boolean; messageId?: string }
+	| { ok: true; resume: boolean; messageId?: string; pendingKind?: "ask" | "mcp" }
 	| { ok: false; status: 400 | 404 | 500; error: string }
-	| { ok: false; status: 409; error: string; answered?: AnsweredElicitation };
+	| {
+			ok: false;
+			status: 409;
+			error: string;
+			answered?: AnsweredElicitation;
+			pendingKind?: "ask" | "mcp";
+	  };
 
 /**
- * Whether anything has picked up a durable prompt's answer. A producer holding the turn, or a
- * parked call being claimed, is a continuation under way; the Resolved update in the parked
- * message is one that ran, however it ended. The turn-state document is deliberately not the
+ * How long a claim holds a row before it may be taken again. A live claim ends once the tool
+ * result is stored, seconds at most, so this only ever expires under a process that died.
+ */
+export const RESUME_LEASE_MS = 5 * 60_000;
+
+const claimLapsed = (resume: ElicitationResume, now: number): boolean =>
+	resume.status === "resuming" && resume.takenAt.getTime() < now - RESUME_LEASE_MS;
+
+/**
+ * Take the right to continue an answered durable prompt. The filter carries the claim state,
+ * so the answer endpoint, the sweep, a second tab and an old client's resume request racing on
+ * one row produce one winner and misses, never two continuations. `updatedAt` moves with the
+ * claim so an answer replacing a system close (keyed on it, see submitElicitationAnswer)
+ * cannot land on a row whose close is already being consumed.
+ */
+export async function claimElicitationResume(
+	conversationId: ObjectId,
+	elicitationId: string,
+	/** Claim only a prompt of this kind, for a caller that can continue no other. */
+	only?: "ask"
+): Promise<McpElicitation | null> {
+	const now = new Date();
+	const claimed = await collections.mcpElicitations.findOneAndUpdate(
+		{
+			elicitationId,
+			conversationId,
+			status: "resolved",
+			action: { $exists: true },
+			...(only ? { "pending.kind": only } : { pending: { $exists: true } }),
+			$or: [
+				{ resume: { $exists: false } },
+				{
+					"resume.status": "resuming",
+					"resume.takenAt": { $lt: new Date(now.getTime() - RESUME_LEASE_MS) },
+				},
+			],
+		},
+		{
+			$set: { "resume.status": "resuming", "resume.takenAt": now, updatedAt: now },
+			$inc: { "resume.attempts": 1 },
+		},
+		{ returnDocument: "after" }
+	);
+	// Driver v5: findOneAndUpdate returns ModifyResult unless told otherwise.
+	return claimed?.value ?? null;
+}
+
+/**
+ * Consume a claim. Keyed on the claim this caller took, so a holder that stalled past its
+ * lease cannot close the claim of whoever took over. Deliberately its own write, never part
+ * of a conversation save: a save that throws must not leave the row claimable again, which
+ * is how one parked wait came to be resumed three times.
+ */
+export async function finishElicitationResume(
+	row: McpElicitation,
+	outcome: { abandoned?: string } = {}
+): Promise<void> {
+	const now = new Date();
+	await collections.mcpElicitations.updateOne(
+		{ _id: row._id, "resume.status": "resuming", "resume.takenAt": row.resume?.takenAt },
+		{
+			$set: {
+				...(outcome.abandoned
+					? { "resume.status": "abandoned", "resume.abandonedReason": outcome.abandoned }
+					: { "resume.status": "resumed", "resume.resumedAt": now }),
+				updatedAt: now,
+			},
+		}
+	);
+}
+
+/**
+ * Whether anything has picked up a durable prompt's answer. A live claim on the row, a
+ * producer holding the turn, or a parked call being claimed, is a continuation under way; the
+ * Resolved update in the parked message is one that ran, however it ended (rows continued
+ * before claims existed carry only that). The turn-state document is deliberately not the
  * judge: a continuation that died leaves it at `running` for good (the reaper never moves
  * it), which would read as continued forever.
  */
 async function continued(
 	conversationId: ObjectId,
 	elicitationId: string,
-	messageId: string
+	messageId: string,
+	resume?: ElicitationResume
 ): Promise<boolean> {
+	// A lapsed claim is a continuation that died before storing the result; the checks below
+	// decide, and a repeat answer is then what takes the claim over.
+	if (resume && !claimLapsed(resume, Date.now())) return true;
 	const turn = await isTurnAlive(conversationId, messageId);
 	if (turn.alive && turn.status !== "awaiting_input") return true;
 	const conversation = await collections.conversations.findOne(
@@ -322,7 +405,7 @@ export async function submitElicitationAnswer({
 		if (!doc.pending) return { ok: false, status: 409, error: "Already answered." };
 		let done: boolean;
 		try {
-			done = await continued(conversationId, elicitationId, doc.pending.messageId);
+			done = await continued(conversationId, elicitationId, doc.pending.messageId, doc.resume);
 		} catch (err) {
 			logger.error({ err, elicitationId }, "[mcp] could not tell whether an answer was continued");
 			// Not a refusal: one that carries `answered` makes the composer drop the question.
@@ -341,6 +424,7 @@ export async function submitElicitationAnswer({
 					? "Already answered. Continuing with that answer."
 					: "Already answered.",
 				answered,
+				pendingKind: doc.pending.kind ?? "mcp",
 			};
 		}
 		// Closed by the system, never continued: nothing consumed that cancel, so the user's
@@ -424,7 +508,9 @@ export async function submitElicitationAnswer({
 	return {
 		ok: true,
 		resume: doc.pending !== undefined,
-		...(doc.pending ? { messageId: doc.pending.messageId } : {}),
+		...(doc.pending
+			? { messageId: doc.pending.messageId, pendingKind: doc.pending.kind ?? "mcp" }
+			: {}),
 	};
 }
 
@@ -496,13 +582,41 @@ export async function openDurableElicitation({
 	return { opened: true };
 }
 
+/**
+ * Hand a claim back after a failure this process survived, so the retry does not sit out a
+ * lease meant for a process that died. `attempts` stands, which is what bounds the retries,
+ * unless the caller backed off without anything having failed.
+ */
+export async function releaseElicitationResume(
+	row: McpElicitation,
+	{ uncounted = false }: { uncounted?: boolean } = {}
+): Promise<void> {
+	await collections.mcpElicitations
+		.updateOne(
+			{ _id: row._id, "resume.status": "resuming", "resume.takenAt": row.resume?.takenAt },
+			{
+				$set: { "resume.takenAt": new Date(0) },
+				...(uncounted ? { $inc: { "resume.attempts": -1 } } : {}),
+			}
+		)
+		.catch((err) =>
+			logger.error({ err, elicitationId: row.elicitationId }, "[mcp] failed to release a claim")
+		);
+}
+
 /** The answered prompt for a conversation, ready to re-issue its tool call. */
 export async function takeResumableElicitation(
 	conversationId: ObjectId,
 	elicitationId: string
 ): Promise<{ row: McpElicitation; inputResponses: InputResponses } | null> {
 	const row = await collections.mcpElicitations.findOne({ elicitationId, conversationId });
-	if (!row?.pending || row.status !== "resolved" || !row.action) return null;
+	return row ? resumableFrom(row) : null;
+}
+
+export function resumableFrom(
+	row: McpElicitation
+): { row: McpElicitation; inputResponses: InputResponses } | null {
+	if (!row.pending || row.status !== "resolved" || !row.action) return null;
 	// The model's own question is answered by the answer itself; there is no call to replay
 	// responses into.
 	if (row.pending.kind === "ask") return { row, inputResponses: {} };

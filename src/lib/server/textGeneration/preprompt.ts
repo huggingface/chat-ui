@@ -1,7 +1,7 @@
 import { injectArtifactsPrompt } from "./artifacts";
 import {
 	ML_ASSISTANT_BUDGET_RULES,
-	ML_ASSISTANT_PREPROMPT,
+	mlAssistantPreprompt,
 	mlAssistantSessionContext,
 } from "$lib/server/mlAssistantPrompt";
 import type { MlBudget } from "$lib/types/Conversation";
@@ -12,6 +12,8 @@ export interface PrepromptInput {
 	conversationPreprompt?: string;
 	/** Whether this conversation runs the ML Assistant preset. */
 	mlAssistant: boolean;
+	/** whether the file tools are offered this turn, decides the scripts section, defaults on like the switch */
+	virtualFiles?: boolean;
 	/** Per-model user override for artifacts, from the model settings page. */
 	artifactsOverride?: boolean;
 	/** Whether the model advertises artifact support (supportsArtifacts). */
@@ -24,8 +26,10 @@ export interface PrepromptInput {
 	now?: Date;
 	/** The conversation's compute budget; presence turns on the budget rules. */
 	budget?: MlBudget;
-	/** Organization the mode's jobs and sandboxes are billed to; stamped as BillTo. */
+	/** Organization namespace the mode's compute runs under; stamped as BillTo. */
 	billTo?: string;
+	/** Resource group within BillTo used for cost attribution. */
+	billingResourceGroup?: string;
 }
 
 /**
@@ -39,6 +43,7 @@ export interface PrepromptInput {
 export function resolvePreprompt({
 	conversationPreprompt,
 	mlAssistant,
+	virtualFiles,
 	artifactsOverride,
 	supportsArtifacts,
 	username,
@@ -46,8 +51,11 @@ export function resolvePreprompt({
 	now,
 	budget,
 	billTo,
+	billingResourceGroup,
 }: PrepromptInput): string | undefined {
-	const base = mlAssistant ? ML_ASSISTANT_PREPROMPT : conversationPreprompt;
+	const base = mlAssistant
+		? mlAssistantPreprompt({ virtualFiles: virtualFiles ?? true })
+		: conversationPreprompt;
 	const artifacts = mlAssistant || (artifactsOverride ?? supportsArtifacts);
 	const resolved = artifacts ? injectArtifactsPrompt(base) : base;
 	if (!mlAssistant) return resolved;
@@ -67,5 +75,6 @@ export function resolvePreprompt({
 			total: formatMicroUsd(effective.totalMicroUsd),
 		},
 		billTo,
+		billingResourceGroup,
 	})}`;
 }

@@ -19,12 +19,19 @@ const asRecord = (value: unknown): Record<string, unknown> | undefined =>
 		? (value as Record<string, unknown>)
 		: undefined;
 
-const asText = (value: unknown, max: number): string | undefined => {
+/** Refused rather than cut: a cut label or question can read as something never asked. */
+class TextTooLong extends Error {}
+
+const tooLong = (what: string, length: number, max: number) =>
+	new TextTooLong(`${what} is ${length} characters; the limit is ${max}.`);
+
+const asText = (value: unknown, max: number, what: string): string | undefined => {
 	if (typeof value !== "string") return undefined;
 	// Stripped so a label cannot smuggle line breaks in and fake chrome around the form.
 	const cleaned = value.replace(/[\p{Cc}\p{Cf}]/gu, " ").trim();
 	if (!cleaned) return undefined;
-	return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
+	if (cleaned.length > max) throw tooLong(what, cleaned.length, max);
+	return cleaned;
 };
 
 /** `out[name] = x` on one of these hits an inherited setter instead of creating a key. */
@@ -35,15 +42,20 @@ const asFiniteNumber = (value: unknown): number | undefined =>
 
 type Option = { value: string; label: string };
 
+const optionLabel = (field: string) => `An option label in "${field}"`;
+
 /** An untitled option shows its raw value, which still has to be safe to display. */
-const labelOf = (value: string) =>
-	asText(value, MAX_TITLE_CHARS) ?? value.slice(0, MAX_TITLE_CHARS);
+const labelOf = (value: string, field: string) => {
+	if (value.length > MAX_TITLE_CHARS)
+		throw tooLong(optionLabel(field), value.length, MAX_TITLE_CHARS);
+	return asText(value, MAX_TITLE_CHARS, optionLabel(field)) ?? value;
+};
 
 /** The UI keys options by value, so duplicates would break rendering outright. */
 const uniqueValues = (options: Option[]) =>
 	new Set(options.map((o) => o.value)).size === options.length;
 
-function optionsFromEnum(def: Record<string, unknown>): Option[] | undefined {
+function optionsFromEnum(def: Record<string, unknown>, field: string): Option[] | undefined {
 	if (!Array.isArray(def.enum)) return undefined;
 	const values = def.enum.filter((v): v is string => typeof v === "string");
 	if (values.length !== def.enum.length) return undefined;
@@ -52,11 +64,13 @@ function optionsFromEnum(def: Record<string, unknown>): Option[] | undefined {
 	const labelled = names?.length === values.length && names.every((n) => typeof n === "string");
 	return values.map((value, i) => ({
 		value,
-		label: (labelled ? asText(names?.[i], MAX_TITLE_CHARS) : undefined) ?? labelOf(value),
+		label:
+			(labelled ? asText(names?.[i], MAX_TITLE_CHARS, optionLabel(field)) : undefined) ??
+			labelOf(value, field),
 	}));
 }
 
-function optionsFromConstList(list: unknown): Option[] | undefined {
+function optionsFromConstList(list: unknown, field: string): Option[] | undefined {
 	if (!Array.isArray(list)) return undefined;
 	const options: Option[] = [];
 	for (const entry of list) {
@@ -64,7 +78,7 @@ function optionsFromConstList(list: unknown): Option[] | undefined {
 		if (!obj || typeof obj.const !== "string") return undefined;
 		options.push({
 			value: obj.const,
-			label: asText(obj.title, MAX_TITLE_CHARS) ?? labelOf(obj.const),
+			label: asText(obj.title, MAX_TITLE_CHARS, optionLabel(field)) ?? labelOf(obj.const, field),
 		});
 	}
 	return options;
@@ -76,8 +90,8 @@ function normalizeField(name: string, raw: unknown, required: boolean): Elicitat
 
 	const common = {
 		name,
-		title: asText(def.title, MAX_TITLE_CHARS),
-		description: asText(def.description, MAX_DESCRIPTION_CHARS),
+		title: asText(def.title, MAX_TITLE_CHARS, `The title of "${name}"`),
+		description: asText(def.description, MAX_DESCRIPTION_CHARS, `The description of "${name}"`),
 		required,
 	};
 
@@ -101,7 +115,7 @@ function normalizeField(name: string, raw: unknown, required: boolean): Elicitat
 	}
 
 	if (def.type === "string") {
-		const options = optionsFromConstList(def.oneOf) ?? optionsFromEnum(def);
+		const options = optionsFromConstList(def.oneOf, name) ?? optionsFromEnum(def, name);
 		if (options) {
 			if (options.length === 0 || options.length > MAX_OPTIONS) return null;
 			if (!uniqueValues(options)) return null;
@@ -139,7 +153,7 @@ function normalizeField(name: string, raw: unknown, required: boolean): Elicitat
 	if (def.type === "array") {
 		const items = asRecord(def.items);
 		if (!items) return null;
-		const options = optionsFromConstList(items.anyOf) ?? optionsFromEnum(items);
+		const options = optionsFromConstList(items.anyOf, name) ?? optionsFromEnum(items, name);
 		if (!options || options.length === 0 || options.length > MAX_OPTIONS) return null;
 		if (!uniqueValues(options)) return null;
 		const known = new Set(options.map((o) => o.value));
@@ -165,10 +179,19 @@ export type NormalizeResult =
 	| { ok: false; reason: string };
 
 export function normalizeElicitationRequest(params: unknown): NormalizeResult {
+	try {
+		return normalizeRequest(params);
+	} catch (err) {
+		if (err instanceof TextTooLong) return { ok: false, reason: err.message };
+		throw err;
+	}
+}
+
+function normalizeRequest(params: unknown): NormalizeResult {
 	const raw = asRecord(params);
 	if (!raw) return { ok: false, reason: "Malformed elicitation params." };
 
-	const message = asText(raw.message, MAX_MESSAGE_CHARS);
+	const message = asText(raw.message, MAX_MESSAGE_CHARS, "The message");
 	if (!message) return { ok: false, reason: "Elicitation is missing a message." };
 
 	if (raw.mode === "url") {

@@ -136,6 +136,52 @@ describe("normalizeElicitationRequest", () => {
 		expect(field.title).toBe("Name  Admin only");
 	});
 
+	it("shows text up to its limit whole", () => {
+		const title = "t".repeat(200);
+		const description = "d".repeat(1_000);
+		const message = "m".repeat(2_000);
+		const result = normalizeElicitationRequest({
+			...form({ pick: { type: "string", title, description, enum: ["v".repeat(200)] } }),
+			message,
+		});
+
+		expect(result).toMatchObject({
+			ok: true,
+			payload: {
+				message,
+				fields: [{ title, description, options: [{ label: "v".repeat(200) }] }],
+			},
+		});
+	});
+
+	it("refuses text over its limit, naming what and by how much, rather than cutting it", () => {
+		const refusal = (params: unknown) => {
+			const result = normalizeElicitationRequest(params);
+			if (result.ok) throw new Error("expected a refusal");
+			return result.reason;
+		};
+
+		expect(refusal({ ...form({ a: { type: "string" } }), message: "m".repeat(2_001) })).toBe(
+			"The message is 2001 characters; the limit is 2000."
+		);
+		expect(refusal(form({ plan: { type: "string", title: "t".repeat(201) } }))).toBe(
+			'The title of "plan" is 201 characters; the limit is 200.'
+		);
+		expect(refusal(form({ plan: { type: "string", description: "d".repeat(1_001) } }))).toBe(
+			'The description of "plan" is 1001 characters; the limit is 1000.'
+		);
+		for (const pick of [
+			{ type: "string", enum: ["a", "b"], enumNames: ["Alpha", "B".repeat(201)] },
+			{ type: "string", oneOf: [{ const: "a", title: "T".repeat(201) }] },
+			{ type: "string", enum: ["v".repeat(201)] },
+			{ type: "array", items: { anyOf: [{ const: "v".repeat(201) }] } },
+		]) {
+			expect(refusal(form({ pick }))).toBe(
+				'An option label in "pick" is 201 characters; the limit is 200.'
+			);
+		}
+	});
+
 	it("refuses url elicitation over a scheme that is not http(s)", () => {
 		for (const url of ["javascript:alert(1)", "data:text/html,hi", "file:///etc/passwd"]) {
 			expect(normalizeElicitationRequest({ mode: "url", message: "Sign in", url })).toMatchObject({

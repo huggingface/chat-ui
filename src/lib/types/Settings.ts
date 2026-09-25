@@ -91,6 +91,9 @@ export interface Settings extends Timestamps {
 	 * preferred_username. If empty/undefined, bills to personal account.
 	 */
 	billingOrganization?: string;
+
+	/** Enterprise resource-group id within billingOrganization. */
+	billingResourceGroup?: string;
 }
 
 export type SettingsEditable = Omit<

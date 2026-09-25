@@ -59,6 +59,16 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				});
 			}
 
+			// Reject URI paths with invalid percent-encoding (e.g. overlong UTF-8
+			// like %c0%af used by path-traversal scanners) before any further
+			// processing. SvelteKit only turns these into a 400 inside resolve();
+			// the OAuth redirect logic below runs earlier and must not see them.
+			try {
+				decodeURIComponent(event.url.pathname);
+			} catch {
+				return errorResponse(400, "Malformed URI");
+			}
+
 			if (event.route.id === "/admin" || event.route.id?.startsWith("/admin/")) {
 				const ADMIN_SECRET = config.ADMIN_API_SECRET || config.PARQUET_EXPORT_SECRET;
 

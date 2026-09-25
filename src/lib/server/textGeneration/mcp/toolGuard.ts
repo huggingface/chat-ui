@@ -30,9 +30,9 @@ export type GuardVerdict =
 
 export type GuardOutcome =
 	/** The server returned a normal result; `text` is its textual payload. */
-	| { status: "success"; text: string }
+	| { status: "success"; text: string; structured?: unknown }
 	/** The server answered with an error result — the call verifiably did not do its work. */
-	| { status: "error"; text?: string }
+	| { status: "error"; text?: string; structured?: unknown }
 	/** The call failed in transport; whether the server acted is unknown. */
 	| { status: "transport_error" }
 	/** The server asked for interactive input; the call was not completed and will not be resumed. */

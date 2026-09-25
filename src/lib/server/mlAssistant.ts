@@ -3,6 +3,8 @@ import type { McpServerConfig } from "./mcp/httpClient";
 import { hasAuthHeader, isHfMcpServer } from "./mcp/hf";
 import { getMcpServers } from "./mcp/registry";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+import type { HubBillingTarget } from "$lib/server/mcp/hubBilling";
+import { billingTarget } from "$lib/server/billing";
 
 /**
  * The ML Assistant preset: the tools and capabilities a conversation gets when it
@@ -96,21 +98,39 @@ export function pinnedHubToken(): string | undefined {
 export function mlAssistantBillingNamespace(
 	locals: { billingOrganization?: string } | undefined
 ): string | undefined {
-	return locals?.billingOrganization?.trim() || undefined;
+	return billingTarget(locals)?.organization;
+}
+
+/** Trusted Jobs/Sandbox payer selected in the user's settings. */
+export function mlAssistantBillingTarget(
+	locals: { billingOrganization?: string; billingResourceGroup?: string } | undefined
+): HubBillingTarget | undefined {
+	const target = billingTarget(locals);
+	if (!target) return undefined;
+	return {
+		namespace: target.organization,
+		...(target.resourceGroupId ? { resourceGroupId: target.resourceGroupId } : {}),
+	};
 }
 
 /**
- * The namespace this request's Hub compute runs under and is charged to: the
- * billing organisation, else the user's own account.
+ * The target this request's Hub compute runs under and is charged to: the
+ * billing organisation, with its resource group when one is selected, else the
+ * user's own account.
  *
  * Personal is a choice too. Without a namespace of its own to enforce, a run
  * the model addressed to some organisation would go through and charge an
  * account the user never picked.
  */
-export function mlAssistantPayerNamespace(
-	locals: { billingOrganization?: string; user?: { username?: string } } | undefined
-): string | undefined {
-	return mlAssistantBillingNamespace(locals) ?? (locals?.user?.username?.trim() || undefined);
+export function mlAssistantPayerTarget(
+	locals:
+		| { billingOrganization?: string; billingResourceGroup?: string; user?: { username?: string } }
+		| undefined
+): HubBillingTarget | undefined {
+	const selected = mlAssistantBillingTarget(locals);
+	if (selected) return selected;
+	const username = locals?.user?.username?.trim();
+	return username ? { namespace: username } : undefined;
 }
 
 /**

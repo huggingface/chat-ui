@@ -3,12 +3,14 @@ import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
 import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { resolveConversation } from "$lib/server/api/utils/resolveConversation";
 import { collections } from "$lib/server/database";
+import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
+import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
 import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
 import { validModelIdSchema } from "$lib/server/models";
 import { applyConversationSettings } from "$lib/server/conversationSettings";
-import { setMlBudgetTotal } from "$lib/server/mlBudget/budget";
-import { usdToMicroUsd } from "$lib/utils/mlBudget";
+import { setMlBudgetLeft, setMlBudgetTotal } from "$lib/server/mlBudget/budget";
+import { reservedMicroUsd, usdToMicroUsd } from "$lib/utils/mlBudget";
 import type { TurnStateSnapshot } from "$lib/types/TurnState";
 
 export const GET: RequestHandler = async ({ locals, params, url }) => {
@@ -76,6 +78,8 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 	if (res.deletedCount === 0) {
 		error(404, "Conversation not found");
 	}
+	await deleteMlFilesOf([new ObjectId(id)]);
+	await deleteMlRegistry([new ObjectId(id)]);
 
 	return superjsonResponse({ success: true });
 };
@@ -87,6 +91,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 	const title = body?.title as string | undefined;
 	const model = body?.model as string | undefined;
 	const mlBudgetTotalUsd = body?.mlBudgetTotalUsd as number | undefined;
+	const mlBudgetLeftUsd = body?.mlBudgetLeftUsd as number | undefined;
 
 	if (title !== undefined) {
 		if (typeof title !== "string" || title.length === 0 || title.length > 100) {
@@ -113,9 +118,49 @@ export const PATCH: RequestHandler = async ({ locals, params, request }) => {
 		}
 	}
 
+	if (mlBudgetLeftUsd !== undefined) {
+		if (mlBudgetTotalUsd !== undefined) {
+			error(400, "Set either the budget total or what is left, not both");
+		}
+		if (
+			typeof mlBudgetLeftUsd !== "number" ||
+			!Number.isFinite(mlBudgetLeftUsd) ||
+			mlBudgetLeftUsd < 0 ||
+			mlBudgetLeftUsd > 10_000
+		) {
+			error(400, "Budget must be a number of dollars between 0 and 10000");
+		}
+	}
+
 	const id = params.id ?? "";
 	if (!ObjectId.isValid(id)) {
 		error(400, "Invalid conversation ID");
+	}
+
+	if (mlBudgetLeftUsd !== undefined) {
+		// The server owns the arithmetic: left + spent + held is summed against the
+		// live ledger in the write itself, so the client's snapshot never skews it.
+		const result = await setMlBudgetLeft({
+			conversationId: new ObjectId(id),
+			leftMicroUsd: usdToMicroUsd(mlBudgetLeftUsd),
+			maxTotalMicroUsd: usdToMicroUsd(10_000),
+			extraFilter: { ...authCondition(locals), mlAssistant: true },
+		});
+		if (result.outcome === "not_found") {
+			error(404, "Conversation not found");
+		}
+		if (result.outcome === "over_ceiling") {
+			error(400, "Budget total cannot exceed 10000 dollars");
+		}
+		const { budget } = result;
+		const mlBudget = {
+			totalMicroUsd: budget.totalMicroUsd,
+			spentMicroUsd: budget.spentMicroUsd,
+			reservedMicroUsd: reservedMicroUsd(budget),
+		};
+		if (title === undefined && model === undefined) {
+			return superjsonResponse({ success: true, mlBudget });
+		}
 	}
 
 	if (mlBudgetTotalUsd !== undefined) {

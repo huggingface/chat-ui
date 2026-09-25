@@ -2,7 +2,7 @@ import type { ObjectId } from "mongodb";
 import { logger } from "$lib/server/logger";
 import { callMcpTool, getMcpToolTimeoutMs } from "./httpClient";
 import { getMcpServers } from "./registry";
-import { openDurableElicitation, takeResumableElicitation } from "./elicitation";
+import { openDurableElicitation, resumableFrom, takeResumableElicitation } from "./elicitation";
 import { ToolResultStatus } from "$lib/types/Tool";
 import {
 	MessageElicitationUpdateType,
@@ -10,6 +10,7 @@ import {
 	MessageUpdateType,
 } from "$lib/types/MessageUpdate";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
+import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { McpServerConfig } from "./httpClient";
 import { ASK_USER_QUESTION_TOOL_NAME, answerToToolResult } from "$lib/server/askUserQuestion";
 
@@ -25,12 +26,19 @@ import { ASK_USER_QUESTION_TOOL_NAME, answerToToolResult } from "$lib/server/ask
 export async function resumeParkedToolCall({
 	conversationId,
 	elicitationId,
+	claimed,
 	generationId,
 	extraServers = [],
 	signal,
 }: {
 	conversationId: ObjectId;
 	elicitationId: string;
+	/**
+	 * The row as `claimElicitationResume` returned it. Anything that goes on to run the turn
+	 * must pass it: reading the row here instead is not a claim, and two callers would both
+	 * continue the same answer.
+	 */
+	claimed?: McpElicitation;
 	generationId?: string;
 	extraServers?: McpServerConfig[];
 	signal?: AbortSignal;
@@ -41,7 +49,9 @@ export async function resumeParkedToolCall({
 	/** The tool asked something else; the run ends again until that is answered too. */
 	parkedAgain?: boolean;
 }> {
-	const taken = await takeResumableElicitation(conversationId, elicitationId);
+	const taken = claimed
+		? resumableFrom(claimed)
+		: await takeResumableElicitation(conversationId, elicitationId);
 	const pending = taken?.row.pending;
 	if (!taken || !pending) {
 		return { resumed: false, reason: "no answered prompt to resume", updates: [] };
