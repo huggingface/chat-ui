@@ -73,7 +73,9 @@ export type ElicitationResolution = "user" | "expired" | "aborted" | "withdrawn"
  * Sent with the 409 a repeat answer to a durable prompt gets. `resume` is true when the call
  * the prompt parked was never continued: the page that answered lost its cue (a reload, a closed tab, a run
  * that died before persisting), so the transcript shows the question open again and this
- * answer is the only thing that can start the continuation.
+ * answer is the only thing that can start the continuation. On the wire it is the instruction
+ * to the client to do so, which the endpoint clears for the model's own questions: those it
+ * continues itself.
  */
 export interface AnsweredElicitation {
 	action: ElicitationAction;
@@ -116,6 +118,22 @@ export interface McpElicitation extends Timestamps {
 	expiresAt?: Date;
 	resolvedAt?: Date;
 	pending?: PendingCall;
+	resume?: ElicitationResume;
+}
+
+/**
+ * The claim on a durable prompt's answer. Whatever continues the parked turn — the answer
+ * endpoint, the sweep, an old client's resume request — takes it first, atomically, so one
+ * answer starts one continuation. `resuming` is held only until the tool result is stored:
+ * from there the turn is an ordinary run, and a row left `resuming` is one whose process
+ * died before the model could have seen the answer, which is why `attempts` is counted.
+ */
+export interface ElicitationResume {
+	status: "resuming" | "resumed" | "abandoned";
+	takenAt: Date;
+	attempts: number;
+	resumedAt?: Date;
+	abandonedReason?: string;
 }
 
 /** Where the parked run picks up. `kind` is absent on rows written before ask existed. */

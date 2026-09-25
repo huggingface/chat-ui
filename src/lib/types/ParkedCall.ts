@@ -1,5 +1,6 @@
 import type { ObjectId } from "mongodb";
 import type { Conversation } from "./Conversation";
+import type { ServiceEvent } from "./MlService";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 
@@ -63,6 +64,10 @@ export interface ParkedCall extends Timestamps {
 	 * as "still not ready after the wait I asked for".
 	 */
 	plannedResumeAt?: Date;
+	/** ends seen while parked, one entry per service and stage however often delivery ran */
+	serviceEvents?: ServiceEvent[];
+	/** set when an event moved resumeAt, worded apart from wokeEarlyAt since the user did not ask */
+	wokeByHarnessAt?: Date;
 
 	/** Set when a sweeper claims the row, so two pods cannot resume the same turn. */
 	takenAt?: Date;

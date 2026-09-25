@@ -160,3 +160,60 @@ export async function readMlBudget(conversationId: ObjectId): Promise<MlBudget |
 	);
 	return doc?.mlBudget;
 }
+
+export type SetLeftOutcome =
+	| { outcome: "set"; budget: MlBudget }
+	/** The new total (left + spent + held) would exceed the ceiling. */
+	| { outcome: "over_ceiling" }
+	| { outcome: "not_found" };
+
+/**
+ * Sets what is left rather than the total: the total becomes left + spent +
+ * held, computed in the same pipeline update that writes it, so a hold that
+ * settles or opens between the user's click and the write cannot skew it the
+ * way a client-side sum over a lagging snapshot would.
+ */
+export async function setMlBudgetLeft({
+	conversationId,
+	leftMicroUsd,
+	maxTotalMicroUsd,
+	extraFilter = {},
+}: {
+	conversationId: ObjectId;
+	leftMicroUsd: number;
+	maxTotalMicroUsd: number;
+	extraFilter?: Record<string, unknown>;
+}): Promise<SetLeftOutcome> {
+	const spent = { $ifNull: ["$mlBudget.spentMicroUsd", 0] };
+	const held = { $sum: { $ifNull: ["$mlBudget.reservations.ceilingMicroUsd", []] } };
+	const total = { $add: [leftMicroUsd, spent, held] };
+	const res = await collections.conversations.findOneAndUpdate(
+		{
+			_id: conversationId,
+			...extraFilter,
+			$expr: { $lte: [total, maxTotalMicroUsd] },
+		},
+		[
+			{
+				$set: {
+					mlBudget: {
+						totalMicroUsd: total,
+						spentMicroUsd: spent,
+						reservations: { $ifNull: ["$mlBudget.reservations", []] },
+					},
+					updatedAt: new Date(),
+				},
+			},
+		],
+		{ returnDocument: "after", projection: { mlBudget: 1 } }
+	);
+	// Driver v5: findOneAndUpdate returns ModifyResult unless told otherwise.
+	const budget = res?.value?.mlBudget;
+	if (budget) return { outcome: "set", budget };
+	// Tell the ceiling apart from a missing (or not-yours) conversation.
+	const exists = await collections.conversations.countDocuments(
+		{ _id: conversationId, ...extraFilter },
+		{ limit: 1 }
+	);
+	return exists ? { outcome: "over_ceiling" } : { outcome: "not_found" };
+}

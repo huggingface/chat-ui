@@ -445,6 +445,12 @@
 	// `text-smd` (0.94rem); re-applying it here keeps answer text — and every
 	// em-scaled child (code, pre, lists, tables, KaTeX) — in line with the rest
 	// of the UI. Single source for both the streaming and final render branches.
+	// Every process row (thinking, tools, an answered question) keeps one rhythm:
+	// 4px between rows, more against prose. The elicitation wrapper needs it too:
+	// the BlockWrapper inside it is always its parent's last child, so its own
+	// not-last margin never applies.
+	const processBlockClasses = "not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3";
+
 	const proseClasses =
 		"prose max-w-none text-smd dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900";
 
@@ -487,7 +493,8 @@
 		>
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
-					{#each message.files as file (file.value)}
+					<!-- Not keyed by hash alone: it is the content hash, and the same content can be attached twice (each_key_duplicate). -->
+					{#each message.files as file, i (`${file.value}-${i}`)}
 						<UploadedFile {file} canClose={false} />
 					{/each}
 				</div>
@@ -512,7 +519,7 @@
 						{:else if block.type === "artifact"}
 							<ArtifactCard op={block.op} messageId={message.id} opIndex={block.opIndex} />
 						{:else if block.type === "elicitation"}
-							<div data-exclude-from-copy>
+							<div data-exclude-from-copy class={processBlockClasses}>
 								<ElicitationForm
 									conversationId={page.params.id ?? ""}
 									request={block.request}
@@ -525,7 +532,7 @@
 								<PlanCard update={block.update} />
 							</div>
 						{:else}
-							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
+							<div data-exclude-from-copy class={processBlockClasses}>
 								{#if block.type === "think"}
 									<!-- Only the trailing block can still be streaming: an earlier
 									     unclosed think is a stream artifact (e.g. a lost close marker)
@@ -557,7 +564,7 @@
 						{:else if unit.kind === "artifact"}
 							<ArtifactCard op={unit.op} messageId={message.id} opIndex={unit.opIndex} />
 						{:else if unit.kind === "elicitation"}
-							<div data-exclude-from-copy>
+							<div data-exclude-from-copy class={processBlockClasses}>
 								<ElicitationForm
 									conversationId={page.params.id ?? ""}
 									request={unit.request}
@@ -570,7 +577,7 @@
 								<PlanCard update={unit.update} />
 							</div>
 						{:else if unit.kind === "group"}
-							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
+							<div data-exclude-from-copy class={processBlockClasses}>
 								{#if unit.blocks.length > 1}
 									<!-- Collapse the whole run into a single summary -->
 									<ToolCallsSummary blocks={unit.blocks} toolCount={unit.toolCount} />

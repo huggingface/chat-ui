@@ -92,6 +92,10 @@ envVars:
   MODELS: >
     [
       { "id": "omni", "supportsArtifacts": true },
+      { "id": "tencent/Hy4-preview", "description": "Preview 770B MoE with 49B active params, deep thinking, and 1M context.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "zai-org/GLM-5.1-FP8", "description": "FP8 GLM-5.1 for efficient agentic coding and extended reasoning.", "parameters": { "max_tokens": 98304 }, "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "zai-org/GLM-4.7-FP8", "description": "FP8 GLM-4.7 for efficient coding, reasoning, and agentic tool use.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "CohereLabs/command-a-vision-07-2025", "description": "112B vision-language Command A for enterprise documents, charts, and OCR.", "supportsArtifacts": true },
       { "id": "deepseek-ai/DeepSeek-V4.1-Flash", "description": "Native multimodal 552B MoE for agentic coding, adjustable thinking, and 1M context.", "parameters": { "max_tokens": 49152 }, "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "zai-org/GLM-4.5", "description": "Flagship GLM agent model unifying advanced reasoning, coding, and tool-using capabilities.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "swiss-ai/Apertus-v1.5-70B", "description": "Open Swiss multimodal model, massively multilingual with 256K context.", "supportsArtifacts": true },
@@ -102,7 +106,6 @@ envVars:
       { "id": "inclusionAI/Ling-3.0-flash-Fin", "description": "Finance-tuned Ling-3.0-flash for grounded research, valuation, and spreadsheet workflows.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "Qwen/Qwen3.5-122B-A10B", "description": "Multimodal MoE excelling at agentic tool use with 1M context and 201 languages.", "supportsArtifacts": true, "parameters": { "max_tokens": 49152 } },
       { "id": "speakleash/Bielik-11B-v3.0-Instruct", "description": "Polish-language 11B instruction model for chat, writing, and comprehension." },
-      { "id": "Qwen/Qwen2.5-7B-Instruct", "description": "Compact instruction model solid for basic conversation and tasks." },
       { "id": "zai-org/GLM-5.3", "description": "Post-trained 744B MoE for complex coding and long-horizon agentic tasks.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "zai-org/GLM-5.3-BF16", "description": "BF16 GLM-5.3 for full-precision agentic coding and long-horizon tasks.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "Qwen/Qwen3.8-27B", "description": "Dense 27B vision-language Qwen with thinking control and 262K context.", "supportsReasoning": true },

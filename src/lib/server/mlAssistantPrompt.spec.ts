@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
 	ML_ASSISTANT_BUDGET_RULES,
 	ML_ASSISTANT_PREPROMPT,
+	mlAssistantPreprompt,
 	mlAssistantSessionContext,
 } from "./mlAssistantPrompt";
+import { VIRTUAL_FILES_TOOL_PREPROMPT } from "$lib/server/mlFiles/prompt";
 import { buildToolPreprompt } from "./textGeneration/utils/toolPrompt";
 import { ARTIFACTS_SYSTEM_PROMPT } from "./textGeneration/artifacts";
 import { askUserQuestionBuiltin } from "./textGeneration/builtinTools/askUserQuestion";
@@ -18,8 +20,8 @@ const tool = (name: string): OpenAiTool =>
 const HF_TOOLS = [tool("hf_jobs"), tool("hf_fs"), tool("hub_repo_details")];
 
 /** The preset's system message, as `runMcpFlow` asks for it. */
-const inMode = (tools: OpenAiTool[]) =>
-	buildToolPreprompt(tools, undefined, undefined, { mlAssistant: true });
+const inMode = (tools: OpenAiTool[], { serviceEvents = false } = {}) =>
+	buildToolPreprompt(tools, undefined, undefined, { mlAssistant: true, serviceEvents });
 
 describe("ML Assistant preprompt", () => {
 	it("ships text that does not depend on the model or a template engine", () => {
@@ -36,7 +38,7 @@ describe("ML Assistant preprompt", () => {
 			"# Audit the data before you use it",
 			"# When you write ML code",
 			"# Submitting jobs",
-			"# Scripts: artifact or payload",
+			"# Scripts are files",
 			"# When a run fails",
 			"# Finishing",
 		]) {
@@ -70,11 +72,63 @@ describe("ML Assistant preprompt", () => {
 	});
 
 	it("refers only to tools this harness actually has", () => {
-		// The doctrine was ported from a harness with a shell and a sandbox. A rule
-		// naming a tool that isn't on offer is dead text the model can't act on.
-		for (const absent of ["sandbox", "/app/", "bash", "read_file", "write_file"]) {
+		// the doctrine was ported from a harness with a shell, a rule naming a tool that is
+		// not on offer is dead text the model cannot act on
+		for (const absent of ["/app/", "bash"]) {
 			expect(ML_ASSISTANT_PREPROMPT).not.toContain(absent);
 		}
+	});
+});
+
+describe("ML Assistant virtual files", () => {
+	it("tells the model to write a script once, edit it, and submit it by reference", () => {
+		const prompt = ML_ASSISTANT_PREPROMPT;
+		expect(prompt).toContain("Every script you run is a virtual file");
+		expect(prompt).toContain("write_file");
+		expect(prompt).toContain("edit_file");
+		expect(prompt).toContain("read_file");
+		expect(prompt).toContain("Never paste a script you have already written");
+	});
+
+	it("names the three places a reference works", () => {
+		// must agree with the allowlist in mlFiles/expand.ts, a position taught here but not
+		// expanded there reaches the server as a literal
+		const prompt = ML_ASSISTANT_PREPROMPT;
+		expect(prompt).toContain('"script": "v-file://train.py"');
+		expect(prompt).toContain('hf_fs_write put <uri> and content "v-file://train.py"');
+		expect(prompt).toContain(
+			"hf_sandbox_fs write <handle> /work/train.py --text v-file://train.py"
+		);
+		expect(prompt).toContain("v-file://train.py@v3");
+	});
+
+	it("uses the reference in the job example, not an inline script", () => {
+		expect(ML_ASSISTANT_PREPROMPT).toContain('{"script": "v-file://train.py", "with_deps"');
+		expect(ML_ASSISTANT_PREPROMPT).not.toContain("<the whole script>");
+	});
+
+	it("keeps the artifact for scripts the user asked to keep", () => {
+		expect(ML_ASSISTANT_PREPROMPT).toContain("goes in an artifact");
+	});
+
+	it("goes back to the inline shape when the switch is off, naming no tool the model lacks", () => {
+		const off = mlAssistantPreprompt({ virtualFiles: false });
+		expect(off).not.toContain("v-file://");
+		expect(off).not.toContain("write_file");
+		expect(off).toContain("# Scripts: artifact or payload");
+		expect(off).toContain('{"script": "<the whole script>", "with_deps"');
+		expect(off).not.toContain("# Scripts are files");
+	});
+
+	it("restates the reference rule beside the tools, where it gets violated", () => {
+		const builtin = { name: "write_file", preprompt: VIRTUAL_FILES_TOOL_PREPROMPT };
+		const withTools = buildToolPreprompt([...HF_TOOLS, tool("write_file")], undefined, [builtin], {
+			mlAssistant: true,
+		});
+		expect(withTools).toContain("VIRTUAL FILES:");
+		expect(withTools).toContain("exactly three places");
+		expect(withTools).toContain("comes back with import_file");
+		expect(inMode(HF_TOOLS)).not.toContain("VIRTUAL FILES:");
 	});
 });
 
@@ -150,13 +204,25 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("span the real spectrum");
 	});
 
-	it("front-loads the first status check after a submit", () => {
+	it("front-loads the first status check after a submit where nothing wakes a wait", () => {
 		// Dogfooding: models set long waits uniformly, so a job that died on a bad
 		// dependency in its first minute sat undiscovered for twenty.
 		const jobs = inMode([tool("hf_jobs")]);
 
 		expect(jobs).toContain("failures cluster at the start");
 		expect(jobs).toContain("SHORT wait");
+		expect(jobs).not.toContain("wakes you the moment");
+	});
+
+	it("sizes waits for the work where the harness wakes the turn on a job's end", () => {
+		const jobs = inMode([tool("hf_jobs")], { serviceEvents: true });
+
+		expect(jobs).toContain("wakes you the moment one ends or fails");
+		expect(jobs).toContain("you do not need short first waits");
+		expect(jobs).toContain("confirm the dashboard has rows in it");
+		expect(jobs).toContain("read them before you change anything");
+		expect(jobs).not.toContain("SHORT wait");
+		expect(jobs).not.toContain("failures cluster at the start");
 	});
 
 	it("sends smoke checks to the sandbox first when it is on offer", () => {
@@ -321,6 +387,10 @@ describe("ML Assistant system message size", () => {
 		// 30.5k -> 32k for headroom, not content: the rules above landed at 30,495
 		// against a 30,500 ceiling, and a guard with five characters of slack fires
 		// on every edit, which is the state that made it noise at 21,889.
+		//
+		// 32k to 34k for virtual files, the scripts section plus the write_file guidance, argued
+		// by what they remove, 930 hf_jobs uv calls in the ten largest conversations each re-sent
+		// a whole script averaging 3.7k characters and a 30 character reference now replaces it
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -334,9 +404,10 @@ describe("ML Assistant system message size", () => {
 					tool("github_find_examples"),
 					tool("web_search_exa"),
 					tool("hf_sandbox"),
+					tool("write_file"),
 				],
 				undefined,
-				[askUserQuestionBuiltin],
+				[askUserQuestionBuiltin, { name: "write_file", preprompt: VIRTUAL_FILES_TOOL_PREPROMPT }],
 				{ mlAssistant: true }
 			),
 			ML_ASSISTANT_PREPROMPT,
@@ -344,7 +415,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(32_000);
+		expect(composed.length).toBeLessThan(34_000);
 	});
 });
 

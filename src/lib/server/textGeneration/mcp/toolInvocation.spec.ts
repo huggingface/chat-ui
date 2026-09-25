@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
@@ -28,6 +28,8 @@ vi.mock("../../logger", () => ({
 
 const { executeToolCalls, isValidJsonObject, withRewrittenArguments } =
 	await import("./toolInvocation");
+const { createVirtualFileExpander } = await import("$lib/server/mlFiles/expand");
+const { writeMlFileVersion } = await import("$lib/server/mlFiles/store");
 
 const SERVERS = [{ name: "hf", url: "https://example.test/mcp" }];
 const MAPPING = { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } };
@@ -472,6 +474,29 @@ describe("executeToolCalls with a guard", () => {
 		expect(after).toHaveBeenCalledWith({ key: "k" }, { status: "error", text: "bad image" });
 	});
 
+	it("hands the guard the result's structured part, untouched", async () => {
+		const structured = { outcome: { kind: "job", job: { id: "0123456789abcdef01234567" } } };
+		const { guard, after } = fakeGuard({
+			before: vi.fn(async () => ({ allow: true, ticket: { key: "k" } }) as const),
+		});
+
+		mcpMock.callMcpTool.mockResolvedValue(mcpResult({ text: "job started", structured }));
+		await drain([CALL], undefined, undefined, guard);
+		expect(after).toHaveBeenLastCalledWith(
+			{ key: "k" },
+			{ status: "success", text: "job started", structured }
+		);
+
+		mcpMock.callMcpTool.mockResolvedValue(
+			mcpResult({ text: "bad image", isError: true, structured })
+		);
+		await drain([CALL], undefined, undefined, guard);
+		expect(after).toHaveBeenLastCalledWith(
+			{ key: "k" },
+			{ status: "error", text: "bad image", structured }
+		);
+	});
+
 	it("reports a transport failure", async () => {
 		mcpMock.callMcpTool.mockRejectedValue(new Error("socket hang up"));
 		const { guard, after } = fakeGuard({
@@ -600,5 +625,245 @@ describe("withRewrittenArguments", () => {
 				? JSON.parse(call.argumentsRaw)
 				: undefined
 		).toEqual(expected);
+	});
+});
+
+describe("virtual file expansion at dispatch", () => {
+	const HUB = { name: "hub", url: "https://huggingface.co/mcp?login&bouquet=intern" };
+	const SERVERS_WITH_HUB = [...SERVERS, HUB];
+	const MAPPING_WITH_HUB = {
+		...MAPPING,
+		hf_jobs: { fnName: "hf_jobs", server: "hub", tool: "hf_jobs" },
+		hf_fs_write: { fnName: "hf_fs_write", server: "hub", tool: "hf_fs_write" },
+		hf_sandbox_fs: { fnName: "hf_sandbox_fs", server: "hub", tool: "hf_sandbox_fs" },
+		hf_jobs_2: { fnName: "hf_jobs_2", server: "hf", tool: "hf_jobs" },
+	};
+
+	async function seeded() {
+		await ready;
+		const conversationId = new ObjectId();
+		await writeMlFileVersion({
+			conversationId,
+			name: "train.py",
+			content: "print(1)",
+			origin: "write",
+		});
+		await writeMlFileVersion({
+			conversationId,
+			name: "train.py",
+			content: "print(2)",
+			origin: "edit",
+		});
+		return { conversationId, expandVirtualFiles: createVirtualFileExpander(conversationId) };
+	}
+
+	async function drainExpanding(
+		calls: NormalizedToolCall[],
+		expandVirtualFiles: import("$lib/server/mlFiles/expand").VirtualFileExpander,
+		extra: { guard?: import("./toolGuard").ToolCallGuard; builtinTools?: BuiltinTool[] } = {}
+	) {
+		const events = [];
+		for await (const event of executeToolCalls({
+			calls,
+			mapping: MAPPING_WITH_HUB,
+			servers: SERVERS_WITH_HUB,
+			parseArgs: parseToolArguments,
+			toPrimitive,
+			processToolOutput,
+			expandVirtualFiles,
+			...extra,
+		})) {
+			events.push(event);
+		}
+		return events;
+	}
+
+	const callUpdateOf = (events: Events) => {
+		const update = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Call);
+		if (update?.subtype !== MessageToolUpdateType.Call) throw new Error("no call update");
+		return update;
+	};
+
+	afterEach(async () => {
+		await collections.mlFiles.deleteMany({});
+	});
+
+	it("sends the content to the server and keeps the reference everywhere else", async () => {
+		const { expandVirtualFiles } = await seeded();
+		const raw = '{"operation":"uv","args":{"script":"v-file://train.py","flavor":"cpu-basic"}}';
+
+		const events = await drainExpanding(
+			[{ id: "call_1", name: "hf_jobs", arguments: raw }],
+			expandVirtualFiles
+		);
+
+		expect(mcpMock.callMcpTool.mock.calls[0][2]).toEqual({
+			operation: "uv",
+			args: { script: "print(2)", flavor: "cpu-basic" },
+		});
+		const call = callUpdateOf(events);
+		expect(call.argumentsRaw).toBe(raw);
+		expect(call.call.parameters).toEqual({ operation: "uv" });
+		expect(call.fileRefs).toEqual([{ ref: "v-file://train.py", name: "train.py", version: 2 }]);
+		expect(toolMessagesOf(events)[0].content).toBe("ok");
+	});
+
+	it("expands hf_fs_write content and the --text token of hf_sandbox_fs write", async () => {
+		const { expandVirtualFiles } = await seeded();
+
+		const events = await drainExpanding(
+			[
+				{
+					id: "call_1",
+					name: "hf_fs_write",
+					arguments:
+						'{"cmd":"put","args":["put","hf://models/o/n/train.py"],"content":"v-file://train.py@v1"}',
+				},
+				{
+					id: "call_2",
+					name: "hf_sandbox_fs",
+					arguments:
+						'{"cmd":"write","args":["write","hfsb2:o:1","/work/train.py","--text","v-file://train.py"]}',
+				},
+			],
+			expandVirtualFiles
+		);
+
+		const dispatched = mcpMock.callMcpTool.mock.calls.map((c) => [c[1], c[2]]);
+		expect(dispatched).toContainEqual([
+			"hf_fs_write",
+			{ cmd: "put", args: ["put", "hf://models/o/n/train.py"], content: "print(1)" },
+		]);
+		expect(dispatched).toContainEqual([
+			"hf_sandbox_fs",
+			{ cmd: "write", args: ["write", "hfsb2:o:1", "/work/train.py", "--text", "print(2)"] },
+		]);
+		const calls = toolUpdatesOf(events).filter((u) => u.subtype === MessageToolUpdateType.Call);
+		expect(calls[0]).toMatchObject({
+			call: { parameters: { cmd: "put", content: "v-file://train.py@v1" } },
+			fileRefs: [{ ref: "v-file://train.py@v1", name: "train.py", version: 1 }],
+		});
+		expect(calls[1]).toMatchObject({
+			fileRefs: [{ ref: "v-file://train.py", name: "train.py", version: 2 }],
+		});
+	});
+
+	it("leaves a reference outside the allowlisted positions, or inside a longer string, alone", async () => {
+		const { expandVirtualFiles } = await seeded();
+		const inCommand =
+			'{"operation":"run","args":{"image":"python:3.12","command":["v-file://train.py"]}}';
+		const inProse = '{"operation":"uv","args":{"script":"# see v-file://train.py\\nprint(3)"}}';
+
+		const events = await drainExpanding(
+			[
+				{ id: "call_1", name: "hf_jobs", arguments: inCommand },
+				{ id: "call_2", name: "hf_jobs", arguments: inProse },
+			],
+			expandVirtualFiles
+		);
+
+		expect(mcpMock.callMcpTool.mock.calls.map((c) => c[2])).toEqual([
+			JSON.parse(inCommand),
+			JSON.parse(inProse),
+		]);
+		for (const update of toolUpdatesOf(events)) {
+			if (update.subtype === MessageToolUpdateType.Call) expect(update.fileRefs).toBeUndefined();
+		}
+	});
+
+	it("does not touch a same-named tool on a server that is not the Hub", async () => {
+		const { expandVirtualFiles } = await seeded();
+		const raw = '{"operation":"uv","args":{"script":"v-file://train.py"}}';
+
+		await drainExpanding([{ id: "call_1", name: "hf_jobs_2", arguments: raw }], expandVirtualFiles);
+
+		expect(mcpMock.callMcpTool.mock.calls[0][2]).toEqual(JSON.parse(raw));
+	});
+
+	it("refuses an unresolved reference before the guard, and lists what exists", async () => {
+		const { expandVirtualFiles } = await seeded();
+		const before = vi.fn(async () => ({ allow: true }) as const);
+		const guard = { allowParking: false, before, after: vi.fn(async () => undefined) };
+
+		const events = await drainExpanding(
+			[
+				{
+					id: "call_1",
+					name: "hf_jobs",
+					arguments: '{"operation":"uv","args":{"script":"v-file://missing.py"}}',
+				},
+			],
+			expandVirtualFiles,
+			{ guard }
+		);
+
+		expect(before).not.toHaveBeenCalled();
+		expect(mcpMock.callMcpTool).not.toHaveBeenCalled();
+		const error = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Error);
+		expect(error).toMatchObject({
+			message: expect.stringContaining("v-file://missing.py does not resolve"),
+		});
+		const [message] = toolMessagesOf(events);
+		expect(String(message.content)).toContain("v-file://train.py (v2)");
+		expect(summaryOf(events).toolRuns).toHaveLength(0);
+	});
+
+	it("hands the guard the expanded arguments and the versions they came from", async () => {
+		const { expandVirtualFiles } = await seeded();
+		const before = vi.fn(
+			async (_call: import("./toolGuard").GuardedToolCall) => ({ allow: true }) as const
+		);
+		const guard = { allowParking: false, before, after: vi.fn(async () => undefined) };
+
+		await drainExpanding(
+			[
+				{
+					id: "call_1",
+					name: "hf_jobs",
+					arguments: '{"operation":"uv","args":{"script":"v-file://train.py@v1"}}',
+				},
+				{ id: "call_2", name: "hf_jobs", arguments: '{"operation":"uv","args":{"script":"x"}}' },
+			],
+			expandVirtualFiles,
+			{ guard }
+		);
+
+		const calls = before.mock.calls.map(([call]) => call);
+		expect(calls).toContainEqual(
+			expect.objectContaining({
+				args: { operation: "uv", args: { script: "print(1)" } },
+				fileRefs: [{ ref: "v-file://train.py@v1", name: "train.py", version: 1 }],
+			})
+		);
+		const inline = calls.find((call) => JSON.stringify(call.args).includes('"x"'));
+		expect(inline).toBeDefined();
+		expect(inline).not.toHaveProperty("fileRefs");
+	});
+
+	it("never expands the arguments of a builtin tool", async () => {
+		const { expandVirtualFiles } = await seeded();
+		const execute = vi.fn<BuiltinTool["execute"]>(async () => ({ resultText: "stored" }));
+		const builtin: BuiltinTool = {
+			name: "hf_jobs",
+			definition: { type: "function", function: { name: "hf_jobs" } },
+			execute,
+		};
+
+		await drainExpanding(
+			[
+				{
+					id: "call_1",
+					name: "hf_jobs",
+					arguments: '{"operation":"uv","args":{"script":"v-file://train.py"}}',
+				},
+			],
+			expandVirtualFiles,
+			{ builtinTools: [builtin] }
+		);
+
+		expect(execute.mock.calls[0][0]).toEqual({
+			operation: "uv",
+			args: { script: "v-file://train.py" },
+		});
 	});
 });

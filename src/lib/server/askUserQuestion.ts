@@ -9,7 +9,12 @@ import { MessageElicitationUpdateType, MessageUpdateType } from "$lib/types/Mess
 const MAX_QUESTIONS = 4;
 const MAX_OPTIONS = 4;
 const MIN_OPTIONS = 2;
-const MAX_HEADER_CHARS = 12;
+/** Shown whole, so these only turn away the absurd — over them the call is refused, never cut. */
+const MAX_TEXT_CHARS = 4_000;
+// A label is also the answer's value: every question fully picked at this length must stay
+// under validateElicitationContent's answer ceiling, or the user could not send it.
+const MAX_LABEL_CHARS = 500;
+const MAX_HEADER_CHARS = MAX_LABEL_CHARS;
 
 export const ASK_USER_QUESTION_TOOL_NAME = "ask_user_question";
 
@@ -23,7 +28,10 @@ export const askUserQuestionTool = {
 			"lead to materially different work — which framing, which scope, which of several " +
 			"approaches. Prefer it to asking in prose, which cannot be answered with a click. " +
 			"Not for something you can look up, a choice with an obvious default, or anything " +
-			"the user has already told you.",
+			"the user has already told you. " +
+			"It is shown in a small panel, often on a phone, and everything you write is shown in " +
+			"full: ask in a sentence or two, keep each label to a few words, and put the detail " +
+			"and trade-off in the option's description.",
 		parameters: {
 			type: "object",
 			properties: {
@@ -37,11 +45,13 @@ export const askUserQuestionTool = {
 						properties: {
 							question: {
 								type: "string",
-								description: "The complete question, ending in a question mark.",
+								description:
+									"The complete question in a sentence or two, ending in a question mark.",
 							},
 							header: {
 								type: "string",
-								description: `Short label shown as a chip, at most ${MAX_HEADER_CHARS} characters.`,
+								description:
+									'Short label naming the decision, around 12 characters (e.g. "Database").',
 							},
 							multiSelect: {
 								type: "boolean",
@@ -54,10 +64,15 @@ export const askUserQuestionTool = {
 								items: {
 									type: "object",
 									properties: {
-										label: { type: "string", description: "The choice, in a few words." },
+										label: {
+											type: "string",
+											description:
+												"The choice, in a few words — details belong in the description. In a budget question, a label that names a dollar amount must carry setBudgetUsd.",
+										},
 										description: {
 											type: "string",
-											description: "What picking this means, and its trade-off.",
+											description:
+												"What picking this means, and its trade-off, in a sentence or two. What the choice costs goes here, not in the label.",
 										},
 										setBudgetUsd: {
 											type: "number",
@@ -78,13 +93,54 @@ export const askUserQuestionTool = {
 	},
 };
 
+// Model-authored, so the same display rules as server-authored text apply.
+const cleanText = (value: unknown): string =>
+	typeof value === "string" ? value.replace(/[\p{Cc}\p{Cf}]/gu, "").trim() : "";
+
+/** Never cut: `tooLong` turns over-long text away before anything reads it. */
 const asText = (value: unknown, max: number): string | undefined => {
-	if (typeof value !== "string") return undefined;
-	// Model-authored, so the same display rules as server-authored text apply.
-	const cleaned = value.replace(/[\p{Cc}\p{Cf}]/gu, "").trim();
-	if (!cleaned) return undefined;
-	return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
+	const cleaned = cleanText(value);
+	return cleaned && cleaned.length <= max ? cleaned : undefined;
 };
+
+/** Why a question cannot be shown as written, phrased for the model to fix and re-issue. */
+function tooLong(q: Record<string, unknown> | null, n: number): string | undefined {
+	const over = (value: unknown, max: number, what: string, fix: string) => {
+		const length = cleanText(value).length;
+		return length > max
+			? `${what} is ${length} characters, over the ${max} limit — ${fix}`
+			: undefined;
+	};
+	const found =
+		over(q?.question, MAX_TEXT_CHARS, `question ${n}`, "ask it in a sentence or two") ??
+		over(
+			q?.header,
+			MAX_HEADER_CHARS,
+			`question ${n}'s header`,
+			"name the decision in a word or two"
+		);
+	if (found) return found;
+	const rawOptions = Array.isArray(q?.options) ? q.options : [];
+	for (const [i, rawOption] of rawOptions.entries()) {
+		const option = rawOption as Record<string, unknown> | null;
+		const what = `question ${n} option ${i + 1}`;
+		const problem =
+			over(
+				option?.label,
+				MAX_LABEL_CHARS,
+				`${what}'s label`,
+				"keep the label to a few words and move the detail into its description"
+			) ??
+			over(
+				option?.description,
+				MAX_TEXT_CHARS,
+				`${what}'s description`,
+				"say what picking it means in a sentence or two"
+			);
+		if (problem) return problem;
+	}
+	return undefined;
+}
 
 export type NormalizedAsk =
 	| { ok: true; payload: Omit<ElicitationRequestPayload, "elicitationId"> }
@@ -106,7 +162,9 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 	const fields: ElicitationField[] = [];
 	for (const [index, raw] of questions.entries()) {
 		const q = raw as Record<string, unknown> | null;
-		const question = asText(q?.question, 300);
+		const lengthProblem = tooLong(q, index + 1);
+		if (lengthProblem) return { ok: false, reason: lengthProblem };
+		const question = asText(q?.question, MAX_TEXT_CHARS);
 		if (!question) return { ok: false, reason: `question ${index + 1} has no text` };
 
 		const options: Array<{
@@ -118,7 +176,7 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 		const rawOptions = Array.isArray(q?.options) ? q.options : [];
 		for (const rawOption of rawOptions) {
 			const option = rawOption as Record<string, unknown>;
-			const modelLabel = asText(option?.label, 80);
+			const modelLabel = asText(option?.label, MAX_LABEL_CHARS);
 			// Model-proposed, user-applied: the amount survives only if it is a sane
 			// number of dollars.
 			const rawBudget = option?.setBudgetUsd;
@@ -135,7 +193,7 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 			// Keyed by value in the form, so a repeat would break rendering outright.
 			// Canonical grant labels make two same-amount options one option.
 			if (!label || options.some((o) => o.value === label)) continue;
-			const description = asText(option?.description, 200);
+			const description = asText(option?.description, MAX_TEXT_CHARS);
 			options.push({
 				value: label,
 				label,
@@ -152,19 +210,20 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 		// single setBudgetUsd is the observed failure mode: the user clicks "$5",
 		// nothing reaches the ledger, and the model proceeds as if authorized.
 		// Bounce it back for correction instead of showing a grant that isn't one.
+		// Labels only: the label is what a click appears to grant. A description
+		// that states what a choice costs is information, and rejecting it sent
+		// 7% of asks back for a re-issue that had nothing to fix.
 		const mentionsBudget = /budget/i.test(
 			`${question} ${asText(q?.header, MAX_HEADER_CHARS) ?? ""}`
 		);
-		const hasDollarOption = options.some((o) =>
-			/\$\s*\d/.test(`${o.label} ${o.description ?? ""}`)
-		);
+		const hasDollarLabel = options.some((o) => /\$\s*\d/.test(o.label));
 		const hasGrantOption = options.some((o) => o.setBudgetUsd !== undefined);
-		if (mentionsBudget && hasDollarOption && !hasGrantOption) {
+		if (mentionsBudget && hasDollarLabel && !hasGrantOption) {
 			return {
 				ok: false,
 				reason:
-					`question ${index + 1} offers budget amounts without setBudgetUsd — a dollar amount written into a label changes nothing. ` +
-					"Re-issue with setBudgetUsd on every option that changes the budget; options that merely mention costs, or decline a raise, omit it",
+					`question ${index + 1} puts a dollar amount in an option label without setBudgetUsd — a dollar amount written into a label changes nothing. ` +
+					"Re-issue with setBudgetUsd on every option that changes the budget; an option that declines a raise omits it, and what a choice costs goes in its description, not its label",
 			};
 		}
 
@@ -235,8 +294,19 @@ export function answerToToolResult(
 		return `${field.description ?? field.title ?? field.name}\n${shown}`;
 	});
 	const granted = chosenBudgetUsd(payload, content);
+	// The validator reads labels only, so a raise can still be described in an option's
+	// description ("Set it to $5") with no setBudgetUsd behind it — and a model bounced for
+	// a dollar label can get there just by moving the amount. Nothing is rejected for that;
+	// instead the model is never left to assume the click granted anything.
+	const aboutBudget = (payload.fields ?? []).some((field) =>
+		/budget/i.test(`${field.title ?? ""} ${field.description ?? ""}`)
+	);
 	const budgetLine =
-		granted !== undefined ? `\n\nThe session compute budget is now $${granted.toFixed(2)}.` : "";
+		granted !== undefined
+			? `\n\nThe session compute budget is now $${granted.toFixed(2)}.`
+			: aboutBudget
+				? "\n\nThis answer did not change the session compute budget: only an option carrying setBudgetUsd does."
+				: "";
 	return `The user answered:\n\n${answered.join("\n\n")}${budgetLine}`;
 }
 

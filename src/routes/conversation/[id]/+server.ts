@@ -1,5 +1,7 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
+import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
+import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
 import { config } from "$lib/server/config";
 import { models, validModelIdSchema } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
@@ -24,11 +26,16 @@ import { usageLimits } from "$lib/server/usageLimits";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
+import type { McpElicitation } from "$lib/types/McpElicitation";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
-import { compressUpdatesForStorage } from "$lib/server/generation/compressUpdates";
+import {
+	compressUpdatesForStorage,
+	messageForStorage,
+} from "$lib/server/generation/compressUpdates";
+import { restoreRunningShape } from "$lib/server/generation/messageShape";
 import { applyUpdateToMessage } from "$lib/server/generation/applyUpdate";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
@@ -285,15 +292,36 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 	let messagesForPrompt: Message[] = [];
 
+	let claimedResume: McpElicitation | undefined;
+	/** Consumes the claims `settleAnsweredAsks` took, once the save carrying them has landed. */
+	let answeredAsksSaved: (() => Promise<void>) | undefined;
+
+	// Asks exist only in ML Assistant conversations, so nothing else pays for the lookup.
+	if (!resumeElicitationId && isMlAssistantConversation(conv)) {
+		const { settleAnsweredAsks } = await import("$lib/server/generation/askResume");
+		answeredAsksSaved = await settleAnsweredAsks(conv);
+	}
+
 	if (resumeElicitationId) {
+		// Before anything is written: an answered question is continued by the server itself,
+		// and a client from before that (or a second tab) still asks for the continuation
+		// here. Losing the claim means that continuation exists, so this request must not
+		// stamp a generation on the message, save over it, or run a second one. The empty
+		// stream sends the client to the turn's subscription, which is where the run is.
+		const { claimElicitationResume, finishElicitationResume } =
+			await import("$lib/server/mcp/elicitation");
+		claimedResume = (await claimElicitationResume(convId, resumeElicitationId)) ?? undefined;
+		if (!claimedResume) {
+			return new Response("", { headers: { "Content-Type": "application/jsonl" } });
+		}
 		// Continue the assistant message the prompt parked, in place: its tool call and the
 		// answer belong to that turn, and a new one would strand them behind an empty user
 		// message. Taken from the record rather than the request, or a turn sent while the
 		// prompt was open would move the answer onto it.
-		const { parkedMessageId } = await import("$lib/server/mcp/elicitation");
-		const parkedId = await parkedMessageId(convId, resumeElicitationId);
+		const parkedId = claimedResume.pending?.messageId;
 		const parked = conv.messages.find((message) => message.id === parkedId);
 		if (!parked || parked.from !== "assistant") {
+			await finishElicitationResume(claimedResume, { abandoned: "no parked message to resume" });
 			error(404, "No parked message to resume");
 		}
 		messageToWriteToId = parked.id;
@@ -379,6 +407,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	if (!messageToWriteTo) {
 		error(500, "Failed to create message");
 	}
+	restoreRunningShape(messageToWriteTo);
 	if (messagesForPrompt.length === 0) {
 		error(500, "Failed to create prompt");
 	}
@@ -392,6 +421,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		{ _id: convId },
 		{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
 	);
+	await answeredAsksSaved?.();
 
 	let doneStreaming = false;
 	let clientDetached = false;
@@ -412,10 +442,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		if (generationWriter && messageToWriteTo) {
 			messageToWriteTo.materializedSeq = generationWriter.currentSeq();
 		}
-		const messagesForSave = conv.messages.map((msg) => ({
-			...msg,
-			updates: compressUpdatesForStorage(msg.updates),
-		}));
+		const messagesForSave = conv.messages.map(messageForStorage);
 
 		await collections.conversations.updateOne(
 			{ _id: convId },
@@ -636,6 +663,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					const outcome = await resumeParkedToolCall({
 						conversationId: convId,
 						elicitationId: resumeElicitationId,
+						claimed: claimedResume,
 						generationId: effectiveGenerationId,
 						extraServers: (locals as unknown as { mcp?: { selectedServers?: McpServerConfig[] } })
 							?.mcp?.selectedServers,
@@ -652,6 +680,15 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					);
 					for (const event of outcome.updates) await update(event);
 					parkedAgain = outcome.parkedAgain === true;
+					// Stored before the model is called, then the claim consumed as its own
+					// write. A run that dies past here is an ordinary interrupted turn whose
+					// history holds the answer; tying the claim to the final save instead is
+					// what let a failed save resume one parked wait three times.
+					if (claimedResume) {
+						const { finishElicitationResume } = await import("$lib/server/mcp/elicitation");
+						await persistConversation();
+						await finishElicitationResume(claimedResume);
+					}
 				}
 
 				const ctx: TextGenerationContext = {
@@ -837,6 +874,8 @@ export async function DELETE({ locals, params }) {
 	}
 
 	await collections.conversations.deleteOne({ _id: conv._id });
+	await deleteMlFilesOf([conv._id]);
+	await deleteMlRegistry([conv._id]);
 
 	return new Response();
 }

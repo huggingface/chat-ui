@@ -1,13 +1,17 @@
 import type { Conversation } from "$lib/types/Conversation";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
+import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
+import { mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
 import { askUserQuestionBuiltin } from "./askUserQuestion";
 import { githubGroundingBuiltins } from "./githubGrounding";
 import { createPlanTool } from "./planTool";
-import { waitBuiltin } from "./waitTool";
+import { createWaitTool } from "./waitTool";
 import { createResearchTool } from "./researchTool";
 import { createSandboxTool } from "./sandboxTool";
 import { createJobCheckTool } from "./jobCheckTool";
 import { createTrackioTool } from "./createTrackioTool";
+import { createFileTools } from "./fileTools";
+import { createImportFileTool } from "./importFileTool";
 import type { BuiltinTool } from "./types";
 
 export type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
@@ -16,6 +20,8 @@ export { RESEARCH_TOOL_NAME, isResearchTool } from "./researchTool";
 export { SANDBOX_TOOL_NAME, isSandboxTool } from "./sandboxTool";
 export { JOB_CHECK_TOOL_NAME, isJobCheckTool } from "./jobCheckTool";
 export { CREATE_TRACKIO_TOOL_NAME } from "./createTrackioTool";
+export { WRITE_FILE_TOOL_NAME, EDIT_FILE_TOOL_NAME, READ_FILE_TOOL_NAME } from "./fileTools";
+export { IMPORT_FILE_TOOL_NAME } from "./importFileTool";
 export { isNestedAgentTool } from "./nestedAgent";
 
 /**
@@ -35,15 +41,17 @@ export function getEnabledBuiltinTools(params: {
 	// them rather than leaking a config read into this list. The research tool's
 	// definition is static too, but its nested loop needs the turn's request
 	// plumbing, which runMcpFlow binds onto it once that exists.
+	const virtualFiles = mlVirtualFilesEnabled(params.conv);
 	return [
 		askUserQuestionBuiltin,
 		createPlanTool(params.conv),
-		waitBuiltin,
+		createWaitTool({ serviceEvents: mlServiceEventsEnabled() }),
 		...githubGroundingBuiltins(),
 		createResearchTool(),
-		createSandboxTool(),
-		createJobCheckTool(),
+		createSandboxTool({ virtualFiles }),
+		createJobCheckTool({ virtualFiles }),
 		createTrackioTool(() => params.namespace),
+		...(virtualFiles ? [...createFileTools(params.conv), createImportFileTool(params.conv)] : []),
 	];
 }
 

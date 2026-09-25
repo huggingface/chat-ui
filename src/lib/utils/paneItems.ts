@@ -1,4 +1,5 @@
 import type { Message } from "$lib/types/Message";
+import type { SidePaneView } from "$lib/stores/sidePane.svelte";
 import type { ArtifactRegistry } from "./artifacts";
 import type { TrackioDashboard } from "./trackio";
 
@@ -22,7 +23,7 @@ export type PaneItem =
 
 /** The pane's current selection, as the store holds it. */
 export interface PaneSelection {
-	view: "artifact" | "trackio";
+	view: SidePaneView;
 	identifier: string | null;
 	trackioUrl?: string;
 }

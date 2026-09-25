@@ -128,6 +128,11 @@ export interface MessageToolCallUpdate extends MessageToolUpdateBase<MessageTool
 	 */
 	originalId?: string;
 	argumentsRaw?: string;
+	/**
+	 * virtual files expanded into this call at dispatch, parameters and argumentsRaw keep
+	 * the reference so this is the only record of which version ran
+	 */
+	fileRefs?: { ref: string; name: string; version: number }[];
 }
 
 export interface MessageToolResultUpdate extends MessageToolUpdateBase<MessageToolUpdateType.Result> {
