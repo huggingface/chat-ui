@@ -247,7 +247,7 @@ function normalizeTypography(s: string): string {
  * sides are also typography-normalized (curly quotes, en/em dashes) before
  * matching.
  */
-function findMatch(content: string, needle: string): { start: number; end: number } | null {
+export function findMatch(content: string, needle: string): { start: number; end: number } | null {
 	// Substitutions are 1:1, so offsets in the normalized strings index the raw
 	// `content` directly — no offset remapping needed.
 	const nContent = normalizeTypography(content);

@@ -165,7 +165,8 @@ type ExtraConfigKeys =
 	| "MCP_FORWARD_HF_USER_TOKEN"
 	| "MCP_TOOL_TIMEOUT_MS"
 	| "EXA_API_KEY"
-	| "GITHUB_TOKEN";
+	| "GITHUB_TOKEN"
+	| "ML_ASSISTANT_VIRTUAL_FILES";
 
 type ConfigProxy = ConfigManager & { [K in ConfigKey | ExtraConfigKeys]: string };
 
