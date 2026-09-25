@@ -4,6 +4,7 @@ on:
 permissions: {}
 jobs:
   diag:
+    name: diag ${{ matrix.name }}
     if: github.head_ref == 'e2e-webkit-flake-diag'
     permissions:
       contents: read
@@ -14,7 +15,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: ["0", "1", "1", "1"]
+        include:
+          - { name: base, variant: "0" }
+          - { name: fix-a, variant: "1" }
+          - { name: fix-b, variant: "1" }
+          - { name: fix-c, variant: "1" }
     steps:
       - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
       - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
