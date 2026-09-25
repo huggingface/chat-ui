@@ -1,10 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { ObjectId } from "mongodb";
+import { collections, ready } from "$lib/server/database";
+import { listMlArtefacts } from "$lib/server/mlRegistry/store";
 import { createTrackioTool, CREATE_TRACKIO_TOOL_NAME } from "./createTrackioTool";
 import { extractTrackioDashboards } from "$lib/utils/trackio";
 import type { BuiltinToolContext } from "./types";
 
 const ctx = {} as BuiltinToolContext;
 const tool = (namespace?: string) => createTrackioTool(() => namespace);
+
+beforeAll(async () => {
+	await ready;
+});
+
+const conversationIds: ObjectId[] = [];
+
+afterEach(async () => {
+	await collections.mlArtefacts.deleteMany({ conversationId: { $in: conversationIds } });
+	conversationIds.length = 0;
+});
 
 describe("create_trackio", () => {
 	it("returns a dashboard chat-ui can frame without reading the model's output", async () => {
@@ -41,6 +55,37 @@ describe("create_trackio", () => {
 
 	it("refuses without a project", async () => {
 		expect(await tool("pngwn").execute({}, ctx)).toEqual({ error: "No project name provided." });
+	});
+
+	it("records the dashboard as an artefact of the conversation", async () => {
+		const conversationId = new ObjectId();
+		conversationIds.push(conversationId);
+		const result = await tool("pngwn").execute(
+			{ project: "smollm2-capybara-sft" },
+			{ ...ctx, conversationId, uuid: "uuid-7", messageId: "msg-1", generationId: "gen-1" }
+		);
+		expect(result).toHaveProperty("resultText");
+
+		await vi.waitFor(async () => {
+			expect(await listMlArtefacts(conversationId)).toHaveLength(1);
+		});
+		expect((await listMlArtefacts(conversationId))[0]).toMatchObject({
+			kind: "dashboard",
+			uri: "hf://spaces/pngwn/smollm2-capybara-sft-trackio",
+			url: "https://huggingface.co/spaces/pngwn/smollm2-capybara-sft-trackio",
+			origin: "dispatched",
+			toolUuid: "uuid-7",
+			messageId: "msg-1",
+			generationId: "gen-1",
+		});
+	});
+
+	it("records nothing without a conversation to record against", async () => {
+		const result = await tool("pngwn").execute({ project: "orphan" }, ctx);
+		expect(result).toHaveProperty("resultText");
+		expect(
+			await collections.mlArtefacts.countDocuments({ uri: "hf://spaces/pngwn/orphan-trackio" })
+		).toBe(0);
 	});
 
 	it("is exempt from tool restraint, like the other run-shaping builtins", () => {

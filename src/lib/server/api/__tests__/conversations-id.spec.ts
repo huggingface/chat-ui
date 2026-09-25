@@ -10,6 +10,12 @@ import {
 } from "./testHelpers";
 
 import { GET, DELETE, PATCH } from "../../../../routes/api/v2/conversations/[id]/+server";
+import {
+	listMlArtefacts,
+	listMlServices,
+	recordArtefact,
+	recordDispatchedService,
+} from "$lib/server/mlRegistry/store";
 
 async function parseResponse<T = unknown>(res: Response): Promise<T> {
 	return superjson.parse(await res.text()) as T;
@@ -140,6 +146,34 @@ describe.sequential("DELETE /api/v2/conversations/[id]", () => {
 
 		const found = await collections.conversations.findOne({ _id: conv._id });
 		expect(found).toBeNull();
+	});
+
+	it("takes the conversation's registry rows with it and no one else's", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { title: "To Delete" });
+		const other = await createTestConversation(locals, { title: "Kept" });
+		for (const conversationId of [conv._id, other._id]) {
+			await recordDispatchedService({
+				conversationId,
+				kind: "job",
+				jobId: "0123456789abcdef01234567",
+				namespace: "testuser",
+				stage: "RUNNING",
+			});
+			await recordArtefact({
+				conversationId,
+				kind: "dataset",
+				uri: "hf://datasets/testuser/demo",
+				url: "https://huggingface.co/datasets/testuser/demo",
+			});
+		}
+
+		await DELETE({ locals, params: { id: conv._id.toString() } } as never);
+
+		expect(await listMlServices(conv._id)).toHaveLength(0);
+		expect(await listMlArtefacts(conv._id)).toHaveLength(0);
+		expect(await listMlServices(other._id)).toHaveLength(1);
+		expect(await listMlArtefacts(other._id)).toHaveLength(1);
 	});
 
 	it("throws 404 for non-existent conversation", async () => {
