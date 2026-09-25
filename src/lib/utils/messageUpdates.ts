@@ -10,6 +10,7 @@ import {
 	type MessageElicitationRequestUpdate,
 	type MessageElicitationResolvedUpdate,
 	type MessagePlanUpdate,
+	type MessageHarnessEventUpdate,
 	MessageUpdateType,
 	MessageUpdateStatus,
 	MessageToolUpdateType,
@@ -398,6 +399,10 @@ export const isMessageElicitationResolvedUpdate = (
 
 export const isMessagePlanUpdate = (update: MessageUpdate): update is MessagePlanUpdate =>
 	update.type === MessageUpdateType.Plan;
+
+export const isMessageHarnessEventUpdate = (
+	update: MessageUpdate
+): update is MessageHarnessEventUpdate => update.type === MessageUpdateType.HarnessEvent;
 
 const defaultSleep = (ms: number): Promise<void> =>
 	new Promise((resolve) => setTimeout(resolve, ms));

@@ -1,5 +1,9 @@
 import { config } from "$lib/server/config";
-import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
+import {
+	MessageToolUpdateType,
+	MessageUpdateType,
+	type MessageUpdate,
+} from "$lib/types/MessageUpdate";
 import { getMcpServers } from "$lib/server/mcp/registry";
 import { isValidUrl } from "$lib/server/urlSafety";
 import { getOpenAiToolsForMcp } from "$lib/server/mcp/tools";
@@ -36,6 +40,7 @@ import {
 	windowLimitChars,
 } from "$lib/server/textGeneration/utils/historyWindow";
 import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWindowFlag";
+import { withHarnessEventOnLastTool } from "$lib/server/textGeneration/utils/harnessEvent";
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
@@ -50,6 +55,8 @@ import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
+import { mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
+import { markHarnessEventDelivered, pendingHarnessEvent } from "$lib/server/mlRegistry/midTurn";
 import {
 	buildSessionStateBlock,
 	injectSessionState,
@@ -177,6 +184,7 @@ export async function* runMcpFlow({
 	// Read once: the preset decides the servers, the round budget and which tool
 	// doctrine is sent, and they must all agree within a run.
 	const mlAssistant = isMlAssistantConversation(conv);
+	const harnessEvents = mlAssistant && mlServiceEventsEnabled();
 
 	// Every mode conversation is gated — one without a stored budget is a zero
 	// budget, not an ungated one. Settle already ran this turn
@@ -1182,9 +1190,16 @@ export async function* runMcpFlow({
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;
+				let lastCallUuid: string | undefined;
 				for await (const event of exec) {
 					if (event.type === "update") {
 						producedOutput = true;
+						if (
+							event.update.type === MessageUpdateType.Tool &&
+							event.update.subtype === MessageToolUpdateType.Call
+						) {
+							lastCallUuid = event.update.uuid;
+						}
 						yield event.update;
 					} else {
 						if (event.summary.awaitingInput) {
@@ -1228,6 +1243,16 @@ export async function* runMcpFlow({
 				if (checkAborted()) {
 					logger.info({ loop }, "[mcp] aborting after tool execution");
 					return "aborted";
+				}
+				// no completion follows the last round, its events wait for the next state block
+				if (harnessEvents && lastCallUuid && toolMsgCount > 0 && loop + 1 < maxToolRounds) {
+					const pending = await pendingHarnessEvent(conv._id, lastCallUuid);
+					if (pending) {
+						// emitted before the rows are cleared, a run that dies in between tells them again
+						yield pending.update;
+						messagesOpenAI = withHarnessEventOnLastTool(messagesOpenAI, pending.update.text);
+						await markHarnessEventDelivered(conv._id, pending.services);
+					}
 				}
 				// Continue loop: next iteration will use tool messages to get the final content
 				continue;

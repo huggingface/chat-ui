@@ -2,6 +2,7 @@ import type { InferenceProvider } from "@huggingface/inference";
 import type { ToolCall, ToolResult } from "$lib/types/Tool";
 import type { PlanStep } from "$lib/types/Plan";
 import type { TurnStatus } from "$lib/types/TurnState";
+import type { MlServiceKind } from "$lib/types/MlService";
 import type {
 	ElicitationAction,
 	ElicitationRequestPayload,
@@ -21,7 +22,8 @@ export type MessageUpdate =
 	| MessageElicitationUpdate
 	| MessagePlanUpdate
 	| MessageBudgetUpdate
-	| MessageTurnStateUpdate;
+	| MessageTurnStateUpdate
+	| MessageHarnessEventUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -36,6 +38,7 @@ export enum MessageUpdateType {
 	Plan = "plan",
 	Budget = "budget",
 	TurnState = "turnState",
+	HarnessEvent = "harnessEvent",
 }
 
 /**
@@ -257,4 +260,30 @@ export interface MessageBudgetUpdate {
 	spentMicroUsd: number;
 	/** Sum of open reservation ceilings — held, not yet settled. */
 	reservedMicroUsd: number;
+}
+
+/** a service change as the transcript keeps it, plain json so it streams and persists as is */
+export interface HarnessServiceEvent {
+	serviceId: string;
+	kind: MlServiceKind;
+	jobId: string;
+	handle?: string;
+	name?: string;
+	flavor?: string;
+	from: string;
+	to: string;
+	ranSeconds?: number;
+	/** epoch ms */
+	at: number;
+}
+
+/**
+ * services that ended while the turn was busy, told to the model at a round boundary, the text
+ * is replayed verbatim after the result of afterToolUuid, the last call of the round
+ */
+export interface MessageHarnessEventUpdate {
+	type: MessageUpdateType.HarnessEvent;
+	events: HarnessServiceEvent[];
+	text: string;
+	afterToolUuid: string;
 }

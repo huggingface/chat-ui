@@ -16,6 +16,8 @@ function shown(blocks: MessageBlock[]) {
 				return { question: block.request.elicitationId, answered: block.resolved?.action };
 			case "plan":
 				return { plan: block.update.version };
+			case "harnessEvent":
+				return { event: block.update.afterToolUuid };
 			default:
 				return block;
 		}
@@ -44,7 +46,7 @@ describe.each(Object.entries(convertingTurns()))("%s", (_name, legacy) => {
 	});
 });
 
-it("keeps a question and a plan card where the legacy form had them", () => {
+it("keeps a question, a plan card and a harness event where the legacy form had them", () => {
 	const turns = convertingTurns();
 	const kinds = (name: string) =>
 		messageBlocks(messageForStorage(turns[name])).map((block) => block.type);
@@ -55,6 +57,15 @@ it("keeps a question and a plan card where the legacy form had them", () => {
 		"elicitation",
 		"think",
 		"text",
+		"tool",
+		"text",
+	]);
+	expect(kinds("a job ended mid-turn")).toEqual([
+		"think",
+		"text",
+		"tool",
+		"harnessEvent",
+		"think",
 		"tool",
 		"text",
 	]);
