@@ -56,6 +56,23 @@ export interface Conversation extends Timestamps {
 	 * writes in the conversation route never clobber a concurrent reservation.
 	 */
 	mlBudget?: MlBudget;
+
+	/**
+	 * where replayed history starts once the conversation outgrew the model window, only written
+	 * with its own targeted $set like plan, a start not on the replayed path is ignored
+	 */
+	historyWindow?: StoredHistoryWindow;
+}
+
+/** a message on the path and the tool round inside it, a user message is round 0 */
+export interface HistoryWindowStart {
+	messageId: string;
+	round: number;
+}
+
+export interface StoredHistoryWindow extends HistoryWindowStart {
+	/** a start chosen for a smaller window would keep out history that now fits */
+	limitChars: number;
 }
 
 /**

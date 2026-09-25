@@ -60,6 +60,7 @@ export async function* generate(
 		// Allow user-level override to force multimodal
 		isMultimodal: (forceMultimodal ?? false) || model.multimodal,
 		conversationId: conv._id,
+		historyWindow: conv.historyWindow,
 		locals,
 		abortSignal: abortController.signal,
 		provider,

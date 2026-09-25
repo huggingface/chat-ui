@@ -93,8 +93,9 @@ vi.mock("./routerResolution", () => ({
 vi.mock("./toolInvocation", () => ({ executeToolCalls: mocks.executeToolCalls }));
 
 vi.mock("$lib/server/textGeneration/utils/prepareFiles", () => ({
-	prepareMessagesWithFiles: async (messages: Array<{ from: string; content: string }>) =>
-		messages.map((m) => ({ role: m.from, content: m.content })),
+	prepareHistory: async (messages: Array<{ from: string; content: string }>) => ({
+		messages: messages.map((m) => ({ role: m.from, content: m.content })),
+	}),
 }));
 
 vi.mock("$lib/server/endpoints/images", () => ({ makeImageProcessor: () => () => undefined }));

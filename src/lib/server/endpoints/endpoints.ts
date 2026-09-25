@@ -1,4 +1,4 @@
-import type { Conversation } from "$lib/types/Conversation";
+import type { Conversation, StoredHistoryWindow } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 import type {
 	TextGenerationStreamOutput,
@@ -27,6 +27,7 @@ export interface EndpointParameters {
 	reasoningEffort?: "low" | "medium" | "high";
 	/** Per-model user override for reasoning; wins over the model's supportsReasoning flag in both directions */
 	reasoningOverride?: boolean;
+	historyWindow?: StoredHistoryWindow;
 }
 
 export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & {
