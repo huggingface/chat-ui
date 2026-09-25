@@ -29,6 +29,8 @@ Chat UI connects to any OpenAI-compatible API. Set `OPENAI_BASE_URL` to your pro
 | llama.cpp    | `http://127.0.0.1:8080/v1`         |
 | OpenRouter   | `https://openrouter.ai/api/v1`     |
 
+> **Important:** `OPENAI_BASE_URL` is the common prefix of the paths Chat UI calls. It appends `/models` to it for model discovery, and hands the same value to the OpenAI client, which appends `/chat/completions`. Use whatever prefix your provider exposes those two paths under — every provider in the table above serves them below `/v1`, but a provider that serves them at the root needs no version segment. Do not point it at a URL that already includes `/chat/completions` — Chat UI adds that path itself.
+
 See the [configuration overview](../configuration/overview) for all available options.
 
 ## Database
