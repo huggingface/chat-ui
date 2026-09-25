@@ -128,6 +128,20 @@ async function deliverTo(conversationId: ObjectId, now: Date): Promise<void> {
 	);
 }
 
+// an ended row is never polled again, so every tick looks here to retry a failed delivery or
+// reach a wait that parked after the mark
+export async function conversationsAwaitingEvents(): Promise<ObjectId[]> {
+	const parked = await collections.parkedCalls.distinct("conversationId", {
+		kind: "timer",
+		status: "waiting",
+	});
+	if (parked.length === 0) return [];
+	return collections.mlServices.distinct("conversationId", {
+		conversationId: { $in: parked },
+		eventPendingSince: { $exists: true },
+	});
+}
+
 export async function deliverServiceEvents(
 	conversationIds: ObjectId[],
 	now = new Date()

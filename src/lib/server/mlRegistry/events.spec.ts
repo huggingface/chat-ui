@@ -4,7 +4,7 @@ import { collections, ready } from "$lib/server/database";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { MlService } from "$lib/types/MlService";
 import type { ParkedCall } from "$lib/types/ParkedCall";
-import { claimServiceEvents, deliverServiceEvents } from "./events";
+import { claimServiceEvents, conversationsAwaitingEvents, deliverServiceEvents } from "./events";
 import { pollDueServices, pollService } from "./poller";
 
 const switches = vi.hoisted(() => ({ events: true }));
@@ -413,6 +413,46 @@ describe.sequential("delivering into a parked wait", () => {
 		]);
 		const rows = await collections.mlServices.find({ conversationId }).toArray();
 		expect(rows.map((r) => r.eventPendingSince)).toEqual([undefined, undefined]);
+	});
+});
+
+describe.sequential("delivering on every tick", () => {
+	it("reaches a wait that parked after the end was marked", async () => {
+		const conversationId = await insertConversation();
+		const service = await insertService(conversationId, endedUnreported());
+		const park = await insertPark(conversationId);
+
+		expect(await pollDueServices(NOW)).toEqual([]);
+
+		expect((await readPark(park._id)).serviceEvents).toHaveLength(1);
+		expect((await readService(service._id)).eventPendingSince).toBeUndefined();
+	});
+
+	it("retries a delivery that failed on an earlier tick", async () => {
+		const conversationId = await insertConversation();
+		const service = await insertService(conversationId);
+		const park = await insertPark(conversationId);
+		stubJobApi({ status: { stage: "ERROR" } });
+		vi.spyOn(collections.parkedCalls, "updateOne").mockRejectedValueOnce(
+			new Error("write refused")
+		);
+
+		await pollDueServices(NOW);
+		expect((await readService(service._id)).eventPendingSince).toEqual(NOW);
+		expect((await readPark(park._id)).serviceEvents).toBeUndefined();
+
+		await pollDueServices(new Date(NOW.getTime() + 5 * SECOND));
+		expect((await readPark(park._id)).serviceEvents?.map((e) => e.to)).toEqual(["ERROR"]);
+		expect((await readService(service._id)).eventPendingSince).toBeUndefined();
+	});
+
+	it("leaves a conversation with pending events and no parked wait alone", async () => {
+		const conversationId = await insertConversation();
+		await insertService(conversationId, endedUnreported());
+		await insertPark(conversationId, { status: "resumed" });
+		await insertPark(new ObjectId());
+
+		expect(await conversationsAwaitingEvents()).toEqual([]);
 	});
 });
 

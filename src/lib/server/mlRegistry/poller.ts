@@ -16,7 +16,7 @@ import { rebuildIdentity } from "$lib/server/generation/parkedSweeper";
 import type { MlService } from "$lib/types/MlService";
 import { backoffDelayMs, nextPollDelayMs } from "./schedule";
 import { mlServiceEventsEnabled } from "./enabled";
-import { deliverServiceEvents, endEventFields } from "./events";
+import { conversationsAwaitingEvents, deliverServiceEvents, endEventFields } from "./events";
 
 // status only and never logs, an end is marked on the row for deliverServiceEvents
 
@@ -261,7 +261,6 @@ export async function pollDueServices(now = new Date()): Promise<PollOutcome[]> 
 		if (!service) break;
 		claimed.push(service);
 	}
-	if (claimed.length === 0) return [];
 
 	const tokens: TokenCache = new Map();
 	const outcomes = await Promise.all(
@@ -294,10 +293,7 @@ export async function pollDueServices(now = new Date()): Promise<PollOutcome[]> 
 		);
 	}
 	if (mlServiceEventsEnabled()) {
-		await deliverServiceEvents(
-			results.filter((o) => o.terminal).map((o) => o.service.conversationId),
-			now
-		);
+		await deliverServiceEvents(await conversationsAwaitingEvents(), now);
 	}
 	return results;
 }
