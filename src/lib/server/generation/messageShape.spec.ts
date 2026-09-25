@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
-import {
-	convertFinishedMessage,
-	convertMessageShape,
-	restoreRunningShape,
-	type ShapeSkipReason,
-} from "./messageShape";
+import { convertFinishedMessage, convertMessageShape, type ShapeSkipReason } from "./messageShape";
 import { messageForStorage } from "./compressUpdates";
-import { rebuildLegacyContent, toLegacyShape, toolRounds } from "$lib/utils/messageShape";
+import {
+	rebuildLegacyContent,
+	restoreRunningShape,
+	toLegacyShape,
+	toolRounds,
+} from "$lib/utils/messageShape";
 import type { Message } from "$lib/types/Message";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
 import {
 	assistantMessage,
+	convertingTurns,
 	finalAnswer,
+	preamblesTrimmed,
 	stream,
 	streamed,
 	toolRound,
@@ -251,6 +253,76 @@ describe("messageForStorage", () => {
 	});
 });
 
+describe("what a converted message stores", () => {
+	const turn = () =>
+		assistantMessage([
+			...toolRound({ reasoning: "Plan.", text: "Let me check." }),
+			...toolRound({ text: "And again." }),
+			...finalAnswer("Done.", "Sunny."),
+		]);
+	const ofType = (message: Message, type: MessageUpdateType) =>
+		(message.updates ?? []).filter((u) => u.type === type);
+	const calls = (message: Message) => toolRounds(message.updates ?? []).flatMap((r) => r.calls);
+
+	it("drops the stream markers, the answer text and the parameters argumentsRaw repeats", () => {
+		const legacy = turn();
+		expect(ofType(legacy, MessageUpdateType.Stream).length).toBeGreaterThan(0);
+
+		const next = converted(legacy);
+		expect(ofType(next, MessageUpdateType.Stream)).toEqual([]);
+		expect(ofType(next, MessageUpdateType.FinalAnswer)).toEqual([
+			{
+				type: MessageUpdateType.FinalAnswer,
+				text: "",
+				len: "<think>Done.</think>Sunny.".length,
+				interrupted: false,
+			},
+		]);
+		expect(calls(next).map((u) => u.call.parameters)).toEqual([{}, {}]);
+		expect(calls(next).map((u) => u.argumentsRaw)).toEqual([
+			'{"city":"Paris"}',
+			'{"city":"Paris"}',
+		]);
+	});
+
+	it("keeps parameters argumentsRaw cannot give back", () => {
+		const legacy = turn();
+		const [first, second] = calls(legacy);
+		delete first.argumentsRaw;
+		second.call.parameters = { city: "Lyon" };
+
+		expect(calls(converted(legacy)).map((u) => u.call.parameters)).toEqual([
+			{ city: "Paris" },
+			{ city: "Lyon" },
+		]);
+	});
+
+	it("leaves a message that stays in the old shape as it was", () => {
+		const legacy = assistantMessage(
+			[
+				...toolRound({ reasoning: "Plan.", text: "Let me check." }),
+				...finalAnswer(undefined, "Sunny."),
+			],
+			"running"
+		);
+
+		const stored = messageForStorage(legacy);
+		expect(stored.contentShape).toBeUndefined();
+		expect(stored.updates).toEqual(legacy.updates);
+	});
+
+	it("slims a message converted before it did, and only once", () => {
+		const legacy = turn();
+		const unslimmed = { ...converted(legacy), updates: legacy.updates };
+
+		const once = messageForStorage(unslimmed);
+		expect(ofType(once, MessageUpdateType.Stream)).toEqual([]);
+		expect(calls(once).map((u) => u.call.parameters)).toEqual([{}, {}]);
+		expect(messageForStorage(once)).toEqual(once);
+		expect(convertFinishedMessage(once)).toBe(once);
+	});
+});
+
 describe("restoreRunningShape", () => {
 	it("puts a converted message back as the buffer a turn appends to", () => {
 		const message = assistantMessage([
@@ -263,5 +335,15 @@ describe("restoreRunningShape", () => {
 		expect(next.content).toBe(message.content);
 		expect(next.contentShape).toBeUndefined();
 		expect(next.reasoning).toBeUndefined();
+	});
+
+	it("puts back the stream markers the next conversion cuts rounds at", () => {
+		for (const [name, legacy] of Object.entries(convertingTurns())) {
+			const restored = converted(legacy);
+			restoreRunningShape(restored);
+
+			expect(preamblesTrimmed(restored), name).toEqual(legacy);
+			expect(converted(restored), name).toEqual(converted(legacy));
+		}
 	});
 });

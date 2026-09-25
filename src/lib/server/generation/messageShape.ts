@@ -1,8 +1,16 @@
+import { isDeepStrictEqual } from "node:util";
 import type { Message } from "$lib/types/Message";
-import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
+import {
+	MessageToolUpdateType,
+	MessageUpdateType,
+	type MessageToolCallUpdate,
+	type MessageUpdate,
+} from "$lib/types/MessageUpdate";
 import { isTurnEnded } from "$lib/utils/generationState";
 import {
 	ROUNDS_SHAPE,
+	argumentsObject,
+	primitiveArguments,
 	rebuildLegacyContent,
 	toolRounds,
 	type ToolRound,
@@ -105,19 +113,43 @@ export function convertMessageShape(message: Message): ShapeConversion {
 	) {
 		return { skipped: "rebuild_mismatch" };
 	}
-	return { message: next };
+	return { message: slimRoundsShape(next) };
+}
+
+/** parameters are the primitive top level of argumentsRaw, the tool card parses that instead */
+function withoutParameters(update: MessageToolCallUpdate): MessageToolCallUpdate {
+	if (Object.keys(update.call.parameters).length === 0) return update;
+	const args = argumentsObject(update.argumentsRaw);
+	if (!args || !isDeepStrictEqual(primitiveArguments(args), update.call.parameters)) return update;
+	return { ...update, call: { ...update.call, parameters: {} } };
+}
+
+/** rounds place text so stream markers go, and a final answer repeats the end of content */
+function slimRoundsShape(message: Message): Message {
+	const updates: MessageUpdate[] = [];
+	let changed = false;
+	for (const update of message.updates ?? []) {
+		let slim: MessageUpdate | undefined = update;
+		if (update.type === MessageUpdateType.Stream) {
+			slim = undefined;
+		} else if (update.type === MessageUpdateType.FinalAnswer && update.text) {
+			slim = { ...update, text: "", len: update.text.length };
+		} else if (
+			update.type === MessageUpdateType.Tool &&
+			update.subtype === MessageToolUpdateType.Call
+		) {
+			slim = withoutParameters(update);
+		}
+		if (slim !== update) changed = true;
+		if (slim) updates.push(slim);
+	}
+	return changed ? { ...message, updates } : message;
 }
 
 /** the rounds shape when the turn has ended and converts losslessly, else the message as it was */
 export function convertFinishedMessage(message: Message): Message {
 	const result = convertMessageShape(message);
-	return "message" in result ? result.message : message;
-}
-
-/** guards a turn misjudged as ended, whose round text would otherwise come back twice */
-export function restoreRunningShape(message: Message): void {
-	if (message.contentShape !== ROUNDS_SHAPE) return;
-	message.content = rebuildLegacyContent(message).content;
-	delete message.reasoning;
-	delete message.contentShape;
+	if ("message" in result) return result.message;
+	// older builds stored the rounds shape with markers and answer text
+	return message.contentShape === ROUNDS_SHAPE ? slimRoundsShape(message) : message;
 }

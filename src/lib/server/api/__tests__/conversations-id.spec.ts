@@ -69,7 +69,7 @@ describe.sequential("GET /api/v2/conversations/[id]", () => {
 		expect(data.id).toBe(conv._id.toString());
 	});
 
-	it("returns a converted turn in the shape the client renders", async () => {
+	it("returns a converted turn as stored, which the client renders by its rounds", async () => {
 		const { locals } = await createTestUser();
 		const legacy = assistantMessage([
 			...toolRound({ reasoning: "Plan.", text: "Let me check." }),
@@ -87,9 +87,11 @@ describe.sequential("GET /api/v2/conversations/[id]", () => {
 
 		const data = await parseResponse<{ messages: Message[] }>(res);
 		const returned = data.messages.find((m) => m.id === stored.id);
-		expect(returned?.content).toBe(legacy.content);
-		expect(returned?.contentShape).toBeUndefined();
-		expect(returned?.reasoning).toBeUndefined();
+		expect(returned?.contentShape).toBe(2);
+		expect(returned?.content).toBe("Sunny.");
+		expect(returned?.reasoning).toBe("Done.");
+		expect(returned?.updates).toEqual(stored.updates);
+		expect(JSON.stringify(returned).length).toBeLessThan(JSON.stringify(legacy).length);
 	});
 
 	it("throws 404 for non-existent conversation", async () => {

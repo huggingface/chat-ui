@@ -25,7 +25,7 @@ import { createGenerationWriter } from "./writer";
 import { applyUpdateToMessage } from "./applyUpdate";
 import { turnAbandoned, turnEnded, turnRunning, turnUnsaved } from "./turnState";
 import { compressUpdatesForStorage, messageForStorage } from "./compressUpdates";
-import { restoreRunningShape } from "./messageShape";
+import { restoreRunningShape } from "$lib/utils/messageShape";
 
 const SWEEP_BATCH = 5;
 /** A row this many attempts deep is not going to resume; stop burning turns on it. */

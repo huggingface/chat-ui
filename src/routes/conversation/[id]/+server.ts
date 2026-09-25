@@ -35,7 +35,7 @@ import {
 	compressUpdatesForStorage,
 	messageForStorage,
 } from "$lib/server/generation/compressUpdates";
-import { restoreRunningShape } from "$lib/server/generation/messageShape";
+import { restoreRunningShape } from "$lib/utils/messageShape";
 import { applyUpdateToMessage } from "$lib/server/generation/applyUpdate";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
