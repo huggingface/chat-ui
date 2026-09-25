@@ -42,7 +42,8 @@ import {
 	turnEnded,
 	turnRunning,
 } from "./turnState";
-import { compressUpdatesForStorage } from "./compressUpdates";
+import { compressUpdatesForStorage, messageForStorage } from "./compressUpdates";
+import { restoreRunningShape } from "./messageShape";
 
 const SWEEP_BATCH = 5;
 /** A row this many claims deep is not going to store its result; stop trying. */
@@ -256,6 +257,7 @@ export async function resumeAnsweredAsk({
 	}
 
 	const generationId = randomUUID();
+	restoreRunningShape(message);
 	const initialContent = message.content;
 	const promptedAt = new Date();
 	const abortController = new AbortController();
@@ -309,15 +311,23 @@ export async function resumeAnsweredAsk({
 	// wrote meanwhile.
 	const persist = async () => {
 		message.materializedSeq = writer.currentSeq();
+		const stored = messageForStorage(message);
+		// written field by field, restoreRunningShape can drop both from a message stored converted
+		const unset: Record<string, ""> = {};
+		if (stored.reasoning === undefined) unset["messages.$.reasoning"] = "";
+		if (stored.contentShape === undefined) unset["messages.$.contentShape"] = "";
 		await collections.conversations.updateOne(
 			{ _id: conv._id, "messages.id": message.id },
 			{
 				$set: {
-					"messages.$.content": message.content,
-					"messages.$.updates": compressUpdatesForStorage(message.updates),
+					"messages.$.content": stored.content,
+					"messages.$.updates": stored.updates,
 					"messages.$.materializedSeq": message.materializedSeq,
 					"messages.$.updatedAt": new Date(),
-					...(message.reasoning !== undefined ? { "messages.$.reasoning": message.reasoning } : {}),
+					...(stored.reasoning !== undefined ? { "messages.$.reasoning": stored.reasoning } : {}),
+					...(stored.contentShape !== undefined
+						? { "messages.$.contentShape": stored.contentShape }
+						: {}),
 					...(message.files !== undefined ? { "messages.$.files": message.files } : {}),
 					...(message.routerMetadata !== undefined
 						? { "messages.$.routerMetadata": message.routerMetadata }
@@ -328,6 +338,7 @@ export async function resumeAnsweredAsk({
 					title: conv.title,
 					updatedAt: new Date(),
 				},
+				...(Object.keys(unset).length > 0 ? { $unset: unset } : {}),
 			}
 		);
 	};

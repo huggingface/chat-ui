@@ -6,6 +6,7 @@ import {
 	type MessageStreamUpdate,
 } from "$lib/types/MessageUpdate";
 import type { Message } from "$lib/types/Message";
+import { convertFinishedMessage } from "./messageShape";
 
 /**
  * A conversation is one MongoDB document, and Mongo caps a document at 16MB.
@@ -80,4 +81,12 @@ export function compressUpdatesForStorage(updates: Message["updates"]): Message[
 		"[generation] message updates exceeded the persistence cap and were truncated"
 	);
 	return capped;
+}
+
+/** end of turn saves only, a running turn appends to content so materialise stores it as is */
+export function messageForStorage(message: Message): Message {
+	return convertFinishedMessage({
+		...message,
+		updates: compressUpdatesForStorage(message.updates),
+	});
 }
