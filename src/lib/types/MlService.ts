@@ -35,6 +35,11 @@ export interface MlService extends Timestamps {
 	stage: string;
 	stageMessage?: string;
 	origin: MlRegistryOrigin;
+	/**
+	 * found by the session label listing because the submit reply never arrived, dispatched since
+	 * only submissions from this conversation carry the label
+	 */
+	reconciled?: boolean;
 	startedAt?: Date;
 	endedAt?: Date;
 	/** poller bookkeeping, a row with no nextPollAt is finished, stopped or waiting for a token */
