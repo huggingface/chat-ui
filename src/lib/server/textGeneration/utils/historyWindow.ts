@@ -3,7 +3,7 @@ import type { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
 import { ASK_USER_QUESTION_TOOL_NAME } from "$lib/server/askUserQuestion";
-import type { HistoryWindowStart } from "$lib/types/Conversation";
+import type { HistoryWindowStart, StoredHistoryWindow } from "$lib/types/Conversation";
 
 type ChatMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -264,7 +264,7 @@ export function renderWindow(units: HistoryUnit[], plan: WindowPlan): ChatMessag
 
 export async function saveHistoryWindowStart(
 	conversationId: ObjectId,
-	start: HistoryWindowStart
+	start: StoredHistoryWindow
 ): Promise<void> {
 	await collections.conversations.updateOne(
 		{ _id: conversationId },
@@ -284,9 +284,9 @@ export function createHistoryWindow(opts: {
 	limitChars: number;
 	/** sent with every request but not in the list, the tool schemas */
 	fixedChars: number;
-	stored?: HistoryWindowStart;
+	stored?: StoredHistoryWindow;
 	liveMessageId?: string;
-	save?: (conversationId: ObjectId, start: HistoryWindowStart) => Promise<void>;
+	save?: (conversationId: ObjectId, start: StoredHistoryWindow) => Promise<void>;
 }) {
 	const save = opts.save ?? saveHistoryWindowStart;
 	const historyLength = opts.units.reduce((n, unit) => n + unit.messages.length, 0);
@@ -294,7 +294,7 @@ export function createHistoryWindow(opts: {
 		? opts.units.filter((unit) => unit.rounds > 0 && unit.start?.messageId === opts.liveMessageId)
 				.length
 		: 0;
-	let stored = opts.stored;
+	let stored = opts.stored && opts.stored.limitChars >= opts.limitChars ? opts.stored : undefined;
 
 	return {
 		async fit(list: ChatMessageParam[]): Promise<ChatMessageParam[]> {
@@ -319,14 +319,14 @@ export function createHistoryWindow(opts: {
 				stored,
 			});
 			if (plan.moved && plan.start) {
-				stored = plan.start;
+				stored = { ...plan.start, limitChars: opts.limitChars };
 				const conversationId = opts.conversationId.toString();
 				logger.info(
 					{ conversationId, start: plan.start, chars: plan.chars, limitChars: opts.limitChars },
 					"[history] window slid"
 				);
 				try {
-					await save(opts.conversationId, plan.start);
+					await save(opts.conversationId, stored);
 				} catch (err) {
 					logger.warn(
 						{ conversationId, err: String(err) },

@@ -178,6 +178,7 @@ export async function endpointOai(
 			provider,
 			reasoningEffort,
 			reasoningOverride,
+			historyWindow,
 		}) => {
 			// Hoisted above the message prep so the history budget can reserve the
 			// reply allowance this request will actually ask for.
@@ -204,6 +205,7 @@ export async function endpointOai(
 					contextLengthTokens: model.contextLength,
 					maxOutputTokens: parameters?.max_tokens,
 					slidingWindow: historyWindowEnabled(),
+					window: conversationId ? { conversationId, stored: historyWindow } : undefined,
 				});
 
 			// Normalize preprompt and handle empty values

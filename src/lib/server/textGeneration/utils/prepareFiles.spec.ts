@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { ObjectId } from "mongodb";
+import { collections, ready } from "$lib/server/database";
+import type { Conversation } from "$lib/types/Conversation";
 import type { OpenAI } from "openai";
 import { prepareHistory, prepareMessagesWithFiles, type HistoryMessage } from "./prepareFiles";
 import { omittedMarker, planWindow, renderWindow, type HistoryUnit } from "./historyWindow";
@@ -1295,6 +1298,56 @@ describe("sliding history window", () => {
 			expect(next.moved).toBe(true);
 			expect(next.start?.round).toBeGreaterThan(first?.round ?? Infinity);
 			expect(next.chars).toBeLessThanOrEqual(limitChars / 2);
+		});
+
+		it("keeps and stores the start of a tool-less conversation", async () => {
+			await ready;
+			const conversationId = new ObjectId();
+			await collections.conversations.insertOne({
+				_id: conversationId,
+				model: "m",
+				title: "t",
+				messages: [],
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			} satisfies Conversation);
+			const answer = (id: string, fill: string, chars: number): HistoryMessage => ({
+				id,
+				from: "assistant",
+				content: fill.repeat(chars),
+			});
+			const firstThree = [
+				user("u0", "One?"),
+				answer("a0", "a", 250_000),
+				user("u1", "Two?"),
+				answer("a1", "b", 250_000),
+				user("u2", "Three?"),
+				answer("a2", "c", 250_000),
+				user("u3", "Four?"),
+			];
+			const options = {
+				contextLengthTokens: 262_144,
+				slidingWindow: true,
+				window: { conversationId },
+			};
+			const slid = await prepareMessagesWithFiles(firstThree, imageProcessor, false, options);
+			expect(JSON.stringify(slid)).not.toContain("bbbbbbbbbb");
+			const stored = (await collections.conversations.findOne({ _id: conversationId }))
+				?.historyWindow;
+			expect(stored).toEqual({ messageId: "u2", round: 0, limitChars: 774_144 });
+
+			const later = [...firstThree, answer("a3", "d", 200_000), user("u4", "Five?")];
+			const held = await prepareMessagesWithFiles(later, imageProcessor, false, {
+				...options,
+				window: { conversationId, stored },
+			});
+			expect(JSON.stringify(held)).toContain("cccccccccc");
+			const unstored = await prepareMessagesWithFiles(later, imageProcessor, false, {
+				...options,
+				window: undefined,
+			});
+			expect(JSON.stringify(unstored)).not.toContain("cccccccccc");
+			await collections.conversations.deleteOne({ _id: conversationId });
 		});
 
 		it("recomputes from the beginning when the start is not on the replayed path", async () => {

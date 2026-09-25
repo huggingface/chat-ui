@@ -14,10 +14,13 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
+import type { StoredHistoryWindow } from "$lib/types/Conversation";
+import type { ObjectId } from "mongodb";
 import { isValidJsonObject } from "$lib/server/textGeneration/mcp/toolInvocation";
 import {
 	answeredQuestion,
 	CHARS_PER_TOKEN,
+	createHistoryWindow,
 	DEFAULT_OUTPUT_TOKENS,
 	groupRounds,
 	historyCost,
@@ -323,6 +326,8 @@ export type HistoryOptions = {
 	maxOutputTokens?: number;
 	/** HISTORY_SLIDING_WINDOW, off keeps the legacy budget and its per-output cap */
 	slidingWindow?: boolean;
+	/** where the window start is kept, without it every request picks its own start */
+	window?: { conversationId: ObjectId; stored?: StoredHistoryWindow };
 };
 
 /**
@@ -357,12 +362,19 @@ export async function prepareMessagesWithFiles(
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
 	const history = await prepareHistory(messages, imageProcessor, isMultimodal, options);
 	if (!history.units || !options?.contextLengthTokens) return history.messages;
-	// no stored start on this path, it only serves tool-less requests
-	const plan = planWindow(history.units, {
-		limitChars: windowLimitChars(options.contextLengthTokens, options.maxOutputTokens),
-		fixedChars: PROMPT_OVERHEAD_TOKENS * CHARS_PER_TOKEN,
-	});
-	return renderWindow(history.units, plan);
+	const limitChars = windowLimitChars(options.contextLengthTokens, options.maxOutputTokens);
+	const fixedChars = PROMPT_OVERHEAD_TOKENS * CHARS_PER_TOKEN;
+	if (!options.window) {
+		return renderWindow(history.units, planWindow(history.units, { limitChars, fixedChars }));
+	}
+	return createHistoryWindow({
+		conversationId: options.window.conversationId,
+		units: history.units,
+		offset: 0,
+		limitChars,
+		fixedChars,
+		stored: options.window.stored,
+	}).fit(history.messages);
 }
 
 /**

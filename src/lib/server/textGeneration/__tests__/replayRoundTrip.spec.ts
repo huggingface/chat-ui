@@ -1005,7 +1005,7 @@ describe.sequential("replay budget", () => {
 
 		const stored = await reload(conv);
 		const turn = assistantMessages(stored)[0];
-		expect(stored.historyWindow).toEqual({ messageId: turn.id, round: 2 });
+		expect(stored.historyWindow).toEqual({ messageId: turn.id, round: 2, limitChars: 774_144 });
 
 		await sendMessage(stored, locals, "Again?");
 		const next = outgoing(6);
@@ -1016,7 +1016,39 @@ describe.sequential("replay budget", () => {
 		).toEqual(['{"city":"c2"}', '{"city":"c3"}', '{"city":"c4"}']);
 		expect(String(next[1].content), nextShape).toContain("[Earlier history omitted:");
 		expect(next.at(-1)?.content, nextShape).toBe("Again?");
-		expect((await reload(conv)).historyWindow).toEqual({ messageId: turn.id, round: 2 });
+		expect((await reload(conv)).historyWindow).toEqual({
+			messageId: turn.id,
+			round: 2,
+			limitChars: 774_144,
+		});
+	});
+
+	it("keeps the window start across turns until the trigger fires again", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([
+			{ content: "a".repeat(250_000) },
+			{ content: "b".repeat(250_000) },
+			{ content: "c".repeat(250_000) },
+			{ content: "d".repeat(200_000) },
+			{ content: "Five." },
+		]);
+		let current = conv;
+		for (const prompt of ["One?", "Two?", "Three?", "Four?", "Five?"]) {
+			await sendMessage(current, locals, prompt, { withTools: false });
+			current = await reload(conv);
+		}
+
+		const slid = JSON.stringify(outgoing(3));
+		expect(slid).toContain("[Earlier history omitted: 1 turn / 0 tool rounds.");
+		expect(slid).not.toContain("bbbbbbbbbb");
+		expect(slid).toContain("cccccccccc");
+
+		// recomputed from the beginning this request would drop the third answer too
+		const held = JSON.stringify(outgoing(4));
+		expect(held).toContain("cccccccccc");
+		expect(held).toContain("dddddddddd");
+		const third = current.messages.find((m) => m.from === "user" && m.content === "Three?");
+		expect(current.historyWindow).toEqual({ messageId: third?.id, round: 0, limitChars: 774_144 });
 	});
 
 	it("stores each round's reasoning exactly twice, so growth stays bounded", async () => {

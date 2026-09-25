@@ -10,7 +10,7 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
-import type { HistoryWindowStart } from "$lib/types/Conversation";
+import type { StoredHistoryWindow } from "$lib/types/Conversation";
 
 type Sent = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -50,7 +50,11 @@ const liveRound = (id: string, outputChars: number): Sent[] => [
 	{ role: "tool", tool_call_id: id, content: `${id}:`.padEnd(outputChars, "l") },
 ];
 
-async function loop(history: HistoryMessage[], liveMessageId: string) {
+async function loop(
+	history: HistoryMessage[],
+	liveMessageId: string,
+	stored?: StoredHistoryWindow
+) {
 	const prepared = await prepareHistory(history, imageProcessor, false, {
 		replayToolHistory: true,
 		contextLengthTokens: 1_048_576,
@@ -58,7 +62,7 @@ async function loop(history: HistoryMessage[], liveMessageId: string) {
 	});
 	if (!prepared.units) throw new Error("expected the sliding window to apply");
 	const list: Sent[] = [{ role: "system", content: "SYSTEM" }, ...prepared.messages];
-	const saved: HistoryWindowStart[] = [];
+	const saved: StoredHistoryWindow[] = [];
 	const window = createHistoryWindow({
 		conversationId: new ObjectId(),
 		units: prepared.units,
@@ -66,7 +70,8 @@ async function loop(history: HistoryMessage[], liveMessageId: string) {
 		limitChars: 200_000,
 		fixedChars: 0,
 		liveMessageId,
-		save: vi.fn(async (_id: ObjectId, start: HistoryWindowStart) => {
+		stored,
+		save: vi.fn(async (_id: ObjectId, start: StoredHistoryWindow) => {
 			saved.push(start);
 		}),
 	});
@@ -140,8 +145,28 @@ describe("history window in the tool loop", () => {
 			await window.fit(list);
 		}
 		expect(saved).toEqual([
-			{ messageId: "a0", round: 3 },
-			{ messageId: "a0", round: 5 },
+			{ messageId: "a0", round: 3, limitChars: 200_000 },
+			{ messageId: "a0", round: 5, limitChars: 200_000 },
 		]);
+	});
+
+	it("keeps a start chosen for a larger window and ignores one chosen for a smaller one", async () => {
+		const history: HistoryMessage[] = [
+			{ id: "u0", from: "user", content: "BRIEF" },
+			storedTurn("a0", 4, 10_000),
+			{ id: "u1", from: "user", content: "GO" },
+		];
+		const start = { messageId: "a0", round: 2 };
+
+		const larger = await loop(history, "a1", { ...start, limitChars: 400_000 });
+		const kept = await larger.window.fit(larger.list);
+		expect(String(kept[1].content)).toContain("[Earlier history omitted: 0 turns / 2 tool rounds.");
+		expect(toolIds(kept)).toHaveLength(2);
+
+		const smaller = await loop(history, "a1", { ...start, limitChars: 100_000 });
+		const recomputed = await smaller.window.fit(smaller.list);
+		expect(JSON.stringify(recomputed)).not.toContain("[Earlier history omitted");
+		expect(toolIds(recomputed)).toHaveLength(4);
+		expect(smaller.saved).toEqual([]);
 	});
 });
