@@ -20,6 +20,7 @@ import type { MlService } from "$lib/types/MlService";
 import type { MlArtefact } from "$lib/types/MlArtefact";
 import type { MlAgentRun } from "$lib/types/MlAgentRun";
 import type { MlSource } from "$lib/types/MlSource";
+import type { MlSessionLabel } from "$lib/types/MlSessionLabel";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
@@ -156,6 +157,7 @@ export class Database {
 		const mlArtefacts = db.collection<MlArtefact>("mlArtefacts");
 		const mlAgentRuns = db.collection<MlAgentRun>("mlAgentRuns");
 		const mlSources = db.collection<MlSource>("mlSources");
+		const mlSessionLabels = db.collection<MlSessionLabel>("mlSessionLabels");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
@@ -195,6 +197,7 @@ export class Database {
 			mlArtefacts,
 			mlAgentRuns,
 			mlSources,
+			mlSessionLabels,
 			settings,
 			users,
 			sessions,
@@ -231,6 +234,7 @@ export class Database {
 			mlArtefacts,
 			mlAgentRuns,
 			mlSources,
+			mlSessionLabels,
 			settings,
 			users,
 			sessions,
@@ -406,6 +410,9 @@ export class Database {
 		mlSources
 			.createIndex({ conversationId: 1, url: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating unique index for mlSources by url"));
+		mlSessionLabels
+			.createIndex({ reconcileAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for mlSessionLabels by due time"));
 
 		// One state document per turn; the unique key is what makes the upsert in
 		// turnState.ts race-safe. Ended turns expire like ended generations do.

@@ -22,7 +22,12 @@ import {
 	withRewrittenArguments,
 	type NormalizedToolCall,
 } from "./toolInvocation";
-import { hasTruncatedToolCall, parseToolArguments, withParseableArguments } from "./toolArgs";
+import {
+	composeRewrites,
+	hasTruncatedToolCall,
+	parseToolArguments,
+	withParseableArguments,
+} from "./toolArgs";
 import type { TextGenerationContext } from "../types";
 import {
 	hasAuthHeader,
@@ -52,6 +57,8 @@ import {
 	withMlAssistantServers,
 } from "$lib/server/mlAssistant";
 import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
+import { createJobLabelRewrite } from "$lib/server/mcp/jobLabels";
+import { loadSessionJobLabels } from "$lib/server/mlRegistry/sessionLabel";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
@@ -213,7 +220,20 @@ export async function* runMcpFlow({
 	// A job bills the namespace it runs under, so the billing setting travels as
 	// an argument rather than a header — see mcp/hubBilling.ts.
 	const payer = mlAssistant ? mlAssistantPayerTarget(locals) : undefined;
-	const rewriteArgs = payer ? createHubBillingRewrite(payer) : undefined;
+	// a turn whose labels cannot be read submits unlabelled rather than not at all
+	const jobLabels = mlAssistant
+		? await loadSessionJobLabels(conv._id).catch((err) => {
+				logger.warn(
+					{ err: String(err), conversationId: conv._id.toString() },
+					"[mcp] session job labels unavailable; this turn's jobs go unlabelled"
+				);
+				return undefined;
+			})
+		: undefined;
+	const rewriteArgs = composeRewrites([
+		payer ? createHubBillingRewrite(payer) : undefined,
+		jobLabels ? createJobLabelRewrite(jobLabels) : undefined,
+	]);
 	const recordingGuard = mlAssistant
 		? createMlRecordingGuard({
 				conversationId: conv._id,
@@ -222,6 +242,7 @@ export async function* runMcpFlow({
 				namespace:
 					payer?.namespace ??
 					(locals as unknown as { user?: { username?: string } })?.user?.username,
+				...(jobLabels ? { jobLabels } : {}),
 			})
 		: undefined;
 	const sourcesGuardFor = mlAssistant

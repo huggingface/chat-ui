@@ -53,7 +53,7 @@ describe("hub billing rewrite: jobs", () => {
 
 	it("fills in the namespace on a read that names none", () => {
 		// The org's jobs live in the org's namespace; a bare id would 404 under the user.
-		for (const operation of ["ps", "logs", "inspect", "cancel"]) {
+		for (const operation of ["ps", "logs", "inspect", "cancel", "update-labels"]) {
 			const out = apply("hf_jobs", { operation, args: { job_id: "abc" } });
 			expect(out.args).toEqual({ job_id: "abc", namespace: "acme" });
 		}
@@ -78,6 +78,24 @@ describe("hub billing rewrite: jobs", () => {
 		// A job launched before the setting changed lives elsewhere, and its URL says where.
 		const args = { operation: "logs", args: { job_id: "abc", namespace: "pngwn" } };
 		expect(apply("hf_jobs", args)).toBe(args);
+		const relabel = {
+			operation: "update-labels",
+			args: { job_id: "abc", labels: {}, namespace: "pngwn" },
+		};
+		expect(apply("hf_jobs", relabel)).toBe(relabel);
+	});
+
+	it("does not add the resource group when relabelling", () => {
+		const rewriteToGroup = createHubBillingRewrite({
+			namespace: "acme",
+			resourceGroupId: "65f000000000000000000001",
+		});
+		const out = rewriteToGroup({
+			serverUrl: HF_URL,
+			tool: "hf_jobs",
+			args: { operation: "update-labels", args: { job_id: "abc", labels: { stage: "eval" } } },
+		});
+		expect(out.args).toEqual({ job_id: "abc", labels: { stage: "eval" }, namespace: "acme" });
 	});
 
 	it("treats missing args as an empty object", () => {
