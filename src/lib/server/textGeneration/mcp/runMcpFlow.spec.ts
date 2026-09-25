@@ -36,6 +36,10 @@ const mocks = vi.hoisted(() => ({
 		name: string;
 		url: string;
 	}>,
+	listMlServices: vi.fn(async (): Promise<unknown[]> => []),
+	listMlArtefacts: vi.fn(async (): Promise<unknown[]> => []),
+	listMlFiles: vi.fn(async (): Promise<unknown[]> => []),
+	markServicesReported: vi.fn(async () => undefined),
 }));
 
 // The gate itself is real; only the build flag behind it is forced on.
@@ -101,8 +105,19 @@ vi.mock("$lib/server/logger", () => ({
 vi.mock("$lib/server/abortedGenerations", () => ({
 	AbortedGenerations: { getInstance: () => ({ getAbortTime: mocks.getAbortTime }) },
 }));
+vi.mock("$lib/server/mlRegistry/store", async (importOriginal) => ({
+	...(await importOriginal<typeof import("$lib/server/mlRegistry/store")>()),
+	listMlServices: mocks.listMlServices,
+	listMlArtefacts: mocks.listMlArtefacts,
+	markServicesReported: mocks.markServicesReported,
+}));
+vi.mock("$lib/server/mlFiles/store", async (importOriginal) => ({
+	...(await importOriginal<typeof import("$lib/server/mlFiles/store")>()),
+	listMlFiles: mocks.listMlFiles,
+}));
 
 const { runMcpFlow } = await import("./runMcpFlow");
+const { config } = await import("$lib/server/config");
 
 type ScriptedCall = { id?: string; name?: string; arguments: string };
 
@@ -242,6 +257,12 @@ beforeEach(() => {
 	mocks.mcpTools = [{ type: "function", function: { name: "do_thing" } }];
 	mocks.servers = [{ name: "hf", url: "https://example.test/mcp" }];
 	mocks.getAbortTime.mockReturnValue(undefined);
+	for (const list of [mocks.listMlServices, mocks.listMlArtefacts, mocks.listMlFiles]) {
+		list.mockReset();
+		list.mockResolvedValue([]);
+	}
+	mocks.markServicesReported.mockReset();
+	mocks.markServicesReported.mockResolvedValue(undefined);
 	scriptToolResults();
 });
 
@@ -845,6 +866,146 @@ describe("runMcpFlow under the ML Assistant preset", () => {
 
 		expect(result).toBe("exhausted");
 		expect(mocks.create).toHaveBeenCalledTimes(100);
+	});
+});
+
+describe("runMcpFlow session state block", () => {
+	const mlConv = () =>
+		({ _id: new ObjectId(), mlAssistant: true }) as unknown as Parameters<
+			typeof runMcpFlow
+		>[0]["conv"];
+
+	const job = (stage: string) => ({
+		_id: new ObjectId(),
+		conversationId: new ObjectId(),
+		kind: "job",
+		jobId: "0123456789abcdef01234567",
+		namespace: "ns",
+		name: "sft-smoke",
+		stage,
+		origin: "dispatched",
+		hubUrl: "https://huggingface.co/jobs/ns/0123456789abcdef01234567",
+		createdAt: new Date(Date.now() - 60_000),
+		updatedAt: new Date(),
+	});
+
+	const lastUserText = (n: number) =>
+		String(requestMessages(n).findLast((m) => m.role === "user")?.content);
+	const blocksIn = (text: string) => text.split("[SESSION STATE").length - 1;
+
+	it("appends the block to the last user message once, and keeps it across the run's rounds", async () => {
+		mocks.listMlServices.mockResolvedValue([job("RUNNING")]);
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		for (const n of [0, 1]) {
+			const text = lastUserText(n);
+			expect(text.startsWith("hello\n\n[SESSION STATE")).toBe(true);
+			expect(blocksIn(text)).toBe(1);
+			expect(text).toContain("- job sft-smoke · RUNNING");
+		}
+		expect(mocks.listMlServices).toHaveBeenCalledTimes(1);
+	});
+
+	it("rebuilds the block when the next run starts, a resume included", async () => {
+		mocks.listMlServices.mockResolvedValue([job("RUNNING")]);
+		scriptRounds([{ content: "waiting" }]);
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		mocks.create.mockClear();
+		mocks.listMlServices.mockResolvedValue([{ ...job("ERROR"), endedAt: new Date() }]);
+		scriptRounds([{ content: "it failed" }]);
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(lastUserText(0)).toContain("- job sft-smoke · ERROR after");
+		expect(lastUserText(0)).not.toContain("RUNNING");
+	});
+
+	it("marks the ended jobs it listed as told once the first completion has read the block", async () => {
+		const ended = { ...job("ERROR"), endedAt: new Date() };
+		mocks.listMlServices.mockResolvedValue([job("RUNNING"), ended]);
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(mocks.markServicesReported).toHaveBeenCalledTimes(1);
+		expect(mocks.markServicesReported).toHaveBeenCalledWith([
+			{ _id: ended._id, stage: "ERROR", reported: "ERROR" },
+		]);
+	});
+
+	it("leaves the ended jobs to the next block when the request fails before the model reads it", async () => {
+		mocks.listMlServices.mockResolvedValue([{ ...job("ERROR"), endedAt: new Date() }]);
+		scriptRounds([{ error: new Error("upstream exploded") }]);
+
+		const { result } = await runFlow({ conv: mlConv() } as Partial<
+			Parameters<typeof runMcpFlow>[0]
+		>);
+
+		expect(result).toBe("not_applicable");
+		expect(mocks.markServicesReported).not.toHaveBeenCalled();
+	});
+
+	it("marks nothing when the block lists no ended job", async () => {
+		mocks.listMlServices.mockResolvedValue([job("RUNNING")]);
+		scriptRounds([{ content: "the answer" }]);
+
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(mocks.markServicesReported).not.toHaveBeenCalled();
+	});
+
+	it("sends no block outside the mode", async () => {
+		mocks.listMlServices.mockResolvedValue([job("RUNNING")]);
+		scriptRounds([{ content: "the answer" }]);
+
+		await runFlow();
+
+		expect(lastUserText(0)).toBe("hello");
+		expect(mocks.listMlServices).not.toHaveBeenCalled();
+	});
+
+	it("sends no block when the switch is off", async () => {
+		mocks.listMlServices.mockResolvedValue([job("RUNNING")]);
+		scriptRounds([{ content: "the answer" }]);
+		config.ML_ASSISTANT_STATE_BLOCK = "false";
+		try {
+			await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+		} finally {
+			config.ML_ASSISTANT_STATE_BLOCK = "";
+		}
+
+		expect(lastUserText(0)).toBe("hello");
+		expect(mocks.listMlServices).not.toHaveBeenCalled();
+	});
+
+	it("sends no block while the registry is empty", async () => {
+		scriptRounds([{ content: "the answer" }]);
+
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(lastUserText(0)).toBe("hello");
+		expect(mocks.listMlServices).toHaveBeenCalledTimes(1);
+	});
+
+	it("runs the turn without the block when the registry cannot be read", async () => {
+		mocks.listMlArtefacts.mockRejectedValue(new Error("connection reset"));
+		mocks.listMlServices.mockResolvedValue([job("RUNNING")]);
+		scriptRounds([{ content: "the answer" }]);
+
+		const { result } = await runFlow({ conv: mlConv() } as Partial<
+			Parameters<typeof runMcpFlow>[0]
+		>);
+
+		expect(result).toBe("completed");
+		expect(lastUserText(0)).toBe("hello");
 	});
 });
 

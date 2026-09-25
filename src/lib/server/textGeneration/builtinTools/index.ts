@@ -1,10 +1,11 @@
 import type { Conversation } from "$lib/types/Conversation";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
+import { mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
 import { askUserQuestionBuiltin } from "./askUserQuestion";
 import { githubGroundingBuiltins } from "./githubGrounding";
 import { createPlanTool } from "./planTool";
-import { waitBuiltin } from "./waitTool";
+import { createWaitTool } from "./waitTool";
 import { createResearchTool } from "./researchTool";
 import { createSandboxTool } from "./sandboxTool";
 import { createJobCheckTool } from "./jobCheckTool";
@@ -44,7 +45,7 @@ export function getEnabledBuiltinTools(params: {
 	return [
 		askUserQuestionBuiltin,
 		createPlanTool(params.conv),
-		waitBuiltin,
+		createWaitTool({ serviceEvents: mlServiceEventsEnabled() }),
 		...githubGroundingBuiltins(),
 		createResearchTool(),
 		createSandboxTool({ virtualFiles }),

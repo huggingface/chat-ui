@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 import type { Conversation } from "./Conversation";
 import type { Message } from "./Message";
+import type { MlFileRef } from "./MlFile";
 import type { Timestamps } from "./Timestamps";
 
 export type MlServiceKind = "job" | "sandbox";
@@ -26,6 +27,8 @@ export interface MlService extends Timestamps {
 	handle?: string;
 	/** the hub mcp server drops it, so the arguments are the only place it survives */
 	name?: string;
+	/** the virtual file versions the submission was expanded from */
+	scriptRefs?: MlFileRef[];
 	flavor?: string;
 	timeoutSeconds?: number;
 	/** the hub stage as returned, SCHEDULING RUNNING COMPLETED CANCELED ERROR DELETED, or UNKNOWN */
@@ -45,7 +48,14 @@ export interface MlService extends Timestamps {
 	pollStoppedReason?: string;
 	/** since when no usable hub token could be found for the conversation, cleared on the next poll */
 	tokenMissingSince?: Date;
-	/** the stage the model was last told about, written by the event path, never by the poller */
+	/** the stage just before the row ended, the from of its event */
+	stageBeforeEnd?: string;
+	/** set when the row ended and the model has not been told yet */
+	eventPendingSince?: Date;
+	/**
+	 * the stage the model was last told about, or an end judged not news, UNTRACKED once the
+	 * state block told it the poller gave the row up, an ended row matching it is not listed again
+	 */
 	lastReportedStage?: string;
 	/** the budget reservation key, generationId:callUuid */
 	reservationKey?: string;
@@ -54,4 +64,20 @@ export interface MlService extends Timestamps {
 	generationId?: string;
 	/** the dispatch uuid, not the provider tool call id */
 	toolUuid?: string;
+}
+
+/** a terminal change the model is told about, ids and numbers only, its text is built on resume */
+export interface ServiceEvent {
+	serviceId: MlService["_id"];
+	kind: MlServiceKind;
+	jobId: string;
+	handle?: string;
+	name?: string;
+	flavor?: string;
+	/** UNKNOWN when the poller never read a stage before the end */
+	from: string;
+	to: string;
+	/** absent when no start was ever recorded */
+	ranSeconds?: number;
+	at: Date;
 }

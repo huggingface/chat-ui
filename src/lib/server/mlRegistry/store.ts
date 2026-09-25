@@ -1,12 +1,16 @@
 import type { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import type { MlArtefact, MlArtefactKind } from "$lib/types/MlArtefact";
+import type { MlFileRef } from "$lib/types/MlFile";
 import type { MlService, MlServiceKind } from "$lib/types/MlService";
 
 // every write is an upsert keyed on the external id, so a retried round or a discovery racing a
 // dispatch converge on one row
 
 export const UNKNOWN_STAGE = "UNKNOWN";
+
+/** what a row the poller gave up on was reported as, never a stage the hub returns */
+export const UNTRACKED_STAGE = "UNTRACKED";
 
 export const hubJobUrl = (namespace: string, jobId: string): string =>
 	`https://huggingface.co/jobs/${namespace}/${jobId}`;
@@ -38,6 +42,7 @@ export interface DispatchedService extends Provenance {
 	/** defaults to the job page */
 	hubUrl?: string;
 	reservationKey?: string;
+	scriptRefs?: MlFileRef[];
 }
 
 /** what the reply said overrides whatever was there */
@@ -100,14 +105,28 @@ export interface ArtefactRecord extends Provenance {
 	uri: string;
 	url: string;
 	commit?: string;
+	fromFile?: MlFileRef;
 	serviceId?: ObjectId;
 }
 
-/** a repeat write moves the commit, or clears it when the reply named none, who first made it stays */
+/** a repeat write moves or clears commit and fromFile, who first made it stays */
 export async function recordArtefact(artefact: ArtefactRecord): Promise<void> {
 	const now = new Date();
-	const { conversationId, uri, kind, url, commit, serviceId, messageId, generationId, toolUuid } =
-		artefact;
+	const {
+		conversationId,
+		uri,
+		kind,
+		url,
+		commit,
+		fromFile,
+		serviceId,
+		messageId,
+		generationId,
+		toolUuid,
+	} = artefact;
+	const unset: { commit?: ""; fromFile?: "" } = {};
+	if (!commit) unset.commit = "";
+	if (!fromFile) unset.fromFile = "";
 	await collections.mlArtefacts.updateOne(
 		{ conversationId, uri },
 		{
@@ -117,9 +136,9 @@ export async function recordArtefact(artefact: ArtefactRecord): Promise<void> {
 				url,
 				origin: "dispatched",
 				updatedAt: now,
-				...compact({ commit, serviceId }),
+				...compact({ commit, fromFile, serviceId }),
 			},
-			...(commit ? {} : { $unset: { commit: "" } }),
+			...(Object.keys(unset).length ? { $unset: unset } : {}),
 		},
 		{ upsert: true }
 	);
@@ -167,6 +186,32 @@ export async function deleteMlRegistry(conversationIds: ObjectId[]): Promise<voi
 		collections.mlServices.deleteMany(filter),
 		collections.mlArtefacts.deleteMany(filter),
 	]);
+}
+
+export interface ServiceReport {
+	_id: ObjectId;
+	/** the stage the row had when it was read, a row that moved on since is not marked */
+	stage: string;
+	/** the stage, or UNTRACKED_STAGE for a row the poller gave up on */
+	reported: string;
+}
+
+/** every path that tells the model about an ended row records it here so it is told once */
+export async function markServicesReported(reports: readonly ServiceReport[]): Promise<void> {
+	if (reports.length === 0) return;
+	await collections.mlServices.bulkWrite(
+		reports.map(({ _id, stage, reported }) => ({
+			updateOne: {
+				filter: { _id, stage },
+				// an event still pending would tell the model a second time from a parked wait
+				update: {
+					$set: { lastReportedStage: reported },
+					$unset: { eventPendingSince: "" as const },
+				},
+			},
+		})),
+		{ ordered: false }
+	);
 }
 
 export function listMlServices(conversationId: ObjectId): Promise<MlService[]> {

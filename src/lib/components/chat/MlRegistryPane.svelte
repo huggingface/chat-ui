@@ -1,23 +1,33 @@
 <script lang="ts">
+	import { tick, untrack } from "svelte";
+	import { SvelteMap, SvelteSet } from "svelte/reactivity";
 	import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
+	import type { MlFileRef } from "$lib/types/MlFile";
 	import type { MlRegistryArtefact, MlRegistryService } from "$lib/types/MlRegistry";
 	import { serverCorrectedNow } from "$lib/utils/clockSkew.svelte";
 	import { formatMicroUsd } from "$lib/utils/mlBudget";
 	import {
+		FILE_ORIGIN_LABEL,
+		formatAgo,
+		formatBytes,
+		formatFileRef,
 		groupArtefacts,
 		hubLabel,
 		isServiceOpen,
 		pathWithin,
 		serviceDisplayName,
 		serviceElapsed,
+		servicesForFileVersion,
 		shortCommit,
 		sortServices,
 		stageBadge,
 	} from "$lib/utils/mlRegistry";
+	import MlFileVersionView from "./MlFileVersionView.svelte";
 	import SidePane from "./SidePane.svelte";
 
 	import CarbonChartLine from "~icons/carbon/chart-line";
+	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonChip from "~icons/carbon/chip";
 	import CarbonCloseLarge from "~icons/carbon/close-large";
 	import CarbonCube from "~icons/carbon/cube";
@@ -49,6 +59,23 @@
 	let grouped = $derived(groupArtefacts(mlRegistry.artefacts));
 	let openCount = $derived(services.filter(isServiceOpen).length);
 	let artefactCount = $derived(mlRegistry.artefacts.length);
+	let files = $derived(mlRegistry.files);
+
+	const openFiles = new SvelteSet<string>();
+	const shownVersions = new SvelteMap<string, number>();
+
+	const fileRowId = (name: string) => `ml-file-${name}`;
+	const versionRowId = ({ name, version }: MlFileRef) => `ml-file-${name}@v${version}`;
+
+	function toggleFile(name: string) {
+		if (openFiles.has(name)) openFiles.delete(name);
+		else openFiles.add(name);
+	}
+
+	function toggleVersion(name: string, version: number) {
+		if (shownVersions.get(name) === version) shownVersions.delete(name);
+		else shownVersions.set(name, version);
+	}
 
 	$effect(() => {
 		if (showing) void mlRegistry.refresh();
@@ -59,15 +86,58 @@
 		if (showing && mlRegistry.conversationId === undefined) sidePane.close();
 	});
 
+	$effect(() => {
+		void mlRegistry.conversationId;
+		untrack(() => {
+			openFiles.clear();
+			shownVersions.clear();
+		});
+	});
+
+	$effect(() => {
+		if (!showing) return;
+		for (const name of openFiles) {
+			// read so a newer version on the next poll refetches the list
+			void files.find((file) => file.name === name)?.version;
+			untrack(() => mlRegistry.loadFileVersions(name));
+		}
+	});
+
+	// every open bumps the nonce, so asking twice for one version reveals it twice
+	let openedFor = 0;
+	let scrolledFor = 0;
+	$effect(() => {
+		const focus = sidePane.registryFocus;
+		const nonce = sidePane.revealNonce;
+		if (!showing || !focus) return;
+		if (openedFor !== nonce) {
+			openedFor = nonce;
+			untrack(() => {
+				openFiles.add(focus.name);
+				shownVersions.set(focus.name, focus.version);
+			});
+		}
+		// the version row only exists once the list has loaded
+		const load = mlRegistry.fileVersions(focus.name);
+		if (scrolledFor === nonce || !load || load.status === "loading") return;
+		scrolledFor = nonce;
+		void tick().then(() => {
+			document.getElementById(fileRowId(focus.name))?.scrollIntoView({ block: "start" });
+			document.getElementById(versionRowId(focus))?.scrollIntoView({ block: "nearest" });
+		});
+	});
+
 	// reseeded on every payload so a corrected skew lands at once
 	let now = $state(serverCorrectedNow());
 	$effect(() => {
 		void mlRegistry.serverNow;
 		now = serverCorrectedNow();
 	});
+	// elapsed times need the second, file ages only the minute
+	let tickMs = $derived(openCount > 0 ? 1000 : files.length > 0 ? 30_000 : 0);
 	$effect(() => {
-		if (!showing || openCount === 0) return;
-		const timer = setInterval(() => (now = serverCorrectedNow()), 1000);
+		if (!showing || tickMs === 0) return;
+		const timer = setInterval(() => (now = serverCorrectedNow()), tickMs);
 		return () => clearInterval(timer);
 	});
 
@@ -186,6 +256,21 @@
 												</span>
 											{/if}
 										</div>
+										{#if service.scriptRefs?.length}
+											<div class="mt-1 flex flex-wrap gap-1.5">
+												{#each service.scriptRefs as ref (formatFileRef(ref))}
+													<button
+														type="button"
+														class="ml-file-ref"
+														title="Show {formatFileRef(ref)} under Files"
+														onclick={() => sidePane.openRegistry(ref)}
+													>
+														<CarbonDocument class="size-3 flex-none" />
+														{formatFileRef(ref)}
+													</button>
+												{/each}
+											</div>
+										{/if}
 										{#if service.tokenMissingSince}
 											<p class="mt-0.5 text-xs text-[#a8a29e] dark:text-[#78716c]">
 												Status unknown since the session expired.
@@ -312,6 +397,183 @@
 									>
 									{#if dashboard.origin === "discovered"}
 										<span class="ml-registry-discovered" title={DISCOVERED_TITLE}>discovered</span>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</section>
+
+				<section aria-labelledby="ml-registry-files">
+					<h3 id="ml-registry-files" class="ml-registry-heading">
+						Files
+						{#if files.length}
+							<span class="ml-registry-count">{files.length}</span>
+						{/if}
+					</h3>
+					{#if files.length === 0}
+						<p class="ml-registry-empty">
+							No files yet. Scripts and configs the intern writes appear here, with every version.
+						</p>
+					{:else}
+						<ul class="ml-registry-list">
+							{#each files as file (file.name)}
+								{@const isOpen = openFiles.has(file.name)}
+								{@const load = mlRegistry.fileVersions(file.name)}
+								<li class="ml-file" id={fileRowId(file.name)}>
+									<button
+										type="button"
+										class="ml-file-toggle flex w-full items-start gap-2.5 px-4 py-2.5 text-left"
+										aria-expanded={isOpen}
+										aria-controls="{fileRowId(file.name)}-versions"
+										onclick={() => toggleFile(file.name)}
+									>
+										<CarbonChevronRight
+											class="ml-file-chevron mt-[3px] size-[14px] flex-none text-[#a8a29e] dark:text-[#78716c]"
+										/>
+										<span class="block min-w-0 flex-1">
+											<span class="flex items-center gap-2">
+												<span
+													class="ml-file-name min-w-0 truncate font-mono font-medium text-[#1c1917] dark:text-[#f5f5f4]"
+												>
+													{file.name}
+												</span>
+												<span class="ml-file-latest">v{file.version}</span>
+											</span>
+											<span
+												class="ml-file-meta mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-xs text-[#78716c] dark:text-[#a8a29e]"
+											>
+												<span class="tabular-nums">{formatBytes(file.size)}</span>
+												<span aria-hidden="true">·</span>
+												<span title={file.updatedAt.toLocaleString()}>
+													updated {formatAgo(now - file.updatedAt.getTime())}
+												</span>
+											</span>
+											{#if file.summary}
+												<span
+													class="ml-file-summary mt-0.5 block text-xs text-[#57534e] dark:text-[#d6d3d1]"
+												>
+													{file.summary}
+												</span>
+											{/if}
+										</span>
+									</button>
+									{#if isOpen}
+										<div id="{fileRowId(file.name)}-versions" class="pr-4 pb-3 pl-[40px]">
+											{#if load?.status === "ready"}
+												<ol
+													class="ml-file-versions border-l border-[#ececea] dark:border-[#262626]"
+													aria-label="Versions of {file.name}"
+												>
+													{#each load.value as entry (entry.version)}
+														{@const ref = { name: file.name, version: entry.version }}
+														{@const jobs = servicesForFileVersion(mlRegistry.services, ref)}
+														{@const isSelected = shownVersions.get(file.name) === entry.version}
+														<li
+															class="ml-version py-1 pl-3"
+															id={versionRowId(ref)}
+															data-version={entry.version}
+														>
+															<button
+																type="button"
+																class="ml-version-toggle w-full rounded-[5px] px-1.5 py-1 text-left"
+																aria-pressed={isSelected}
+																title={isSelected
+																	? `Hide v${entry.version}`
+																	: entry.version === 1
+																		? "Show v1"
+																		: `Show what v${entry.version} changed`}
+																onclick={() => toggleVersion(file.name, entry.version)}
+															>
+																<span class="flex items-baseline gap-2 text-xs">
+																	<span
+																		class="font-mono font-medium text-[#1c1917] dark:text-[#f5f5f4]"
+																	>
+																		v{entry.version}
+																	</span>
+																	<span class="ml-version-origin">
+																		{FILE_ORIGIN_LABEL[entry.origin]}
+																	</span>
+																	{#if entry.agent}
+																		<span
+																			class="ml-version-agent"
+																			title="Written by the {entry.agent} sub-agent"
+																			>{entry.agent}</span
+																		>
+																	{/if}
+																	<span
+																		class="ml-auto flex-none text-[#a8a29e] dark:text-[#78716c]"
+																		title={entry.createdAt.toLocaleString()}
+																	>
+																		{formatAgo(now - entry.createdAt.getTime())}
+																	</span>
+																</span>
+																{#if entry.summary}
+																	<span
+																		class="ml-version-summary mt-0.5 block text-xs text-[#57534e] dark:text-[#d6d3d1]"
+																	>
+																		{entry.summary}
+																	</span>
+																{/if}
+																{#if entry.source}
+																	<span
+																		class="ml-version-source mt-0.5 block truncate font-mono text-[11px] text-[#a8a29e] dark:text-[#78716c]"
+																		title={entry.source}
+																	>
+																		from {entry.source}
+																	</span>
+																{/if}
+															</button>
+															{#if jobs.length}
+																<ul
+																	class="ml-version-jobs mt-0.5 flex flex-col gap-0.5 px-1.5"
+																	aria-label="Jobs that ran v{entry.version}"
+																>
+																	{#each jobs as job (job.id)}
+																		{@const Icon = SERVICE_ICON[job.kind]}
+																		{@const badge = stageBadge(job.stage)}
+																		<li class="flex items-center gap-1.5 text-xs">
+																			<Icon
+																				class="size-3 flex-none text-[#a8a29e] dark:text-[#78716c]"
+																			/>
+																			<a
+																				href={job.hubUrl}
+																				target="_blank"
+																				rel="noopener noreferrer"
+																				class="ml-registry-link min-w-0 truncate text-[#57534e] dark:text-[#d6d3d1]"
+																				title={serviceTitle(job)}
+																			>
+																				{serviceDisplayName(job)}
+																			</a>
+																			<span class="ml-stage" data-tone={badge.tone}>
+																				{#if badge.tone === "running"}
+																					<span aria-hidden="true" class="ml-live-dot"></span>
+																				{/if}
+																				{badge.label}
+																			</span>
+																		</li>
+																	{/each}
+																</ul>
+															{/if}
+															{#if isSelected}
+																<MlFileVersionView name={file.name} version={entry.version} />
+															{/if}
+														</li>
+													{/each}
+												</ol>
+											{:else if load?.status === "error"}
+												<p class="ml-file-note">
+													Could not load the versions.
+													<button
+														type="button"
+														class="ml-file-retry"
+														onclick={() => mlRegistry.loadFileVersions(file.name)}>Try again</button
+													>
+												</p>
+											{:else}
+												<p class="ml-file-note" role="status">Loading versions…</p>
+											{/if}
+										</div>
 									{/if}
 								</li>
 							{/each}
@@ -485,6 +747,150 @@
 	:global(.dark) .ml-stage[data-tone="unknown"] {
 		color: #a8a29e;
 		box-shadow: inset 0 0 0 1px #44403c;
+	}
+
+	.ml-file-toggle,
+	.ml-version-toggle {
+		transition: background-color 120ms ease;
+	}
+
+	.ml-file-toggle:hover,
+	.ml-version-toggle:hover {
+		background: rgba(0, 0, 0, 0.03);
+	}
+
+	:global(.dark) .ml-file-toggle:hover,
+	:global(.dark) .ml-version-toggle:hover {
+		background: rgba(255, 255, 255, 0.04);
+	}
+
+	.ml-file-toggle :global(.ml-file-chevron) {
+		transition: transform 150ms ease;
+	}
+
+	.ml-file-toggle[aria-expanded="true"] :global(.ml-file-chevron) {
+		transform: rotate(90deg);
+	}
+
+	.ml-version-toggle[aria-pressed="true"] {
+		background: rgba(232, 98, 42, 0.08);
+		box-shadow: inset 2px 0 0 #e8622a;
+	}
+
+	:global(.dark) .ml-version-toggle[aria-pressed="true"] {
+		background: rgba(240, 164, 104, 0.1);
+		box-shadow: inset 2px 0 0 #f0a468;
+	}
+
+	.ml-file-toggle:focus-visible,
+	.ml-version-toggle:focus-visible,
+	.ml-file-ref:focus-visible,
+	.ml-file-retry:focus-visible {
+		outline: none;
+		box-shadow:
+			inset 0 0 0 1.5px #c4511a,
+			0 0 0 1px #fff;
+	}
+
+	:global(.dark) .ml-file-toggle:focus-visible,
+	:global(.dark) .ml-version-toggle:focus-visible,
+	:global(.dark) .ml-file-ref:focus-visible,
+	:global(.dark) .ml-file-retry:focus-visible {
+		box-shadow:
+			inset 0 0 0 1.5px #f0a468,
+			0 0 0 1px #111827;
+	}
+
+	.ml-file-latest {
+		flex: none;
+		padding: 0 6px;
+		border-radius: 9999px;
+		background: rgba(0, 0, 0, 0.05);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		line-height: 18px;
+		color: #57534e;
+	}
+
+	:global(.dark) .ml-file-latest {
+		background: rgba(255, 255, 255, 0.07);
+		color: #d6d3d1;
+	}
+
+	.ml-version-origin {
+		color: #78716c;
+	}
+
+	:global(.dark) .ml-version-origin {
+		color: #a8a29e;
+	}
+
+	.ml-version-agent {
+		flex: none;
+		padding: 0 6px;
+		border: 1px solid #e7e5e4;
+		border-radius: 9999px;
+		font-size: 11px;
+		line-height: 16px;
+		color: #57534e;
+	}
+
+	:global(.dark) .ml-version-agent {
+		border-color: #44403c;
+		color: #d6d3d1;
+	}
+
+	.ml-file-note {
+		padding: 4px 0;
+		font-size: 12px;
+		color: #a8a29e;
+	}
+
+	:global(.dark) .ml-file-note {
+		color: #78716c;
+	}
+
+	.ml-file-retry {
+		margin-left: 4px;
+		border-radius: 3px;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		color: #57534e;
+	}
+
+	:global(.dark) .ml-file-retry {
+		color: #d6d3d1;
+	}
+
+	.ml-file-ref {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 1px 6px;
+		border: 1px solid #e7e5e4;
+		border-radius: 4px;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		line-height: 16px;
+		color: #57534e;
+		transition:
+			color 120ms ease,
+			border-color 120ms ease;
+	}
+
+	.ml-file-ref:hover {
+		border-color: #f0a468;
+		color: #c4511a;
+	}
+
+	:global(.dark) .ml-file-ref {
+		border-color: #44403c;
+		color: #d6d3d1;
+	}
+
+	:global(.dark) .ml-file-ref:hover {
+		border-color: #c4511a;
+		color: #f0a468;
 	}
 
 	/* the same 1.4s breath as the strip running step */

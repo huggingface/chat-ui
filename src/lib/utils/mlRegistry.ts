@@ -1,3 +1,4 @@
+import type { MlFile, MlFileRef } from "$lib/types/MlFile";
 import type { MlRegistryArtefact, MlRegistryService } from "$lib/types/MlRegistry";
 
 /** the hub stages after which a job is never billed again */
@@ -94,29 +95,33 @@ export function sortServices(services: readonly MlRegistryService[]): MlRegistry
 	);
 }
 
-export interface ArtefactGroup {
-	repo: MlRegistryArtefact;
+type GroupableArtefact = Pick<MlRegistryArtefact, "kind" | "uri" | "createdAt">;
+
+export interface ArtefactGroup<T extends GroupableArtefact = MlRegistryArtefact> {
+	repo: T;
 	/** the files written under it, by path */
-	files: MlRegistryArtefact[];
+	files: T[];
 }
 
-export interface GroupedArtefacts {
-	repos: ArtefactGroup[];
+export interface GroupedArtefacts<T extends GroupableArtefact = MlRegistryArtefact> {
+	repos: ArtefactGroup<T>[];
 	/** files whose repo row is missing, shown on their own */
-	orphans: MlRegistryArtefact[];
-	dashboards: MlRegistryArtefact[];
+	orphans: T[];
+	dashboards: T[];
 }
 
-const byCreatedAt = (a: MlRegistryArtefact, b: MlRegistryArtefact) =>
+const byCreatedAt = (a: GroupableArtefact, b: GroupableArtefact) =>
 	a.createdAt.getTime() - b.createdAt.getTime();
 
 /** repos in the order they were made, each with its files nested, then dashboards */
-export function groupArtefacts(artefacts: readonly MlRegistryArtefact[]): GroupedArtefacts {
-	const repos: ArtefactGroup[] = artefacts
+export function groupArtefacts<T extends GroupableArtefact>(
+	artefacts: readonly T[]
+): GroupedArtefacts<T> {
+	const repos: ArtefactGroup<T>[] = artefacts
 		.filter((artefact) => artefact.kind !== "file" && artefact.kind !== "dashboard")
 		.sort(byCreatedAt)
 		.map((repo) => ({ repo, files: [] }));
-	const orphans: MlRegistryArtefact[] = [];
+	const orphans: T[] = [];
 	for (const file of artefacts.filter((artefact) => artefact.kind === "file")) {
 		// the slash keeps a repo from claiming a sibling whose name extends its own
 		const group = repos.find(({ repo }) => file.uri.startsWith(`${repo.uri}/`));
@@ -141,3 +146,61 @@ export function hubLabel(uri: string): string {
 }
 
 export const shortCommit = (commit: string): string => commit.slice(0, 7);
+
+export const formatFileRef = ({ name, version }: MlFileRef): string => `${name} v${version}`;
+
+/** the jobs and sandboxes whose script was this version, sorted like the services list */
+export function servicesForFileVersion(
+	services: readonly MlRegistryService[],
+	{ name, version }: MlFileRef
+): MlRegistryService[] {
+	return sortServices(
+		services.filter((service) =>
+			service.scriptRefs?.some((ref) => ref.name === name && ref.version === version)
+		)
+	);
+}
+
+export const FILE_ORIGIN_LABEL: Record<MlFile["origin"], string> = {
+	write: "written",
+	edit: "edited",
+	import: "imported",
+};
+
+export function formatBytes(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	const kb = bytes / 1024;
+	if (kb < 1024) return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`;
+	return `${(kb / 1024).toFixed(1)} MB`;
+}
+
+export function formatAgo(ms: number): string {
+	const seconds = Math.max(0, Math.floor(ms / 1000));
+	if (seconds < 45) return "just now";
+	if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))}m ago`;
+	if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h ago`;
+	return `${Math.floor(seconds / 86_400)}d ago`;
+}
+
+const LANGUAGE_BY_EXTENSION: Record<string, string> = {
+	py: "python",
+	sh: "bash",
+	bash: "bash",
+	yaml: "yaml",
+	yml: "yaml",
+	json: "json",
+	jsonl: "json",
+	md: "markdown",
+	js: "javascript",
+	mjs: "javascript",
+	ts: "typescript",
+	html: "html",
+	css: "css",
+	sql: "sql",
+};
+
+/** plaintext for anything unknown, auto-detection is slow and guesses wrong on configs */
+export function fileLanguage(name: string): string {
+	const extension = /\.([A-Za-z0-9]+)$/.exec(name)?.[1]?.toLowerCase();
+	return (extension && LANGUAGE_BY_EXTENSION[extension]) || "plaintext";
+}

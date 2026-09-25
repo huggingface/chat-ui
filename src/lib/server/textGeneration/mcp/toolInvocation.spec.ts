@@ -808,6 +808,38 @@ describe("virtual file expansion at dispatch", () => {
 		expect(summaryOf(events).toolRuns).toHaveLength(0);
 	});
 
+	it("hands the guard the expanded arguments and the versions they came from", async () => {
+		const { expandVirtualFiles } = await seeded();
+		const before = vi.fn(
+			async (_call: import("./toolGuard").GuardedToolCall) => ({ allow: true }) as const
+		);
+		const guard = { allowParking: false, before, after: vi.fn(async () => undefined) };
+
+		await drainExpanding(
+			[
+				{
+					id: "call_1",
+					name: "hf_jobs",
+					arguments: '{"operation":"uv","args":{"script":"v-file://train.py@v1"}}',
+				},
+				{ id: "call_2", name: "hf_jobs", arguments: '{"operation":"uv","args":{"script":"x"}}' },
+			],
+			expandVirtualFiles,
+			{ guard }
+		);
+
+		const calls = before.mock.calls.map(([call]) => call);
+		expect(calls).toContainEqual(
+			expect.objectContaining({
+				args: { operation: "uv", args: { script: "print(1)" } },
+				fileRefs: [{ ref: "v-file://train.py@v1", name: "train.py", version: 1 }],
+			})
+		);
+		const inline = calls.find((call) => JSON.stringify(call.args).includes('"x"'));
+		expect(inline).toBeDefined();
+		expect(inline).not.toHaveProperty("fileRefs");
+	});
+
 	it("never expands the arguments of a builtin tool", async () => {
 		const { expandVirtualFiles } = await seeded();
 		const execute = vi.fn<BuiltinTool["execute"]>(async () => ({ resultText: "stored" }));

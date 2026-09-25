@@ -6,7 +6,11 @@ import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
 import { createMlBudgetGuard } from "$lib/server/mlBudget/guard";
 import { readMlBudget } from "$lib/server/mlBudget/budget";
 import { resetPriceCacheForTests } from "$lib/server/mlBudget/pricing";
-import { composeGuards, type GuardOutcome } from "$lib/server/textGeneration/mcp/toolGuard";
+import {
+	composeGuards,
+	type GuardedToolCall,
+	type GuardOutcome,
+} from "$lib/server/textGeneration/mcp/toolGuard";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
 import { createMlRecordingGuard } from "./recordingGuard";
 import { listMlArtefacts, listMlServices } from "./store";
@@ -131,13 +135,17 @@ function makeGuard(conversationId: ObjectId) {
 		tool: string,
 		args: Record<string, unknown>,
 		outcome: GuardOutcome,
-		serverUrl = HF_URL
+		{
+			serverUrl = HF_URL,
+			fileRefs,
+		}: { serverUrl?: string; fileRefs?: GuardedToolCall["fileRefs"] } = {}
 	) => {
 		const verdict = await guard.before({
 			serverUrl,
 			tool,
 			fnName: tool,
 			args,
+			...(fileRefs ? { fileRefs } : {}),
 			callUuid: `uuid-${++n}`,
 		});
 		if (!verdict.allow) throw new Error("the recording guard refused a call");
@@ -182,6 +190,24 @@ describe.sequential("mlRegistry recording guard: services", () => {
 		});
 		expect(services[0]).not.toHaveProperty("stageMessage");
 		expect(services[0]).not.toHaveProperty("handle");
+		expect(services[0]).not.toHaveProperty("scriptRefs");
+	});
+
+	it("records which virtual file version a job's script was expanded from", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+		const resolved = { ref: "v-file://train.py", name: "train.py", version: 4 };
+
+		await dispatch(
+			"hf_jobs",
+			{ operation: "uv", args: { script: "print(4)", flavor: "a10g-small", timeout: "30m" } },
+			ok(JOB_REPLY),
+			{ fileRefs: [resolved] }
+		);
+
+		const [service] = await listMlServices(conversationId);
+		expect(service.jobId).toBe(JOB_ID);
+		expect(service.scriptRefs).toEqual([{ name: "train.py", version: 4 }]);
 	});
 
 	it("falls back to the arguments when the reply is text only", async () => {
@@ -272,7 +298,7 @@ describe.sequential("mlRegistry recording guard: services", () => {
 			"hf_jobs",
 			{ operation: "uv", args: { script: "x" } },
 			ok(JOB_REPLY),
-			"https://other.example/mcp"
+			{ serverUrl: "https://other.example/mcp" }
 		);
 
 		expect(verdict).toEqual({ allow: true });
@@ -347,6 +373,31 @@ describe.sequential("mlRegistry recording guard: artefacts", () => {
 		const file = (await listMlArtefacts(conversationId)).find((a) => a.kind === "file");
 		expect(file).toMatchObject({ uri: "hf://datasets/testuser/demo/README.md" });
 		expect(file).not.toHaveProperty("commit");
+	});
+
+	it("records the virtual file version a put uploaded, and forgets it when a later put is inline", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+		const put = (content: string) => ({
+			cmd: "put",
+			args: ["put", "hf://datasets/testuser/demo/train.py"],
+			content,
+		});
+		const fileRow = async () =>
+			(await listMlArtefacts(conversationId)).find((a) => a.kind === "file");
+
+		await dispatch("hf_fs_write", put("print(2)"), ok(putReply("train.py", SHA_1)), {
+			fileRefs: [{ name: "train.py", version: 2 }],
+		});
+		expect(await fileRow()).toMatchObject({
+			commit: SHA_1,
+			fromFile: { name: "train.py", version: 2 },
+		});
+
+		await dispatch("hf_fs_write", put("print(3)"), ok(putReply("train.py", SHA_2)));
+		const file = await fileRow();
+		expect(file?.commit).toBe(SHA_2);
+		expect(file).not.toHaveProperty("fromFile");
 	});
 
 	it("gives a file written into a repo the session never created a discovered parent", async () => {
@@ -562,6 +613,7 @@ describe.sequential("mlRegistry recording guard: in the chain", () => {
 			tool: "hf_jobs",
 			fnName: "hf_jobs",
 			args: { operation: "uv", args: { script: "x", flavor: "a10g-small", timeout: "30m" } },
+			fileRefs: [{ name: "train.py", version: 1 }],
 			callUuid: "uuid-1",
 		});
 		if (!verdict.allow) throw new Error(verdict.message);
@@ -572,7 +624,11 @@ describe.sequential("mlRegistry recording guard: in the chain", () => {
 
 		expect(update).toMatchObject({ type: MessageUpdateType.Budget });
 		const [service] = await listMlServices(conversationId);
-		expect(service).toMatchObject({ jobId: JOB_ID, reservationKey: "gen-1:uuid-1" });
+		expect(service).toMatchObject({
+			jobId: JOB_ID,
+			reservationKey: "gen-1:uuid-1",
+			scriptRefs: [{ name: "train.py", version: 1 }],
+		});
 		expect((await readMlBudget(conversationId))?.reservations).toEqual([
 			expect.objectContaining({ key: "gen-1:uuid-1", jobId: JOB_ID }),
 		]);
