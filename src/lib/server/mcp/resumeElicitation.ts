@@ -158,7 +158,13 @@ export async function resumeParkedToolCall({
 					result: {
 						status: ToolResultStatus.Success,
 						call: { name: pending.tool, parameters: {} },
-						outputs: [slimToolOutput({ text: response.text ?? "", content: response.content })],
+						outputs: [
+							slimToolOutput({
+								text: response.text ?? "",
+								structured: response.structured,
+								content: response.content,
+							}),
+						],
 						display: true,
 					},
 				};

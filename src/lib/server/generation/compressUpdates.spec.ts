@@ -153,6 +153,22 @@ describe("compressUpdatesForStorage", () => {
 			expect(JSON.stringify(stored)).not.toContain('"content"');
 		});
 
+		it("keeps structured when the tool answered with nothing else", () => {
+			const structuredOnly: MessageUpdate = {
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: "a",
+				result: {
+					status: ToolResultStatus.Success,
+					call: { name: "hf_jobs", parameters: {} },
+					outputs: [{ text: "", structured: { job: { id: "0123" } } }],
+					display: true,
+				},
+			};
+
+			expect(compressUpdatesForStorage([structuredOnly])).toEqual([structuredOnly]);
+		});
+
 		it("is a no-op on a message it already stored", () => {
 			const once = compressUpdatesForStorage([call("a"), storedAsToday()]);
 			expect(compressUpdatesForStorage(once)).toEqual(once);

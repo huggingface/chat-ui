@@ -31,7 +31,9 @@ const isTextBlock = (block: unknown): boolean =>
 /** structured and the text blocks both repeat the text */
 export function slimToolOutput(output: Record<string, unknown>): Record<string, unknown> {
 	const slim = { ...output };
-	delete slim.structured;
+	// a tool can answer with structured alone, then it is the only record of the result
+	const hasText = typeof slim.text === "string" && slim.text.trim() !== "";
+	if (hasText || slim.structured === undefined) delete slim.structured;
 	if (Array.isArray(slim.content)) {
 		// the tool card renders images from the blocks that are left
 		const blocks = slim.content.filter((block) => !isTextBlock(block));

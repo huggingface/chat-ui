@@ -701,7 +701,13 @@ export async function* executeToolCalls({
 				result: {
 					status: ToolResultStatus.Success,
 					call: { name: p.call.name, parameters: {} },
-					outputs: [slimToolOutput({ text: annotated ?? "", content: toolResponse.content })],
+					outputs: [
+						slimToolOutput({
+							text: annotated ?? "",
+							structured: toolResponse.structured,
+							content: toolResponse.content,
+						}),
+					],
 					display: true,
 				},
 			});

@@ -530,6 +530,17 @@ describe("executeToolCalls with a guard", () => {
 		}
 	});
 
+	it("streams structured when the tool answered with nothing else", async () => {
+		const structured = { job: { id: "0123456789abcdef01234567" } };
+		mcpMock.callMcpTool.mockResolvedValue(mcpResult({ structured, content: [] }));
+
+		const events = await drain([CALL]);
+
+		const result = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Result);
+		expect(result).toMatchObject({ result: { outputs: [{ text: "", structured }] } });
+		expect(result).not.toHaveProperty("result.outputs.0.content");
+	});
+
 	it("reports a transport failure", async () => {
 		mcpMock.callMcpTool.mockRejectedValue(new Error("socket hang up"));
 		const { guard, after } = fakeGuard({
