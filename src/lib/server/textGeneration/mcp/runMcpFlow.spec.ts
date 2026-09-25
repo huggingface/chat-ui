@@ -90,7 +90,14 @@ vi.mock("./routerResolution", () => ({
 	}),
 }));
 
-vi.mock("./toolInvocation", () => ({ executeToolCalls: mocks.executeToolCalls }));
+vi.mock("./toolInvocation", async (importOriginal) => ({
+	withRewrittenArguments: (await importOriginal<typeof import("./toolInvocation")>())
+		.withRewrittenArguments,
+	executeToolCalls: mocks.executeToolCalls,
+}));
+vi.mock("$lib/server/mlRegistry/sessionLabel", () => ({
+	loadSessionJobLabels: async () => ({ session: "0123456789abcdef", ownJobs: new Map() }),
+}));
 
 vi.mock("$lib/server/textGeneration/utils/prepareFiles", () => ({
 	prepareHistory: async (messages: Array<{ from: string; content: string }>) => ({
