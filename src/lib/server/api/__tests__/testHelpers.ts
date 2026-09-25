@@ -109,6 +109,8 @@ export async function cleanupTestData() {
 		collections.reports.deleteMany({}),
 		collections.assistants.deleteMany({}),
 		collections.messageEvents.deleteMany({}),
+		collections.mlServices.deleteMany({}),
+		collections.mlArtefacts.deleteMany({}),
 		collections.semaphores.deleteMany({}),
 		collections.migrationResults.deleteMany({}),
 		collections.tokenCaches.deleteMany({}),

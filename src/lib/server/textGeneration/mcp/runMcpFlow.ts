@@ -43,6 +43,7 @@ import {
 import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
+import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
 import { readMlBudget } from "$lib/server/mlBudget/budget";
 import { appendToLastToolMessage, budgetChangeNote } from "$lib/server/mlBudget/budgetNote";
 import { createRepeatedCallGuard } from "./repeatedCallGuard";
@@ -190,6 +191,16 @@ export async function* runMcpFlow({
 	// an argument rather than a header — see mcp/hubBilling.ts.
 	const payer = mlAssistant ? mlAssistantPayerTarget(locals) : undefined;
 	const rewriteArgs = payer ? createHubBillingRewrite(payer) : undefined;
+	const recordingGuard = mlAssistant
+		? createMlRecordingGuard({
+				conversationId: conv._id,
+				generationId: generationId ?? conv._id.toString(),
+				messageId,
+				namespace:
+					payer?.namespace ??
+					(locals as unknown as { user?: { username?: string } })?.user?.username,
+			})
+		: undefined;
 	if (mlAssistant) {
 		logger.info(
 			{ conversationId: conv._id.toString(), payer: payer ?? null },
@@ -464,9 +475,11 @@ export async function* runMcpFlow({
 		// arguments that cannot satisfy the tool's own schema, then the budget.
 		// The first two run for every conversation — getting a tool's arguments
 		// wrong is not a mode-specific failure.
+		// the recorder goes ahead of the budget so the budget update still reaches the stream
 		const guard = [
 			repeatedCallGuard,
 			createSchemaPreflightGuard(mapping),
+			...(recordingGuard ? [recordingGuard] : []),
 			...(budgetGuard ? [budgetGuard] : []),
 		].reduce(composeGuards);
 		const oaTools = [
