@@ -1,6 +1,7 @@
 import type { OpenAiTool } from "$lib/server/mcp/tools";
 import type { Message } from "$lib/types/Message";
-import { collectTrackioDashboards } from "$lib/utils/trackio";
+import { collectTrackioDashboards, type TrackioDashboard } from "$lib/utils/trackio";
+import { verifyTrackioSpace, type TrackioSpaceCheck } from "$lib/server/trackioVerify";
 import type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
 
 export const READ_TRACKIO_TOOL_NAME = "read_trackio";
@@ -73,13 +74,18 @@ function finite(value: unknown): number | undefined {
  * produced — the same allowlist that decides what the pane may frame — so a
  * model-supplied URL can never point this at an arbitrary host.
  */
-function resolveDashboard(messages: ReturnType<MessagesSource>, requested?: string) {
-	const known = collectTrackioDashboards(messages).map((d) => d.url);
-	if (requested) return known.includes(requested) ? requested : undefined;
+function resolveDashboard(
+	messages: ReturnType<MessagesSource>,
+	requested?: string
+): TrackioDashboard | undefined {
+	const known = collectTrackioDashboards(messages);
+	const byUrl = (url: string) => known.find((d) => d.url === url);
+	if (requested) return byUrl(requested);
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const views = messages[i].dashboardViews;
 		const url = views?.[views.length - 1]?.dashboardUrl;
-		if (url && known.includes(url)) return url;
+		const dashboard = url ? byUrl(url) : undefined;
+		if (dashboard) return dashboard;
 	}
 	return known.at(-1);
 }
@@ -158,7 +164,8 @@ async function read(
 	args: Record<string, unknown>,
 	ctx: BuiltinToolContext,
 	messages: ReturnType<MessagesSource>,
-	token: string | undefined
+	token: string | undefined,
+	verify: (dashboard: TrackioDashboard) => Promise<TrackioSpaceCheck>
 ): Promise<BuiltinToolResult> {
 	const project = typeof args.project === "string" ? args.project.trim() : "";
 	const runs = stringList(args.runs);
@@ -172,15 +179,20 @@ async function read(
 	}
 
 	const requested = typeof args.dashboard === "string" ? args.dashboard.trim() : undefined;
-	const dashboard = resolveDashboard(messages, requested || undefined);
-	if (!dashboard) {
+	const found = resolveDashboard(messages, requested || undefined);
+	if (!found) {
 		return {
 			error: requested
 				? `${requested} is not a dashboard from this conversation.`
 				: "This conversation has no Trackio dashboard yet.",
 		};
 	}
+	const dashboard = found.url;
 	const origin = new URL(dashboard).origin;
+	// The token goes to the dashboard only once the Hub vouches for it: a
+	// Trackio Space at this origin, owned by the user or an org they write to.
+	const check = await verify(found);
+	if (!check.ok) return { error: `Not reading ${dashboard}: ${check.reason}.` };
 
 	const xMin = finite(args.x_min);
 	const xMax = finite(args.x_max);
@@ -256,6 +268,8 @@ export function createReadTrackioTool(
 	messages: MessagesSource,
 	token: () => string | undefined
 ): BuiltinTool {
+	// One check per dashboard per turn, however many reads the model makes.
+	const verified = new Map<string, Promise<TrackioSpaceCheck>>();
 	return {
 		name: READ_TRACKIO_TOOL_NAME,
 		definition,
@@ -268,7 +282,15 @@ export function createReadTrackioTool(
 			`x_min/x_max, then answer from the numbers it returns. The charts they saw are smoothed; ` +
 			`the values you read are raw.`,
 		async execute(args: Record<string, unknown>, ctx: BuiltinToolContext) {
-			return read(args, ctx, messages(), token());
+			const hfToken = token();
+			const verify = (dashboard: TrackioDashboard) => {
+				const cached = verified.get(dashboard.url);
+				if (cached) return cached;
+				const pending = verifyTrackioSpace(dashboard, hfToken, ctx.abortSignal);
+				verified.set(dashboard.url, pending);
+				return pending;
+			};
+			return read(args, ctx, messages(), hfToken, verify);
 		},
 	};
 }

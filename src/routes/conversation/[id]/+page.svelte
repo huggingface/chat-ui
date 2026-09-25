@@ -274,6 +274,10 @@
 							from: "user",
 							content: prompt,
 							files: messageToRetry.files,
+							// The server keeps the edited message's views; so does this copy.
+							...(messageToRetry.dashboardViews?.length
+								? { dashboardViews: messageToRetry.dashboardViews }
+								: {}),
 						},
 						messageId
 					);

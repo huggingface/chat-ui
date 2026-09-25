@@ -28,11 +28,41 @@ const messages = [
 	},
 ] as unknown as Message[];
 
-function mockSpace(rows: Array<{ step: number; value: number }>) {
-	const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: rows })));
+interface HubFixture {
+	author?: string;
+	tags?: string[];
+	host?: string;
+	orgs?: Array<{ name: string; roleInOrg: string }>;
+}
+
+/** The Hub and the dashboard Space, answering the way each does. */
+function mockSpace(rows: Array<{ step: number; value: number }>, hub: HubFixture = {}) {
+	const fetchMock = vi.fn(async (input: string | URL | Request, _init?: RequestInit) => {
+		const url = String(input);
+		if (url === "https://huggingface.co/api/spaces/me/mnist-trackio") {
+			return new Response(
+				JSON.stringify({
+					id: "me/mnist-trackio",
+					author: hub.author ?? "me",
+					host: hub.host ?? DASH,
+					tags: hub.tags ?? ["gradio", "trackio"],
+				})
+			);
+		}
+		if (url === "https://huggingface.co/api/whoami-v2") {
+			return new Response(JSON.stringify({ name: "me", orgs: hub.orgs ?? [] }));
+		}
+		return new Response(JSON.stringify({ data: rows }));
+	});
 	vi.stubGlobal("fetch", fetchMock);
 	return fetchMock;
 }
+
+/** Calls that reached the dashboard itself, as opposed to the Hub. */
+const dashboardCalls = (fetchMock: ReturnType<typeof mockSpace>) =>
+	fetchMock.mock.calls
+		.map(([input, init]) => [String(input), init] as [string, RequestInit | undefined])
+		.filter(([url]) => url.startsWith(DASH));
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -52,7 +82,7 @@ describe("read_trackio", () => {
 		);
 
 		if (!("resultText" in result)) throw new Error(JSON.stringify(result));
-		const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+		const [[url, init]] = dashboardCalls(fetchMock) as Array<[string, RequestInit]>;
 		expect(url).toBe(`${DASH}/api/get_metric_values`);
 		expect(JSON.parse(init.body as string)).toEqual({
 			project: "mnist",
@@ -85,6 +115,42 @@ describe("read_trackio", () => {
 		);
 		expect(result).toHaveProperty("error");
 		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("reads a Space owned by an org the user can write to", async () => {
+		const fetchMock = mockSpace([{ step: 1, value: 1 }], {
+			author: "lab",
+			orgs: [{ name: "lab", roleInOrg: "write" }],
+		});
+		const tool = createReadTrackioTool(
+			() => messages,
+			() => "hf_user"
+		);
+		const result = await tool.execute({ project: "p", runs: ["r"], metrics: ["m"] }, ctx);
+		expect(result).toHaveProperty("resultText");
+		expect(dashboardCalls(fetchMock)).toHaveLength(1);
+	});
+
+	it.each([
+		["is not a Trackio Space", { tags: ["gradio"] }, "not a Trackio Space"],
+		["belongs to someone else", { author: "stranger" }, "cannot write to"],
+		[
+			"is only readable through an org",
+			{ author: "lab", orgs: [{ name: "lab", roleInOrg: "read" }] },
+			"cannot write to",
+		],
+		["is served somewhere else", { host: "https://elsewhere.hf.space" }, "is not the Space served"],
+	])("never sends the token to a Space that %s", async (_label, hub, reason) => {
+		const fetchMock = mockSpace([{ step: 1, value: 1 }], hub);
+		const tool = createReadTrackioTool(
+			() => messages,
+			() => "hf_user"
+		);
+		const result = await tool.execute({ project: "p", runs: ["r"], metrics: ["m"] }, ctx);
+
+		if (!("error" in result)) throw new Error("expected a refusal");
+		expect(result.error).toContain(reason);
+		expect(dashboardCalls(fetchMock)).toHaveLength(0);
 	});
 
 	it("keeps both ends when downsampling", () => {
