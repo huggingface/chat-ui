@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 import type { Conversation } from "./Conversation";
 import type { Message } from "./Message";
+import type { MlFileRef } from "./MlFile";
 import type { Timestamps } from "./Timestamps";
 
 export type MlServiceKind = "job" | "sandbox";
@@ -26,6 +27,8 @@ export interface MlService extends Timestamps {
 	handle?: string;
 	/** the hub mcp server drops it, so the arguments are the only place it survives */
 	name?: string;
+	/** the virtual file versions the submission was expanded from */
+	scriptRefs?: MlFileRef[];
 	flavor?: string;
 	timeoutSeconds?: number;
 	/** the hub stage as returned, SCHEDULING RUNNING COMPLETED CANCELED ERROR DELETED, or UNKNOWN */
