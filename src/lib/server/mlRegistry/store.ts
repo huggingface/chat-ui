@@ -47,7 +47,7 @@ export async function recordDispatchedService(service: DispatchedService): Promi
 	await collections.mlServices.updateOne(
 		{ conversationId, kind, jobId },
 		{
-			$setOnInsert: { createdAt: now },
+			$setOnInsert: { createdAt: now, nextPollAt: now },
 			$set: {
 				...compact(rest),
 				namespace,
@@ -87,6 +87,7 @@ export async function recordDiscoveredService({
 				hubUrl: hubJobUrl(namespace, jobId),
 				createdAt: now,
 				updatedAt: now,
+				nextPollAt: now,
 			},
 		},
 		{ upsert: true }

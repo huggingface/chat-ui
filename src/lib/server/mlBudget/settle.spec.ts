@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
 import type { MlBudget, MlBudgetReservation } from "$lib/types/Conversation";
 import { readMlBudget } from "./budget";
-import { settleMlBudget } from "./settle";
+import { settleHoldFromLookup, settleMlBudget } from "./settle";
 
 beforeAll(async () => {
 	await ready;
@@ -177,5 +177,53 @@ describe.sequential("settleMlBudget", () => {
 		});
 		expect(settled.spentMicroUsd).toBe(400_020);
 		expect(settled.reservations.map((r) => r.key)).toEqual(["gen:young"]);
+	});
+});
+
+describe.sequential("settleHoldFromLookup", () => {
+	const completed = {
+		state: "terminal" as const,
+		billedMinutes: 10,
+		job: { stage: "COMPLETED" },
+	};
+
+	it("settles the hold with the key, at the minutes already looked up", async () => {
+		const id = await insertConversation(budgetWith(traceable(), traceable({ key: "gen:call-2" })));
+		const settled = await settleHoldFromLookup({
+			conversationId: id,
+			budget: (await readMlBudget(id)) as MlBudget,
+			reservationKey: "gen:call-1",
+			jobId: "0123456789abcdef01234567",
+			lookup: completed,
+		});
+		expect(settled).toBe(true);
+		const budget = await readMlBudget(id);
+		expect(budget?.reservations.map((r) => r.key)).toEqual(["gen:call-2"]);
+		expect(budget?.spentMicroUsd).toBe(6667 * 10);
+	});
+
+	it("falls back to the job id and charges the ceiling for a job that is gone", async () => {
+		const id = await insertConversation(budgetWith(traceable()));
+		const settled = await settleHoldFromLookup({
+			conversationId: id,
+			budget: (await readMlBudget(id)) as MlBudget,
+			jobId: "0123456789abcdef01234567",
+			lookup: { state: "gone" },
+		});
+		expect(settled).toBe(true);
+		expect((await readMlBudget(id))?.spentMicroUsd).toBe(400_020);
+	});
+
+	it("settles nothing when no hold matches", async () => {
+		const id = await insertConversation(budgetWith(traceable()));
+		const settled = await settleHoldFromLookup({
+			conversationId: id,
+			budget: (await readMlBudget(id)) as MlBudget,
+			reservationKey: "gen:unknown",
+			jobId: "ffffffffffffffffffffffff",
+			lookup: completed,
+		});
+		expect(settled).toBe(false);
+		expect((await readMlBudget(id))?.reservations).toHaveLength(1);
 	});
 });

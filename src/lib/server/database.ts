@@ -375,6 +375,10 @@ export class Database {
 		mlServices
 			.createIndex({ conversationId: 1, createdAt: 1 })
 			.catch((e) => logger.error(e, "Error creating index for mlServices by conversationId"));
+		// the poller claim, open rows that are due, oldest first
+		mlServices
+			.createIndex({ stage: 1, nextPollAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for mlServices by due time"));
 		mlArtefacts
 			.createIndex({ conversationId: 1, uri: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating unique index for mlArtefacts by uri"));
