@@ -111,6 +111,34 @@ const actualMicroUsd = (reservation: MlBudgetReservation, billedMinutes: number)
 		Math.max(0, reservation.priceMicroUsdPerMinute * billedMinutes)
 	);
 
+export type EndedJobLookup = Extract<JobLookup, { state: "terminal" | "gone" }>;
+
+/** the one hold a job read already in hand is for, matched by key else by job id, no second read */
+export async function settleHoldFromLookup({
+	conversationId,
+	budget,
+	reservationKey,
+	jobId,
+	lookup,
+}: {
+	conversationId: ObjectId;
+	budget: MlBudget;
+	reservationKey?: string;
+	jobId: string;
+	lookup: EndedJobLookup;
+}): Promise<boolean> {
+	const reservation = budget.reservations.find(
+		(r) => (reservationKey !== undefined && r.key === reservationKey) || r.jobId === jobId
+	);
+	if (!reservation) return false;
+	// a deleted job has no knowable runtime, charge the ceiling
+	const actual =
+		lookup.state === "terminal"
+			? actualMicroUsd(reservation, lookup.billedMinutes)
+			: reservation.ceilingMicroUsd;
+	return settleReservation({ conversationId, key: reservation.key, actualMicroUsd: actual });
+}
+
 /**
  * Settle whatever can be settled and return the freshest budget. Failures skip
  * the reservation — it stays held, in the safe direction — and the next turn

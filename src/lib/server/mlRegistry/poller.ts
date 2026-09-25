@@ -7,8 +7,9 @@ import { pinnedHubToken } from "$lib/server/mlAssistant";
 import { readMlBudget } from "$lib/server/mlBudget/budget";
 import {
 	lookupJob,
-	settleMlBudget,
+	settleHoldFromLookup,
 	TERMINAL_STAGES,
+	type EndedJobLookup,
 	type JobStatus,
 } from "$lib/server/mlBudget/settle";
 import { rebuildIdentity } from "$lib/server/generation/parkedSweeper";
@@ -116,17 +117,18 @@ async function writeRow(service: MlService, update: UpdateFilter<MlService>): Pr
 	await collections.mlServices.updateOne({ _id: service._id }, update);
 }
 
-async function settleConversation(conversationId: ObjectId, token: string): Promise<void> {
-	try {
-		const budget = await readMlBudget(conversationId);
-		if (!budget) return;
-		await settleMlBudget({ conversationId, budget, token });
-	} catch (err) {
-		logger.error(
-			{ err, conversationId: conversationId.toString() },
-			"[mlPoller] failed to settle the budget after a job ended"
-		);
-	}
+// runs before the row is marked ended, so a settle that throws leaves the row on its lease
+// and the next claim reads the job and settles again
+async function settleHold(service: MlService, lookup: EndedJobLookup): Promise<void> {
+	const budget = await readMlBudget(service.conversationId);
+	if (!budget) return;
+	await settleHoldFromLookup({
+		conversationId: service.conversationId,
+		budget,
+		reservationKey: service.reservationKey,
+		jobId: service.jobId,
+		lookup,
+	});
 }
 
 /** every path writes the next due time or unsets it for good, so a claimed row never sits on its lease */
@@ -171,6 +173,7 @@ export async function pollService(
 		const stage = job?.stage ?? "DELETED";
 		const startedAt = job?.startedAt ?? service.startedAt;
 		const endedAt = job?.finishedAt ?? service.endedAt ?? now;
+		await settleHold(service, lookup);
 		await writeRow(service, {
 			$set: {
 				stage,
@@ -200,7 +203,6 @@ export async function pollService(
 			},
 			"[mlPoller] service ended"
 		);
-		await settleConversation(service.conversationId, token);
 		return outcome(stage, true);
 	}
 

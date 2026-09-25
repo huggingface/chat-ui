@@ -244,7 +244,7 @@ describe.sequential("pollService", () => {
 			stage: "RUNNING",
 			startedAt: new Date("2026-09-25T11:50:00Z"),
 		});
-		stubJobApi({
+		const fetchMock = stubJobApi({
 			status: { stage: "COMPLETED", message: null },
 			startedAt: "2026-09-25T11:50:00Z",
 			finishedAt: "2026-09-25T11:59:30Z", // 9.5 min, billed 10
@@ -252,6 +252,7 @@ describe.sequential("pollService", () => {
 
 		const outcome = await pollService(service, TOKEN, NOW);
 		expect(outcome).toMatchObject({ previousStage: "RUNNING", stage: "COMPLETED", terminal: true });
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 		const row = await readService(service._id);
 		expect(row.stage).toBe("COMPLETED");
 		expect(row.endedAt).toEqual(new Date("2026-09-25T11:59:30Z"));
@@ -264,13 +265,46 @@ describe.sequential("pollService", () => {
 		expect(await claimDueService(new Date(NOW.getTime() + HOUR))).toBeNull();
 	});
 
+	it("settles a hold the budget only knows by job id", async () => {
+		const conversationId = await insertConversation({
+			mlBudget: budgetWith(reservation({ key: "gen:other-call" })),
+		});
+		const service = await insertService(conversationId, { reservationKey: undefined });
+		stubJobApi({ status: { stage: "CANCELED" } });
+		await pollService(service, TOKEN, NOW);
+		const budget = await readMlBudget(conversationId);
+		expect(budget?.reservations).toHaveLength(0);
+		expect(budget?.spentMicroUsd).toBe(0);
+	});
+
+	it("keeps a row on its lease when its hold cannot be settled", async () => {
+		const conversationId = await insertConversation({ mlBudget: budgetWith(reservation()) });
+		const service = await insertService(conversationId, { stage: "RUNNING" });
+		stubJobApi({ status: { stage: "COMPLETED" }, startedAt: "2026-09-25T11:50:00Z" });
+		vi.spyOn(collections.conversations, "updateOne").mockRejectedValueOnce(
+			new Error("write refused")
+		);
+
+		await expect(pollService(service, TOKEN, NOW)).rejects.toThrow("write refused");
+		const row = await readService(service._id);
+		expect(row.stage).toBe("RUNNING");
+		expect(row.endedAt).toBeUndefined();
+		expect(row.nextPollAt).toEqual(NOW);
+		expect((await readMlBudget(conversationId))?.reservations).toHaveLength(1);
+
+		await pollService(row, TOKEN, NOW);
+		expect((await readService(service._id)).stage).toBe("COMPLETED");
+		expect((await readMlBudget(conversationId))?.reservations).toHaveLength(0);
+	});
+
 	it("records a job the Hub no longer knows as deleted and settles at the ceiling", async () => {
 		const conversationId = await insertConversation({ mlBudget: budgetWith(reservation()) });
 		const service = await insertService(conversationId);
-		stubJobApi({ notFound: true });
+		const fetchMock = stubJobApi({ notFound: true });
 
 		const outcome = await pollService(service, TOKEN, NOW);
 		expect(outcome).toMatchObject({ stage: "DELETED", terminal: true });
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 		const row = await readService(service._id);
 		expect(row.stage).toBe("DELETED");
 		expect(row.endedAt).toEqual(NOW);
