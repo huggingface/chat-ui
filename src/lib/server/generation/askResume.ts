@@ -10,6 +10,7 @@ import { buildSubtree } from "$lib/utils/tree/buildSubtree";
 import { textGeneration } from "$lib/server/textGeneration";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
+import { stampMlHarness } from "$lib/server/mlAssistantHarness";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import {
 	RESUME_LEASE_MS,
@@ -269,10 +270,15 @@ export async function resumeAnsweredAsk({
 	// (see parkedSweeper). A reaper-set `interrupted` would make the message unsubscribable.
 	message.generationId = generationId;
 	delete message.interrupted;
+	const harness = stampMlHarness(message, conv, model);
 	await collections.conversations.updateOne(
 		{ _id: conv._id, "messages.id": message.id },
 		{
-			$set: { "messages.$.generationId": generationId, updatedAt: new Date() },
+			$set: {
+				"messages.$.generationId": generationId,
+				...(harness ? { "messages.$.harness": harness } : {}),
+				updatedAt: new Date(),
+			},
 			$unset: { "messages.$.interrupted": "" },
 		}
 	);
