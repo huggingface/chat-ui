@@ -159,6 +159,31 @@ describe("the nested loop", () => {
 		expect(toolMessage.content.length).toBe(4800 + 3200 + "\n...(truncated)...\n".length);
 	});
 
+	it("leaves the virtual file tools out even when the turn has them", async () => {
+		createCompletion.mockResolvedValueOnce(respond({ content: "done" }));
+		const fileTool = (name: string): BuiltinTool => ({
+			name,
+			definition: { type: "function", function: { name, parameters: { type: "object" } } },
+			execute: vi.fn(async () => ({ resultText: "" })),
+		});
+		const tool = boundTool({
+			hostBuiltinTools: [
+				fakeHfFs,
+				fileTool("write_file"),
+				fileTool("edit_file"),
+				fileTool("read_file"),
+				fileTool("import_file"),
+			],
+		});
+
+		await tool.execute({ task: "t" }, ctx);
+
+		const request = createCompletion.mock.calls[0][0];
+		expect(request.tools.map((t: { function: { name: string } }) => t.function.name)).toEqual([
+			"hf_fs",
+		]);
+	});
+
 	it("refuses tools outside the allowlist without executing anything", async () => {
 		createCompletion
 			.mockResolvedValueOnce(

@@ -1,6 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, beforeAll, describe, it, expect, vi, beforeEach } from "vitest";
+import { ObjectId } from "mongodb";
 import type { OpenAI } from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { collections, ready } from "$lib/server/database";
+import { ML_FILE_VERSION_INDEX } from "$lib/server/mlFiles/indexes";
 
 vi.mock("$lib/server/logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -19,8 +22,14 @@ const {
 	SANDBOX_TOOL_NAME,
 } = await import("./sandboxTool");
 const { createResearchTool } = await import("./researchTool");
-const { SANDBOX_SYSTEM_PROMPT, SANDBOX_REPETITION_PROMPT, SANDBOX_DELEGATION_DOCTRINE } =
-	await import("./sandboxPrompt");
+const { createFileTools } = await import("./fileTools");
+const { createImportFileTool } = await import("./importFileTool");
+const {
+	SANDBOX_SYSTEM_PROMPT,
+	SANDBOX_REPETITION_PROMPT,
+	SANDBOX_DELEGATION_DOCTRINE,
+	sandboxSystemPrompt,
+} = await import("./sandboxPrompt");
 type NestedAgentDeps = import("./nestedAgent").NestedAgentDeps;
 type OpenAiTool = import("$lib/server/mcp/tools").OpenAiTool;
 
@@ -341,6 +350,109 @@ describe("where the sandbox tools are allowed to come from", () => {
 });
 
 describe("virtual files inside the sandbox sub-agent", () => {
+	beforeAll(async () => {
+		await ready;
+		await collections.mlFiles.createIndex(
+			ML_FILE_VERSION_INDEX.keys,
+			ML_FILE_VERSION_INDEX.options
+		);
+	});
+
+	afterEach(async () => {
+		await collections.mlFiles.deleteMany({});
+	});
+
+	const fileToolsFor = (conv: { _id: ObjectId }) => [
+		...createFileTools(conv),
+		createImportFileTool(conv),
+	];
+
+	it("offers the file tools when the turn has them, still nothing that spends", async () => {
+		createCompletion.mockResolvedValueOnce(respond({ content: "Outcome: worked." }));
+		const conv = { _id: new ObjectId() };
+
+		await boundTool({ hostBuiltinTools: fileToolsFor(conv) }).execute(
+			{ handle: HANDLE, task: "run it" },
+			ctx
+		);
+
+		expect(request(0).tools?.map((t) => t.function.name)).toEqual([
+			"write_file",
+			"edit_file",
+			"read_file",
+			"import_file",
+			"hf_sandbox_exec",
+			"hf_sandbox_fs",
+		]);
+	});
+
+	it("writes versions under the parent's message, labelled with the sub-agent", async () => {
+		const conv = { _id: new ObjectId() };
+		createCompletion
+			.mockResolvedValueOnce(
+				respond({
+					toolCalls: [
+						{
+							id: "t1",
+							name: "write_file",
+							arguments: JSON.stringify({ name: "train.py", content: "print(1)\n" }),
+						},
+					],
+				})
+			)
+			.mockResolvedValueOnce(respond({ content: "Outcome: worked. Files: v-file://train.py v1" }));
+
+		const outcome = await boundTool({ hostBuiltinTools: fileToolsFor(conv) }).execute(
+			{ handle: HANDLE, task: "write it" },
+			{ ...ctx, messageId: "parent-msg", generationId: "parent-gen" }
+		);
+
+		expect(outcome).toEqual({ resultText: "Outcome: worked. Files: v-file://train.py v1" });
+		const stored = await collections.mlFiles.findOne({ conversationId: conv._id });
+		expect(stored).toMatchObject({
+			name: "train.py",
+			version: 1,
+			content: "print(1)\n",
+			messageId: "parent-msg",
+			generationId: "parent-gen",
+			agent: "sandbox",
+		});
+		const fed = request(1).messages.at(-1);
+		expect(fed?.role).toBe("tool");
+		expect(String(fed?.content)).toContain("Wrote train.py v1");
+	});
+
+	it("tells the sub-agent to push by reference, fix in place and import back", () => {
+		expect(SANDBOX_SYSTEM_PROMPT).toContain("--text v-file://train.py");
+		expect(SANDBOX_SYSTEM_PROMPT).toContain("Fix it where it runs");
+		expect(SANDBOX_SYSTEM_PROMPT).toContain("Before you report, import the copy that worked");
+		expect(SANDBOX_SYSTEM_PROMPT).toContain("v-file://train.py v5");
+		expect(SANDBOX_SYSTEM_PROMPT).not.toContain("two tools");
+	});
+
+	it("names no file tool to a run without them", async () => {
+		const off = sandboxSystemPrompt({ virtualFiles: false });
+		expect(off).toContain("You have two tools");
+		expect(off).not.toContain("import_file");
+		expect(off).not.toContain("v-file://");
+
+		createCompletion.mockResolvedValueOnce(respond({ content: "Outcome: worked." }));
+		const tool = createSandboxTool({ virtualFiles: false });
+		tool.bind(makeDeps());
+		await tool.execute({ handle: HANDLE, task: "run it" }, ctx);
+		expect(String(request(0).messages[0].content)).not.toContain("import_file");
+		expect(tool.preprompt).not.toContain("v-file://");
+	});
+
+	it("tells the parent to hand over the name and submit the imported version", () => {
+		const doctrine = SANDBOX_DELEGATION_DOCTRINE("sandbox_task");
+		expect(doctrine).toContain("never its content");
+		expect(doctrine).toContain("that imported version is what you submit");
+		expect(SANDBOX_DELEGATION_DOCTRINE("sandbox_task", { virtualFiles: false })).not.toContain(
+			"v-file://"
+		);
+	});
+
 	it("passes the parent's expander through to its own dispatch", async () => {
 		const { callMcpTool } = await import("$lib/server/mcp/httpClient");
 		vi.mocked(callMcpTool).mockClear();

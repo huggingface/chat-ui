@@ -21,6 +21,28 @@ afterEach(async () => {
 	await collections.mlFiles.deleteMany({});
 });
 
+describe("writeMlFileVersion provenance", () => {
+	it("keeps an import's source and the sub-agent that wrote it", async () => {
+		const conversationId = new ObjectId();
+
+		await writeMlFileVersion({
+			conversationId,
+			name: "train.py",
+			content: "print(1)",
+			origin: "import",
+			source: "hf://models/org/repo/train.py",
+			attribution: { messageId: "m1", agent: "sandbox" },
+		});
+
+		expect(await readMlFile(conversationId, "train.py")).toMatchObject({
+			origin: "import",
+			source: "hf://models/org/repo/train.py",
+			messageId: "m1",
+			agent: "sandbox",
+		});
+	});
+});
+
 describe("validateMlFileName", () => {
 	it("accepts relative path-like names", () => {
 		for (const name of ["train.py", "configs/sft.yaml", "a-b_c.d", " eval.py "]) {

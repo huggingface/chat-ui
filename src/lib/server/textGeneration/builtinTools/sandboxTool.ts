@@ -1,6 +1,12 @@
 import { isHfMcpServer } from "$lib/server/mcp/hf";
 import type { OpenAiTool } from "$lib/server/mcp/tools";
 import {
+	EDIT_FILE_TOOL_NAME,
+	IMPORT_FILE_TOOL_NAME,
+	READ_FILE_TOOL_NAME,
+	WRITE_FILE_TOOL_NAME,
+} from "$lib/server/mlFiles/prompt";
+import {
 	makeTruncator,
 	runNestedAgent,
 	type NestedAgentBuiltinTool,
@@ -13,7 +19,7 @@ import {
 	SANDBOX_DELEGATION_DOCTRINE,
 	SANDBOX_ITERATION_LIMIT_PROMPT,
 	SANDBOX_REPETITION_PROMPT,
-	SANDBOX_SYSTEM_PROMPT,
+	sandboxSystemPrompt,
 } from "./sandboxPrompt";
 import type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
 
@@ -37,7 +43,15 @@ export const SANDBOX_TOOL_NAME = "sandbox_task";
  * holding it here would let a delegated loop reserve compute outside the
  * pre-flight list the user is shown. The parent keeps the lifecycle.
  */
-const SANDBOX_ALLOWED_TOOLS: ReadonlySet<string> = new Set(["hf_sandbox_exec", "hf_sandbox_fs"]);
+// the file tools exist only when virtual files are on, so naming them offers nothing to a run without them
+const SANDBOX_ALLOWED_TOOLS: ReadonlySet<string> = new Set([
+	"hf_sandbox_exec",
+	"hf_sandbox_fs",
+	WRITE_FILE_TOOL_NAME,
+	EDIT_FILE_TOOL_NAME,
+	READ_FILE_TOOL_NAME,
+	IMPORT_FILE_TOOL_NAME,
+]);
 
 /** The longest sandbox loop in the traces ran 30 calls; past that it is stuck, not working. */
 export const MAX_SANDBOX_ITERATIONS = 30;
@@ -109,20 +123,22 @@ const definition: OpenAiTool = {
 	},
 };
 
-export function createSandboxTool(): SandboxBuiltinTool {
+export function createSandboxTool({
+	virtualFiles = true,
+}: { virtualFiles?: boolean } = {}): SandboxBuiltinTool {
 	// Definition and enablement are static; the request plumbing only exists
 	// inside runMcpFlow, which binds it before the tool loop starts.
 	let deps: NestedAgentDeps | undefined;
 	return {
 		name: SANDBOX_TOOL_NAME,
 		definition,
-		preprompt: SANDBOX_DELEGATION_DOCTRINE(SANDBOX_TOOL_NAME),
+		preprompt: SANDBOX_DELEGATION_DOCTRINE(SANDBOX_TOOL_NAME, { virtualFiles }),
 		exemptFromToolRestraint: true,
 		bind(next: NestedAgentDeps) {
 			deps = next;
 		},
 		async execute(args, ctx) {
-			return runSandboxTask(args, ctx, deps);
+			return runSandboxTask(args, ctx, deps, virtualFiles);
 		},
 	};
 }
@@ -130,7 +146,8 @@ export function createSandboxTool(): SandboxBuiltinTool {
 async function runSandboxTask(
 	args: Record<string, unknown>,
 	ctx: BuiltinToolContext,
-	deps: NestedAgentDeps | undefined
+	deps: NestedAgentDeps | undefined,
+	virtualFiles: boolean
 ): Promise<BuiltinToolResult> {
 	const handle = typeof args.handle === "string" ? args.handle.trim() : "";
 	const task = typeof args.task === "string" ? args.task.trim() : "";
@@ -145,7 +162,7 @@ async function runSandboxTask(
 	const spec: NestedAgentSpec = {
 		label: "sandbox",
 		displayName: "Sandbox",
-		systemPrompt: SANDBOX_SYSTEM_PROMPT,
+		systemPrompt: sandboxSystemPrompt({ virtualFiles }),
 		task: [`Sandbox handle: ${handle}`, context ? `Context: ${context}` : "", `Task: ${task}`]
 			.filter(Boolean)
 			.join("\n\n"),

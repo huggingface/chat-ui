@@ -109,6 +109,11 @@ export interface ExecuteToolCallsParams {
 	elicitation?: { conversationId: ObjectId; generationId?: string; messageId?: string };
 	/** Identity the turn runs as, for a builtin that has to be resumable later. */
 	owner?: { userId?: ObjectId; sessionId?: string };
+	/**
+	 * what a builtin records its writes under when there is no elicitation context, a
+	 * sub-agent version lands on the parent message
+	 */
+	attribution?: { messageId?: string; generationId?: string; agent?: string };
 	/** Locally-executed tools, dispatched before the MCP mapping lookup. */
 	builtinTools?: BuiltinTool[];
 	/** Policy gate consulted around every MCP dispatch (not builtins) — see toolGuard.ts. */
@@ -172,6 +177,7 @@ export async function* executeToolCalls({
 	roundContent,
 	elicitation,
 	owner,
+	attribution,
 	builtinTools,
 	guard,
 	clientKind,
@@ -408,8 +414,9 @@ export async function* executeToolCalls({
 					conversationId: elicitation?.conversationId,
 					userId: owner?.userId,
 					sessionId: owner?.sessionId,
-					messageId: elicitation?.messageId,
-					generationId: elicitation?.generationId,
+					messageId: elicitation?.messageId ?? attribution?.messageId,
+					generationId: elicitation?.generationId ?? attribution?.generationId,
+					...(attribution?.agent ? { agent: attribution.agent } : {}),
 					elicitationSink,
 					abortSignal,
 				});

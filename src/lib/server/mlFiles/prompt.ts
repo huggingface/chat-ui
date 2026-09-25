@@ -5,6 +5,7 @@ import { VIRTUAL_FILE_SCHEME } from "./refs";
 export const WRITE_FILE_TOOL_NAME = "write_file";
 export const EDIT_FILE_TOOL_NAME = "edit_file";
 export const READ_FILE_TOOL_NAME = "read_file";
+export const IMPORT_FILE_TOOL_NAME = "import_file";
 
 export const VIRTUAL_FILE_REFERENCE_RULES =
 	`Pass a file to a Hub tool as the reference ${VIRTUAL_FILE_SCHEME}<name> in place of the ` +
@@ -19,4 +20,6 @@ export const VIRTUAL_FILES_TOOL_PREPROMPT =
 	`change it with ${EDIT_FILE_TOOL_NAME} (search-and-replace, not a rewrite), and find it again with ` +
 	`${READ_FILE_TOOL_NAME}, which lists your files when called with no name. ${VIRTUAL_FILE_REFERENCE_RULES} ` +
 	`Never paste a script you have already written into a tool call: fix the file and resubmit the ` +
-	`reference. Tool results never echo file content back.`;
+	`reference. A file fixed somewhere else, in a sandbox or on the Hub, comes back with ` +
+	`${IMPORT_FILE_TOOL_NAME}, which reads it there and stores a new version; never cat it and paste ` +
+	`it. Tool results never echo file content back.`;

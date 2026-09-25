@@ -10,6 +10,7 @@ import { createSandboxTool } from "./sandboxTool";
 import { createJobCheckTool } from "./jobCheckTool";
 import { createTrackioTool } from "./createTrackioTool";
 import { createFileTools } from "./fileTools";
+import { createImportFileTool } from "./importFileTool";
 import type { BuiltinTool } from "./types";
 
 export type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
@@ -19,6 +20,7 @@ export { SANDBOX_TOOL_NAME, isSandboxTool } from "./sandboxTool";
 export { JOB_CHECK_TOOL_NAME, isJobCheckTool } from "./jobCheckTool";
 export { CREATE_TRACKIO_TOOL_NAME } from "./createTrackioTool";
 export { WRITE_FILE_TOOL_NAME, EDIT_FILE_TOOL_NAME, READ_FILE_TOOL_NAME } from "./fileTools";
+export { IMPORT_FILE_TOOL_NAME } from "./importFileTool";
 export { isNestedAgentTool } from "./nestedAgent";
 
 /**
@@ -38,16 +40,17 @@ export function getEnabledBuiltinTools(params: {
 	// them rather than leaking a config read into this list. The research tool's
 	// definition is static too, but its nested loop needs the turn's request
 	// plumbing, which runMcpFlow binds onto it once that exists.
+	const virtualFiles = mlVirtualFilesEnabled(params.conv);
 	return [
 		askUserQuestionBuiltin,
 		createPlanTool(params.conv),
 		waitBuiltin,
 		...githubGroundingBuiltins(),
 		createResearchTool(),
-		createSandboxTool(),
-		createJobCheckTool(),
+		createSandboxTool({ virtualFiles }),
+		createJobCheckTool({ virtualFiles }),
 		createTrackioTool(() => params.namespace),
-		...(mlVirtualFilesEnabled(params.conv) ? createFileTools(params.conv) : []),
+		...(virtualFiles ? [...createFileTools(params.conv), createImportFileTool(params.conv)] : []),
 	];
 }
 
