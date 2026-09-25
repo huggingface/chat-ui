@@ -168,18 +168,11 @@
 		}
 	});
 
-	// `?mode=ml-intern` switches the mode on as the composer pill would, on builds
-	// that ship the mode and have its model set configured (the pill's own
-	// conditions); elsewhere the link opens a normal chat. The param stays in the
-	// URL, so a reload lands in the mode again. Keyed on the param's value, so
-	// stripping the prompt params does not switch the mode back on after the user
-	// turned it off.
 	let linkMode = $derived(readLinkMode(page.url.searchParams));
 	$effect(() => {
 		if (linkMode !== "ml-intern") return;
 		untrack(() => {
 			if (!ML_ASSISTANT_MODE || data.mlAssistantModels.length === 0) return;
-			// Redirects to login and comes back to this URL, param included.
 			if (requireAuthUser()) return;
 			mlAssistant.toggle(true);
 		});
@@ -210,7 +203,6 @@
 				}
 			}
 			if (request.send && request.prompt) {
-				// Latches the mode the way the composer's send does; no-op when it is off.
 				mlAssistant.startTask();
 				await createConversation(request.prompt);
 			} else if (request.prompt && !draft) {
