@@ -15,6 +15,7 @@ import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { ParkedCall } from "$lib/types/ParkedCall";
 import type { NestedAgentCall } from "$lib/types/NestedAgentCall";
 import type { MlFile } from "$lib/types/MlFile";
+import { ML_FILE_VERSION_INDEX } from "$lib/server/mlFiles/indexes";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
@@ -354,10 +355,8 @@ export class Database {
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for nestedAgentCalls by createdAt"));
 
-		// unique so two concurrent writes of one name cannot both take a version, compound so
-		// the latest version read is one index seek
 		mlFiles
-			.createIndex({ conversationId: 1, name: 1, version: -1 }, { unique: true })
+			.createIndex(ML_FILE_VERSION_INDEX.keys, ML_FILE_VERSION_INDEX.options)
 			.catch((e) =>
 				logger.error(e, "Error creating index for mlFiles by conversationId, name and version")
 			);

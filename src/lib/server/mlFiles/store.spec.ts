@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
+import { ML_FILE_VERSION_INDEX } from "$lib/server/mlFiles/indexes";
 import {
 	deleteMlFilesOf,
 	listMlFiles,
@@ -13,6 +14,7 @@ import {
 
 beforeAll(async () => {
 	await ready;
+	await collections.mlFiles.createIndex(ML_FILE_VERSION_INDEX.keys, ML_FILE_VERSION_INDEX.options);
 });
 
 afterEach(async () => {

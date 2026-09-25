@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
+import { ML_FILE_VERSION_INDEX } from "$lib/server/mlFiles/indexes";
 import type { BuiltinToolContext, BuiltinToolResult } from "./types";
 
 vi.mock("$lib/server/logger", () => ({
@@ -31,6 +32,7 @@ const textOf = (outcome: BuiltinToolResult) =>
 
 beforeAll(async () => {
 	await ready;
+	await collections.mlFiles.createIndex(ML_FILE_VERSION_INDEX.keys, ML_FILE_VERSION_INDEX.options);
 });
 
 afterEach(async () => {
