@@ -142,6 +142,14 @@ export async function recordReconciledService(service: ReconciledService): Promi
 	}
 }
 
+export async function isRecordedSandbox(conversationId: ObjectId, jobId: string): Promise<boolean> {
+	const count = await collections.mlServices.countDocuments(
+		{ conversationId, jobId, kind: "sandbox" },
+		{ limit: 1 }
+	);
+	return count > 0;
+}
+
 /** update-labels replaces the whole set, so a relabel without a name leaves the job unnamed */
 export async function recordServiceName({
 	conversationId,

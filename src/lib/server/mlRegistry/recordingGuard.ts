@@ -20,6 +20,7 @@ import {
 	recordArtefact,
 	recordDiscoveredService,
 	recordDispatchedService,
+	isRecordedSandbox,
 	recordServiceName,
 	sandboxHandle,
 	UNKNOWN_STAGE,
@@ -177,6 +178,26 @@ export function createMlRecordingGuard({
 		});
 	}
 
+	// update-labels replaces every label, and one the server set on a sandbox is part of its auth
+	async function refuseSandboxRelabel(call: GuardedToolCall): Promise<GuardVerdict | undefined> {
+		if (call.tool !== "hf_jobs" || call.args.operation !== "update-labels") return undefined;
+		const jobId = asString(asRecord(call.args.args)?.job_id);
+		if (!jobId) return undefined;
+		try {
+			if (!(await isRecordedSandbox(conversationId, jobId))) return undefined;
+		} catch (err) {
+			logger.error(
+				{ err: String(err), conversationId: conversationId.toString(), jobId },
+				"[mlRegistry] checking a relabel against the recorded sandboxes failed"
+			);
+			return undefined;
+		}
+		return {
+			allow: false,
+			message: `Refused: ${jobId} is a sandbox, not a job. update-labels replaces every label, and one of the labels the sandbox server set authenticates the sandbox, so relabelling it would break it. Nothing was changed. Relabel jobs only.`,
+		};
+	}
+
 	async function markForReconcile(ticket: SubmissionTicket): Promise<void> {
 		const jobNamespace = ticket.namespace ?? namespace;
 		if (!jobNamespace || ticket.timeoutSeconds === undefined) return;
@@ -314,6 +335,8 @@ export function createMlRecordingGuard({
 
 		async before(call: GuardedToolCall): Promise<GuardVerdict> {
 			if (!isHfMcpServer(call.serverUrl)) return { allow: true };
+			const refusal = await refuseSandboxRelabel(call);
+			if (refusal) return refusal;
 			try {
 				await discover(call);
 			} catch (err) {

@@ -770,6 +770,32 @@ describe.sequential("mlRegistry recording guard: session labels", () => {
 		expect(jobLabels.ownJobs.get(JOB_ID)).toBe("ml-intern-second");
 	});
 
+	it("refuses to relabel a sandbox it recorded, and still lets a job through", async () => {
+		const conversationId = newConversationId();
+		const { guard, dispatch } = makeGuard(conversationId);
+		await dispatch(
+			"hf_sandbox",
+			{
+				cmd: "create",
+				args: ["create", "--name", "smoke", "--flavor", "cpu-basic", "--timeout", "1h"],
+			},
+			ok(SANDBOX_REPLY)
+		);
+		const relabel = (jobId: string) =>
+			guard.before({
+				serverUrl: HF_URL,
+				tool: "hf_jobs",
+				fnName: "hf_jobs",
+				args: { operation: "update-labels", args: { job_id: jobId, labels: {} } },
+				callUuid: `relabel-${jobId}`,
+			});
+
+		const sandbox = await relabel(SANDBOX_JOB_ID);
+		expect(sandbox.allow).toBe(false);
+		if (!sandbox.allow) expect(sandbox.message).toContain("is a sandbox");
+		expect((await relabel(OTHER_JOB_ID)).allow).toBe(true);
+	});
+
 	it("records a relabel that dropped the name on a job it does not own", async () => {
 		const conversationId = newConversationId();
 		const { dispatch } = makeGuard(conversationId);
