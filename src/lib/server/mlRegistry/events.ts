@@ -159,7 +159,7 @@ export async function deliverServiceEvents(
 	}
 }
 
-/** for a wait about to park, a crash after the claim loses a line the state block still shows */
+/** for a wait about to park, a crash after the claim loses the line, an ended job is listed once */
 export async function claimServiceEvents(
 	conversationId: ObjectId,
 	now = new Date()

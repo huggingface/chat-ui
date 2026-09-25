@@ -95,29 +95,33 @@ export function sortServices(services: readonly MlRegistryService[]): MlRegistry
 	);
 }
 
-export interface ArtefactGroup {
-	repo: MlRegistryArtefact;
+type GroupableArtefact = Pick<MlRegistryArtefact, "kind" | "uri" | "createdAt">;
+
+export interface ArtefactGroup<T extends GroupableArtefact = MlRegistryArtefact> {
+	repo: T;
 	/** the files written under it, by path */
-	files: MlRegistryArtefact[];
+	files: T[];
 }
 
-export interface GroupedArtefacts {
-	repos: ArtefactGroup[];
+export interface GroupedArtefacts<T extends GroupableArtefact = MlRegistryArtefact> {
+	repos: ArtefactGroup<T>[];
 	/** files whose repo row is missing, shown on their own */
-	orphans: MlRegistryArtefact[];
-	dashboards: MlRegistryArtefact[];
+	orphans: T[];
+	dashboards: T[];
 }
 
-const byCreatedAt = (a: MlRegistryArtefact, b: MlRegistryArtefact) =>
+const byCreatedAt = (a: GroupableArtefact, b: GroupableArtefact) =>
 	a.createdAt.getTime() - b.createdAt.getTime();
 
 /** repos in the order they were made, each with its files nested, then dashboards */
-export function groupArtefacts(artefacts: readonly MlRegistryArtefact[]): GroupedArtefacts {
-	const repos: ArtefactGroup[] = artefacts
+export function groupArtefacts<T extends GroupableArtefact>(
+	artefacts: readonly T[]
+): GroupedArtefacts<T> {
+	const repos: ArtefactGroup<T>[] = artefacts
 		.filter((artefact) => artefact.kind !== "file" && artefact.kind !== "dashboard")
 		.sort(byCreatedAt)
 		.map((repo) => ({ repo, files: [] }));
-	const orphans: MlRegistryArtefact[] = [];
+	const orphans: T[] = [];
 	for (const file of artefacts.filter((artefact) => artefact.kind === "file")) {
 		// the slash keeps a repo from claiming a sibling whose name extends its own
 		const group = repos.find(({ repo }) => file.uri.startsWith(`${repo.uri}/`));
