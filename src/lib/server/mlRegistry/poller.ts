@@ -13,12 +13,12 @@ import {
 	type JobStatus,
 } from "$lib/server/mlBudget/settle";
 import { rebuildIdentity } from "$lib/server/generation/parkedSweeper";
-import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 import type { MlService } from "$lib/types/MlService";
 import { backoffDelayMs, nextPollDelayMs } from "./schedule";
+import { mlServiceEventsEnabled } from "./enabled";
+import { deliverServiceEvents, endEventFields } from "./events";
 
-// status only and never logs, nothing here reaches a turn, the transitions a tick returns
-// are the seam for the events that will
+// status only and never logs, an end is marked on the row for deliverServiceEvents
 
 const CLAIM_BATCH = 20;
 /** a pod that dies mid poll leaves its rows due again once this has passed */
@@ -37,10 +37,6 @@ function pollIntervalMs(): number {
 	const raw = config.ML_ASSISTANT_SERVICE_POLL_INTERVAL_MS;
 	const parsed = raw ? parseInt(raw, 10) : NaN;
 	return !isNaN(parsed) && parsed > 0 ? parsed : 5_000;
-}
-
-export function mlServicePollerEnabled(): boolean {
-	return ML_ASSISTANT_MODE && config.ML_ASSISTANT_SERVICE_POLLER !== "false";
 }
 
 // the write that selects the row also pushes nextPollAt past the lease, so two pods get
@@ -183,6 +179,8 @@ export async function pollService(
 				lastPolledAt: now,
 				updatedAt: now,
 				...(job ? fillFromBody(service, job) : {}),
+				stageBeforeEnd: previousStage,
+				...(mlServiceEventsEnabled() ? endEventFields(service, stage, now) : {}),
 			},
 			$unset: {
 				nextPollAt: "",
@@ -281,7 +279,6 @@ export async function pollDueServices(now = new Date()): Promise<PollOutcome[]> 
 	);
 	const results = outcomes.filter((o): o is PollOutcome => o !== undefined);
 
-	// the seam for events, nothing acts on a transition yet
 	const transitions = results.filter((o) => o.previousStage !== o.stage);
 	for (const { service, previousStage, stage, terminal } of transitions) {
 		logger.info(
@@ -294,6 +291,12 @@ export async function pollDueServices(now = new Date()): Promise<PollOutcome[]> 
 				terminal,
 			},
 			"[mlPoller] stage changed"
+		);
+	}
+	if (mlServiceEventsEnabled()) {
+		await deliverServiceEvents(
+			results.filter((o) => o.terminal).map((o) => o.service.conversationId),
+			now
 		);
 	}
 	return results;
