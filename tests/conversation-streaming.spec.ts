@@ -15,7 +15,7 @@ const SEND = { name: "Send message" };
 const STOP = { name: "Stop generating" };
 
 /** Long enough to observe / navigate / stop comfortably mid-stream. */
-const slowStream = (tokens = 40, chunkDelayMs = 300) => ({
+const slowStream = (tokens = 40, chunkDelayMs = 150) => ({
 	content: Array.from({ length: tokens }, (_, i) => `word${i} `),
 	chunkDelayMs,
 	finishReason: "stop" as const,
@@ -88,7 +88,7 @@ test("stopping freezes the reply — it does not grow back after reload", async 
 	mockOpenAI,
 }) => {
 	test.setTimeout(60_000);
-	await mockOpenAI.setDefaultScenario(slowStream(60, 250));
+	await mockOpenAI.setDefaultScenario(slowStream(60, 150)); // ~9s, longer than the checks below
 	const convId = await startConversation(page, "stop me midway");
 
 	// Let a few words stream, then stop.
@@ -98,21 +98,21 @@ test("stopping freezes the reply — it does not grow back after reload", async 
 	await page.getByRole("button", STOP).click();
 
 	// Freeze point.
-	await page.waitForTimeout(1500);
+	await page.waitForTimeout(1000);
 	const atStop = await assistantText(page);
 	expect(atStop.length).toBeGreaterThan(0);
 
 	// It must not keep growing after the stop, and must survive a reload unchanged
 	// (no "growing back" past what the user saw).
-	await page.waitForTimeout(2500);
+	await page.waitForTimeout(1500);
 	expect((await assistantText(page)).length).toBeLessThanOrEqual(atStop.length + 8);
 
 	await page.goto(`/conversation/${convId}`);
-	await page.waitForTimeout(1500);
+	await page.waitForTimeout(1000);
 	const afterReload = await assistantText(page);
 	expect(afterReload.length).toBeLessThanOrEqual(atStop.length + 8);
 	// And it never resumes streaming after reload.
-	await page.waitForTimeout(2500);
+	await page.waitForTimeout(1500);
 	expect(await assistantText(page)).toBe(afterReload);
 });
 
@@ -121,7 +121,7 @@ test("leaving mid-stream and returning preserves the generation to completion", 
 	mockOpenAI,
 }) => {
 	test.setTimeout(90_000);
-	await mockOpenAI.setDefaultScenario(slowStream(50, 300)); // ~15s
+	await mockOpenAI.setDefaultScenario(slowStream(50, 150)); // ~7.5s
 	const convId = await startConversation(page, "long answer please");
 
 	// Confirm it is genuinely mid-stream, then navigate away.
@@ -130,7 +130,7 @@ test("leaving mid-stream and returning preserves the generation to completion", 
 	});
 	await page.goto("/");
 	await expect(page).toHaveURL(/\/$/);
-	await page.waitForTimeout(6000);
+	await page.waitForTimeout(2500);
 
 	// Return: the reply must complete and be fully present, nothing lost.
 	await page.goto(`/conversation/${convId}`);
@@ -148,7 +148,7 @@ test("a second viewer of a live generation sees it stream and complete", async (
 	mockOpenAI,
 }) => {
 	test.setTimeout(90_000);
-	await mockOpenAI.setDefaultScenario(slowStream(40, 350)); // ~14s
+	await mockOpenAI.setDefaultScenario(slowStream(40, 150)); // ~6s
 	const convId = await startConversation(page, "two watchers");
 
 	// Second page in the same (logged-in) context opens the conversation mid-stream.

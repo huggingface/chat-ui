@@ -1,4 +1,5 @@
 import { browser } from "$app/environment";
+import type { MlFileRef } from "$lib/types/MlFile";
 
 // Loose absolute bounds for a resized width; the real visual bounds are
 // proportional (each pane keeps at least 20% of the chat/panel split, see
@@ -9,7 +10,7 @@ export const SIDE_PANE_MAX_WIDTH = 2400;
 export const SIDE_PANE_DEFAULT_FRACTION = "60%";
 
 /** Which view owns the pane. One slot, so the views are mutually exclusive. */
-export type SidePaneView = "artifact" | "trackio";
+export type SidePaneView = "artifact" | "trackio" | "registry";
 
 /**
  * UI state for the side pane. Its content is always derived from the
@@ -29,6 +30,8 @@ class SidePaneStore {
 	 * captured view to show instead of the dashboard's default one.
 	 */
 	trackio = $state<{ url: string; label: string; viewUrl?: string } | null>(null);
+	/** the file version the registry view scrolls to and opens */
+	registryFocus = $state<MlFileRef | null>(null);
 	identifier = $state<string | null>(null);
 	/** 1-based version to display; null follows the latest version (including streaming growth) */
 	version = $state<number | null>(null);
@@ -105,6 +108,14 @@ class SidePaneStore {
 		this.openTrackio(url, label);
 	}
 
+	/** a list, not an item, so it has no place in the item nav */
+	openRegistry(focus: MlFileRef | null = null) {
+		this.view = "registry";
+		this.registryFocus = focus && { name: focus.name, version: focus.version };
+		this.open = true;
+		this.revealNonce += 1;
+	}
+
 	selectTab(tab: "preview" | "code") {
 		this.tab = tab;
 		this.userPinnedTab = true;
@@ -138,6 +149,7 @@ class SidePaneStore {
 				open: this.open,
 				view: this.view,
 				trackio: this.trackio,
+				registryFocus: this.registryFocus,
 				identifier: this.identifier,
 				version: this.version,
 				tab: this.tab,
@@ -153,6 +165,7 @@ class SidePaneStore {
 		this.saved.delete(to as string);
 		this.view = next.view;
 		this.trackio = next.trackio;
+		this.registryFocus = next.registryFocus;
 		this.identifier = next.identifier;
 		this.version = next.version;
 		this.tab = next.tab;
@@ -168,6 +181,7 @@ class SidePaneStore {
 		this.open = false;
 		this.view = "artifact";
 		this.trackio = null;
+		this.registryFocus = null;
 		this.identifier = null;
 		this.version = null;
 		this.tab = "preview";
@@ -182,6 +196,7 @@ interface SavedPaneState {
 	open: boolean;
 	view: SidePaneView;
 	trackio: SidePaneStore["trackio"];
+	registryFocus: SidePaneStore["registryFocus"];
 	identifier: string | null;
 	version: number | null;
 	tab: "preview" | "code";

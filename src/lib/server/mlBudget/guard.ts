@@ -17,6 +17,7 @@ import {
 	releaseReservation,
 	reserveMlBudget,
 } from "./budget";
+import { isHelpReply, jobRefFromStructured, jobRefFromText } from "./jobRef";
 import { settleMlBudget } from "./settle";
 import { ceilingMicroUsd, getFlavorPriceMicroUsdPerMinute, parseTimeoutSeconds } from "./pricing";
 
@@ -67,7 +68,7 @@ function isStopCall(call: GuardedToolCall): boolean {
 	return false;
 }
 
-interface GatedSubmission {
+export interface GatedSubmission {
 	kind: "job" | "sandbox";
 	flavor: string;
 	timeoutRaw: unknown;
@@ -81,7 +82,7 @@ const asRecord = (value: unknown): Record<string, unknown> | undefined =>
 		: undefined;
 
 /** Value following a `--flag` token in a sandbox-style argument list. */
-const tokenAfter = (tokens: string[], flag: string): string | undefined => {
+export const tokenAfter = (tokens: string[], flag: string): string | undefined => {
 	const at = tokens.indexOf(flag);
 	return at >= 0 ? tokens[at + 1] : undefined;
 };
@@ -109,7 +110,9 @@ const FREE_SANDBOX_COMMANDS = new Set(["status", "terminate", "ps", "kill"]);
  * What this call is about to spend, or a refusal, or null for calls that spend
  * nothing.
  */
-function classify(call: GuardedToolCall): GatedSubmission | { blocked: string } | null {
+export function classifySubmission(
+	call: GuardedToolCall
+): GatedSubmission | { blocked: string } | null {
 	if (call.tool === "hf_jobs") {
 		const operation = call.args.operation;
 		if (operation === "scheduled run" || operation === "scheduled uv") {
@@ -216,28 +219,6 @@ export function withRequiredDiscriminators(
 	});
 }
 
-/** `huggingface.co/jobs/<namespace>/<id>` in a submission response. */
-const JOB_URL_PATTERN = /huggingface\.co\/jobs\/([A-Za-z0-9][\w.-]*)\/([0-9a-f]{24})/;
-/** `hfsb2:<namespace>:<job id>` — the sandbox handle format. */
-const SANDBOX_HANDLE_PATTERN = /hfsb2:([\w.-]+):([0-9a-f]{24})/;
-/** Last resort: any 24-hex id in the response, namespace taken from the args or the user. */
-const BARE_JOB_ID_PATTERN = /\b([0-9a-f]{24})\b/;
-
-function extractJobRef(
-	text: string,
-	fallbackNamespace?: string
-): { jobId: string; namespace?: string } | undefined {
-	const url = JOB_URL_PATTERN.exec(text);
-	if (url) return { namespace: url[1], jobId: url[2] };
-	const handle = SANDBOX_HANDLE_PATTERN.exec(text);
-	if (handle) return { namespace: handle[1], jobId: handle[2] };
-	const bare = BARE_JOB_ID_PATTERN.exec(text);
-	if (bare) {
-		return { jobId: bare[1], ...(fallbackNamespace ? { namespace: fallbackNamespace } : {}) };
-	}
-	return undefined;
-}
-
 function budgetUpdate(budget: MlBudget): MessageBudgetUpdate {
 	return {
 		type: MessageUpdateType.Budget,
@@ -267,7 +248,7 @@ export function createMlBudgetGuard({
 
 		async before(call: GuardedToolCall): Promise<GuardVerdict> {
 			if (!isHfMcpServer(call.serverUrl)) return { allow: true };
-			const gated = classify(call);
+			const gated = classifySubmission(call);
 			// Stops are never gated, but their success is the one moment in a turn
 			// when a hold is known to be over. Ticketing them is what lets `after`
 			// reconcile without waiting for the next generation — a turn that
@@ -380,13 +361,28 @@ export function createMlBudgetGuard({
 			try {
 				switch (outcome.status) {
 					case "success": {
-						const ref = extractJobRef(outcome.text, ticket.namespace ?? username);
+						// before the id lookup, an id read from the help text would attach and block the refund
+						if (isHelpReply(outcome.structured)) {
+							await releaseReservation({ conversationId, key: ticket.key });
+							break;
+						}
+						const fallbackNamespace = ticket.namespace ?? username;
+						const structuredRef = jobRefFromStructured(ticket.kind, outcome.structured);
+						const ref = structuredRef ?? jobRefFromText(outcome.text, fallbackNamespace);
 						if (ref) {
+							if (!structuredRef && outcome.structured !== undefined) {
+								// every reply seen in production carries the id here, so this is the server changing shape
+								logger.warn(
+									{ key: ticket.key },
+									"[mlBudget] structured result had no usable job id; read it from the text"
+								);
+							}
+							const namespace = ref.namespace ?? fallbackNamespace;
 							await attachJobToReservation({
 								conversationId,
 								key: ticket.key,
 								jobId: ref.jobId,
-								...(ref.namespace ? { namespace: ref.namespace } : {}),
+								...(namespace ? { namespace } : {}),
 							});
 						} else {
 							// Without a job id the reservation can never settle to actual

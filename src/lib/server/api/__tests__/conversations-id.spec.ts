@@ -10,6 +10,19 @@ import {
 } from "./testHelpers";
 
 import { GET, DELETE, PATCH } from "../../../../routes/api/v2/conversations/[id]/+server";
+import { convertFinishedMessage } from "$lib/server/generation/messageShape";
+import {
+	assistantMessage,
+	finalAnswer,
+	toolRound,
+} from "$lib/server/generation/__tests__/turnFixtures";
+import type { Message } from "$lib/types/Message";
+import {
+	listMlArtefacts,
+	listMlServices,
+	recordArtefact,
+	recordDispatchedService,
+} from "$lib/server/mlRegistry/store";
 
 async function parseResponse<T = unknown>(res: Response): Promise<T> {
 	return superjson.parse(await res.text()) as T;
@@ -54,6 +67,29 @@ describe.sequential("GET /api/v2/conversations/[id]", () => {
 		expect(data.model).toBe("test-model");
 		expect(data.preprompt).toBe("You are helpful.");
 		expect(data.id).toBe(conv._id.toString());
+	});
+
+	it("returns a converted turn in the shape the client renders", async () => {
+		const { locals } = await createTestUser();
+		const legacy = assistantMessage([
+			...toolRound({ reasoning: "Plan.", text: "Let me check." }),
+			...finalAnswer("Done.", "Sunny."),
+		]);
+		const stored = convertFinishedMessage(legacy);
+		expect(stored.contentShape).toBe(2);
+		const conv = await createTestConversation(locals, { messages: [stored] });
+
+		const res = await GET({
+			locals,
+			params: { id: conv._id.toString() },
+			url: mockUrl(),
+		} as never);
+
+		const data = await parseResponse<{ messages: Message[] }>(res);
+		const returned = data.messages.find((m) => m.id === stored.id);
+		expect(returned?.content).toBe(legacy.content);
+		expect(returned?.contentShape).toBeUndefined();
+		expect(returned?.reasoning).toBeUndefined();
 	});
 
 	it("throws 404 for non-existent conversation", async () => {
@@ -140,6 +176,34 @@ describe.sequential("DELETE /api/v2/conversations/[id]", () => {
 
 		const found = await collections.conversations.findOne({ _id: conv._id });
 		expect(found).toBeNull();
+	});
+
+	it("takes the conversation's registry rows with it and no one else's", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { title: "To Delete" });
+		const other = await createTestConversation(locals, { title: "Kept" });
+		for (const conversationId of [conv._id, other._id]) {
+			await recordDispatchedService({
+				conversationId,
+				kind: "job",
+				jobId: "0123456789abcdef01234567",
+				namespace: "testuser",
+				stage: "RUNNING",
+			});
+			await recordArtefact({
+				conversationId,
+				kind: "dataset",
+				uri: "hf://datasets/testuser/demo",
+				url: "https://huggingface.co/datasets/testuser/demo",
+			});
+		}
+
+		await DELETE({ locals, params: { id: conv._id.toString() } } as never);
+
+		expect(await listMlServices(conv._id)).toHaveLength(0);
+		expect(await listMlArtefacts(conv._id)).toHaveLength(0);
+		expect(await listMlServices(other._id)).toHaveLength(1);
+		expect(await listMlArtefacts(other._id)).toHaveLength(1);
 	});
 
 	it("throws 404 for non-existent conversation", async () => {

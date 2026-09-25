@@ -19,6 +19,8 @@ import { settleMlBudget } from "$lib/server/mlBudget/settle";
 import { reservedMicroUsd } from "$lib/utils/mlBudget";
 import { logger } from "$lib/server/logger";
 import { resolvePreprompt } from "./preprompt";
+import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
+import { mlStateBlockEnabled } from "$lib/server/mlRegistry/stateBlock";
 
 /** Updates that mean the user has already been shown something for this turn. */
 function isVisibleWork(update: MessageUpdate): boolean {
@@ -108,6 +110,8 @@ async function* textGenerationWithoutTitle(
 	const preprompt = resolvePreprompt({
 		conversationPreprompt: conv.preprompt,
 		mlAssistant,
+		virtualFiles: mlVirtualFilesEnabled(conv),
+		stateBlock: mlStateBlockEnabled(conv),
 		artifactsOverride: ctx.artifactsOverride,
 		supportsArtifacts: ctx.model.supportsArtifacts,
 		username: ctx.username,

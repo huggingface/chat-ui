@@ -39,7 +39,17 @@ export function mergedStreamToken(
 }
 
 const FLUSH_INTERVAL_MS = 200;
-const MATERIALIZE_MS = 3_000;
+
+// How often a run's progress is written onto its message. Configurable only so the e2e
+// suite can observe several windows without streaming for tens of seconds.
+function materializeMs(): number {
+	const raw = config.GENERATION_MATERIALIZE_MS;
+	if (raw) {
+		const parsed = parseInt(raw, 10);
+		if (!isNaN(parsed) && parsed > 0) return parsed;
+	}
+	return 3_000;
+}
 
 // Must stay well below the reaper's stale threshold (see reaper.ts), or a live run
 // gets reaped between beats. Configurable only so tests can scale both down together.
@@ -207,8 +217,12 @@ export async function createGenerationWriter(
 			// is the reattach cursor, so any tool/file/router event at or below it that is not
 			// written here would be skipped by a resuming reader and lost if the run dies before
 			// the final full save.
+			// finish materialises after the end of turn save, which may have converted the message
 			await collections.conversations.updateOne(
-				{ _id: conversationId, "messages.id": messageId },
+				{
+					_id: conversationId,
+					messages: { $elemMatch: { id: messageId, contentShape: { $exists: false } } },
+				},
 				{
 					$set: {
 						"messages.$.content": snap.content,
@@ -239,7 +253,7 @@ export async function createGenerationWriter(
 
 	const materializeTimer = setInterval(() => {
 		void materialize();
-	}, MATERIALIZE_MS);
+	}, materializeMs());
 	materializeTimer.unref?.();
 
 	return {

@@ -29,12 +29,18 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 import type { MessageToolCallUpdate } from "$lib/types/MessageUpdate";
 import { streamFor, describeMessages, type ChatMessage, type Round } from "./replayHarness";
+import { toLegacyShape } from "$lib/utils/messageShape";
 
 // ── Scripted edges ────────────────────────────────────────────────────────────
 
 const mocks = vi.hoisted(() => ({
 	create: vi.fn(),
 	callMcpTool: vi.fn(),
+	slidingWindow: true,
+}));
+
+vi.mock("$lib/server/textGeneration/utils/historyWindowFlag", () => ({
+	historyWindowEnabled: () => mocks.slidingWindow,
 }));
 
 // Only the client is stubbed. The SDK's error classes stay real: the retry
@@ -229,6 +235,37 @@ async function sendMessageAndDetach(
 	await reader.cancel();
 }
 
+/** a retry replays exactly the history the message was answered from */
+async function retryMessage(conv: Conversation, locals: App.Locals, messageId: string) {
+	const form = new FormData();
+	form.set(
+		"data",
+		JSON.stringify({
+			id: messageId,
+			is_retry: true,
+			selectedMcpServers: [{ name: "mock", url: "https://mock.test/mcp", headers: [] }],
+		})
+	);
+	const response = await POST({
+		request: new Request(`http://localhost/conversation/${conv._id}`, {
+			method: "POST",
+			body: form,
+		}),
+		locals,
+		params: { id: conv._id.toString() },
+		getClientAddress: () => "127.0.0.1",
+	} as never);
+	if (response.status !== 200) {
+		throw new Error(`POST returned ${response.status}: ${await response.text()}`);
+	}
+	const reader = response.body?.getReader();
+	if (!reader) throw new Error("no response body");
+	for (;;) {
+		const { done } = await reader.read();
+		if (done) break;
+	}
+}
+
 /** The messages array sent on the nth upstream completion request (0-indexed). */
 function outgoing(n: number): ChatMessage[] {
 	const call = mocks.create.mock.calls[n];
@@ -261,6 +298,7 @@ beforeAll(async () => {
 beforeEach(() => {
 	mocks.create.mockReset();
 	mocks.callMcpTool.mockReset();
+	mocks.slidingWindow = true;
 	scriptToolResult({ text: "18°C, sunny" });
 });
 
@@ -477,9 +515,13 @@ describe.sequential("replaying a turn that ended badly", () => {
 			{ content: "Never reached." },
 			{ content: "Next turn." },
 		]);
-		// Hangs past the detach below, so the Result update is never emitted.
+		// held past the detach below so the Result update is never emitted
+		let releaseTool: (value: unknown) => void = () => {};
 		mocks.callMcpTool.mockImplementation(
-			() => new Promise((resolve) => setTimeout(() => resolve({ text: "late" }), 5_000))
+			() =>
+				new Promise((resolve) => {
+					releaseTool = resolve;
+				})
 		);
 
 		// One more chunk than before the turnState events existed: the turn now
@@ -489,6 +531,7 @@ describe.sequential("replaying a turn that ended badly", () => {
 		const stored = await reload(conv);
 		const lastAssistant = assistantMessages(stored).at(-1);
 		expect(callUpdatesOf(lastAssistant as Message).length).toBeGreaterThan(0);
+		expect(lastAssistant?.contentShape).toBeUndefined();
 
 		scriptToolResult({ text: "fine now" });
 		await sendMessage(stored, locals, "Try again?");
@@ -498,6 +541,17 @@ describe.sequential("replaying a turn that ended badly", () => {
 		// Fabricating an empty success here would teach the model the tool
 		// returned nothing, rather than that it never finished.
 		expect(String(toolMessage?.content)).toContain("interrupted");
+
+		// end the detached run here, or its next request lands in a later test
+		releaseTool({ text: "late", isError: false, content: [] });
+		await vi.waitFor(async () =>
+			expect(
+				await collections.generations.countDocuments({
+					conversationId: conv._id,
+					status: "running",
+				})
+			).toBe(0)
+		);
 	});
 
 	it("replays an MCP error result as an error, not as a successful empty output", async () => {
@@ -897,7 +951,8 @@ describe.sequential("model switching", () => {
 // ── Budget and storage growth ─────────────────────────────────────────────────
 
 describe.sequential("replay budget", () => {
-	it("degrades the oldest turns to flat text, monotonically, without leaking think markup", async () => {
+	it("with the sliding window off, degrades the oldest turns to flat text, monotonically, without leaking think markup", async () => {
+		mocks.slidingWindow = false;
 		const { conv, locals } = await newConversation();
 		await setReasoningOverride(locals, true);
 		// The history budget ceiling is 400k chars, so three turns of ~160k
@@ -936,7 +991,117 @@ describe.sequential("replay budget", () => {
 		expect(String(assistants[0].content), shape).toBe("Answer one.");
 	});
 
-	it("stores each round's reasoning exactly twice, so growth stays bounded", async () => {
+	it("keeps every turn's reasoning while the request fits the model's window", async () => {
+		const { conv, locals } = await newConversation();
+		await setReasoningOverride(locals, true);
+		const big = (tag: string) => `${tag} `.repeat(27_000);
+		scriptRounds([
+			{ reasoning: big("first"), content: "Answer one." },
+			{ reasoning: big("second"), content: "Answer two." },
+			{ reasoning: big("third"), content: "Answer three." },
+			{ content: "Answer four." },
+		]);
+
+		let current = conv;
+		for (const prompt of ["One?", "Two?", "Three?"]) {
+			await sendMessage(current, locals, prompt, { withTools: false });
+			current = await reload(conv);
+		}
+		await sendMessage(current, locals, "Four?", { withTools: false });
+
+		const replayed = outgoing(3);
+		const assistants = replayed.filter((m) => m.role === "assistant");
+		const shape = describeMessages(replayed);
+		expect(assistants, shape).toHaveLength(3);
+		expect(
+			assistants.every((m) => m.reasoning_content !== undefined),
+			shape
+		).toBe(true);
+		expect(JSON.stringify(replayed), shape).not.toContain("<think>");
+	});
+
+	it("slides the live loop at the window, stores the start and keeps it on the next turn", async () => {
+		// the fixture reports 262,144 tokens, so the limit is about 774k characters and a
+		// request slides past about 580k
+		const { conv, locals } = await newConversation();
+		scriptToolResult({ text: "R".repeat(150_000) });
+		const call = (n: number) => ({
+			toolCalls: [{ id: `call_${n}`, name: "get_weather", arguments: `{"city":"c${n}"}` }],
+		});
+		scriptRounds([
+			call(0),
+			call(1),
+			call(2),
+			call(3),
+			call(4),
+			{ content: "Done." },
+			{
+				content: "Sure.",
+			},
+		]);
+
+		await sendMessage(conv, locals, "Weather?");
+		const toolCount = (n: number) => outgoing(n).filter((m) => m.role === "tool").length;
+		expect([0, 1, 2, 3, 4, 5].map(toolCount)).toEqual([0, 1, 2, 3, 2, 3]);
+
+		const slid = outgoing(4);
+		const shape = describeMessages(slid);
+		expect(slid[0].role, shape).toBe("system");
+		expect(String(slid[1].content), shape).toMatch(
+			/^Weather\?\n\n\[Earlier history omitted: 0 turns \/ 2 tool rounds\./
+		);
+		const toolNames = slid.flatMap((m) => m.tool_calls?.map((c) => c.function.arguments) ?? []);
+		expect(toolNames, shape).toEqual(['{"city":"c2"}', '{"city":"c3"}']);
+
+		const stored = await reload(conv);
+		const turn = assistantMessages(stored)[0];
+		expect(stored.historyWindow).toEqual({ messageId: turn.id, round: 2, limitChars: 774_144 });
+
+		await sendMessage(stored, locals, "Again?");
+		const next = outgoing(6);
+		const nextShape = describeMessages(next);
+		expect(
+			next.flatMap((m) => m.tool_calls?.map((c) => c.function.arguments) ?? []),
+			nextShape
+		).toEqual(['{"city":"c2"}', '{"city":"c3"}', '{"city":"c4"}']);
+		expect(String(next[1].content), nextShape).toContain("[Earlier history omitted:");
+		expect(next.at(-1)?.content, nextShape).toBe("Again?");
+		expect((await reload(conv)).historyWindow).toEqual({
+			messageId: turn.id,
+			round: 2,
+			limitChars: 774_144,
+		});
+	});
+
+	it("keeps the window start across turns until the trigger fires again", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([
+			{ content: "a".repeat(250_000) },
+			{ content: "b".repeat(250_000) },
+			{ content: "c".repeat(250_000) },
+			{ content: "d".repeat(200_000) },
+			{ content: "Five." },
+		]);
+		let current = conv;
+		for (const prompt of ["One?", "Two?", "Three?", "Four?", "Five?"]) {
+			await sendMessage(current, locals, prompt, { withTools: false });
+			current = await reload(conv);
+		}
+
+		const slid = JSON.stringify(outgoing(3));
+		expect(slid).toContain("[Earlier history omitted: 1 turn / 0 tool rounds.");
+		expect(slid).not.toContain("bbbbbbbbbb");
+		expect(slid).toContain("cccccccccc");
+
+		// recomputed from the beginning this request would drop the third answer too
+		const held = JSON.stringify(outgoing(4));
+		expect(held).toContain("cccccccccc");
+		expect(held).toContain("dddddddddd");
+		const third = current.messages.find((m) => m.from === "user" && m.content === "Three?");
+		expect(current.historyWindow).toEqual({ messageId: third?.id, round: 0, limitChars: 774_144 });
+	});
+
+	it("stores each round's reasoning once, so growth stays bounded", async () => {
 		const { conv, locals } = await newConversation();
 		await setReasoningOverride(locals, true);
 		const trace = "UNIQUE-REASONING-MARKER";
@@ -955,11 +1120,55 @@ describe.sequential("replay budget", () => {
 		const serialized = JSON.stringify(stored);
 		const occurrences = serialized.split(trace).length - 1;
 
-		// Once inline in `content` as <think>, once on the round's Call update.
-		// A third copy means something started duplicating per-round state, which
-		// on a long tool-heavy conversation is what walks a document into the
-		// 16MB BSON ceiling and makes it unsaveable.
-		expect(occurrences, `reasoning appeared ${occurrences}x in the stored document`).toBe(2);
+		// a second copy is what walks a long tool heavy conversation into the 16MB ceiling
+		expect(occurrences, `reasoning appeared ${occurrences}x in the stored document`).toBe(1);
+		expect(assistantMessages(stored)[0]).toMatchObject({ content: "It is 18°C.", contentShape: 2 });
+	});
+});
+
+describe.sequential("history stored in either shape", () => {
+	it("replays a finished turn the same whether it was converted or not", async () => {
+		const { conv, locals } = await newConversation();
+		await setReasoningOverride(locals, true);
+		scriptRounds([
+			{
+				reasoning: "First I need the current weather.",
+				content: "\n\nLet me check that.\n\n",
+				toolCalls: [{ id: "call_one11111", name: "get_weather", arguments: '{"city":"Paris"}' }],
+			},
+			{
+				reasoning: "Now the forecast.",
+				toolCalls: [{ id: "call_two22222", name: "get_forecast", arguments: '{"city":"Paris"}' }],
+			},
+			{ reasoning: "I have both.", content: "Sunny now and all week." },
+			{ content: "Follow-up." },
+			{ content: "Follow-up again." },
+		]);
+
+		await sendMessage(conv, locals, "Weather and forecast for Paris?");
+		const converted = await reload(conv);
+		const [turn] = assistantMessages(converted);
+		expect(turn).toMatchObject({
+			contentShape: 2,
+			content: "Sunny now and all week.",
+			reasoning: "I have both.",
+		});
+
+		await sendMessage(converted, locals, "Thanks?");
+		const fromRounds = outgoing(3);
+
+		await collections.conversations.updateOne(
+			{ _id: conv._id, "messages.id": turn.id },
+			{ $set: { "messages.$": toLegacyShape(turn) } }
+		);
+		const legacy = await reload(conv);
+		expect(assistantMessages(legacy)[0].contentShape).toBeUndefined();
+		await retryMessage(legacy, locals, assistantMessages(legacy)[1].id);
+		const fromLegacy = outgoing(4);
+
+		const history = (messages: ChatMessage[]) => messages.filter((m) => m.role !== "system");
+		expect(history(fromRounds), describeMessages(fromRounds)).toEqual(history(fromLegacy));
+		expect(history(fromRounds).filter((m) => m.tool_calls)).toHaveLength(2);
 	});
 });
 

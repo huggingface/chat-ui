@@ -125,6 +125,10 @@ describe("registration", () => {
 			"check_job",
 			"create_trackio",
 			"read_trackio",
+			"write_file",
+			"edit_file",
+			"read_file",
+			"import_file",
 		]);
 	});
 
@@ -147,6 +151,10 @@ describe("registration", () => {
 			"check_job",
 			"create_trackio",
 			"read_trackio",
+			"write_file",
+			"edit_file",
+			"read_file",
+			"import_file",
 		]);
 	});
 });

@@ -3,6 +3,8 @@ import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
 import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { resolveConversation } from "$lib/server/api/utils/resolveConversation";
 import { collections } from "$lib/server/database";
+import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
+import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
 import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
 import { validModelIdSchema } from "$lib/server/models";
@@ -10,6 +12,7 @@ import { applyConversationSettings } from "$lib/server/conversationSettings";
 import { setMlBudgetLeft, setMlBudgetTotal } from "$lib/server/mlBudget/budget";
 import { reservedMicroUsd, usdToMicroUsd } from "$lib/utils/mlBudget";
 import type { TurnStateSnapshot } from "$lib/types/TurnState";
+import { toLegacyShape } from "$lib/utils/messageShape";
 
 export const GET: RequestHandler = async ({ locals, params, url }) => {
 	requireAuth(locals);
@@ -44,7 +47,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 		: undefined;
 
 	return superjsonResponse({
-		messages: conversation.messages,
+		messages: conversation.messages.map(toLegacyShape),
 		title: conversation.title,
 		model: conversation.model,
 		preprompt: conversation.preprompt,
@@ -76,6 +79,8 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 	if (res.deletedCount === 0) {
 		error(404, "Conversation not found");
 	}
+	await deleteMlFilesOf([new ObjectId(id)]);
+	await deleteMlRegistry([new ObjectId(id)]);
 
 	return superjsonResponse({ success: true });
 };

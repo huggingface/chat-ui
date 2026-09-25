@@ -99,6 +99,7 @@ export async function cleanupTestData() {
 
 	await Promise.all([
 		collections.conversations.deleteMany({}),
+		collections.mlFiles.deleteMany({}),
 		collections.conversationStats.deleteMany({}),
 		collections.abortedGenerations.deleteMany({}),
 		collections.users.deleteMany({}),
@@ -108,6 +109,8 @@ export async function cleanupTestData() {
 		collections.reports.deleteMany({}),
 		collections.assistants.deleteMany({}),
 		collections.messageEvents.deleteMany({}),
+		collections.mlServices.deleteMany({}),
+		collections.mlArtefacts.deleteMany({}),
 		collections.semaphores.deleteMany({}),
 		collections.migrationResults.deleteMany({}),
 		collections.tokenCaches.deleteMany({}),

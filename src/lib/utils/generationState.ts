@@ -45,6 +45,26 @@ function legacyTerminal(message: Message): boolean {
 }
 
 /**
+ * done or failed, a park is not ended since its resume continues content, and before turn states
+ * a park was stamped finished too, so there it takes an answer or an error since the last start
+ */
+export function isTurnEnded(message: Message): boolean {
+	if (message.from !== "assistant") return false;
+	const state = turnStateOf(message);
+	if (state) return state.state === "done" || state.state === "failed";
+	const updates = message.updates ?? [];
+	for (let i = updates.length - 1; i >= 0; i -= 1) {
+		const update = updates[i];
+		if (update.type === MessageUpdateType.FinalAnswer) return true;
+		if (update.type === MessageUpdateType.Status) {
+			if (update.status === MessageUpdateStatus.Error) return true;
+			if (update.status === MessageUpdateStatus.Started) return false;
+		}
+	}
+	return false;
+}
+
+/**
  * Whether the assistant message is past generation FOR UI PURPOSES — the
  * loading spinner, scroll following, the stop button. Only a running turn is
  * non-terminal: a waiting turn reads terminal here (the wait banner is its

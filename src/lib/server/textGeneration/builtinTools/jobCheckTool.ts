@@ -1,5 +1,6 @@
 import { isHfMcpServer } from "$lib/server/mcp/hf";
 import type { OpenAiTool } from "$lib/server/mcp/tools";
+import { READ_FILE_TOOL_NAME } from "$lib/server/mlFiles/prompt";
 import {
 	makeTruncator,
 	runNestedAgent,
@@ -13,7 +14,7 @@ import {
 	JOB_CHECK_DELEGATION_DOCTRINE,
 	JOB_CHECK_ITERATION_LIMIT_PROMPT,
 	JOB_CHECK_REPETITION_PROMPT,
-	JOB_CHECK_SYSTEM_PROMPT,
+	jobCheckSystemPrompt,
 } from "./jobCheckPrompt";
 import { createReadOnlyJobsGuard } from "./readOnlyJobsGuard";
 import type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
@@ -23,7 +24,8 @@ import type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types
 export const JOB_CHECK_TOOL_NAME = "check_job";
 
 /** Reading operations only, enforced by the guard below — see readOnlyJobsGuard. */
-const JOB_CHECK_ALLOWED_TOOLS: ReadonlySet<string> = new Set(["hf_jobs"]);
+// read_file only reads the conversation store, so it needs no guard
+const JOB_CHECK_ALLOWED_TOOLS: ReadonlySet<string> = new Set(["hf_jobs", READ_FILE_TOOL_NAME]);
 
 /**
  * One pass, not a watch: enough to read the tail, inspect, and finish a
@@ -91,18 +93,20 @@ const definition: OpenAiTool = {
 	},
 };
 
-export function createJobCheckTool(): JobCheckBuiltinTool {
+export function createJobCheckTool({
+	virtualFiles = true,
+}: { virtualFiles?: boolean } = {}): JobCheckBuiltinTool {
 	let deps: NestedAgentDeps | undefined;
 	return {
 		name: JOB_CHECK_TOOL_NAME,
 		definition,
-		preprompt: JOB_CHECK_DELEGATION_DOCTRINE(JOB_CHECK_TOOL_NAME),
+		preprompt: JOB_CHECK_DELEGATION_DOCTRINE(JOB_CHECK_TOOL_NAME, { virtualFiles }),
 		exemptFromToolRestraint: true,
 		bind(next: NestedAgentDeps) {
 			deps = next;
 		},
 		async execute(args, ctx) {
-			return runJobCheck(args, ctx, deps);
+			return runJobCheck(args, ctx, deps, virtualFiles);
 		},
 	};
 }
@@ -110,7 +114,8 @@ export function createJobCheckTool(): JobCheckBuiltinTool {
 async function runJobCheck(
 	args: Record<string, unknown>,
 	ctx: BuiltinToolContext,
-	deps: NestedAgentDeps | undefined
+	deps: NestedAgentDeps | undefined,
+	virtualFiles: boolean
 ): Promise<BuiltinToolResult> {
 	const jobId = typeof args.job_id === "string" ? args.job_id.trim() : "";
 	const task = typeof args.task === "string" ? args.task.trim() : "";
@@ -123,7 +128,7 @@ async function runJobCheck(
 	const spec: NestedAgentSpec = {
 		label: "job-check",
 		displayName: "Job check",
-		systemPrompt: JOB_CHECK_SYSTEM_PROMPT,
+		systemPrompt: jobCheckSystemPrompt({ virtualFiles }),
 		task: [`Job id: ${jobId}`, context ? `Context: ${context}` : "", `Checking for: ${task}`]
 			.filter(Boolean)
 			.join("\n\n"),

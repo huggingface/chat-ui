@@ -23,11 +23,26 @@ const FETCH_TIMEOUT_MS = 10_000;
  */
 const ORPHAN_SLACK_MS = 2 * 60 * 60 * 1000;
 
-const TERMINAL_STAGES = new Set(["COMPLETED", "CANCELED", "ERROR", "DELETED"]);
+export const TERMINAL_STAGES: ReadonlySet<string> = new Set([
+	"COMPLETED",
+	"CANCELED",
+	"ERROR",
+	"DELETED",
+]);
 
-type JobLookup =
-	| { state: "terminal"; billedMinutes: number }
-	| { state: "running" }
+export interface JobStatus {
+	stage: string;
+	message?: string;
+	startedAt?: Date;
+	finishedAt?: Date;
+	flavor?: string;
+	timeoutSeconds?: number;
+}
+
+export type JobLookup =
+	| { state: "terminal"; billedMinutes: number; job: JobStatus }
+	/** any non-terminal stage, queued included */
+	| { state: "running"; job: JobStatus }
 	| { state: "gone" }
 	| { state: "unknown" };
 
@@ -37,7 +52,8 @@ const parseDate = (value: unknown): Date | undefined => {
 	return Number.isNaN(date.getTime()) ? undefined : date;
 };
 
-async function lookupJob({
+/** one GET /api/jobs/{namespace}/{id}, a sandbox is a job so the same read serves both */
+export async function lookupJob({
 	namespace,
 	jobId,
 	token,
@@ -66,15 +82,26 @@ async function lookupJob({
 	}
 	const status = body.status as Record<string, unknown> | undefined;
 	const stage = typeof status?.stage === "string" ? status.stage : undefined;
-	if (!stage || !TERMINAL_STAGES.has(stage)) return { state: "running" };
+	if (!stage) return { state: "unknown" };
 
-	// Billing runs from start to finish; a job that never started billed nothing.
 	const startedAt = parseDate(body.startedAt ?? body.started_at);
 	const finishedAt = parseDate(body.finishedAt ?? body.finished_at);
-	if (!startedAt) return { state: "terminal", billedMinutes: 0 };
+	const timeoutSeconds = body.timeoutSeconds ?? body.timeout_seconds;
+	const job: JobStatus = {
+		stage,
+		...(typeof status?.message === "string" ? { message: status.message } : {}),
+		...(startedAt ? { startedAt } : {}),
+		...(finishedAt ? { finishedAt } : {}),
+		...(typeof body.flavor === "string" ? { flavor: body.flavor } : {}),
+		...(typeof timeoutSeconds === "number" ? { timeoutSeconds } : {}),
+	};
+	if (!TERMINAL_STAGES.has(stage)) return { state: "running", job };
+
+	// billing runs from start to finish, a job that never started billed nothing
+	if (!startedAt) return { state: "terminal", billedMinutes: 0, job };
 	const endedAt = finishedAt ?? new Date();
 	const minutes = Math.ceil(Math.max(0, endedAt.getTime() - startedAt.getTime()) / 60_000);
-	return { state: "terminal", billedMinutes: minutes };
+	return { state: "terminal", billedMinutes: minutes, job };
 }
 
 /** Actual cost, never refunded past the ceiling and never negative. */
@@ -83,6 +110,34 @@ const actualMicroUsd = (reservation: MlBudgetReservation, billedMinutes: number)
 		reservation.ceilingMicroUsd,
 		Math.max(0, reservation.priceMicroUsdPerMinute * billedMinutes)
 	);
+
+export type EndedJobLookup = Extract<JobLookup, { state: "terminal" | "gone" }>;
+
+/** the one hold a job read already in hand is for, matched by key else by job id, no second read */
+export async function settleHoldFromLookup({
+	conversationId,
+	budget,
+	reservationKey,
+	jobId,
+	lookup,
+}: {
+	conversationId: ObjectId;
+	budget: MlBudget;
+	reservationKey?: string;
+	jobId: string;
+	lookup: EndedJobLookup;
+}): Promise<boolean> {
+	const reservation = budget.reservations.find(
+		(r) => (reservationKey !== undefined && r.key === reservationKey) || r.jobId === jobId
+	);
+	if (!reservation) return false;
+	// a deleted job has no knowable runtime, charge the ceiling
+	const actual =
+		lookup.state === "terminal"
+			? actualMicroUsd(reservation, lookup.billedMinutes)
+			: reservation.ceilingMicroUsd;
+	return settleReservation({ conversationId, key: reservation.key, actualMicroUsd: actual });
+}
 
 /**
  * Settle whatever can be settled and return the freshest budget. Failures skip

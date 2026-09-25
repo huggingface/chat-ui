@@ -14,7 +14,22 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
+import type { StoredHistoryWindow } from "$lib/types/Conversation";
+import type { ObjectId } from "mongodb";
 import { isValidJsonObject } from "$lib/server/textGeneration/mcp/toolInvocation";
+import { ROUNDS_SHAPE, rebuildLegacyContent, toolRounds } from "$lib/utils/messageShape";
+import {
+	answeredQuestion,
+	CHARS_PER_TOKEN,
+	createHistoryWindow,
+	DEFAULT_OUTPUT_TOKENS,
+	groupRounds,
+	historyCost,
+	planWindow,
+	renderWindow,
+	windowLimitChars,
+	type HistoryUnit,
+} from "./historyWindow";
 
 type ChatMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -25,96 +40,24 @@ type ChatMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
  */
 type AssistantReplayMessage = ChatMessageParam & { reasoning_content?: string };
 
-/** Cap replayed tool outputs so old turns can't flood the context window. */
+/** cap on each replayed tool output, legacy path only */
 const MAX_REPLAYED_TOOL_OUTPUT_CHARS = 8000;
 
 /**
- * Cumulative cap on the WHOLE outgoing history, not just the part replay
- * expands. Every message is charged against it — system, user, and plain
- * assistant turns included — because a long conversation that already fills a
- * context window would otherwise still be handed another budget's worth of
- * replay on top and overflow a window it previously fit.
- *
- * Nothing is ever dropped: messages that can't degrade are charged and kept,
- * which can drive the budget negative. All the budget decides is how far back
- * the richer replayed shape extends before turns fall back to the flat
- * {role, content} form the request used before replay existed. Turns are
- * charged newest-first, so recent history keeps its tool calls and reasoning.
- *
- * Not counted: the preprompt and tool schemas, which callers prepend after
- * this function returns — see PROMPT_OVERHEAD_TOKENS.
- *
- * This is only the ceiling. When the model's context window is known it is
- * lowered to fit (see budgetCharsFor), because on a small-context model a flat
- * history that fit could otherwise be expanded into an overflow.
- *
- * Sized for long agentic turns: an ML Assistant turn parks and resumes for
- * half an hour and its tool transcript IS the working state — at the previous
- * 100k ceiling one such turn's floor consumed the whole budget and every
- * turn replayed flat, so the resumed model forgot its own waits, jobs and
- * answered questions. Real windows bound this anyway (budgetCharsFor);
- * the absolute ceiling only protects huge-window models from megabyte
- * requests.
+ * soft ceiling on the whole history when HISTORY_SLIDING_WINDOW is false or the model reports
+ * no window, turns are replayed newest first and the rest fall back to flat text, nothing is dropped
  */
-const HISTORY_BUDGET_CHARS = 400_000;
+const LEGACY_HISTORY_BUDGET_CHARS = 400_000;
 
-/**
- * Characters assumed per token when converting a context window into a
- * character budget. Deliberately below the usual ~4 for English prose: a low
- * ratio yields a smaller budget, so mis-estimating errs toward sending less
- * rather than toward a request the model rejects outright.
- */
-const CHARS_PER_TOKEN = 3;
-
-/**
- * Held back from the context window for the preprompt and tool schemas, which
- * run to thousands of tokens when several MCP servers are selected. The reply
- * is reserved separately, from the model's own configured limit.
- */
+/** held back for the preprompt and tool schemas where the caller cannot measure them */
 const PROMPT_OVERHEAD_TOKENS = 4_000;
 
-/**
- * Reply allowance when the model configures no explicit limit. Models that do
- * configure one are reserved that instead — a model set to emit up to 98k
- * tokens needs 98k held back, and a flat constant would let history plus reply
- * exceed the window even though each fits on its own.
- */
-const DEFAULT_OUTPUT_TOKENS = 4_096;
-
-/**
- * How many characters of history this request may spend.
- *
- * With no context length reported (self-hosted backends, or a router that
- * omits it) this is the flat ceiling, i.e. the behaviour before models
- * reported one. Otherwise the window bounds it, so replay can never push a
- * request past what the model accepts. A window smaller than the reserve
- * yields 0: everything degrades to the flat pre-replay shape, which is the
- * most that model could ever have taken anyway.
- */
-function budgetCharsFor(contextLengthTokens?: number, maxOutputTokens?: number): number {
-	if (!contextLengthTokens || contextLengthTokens <= 0) return HISTORY_BUDGET_CHARS;
+function legacyBudgetChars(contextLengthTokens?: number, maxOutputTokens?: number): number {
+	if (!contextLengthTokens || contextLengthTokens <= 0) return LEGACY_HISTORY_BUDGET_CHARS;
 	const outputReserve =
 		maxOutputTokens && maxOutputTokens > 0 ? maxOutputTokens : DEFAULT_OUTPUT_TOKENS;
 	const usableTokens = Math.max(0, contextLengthTokens - outputReserve - PROMPT_OVERHEAD_TOKENS);
-	return Math.min(HISTORY_BUDGET_CHARS, usableTokens * CHARS_PER_TOKEN);
-}
-
-/**
- * Nominal size charged for one image part instead of its encoded length. A
- * data URL runs to hundreds of thousands of characters while the image costs
- * the model on the order of a thousand tokens, so charging the encoding would
- * let a single attachment flatten every replayable turn behind it.
- */
-const IMAGE_COST_CHARS = 4_000;
-const IMAGE_COST_PLACEHOLDER = "i".repeat(IMAGE_COST_CHARS);
-
-/** Approximate the context a message (or list of them) occupies. */
-function historyCost(value: unknown): number {
-	return JSON.stringify(value, (key, inner) =>
-		key === "url" && typeof inner === "string" && inner.startsWith("data:")
-			? IMAGE_COST_PLACEHOLDER
-			: inner
-	).length;
+	return Math.min(LEGACY_HISTORY_BUDGET_CHARS, usableTokens * CHARS_PER_TOKEN);
 }
 
 /**
@@ -134,8 +77,6 @@ function toToolCallId(uuid: string, used: Set<string>): string {
 	return candidate;
 }
 
-const isToolCallUpdate = (u: MessageUpdate): u is MessageToolCallUpdate =>
-	u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Call;
 const isToolResultUpdate = (u: MessageUpdate): u is MessageToolResultUpdate =>
 	u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Result;
 const isToolErrorUpdate = (u: MessageUpdate): u is MessageToolErrorUpdate =>
@@ -183,22 +124,41 @@ function splitReasoning(
 	return { visible: visible.trim(), parts };
 }
 
+interface TurnRound {
+	calls: MessageToolCallUpdate[];
+	/** byte exact, see splitReasoning */
+	reasoning: string;
+	/** visible text streamed before the calls, trimmed */
+	content: string;
+}
+
 /**
- * Rebuild a past assistant turn from its persisted tool updates so follow-up
- * requests see the tool calls and their outputs instead of a flat text
- * summary. Rounds are inferred from update order — a Call update arriving
- * after any Result/Error starts a new round, matching how the live loop emits
- * one batch of calls per completion round. Each call's `tool_call_id` is
- * always the normalized id from toToolCallId, even though the original
- * provider-issued id may also be persisted (see MessageToolCallUpdate):
- * emitting it unconditionally keeps one code path and satisfies every
- * provider's id-shape requirements, including Mistral-family templates.
+ * either stored shape, cut on the live loop boundaries so a history window can drop whole rounds
+ * without separating a tool result from its call
  */
-function replayAssistantTurn(
+function turnRounds(message: EndpointMessage): {
+	rounds: TurnRound[];
+	final: { content: string; reasoning: string };
+} {
+	const rounds = toolRounds(message.updates ?? []).map(({ calls }) => ({
+		calls,
+		reasoning: calls.find((u) => u.reasoning?.trim())?.reasoning ?? "",
+		content: (calls.find((u) => u.content?.trim())?.content ?? "").trim(),
+	}));
+	if (message.contentShape === ROUNDS_SHAPE) {
+		return {
+			rounds,
+			final: { content: message.content.trim(), reasoning: message.reasoning ?? "" },
+		};
+	}
+	return { rounds, final: legacyFinalAnswer(message, rounds) };
+}
+
+/** the original shape keeps every round think block and preamble in content too */
+function legacyFinalAnswer(
 	message: EndpointMessage,
-	includeReasoning: boolean
-): AssistantReplayMessage[] {
-	const updates = message.updates ?? [];
+	rounds: TurnRound[]
+): { content: string; reasoning: string } {
 	const { visible, parts } = splitReasoning(message.content, message.reasoning);
 	// `parts` holds every recovered reasoning block across the whole turn, and
 	// `remainingVisible` the full visible text: when tools ran, the
@@ -210,82 +170,12 @@ function replayAssistantTurn(
 	// final answer.
 	const remainingParts = [...parts];
 	let remainingVisible = visible;
-	// null, not an empty-content message, when a turn was interrupted before
-	// producing any final text or reasoning (e.g. aborted mid-tool-call): an
-	// empty trailing `{role: "assistant", content: ""}` with nothing else
-	// attached represents an assistant turn that never happened, and strict
-	// providers can reject it outright.
-	const buildFinalMessage = (): AssistantReplayMessage | null => {
-		const reasoning = remainingParts.join("\n");
-		const content = remainingVisible.trim();
-		const hasReasoning = includeReasoning && reasoning.length > 0;
-		if (content.length === 0 && !hasReasoning) return null;
-		return {
-			role: "assistant",
-			content,
-			...(hasReasoning ? { reasoning_content: reasoning } : {}),
-		};
-	};
-
-	const callUpdates = updates.filter(isToolCallUpdate);
-	if (callUpdates.length === 0) {
-		const finalMessage = buildFinalMessage();
-		return finalMessage ? [finalMessage] : [];
-	}
-
-	const outputsByUuid = new Map<string, string>();
-	const rounds: MessageToolCallUpdate[][] = [];
-	let round: MessageToolCallUpdate[] = [];
-	let roundHasOutcome = false;
-	for (const update of updates) {
-		if (isToolCallUpdate(update)) {
-			if (roundHasOutcome && round.length > 0) {
-				rounds.push(round);
-				round = [];
-				roundHasOutcome = false;
-			}
-			round.push(update);
-		} else if (isToolResultUpdate(update)) {
-			const result = update.result;
-			const firstOutput =
-				result.status === ToolResultStatus.Success ? result.outputs[0] : undefined;
-			outputsByUuid.set(
-				update.uuid,
-				result.status === ToolResultStatus.Success
-					? typeof firstOutput?.text === "string"
-						? firstOutput.text
-						: JSON.stringify(firstOutput ?? "")
-					: `Error: ${result.message}`
-			);
-			roundHasOutcome = true;
-		} else if (isToolErrorUpdate(update)) {
-			outputsByUuid.set(update.uuid, `Error: ${update.message}`);
-			roundHasOutcome = true;
-		}
-	}
-	if (round.length > 0) {
-		rounds.push(round);
-	}
-
-	const usedIds = new Set<string>();
-	const idByUuid = new Map(callUpdates.map((u) => [u.uuid, toToolCallId(u.uuid, usedIds)]));
-
-	const replayed: AssistantReplayMessage[] = [];
-	for (const callsInRound of rounds) {
-		// Reasoning and preamble text persisted on the round's Call update go
-		// back on this round's message and are deduped out of the final
-		// answer's blocks. Kept byte-exact (trim only tests for emptiness): see
-		// splitReasoning for why reasoning fidelity matters; the same
-		// unmodified-echo principle is applied to preamble text for symmetry
-		// and so the dedup below matches reliably.
-		const roundReasoning = includeReasoning
-			? (callsInRound.find((u) => u.reasoning?.trim())?.reasoning ?? "")
-			: "";
-		if (roundReasoning) {
-			const exact = remainingParts.indexOf(roundReasoning);
+	for (const round of rounds) {
+		if (round.reasoning) {
+			const exact = remainingParts.indexOf(round.reasoning);
 			if (exact !== -1) {
 				remainingParts.splice(exact, 1);
-			} else if (remainingParts.length > 0 && roundReasoning.includes(remainingParts[0])) {
+			} else if (remainingParts.length > 0 && round.reasoning.includes(remainingParts[0])) {
 				// Positional fallback only, never a scan of the whole array: parts
 				// are chronologically ordered and rounds are processed oldest-first,
 				// so the earliest still-unconsumed part is the only one that can be
@@ -304,8 +194,7 @@ function replayAssistantTurn(
 		// the final message. Trimmed on both sides (persistence trims too)
 		// because `remainingVisible` comes from splitReasoning trim-normalized;
 		// visible text has no byte-exactness requirement, unlike reasoning.
-		const roundContent = (callsInRound.find((u) => u.content?.trim())?.content ?? "").trim();
-		if (roundContent && remainingVisible.startsWith(roundContent)) {
+		if (round.content && remainingVisible.startsWith(round.content)) {
 			// Prefix-only, deliberately: rounds consume the visible text in
 			// chronological order, so a streamed preamble is always the next
 			// prefix. A persisted preamble that is NOT a prefix was never merged
@@ -314,8 +203,77 @@ function replayAssistantTurn(
 			// indexOf match could only hit identical text belonging to the final
 			// answer — removing that would reorder the conversation. The failure
 			// mode of not matching is mild duplication, which is safer.
-			remainingVisible = remainingVisible.slice(roundContent.length).trimStart();
+			remainingVisible = remainingVisible.slice(round.content.length).trimStart();
 		}
+	}
+	return { content: remainingVisible.trim(), reasoning: remainingParts.join("\n") };
+}
+
+/**
+ * Rebuild a past assistant turn from its persisted tool updates so follow-up
+ * requests see the tool calls and their outputs instead of a flat text
+ * summary. Rounds are inferred from update order — a Call update arriving
+ * after any Result/Error starts a new round, matching how the live loop emits
+ * one batch of calls per completion round. Each call's `tool_call_id` is
+ * always the normalized id from toToolCallId, even though the original
+ * provider-issued id may also be persisted (see MessageToolCallUpdate):
+ * emitting it unconditionally keeps one code path and satisfies every
+ * provider's id-shape requirements, including Mistral-family templates.
+ */
+function replayAssistantTurn(
+	message: EndpointMessage,
+	includeReasoning: boolean,
+	capToolOutputs: boolean
+): AssistantReplayMessage[] {
+	const updates = message.updates ?? [];
+	const { rounds, final } = turnRounds(message);
+	// null, not an empty-content message, when a turn was interrupted before
+	// producing any final text or reasoning (e.g. aborted mid-tool-call): an
+	// empty trailing `{role: "assistant", content: ""}` with nothing else
+	// attached represents an assistant turn that never happened, and strict
+	// providers can reject it outright.
+	const buildFinalMessage = (): AssistantReplayMessage | null => {
+		const hasReasoning = includeReasoning && final.reasoning.length > 0;
+		if (final.content.length === 0 && !hasReasoning) return null;
+		return {
+			role: "assistant",
+			content: final.content,
+			...(hasReasoning ? { reasoning_content: final.reasoning } : {}),
+		};
+	};
+
+	if (rounds.length === 0) {
+		const finalMessage = buildFinalMessage();
+		return finalMessage ? [finalMessage] : [];
+	}
+
+	const outputsByUuid = new Map<string, string>();
+	for (const update of updates) {
+		if (isToolResultUpdate(update)) {
+			const result = update.result;
+			const firstOutput =
+				result.status === ToolResultStatus.Success ? result.outputs[0] : undefined;
+			outputsByUuid.set(
+				update.uuid,
+				result.status === ToolResultStatus.Success
+					? typeof firstOutput?.text === "string"
+						? firstOutput.text
+						: JSON.stringify(firstOutput ?? "")
+					: `Error: ${result.message}`
+			);
+		} else if (isToolErrorUpdate(update)) {
+			outputsByUuid.set(update.uuid, `Error: ${update.message}`);
+		}
+	}
+
+	const usedIds = new Set<string>();
+	const idByUuid = new Map(
+		rounds.flatMap(({ calls }) => calls).map((u) => [u.uuid, toToolCallId(u.uuid, usedIds)])
+	);
+
+	const replayed: AssistantReplayMessage[] = [];
+	for (const { calls: callsInRound, reasoning, content: roundContent } of rounds) {
+		const roundReasoning = includeReasoning ? reasoning : "";
 		// `content` is included only when a preamble was actually persisted
 		// (messages recorded before this field existed have none); omitted
 		// otherwise since some OpenAI-compatible backends reject empty text
@@ -355,7 +313,7 @@ function replayAssistantTurn(
 				role: "tool",
 				tool_call_id: idByUuid.get(u.uuid) ?? u.uuid,
 				content:
-					output.length > MAX_REPLAYED_TOOL_OUTPUT_CHARS
+					capToolOutputs && output.length > MAX_REPLAYED_TOOL_OUTPUT_CHARS
 						? stripLoneSurrogates(output.slice(0, MAX_REPLAYED_TOOL_OUTPUT_CHARS)) +
 							"\n[...truncated]"
 						: output,
@@ -366,6 +324,26 @@ function replayAssistantTurn(
 	if (finalMessage) replayed.push(finalMessage);
 	return replayed;
 }
+
+type ReplayCandidate = { replay: AssistantReplayMessage[]; flat: ChatMessageParam };
+type PreparedEntry = ChatMessageParam[] | ReplayCandidate;
+
+/** the stored path, ids are there at runtime even though the endpoint type omits them */
+export type HistoryMessage = EndpointMessage & { id?: string };
+
+export type HistoryOptions = {
+	replayToolHistory?: boolean;
+	attachReasoning?: boolean;
+	currentProducerModel?: string;
+	/** context window of the consuming model in tokens, when it reports one */
+	contextLengthTokens?: number;
+	/** the reply allowance this request asks for, reserved from the window */
+	maxOutputTokens?: number;
+	/** HISTORY_SLIDING_WINDOW, off keeps the legacy budget and its per-output cap */
+	slidingWindow?: boolean;
+	/** where the window start is kept, without it every request picks its own start */
+	window?: { conversationId: ObjectId; stored?: StoredHistoryWindow };
+};
 
 /**
  * Prepare chat messages for OpenAI-compatible multimodal payloads.
@@ -392,28 +370,80 @@ function replayAssistantTurn(
  *   proceeds regardless of producer.
  */
 export async function prepareMessagesWithFiles(
-	messages: EndpointMessage[],
+	messages: HistoryMessage[],
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
 	isMultimodal: boolean,
-	options?: {
-		replayToolHistory?: boolean;
-		attachReasoning?: boolean;
-		currentProducerModel?: string;
-		/**
-		 * The consuming model's context window in tokens, when known. Bounds how
-		 * much history is sent; omitting it keeps the flat default ceiling.
-		 */
-		contextLengthTokens?: number;
-		/**
-		 * The reply allowance this request will ask for (the model's configured
-		 * max_tokens). Reserved from the window alongside prompt overhead.
-		 */
-		maxOutputTokens?: number;
-	}
+	options?: HistoryOptions
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
-	type ReplayCandidate = { replay: AssistantReplayMessage[]; flat: ChatMessageParam };
-	const prepared = await Promise.all(
-		messages.map(async (message): Promise<ChatMessageParam[] | ReplayCandidate> => {
+	const history = await prepareHistory(messages, imageProcessor, isMultimodal, options);
+	if (!history.units || !options?.contextLengthTokens) return history.messages;
+	const limitChars = windowLimitChars(options.contextLengthTokens, options.maxOutputTokens);
+	const fixedChars = PROMPT_OVERHEAD_TOKENS * CHARS_PER_TOKEN;
+	if (!options.window) {
+		return renderWindow(history.units, planWindow(history.units, { limitChars, fixedChars }));
+	}
+	return createHistoryWindow({
+		conversationId: options.window.conversationId,
+		units: history.units,
+		offset: 0,
+		limitChars,
+		fixedChars,
+		stored: options.window.stored,
+	}).fit(history.messages);
+}
+
+/**
+ * the whole history replayed in full, with its units when the sliding window applies, a caller
+ * that gets no units has the legacy budgeted history
+ */
+export async function prepareHistory(
+	messages: HistoryMessage[],
+	imageProcessor: ReturnType<typeof makeImageProcessor>,
+	isMultimodal: boolean,
+	options?: HistoryOptions
+): Promise<{ messages: ChatMessageParam[]; units?: HistoryUnit[] }> {
+	const sliding = Boolean(
+		options?.slidingWindow && options.contextLengthTokens && options.contextLengthTokens > 0
+	);
+	const prepared = await prepareEntries(messages, imageProcessor, isMultimodal, options, !sliding);
+	if (!sliding) return { messages: legacyBudget(prepared, options) };
+	const units = historyUnits(messages, prepared);
+	return { messages: units.flatMap((unit) => unit.messages), units };
+}
+
+function historyUnits(messages: HistoryMessage[], prepared: PreparedEntry[]): HistoryUnit[] {
+	return prepared.flatMap((entry, i): HistoryUnit[] => {
+		const message = messages[i];
+		const replayed = Array.isArray(entry) ? entry : entry.replay;
+		if (message.from === "system") return [{ messages: replayed, head: true, rounds: 0 }];
+		const start = (round: number) => (message.id ? { messageId: message.id, round } : undefined);
+		if (message.from === "user") {
+			return [{ messages: replayed, opensTurn: true, rounds: 0, start: start(0) }];
+		}
+		let round = 0;
+		return groupRounds(replayed).map((group) => {
+			const isRound = group[0].role === "assistant" && (group[0].tool_calls?.length ?? 0) > 0;
+			const unit: HistoryUnit = {
+				messages: group,
+				rounds: isRound ? 1 : 0,
+				start: start(round),
+				question: isRound ? answeredQuestion(group) : undefined,
+			};
+			if (isRound) round += 1;
+			return unit;
+		});
+	});
+}
+
+async function prepareEntries(
+	messages: HistoryMessage[],
+	imageProcessor: ReturnType<typeof makeImageProcessor>,
+	isMultimodal: boolean,
+	options: HistoryOptions | undefined,
+	capToolOutputs: boolean
+): Promise<PreparedEntry[]> {
+	return Promise.all(
+		messages.map(async (message): Promise<PreparedEntry> => {
 			if (message.from === "user" && message.files && message.files.length > 0) {
 				const { imageParts, textContent } = await prepareFiles(
 					imageProcessor,
@@ -440,6 +470,8 @@ export async function prepareMessagesWithFiles(
 						: Boolean(options?.attachReasoning)) &&
 					reasoningProducerMatches(message, options?.currentProducerModel);
 
+				// flat forms need every round text, which the rounds shape keeps out of content
+				const legacy = rebuildLegacyContent(message);
 				if (options?.replayToolHistory) {
 					// The budget-fallback `flat` must still strip <think>, not just
 					// drop the reasoning_content/tool-replay enrichments: the raw
@@ -449,14 +481,14 @@ export async function prepareMessagesWithFiles(
 					// replay budget.
 					const flat: ChatMessageParam = {
 						role: "assistant",
-						content: stripThink(message.content),
+						content: stripThink(legacy.content),
 					};
 					return {
-						replay: replayAssistantTurn(message, wantsReasoning),
+						replay: replayAssistantTurn(message, wantsReasoning, capToolOutputs),
 						flat,
 					};
 				}
-				const { visible, parts } = splitReasoning(message.content, message.reasoning);
+				const { visible, parts } = splitReasoning(legacy.content, legacy.reasoning);
 				const reasoning = parts.join("\n");
 				if (!wantsReasoning || reasoning.length === 0) {
 					// Either nothing to attach, or attachment is disabled/gated:
@@ -480,7 +512,9 @@ export async function prepareMessagesWithFiles(
 			return [{ role: message.from, content: message.content }];
 		})
 	);
+}
 
+function legacyBudget(prepared: PreparedEntry[], options?: HistoryOptions): ChatMessageParam[] {
 	// Spend the replay budget newest-first so recent turns keep their full
 	// tool history and older ones degrade to the pre-replay flat shape. The
 	// degradation is monotonic: once any turn falls back to flat, every older
@@ -507,7 +541,7 @@ export async function prepareMessagesWithFiles(
 	// paying only the difference over the floor. A history that already exceeds
 	// the cap leaves nothing to spend, so every turn keeps its flat form and the
 	// request is no larger than it used to be.
-	const total = budgetCharsFor(options?.contextLengthTokens, options?.maxOutputTokens);
+	const total = legacyBudgetChars(options?.contextLengthTokens, options?.maxOutputTokens);
 	const windowBounded = Boolean(options?.contextLengthTokens && options.contextLengthTokens > 0);
 	let budget = total - floor;
 	const resolved: ChatMessageParam[][] = [...flatForms];

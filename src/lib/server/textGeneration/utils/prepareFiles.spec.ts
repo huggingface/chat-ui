@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { prepareMessagesWithFiles } from "./prepareFiles";
+import { ObjectId } from "mongodb";
+import { collections, ready } from "$lib/server/database";
+import type { Conversation } from "$lib/types/Conversation";
+import type { OpenAI } from "openai";
+import { prepareHistory, prepareMessagesWithFiles, type HistoryMessage } from "./prepareFiles";
+import { omittedMarker, planWindow, renderWindow, type HistoryUnit } from "./historyWindow";
 import type { EndpointMessage } from "$lib/server/endpoints/endpoints";
 import type { makeImageProcessor } from "$lib/server/endpoints/images";
 import {
@@ -115,6 +120,32 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		for (const message of withToolCalls) {
 			expect("content" in message).toBe(false);
 		}
+	});
+
+	it("replays a virtual-file call with the reference the model wrote, never the expanded content", async () => {
+		const raw = '{"operation":"uv","args":{"script":"v-file://train.py","flavor":"cpu-basic"}}';
+		const messages: EndpointMessage[] = [
+			{ from: "user", content: "train it" },
+			{
+				from: "assistant",
+				content: "Submitted.",
+				updates: [
+					{
+						...callUpdate("u1", "hf_jobs", { operation: "uv" }),
+						argumentsRaw: raw,
+						fileRefs: [{ ref: "v-file://train.py", name: "train.py", version: 4 }],
+					},
+					resultUpdate("u1", "hf_jobs", "job started"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const assistant = prepared[1];
+		if (assistant.role !== "assistant" || !assistant.tool_calls) throw new Error("no tool_calls");
+		expect(assistant.tool_calls[0].function.arguments).toBe(raw);
+		expect(JSON.stringify(prepared)).not.toContain("fileRefs");
 	});
 
 	it("groups parallel calls of one round into a single assistant message", async () => {
@@ -1033,5 +1064,302 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		});
 		const callMessage = prepared[0] as { tool_calls?: Array<{ id: string }> };
 		expect(callMessage.tool_calls?.[0]?.id).toBe("u10000000");
+	});
+});
+
+type Sent = OpenAI.Chat.Completions.ChatCompletionMessageParam;
+
+const user = (id: string, content: string): HistoryMessage => ({ id, from: "user", content });
+
+const toolTurn = (
+	id: string,
+	rounds: number,
+	outputChars: number,
+	output: (round: number) => string = () => ""
+): HistoryMessage => ({
+	id,
+	from: "assistant",
+	content: `${id} done`,
+	updates: Array.from({ length: rounds }, (_, i) => [
+		callUpdate(`${id}r${i}`, "search", { q: String(i) }),
+		resultUpdate(`${id}r${i}`, "search", output(i).padEnd(outputChars, "x")),
+	]).flat(),
+});
+
+const windowOptions = {
+	replayToolHistory: true,
+	contextLengthTokens: 1_048_576,
+	slidingWindow: true,
+} as const;
+
+async function unitsOf(messages: HistoryMessage[]): Promise<HistoryUnit[]> {
+	const history = await prepareHistory(messages, imageProcessor, false, windowOptions);
+	if (!history.units) throw new Error("expected the sliding window to apply");
+	return history.units;
+}
+
+function expectPaired(messages: Sent[]) {
+	const open = new Set<string>();
+	for (const message of messages) {
+		if (message.role === "tool") {
+			expect(open.has(message.tool_call_id)).toBe(true);
+			open.delete(message.tool_call_id);
+			continue;
+		}
+		expect(open.size).toBe(0);
+		if (message.role === "assistant") message.tool_calls?.forEach((call) => open.add(call.id));
+	}
+	expect(open.size).toBe(0);
+}
+
+const textOf = (message: Sent | undefined) =>
+	typeof message?.content === "string" ? message.content : JSON.stringify(message?.content);
+
+describe("sliding history window", () => {
+	const longRun = () =>
+		Array.from({ length: 5 }, (_, t) => [
+			user(`u${t}`, `ask ${t}`),
+			toolTurn(`a${t}`, 12, 30_000),
+		]).flat();
+
+	it("replays every turn whole and every output uncapped while the request fits the window", async () => {
+		const prepared = await prepareMessagesWithFiles(
+			longRun(),
+			imageProcessor,
+			false,
+			windowOptions
+		);
+		const tools = prepared.filter((m) => m.role === "tool");
+		expect(tools).toHaveLength(60);
+		expect(tools.every((m) => textOf(m).length === 30_000)).toBe(true);
+		expect(prepared.filter((m) => m.role === "user")).toHaveLength(5);
+	});
+
+	it("restores the legacy budget and per-output cap when the flag is off", async () => {
+		const prepared = await prepareMessagesWithFiles(longRun(), imageProcessor, false, {
+			...windowOptions,
+			slidingWindow: false,
+		});
+		const tools = prepared.filter((m) => m.role === "tool");
+		expect(tools.length).toBeGreaterThan(0);
+		expect(tools.length).toBeLessThan(60);
+		expect(textOf(tools[0])).toBe("x".repeat(8000) + "\n[...truncated]");
+		expect(prepared[1]).toEqual({ role: "assistant", content: "a0 done" });
+	});
+
+	it("keeps the legacy budget for a model that reports no window", async () => {
+		const options = { replayToolHistory: true, slidingWindow: true } as const;
+		const withFlag = await prepareMessagesWithFiles(longRun(), imageProcessor, false, options);
+		const legacy = await prepareMessagesWithFiles(longRun(), imageProcessor, false, {
+			...options,
+			slidingWindow: false,
+		});
+		expect(withFlag).toEqual(legacy);
+		expect(withFlag.filter((m) => m.role === "tool").length).toBeLessThan(60);
+	});
+
+	it("never separates a tool result from its call, whatever the limit", async () => {
+		const parallel: HistoryMessage = {
+			id: "a0",
+			from: "assistant",
+			content: "a0 done",
+			updates: Array.from({ length: 4 }, (_, i) => [
+				callUpdate(`p${i}a`, "search", { q: "a" }),
+				callUpdate(`p${i}b`, "search", { q: "b" }),
+				resultUpdate(`p${i}a`, "search", "y".repeat(5_000)),
+				resultUpdate(`p${i}b`, "search", "z".repeat(5_000)),
+			]).flat(),
+		};
+		const units = await unitsOf([
+			{ id: "sys", from: "system", content: "SYSTEM" },
+			user("u0", "BRIEF"),
+			parallel,
+			user("u1", "more"),
+			toolTurn("a1", 6, 5_000),
+			user("u2", "LIVE"),
+			toolTurn("a2", 5, 5_000),
+		]);
+		for (let limitChars = 0; limitChars <= 200_000; limitChars += 4_000) {
+			const sent = renderWindow(units, planWindow(units, { limitChars, fixedChars: 0 }));
+			expectPaired(sent);
+			expect(sent[0]).toEqual({ role: "system", content: "SYSTEM" });
+			expect(textOf(sent[1])).toContain("BRIEF");
+			expect(sent.some((m) => m.role === "user" && textOf(m).includes("LIVE"))).toBe(true);
+		}
+	});
+
+	it("keeps the system prompt, the brief and answered questions, and marks the gap", async () => {
+		const units = await unitsOf([
+			{ id: "sys", from: "system", content: "SYSTEM" },
+			user("u0", "BRIEF"),
+			{
+				id: "a0",
+				from: "assistant",
+				content: "Asked.",
+				updates: [
+					callUpdate("q1", "ask_user_question", {}),
+					resultUpdate("q1", "ask_user_question", "ANSWER: use LoRA"),
+				],
+			},
+			user("u1", "next"),
+			toolTurn("a1", 10, 10_000, (i) => `OLD${i}`),
+			user("u2", "LIVE"),
+		]);
+		const plan = planWindow(units, { limitChars: 40_000, fixedChars: 0 });
+		expect(plan.moved).toBe(true);
+		const sent = renderWindow(units, plan);
+		expectPaired(sent);
+		expect(sent[0]).toEqual({ role: "system", content: "SYSTEM" });
+		expect(textOf(sent[1])).toMatch(/^BRIEF\n\n\[Earlier history omitted: /);
+		const question = sent.find((m) => m.role === "assistant" && m.tool_calls);
+		expect(question?.role === "assistant" && question.tool_calls?.[0]?.function.name).toBe(
+			"ask_user_question"
+		);
+		expect(sent.some((m) => m.role === "tool" && textOf(m) === "ANSWER: use LoRA")).toBe(true);
+		expect(JSON.stringify(sent)).not.toContain("OLD0");
+		expect(JSON.stringify(sent)).not.toContain("Asked.");
+		expect(sent.at(-1)).toEqual({ role: "user", content: "LIVE" });
+	});
+
+	it("counts what it dropped and folds the brief into the next user message", async () => {
+		const units = await unitsOf([
+			user("u0", "BRIEF"),
+			toolTurn("a0", 3, 1_000),
+			user("u1", "second"),
+			toolTurn("a1", 3, 1_000),
+			user("u2", "third"),
+			toolTurn("a2", 3, 1_000),
+			user("u3", "fourth"),
+		]);
+		const plan = planWindow(units, {
+			limitChars: 1_000_000,
+			fixedChars: 0,
+			stored: { messageId: "u2", round: 0 },
+		});
+		expect(plan.moved).toBe(false);
+		const sent = renderWindow(units, plan);
+		expect(sent[0]).toEqual({
+			role: "user",
+			content: `BRIEF\n\n${omittedMarker(1, 6)}\n\nthird`,
+		});
+		expect(sent.filter((m) => m.role === "tool")).toHaveLength(3);
+		sent.forEach((m, i) => expect(m.role === "user" && sent[i + 1]?.role === "user").toBe(false));
+	});
+
+	it("slides inside a monster live turn by rounds, never flattening it", async () => {
+		const live: HistoryMessage = { ...toolTurn("a1", 60, 20_000, (i) => `R${i}:`), content: "" };
+		const units = await unitsOf([
+			user("u0", "BRIEF"),
+			toolTurn("a0", 1, 1_000),
+			user("u1", "GO"),
+			live,
+		]);
+		const limitChars = 400_000;
+		const plan = planWindow(units, { limitChars, fixedChars: 0 });
+		expect(plan.moved).toBe(true);
+		expect(plan.chars).toBeLessThanOrEqual(limitChars / 2);
+		const sent = renderWindow(units, plan);
+		expectPaired(sent);
+		expect(textOf(sent[0])).toMatch(
+			/^BRIEF\n\n\[Earlier history omitted: 0 turns \/ \d+ tool rounds\.[^\]]*\]\n\nGO$/
+		);
+		const kept = sent.filter((m) => m.role === "tool").map((m) => textOf(m).split(":")[0]);
+		const newest = Array.from({ length: kept.length }, (_, i) => `R${60 - kept.length + i}`);
+		expect(kept).toEqual(newest);
+		expect(kept.length).toBeGreaterThan(0);
+		expect(sent.filter((m) => m.role === "tool").every((m) => textOf(m).length === 20_000)).toBe(
+			true
+		);
+		expect(sent.filter((m) => m.role === "assistant").every((m) => m.tool_calls)).toBe(true);
+	});
+
+	describe("the stored start", () => {
+		const limitChars = 200_000;
+		const growing = (rounds: number) =>
+			unitsOf([user("u0", "BRIEF"), toolTurn("a0", rounds, 10_000)]);
+
+		it("holds until a request passes the trigger, then jumps to about half the limit", async () => {
+			const underTrigger = planWindow(await growing(14), { limitChars, fixedChars: 0 });
+			expect(underTrigger).toMatchObject({ moved: false, start: undefined });
+
+			const overTrigger = planWindow(await growing(16), { limitChars, fixedChars: 0 });
+			expect(overTrigger.moved).toBe(true);
+			expect(overTrigger.chars).toBeLessThanOrEqual(limitChars / 2);
+			const first = overTrigger.start;
+			expect(first?.messageId).toBe("a0");
+
+			const grown = await growing(19);
+			const held = planWindow(grown, { limitChars, fixedChars: 0, stored: first });
+			expect(held).toMatchObject({ moved: false, start: first });
+			expect(held.chars).toBeGreaterThan(limitChars / 2);
+			expect(grown[held.from].start).toEqual(first);
+
+			const next = planWindow(await growing(24), { limitChars, fixedChars: 0, stored: first });
+			expect(next.moved).toBe(true);
+			expect(next.start?.round).toBeGreaterThan(first?.round ?? Infinity);
+			expect(next.chars).toBeLessThanOrEqual(limitChars / 2);
+		});
+
+		it("keeps and stores the start of a tool-less conversation", async () => {
+			await ready;
+			const conversationId = new ObjectId();
+			await collections.conversations.insertOne({
+				_id: conversationId,
+				model: "m",
+				title: "t",
+				messages: [],
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			} satisfies Conversation);
+			const answer = (id: string, fill: string, chars: number): HistoryMessage => ({
+				id,
+				from: "assistant",
+				content: fill.repeat(chars),
+			});
+			const firstThree = [
+				user("u0", "One?"),
+				answer("a0", "a", 250_000),
+				user("u1", "Two?"),
+				answer("a1", "b", 250_000),
+				user("u2", "Three?"),
+				answer("a2", "c", 250_000),
+				user("u3", "Four?"),
+			];
+			const options = {
+				contextLengthTokens: 262_144,
+				slidingWindow: true,
+				window: { conversationId },
+			};
+			const slid = await prepareMessagesWithFiles(firstThree, imageProcessor, false, options);
+			expect(JSON.stringify(slid)).not.toContain("bbbbbbbbbb");
+			const stored = (await collections.conversations.findOne({ _id: conversationId }))
+				?.historyWindow;
+			expect(stored).toEqual({ messageId: "u2", round: 0, limitChars: 774_144 });
+
+			const later = [...firstThree, answer("a3", "d", 200_000), user("u4", "Five?")];
+			const held = await prepareMessagesWithFiles(later, imageProcessor, false, {
+				...options,
+				window: { conversationId, stored },
+			});
+			expect(JSON.stringify(held)).toContain("cccccccccc");
+			const unstored = await prepareMessagesWithFiles(later, imageProcessor, false, {
+				...options,
+				window: undefined,
+			});
+			expect(JSON.stringify(unstored)).not.toContain("cccccccccc");
+			await collections.conversations.deleteOne({ _id: conversationId });
+		});
+
+		it("recomputes from the beginning when the start is not on the replayed path", async () => {
+			const elsewhere = { messageId: "another-branch", round: 3 };
+			const small = await growing(14);
+			expect(planWindow(small, { limitChars, fixedChars: 0, stored: elsewhere })).toEqual(
+				planWindow(small, { limitChars, fixedChars: 0 })
+			);
+			const large = await growing(16);
+			expect(planWindow(large, { limitChars, fixedChars: 0, stored: elsewhere })).toEqual(
+				planWindow(large, { limitChars, fixedChars: 0 })
+			);
+		});
 	});
 });
