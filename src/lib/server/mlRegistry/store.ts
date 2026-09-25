@@ -102,7 +102,7 @@ export interface ArtefactRecord extends Provenance {
 	serviceId?: ObjectId;
 }
 
-/** a repeat write moves the commit, who first made it stays */
+/** a repeat write moves the commit, or clears it when the reply named none, who first made it stays */
 export async function recordArtefact(artefact: ArtefactRecord): Promise<void> {
 	const now = new Date();
 	const { conversationId, uri, kind, url, commit, serviceId, messageId, generationId, toolUuid } =
@@ -111,7 +111,14 @@ export async function recordArtefact(artefact: ArtefactRecord): Promise<void> {
 		{ conversationId, uri },
 		{
 			$setOnInsert: { createdAt: now, ...compact({ messageId, generationId, toolUuid }) },
-			$set: { kind, url, origin: "dispatched", updatedAt: now, ...compact({ commit, serviceId }) },
+			$set: {
+				kind,
+				url,
+				origin: "dispatched",
+				updatedAt: now,
+				...compact({ commit, serviceId }),
+			},
+			...(commit ? {} : { $unset: { commit: "" } }),
 		},
 		{ upsert: true }
 	);
@@ -149,6 +156,16 @@ export function recordDashboardArtefact({
 		url: `https://huggingface.co/spaces/${spaceId}`,
 		...provenance,
 	});
+}
+
+/** the rows have no ttl, so a deleted conversation takes them with it */
+export async function deleteMlRegistry(conversationIds: ObjectId[]): Promise<void> {
+	if (conversationIds.length === 0) return;
+	const filter = { conversationId: { $in: conversationIds } };
+	await Promise.all([
+		collections.mlServices.deleteMany(filter),
+		collections.mlArtefacts.deleteMany(filter),
+	]);
 }
 
 export function listMlServices(conversationId: ObjectId): Promise<MlService[]> {

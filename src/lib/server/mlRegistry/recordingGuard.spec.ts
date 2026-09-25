@@ -332,6 +332,23 @@ describe.sequential("mlRegistry recording guard: artefacts", () => {
 		expect(file.updatedAt.getTime()).toBeGreaterThanOrEqual(file.createdAt.getTime());
 	});
 
+	it("clears the commit when a later write reports none", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+		const put = {
+			cmd: "put",
+			args: ["put", "hf://datasets/testuser/demo/README.md"],
+			content: "x",
+		};
+
+		await dispatch("hf_fs_write", put, ok(putReply("README.md", SHA_1)));
+		await dispatch("hf_fs_write", put, ok(undefined, "# hf_fs_write put\n\nPath: `README.md`"));
+
+		const file = (await listMlArtefacts(conversationId)).find((a) => a.kind === "file");
+		expect(file).toMatchObject({ uri: "hf://datasets/testuser/demo/README.md" });
+		expect(file).not.toHaveProperty("commit");
+	});
+
 	it("gives a file written into a repo the session never created a discovered parent", async () => {
 		const conversationId = newConversationId();
 		const { dispatch } = makeGuard(conversationId);
