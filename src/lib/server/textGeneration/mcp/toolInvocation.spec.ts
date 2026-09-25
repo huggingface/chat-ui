@@ -472,6 +472,29 @@ describe("executeToolCalls with a guard", () => {
 		expect(after).toHaveBeenCalledWith({ key: "k" }, { status: "error", text: "bad image" });
 	});
 
+	it("hands the guard the result's structured part, untouched", async () => {
+		const structured = { outcome: { kind: "job", job: { id: "0123456789abcdef01234567" } } };
+		const { guard, after } = fakeGuard({
+			before: vi.fn(async () => ({ allow: true, ticket: { key: "k" } }) as const),
+		});
+
+		mcpMock.callMcpTool.mockResolvedValue(mcpResult({ text: "job started", structured }));
+		await drain([CALL], undefined, undefined, guard);
+		expect(after).toHaveBeenLastCalledWith(
+			{ key: "k" },
+			{ status: "success", text: "job started", structured }
+		);
+
+		mcpMock.callMcpTool.mockResolvedValue(
+			mcpResult({ text: "bad image", isError: true, structured })
+		);
+		await drain([CALL], undefined, undefined, guard);
+		expect(after).toHaveBeenLastCalledWith(
+			{ key: "k" },
+			{ status: "error", text: "bad image", structured }
+		);
+	});
+
 	it("reports a transport failure", async () => {
 		mcpMock.callMcpTool.mockRejectedValue(new Error("socket hang up"));
 		const { guard, after } = fakeGuard({
