@@ -148,6 +148,17 @@ export function startAgentRun(start: {
 	};
 }
 
+/** the runs a dead generation left running, called once that generation is marked interrupted */
+export async function interruptAgentRuns(
+	conversationId: ObjectId,
+	generationId: string
+): Promise<void> {
+	await collections.mlAgentRuns.updateMany(
+		{ conversationId, "parent.generationId": generationId, status: "running" },
+		{ $set: { status: "interrupted", endedAt: new Date() } }
+	);
+}
+
 /** the rows without their calls and summary, the pane asks for those one run at a time */
 export function listMlAgentRuns(
 	conversationId: ObjectId

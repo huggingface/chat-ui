@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
+import { interruptAgentRuns } from "$lib/server/mlRegistry/agentRuns";
 
 export interface ActiveRun {
 	conversationId: ObjectId;
@@ -69,6 +70,10 @@ export async function markGenerationInterrupted(
 		.catch((err) =>
 			logger.error({ err, generationId }, "[generation] failed to close pending elicitations")
 		);
+	// a sub-agent run ends inside its generation, one still running there never will
+	await interruptAgentRuns(run.conversationId, generationId).catch((err) =>
+		logger.error({ err, generationId }, "[generation] failed to interrupt sub-agent runs")
+	);
 }
 
 export async function finalizeActiveRunsOnExit(): Promise<void> {

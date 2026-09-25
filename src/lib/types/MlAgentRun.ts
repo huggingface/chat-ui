@@ -2,7 +2,8 @@ import type { ObjectId } from "mongodb";
 import type { Conversation } from "./Conversation";
 import type { Message } from "./Message";
 
-export type MlAgentRunStatus = "running" | "completed" | "failed" | "aborted";
+/** interrupted is a run whose generation died before the run could record an end */
+export type MlAgentRunStatus = "running" | "completed" | "failed" | "aborted" | "interrupted";
 
 /** the exit a failed run took, internal_error is a throw out of the loop */
 export type MlAgentRunFailure =

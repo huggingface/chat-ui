@@ -141,18 +141,6 @@ describe("mlRegistry store", () => {
 		expect(store.summary.rows).toBe(1);
 	});
 
-	it("knows whether a turn is live, for a run left marked running", async () => {
-		const net = fakeFetch();
-		const store = new MlRegistryStore(net.fetcher);
-		store.watch("conv-1", { live: true });
-		expect(store.turnLive).toBe(true);
-		store.watch("conv-1", { live: false });
-		expect(store.turnLive).toBe(false);
-		store.watch("conv-1", { live: true });
-		store.reset();
-		expect(store.turnLive).toBe(false);
-	});
-
 	it("forgets the conversation on reset", () => {
 		const store = new MlRegistryStore(fakeFetch().fetcher);
 		store.bind("conv-1");

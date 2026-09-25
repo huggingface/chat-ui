@@ -42,8 +42,6 @@ export class MlRegistryStore {
 	artefacts = $state<MlRegistryArtefact[]>([]);
 	files = $state<MlFileListing[]>([]);
 	sources = $state<MlRegistrySource[]>([]);
-	/** whether a turn is running, a run still marked running outside one never recorded its end */
-	turnLive = $state(false);
 	/** the server clock on the last payload, effects reseed from it */
 	serverNow = $state<number | undefined>(undefined);
 	/** whether a payload has arrived for the current conversation */
@@ -60,6 +58,7 @@ export class MlRegistryStore {
 	#runDetails = new SvelteMap<string, FileLoad<MlAgentRunDetail>>();
 	#fileRequests = new Map<string, Promise<void>>();
 
+	#live = false;
 	#watching = false;
 	#timer: ReturnType<typeof setTimeout> | undefined;
 	#inflight: Promise<void> | undefined;
@@ -95,8 +94,8 @@ export class MlRegistryStore {
 	 */
 	watch(conversationId: string, { live }: { live: boolean }): () => void {
 		this.bind(conversationId);
-		const turnEnded = this.turnLive && !live;
-		this.turnLive = live;
+		const turnEnded = this.#live && !live;
+		this.#live = live;
 		this.#watching = true;
 		if (!this.loaded || turnEnded) void this.refresh();
 		this.#reschedule();
@@ -257,7 +256,7 @@ export class MlRegistryStore {
 		this.#epoch += 1;
 		this.#inflight = undefined;
 		this.conversationId = undefined;
-		this.turnLive = false;
+		this.#live = false;
 		this.#watching = false;
 		this.services = [];
 		this.agentRuns = [];
@@ -282,7 +281,7 @@ export class MlRegistryStore {
 	#reschedule() {
 		this.#stopTimer();
 		if (!this.#watching) return;
-		if (!this.turnLive && this.openServices.length === 0) return;
+		if (!this.#live && this.openServices.length === 0) return;
 		this.#timer = setTimeout(() => {
 			this.#timer = undefined;
 			void this.refresh();

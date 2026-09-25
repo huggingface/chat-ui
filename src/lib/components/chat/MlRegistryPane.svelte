@@ -3,8 +3,8 @@
 	import { SvelteMap, SvelteSet } from "svelte/reactivity";
 	import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
-	import type { MlFileRef } from "$lib/types/MlFile";
 	import type {
+		MlRegistryAgentRun,
 		MlRegistryArtefact,
 		MlRegistryService,
 		MlRegistrySource,
@@ -19,7 +19,6 @@
 		groupArtefacts,
 		groupSources,
 		hubLabel,
-		isRunLive,
 		isServiceOpen,
 		pathWithin,
 		RUN_FAILURE_LABEL,
@@ -31,10 +30,12 @@
 		servicesForFileVersion,
 		shortCommit,
 		sortServiceRows,
+		splitSettled,
 		sourcePath,
 		sourceReaders,
 		sourcesByReader,
 		stageBadge,
+		type ServiceRow,
 	} from "$lib/utils/mlRegistry";
 	import MlFileVersionView from "./MlFileVersionView.svelte";
 	import SidePane from "./SidePane.svelte";
@@ -79,12 +80,12 @@
 		"Seen in the arguments of a later tool call, not created here: nothing about it is verified";
 
 	let showing = $derived(sidePane.open && sidePane.view === "registry");
-	let turnLive = $derived(mlRegistry.turnLive);
-	let serviceRows = $derived(sortServiceRows(mlRegistry.services, mlRegistry.agentRuns, turnLive));
+	let serviceRows = $derived(sortServiceRows(mlRegistry.services, mlRegistry.agentRuns));
+	let settled = $derived(splitSettled(serviceRows));
 	let grouped = $derived(groupArtefacts(mlRegistry.artefacts));
 	let openCount = $derived(mlRegistry.services.filter(isServiceOpen).length);
 	let liveRunCount = $derived(
-		mlRegistry.agentRuns.filter((run) => isRunLive(run, turnLive)).length
+		mlRegistry.agentRuns.filter((run) => run.status === "running").length
 	);
 	let artefactCount = $derived(mlRegistry.artefacts.length);
 	let files = $derived(mlRegistry.files);
@@ -96,20 +97,33 @@
 	const shownVersions = new SvelteMap<string, number>();
 	const openRuns = new SvelteSet<string>();
 	const openGroups = new SvelteSet<string>();
+	let showSettled = $state(false);
 
 	const fileRowId = (name: string) => `ml-file-${name}`;
-	const versionRowId = ({ name, version }: MlFileRef) => `ml-file-${name}@v${version}`;
+	const versionNumbers = (latest: number) =>
+		Array.from({ length: latest }, (_, index) => latest - index);
 	const runRowId = (id: string) => `ml-run-${id}`;
 	const groupRowId = (key: string) => `ml-sources-${key}`;
 
+	function closeFile(name: string) {
+		openFiles.delete(name);
+		shownVersions.delete(name);
+	}
+
+	/** opens on the latest version unless a pill picked another */
 	function toggleFile(name: string) {
-		if (openFiles.has(name)) openFiles.delete(name);
+		if (openFiles.has(name)) closeFile(name);
 		else openFiles.add(name);
 	}
 
-	function toggleVersion(name: string, version: number) {
-		if (shownVersions.get(name) === version) shownVersions.delete(name);
-		else shownVersions.set(name, version);
+	function pickVersion(name: string, version: number) {
+		const latest = files.find((file) => file.name === name)?.version;
+		if (openFiles.has(name) && (shownVersions.get(name) ?? latest) === version) {
+			closeFile(name);
+			return;
+		}
+		openFiles.add(name);
+		shownVersions.set(name, version);
 	}
 
 	function toggleRun(id: string) {
@@ -124,6 +138,7 @@
 
 	function revealRun(id: string) {
 		openRuns.add(id);
+		if (settled.settled.some((row) => row.key === `run:${id}`)) showSettled = true;
 		void tick().then(() =>
 			document.getElementById(runRowId(id))?.scrollIntoView({ block: "start" })
 		);
@@ -145,6 +160,7 @@
 			shownVersions.clear();
 			openRuns.clear();
 			openGroups.clear();
+			showSettled = false;
 		});
 	});
 
@@ -183,14 +199,11 @@
 				shownVersions.set(focus.name, focus.version);
 			});
 		}
-		// the version row only exists once the list has loaded
-		const load = mlRegistry.fileVersions(focus.name);
-		if (scrolledFor === nonce || !load || load.status === "loading") return;
+		if (scrolledFor === nonce) return;
 		scrolledFor = nonce;
-		void tick().then(() => {
-			document.getElementById(fileRowId(focus.name))?.scrollIntoView({ block: "start" });
-			document.getElementById(versionRowId(focus))?.scrollIntoView({ block: "nearest" });
-		});
+		void tick().then(() =>
+			document.getElementById(fileRowId(focus.name))?.scrollIntoView({ block: "start" })
+		);
 	});
 
 	// reseeded on every payload so a corrected skew lands at once
@@ -216,6 +229,258 @@
 	const plural = (count: number, one: string, many = `${one}s`) =>
 		`${count} ${count === 1 ? one : many}`;
 </script>
+
+{#snippet serviceItem(service: MlRegistryService)}
+	{@const Icon = SERVICE_ICON[service.kind]}
+	{@const badge = stageBadge(service.stage)}
+	{@const elapsed = serviceElapsed(service, now)}
+	<li class="ml-service flex gap-2.5 px-4 py-2.5" data-stage={badge.tone}>
+		<Icon class="mt-[3px] size-[14px] flex-none text-[#78716c] dark:text-[#a8a29e]" />
+		<div class="min-w-0 flex-1">
+			<div class="flex items-center gap-2">
+				<a
+					href={service.hubUrl}
+					target="_blank"
+					rel="noopener noreferrer"
+					class="ml-registry-link min-w-0 truncate font-medium text-[#1c1917] dark:text-[#f5f5f4]"
+					title={serviceTitle(service)}
+				>
+					{serviceDisplayName(service)}
+				</a>
+				{#if service.origin === "discovered"}
+					<span class="ml-registry-discovered" title={DISCOVERED_TITLE}>discovered</span>
+				{/if}
+				<span class="ml-stage ml-auto" data-tone={badge.tone}>
+					{#if badge.tone === "running"}
+						<span aria-hidden="true" class="ml-live-dot"></span>
+					{/if}
+					{badge.label}
+				</span>
+			</div>
+			<div
+				class="ml-service-meta mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-xs text-[#78716c] dark:text-[#a8a29e]"
+			>
+				<span>{service.kind}</span>
+				{#if service.flavor}
+					<span aria-hidden="true">·</span>
+					<span class="font-mono">{service.flavor}</span>
+				{/if}
+				{#if elapsed}
+					<span aria-hidden="true">·</span>
+					<span class="ml-service-elapsed tabular-nums">{elapsed}</span>
+				{/if}
+				{#if service.heldMicroUsd !== undefined}
+					<span aria-hidden="true">·</span>
+					<span class="ml-service-hold font-mono text-[#c4511a] tabular-nums dark:text-[#f0a468]">
+						holds {formatMicroUsd(service.heldMicroUsd)}
+					</span>
+				{/if}
+			</div>
+			{#if service.scriptRefs?.length}
+				<div class="mt-1 flex flex-wrap gap-1.5">
+					{#each service.scriptRefs as ref (formatFileRef(ref))}
+						<button
+							type="button"
+							class="ml-file-ref"
+							title="Show {formatFileRef(ref)} under Files"
+							onclick={() => sidePane.openRegistry(ref)}
+						>
+							<CarbonDocument class="size-3 flex-none" />
+							{formatFileRef(ref)}
+						</button>
+					{/each}
+				</div>
+			{/if}
+			{#if service.tokenMissingSince}
+				<p class="mt-0.5 text-xs text-[#a8a29e] dark:text-[#78716c]">
+					Status unknown since the session expired.
+				</p>
+			{/if}
+		</div>
+	</li>
+{/snippet}
+
+{#snippet runItem(run: MlRegistryAgentRun)}
+	{@const badge = runBadge(run)}
+	{@const elapsed = runElapsed(run, now)}
+	{@const isOpen = openRuns.has(run.id)}
+	{@const opened = readByRun.get(run.id)?.opened ?? []}
+	{@const foundOnly = readByRun.get(run.id)?.found.length ?? 0}
+	<li class="ml-run" id={runRowId(run.id)} data-stage={badge.tone}>
+		<button
+			type="button"
+			class="ml-file-toggle flex w-full items-start gap-2.5 px-4 py-2.5 text-left"
+			aria-expanded={isOpen}
+			aria-controls="{runRowId(run.id)}-detail"
+			onclick={() => toggleRun(run.id)}
+		>
+			<CarbonChevronRight
+				class="ml-file-chevron mt-[3px] size-[14px] flex-none text-[#a8a29e] dark:text-[#78716c]"
+			/>
+			<span class="block min-w-0 flex-1">
+				<span class="flex items-center gap-2">
+					<span class="min-w-0 truncate font-medium text-[#1c1917] dark:text-[#f5f5f4]">
+						{run.displayName}
+					</span>
+					<span class="ml-stage ml-auto" data-tone={badge.tone}>
+						{#if badge.tone === "running"}
+							<span aria-hidden="true" class="ml-live-dot"></span>
+						{/if}
+						{badge.label}
+					</span>
+				</span>
+				<span
+					class="ml-service-meta mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-xs text-[#78716c] dark:text-[#a8a29e]"
+				>
+					<span title="Started by the {run.parent.tool} call">
+						via <span class="font-mono">{run.parent.tool}</span>
+					</span>
+					<span aria-hidden="true">·</span>
+					<span class="tabular-nums">{plural(run.callCount, "call")}</span>
+					{#if elapsed}
+						<span aria-hidden="true">·</span>
+						<span class="ml-service-elapsed tabular-nums">{elapsed}</span>
+					{/if}
+					{#if opened.length}
+						<span aria-hidden="true">·</span>
+						<span class="tabular-nums">{plural(opened.length, "source")} read</span>
+					{/if}
+				</span>
+				{#if run.status === "failed" && run.failure}
+					<span class="ml-run-note mt-0.5 block text-xs" data-tone="error">
+						{RUN_FAILURE_LABEL[run.failure]}
+					</span>
+				{:else if run.forcedBy}
+					<span class="ml-run-note mt-0.5 block text-xs">
+						{RUN_FORCED_LABEL[run.forcedBy]}
+					</span>
+				{/if}
+			</span>
+		</button>
+		{#if isOpen}
+			{@const load = mlRegistry.runDetail(run.id)}
+			<div
+				id="{runRowId(run.id)}-detail"
+				class="ml-run-detail flex flex-col gap-3 pr-4 pb-3 pl-[40px] text-xs"
+			>
+				{#if load?.status === "ready"}
+					{@const detail = load.value}
+					<div>
+						<h4 class="ml-run-label">Task</h4>
+						<p class="ml-run-text">{detail.task}</p>
+					</div>
+					{#if detail.summary}
+						<div>
+							<h4 class="ml-run-label">Summary</h4>
+							<p class="ml-run-text ml-run-summary scrollbar-custom">
+								{detail.summary}
+							</p>
+						</div>
+					{:else if detail.error}
+						<div>
+							<h4 class="ml-run-label">Error</h4>
+							<p class="ml-run-text" data-tone="error">{detail.error}</p>
+						</div>
+					{/if}
+					<div>
+						<h4 class="ml-run-label">
+							Calls
+							<span class="ml-registry-count">{detail.callCount}</span>
+						</h4>
+						{#if detail.calls.length === 0}
+							<p class="ml-file-note">No calls.</p>
+						{:else}
+							<ol
+								class="ml-run-calls border-l border-[#ececea] dark:border-[#262626]"
+								aria-label="Calls {run.displayName.toLowerCase()} made"
+							>
+								{#each detail.calls as call, index (index)}
+									<li class="py-[3px] pl-3" data-status={call.status}>
+										<span class="flex min-w-0 items-baseline gap-2">
+											<span
+												class="flex-none font-mono font-medium text-[#1c1917] dark:text-[#f5f5f4]"
+											>
+												{call.tool}
+											</span>
+											<span
+												class="min-w-0 truncate font-mono text-[11px] text-[#78716c] dark:text-[#a8a29e]"
+												title={call.args}
+											>
+												{call.args}
+											</span>
+										</span>
+										{#if call.error}
+											<span class="ml-run-note block truncate" data-tone="error" title={call.error}>
+												{call.error}
+											</span>
+										{/if}
+									</li>
+								{/each}
+							</ol>
+							{#if detail.callCount > detail.calls.length}
+								<p class="ml-file-note">
+									{plural(detail.callCount - detail.calls.length, "later call")} not kept.
+								</p>
+							{/if}
+						{/if}
+					</div>
+				{:else if load?.status === "error"}
+					<p class="ml-file-note">
+						Could not load the run.
+						<button
+							type="button"
+							class="ml-file-retry"
+							onclick={() => mlRegistry.loadRunDetail(run.id)}>Try again</button
+						>
+					</p>
+				{:else}
+					<p class="ml-file-note" role="status">Loading the run…</p>
+				{/if}
+				{#if opened.length || foundOnly}
+					<div>
+						<h4 class="ml-run-label">
+							Sources
+							<span class="ml-registry-count">{opened.length}</span>
+						</h4>
+						{#if opened.length}
+							<ul class="ml-run-sources">
+								{#each opened as source (source.id)}
+									<li class="flex min-w-0 items-baseline gap-2 py-[2px]">
+										<a
+											href={source.url}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="ml-registry-link min-w-0 truncate text-[#57534e] dark:text-[#d6d3d1]"
+											title={sourceTitle(source)}
+										>
+											{source.title ?? sourcePath(source)}
+										</a>
+										<span class="ml-auto flex-none text-[11px] text-[#a8a29e] dark:text-[#78716c]">
+											{source.group}
+										</span>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if foundOnly}
+							<p class="ml-file-note">
+								{plural(foundOnly, "more link")} only in its search results, listed under Sources.
+							</p>
+						{/if}
+					</div>
+				{/if}
+			</div>
+		{/if}
+	</li>
+{/snippet}
+
+{#snippet serviceRow(row: ServiceRow)}
+	{#if row.type === "service"}
+		{@render serviceItem(row.service)}
+	{:else}
+		{@render runItem(row.run)}
+	{/if}
+{/snippet}
 
 {#snippet sourceItem(source: MlRegistrySource, readers: readonly string[])}
 	<li class="ml-source flex min-w-0 items-baseline gap-2 py-[3px] pl-3 text-xs">
@@ -256,14 +521,14 @@
 {/snippet}
 
 {#if showing}
-	<SidePane label="Services and artefacts">
+	<SidePane label="Services and artifacts">
 		<!-- container query, the pane is resizable and at phone width the title and controls take the row -->
 		<header
 			class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
 		>
 			<div class="flex min-w-0 flex-1 items-baseline gap-2">
 				<h2 class="flex-none text-sm font-semibold text-gray-800 dark:text-gray-200">
-					Services and artefacts
+					Services and artifacts
 				</h2>
 				{#if openCount + liveRunCount > 0}
 					<span
@@ -314,283 +579,43 @@
 							them.
 						</p>
 					{:else}
-						<ul class="ml-registry-list">
-							{#each serviceRows as row (row.key)}
-								{#if row.type === "service"}
-									{@const service = row.service}
-									{@const Icon = SERVICE_ICON[service.kind]}
-									{@const badge = stageBadge(service.stage)}
-									{@const elapsed = serviceElapsed(service, now)}
-									<li class="ml-service flex gap-2.5 px-4 py-2.5" data-stage={badge.tone}>
-										<Icon
-											class="mt-[3px] size-[14px] flex-none text-[#78716c] dark:text-[#a8a29e]"
-										/>
-										<div class="min-w-0 flex-1">
-											<div class="flex items-center gap-2">
-												<a
-													href={service.hubUrl}
-													target="_blank"
-													rel="noopener noreferrer"
-													class="ml-registry-link min-w-0 truncate font-medium text-[#1c1917] dark:text-[#f5f5f4]"
-													title={serviceTitle(service)}
-												>
-													{serviceDisplayName(service)}
-												</a>
-												{#if service.origin === "discovered"}
-													<span class="ml-registry-discovered" title={DISCOVERED_TITLE}
-														>discovered</span
-													>
-												{/if}
-												<span class="ml-stage ml-auto" data-tone={badge.tone}>
-													{#if badge.tone === "running"}
-														<span aria-hidden="true" class="ml-live-dot"></span>
-													{/if}
-													{badge.label}
-												</span>
-											</div>
-											<div
-												class="ml-service-meta mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-xs text-[#78716c] dark:text-[#a8a29e]"
-											>
-												<span>{service.kind}</span>
-												{#if service.flavor}
-													<span aria-hidden="true">·</span>
-													<span class="font-mono">{service.flavor}</span>
-												{/if}
-												{#if elapsed}
-													<span aria-hidden="true">·</span>
-													<span class="ml-service-elapsed tabular-nums">{elapsed}</span>
-												{/if}
-												{#if service.heldMicroUsd !== undefined}
-													<span aria-hidden="true">·</span>
-													<span
-														class="ml-service-hold font-mono text-[#c4511a] tabular-nums dark:text-[#f0a468]"
-													>
-														holds {formatMicroUsd(service.heldMicroUsd)}
-													</span>
-												{/if}
-											</div>
-											{#if service.scriptRefs?.length}
-												<div class="mt-1 flex flex-wrap gap-1.5">
-													{#each service.scriptRefs as ref (formatFileRef(ref))}
-														<button
-															type="button"
-															class="ml-file-ref"
-															title="Show {formatFileRef(ref)} under Files"
-															onclick={() => sidePane.openRegistry(ref)}
-														>
-															<CarbonDocument class="size-3 flex-none" />
-															{formatFileRef(ref)}
-														</button>
-													{/each}
-												</div>
-											{/if}
-											{#if service.tokenMissingSince}
-												<p class="mt-0.5 text-xs text-[#a8a29e] dark:text-[#78716c]">
-													Status unknown since the session expired.
-												</p>
-											{/if}
-										</div>
-									</li>
-								{:else}
-									{@const run = row.run}
-									{@const badge = runBadge(run, turnLive)}
-									{@const elapsed = runElapsed(run, now, turnLive)}
-									{@const isOpen = openRuns.has(run.id)}
-									{@const opened = readByRun.get(run.id)?.opened ?? []}
-									{@const foundOnly = readByRun.get(run.id)?.found.length ?? 0}
-									<li class="ml-run" id={runRowId(run.id)} data-stage={badge.tone}>
-										<button
-											type="button"
-											class="ml-file-toggle flex w-full items-start gap-2.5 px-4 py-2.5 text-left"
-											aria-expanded={isOpen}
-											aria-controls="{runRowId(run.id)}-detail"
-											onclick={() => toggleRun(run.id)}
-										>
-											<CarbonChevronRight
-												class="ml-file-chevron mt-[3px] size-[14px] flex-none text-[#a8a29e] dark:text-[#78716c]"
-											/>
-											<span class="block min-w-0 flex-1">
-												<span class="flex items-center gap-2">
-													<span
-														class="min-w-0 truncate font-medium text-[#1c1917] dark:text-[#f5f5f4]"
-													>
-														{run.displayName}
-													</span>
-													<span class="ml-stage ml-auto" data-tone={badge.tone}>
-														{#if badge.tone === "running"}
-															<span aria-hidden="true" class="ml-live-dot"></span>
-														{/if}
-														{badge.label}
-													</span>
-												</span>
-												{#if run.taskPreview}
-													<span
-														class="ml-run-task mt-0.5 block truncate text-xs text-[#57534e] dark:text-[#d6d3d1]"
-													>
-														{run.taskPreview}
-													</span>
-												{/if}
-												<span
-													class="ml-service-meta mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-xs text-[#78716c] dark:text-[#a8a29e]"
-												>
-													<span>sub-agent</span>
-													<span aria-hidden="true">·</span>
-													<span title="Started by the {run.parent.tool} call">
-														via <span class="font-mono">{run.parent.tool}</span>
-													</span>
-													<span aria-hidden="true">·</span>
-													<span class="tabular-nums">{plural(run.callCount, "call")}</span>
-													{#if elapsed}
-														<span aria-hidden="true">·</span>
-														<span class="ml-service-elapsed tabular-nums">{elapsed}</span>
-													{/if}
-													{#if opened.length}
-														<span aria-hidden="true">·</span>
-														<span class="tabular-nums">{plural(opened.length, "source")} read</span>
-													{/if}
-												</span>
-												{#if run.status === "failed" && run.failure}
-													<span class="ml-run-note mt-0.5 block text-xs" data-tone="error">
-														{RUN_FAILURE_LABEL[run.failure]}
-													</span>
-												{:else if run.forcedBy}
-													<span class="ml-run-note mt-0.5 block text-xs">
-														{RUN_FORCED_LABEL[run.forcedBy]}
-													</span>
-												{/if}
-											</span>
-										</button>
-										{#if isOpen}
-											{@const load = mlRegistry.runDetail(run.id)}
-											<div
-												id="{runRowId(run.id)}-detail"
-												class="ml-run-detail flex flex-col gap-3 pr-4 pb-3 pl-[40px] text-xs"
-											>
-												{#if load?.status === "ready"}
-													{@const detail = load.value}
-													<div>
-														<h4 class="ml-run-label">Task</h4>
-														<p class="ml-run-text">{detail.task}</p>
-													</div>
-													{#if detail.summary}
-														<div>
-															<h4 class="ml-run-label">Summary</h4>
-															<p class="ml-run-text ml-run-summary scrollbar-custom">
-																{detail.summary}
-															</p>
-														</div>
-													{:else if detail.error}
-														<div>
-															<h4 class="ml-run-label">Error</h4>
-															<p class="ml-run-text" data-tone="error">{detail.error}</p>
-														</div>
-													{/if}
-													<div>
-														<h4 class="ml-run-label">
-															Calls
-															<span class="ml-registry-count">{detail.callCount}</span>
-														</h4>
-														{#if detail.calls.length === 0}
-															<p class="ml-file-note">No calls.</p>
-														{:else}
-															<ol
-																class="ml-run-calls border-l border-[#ececea] dark:border-[#262626]"
-																aria-label="Calls {run.displayName.toLowerCase()} made"
-															>
-																{#each detail.calls as call, index (index)}
-																	<li class="py-[3px] pl-3" data-status={call.status}>
-																		<span class="flex min-w-0 items-baseline gap-2">
-																			<span
-																				class="flex-none font-mono font-medium text-[#1c1917] dark:text-[#f5f5f4]"
-																			>
-																				{call.tool}
-																			</span>
-																			<span
-																				class="min-w-0 truncate font-mono text-[11px] text-[#78716c] dark:text-[#a8a29e]"
-																				title={call.args}
-																			>
-																				{call.args}
-																			</span>
-																		</span>
-																		{#if call.error}
-																			<span
-																				class="ml-run-note block truncate"
-																				data-tone="error"
-																				title={call.error}
-																			>
-																				{call.error}
-																			</span>
-																		{/if}
-																	</li>
-																{/each}
-															</ol>
-															{#if detail.callCount > detail.calls.length}
-																<p class="ml-file-note">
-																	{plural(detail.callCount - detail.calls.length, "later call")} not kept.
-																</p>
-															{/if}
-														{/if}
-													</div>
-												{:else if load?.status === "error"}
-													<p class="ml-file-note">
-														Could not load the run.
-														<button
-															type="button"
-															class="ml-file-retry"
-															onclick={() => mlRegistry.loadRunDetail(run.id)}>Try again</button
-														>
-													</p>
-												{:else}
-													<p class="ml-file-note" role="status">Loading the run…</p>
-												{/if}
-												{#if opened.length || foundOnly}
-													<div>
-														<h4 class="ml-run-label">
-															Sources
-															<span class="ml-registry-count">{opened.length}</span>
-														</h4>
-														{#if opened.length}
-															<ul class="ml-run-sources">
-																{#each opened as source (source.id)}
-																	<li class="flex min-w-0 items-baseline gap-2 py-[2px]">
-																		<a
-																			href={source.url}
-																			target="_blank"
-																			rel="noopener noreferrer"
-																			class="ml-registry-link min-w-0 truncate text-[#57534e] dark:text-[#d6d3d1]"
-																			title={sourceTitle(source)}
-																		>
-																			{source.title ?? sourcePath(source)}
-																		</a>
-																		<span
-																			class="ml-auto flex-none text-[11px] text-[#a8a29e] dark:text-[#78716c]"
-																		>
-																			{source.group}
-																		</span>
-																	</li>
-																{/each}
-															</ul>
-														{/if}
-														{#if foundOnly}
-															<p class="ml-file-note">
-																{plural(foundOnly, "more link")} only in its search results, listed under
-																Sources.
-															</p>
-														{/if}
-													</div>
-												{/if}
-											</div>
-										{/if}
-									</li>
+						{#if settled.active.length}
+							<ul class="ml-registry-list">
+								{#each settled.active as row (row.key)}
+									{@render serviceRow(row)}
+								{/each}
+							</ul>
+						{/if}
+						{#if settled.settled.length}
+							<div class="ml-settled">
+								<button
+									type="button"
+									class="ml-file-toggle ml-settled-toggle flex w-full items-center gap-2.5 px-4 py-2 text-left text-xs"
+									aria-expanded={showSettled}
+									aria-controls="ml-registry-settled"
+									title="Ended, and the intern has already been told"
+									onclick={() => (showSettled = !showSettled)}
+								>
+									<CarbonChevronRight
+										class="ml-file-chevron size-[14px] flex-none text-[#a8a29e] dark:text-[#78716c]"
+									/>
+									<span class="tabular-nums">{settled.settled.length} ended</span>
+								</button>
+								{#if showSettled}
+									<ul id="ml-registry-settled" class="ml-registry-list">
+										{#each settled.settled as row (row.key)}
+											{@render serviceRow(row)}
+										{/each}
+									</ul>
 								{/if}
-							{/each}
-						</ul>
+							</div>
+						{/if}
 					{/if}
 				</section>
 
 				<section aria-labelledby="ml-registry-artefacts">
 					<h3 id="ml-registry-artefacts" class="ml-registry-heading">
-						Artefacts
+						Artifacts
 						{#if artefactCount}
 							<span class="ml-registry-count">{artefactCount}</span>
 						{/if}
@@ -724,26 +749,25 @@
 						<ul class="ml-registry-list">
 							{#each files as file (file.name)}
 								{@const isOpen = openFiles.has(file.name)}
-								{@const load = mlRegistry.fileVersions(file.name)}
-								<li class="ml-file" id={fileRowId(file.name)}>
-									<button
-										type="button"
-										class="ml-file-toggle flex w-full items-start gap-2.5 px-4 py-2.5 text-left"
-										aria-expanded={isOpen}
-										aria-controls="{fileRowId(file.name)}-versions"
-										onclick={() => toggleFile(file.name)}
-									>
+								{@const selected = shownVersions.get(file.name) ?? file.version}
+								<li class="ml-file" id={fileRowId(file.name)} data-open={isOpen}>
+									<div class="ml-file-head relative flex items-start gap-2.5 px-4 py-2.5">
+										<button
+											type="button"
+											class="ml-file-toggle absolute inset-0"
+											aria-expanded={isOpen}
+											aria-controls="{fileRowId(file.name)}-version"
+											aria-label="{isOpen ? 'Hide' : 'Show'} {file.name}"
+											onclick={() => toggleFile(file.name)}
+										></button>
 										<CarbonChevronRight
-											class="ml-file-chevron mt-[3px] size-[14px] flex-none text-[#a8a29e] dark:text-[#78716c]"
+											class="ml-file-chevron pointer-events-none mt-[3px] size-[14px] flex-none text-[#a8a29e] dark:text-[#78716c]"
 										/>
-										<span class="block min-w-0 flex-1">
-											<span class="flex items-center gap-2">
-												<span
-													class="ml-file-name min-w-0 truncate font-mono font-medium text-[#1c1917] dark:text-[#f5f5f4]"
-												>
-													{file.name}
-												</span>
-												<span class="ml-file-latest">v{file.version}</span>
+										<span class="pointer-events-none block min-w-0 flex-1">
+											<span
+												class="ml-file-name block truncate font-mono font-medium text-[#1c1917] dark:text-[#f5f5f4]"
+											>
+												{file.name}
 											</span>
 											<span
 												class="ml-file-meta mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-xs text-[#78716c] dark:text-[#a8a29e]"
@@ -754,118 +778,109 @@
 													updated {formatAgo(now - file.updatedAt.getTime())}
 												</span>
 											</span>
-											{#if file.summary}
-												<span
-													class="ml-file-summary mt-0.5 block text-xs text-[#57534e] dark:text-[#d6d3d1]"
-												>
-													{file.summary}
-												</span>
-											{/if}
 										</span>
-									</button>
-									{#if isOpen}
-										<div id="{fileRowId(file.name)}-versions" class="pr-4 pb-3 pl-[40px]">
-											{#if load?.status === "ready"}
-												<ol
-													class="ml-file-versions border-l border-[#ececea] dark:border-[#262626]"
-													aria-label="Versions of {file.name}"
+										<span
+											class="ml-file-versions relative flex max-w-[50%] flex-none flex-wrap justify-end gap-1"
+											role="group"
+											aria-label="Versions of {file.name}"
+										>
+											{#each versionNumbers(file.version) as version (version)}
+												{@const isSelected = isOpen && selected === version}
+												<button
+													type="button"
+													class="ml-version-pill"
+													data-version={version}
+													aria-pressed={isSelected}
+													title={isSelected
+														? `Hide v${version}`
+														: version === 1
+															? "Show v1"
+															: `Show what v${version} changed`}
+													onclick={() => pickVersion(file.name, version)}
 												>
-													{#each load.value as entry (entry.version)}
-														{@const ref = { name: file.name, version: entry.version }}
-														{@const jobs = servicesForFileVersion(mlRegistry.services, ref)}
-														{@const isSelected = shownVersions.get(file.name) === entry.version}
-														<li
-															class="ml-version py-1 pl-3"
-															id={versionRowId(ref)}
-															data-version={entry.version}
+													v{version}
+												</button>
+											{/each}
+										</span>
+									</div>
+									{#if isOpen}
+										{@const load = mlRegistry.fileVersions(file.name)}
+										{@const entry =
+											load?.status === "ready"
+												? load.value.find((candidate) => candidate.version === selected)
+												: undefined}
+										<div
+											id="{fileRowId(file.name)}-version"
+											class="ml-version pr-4 pb-3 pl-[40px]"
+											data-version={selected}
+										>
+											{#if entry}
+												{@const jobs = servicesForFileVersion(mlRegistry.services, {
+													name: file.name,
+													version: selected,
+												})}
+												<p class="flex items-baseline gap-2 text-xs">
+													<span class="font-mono font-medium text-[#1c1917] dark:text-[#f5f5f4]">
+														v{entry.version}
+													</span>
+													<span class="ml-version-origin">{FILE_ORIGIN_LABEL[entry.origin]}</span>
+													{#if entry.agent}
+														<span
+															class="ml-version-agent"
+															title="Written by the {entry.agent} sub-agent">{entry.agent}</span
 														>
-															<button
-																type="button"
-																class="ml-version-toggle w-full rounded-[5px] px-1.5 py-1 text-left"
-																aria-pressed={isSelected}
-																title={isSelected
-																	? `Hide v${entry.version}`
-																	: entry.version === 1
-																		? "Show v1"
-																		: `Show what v${entry.version} changed`}
-																onclick={() => toggleVersion(file.name, entry.version)}
-															>
-																<span class="flex items-baseline gap-2 text-xs">
-																	<span
-																		class="font-mono font-medium text-[#1c1917] dark:text-[#f5f5f4]"
-																	>
-																		v{entry.version}
-																	</span>
-																	<span class="ml-version-origin">
-																		{FILE_ORIGIN_LABEL[entry.origin]}
-																	</span>
-																	{#if entry.agent}
-																		<span
-																			class="ml-version-agent"
-																			title="Written by the {entry.agent} sub-agent"
-																			>{entry.agent}</span
-																		>
-																	{/if}
-																	<span
-																		class="ml-auto flex-none text-[#a8a29e] dark:text-[#78716c]"
-																		title={entry.createdAt.toLocaleString()}
-																	>
-																		{formatAgo(now - entry.createdAt.getTime())}
-																	</span>
-																</span>
-																{#if entry.summary}
-																	<span
-																		class="ml-version-summary mt-0.5 block text-xs text-[#57534e] dark:text-[#d6d3d1]"
-																	>
-																		{entry.summary}
-																	</span>
-																{/if}
-																{#if entry.source}
-																	<span
-																		class="ml-version-source mt-0.5 block truncate font-mono text-[11px] text-[#a8a29e] dark:text-[#78716c]"
-																		title={entry.source}
-																	>
-																		from {entry.source}
-																	</span>
-																{/if}
-															</button>
-															{#if jobs.length}
-																<ul
-																	class="ml-version-jobs mt-0.5 flex flex-col gap-0.5 px-1.5"
-																	aria-label="Jobs that ran v{entry.version}"
+													{/if}
+													<span
+														class="ml-auto flex-none text-[#a8a29e] dark:text-[#78716c]"
+														title={entry.createdAt.toLocaleString()}
+													>
+														{formatAgo(now - entry.createdAt.getTime())}
+													</span>
+												</p>
+												{#if entry.summary}
+													<p
+														class="ml-version-summary mt-0.5 text-xs text-[#57534e] dark:text-[#d6d3d1]"
+													>
+														{entry.summary}
+													</p>
+												{/if}
+												{#if entry.source}
+													<p
+														class="ml-version-source mt-0.5 truncate font-mono text-[11px] text-[#a8a29e] dark:text-[#78716c]"
+														title={entry.source}
+													>
+														from {entry.source}
+													</p>
+												{/if}
+												{#if jobs.length}
+													<ul
+														class="ml-version-jobs mt-1 flex flex-col gap-0.5"
+														aria-label="Jobs that ran v{entry.version}"
+													>
+														{#each jobs as job (job.id)}
+															{@const Icon = SERVICE_ICON[job.kind]}
+															{@const badge = stageBadge(job.stage)}
+															<li class="flex items-center gap-1.5 text-xs">
+																<Icon class="size-3 flex-none text-[#a8a29e] dark:text-[#78716c]" />
+																<a
+																	href={job.hubUrl}
+																	target="_blank"
+																	rel="noopener noreferrer"
+																	class="ml-registry-link min-w-0 truncate text-[#57534e] dark:text-[#d6d3d1]"
+																	title={serviceTitle(job)}
 																>
-																	{#each jobs as job (job.id)}
-																		{@const Icon = SERVICE_ICON[job.kind]}
-																		{@const badge = stageBadge(job.stage)}
-																		<li class="flex items-center gap-1.5 text-xs">
-																			<Icon
-																				class="size-3 flex-none text-[#a8a29e] dark:text-[#78716c]"
-																			/>
-																			<a
-																				href={job.hubUrl}
-																				target="_blank"
-																				rel="noopener noreferrer"
-																				class="ml-registry-link min-w-0 truncate text-[#57534e] dark:text-[#d6d3d1]"
-																				title={serviceTitle(job)}
-																			>
-																				{serviceDisplayName(job)}
-																			</a>
-																			<span class="ml-stage" data-tone={badge.tone}>
-																				{#if badge.tone === "running"}
-																					<span aria-hidden="true" class="ml-live-dot"></span>
-																				{/if}
-																				{badge.label}
-																			</span>
-																		</li>
-																	{/each}
-																</ul>
-															{/if}
-															{#if isSelected}
-																<MlFileVersionView name={file.name} version={entry.version} />
-															{/if}
-														</li>
-													{/each}
-												</ol>
+																	{serviceDisplayName(job)}
+																</a>
+																<span class="ml-stage" data-tone={badge.tone}>
+																	{#if badge.tone === "running"}
+																		<span aria-hidden="true" class="ml-live-dot"></span>
+																	{/if}
+																	{badge.label}
+																</span>
+															</li>
+														{/each}
+													</ul>
+												{/if}
 											{:else if load?.status === "error"}
 												<p class="ml-file-note">
 													Could not load the versions.
@@ -875,9 +890,10 @@
 														onclick={() => mlRegistry.loadFileVersions(file.name)}>Try again</button
 													>
 												</p>
-											{:else}
+											{:else if load?.status !== "ready"}
 												<p class="ml-file-note" role="status">Loading versions…</p>
 											{/if}
+											<MlFileVersionView name={file.name} version={selected} />
 										</div>
 									{/if}
 								</li>
@@ -1010,11 +1026,13 @@
 		border-top-color: #262626;
 	}
 
-	section + section {
+	section + section,
+	.ml-registry-list + .ml-settled {
 		border-top: 1px solid #ececea;
 	}
 
-	:global(.dark) section + section {
+	:global(.dark) section + section,
+	:global(.dark) .ml-registry-list + .ml-settled {
 		border-top-color: #262626;
 	}
 
@@ -1130,41 +1148,30 @@
 		box-shadow: inset 0 0 0 1px #44403c;
 	}
 
-	.ml-file-toggle,
-	.ml-version-toggle {
+	.ml-file-toggle {
 		transition: background-color 120ms ease;
 	}
 
-	.ml-file-toggle:hover,
-	.ml-version-toggle:hover {
+	.ml-file-toggle:hover {
 		background: rgba(0, 0, 0, 0.03);
 	}
 
-	:global(.dark) .ml-file-toggle:hover,
-	:global(.dark) .ml-version-toggle:hover {
+	:global(.dark) .ml-file-toggle:hover {
 		background: rgba(255, 255, 255, 0.04);
 	}
 
-	.ml-file-toggle :global(.ml-file-chevron) {
+	:global(.ml-file-chevron) {
 		transition: transform 150ms ease;
 	}
 
-	.ml-file-toggle[aria-expanded="true"] :global(.ml-file-chevron) {
+	/* a file row toggles from a button laid over it, so the chevron sits beside the button */
+	.ml-file-toggle[aria-expanded="true"] :global(.ml-file-chevron),
+	.ml-file[data-open="true"] > .ml-file-head > :global(.ml-file-chevron) {
 		transform: rotate(90deg);
 	}
 
-	.ml-version-toggle[aria-pressed="true"] {
-		background: rgba(232, 98, 42, 0.08);
-		box-shadow: inset 2px 0 0 #e8622a;
-	}
-
-	:global(.dark) .ml-version-toggle[aria-pressed="true"] {
-		background: rgba(240, 164, 104, 0.1);
-		box-shadow: inset 2px 0 0 #f0a468;
-	}
-
 	.ml-file-toggle:focus-visible,
-	.ml-version-toggle:focus-visible,
+	.ml-version-pill:focus-visible,
 	.ml-file-ref:focus-visible,
 	.ml-file-retry:focus-visible,
 	.ml-source-reader:focus-visible {
@@ -1175,7 +1182,7 @@
 	}
 
 	:global(.dark) .ml-file-toggle:focus-visible,
-	:global(.dark) .ml-version-toggle:focus-visible,
+	:global(.dark) .ml-version-pill:focus-visible,
 	:global(.dark) .ml-file-ref:focus-visible,
 	:global(.dark) .ml-file-retry:focus-visible,
 	:global(.dark) .ml-source-reader:focus-visible {
@@ -1184,7 +1191,7 @@
 			0 0 0 1px #111827;
 	}
 
-	.ml-file-latest {
+	.ml-version-pill {
 		flex: none;
 		padding: 0 6px;
 		border-radius: 9999px;
@@ -1193,11 +1200,32 @@
 		font-size: 11px;
 		line-height: 18px;
 		color: #57534e;
+		transition:
+			color 120ms ease,
+			background-color 120ms ease;
 	}
 
-	:global(.dark) .ml-file-latest {
+	.ml-version-pill:hover {
+		color: #c4511a;
+	}
+
+	.ml-version-pill[aria-pressed="true"] {
+		background: rgba(232, 98, 42, 0.14);
+		color: #c4511a;
+	}
+
+	:global(.dark) .ml-version-pill {
 		background: rgba(255, 255, 255, 0.07);
 		color: #d6d3d1;
+	}
+
+	:global(.dark) .ml-version-pill:hover,
+	:global(.dark) .ml-version-pill[aria-pressed="true"] {
+		color: #f0a468;
+	}
+
+	:global(.dark) .ml-version-pill[aria-pressed="true"] {
+		background: rgba(240, 164, 104, 0.14);
 	}
 
 	.ml-version-origin {

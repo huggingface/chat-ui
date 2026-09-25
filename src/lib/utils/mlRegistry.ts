@@ -114,35 +114,27 @@ export function sortServices(services: readonly MlRegistryService[]): MlRegistry
 	);
 }
 
-/**
- * a run only runs inside a live turn, one still marked running once the turn is over lost its
- * process before it could record an end
- */
-export const isRunLive = (run: Pick<MlRegistryAgentRun, "status">, turnLive: boolean): boolean =>
-	run.status === "running" && turnLive;
-
-export function runBadge(run: Pick<MlRegistryAgentRun, "status">, turnLive: boolean): StageBadge {
+export function runBadge(run: Pick<MlRegistryAgentRun, "status">): StageBadge {
 	switch (run.status) {
 		case "running":
-			return turnLive
-				? { label: "running", tone: "running" }
-				: { label: "interrupted", tone: "unknown" };
+			return { label: "running", tone: "running" };
 		case "completed":
 			return { label: "completed", tone: "completed" };
 		case "failed":
 			return { label: "failed", tone: "error" };
 		case "aborted":
 			return { label: "stopped", tone: "cancelled" };
+		case "interrupted":
+			return { label: "interrupted", tone: "unknown" };
 	}
 }
 
 export function runElapsed(
 	run: Pick<MlRegistryAgentRun, "status" | "startedAt" | "endedAt">,
-	now: number,
-	turnLive: boolean
+	now: number
 ): string | undefined {
 	if (run.endedAt) return formatElapsed(run.endedAt.getTime() - run.startedAt.getTime());
-	return isRunLive(run, turnLive) ? formatElapsed(now - run.startedAt.getTime()) : undefined;
+	return run.status === "running" ? formatElapsed(now - run.startedAt.getTime()) : undefined;
 }
 
 export const RUN_FAILURE_LABEL: Record<MlAgentRunFailure, string> = {
@@ -167,8 +159,7 @@ export type ServiceRow =
 /** hub services and sub-agent runs in one list, running first, then open, then the rest, newest first */
 export function sortServiceRows(
 	services: readonly MlRegistryService[],
-	runs: readonly MlRegistryAgentRun[],
-	turnLive: boolean
+	runs: readonly MlRegistryAgentRun[]
 ): ServiceRow[] {
 	const rows = [
 		...services.map((service) => ({
@@ -178,11 +169,32 @@ export function sortServiceRows(
 		})),
 		...runs.map((run) => ({
 			row: { type: "run", key: `run:${run.id}`, run } as const,
-			rank: isRunLive(run, turnLive) ? 0 : 2,
+			rank: run.status === "running" ? 0 : 2,
 			at: run.startedAt.getTime(),
 		})),
 	];
 	return rows.sort((a, b) => a.rank - b.rank || b.at - a.at).map(({ row }) => row);
+}
+
+/**
+ * ended and already told to the agent, nothing left to watch, a run hands its result to the
+ * agent when it ends but an interrupted one never did
+ */
+export function isSettledRow(row: ServiceRow): boolean {
+	if (row.type === "run") return row.run.status !== "running" && row.run.status !== "interrupted";
+	const { stage, lastReportedStage } = row.service;
+	return isTerminalStage(stage) && lastReportedStage === stage;
+}
+
+/** what still needs watching, and underneath it what has settled */
+export function splitSettled(rows: readonly ServiceRow[]): {
+	active: ServiceRow[];
+	settled: ServiceRow[];
+} {
+	return {
+		active: rows.filter((row) => !isSettledRow(row)),
+		settled: rows.filter(isSettledRow),
+	};
 }
 
 export interface SourceGroup {

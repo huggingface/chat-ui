@@ -11,6 +11,8 @@ import {
 	runBadge,
 	runElapsed,
 	sortServiceRows,
+	splitSettled,
+	isSettledRow,
 	sourcePath,
 	sourceReaders,
 	sourcesByReader,
@@ -298,31 +300,25 @@ const run = (overrides: Partial<MlRegistryAgentRun> = {}): MlRegistryAgentRun =>
 });
 
 describe("sub-agent runs", () => {
-	it("badges a run, and one left running outside a live turn as interrupted", () => {
-		expect(runBadge(run({ status: "running" }), true)).toEqual({
-			label: "running",
-			tone: "running",
-		});
-		expect(runBadge(run({ status: "running" }), false)).toEqual({
+	it("badges each status in its own tone", () => {
+		expect(runBadge(run({ status: "running" }))).toEqual({ label: "running", tone: "running" });
+		expect(runBadge(run()).tone).toBe("completed");
+		expect(runBadge(run({ status: "failed" }))).toEqual({ label: "failed", tone: "error" });
+		expect(runBadge(run({ status: "aborted" }))).toEqual({ label: "stopped", tone: "cancelled" });
+		expect(runBadge(run({ status: "interrupted" }))).toEqual({
 			label: "interrupted",
 			tone: "unknown",
 		});
-		expect(runBadge(run(), false).tone).toBe("completed");
-		expect(runBadge(run({ status: "failed" }), true)).toEqual({ label: "failed", tone: "error" });
-		expect(runBadge(run({ status: "aborted" }), true)).toEqual({
-			label: "stopped",
-			tone: "cancelled",
-		});
 	});
 
-	it("times an ended run by its end, a live one by now, and an interrupted one not at all", () => {
-		expect(runElapsed(run(), T0 + 999_999, false)).toBe("1m 05s");
+	it("times an ended run by its end and a running one by now", () => {
+		expect(runElapsed(run(), T0 + 999_999)).toBe("1m 05s");
 		const running = run({ status: "running", endedAt: undefined });
-		expect(runElapsed(running, T0 + 12_000, true)).toBe("12s");
-		expect(runElapsed(running, T0 + 12_000, false)).toBeUndefined();
+		expect(runElapsed(running, T0 + 12_000)).toBe("12s");
+		expect(runElapsed(run({ status: "interrupted", endedAt: undefined }), T0)).toBeUndefined();
 	});
 
-	it("sorts runs among services, live ones with the running jobs, newest first", () => {
+	it("sorts runs among services, running ones with the running jobs, newest first", () => {
 		const rows = sortServiceRows(
 			[
 				service({ id: "old-job", stage: "COMPLETED", createdAt: at(0) }),
@@ -331,8 +327,7 @@ describe("sub-agent runs", () => {
 			[
 				run({ id: "done", startedAt: at(20) }),
 				run({ id: "live", status: "running", endedAt: undefined, startedAt: at(5) }),
-			],
-			true
+			]
 		);
 		expect(rows.map((row) => row.key)).toEqual([
 			"service:live-job",
@@ -340,10 +335,32 @@ describe("sub-agent runs", () => {
 			"run:done",
 			"service:old-job",
 		]);
-		expect(
-			sortServiceRows([], [run({ id: "stuck", status: "running", endedAt: undefined })], false)[0]
-				.key
-		).toBe("run:stuck");
+	});
+
+	it("settles what has ended and what the agent was told, never what it was not", () => {
+		const rows = sortServiceRows(
+			[
+				service({ id: "told", stage: "COMPLETED", lastReportedStage: "COMPLETED" }),
+				service({ id: "untold", stage: "ERROR" }),
+				service({ id: "moved-on", stage: "ERROR", lastReportedStage: "RUNNING" }),
+				service({ id: "live", stage: "RUNNING", lastReportedStage: "RUNNING" }),
+			],
+			[
+				run({ id: "done" }),
+				run({ id: "failed", status: "failed" }),
+				run({ id: "stopped", status: "aborted" }),
+				run({ id: "cut", status: "interrupted" }),
+				run({ id: "going", status: "running", endedAt: undefined }),
+			]
+		);
+		const { active, settled } = splitSettled(rows);
+		expect(settled.map((row) => row.key).sort()).toEqual(
+			["service:told", "run:done", "run:failed", "run:stopped"].sort()
+		);
+		expect(active.map((row) => row.key).sort()).toEqual(
+			["service:untold", "service:moved-on", "service:live", "run:cut", "run:going"].sort()
+		);
+		expect(isSettledRow(rows[0])).toBe(false);
 	});
 });
 
