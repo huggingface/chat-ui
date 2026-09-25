@@ -2,7 +2,7 @@ import type { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import type { MlArtefact, MlArtefactKind } from "$lib/types/MlArtefact";
 import type { MlFileRef } from "$lib/types/MlFile";
-import type { MlService, MlServiceKind } from "$lib/types/MlService";
+import type { ExpectedPush, MlService, MlServiceKind } from "$lib/types/MlService";
 
 // every write is an upsert keyed on the external id, so a retried round or a discovery racing a
 // dispatch converge on one row
@@ -43,6 +43,7 @@ export interface DispatchedService extends Provenance {
 	hubUrl?: string;
 	reservationKey?: string;
 	scriptRefs?: MlFileRef[];
+	expectedPushes?: ExpectedPush[];
 }
 
 /** what the reply said overrides whatever was there */
@@ -228,6 +229,33 @@ export async function ensureArtefact({
 	await collections.mlArtefacts.updateOne(
 		{ conversationId, uri },
 		{ $setOnInsert: { kind, url, origin: "discovered", createdAt: now, updatedAt: now } },
+		{ upsert: true }
+	);
+}
+
+/** a repo a job pushed to, discovered when the registry did not know it, who made it stays */
+export async function recordPushedRepo({
+	conversationId,
+	kind,
+	uri,
+	url,
+	commit,
+	serviceId,
+}: {
+	conversationId: ObjectId;
+	kind: "model" | "dataset";
+	uri: string;
+	url: string;
+	commit?: string;
+	serviceId: ObjectId;
+}): Promise<void> {
+	const now = new Date();
+	await collections.mlArtefacts.updateOne(
+		{ conversationId, uri },
+		{
+			$setOnInsert: { kind, url, origin: "discovered", createdAt: now },
+			$set: { serviceId, updatedAt: now, ...compact({ commit }) },
+		},
 		{ upsert: true }
 	);
 }

@@ -19,10 +19,11 @@ export interface MlArtefact extends Timestamps {
 	uri: string;
 	url: string;
 	origin: MlRegistryOrigin;
-	/** latest commit that wrote it, files only */
+	/** latest commit that wrote it, a put for a file or a job push for a repo */
 	commit?: string;
 	/** the virtual file version that latest commit uploaded, files only */
 	fromFile?: MlFileRef;
+	/** the job that pushed to it */
 	serviceId?: MlService["_id"];
 	messageId?: Message["id"];
 	generationId?: string;

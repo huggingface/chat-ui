@@ -288,6 +288,82 @@ describe("the tool result a resumed turn reads", () => {
 			);
 		});
 
+		describe("with what the harness saw land on the Hub", () => {
+			const done = (pushes: ServiceEvent["pushes"]) =>
+				woken(event({ to: "COMPLETED", ranSeconds: 4320, pushes }));
+			const JOB = `Job sft-smoke (a10g-small, id ${JOB_ID})`;
+
+			it("names the commit a completed job pushed", () => {
+				expect(
+					done([{ uri: "hf://models/ns/qwen-sft", status: "pushed", commit: "abc1234def5678" }])
+				).toContain(
+					`${JOB} completed after 1h12m. Pushed hf://models/ns/qwen-sft at commit abc1234. ` +
+						"Confirm the result with check_job before reporting it."
+				);
+			});
+
+			it("says a destination got no commit and sends the model to the end of the logs", () => {
+				expect(done([{ uri: "hf://models/ns/qwen-sft", status: "missing" }])).toContain(
+					`${JOB} completed after 1h12m, but hf://models/ns/qwen-sft received no new commit ` +
+						"during the run. Read the end of its logs with check_job: the push most likely failed."
+				);
+			});
+
+			it("names what landed after what did not", () => {
+				expect(
+					done([
+						{ uri: "hf://models/ns/qwen-sft", status: "pushed", commit: "abc1234def5678" },
+						{ uri: "hf://datasets/ns/evals", status: "missing" },
+						{ uri: "hf://datasets/ns/generations", status: "missing" },
+					])
+				).toContain(
+					"but hf://datasets/ns/evals and hf://datasets/ns/generations received no new commit " +
+						"during the run. Read the end of its logs with check_job: the push most likely " +
+						"failed. Pushed hf://models/ns/qwen-sft at commit abc1234."
+				);
+			});
+
+			it("marks a repo only the namespace listing found", () => {
+				expect(
+					done([
+						{
+							uri: "hf://models/ns/merged",
+							status: "pushed",
+							commit: "fedcba9876",
+							discovered: true,
+						},
+					])
+				).toContain(
+					`${JOB} completed after 1h12m. Also changed during the run, not named in the script: ` +
+						"hf://models/ns/merged at commit fedcba9. Confirm the result"
+				);
+			});
+
+			it("adds nothing to a failed job that pushed nothing", () => {
+				const missing: ServiceEvent["pushes"] = [
+					{ uri: "hf://models/ns/qwen-sft", status: "missing" },
+				];
+				for (const to of ["ERROR", "CANCELED", "DELETED"]) {
+					expect(woken(event({ to, pushes: missing }))).toBe(woken(event({ to })));
+				}
+			});
+
+			it("tells a failed job's commit that did land", () => {
+				expect(
+					woken(
+						event({
+							pushes: [
+								{ uri: "hf://models/ns/qwen-sft", status: "pushed", commit: "abc1234def5678" },
+							],
+						})
+					)
+				).toContain(
+					`${JOB} failed: ERROR after 2m17s. Read its logs with check_job before changing ` +
+						"anything. Pushed hf://models/ns/qwen-sft at commit abc1234."
+				);
+			});
+		});
+
 		it("names an unnamed job by its id and leaves out a run time it never had", () => {
 			expect(
 				woken(

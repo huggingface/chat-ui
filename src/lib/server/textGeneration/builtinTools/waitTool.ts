@@ -4,7 +4,7 @@ import { collections } from "$lib/server/database";
 import { turnWaiting } from "$lib/server/generation/turnState";
 import { logger } from "$lib/server/logger";
 import { claimServiceEvents } from "$lib/server/mlRegistry/events";
-import type { ServiceEvent } from "$lib/types/MlService";
+import type { ServiceEvent, ServicePush } from "$lib/types/MlService";
 import type { BuiltinTool } from "./types";
 
 export const WAIT_TOOL_NAME = "wait";
@@ -181,6 +181,31 @@ function formatDuration(totalSeconds: number): string {
 	return minutes % 60 > 0 ? `${hours}h${minutes % 60}m` : `${hours}h`;
 }
 
+const listed = (items: string[]): string =>
+	items.length > 1
+		? `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`
+		: items.join("");
+
+const atCommit = (push: ServicePush): string =>
+	push.commit ? `${push.uri} at commit ${push.commit.slice(0, 7)}` : push.uri;
+
+/** what the harness saw land on the hub during the run, empty when nothing did */
+function pushedText(pushes: ServicePush[]): string {
+	const landed = pushes.filter((push) => push.status === "pushed");
+	const named = landed.filter((push) => !push.discovered);
+	const discovered = landed.filter((push) => push.discovered);
+	return [
+		named.length > 0 ? `Pushed ${listed(named.map(atCommit))}.` : "",
+		discovered.length > 0
+			? `Also changed during the run, not named in the script: ${listed(discovered.map(atCommit))}.`
+			: "",
+	]
+		.filter(Boolean)
+		.join(" ");
+}
+
+const withPushed = (text: string, pushed: string) => (pushed ? `${text} ${pushed}` : text);
+
 /** status and the next step only, never log lines, reading those is left to the model */
 export function serviceEventText(event: ServiceEvent): string {
 	const after = event.ranSeconds !== undefined ? ` after ${formatDuration(event.ranSeconds)}` : "";
@@ -193,26 +218,49 @@ export function serviceEventText(event: ServiceEvent): string {
 	}
 	const details = [event.flavor, event.name ? `id ${event.jobId}` : undefined].filter(Boolean);
 	const job = `Job ${event.name ?? event.jobId}${details.length > 0 ? ` (${details.join(", ")})` : ""}`;
+	const pushes = event.pushes ?? [];
+	const pushed = pushedText(pushes);
 	switch (event.to) {
 		case "ERROR":
-			return `${job} failed: ERROR${after}. Read its logs with check_job before changing anything.`;
-		case "COMPLETED":
+			return withPushed(
+				`${job} failed: ERROR${after}. Read its logs with check_job before changing anything.`,
+				pushed
+			);
+		case "COMPLETED": {
+			// missing is news only when the run finished, a failed one already says why nothing landed
+			const missing = pushes.filter((push) => push.status === "missing").map((push) => push.uri);
+			if (missing.length > 0) {
+				return withPushed(
+					`${job} completed${after}, but ${listed(missing)} received no new commit during the ` +
+						"run. Read the end of its logs with check_job: the push most likely failed.",
+					pushed
+				);
+			}
+			if (pushed) {
+				return `${job} completed${after}. ${pushed} Confirm the result with check_job before reporting it.`;
+			}
 			return (
 				`${job} completed${after}. Confirm the result and that its outputs were pushed with ` +
 				"check_job before reporting it."
 			);
+		}
 		case "CANCELED":
-			return (
+			return withPushed(
 				`${job} was cancelled${after}. If you did not cancel it, read its logs with check_job ` +
-				"to find out why."
+					"to find out why.",
+				pushed
 			);
 		case "DELETED":
-			return (
+			return withPushed(
 				`${job} is gone${after}: the Hub no longer has it. Check that its outputs were pushed ` +
-				"before relying on them."
+					"before relying on them.",
+				pushed
 			);
 		default:
-			return `${job} ended: ${event.to}${after}. Read its logs with check_job before acting on it.`;
+			return withPushed(
+				`${job} ended: ${event.to}${after}. Read its logs with check_job before acting on it.`,
+				pushed
+			);
 	}
 }
 

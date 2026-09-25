@@ -12,6 +12,24 @@ export type MlServiceKind = "job" | "sandbox";
  */
 export type MlRegistryOrigin = "dispatched" | "discovered";
 
+/** a repo the job script names as a string literal where it pushes */
+export interface ExpectedPush {
+	kind: "model" | "dataset";
+	/** hf://<models|datasets>/<owner>/<name> */
+	uri: string;
+}
+
+/** what the hub showed for a repo once the job ended */
+export interface ServicePush {
+	uri: string;
+	/** the commit that landed during the run */
+	commit?: string;
+	/** missing is only ever said of an expected push */
+	status: "pushed" | "missing";
+	/** found by listing the namespace, neither the script nor the registry named it */
+	discovered?: boolean;
+}
+
 /**
  * owned by the conversation, not a branch, editing an earlier message does not un-launch a job
  * its own collection because a poller asks which services are due across every conversation
@@ -29,6 +47,10 @@ export interface MlService extends Timestamps {
 	name?: string;
 	/** the virtual file versions the submission was expanded from */
 	scriptRefs?: MlFileRef[];
+	/** read from the script at dispatch, an id built at runtime is not found */
+	expectedPushes?: ExpectedPush[];
+	/** checked when the job ended, absent when the hub could not be read in time */
+	pushes?: ServicePush[];
 	flavor?: string;
 	timeoutSeconds?: number;
 	/** the hub stage as returned, SCHEDULING RUNNING COMPLETED CANCELED ERROR DELETED, or UNKNOWN */
@@ -84,5 +106,6 @@ export interface ServiceEvent {
 	to: string;
 	/** absent when no start was ever recorded */
 	ranSeconds?: number;
+	pushes?: ServicePush[];
 	at: Date;
 }

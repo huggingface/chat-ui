@@ -41,6 +41,7 @@ export function serviceEventFrom(service: MlService, now: Date): ServiceEvent {
 					ranSeconds: Math.max(0, Math.round((at.getTime() - service.startedAt.getTime()) / 1000)),
 				}
 			: {}),
+		...(service.pushes?.length ? { pushes: service.pushes } : {}),
 		at,
 	};
 }

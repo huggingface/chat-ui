@@ -218,6 +218,50 @@ describe.sequential("mlRegistry recording guard: services", () => {
 		expect(service.scriptRefs).toEqual([{ name: "train.py", version: 4 }]);
 	});
 
+	it("records where the expanded script says the job will push", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+
+		await dispatch(
+			"hf_jobs",
+			{
+				operation: "uv",
+				args: {
+					script: [
+						'HUB_ID = "testuser/qwen-sft"',
+						"cfg = SFTConfig(push_to_hub=True, hub_model_id=HUB_ID)",
+						'trackio.init(project="sft", space_id="testuser/sft-trackio")',
+						'evals.push_to_hub(f"{user}/evals")',
+					].join("\n"),
+					script_args: ["--epochs", "3"],
+					flavor: "a10g-small",
+					timeout: "2h",
+				},
+			},
+			ok(JOB_REPLY),
+			{ fileRefs: [{ name: "train.py", version: 2 }] }
+		);
+
+		const [service] = await listMlServices(conversationId);
+		expect(service.expectedPushes).toEqual([
+			{ kind: "model", uri: "hf://models/testuser/qwen-sft" },
+		]);
+	});
+
+	it("records no destinations for a script that names none", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+
+		await dispatch(
+			"hf_jobs",
+			{ operation: "uv", args: { script: "print(1)", flavor: "a10g-small", timeout: "30m" } },
+			ok(JOB_REPLY)
+		);
+
+		const [service] = await listMlServices(conversationId);
+		expect(service).not.toHaveProperty("expectedPushes");
+	});
+
 	it("falls back to the arguments when the reply is text only", async () => {
 		const conversationId = newConversationId();
 		const { dispatch } = makeGuard(conversationId);

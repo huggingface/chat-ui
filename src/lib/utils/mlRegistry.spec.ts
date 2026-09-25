@@ -11,6 +11,8 @@ import {
 	hubLabel,
 	isServiceOpen,
 	pathWithin,
+	pushingService,
+	repoPageUrl,
 	serviceDisplayName,
 	serviceElapsed,
 	servicesForFileVersion,
@@ -213,6 +215,24 @@ describe("hubLabel", () => {
 		expect(hubLabel("hf://spaces/pngwn/trackio")).toBe("pngwn/trackio");
 		expect(hubLabel("hf://datasets/pngwn/gone/data.parquet")).toBe("pngwn/gone/data.parquet");
 		expect(hubLabel("not-a-uri")).toBe("not-a-uri");
+	});
+});
+
+describe("pushes", () => {
+	it("links a model or dataset repo uri to its Hub page", () => {
+		expect(repoPageUrl("hf://models/pngwn/qwen-sft")).toBe("https://huggingface.co/pngwn/qwen-sft");
+		expect(repoPageUrl("hf://datasets/pngwn/evals")).toBe(
+			"https://huggingface.co/datasets/pngwn/evals"
+		);
+		expect(repoPageUrl("hf://models/pngwn/qwen-sft/README.md")).toBeUndefined();
+		expect(repoPageUrl("hf://spaces/pngwn/trackio")).toBeUndefined();
+	});
+
+	it("finds the job that pushed to a repo while the registry lists it", () => {
+		const job = service({ id: "job-1" });
+		expect(pushingService(artefact({ serviceId: "job-1" }), [job])).toBe(job);
+		expect(pushingService(artefact({ serviceId: "gone" }), [job])).toBeUndefined();
+		expect(pushingService(artefact(), [job])).toBeUndefined();
 	});
 });
 

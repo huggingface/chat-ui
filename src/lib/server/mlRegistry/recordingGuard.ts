@@ -12,7 +12,8 @@ import type {
 	ToolCallGuard,
 } from "$lib/server/textGeneration/mcp/toolGuard";
 import type { MlFileRef } from "$lib/types/MlFile";
-import type { MlServiceKind } from "$lib/types/MlService";
+import type { ExpectedPush, MlServiceKind } from "$lib/types/MlService";
+import { expectedPushesOfJob } from "./expectedPushes";
 import { fileUri, fileUrl, parseHfUri, repoUri, repoUrl } from "./hubUri";
 import {
 	ensureArtefact,
@@ -39,6 +40,7 @@ type SubmissionTicket = {
 	timeoutSeconds?: number;
 	namespace?: string;
 	scriptRefs?: MlFileRef[];
+	expectedPushes?: ExpectedPush[];
 };
 
 type FileTicket = { kind: "file"; callUuid: string; uri: string; fromFile?: MlFileRef };
@@ -124,6 +126,8 @@ export function createMlRecordingGuard({
 			const name = submissionName(call);
 			const timeoutSeconds = parseTimeoutSeconds(gated.timeoutRaw);
 			const scriptRefs = fileRefsOf(call);
+			const expectedPushes =
+				gated.kind === "job" ? expectedPushesOfJob(asRecord(call.args.args) ?? {}) : [];
 			return {
 				kind: gated.kind,
 				callUuid: call.callUuid,
@@ -133,6 +137,7 @@ export function createMlRecordingGuard({
 				...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
 				...(gated.namespace ? { namespace: gated.namespace } : {}),
 				...(scriptRefs.length ? { scriptRefs } : {}),
+				...(expectedPushes.length ? { expectedPushes } : {}),
 			};
 		}
 		if (call.tool === "create_repo") {
@@ -238,6 +243,7 @@ export function createMlRecordingGuard({
 			reservationKey: ticket.reservationKey,
 			toolUuid: ticket.callUuid,
 			...(ticket.scriptRefs ? { scriptRefs: ticket.scriptRefs } : {}),
+			...(ticket.expectedPushes ? { expectedPushes: ticket.expectedPushes } : {}),
 			...provenance,
 		};
 		if (ticket.kind === "job") {

@@ -16,6 +16,8 @@
 		hubLabel,
 		isServiceOpen,
 		pathWithin,
+		pushingService,
+		repoPageUrl,
 		serviceDisplayName,
 		serviceElapsed,
 		servicesForFileVersion,
@@ -30,6 +32,7 @@
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonChip from "~icons/carbon/chip";
 	import CarbonCloseLarge from "~icons/carbon/close-large";
+	import CarbonCloudUpload from "~icons/carbon/cloud-upload";
 	import CarbonCube from "~icons/carbon/cube";
 	import CarbonDataTable from "~icons/carbon/data-table";
 	import CarbonDocument from "~icons/carbon/document";
@@ -37,6 +40,7 @@
 	import CarbonRenew from "~icons/carbon/renew";
 	import CarbonRocket from "~icons/carbon/rocket";
 	import CarbonTerminal from "~icons/carbon/terminal";
+	import CarbonWarningAlt from "~icons/carbon/warning-alt";
 
 	// read from the registry store and never the messages, so a job launched three turns
 	// ago reads the same whether the pane was open for it or not
@@ -53,6 +57,8 @@
 
 	const DISCOVERED_TITLE =
 		"Seen in the arguments of a later tool call, not created here: nothing about it is verified";
+	const DISCOVERED_PUSH_TITLE =
+		"Changed while the job ran, found by listing the namespace: the script did not name it";
 
 	let showing = $derived(sidePane.open && sidePane.view === "registry");
 	let services = $derived(sortServices(mlRegistry.services));
@@ -271,6 +277,54 @@
 												{/each}
 											</div>
 										{/if}
+										{#if service.pushes?.length}
+											<ul
+												class="ml-service-pushes mt-1 flex flex-col gap-0.5"
+												aria-label="What {serviceDisplayName(service)} pushed"
+											>
+												{#each service.pushes as push (push.uri)}
+													{@const url = repoPageUrl(push.uri)}
+													<li
+														class="ml-push flex min-w-0 items-center gap-1.5 text-xs"
+														data-status={push.status}
+													>
+														{#if push.status === "pushed"}
+															<CarbonCloudUpload class="size-3 flex-none" />
+															<span class="flex-none">pushed</span>
+														{:else}
+															<CarbonWarningAlt class="size-3 flex-none" />
+															<span class="flex-none">nothing pushed to</span>
+														{/if}
+														{#if url}
+															<a
+																href={url}
+																target="_blank"
+																rel="noopener noreferrer"
+																class="ml-registry-link min-w-0 truncate font-mono"
+																title="Open {hubLabel(push.uri)} on the Hub"
+															>
+																{hubLabel(push.uri)}
+															</a>
+														{:else}
+															<span class="min-w-0 truncate font-mono">{hubLabel(push.uri)}</span>
+														{/if}
+														{#if push.commit}
+															<span
+																class="flex-none font-mono text-[11px] text-[#a8a29e] dark:text-[#78716c]"
+																title="commit {push.commit}"
+															>
+																{shortCommit(push.commit)}
+															</span>
+														{/if}
+														{#if push.discovered}
+															<span class="ml-registry-discovered" title={DISCOVERED_PUSH_TITLE}
+																>discovered</span
+															>
+														{/if}
+													</li>
+												{/each}
+											</ul>
+										{/if}
 										{#if service.tokenMissingSince}
 											<p class="mt-0.5 text-xs text-[#a8a29e] dark:text-[#78716c]">
 												Status unknown since the session expired.
@@ -298,6 +352,7 @@
 						<ul class="ml-registry-list">
 							{#each grouped.repos as { repo, files } (repo.id)}
 								{@const Icon = ARTEFACT_ICON[repo.kind]}
+								{@const pusher = pushingService(repo, mlRegistry.services)}
 								<li class="ml-artefact px-4 py-2.5" data-kind={repo.kind}>
 									<div class="flex items-center gap-2.5">
 										<Icon class="size-[14px] flex-none text-[#78716c] dark:text-[#a8a29e]" />
@@ -318,6 +373,30 @@
 											>
 										{/if}
 									</div>
+									{#if pusher}
+										<p
+											class="ml-artefact-pushed mt-0.5 flex min-w-0 items-baseline gap-1.5 pl-[24px] text-xs text-[#78716c] dark:text-[#a8a29e]"
+										>
+											<span class="flex-none">pushed by</span>
+											<a
+												href={pusher.hubUrl}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="ml-registry-link min-w-0 truncate text-[#57534e] dark:text-[#d6d3d1]"
+												title={serviceTitle(pusher)}
+											>
+												{serviceDisplayName(pusher)}
+											</a>
+											{#if repo.commit}
+												<span
+													class="flex-none font-mono text-[11px] text-[#a8a29e] dark:text-[#78716c]"
+													title="commit {repo.commit}"
+												>
+													{shortCommit(repo.commit)}
+												</span>
+											{/if}
+										</p>
+									{/if}
 									{#if files.length}
 										<ul
 											class="ml-artefact-files mt-1.5 ml-[6px] border-l border-[#ececea] pl-[15px] dark:border-[#262626]"
@@ -891,6 +970,22 @@
 	:global(.dark) .ml-file-ref:hover {
 		border-color: #c4511a;
 		color: #f0a468;
+	}
+
+	.ml-push {
+		color: #78716c;
+	}
+
+	.ml-push[data-status="missing"] {
+		color: #b91c1c;
+	}
+
+	:global(.dark) .ml-push {
+		color: #a8a29e;
+	}
+
+	:global(.dark) .ml-push[data-status="missing"] {
+		color: #f87171;
 	}
 
 	/* the same 1.4s breath as the strip running step */
