@@ -31,7 +31,11 @@ import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
-import { compressUpdatesForStorage } from "$lib/server/generation/compressUpdates";
+import {
+	compressUpdatesForStorage,
+	messageForStorage,
+} from "$lib/server/generation/compressUpdates";
+import { restoreRunningShape } from "$lib/server/generation/messageShape";
 import { applyUpdateToMessage } from "$lib/server/generation/applyUpdate";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
@@ -403,6 +407,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	if (!messageToWriteTo) {
 		error(500, "Failed to create message");
 	}
+	restoreRunningShape(messageToWriteTo);
 	if (messagesForPrompt.length === 0) {
 		error(500, "Failed to create prompt");
 	}
@@ -437,10 +442,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		if (generationWriter && messageToWriteTo) {
 			messageToWriteTo.materializedSeq = generationWriter.currentSeq();
 		}
-		const messagesForSave = conv.messages.map((msg) => ({
-			...msg,
-			updates: compressUpdatesForStorage(msg.updates),
-		}));
+		const messagesForSave = conv.messages.map(messageForStorage);
 
 		await collections.conversations.updateOne(
 			{ _id: convId },

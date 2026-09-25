@@ -5,6 +5,7 @@ import { config } from "$lib/server/config";
 import yazl from "yazl";
 import { downloadFile } from "$lib/server/files/downloadFile";
 import mimeTypes from "mime-types";
+import { toLegacyShape } from "$lib/utils/messageShape";
 import { logger } from "$lib/server/logger";
 
 export const GET: RequestHandler = async ({ locals }) => {
@@ -94,7 +95,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 							...conversation,
 							messages: conversation.messages.map((message) => {
 								return {
-									...message,
+									...toLegacyShape(message),
 									files: filenames,
 									updates: undefined,
 								};

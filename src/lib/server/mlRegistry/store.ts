@@ -9,6 +9,9 @@ import type { MlService, MlServiceKind } from "$lib/types/MlService";
 
 export const UNKNOWN_STAGE = "UNKNOWN";
 
+/** what a row the poller gave up on was reported as, never a stage the hub returns */
+export const UNTRACKED_STAGE = "UNTRACKED";
+
 export const hubJobUrl = (namespace: string, jobId: string): string =>
 	`https://huggingface.co/jobs/${namespace}/${jobId}`;
 
@@ -183,6 +186,32 @@ export async function deleteMlRegistry(conversationIds: ObjectId[]): Promise<voi
 		collections.mlServices.deleteMany(filter),
 		collections.mlArtefacts.deleteMany(filter),
 	]);
+}
+
+export interface ServiceReport {
+	_id: ObjectId;
+	/** the stage the row had when it was read, a row that moved on since is not marked */
+	stage: string;
+	/** the stage, or UNTRACKED_STAGE for a row the poller gave up on */
+	reported: string;
+}
+
+/** every path that tells the model about an ended row records it here so it is told once */
+export async function markServicesReported(reports: readonly ServiceReport[]): Promise<void> {
+	if (reports.length === 0) return;
+	await collections.mlServices.bulkWrite(
+		reports.map(({ _id, stage, reported }) => ({
+			updateOne: {
+				filter: { _id, stage },
+				// an event still pending would tell the model a second time from a parked wait
+				update: {
+					$set: { lastReportedStage: reported },
+					$unset: { eventPendingSince: "" as const },
+				},
+			},
+		})),
+		{ ordered: false }
+	);
 }
 
 export function listMlServices(conversationId: ObjectId): Promise<MlService[]> {

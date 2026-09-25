@@ -24,7 +24,8 @@ import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { createGenerationWriter } from "./writer";
 import { applyUpdateToMessage } from "./applyUpdate";
 import { turnAbandoned, turnEnded, turnRunning, turnUnsaved } from "./turnState";
-import { compressUpdatesForStorage } from "./compressUpdates";
+import { compressUpdatesForStorage, messageForStorage } from "./compressUpdates";
+import { restoreRunningShape } from "./messageShape";
 
 const SWEEP_BATCH = 5;
 /** A row this many attempts deep is not going to resume; stop burning turns on it. */
@@ -303,6 +304,7 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 	const { locals, settings, tokenExpired } = await rebuildIdentity(park);
 
 	const generationId = randomUUID();
+	restoreRunningShape(message);
 	const initialContent = message.content;
 	const promptedAt = new Date();
 	const abortController = new AbortController();
@@ -349,10 +351,7 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 			{ _id: conv._id },
 			{
 				$set: {
-					messages: conv.messages.map((m) => ({
-						...m,
-						updates: compressUpdatesForStorage(m.updates),
-					})),
+					messages: conv.messages.map(messageForStorage),
 					title: conv.title,
 					updatedAt: new Date(),
 				},
