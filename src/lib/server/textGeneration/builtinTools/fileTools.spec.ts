@@ -66,6 +66,15 @@ describe("write_file", () => {
 		});
 	});
 
+	it("records the sub-agent label when the call runs inside one", async () => {
+		const { conv, write } = tools();
+
+		await write.execute({ name: "train.py", content: "a" }, { ...ctx, agent: "sandbox" });
+
+		const stored = await collections.mlFiles.findOne({ conversationId: conv._id });
+		expect(stored).toMatchObject({ agent: "sandbox", messageId: "msg-1" });
+	});
+
 	it("bumps the version on a rewrite", async () => {
 		const { write } = tools();
 		await write.execute({ name: "train.py", content: "a" }, ctx);

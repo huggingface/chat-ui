@@ -127,6 +127,7 @@ describe("ML Assistant virtual files", () => {
 		});
 		expect(withTools).toContain("VIRTUAL FILES:");
 		expect(withTools).toContain("exactly three places");
+		expect(withTools).toContain("comes back with import_file");
 		expect(inMode(HF_TOOLS)).not.toContain("VIRTUAL FILES:");
 	});
 });

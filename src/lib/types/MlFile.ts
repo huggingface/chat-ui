@@ -16,7 +16,9 @@ export interface MlFile {
 	/** utf8 bytes of content */
 	size: number;
 	sha256: string;
-	origin: "write" | "edit";
+	origin: "write" | "edit" | "import";
+	/** what an import read, the sandbox handle and path or the hf:// uri */
+	source?: string;
 	createdAt: Date;
 	messageId?: Message["id"];
 	generationId?: string;
@@ -24,4 +26,6 @@ export interface MlFile {
 	toolUuid?: string;
 	/** one line the model gave */
 	summary?: string;
+	/** label of the sub-agent whose run wrote this version, absent for the parent loop */
+	agent?: string;
 }

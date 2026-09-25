@@ -440,6 +440,12 @@ export async function runNestedAgent(
 				...(deps.rewriteArgs ? { rewriteArgs: deps.rewriteArgs } : {}),
 				// No `elicitation`: the sub-agent has no chat to ask, so an
 				// input-required response comes back as an ordinary tool error.
+				// attribution travels apart from elicitation so a sub-agent write lands on the parent message
+				attribution: {
+					...(ctx.messageId ? { messageId: ctx.messageId } : {}),
+					...(ctx.generationId ? { generationId: ctx.generationId } : {}),
+					agent: spec.label,
+				},
 			});
 			for await (const event of exec) {
 				// The sub-agent's raw Call/Result updates stay internal — the

@@ -72,6 +72,7 @@ export interface MlFileAttribution {
 	messageId?: string;
 	generationId?: string;
 	toolUuid?: string;
+	agent?: string;
 }
 
 export interface WrittenMlFile {
@@ -106,6 +107,7 @@ interface WriteMlFileParams {
 	name: string;
 	content: string;
 	origin: MlFile["origin"];
+	source?: string;
 	summary?: string;
 	attribution?: MlFileAttribution;
 }
@@ -150,12 +152,14 @@ export async function writeMlFileVersion(
 				size,
 				sha256,
 				origin,
+				...(params.source ? { source: params.source } : {}),
 				createdAt: new Date(),
 				...(params.attribution?.messageId ? { messageId: params.attribution.messageId } : {}),
 				...(params.attribution?.generationId
 					? { generationId: params.attribution.generationId }
 					: {}),
 				...(params.attribution?.toolUuid ? { toolUuid: params.attribution.toolUuid } : {}),
+				...(params.attribution?.agent ? { agent: params.attribution.agent } : {}),
 				...(summary ? { summary } : {}),
 			} as MlFile);
 			return { name, version, size, lineCount: countLines(content), sha256 };

@@ -688,6 +688,7 @@ describe("runMcpFlow offering the question tool", () => {
 			"write_file",
 			"edit_file",
 			"read_file",
+			"import_file",
 		]);
 	});
 
