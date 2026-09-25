@@ -43,7 +43,7 @@ import {
 	turnRunning,
 } from "./turnState";
 import { compressUpdatesForStorage, messageForStorage } from "./compressUpdates";
-import { restoreRunningShape } from "./messageShape";
+import { restoreRunningShape } from "$lib/utils/messageShape";
 
 const SWEEP_BATCH = 5;
 /** A row this many claims deep is not going to store its result; stop trying. */

@@ -209,3 +209,74 @@ describe("collapsed process blocks during streaming", () => {
 		expect(summaries(screen.baseElement as HTMLElement).length).toBeGreaterThan(0);
 	});
 });
+
+describe("a finished turn stored in the rounds shape", () => {
+	const args = '{"path":"/work","recursive":true}';
+	const callUpdate = (parameters: Record<string, unknown>) => ({
+		type: "tool",
+		subtype: "call",
+		uuid: "u1",
+		call: { name: "hf_fs", parameters },
+		argumentsRaw: args,
+		reasoning: "I need the files.",
+		content: "Let me look.",
+	});
+	const resultUpdate = {
+		type: "tool",
+		subtype: "result",
+		uuid: "u1",
+		result: { status: 0, call: { name: "hf_fs", parameters: {} }, outputs: [{ text: "ok" }] },
+	};
+	const round = "<think>I need the files.</think>Let me look.";
+	const answer = "<think>All there.</think>Everything is in **/work**.";
+	const legacy = {
+		id: "m1",
+		from: "assistant",
+		content: round + answer,
+		children: [],
+		updates: [
+			{ type: "stream", token: "", len: round.length },
+			callUpdate({ path: "/work", recursive: true }),
+			resultUpdate,
+			{ type: "stream", token: "", len: answer.length },
+			{ type: "finalAnswer", text: answer, interrupted: false },
+		],
+	};
+	const rounds = {
+		id: "m1",
+		from: "assistant",
+		content: "Everything is in **/work**.",
+		reasoning: "All there.",
+		contentShape: 2,
+		children: [],
+		updates: [
+			callUpdate({}),
+			resultUpdate,
+			{ type: "finalAnswer", text: "", len: answer.length, interrupted: false },
+		],
+	};
+	const show = (message: unknown) =>
+		render(ChatMessage, { message, loading: false, isLast: false } as never).container;
+
+	it("renders what its legacy form rendered", async () => {
+		const fromLegacy = show(legacy);
+		const fromRounds = show(rounds);
+		await vi.waitFor(() => {
+			expect(fromLegacy.querySelector("strong")?.textContent).toBe("/work");
+			expect(fromRounds.querySelector("strong")?.textContent).toBe("/work");
+		});
+
+		expect(fromRounds.innerHTML).toBe(fromLegacy.innerHTML);
+		expect(fromRounds.textContent?.match(/Let me look\./g)).toHaveLength(1);
+	});
+
+	it("copies every visible text, the round's preamble included", async () => {
+		const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+		const copy = show(rounds).querySelector<HTMLButtonElement>("button[title='Copy to clipboard']");
+		copy?.click();
+
+		await vi.waitFor(() =>
+			expect(writeText).toHaveBeenCalledWith("Let me look.Everything is in **/work**.")
+		);
+	});
+});

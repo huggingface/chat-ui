@@ -3,6 +3,7 @@ import { applyUpdateToMessage } from "../applyUpdate";
 import { compressUpdatesForStorage } from "../compressUpdates";
 import type { Message } from "$lib/types/Message";
 import {
+	MessageElicitationUpdateType,
 	MessageToolUpdateType,
 	MessageUpdateStatus,
 	MessageUpdateType,
@@ -29,6 +30,10 @@ export interface FixtureRound {
 	storesNothing?: boolean;
 	/** the last call never recorded an outcome */
 	unfinished?: boolean;
+	/** what the calls emit while they run, a question for one */
+	during?: (uuids: string[]) => MessageUpdate[];
+	/** what follows the results, a plan card for one */
+	after?: (uuids: string[]) => MessageUpdate[];
 }
 
 export function toolRound(round: FixtureRound): MessageUpdate[] {
@@ -54,6 +59,7 @@ export function toolRound(round: FixtureRound): MessageUpdate[] {
 			eta: 10,
 		});
 	}
+	events.push(...(round.during?.(uuids) ?? []));
 	for (const [index, name] of tools.entries()) {
 		if (round.unfinished && index === tools.length - 1) break;
 		events.push({
@@ -68,6 +74,7 @@ export function toolRound(round: FixtureRound): MessageUpdate[] {
 			},
 		});
 	}
+	events.push(...(round.after?.(uuids) ?? []));
 	return events;
 }
 
@@ -118,4 +125,115 @@ export function assistantMessage(events: MessageUpdate[], end: FixtureEnd = "don
 		applyUpdateToMessage(event, { message, conv, initialContent: "", isRouterModel: false });
 	}
 	return { ...message, updates: compressUpdatesForStorage(message.updates) };
+}
+
+/** the conversion keeps the whitespace around a preamble, which the live loop stores trimmed */
+export function preamblesTrimmed(message: Message): Message {
+	return {
+		...message,
+		updates: message.updates?.map((update) => {
+			if (update.type !== MessageUpdateType.Tool || update.subtype !== MessageToolUpdateType.Call) {
+				return update;
+			}
+			const { content, ...call } = update;
+			return content?.trim() ? { ...call, content: content.trim() } : call;
+		}),
+	};
+}
+
+export const ARTIFACT = '<artifact identifier="page" type="html" title="Page"><p>hi</p></artifact>';
+
+const question = ([uuid]: string[]): MessageUpdate[] => [
+	{
+		type: MessageUpdateType.Elicitation,
+		subtype: MessageElicitationUpdateType.Request,
+		toolUuid: uuid,
+		request: {
+			elicitationId: `e-${uuid}`,
+			source: "assistant",
+			server: "",
+			mode: "form",
+			message: "",
+			fields: [
+				{
+					kind: "select",
+					name: "q1",
+					title: "Storage",
+					required: true,
+					multiple: false,
+					options: [{ value: "S3", label: "S3" }],
+				},
+			],
+		},
+	},
+	{
+		type: MessageUpdateType.Elicitation,
+		subtype: MessageElicitationUpdateType.Resolved,
+		elicitationId: `e-${uuid}`,
+		action: "accept",
+		resolution: "user",
+		content: { q1: "S3" },
+	},
+];
+
+const plan =
+	(version: number) =>
+	([uuid]: string[]): MessageUpdate[] => [
+		{
+			type: MessageUpdateType.Plan,
+			uuid,
+			goal: "Forecast",
+			steps: [{ step: "Fetch", status: version > 1 ? "completed" : "in_progress" }],
+			version,
+		},
+	];
+
+export function convertingTurns(): Record<string, Message> {
+	return {
+		"plain answer with reasoning": assistantMessage(finalAnswer("Weighing it up.", "It is sunny.")),
+		"rounds with reasoning and preambles": assistantMessage([
+			...toolRound({ reasoning: "I need the weather.", text: "\n\nLet me check.\n\n" }),
+			...toolRound({ reasoning: "Now the forecast.", tools: ["a", "b"] }),
+			...toolRound({ text: "One more." }),
+			...finalAnswer("I have it all.", "Sunny all week."),
+		]),
+		"runaway loop": assistantMessage([
+			...Array.from({ length: 6 }, () =>
+				toolRound({ reasoning: "Check again.", text: "Checking again." })
+			).flat(),
+			...finalAnswer("Still checking.", "Checking again."),
+		]),
+		"stopped mid-call": assistantMessage([
+			...toolRound({ reasoning: "Plan.", text: "Let me check." }),
+			...toolRound({ reasoning: "Again.", unfinished: true }),
+		]),
+		"stopped mid-call with the text so far": assistantMessage([
+			...toolRound({ reasoning: "Plan.", text: "Let me check." }),
+			...toolRound({ reasoning: "Again.", unfinished: true }),
+			{
+				type: MessageUpdateType.FinalAnswer,
+				text: "<think>Plan.</think>Let me check.<think>Again.</think>",
+				interrupted: true,
+			},
+		]),
+		"artifact in a preamble": assistantMessage([
+			...toolRound({ reasoning: `Draft it: ${ARTIFACT}`, text: `Here it is. ${ARTIFACT}` }),
+			...finalAnswer("Done.", "Built the page."),
+		]),
+		"literal closer in a preamble": assistantMessage([
+			...toolRound({ reasoning: "Plan.", text: "Closing </think> here." }),
+			...finalAnswer(undefined, "Done."),
+		]),
+		"a question answered mid-turn": assistantMessage([
+			...toolRound({ reasoning: "Ask first.", tools: ["ask_user_question"], during: question }),
+			...toolRound({ reasoning: "They chose S3.", text: "Setting up S3." }),
+			...finalAnswer(undefined, "Uploads go to S3."),
+		]),
+		"plan updates": assistantMessage([
+			...toolRound({ reasoning: "Plan it.", tools: ["update_plan"], after: plan(1) }),
+			...toolRound({ text: "Fetching." }),
+			...toolRound({ reasoning: "Done.", tools: ["update_plan"], after: plan(2) }),
+			...finalAnswer("Wrap up.", "Sunny."),
+		]),
+	};
 }

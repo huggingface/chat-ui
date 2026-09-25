@@ -11,6 +11,8 @@
 	import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 	import { formatFileRef } from "$lib/utils/mlRegistry";
+	import { callArguments } from "$lib/utils/messageShape";
+	import { redactToolArguments } from "$lib/utils/redactSecrets";
 	import { page } from "$app/state";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonDocument from "~icons/carbon/document";
@@ -215,7 +217,7 @@
 							</div>
 							<pre
 								class="rounded-lg bg-gray-100 p-2 font-mono text-xs break-all whitespace-pre-wrap dark:bg-gray-800/70">{formatValue(
-									update.call.parameters
+									redactToolArguments(callArguments(update))
 								)}</pre>
 						</div>
 					{:else if update.subtype === MessageToolUpdateType.Error}

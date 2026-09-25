@@ -188,6 +188,8 @@ export interface MessageFinalAnswerUpdate {
 	type: MessageUpdateType.FinalAnswer;
 	text: string;
 	interrupted: boolean;
+	/** length of the text, stored in its place when the rounds shape holds the answer in content */
+	len?: number;
 }
 export interface MessageRouterMetadataUpdate {
 	type: MessageUpdateType.RouterMetadata;

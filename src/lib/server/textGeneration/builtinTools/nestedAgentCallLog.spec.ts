@@ -7,7 +7,8 @@ vi.mock("$lib/server/database", () => ({
 	collections: { nestedAgentCalls: { insertMany: (...args: unknown[]) => insertMany(...args) } },
 }));
 
-const { recordNestedAgentCalls, redactSecrets } = await import("./nestedAgentCallLog");
+const { recordNestedAgentCalls } = await import("./nestedAgentCallLog");
+const { redactSecrets } = await import("$lib/utils/redactSecrets");
 
 const ctx = { conversationId: new ObjectId(), messageId: "msg-1", generationId: "gen-1" };
 

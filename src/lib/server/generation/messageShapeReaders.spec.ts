@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { convertMessageShape } from "./messageShape";
-import { assistantMessage, finalAnswer, toolRound } from "./__tests__/turnFixtures";
+import { convertingTurns, preamblesTrimmed } from "./__tests__/turnFixtures";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
 import { stripReasoningFromMessageForRouting } from "$lib/server/textGeneration/utils/routing";
 import { collectArtifacts } from "$lib/utils/artifacts";
@@ -20,37 +20,7 @@ const user = (content: string): Message => ({
 	content,
 });
 
-const ARTIFACT = '<artifact identifier="page" type="html" title="Page"><p>hi</p></artifact>';
-
-const fixtures: Record<string, Message> = {
-	"plain answer with reasoning": assistantMessage(finalAnswer("Weighing it up.", "It is sunny.")),
-	"rounds with reasoning and preambles": assistantMessage([
-		...toolRound({ reasoning: "I need the weather.", text: "\n\nLet me check.\n\n" }),
-		...toolRound({ reasoning: "Now the forecast.", tools: ["a", "b"] }),
-		...toolRound({ text: "One more." }),
-		...finalAnswer("I have it all.", "Sunny all week."),
-	]),
-	"runaway loop": assistantMessage([
-		...Array.from({ length: 6 }, () =>
-			toolRound({ reasoning: "Check again.", text: "Checking again." })
-		).flat(),
-		...finalAnswer("Still checking.", "Checking again."),
-	]),
-	"stopped mid-call": assistantMessage([
-		...toolRound({ reasoning: "Plan.", text: "Let me check." }),
-		...toolRound({ reasoning: "Again.", unfinished: true }),
-	]),
-	"artifact in a preamble": assistantMessage([
-		...toolRound({ reasoning: `Draft it: ${ARTIFACT}`, text: `Here it is. ${ARTIFACT}` }),
-		...finalAnswer("Done.", "Built the page."),
-	]),
-	"literal closer in a preamble": assistantMessage([
-		...toolRound({ reasoning: "Plan.", text: "Closing </think> here." }),
-		...finalAnswer(undefined, "Done."),
-	]),
-};
-
-const cases = Object.entries(fixtures).map(([name, legacy]) => {
+const cases = Object.entries(convertingTurns()).map(([name, legacy]) => {
 	const result = convertMessageShape(legacy);
 	if (!("message" in result)) throw new Error(`${name} did not convert: ${result.skipped}`);
 	return { name, legacy, rounds: result.message };
@@ -59,9 +29,10 @@ const cases = Object.entries(fixtures).map(([name, legacy]) => {
 describe.each(cases)("$name", ({ legacy, rounds }) => {
 	const history = (message: Message) => [user("Weather?"), message, user("And now?")];
 
-	it("is actually stored differently", () => {
+	it("is actually stored differently, and gives back exactly what it was", () => {
 		expect(rounds.content).not.toBe(legacy.content);
-		expect(toLegacyShape(rounds)).toEqual({ ...legacy, updates: rounds.updates });
+		expect(rounds.updates).not.toEqual(legacy.updates);
+		expect(preamblesTrimmed(toLegacyShape(rounds))).toEqual(legacy);
 	});
 
 	it.each([
