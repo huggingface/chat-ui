@@ -229,9 +229,10 @@
 		bind:files
 		bind:draft
 	/>
-	<!-- A first visit also opens the layout's welcome modal. One dialog at a time:
-	     the request waits in memory until that one is dismissed. -->
-	{#if linkRequest && $settings.welcomeModalSeen}
+	<!-- A first visit also opens the layout's welcome modal, and a first switch into
+	     ML Intern its onboarding. One dialog at a time: the request waits in memory
+	     until those are dismissed. -->
+	{#if linkRequest && $settings.welcomeModalSeen && !mlAssistant.onboardingOpen}
 		{@const request = linkRequest}
 		<LinkPromptModal
 			{request}
