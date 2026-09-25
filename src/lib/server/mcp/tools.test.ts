@@ -212,6 +212,7 @@ describe("getOpenAiToolsForMcp per-server cache", () => {
 		expect(second.mapping.search).toMatchObject({
 			fnName: "search",
 			server: "Server A",
+			serverUrl: SERVER_A.url,
 			tool: "search",
 		});
 		// The server's own schema survives the cache round trip: the preflight

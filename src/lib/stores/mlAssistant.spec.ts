@@ -15,12 +15,12 @@ describe("mlAssistant store", () => {
 		mlAssistant.syncConversation(undefined);
 	});
 
-	it("toggles freely until a task starts, then locks", () => {
+	it("toggles freely until a task is confirmed, then locks", () => {
 		mlAssistant.toggle(true);
 		expect(mlAssistant.enabled).toBe(true);
 		expect(mlAssistant.locked).toBe(false);
 
-		mlAssistant.startTask();
+		mlAssistant.confirmCreation(true);
 		expect(mlAssistant.taskStarted).toBe(true);
 		expect(mlAssistant.locked).toBe(true);
 
@@ -28,9 +28,15 @@ describe("mlAssistant store", () => {
 		expect(mlAssistant.enabled).toBe(true);
 	});
 
-	it("does not start a task while the mode is off", () => {
-		mlAssistant.startTask();
+	it("takes the created conversation's confirmed mode as truth", () => {
+		mlAssistant.toggle(true);
+		mlAssistant.confirmCreation(false);
+		expect(mlAssistant.enabled).toBe(false);
 		expect(mlAssistant.taskStarted).toBe(false);
+
+		mlAssistant.confirmCreation(true);
+		expect(mlAssistant.enabled).toBe(true);
+		expect(mlAssistant.taskStarted).toBe(true);
 	});
 
 	it("reports the running step's status label, then Done", () => {
@@ -57,7 +63,7 @@ describe("mlAssistant store", () => {
 
 	it("adopts the conversation a run started from the home composer creates", () => {
 		mlAssistant.toggle(true);
-		mlAssistant.startTask();
+		mlAssistant.confirmCreation(true);
 		mlAssistant.setPlan([step("Research", "running")]);
 
 		// The created conversation arrives already marked, and keeps its plan.
@@ -69,30 +75,16 @@ describe("mlAssistant store", () => {
 
 	it("does not adopt a plain conversation opened while a create is in flight", () => {
 		mlAssistant.toggle(true);
-		mlAssistant.startTask();
+		expect(mlAssistant.enabled).toBe(true);
 
 		expect(mlAssistant.syncConversation("someone-elses-conversation")).toBe(true);
 		expect(mlAssistant.enabled).toBe(false);
 		expect(mlAssistant.taskStarted).toBe(false);
 	});
 
-	it("unlatches the task when the conversation it was for never got created", () => {
-		mlAssistant.toggle(true);
-		mlAssistant.startTask();
-		mlAssistant.setPlan([step("Research", "running")]);
-
-		mlAssistant.abortTask();
-
-		expect(mlAssistant.taskStarted).toBe(false);
-		expect(mlAssistant.steps).toEqual([]);
-		// The switch is usable again, and the mode stays on so a retry keeps it.
-		expect(mlAssistant.locked).toBe(false);
-		expect(mlAssistant.enabled).toBe(true);
-	});
-
 	it("resets when the conversation changes", () => {
 		mlAssistant.toggle(true);
-		mlAssistant.startTask();
+		mlAssistant.confirmCreation(true);
 		mlAssistant.syncConversation("first");
 
 		expect(mlAssistant.syncConversation("second")).toBe(true);
@@ -102,7 +94,7 @@ describe("mlAssistant store", () => {
 
 	it("resets when leaving a conversation for the home composer", () => {
 		mlAssistant.toggle(true);
-		mlAssistant.startTask();
+		mlAssistant.confirmCreation(true);
 		mlAssistant.syncConversation("first");
 
 		expect(mlAssistant.syncConversation(undefined)).toBe(true);

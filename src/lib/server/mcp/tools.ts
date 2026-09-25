@@ -25,6 +25,8 @@ export type McpToolAnnotations = {
 export interface McpToolMapping {
 	fnName: string;
 	server: string;
+	/** The URL of the server that owns this tool, when available. */
+	serverUrl?: string;
 	tool: string;
 	/** The server's unsanitized inputSchema, for checking arguments before dispatch. */
 	inputSchema?: Record<string, unknown>;
@@ -339,6 +341,7 @@ export async function getOpenAiToolsForMcp(
 			mapping[plainName] = {
 				fnName: plainName,
 				server: server.name,
+				serverUrl: server.url,
 				tool: tool.name,
 				...(tool.inputSchema ? { inputSchema: tool.inputSchema } : {}),
 				...(tool.annotations ? { annotations: tool.annotations } : {}),
