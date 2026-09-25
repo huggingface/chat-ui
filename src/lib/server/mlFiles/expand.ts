@@ -112,6 +112,7 @@ async function refuseCommandFileUse(
 	if (tokens.length === 0) return undefined;
 	const byRef = tokens.map((token) => parseVirtualFileRef(token)).find((ref) => ref);
 	let name = byRef?.name;
+	const version = byRef?.version;
 	if (!name) {
 		const files = await listMlFiles(conversationId);
 		const names = new Set(files.map((file) => file.name));
@@ -122,7 +123,7 @@ async function refuseCommandFileUse(
 	return (
 		`${name} is a virtual file and the container of a ${String(args.operation)} job never ` +
 		`receives it, so nothing was sent. Submit it with ${operation}: ` +
-		`{"operation": "${operation}", "args": {"script": "${formatVirtualFileRef(name)}"}}, ` +
+		`{"operation": "${operation}", "args": {"script": "${formatVirtualFileRef(name, version)}"}}, ` +
 		`with third-party imports in with_deps and its arguments in script_args.`
 	);
 }

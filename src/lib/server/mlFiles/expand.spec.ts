@@ -111,6 +111,13 @@ describe("createVirtualFileExpander", () => {
 			});
 		}
 
+		const pinned = await expand({
+			serverUrl: HUB,
+			tool: "hf_jobs",
+			args: { operation: "run", args: { command: ["python", "v-file://train.py@v1"] } },
+		});
+		expect(pinned).toEqual({ error: expect.stringContaining('"script": "v-file://train.py@v1"') });
+
 		const scheduled = await expand({
 			serverUrl: HUB,
 			tool: "hf_jobs",
