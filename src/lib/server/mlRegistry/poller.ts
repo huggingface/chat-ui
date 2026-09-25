@@ -17,10 +17,12 @@ import type { MlService } from "$lib/types/MlService";
 import { backoffDelayMs, nextPollDelayMs } from "./schedule";
 import { mlServiceEventsEnabled } from "./enabled";
 import { conversationsAwaitingEvents, deliverServiceEvents, endEventFields } from "./events";
+import { claimDueReconcile, reconcileSession } from "./reconcile";
 
 // status only and never logs, an end is marked on the row for deliverServiceEvents
 
 const CLAIM_BATCH = 20;
+const RECONCILE_BATCH = 5;
 /** a pod that dies mid poll leaves its rows due again once this has passed */
 const CLAIM_LEASE_MS = 60_000;
 const NO_TOKEN_DELAY_MS = 5 * 60_000;
@@ -292,10 +294,29 @@ export async function pollDueServices(now = new Date()): Promise<PollOutcome[]> 
 			"[mlPoller] stage changed"
 		);
 	}
+	// a reconcile that throws must not cost the tick its event delivery
+	await reconcileDueSessions(tokens, now).catch((err) =>
+		logger.error({ err }, "[mlReconcile] claiming a due reconcile failed")
+	);
 	if (mlServiceEventsEnabled()) {
 		await deliverServiceEvents(await conversationsAwaitingEvents(), now);
 	}
 	return results;
+}
+
+async function reconcileDueSessions(tokens: TokenCache, now: Date): Promise<void> {
+	for (let i = 0; i < RECONCILE_BATCH; i++) {
+		const session = await claimDueReconcile(now);
+		if (!session) return;
+		try {
+			await reconcileSession(session, await tokenFor(session._id, tokens), now);
+		} catch (err) {
+			logger.error(
+				{ err, conversationId: session._id.toString() },
+				"[mlReconcile] reconcile failed"
+			);
+		}
+	}
 }
 
 export class MlServicePoller {

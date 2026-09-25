@@ -6,6 +6,7 @@ import type { MlBudget, MlBudgetReservation } from "$lib/types/Conversation";
 import type { MlService } from "$lib/types/MlService";
 import { claimDueService, pollDueServices, pollService } from "./poller";
 import { recordDiscoveredService, recordDispatchedService, sandboxHandle } from "./store";
+import { loadSessionJobLabels, markLabelledSubmission, RECONCILE_DELAY_MS } from "./sessionLabel";
 
 beforeAll(async () => {
 	await ready;
@@ -18,6 +19,7 @@ afterEach(async () => {
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 	await collections.mlServices.deleteMany({ conversationId: { $in: conversationIds } });
+	await collections.mlSessionLabels.deleteMany({ _id: { $in: conversationIds } });
 	await collections.conversations.deleteMany({ _id: { $in: conversationIds } });
 	await collections.sessions.deleteMany({ sessionId: { $in: sessionIds } });
 	conversationIds.length = 0;
@@ -517,5 +519,38 @@ describe.sequential("store", () => {
 			jobId: SANDBOX_JOB_ID,
 		});
 		expect(discovered?.nextPollAt).toBeInstanceOf(Date);
+	});
+});
+
+describe.sequential("pollDueServices: reconcile", () => {
+	it("lists a due session's jobs with the conversation's token and records what it missed", async () => {
+		const conversationId = await insertConversation();
+		const { session } = await loadSessionJobLabels(conversationId);
+		await markLabelledSubmission({
+			conversationId,
+			namespace: "testuser",
+			timeoutSeconds: 3600,
+			now: new Date(NOW.getTime() - RECONCILE_DELAY_MS),
+		});
+		const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => ({
+			ok: true,
+			status: 200,
+			headers: new Headers(),
+			json: async () => [
+				{ id: JOB_ID, status: { stage: "RUNNING" }, labels: { "ml-intern-session": session } },
+			],
+		}));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await pollDueServices(NOW);
+
+		const [url, init] = fetchMock.mock.calls[0];
+		expect(new URL(String(url)).pathname).toBe("/api/jobs/testuser");
+		expect((init?.headers as Record<string, string>).Authorization).toBe(`Bearer ${TOKEN}`);
+		expect(await collections.mlServices.findOne({ conversationId, jobId: JOB_ID })).toMatchObject({
+			stage: "RUNNING",
+			origin: "dispatched",
+			reconciled: true,
+		});
 	});
 });
