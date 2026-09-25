@@ -1,4 +1,6 @@
 import { collections } from "$lib/server/database";
+import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
+import type { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
 import type { Conversation } from "$lib/types/Conversation";
 import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
@@ -39,9 +41,13 @@ export async function GET({ locals, url }) {
 
 export async function DELETE({ locals }) {
 	if (locals.user?._id || locals.sessionId) {
-		await collections.conversations.deleteMany({
-			...authCondition(locals),
-		});
+		const ids = await collections.conversations
+			.find(authCondition(locals))
+			.project<{ _id: ObjectId }>({ _id: 1 })
+			.map((conv) => conv._id)
+			.toArray();
+		await collections.conversations.deleteMany({ _id: { $in: ids } });
+		await deleteMlRegistry(ids);
 	}
 
 	return new Response();
