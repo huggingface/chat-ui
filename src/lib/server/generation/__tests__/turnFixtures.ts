@@ -188,6 +188,26 @@ const plan =
 		},
 	];
 
+const jobEnded = (uuids: string[]): MessageUpdate[] => [
+	{
+		type: MessageUpdateType.HarnessEvent,
+		events: [
+			{
+				serviceId: "svc",
+				kind: "job",
+				jobId: "0123456789abcdef01234567",
+				name: "sft-smoke",
+				from: "RUNNING",
+				to: "ERROR",
+				ranSeconds: 137,
+				at: 0,
+			},
+		],
+		text: "[Harness event, not part of this tool result]\nJob sft-smoke failed: ERROR after 2m17s.",
+		afterToolUuid: uuids[uuids.length - 1],
+	},
+];
+
 export function convertingTurns(): Record<string, Message> {
 	return {
 		"plain answer with reasoning": assistantMessage(finalAnswer("Weighing it up.", "It is sunny.")),
@@ -228,6 +248,11 @@ export function convertingTurns(): Record<string, Message> {
 			...toolRound({ reasoning: "Ask first.", tools: ["ask_user_question"], during: question }),
 			...toolRound({ reasoning: "They chose S3.", text: "Setting up S3." }),
 			...finalAnswer(undefined, "Uploads go to S3."),
+		]),
+		"a job ended mid-turn": assistantMessage([
+			...toolRound({ reasoning: "Write the eval.", text: "Writing it.", after: jobEnded }),
+			...toolRound({ reasoning: "It failed, read the logs." }),
+			...finalAnswer(undefined, "It ran out of memory."),
 		]),
 		"plan updates": assistantMessage([
 			...toolRound({ reasoning: "Plan it.", tools: ["update_plan"], after: plan(1) }),

@@ -18,6 +18,7 @@ import type { StoredHistoryWindow } from "$lib/types/Conversation";
 import type { ObjectId } from "mongodb";
 import { isValidJsonObject } from "$lib/server/textGeneration/mcp/toolInvocation";
 import { ROUNDS_SHAPE, rebuildLegacyContent, toolRounds } from "$lib/utils/messageShape";
+import { withHarnessEvent } from "./harnessEvent";
 import {
 	answeredQuestion,
 	CHARS_PER_TOKEN,
@@ -248,6 +249,7 @@ function replayAssistantTurn(
 	}
 
 	const outputsByUuid = new Map<string, string>();
+	const eventsByUuid = new Map<string, string[]>();
 	for (const update of updates) {
 		if (isToolResultUpdate(update)) {
 			const result = update.result;
@@ -263,6 +265,9 @@ function replayAssistantTurn(
 			);
 		} else if (isToolErrorUpdate(update)) {
 			outputsByUuid.set(update.uuid, `Error: ${update.message}`);
+		} else if (update.type === MessageUpdateType.HarnessEvent) {
+			const texts = eventsByUuid.get(update.afterToolUuid) ?? [];
+			eventsByUuid.set(update.afterToolUuid, [...texts, update.text]);
 		}
 	}
 
@@ -309,14 +314,16 @@ function replayAssistantTurn(
 			const output = outputsByUuid.has(u.uuid)
 				? (outputsByUuid.get(u.uuid) ?? "")
 				: "Error: interrupted before a result was recorded";
+			const capped =
+				capToolOutputs && output.length > MAX_REPLAYED_TOOL_OUTPUT_CHARS
+					? stripLoneSurrogates(output.slice(0, MAX_REPLAYED_TOOL_OUTPUT_CHARS)) +
+						"\n[...truncated]"
+					: output;
 			replayed.push({
 				role: "tool",
 				tool_call_id: idByUuid.get(u.uuid) ?? u.uuid,
-				content:
-					capToolOutputs && output.length > MAX_REPLAYED_TOOL_OUTPUT_CHARS
-						? stripLoneSurrogates(output.slice(0, MAX_REPLAYED_TOOL_OUTPUT_CHARS)) +
-							"\n[...truncated]"
-						: output,
+				// the event goes on after the cap, a long output never cuts it
+				content: (eventsByUuid.get(u.uuid) ?? []).reduce(withHarnessEvent, capped),
 			});
 		}
 	}

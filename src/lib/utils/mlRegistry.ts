@@ -7,6 +7,7 @@ import type {
 	MlRegistryService,
 } from "$lib/types/MlRegistry";
 import { PARENT_READER, type MlSourceKind } from "$lib/types/MlSource";
+import type { HarnessServiceEvent } from "$lib/types/MessageUpdate";
 
 /** the hub stages after which a job is never billed again */
 const TERMINAL_STAGES = new Set(["COMPLETED", "CANCELED", "ERROR", "DELETED"]);
@@ -68,6 +69,17 @@ export function formatElapsed(ms: number): string {
 	if (hours > 0) return `${hours}h ${pad(minutes)}m`;
 	if (minutes > 0) return `${minutes}m ${pad(seconds)}s`;
 	return `${seconds}s`;
+}
+
+/** the chip text a mid turn event leaves in the message, like sft-smoke failed after 2m 17s */
+export function harnessEventLabel(
+	event: Pick<HarnessServiceEvent, "name" | "jobId" | "to" | "ranSeconds">
+): string {
+	const badge = stageBadge(event.to);
+	const verb = badge.tone === "error" ? "failed" : badge.tone === "unknown" ? "ended" : badge.label;
+	const after =
+		event.ranSeconds !== undefined ? ` after ${formatElapsed(event.ranSeconds * 1000)}` : "";
+	return `${serviceDisplayName(event)} ${verb}${after}`;
 }
 
 /**

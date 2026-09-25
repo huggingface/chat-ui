@@ -387,6 +387,13 @@ export class Database {
 		mlServices
 			.createIndex({ stage: 1, nextPollAt: 1 })
 			.catch((e) => logger.error(e, "Error creating index for mlServices by due time"));
+		// read every tool round of a mode turn, partial because few rows ever carry the mark
+		mlServices
+			.createIndex(
+				{ conversationId: 1, eventPendingSince: 1 },
+				{ partialFilterExpression: { eventPendingSince: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for mlServices by pending event"));
 		mlArtefacts
 			.createIndex({ conversationId: 1, uri: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating unique index for mlArtefacts by uri"));

@@ -27,8 +27,9 @@
 	import ArtifactCard from "./ArtifactCard.svelte";
 	import ElicitationForm from "./ElicitationForm.svelte";
 	import PlanCard from "./PlanCard.svelte";
+	import HarnessEventChip from "./HarnessEventChip.svelte";
 	import { isMessageToolResultUpdate, isMessageToolErrorUpdate } from "$lib/utils/messageUpdates";
-	import type { MessagePlanUpdate } from "$lib/types/MessageUpdate";
+	import type { MessageHarnessEventUpdate, MessagePlanUpdate } from "$lib/types/MessageUpdate";
 	import { page } from "$app/state";
 	import ImageLightbox from "./ImageLightbox.svelte";
 	import { stripArtifacts } from "$lib/utils/artifacts";
@@ -154,7 +155,8 @@
 		| { kind: "group"; blocks: ProcessBlock[]; toolCount: number }
 		| { kind: "artifact"; op: ArtifactOperation; opIndex: number }
 		| ({ kind: "elicitation" } & Omit<ElicitationBlock, "type">)
-		| { kind: "plan"; update: MessagePlanUpdate };
+		| { kind: "plan"; update: MessagePlanUpdate }
+		| { kind: "harnessEvent"; update: MessageHarnessEventUpdate };
 
 	// The live turn's park, rendered as a countdown from its ABSOLUTE deadline
 	// (clock-skew corrected). Only the last message of the conversation can be
@@ -198,6 +200,9 @@
 				// Never folded into the collapsible summary: the plan stays visible.
 				flush();
 				units.push({ kind: "plan", update: block.update });
+			} else if (block.type === "harnessEvent") {
+				flush();
+				units.push({ kind: "harnessEvent", update: block.update });
 			} else {
 				flush();
 				units.push({ kind: "text", content: block.content });
@@ -334,6 +339,10 @@
 							<div data-exclude-from-copy>
 								<PlanCard update={block.update} />
 							</div>
+						{:else if block.type === "harnessEvent"}
+							<div data-exclude-from-copy class={processBlockClasses}>
+								<HarnessEventChip update={block.update} />
+							</div>
 						{:else}
 							<div data-exclude-from-copy class={processBlockClasses}>
 								{#if block.type === "think"}
@@ -378,6 +387,10 @@
 						{:else if unit.kind === "plan"}
 							<div data-exclude-from-copy>
 								<PlanCard update={unit.update} />
+							</div>
+						{:else if unit.kind === "harnessEvent"}
+							<div data-exclude-from-copy class={processBlockClasses}>
+								<HarnessEventChip update={unit.update} />
 							</div>
 						{:else if unit.kind === "group"}
 							<div data-exclude-from-copy class={processBlockClasses}>
