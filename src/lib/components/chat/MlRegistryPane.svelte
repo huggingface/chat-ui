@@ -133,9 +133,11 @@
 		void mlRegistry.serverNow;
 		now = serverCorrectedNow();
 	});
+	// elapsed times need the second, file ages only the minute
+	let tickMs = $derived(openCount > 0 ? 1000 : files.length > 0 ? 30_000 : 0);
 	$effect(() => {
-		if (!showing || openCount === 0) return;
-		const timer = setInterval(() => (now = serverCorrectedNow()), 1000);
+		if (!showing || tickMs === 0) return;
+		const timer = setInterval(() => (now = serverCorrectedNow()), tickMs);
 		return () => clearInterval(timer);
 	});
 

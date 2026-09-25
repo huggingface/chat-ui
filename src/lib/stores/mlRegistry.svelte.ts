@@ -122,7 +122,7 @@ export class MlRegistryStore {
 
 	/** a stale list stays on show while the newer one loads, a failed load is asked again */
 	loadFileVersions(name: string): Promise<void> {
-		const latest = this.files.find((file) => file.name === name)?.version ?? 0;
+		const latest = this.#latestVersion(name);
 		const cached = this.#versions.get(name);
 		if (cached?.status === "ready" && (cached.value[0]?.version ?? 0) >= latest) {
 			return Promise.resolve();
@@ -132,7 +132,11 @@ export class MlRegistryStore {
 			try {
 				const response = await client.conversations({ id: conversationId }).files(name).get();
 				const payload = handleResponse(response) as MlFileVersions;
-				return () => this.#versions.set(name, { status: "ready", value: payload.versions });
+				return () => {
+					this.#versions.set(name, { status: "ready", value: payload.versions });
+					// a poll that listed a newer version mid flight was coalesced into this request
+					return this.#latestVersion(name) > latest ? this.loadFileVersions(name) : undefined;
+				};
 			} catch {
 				return () => {
 					if (cached?.status !== "ready") this.#versions.set(name, { status: "error" });
@@ -152,9 +156,9 @@ export class MlRegistryStore {
 					.files(name)
 					.get({ query: { version } });
 				const payload = handleResponse(response) as MlFileVersionContent;
-				return () => this.#contents.set(key, { status: "ready", value: payload.content });
+				return () => void this.#contents.set(key, { status: "ready", value: payload.content });
 			} catch {
-				return () => this.#contents.set(key, { status: "error" });
+				return () => void this.#contents.set(key, { status: "error" });
 			}
 		});
 	}
@@ -162,7 +166,10 @@ export class MlRegistryStore {
 	/** one request per key at a time, and an answer that lands after a reset lands nowhere */
 	#request(
 		key: string,
-		run: (conversationId: string, client: ReturnType<typeof useAPIClient>) => Promise<() => void>
+		run: (
+			conversationId: string,
+			client: ReturnType<typeof useAPIClient>
+		) => Promise<() => void | Promise<void>>
 	): Promise<void> {
 		const conversationId = this.conversationId;
 		if (!conversationId) return Promise.resolve();
@@ -172,10 +179,14 @@ export class MlRegistryStore {
 		const request = run(conversationId, this.#client()).then((settle) => {
 			if (this.#epoch !== epoch) return;
 			this.#fileRequests.delete(key);
-			settle();
+			return settle();
 		});
 		this.#fileRequests.set(key, request);
 		return request;
+	}
+
+	#latestVersion(name: string): number {
+		return this.files.find((file) => file.name === name)?.version ?? 0;
 	}
 
 	apply(payload: MlRegistryPayload): void {

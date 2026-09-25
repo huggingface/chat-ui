@@ -2,6 +2,7 @@ import MlRegistryPane from "./MlRegistryPane.svelte";
 import { render } from "vitest-browser-svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import superjson from "superjson";
+import { tick } from "svelte";
 import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 import { sidePane } from "$lib/stores/sidePane.svelte";
 import type { MlFileListing, MlFileVersionListing } from "$lib/types/MlFile";
@@ -537,6 +538,21 @@ describe("MlRegistryPane files", () => {
 		await codeOf(row);
 		expect(find(row, ".ml-version-toggle").getAttribute("aria-pressed")).toBe("true");
 		expect(versionRow(container, 3).querySelector(".ml-file-code")).toBeNull();
+	});
+
+	it("keeps file ages moving when nothing is running", async () => {
+		vi.useRealTimers();
+		vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+		vi.setSystemTime(NOW);
+		serveFiles();
+		const { container } = mount(payload({ services: [COMPLETED], artefacts: [], files: FILES }));
+		const meta = () => text(fileRow(container, "train.py").querySelector(".ml-file-meta"));
+		expect(meta()).toBe("3.2 KB · updated 5m ago");
+
+		await tick();
+		vi.advanceTimersByTime(3 * 60_000);
+
+		await vi.waitFor(() => expect(meta()).toBe("3.2 KB · updated 8m ago"));
 	});
 
 	it("says so when the versions cannot be read, and tries again", async () => {

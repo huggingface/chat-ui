@@ -262,15 +262,15 @@ describe("mlRegistry store: file versions and content", () => {
 		const fetcher = (async (input: RequestInfo | URL) => {
 			const url = new URL(String(input));
 			calls.push(`${url.pathname}${url.search}`);
-			if (suspended) await new Promise<void>((resolve) => suspended?.push(resolve));
-			if (failing) throw new TypeError("offline");
 			const name = decodeURIComponent(url.pathname.split("/files/")[1] ?? "");
 			const contents = files[name];
-			if (!contents) return new Response("{}", { status: 404 });
 			const version = url.searchParams.get("version");
 			const body = version
-				? { name, ...listing(Number(version)), content: contents[Number(version) - 1] }
-				: { name, versions: contents.map((_, i) => listing(i + 1)).reverse() };
+				? { name, ...listing(Number(version)), content: contents?.[Number(version) - 1] }
+				: { name, versions: (contents ?? []).map((_, i) => listing(i + 1)).reverse() };
+			if (suspended) await new Promise<void>((resolve) => suspended?.push(resolve));
+			if (failing) throw new TypeError("offline");
+			if (!contents) return new Response("{}", { status: 404 });
 			return new Response(superjson.stringify(body), { status: 200 });
 		}) as typeof fetch;
 		return {
@@ -325,6 +325,27 @@ describe("mlRegistry store: file versions and content", () => {
 		const refetch = store.loadFileVersions("train.py");
 		expect(store.fileVersions("train.py")?.status).toBe("ready");
 		await refetch;
+
+		expect(server.calls).toHaveLength(2);
+		const versions = store.fileVersions("train.py");
+		expect(versions?.status === "ready" && versions.value.map((v) => v.version)).toEqual([3, 2, 1]);
+	});
+
+	it("asks again when a poll lists a newer version while an older answer is in flight", async () => {
+		const table = { "train.py": ["a", "b"] };
+		const server = fileServer(table);
+		const store = bound(server, { "train.py": 2 });
+
+		server.suspend();
+		const first = store.loadFileVersions("train.py");
+		table["train.py"].push("c");
+		store.apply({
+			...payload(),
+			files: [{ name: "train.py", version: 3, size: 9, updatedAt: new Date(0) }],
+		});
+		const coalesced = store.loadFileVersions("train.py");
+		server.release();
+		await Promise.all([first, coalesced]);
 
 		expect(server.calls).toHaveLength(2);
 		const versions = store.fileVersions("train.py");
