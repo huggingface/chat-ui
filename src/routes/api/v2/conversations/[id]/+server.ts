@@ -12,6 +12,7 @@ import { applyConversationSettings } from "$lib/server/conversationSettings";
 import { setMlBudgetLeft, setMlBudgetTotal } from "$lib/server/mlBudget/budget";
 import { reservedMicroUsd, usdToMicroUsd } from "$lib/utils/mlBudget";
 import type { TurnStateSnapshot } from "$lib/types/TurnState";
+import { toLegacyShape } from "$lib/utils/messageShape";
 
 export const GET: RequestHandler = async ({ locals, params, url }) => {
 	requireAuth(locals);
@@ -46,7 +47,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 		: undefined;
 
 	return superjsonResponse({
-		messages: conversation.messages,
+		messages: conversation.messages.map(toLegacyShape),
 		title: conversation.title,
 		model: conversation.model,
 		preprompt: conversation.preprompt,

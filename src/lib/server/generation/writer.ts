@@ -207,8 +207,12 @@ export async function createGenerationWriter(
 			// is the reattach cursor, so any tool/file/router event at or below it that is not
 			// written here would be skipped by a resuming reader and lost if the run dies before
 			// the final full save.
+			// finish materialises after the end of turn save, which may have converted the message
 			await collections.conversations.updateOne(
-				{ _id: conversationId, "messages.id": messageId },
+				{
+					_id: conversationId,
+					messages: { $elemMatch: { id: messageId, contentShape: { $exists: false } } },
+				},
 				{
 					$set: {
 						"messages.$.content": snap.content,
