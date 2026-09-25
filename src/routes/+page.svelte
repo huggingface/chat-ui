@@ -14,18 +14,20 @@
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
-	import { onDestroy, onMount, tick } from "svelte";
+	import { onDestroy, onMount, tick, untrack } from "svelte";
 	import { loading } from "$lib/stores/loading.js";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
 	import {
 		LINK_PARAM_NAMES,
 		linkPromptNeedsConfirmation,
+		readLinkMode,
 		readLinkPromptRequest,
 		type LinkPromptRequest,
 	} from "$lib/utils/linkParams";
 	import LinkPromptModal from "$lib/components/LinkPromptModal.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 
 	let { data } = $props();
 
@@ -166,6 +168,16 @@
 		}
 	});
 
+	let linkMode = $derived(readLinkMode(page.url.searchParams));
+	$effect(() => {
+		if (linkMode !== "ml-intern") return;
+		untrack(() => {
+			if (!ML_ASSISTANT_MODE || data.mlAssistantModels.length === 0) return;
+			if (requireAuthUser()) return;
+			mlAssistant.toggle(true);
+		});
+	});
+
 	// A confirmed request can still be loading attachments when the user moves
 	// on. Once this page is gone it must neither attach nor send: a send from
 	// here navigates, and would pull the user back into a conversation they
@@ -191,6 +203,7 @@
 				}
 			}
 			if (request.send && request.prompt) {
+				mlAssistant.startTask();
 				await createConversation(request.prompt);
 			} else if (request.prompt && !draft) {
 				draft = request.prompt;
@@ -216,9 +229,10 @@
 		bind:files
 		bind:draft
 	/>
-	<!-- A first visit also opens the layout's welcome modal. One dialog at a time:
-	     the request waits in memory until that one is dismissed. -->
-	{#if linkRequest && $settings.welcomeModalSeen}
+	<!-- A first visit also opens the layout's welcome modal, and a first switch into
+	     ML Intern its onboarding. One dialog at a time: the request waits in memory
+	     until those are dismissed. -->
+	{#if linkRequest && $settings.welcomeModalSeen && !mlAssistant.onboardingOpen}
 		{@const request = linkRequest}
 		<LinkPromptModal
 			{request}
