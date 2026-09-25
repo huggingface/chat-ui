@@ -56,6 +56,37 @@ describe.sequential("GET /api/v2/conversations/[id]", () => {
 		expect(data.id).toBe(conv._id.toString());
 	});
 
+	it("returns shared conversations with non-ObjectId ids", async () => {
+		const locals = createTestLocals();
+		const shareId = "abcdefg";
+		await collections.sharedConversations.insertOne({
+			_id: shareId,
+			hash: "share-hash",
+			model: "test-model",
+			title: "Shared Conversation",
+			messages: [
+				{
+					from: "assistant",
+					id: crypto.randomUUID(),
+					content: "Hello from a shared conversation",
+				},
+			],
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+
+		const res = await GET({
+			locals,
+			params: { id: shareId },
+			url: mockUrl(),
+		} as never);
+
+		expect(res.status).toBe(200);
+		const data = await parseResponse<{ id: string; title: string }>(res);
+		expect(data.id).toBe(shareId);
+		expect(data.title).toBe("Shared Conversation");
+	});
+
 	it("throws 404 for non-existent conversation", async () => {
 		const { locals } = await createTestUser();
 		const fakeId = new ObjectId().toString();
