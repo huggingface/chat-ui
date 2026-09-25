@@ -35,6 +35,11 @@ import { streamFor, describeMessages, type ChatMessage, type Round } from "./rep
 const mocks = vi.hoisted(() => ({
 	create: vi.fn(),
 	callMcpTool: vi.fn(),
+	slidingWindow: true,
+}));
+
+vi.mock("$lib/server/textGeneration/utils/historyWindowFlag", () => ({
+	historyWindowEnabled: () => mocks.slidingWindow,
 }));
 
 // Only the client is stubbed. The SDK's error classes stay real: the retry
@@ -261,6 +266,7 @@ beforeAll(async () => {
 beforeEach(() => {
 	mocks.create.mockReset();
 	mocks.callMcpTool.mockReset();
+	mocks.slidingWindow = true;
 	scriptToolResult({ text: "18°C, sunny" });
 });
 
@@ -477,10 +483,8 @@ describe.sequential("replaying a turn that ended badly", () => {
 			{ content: "Never reached." },
 			{ content: "Next turn." },
 		]);
-		// Hangs past the detach below, so the Result update is never emitted.
-		mocks.callMcpTool.mockImplementation(
-			() => new Promise((resolve) => setTimeout(() => resolve({ text: "late" }), 5_000))
-		);
+		// never settles, a late result would resume the detached run inside a later test
+		mocks.callMcpTool.mockImplementation(() => new Promise(() => {}));
 
 		// One more chunk than before the turnState events existed: the turn now
 		// opens with an in-band `running` transition ahead of the tool call.
@@ -897,7 +901,8 @@ describe.sequential("model switching", () => {
 // ── Budget and storage growth ─────────────────────────────────────────────────
 
 describe.sequential("replay budget", () => {
-	it("degrades the oldest turns to flat text, monotonically, without leaking think markup", async () => {
+	it("with the sliding window off, degrades the oldest turns to flat text, monotonically, without leaking think markup", async () => {
+		mocks.slidingWindow = false;
 		const { conv, locals } = await newConversation();
 		await setReasoningOverride(locals, true);
 		// The history budget ceiling is 400k chars, so three turns of ~160k
@@ -934,6 +939,84 @@ describe.sequential("replay budget", () => {
 		// enrichment is fine, leaking the raw trace as visible content is not.
 		expect(JSON.stringify(replayed), shape).not.toContain("<think>");
 		expect(String(assistants[0].content), shape).toBe("Answer one.");
+	});
+
+	it("keeps every turn's reasoning while the request fits the model's window", async () => {
+		const { conv, locals } = await newConversation();
+		await setReasoningOverride(locals, true);
+		const big = (tag: string) => `${tag} `.repeat(27_000);
+		scriptRounds([
+			{ reasoning: big("first"), content: "Answer one." },
+			{ reasoning: big("second"), content: "Answer two." },
+			{ reasoning: big("third"), content: "Answer three." },
+			{ content: "Answer four." },
+		]);
+
+		let current = conv;
+		for (const prompt of ["One?", "Two?", "Three?"]) {
+			await sendMessage(current, locals, prompt, { withTools: false });
+			current = await reload(conv);
+		}
+		await sendMessage(current, locals, "Four?", { withTools: false });
+
+		const replayed = outgoing(3);
+		const assistants = replayed.filter((m) => m.role === "assistant");
+		const shape = describeMessages(replayed);
+		expect(assistants, shape).toHaveLength(3);
+		expect(
+			assistants.every((m) => m.reasoning_content !== undefined),
+			shape
+		).toBe(true);
+		expect(JSON.stringify(replayed), shape).not.toContain("<think>");
+	});
+
+	it("slides the live loop at the window, stores the start and keeps it on the next turn", async () => {
+		// the fixture reports 262,144 tokens, so the limit is about 774k characters and a
+		// request slides past about 580k
+		const { conv, locals } = await newConversation();
+		scriptToolResult({ text: "R".repeat(150_000) });
+		const call = (n: number) => ({
+			toolCalls: [{ id: `call_${n}`, name: "get_weather", arguments: `{"city":"c${n}"}` }],
+		});
+		scriptRounds([
+			call(0),
+			call(1),
+			call(2),
+			call(3),
+			call(4),
+			{ content: "Done." },
+			{
+				content: "Sure.",
+			},
+		]);
+
+		await sendMessage(conv, locals, "Weather?");
+		const toolCount = (n: number) => outgoing(n).filter((m) => m.role === "tool").length;
+		expect([0, 1, 2, 3, 4, 5].map(toolCount)).toEqual([0, 1, 2, 3, 2, 3]);
+
+		const slid = outgoing(4);
+		const shape = describeMessages(slid);
+		expect(slid[0].role, shape).toBe("system");
+		expect(String(slid[1].content), shape).toMatch(
+			/^Weather\?\n\n\[Earlier history omitted: 0 turns \/ 2 tool rounds\./
+		);
+		const toolNames = slid.flatMap((m) => m.tool_calls?.map((c) => c.function.arguments) ?? []);
+		expect(toolNames, shape).toEqual(['{"city":"c2"}', '{"city":"c3"}']);
+
+		const stored = await reload(conv);
+		const turn = assistantMessages(stored)[0];
+		expect(stored.historyWindow).toEqual({ messageId: turn.id, round: 2 });
+
+		await sendMessage(stored, locals, "Again?");
+		const next = outgoing(6);
+		const nextShape = describeMessages(next);
+		expect(
+			next.flatMap((m) => m.tool_calls?.map((c) => c.function.arguments) ?? []),
+			nextShape
+		).toEqual(['{"city":"c2"}', '{"city":"c3"}', '{"city":"c4"}']);
+		expect(String(next[1].content), nextShape).toContain("[Earlier history omitted:");
+		expect(next.at(-1)?.content, nextShape).toBe("Again?");
+		expect((await reload(conv)).historyWindow).toEqual({ messageId: turn.id, round: 2 });
 	});
 
 	it("stores each round's reasoning exactly twice, so growth stays bounded", async () => {

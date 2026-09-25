@@ -15,6 +15,17 @@ import {
 } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { isValidJsonObject } from "$lib/server/textGeneration/mcp/toolInvocation";
+import {
+	answeredQuestion,
+	CHARS_PER_TOKEN,
+	DEFAULT_OUTPUT_TOKENS,
+	groupRounds,
+	historyCost,
+	planWindow,
+	renderWindow,
+	windowLimitChars,
+	type HistoryUnit,
+} from "./historyWindow";
 
 type ChatMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -25,96 +36,24 @@ type ChatMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
  */
 type AssistantReplayMessage = ChatMessageParam & { reasoning_content?: string };
 
-/** Cap replayed tool outputs so old turns can't flood the context window. */
+/** cap on each replayed tool output, legacy path only */
 const MAX_REPLAYED_TOOL_OUTPUT_CHARS = 8000;
 
 /**
- * Cumulative cap on the WHOLE outgoing history, not just the part replay
- * expands. Every message is charged against it — system, user, and plain
- * assistant turns included — because a long conversation that already fills a
- * context window would otherwise still be handed another budget's worth of
- * replay on top and overflow a window it previously fit.
- *
- * Nothing is ever dropped: messages that can't degrade are charged and kept,
- * which can drive the budget negative. All the budget decides is how far back
- * the richer replayed shape extends before turns fall back to the flat
- * {role, content} form the request used before replay existed. Turns are
- * charged newest-first, so recent history keeps its tool calls and reasoning.
- *
- * Not counted: the preprompt and tool schemas, which callers prepend after
- * this function returns — see PROMPT_OVERHEAD_TOKENS.
- *
- * This is only the ceiling. When the model's context window is known it is
- * lowered to fit (see budgetCharsFor), because on a small-context model a flat
- * history that fit could otherwise be expanded into an overflow.
- *
- * Sized for long agentic turns: an ML Assistant turn parks and resumes for
- * half an hour and its tool transcript IS the working state — at the previous
- * 100k ceiling one such turn's floor consumed the whole budget and every
- * turn replayed flat, so the resumed model forgot its own waits, jobs and
- * answered questions. Real windows bound this anyway (budgetCharsFor);
- * the absolute ceiling only protects huge-window models from megabyte
- * requests.
+ * soft ceiling on the whole history when HISTORY_SLIDING_WINDOW is false or the model reports
+ * no window, turns are replayed newest first and the rest fall back to flat text, nothing is dropped
  */
-const HISTORY_BUDGET_CHARS = 400_000;
+const LEGACY_HISTORY_BUDGET_CHARS = 400_000;
 
-/**
- * Characters assumed per token when converting a context window into a
- * character budget. Deliberately below the usual ~4 for English prose: a low
- * ratio yields a smaller budget, so mis-estimating errs toward sending less
- * rather than toward a request the model rejects outright.
- */
-const CHARS_PER_TOKEN = 3;
-
-/**
- * Held back from the context window for the preprompt and tool schemas, which
- * run to thousands of tokens when several MCP servers are selected. The reply
- * is reserved separately, from the model's own configured limit.
- */
+/** held back for the preprompt and tool schemas where the caller cannot measure them */
 const PROMPT_OVERHEAD_TOKENS = 4_000;
 
-/**
- * Reply allowance when the model configures no explicit limit. Models that do
- * configure one are reserved that instead — a model set to emit up to 98k
- * tokens needs 98k held back, and a flat constant would let history plus reply
- * exceed the window even though each fits on its own.
- */
-const DEFAULT_OUTPUT_TOKENS = 4_096;
-
-/**
- * How many characters of history this request may spend.
- *
- * With no context length reported (self-hosted backends, or a router that
- * omits it) this is the flat ceiling, i.e. the behaviour before models
- * reported one. Otherwise the window bounds it, so replay can never push a
- * request past what the model accepts. A window smaller than the reserve
- * yields 0: everything degrades to the flat pre-replay shape, which is the
- * most that model could ever have taken anyway.
- */
-function budgetCharsFor(contextLengthTokens?: number, maxOutputTokens?: number): number {
-	if (!contextLengthTokens || contextLengthTokens <= 0) return HISTORY_BUDGET_CHARS;
+function legacyBudgetChars(contextLengthTokens?: number, maxOutputTokens?: number): number {
+	if (!contextLengthTokens || contextLengthTokens <= 0) return LEGACY_HISTORY_BUDGET_CHARS;
 	const outputReserve =
 		maxOutputTokens && maxOutputTokens > 0 ? maxOutputTokens : DEFAULT_OUTPUT_TOKENS;
 	const usableTokens = Math.max(0, contextLengthTokens - outputReserve - PROMPT_OVERHEAD_TOKENS);
-	return Math.min(HISTORY_BUDGET_CHARS, usableTokens * CHARS_PER_TOKEN);
-}
-
-/**
- * Nominal size charged for one image part instead of its encoded length. A
- * data URL runs to hundreds of thousands of characters while the image costs
- * the model on the order of a thousand tokens, so charging the encoding would
- * let a single attachment flatten every replayable turn behind it.
- */
-const IMAGE_COST_CHARS = 4_000;
-const IMAGE_COST_PLACEHOLDER = "i".repeat(IMAGE_COST_CHARS);
-
-/** Approximate the context a message (or list of them) occupies. */
-function historyCost(value: unknown): number {
-	return JSON.stringify(value, (key, inner) =>
-		key === "url" && typeof inner === "string" && inner.startsWith("data:")
-			? IMAGE_COST_PLACEHOLDER
-			: inner
-	).length;
+	return Math.min(LEGACY_HISTORY_BUDGET_CHARS, usableTokens * CHARS_PER_TOKEN);
 }
 
 /**
@@ -196,7 +135,8 @@ function splitReasoning(
  */
 function replayAssistantTurn(
 	message: EndpointMessage,
-	includeReasoning: boolean
+	includeReasoning: boolean,
+	capToolOutputs: boolean
 ): AssistantReplayMessage[] {
 	const updates = message.updates ?? [];
 	const { visible, parts } = splitReasoning(message.content, message.reasoning);
@@ -355,7 +295,7 @@ function replayAssistantTurn(
 				role: "tool",
 				tool_call_id: idByUuid.get(u.uuid) ?? u.uuid,
 				content:
-					output.length > MAX_REPLAYED_TOOL_OUTPUT_CHARS
+					capToolOutputs && output.length > MAX_REPLAYED_TOOL_OUTPUT_CHARS
 						? stripLoneSurrogates(output.slice(0, MAX_REPLAYED_TOOL_OUTPUT_CHARS)) +
 							"\n[...truncated]"
 						: output,
@@ -366,6 +306,24 @@ function replayAssistantTurn(
 	if (finalMessage) replayed.push(finalMessage);
 	return replayed;
 }
+
+type ReplayCandidate = { replay: AssistantReplayMessage[]; flat: ChatMessageParam };
+type PreparedEntry = ChatMessageParam[] | ReplayCandidate;
+
+/** the stored path, ids are there at runtime even though the endpoint type omits them */
+export type HistoryMessage = EndpointMessage & { id?: string };
+
+export type HistoryOptions = {
+	replayToolHistory?: boolean;
+	attachReasoning?: boolean;
+	currentProducerModel?: string;
+	/** context window of the consuming model in tokens, when it reports one */
+	contextLengthTokens?: number;
+	/** the reply allowance this request asks for, reserved from the window */
+	maxOutputTokens?: number;
+	/** HISTORY_SLIDING_WINDOW, off keeps the legacy budget and its per-output cap */
+	slidingWindow?: boolean;
+};
 
 /**
  * Prepare chat messages for OpenAI-compatible multimodal payloads.
@@ -392,28 +350,73 @@ function replayAssistantTurn(
  *   proceeds regardless of producer.
  */
 export async function prepareMessagesWithFiles(
-	messages: EndpointMessage[],
+	messages: HistoryMessage[],
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
 	isMultimodal: boolean,
-	options?: {
-		replayToolHistory?: boolean;
-		attachReasoning?: boolean;
-		currentProducerModel?: string;
-		/**
-		 * The consuming model's context window in tokens, when known. Bounds how
-		 * much history is sent; omitting it keeps the flat default ceiling.
-		 */
-		contextLengthTokens?: number;
-		/**
-		 * The reply allowance this request will ask for (the model's configured
-		 * max_tokens). Reserved from the window alongside prompt overhead.
-		 */
-		maxOutputTokens?: number;
-	}
+	options?: HistoryOptions
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
-	type ReplayCandidate = { replay: AssistantReplayMessage[]; flat: ChatMessageParam };
-	const prepared = await Promise.all(
-		messages.map(async (message): Promise<ChatMessageParam[] | ReplayCandidate> => {
+	const history = await prepareHistory(messages, imageProcessor, isMultimodal, options);
+	if (!history.units || !options?.contextLengthTokens) return history.messages;
+	// no stored start on this path, it only serves tool-less requests
+	const plan = planWindow(history.units, {
+		limitChars: windowLimitChars(options.contextLengthTokens, options.maxOutputTokens),
+		fixedChars: PROMPT_OVERHEAD_TOKENS * CHARS_PER_TOKEN,
+	});
+	return renderWindow(history.units, plan);
+}
+
+/**
+ * the whole history replayed in full, with its units when the sliding window applies, a caller
+ * that gets no units has the legacy budgeted history
+ */
+export async function prepareHistory(
+	messages: HistoryMessage[],
+	imageProcessor: ReturnType<typeof makeImageProcessor>,
+	isMultimodal: boolean,
+	options?: HistoryOptions
+): Promise<{ messages: ChatMessageParam[]; units?: HistoryUnit[] }> {
+	const sliding = Boolean(
+		options?.slidingWindow && options.contextLengthTokens && options.contextLengthTokens > 0
+	);
+	const prepared = await prepareEntries(messages, imageProcessor, isMultimodal, options, !sliding);
+	if (!sliding) return { messages: legacyBudget(prepared, options) };
+	const units = historyUnits(messages, prepared);
+	return { messages: units.flatMap((unit) => unit.messages), units };
+}
+
+function historyUnits(messages: HistoryMessage[], prepared: PreparedEntry[]): HistoryUnit[] {
+	return prepared.flatMap((entry, i): HistoryUnit[] => {
+		const message = messages[i];
+		const replayed = Array.isArray(entry) ? entry : entry.replay;
+		if (message.from === "system") return [{ messages: replayed, head: true, rounds: 0 }];
+		const start = (round: number) => (message.id ? { messageId: message.id, round } : undefined);
+		if (message.from === "user") {
+			return [{ messages: replayed, opensTurn: true, rounds: 0, start: start(0) }];
+		}
+		let round = 0;
+		return groupRounds(replayed).map((group) => {
+			const isRound = group[0].role === "assistant" && (group[0].tool_calls?.length ?? 0) > 0;
+			const unit: HistoryUnit = {
+				messages: group,
+				rounds: isRound ? 1 : 0,
+				start: start(round),
+				question: isRound ? answeredQuestion(group) : undefined,
+			};
+			if (isRound) round += 1;
+			return unit;
+		});
+	});
+}
+
+async function prepareEntries(
+	messages: HistoryMessage[],
+	imageProcessor: ReturnType<typeof makeImageProcessor>,
+	isMultimodal: boolean,
+	options: HistoryOptions | undefined,
+	capToolOutputs: boolean
+): Promise<PreparedEntry[]> {
+	return Promise.all(
+		messages.map(async (message): Promise<PreparedEntry> => {
 			if (message.from === "user" && message.files && message.files.length > 0) {
 				const { imageParts, textContent } = await prepareFiles(
 					imageProcessor,
@@ -452,7 +455,7 @@ export async function prepareMessagesWithFiles(
 						content: stripThink(message.content),
 					};
 					return {
-						replay: replayAssistantTurn(message, wantsReasoning),
+						replay: replayAssistantTurn(message, wantsReasoning, capToolOutputs),
 						flat,
 					};
 				}
@@ -480,7 +483,9 @@ export async function prepareMessagesWithFiles(
 			return [{ role: message.from, content: message.content }];
 		})
 	);
+}
 
+function legacyBudget(prepared: PreparedEntry[], options?: HistoryOptions): ChatMessageParam[] {
 	// Spend the replay budget newest-first so recent turns keep their full
 	// tool history and older ones degrade to the pre-replay flat shape. The
 	// degradation is monotonic: once any turn falls back to flat, every older
@@ -507,7 +512,7 @@ export async function prepareMessagesWithFiles(
 	// paying only the difference over the floor. A history that already exceeds
 	// the cap leaves nothing to spend, so every turn keeps its flat form and the
 	// request is no larger than it used to be.
-	const total = budgetCharsFor(options?.contextLengthTokens, options?.maxOutputTokens);
+	const total = legacyBudgetChars(options?.contextLengthTokens, options?.maxOutputTokens);
 	const windowBounded = Boolean(options?.contextLengthTokens && options.contextLengthTokens > 0);
 	let budget = total - floor;
 	const resolved: ChatMessageParam[][] = [...flatForms];

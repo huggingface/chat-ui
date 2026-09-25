@@ -29,7 +29,13 @@ import {
 import { buildImageRefResolver } from "./fileRefs";
 import { createVirtualFileExpander } from "$lib/server/mlFiles/expand";
 import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
-import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
+import { prepareHistory } from "$lib/server/textGeneration/utils/prepareFiles";
+import {
+	createHistoryWindow,
+	historyCost,
+	windowLimitChars,
+} from "$lib/server/textGeneration/utils/historyWindow";
+import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWindowFlag";
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
@@ -576,26 +582,22 @@ export async function* runMcpFlow({
 			? Math.max(catalogMaxTokens ?? 0, clampedFloor)
 			: catalogMaxTokens;
 
-		let messagesOpenAI: ChatCompletionMessageParam[] = await prepareMessagesWithFiles(
-			messages,
-			imageProcessor,
-			mmEnabled,
-			{
-				replayToolHistory: true,
-				attachReasoning: mayEchoReasoning,
-				// The model resolved for THIS turn. Under the "omni" router alias a
-				// prior turn in the same conversation can have been produced by a
-				// different model (per-message routing, no user action needed); this
-				// gates reasoning_content to only replay onto its own producer.
-				currentProducerModel: candidateModelId ?? targetModel.id ?? targetModel.name,
-				// The resolved target's window, not the router alias's: under "omni"
-				// the alias itself has none, and the candidate is what serves this
-				// request. Tool schemas are prepended after this returns, which is
-				// part of what CONTEXT_RESERVE_TOKENS holds back.
-				contextLengthTokens: targetContextLength,
-				maxOutputTokens: maxTokens,
-			}
-		);
+		const history = await prepareHistory(messages, imageProcessor, mmEnabled, {
+			replayToolHistory: true,
+			attachReasoning: mayEchoReasoning,
+			// The model resolved for THIS turn. Under the "omni" router alias a
+			// prior turn in the same conversation can have been produced by a
+			// different model (per-message routing, no user action needed); this
+			// gates reasoning_content to only replay onto its own producer.
+			currentProducerModel: candidateModelId ?? targetModel.id ?? targetModel.name,
+			// The resolved target's window, not the router alias's: under "omni"
+			// the alias itself has none, and the candidate is what serves this
+			// request.
+			contextLengthTokens: targetContextLength,
+			maxOutputTokens: maxTokens,
+			slidingWindow: historyWindowEnabled(),
+		});
+		let messagesOpenAI: ChatCompletionMessageParam[] = history.messages;
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
 		// In the mode the doctrine paragraphs are swapped, not appended to: the
 		// generic restraint rule tells the model not to reach for a tool unless it
@@ -622,6 +624,19 @@ export async function* runMcpFlow({
 		} else if (mergedPreprompt.length > 0) {
 			messagesOpenAI = [{ role: "system", content: mergedPreprompt }, ...messagesOpenAI];
 		}
+
+		const historyWindow =
+			history.units && targetContextLength
+				? createHistoryWindow({
+						conversationId: conv._id,
+						units: history.units,
+						offset: messagesOpenAI.length - history.messages.length,
+						limitChars: windowLimitChars(targetContextLength, maxTokens),
+						fixedChars: historyCost(oaTools),
+						stored: conv.historyWindow,
+						liveMessageId: messageId,
+					})
+				: undefined;
 
 		// Tail-injected once per turn; within the turn, freshness travels in the tool
 		// results. Gated on the tool being offered so a stale plan can't tell the model
@@ -770,9 +785,12 @@ export async function* runMcpFlow({
 			// non-blank delta last round — it never became part of a real trace.
 			pendingReasoningWhitespace = "";
 
+			const requestMessages = historyWindow
+				? await historyWindow.fit(messagesOpenAI)
+				: messagesOpenAI;
 			const completionRequest: ChatCompletionCreateParamsStreaming = {
 				...completionBase,
-				messages: messagesOpenAI,
+				messages: requestMessages,
 			};
 
 			// A turn several productive rounds deep must not die on one throttled
@@ -1019,7 +1037,7 @@ export async function* runMcpFlow({
 					const nonStream = await withUpstreamRetry(
 						() =>
 							openai.chat.completions.create(
-								{ ...completionBase, messages: messagesOpenAI, stream: false },
+								{ ...completionBase, messages: requestMessages, stream: false },
 								{
 									signal: abortSignal,
 									headers: {

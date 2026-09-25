@@ -15,6 +15,7 @@ import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
+import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWindowFlag";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import { inferenceBillingHeaders } from "$lib/server/billing";
 // uuid import removed (no tool call ids)
@@ -202,6 +203,7 @@ export async function endpointOai(
 					currentProducerModel: model.id ?? model.name,
 					contextLengthTokens: model.contextLength,
 					maxOutputTokens: parameters?.max_tokens,
+					slidingWindow: historyWindowEnabled(),
 				});
 
 			// Normalize preprompt and handle empty values
