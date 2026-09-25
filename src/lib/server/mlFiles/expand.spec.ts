@@ -24,9 +24,9 @@ async function seeded() {
 }
 
 describe("createVirtualFileExpander", () => {
-	it("expands hf_jobs script for run and uv, latest version by default", async () => {
+	it("expands hf_jobs script for uv and scheduled uv, latest version by default", async () => {
 		const { expand } = await seeded();
-		for (const operation of ["uv", "run"]) {
+		for (const operation of ["uv", "scheduled uv"]) {
 			const args = { operation, args: { script: "v-file://train.py", flavor: "cpu-basic" } };
 			const result = await expand({ serverUrl: HUB, tool: "hf_jobs", args });
 
@@ -77,7 +77,8 @@ describe("createVirtualFileExpander", () => {
 			{ tool: "hf_jobs", args: { operation: "logs", args: { script: "v-file://train.py" } } },
 			{ tool: "hf_fs_write", args: { cmd: "rm", content: "v-file://train.py" } },
 			{ tool: "hf_sandbox_fs", args: { cmd: "cat", args: ["cat", "h", "v-file://train.py"] } },
-			{ tool: "hf_jobs", args: { operation: "run", args: { command: ["v-file://train.py"] } } },
+			{ tool: "hf_jobs", args: { operation: "run", args: { script: "v-file://train.py" } } },
+			{ tool: "hf_jobs", args: { operation: "run", args: { command: ["python", "other.py"] } } },
 			{ tool: "hf_fs_write", args: { cmd: "put", args: ["put", "v-file://train.py"] } },
 			{ tool: "hf_sandbox_fs", args: { cmd: "write", args: ["write", "h", "v-file://train.py"] } },
 			{
@@ -89,6 +90,43 @@ describe("createVirtualFileExpander", () => {
 		for (const { tool, args } of cases) {
 			expect(await expand({ serverUrl: HUB, tool, args }), tool).toEqual({ args, fileRefs: [] });
 		}
+	});
+
+	it("refuses a run command that names a virtual file, by reference or bare name", async () => {
+		const { expand } = await seeded();
+		const commands = [
+			["python", "v-file://train.py"],
+			["python", "train.py"],
+			["python", "./train.py", "--lr", "1e-4"],
+			"python train.py",
+		];
+		for (const command of commands) {
+			const result = await expand({
+				serverUrl: HUB,
+				tool: "hf_jobs",
+				args: { operation: "run", args: { image: "python:3.12", command } },
+			});
+			expect(result, JSON.stringify(command)).toEqual({
+				error: expect.stringContaining('"script": "v-file://train.py"'),
+			});
+		}
+
+		const pinned = await expand({
+			serverUrl: HUB,
+			tool: "hf_jobs",
+			args: { operation: "run", args: { command: ["python", "v-file://train.py@v1"] } },
+		});
+		expect(pinned).toEqual({ error: expect.stringContaining('"script": "v-file://train.py@v1"') });
+
+		const scheduled = await expand({
+			serverUrl: HUB,
+			tool: "hf_jobs",
+			args: {
+				operation: "scheduled run",
+				args: { schedule: "@daily", command: ["python", "eval.py"] },
+			},
+		});
+		expect(scheduled).toEqual({ error: expect.stringContaining('"operation": "scheduled uv"') });
 	});
 
 	it("never touches a same-named tool on another server", async () => {
