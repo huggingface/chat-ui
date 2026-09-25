@@ -104,6 +104,7 @@ export function useAPIClient({
 				...endpoint(fetcher, `${baseUrl}/conversations/${params.id}`),
 				message: (msgParams: { messageId: string }) =>
 					endpoint(fetcher, `${baseUrl}/conversations/${params.id}/message/${msgParams.messageId}`),
+				registry: endpoint(fetcher, `${baseUrl}/conversations/${params.id}/registry`),
 			}),
 			// client.conversations.get(), .delete()
 			{

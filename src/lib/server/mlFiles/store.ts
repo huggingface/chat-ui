@@ -2,7 +2,9 @@ import { createHash } from "crypto";
 import type { ObjectId } from "mongodb";
 import { MongoServerError } from "mongodb";
 import { collections } from "$lib/server/database";
-import type { MlFile } from "$lib/types/MlFile";
+import type { MlFile, MlFileListing } from "$lib/types/MlFile";
+
+export type { MlFileListing };
 
 /**
  * mongodb is canonical, nothing is pushed anywhere unless the model passes a reference
@@ -188,15 +190,6 @@ export async function readMlFile(
 		return collections.mlFiles.findOne({ conversationId, name, version });
 	}
 	return collections.mlFiles.findOne({ conversationId, name }, { sort: { version: -1 } });
-}
-
-export interface MlFileListing {
-	name: string;
-	/** the latest version, also how many exist */
-	version: number;
-	size: number;
-	updatedAt: Date;
-	summary?: string;
 }
 
 /** the latest version of every file by name, without content */

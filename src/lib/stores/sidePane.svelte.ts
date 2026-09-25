@@ -9,7 +9,7 @@ export const SIDE_PANE_MAX_WIDTH = 2400;
 export const SIDE_PANE_DEFAULT_FRACTION = "60%";
 
 /** Which view owns the pane. One slot, so the views are mutually exclusive. */
-export type SidePaneView = "artifact" | "trackio";
+export type SidePaneView = "artifact" | "trackio" | "registry";
 
 /**
  * UI state for the side pane. Its content is always derived from the
@@ -100,6 +100,13 @@ class SidePaneStore {
 		if (this.autoOpenedKeys.has(key)) return;
 		this.autoOpenedKeys.add(key);
 		this.openTrackio(url, label);
+	}
+
+	/** a list, not an item, so it has no place in the item nav */
+	openRegistry() {
+		this.view = "registry";
+		this.open = true;
+		this.revealNonce += 1;
 	}
 
 	selectTab(tab: "preview" | "code") {

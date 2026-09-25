@@ -25,3 +25,13 @@ export interface MlFile {
 	/** one line the model gave */
 	summary?: string;
 }
+
+/** the latest version of a file by name, without its content */
+export interface MlFileListing {
+	name: string;
+	/** the latest version, also how many exist */
+	version: number;
+	size: number;
+	updatedAt: Date;
+	summary?: string;
+}

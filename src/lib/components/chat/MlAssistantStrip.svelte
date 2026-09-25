@@ -2,11 +2,13 @@
 	import MlAssistantPlanProgress from "./MlAssistantPlanProgress.svelte";
 	import { ML_ASSISTANT_TOOLS } from "$lib/constants/mlAssistant";
 	import type { MlBudgetSnapshot, MlPlanStep } from "$lib/types/MlAssistant";
+	import type { MlRegistrySummary } from "$lib/types/MlRegistry";
 	import { formatMicroUsd, formatMicroUsdCompact } from "$lib/utils/mlBudget";
 	import IconSparkline from "../icons/IconSparkline.svelte";
 	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 	import type { TrackioDashboard } from "$lib/utils/trackio";
+	import CarbonBox from "~icons/carbon/box";
 
 	interface Props {
 		/** Collapses the strip out of the composer when false, rather than unmounting it. */
@@ -20,10 +22,31 @@
 		onbudgetchange?: (leftUsd: number) => void;
 		/** The run's newest Trackio dashboard, if it has named one. */
 		dashboard?: TrackioDashboard;
+		/** the control stays hidden until the registry holds anything */
+		registry?: MlRegistrySummary;
 	}
 
-	let { visible, steps, statusLabel, complete, budget, onbudgetchange, dashboard }: Props =
-		$props();
+	let {
+		visible,
+		steps,
+		statusLabel,
+		complete,
+		budget,
+		onbudgetchange,
+		dashboard,
+		registry,
+	}: Props = $props();
+
+	let registryVisible = $derived(!!registry && registry.rows > 0);
+	// the count is everything the Hub still bills, queued included, the dot is only what runs
+	let registryLabel = $derived(
+		registry && registry.open > 0 ? `${registry.open} running` : "Services"
+	);
+	let registryTitle = $derived(
+		registry && registry.open > 0
+			? `Services and artefacts: ${registry.open} running. Open the list`
+			: "Services and artefacts: open the list"
+	);
 
 	$effect(() => {
 		if (!dashboard?.spaceId) return;
@@ -165,6 +188,36 @@
 
 		<span class="ml-auto"></span>
 
+		{#if registryVisible && registry}
+			<!-- orange once something is open, so the count reads as a figure -->
+			<button
+				type="button"
+				class={[
+					"ml-control ml-registry-control flex flex-none items-center justify-center gap-[6px] px-2 py-[5px]",
+					"size-7 rounded-full @min-[480px]:size-auto @min-[480px]:rounded-[6px]",
+					"cursor-pointer text-[13px] leading-none font-medium hover:bg-black/5 dark:hover:bg-white/[.07]",
+					registry.open > 0
+						? "text-[#c4511a] dark:text-[#f0a468]"
+						: "text-[#57534e] hover:text-[#1c1917] dark:text-[#a8a29e] dark:hover:text-[#f5f5f4]",
+				]}
+				title={registryTitle}
+				aria-label={registryTitle}
+				onclick={() => sidePane.openRegistry()}
+			>
+				<span class="relative flex size-[14px] flex-none items-center justify-center">
+					<CarbonBox class="size-[14px]" />
+					{#if registry.running > 0}
+						<!-- ringed in the strip background so the dot does not touch the icon strokes -->
+						<span
+							aria-hidden="true"
+							class="ml-registry-live absolute -top-[3px] -right-[3px] size-[7px] rounded-full bg-[#e8622a] ring-2 ring-white dark:ring-[#141414]"
+						></span>
+					{/if}
+				</span>
+				<span class="hidden tabular-nums @min-[480px]:inline">{registryLabel}</span>
+			</button>
+		{/if}
+
 		{#if dashboard}
 			<button
 				type="button"
@@ -199,7 +252,7 @@
 		{/if}
 
 		{#if budget}
-			{#if dashboard}
+			{#if dashboard || registryVisible}
 				<!-- Negative margin pulls its neighbours to 8px, inside the 14px group gap. -->
 				<span
 					aria-hidden="true"
@@ -288,6 +341,21 @@
 		opacity: 1;
 	}
 
+	/* the same 1.4s breath as the running step */
+	.ml-registry-live {
+		animation: ml-registry-live 1.4s ease-in-out infinite;
+	}
+
+	@keyframes ml-registry-live {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.35;
+		}
+	}
+
 	/* One property moves on hover, per the design. */
 	:global(.ml-control) {
 		transition:
@@ -323,6 +391,10 @@
 	@media (prefers-reduced-motion: reduce) {
 		.ml-strip-collapse {
 			transition: none;
+		}
+
+		.ml-registry-live {
+			animation: none;
 		}
 	}
 </style>
