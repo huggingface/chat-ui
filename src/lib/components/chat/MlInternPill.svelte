@@ -75,7 +75,10 @@
 	</Switch.Root>
 </div>
 
-{#if onboardingOpen}
+<!-- A first visit also opens the layout's welcome modal (a `?mode=ml-intern` link
+     switches the mode on during that visit). One dialog at a time: the onboarding
+     waits until that one is dismissed. -->
+{#if onboardingOpen && $settings.welcomeModalSeen}
 	<MlInternOnboardingModal close={closeOnboarding} />
 {/if}
 

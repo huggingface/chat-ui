@@ -14,18 +14,20 @@
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
-	import { onDestroy, onMount, tick } from "svelte";
+	import { onDestroy, onMount, tick, untrack } from "svelte";
 	import { loading } from "$lib/stores/loading.js";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
 	import {
 		LINK_PARAM_NAMES,
 		linkPromptNeedsConfirmation,
+		readLinkMode,
 		readLinkPromptRequest,
 		type LinkPromptRequest,
 	} from "$lib/utils/linkParams";
 	import LinkPromptModal from "$lib/components/LinkPromptModal.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 
 	let { data } = $props();
 
@@ -166,6 +168,23 @@
 		}
 	});
 
+	// `?mode=ml-intern` switches the mode on as the composer pill would, on builds
+	// that ship the mode and have its model set configured (the pill's own
+	// conditions); elsewhere the link opens a normal chat. The param stays in the
+	// URL, so a reload lands in the mode again. Keyed on the param's value, so
+	// stripping the prompt params does not switch the mode back on after the user
+	// turned it off.
+	let linkMode = $derived(readLinkMode(page.url.searchParams));
+	$effect(() => {
+		if (linkMode !== "ml-intern") return;
+		untrack(() => {
+			if (!ML_ASSISTANT_MODE || data.mlAssistantModels.length === 0) return;
+			// Redirects to login and comes back to this URL, param included.
+			if (requireAuthUser()) return;
+			mlAssistant.toggle(true);
+		});
+	});
+
 	// A confirmed request can still be loading attachments when the user moves
 	// on. Once this page is gone it must neither attach nor send: a send from
 	// here navigates, and would pull the user back into a conversation they
@@ -191,6 +210,8 @@
 				}
 			}
 			if (request.send && request.prompt) {
+				// Latches the mode the way the composer's send does; no-op when it is off.
+				mlAssistant.startTask();
 				await createConversation(request.prompt);
 			} else if (request.prompt && !draft) {
 				draft = request.prompt;

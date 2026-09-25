@@ -22,10 +22,11 @@ const box = (el: Element) => {
 const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]');
 
 /** The slice of the layout's settings context the pill reads and writes. */
-function settingsContext(mlInternOnboardingSeen: boolean) {
-	const store = writable({ mlInternOnboardingSeen });
+function settingsContext(mlInternOnboardingSeen: boolean, welcomeModalSeen = true) {
+	const store = writable({ mlInternOnboardingSeen, welcomeModalSeen });
 	const set = vi.fn((patch: Record<string, unknown>) => store.update((s) => ({ ...s, ...patch })));
 	return {
+		store,
 		set,
 		context: new Map<unknown, unknown>([
 			["settings", { subscribe: store.subscribe, instantSet: set }],
@@ -129,6 +130,20 @@ describe("MlInternPill", () => {
 			await vi.waitFor(() => expect(dialog()).not.toBeNull());
 			expect(dialog()?.textContent).toContain("ML Intern is experimental");
 			expect(set).not.toHaveBeenCalled();
+		});
+
+		it("waits for the welcome modal to be dismissed before opening", async () => {
+			const { store, context } = settingsContext(false, false);
+			renderWithApp(MlInternPill, {}, { context });
+
+			// A `?mode=ml-intern` link switches the mode on during a first visit,
+			// while the layout's welcome modal is still up.
+			mlAssistant.toggle(true);
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			expect(dialog()).toBeNull();
+
+			store.update((s) => ({ ...s, welcomeModalSeen: true }));
+			await vi.waitFor(() => expect(dialog()?.textContent).toContain("ML Intern is experimental"));
 		});
 
 		it("records Escape once, though the key reaches the modal twice", async () => {

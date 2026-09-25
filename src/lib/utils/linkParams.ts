@@ -21,6 +21,18 @@ export interface LinkPromptRequest {
 
 export const LINK_PARAM_NAMES = ["q", "prompt", "attachments"] as const;
 
+/** Composer modes a link can preselect with `?mode=`. */
+export type LinkMode = "ml-intern";
+
+/**
+ * `?mode=ml-intern` preselects ML Intern mode; any other value is ignored.
+ * Unlike the params above it stays in the URL: it only switches the composer's
+ * mode and sends nothing, so replaying it on a reload is what the link means.
+ */
+export function readLinkMode(params: URLSearchParams): LinkMode | null {
+	return params.get("mode")?.trim().toLowerCase() === "ml-intern" ? "ml-intern" : null;
+}
+
 /**
  * Attachment sources that need no confirmation: content Hugging Face itself
  * publishes, matched by path prefix. The Hub's "Ask HuggingChat" boxes and
