@@ -1,10 +1,15 @@
+import type { ObjectId } from "mongodb";
 import {
 	GITHUB_FIND_EXAMPLES,
 	GITHUB_READ_FILE,
 	githubTools,
 	runGithubTool,
 } from "$lib/server/github";
-import type { BuiltinTool } from "./types";
+import type { GithubFileRef } from "$lib/server/github/types";
+import { logger } from "$lib/server/logger";
+import { recordSources } from "$lib/server/mlRegistry/sources";
+import { PARENT_READER } from "$lib/types/MlSource";
+import type { BuiltinTool, BuiltinToolContext } from "./types";
 
 /**
  * The GitHub code-grounding tools as builtins: read-only, stateless, nothing to
@@ -28,12 +33,32 @@ const GROUNDING_DOCTRINE =
 	`Before submitting anything that costs money or time to run — a training job, a long evaluation — check that you have read a working reference implementation, and say which file it was. ` +
 	`If you could not find one, say so plainly instead of proceeding on recall.`;
 
+// builtins bypass the sources guard, a failed write is logged and never reaches the reply
+async function recordGithubFiles(
+	conversationId: ObjectId,
+	ctx: BuiltinToolContext,
+	files: GithubFileRef[]
+): Promise<void> {
+	try {
+		await recordSources(
+			conversationId,
+			ctx.agentRunId ?? PARENT_READER,
+			files.map(({ repo, url, opened }) => ({ url, group: repo, kind: "github", opened }))
+		);
+	} catch (err) {
+		logger.error(
+			{ err: String(err), conversationId: conversationId.toString() },
+			"[mlRegistry] recording GitHub sources failed"
+		);
+	}
+}
+
 /**
  * Empty without a `GITHUB_TOKEN`, since `githubTools()` withholds the
  * definitions: a tool that is offered and always fails costs the model a turn
  * to discover that.
  */
-export function githubGroundingBuiltins(): BuiltinTool[] {
+export function githubGroundingBuiltins(conversationId?: ObjectId): BuiltinTool[] {
 	return githubTools().map((definition) => {
 		const name = definition.function.name;
 		return {
@@ -46,7 +71,12 @@ export function githubGroundingBuiltins(): BuiltinTool[] {
 			...(name === GITHUB_FIND_EXAMPLES ? { preprompt: GROUNDING_DOCTRINE } : {}),
 			async execute(args, ctx) {
 				const result = await runGithubTool(name, args, { signal: ctx.abortSignal });
-				return result.isError ? { error: result.text } : { resultText: result.text };
+				if (result.isError) return { error: result.text };
+				// awaited so a run that ends on this call counts it among its sources
+				if (conversationId && result.files?.length) {
+					await recordGithubFiles(conversationId, ctx, result.files);
+				}
+				return { resultText: result.text };
 			},
 		};
 	});

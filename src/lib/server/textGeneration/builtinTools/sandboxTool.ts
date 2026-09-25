@@ -162,6 +162,7 @@ async function runSandboxTask(
 	const spec: NestedAgentSpec = {
 		label: "sandbox",
 		displayName: "Sandbox",
+		toolName: SANDBOX_TOOL_NAME,
 		systemPrompt: sandboxSystemPrompt({ virtualFiles }),
 		task: [`Sandbox handle: ${handle}`, context ? `Context: ${context}` : "", `Task: ${task}`]
 			.filter(Boolean)

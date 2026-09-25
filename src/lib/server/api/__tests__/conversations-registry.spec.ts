@@ -3,8 +3,11 @@ import { ObjectId } from "mongodb";
 import superjson from "superjson";
 import { ready } from "$lib/server/database";
 import { recordArtefact, recordDispatchedService } from "$lib/server/mlRegistry/store";
+import { startAgentRun } from "$lib/server/mlRegistry/agentRuns";
+import { recordSources } from "$lib/server/mlRegistry/sources";
+import { PARENT_READER } from "$lib/types/MlSource";
 import { writeMlFileVersion } from "$lib/server/mlFiles/store";
-import type { MlRegistryPayload } from "$lib/types/MlRegistry";
+import type { MlAgentRunDetail, MlRegistryPayload } from "$lib/types/MlRegistry";
 import {
 	cleanupTestData,
 	createTestConversation,
@@ -13,6 +16,7 @@ import {
 } from "./testHelpers";
 
 import { GET } from "../../../../routes/api/v2/conversations/[id]/registry/+server";
+import { GET as GET_RUN } from "../../../../routes/api/v2/conversations/[id]/runs/[runId]/+server";
 
 const JOB_ID = "0123456789abcdef01234567";
 const SETTLED_JOB_ID = "89abcdef0123456789abcdef";
@@ -75,6 +79,8 @@ describe.sequential("GET /api/v2/conversations/[id]/registry", () => {
 		expect(payload.services).toEqual([]);
 		expect(payload.artefacts).toEqual([]);
 		expect(payload.files).toEqual([]);
+		expect(payload.agentRuns).toEqual([]);
+		expect(payload.sources).toEqual([]);
 		expect(payload.serverNow).toBeGreaterThanOrEqual(before);
 		expect(payload.serverNow).toBeLessThanOrEqual(Date.now());
 	});
@@ -214,5 +220,139 @@ describe.sequential("GET /api/v2/conversations/[id]/registry", () => {
 		expect(held?.heldMicroUsd).toBe(1_200_000);
 		expect(settled).toBeDefined();
 		expect(settled).not.toHaveProperty("heldMicroUsd");
+	});
+
+	it("lists the conversation's sub-agent runs without their calls or summary, and its sources", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals);
+		const other = await createTestConversation(locals);
+		const run = startAgentRun({
+			conversationId: conv._id,
+			label: "research",
+			displayName: "Research",
+			task: `Context: the user wants X\n\nResearch task: ${"find a recipe ".repeat(20)}`,
+			parent: { tool: "research", toolUuid: "tool-1", messageId: "msg-1" },
+		});
+		run.round(1, [{ tool: "hf_fs", args: "{}", status: "success" }]);
+		await recordSources(conv._id, run.id, [
+			{
+				url: "https://huggingface.co/papers/2502.16161",
+				group: "Hugging Face papers",
+				kind: "paper",
+				title: "OmniParser V2",
+				opened: true,
+			},
+		]);
+		await run.finish({ status: "completed", summary: "found it", iterations: 1 });
+		await recordSources(other._id, PARENT_READER, [
+			{ url: "https://example.com", group: "example.com", kind: "web", opened: true },
+		]);
+
+		const payload = await parseResponse(await get(locals, conv._id.toString()));
+
+		expect(payload.agentRuns).toHaveLength(1);
+		const [listed] = payload.agentRuns ?? [];
+		expect(listed).toMatchObject({
+			id: run.id,
+			label: "research",
+			displayName: "Research",
+			parent: { tool: "research", toolUuid: "tool-1", messageId: "msg-1" },
+			status: "completed",
+			iterations: 1,
+			callCount: 1,
+			sourceCount: 1,
+		});
+		expect(listed.taskPreview.startsWith("Research task: find a recipe")).toBe(true);
+		expect(listed.taskPreview.length).toBeLessThanOrEqual(161);
+		for (const heavy of ["calls", "summary", "task", "_id", "conversationId"]) {
+			expect(listed).not.toHaveProperty(heavy);
+		}
+
+		expect(payload.sources).toEqual([
+			{
+				id: expect.any(String),
+				url: "https://huggingface.co/papers/2502.16161",
+				group: "Hugging Face papers",
+				kind: "paper",
+				title: "OmniParser V2",
+				opened: true,
+				readBy: [run.id],
+				count: 1,
+				firstSeenAt: expect.any(Date),
+				lastSeenAt: expect.any(Date),
+			},
+		]);
+	});
+});
+
+describe.sequential("GET /api/v2/conversations/[id]/runs/[runId]", () => {
+	afterEach(async () => {
+		await cleanupTestData();
+	});
+
+	const getRun = async (locals: App.Locals, id: string, runId: string) =>
+		GET_RUN({ locals, params: { id, runId } } as never);
+
+	it("returns one run with its task, summary and calls", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals);
+		const run = startAgentRun({
+			conversationId: conv._id,
+			label: "sandbox",
+			displayName: "Sandbox",
+			task: "Sandbox handle: hfsb2:pngwn:abc\n\nTask: run the tests",
+			parent: { tool: "sandbox_task", toolUuid: "tool-2" },
+		});
+		run.round(1, [
+			{ tool: "hf_sandbox_exec", args: '{"cmd":"exec"}', status: "error", error: "boom" },
+		]);
+		await run.finish({ status: "completed", summary: "tests pass", iterations: 2 });
+
+		const res = await getRun(locals, conv._id.toString(), run.id);
+		const detail = superjson.parse(await res.text()) as MlAgentRunDetail;
+
+		expect(detail).toMatchObject({
+			id: run.id,
+			task: "Sandbox handle: hfsb2:pngwn:abc\n\nTask: run the tests",
+			summary: "tests pass",
+			calls: [{ tool: "hf_sandbox_exec", args: '{"cmd":"exec"}', status: "error", error: "boom" }],
+			status: "completed",
+			iterations: 2,
+		});
+		expect(detail).not.toHaveProperty("conversationId");
+	});
+
+	it("404s for a run of another conversation, a malformed id and a share id", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals);
+		const other = await createTestConversation(locals);
+		const run = startAgentRun({
+			conversationId: other._id,
+			label: "research",
+			displayName: "Research",
+			task: "t",
+			parent: { tool: "research", toolUuid: "tool-3" },
+		});
+		await run.finish({ status: "aborted", iterations: 0 });
+
+		await expectStatus(getRun(locals, conv._id.toString(), run.id), 404);
+		await expectStatus(getRun(locals, conv._id.toString(), "not-an-id"), 404);
+		await expectStatus(getRun(locals, "abcdefg", run.id), 404);
+	});
+
+	it("403s for another user's conversation", async () => {
+		const { locals: owner } = await createTestUser();
+		const { locals: intruder } = await createTestUser();
+		const conv = await createTestConversation(owner);
+		const run = startAgentRun({
+			conversationId: conv._id,
+			label: "research",
+			displayName: "Research",
+			task: "t",
+			parent: { tool: "research", toolUuid: "tool-4" },
+		});
+		await run.finish({ status: "aborted", iterations: 0 });
+
+		await expectStatus(getRun(intruder, conv._id.toString(), run.id), 403);
 	});
 });

@@ -7,9 +7,12 @@ import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 import { sidePane } from "$lib/stores/sidePane.svelte";
 import type { MlFileListing, MlFileVersionListing } from "$lib/types/MlFile";
 import type {
+	MlAgentRunDetail,
+	MlRegistryAgentRun,
 	MlRegistryArtefact,
 	MlRegistryPayload,
 	MlRegistryService,
+	MlRegistrySource,
 } from "$lib/types/MlRegistry";
 
 const NOW = Date.UTC(2026, 8, 25, 12, 0, 0);
@@ -289,10 +292,11 @@ describe("MlRegistryPane", () => {
 	it("shows an empty state per section", () => {
 		const { container } = mount(payload({ services: [], artefacts: [] }));
 		const empties = all(container, ".ml-registry-empty").map(text);
-		expect(empties).toHaveLength(3);
-		expect(empties[0]).toMatch(/^No jobs or sandboxes yet/);
+		expect(empties).toHaveLength(4);
+		expect(empties[0]).toMatch(/^No jobs, sandboxes or sub-agent runs yet/);
 		expect(empties[1]).toMatch(/^Nothing on the Hub yet/);
 		expect(empties[2]).toMatch(/^No files yet/);
+		expect(empties[3]).toMatch(/^No sources yet/);
 		expect(container.querySelector(".ml-registry-list")).toBeNull();
 	});
 
@@ -572,5 +576,340 @@ describe("MlRegistryPane files", () => {
 		serveFiles();
 		find(fileRow(container, "train.py"), ".ml-file-retry").click();
 		await vi.waitFor(() => expect(all(container, ".ml-version")).toHaveLength(3));
+	});
+});
+
+describe("MlRegistryPane sub-agent runs and sources", () => {
+	const RESEARCH: MlRegistryAgentRun = {
+		id: "65f000000000000000000001",
+		label: "research",
+		displayName: "Research",
+		taskPreview: "Research task: find a working SFT recipe for SmolLM2",
+		parent: { tool: "research", toolUuid: "tool-1", messageId: "msg-1" },
+		status: "completed",
+		startedAt: at(-10 * 60_000),
+		endedAt: at(-10 * 60_000 + 65_000),
+		iterations: 5,
+		callCount: 7,
+		sourceCount: 3,
+	};
+	const LIVE_SANDBOX: MlRegistryAgentRun = {
+		id: "65f000000000000000000002",
+		label: "sandbox",
+		displayName: "Sandbox",
+		taskPreview: "Task: run the smoke test",
+		parent: { tool: "sandbox_task", toolUuid: "tool-2" },
+		status: "running",
+		startedAt: at(-42_000),
+		iterations: 2,
+		callCount: 3,
+		sourceCount: 0,
+	};
+	const FAILED: MlRegistryAgentRun = {
+		...RESEARCH,
+		id: "65f000000000000000000003",
+		label: "job-check",
+		displayName: "Job check",
+		taskPreview: "Checking for: why the job errored",
+		parent: { tool: "check_job", toolUuid: "tool-3" },
+		status: "failed",
+		failure: "iteration_limit",
+		error: "Job check agent hit the iteration limit",
+		startedAt: at(-3 * 60_000),
+		endedAt: at(-60_000),
+		sourceCount: 0,
+	};
+	const DETAIL: MlAgentRunDetail = {
+		...RESEARCH,
+		task: "Context: the user wants to fine-tune SmolLM2\n\nResearch task: find a working SFT recipe for SmolLM2",
+		summary: "Use TRL SFTTrainer with packing.\nThe example is examples/scripts/sft.py.",
+		calls: [
+			{ tool: "hf_fs", args: '{"operations":[{"cmd":"cat"}]}', status: "success" },
+			{ tool: "crawling_exa", args: '{"urls":["https://x"]}', status: "error", error: "timeout" },
+		],
+	};
+
+	const source = (
+		over: Partial<MlRegistrySource> & { id: string; url: string }
+	): MlRegistrySource => ({
+		group: "arxiv.org",
+		kind: "web",
+		opened: true,
+		readBy: [RESEARCH.id],
+		firstSeenAt: at(-9 * 60_000),
+		lastSeenAt: at(-9 * 60_000),
+		count: 1,
+		...over,
+	});
+	const SOURCES: MlRegistrySource[] = [
+		source({ id: "s1", url: "https://arxiv.org/abs/2502.16161", title: "OmniParser V2" }),
+		source({
+			id: "s2",
+			url: "https://arxiv.org/abs/2305.14233",
+			readBy: ["parent", RESEARCH.id],
+			lastSeenAt: at(-60_000),
+		}),
+		source({ id: "s3", url: "https://arxiv.org/abs/9999.00001", opened: false }),
+		source({
+			id: "s4",
+			url: "https://huggingface.co/papers/2502.16161",
+			group: "Hugging Face papers",
+			kind: "paper",
+			title: "OmniParser V2 on the Hub",
+			readBy: ["parent"],
+		}),
+		source({
+			id: "s5",
+			url: "https://github.com/huggingface/trl/blob/HEAD/examples/scripts/sft.py",
+			group: "huggingface/trl",
+			kind: "github",
+			opened: false,
+		}),
+	];
+
+	function serveRun(detail: MlAgentRunDetail = DETAIL): string[] {
+		const calls: string[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: RequestInfo | URL) => {
+				const url = new URL(String(input));
+				if (!url.pathname.includes("/runs/")) return new Response("{}", { status: 500 });
+				calls.push(url.pathname);
+				return new Response(superjson.stringify(detail), { status: 200 });
+			})
+		);
+		return calls;
+	}
+
+	const mountRuns = (live = false, over: Partial<MlRegistryPayload> = {}) => {
+		const mounted = mount(
+			payload({
+				services: [COMPLETED, RUNNING],
+				agentRuns: [RESEARCH, LIVE_SANDBOX, FAILED],
+				artefacts: [],
+				sources: SOURCES,
+				...over,
+			})
+		);
+		mlRegistry.turnLive = live;
+		return mounted;
+	};
+	const runRow = (root: ParentNode, id: string) => find(root, `#ml-run-${id}`);
+	const groupRow = (root: ParentNode, label: string) =>
+		all(root, ".ml-source-group").find(
+			(row) => text(row.querySelector(".ml-source-label")) === label
+		) ??
+		(() => {
+			throw new Error(`no source group ${label}`);
+		})();
+
+	beforeEach(() => {
+		vi.useFakeTimers({ toFake: ["Date"] });
+		vi.setSystemTime(NOW);
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+		sidePane.reset();
+		mlRegistry.reset();
+	});
+
+	it("lists runs among the services, a live one beside the running job", async () => {
+		serveRun();
+		const { container } = mountRuns(true);
+		await tick();
+
+		const rows = all(container, ".ml-registry-list")[0].children;
+		expect([...rows].map((row) => row.id || row.className.split(" ")[0])).toEqual([
+			`ml-run-${LIVE_SANDBOX.id}`,
+			"ml-service",
+			`ml-run-${FAILED.id}`,
+			`ml-run-${RESEARCH.id}`,
+			"ml-service",
+		]);
+		expect(text(find(container, "#ml-registry-services"))).toBe("Services 5");
+		expect(text(find(container, "header h2 + span"))).toBe("2 running");
+	});
+
+	it("shows a run's name, status, task, parent call, calls, time and what it read", async () => {
+		serveRun();
+		const { container } = mountRuns(true);
+		await tick();
+
+		const research = runRow(container, RESEARCH.id);
+		expect(text(research.querySelector(".ml-file-toggle span"))).toContain("Research");
+		const badge = find(research, ".ml-stage");
+		expect(badge.dataset.tone).toBe("completed");
+		expect(style(badge).color).toBe(GREEN_INK);
+		expect(text(research.querySelector(".ml-run-task"))).toBe(RESEARCH.taskPreview);
+		expect(text(research.querySelector(".ml-service-meta"))).toBe(
+			"sub-agent · via research · 7 calls · 1m 05s · 2 sources read"
+		);
+
+		const live = runRow(container, LIVE_SANDBOX.id);
+		expect(text(live.querySelector(".ml-stage"))).toBe("running");
+		expect(live.querySelector(".ml-live-dot")).not.toBeNull();
+		expect(text(live.querySelector(".ml-service-meta"))).toBe(
+			"sub-agent · via sandbox_task · 3 calls · 42s"
+		);
+
+		const failed = runRow(container, FAILED.id);
+		expect(find(failed, ".ml-stage").dataset.tone).toBe("error");
+		const note = find(failed, ".ml-run-note");
+		expect(text(note)).toBe("hit its step limit");
+		expect(style(note).color).toBe(RED_INK);
+	});
+
+	it("calls a run still marked running outside a live turn interrupted, with no clock", async () => {
+		serveRun();
+		const { container } = mountRuns(false);
+		await tick();
+
+		const stuck = runRow(container, LIVE_SANDBOX.id);
+		expect(text(stuck.querySelector(".ml-stage"))).toBe("interrupted");
+		expect(stuck.querySelector(".ml-live-dot")).toBeNull();
+		expect(text(stuck.querySelector(".ml-service-meta"))).toBe(
+			"sub-agent · via sandbox_task · 3 calls"
+		);
+	});
+
+	it("expands a run to its task, summary, calls and sources, fetched only when opened", async () => {
+		const calls = serveRun();
+		const { container } = mountRuns();
+		await tick();
+		expect(calls).toEqual([]);
+
+		const research = runRow(container, RESEARCH.id);
+		const toggle = find(research, ".ml-file-toggle");
+		expect(toggle.getAttribute("aria-expanded")).toBe("false");
+		toggle.click();
+		await vi.waitFor(() => expect(research.querySelector(".ml-run-summary")).not.toBeNull());
+
+		expect(toggle.getAttribute("aria-expanded")).toBe("true");
+		expect(calls).toEqual([`/api/v2/conversations/conv-1/runs/${RESEARCH.id}`]);
+		const detail = find(research, ".ml-run-detail");
+		const labels = all(detail, ".ml-run-label").map(text);
+		expect(labels).toEqual(["Task", "Summary", "Calls 7", "Sources 2"]);
+		expect(find(detail, ".ml-run-text").textContent).toBe(DETAIL.task);
+		expect(find(detail, ".ml-run-summary").textContent).toBe(DETAIL.summary);
+
+		const callRows = all(detail, ".ml-run-calls li");
+		expect(callRows.map((row) => row.dataset.status)).toEqual(["success", "error"]);
+		expect(text(callRows[0])).toBe('hf_fs {"operations":[{"cmd":"cat"}]}');
+		expect(text(callRows[1].querySelector(".ml-run-note"))).toBe("timeout");
+		expect(text(detail)).toContain("5 later calls not kept.");
+
+		const read = all(detail, ".ml-run-sources a");
+		expect(read.map((a) => [text(a), a.getAttribute("href")])).toEqual([
+			["/abs/2305.14233", "https://arxiv.org/abs/2305.14233"],
+			["OmniParser V2", "https://arxiv.org/abs/2502.16161"],
+		]);
+		expect(
+			read.every(
+				(a) =>
+					a.getAttribute("target") === "_blank" && a.getAttribute("rel") === "noopener noreferrer"
+			)
+		).toBe(true);
+		expect(text(detail)).toContain("2 more links only in its search results");
+
+		toggle.click();
+		await tick();
+		expect(research.querySelector(".ml-run-detail")).toBeNull();
+	});
+
+	it("says so when a run cannot be read, and tries again", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response("{}", { status: 500 }))
+		);
+		const { container } = mountRuns();
+		await tick();
+		const research = runRow(container, RESEARCH.id);
+		find(research, ".ml-file-toggle").click();
+		await vi.waitFor(() => expect(text(research)).toContain("Could not load the run."));
+
+		const calls = serveRun();
+		find(research, ".ml-file-retry").click();
+		await vi.waitFor(() => expect(research.querySelector(".ml-run-summary")).not.toBeNull());
+		expect(calls).toHaveLength(1);
+	});
+
+	it("groups sources, most read first, each with how many were read and found", async () => {
+		serveRun();
+		const { container } = mountRuns();
+		await tick();
+
+		expect(text(find(container, "#ml-registry-sources"))).toBe("Sources 5");
+		const groups = all(container, ".ml-source-group");
+		expect(
+			groups.map((row) => [row.dataset.kind, text(row.querySelector(".ml-file-toggle"))])
+		).toEqual([
+			["web", "arxiv.org 2 read 1 found"],
+			["paper", "Hugging Face papers 1 read"],
+			["github", "huggingface/trl 1 found"],
+		]);
+		expect(container.querySelector(".ml-source")).toBeNull();
+	});
+
+	it("expands a group to its paths, read first, search-only results apart and dimmed", async () => {
+		serveRun();
+		const { container } = mountRuns();
+		await tick();
+
+		const arxiv = groupRow(container, "arxiv.org");
+		find(arxiv, ".ml-file-toggle").click();
+		await tick();
+
+		const [readList, foundList] = all(arxiv, ".ml-source-paths");
+		expect(readList.dataset.found).toBeUndefined();
+		expect(all(readList, ".ml-source-link").map(text)).toEqual([
+			"/abs/2305.14233",
+			"OmniParser V2",
+		]);
+		expect(text(find(readList, ".ml-source-path"))).toBe("/abs/2502.16161");
+		expect(text(find(arxiv, ".ml-source-found-heading"))).toBe("Only in search results");
+		expect(foundList.dataset.found).toBe("true");
+		const dimmed = find(foundList, ".ml-source-link");
+		expect(dimmed.getAttribute("href")).toBe("https://arxiv.org/abs/9999.00001");
+		expect(style(dimmed).color).not.toBe(style(find(readList, ".ml-source-link")).color);
+
+		const readers = all(readList.children[0], ".ml-source-reader");
+		expect(readers.map((reader) => [reader.tagName, text(reader)])).toEqual([
+			["SPAN", "main"],
+			["BUTTON", "research"],
+		]);
+	});
+
+	it("goes from a source's reader to the run that read it", async () => {
+		serveRun();
+		const { container } = mountRuns();
+		await tick();
+		const arxiv = groupRow(container, "arxiv.org");
+		find(arxiv, ".ml-file-toggle").click();
+		await tick();
+
+		find(arxiv, "button.ml-source-reader").click();
+		const research = runRow(container, RESEARCH.id);
+		await vi.waitFor(() => expect(research.querySelector(".ml-run-summary")).not.toBeNull());
+		expect(find(research, ".ml-file-toggle").getAttribute("aria-expanded")).toBe("true");
+	});
+
+	it("renders a payload from a server that predates runs and sources", async () => {
+		const { container } = mount(payload({ agentRuns: undefined, sources: undefined }));
+		await tick();
+		expect(container.querySelector(".ml-run")).toBeNull();
+		expect(text(find(container, "#ml-registry-sources"))).toBe("Sources");
+	});
+
+	it("fits a phone width without scrolling sideways", async () => {
+		serveRun();
+		const { container } = mountRuns(true);
+		await tick();
+		const scroller = find(container, ".ml-registry");
+		scroller.style.width = "340px";
+		find(groupRow(container, "arxiv.org"), ".ml-file-toggle").click();
+		find(runRow(container, RESEARCH.id), ".ml-file-toggle").click();
+		await vi.waitFor(() => expect(container.querySelector(".ml-run-summary")).not.toBeNull());
+		expect(scroller.scrollWidth).toBeLessThanOrEqual(scroller.clientWidth);
 	});
 });

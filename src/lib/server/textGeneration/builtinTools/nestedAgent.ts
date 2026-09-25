@@ -8,7 +8,7 @@ import { logger } from "$lib/server/logger";
 import type { McpToolMapping, OpenAiTool } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
-import { recordNestedAgentCalls, type LoggedCall } from "./nestedAgentCallLog";
+import { callOutcomes, recordNestedAgentCalls, type LoggedCall } from "./nestedAgentCallLog";
 import {
 	executeToolCalls,
 	withRewrittenArguments,
@@ -21,6 +21,13 @@ import { parseToolArguments, withParseableArguments } from "../mcp/toolArgs";
 import { stripLoneSurrogates } from "../utils/loneSurrogates";
 import { isRateLimitError, withUpstreamRetry } from "../utils/upstreamRetry";
 import type { VirtualFileExpander } from "$lib/server/mlFiles/expand";
+import {
+	startAgentRun,
+	toRunCall,
+	type AgentRunEnd,
+	type AgentRunRecorder,
+} from "$lib/server/mlRegistry/agentRuns";
+import type { MlAgentRunFailure } from "$lib/types/MlAgentRun";
 import type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
 
 /**
@@ -75,6 +82,8 @@ export interface NestedAgentDeps {
 	rewriteArgs?: ToolArgsRewrite;
 	/** the parent expansion, a sub-agent writing into a sandbox passes a reference the same way */
 	expandVirtualFiles?: VirtualFileExpander;
+	/** records what the run reads, attributed to the run, it books nothing so it follows the preflight */
+	sourcesGuard?: (agentRunId: string) => ToolCallGuard;
 }
 
 export interface NestedAgentSpec {
@@ -82,6 +91,8 @@ export interface NestedAgentSpec {
 	label: string;
 	/** Sentence-cased, for model-facing error text: "Research agent LLM error". */
 	displayName: string;
+	/** the builtin the parent called to start the run */
+	toolName: string;
 	systemPrompt: string;
 	/** The single user message the run starts from. */
 	task: string;
@@ -171,11 +182,74 @@ const stableStringify = (value: unknown): string =>
 			: val
 	) ?? "";
 
+/** how the loop ended, a failure name where a result without a summary fails the run */
+type RunExit = MlAgentRunFailure | "aborted";
+
+interface LoopEnd {
+	result: BuiltinToolResult;
+	exit: RunExit;
+}
+
+function runEnd({ result, exit }: LoopEnd, aborted: boolean): AgentRunEnd {
+	if ("resultText" in result) {
+		const forcedBy = exit === "context_limit" || exit === "iteration_limit" ? exit : undefined;
+		return { status: "completed", summary: result.resultText, ...(forcedBy ? { forcedBy } : {}) };
+	}
+	const error = "error" in result ? result.error : "";
+	if (aborted || exit === "aborted") return { status: "aborted", error };
+	return { status: "failed", failure: exit, error };
+}
+
 export async function runNestedAgent(
 	spec: NestedAgentSpec,
 	ctx: BuiltinToolContext,
 	deps: NestedAgentDeps
 ): Promise<BuiltinToolResult> {
+	// every run in a conversation leaves a row, including one that ends before its first request
+	const run = ctx.conversationId
+		? startAgentRun({
+				conversationId: ctx.conversationId,
+				label: spec.label,
+				displayName: spec.displayName,
+				task: spec.task,
+				parent: {
+					tool: spec.toolName,
+					toolUuid: ctx.uuid,
+					...(ctx.messageId ? { messageId: ctx.messageId } : {}),
+					...(ctx.generationId ? { generationId: ctx.generationId } : {}),
+				},
+			})
+		: undefined;
+	const progress = { iterations: 0 };
+	let end: LoopEnd;
+	try {
+		end = await runLoop(spec, ctx, deps, run, progress);
+	} catch (err) {
+		await run?.finish({
+			status: "failed",
+			failure: "internal_error",
+			error: err instanceof Error ? err.message : String(err),
+			iterations: progress.iterations,
+		});
+		throw err;
+	}
+	await run?.finish({
+		...runEnd(end, ctx.abortSignal?.aborted === true),
+		iterations: progress.iterations,
+	});
+	return end.result;
+}
+
+async function runLoop(
+	spec: NestedAgentSpec,
+	ctx: BuiltinToolContext,
+	deps: NestedAgentDeps,
+	run: AgentRunRecorder | undefined,
+	/** model requests made with tools offered, read even when the loop throws */
+	progress: { iterations: number }
+): Promise<LoopEnd> {
+	const exitWith = (result: BuiltinToolResult, exit: RunExit): LoopEnd => ({ result, exit });
+
 	const allowedBuiltins = deps.hostBuiltinTools.filter((tool) => spec.allowedTools.has(tool.name));
 	const builtinNames = new Set(allowedBuiltins.map((tool) => tool.name));
 	// Builtins run in this process, so provenance is not a question for them.
@@ -194,12 +268,14 @@ export async function runNestedAgent(
 				fromAllowedServer(tool.function.name)
 		),
 	];
-	if (nestedTools.length === 0) return { error: spec.failure.noTools };
+	if (nestedTools.length === 0) return exitWith({ error: spec.failure.noTools }, "no_tools");
 	const availableNames = new Set(nestedTools.map((tool) => tool.function.name));
 	// Preflight first: it books nothing, which is the ordering composeGuards requires.
-	const preflightGuard = spec.guard
-		? composeGuards(createSchemaPreflightGuard(deps.mapping), spec.guard)
-		: createSchemaPreflightGuard(deps.mapping);
+	const guard = [
+		createSchemaPreflightGuard(deps.mapping),
+		...(run && deps.sourcesGuard ? [deps.sourcesGuard(run.id)] : []),
+		...(spec.guard ? [spec.guard] : []),
+	].reduce(composeGuards);
 
 	let messages: ChatCompletionMessageParam[] = [
 		{ role: "system", content: spec.systemPrompt },
@@ -272,16 +348,17 @@ export async function runNestedAgent(
 
 	const forcedSummary = async (
 		stopPrompt: string,
-		failureText: string
-	): Promise<BuiltinToolResult> => {
+		failureText: string,
+		exit: "context_limit" | "iteration_limit"
+	): Promise<LoopEnd> => {
 		messages = [...messages, { role: "user", content: stopPrompt }];
 		try {
 			const response = await completeWithRetry(false, spec.maxIterations);
 			const content = response.choices[0]?.message?.content ?? "";
-			return content ? { resultText: content } : { error: failureText };
+			return exitWith(content ? { resultText: content } : { error: failureText }, exit);
 		} catch (err) {
 			logger.warn({ err: String(err) }, `[${spec.label}] forced summary call failed`);
-			return { error: failureText };
+			return exitWith({ error: failureText }, exit);
 		}
 	};
 
@@ -294,7 +371,7 @@ export async function runNestedAgent(
 	emitProgress(0, spec.progress.start);
 
 	for (let iteration = 0; iteration < spec.maxIterations; iteration += 1) {
-		if (ctx.abortSignal?.aborted) return { error: "Aborted by user" };
+		if (ctx.abortSignal?.aborted) return exitWith({ error: "Aborted by user" }, "aborted");
 
 		if (totalTokens >= contextMaxAt) {
 			logger.warn(
@@ -302,7 +379,7 @@ export async function runNestedAgent(
 				`[${spec.label}] context max reached; forcing summary`
 			);
 			emitProgress(iteration, "Context limit reached — wrapping up");
-			return forcedSummary(spec.stop.contextMax, spec.failure.contextMax);
+			return forcedSummary(spec.stop.contextMax, spec.failure.contextMax, "context_limit");
 		}
 		if (!warned && totalTokens >= contextWarnAt) {
 			warned = true;
@@ -313,12 +390,14 @@ export async function runNestedAgent(
 		try {
 			response = await completeWithRetry(true, iteration);
 		} catch (err) {
-			if (ctx.abortSignal?.aborted) return { error: "Aborted by user" };
+			if (ctx.abortSignal?.aborted) return exitWith({ error: "Aborted by user" }, "aborted");
 			const message = err instanceof Error ? err.message : String(err);
 			logger.warn({ err: message, iteration }, `[${spec.label}] sub-agent LLM call failed`);
-			if (isRateLimitError(err)) return { error: spec.failure.rateLimited };
-			return { error: `${spec.displayName} agent LLM error: ${message}` };
+			if (isRateLimitError(err))
+				return exitWith({ error: spec.failure.rateLimited }, "rate_limited");
+			return exitWith({ error: `${spec.displayName} agent LLM error: ${message}` }, "llm_error");
 		}
+		progress.iterations = iteration + 1;
 
 		totalTokens =
 			response.usage?.total_tokens ??
@@ -356,7 +435,10 @@ export async function runNestedAgent(
 			}
 			const content = msg?.content ?? "";
 			emitProgress(iteration + 1, spec.progress.done);
-			return content ? { resultText: content } : { error: spec.failure.noSummary };
+			return exitWith(
+				content ? { resultText: content } : { error: spec.failure.noSummary },
+				"no_summary"
+			);
 		}
 
 		let allowedCalls: NormalizedToolCall[] = [];
@@ -436,7 +518,7 @@ export async function runNestedAgent(
 				// allowlist is what keeps a sub-agent from spending — but checking
 				// a call against its own schema is not a policy, it is the round
 				// trip and the iteration this run would otherwise lose.
-				guard: preflightGuard,
+				guard,
 				...(deps.rewriteArgs ? { rewriteArgs: deps.rewriteArgs } : {}),
 				// No `elicitation`: the sub-agent has no chat to ask, so an
 				// input-required response comes back as an ordinary tool error.
@@ -445,6 +527,7 @@ export async function runNestedAgent(
 					...(ctx.messageId ? { messageId: ctx.messageId } : {}),
 					...(ctx.generationId ? { generationId: ctx.generationId } : {}),
 					agent: spec.label,
+					...(run ? { agentRunId: run.id } : {}),
 				},
 			});
 			for await (const event of exec) {
@@ -470,18 +553,26 @@ export async function runNestedAgent(
 
 		// Refusals never reach executeToolCalls, so they carry their own name,
 		// arguments and count rather than being reconstructed from the message.
+		const loggedCalls = allowedCalls.map((call) => ({
+			id: call.id,
+			name: call.name,
+			arguments: call.arguments,
+			repeatCount: repeatCounts.get(call.id) ?? 1,
+		}));
 		recordNestedAgentCalls(
-			ctx,
+			run ? { ...ctx, agentRunId: run.id } : ctx,
 			spec.label,
 			iteration,
-			allowedCalls.map((call) => ({
-				id: call.id,
-				name: call.name,
-				arguments: call.arguments,
-				repeatCount: repeatCounts.get(call.id) ?? 1,
-			})),
+			loggedCalls,
 			toolMessages,
 			refusedCalls
+		);
+		run?.round(
+			progress.iterations,
+			callOutcomes(spec.label, loggedCalls, toolMessages, refusedCalls).map(
+				({ call, status, error }) =>
+					toRunCall({ tool: call.name, args: call.arguments, status, error })
+			)
 		);
 
 		if (sawRepetition && !repetitionNudged) {
@@ -493,5 +584,5 @@ export async function runNestedAgent(
 
 	logger.warn({}, `[${spec.label}] iteration limit reached; extracting summary`);
 	emitProgress(spec.maxIterations, "Iteration limit reached — extracting summary");
-	return forcedSummary(spec.stop.iterationLimit, spec.failure.iterationLimit);
+	return forcedSummary(spec.stop.iterationLimit, spec.failure.iterationLimit, "iteration_limit");
 }

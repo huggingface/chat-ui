@@ -148,6 +148,7 @@ async function runResearch(
 		{
 			label: "research",
 			displayName: "Research",
+			toolName: RESEARCH_TOOL_NAME,
 			systemPrompt: buildResearchSystemPrompt(
 				availableResearchToolNames(deps, RESEARCH_ALLOWED_TOOLS)
 			),

@@ -24,6 +24,7 @@ interface RecordContext {
 	conversationId?: ObjectId;
 	messageId?: string;
 	generationId?: string;
+	agentRunId?: string;
 }
 
 /**
@@ -57,6 +58,50 @@ export function recordNestedAgentCalls(
 /** How executeToolCalls reports a failed call. */
 const ERROR_PREFIX = "Error: ";
 
+export interface CallOutcome {
+	call: LoggedCall;
+	status: "success" | "error";
+	/** unredacted and whole, each record cuts it to its own size */
+	error?: string;
+}
+
+/** the executed calls read against their tool messages, then the refused ones */
+export function callOutcomes(
+	label: string,
+	calls: LoggedCall[],
+	toolMessages: ChatCompletionMessageParam[],
+	refused: LoggedCall[] = []
+): CallOutcome[] {
+	const byId = new Map<string, string>();
+	for (const message of toolMessages) {
+		if (message.role !== "tool") continue;
+		const id = (message as { tool_call_id?: string }).tool_call_id;
+		if (typeof id === "string" && typeof message.content === "string") {
+			byId.set(id, message.content);
+		}
+	}
+
+	const outcomes: CallOutcome[] = calls.map((call) => {
+		const content = byId.get(call.id);
+		// Cut short rather than run — the iteration was spent either way.
+		if (content === undefined) {
+			return { call, status: "error", error: "no result observed for this call" };
+		}
+		if (content.startsWith(ERROR_PREFIX)) {
+			return { call, status: "error", error: content.slice(ERROR_PREFIX.length) };
+		}
+		return { call, status: "success" };
+	});
+	for (const call of refused) {
+		outcomes.push({
+			call: { ...call, name: call.name || "unknown" },
+			status: "error",
+			error: `Tool '${call.name}' not available for ${label}.`,
+		});
+	}
+	return outcomes;
+}
+
 function buildRows(
 	ctx: RecordContext,
 	label: string,
@@ -69,54 +114,19 @@ function buildRows(
 		...(ctx.conversationId ? { conversationId: ctx.conversationId } : {}),
 		...(ctx.messageId ? { messageId: ctx.messageId } : {}),
 		...(ctx.generationId ? { generationId: ctx.generationId } : {}),
+		...(ctx.agentRunId ? { agentRunId: ctx.agentRunId } : {}),
 		label,
 		iteration,
 		createdAt: new Date(),
 	};
 
-	const byId = new Map<string, string>();
-	for (const message of toolMessages) {
-		if (message.role !== "tool") continue;
-		const id = (message as { tool_call_id?: string }).tool_call_id;
-		if (typeof id === "string" && typeof message.content === "string") {
-			byId.set(id, message.content);
-		}
-	}
-
-	const rows: NestedAgentCall[] = calls.map((call) => {
-		const content = byId.get(call.id);
-		const row = {
-			_id: new ObjectId(),
-			...base,
-			toolName: call.name,
-			arguments: clamp(call.arguments, ARGUMENTS_MAX),
-			repeatCount: call.repeatCount,
-		};
-		// Cut short rather than run — the iteration was spent either way.
-		if (content === undefined) {
-			return { ...row, status: "error" as const, error: "no result observed for this call" };
-		}
-		if (content.startsWith(ERROR_PREFIX)) {
-			return {
-				...row,
-				status: "error" as const,
-				error: clamp(content.slice(ERROR_PREFIX.length), ERROR_MAX),
-			};
-		}
-		return { ...row, status: "success" as const };
-	});
-
-	for (const call of refused) {
-		rows.push({
-			_id: new ObjectId(),
-			...base,
-			toolName: call.name || "unknown",
-			arguments: clamp(call.arguments, ARGUMENTS_MAX),
-			repeatCount: call.repeatCount,
-			status: "error",
-			error: `Tool '${call.name}' not available for ${label}.`,
-		});
-	}
-
-	return rows;
+	return callOutcomes(label, calls, toolMessages, refused).map(({ call, status, error }) => ({
+		_id: new ObjectId(),
+		...base,
+		toolName: call.name,
+		arguments: clamp(call.arguments, ARGUMENTS_MAX),
+		repeatCount: call.repeatCount,
+		status,
+		...(error !== undefined ? { error: clamp(error, ERROR_MAX) } : {}),
+	}));
 }

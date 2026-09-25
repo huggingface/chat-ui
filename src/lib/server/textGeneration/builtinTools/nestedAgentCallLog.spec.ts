@@ -129,6 +129,20 @@ describe("nested agent call log", () => {
 		expect(rows[0].error).toContain("not available");
 	});
 
+	it("names the run each call belongs to, when there is one", () => {
+		insertMany.mockClear();
+		recordNestedAgentCalls(
+			{ ...ctx, agentRunId: "65f000000000000000000001" },
+			"research",
+			0,
+			[call("c1", "hf_fs", "{}")],
+			[ok("c1")]
+		);
+		const [row] = insertMany.mock.calls[0][0] as Array<Record<string, unknown>>;
+		expect(row.agentRunId).toBe("65f000000000000000000001");
+		expect(rowsFrom([call("c1", "hf_fs", "{}")], [ok("c1")])[0]).not.toHaveProperty("agentRunId");
+	});
+
 	it("writes nothing when the iteration made no calls", () => {
 		insertMany.mockClear();
 		recordNestedAgentCalls(ctx, "sandbox", 0, [], [], []);

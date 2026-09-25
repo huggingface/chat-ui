@@ -50,6 +50,8 @@ import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
+import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
+import { PARENT_READER } from "$lib/types/MlSource";
 import {
 	buildSessionStateBlock,
 	injectSessionState,
@@ -213,6 +215,9 @@ export async function* runMcpFlow({
 					payer?.namespace ??
 					(locals as unknown as { user?: { username?: string } })?.user?.username,
 			})
+		: undefined;
+	const sourcesGuardFor = mlAssistant
+		? (readBy: string) => createMlSourcesGuard({ conversationId: conv._id, readBy })
 		: undefined;
 	if (mlAssistant) {
 		logger.info(
@@ -493,6 +498,7 @@ export async function* runMcpFlow({
 			repeatedCallGuard,
 			createSchemaPreflightGuard(mapping),
 			...(recordingGuard ? [recordingGuard] : []),
+			...(sourcesGuardFor ? [sourcesGuardFor(PARENT_READER)] : []),
 			...(budgetGuard ? [budgetGuard] : []),
 		].reduce(composeGuards);
 		const oaTools = [
@@ -729,6 +735,7 @@ export async function* runMcpFlow({
 			contextLengthTokens: targetContextLength,
 			...(rewriteArgs ? { rewriteArgs } : {}),
 			...(expandVirtualFiles ? { expandVirtualFiles } : {}),
+			...(sourcesGuardFor ? { sourcesGuard: sourcesGuardFor } : {}),
 		};
 		for (const tool of builtinTools) {
 			if (isNestedAgentTool(tool)) tool.bind(nestedAgentDeps);

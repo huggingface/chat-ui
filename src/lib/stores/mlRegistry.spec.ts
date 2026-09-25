@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import superjson from "superjson";
 import type { MlFileVersionListing } from "$lib/types/MlFile";
-import type { MlRegistryPayload, MlRegistryService } from "$lib/types/MlRegistry";
+import type {
+	MlAgentRunDetail,
+	MlRegistryAgentRun,
+	MlRegistryPayload,
+	MlRegistryService,
+	MlRegistrySource,
+} from "$lib/types/MlRegistry";
 
 vi.mock("$app/environment", () => ({ browser: false, dev: true, building: false }));
 vi.mock("$app/paths", () => ({ base: "" }));
@@ -19,6 +25,32 @@ const service = (overrides: Partial<MlRegistryService> = {}): MlRegistryService 
 	createdAt: new Date(0),
 	updatedAt: new Date(0),
 	...overrides,
+});
+
+const agentRun = (overrides: Partial<MlRegistryAgentRun> = {}): MlRegistryAgentRun => ({
+	id: "run-1",
+	label: "research",
+	displayName: "Research",
+	taskPreview: "Research task: find recipes",
+	parent: { tool: "research", toolUuid: "tool-1" },
+	status: "running",
+	startedAt: new Date(0),
+	iterations: 1,
+	callCount: 2,
+	sourceCount: 0,
+	...overrides,
+});
+
+const source = (path = "a"): MlRegistrySource => ({
+	id: `source-${path}`,
+	url: `https://example.com/${path}`,
+	group: "example.com",
+	kind: "web",
+	opened: true,
+	readBy: ["parent"],
+	firstSeenAt: new Date(0),
+	lastSeenAt: new Date(0),
+	count: 1,
 });
 
 const payload = (services: MlRegistryService[] = []): MlRegistryPayload => ({
@@ -89,6 +121,35 @@ describe("mlRegistry store", () => {
 			files: [{ name: "train.py", version: 3, size: 9, updatedAt: new Date(0) }],
 		});
 		expect(store.summary).toEqual({ rows: 1, open: 0, running: 0 });
+	});
+
+	it("counts sub-agent runs and sources among the rows, and neither as open", () => {
+		const store = new MlRegistryStore(fakeFetch().fetcher);
+		store.bind("conv-1");
+		store.apply({ ...payload(), agentRuns: [agentRun()], sources: [source(), source("b")] });
+		expect(store.summary).toEqual({ rows: 3, open: 0, running: 0 });
+	});
+
+	it("reads a payload from a server that predates runs and sources as empty lists", () => {
+		const store = new MlRegistryStore(fakeFetch().fetcher);
+		store.bind("conv-1");
+		store.apply({ ...payload(), agentRuns: [agentRun()], sources: [source()] });
+		store.apply(payload([service()]));
+		expect(store.agentRuns).toEqual([]);
+		expect(store.sources).toEqual([]);
+		expect(store.summary.rows).toBe(1);
+	});
+
+	it("knows whether a turn is live, for a run left marked running", async () => {
+		const net = fakeFetch();
+		const store = new MlRegistryStore(net.fetcher);
+		store.watch("conv-1", { live: true });
+		expect(store.turnLive).toBe(true);
+		store.watch("conv-1", { live: false });
+		expect(store.turnLive).toBe(false);
+		store.watch("conv-1", { live: true });
+		store.reset();
+		expect(store.turnLive).toBe(false);
 	});
 
 	it("forgets the conversation on reset", () => {
@@ -401,5 +462,102 @@ describe("mlRegistry store: file versions and content", () => {
 
 		expect(store.fileContent("train.py", 1)).toBeUndefined();
 		expect(store.fileVersions("train.py")).toBeUndefined();
+	});
+});
+
+describe("mlRegistry store: sub-agent run details", () => {
+	const detail = (
+		{ taskPreview: _taskPreview, ...run }: MlRegistryAgentRun,
+		callCount = run.callCount
+	): MlAgentRunDetail => ({
+		...run,
+		callCount,
+		task: "Context: x\n\nResearch task: find recipes",
+		calls: Array.from({ length: callCount }, (_, i) => ({
+			tool: "hf_fs",
+			args: `{"i":${i}}`,
+			status: "success" as const,
+		})),
+	});
+
+	function runServer(answer: () => MlAgentRunDetail | undefined) {
+		const calls: string[] = [];
+		let suspended: Array<() => void> | undefined;
+		const fetcher = (async (input: RequestInfo | URL) => {
+			calls.push(new URL(String(input)).pathname);
+			const body = answer();
+			if (suspended) await new Promise<void>((resolve) => suspended?.push(resolve));
+			if (!body) return new Response("{}", { status: 404 });
+			return new Response(superjson.stringify(body), { status: 200 });
+		}) as typeof fetch;
+		return {
+			fetcher,
+			calls,
+			suspend: () => (suspended = []),
+			release: () => {
+				const waiting = suspended ?? [];
+				suspended = undefined;
+				waiting.forEach((resume) => resume());
+			},
+		};
+	}
+
+	it("fetches a run once, and again only once the listing shows it moved on", async () => {
+		let current = agentRun();
+		const server = runServer(() => detail(current));
+		const store = new MlRegistryStore(server.fetcher);
+		store.bind("conv-1");
+		store.apply({ ...payload(), agentRuns: [current] });
+
+		const first = store.loadRunDetail("run-1");
+		expect(store.runDetail("run-1")).toEqual({ status: "loading" });
+		await first;
+		await store.loadRunDetail("run-1");
+		expect(server.calls).toEqual(["/api/v2/conversations/conv-1/runs/run-1"]);
+		const loaded = store.runDetail("run-1");
+		expect(loaded?.status === "ready" && loaded.value.calls).toHaveLength(2);
+
+		current = agentRun({ status: "completed", callCount: 3, endedAt: new Date(1) });
+		store.apply({ ...payload(), agentRuns: [current] });
+		const refetch = store.loadRunDetail("run-1");
+		expect(store.runDetail("run-1")?.status).toBe("ready");
+		await refetch;
+
+		expect(server.calls).toHaveLength(2);
+		const updated = store.runDetail("run-1");
+		expect(updated?.status === "ready" && updated.value.status).toBe("completed");
+	});
+
+	it("asks again when a poll moves the run on while an older answer is in flight", async () => {
+		let current = agentRun();
+		const server = runServer(() => detail(current));
+		const store = new MlRegistryStore(server.fetcher);
+		store.bind("conv-1");
+		store.apply({ ...payload(), agentRuns: [current] });
+
+		server.suspend();
+		const first = store.loadRunDetail("run-1");
+		current = agentRun({ callCount: 5, iterations: 3 });
+		store.apply({ ...payload(), agentRuns: [current] });
+		const coalesced = store.loadRunDetail("run-1");
+		server.release();
+		await Promise.all([first, coalesced]);
+
+		expect(server.calls).toHaveLength(2);
+		const loaded = store.runDetail("run-1");
+		expect(loaded?.status === "ready" && loaded.value.callCount).toBe(5);
+	});
+
+	it("marks a failed load, and forgets details on reset", async () => {
+		const server = runServer(() => undefined);
+		const store = new MlRegistryStore(server.fetcher);
+		store.bind("conv-1");
+		store.apply({ ...payload(), agentRuns: [agentRun()] });
+
+		await store.loadRunDetail("run-1");
+		expect(store.runDetail("run-1")).toEqual({ status: "error" });
+
+		store.reset();
+		expect(store.runDetail("run-1")).toBeUndefined();
 	});
 });

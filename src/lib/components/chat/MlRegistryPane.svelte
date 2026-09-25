@@ -4,7 +4,11 @@
 	import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 	import type { MlFileRef } from "$lib/types/MlFile";
-	import type { MlRegistryArtefact, MlRegistryService } from "$lib/types/MlRegistry";
+	import type {
+		MlRegistryArtefact,
+		MlRegistryService,
+		MlRegistrySource,
+	} from "$lib/types/MlRegistry";
 	import { serverCorrectedNow } from "$lib/utils/clockSkew.svelte";
 	import { formatMicroUsd } from "$lib/utils/mlBudget";
 	import {
@@ -13,19 +17,29 @@
 		formatBytes,
 		formatFileRef,
 		groupArtefacts,
+		groupSources,
 		hubLabel,
+		isRunLive,
 		isServiceOpen,
 		pathWithin,
+		RUN_FAILURE_LABEL,
+		RUN_FORCED_LABEL,
+		runBadge,
+		runElapsed,
 		serviceDisplayName,
 		serviceElapsed,
 		servicesForFileVersion,
 		shortCommit,
-		sortServices,
+		sortServiceRows,
+		sourcePath,
+		sourceReaders,
+		sourcesByReader,
 		stageBadge,
 	} from "$lib/utils/mlRegistry";
 	import MlFileVersionView from "./MlFileVersionView.svelte";
 	import SidePane from "./SidePane.svelte";
 
+	import CarbonBook from "~icons/carbon/book";
 	import CarbonChartLine from "~icons/carbon/chart-line";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonChip from "~icons/carbon/chip";
@@ -33,7 +47,10 @@
 	import CarbonCube from "~icons/carbon/cube";
 	import CarbonDataTable from "~icons/carbon/data-table";
 	import CarbonDocument from "~icons/carbon/document";
+	import CarbonEarth from "~icons/carbon/earth";
+	import CarbonEducation from "~icons/carbon/education";
 	import CarbonFolder from "~icons/carbon/folder";
+	import CarbonLogoGithub from "~icons/carbon/logo-github";
 	import CarbonRenew from "~icons/carbon/renew";
 	import CarbonRocket from "~icons/carbon/rocket";
 	import CarbonTerminal from "~icons/carbon/terminal";
@@ -50,22 +67,40 @@
 		file: CarbonDocument,
 		dashboard: CarbonChartLine,
 	} as const;
+	const SOURCE_ICON = {
+		paper: CarbonEducation,
+		docs: CarbonBook,
+		hub: CarbonCube,
+		github: CarbonLogoGithub,
+		web: CarbonEarth,
+	} as const;
 
 	const DISCOVERED_TITLE =
 		"Seen in the arguments of a later tool call, not created here: nothing about it is verified";
 
 	let showing = $derived(sidePane.open && sidePane.view === "registry");
-	let services = $derived(sortServices(mlRegistry.services));
+	let turnLive = $derived(mlRegistry.turnLive);
+	let serviceRows = $derived(sortServiceRows(mlRegistry.services, mlRegistry.agentRuns, turnLive));
 	let grouped = $derived(groupArtefacts(mlRegistry.artefacts));
-	let openCount = $derived(services.filter(isServiceOpen).length);
+	let openCount = $derived(mlRegistry.services.filter(isServiceOpen).length);
+	let liveRunCount = $derived(
+		mlRegistry.agentRuns.filter((run) => isRunLive(run, turnLive)).length
+	);
 	let artefactCount = $derived(mlRegistry.artefacts.length);
 	let files = $derived(mlRegistry.files);
+	let sources = $derived(mlRegistry.sources);
+	let sourceGroups = $derived(groupSources(sources));
+	let readByRun = $derived(sourcesByReader(sources));
 
 	const openFiles = new SvelteSet<string>();
 	const shownVersions = new SvelteMap<string, number>();
+	const openRuns = new SvelteSet<string>();
+	const openGroups = new SvelteSet<string>();
 
 	const fileRowId = (name: string) => `ml-file-${name}`;
 	const versionRowId = ({ name, version }: MlFileRef) => `ml-file-${name}@v${version}`;
+	const runRowId = (id: string) => `ml-run-${id}`;
+	const groupRowId = (key: string) => `ml-sources-${key}`;
 
 	function toggleFile(name: string) {
 		if (openFiles.has(name)) openFiles.delete(name);
@@ -75,6 +110,23 @@
 	function toggleVersion(name: string, version: number) {
 		if (shownVersions.get(name) === version) shownVersions.delete(name);
 		else shownVersions.set(name, version);
+	}
+
+	function toggleRun(id: string) {
+		if (openRuns.has(id)) openRuns.delete(id);
+		else openRuns.add(id);
+	}
+
+	function toggleGroup(key: string) {
+		if (openGroups.has(key)) openGroups.delete(key);
+		else openGroups.add(key);
+	}
+
+	function revealRun(id: string) {
+		openRuns.add(id);
+		void tick().then(() =>
+			document.getElementById(runRowId(id))?.scrollIntoView({ block: "start" })
+		);
 	}
 
 	$effect(() => {
@@ -91,7 +143,21 @@
 		untrack(() => {
 			openFiles.clear();
 			shownVersions.clear();
+			openRuns.clear();
+			openGroups.clear();
 		});
+	});
+
+	$effect(() => {
+		if (!showing) return;
+		for (const id of openRuns) {
+			const run = mlRegistry.agentRuns.find((candidate) => candidate.id === id);
+			// read so a run that moved on refetches its detail
+			void run?.status;
+			void run?.callCount;
+			void run?.iterations;
+			untrack(() => mlRegistry.loadRunDetail(id));
+		}
 	});
 
 	$effect(() => {
@@ -134,7 +200,7 @@
 		now = serverCorrectedNow();
 	});
 	// elapsed times need the second, file ages only the minute
-	let tickMs = $derived(openCount > 0 ? 1000 : files.length > 0 ? 30_000 : 0);
+	let tickMs = $derived(openCount + liveRunCount > 0 ? 1000 : files.length > 0 ? 30_000 : 0);
 	$effect(() => {
 		if (!showing || tickMs === 0) return;
 		const timer = setInterval(() => (now = serverCorrectedNow()), tickMs);
@@ -145,7 +211,49 @@
 		`Open ${service.kind} ${service.jobId} on the Hub`;
 	const artefactTitle = (artefact: MlRegistryArtefact) =>
 		`Open ${artefact.kind} ${hubLabel(artefact.uri)} on the Hub`;
+	const sourceTitle = (source: MlRegistrySource) =>
+		`${source.title ? `${source.title}\n` : ""}${source.url}\nseen ${source.count} ${source.count === 1 ? "time" : "times"}, last ${source.lastSeenAt.toLocaleString()}`;
+	const plural = (count: number, one: string, many = `${one}s`) =>
+		`${count} ${count === 1 ? one : many}`;
 </script>
+
+{#snippet sourceItem(source: MlRegistrySource)}
+	<li class="ml-source flex min-w-0 items-baseline gap-2 py-[3px] pl-3 text-xs">
+		<span class="block min-w-0 flex-1">
+			<a
+				href={source.url}
+				target="_blank"
+				rel="noopener noreferrer"
+				class="ml-registry-link ml-source-link block truncate"
+				title={sourceTitle(source)}
+			>
+				{source.title ?? sourcePath(source)}
+			</a>
+			{#if source.title}
+				<span class="ml-source-path block truncate font-mono text-[11px]">
+					{sourcePath(source)}
+				</span>
+			{/if}
+		</span>
+		<span class="flex flex-none flex-wrap justify-end gap-1">
+			{#each sourceReaders(source, mlRegistry.agentRuns) as reader (reader.key)}
+				{#if reader.runId}
+					{@const runId = reader.runId}
+					<button
+						type="button"
+						class="ml-source-reader"
+						title="{reader.title}. Show the run"
+						onclick={() => revealRun(runId)}
+					>
+						{reader.label}
+					</button>
+				{:else}
+					<span class="ml-source-reader" title={reader.title}>{reader.label}</span>
+				{/if}
+			{/each}
+		</span>
+	</li>
+{/snippet}
 
 {#if showing}
 	<SidePane label="Services and artefacts">
@@ -157,11 +265,11 @@
 				<h2 class="flex-none text-sm font-semibold text-gray-800 dark:text-gray-200">
 					Services and artefacts
 				</h2>
-				{#if openCount > 0}
+				{#if openCount + liveRunCount > 0}
 					<span
 						class="hidden truncate text-xs text-[#78716c] @min-[400px]:inline dark:text-[#a8a29e]"
 					>
-						{openCount} running
+						{openCount + liveRunCount} running
 					</span>
 				{/if}
 			</div>
@@ -196,88 +304,285 @@
 				<section aria-labelledby="ml-registry-services">
 					<h3 id="ml-registry-services" class="ml-registry-heading">
 						Services
-						{#if services.length}
-							<span class="ml-registry-count">{services.length}</span>
+						{#if serviceRows.length}
+							<span class="ml-registry-count">{serviceRows.length}</span>
 						{/if}
 					</h3>
-					{#if services.length === 0}
+					{#if serviceRows.length === 0}
 						<p class="ml-registry-empty">
-							No jobs or sandboxes yet. They appear here as the intern launches them.
+							No jobs, sandboxes or sub-agent runs yet. They appear here as the intern launches
+							them.
 						</p>
 					{:else}
 						<ul class="ml-registry-list">
-							{#each services as service (service.id)}
-								{@const Icon = SERVICE_ICON[service.kind]}
-								{@const badge = stageBadge(service.stage)}
-								{@const elapsed = serviceElapsed(service, now)}
-								<li class="ml-service flex gap-2.5 px-4 py-2.5" data-stage={badge.tone}>
-									<Icon class="mt-[3px] size-[14px] flex-none text-[#78716c] dark:text-[#a8a29e]" />
-									<div class="min-w-0 flex-1">
-										<div class="flex items-center gap-2">
-											<a
-												href={service.hubUrl}
-												target="_blank"
-												rel="noopener noreferrer"
-												class="ml-registry-link min-w-0 truncate font-medium text-[#1c1917] dark:text-[#f5f5f4]"
-												title={serviceTitle(service)}
-											>
-												{serviceDisplayName(service)}
-											</a>
-											{#if service.origin === "discovered"}
-												<span class="ml-registry-discovered" title={DISCOVERED_TITLE}
-													>discovered</span
+							{#each serviceRows as row (row.key)}
+								{#if row.type === "service"}
+									{@const service = row.service}
+									{@const Icon = SERVICE_ICON[service.kind]}
+									{@const badge = stageBadge(service.stage)}
+									{@const elapsed = serviceElapsed(service, now)}
+									<li class="ml-service flex gap-2.5 px-4 py-2.5" data-stage={badge.tone}>
+										<Icon
+											class="mt-[3px] size-[14px] flex-none text-[#78716c] dark:text-[#a8a29e]"
+										/>
+										<div class="min-w-0 flex-1">
+											<div class="flex items-center gap-2">
+												<a
+													href={service.hubUrl}
+													target="_blank"
+													rel="noopener noreferrer"
+													class="ml-registry-link min-w-0 truncate font-medium text-[#1c1917] dark:text-[#f5f5f4]"
+													title={serviceTitle(service)}
 												>
-											{/if}
-											<span class="ml-stage ml-auto" data-tone={badge.tone}>
-												{#if badge.tone === "running"}
-													<span aria-hidden="true" class="ml-live-dot"></span>
-												{/if}
-												{badge.label}
-											</span>
-										</div>
-										<div
-											class="ml-service-meta mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-xs text-[#78716c] dark:text-[#a8a29e]"
-										>
-											<span>{service.kind}</span>
-											{#if service.flavor}
-												<span aria-hidden="true">·</span>
-												<span class="font-mono">{service.flavor}</span>
-											{/if}
-											{#if elapsed}
-												<span aria-hidden="true">·</span>
-												<span class="ml-service-elapsed tabular-nums">{elapsed}</span>
-											{/if}
-											{#if service.heldMicroUsd !== undefined}
-												<span aria-hidden="true">·</span>
-												<span
-													class="ml-service-hold font-mono text-[#c4511a] tabular-nums dark:text-[#f0a468]"
-												>
-													holds {formatMicroUsd(service.heldMicroUsd)}
-												</span>
-											{/if}
-										</div>
-										{#if service.scriptRefs?.length}
-											<div class="mt-1 flex flex-wrap gap-1.5">
-												{#each service.scriptRefs as ref (formatFileRef(ref))}
-													<button
-														type="button"
-														class="ml-file-ref"
-														title="Show {formatFileRef(ref)} under Files"
-														onclick={() => sidePane.openRegistry(ref)}
+													{serviceDisplayName(service)}
+												</a>
+												{#if service.origin === "discovered"}
+													<span class="ml-registry-discovered" title={DISCOVERED_TITLE}
+														>discovered</span
 													>
-														<CarbonDocument class="size-3 flex-none" />
-														{formatFileRef(ref)}
-													</button>
-												{/each}
+												{/if}
+												<span class="ml-stage ml-auto" data-tone={badge.tone}>
+													{#if badge.tone === "running"}
+														<span aria-hidden="true" class="ml-live-dot"></span>
+													{/if}
+													{badge.label}
+												</span>
+											</div>
+											<div
+												class="ml-service-meta mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-xs text-[#78716c] dark:text-[#a8a29e]"
+											>
+												<span>{service.kind}</span>
+												{#if service.flavor}
+													<span aria-hidden="true">·</span>
+													<span class="font-mono">{service.flavor}</span>
+												{/if}
+												{#if elapsed}
+													<span aria-hidden="true">·</span>
+													<span class="ml-service-elapsed tabular-nums">{elapsed}</span>
+												{/if}
+												{#if service.heldMicroUsd !== undefined}
+													<span aria-hidden="true">·</span>
+													<span
+														class="ml-service-hold font-mono text-[#c4511a] tabular-nums dark:text-[#f0a468]"
+													>
+														holds {formatMicroUsd(service.heldMicroUsd)}
+													</span>
+												{/if}
+											</div>
+											{#if service.scriptRefs?.length}
+												<div class="mt-1 flex flex-wrap gap-1.5">
+													{#each service.scriptRefs as ref (formatFileRef(ref))}
+														<button
+															type="button"
+															class="ml-file-ref"
+															title="Show {formatFileRef(ref)} under Files"
+															onclick={() => sidePane.openRegistry(ref)}
+														>
+															<CarbonDocument class="size-3 flex-none" />
+															{formatFileRef(ref)}
+														</button>
+													{/each}
+												</div>
+											{/if}
+											{#if service.tokenMissingSince}
+												<p class="mt-0.5 text-xs text-[#a8a29e] dark:text-[#78716c]">
+													Status unknown since the session expired.
+												</p>
+											{/if}
+										</div>
+									</li>
+								{:else}
+									{@const run = row.run}
+									{@const badge = runBadge(run, turnLive)}
+									{@const elapsed = runElapsed(run, now, turnLive)}
+									{@const isOpen = openRuns.has(run.id)}
+									{@const read = readByRun.get(run.id) ?? []}
+									{@const opened = read.filter((source) => source.opened)}
+									<li class="ml-run" id={runRowId(run.id)} data-stage={badge.tone}>
+										<button
+											type="button"
+											class="ml-file-toggle flex w-full items-start gap-2.5 px-4 py-2.5 text-left"
+											aria-expanded={isOpen}
+											aria-controls="{runRowId(run.id)}-detail"
+											onclick={() => toggleRun(run.id)}
+										>
+											<CarbonChevronRight
+												class="ml-file-chevron mt-[3px] size-[14px] flex-none text-[#a8a29e] dark:text-[#78716c]"
+											/>
+											<span class="block min-w-0 flex-1">
+												<span class="flex items-center gap-2">
+													<span
+														class="min-w-0 truncate font-medium text-[#1c1917] dark:text-[#f5f5f4]"
+													>
+														{run.displayName}
+													</span>
+													<span class="ml-stage ml-auto" data-tone={badge.tone}>
+														{#if badge.tone === "running"}
+															<span aria-hidden="true" class="ml-live-dot"></span>
+														{/if}
+														{badge.label}
+													</span>
+												</span>
+												{#if run.taskPreview}
+													<span
+														class="ml-run-task mt-0.5 block truncate text-xs text-[#57534e] dark:text-[#d6d3d1]"
+													>
+														{run.taskPreview}
+													</span>
+												{/if}
+												<span
+													class="ml-service-meta mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-xs text-[#78716c] dark:text-[#a8a29e]"
+												>
+													<span>sub-agent</span>
+													<span aria-hidden="true">·</span>
+													<span title="Started by the {run.parent.tool} call">
+														via <span class="font-mono">{run.parent.tool}</span>
+													</span>
+													<span aria-hidden="true">·</span>
+													<span class="tabular-nums">{plural(run.callCount, "call")}</span>
+													{#if elapsed}
+														<span aria-hidden="true">·</span>
+														<span class="ml-service-elapsed tabular-nums">{elapsed}</span>
+													{/if}
+													{#if opened.length}
+														<span aria-hidden="true">·</span>
+														<span class="tabular-nums">{plural(opened.length, "source")} read</span>
+													{/if}
+												</span>
+												{#if run.status === "failed" && run.failure}
+													<span class="ml-run-note mt-0.5 block text-xs" data-tone="error">
+														{RUN_FAILURE_LABEL[run.failure]}
+													</span>
+												{:else if run.forcedBy}
+													<span class="ml-run-note mt-0.5 block text-xs">
+														{RUN_FORCED_LABEL[run.forcedBy]}
+													</span>
+												{/if}
+											</span>
+										</button>
+										{#if isOpen}
+											{@const load = mlRegistry.runDetail(run.id)}
+											<div
+												id="{runRowId(run.id)}-detail"
+												class="ml-run-detail flex flex-col gap-3 pr-4 pb-3 pl-[40px] text-xs"
+											>
+												{#if load?.status === "ready"}
+													{@const detail = load.value}
+													<div>
+														<h4 class="ml-run-label">Task</h4>
+														<p class="ml-run-text">{detail.task}</p>
+													</div>
+													{#if detail.summary}
+														<div>
+															<h4 class="ml-run-label">Summary</h4>
+															<p class="ml-run-text ml-run-summary scrollbar-custom">
+																{detail.summary}
+															</p>
+														</div>
+													{:else if detail.error}
+														<div>
+															<h4 class="ml-run-label">Error</h4>
+															<p class="ml-run-text" data-tone="error">{detail.error}</p>
+														</div>
+													{/if}
+													<div>
+														<h4 class="ml-run-label">
+															Calls
+															<span class="ml-registry-count">{detail.callCount}</span>
+														</h4>
+														{#if detail.calls.length === 0}
+															<p class="ml-file-note">No calls.</p>
+														{:else}
+															<ol
+																class="ml-run-calls border-l border-[#ececea] dark:border-[#262626]"
+																aria-label="Calls {run.displayName.toLowerCase()} made"
+															>
+																{#each detail.calls as call, index (index)}
+																	<li class="py-[3px] pl-3" data-status={call.status}>
+																		<span class="flex min-w-0 items-baseline gap-2">
+																			<span
+																				class="flex-none font-mono font-medium text-[#1c1917] dark:text-[#f5f5f4]"
+																			>
+																				{call.tool}
+																			</span>
+																			<span
+																				class="min-w-0 truncate font-mono text-[11px] text-[#78716c] dark:text-[#a8a29e]"
+																				title={call.args}
+																			>
+																				{call.args}
+																			</span>
+																		</span>
+																		{#if call.error}
+																			<span
+																				class="ml-run-note block truncate"
+																				data-tone="error"
+																				title={call.error}
+																			>
+																				{call.error}
+																			</span>
+																		{/if}
+																	</li>
+																{/each}
+															</ol>
+															{#if detail.callCount > detail.calls.length}
+																<p class="ml-file-note">
+																	{plural(detail.callCount - detail.calls.length, "later call")} not kept.
+																</p>
+															{/if}
+														{/if}
+													</div>
+												{:else if load?.status === "error"}
+													<p class="ml-file-note">
+														Could not load the run.
+														<button
+															type="button"
+															class="ml-file-retry"
+															onclick={() => mlRegistry.loadRunDetail(run.id)}>Try again</button
+														>
+													</p>
+												{:else}
+													<p class="ml-file-note" role="status">Loading the run…</p>
+												{/if}
+												{#if read.length}
+													<div>
+														<h4 class="ml-run-label">
+															Sources
+															<span class="ml-registry-count">{opened.length}</span>
+														</h4>
+														{#if opened.length}
+															<ul class="ml-run-sources">
+																{#each opened as source (source.id)}
+																	<li class="flex min-w-0 items-baseline gap-2 py-[2px]">
+																		<a
+																			href={source.url}
+																			target="_blank"
+																			rel="noopener noreferrer"
+																			class="ml-registry-link min-w-0 truncate text-[#57534e] dark:text-[#d6d3d1]"
+																			title={sourceTitle(source)}
+																		>
+																			{source.title ?? sourcePath(source)}
+																		</a>
+																		<span
+																			class="ml-auto flex-none text-[11px] text-[#a8a29e] dark:text-[#78716c]"
+																		>
+																			{source.group}
+																		</span>
+																	</li>
+																{/each}
+															</ul>
+														{/if}
+														{#if read.length > opened.length}
+															<p class="ml-file-note">
+																{plural(read.length - opened.length, "more link")} only in its search
+																results, listed under Sources.
+															</p>
+														{/if}
+													</div>
+												{/if}
 											</div>
 										{/if}
-										{#if service.tokenMissingSince}
-											<p class="mt-0.5 text-xs text-[#a8a29e] dark:text-[#78716c]">
-												Status unknown since the session expired.
-											</p>
-										{/if}
-									</div>
-								</li>
+									</li>
+								{/if}
 							{/each}
 						</ul>
 					{/if}
@@ -580,6 +885,82 @@
 						</ul>
 					{/if}
 				</section>
+
+				<section aria-labelledby="ml-registry-sources">
+					<h3 id="ml-registry-sources" class="ml-registry-heading">
+						Sources
+						{#if sources.length}
+							<span class="ml-registry-count">{sources.length}</span>
+						{/if}
+					</h3>
+					{#if sources.length === 0}
+						<p class="ml-registry-empty">
+							No sources yet. Papers, docs, repos and web pages the intern reads appear here.
+						</p>
+					{:else}
+						<ul class="ml-registry-list">
+							{#each sourceGroups as group (group.key)}
+								{@const Icon = SOURCE_ICON[group.kind]}
+								{@const isOpen = openGroups.has(group.key)}
+								<li class="ml-source-group" id={groupRowId(group.key)} data-kind={group.kind}>
+									<button
+										type="button"
+										class="ml-file-toggle flex w-full items-center gap-2.5 px-4 py-2.5 text-left"
+										aria-expanded={isOpen}
+										aria-controls="{groupRowId(group.key)}-paths"
+										onclick={() => toggleGroup(group.key)}
+									>
+										<CarbonChevronRight
+											class="ml-file-chevron size-[14px] flex-none text-[#a8a29e] dark:text-[#78716c]"
+										/>
+										<Icon class="size-[14px] flex-none text-[#78716c] dark:text-[#a8a29e]" />
+										<span
+											class="ml-source-label min-w-0 flex-1 truncate font-medium text-[#1c1917] dark:text-[#f5f5f4]"
+										>
+											{group.label}
+										</span>
+										<span
+											class="flex flex-none items-baseline gap-1.5 text-xs text-[#78716c] tabular-nums dark:text-[#a8a29e]"
+										>
+											{#if group.opened.length}
+												<span class="ml-source-read">{group.opened.length} read</span>
+											{/if}
+											{#if group.found.length}
+												<span class="ml-source-found-count">{group.found.length} found</span>
+											{/if}
+										</span>
+									</button>
+									{#if isOpen}
+										<div id="{groupRowId(group.key)}-paths" class="pr-4 pb-3 pl-[40px]">
+											{#if group.opened.length}
+												<ul
+													class="ml-source-paths border-l border-[#ececea] dark:border-[#262626]"
+													aria-label="Pages read on {group.label}"
+												>
+													{#each group.opened as source (source.id)}
+														{@render sourceItem(source)}
+													{/each}
+												</ul>
+											{/if}
+											{#if group.found.length}
+												<p class="ml-source-found-heading">Only in search results</p>
+												<ul
+													class="ml-source-paths border-l border-[#ececea] dark:border-[#262626]"
+													data-found="true"
+													aria-label="Links to {group.label} only in search results"
+												>
+													{#each group.found as source (source.id)}
+														{@render sourceItem(source)}
+													{/each}
+												</ul>
+											{/if}
+										</div>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</section>
 			{/if}
 		</div>
 	</SidePane>
@@ -785,7 +1166,8 @@
 	.ml-file-toggle:focus-visible,
 	.ml-version-toggle:focus-visible,
 	.ml-file-ref:focus-visible,
-	.ml-file-retry:focus-visible {
+	.ml-file-retry:focus-visible,
+	.ml-source-reader:focus-visible {
 		outline: none;
 		box-shadow:
 			inset 0 0 0 1.5px #c4511a,
@@ -795,7 +1177,8 @@
 	:global(.dark) .ml-file-toggle:focus-visible,
 	:global(.dark) .ml-version-toggle:focus-visible,
 	:global(.dark) .ml-file-ref:focus-visible,
-	:global(.dark) .ml-file-retry:focus-visible {
+	:global(.dark) .ml-file-retry:focus-visible,
+	:global(.dark) .ml-source-reader:focus-visible {
 		box-shadow:
 			inset 0 0 0 1.5px #f0a468,
 			0 0 0 1px #111827;
@@ -825,7 +1208,8 @@
 		color: #a8a29e;
 	}
 
-	.ml-version-agent {
+	.ml-version-agent,
+	.ml-source-reader {
 		flex: none;
 		padding: 0 6px;
 		border: 1px solid #e7e5e4;
@@ -835,9 +1219,120 @@
 		color: #57534e;
 	}
 
-	:global(.dark) .ml-version-agent {
+	:global(.dark) .ml-version-agent,
+	:global(.dark) .ml-source-reader {
 		border-color: #44403c;
 		color: #d6d3d1;
+	}
+
+	button.ml-source-reader {
+		transition:
+			color 120ms ease,
+			border-color 120ms ease;
+	}
+
+	button.ml-source-reader:hover {
+		border-color: #f0a468;
+		color: #c4511a;
+	}
+
+	:global(.dark) button.ml-source-reader:hover {
+		border-color: #c4511a;
+		color: #f0a468;
+	}
+
+	.ml-run-label {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+		margin-bottom: 2px;
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: #78716c;
+	}
+
+	:global(.dark) .ml-run-label {
+		color: #a8a29e;
+	}
+
+	.ml-run-text {
+		font-size: 12px;
+		line-height: 1.5;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+		color: #57534e;
+	}
+
+	:global(.dark) .ml-run-text {
+		color: #d6d3d1;
+	}
+
+	.ml-run-summary {
+		max-height: 16rem;
+		overflow-y: auto;
+		padding: 6px 8px;
+		border-radius: 5px;
+		background: rgba(0, 0, 0, 0.03);
+	}
+
+	:global(.dark) .ml-run-summary {
+		background: rgba(255, 255, 255, 0.04);
+	}
+
+	.ml-run-note {
+		color: #78716c;
+	}
+
+	:global(.dark) .ml-run-note {
+		color: #a8a29e;
+	}
+
+	.ml-run-note[data-tone="error"],
+	.ml-run-text[data-tone="error"] {
+		color: #b91c1c;
+	}
+
+	:global(.dark) .ml-run-note[data-tone="error"],
+	:global(.dark) .ml-run-text[data-tone="error"] {
+		color: #f87171;
+	}
+
+	.ml-source-link {
+		color: #1c1917;
+	}
+
+	:global(.dark) .ml-source-link {
+		color: #f5f5f4;
+	}
+
+	.ml-source-path,
+	.ml-source-found-count {
+		color: #a8a29e;
+	}
+
+	:global(.dark) .ml-source-path,
+	:global(.dark) .ml-source-found-count {
+		color: #78716c;
+	}
+
+	.ml-source-found-heading {
+		margin: 8px 0 2px;
+		font-size: 11px;
+		color: #a8a29e;
+	}
+
+	:global(.dark) .ml-source-found-heading {
+		color: #78716c;
+	}
+
+	.ml-source-paths[data-found="true"] .ml-source-link {
+		color: #a8a29e;
+	}
+
+	:global(.dark) .ml-source-paths[data-found="true"] .ml-source-link {
+		color: #78716c;
 	}
 
 	.ml-file-note {

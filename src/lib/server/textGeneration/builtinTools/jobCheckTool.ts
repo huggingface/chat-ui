@@ -128,6 +128,7 @@ async function runJobCheck(
 	const spec: NestedAgentSpec = {
 		label: "job-check",
 		displayName: "Job check",
+		toolName: JOB_CHECK_TOOL_NAME,
 		systemPrompt: jobCheckSystemPrompt({ virtualFiles }),
 		task: [`Job id: ${jobId}`, context ? `Context: ${context}` : "", `Checking for: ${task}`]
 			.filter(Boolean)

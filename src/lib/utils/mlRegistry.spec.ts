@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { MlRegistryArtefact, MlRegistryService } from "$lib/types/MlRegistry";
+import type {
+	MlRegistryAgentRun,
+	MlRegistryArtefact,
+	MlRegistryService,
+	MlRegistrySource,
+} from "$lib/types/MlRegistry";
 import {
 	fileLanguage,
+	groupSources,
+	runBadge,
+	runElapsed,
+	sortServiceRows,
+	sourcePath,
+	sourceReaders,
 	formatAgo,
 	formatBytes,
 	formatElapsed,
@@ -243,5 +254,147 @@ describe("file formatting", () => {
 		expect(fileLanguage("run.sh")).toBe("bash");
 		expect(fileLanguage("pyproject.toml")).toBe("plaintext");
 		expect(fileLanguage("Dockerfile")).toBe("plaintext");
+	});
+});
+
+const run = (overrides: Partial<MlRegistryAgentRun> = {}): MlRegistryAgentRun => ({
+	id: "run-1",
+	label: "research",
+	displayName: "Research",
+	taskPreview: "Research task: find recipes",
+	parent: { tool: "research", toolUuid: "tool-1" },
+	status: "completed",
+	startedAt: at(0),
+	endedAt: at(65_000),
+	iterations: 4,
+	callCount: 6,
+	sourceCount: 2,
+	...overrides,
+});
+
+describe("sub-agent runs", () => {
+	it("badges a run, and one left running outside a live turn as interrupted", () => {
+		expect(runBadge(run({ status: "running" }), true)).toEqual({
+			label: "running",
+			tone: "running",
+		});
+		expect(runBadge(run({ status: "running" }), false)).toEqual({
+			label: "interrupted",
+			tone: "unknown",
+		});
+		expect(runBadge(run(), false).tone).toBe("completed");
+		expect(runBadge(run({ status: "failed" }), true)).toEqual({ label: "failed", tone: "error" });
+		expect(runBadge(run({ status: "aborted" }), true)).toEqual({
+			label: "stopped",
+			tone: "cancelled",
+		});
+	});
+
+	it("times an ended run by its end, a live one by now, and an interrupted one not at all", () => {
+		expect(runElapsed(run(), T0 + 999_999, false)).toBe("1m 05s");
+		const running = run({ status: "running", endedAt: undefined });
+		expect(runElapsed(running, T0 + 12_000, true)).toBe("12s");
+		expect(runElapsed(running, T0 + 12_000, false)).toBeUndefined();
+	});
+
+	it("sorts runs among services, live ones with the running jobs, newest first", () => {
+		const rows = sortServiceRows(
+			[
+				service({ id: "old-job", stage: "COMPLETED", createdAt: at(0) }),
+				service({ id: "live-job", stage: "RUNNING", createdAt: at(10) }),
+			],
+			[
+				run({ id: "done", startedAt: at(20) }),
+				run({ id: "live", status: "running", endedAt: undefined, startedAt: at(5) }),
+			],
+			true
+		);
+		expect(rows.map((row) => row.key)).toEqual([
+			"service:live-job",
+			"run:live",
+			"run:done",
+			"service:old-job",
+		]);
+		expect(
+			sortServiceRows([], [run({ id: "stuck", status: "running", endedAt: undefined })], false)[0]
+				.key
+		).toBe("run:stuck");
+	});
+});
+
+const source = (overrides: Partial<MlRegistrySource> = {}): MlRegistrySource => ({
+	id: "s",
+	url: "https://example.com/a",
+	group: "example.com",
+	kind: "web",
+	opened: true,
+	readBy: ["parent"],
+	firstSeenAt: at(0),
+	lastSeenAt: at(0),
+	count: 1,
+	...overrides,
+});
+
+describe("sources", () => {
+	it("groups by group, most read first, found-only results apart, newest first in each", () => {
+		const groups = groupSources([
+			source({ id: "w1", url: "https://example.com/a", lastSeenAt: at(1) }),
+			source({ id: "w2", url: "https://example.com/b", opened: false }),
+			source({ id: "a1", url: "https://arxiv.org/abs/1", group: "arxiv.org", lastSeenAt: at(1) }),
+			source({ id: "a2", url: "https://arxiv.org/abs/2", group: "arxiv.org", lastSeenAt: at(2) }),
+			source({
+				id: "g1",
+				url: "https://github.com/huggingface/trl/blob/HEAD/x.py",
+				group: "huggingface/trl",
+				kind: "github",
+				opened: false,
+			}),
+			source({
+				id: "h1",
+				url: "https://huggingface.co/huggingface/trl",
+				group: "huggingface/trl",
+				kind: "hub",
+			}),
+		]);
+		expect(
+			groups.map((g) => [g.label, g.kind, g.opened.map((s) => s.id), g.found.map((s) => s.id)])
+		).toEqual([
+			["arxiv.org", "web", ["a2", "a1"], []],
+			["example.com", "web", ["w1"], ["w2"]],
+			["huggingface/trl", "hub", ["h1"], []],
+			["huggingface/trl", "github", [], ["g1"]],
+		]);
+	});
+
+	it("labels a source by where it sits in its group", () => {
+		expect(sourcePath(source({ url: "https://example.com/" }))).toBe("/");
+		expect(sourcePath(source({ url: "https://example.com/a%20b?q=1" }))).toBe("/a b?q=1");
+		expect(sourcePath({ url: "https://huggingface.co/papers/2502.16161", kind: "paper" })).toBe(
+			"2502.16161"
+		);
+		expect(sourcePath({ url: "https://huggingface.co/docs/trl/sft_trainer", kind: "docs" })).toBe(
+			"trl/sft_trainer"
+		);
+		expect(
+			sourcePath({
+				url: "https://github.com/huggingface/trl/blob/a1b2c3d/examples/scripts/sft.py",
+				kind: "github",
+			})
+		).toBe("examples/scripts/sft.py");
+		expect(
+			sourcePath({
+				url: "https://huggingface.co/datasets/o/n/blob/main/data/train.json",
+				kind: "hub",
+			})
+		).toBe("data/train.json");
+		expect(sourcePath({ url: "https://huggingface.co/datasets/o/n", kind: "hub" })).toBe(
+			"repo page"
+		);
+	});
+
+	it("names the main agent and each run that read a source", () => {
+		const readers = sourceReaders(source({ readBy: ["parent", "run-1", "gone"] }), [run()]);
+		expect(readers.map((reader) => reader.label)).toEqual(["main", "research", "sub-agent"]);
+		expect(readers[1].title).toContain("research sub-agent");
 	});
 });

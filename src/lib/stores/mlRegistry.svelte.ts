@@ -7,9 +7,12 @@ import type {
 	MlFileVersions,
 } from "$lib/types/MlFile";
 import type {
+	MlAgentRunDetail,
+	MlRegistryAgentRun,
 	MlRegistryArtefact,
 	MlRegistryPayload,
 	MlRegistryService,
+	MlRegistrySource,
 	MlRegistrySummary,
 } from "$lib/types/MlRegistry";
 import { noteServerNow } from "$lib/utils/clockSkew.svelte";
@@ -24,6 +27,10 @@ export type FileLoad<T> =
 
 const contentKey = (name: string, version: number) => `${version}:${name}`;
 
+/** what changes while a run goes on, a detail with the same stamp as the listing is current */
+const runStamp = (run: Pick<MlRegistryAgentRun, "status" | "callCount" | "iterations">) =>
+	`${run.status}:${run.callCount}:${run.iterations}`;
+
 /**
  * what the harness recorded for a conversation, read from the registry endpoint and nothing else
  * a stage changes between turns and the turn stream is keyed by message, so this polls, every
@@ -31,8 +38,12 @@ const contentKey = (name: string, version: number) => `${version}:${name}`;
  */
 export class MlRegistryStore {
 	services = $state<MlRegistryService[]>([]);
+	agentRuns = $state<MlRegistryAgentRun[]>([]);
 	artefacts = $state<MlRegistryArtefact[]>([]);
 	files = $state<MlFileListing[]>([]);
+	sources = $state<MlRegistrySource[]>([]);
+	/** whether a turn is running, a run still marked running outside one never recorded its end */
+	turnLive = $state(false);
 	/** the server clock on the last payload, effects reseed from it */
 	serverNow = $state<number | undefined>(undefined);
 	/** whether a payload has arrived for the current conversation */
@@ -45,9 +56,10 @@ export class MlRegistryStore {
 	#versions = new SvelteMap<string, FileLoad<MlFileVersionListing[]>>();
 	/** by version and name, a version never changes so it is fetched once */
 	#contents = new SvelteMap<string, FileLoad<string>>();
+	/** by run id, refetched once the listing shows the run moved on */
+	#runDetails = new SvelteMap<string, FileLoad<MlAgentRunDetail>>();
 	#fileRequests = new Map<string, Promise<void>>();
 
-	#live = false;
 	#watching = false;
 	#timer: ReturnType<typeof setTimeout> | undefined;
 	#inflight: Promise<void> | undefined;
@@ -66,7 +78,12 @@ export class MlRegistryStore {
 
 	get summary(): MlRegistrySummary {
 		return {
-			rows: this.services.length + this.artefacts.length + this.files.length,
+			rows:
+				this.services.length +
+				this.agentRuns.length +
+				this.artefacts.length +
+				this.files.length +
+				this.sources.length,
 			open: this.openServices.length,
 			running: this.services.filter((service) => service.stage === "RUNNING").length,
 		};
@@ -78,8 +95,8 @@ export class MlRegistryStore {
 	 */
 	watch(conversationId: string, { live }: { live: boolean }): () => void {
 		this.bind(conversationId);
-		const turnEnded = this.#live && !live;
-		this.#live = live;
+		const turnEnded = this.turnLive && !live;
+		this.turnLive = live;
 		this.#watching = true;
 		if (!this.loaded || turnEnded) void this.refresh();
 		this.#reschedule();
@@ -163,6 +180,41 @@ export class MlRegistryStore {
 		});
 	}
 
+	runDetail(id: string): FileLoad<MlAgentRunDetail> | undefined {
+		return this.#runDetails.get(id);
+	}
+
+	/** a detail kept on show while a newer one loads, like the file versions */
+	loadRunDetail(id: string): Promise<void> {
+		const listed = this.#listedRunStamp(id);
+		const cached = this.#runDetails.get(id);
+		if (cached?.status === "ready" && runStamp(cached.value) === listed) {
+			return Promise.resolve();
+		}
+		return this.#request(`run:${id}`, async (conversationId, client) => {
+			if (cached?.status !== "ready") this.#runDetails.set(id, { status: "loading" });
+			try {
+				const response = await client.conversations({ id: conversationId }).runs(id).get();
+				const detail = handleResponse(response) as MlAgentRunDetail;
+				return () => {
+					this.#runDetails.set(id, { status: "ready", value: detail });
+					// a poll that moved the run on mid flight was coalesced into this request
+					const now = this.#listedRunStamp(id);
+					return now !== listed && now !== runStamp(detail) ? this.loadRunDetail(id) : undefined;
+				};
+			} catch {
+				return () => {
+					if (cached?.status !== "ready") this.#runDetails.set(id, { status: "error" });
+				};
+			}
+		});
+	}
+
+	#listedRunStamp(id: string): string | undefined {
+		const run = this.agentRuns.find((candidate) => candidate.id === id);
+		return run && runStamp(run);
+	}
+
 	/** one request per key at a time, and an answer that lands after a reset lands nowhere */
 	#request(
 		key: string,
@@ -191,8 +243,10 @@ export class MlRegistryStore {
 
 	apply(payload: MlRegistryPayload): void {
 		this.services = payload.services;
+		this.agentRuns = payload.agentRuns ?? [];
 		this.artefacts = payload.artefacts;
 		this.files = payload.files;
+		this.sources = payload.sources ?? [];
 		this.serverNow = payload.serverNow;
 		this.loaded = true;
 		noteServerNow(payload.serverNow);
@@ -203,13 +257,16 @@ export class MlRegistryStore {
 		this.#epoch += 1;
 		this.#inflight = undefined;
 		this.conversationId = undefined;
-		this.#live = false;
+		this.turnLive = false;
 		this.#watching = false;
 		this.services = [];
+		this.agentRuns = [];
 		this.artefacts = [];
 		this.files = [];
+		this.sources = [];
 		this.#versions.clear();
 		this.#contents.clear();
+		this.#runDetails.clear();
 		this.#fileRequests.clear();
 		this.serverNow = undefined;
 		this.loaded = false;
@@ -225,7 +282,7 @@ export class MlRegistryStore {
 	#reschedule() {
 		this.#stopTimer();
 		if (!this.#watching) return;
-		if (!this.#live && this.openServices.length === 0) return;
+		if (!this.turnLive && this.openServices.length === 0) return;
 		this.#timer = setTimeout(() => {
 			this.#timer = undefined;
 			void this.refresh();

@@ -185,6 +185,8 @@ export async function deleteMlRegistry(conversationIds: ObjectId[]): Promise<voi
 	await Promise.all([
 		collections.mlServices.deleteMany(filter),
 		collections.mlArtefacts.deleteMany(filter),
+		collections.mlAgentRuns.deleteMany(filter),
+		collections.mlSources.deleteMany(filter),
 	]);
 }
 
