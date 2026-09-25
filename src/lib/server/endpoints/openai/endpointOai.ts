@@ -179,6 +179,8 @@ export async function endpointOai(
 			reasoningEffort,
 			reasoningOverride,
 			historyWindow,
+			attachments,
+			onAttachments,
 		}) => {
 			// Hoisted above the message prep so the history budget can reserve the
 			// reply allowance this request will actually ask for.
@@ -206,6 +208,8 @@ export async function endpointOai(
 					maxOutputTokens: parameters?.max_tokens,
 					slidingWindow: historyWindowEnabled(),
 					window: conversationId ? { conversationId, stored: historyWindow } : undefined,
+					attachments,
+					onAttachments,
 				});
 
 			// Normalize preprompt and handle empty values

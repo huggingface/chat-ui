@@ -21,6 +21,7 @@ import { logger } from "$lib/server/logger";
 import { resolvePreprompt } from "./preprompt";
 import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
 import { mlStateBlockEnabled } from "$lib/server/mlRegistry/stateBlock";
+import { AttachmentOverflowError } from "./utils/attachmentBudget";
 
 /** Updates that mean the user has already been shown something for this turn. */
 function isVisibleWork(update: MessageUpdate): boolean {
@@ -173,8 +174,8 @@ async function* textGenerationWithoutTitle(
 					err.message.includes("Request was aborted")));
 		if (isAbort) {
 			// nothing to recover; the partial message is already what the user saw
-		} else if (mcpProducedOutput) {
-			// Falling back here would discard the tool work and answer as if none of it ran.
+		} else if (mcpProducedOutput || err instanceof AttachmentOverflowError) {
+			// falling back would discard the tool work, or resend the attachments just refused
 			throw err;
 		} else {
 			// Nothing was shown yet, so a clean tool-free retry is a real recovery.

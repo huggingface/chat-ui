@@ -2,6 +2,7 @@ import ChatMessage from "./ChatMessage.svelte";
 import { render } from "vitest-browser-svelte";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { tick } from "svelte";
+import { MessageUpdateType } from "$lib/types/MessageUpdate";
 
 beforeEach(() => vi.stubGlobal("fetch", async () => new Response("{}", { status: 200 })));
 afterEach(() => vi.unstubAllGlobals());
@@ -278,5 +279,41 @@ describe("a finished turn stored in the rounds shape", () => {
 		await vi.waitFor(() =>
 			expect(writeText).toHaveBeenCalledWith("Let me look.Everything is in **/work**.")
 		);
+	});
+});
+
+describe("a notice on an assistant turn", () => {
+	const text =
+		"data.csv is too long to send whole: the model sees 150,000 of its 2,340,112 characters, from the start and the end.";
+	const notice = { type: MessageUpdateType.Notice, text };
+	const noticeWrapper = (el: HTMLElement) =>
+		[...el.querySelectorAll("span")]
+			.find((span) => span.textContent === text)
+			?.closest("[data-exclude-from-copy]");
+
+	it("shows with the answer and stays out of what is copied", async () => {
+		const { container } = render(ChatMessage, {
+			message: {
+				id: "m1",
+				from: "assistant",
+				content: "Summary.",
+				children: [],
+				updates: [
+					notice,
+					{ type: MessageUpdateType.FinalAnswer, text: "Summary.", interrupted: false },
+				],
+			},
+			loading: false,
+			isLast: true,
+		} as never);
+
+		await vi.waitFor(() => expect(container.textContent).toContain("Summary."));
+		expect(noticeWrapper(container)).toBeTruthy();
+	});
+
+	it("keeps the spinner while it is all that has arrived", () => {
+		const { container } = mount([notice]);
+		expect(noticeWrapper(container)).toBeTruthy();
+		expect(spinners(container)).toBe(1);
 	});
 });

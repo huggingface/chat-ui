@@ -8,6 +8,7 @@ import {
 } from "$lib/types/MessageUpdate";
 import type { McpFlowResult } from "./mcp/runMcpFlow";
 import type { TextGenerationContext } from "./types";
+import { AttachmentOverflowError } from "./utils/attachmentBudget";
 
 const mocks = vi.hoisted(() => ({
 	runMcpFlow: vi.fn(),
@@ -124,6 +125,21 @@ describe("textGeneration MCP fallback", () => {
 		);
 
 		await expect(collect(makeContext())).rejects.toThrow("upstream exploded");
+		expect(mocks.generate).not.toHaveBeenCalled();
+	});
+
+	it("does not fall back after attachments were refused as too large, even cut down", async () => {
+		const refused = new AttachmentOverflowError(
+			{
+				newest: 0,
+				texts: [{ index: 0, name: "data.csv", total: 8_000_000, shown: 5_000 }],
+				images: [],
+			},
+			Object.assign(new Error("400 maximum context length"), { status: 400 })
+		);
+		mocks.runMcpFlow.mockImplementation(mcpFlow({ error: refused }));
+
+		await expect(collect(makeContext())).rejects.toThrow("data.csv (8,000,000 characters)");
 		expect(mocks.generate).not.toHaveBeenCalled();
 	});
 
