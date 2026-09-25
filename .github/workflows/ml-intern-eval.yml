@@ -1,0 +1,57 @@
+name: ML Intern eval
+
+# Runs the end-to-end ML Intern scenarios (evals/ml-intern) against a real model and real HF
+# Jobs, and uploads each run's agent traces to a private Trackio Space per PR.
+#
+# Needs the ML_EVAL_HF_TOKEN secret: a token with inference, job and write permissions, on an
+# account with credits (it pays for the jobs). Optionally set the ML_EVAL_TRACES_NAMESPACE
+# variable to put the trace Spaces under an org instead of the token's user.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ml-intern-eval-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    # Secrets are not available to fork PRs.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
+
+      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
+        with:
+          # 22+ for --experimental-strip-types.
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+
+      - name: Install trackio
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet "trackio>=0.38"
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Run ML Intern eval
+        env:
+          HF_TOKEN: ${{ secrets.ML_EVAL_HF_TOKEN }}
+          ML_EVAL_TRACES_SPACE: ${{ vars.ML_EVAL_TRACES_NAMESPACE && format('{0}/', vars.ML_EVAL_TRACES_NAMESPACE) || '' }}chat-ui-ml-intern-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || 'manual' }}
+          ML_EVAL_RUN_NAME: ${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+        run: npm run eval:ml-intern
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: ml-intern-eval
+          path: eval-output/ml-intern/
+          retention-days: 14
