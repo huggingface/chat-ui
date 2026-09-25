@@ -116,6 +116,7 @@ const text = (el: Element | null | undefined) => el?.textContent?.replace(/\s+/g
 /** null mounts before any payload */
 function mount(data: MlRegistryPayload | null = payload()) {
 	mlRegistry.reset();
+	mlRegistry.bind("conv-1");
 	if (data) mlRegistry.apply(data);
 	sidePane.openRegistry();
 	return render(MlRegistryPane);
@@ -156,6 +157,13 @@ describe("MlRegistryPane", () => {
 		const { container } = mount();
 		find(container, "button[title^='Close panel']").click();
 		expect(sidePane.open).toBe(false);
+	});
+
+	it("closes once its conversation is left", async () => {
+		mount();
+		expect(sidePane.open).toBe(true);
+		mlRegistry.reset();
+		await vi.waitFor(() => expect(sidePane.open).toBe(false));
 	});
 
 	it("lists running rows first, then the rest newest first", () => {

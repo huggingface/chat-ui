@@ -54,6 +54,11 @@
 		if (showing) void mlRegistry.refresh();
 	});
 
+	// the conversation left and took its rows, close like the other views do when their item goes
+	$effect(() => {
+		if (showing && mlRegistry.conversationId === undefined) sidePane.close();
+	});
+
 	// reseeded on every payload so a corrected skew lands at once
 	let now = $state(serverCorrectedNow());
 	$effect(() => {

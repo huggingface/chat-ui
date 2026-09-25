@@ -657,7 +657,11 @@
 	// loading is the live signal, so a turn ending reruns this and the store refetches once
 	$effect(() => {
 		const conversationId = page.params?.id;
-		if (!mlTaskRunning || shared || !conversationId) return;
+		if (!mlTaskRunning || shared || !conversationId) {
+			// nothing to watch here, a remount on another route must not keep the last rows
+			mlRegistry.reset();
+			return;
+		}
 		return mlRegistry.watch(conversationId, { live: loading });
 	});
 

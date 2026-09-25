@@ -71,10 +71,20 @@ describe("mlRegistry store", () => {
 		await flush();
 
 		expect(net.calls).toEqual(["http://localhost:5173/api/v2/conversations/conv-1/registry"]);
+		expect(store.conversationId).toBe("conv-1");
 		expect(store.loaded).toBe(true);
 		expect(store.services).toHaveLength(1);
 		expect(store.services[0].createdAt).toBeInstanceOf(Date);
 		expect(store.summary).toEqual({ rows: 1, open: 1, running: 1 });
+	});
+
+	it("forgets the conversation on reset", () => {
+		const store = new MlRegistryStore(fakeFetch().fetcher);
+		store.bind("conv-1");
+		expect(store.conversationId).toBe("conv-1");
+		store.reset();
+		expect(store.conversationId).toBeUndefined();
+		expect(store.loaded).toBe(false);
 	});
 
 	it("does not poll when no turn is live and nothing is open", async () => {
@@ -203,6 +213,7 @@ describe("mlRegistry store", () => {
 			"conv-1/registry",
 			"conv-2/registry",
 		]);
+		expect(store.conversationId).toBe("conv-2");
 		expect(store.services.map((s) => s.id)).toEqual(["from-conv-2"]);
 	});
 

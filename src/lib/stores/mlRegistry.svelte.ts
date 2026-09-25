@@ -27,7 +27,9 @@ export class MlRegistryStore {
 	/** whether a payload has arrived for the current conversation */
 	loaded = $state(false);
 
-	#conversationId: string | undefined;
+	/** the conversation the rows belong to, undefined once it is left */
+	conversationId = $state<string | undefined>(undefined);
+
 	#live = false;
 	#watching = false;
 	#timer: ReturnType<typeof setTimeout> | undefined;
@@ -58,7 +60,7 @@ export class MlRegistryStore {
 	 * running and a flip to not live is the turn ending, worth one immediate refetch
 	 */
 	watch(conversationId: string, { live }: { live: boolean }): () => void {
-		this.#bind(conversationId);
+		this.bind(conversationId);
 		const turnEnded = this.#live && !live;
 		this.#live = live;
 		this.#watching = true;
@@ -72,7 +74,7 @@ export class MlRegistryStore {
 
 	/** one fetch shared with any already in flight, a failure waits for the next tick */
 	refresh(): Promise<void> {
-		const conversationId = this.#conversationId;
+		const conversationId = this.conversationId;
 		if (!conversationId) return Promise.resolve();
 		if (this.#inflight) return this.#inflight;
 		const epoch = this.#epoch;
@@ -106,7 +108,7 @@ export class MlRegistryStore {
 		this.#stopTimer();
 		this.#epoch += 1;
 		this.#inflight = undefined;
-		this.#conversationId = undefined;
+		this.conversationId = undefined;
 		this.#live = false;
 		this.#watching = false;
 		this.services = [];
@@ -116,10 +118,11 @@ export class MlRegistryStore {
 		this.loaded = false;
 	}
 
-	#bind(conversationId: string) {
-		if (this.#conversationId === conversationId) return;
+	/** binds without fetching, a different conversation starts clean */
+	bind(conversationId: string): void {
+		if (this.conversationId === conversationId) return;
 		this.reset();
-		this.#conversationId = conversationId;
+		this.conversationId = conversationId;
 	}
 
 	#reschedule() {
