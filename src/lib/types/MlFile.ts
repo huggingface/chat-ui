@@ -29,3 +29,13 @@ export interface MlFile {
 	/** label of the sub-agent whose run wrote this version, absent for the parent loop */
 	agent?: string;
 }
+
+/** the latest version of a file by name, without its content */
+export interface MlFileListing {
+	name: string;
+	/** the latest version, also how many exist */
+	version: number;
+	size: number;
+	updatedAt: Date;
+	summary?: string;
+}
