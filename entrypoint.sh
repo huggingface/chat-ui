@@ -16,4 +16,12 @@ fi;
 
 export PUBLIC_VERSION=$(node -p "require('./package.json').version")
 
-dotenv -e /app/.env -c -- node --dns-result-order=ipv4first /app/server.js
+# Load .env / .env.local first, then mirror PUBLIC_ORIGIN -> ORIGIN for adapter-node (#2489).
+# SvelteKit's node adapter forces https:// for page.url.origin unless ORIGIN is set.
+dotenv -e /app/.env -c -- bash -c '
+if [ -z "$ORIGIN" ] && [ -n "$PUBLIC_ORIGIN" ]; then
+    export ORIGIN="$PUBLIC_ORIGIN"
+fi
+[ -n "$ORIGIN" ] && export ORIGIN="${ORIGIN%/}"
+exec node --dns-result-order=ipv4first /app/server.js
+'
