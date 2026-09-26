@@ -33,7 +33,7 @@ describe("expectedPushesIn", () => {
 					"trainer.push_to_hub(commit_message='End of training')"
 				)
 			)
-		).toEqual([{ kind: "model", uri: "hf://models/pngwn/merged" }]);
+		).toEqual([{ kind: "model", uri: "hf://models/pngwn/merged", guessed: true }]);
 	});
 
 	it("guesses a dataset from the receiver of push_to_hub", () => {
@@ -45,8 +45,8 @@ describe("expectedPushesIn", () => {
 				)
 			)
 		).toEqual([
-			{ kind: "dataset", uri: "hf://datasets/pngwn/capybara-clean" },
-			{ kind: "dataset", uri: "hf://datasets/pngwn/capybara-splits" },
+			{ kind: "dataset", uri: "hf://datasets/pngwn/capybara-clean", guessed: true },
+			{ kind: "dataset", uri: "hf://datasets/pngwn/capybara-splits", guessed: true },
 		]);
 	});
 
@@ -83,7 +83,7 @@ describe("expectedPushesIn", () => {
 			)
 		).toEqual([
 			{ kind: "model", uri: "hf://models/pngwn/qwen-sft" },
-			{ kind: "model", uri: "hf://models/pngwn/qwen-merged" },
+			{ kind: "model", uri: "hf://models/pngwn/qwen-merged", guessed: true },
 		]);
 	});
 
@@ -115,7 +115,7 @@ describe("expectedPushesIn", () => {
 					'model.push_to_hub("pngwn/qwen-sft")'
 				)
 			)
-		).toEqual([{ kind: "model", uri: "hf://models/pngwn/qwen-sft" }]);
+		).toEqual([{ kind: "model", uri: "hf://models/pngwn/qwen-sft", guessed: true }]);
 	});
 
 	it("skips commented out lines and lists a repo once, an explicit kind over a guess", () => {
@@ -146,7 +146,7 @@ describe("expectedPushesOfJob", () => {
 				script_args: ["--hub_model_id", "pngwn/b"],
 			})
 		).toEqual([
-			{ kind: "model", uri: "hf://models/pngwn/a" },
+			{ kind: "model", uri: "hf://models/pngwn/a", guessed: true },
 			{ kind: "model", uri: "hf://models/pngwn/b" },
 		]);
 		expect(
@@ -154,7 +154,7 @@ describe("expectedPushesOfJob", () => {
 				image: "python:3.12",
 				command: ["python", "-c", 'ds.push_to_hub("pngwn/c")'],
 			})
-		).toEqual([{ kind: "dataset", uri: "hf://datasets/pngwn/c" }]);
+		).toEqual([{ kind: "dataset", uri: "hf://datasets/pngwn/c", guessed: true }]);
 	});
 
 	it("finds nothing in a script that is a url", () => {

@@ -17,6 +17,8 @@ export interface ExpectedPush {
 	kind: "model" | "dataset";
 	/** hf://<models|datasets>/<owner>/<name> */
 	uri: string;
+	/** push_to_hub without a repo_type, shared by models and datasets */
+	guessed?: boolean;
 }
 
 /** what the hub showed for a repo once the job ended */

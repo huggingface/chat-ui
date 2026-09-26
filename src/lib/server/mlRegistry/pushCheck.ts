@@ -163,7 +163,6 @@ async function checkRepo(
 ): Promise<Check | undefined> {
 	let target = repo;
 	let read = await readRepo(repo, ctx);
-	// push_to_hub is shared by models and datasets, so the parsed kind can be a guess
 	if (read?.state === "absent" && tryOtherKind) {
 		const other = otherKind(repo);
 		const otherRead = await readRepo(other, ctx);
@@ -275,24 +274,30 @@ async function check({
 	);
 	const expected = (service.expectedPushes ?? []).flatMap((push) => {
 		const repo = repoOf(push.uri);
-		return repo ? [repo] : [];
+		return repo ? [{ repo, guessed: push.guessed === true }] : [];
 	});
-	const expectedUris = new Set(expected.map(repoUri));
-	const expectedIds = new Set(expected.map(repoId));
+	const expectedUris = new Set(expected.map(({ repo }) => repoUri(repo)));
+	const guessedIds = new Set(
+		expected.flatMap(({ repo, guessed }) => (guessed ? [repoId(repo)] : []))
+	);
 	const repos = artefacts.filter((a) => a.kind === "model" || a.kind === "dataset");
 	const knownUris = new Set(repos.map((a) => a.uri));
-	// by id, an expected repo whose kind was a guess is read under both kinds already
+	// a guessed kind is read under both kinds already
 	const known = repos
 		.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
 		.flatMap((a) => {
 			const repo = repoOf(a.uri);
-			return repo && !expectedIds.has(repoId(repo)) && !claimedElsewhere.has(a.uri) ? [repo] : [];
+			return repo &&
+				!expectedUris.has(a.uri) &&
+				!guessedIds.has(repoId(repo)) &&
+				!claimedElsewhere.has(a.uri)
+				? [repo]
+				: [];
 		})
 		.slice(0, MAX_KNOWN_REPOS);
-	const namespaces = [...new Set([service.namespace, ...expected.map((repo) => repo.owner)])].slice(
-		0,
-		MAX_NAMESPACES
-	);
+	const namespaces = [
+		...new Set([service.namespace, ...expected.map(({ repo }) => repo.owner)]),
+	].slice(0, MAX_NAMESPACES);
 
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -307,7 +312,7 @@ async function check({
 	let listings: (Listed[] | undefined)[];
 	try {
 		[expectedChecks, knownChecks, listings] = await Promise.all([
-			Promise.all(expected.map((repo) => checkRepo(repo, ctx, true))),
+			Promise.all(expected.map(({ repo, guessed }) => checkRepo(repo, ctx, guessed))),
 			Promise.all(known.map((repo) => checkRepo(repo, ctx, false))),
 			Promise.all(
 				namespaces.flatMap((namespace) =>
@@ -326,7 +331,7 @@ async function check({
 	const results: (Check & { discovered?: boolean })[] = [];
 	expectedChecks.forEach((result, i) => {
 		if (!result) return;
-		decided.add(repoUri(expected[i])).add(repoUri(result.repo));
+		decided.add(repoUri(expected[i].repo)).add(repoUri(result.repo));
 		results.push(result);
 	});
 	// a repo the registry knows but the script did not name is only news when it changed

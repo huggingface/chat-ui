@@ -158,9 +158,11 @@ export function expectedPushesIn(sources: readonly string[]): ExpectedPush[] {
 		const seen = byId.get(candidate.id);
 		if (!seen || (seen.guessed && !candidate.guessed)) byId.set(candidate.id, candidate);
 	}
-	return [...byId.values()]
-		.slice(0, MAX_EXPECTED_PUSHES)
-		.map(({ id, kind }) => ({ kind, uri: `hf://${kind}s/${id}` }));
+	return [...byId.values()].slice(0, MAX_EXPECTED_PUSHES).map(({ id, kind, guessed }) => ({
+		kind,
+		uri: `hf://${kind}s/${id}`,
+		...(guessed ? { guessed: true } : {}),
+	}));
 }
 
 const stringValues = (value: unknown): string[] =>

@@ -198,7 +198,9 @@ describe("checkServicePushes: expected destinations", () => {
 	});
 
 	it("says missing when the repo exists under neither kind", async () => {
-		const service = await insertService();
+		const service = await insertService({
+			expectedPushes: [{ kind: "model", uri: "hf://models/testuser/qwen-sft", guessed: true }],
+		});
 		const fetchMock = stubHub();
 
 		expect(await check(service)).toEqual([
@@ -211,7 +213,7 @@ describe("checkServicePushes: expected destinations", () => {
 
 	it("finds the push under the other kind when push_to_hub's kind was a guess", async () => {
 		const service = await insertService({
-			expectedPushes: [{ kind: "model", uri: "hf://models/testuser/clean" }],
+			expectedPushes: [{ kind: "model", uri: "hf://models/testuser/clean", guessed: true }],
 		});
 		stubHub({ repos: { "datasets/testuser/clean": PUSHED_DURING_RUN } });
 
@@ -224,9 +226,20 @@ describe("checkServicePushes: expected destinations", () => {
 		});
 	});
 
+	it("keeps an explicit destination to its own kind", async () => {
+		const service = await insertService();
+		const fetchMock = stubHub({ repos: { "datasets/testuser/qwen-sft": PUSHED_DURING_RUN } });
+
+		expect(await check(service)).toEqual([
+			{ uri: "hf://models/testuser/qwen-sft", status: "missing" },
+		]);
+		const read = fetchMock.mock.calls.map(([url]) => new URL(String(url)).pathname);
+		expect(read).not.toContain("/api/datasets/testuser/qwen-sft");
+	});
+
 	it("reads a reserved repo once when the script's guessed kind resolves to it", async () => {
 		const service = await insertService({
-			expectedPushes: [{ kind: "model", uri: "hf://models/testuser/clean" }],
+			expectedPushes: [{ kind: "model", uri: "hf://models/testuser/clean", guessed: true }],
 		});
 		await insertArtefact(service.conversationId, {
 			uri: "hf://datasets/testuser/clean",
