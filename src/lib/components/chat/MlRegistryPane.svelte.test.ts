@@ -286,6 +286,61 @@ describe("MlRegistryPane", () => {
 		expect(text(rows[1])).toContain("dashboard");
 	});
 
+	it("lists what a job pushed with its commit, and what it was meant to push and did not", () => {
+		const { container } = mount(
+			payload({
+				services: [
+					service({
+						...COMPLETED,
+						pushes: [
+							{ uri: "hf://models/pngwn/sft-smoke", status: "pushed", commit: "abcdef0123456789" },
+							{ uri: "hf://datasets/pngwn/evals", status: "missing" },
+							{
+								uri: "hf://models/pngwn/merged",
+								status: "pushed",
+								commit: "fedcba9876543210",
+								discovered: true,
+							},
+						],
+					}),
+					RUNNING,
+				],
+			})
+		);
+		const row = all(container, ".ml-service").find((li) => text(li)?.includes("baseline-eval"));
+		if (!row) throw new Error("no baseline-eval row");
+		const pushes = all(row, ".ml-push");
+		expect(pushes.map(text)).toEqual([
+			"pushed pngwn/sft-smoke abcdef0",
+			"nothing pushed to pngwn/evals",
+			"pushed pngwn/merged fedcba9 discovered",
+		]);
+		expect((pushes[1].querySelector("a") as HTMLAnchorElement).href).toBe(
+			"https://huggingface.co/datasets/pngwn/evals"
+		);
+		expect(style(pushes[1]).color).toBe(RED_INK);
+		expect(style(pushes[0]).color).toBe(TEXT_FAINT);
+
+		const running = all(container, ".ml-service").find((li) => text(li)?.includes("sft-smoke"));
+		expect(running?.querySelector(".ml-service-pushes")).toBeNull();
+	});
+
+	it("names the job that pushed to a repo, with the commit it found", () => {
+		const { container } = mount(
+			payload({
+				artefacts: [
+					{ ...MODEL, serviceId: COMPLETED.id, commit: "abcdef0123456789" },
+					artefact({ uri: "hf://models/pngwn/other" }),
+				],
+			})
+		);
+		const [pushed, other] = all(container, ".ml-artefact");
+		const by = find(pushed, ".ml-artefact-pushed");
+		expect(text(by)).toBe("pushed by baseline-eval abcdef0");
+		expect((by.querySelector("a") as HTMLAnchorElement).href).toBe(COMPLETED.hubUrl);
+		expect(other.querySelector(".ml-artefact-pushed")).toBeNull();
+	});
+
 	it("shows an empty state per section", () => {
 		const { container } = mount(payload({ services: [], artefacts: [] }));
 		const empties = all(container, ".ml-registry-empty").map(text);

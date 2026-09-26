@@ -159,6 +159,23 @@ export function hubLabel(uri: string): string {
 
 export const shortCommit = (commit: string): string => commit.slice(0, 7);
 
+/** the hub page of an hf:// model or dataset repo */
+export function repoPageUrl(uri: string): string | undefined {
+	const match = /^hf:\/\/(models|datasets)\/([^/\s]+\/[^/\s]+)$/.exec(uri);
+	if (!match) return undefined;
+	return `https://huggingface.co/${match[1] === "datasets" ? "datasets/" : ""}${match[2]}`;
+}
+
+/** the job whose end found a commit on this repo, while the registry still lists it */
+export function pushingService(
+	artefact: Pick<MlRegistryArtefact, "serviceId">,
+	services: readonly MlRegistryService[]
+): MlRegistryService | undefined {
+	return artefact.serviceId
+		? services.find((service) => service.id === artefact.serviceId)
+		: undefined;
+}
+
 export const formatFileRef = ({ name, version }: MlFileRef): string => `${name} v${version}`;
 
 /** the jobs and sandboxes whose script was this version, sorted like the services list */

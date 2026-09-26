@@ -86,6 +86,23 @@ function serviceStatus(service: MlService, now: Date): string {
 		: `${service.stage} ${elapsed}`;
 }
 
+// ended rows only, a retried dispatch reopens a row with its pushes still on it, and missing only
+// on a completed run, the same rule as the event this line can stand in for
+function pushSuffix(service: MlService): string {
+	if (!isTerminalStage(service.stage)) return "";
+	const pushes = service.pushes ?? [];
+	const pushed = pushes.filter((push) => push.status === "pushed").map((p) => hubLabel(p.uri));
+	const missing =
+		service.stage === "COMPLETED"
+			? pushes.filter((push) => push.status === "missing").map((p) => hubLabel(p.uri))
+			: [];
+	const parts = [
+		...(pushed.length > 0 ? [`pushed ${pushed.join(", ")}`] : []),
+		...(missing.length > 0 ? [`nothing pushed to ${missing.join(", ")}`] : []),
+	];
+	return parts.length > 0 ? ` → ${parts.join(", ")}` : "";
+}
+
 function serviceLine(service: MlService, now: Date): string {
 	const discovered = service.origin === "discovered" ? " (seen in a call, not launched here)" : "";
 	const parts = [
@@ -98,7 +115,7 @@ function serviceLine(service: MlService, now: Date): string {
 			? (service.handle ?? sandboxHandle(service.namespace, service.jobId))
 			: `id ${service.jobId}`
 	);
-	return `- ${parts.join(" · ")}`;
+	return `- ${parts.join(" · ")}${pushSuffix(service)}`;
 }
 
 function artefactRows(artefacts: readonly MlArtefact[]): string[] {
