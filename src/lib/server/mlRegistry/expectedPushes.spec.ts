@@ -131,6 +131,28 @@ describe("expectedPushesIn", () => {
 		).toEqual([{ kind: "dataset", uri: "hf://datasets/pngwn/evals" }]);
 	});
 
+	it("ignores push calls in trailing comments and docstrings", () => {
+		expect(
+			expectedPushesIn(
+				script(
+					'"""Fine-tune, then call model.push_to_hub("pngwn/docstring-example")."""',
+					'pass  # model.push_to_hub("pngwn/old-name")',
+					"def save(model):",
+					"    '''",
+					'    upload_folder(repo_id="pngwn/also-an-example", folder_path="out")',
+					"    '''",
+					'    model.push_to_hub("pngwn/qwen-sft")  # the real one'
+				)
+			)
+		).toEqual([{ kind: "model", uri: "hf://models/pngwn/qwen-sft", guessed: true }]);
+	});
+
+	it("keeps a hash inside a string", () => {
+		expect(
+			expectedPushesIn(script('api.upload_folder(commit_message="step #3", repo_id="pngwn/x")'))
+		).toEqual([{ kind: "model", uri: "hf://models/pngwn/x" }]);
+	});
+
 	it("is not thrown by a parenthesis inside a string or an unclosed call", () => {
 		expect(
 			expectedPushesIn(script('api.upload_folder(commit_message="a) b", repo_id="pngwn/x"'))
@@ -155,6 +177,15 @@ describe("expectedPushesOfJob", () => {
 				command: ["python", "-c", 'ds.push_to_hub("pngwn/c")'],
 			})
 		).toEqual([{ kind: "dataset", uri: "hf://datasets/pngwn/c", guessed: true }]);
+	});
+
+	it("keeps a hash in one argument from hiding the rest", () => {
+		expect(
+			expectedPushesOfJob({
+				script: "print(1)",
+				script_args: ["--run-name", "#1", "--hub_model_id", "pngwn/b"],
+			})
+		).toEqual([{ kind: "model", uri: "hf://models/pngwn/b" }]);
 	});
 
 	it("finds nothing in a script that is a url", () => {

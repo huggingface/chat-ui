@@ -31,6 +31,37 @@ const ASSIGNMENT = /^[ \t]*([A-Za-z_]\w*)[ \t]*(?::[^=\n]*)?=(?!=)/gm;
 
 type Candidate = { id: string; kind: ExpectedPush["kind"]; guessed: boolean };
 
+/** without comments or triple quoted strings, where a push call is prose, one line strings stay */
+function codeOnly(source: string): string {
+	let code = "";
+	let i = 0;
+	while (i < source.length) {
+		const char = source[i];
+		if (char === "#") {
+			const end = source.indexOf("\n", i);
+			i = end === -1 ? source.length : end;
+		} else if (char === '"' || char === "'") {
+			const triple = char.repeat(3);
+			if (source.startsWith(triple, i)) {
+				const end = source.indexOf(triple, i + 3);
+				i = end === -1 ? source.length : end + 3;
+				code += '""';
+				continue;
+			}
+			let end = i + 1;
+			while (end < source.length && source[end] !== char && source[end] !== "\n") {
+				end += source[end] === "\\" ? 2 : 1;
+			}
+			code += source.slice(i, end + 1);
+			i = end + 1;
+		} else {
+			code += char;
+			i++;
+		}
+	}
+	return code;
+}
+
 /** names assigned exactly once, and that once to a plain string */
 function literalConstants(source: string): Map<string, string> {
 	const assignments = new Map<string, number>();
@@ -134,7 +165,7 @@ function fromCall(
 
 /** where the script and arguments of a job say it pushes, in order of first mention */
 export function expectedPushesIn(sources: readonly string[]): ExpectedPush[] {
-	const source = sources.join("\n").replace(/^[ \t]*#.*$/gm, "");
+	const source = codeOnly(sources.join("\n"));
 	const constants = literalConstants(source);
 	const found: { index: number; candidate: Candidate }[] = [];
 
@@ -176,7 +207,8 @@ const stringValues = (value: unknown): string[] =>
 export function expectedPushesOfJob(jobArgs: Record<string, unknown>): ExpectedPush[] {
 	return expectedPushesIn([
 		...stringValues(jobArgs.script),
-		stringValues(jobArgs.script_args).join(" "),
-		stringValues(jobArgs.command).join(" "),
+		// a token per line, so a hash in one does not comment out the rest
+		stringValues(jobArgs.script_args).join("\n"),
+		stringValues(jobArgs.command).join("\n"),
 	]);
 }
