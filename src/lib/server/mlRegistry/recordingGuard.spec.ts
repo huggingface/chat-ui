@@ -405,6 +405,7 @@ describe.sequential("mlRegistry recording guard: artefacts", () => {
 			url: "https://huggingface.co/datasets/testuser/demo/blob/main/README.md",
 			origin: "dispatched",
 			commit: SHA_2,
+			putCommits: [SHA_1, SHA_2],
 			toolUuid: "uuid-2",
 		});
 		expect(file.updatedAt.getTime()).toBeGreaterThanOrEqual(file.createdAt.getTime());

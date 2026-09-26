@@ -251,7 +251,7 @@ async function check({
 		collections.mlArtefacts
 			.find(
 				{ conversationId, kind: { $in: ["model", "dataset", "file"] } },
-				{ projection: { kind: 1, uri: 1, commit: 1, updatedAt: 1 } }
+				{ projection: { kind: 1, uri: 1, commit: 1, putCommits: 1, updatedAt: 1 } }
 			)
 			.toArray(),
 		collections.mlServices
@@ -303,7 +303,11 @@ async function check({
 	const timer = setTimeout(() => controller.abort(), timeoutMs);
 	const ctx: Context = {
 		window,
-		ownPuts: new Set(artefacts.flatMap((a) => (a.kind === "file" && a.commit ? [a.commit] : []))),
+		ownPuts: new Set(
+			artefacts.flatMap((a) =>
+				a.kind === "file" ? [...(a.putCommits ?? []), ...(a.commit ? [a.commit] : [])] : []
+			)
+		),
 		token,
 		signal: controller.signal,
 	};

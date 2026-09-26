@@ -303,6 +303,36 @@ describe("checkServicePushes: expected destinations", () => {
 			{ uri: "hf://models/testuser/qwen-sft", status: "missing" },
 		]);
 	});
+
+	it("credits the job with none of the puts the conversation made to one path", async () => {
+		const service = await insertService();
+		await insertArtefact(service.conversationId, {
+			uri: "hf://models/testuser/qwen-sft/README.md",
+			kind: "file",
+			commit: sha("f"),
+			putCommits: [sha("e"), sha("f")],
+		});
+		const firstPut = iso(STARTED, 10 * MINUTE);
+		const secondPut = iso(STARTED, 20 * MINUTE);
+		stubHub({
+			repos: {
+				"models/testuser/qwen-sft": {
+					sha: sha("f"),
+					lastModified: secondPut,
+					createdAt: iso(SUBMITTED, -MINUTE),
+					commits: [
+						{ id: sha("f"), date: secondPut },
+						{ id: sha("e"), date: firstPut },
+						{ id: sha("0"), date: iso(SUBMITTED, -MINUTE) },
+					],
+				},
+			},
+		});
+
+		expect(await check(service)).toEqual([
+			{ uri: "hf://models/testuser/qwen-sft", status: "missing" },
+		]);
+	});
 });
 
 describe("checkServicePushes: repos nobody named", () => {

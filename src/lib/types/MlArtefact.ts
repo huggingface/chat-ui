@@ -21,6 +21,8 @@ export interface MlArtefact extends Timestamps {
 	origin: MlRegistryOrigin;
 	/** latest commit that wrote it, a put for a file or a job push for a repo */
 	commit?: string;
+	/** every commit a put wrote to the file, newest last, capped, none of them is a job push */
+	putCommits?: string[];
 	/** the virtual file version that latest commit uploaded, files only */
 	fromFile?: MlFileRef;
 	/** the job that pushed to it */

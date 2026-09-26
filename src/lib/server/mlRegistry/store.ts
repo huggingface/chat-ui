@@ -18,6 +18,8 @@ export const hubJobUrl = (namespace: string, jobId: string): string =>
 export const sandboxHandle = (namespace: string, jobId: string): string =>
 	`hfsb2:${namespace}:${jobId}`;
 
+const PUT_COMMITS_CAP = 50;
+
 interface Provenance {
 	messageId?: string;
 	generationId?: string;
@@ -208,6 +210,7 @@ export async function recordArtefact(artefact: ArtefactRecord): Promise<void> {
 				...compact({ commit, fromFile, serviceId }),
 			},
 			...(Object.keys(unset).length ? { $unset: unset } : {}),
+			...(commit ? { $push: { putCommits: { $each: [commit], $slice: -PUT_COMMITS_CAP } } } : {}),
 		},
 		{ upsert: true }
 	);
