@@ -11,6 +11,8 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
 	import type { Message } from "$lib/types/Message";
+	import type { TrackioDashboardView } from "$lib/utils/trackioView";
+	import { saveComposerDraft, takeComposerDraft } from "$lib/stores/composerDrafts";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
@@ -91,7 +93,34 @@
 	// Tab visible, bfcache restore and network back tend to fire together on wake-up.
 	const RECONNECT_DEBOUNCE_MS = 300;
 
-	let files: File[] = $state([]);
+	// The composer belongs to the conversation it was written in. This page is
+	// reused across conversations, so its content is swapped on every switch and
+	// kept for when the user comes back.
+	const initialDraft = takeComposerDraft(untrack(() => convId));
+	let draft = $state(initialDraft.draft);
+	let files: File[] = $state(initialDraft.files);
+	let dashboardViews: TrackioDashboardView[] = $state(initialDraft.dashboardViews);
+	let composerFor = untrack(() => convId);
+
+	function stashComposer(conversationId: string) {
+		saveComposerDraft(conversationId, {
+			draft,
+			files: [...files],
+			dashboardViews: [...dashboardViews],
+		});
+	}
+
+	$effect(() => {
+		const id = convId;
+		untrack(() => {
+			if (id === composerFor) return;
+			stashComposer(composerFor);
+			({ draft, files, dashboardViews } = takeComposerDraft(id));
+			composerFor = id;
+		});
+	});
+
+	onDestroy(() => stashComposer(composerFor));
 
 	function createMessagesPath<T>(messages: TreeNode<T>[], msgId?: TreeId): TreeNode<T>[] {
 		if (initialRun) {
@@ -200,6 +229,10 @@
 			// stale controller a previous generation left behind.
 			messageUpdatesAbortController = new AbortController();
 			activeGenerationId = v4();
+			// Taken before any await, like the controller: what was in the composer
+			// when the user pressed send. A retry re-sends what the message already has.
+			const sentViews: TrackioDashboardView[] =
+				isRetry || resumeElicitationId ? [] : $state.snapshot(dashboardViews);
 			const base64Files = await Promise.all(
 				(files ?? []).map((file) =>
 					file2base64(file).then((value) => ({
@@ -242,6 +275,10 @@
 							from: "user",
 							content: prompt,
 							files: messageToRetry.files,
+							// The server keeps the edited message's views; so does this copy.
+							...(messageToRetry.dashboardViews?.length
+								? { dashboardViews: messageToRetry.dashboardViews }
+								: {}),
 						},
 						messageId
 					);
@@ -277,6 +314,7 @@
 						from: "user",
 						content: prompt ?? "",
 						files: base64Files,
+						...(sentViews.length ? { dashboardViews: sentViews } : {}),
 					},
 					messageId
 				);
@@ -335,6 +373,7 @@
 					...(resumeElicitationId ? { resumeElicitationId } : {}),
 					generationId: activeGenerationId,
 					files: isRetry ? userMessage?.files : base64Files,
+					dashboardViews: sentViews,
 					selectedMcpServerNames: $enabledServers.map((s) => s.name),
 					selectedMcpServers: $enabledServers.map((s) => ({
 						name: s.name,
@@ -362,6 +401,7 @@
 			// restores the user's queued attachments right after, and an
 			// unconditional clear here would wipe that restored queue.
 			if (base64Files.length > 0) files = [];
+			if (sentViews.length > 0) dashboardViews = [];
 
 			streamedMessage = messageToWriteTo;
 			await consumeMessageUpdates(messageUpdatesIterator, messageToWriteTo, {
@@ -886,7 +926,9 @@
 	{messagesAlternatives}
 	shared={data.shared}
 	preprompt={data.preprompt}
+	bind:draft
 	bind:files
+	bind:dashboardViews
 	onmessage={onMessage}
 	onretry={onRetry}
 	onshowAlternateMsg={onShowAlternateMsg}

@@ -13,6 +13,8 @@
 	import CarbonCopy from "~icons/carbon/copy";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import UploadedFile from "./UploadedFile.svelte";
+	import TrackioViewChip from "./TrackioViewChip.svelte";
+	import { sidePane } from "$lib/stores/sidePane.svelte";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
@@ -526,6 +528,16 @@
 				<div class="flex w-fit gap-4 px-5">
 					{#each message.files as file}
 						<UploadedFile {file} canClose={false} />
+					{/each}
+				</div>
+			{/if}
+			{#if message.dashboardViews?.length}
+				<div class="flex flex-wrap gap-1.5 px-5" data-exclude-from-copy>
+					{#each message.dashboardViews as view, index (view.capturedAt + index)}
+						<TrackioViewChip
+							{view}
+							onopen={() => sidePane.openTrackio(view.dashboardUrl, view.project, view.viewUrl)}
+						/>
 					{/each}
 				</div>
 			{/if}

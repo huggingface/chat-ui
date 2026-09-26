@@ -19,6 +19,8 @@ import {
 import { uploadFile } from "$lib/server/files/uploadFile";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
+import { acceptTrackioViews } from "$lib/server/trackioViews";
+import { MAX_VIEWS_PER_MESSAGE } from "$lib/utils/trackioView";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
@@ -181,6 +183,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		selectedMcpServerNames,
 		selectedMcpServers,
 		timezone,
+		dashboardViews: rawDashboardViews,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -211,6 +214,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				)
 				.default([]),
 			timezone: z.optional(z.string()),
+			// Shaped and checked against the conversation's dashboards below.
+			dashboardViews: z.optional(z.array(z.unknown()).max(MAX_VIEWS_PER_MESSAGE)),
 			files: z.optional(
 				z.array(
 					z.object({
@@ -287,6 +292,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const uploadedFiles = await Promise.all(b64Files.map((file) => uploadFile(file, conv))).then(
 		(files) => [...files, ...hashFiles]
 	);
+	const dashboardViews = acceptTrackioViews(rawDashboardViews, conv.messages);
 
 	// we will append tokens to the content of this message
 	let messageToWriteToId: Message["id"] | undefined = undefined;
@@ -348,6 +354,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					from: "user",
 					content: newPrompt,
 					files: uploadedFiles,
+					...(messageToRetry.dashboardViews?.length
+						? { dashboardViews: messageToRetry.dashboardViews }
+						: {}),
 					createdAt: new Date(),
 					updatedAt: new Date(),
 				},
@@ -384,6 +393,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				from: "user",
 				content: newPrompt ?? "",
 				files: uploadedFiles,
+				...(dashboardViews.length ? { dashboardViews } : {}),
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			},

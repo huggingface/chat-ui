@@ -25,8 +25,11 @@ export type SidePaneView = "artifact" | "trackio" | "registry";
 class SidePaneStore {
 	open = $state(false);
 	view = $state<SidePaneView>("artifact");
-	/** The framed Trackio dashboard, when `view` is "trackio". */
-	trackio = $state<{ url: string; label: string } | null>(null);
+	/**
+	 * The framed Trackio dashboard, when `view` is "trackio". `viewUrl` is a
+	 * captured view to show instead of the dashboard's default one.
+	 */
+	trackio = $state<{ url: string; label: string; viewUrl?: string } | null>(null);
 	/** the file version the registry view scrolls to and opens */
 	registryFocus = $state<MlFileRef | null>(null);
 	identifier = $state<string | null>(null);
@@ -86,9 +89,9 @@ class SidePaneStore {
 		this.openArtifact(identifier, null);
 	}
 
-	openTrackio(url: string, label: string) {
+	openTrackio(url: string, label: string, viewUrl?: string) {
 		this.view = "trackio";
-		this.trackio = { url, label };
+		this.trackio = { url, label, ...(viewUrl ? { viewUrl } : {}) };
 		this.open = true;
 		this.revealNonce += 1;
 	}
@@ -131,7 +134,49 @@ class SidePaneStore {
 		this.open = false;
 	}
 
-	/** Full reset, used when switching conversations. */
+	/** Pane state per conversation left this tab, restored on the way back. */
+	private saved = new Map<string, SavedPaneState>();
+
+	/**
+	 * Leaving one conversation for another: remember how the pane was in the
+	 * one being left, then show the other as it was last left — or closed, for
+	 * a conversation not visited yet. A restored item that no longer exists is
+	 * closed by its view, the same way as after a branch switch.
+	 */
+	switchConversation(from: string | undefined, to: string | undefined) {
+		if (from) {
+			this.saved.set(from, {
+				open: this.open,
+				view: this.view,
+				trackio: this.trackio,
+				registryFocus: this.registryFocus,
+				identifier: this.identifier,
+				version: this.version,
+				tab: this.tab,
+				userPinnedTab: this.userPinnedTab,
+				diffView: this.diffView,
+				widthPx: this.widthPx,
+				autoOpenedKeys: new Set(this.autoOpenedKeys),
+			});
+		}
+		this.reset();
+		const next = to ? this.saved.get(to) : undefined;
+		if (!next) return;
+		this.saved.delete(to as string);
+		this.view = next.view;
+		this.trackio = next.trackio;
+		this.registryFocus = next.registryFocus;
+		this.identifier = next.identifier;
+		this.version = next.version;
+		this.tab = next.tab;
+		this.userPinnedTab = next.userPinnedTab;
+		this.diffView = next.diffView;
+		this.widthPx = next.widthPx;
+		this.autoOpenedKeys = next.autoOpenedKeys;
+		this.open = next.open;
+	}
+
+	/** Full reset: everything closed and forgotten for the current conversation. */
 	reset() {
 		this.open = false;
 		this.view = "artifact";
@@ -145,6 +190,20 @@ class SidePaneStore {
 		this.widthPx = null;
 		this.autoOpenedKeys.clear();
 	}
+}
+
+interface SavedPaneState {
+	open: boolean;
+	view: SidePaneView;
+	trackio: SidePaneStore["trackio"];
+	registryFocus: SidePaneStore["registryFocus"];
+	identifier: string | null;
+	version: number | null;
+	tab: "preview" | "code";
+	userPinnedTab: boolean;
+	diffView: boolean;
+	widthPx: number | null;
+	autoOpenedKeys: Set<string>;
 }
 
 export const sidePane = new SidePaneStore();

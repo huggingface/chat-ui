@@ -550,6 +550,23 @@ describe("MlAssistantStrip budget", () => {
 	});
 });
 
+describe("MlAssistantStrip dashboard button", () => {
+	it("opens the dashboard, and closes it on a second click", async () => {
+		sidePane.reset();
+		const { container } = mount({ dashboard: DASHBOARD });
+		const button = find(container, "button[aria-label^='Training dashboard']");
+
+		button.click();
+		await Promise.resolve();
+		expect(sidePane.open).toBe(true);
+		expect(sidePane.trackio?.url).toBe(DASHBOARD.url);
+
+		button.click();
+		await Promise.resolve();
+		expect(sidePane.open).toBe(false);
+	});
+});
+
 describe("MlAssistantStrip services control", () => {
 	afterEach(() => sidePane.reset());
 
