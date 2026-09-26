@@ -116,10 +116,15 @@ function collect(messages: EndpointMessage[]) {
 	return { texts, images };
 }
 
-/** rendered length, the marker is bounded rather than measured */
+/** bounds the marker, whose length varies with its counts and the file name */
+const MARKER_CHARS = 250;
+
 function keptChars(text: string, keep: Keep): number {
-	return text.length <= keep.head + keep.tail ? text.length : keep.head + keep.tail + 250;
+	return text.length <= keep.head + keep.tail ? text.length : keep.head + keep.tail + MARKER_CHARS;
 }
+
+const renderedChars = (shown: number, total: number) =>
+	shown < total ? shown + MARKER_CHARS : total;
 
 /** each file holds one of two sizes, so a later message moves an earlier one at most once */
 function planText(
@@ -223,11 +228,14 @@ export async function prepareAttachments(
 	return { contentOf, report };
 }
 
-/** whether the minimal retry would send less than this request did */
+/** whether the minimal retry would send less than this request did, marker included */
 export function canCutAttachments(report: AttachmentReport): boolean {
 	return (
-		report.texts.some((t) => t.shown > SHORT_HEAD_CHARS) ||
-		report.images.some((i) => i.sent && i.index !== report.newest)
+		report.texts.some(
+			(t) =>
+				renderedChars(t.shown, t.total) >
+				renderedChars(Math.min(t.shown, SHORT_HEAD_CHARS), t.total)
+		) || report.images.some((i) => i.sent && i.index !== report.newest)
 	);
 }
 

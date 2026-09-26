@@ -416,5 +416,12 @@ describe("provider size refusals", () => {
 			canCutAttachments({ newest: 2, texts: [], images: [{ index: 0, name: "a", sent: true }] })
 		).toBe(true);
 		expect(canCutAttachments({ newest: 0, texts: [], images: [] })).toBe(false);
+		expect(
+			canCutAttachments({
+				newest: 0,
+				texts: [{ index: 0, name: "x", total: 5_001, shown: 5_001 }],
+				images: [],
+			})
+		).toBe(false);
 	});
 });
