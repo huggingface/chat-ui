@@ -9,6 +9,7 @@ import {
 	claimElicitationResume,
 	finishElicitationResume,
 	handleElicitationRequest,
+	releaseElicitationResume,
 	submitElicitationAnswer,
 	withElicitationContext,
 	type ElicitationSink,
@@ -823,6 +824,52 @@ describe("claiming an answered prompt's continuation", () => {
 		expect((await collections.mcpElicitations.findOne({ elicitationId }))?.resume?.status).toBe(
 			"resuming"
 		);
+	});
+
+	describe("when the successor claims in the same millisecond as the stale claim", () => {
+		const takeOver = async () => {
+			vi.useFakeTimers({ toFake: ["Date"] });
+			try {
+				const elicitationId = await answeredRow();
+				const stale = await claimElicitationResume(conversationId, elicitationId);
+				if (!stale) throw new Error("expected the claim");
+				await collections.mcpElicitations.updateOne(
+					{ elicitationId },
+					{ $set: { "resume.takenAt": new Date(Date.now() - RESUME_LEASE_MS - 1_000) } }
+				);
+				const successor = await claimElicitationResume(conversationId, elicitationId);
+				if (!successor) throw new Error("expected the successor's claim");
+				expect(successor.resume?.takenAt.getTime()).toBe(stale.resume?.takenAt.getTime());
+				return { elicitationId, stale, successor };
+			} finally {
+				vi.useRealTimers();
+			}
+		};
+
+		it("does not let the stale holder consume the successor's claim", async () => {
+			const { elicitationId, stale, successor } = await takeOver();
+
+			await finishElicitationResume(stale);
+			expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+				resume: { status: "resuming", attempts: 2 },
+			});
+
+			await finishElicitationResume(successor);
+			expect((await collections.mcpElicitations.findOne({ elicitationId }))?.resume?.status).toBe(
+				"resumed"
+			);
+		});
+
+		it("does not let the stale holder release the successor's claim", async () => {
+			const { elicitationId, stale, successor } = await takeOver();
+
+			await releaseElicitationResume(stale, { uncounted: true });
+
+			const row = await collections.mcpElicitations.findOne({ elicitationId });
+			expect(row?.resume?.attempts).toBe(2);
+			expect(row?.resume?.takenAt.getTime()).toBe(successor.resume?.takenAt.getTime());
+			expect(await claimElicitationResume(conversationId, elicitationId)).toBeNull();
+		});
 	});
 
 	it("moves updatedAt, so an answer replacing a system close cannot land under a claim", async () => {
