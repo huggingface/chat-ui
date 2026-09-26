@@ -12,6 +12,7 @@
 	import CarbonPen from "~icons/carbon/pen";
 	import CarbonCopy from "~icons/carbon/copy";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonInformation from "~icons/carbon/information";
 	import UploadedFile from "./UploadedFile.svelte";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
@@ -156,7 +157,8 @@
 		| { kind: "artifact"; op: ArtifactOperation; opIndex: number }
 		| ({ kind: "elicitation" } & Omit<ElicitationBlock, "type">)
 		| { kind: "plan"; update: MessagePlanUpdate }
-		| { kind: "harnessEvent"; update: MessageHarnessEventUpdate };
+		| { kind: "harnessEvent"; update: MessageHarnessEventUpdate }
+		| { kind: "notice"; text: string };
 
 	// The live turn's park, rendered as a countdown from its ABSOLUTE deadline
 	// (clock-skew corrected). Only the last message of the conversation can be
@@ -168,6 +170,9 @@
 	});
 
 	let blocks = $derived(messageBlocks(message));
+
+	// a notice can arrive before the first token, so it must not hide the spinner
+	let awaitingFirstBlock = $derived(blocks.every((block) => block.type === "notice"));
 
 	// Coalesce consecutive process blocks (thinking + tools) into groups so they can
 	// collapse into a single "Called N tools" / "Thought" summary. Text passes through.
@@ -203,6 +208,9 @@
 			} else if (block.type === "harnessEvent") {
 				flush();
 				units.push({ kind: "harnessEvent", update: block.update });
+			} else if (block.type === "notice") {
+				flush();
+				units.push({ kind: "notice", text: block.text });
 			} else {
 				flush();
 				units.push({ kind: "text", content: block.content });
@@ -279,6 +287,16 @@
 	});
 </script>
 
+{#snippet notice(text: string)}
+	<div
+		data-exclude-from-copy
+		class="flex items-start gap-1.5 text-xs text-gray-500 not-last:mb-2 dark:text-gray-400 [.prose+&]:mt-2"
+	>
+		<CarbonInformation class="mt-0.5 flex-none" />
+		<span>{text}</span>
+	</div>
+{/snippet}
+
 {#if message.from === "assistant"}
 	<div
 		bind:offsetWidth={messageWidth}
@@ -311,7 +329,7 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<div bind:this={contentEl} oncopy={handleCopy} onclick={handleContentClick}>
-				{#if isLast && loading && blocks.length === 0}
+				{#if isLast && loading && awaitingFirstBlock}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
 				{#if isProcessStreaming}
@@ -343,6 +361,8 @@
 							<div data-exclude-from-copy class={processBlockClasses}>
 								<HarnessEventChip update={block.update} />
 							</div>
+						{:else if block.type === "notice"}
+							{@render notice(block.text)}
 						{:else}
 							<div data-exclude-from-copy class={processBlockClasses}>
 								{#if block.type === "think"}
@@ -392,6 +412,8 @@
 							<div data-exclude-from-copy class={processBlockClasses}>
 								<HarnessEventChip update={unit.update} />
 							</div>
+						{:else if unit.kind === "notice"}
+							{@render notice(unit.text)}
 						{:else if unit.kind === "group"}
 							<div data-exclude-from-copy class={processBlockClasses}>
 								{#if unit.blocks.length > 1}

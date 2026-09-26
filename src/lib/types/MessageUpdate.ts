@@ -23,7 +23,8 @@ export type MessageUpdate =
 	| MessagePlanUpdate
 	| MessageBudgetUpdate
 	| MessageTurnStateUpdate
-	| MessageHarnessEventUpdate;
+	| MessageHarnessEventUpdate
+	| MessageNoticeUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -39,6 +40,7 @@ export enum MessageUpdateType {
 	Budget = "budget",
 	TurnState = "turnState",
 	HarnessEvent = "harnessEvent",
+	Notice = "notice",
 }
 
 /**
@@ -286,4 +288,10 @@ export interface MessageHarnessEventUpdate {
 	events: HarnessServiceEvent[];
 	text: string;
 	afterToolUuid: string;
+}
+
+/** shown to the user in the turn and never sent to the model, like how much of a file it saw */
+export interface MessageNoticeUpdate {
+	type: MessageUpdateType.Notice;
+	text: string;
 }
