@@ -16,6 +16,8 @@ import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
 import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWindowFlag";
+import { windowLimitChars } from "$lib/server/textGeneration/utils/historyWindow";
+import { prepareAttachments } from "$lib/server/textGeneration/utils/attachmentBudget";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 import { inferenceBillingHeaders } from "$lib/server/billing";
 // uuid import removed (no tool call ids)
@@ -126,9 +128,23 @@ export async function endpointOai(
 			locals,
 			abortSignal,
 			provider,
+			attachments,
+			onAttachments,
 		}) => {
+			const parameters = { ...model.parameters, ...generateSettings };
+			// the prompt renders message content only, pasted text and files have to be in it
+			const { contentOf, report } = await prepareAttachments(messages, imageProcessor, false, {
+				limitChars: model.contextLength
+					? windowLimitChars(model.contextLength, parameters?.max_tokens)
+					: undefined,
+				mode: attachments,
+			});
+			onAttachments?.(report);
 			const prompt = await buildPrompt({
-				messages,
+				messages: messages.map((message, index) => {
+					const content = message.from === "user" ? contentOf(index) : message.content;
+					return typeof content === "string" ? { ...message, content } : message;
+				}),
 				preprompt,
 				model,
 			});
@@ -137,7 +153,6 @@ export async function endpointOai(
 			const baseModelId = model.id ?? model.name;
 			const modelId = provider && provider !== "auto" ? `${baseModelId}:${provider}` : baseModelId;
 
-			const parameters = { ...model.parameters, ...generateSettings };
 			const body: CompletionCreateParamsStreaming = {
 				model: modelId,
 				prompt,
