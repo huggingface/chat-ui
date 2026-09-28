@@ -105,6 +105,43 @@ export function serviceElapsed(
 	return formatElapsed(end - start);
 }
 
+/** when the hub stops it unless someone stops it first, from the start so never too early */
+export function billedUntil(
+	service: Pick<MlRegistryService, "createdAt" | "startedAt" | "timeoutSeconds">
+): Date | undefined {
+	if (!service.timeoutSeconds) return undefined;
+	const start = (service.startedAt ?? service.createdAt).getTime();
+	return new Date(start + service.timeoutSeconds * 1000);
+}
+
+/** only one this conversation created and the hub would still bill, the server checks it again */
+export function isStoppableSandbox(
+	service: Pick<MlRegistryService, "kind" | "origin" | "stage" | "heldMicroUsd">
+): boolean {
+	return service.kind === "sandbox" && service.origin === "dispatched" && isServiceOpen(service);
+}
+
+/** a sandbox bills whether or not anything runs in it, and between turns nothing does */
+export function isIdleSandbox(
+	service: Pick<MlRegistryService, "kind" | "stage" | "stopRequestedAt">,
+	turnRunning: boolean
+): boolean {
+	return (
+		service.kind === "sandbox" &&
+		service.stage === "RUNNING" &&
+		!turnRunning &&
+		!service.stopRequestedAt
+	);
+}
+
+/** the time alone today, with the weekday on any other day, in the local zone */
+export function formatClock(at: Date, now: number): string {
+	const time = at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+	return at.toDateString() === new Date(now).toDateString()
+		? time
+		: `${at.toLocaleDateString([], { weekday: "short" })} ${time}`;
+}
+
 /** running, then the rest of what is open, then everything else, newest first within each */
 export function sortServices(services: readonly MlRegistryService[]): MlRegistryService[] {
 	const rank = (service: MlRegistryService) =>

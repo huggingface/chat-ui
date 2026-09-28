@@ -176,6 +176,22 @@ describe.sequential("marking an end", () => {
 		expect((await readService(service._id)).eventPendingSince).toEqual(NOW);
 	});
 
+	it("leaves a sandbox the user stopped for the state block, neither pending nor reported", async () => {
+		const conversationId = await insertConversation();
+		const service = await insertService(conversationId, {
+			kind: "sandbox",
+			stopRequestedAt: new Date(NOW.getTime() - 10 * SECOND),
+		});
+		stubJobApi({ status: { stage: "CANCELED" } });
+
+		await pollService(service, TOKEN, NOW);
+
+		const row = await readService(service._id);
+		expect(row.stage).toBe("CANCELED");
+		expect(row.eventPendingSince).toBeUndefined();
+		expect(row.lastReportedStage).toBeUndefined();
+	});
+
 	it("does not report a discovered row that had already ended on its first poll", async () => {
 		const conversationId = await insertConversation();
 		const service = await insertService(conversationId, { origin: "discovered", stage: "UNKNOWN" });

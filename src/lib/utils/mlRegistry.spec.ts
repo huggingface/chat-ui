@@ -6,6 +6,7 @@ import type {
 	MlRegistrySource,
 } from "$lib/types/MlRegistry";
 import {
+	billedUntil,
 	fileLanguage,
 	groupSources,
 	runBadge,
@@ -23,7 +24,9 @@ import {
 	groupArtefacts,
 	harnessEventLabel,
 	hubLabel,
+	isIdleSandbox,
 	isServiceOpen,
+	isStoppableSandbox,
 	pathWithin,
 	pushingService,
 	repoPageUrl,
@@ -73,6 +76,33 @@ describe("isServiceOpen", () => {
 	it("takes a hold as the word on an unknown stage", () => {
 		expect(isServiceOpen({ stage: "UNKNOWN" })).toBe(false);
 		expect(isServiceOpen({ stage: "UNKNOWN", heldMicroUsd: 500_000 })).toBe(true);
+	});
+});
+
+describe("sandbox billing", () => {
+	const sandbox = (overrides: Partial<MlRegistryService> = {}) =>
+		service({ kind: "sandbox", timeoutSeconds: 3600, ...overrides });
+
+	it("bills until the timeout counted from the start, or from creation before one is seen", () => {
+		expect(billedUntil(sandbox({ startedAt: at(90_000) }))).toEqual(at(90_000 + 3_600_000));
+		expect(billedUntil(sandbox())).toEqual(at(3_600_000));
+		expect(billedUntil(sandbox({ timeoutSeconds: undefined }))).toBeUndefined();
+	});
+
+	it("is idle only when running between turns and not already being stopped", () => {
+		expect(isIdleSandbox(sandbox(), false)).toBe(true);
+		expect(isIdleSandbox(sandbox(), true)).toBe(false);
+		expect(isIdleSandbox(sandbox({ stage: "SCHEDULING" }), false)).toBe(false);
+		expect(isIdleSandbox(sandbox({ stopRequestedAt: at(0) }), false)).toBe(false);
+		expect(isIdleSandbox(service(), false)).toBe(false);
+	});
+
+	it("can be stopped only when created here and still billed", () => {
+		expect(isStoppableSandbox(sandbox())).toBe(true);
+		expect(isStoppableSandbox(sandbox({ stage: "UNKNOWN", heldMicroUsd: 1 }))).toBe(true);
+		expect(isStoppableSandbox(sandbox({ origin: "discovered" }))).toBe(false);
+		expect(isStoppableSandbox(sandbox({ stage: "CANCELED" }))).toBe(false);
+		expect(isStoppableSandbox(service())).toBe(false);
 	});
 });
 

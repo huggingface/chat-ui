@@ -118,6 +118,37 @@ export async function lookupJob({
 	return { state: "terminal", billedMinutes: minutes, job };
 }
 
+export type JobCancel =
+	| { state: "cancelled" }
+	| { state: "gone" }
+	| { state: "refused"; status: number }
+	| { state: "unreachable" };
+
+/** one POST /api/jobs/{namespace}/{id}/cancel, a sandbox is a job so it stops the same way */
+export async function cancelJob({
+	namespace,
+	jobId,
+	token,
+}: {
+	namespace: string;
+	jobId: string;
+	token: string;
+}): Promise<JobCancel> {
+	let res: Response;
+	try {
+		res = await fetch(`${JOBS_API_BASE}/${encodeURIComponent(namespace)}/${jobId}/cancel`, {
+			method: "POST",
+			headers: { Authorization: `Bearer ${token}` },
+			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+		});
+	} catch {
+		return { state: "unreachable" };
+	}
+	if (res.status === 404) return { state: "gone" };
+	if (!res.ok) return { state: "refused", status: res.status };
+	return { state: "cancelled" };
+}
+
 export interface ListedJob extends JobStatus {
 	jobId: string;
 	createdAt?: Date;

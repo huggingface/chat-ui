@@ -18,6 +18,8 @@ export function endEventFields(
 ): Pick<MlService, "eventPendingSince" | "lastReportedStage"> {
 	// a retried dispatch reopens a row the model was already told about
 	if (service.lastReportedStage === stage) return {};
+	// woken by it the intern would recreate the sandbox, the next state block lists it once instead
+	if (service.stopRequestedAt) return {};
 	// a discovered row found already over was named by the model after it ended, not news
 	const seenOpen = service.stage !== UNKNOWN_STAGE && !TERMINAL_STAGES.has(service.stage);
 	return service.origin === "dispatched" || seenOpen

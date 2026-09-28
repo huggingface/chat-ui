@@ -86,6 +86,8 @@ export interface MlService extends Timestamps {
 	 * state block told it the poller gave the row up, an ended row matching it is not listed again
 	 */
 	lastReportedStage?: string;
+	/** set when the user stopped it from the registry pane, its end then wakes no wait */
+	stopRequestedAt?: Date;
 	/** the budget reservation key, generationId:callUuid */
 	reservationKey?: string;
 	hubUrl: string;

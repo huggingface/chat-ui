@@ -76,10 +76,16 @@ function serviceStatus(service: MlService, now: Date): string {
 	if (isUntracked(service)) {
 		return `no longer tracked${lastSeen}`;
 	}
+	if (service.stopRequestedAt && !isTerminalStage(service.stage)) {
+		return "being stopped by the user";
+	}
 	if (service.tokenMissingSince) return `status unknown: the user's session expired${lastSeen}`;
 	if (service.stage === UNKNOWN_STAGE) return "status not checked yet";
 	const elapsed = serviceElapsed(service, now.getTime());
 	if (service.stage === "SCHEDULING") return elapsed ?? "queued";
+	if (service.stopRequestedAt && service.stage === "CANCELED") {
+		return elapsed ? `stopped by the user after ${elapsed}` : "stopped by the user";
+	}
 	if (!elapsed) return service.stage;
 	return isTerminalStage(service.stage)
 		? `${service.stage} after ${elapsed}`

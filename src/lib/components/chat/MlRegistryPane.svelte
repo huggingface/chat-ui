@@ -12,14 +12,18 @@
 	import { serverCorrectedNow } from "$lib/utils/clockSkew.svelte";
 	import { formatMicroUsd } from "$lib/utils/mlBudget";
 	import {
+		billedUntil,
 		FILE_ORIGIN_LABEL,
 		formatAgo,
 		formatBytes,
+		formatClock,
 		formatFileRef,
 		groupArtefacts,
 		groupSources,
 		hubLabel,
+		isIdleSandbox,
 		isServiceOpen,
+		isStoppableSandbox,
 		pathWithin,
 		pushingService,
 		repoPageUrl,
@@ -38,6 +42,7 @@
 		sourcesByReader,
 		stageBadge,
 		type ServiceRow,
+		type StageBadge,
 	} from "$lib/utils/mlRegistry";
 	import MlFileVersionView from "./MlFileVersionView.svelte";
 	import SidePane from "./SidePane.svelte";
@@ -84,6 +89,16 @@
 		"Seen in the arguments of a later tool call, not created here: nothing about it is verified";
 	const DISCOVERED_PUSH_TITLE =
 		"Changed while the job ran, found by listing the namespace: the script did not name it";
+	// still billed, so the running colour without the pulse
+	const IDLE_BADGE: StageBadge = { label: "idle", tone: "running" };
+	const STOP_TITLE = "Stop the sandbox now, the Hub bills it until then";
+	const STOP_BUSY_TITLE = "The intern may be using it. Stop it once the turn ends.";
+
+	function billingNote(service: MlRegistryService, idle: boolean, now: number): string | undefined {
+		const until = billedUntil(service);
+		if (!until) return idle ? "Idle, billed until stopped" : undefined;
+		return `${idle ? "Idle, billed" : "Billed"} until ${formatClock(until, now)}`;
+	}
 
 	let showing = $derived(sidePane.open && sidePane.view === "registry");
 	let serviceRows = $derived(sortServiceRows(mlRegistry.services, mlRegistry.agentRuns));
@@ -238,8 +253,10 @@
 
 {#snippet serviceItem(service: MlRegistryService)}
 	{@const Icon = SERVICE_ICON[service.kind]}
-	{@const badge = stageBadge(service.stage)}
+	{@const idle = isIdleSandbox(service, mlRegistry.turnRunning)}
+	{@const badge = idle ? IDLE_BADGE : stageBadge(service.stage)}
 	{@const elapsed = serviceElapsed(service, now)}
+	{@const stop = mlRegistry.stops.get(service.id)}
 	<li class="ml-service flex gap-2.5 px-4 py-2.5" data-stage={badge.tone}>
 		<Icon class="mt-[3px] size-[14px] flex-none text-[#78716c] dark:text-[#a8a29e]" />
 		<div class="min-w-0 flex-1">
@@ -257,7 +274,7 @@
 					<span class="ml-registry-discovered" title={DISCOVERED_TITLE}>discovered</span>
 				{/if}
 				<span class="ml-stage ml-auto" data-tone={badge.tone}>
-					{#if badge.tone === "running"}
+					{#if badge.tone === "running" && !idle}
 						<span aria-hidden="true" class="ml-live-dot"></span>
 					{/if}
 					{badge.label}
@@ -282,6 +299,35 @@
 					</span>
 				{/if}
 			</div>
+			{#if isStoppableSandbox(service)}
+				{@const note = billingNote(service, idle, now)}
+				<div
+					class="ml-sandbox-billing mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#78716c] dark:text-[#a8a29e]"
+				>
+					{#if service.stopRequestedAt || stop?.status === "stopping"}
+						<span role="status">Stopping…</span>
+					{:else}
+						{#if note}
+							<span class="tabular-nums">{note}</span>
+						{/if}
+						<button
+							type="button"
+							class="ml-sandbox-stop"
+							disabled={mlRegistry.turnRunning}
+							title={mlRegistry.turnRunning ? STOP_BUSY_TITLE : STOP_TITLE}
+							aria-label="Stop sandbox {serviceDisplayName(service)}"
+							onclick={() => mlRegistry.stop(service.id)}
+						>
+							Stop
+						</button>
+					{/if}
+				</div>
+				{#if stop?.status === "error"}
+					<p class="ml-sandbox-stop-error mt-0.5 text-xs text-[#b91c1c] dark:text-[#f87171]">
+						{stop.message}
+					</p>
+				{/if}
+			{/if}
 			{#if service.scriptRefs?.length}
 				<div class="mt-1 flex flex-wrap gap-1.5">
 					{#each service.scriptRefs as ref (formatFileRef(ref))}
@@ -1499,6 +1545,52 @@
 
 	:global(.dark) .ml-push[data-status="missing"] {
 		color: #f87171;
+	}
+
+	.ml-sandbox-stop {
+		padding: 0 7px;
+		border: 1px solid #e7e5e4;
+		border-radius: 4px;
+		font-size: 11px;
+		font-weight: 500;
+		line-height: 18px;
+		color: #57534e;
+		transition:
+			color 120ms ease,
+			border-color 120ms ease;
+	}
+
+	.ml-sandbox-stop:hover:not(:disabled) {
+		border-color: #f0a468;
+		color: #c4511a;
+	}
+
+	.ml-sandbox-stop:disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+	}
+
+	.ml-sandbox-stop:focus-visible {
+		outline: none;
+		box-shadow:
+			inset 0 0 0 1.5px #c4511a,
+			0 0 0 1px #fff;
+	}
+
+	:global(.dark) .ml-sandbox-stop {
+		border-color: #44403c;
+		color: #d6d3d1;
+	}
+
+	:global(.dark) .ml-sandbox-stop:hover:not(:disabled) {
+		border-color: #c4511a;
+		color: #f0a468;
+	}
+
+	:global(.dark) .ml-sandbox-stop:focus-visible {
+		box-shadow:
+			inset 0 0 0 1.5px #f0a468,
+			0 0 0 1px #111827;
 	}
 
 	/* the same 1.4s breath as the strip running step */
