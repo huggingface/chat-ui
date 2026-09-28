@@ -153,6 +153,25 @@ describe("renderSessionStateBlock", () => {
 		expect(block).toContain(`hfsb2:ns:${SANDBOX_ID}`);
 	});
 
+	it("says until when an open sandbox bills, with the date once it is another day", () => {
+		const sandbox = (overrides: Partial<MlService>) =>
+			service({
+				kind: "sandbox",
+				jobId: SANDBOX_ID,
+				name: "dbg",
+				flavor: "cpu-upgrade",
+				startedAt: ago(40 * MIN),
+				...overrides,
+			});
+		expect(render({ services: [sandbox({ timeoutSeconds: 3600 })] })).toContain(
+			`- sandbox dbg · cpu-upgrade · RUNNING 40m 00s · billed until 14:25 UTC · hfsb2:ns:${SANDBOX_ID}`
+		);
+		expect(render({ services: [sandbox({ timeoutSeconds: 24 * 3600 })] })).toContain(
+			"· billed until 2026-09-26 13:25 UTC ·"
+		);
+		expect(render({ services: [service({ timeoutSeconds: 3600 })] })).not.toContain("billed until");
+	});
+
 	it("says a sandbox the user stopped is being stopped, then lists it once as stopped by them", () => {
 		const stopped = {
 			kind: "sandbox" as const,

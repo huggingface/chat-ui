@@ -10,6 +10,7 @@ import type { MlArtefact } from "$lib/types/MlArtefact";
 import type { MlFileListing } from "$lib/types/MlFile";
 import type { MlService } from "$lib/types/MlService";
 import {
+	billedUntil,
 	groupArtefacts,
 	hubLabel,
 	isTerminalStage,
@@ -70,6 +71,13 @@ const reportedAs = (service: MlService) => (isUntracked(service) ? UNTRACKED_STA
 
 const endTime = (service: MlService) => (service.endedAt ?? service.updatedAt).getTime();
 
+const utcTime = (at: Date, now: Date) => {
+	const iso = at.toISOString();
+	return iso.slice(0, 10) === now.toISOString().slice(0, 10)
+		? `${iso.slice(11, 16)} UTC`
+		: `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
+};
+
 function serviceStatus(service: MlService, now: Date): string {
 	const lastSeen = service.stage === UNKNOWN_STAGE ? "" : `, last seen ${service.stage}`;
 	// a row stopped for want of a token keeps tokenMissingSince so stopped is checked first
@@ -116,6 +124,8 @@ function serviceLine(service: MlService, now: Date): string {
 	];
 	if (!isEnded(service) && service.flavor) parts.push(service.flavor);
 	parts.push(serviceStatus(service, now));
+	const until = service.kind === "sandbox" && !isEnded(service) ? billedUntil(service) : undefined;
+	if (until && !service.stopRequestedAt) parts.push(`billed until ${utcTime(until, now)}`);
 	parts.push(
 		service.kind === "sandbox"
 			? (service.handle ?? sandboxHandle(service.namespace, service.jobId))
