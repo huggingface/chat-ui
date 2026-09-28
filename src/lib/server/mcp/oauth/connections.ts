@@ -12,8 +12,8 @@ import { canonicalizeMcpUri } from "./canonical";
 import type {
 	AuthorizationServerMetadata,
 	OAuthClientInformationFull,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
-import { extractWWWAuthenticateParams } from "@modelcontextprotocol/sdk/client/auth.js";
+} from "@modelcontextprotocol/client";
+import { extractWWWAuthenticateParams } from "@modelcontextprotocol/client";
 import { mergeOAuthScopes, normalizeOAuthScope } from "./scope";
 import {
 	isRefreshGrantRejected,

@@ -2,13 +2,13 @@ import {
 	exchangeAuthorization,
 	refreshAuthorization,
 	startAuthorization,
-} from "@modelcontextprotocol/sdk/client/auth.js";
+} from "@modelcontextprotocol/client";
 import type {
 	AuthorizationServerMetadata,
 	OAuthClientInformationFull,
 	OAuthTokens,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
-import { OAuthError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
+} from "@modelcontextprotocol/client";
+import { OAuthError } from "@modelcontextprotocol/client";
 import { ssrfSafeFetch } from "$lib/server/urlSafety";
 import {
 	assertPkceS256Supported,
@@ -150,7 +150,7 @@ export function assertBearerTokens(tokens: OAuthTokens): void {
 }
 
 export function isRefreshGrantRejected(error: unknown): boolean {
-	return error instanceof OAuthError && error.errorCode === "invalid_grant";
+	return error instanceof OAuthError && error.code === "invalid_grant";
 }
 
 export function tokensWithExpiresAt(tokens: OAuthTokens): OAuthTokens & { expires_at?: number } {

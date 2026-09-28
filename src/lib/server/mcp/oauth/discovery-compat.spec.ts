@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDiscoveryUrls } from "@modelcontextprotocol/sdk/client/auth.js";
+import { buildDiscoveryUrls } from "@modelcontextprotocol/client";
 import { buildClientMetadataDocumentClient, MCP_OAUTH_PROTOCOL_VERSION } from "./discover";
 
 describe("MCP 2025-11-25 discovery compatibility", () => {

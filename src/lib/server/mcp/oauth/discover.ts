@@ -3,12 +3,12 @@ import {
 	discoverOAuthProtectedResourceMetadata,
 	extractWWWAuthenticateParams,
 	registerClient,
-} from "@modelcontextprotocol/sdk/client/auth.js";
+} from "@modelcontextprotocol/client";
 import type {
 	AuthorizationServerMetadata,
 	OAuthClientInformationFull,
 	OAuthProtectedResourceMetadata,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@modelcontextprotocol/client";
 import { isValidUrl, ssrfSafeFetch } from "$lib/server/urlSafety";
 import { logger } from "$lib/server/logger";
 import { canonicalizeMcpUri } from "./canonical";
@@ -20,7 +20,7 @@ import {
 	parseAuthorizationServerMetadata,
 	parseClientInformation,
 } from "./validation";
-import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
+import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/client";
 import { selectInitialOAuthScope } from "./scope";
 
 export interface DiscoveryResult {

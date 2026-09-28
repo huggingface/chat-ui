@@ -2,10 +2,12 @@ import {
 	OAuthClientInformationFullSchema,
 	OAuthMetadataSchema,
 	OpenIdProviderDiscoveryMetadataSchema,
-	type AuthorizationServerMetadata,
-	type OAuthClientInformationFull,
-	type OAuthProtectedResourceMetadata,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@modelcontextprotocol/core";
+import type {
+	AuthorizationServerMetadata,
+	OAuthClientInformationFull,
+	OAuthProtectedResourceMetadata,
+} from "@modelcontextprotocol/client";
 import { isValidUrl } from "$lib/server/urlSafety";
 
 const AuthorizationServerMetadataSchema = OAuthMetadataSchema.or(

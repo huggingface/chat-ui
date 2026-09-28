@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { InvalidGrantError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
+import { OAuthError, OAuthErrorCode } from "@modelcontextprotocol/client";
 
 // Stub only the network token refresh; the rest of exchange (assertBearerTokens, tokensWithExpiresAt,
 // isRefreshGrantRejected) stays real so the connection-state transitions are exercised for real.
@@ -114,7 +114,9 @@ describe.sequential("MCP OAuth JIT token refresh", () => {
 		const locals = createTestLocals();
 		const connection = await createConnection(locals);
 		await seedExpiringTokens(connection);
-		refreshTokensMock.mockRejectedValue(new InvalidGrantError("refresh token no longer valid"));
+		refreshTokensMock.mockRejectedValue(
+			new OAuthError(OAuthErrorCode.InvalidGrant, "refresh token no longer valid")
+		);
 
 		await expect(
 			resolveOAuthAccessToken(locals, connection._id.toString(), serverUrl)

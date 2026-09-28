@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	InvalidGrantError,
-	InvalidRequestError,
-	ServerError,
-} from "@modelcontextprotocol/sdk/server/auth/errors.js";
+import { OAuthError, OAuthErrorCode } from "@modelcontextprotocol/client";
 import { assertBearerTokens, isRefreshGrantRejected, tokensWithExpiresAt } from "./exchange";
 
 describe("OAuth token validation", () => {
@@ -32,9 +28,13 @@ describe("OAuth token validation", () => {
 
 describe("refresh rejection classification", () => {
 	it("treats only invalid_grant as a rejected refresh credential", () => {
-		expect(isRefreshGrantRejected(new InvalidGrantError(""))).toBe(true);
-		expect(isRefreshGrantRejected(new InvalidRequestError("invalid request"))).toBe(false);
-		expect(isRefreshGrantRejected(new ServerError("unavailable"))).toBe(false);
+		expect(isRefreshGrantRejected(new OAuthError(OAuthErrorCode.InvalidGrant, ""))).toBe(true);
+		expect(
+			isRefreshGrantRejected(new OAuthError(OAuthErrorCode.InvalidRequest, "invalid request"))
+		).toBe(false);
+		expect(isRefreshGrantRejected(new OAuthError(OAuthErrorCode.ServerError, "unavailable"))).toBe(
+			false
+		);
 		expect(isRefreshGrantRejected(new Error("invalid_grant"))).toBe(false);
 	});
 });
