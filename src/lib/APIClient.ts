@@ -104,7 +104,16 @@ export function useAPIClient({
 				...endpoint(fetcher, `${baseUrl}/conversations/${params.id}`),
 				message: (msgParams: { messageId: string }) =>
 					endpoint(fetcher, `${baseUrl}/conversations/${params.id}/message/${msgParams.messageId}`),
-				registry: endpoint(fetcher, `${baseUrl}/conversations/${params.id}/registry`),
+				registry: Object.assign(
+					endpoint(fetcher, `${baseUrl}/conversations/${params.id}/registry`),
+					{
+						stop: (serviceId: string) =>
+							endpoint(
+								fetcher,
+								`${baseUrl}/conversations/${params.id}/registry/${encodeURIComponent(serviceId)}/stop`
+							),
+					}
+				),
 				files: (name: string) =>
 					endpoint(
 						fetcher,

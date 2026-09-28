@@ -437,6 +437,51 @@ describe("mlRegistry store: file versions and content", () => {
 		expect(store.fileContent("train.py", 1)).toEqual({ status: "ready", value: "a" });
 	});
 
+	it("follows whether a turn is running, a parked or finished one is not", () => {
+		const store = new MlRegistryStore(fakeFetch().fetcher);
+		store.watch("conv-1", { live: true });
+		expect(store.turnRunning).toBe(true);
+		store.watch("conv-1", { live: false });
+		expect(store.turnRunning).toBe(false);
+	});
+
+	it("stops a sandbox with one post, then refetches so the row carries the mark", async () => {
+		const calls: string[] = [];
+		const stopped = service({ id: "sb", kind: "sandbox", stopRequestedAt: new Date(0) });
+		const fetcher = (async (input: RequestInfo | URL, init?: RequestInit) => {
+			calls.push(`${init?.method ?? "GET"} ${String(input)}`);
+			return init?.method === "POST"
+				? new Response("", { status: 200 })
+				: new Response(superjson.stringify(payload([stopped])), { status: 200 });
+		}) as typeof fetch;
+		const store = new MlRegistryStore(fetcher);
+		store.bind("conv-1");
+		store.apply(payload([service({ id: "sb", kind: "sandbox" })]));
+
+		const stopping = store.stop("sb");
+		expect(store.stops.get("sb")).toEqual({ status: "stopping" });
+		await stopping;
+
+		expect(calls).toEqual([
+			"POST http://localhost:5173/api/v2/conversations/conv-1/registry/sb/stop",
+			"GET http://localhost:5173/api/v2/conversations/conv-1/registry",
+		]);
+		expect(store.services[0].stopRequestedAt).toBeInstanceOf(Date);
+		expect(store.stops.get("sb")).toBeUndefined();
+	});
+
+	it("keeps the server's reason when a stop is refused", async () => {
+		const message = "The intern may be using this sandbox. Stop it once the turn ends.";
+		const fetcher = (async () =>
+			new Response(JSON.stringify({ message }), { status: 409 })) as typeof fetch;
+		const store = new MlRegistryStore(fetcher);
+		store.bind("conv-1");
+
+		await store.stop("sb");
+
+		expect(store.stops.get("sb")).toEqual({ status: "error", message });
+	});
+
 	it("forgets the cache on reset and drops an answer that lands after it", async () => {
 		const server = fileServer({ "train.py": ["a"] });
 		const store = bound(server, { "train.py": 1 });

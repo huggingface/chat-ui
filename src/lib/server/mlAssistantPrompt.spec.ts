@@ -345,6 +345,14 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(inMode([tool("hf_jobs")])).not.toContain("SANDBOXES (hf_sandbox)");
 	});
 
+	it("has the intern terminate a sandbox it will not use on the next message", () => {
+		const sandbox = inMode([tool("hf_sandbox")]);
+
+		expect(sandbox).toContain("hf_sandbox terminate <handle>");
+		expect(sandbox).toContain("before your final answer terminate every sandbox");
+		expect(sandbox).toContain("stopped by the user");
+	});
+
 	it("puts metrics on the pre-flight list, not only in the bullets", () => {
 		// The list is the part the model prints and checks itself. Trackio guidance
 		// sat in a bullet for weeks and was never acted on unprompted: hardware,
@@ -434,6 +442,9 @@ describe("ML Assistant system message size", () => {
 		//
 		// 34k to 35k for the session state section, argued by the hf_jobs ps and inspect calls and
 		// the reads back through old tool results it replaces, it landed at 34,079
+		//
+		// 35k to 35,500 for the sandbox lifecycle, argued by idle sandboxes billing until their
+		// timeout, it landed at 35,364
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -458,7 +469,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(35_000);
+		expect(composed.length).toBeLessThan(35_500);
 	});
 });
 

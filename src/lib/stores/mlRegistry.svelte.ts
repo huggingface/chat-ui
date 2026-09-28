@@ -25,6 +25,15 @@ type FetchFn = typeof globalThis.fetch;
 export type FileLoad<T> =
 	{ status: "loading" } | { status: "ready"; value: T } | { status: "error" };
 
+export type StopRequest = { status: "stopping" } | { status: "error"; message: string };
+
+const STOP_UNREACHABLE = "Could not reach the server. Try again.";
+
+const errorMessage = (body: unknown): string =>
+	typeof body === "object" && body !== null && "message" in body && typeof body.message === "string"
+		? body.message
+		: "Could not stop the sandbox. Try again.";
+
 const contentKey = (name: string, version: number) => `${version}:${name}`;
 
 /** what changes while a run goes on, a detail with the same stamp as the listing is current */
@@ -49,6 +58,11 @@ export class MlRegistryStore {
 
 	/** the conversation the rows belong to, undefined once it is left */
 	conversationId = $state<string | undefined>(undefined);
+	/** whether a turn is generating, a parked or finished one is not */
+	turnRunning = $state(false);
+
+	/** by service id, a stop in flight until a payload carries its mark, or why it failed */
+	stops = new SvelteMap<string, StopRequest>();
 
 	/** by file name, refetched once the registry lists a newer version */
 	#versions = new SvelteMap<string, FileLoad<MlFileVersionListing[]>>();
@@ -96,6 +110,7 @@ export class MlRegistryStore {
 		this.bind(conversationId);
 		const turnEnded = this.#live && !live;
 		this.#live = live;
+		this.turnRunning = live;
 		this.#watching = true;
 		if (!this.loaded || turnEnded) void this.refresh();
 		this.#reschedule();
@@ -126,6 +141,32 @@ export class MlRegistryStore {
 			}
 		})();
 		return this.#inflight;
+	}
+
+	async stop(serviceId: string): Promise<void> {
+		const conversationId = this.conversationId;
+		if (!conversationId || this.stops.get(serviceId)?.status === "stopping") return;
+		const epoch = this.#epoch;
+		this.stops.set(serviceId, { status: "stopping" });
+		let failure: string | undefined;
+		try {
+			const response = await this.#client()
+				.conversations({ id: conversationId })
+				.registry.stop(serviceId)
+				.post();
+			if (response.error !== null) failure = errorMessage(response.error);
+		} catch {
+			failure = STOP_UNREACHABLE;
+		}
+		if (this.#epoch !== epoch) return;
+		if (failure) {
+			this.stops.set(serviceId, { status: "error", message: failure });
+			return;
+		}
+		// one already in flight was asked before the mark was written
+		if (this.#inflight) await this.#inflight;
+		await this.refresh();
+		if (this.#epoch === epoch) this.stops.delete(serviceId);
 	}
 
 	fileVersions(name: string): FileLoad<MlFileVersionListing[]> | undefined {
@@ -257,7 +298,9 @@ export class MlRegistryStore {
 		this.#inflight = undefined;
 		this.conversationId = undefined;
 		this.#live = false;
+		this.turnRunning = false;
 		this.#watching = false;
+		this.stops.clear();
 		this.services = [];
 		this.agentRuns = [];
 		this.artefacts = [];

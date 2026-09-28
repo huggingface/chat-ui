@@ -261,6 +261,110 @@ describe("MlRegistryPane", () => {
 		expect(container.textContent).toContain("Status unknown since the session expired.");
 	});
 
+	describe("an idle sandbox", () => {
+		const SANDBOX_ID = "4".repeat(24);
+		const SANDBOX = service({
+			jobId: SANDBOX_ID,
+			kind: "sandbox",
+			name: "dbg",
+			flavor: "cpu-basic",
+			timeoutSeconds: 3600,
+			startedAt: at(-20 * 60_000),
+			heldMicroUsd: 30_000,
+		});
+		const clock = (ms: number) =>
+			new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+		const sandboxRow = (container: HTMLElement) => find(container, ".ml-service");
+
+		it("reads idle and says until when it is billed, still in orange but without the pulse", () => {
+			const { container } = mount(payload({ services: [SANDBOX] }));
+			const row = sandboxRow(container);
+			const badge = find(row, ".ml-stage");
+
+			expect(text(badge)).toBe("idle");
+			expect(style(badge).color).toBe(ORANGE_INK);
+			expect(badge.querySelector(".ml-live-dot")).toBeNull();
+			expect(text(row.querySelector(".ml-sandbox-billing"))).toBe(
+				`Idle, billed until ${clock(NOW + 40 * 60_000)} Stop`
+			);
+			const stop = find(row, ".ml-sandbox-stop") as HTMLButtonElement;
+			expect(stop.disabled).toBe(false);
+			expect(stop.getAttribute("aria-label")).toBe("Stop sandbox dbg");
+		});
+
+		it("is not idle while a turn runs, and cannot be stopped until it ends", async () => {
+			const { container } = mount(payload({ services: [SANDBOX] }));
+			mlRegistry.turnRunning = true;
+			await tick();
+			const row = sandboxRow(container);
+
+			expect(text(find(row, ".ml-stage"))).toBe("running");
+			expect(row.querySelector(".ml-live-dot")).not.toBeNull();
+			expect(text(row.querySelector(".ml-sandbox-billing"))).toBe(
+				`Billed until ${clock(NOW + 40 * 60_000)} Stop`
+			);
+			const stop = find(row, ".ml-sandbox-stop") as HTMLButtonElement;
+			expect(stop.disabled).toBe(true);
+			expect(stop.title).toMatch(/Stop it once the turn ends/);
+		});
+
+		it("offers no stop for a sandbox it did not create, a job, or one that ended", () => {
+			const { container } = mount(
+				payload({
+					services: [
+						{ ...SANDBOX, origin: "discovered" },
+						RUNNING,
+						{ ...SANDBOX, id: "5".repeat(24), jobId: "5".repeat(24), stage: "CANCELED" },
+					],
+				})
+			);
+			expect(container.querySelector(".ml-sandbox-stop")).toBeNull();
+		});
+
+		it("posts the stop, then says stopping until the sandbox ends", async () => {
+			const posts: string[] = [];
+			let readsAfterPost = 0;
+			vi.stubGlobal(
+				"fetch",
+				vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+					if (init?.method === "POST") {
+						posts.push(new URL(String(input)).pathname);
+						return new Response("", { status: 200 });
+					}
+					if (posts.length > 0) readsAfterPost++;
+					const row = posts.length > 0 ? { ...SANDBOX, stopRequestedAt: at(0) } : SANDBOX;
+					return new Response(superjson.stringify(payload({ services: [row] })));
+				})
+			);
+			const { container } = mount(payload({ services: [SANDBOX] }));
+			const billing = () => text(sandboxRow(container).querySelector(".ml-sandbox-billing"));
+
+			find(container, ".ml-sandbox-stop").click();
+
+			await vi.waitFor(() => expect(billing()).toBe("Stopping…"));
+			await vi.waitFor(() => expect(readsAfterPost).toBeGreaterThan(0));
+			expect(posts).toEqual([`/api/v2/conversations/conv-1/registry/${SANDBOX_ID}/stop`]);
+			await vi.waitFor(() => expect(mlRegistry.stops.size).toBe(0));
+			expect(billing()).toBe("Stopping…");
+		});
+
+		it("says why a stop failed and leaves the button to try again", async () => {
+			const message = "The Hub refused to stop the sandbox (HTTP 403).";
+			vi.stubGlobal(
+				"fetch",
+				vi.fn(async () => new Response(JSON.stringify({ message }), { status: 502 }))
+			);
+			const { container } = mount(payload({ services: [SANDBOX] }));
+
+			find(container, ".ml-sandbox-stop").click();
+
+			const error = await vi.waitFor(() => find(container, ".ml-sandbox-stop-error"));
+			expect(text(error)).toBe(message);
+			expect(style(error).color).toBe(RED_INK);
+			expect((find(container, ".ml-sandbox-stop") as HTMLButtonElement).disabled).toBe(false);
+		});
+	});
+
 	it("nests a repo's files under it, with their commit, then lists dashboards", () => {
 		const { container } = mount();
 		const rows = all(container, ".ml-artefact");
