@@ -1,8 +1,5 @@
 name: Build and Publish Image
 
-permissions:
-  packages: write
-
 on:
   push:
     branches:
@@ -17,8 +14,13 @@ on:
   release:
     types: [published, edited]
 
+permissions: {}
+
 jobs:
   build-and-publish-image-with-db:
+    permissions:
+      contents: read
+      packages: write
     runs-on:
       group: aws-general-8-plus
     steps:
@@ -37,7 +39,7 @@ jobs:
 
       - name: Docker metadata
         id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: |
             ghcr.io/huggingface/chat-ui-db
@@ -49,14 +51,14 @@ jobs:
             type=sha,enable={{is_default_branch}}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -66,7 +68,7 @@ jobs:
         uses: rlespinasse/github-slug-action@797d68864753cbceedc271349d402da4590e6302 # v4.5.0
 
       - name: Build and Publish Docker Image with DB
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: .
           file: Dockerfile
@@ -80,6 +82,9 @@ jobs:
             INCLUDE_DB=true
             PUBLIC_COMMIT_SHA=${{ env.GITHUB_SHA_SHORT }}
   build-and-publish-image-nodb:
+    permissions:
+      contents: read
+      packages: write
     runs-on:
       group: aws-general-8-plus
     steps:
@@ -98,7 +103,7 @@ jobs:
 
       - name: Docker metadata
         id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: |
             ghcr.io/huggingface/chat-ui
@@ -110,14 +115,14 @@ jobs:
             type=sha,enable={{is_default_branch}}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -127,7 +132,7 @@ jobs:
         uses: rlespinasse/github-slug-action@797d68864753cbceedc271349d402da4590e6302 # v4.5.0
 
       - name: Build and Publish Docker Image without DB
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: .
           file: Dockerfile

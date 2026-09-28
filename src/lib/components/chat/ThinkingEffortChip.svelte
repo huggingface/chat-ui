@@ -7,13 +7,19 @@
 
 	interface Props {
 		modelId: string;
+		/**
+		 * Effort a preset pins for this conversation, overriding the user's setting.
+		 * Shown instead of their value and not editable, because the request really
+		 * does go out at this effort — the preset applies it server-side.
+		 */
+		presetEffort?: ReasoningEffort;
 	}
 
-	let { modelId }: Props = $props();
+	let { modelId, presetEffort }: Props = $props();
 
 	const settings = useSettingsStore();
 
-	let current = $derived($settings.reasoningEffortOverrides?.[modelId]);
+	let current = $derived(presetEffort ?? $settings.reasoningEffortOverrides?.[modelId]);
 	let label = $derived(current ? capitalize(current) : "Default");
 
 	function capitalize(s: string) {
@@ -40,33 +46,37 @@
 	];
 </script>
 
-<DropdownMenu.Root>
-	<DropdownMenu.Trigger
-		class="inline-flex items-center gap-1 hover:underline"
-		aria-label="Select thinking effort"
-		title="Thinking effort"
-	>
-		Effort: {label}
-		<CarbonCaretDown class="-ml-0.5 text-xxs" />
-	</DropdownMenu.Trigger>
-	<DropdownMenu.Portal>
-		<DropdownMenu.Content
-			class="z-50 min-w-40 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur-sm dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100"
-			side="top"
-			align="end"
-			sideOffset={6}
+{#if presetEffort}
+	<span title="Set by ML Intern mode">Effort: {label}</span>
+{:else}
+	<DropdownMenu.Root>
+		<DropdownMenu.Trigger
+			class="inline-flex items-center gap-1 hover:underline"
+			aria-label="Select thinking effort"
+			title="Thinking effort"
 		>
-			{#each OPTIONS as opt (opt.label)}
-				<DropdownMenu.Item
-					class="flex h-8 cursor-pointer items-center justify-between gap-2 rounded-md px-2 text-sm select-none focus-visible:outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-white/10"
-					onSelect={() => setEffort(opt.value)}
-				>
-					<span>{opt.label}</span>
-					{#if current === opt.value}
-						<LucideCheck class="size-4 text-gray-500" />
-					{/if}
-				</DropdownMenu.Item>
-			{/each}
-		</DropdownMenu.Content>
-	</DropdownMenu.Portal>
-</DropdownMenu.Root>
+			Effort: {label}
+			<CarbonCaretDown class="-ml-0.5 text-xxs" />
+		</DropdownMenu.Trigger>
+		<DropdownMenu.Portal>
+			<DropdownMenu.Content
+				class="z-50 min-w-40 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur-sm dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100"
+				side="top"
+				align="end"
+				sideOffset={6}
+			>
+				{#each OPTIONS as opt (opt.label)}
+					<DropdownMenu.Item
+						class="flex h-8 cursor-pointer items-center justify-between gap-2 rounded-md px-2 text-sm select-none focus-visible:outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-white/10"
+						onSelect={() => setEffort(opt.value)}
+					>
+						<span>{opt.label}</span>
+						{#if current === opt.value}
+							<LucideCheck class="size-4 text-gray-500" />
+						{/if}
+					</DropdownMenu.Item>
+				{/each}
+			</DropdownMenu.Content>
+		</DropdownMenu.Portal>
+	</DropdownMenu.Root>
+{/if}

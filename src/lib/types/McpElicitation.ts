@@ -1,0 +1,168 @@
+import type { ObjectId } from "mongodb";
+import type { Conversation } from "./Conversation";
+import type { Timestamps } from "./Timestamps";
+
+export const MAX_OTHER_CHARS = 200;
+
+/** Normalized from MCP's `PrimitiveSchemaDefinition`, which spells a select box six ways. */
+export type ElicitationField =
+	| {
+			kind: "string";
+			name: string;
+			title?: string;
+			description?: string;
+			required: boolean;
+			minLength?: number;
+			maxLength?: number;
+			format?: "email" | "uri" | "date" | "date-time";
+			default?: string;
+	  }
+	| {
+			kind: "number";
+			name: string;
+			title?: string;
+			description?: string;
+			required: boolean;
+			integer: boolean;
+			minimum?: number;
+			maximum?: number;
+			default?: number;
+	  }
+	| {
+			kind: "boolean";
+			name: string;
+			title?: string;
+			description?: string;
+			required: boolean;
+			default?: boolean;
+	  }
+	| {
+			kind: "select";
+			name: string;
+			title?: string;
+			description?: string;
+			required: boolean;
+			multiple: boolean;
+			options: Array<{
+				value: string;
+				label: string;
+				description?: string;
+				/**
+				 * ML Assistant sessions only: choosing this option sets the session
+				 * compute budget to this many dollars. Applied by trusted server code
+				 * when the user submits the answer — never by the model — and always
+				 * rendered next to the option so the label cannot hide the amount.
+				 */
+				setBudgetUsd?: number;
+			}>;
+			/** Offers an "Other" choice whose value is typed rather than picked. */
+			allowOther?: boolean;
+			minItems?: number;
+			maxItems?: number;
+			default?: string | string[];
+	  };
+
+export type ElicitationValue = string | number | boolean | string[];
+
+export type ElicitationAction = "accept" | "decline" | "cancel";
+
+/** `withdrawn` is the server giving up on its own request, which it usually does first. */
+export type ElicitationResolution = "user" | "expired" | "aborted" | "withdrawn";
+
+/**
+ * Sent with the 409 a repeat answer to a durable prompt gets. `resume` is true when the call
+ * the prompt parked was never continued: the page that answered lost its cue (a reload, a closed tab, a run
+ * that died before persisting), so the transcript shows the question open again and this
+ * answer is the only thing that can start the continuation. On the wire it is the instruction
+ * to the client to do so, which the endpoint clears for the model's own questions: those it
+ * continues itself.
+ */
+export interface AnsweredElicitation {
+	action: ElicitationAction;
+	resume: boolean;
+	messageId?: string;
+}
+
+/** Every string here is server-authored, so it is display text and never markup. */
+export interface ElicitationRequestPayload {
+	elicitationId: string;
+	/**
+	 * Who is asking. `assistant` is the model's own question, which pins to the composer
+	 * rather than sitting in the stream; absent means an MCP server asked.
+	 */
+	source?: "assistant";
+	server: string;
+	mode: "form" | "url";
+	message: string;
+	fields?: ElicitationField[];
+	url?: string;
+}
+
+/** In the database because the pod serving the answer need not be the one waiting on it. */
+export interface McpElicitation extends Timestamps {
+	_id: ObjectId;
+	elicitationId: string;
+	conversationId: Conversation["_id"];
+	generationId?: string;
+	status: "pending" | "resolved";
+	request: ElicitationRequestPayload;
+	action?: ElicitationAction;
+	/**
+	 * Who closed it. Absent on rows written before this was recorded; for those a durable
+	 * prompt's `cancel` is read as the system's, since a user's cancel that nothing consumed
+	 * loses nothing by being answerable again.
+	 */
+	resolution?: ElicitationResolution;
+	content?: Record<string, ElicitationValue>;
+	/** Absent for a 2026-era prompt: nothing is waiting, so nothing expires. */
+	expiresAt?: Date;
+	resolvedAt?: Date;
+	pending?: PendingCall;
+	resume?: ElicitationResume;
+}
+
+/**
+ * The claim on a durable prompt's answer. Whatever continues the parked turn — the answer
+ * endpoint, the sweep, an old client's resume request — takes it first, atomically, so one
+ * answer starts one continuation. `resuming` is held only until the tool result is stored:
+ * from there the turn is an ordinary run, and a row left `resuming` is one whose process
+ * died before the model could have seen the answer, which is why `attempts` is counted.
+ */
+export interface ElicitationResume {
+	status: "resuming" | "resumed" | "abandoned";
+	takenAt: Date;
+	/** unique per claim, unlike takenAt and attempts which a successor can repeat */
+	claimId?: string;
+	attempts: number;
+	resumedAt?: Date;
+	abandonedReason?: string;
+}
+
+/** Where the parked run picks up. `kind` is absent on rows written before ask existed. */
+export type PendingCall = PendingMcpCall | PendingAskCall;
+
+interface PendingCallBase {
+	messageId: string;
+	toolCallId: string;
+	toolUuid: string;
+}
+
+/**
+ * Re-issues the call against the server. Only a 2026-era prompt parks like this: the
+ * server kept no state, so any process can continue it however long afterwards.
+ */
+export interface PendingMcpCall extends PendingCallBase {
+	kind?: "mcp";
+	server: string;
+	tool: string;
+	args: Record<string, unknown>;
+	/** Opaque; echoed back byte-exact. */
+	requestState?: string;
+	/** Which key in the server's `inputRequests` this form answers. */
+	inputKey: string;
+}
+
+/** Nothing to re-issue: the answer itself is the tool result. */
+export interface PendingAskCall extends PendingCallBase {
+	kind: "ask";
+}

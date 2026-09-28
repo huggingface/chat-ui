@@ -8,6 +8,7 @@ import {
 	GET as settingsGET,
 	POST as settingsPOST,
 } from "../../../../routes/api/v2/user/settings/+server";
+import { loadBillingSettings } from "$lib/server/billingSettings";
 
 async function parseResponse<T = unknown>(res: Response): Promise<T> {
 	return superjson.parse(await res.text()) as T;
@@ -88,6 +89,7 @@ describe("GET /api/v2/user/settings", () => {
 		expect(data).toMatchObject({
 			welcomeModalSeen: false,
 			welcomeModalSeenAt: null,
+			mlInternOnboardingSeen: false,
 			streamingMode: "smooth",
 			directPaste: false,
 			shareConversationsWithModelAuthors: true,
@@ -159,6 +161,26 @@ describe("GET /api/v2/user/settings", () => {
 			streamingMode: "smooth",
 		});
 	});
+
+	it("loads the billing target for authenticated routes outside conversation generation", async () => {
+		const { user, locals } = await createTestUser();
+		await collections.settings.insertOne({
+			userId: user._id,
+			shareConversationsWithModelAuthors: true,
+			activeModel: "test-model",
+			streamingMode: "smooth",
+			directPaste: false,
+			hapticsEnabled: true,
+			billingOrganization: "acme",
+			billingResourceGroup: "65f000000000000000000001",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+
+		await loadBillingSettings(locals);
+		expect(locals.billingOrganization).toBe("acme");
+		expect(locals.billingResourceGroup).toBe("65f000000000000000000001");
+	});
 });
 
 describe("POST /api/v2/user/settings", () => {
@@ -224,6 +246,24 @@ describe("POST /api/v2/user/settings", () => {
 		expect(stored?.welcomeModalSeenAt).toBeInstanceOf(Date);
 	});
 
+	it("records the ML Intern onboarding acknowledgement independently of the welcome modal", async () => {
+		const { user, locals } = await createTestUser();
+
+		await testRequest(settingsPOST, {
+			path: "/api/v2/user/settings",
+			locals,
+			...jsonBody({ mlInternOnboardingSeen: true, activeModel: "test-model" }),
+		});
+
+		const stored = await collections.settings.findOne({ userId: user._id });
+		expect(stored?.mlInternOnboardingSeenAt).toBeInstanceOf(Date);
+		expect(stored?.welcomeModalSeenAt).toBeUndefined();
+
+		const res = await testRequest(settingsGET, { path: "/api/v2/user/settings", locals });
+		const data = await parseResponse<Record<string, unknown>>(res);
+		expect(data).toMatchObject({ mlInternOnboardingSeen: true, welcomeModalSeen: false });
+	});
+
 	it("validates body with Zod and applies defaults for missing fields", async () => {
 		const { user, locals } = await createTestUser();
 
@@ -245,6 +285,27 @@ describe("POST /api/v2/user/settings", () => {
 		expect(stored?.streamingMode).toBe("smooth");
 		expect(stored?.directPaste).toBe(false);
 		expect(stored?.customPrompts).toEqual({});
+	});
+
+	it.each([
+		[
+			"a malformed resource-group id",
+			{ billingOrganization: "acme", billingResourceGroup: "not-an-object-id" },
+		],
+		[
+			"a resource group without its organization",
+			{ billingResourceGroup: "65f000000000000000000001" },
+		],
+	])("returns 400 for %s", async (_label, invalidBillingSettings) => {
+		const { locals } = await createTestUser();
+		const res = await testRequest(settingsPOST, {
+			path: "/api/v2/user/settings",
+			locals,
+			...jsonBody(invalidBillingSettings),
+		});
+
+		expect(res.status).toBe(400);
+		expect(await res.text()).toContain("billingResourceGroup");
 	});
 });
 

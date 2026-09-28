@@ -9,9 +9,11 @@ const mcpMock = vi.hoisted(() => ({
 	responses: new Map<string, { tools: unknown[] } | Error>(),
 }));
 
-vi.mock("@modelcontextprotocol/sdk/client", () => ({
+vi.mock("@modelcontextprotocol/client", () => ({
 	Client: class {
 		private url = "";
+		// Session clients register one per declared capability; listing never invokes them.
+		setRequestHandler() {}
 		async connect(transport: { url?: unknown }) {
 			this.url = String(transport.url ?? "");
 		}
@@ -24,18 +26,12 @@ vi.mock("@modelcontextprotocol/sdk/client", () => ({
 		}
 		async close() {}
 	},
-}));
-
-vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
 	StreamableHTTPClientTransport: class {
 		url: unknown;
 		constructor(url: unknown) {
 			this.url = url;
 		}
 	},
-}));
-
-vi.mock("@modelcontextprotocol/sdk/client/sse.js", () => ({
 	SSEClientTransport: class {
 		url: unknown;
 		constructor(url: unknown) {
@@ -213,11 +209,14 @@ describe("getOpenAiToolsForMcp per-server cache", () => {
 		expect(first.tools.map((t) => t.function.name)).toEqual(["search"]);
 		expect(first.tools[0].function.parameters).toMatchObject({ type: "object" });
 		expect(second.tools.map((t) => t.function.name)).toEqual(["search"]);
-		expect(second.mapping.search).toEqual({
+		expect(second.mapping.search).toMatchObject({
 			fnName: "search",
 			server: "Server A",
 			tool: "search",
 		});
+		// The server's own schema survives the cache round trip: the preflight
+		// check reads it from here, and it must be the unsanitized one.
+		expect(second.mapping.search?.inputSchema).toEqual(searchTool.inputSchema);
 	});
 
 	it("fetches only servers missing from the cache when the selection grows", async () => {

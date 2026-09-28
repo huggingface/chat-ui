@@ -54,8 +54,39 @@ describe.sequential("markGenerationInterrupted", () => {
 		await Promise.all([
 			collections.conversations.deleteMany({}),
 			collections.generations.deleteMany({}),
+			collections.mcpElicitations.deleteMany({}),
+			collections.mlAgentRuns.deleteMany({}),
 		]);
 	});
+
+	const prompt = async ({
+		generationId,
+		conversationId,
+		messageId,
+		durable,
+	}: {
+		generationId: string;
+		conversationId: ObjectId;
+		messageId: string;
+		durable: boolean;
+	}) => {
+		const elicitationId = randomUUID();
+		const now = new Date();
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			elicitationId,
+			conversationId,
+			generationId,
+			status: "pending",
+			request: { elicitationId, server: "Test", mode: "form", message: "?", fields: [] },
+			...(durable
+				? { pending: { kind: "ask", messageId, toolCallId: "call-1", toolUuid: "tool-1" } }
+				: { expiresAt: new Date(now.getTime() + 60_000) }),
+			createdAt: now,
+			updatedAt: now,
+		});
+		return elicitationId;
+	};
 
 	it("marks the message when it wins the claim on a running run", async () => {
 		const { conversationId, messageId, generationId } = await seed({ status: "running" });
@@ -90,5 +121,62 @@ describe.sequential("markGenerationInterrupted", () => {
 		const gen = await collections.generations.findOne({ generationId });
 		expect(gen?.status).toBe("error");
 		expect(await messageInterrupted(conversationId, messageId)).toBe(false);
+	});
+
+	it("closes the prompts the dead run was polling, and only those", async () => {
+		const { conversationId, messageId, generationId } = await seed({ status: "running" });
+		const blocking = await prompt({ generationId, conversationId, messageId, durable: false });
+		// Nothing polls a durable prompt: its answer continues the turn whenever it comes, and
+		// closing it here would turn that answer into a refusal.
+		const durable = await prompt({ generationId, conversationId, messageId, durable: true });
+
+		await markGenerationInterrupted(generationId, { conversationId, messageId });
+
+		expect(await collections.mcpElicitations.findOne({ elicitationId: blocking })).toMatchObject({
+			status: "resolved",
+			action: "cancel",
+			resolution: "aborted",
+		});
+		expect(await collections.mcpElicitations.findOne({ elicitationId: durable })).toMatchObject({
+			status: "pending",
+		});
+	});
+
+	it("interrupts the sub-agent runs the dead run left running, and only those", async () => {
+		const { conversationId, messageId, generationId } = await seed({ status: "running" });
+		const run = (
+			task: string,
+			over: { status?: "running" | "completed"; generationId?: string; conversationId?: ObjectId }
+		) => ({
+			_id: new ObjectId(),
+			conversationId: over.conversationId ?? conversationId,
+			label: "research",
+			displayName: "Research",
+			task,
+			parent: { tool: "research", toolUuid: task, generationId: over.generationId ?? generationId },
+			status: over.status ?? ("running" as const),
+			startedAt: new Date(),
+			iterations: 1,
+			calls: [],
+			callCount: 0,
+			sourceCount: 0,
+		});
+		await collections.mlAgentRuns.insertMany([
+			run("live", {}),
+			run("done", { status: "completed" }),
+			run("other-turn", { generationId: randomUUID() }),
+			run("other-chat", { conversationId: new ObjectId() }),
+		]);
+
+		await markGenerationInterrupted(generationId, { conversationId, messageId });
+
+		const byTask = Object.fromEntries(
+			(await collections.mlAgentRuns.find({}).toArray()).map((r) => [r.task, r])
+		);
+		expect(byTask.live.status).toBe("interrupted");
+		expect(byTask.live.endedAt).toBeInstanceOf(Date);
+		expect(byTask.done.status).toBe("completed");
+		expect(byTask["other-turn"].status).toBe("running");
+		expect(byTask["other-chat"].status).toBe("running");
 	});
 });

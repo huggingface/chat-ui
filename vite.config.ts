@@ -6,6 +6,7 @@ import { defineConfig } from "vitest/config";
 import { config } from "dotenv";
 
 config({ path: "./.env.local" });
+config({ path: "./.env" });
 
 // used to load fonts server side for thumbnail generation
 function loadTTFAsArrayBuffer() {
@@ -21,6 +22,12 @@ function loadTTFAsArrayBuffer() {
 	};
 }
 export default defineConfig({
+	define: {
+		// Build flag for ML Assistant mode, fixed at build time rather than read from
+		// runtime config so a build either ships the feature or cannot turn it on.
+		// Read it via `ML_ASSISTANT_MODE` in $lib/utils/mlAssistantFlag.
+		__ML_ASSISTANT_MODE__: JSON.stringify(process.env.ML_ASSISTANT_MODE === "true"),
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit(),

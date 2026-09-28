@@ -212,6 +212,15 @@ function buildPreviewHookScript(channel: string): string {
       intercept(ev);
     }
   }, true);
+  // A click must hand the preview keyboard focus even when the artifact
+  // cancels pointerdown (canvas games do, to stop scrolling and text
+  // selection): cancelling it also cancels the browser's focus move, so
+  // arrow keys would keep going to the chat page. Capture phase runs
+  // before any artifact handler, and a real click is the only trigger, so
+  // auto-opened previews never steal the cursor from the composer.
+  window.addEventListener('pointerdown', function(){
+    if (!document.hasFocus()) window.focus();
+  }, true);
   window.addEventListener('error', function(ev){
     var msg = ev && ev.message ? ev.message : 'Script error';
     var stack = ev && ev.error && ev.error.stack ? ev.error.stack : undefined;

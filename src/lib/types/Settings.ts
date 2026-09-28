@@ -12,6 +12,8 @@ export interface Settings extends Timestamps {
 	shareConversationsWithModelAuthors: boolean;
 	/** One-time welcome modal acknowledgement */
 	welcomeModalSeenAt?: Date | null;
+	/** One-time ML Intern onboarding modal acknowledgement */
+	mlInternOnboardingSeenAt?: Date | null;
 	activeModel: string;
 
 	// model name and system prompts
@@ -83,13 +85,21 @@ export interface Settings extends Timestamps {
 	hapticsEnabled: boolean;
 
 	/**
-	 * Organization to bill inference requests to (HuggingChat only).
-	 * Stores the org's preferred_username. If empty/undefined, bills to personal account.
+	 * Organization to bill inference requests, and the Jobs and sandboxes ML Intern
+	 * launches, to (HuggingChat only). Nothing else on the Hub follows it: Spaces,
+	 * repositories and Endpoints bill their own owner. Stores the org's
+	 * preferred_username. If empty/undefined, bills to personal account.
 	 */
 	billingOrganization?: string;
+
+	/** Enterprise resource-group id within billingOrganization. */
+	billingResourceGroup?: string;
 }
 
-export type SettingsEditable = Omit<Settings, "welcomeModalSeenAt" | "createdAt" | "updatedAt">;
+export type SettingsEditable = Omit<
+	Settings,
+	"welcomeModalSeenAt" | "mlInternOnboardingSeenAt" | "createdAt" | "updatedAt"
+>;
 // TODO: move this to a constant file along with other constants
 export const DEFAULT_SETTINGS = {
 	shareConversationsWithModelAuthors: true,

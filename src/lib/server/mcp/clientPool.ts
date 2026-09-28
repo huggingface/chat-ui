@@ -1,15 +1,26 @@
-import type { Client } from "@modelcontextprotocol/sdk/client";
-import { createMcpClient } from "./client";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StreamableHTTPClientTransport, SSEClientTransport } from "@modelcontextprotocol/client";
+import type { Client } from "@modelcontextprotocol/client";
+import { createMcpClient, type McpClientKind } from "./client";
 import type { McpServerConfig } from "./httpClient";
 import { mcpFetchForServer } from "./fetch";
 
-type PoolEntry = { client: Client; lastUsedAt: number; activeCalls: number };
+type PoolEntry = {
+	client: Client;
+	lastUsedAt: number;
+	activeCalls: number;
+	/** Evicted from the pool; closed once its last in-flight call finishes. */
+	retired?: boolean;
+};
 
 const pool = new Map<string, PoolEntry>();
 // In-flight connects, keyed like the pool, so concurrent cold-misses share one connect.
 const inflight = new Map<string, Promise<Client>>();
+
+/**
+ * Entries by client, so retain/release still find one after it leaves the pool, and
+ * evicted clients with calls still running can be closed by the last one to finish.
+ */
+const entries = new Map<Client, PoolEntry>();
 
 // Reuse a recently-used client as-is; ping it first if it has been idle longer than this,
 // since proxies / load balancers silently reap idle connections.
@@ -40,6 +51,7 @@ function ensureSweeper() {
 		for (const [key, entry] of pool) {
 			if (entry.activeCalls === 0 && now - entry.lastUsedAt > IDLE_TTL_MS) {
 				pool.delete(key);
+				entries.delete(entry.client);
 				void disposeClient(entry.client);
 			}
 		}
@@ -47,16 +59,24 @@ function ensureSweeper() {
 	sweeper.unref?.();
 }
 
-function keyOf(server: McpServerConfig) {
+function keyOf(server: McpServerConfig, isolation?: string, kind: McpClientKind = "session") {
 	const headers = Object.entries(server.headers ?? {})
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([k, v]) => `${k}:${v}`)
 		.join("|\u0000|");
-	return `${server.url}|${server.oauthConnectionId ?? ""}|${headers}`;
+	// The kind is part of the key, not decoration: it is sent once at initialize,
+	// so a connection opened as one identity would otherwise be handed to a
+	// caller that means to be the other, and the server would see the wrong name.
+	return `${server.url}|${server.oauthConnectionId ?? ""}|${headers}|${isolation ?? ""}|${kind}`;
 }
 
-export async function getClient(server: McpServerConfig, signal?: AbortSignal): Promise<Client> {
-	const key = keyOf(server);
+export async function getClient(
+	server: McpServerConfig,
+	signal?: AbortSignal,
+	isolation?: string,
+	kind: McpClientKind = "session"
+): Promise<Client> {
+	const key = keyOf(server, isolation, kind);
 	const existing = pool.get(key);
 	if (existing) {
 		if (Date.now() - existing.lastUsedAt <= PING_AFTER_IDLE_MS) {
@@ -69,15 +89,15 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 			return existing.client;
 		} catch (err) {
 			if (signal?.aborted) throw err;
-			// Don't close a client mid-flight for another caller (e.g. a long tool call that hasn't
-			// refreshed lastUsedAt); hand it back and let a later idle ping reap it.
-			if (existing.activeCalls > 0) {
-				existing.lastUsedAt = Date.now();
-				return existing.client;
-			}
 			// Stale connection; evict it (unless a concurrent caller already replaced it) and reconnect.
 			if (pool.get(key) === existing) pool.delete(key);
-			existing.client.close?.().catch(() => {});
+			// Another caller may be mid-call on it; the last release closes it instead.
+			if (existing.activeCalls > 0) {
+				existing.retired = true;
+			} else {
+				entries.delete(existing.client);
+				existing.client.close?.().catch(() => {});
+			}
 		}
 	}
 
@@ -86,7 +106,7 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 	const pending = inflight.get(key);
 	if (pending) return pending;
 
-	const connectPromise = connectAndPool(server, key);
+	const connectPromise = connectAndPool(server, key, kind);
 	inflight.set(key, connectPromise);
 	try {
 		return await connectPromise;
@@ -95,9 +115,13 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 	}
 }
 
-async function connectAndPool(server: McpServerConfig, key: string): Promise<Client> {
+async function connectAndPool(
+	server: McpServerConfig,
+	key: string,
+	kind: McpClientKind
+): Promise<Client> {
 	let firstError: unknown;
-	const client = createMcpClient();
+	const client = createMcpClient(kind);
 	const url = new URL(server.url);
 	// Pooled clients outlive the request that created them, so never bind the per-request
 	// abort signal to the transport. Per-call cancellation goes through RequestOptions instead.
@@ -127,43 +151,75 @@ async function connectAndPool(server: McpServerConfig, key: string): Promise<Cli
 		throw err;
 	}
 
-	pool.set(key, { client, lastUsedAt: Date.now(), activeCalls: 0 });
+	const entry: PoolEntry = { client, lastUsedAt: Date.now(), activeCalls: 0 };
+	pool.set(key, entry);
+	entries.set(client, entry);
 	ensureSweeper();
 	return client;
 }
 
 /** Mark a pooled client as having an in-flight call so the sweeper won't close it. */
 export function retainClient(client: Client) {
-	for (const entry of pool.values()) {
-		if (entry.client === client) {
-			entry.activeCalls++;
-			return;
-		}
-	}
+	const entry = entries.get(client);
+	if (entry) entry.activeCalls++;
 }
 
 export function releaseClient(client: Client) {
-	for (const entry of pool.values()) {
-		if (entry.client === client) {
-			entry.activeCalls = Math.max(0, entry.activeCalls - 1);
-			entry.lastUsedAt = Date.now();
-			return;
-		}
+	const entry = entries.get(client);
+	if (!entry) return;
+	entry.activeCalls = Math.max(0, entry.activeCalls - 1);
+	entry.lastUsedAt = Date.now();
+	// A client is only evicted because it looked broken to one caller. Closing it while
+	// another conversation is still mid-call would cancel that call too, so the last one
+	// out closes the door.
+	if (entry.retired && entry.activeCalls === 0) {
+		entries.delete(client);
+		void disposeClient(client);
 	}
 }
 
 export async function drainPool() {
 	for (const [key, entry] of pool) {
 		await disposeClient(entry.client);
+		entries.delete(entry.client);
 		pool.delete(key);
 	}
 }
 
-export function evictFromPool(server: McpServerConfig): Client | undefined {
-	const key = keyOf(server);
+/**
+ * Take a client out of circulation. Returns it only when nothing else is using it, so the
+ * caller cannot close a connection another conversation is still talking over.
+ */
+export function evictFromPool(server: McpServerConfig, isolation?: string): Client | undefined {
+	const key = keyOf(server, isolation);
 	const entry = pool.get(key);
-	if (entry) {
-		pool.delete(key);
+	if (!entry) return undefined;
+	pool.delete(key);
+	if (entry.activeCalls > 0) {
+		entry.retired = true;
+		return undefined;
 	}
-	return entry?.client;
+	entries.delete(entry.client);
+	return entry.client;
+}
+
+/**
+ * A connection an unsolicited `elicitation/create` can be attributed on. A legacy server
+ * pushes one down the connection with nothing tying it to a call, so it can only be routed
+ * when every call on that connection belongs to the same conversation; sharing one instead
+ * means a prompt raised for one chat gets declined because another chat is also mid-call.
+ * A modern server answers the call itself, so it keeps the shared connection.
+ */
+export async function getAttributableClient(
+	server: McpServerConfig,
+	conversationId: string,
+	signal?: AbortSignal,
+	kind: McpClientKind = "session"
+): Promise<{ client: Client; isolation?: string }> {
+	const isolation = `conversation:${conversationId}`;
+	if (!pool.has(keyOf(server, isolation, kind))) {
+		const shared = await getClient(server, signal, undefined, kind);
+		if (shared.getProtocolEra() === "modern") return { client: shared };
+	}
+	return { client: await getClient(server, signal, isolation, kind), isolation };
 }

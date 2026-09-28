@@ -21,8 +21,14 @@ export interface TextGenerationContext {
 	provider?: string;
 	/** Optional thinking-effort override forwarded as `reasoning_effort` to OpenAI-compatible endpoints */
 	reasoningEffort?: "low" | "medium" | "high";
+	/** Per-model user override for reasoning; wins over the model's supportsReasoning flag in both directions */
+	reasoningOverride?: boolean;
 	/** Per-model user override for artifacts; wins over the model's supportsArtifacts flag in both directions */
 	artifactsOverride?: boolean;
 	locals: App.Locals | undefined;
 	abortController: AbortController;
+	/** Also identifies the audience for an MCP elicitation raised mid tool call. */
+	generationId?: string;
+	/** The assistant message this run writes into; a durable prompt resumes against it. */
+	messageId?: string;
 }

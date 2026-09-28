@@ -2,9 +2,11 @@
  * Live generations feed (P4): GET /api/v2/generations/live.
  *
  * Reports the caller's own running generations so the sidebar can show which
- * conversations are generating and toast when a background one finishes. It is scoped
- * to the caller — another user's runs never appear — and releases the connection with
- * an `idle` event once nothing is running.
+ * conversations are generating and toast when a background one finishes — plus
+ * parked turns (waiting / awaiting_input) and recent failures from the turn-state
+ * docs. It is scoped to the caller — another user's runs never appear — and
+ * releases the connection with an `idle` event once nothing is running and no
+ * turn is parked (terminal failures don't hold it open).
  */
 import { test, expect, E2E_APP_URL, SESSION_COOKIE_NAME } from "./fixtures.ts";
 import { ObjectId, type Db } from "mongodb";
@@ -33,6 +35,7 @@ function parseFrame(raw: string): SseFrame {
 interface SyncPayload {
 	running: Array<{ conversationId: string; title: string }>;
 	ended: Array<{ conversationId: string; status: string; title: string }>;
+	parked: Array<{ conversationId: string; status: string; expiresAt?: number }>;
 }
 
 const syncFrames = (frames: SseFrame[]): SyncPayload[] =>
@@ -233,6 +236,156 @@ test("does not report another session's running generation", async ({ db, sessio
 	const running = syncFrames(frames).flatMap((s) => s.running);
 	expect(
 		running.some((r) => r.conversationId === convId),
+		"must not leak across sessions"
+	).toBe(false);
+});
+
+/** Seed a conversation + a turn-state doc owned by the given session. */
+async function seedTurnState(
+	db: Db,
+	sessionId: string,
+	opts: {
+		status: "waiting" | "awaiting_input" | "failed" | "done";
+		title: string;
+		convId?: ObjectId;
+		updatedAt?: Date;
+		endedAt?: Date;
+	}
+): Promise<{ convId: ObjectId }> {
+	const now = new Date();
+	const conversationId = opts.convId ?? new ObjectId();
+	if (!opts.convId) {
+		await db.collection("conversations").insertOne({
+			_id: conversationId,
+			sessionId,
+			model: "test-org/test-model",
+			title: opts.title,
+			messages: [],
+			createdAt: now,
+			updatedAt: now,
+		} as never);
+	}
+	await db.collection("turnStates").insertOne({
+		_id: new ObjectId(),
+		conversationId,
+		messageId: randomUUID(),
+		sessionId,
+		status: opts.status,
+		producerId: randomUUID(),
+		createdAt: now,
+		updatedAt: opts.updatedAt ?? now,
+		...(opts.endedAt ? { endedAt: opts.endedAt } : {}),
+	} as never);
+	return { convId: conversationId };
+}
+
+test("reports parked turns and holds the feed open for them", async ({ db, session }) => {
+	test.setTimeout(20_000);
+	const waiting = await seedTurnState(db, session.sessionId, {
+		status: "waiting",
+		title: "parked on a timer",
+	});
+	const asking = await seedTurnState(db, session.sessionId, {
+		status: "awaiting_input",
+		title: "parked on a question",
+	});
+
+	// Long enough for the no-parked idle close (~2 ticks); idle must never come.
+	const { frames } = await collectLive({
+		secret: session.secret,
+		until: (f) => f.event === "idle",
+		timeoutMs: 8_000,
+	});
+
+	expect(
+		frames.some((f) => f.event === "idle"),
+		"a parked turn must hold the feed open"
+	).toBe(false);
+	const parked = syncFrames(frames).flatMap((s) => s.parked);
+	expect(parked.find((p) => p.conversationId === waiting.convId.toString())?.status).toBe(
+		"waiting"
+	);
+	expect(parked.find((p) => p.conversationId === asking.convId.toString())?.status).toBe(
+		"awaiting_input"
+	);
+});
+
+test("reports a recent failure but still lets the feed go idle", async ({ db, session }) => {
+	test.setTimeout(20_000);
+	const failedAt = new Date();
+	const { convId } = await seedTurnState(db, session.sessionId, {
+		status: "failed",
+		title: "died in the background",
+		endedAt: failedAt,
+	});
+
+	const { frames } = await collectLive({
+		secret: session.secret,
+		until: (f) => f.event === "idle",
+		timeoutMs: 15_000,
+	});
+
+	expect(
+		frames.some((f) => f.event === "idle"),
+		"a terminal failure must not hold the feed open"
+	).toBe(true);
+	const row = syncFrames(frames)
+		.flatMap((s) => s.parked)
+		.find((p) => p.conversationId === convId.toString());
+	expect(row?.status, "the failure should be reported before the close").toBe("failed");
+	// The display window the client prunes against: endedAt + 24h.
+	expect(row?.expiresAt).toBe(failedAt.getTime() + 24 * 60 * 60 * 1000);
+});
+
+test("a conversation's newer turn shadows its older failed one", async ({ db, session }) => {
+	test.setTimeout(20_000);
+	const failed = await seedTurnState(db, session.sessionId, {
+		status: "failed",
+		title: "retried and recovered",
+		updatedAt: new Date(Date.now() - 60_000),
+		endedAt: new Date(Date.now() - 60_000),
+	});
+	// The retry's turn: a separate doc on the same conversation, ending well.
+	await seedTurnState(db, session.sessionId, {
+		status: "done",
+		title: "retried and recovered",
+		convId: failed.convId,
+		endedAt: new Date(),
+	});
+
+	const { frames } = await collectLive({
+		secret: session.secret,
+		until: (f) => f.event === "idle",
+		timeoutMs: 15_000,
+	});
+
+	const parked = syncFrames(frames).flatMap((s) => s.parked);
+	expect(
+		parked.some((p) => p.conversationId === failed.convId.toString()),
+		"only the latest turn's state may speak for the conversation"
+	).toBe(false);
+});
+
+test("does not report another session's parked turn", async ({ db, session }) => {
+	test.setTimeout(20_000);
+	const { convId } = await seedTurnState(db, "someone-elses-session", {
+		status: "awaiting_input",
+		title: "someone else's question",
+	});
+
+	const { frames } = await collectLive({
+		secret: session.secret,
+		until: (f) => f.event === "idle",
+		timeoutMs: 15_000,
+	});
+
+	expect(
+		frames.some((f) => f.event === "idle"),
+		"another caller's parked turn must not hold this feed open"
+	).toBe(true);
+	const parked = syncFrames(frames).flatMap((s) => s.parked);
+	expect(
+		parked.some((p) => p.conversationId === convId.toString()),
 		"must not leak across sessions"
 	).toBe(false);
 });

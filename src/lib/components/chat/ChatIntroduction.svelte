@@ -8,9 +8,10 @@
 	interface Props {
 		currentModel: Model;
 		onmessage?: (content: string) => void;
+		children?: import("svelte").Snippet;
 	}
 
-	let { currentModel: _currentModel, onmessage }: Props = $props();
+	let { currentModel: _currentModel, onmessage, children }: Props = $props();
 
 	$effect(() => {
 		// referenced to appease linter while UI blocks are commented out
@@ -19,13 +20,16 @@
 	});
 </script>
 
-<div class="my-auto grid items-center justify-center gap-8 text-center">
+<div
+	class="my-auto grid -translate-y-16 items-center justify-center gap-8 text-center md:-translate-y-12"
+>
 	<div
-		class="flex -translate-y-16 items-center rounded-xl text-[1.6rem] font-semibold select-none md:-translate-y-12 md:text-[2.55rem]"
+		class="flex items-center justify-center rounded-xl text-[1.6rem] font-semibold select-none md:text-[2.55rem]"
 	>
 		<Logo classNames="size-[2.55rem] md:size-[4.25rem] dark:invert mr-0.5" />
 		{publicConfig.PUBLIC_APP_NAME}
 	</div>
+	{@render children?.()}
 	<!-- <div class="lg:col-span-1">
 		<div>
 			<div class="mb-3 flex items-center text-2xl font-semibold">

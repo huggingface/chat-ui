@@ -3,9 +3,14 @@
 	import { onDestroy, untrack } from "svelte";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
+	import TrackioPane from "./TrackioPane.svelte";
+	import MlRegistryPane from "./MlRegistryPane.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
-	import { artifactPanel } from "$lib/stores/artifactPanel.svelte";
+	import { collectTrackioDashboards } from "$lib/utils/trackio";
+	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
+	import { collectPaneItems } from "$lib/utils/paneItems";
+	import { sidePane } from "$lib/stores/sidePane.svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import IconCheap from "$lib/components/icons/IconCheap.svelte";
@@ -17,11 +22,20 @@
 	import IconMic from "~icons/lucide/mic";
 
 	import ChatInput from "./ChatInput.svelte";
+	import AskQuestion from "./AskQuestion.svelte";
+	import { firstQuestionFor } from "$lib/stores/pendingQuestion";
+	import { shouldShowPendingPlaceholder } from "$lib/utils/pendingPlaceholder";
 	import VoiceRecorder from "./VoiceRecorder.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
+	import ResumeBtn from "../ResumeBtn.svelte";
+	import {
+		buildResumeMessage,
+		canResumeAfterFailure,
+		failureDetailOf,
+	} from "$lib/utils/resumeAfterFailure";
 	import file2base64 from "$lib/utils/file2base64";
 	import { base } from "$app/paths";
 	import ChatMessage from "./ChatMessage.svelte";
@@ -30,7 +44,7 @@
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
 	import { browser } from "$app/environment";
 	import { createChatScroll } from "$lib/utils/scroll/chatScroll.svelte";
-	import { MIN_SPACER_FALLBACK_PX } from "$lib/utils/scroll/spacer";
+	import { isAssistantGenerationTerminal } from "$lib/utils/generationState";
 	import { NAV_EDGE_SWIPE_ZONE_PX } from "$lib/constants/gestures";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ShareConversationModal from "../ShareConversationModal.svelte";
@@ -52,6 +66,24 @@
 	import { mimeMatchesAllowlist } from "$lib/utils/mimeMatch";
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideSparkles from "~icons/lucide/sparkles";
+	import MlAssistantStrip from "./MlAssistantStrip.svelte";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
+	import MlInternSpotlight from "./MlInternSpotlight.svelte";
+	import { useConversationsStore } from "$lib/stores/conversations.svelte";
+	import { MediaQuery } from "svelte/reactivity";
+	import { planStepsToMlSteps } from "$lib/utils/planProgress";
+	import type { PlanState } from "$lib/types/Plan";
+	import type { MlBudget } from "$lib/types/Conversation";
+	import type { MlBudgetSnapshot } from "$lib/types/MlAssistant";
+	import { reservedMicroUsd, usdToMicroUsd } from "$lib/utils/mlBudget";
+	import { handleResponse, useAPIClient } from "$lib/APIClient";
+	import {
+		ML_ASSISTANT_EFFORT,
+		ML_ASSISTANT_PLACEHOLDER,
+		mlAssistantExamples,
+	} from "$lib/constants/mlAssistant";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -60,6 +92,10 @@
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { tap, error as hapticError } from "$lib/utils/haptics";
 	import { page } from "$app/state";
+
+	// Only this conversation's question; the store outlives a navigation by a tick.
+	let questionStore = $derived(firstQuestionFor(page.params.id));
+	let askQuestion = $derived($questionStore);
 	import {
 		isMessageToolCallUpdate,
 		isMessageToolErrorUpdate,
@@ -72,6 +108,7 @@
 		messagesAlternatives?: Message["id"][][];
 		loading?: boolean;
 		pending?: boolean;
+		resuming?: boolean;
 		shared?: boolean;
 		currentModel: Model;
 		models: Model[];
@@ -89,6 +126,7 @@
 		messagesAlternatives = [],
 		loading = false,
 		pending = false,
+		resuming = false,
 		shared = false,
 		currentModel,
 		models,
@@ -127,7 +165,7 @@
 		get registry() {
 			return artifactRegistry;
 		},
-		panel: artifactPanel,
+		panel: sidePane,
 		// Deep consumers (e.g. the code-block preview modal) can't render a
 		// meaningful disabled state, so streaming also gates availability here;
 		// the panel gets the handler as a prop and disables on `loading` itself.
@@ -141,8 +179,18 @@
 	$effect(() => {
 		const streaming = artifactRegistry.streaming;
 		if (!streaming || !loading) return;
-		artifactPanel.maybeAutoOpen(streaming.identifier, streaming.version);
+		sidePane.maybeAutoOpen(streaming.identifier, streaming.version);
 	});
+
+	// Trackio dashboards a training run printed into its job logs, read back out
+	// of the tool results on the messages. Derived like the artifact registry, so
+	// reopening the conversation finds the same dashboards.
+	let trackioDashboards = $derived(collectTrackioDashboards(messages));
+
+	// One ordered list of everything the pane can show, so its next/previous walks
+	// artifacts and dashboards together instead of each view navigating only its
+	// own kind.
+	let paneItems = $derived(collectPaneItems(messages, artifactRegistry, trackioDashboards));
 
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
@@ -159,7 +207,10 @@
 	const handleSubmit = () => {
 		if (requireAuthUser() || loading || !draft) return;
 		tap();
-		chatScroll.armSend();
+		chatScroll.notifySend();
+		// Latches the mode onto the conversation, so the strip stays and swaps its
+		// tool note for the plan progress row. No-op when the mode is off.
+		mlAssistant.startTask();
 		onmessage?.(draft);
 		draft = "";
 	};
@@ -214,8 +265,7 @@
 
 	let lastMessage = $derived(browser && (messages.at(-1) as Message));
 	let showPendingPlaceholder = $derived(
-		pending &&
-			!(lastMessage && lastMessage.from === "assistant" && (lastMessage.content ?? "").length === 0)
+		shouldShowPendingPlaceholder({ pending, resuming, lastMessage: lastMessage || undefined })
 	);
 	let streamingAssistantMessage = $derived(
 		(() => {
@@ -249,7 +299,7 @@
 	function sendFixRequest(text: string): boolean {
 		if (requireAuthUser() || loading) return false;
 		tap();
-		chatScroll.armSend();
+		chatScroll.notifySend();
 		// Queued attachments belong to the user's next message, not to this
 		// machine-composed one. The send handler snapshots the bound `files`
 		// synchronously before its first await, so emptying around the call is
@@ -336,15 +386,52 @@
 	let pendingEl: HTMLElement | undefined = $state();
 	let composerHeight = $state<number | undefined>(undefined);
 
-	// Structural sync: conversation identity + message-list shape. Reads only
-	// ids/from (content is read untracked), so token flushes never re-run it;
-	// the meaning of each change comes from explicit intents armed at the
-	// send/retry/branch call sites.
+	// Turn grouping: a user message starts a turn, following assistant messages
+	// join it (plus a headless leading turn for edge shapes). Each turn renders
+	// as one group so the anchored turn's reservation is a single CSS
+	// min-height. Reads only
+	// ids/from, so token flushes never regroup.
+	let turns = $derived.by(() => {
+		const groups: { key: string; messages: Message[] }[] = [];
+		for (const message of messages) {
+			const last = groups.at(-1);
+			if (message.from === "user" || !last) {
+				groups.push({ key: message.id, messages: [message] });
+			} else {
+				last.messages.push(message);
+			}
+		}
+		return groups;
+	});
+
+	// Structural sync: conversation identity, the trailing turn, and which turn
+	// (if any) a reply is currently streaming into — the whole condition for a
+	// turn to anchor. Reads ids/from/loading only (terminal-ness untracked), so
+	// token flushes never re-run it. The terminal check keeps the pre-mount gap
+	// after a submit — when the trailing message is still the previous, settled
+	// reply — from anchoring that turn.
 	$effect(() => {
+		const lastMessage = messages.at(-1);
+		const lastTurnKey = turns.at(-1)?.key ?? null;
+		const streaming =
+			loading &&
+			lastMessage?.from === "assistant" &&
+			untrack(() => !isAssistantGenerationTerminal(lastMessage));
 		chatScroll.sync({
 			conversationKey: page.params?.id,
-			messages: messages.map((m) => ({ id: m.id, from: m.from })),
-			lastMessageEmpty: untrack(() => (messages.at(-1)?.content ?? "") === ""),
+			turnCount: turns.length,
+			lastTurnKey,
+			streamingTurnKey: streaming ? lastTurnKey : null,
+			// Untracked like the terminal check: read once at the streaming flip,
+			// never per token. A park resuming (wait elapsed, question answered)
+			// re-enters streaming on a message that already carries work — a
+			// continuation, not a new reply, so the carry-to-anchor must not
+			// re-run. A fresh reply's message is still empty at the flip.
+			resumedStream: Boolean(
+				streaming &&
+				lastMessage &&
+				untrack(() => lastMessage.content.length > 0 || (lastMessage.updates?.length ?? 0) > 0)
+			),
 		});
 	});
 
@@ -356,7 +443,7 @@
 		const key = page.params?.id;
 		if (key !== prevConversationKey) {
 			prevConversationKey = key;
-			artifactPanel.reset();
+			sidePane.reset();
 		}
 	});
 
@@ -373,11 +460,33 @@
 		chatScroll.setComposerHeight(composerHeight);
 	});
 
-	// Follow behavior tracks generation state: glide while a reply streams,
-	// snap while idle — a conversation switch must land at the bottom with no
-	// animated scrolling while its async content (markdown, images) settles.
+	// Open the newest dashboard the first time it shows up: the point of the run
+	// is watching it train. Once per URL, so the user can close it and read the
+	// chat while the run continues.
+	//
+	// Declared after the conversation-switch effect for the same reason the shared
+	// artifact open below is: a conversation -> conversation navigation can deliver
+	// the new messages and the new route param in one flush, and effects run in
+	// declaration order. Above the reset, this would open the destination's
+	// dashboard and record its key, then reset() would close the pane and clear
+	// that key -- and nothing would re-run this, so the dashboard would never open.
+	//
+	// Gated like the other two auto-opens rather than firing on presence. `loading`
+	// is what makes this "a run is happening now": without it, every hard load of
+	// any conversation that ever trained something re-opens the pane, because
+	// reset() clears the once-per-URL keys on each switch — framing a Space that
+	// went to sleep months ago. Desktop-only for the reason the shared-artifact
+	// open below is: on mobile the pane is a fullscreen overlay, and a shared
+	// conversation carries its tool results verbatim, so every viewer on a phone
+	// would arrive with the chat covered.
 	$effect(() => {
-		chatScroll.setStreaming(loading);
+		const latest = trackioDashboards.at(-1);
+		if (!latest || !loading) return;
+		// A dashboard named before it exists (create_trackio) is not framable until
+		// the run reaches trackio.init; opening it early frames a 404.
+		if (latest.spaceId && trackioStatus.status(latest.url) !== "live") return;
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
+		sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
 	});
 
 	// Shared conversations containing artifacts usually exist to show one off:
@@ -392,7 +501,7 @@
 		if (!latest) return;
 		autoOpenedSharedArtifact = true;
 		if (!window.matchMedia("(min-width: 768px)").matches) return;
-		artifactPanel.openArtifact(latest.identifier, null);
+		sidePane.openArtifact(latest.identifier, null);
 	});
 
 	const settings = useSettingsStore();
@@ -430,10 +539,164 @@
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
 
+	// --- ML Assistant mode (build flag, see $lib/utils/mlAssistantFlag) --------
+
+	let mlModeOn = $derived(ML_ASSISTANT_MODE && mlAssistant.enabled);
+	let mlTaskRunning = $derived(ML_ASSISTANT_MODE && mlAssistant.taskStarted);
+	// Resume beats Retry for a failed agentic turn: retry re-runs the whole turn
+	// (duplicating jobs and repos already created), resume continues past the
+	// preserved transcript. ML mode only — elsewhere turns rarely carry work
+	// worth saving — and only when the turn did something (see the util).
+	let canResumeTurn = $derived(
+		mlModeOn && !loading && lastIsError && !!lastMessage && canResumeAfterFailure(lastMessage)
+	);
+	function sendResumeMessage() {
+		if (!lastMessage) return;
+		sendFixRequest(buildResumeMessage(failureDetailOf(lastMessage)));
+	}
+	// The strip is a task status bar only: it slides in on the send that starts an
+	// ML task and stays for the rest of the conversation. Before that the mode
+	// lives in the composer pill, and a chat started without the mode never shows
+	// either surface.
+	let mlStripVisible = $derived(ML_ASSISTANT_MODE && mlTaskRunning);
+
+	// The pill is the mode's pre-task switch. Empty conversations only — the mode
+	// cannot be joined once a chat has started without it.
+	// With no set configured the send would fail; no switch is better than a
+	// dead end.
+	let mlModelSet = $derived(
+		ML_ASSISTANT_MODE
+			? ((page.data as { mlAssistantModels?: string[] }).mlAssistantModels ?? [])
+			: []
+	);
+	let mlPillVisible = $derived(
+		ML_ASSISTANT_MODE &&
+			!shared &&
+			!isReadOnly &&
+			!mlTaskRunning &&
+			messages.length === 0 &&
+			mlModelSet.length > 0
+	);
+
+	// ML Intern launch card under the home-screen logo (HuggingChat only). Temporary,
+	// so its dismissal lives in localStorage rather than in a settings field. Off on
+	// short viewports, and while the recorder replaces the composer: the pill (and
+	// with it the first-run onboarding its CTA relies on) is unmounted then.
+	const convsStore = useConversationsStore();
+	const shortViewport = new MediaQuery("(max-height: 560px)");
+	const ML_SPOTLIGHT_KEY = "mlInternSpotlightDismissed";
+	// Hidden until the browser has been asked, so SSR and hydration agree.
+	let mlSpotlightDismissed = $state(true);
+	$effect(() => {
+		mlSpotlightDismissed = localStorage.getItem(ML_SPOTLIGHT_KEY) === "1";
+	});
+	let mlSpotlightVisible = $derived(
+		publicConfig.isHuggingChat &&
+			mlPillVisible &&
+			page.route.id === "/" &&
+			!mlAssistant.enabled &&
+			!mlSpotlightDismissed &&
+			!shortViewport.current &&
+			!isRecording &&
+			!isTranscribing &&
+			!convsStore.list.some((conv) => conv.mlAssistant)
+	);
+
+	function dismissMlSpotlight() {
+		mlSpotlightDismissed = true;
+		localStorage.setItem(ML_SPOTLIGHT_KEY, "1");
+	}
+
+	/** The card's CTA: switches the mode on, as the pill would, and retires the card. */
+	function tryMlIntern() {
+		if (requireAuthUser()) return;
+		mlAssistant.toggle(true);
+		dismissMlSpotlight();
+	}
+	// A mode conversation whose model left the set can only move within the set.
+	let switchableModels = $derived(
+		mlTaskRunning ? models.filter((m) => mlModelSet.includes(m.id)) : models
+	);
+
+	$effect(() => {
+		if (!ML_ASSISTANT_MODE) return;
+		const conversationId = page.params?.id;
+		const {
+			mlAssistant: startedInMlMode,
+			plan,
+			mlBudget,
+		} = page.data as {
+			mlAssistant?: boolean;
+			plan?: PlanState;
+			mlBudget?: MlBudget;
+		};
+		untrack(() => {
+			const reset = mlAssistant.syncConversation(conversationId, Boolean(startedInMlMode));
+			// A reopened mode conversation renders mid-plan from the stored snapshot;
+			// a reset without one keeps the strip on its tool note.
+			if (reset && startedInMlMode && plan?.steps.length) {
+				mlAssistant.setPlan(planStepsToMlSteps(plan.steps));
+			}
+			// Loaded state seeds the ledger; the stream's Budget updates take over
+			// from there. The empty-ledger condition covers adoption — the create
+			// flow lands here with reset=false — while still refusing to let a
+			// stale invalidation roll back what the stream already reported. A mode
+			// conversation without a stored budget renders as $0.00: the gate treats
+			// it that way, and the readout must say what the gate will do.
+			if (startedInMlMode && (reset || mlAssistant.budget === undefined)) {
+				mlAssistant.setBudget({
+					totalMicroUsd: mlBudget?.totalMicroUsd ?? 0,
+					spentMicroUsd: mlBudget?.spentMicroUsd ?? 0,
+					reservedMicroUsd: mlBudget ? reservedMicroUsd(mlBudget) : 0,
+				});
+			}
+		});
+	});
+
+	// read from the registry, not derived from the messages, a stage changes between turns
+	// loading is the live signal, so a turn ending reruns this and the store refetches once
+	$effect(() => {
+		const conversationId = page.params?.id;
+		if (!mlTaskRunning || shared || !conversationId) {
+			// nothing to watch here, a remount on another route must not keep the last rows
+			mlRegistry.reset();
+			return;
+		}
+		return mlRegistry.watch(conversationId, { live: loading });
+	});
+
+	const budgetClient = useAPIClient();
+
+	/**
+	 * Commits a new amount left. The server turns it into a total against the
+	 * live ledger; the strip shows the expected figure at once, takes the
+	 * server's ledger when it answers, and rolls back if the server said no.
+	 */
+	function changeMlBudget(leftUsd: number) {
+		const conversationId = page.params?.id;
+		const previous = mlAssistant.budget;
+		if (!conversationId || !previous) return;
+		mlAssistant.setBudget({
+			...previous,
+			totalMicroUsd: usdToMicroUsd(leftUsd) + previous.spentMicroUsd + previous.reservedMicroUsd,
+		});
+		budgetClient
+			.conversations({ id: conversationId })
+			.patch({ mlBudgetLeftUsd: leftUsd })
+			.then(handleResponse)
+			.then((res: { mlBudget?: MlBudgetSnapshot } | null) => {
+				if (res?.mlBudget) mlAssistant.setBudget(res.mlBudget);
+			})
+			.catch(() => {
+				mlAssistant.setBudget(previous);
+			});
+	}
+
 	let activeRouterExamplePrompt = $state<string | null>(null);
-	// Use MCP examples when all base servers are enabled, otherwise use router examples
+	// ML Assistant mode brings its own chip set; otherwise use MCP examples when all
+	// base servers are enabled, and router examples when they are not.
 	let activeExamples = $derived<RouterExample[]>(
-		$allBaseServersEnabled ? mcpExamples : routerExamples
+		mlModeOn ? mlAssistantExamples : $allBaseServersEnabled ? mcpExamples : routerExamples
 	);
 	let routerFollowUps = $derived<RouterFollowUp[]>(
 		activeRouterExamplePrompt
@@ -497,6 +760,15 @@
 
 	async function startExample(example: RouterExample) {
 		if (requireAuthUser()) return;
+
+		// ML Intern chips seed the composer instead of dispatching. Their prompts
+		// are complete, but they name one specific paper, model or dataset, and a
+		// task at this price is one the user should read before it starts.
+		if (mlModeOn) {
+			draft = example.prompt;
+			return;
+		}
+
 		activeRouterExamplePrompt = example.prompt;
 
 		if (browser && example.attachments?.length) {
@@ -631,14 +903,16 @@
 				<IconShare />
 			</button>
 		{/if}
-		{#if featureAnnouncement && showFeatureAnnouncement}
+		{#if featureAnnouncement && showFeatureAnnouncement && !mlSpotlightVisible}
 			<FeatureAnnouncementToast announcement={featureAnnouncement} />
 		{/if}
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<!-- tabindex: the document never scrolls in this app, so without it
-		     keyboard-only users cannot scroll the conversation at all. -->
+		     keyboard-only users cannot scroll the conversation at all. Keyboard
+		     focus draws a soft inset ring instead of the browser's default
+		     outline around the whole pane; mouse focus draws nothing. -->
 		<div
-			class="scrollbar-custom h-full [scrollbar-gutter:stable_both-edges] overflow-y-auto overscroll-contain"
+			class="scrollbar-custom h-full [scrollbar-gutter:stable_both-edges] overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-500/60 dark:focus-visible:outline-blue-400/60"
 			tabindex="0"
 			aria-label="Conversation messages"
 			use:chatScroll.attach={{
@@ -656,57 +930,70 @@
 				{/if}
 
 				{#if messages.length > 0}
-					<div bind:this={messagesEl} class="flex h-max flex-col gap-8">
-						{#each messages as message, idx (message.id)}
-							<ChatMessage
-								{loading}
-								{message}
-								alternatives={messagesAlternatives.find((a) => a.includes(message.id)) ?? []}
-								isAuthor={!shared}
-								readOnly={isReadOnly}
-								isLast={idx === messages.length - 1}
-								bind:editMsdgId
-								onretry={(payload) => {
-									// Edit-with-content mounts a fresh pair like a send and
-									// anchors it; a plain regenerate must never yank a user
-									// who triggered it from a scrolled-up position.
-									if (payload.content !== undefined) chatScroll.armSend();
-									else chatScroll.armRetry();
-									onretry?.(payload);
-								}}
-								onshowAlternateMsg={(payload) => {
-									chatScroll.notifyBranchSwitch();
-									onshowAlternateMsg?.(payload);
-								}}
-							/>
+					<!-- padding-bottom is the composer clearance (content never hides
+					     behind the composer overlay); the SSR-rendered value equals the
+					     historical clearance. The anchored turn's min-height is the
+					     reservation its reply streams into — space the turn owns from
+					     the start, so filling it moves nothing. -->
+					<div
+						bind:this={messagesEl}
+						class="flex h-max flex-col gap-8"
+						style:padding-bottom="{chatScroll.bottomClearancePx}px"
+					>
+						<!-- Turn groups are identified by position, not key: the post-stream
+						     reconciliation re-keys every message, and re-created group
+						     elements would give Safari an in-between layout to clamp the
+						     view against (it clamps synchronously mid-DOM-swap). Messages
+						     inside stay keyed by id; the group's reservation binds to the
+						     anchored INDEX for the same reason. -->
+						{#each turns as turn, turnIdx}
+							<div
+								class="flex flex-col gap-8"
+								style:min-height={turnIdx === chatScroll.anchoredTurnIndex
+									? `${chatScroll.anchorMinHeightPx}px`
+									: null}
+							>
+								{#each turn.messages as message, msgIdx (message.id)}
+									<ChatMessage
+										{loading}
+										{message}
+										alternatives={messagesAlternatives.find((a) => a.includes(message.id)) ?? []}
+										isAuthor={!shared}
+										readOnly={isReadOnly}
+										isLast={turnIdx === turns.length - 1 && msgIdx === turn.messages.length - 1}
+										bind:editMsdgId
+										onretry={(payload) => {
+											// Edit-with-content mounts a fresh turn like a send; a
+											// plain regenerate needs nothing — the reservation
+											// absorbs the old reply's collapse either way.
+											if (payload.content !== undefined) chatScroll.notifySend();
+											onretry?.(payload);
+										}}
+										onshowAlternateMsg={(payload) => {
+											chatScroll.notifyBranchSwitch();
+											onshowAlternateMsg?.(payload);
+										}}
+									/>
+								{/each}
+								{#if turnIdx === turns.length - 1 && showPendingPlaceholder}
+									<ChatMessage
+										loading={true}
+										message={{
+											id: "pending-placeholder",
+											content: "",
+											from: "assistant",
+											children: [],
+										}}
+										isAuthor={!shared}
+										readOnly={isReadOnly}
+									/>
+								{/if}
+							</div>
 						{/each}
-						{#if showPendingPlaceholder}
-							<ChatMessage
-								loading={true}
-								message={{
-									id: "pending-placeholder",
-									content: "",
-									from: "assistant",
-									children: [],
-								}}
-								isAuthor={!shared}
-								readOnly={isReadOnly}
-							/>
-						{/if}
 						{#if isReadOnly}
-							<ModelSwitch {models} {currentModel} />
+							<ModelSwitch models={switchableModels} {currentModel} />
 						{/if}
 					</div>
-					<!-- Send-anchor spacer: inflated at send so the sent message lands near
-					     the viewport top, shrinking 1:1 as the reply grows (constant
-					     scrollHeight = zero motion), floored at composer clearance.
-					     chatScroll owns the height after hydration; the template value
-					     provides the composer clearance in server-rendered markup. -->
-					<div
-						use:chatScroll.attachSpacer
-						class="flex-shrink-0"
-						style="height: {MIN_SPACER_FALLBACK_PX}px"
-					></div>
 				{:else if pending}
 					<!-- Outside messagesEl, so it gets its own wrapper for the scroll
 					     controller's size observer (an h-full column never resizes). -->
@@ -729,7 +1016,11 @@
 						onmessage={(content) => {
 							onmessage?.(content);
 						}}
-					/>
+					>
+						{#if mlSpotlightVisible}
+							<MlInternSpotlight ontry={tryMlIntern} ondismiss={dismissMlSpotlight} />
+						{/if}
+					</ChatIntroduction>
 				{/if}
 			</div>
 
@@ -757,13 +1048,18 @@
 			max-sm:py-0 sm:px-[calc(1.25rem+var(--scrollbar-gutter,0px))]
 			md:pb-4 xl:max-w-4xl dark:border-gray-800 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0"
 		>
-			{#if !draft.length && !messages.length && !sources.length && !loading && (currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
+			{#if !draft.length && !messages.length && !sources.length && !loading && (mlModeOn || currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
 				<div
 					class="mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 select-none dark:text-gray-500"
 				>
 					{#each activeExamples as ex}
 						<button
-							class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur-sm hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
+							class={[
+								"flex items-center gap-1 rounded-lg px-2 py-0.5 text-center text-sm backdrop-blur-sm",
+								mlModeOn
+									? "bg-[#fff1e4] text-[#c2410c] dark:bg-[#3a2410] dark:text-[#fdba74]"
+									: "bg-gray-100/90 hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400",
+							]}
 							onclick={() => startExample(ex)}
 						>
 							{ex.title}
@@ -809,13 +1105,24 @@
 			{/if}
 
 			<div class="w-full">
-				<div class="flex w-full *:mb-3">
+				{#if askQuestion}
+					<!-- Keyed: the next waiting question must not inherit this one's step and picks. -->
+					{#key askQuestion.request.elicitationId}
+						<AskQuestion
+							conversationId={askQuestion.conversationId}
+							request={askQuestion.request}
+						/>
+					{/key}
+				{/if}
+				<div class="flex w-full gap-2 *:mb-3">
 					{#if !loading && lastIsError}
+						{#if canResumeTurn}
+							<ResumeBtn classNames="ml-auto" onClick={sendResumeMessage} />
+						{/if}
 						<RetryBtn
-							classNames="ml-auto"
+							classNames={canResumeTurn ? "" : "ml-auto"}
 							onClick={() => {
 								if (lastMessage && lastMessage.ancestors) {
-									chatScroll.armRetry();
 									onretry?.({
 										id: lastMessage.id,
 									});
@@ -832,85 +1139,113 @@
 						handleSubmit();
 					}}
 					class={{
-						"relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 dark:border-gray-700 dark:bg-gray-800": true,
+						"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
+						"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
+						"border-[#e2ddd6] dark:border-[#2c2c2c]": mlModeOn && (mlStripVisible || mlPillVisible),
+						"dark:border-gray-700": !(mlModeOn && (mlStripVisible || mlPillVisible)),
 						"opacity-30": isReadOnly,
 						"max-sm:mb-4": focused && isVirtualKeyboard(),
 					}}
+					style:--composer-actions-width={transcriptionEnabled && !loading ? "84px" : "44px"}
 				>
-					{#if isRecording || isTranscribing}
-						<VoiceRecorder
-							{isTranscribing}
-							{isTouchDevice}
-							oncancel={() => {
-								isRecording = false;
-							}}
-							onconfirm={handleRecordingConfirm}
-							onsend={handleRecordingSend}
-							onerror={handleRecordingError}
+					{#if ML_ASSISTANT_MODE}
+						<MlAssistantStrip
+							visible={mlStripVisible}
+							steps={mlAssistant.steps}
+							statusLabel={mlAssistant.statusLabel}
+							complete={mlAssistant.complete}
+							budget={mlAssistant.budget}
+							onbudgetchange={page.params?.id ? changeMlBudget : undefined}
+							dashboard={trackioDashboards.at(-1)}
+							registry={mlRegistry.summary}
 						/>
-					{:else if onDrag && isFileUploadEnabled}
-						<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
-					{:else}
-						<div
-							class="flex w-full flex-1 rounded-xl border-none bg-transparent"
-							class:paste-glow={pastedLongContent}
-						>
-							{#if lastIsError}
-								<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
-							{:else}
-								<ChatInput
-									placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
-									{loading}
-									bind:value={draft}
-									bind:files
-									mimeTypes={activeMimeTypes}
-									onsubmit={handleSubmit}
-									{onPaste}
-									disabled={isReadOnly || lastIsError}
-									{modelIsMultimodal}
-									{modelSupportsTools}
-									bind:focused
-								/>
-							{/if}
+					{/if}
+					<!-- The composer box is a column so the ML Assistant strip can stack on
+					     top; this row is the composer proper and keeps its own layout. -->
+					<div class="flex w-full items-center">
+						{#if isRecording || isTranscribing}
+							<VoiceRecorder
+								{isTranscribing}
+								{isTouchDevice}
+								oncancel={() => {
+									isRecording = false;
+								}}
+								onconfirm={handleRecordingConfirm}
+								onsend={handleRecordingSend}
+								onerror={handleRecordingError}
+							/>
+						{:else if onDrag && isFileUploadEnabled}
+							<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
+						{:else}
+							<div
+								class="flex w-full flex-1 rounded-xl border-none bg-transparent"
+								class:paste-glow={pastedLongContent}
+							>
+								{#if lastIsError}
+									<ChatInput
+										value="Sorry, something went wrong. Please try again."
+										disabled={true}
+									/>
+								{:else}
+									<ChatInput
+										placeholder={isReadOnly
+											? "This conversation is read-only."
+											: mlModeOn
+												? ML_ASSISTANT_PLACEHOLDER
+												: "Ask anything"}
+										{loading}
+										bind:value={draft}
+										bind:files
+										mimeTypes={activeMimeTypes}
+										onsubmit={handleSubmit}
+										{onPaste}
+										disabled={isReadOnly || lastIsError}
+										{modelIsMultimodal}
+										{modelSupportsTools}
+										showMlPill={mlPillVisible}
+										bind:focused
+									/>
+								{/if}
 
-							{#if loading}
-								<StopGeneratingBtn
-									onClick={() => {
-										hapticError();
-										onstop?.();
-									}}
-									showBorder={true}
-									classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow-sm transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
-								/>
-							{:else}
-								{#if transcriptionEnabled}
-									<button
-										type="button"
-										class="absolute right-10 bottom-2 mr-1.5 btn size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 sm:right-9 sm:size-7 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white"
-										disabled={isReadOnly}
-										onclick={() => {
-											isRecording = true;
+								{#if loading}
+									<StopGeneratingBtn
+										onClick={() => {
+											hapticError();
+											onstop?.();
 										}}
-										aria-label="Start voice recording"
+										showBorder={true}
+										classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow-sm transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
+									/>
+								{:else}
+									{#if transcriptionEnabled}
+										<button
+											type="button"
+											class="absolute right-10 bottom-2 mr-1.5 btn size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 sm:right-9 sm:size-7 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white"
+											disabled={isReadOnly}
+											onclick={() => {
+												isRecording = true;
+											}}
+											aria-label="Start voice recording"
+										>
+											<IconMic class="size-4" />
+										</button>
+									{/if}
+									<button
+										class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
+										isReadOnly
+											? ''
+											: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
+										disabled={!draft || isReadOnly}
+										type="submit"
+										aria-label="Send message"
+										name="submit"
 									>
-										<IconMic class="size-4" />
+										<IconArrowUp />
 									</button>
 								{/if}
-								<button
-									class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
-									isReadOnly
-										? ''
-										: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
-									disabled={!draft || isReadOnly}
-									type="submit"
-									aria-label="Send message"
-									name="submit"
-								>
-									<IconArrowUp />
-								</button>
-							{/if}
-						</div>
-					{/if}
+							</div>
+						{/if}
+					</div>
 				</form>
 				<div
 					class={{
@@ -1015,7 +1350,10 @@
 					{/if}
 					{#if $settings.reasoningOverrides?.[currentModel.id] ?? currentModel.supportsReasoning}
 						<div class="ml-auto">
-							<ThinkingEffortChip modelId={currentModel.id} />
+							<ThinkingEffortChip
+								modelId={currentModel.id}
+								presetEffort={mlModeOn ? ML_ASSISTANT_EFFORT : undefined}
+							/>
 						</div>
 					{/if}
 				</div>
@@ -1025,10 +1363,15 @@
 
 	<ArtifactPanel
 		registry={artifactRegistry}
+		items={paneItems}
 		{loading}
 		canScreenshot={!shared && !isReadOnly && mimeMatchesAllowlist("image/png", activeMimeTypes)}
 		onsend={canSendFix ? sendFixRequest : undefined}
 	/>
+	<TrackioPane items={paneItems} />
+	{#if ML_ASSISTANT_MODE}
+		<MlRegistryPane />
+	{/if}
 </div>
 
 <style>

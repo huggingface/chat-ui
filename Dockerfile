@@ -44,6 +44,7 @@ COPY --link --chown=1000 package-lock.json package.json ./
 
 ARG APP_BASE=
 ARG PUBLIC_APP_COLOR=
+ARG ML_ASSISTANT_MODE=
 ENV BODY_SIZE_LIMIT=15728640
 
 RUN --mount=type=cache,target=/app/.npm \

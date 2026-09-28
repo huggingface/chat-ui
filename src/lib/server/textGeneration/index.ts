@@ -1,7 +1,6 @@
 import { preprocessMessages } from "../endpoints/preprocessMessages";
 
 import { generateTitleForConversation } from "./title";
-import { injectArtifactsPrompt } from "./artifacts";
 import {
 	type MessageUpdate,
 	MessageUpdateType,
@@ -11,6 +10,18 @@ import { generate } from "./generate";
 import { runMcpFlow } from "./mcp/runMcpFlow";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
+import {
+	isMlAssistantConversation,
+	mlAssistantBillingTarget,
+	pinnedHubToken,
+} from "$lib/server/mlAssistant";
+import { settleMlBudget } from "$lib/server/mlBudget/settle";
+import { reservedMicroUsd } from "$lib/utils/mlBudget";
+import { logger } from "$lib/server/logger";
+import { resolvePreprompt } from "./preprompt";
+import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
+import { mlStateBlockEnabled } from "$lib/server/mlRegistry/stateBlock";
+import { AttachmentOverflowError } from "./utils/attachmentBudget";
 
 /** Updates that mean the user has already been shown something for this turn. */
 function isVisibleWork(update: MessageUpdate): boolean {
@@ -56,12 +67,62 @@ async function* textGenerationWithoutTitle(
 	const { conv, messages } = ctx;
 	const convId = conv._id;
 
-	// Artifacts are opt-in per model (supportsArtifacts in the MODELS overrides),
-	// with a per-model user override from the model settings page
-	const preprompt =
-		(ctx.artifactsOverride ?? ctx.model.supportsArtifacts)
-			? injectArtifactsPrompt(conv.preprompt)
-			: conv.preprompt;
+	// ML Assistant conversations run the preset instead of the user's per-model
+	// custom prompt, and get its capabilities regardless of what the model
+	// advertises: the preset is a mode, not a set of defaults to fall back from.
+	// Outside it nothing changes — artifacts stay opt-in per model.
+	const mlAssistant = isMlAssistantConversation(conv);
+
+	// Settle finished jobs before the remaining budget is read anywhere this
+	// turn — the session-context line and the gate must both see refunds land.
+	if (mlAssistant && conv.mlBudget) {
+		try {
+			// Same effective credential as dispatch: an operator-pinned Hub entry
+			// launched the jobs, so it is what can read them back; the user's own
+			// token otherwise.
+			const token =
+				pinnedHubToken() ??
+				(ctx.locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
+				(ctx.locals as unknown as { token?: string } | undefined)?.token;
+			const settled = await settleMlBudget({
+				conversationId: convId,
+				budget: conv.mlBudget,
+				...(token ? { token } : {}),
+			});
+			// A changed ledger must reach the strip now: the guard only emits on
+			// gated calls, so a turn of text or log reads would otherwise leave the
+			// old hold on screen after the refund landed.
+			if (settled !== conv.mlBudget) {
+				conv.mlBudget = settled;
+				yield {
+					type: MessageUpdateType.Budget,
+					totalMicroUsd: settled.totalMicroUsd,
+					spentMicroUsd: settled.spentMicroUsd,
+					reservedMicroUsd: reservedMicroUsd(settled),
+				};
+			}
+		} catch (err) {
+			// A failed settle only leaves holds in place — safe to run the turn on.
+			logger.warn({ err: String(err) }, "[mlBudget] settle pass failed; continuing");
+		}
+	}
+
+	const promptBillingTarget = mlAssistant ? mlAssistantBillingTarget(ctx.locals) : undefined;
+	const preprompt = resolvePreprompt({
+		conversationPreprompt: conv.preprompt,
+		mlAssistant,
+		virtualFiles: mlVirtualFilesEnabled(conv),
+		stateBlock: mlStateBlockEnabled(conv),
+		artifactsOverride: ctx.artifactsOverride,
+		supportsArtifacts: ctx.model.supportsArtifacts,
+		username: ctx.username,
+		timezone: (ctx.locals as unknown as { timezone?: string } | undefined)?.timezone,
+		budget: conv.mlBudget,
+		// The same target the dispatch rewrite uses. BillTo remains the valid Hub
+		// namespace; the resource group is a separate attribution field.
+		billTo: promptBillingTarget?.namespace,
+		billingResourceGroup: promptBillingTarget?.resourceGroupId,
+	});
 
 	const processedMessages = await preprocessMessages(messages, convId);
 
@@ -75,14 +136,17 @@ async function* textGenerationWithoutTitle(
 			messages: processedMessages,
 			assistant: ctx.assistant,
 			forceMultimodal: ctx.forceMultimodal,
-			forceTools: ctx.forceTools,
+			forceTools: mlAssistant || ctx.forceTools,
 			provider: ctx.provider,
 			reasoningEffort: ctx.reasoningEffort,
+			reasoningOverride: ctx.reasoningOverride,
 			locals: ctx.locals,
 			preprompt,
 			abortSignal: ctx.abortController.signal,
 			abortController: ctx.abortController,
 			promptedAt: ctx.promptedAt,
+			generationId: ctx.generationId,
+			messageId: ctx.messageId,
 		});
 
 		let step = await mcpGen.next();
@@ -110,8 +174,8 @@ async function* textGenerationWithoutTitle(
 					err.message.includes("Request was aborted")));
 		if (isAbort) {
 			// nothing to recover; the partial message is already what the user saw
-		} else if (mcpProducedOutput) {
-			// Falling back here would discard the tool work and answer as if none of it ran.
+		} else if (mcpProducedOutput || err instanceof AttachmentOverflowError) {
+			// falling back would discard the tool work, or resend the attachments just refused
 			throw err;
 		} else {
 			// Nothing was shown yet, so a clean tool-free retry is a real recovery.

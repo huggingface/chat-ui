@@ -1,7 +1,10 @@
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
+	type MessageBudgetUpdate,
+	type MessagePlanUpdate,
 	type MessageStatusUpdate,
+	type MessageTurnStateUpdate,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import type { Message } from "$lib/types/Message";
@@ -18,6 +21,12 @@ export interface ConsumeContext {
 	onStreamStart: () => void;
 	onTitle: (title: string) => void;
 	onError: (update: MessageStatusUpdate) => void;
+	/** Fired on every plan snapshot, so mode UI can track progress outside the message. */
+	onPlan?: (update: MessagePlanUpdate) => void;
+	/** Fired on every budget ledger change, so the strip's balance tracks the run live. */
+	onBudget?: (update: MessageBudgetUpdate) => void;
+	/** Fired on every turn lifecycle transition; the caller notes serverNow for clock skew. */
+	onTurnState?: (update: MessageTurnStateUpdate) => void;
 }
 
 /**
@@ -151,6 +160,12 @@ export async function consumeMessageUpdates(
 			];
 		} else if (update.type === MessageUpdateType.RouterMetadata) {
 			message.routerMetadata = { route: update.route, model: update.model };
+		} else if (update.type === MessageUpdateType.Plan) {
+			ctx.onPlan?.(update);
+		} else if (update.type === MessageUpdateType.Budget) {
+			ctx.onBudget?.(update);
+		} else if (update.type === MessageUpdateType.TurnState) {
+			ctx.onTurnState?.(update);
 		}
 	}
 

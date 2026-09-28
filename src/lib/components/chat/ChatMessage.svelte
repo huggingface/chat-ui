@@ -12,6 +12,7 @@
 	import CarbonPen from "~icons/carbon/pen";
 	import CarbonCopy from "~icons/carbon/copy";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonInformation from "~icons/carbon/information";
 	import UploadedFile from "./UploadedFile.svelte";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
@@ -21,13 +22,26 @@
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import ToolUpdate from "./ToolUpdate.svelte";
+	import TurnWaitBanner from "./TurnWaitBanner.svelte";
+	import { turnStateOf } from "$lib/utils/generationState";
 	import ToolCallsSummary from "./ToolCallsSummary.svelte";
 	import ArtifactCard from "./ArtifactCard.svelte";
-	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
-	import { MessageUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
+	import ElicitationForm from "./ElicitationForm.svelte";
+	import PlanCard from "./PlanCard.svelte";
+	import HarnessEventChip from "./HarnessEventChip.svelte";
+	import { isMessageToolResultUpdate, isMessageToolErrorUpdate } from "$lib/utils/messageUpdates";
+	import type { MessageHarnessEventUpdate, MessagePlanUpdate } from "$lib/types/MessageUpdate";
+	import { page } from "$app/state";
 	import ImageLightbox from "./ImageLightbox.svelte";
-	import { splitArtifactSegments, stripArtifacts } from "$lib/utils/artifacts";
+	import { stripArtifacts } from "$lib/utils/artifacts";
 	import type { ArtifactOperation } from "$lib/utils/artifacts";
+	import {
+		messageBlocks,
+		THINK_BLOCK_REGEX,
+		type ElicitationBlock,
+		type MessageBlock,
+	} from "$lib/utils/messageBlocks";
+	import { rebuildLegacyContent } from "$lib/utils/messageShape";
 
 	interface Props {
 		message: Message;
@@ -45,8 +59,8 @@
 	let {
 		message,
 		loading = false,
-		isAuthor: _isAuthor = true,
-		readOnly: _readOnly = false,
+		isAuthor = true,
+		readOnly = false,
 		isTapped = $bindable(false),
 		alternatives = [],
 		editMsdgId = $bindable(null),
@@ -72,11 +86,6 @@
 		}
 	}
 
-	$effect(() => {
-		// referenced to appease linter for currently-unused props
-		void _isAuthor;
-		void _readOnly;
-	});
 	function handleKeyDown(e: KeyboardEvent) {
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
 			editFormEl?.requestSubmit();
@@ -132,181 +141,38 @@
 	let editContentEl: HTMLTextAreaElement | undefined = $state();
 	let editFormEl: HTMLFormElement | undefined = $state();
 
-	// Zero-config reasoning autodetection: detect <think> blocks in content
-	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/gi;
+	// the rounds shape keeps round text out of content, copy still takes all of it
+	let fullContent = $derived(rebuildLegacyContent(message).content);
 
 	// Strip think blocks and artifact tags for clipboard copy (always, regardless of detection)
 	let contentWithoutThink = $derived.by(() =>
-		stripArtifacts(message.content.replace(THINK_BLOCK_REGEX, "")).trim()
+		stripArtifacts(fullContent.replace(THINK_BLOCK_REGEX, "")).trim()
 	);
 
-	type Block =
-		| { type: "text"; content: string }
-		| { type: "think"; content: string; closed: boolean }
-		| { type: "tool"; uuid: string; updates: MessageToolUpdate[] }
-		| { type: "artifact"; op: ArtifactOperation; opIndex: number };
-
-	type ToolBlock = Extract<Block, { type: "tool" }>;
-	type ProcessBlock = Extract<Block, { type: "think" } | { type: "tool" }>;
+	type ProcessBlock = Extract<MessageBlock, { type: "think" } | { type: "tool" }>;
 
 	type RenderUnit =
 		| { kind: "text"; content: string }
 		| { kind: "group"; blocks: ProcessBlock[]; toolCount: number }
-		| { kind: "artifact"; op: ArtifactOperation; opIndex: number };
+		| { kind: "artifact"; op: ArtifactOperation; opIndex: number }
+		| ({ kind: "elicitation" } & Omit<ElicitationBlock, "type">)
+		| { kind: "plan"; update: MessagePlanUpdate }
+		| { kind: "harnessEvent"; update: MessageHarnessEventUpdate }
+		| { kind: "notice"; text: string };
 
-	// Expand any text block containing <think>…</think> into dedicated think blocks
-	// so reasoning can be grouped/collapsed separately from the answer text.
-	function expandThinkBlocks(input: Block[]): Block[] {
-		const out: Block[] = [];
-		for (const block of input) {
-			if (block.type !== "text") {
-				out.push(block);
-				continue;
-			}
-			for (const part of block.content.split(THINK_BLOCK_REGEX)) {
-				if (!part) continue;
-				if (part.startsWith("<think>")) {
-					const closed = part.endsWith("</think>");
-					out.push({ type: "think", content: part.slice(7, closed ? -8 : undefined), closed });
-				} else if (part.trim().length > 0) {
-					out.push({ type: "text", content: part });
-				}
-			}
-		}
-		return out;
-	}
-
-	// Replace inline <artifact> blocks in text with dedicated artifact blocks that
-	// render as cards (content lives in the artifact panel). Streaming-safe:
-	// partially received tags are hidden until complete.
-	function expandArtifactBlocks(input: Block[]): Block[] {
-		const out: Block[] = [];
-		let opIndex = 0;
-		for (const block of input) {
-			if (block.type !== "text") {
-				out.push(block);
-				continue;
-			}
-			for (const segment of splitArtifactSegments(block.content)) {
-				if (segment.type === "artifact") {
-					out.push({ type: "artifact", op: segment.op, opIndex: opIndex++ });
-				} else if (segment.content.length > 0) {
-					out.push({ type: "text", content: segment.content });
-				}
-			}
-		}
-		return collapseConsecutiveArtifactOps(out);
-	}
-
-	// Models sometimes emit several back-to-back operations on the same artifact
-	// (e.g. one update block per find/replace pair). Every op still becomes a
-	// version in the registry, but showing a card per op clutters the chat —
-	// keep only the last card of each consecutive run.
-	function collapseConsecutiveArtifactOps(input: Block[]): Block[] {
-		const out: Block[] = [];
-		for (const block of input) {
-			if (block.type === "artifact") {
-				let i = out.length - 1;
-				while (i >= 0) {
-					const prior = out[i];
-					if (prior.type === "text" && prior.content.trim().length === 0) {
-						i -= 1;
-						continue;
-					}
-					if (prior.type === "artifact" && prior.op.identifier === block.op.identifier) {
-						// Drop the earlier card (and the whitespace between) — this
-						// later op supersedes it.
-						out.splice(i, out.length - i);
-					}
-					break;
-				}
-			}
-			out.push(block);
-		}
-		return out;
-	}
-
-	let blocks = $derived.by(() => {
-		const updates = message.updates ?? [];
-		const res: Block[] = [];
-		const hasTools = updates.some(isMessageToolUpdate);
-		let contentCursor = 0;
-		let sawFinalAnswer = false;
-
-		// Fast path: no tool updates at all
-		if (!hasTools && updates.length === 0) {
-			return expandArtifactBlocks(
-				expandThinkBlocks(
-					message.content ? [{ type: "text" as const, content: message.content }] : []
-				)
-			);
-		}
-
-		for (const update of updates) {
-			if (update.type === MessageUpdateType.Stream) {
-				const token =
-					typeof update.token === "string" && update.token.length > 0 ? update.token : null;
-				const len = token !== null ? token.length : (update.len ?? 0);
-				const chunk =
-					token ??
-					(message.content ? message.content.slice(contentCursor, contentCursor + len) : "");
-				contentCursor += len;
-				if (!chunk) continue;
-				const last = res.at(-1);
-				if (last?.type === "text") last.content += chunk;
-				else res.push({ type: "text" as const, content: chunk });
-			} else if (isMessageToolUpdate(update)) {
-				const existingBlock = res.find(
-					(b): b is ToolBlock => b.type === "tool" && b.uuid === update.uuid
-				);
-				if (existingBlock) {
-					existingBlock.updates.push(update);
-				} else {
-					res.push({ type: "tool" as const, uuid: update.uuid, updates: [update] });
-				}
-			} else if (update.type === MessageUpdateType.FinalAnswer) {
-				sawFinalAnswer = true;
-				const finalText = update.text ?? "";
-				const currentText = res
-					.filter((b) => b.type === "text")
-					.map((b) => (b as { type: "text"; content: string }).content)
-					.join("");
-
-				let addedText = "";
-				if (finalText.startsWith(currentText)) {
-					addedText = finalText.slice(currentText.length);
-				} else if (!currentText.endsWith(finalText)) {
-					const needsGap = !/\n\n$/.test(currentText) && !/^\n/.test(finalText);
-					addedText = (needsGap ? "\n\n" : "") + finalText;
-				}
-
-				if (addedText) {
-					const last = res.at(-1);
-					if (last?.type === "text") {
-						last.content += addedText;
-					} else {
-						res.push({ type: "text" as const, content: addedText });
-					}
-				}
-			}
-		}
-
-		// If content remains unmatched (e.g., persisted stream markers), append the remainder
-		// Skip when a FinalAnswer already provided the authoritative text.
-		if (!sawFinalAnswer && message.content && contentCursor < message.content.length) {
-			const remaining = message.content.slice(contentCursor);
-			if (remaining.length > 0) {
-				const last = res.at(-1);
-				if (last?.type === "text") last.content += remaining;
-				else res.push({ type: "text" as const, content: remaining });
-			}
-		} else if (!res.some((b) => b.type === "text") && message.content) {
-			// Fallback: no text produced at all
-			res.push({ type: "text" as const, content: message.content });
-		}
-
-		return expandArtifactBlocks(expandThinkBlocks(res));
+	// The live turn's park, rendered as a countdown from its ABSOLUTE deadline
+	// (clock-skew corrected). Only the last message of the conversation can be
+	// parked; earlier messages' turnState events are history, not liveness.
+	let waitingState = $derived.by(() => {
+		if (!isLast) return undefined;
+		const state = turnStateOf(message);
+		return state?.state === "waiting" && state.until !== undefined ? state : undefined;
 	});
+
+	let blocks = $derived(messageBlocks(message));
+
+	// a notice can arrive before the first token, so it must not hide the spinner
+	let awaitingFirstBlock = $derived(blocks.every((block) => block.type === "notice"));
 
 	// Coalesce consecutive process blocks (thinking + tools) into groups so they can
 	// collapse into a single "Called N tools" / "Thought" summary. Text passes through.
@@ -326,6 +192,25 @@
 			} else if (block.type === "artifact") {
 				flush();
 				units.push({ kind: "artifact", op: block.op, opIndex: block.opIndex });
+			} else if (block.type === "elicitation") {
+				// Never folded into the collapsible summary: the user has to be able to act on it.
+				flush();
+				units.push({
+					kind: "elicitation",
+					request: block.request,
+					expiresAt: block.expiresAt,
+					resolved: block.resolved,
+				});
+			} else if (block.type === "plan") {
+				// Never folded into the collapsible summary: the plan stays visible.
+				flush();
+				units.push({ kind: "plan", update: block.update });
+			} else if (block.type === "harnessEvent") {
+				flush();
+				units.push({ kind: "harnessEvent", update: block.update });
+			} else if (block.type === "notice") {
+				flush();
+				units.push({ kind: "notice", text: block.text });
 			} else {
 				flush();
 				units.push({ kind: "text", content: block.content });
@@ -335,13 +220,33 @@
 		return units;
 	});
 
-	// Still mid-process (thinking / calling tools, no answer yet) → render the
-	// blocks flat like today. Once the final answer starts streaming the last
-	// block becomes text, so this flips to false and the nested summary takes over.
+	/** Reasoning, a running tool and growing text animate; a finished tool and a settled question do not. */
+	let trailingBlockShowsProgress = $derived.by(() => {
+		const last = blocks.at(-1);
+		if (!last) return false;
+		if (last.type === "think") return !last.closed;
+		if (last.type === "tool") {
+			return !last.updates.some(
+				(update) => isMessageToolResultUpdate(update) || isMessageToolErrorUpdate(update)
+			);
+		}
+		if (last.type === "text") return last.content.trim().length > 0;
+		return false;
+	});
+
+	// A streaming turn with process blocks renders them flat for its whole
+	// duration — mid-turn narration between tool rounds must not regroup the
+	// rows into the collapsed summary, or every new round visibly "re-expands"
+	// them. The nested summary takes over only once the turn is over.
 	let isProcessStreaming = $derived.by(() => {
 		if (!isLast || !loading) return false;
-		const last = blocks.at(-1);
-		return !!last && (last.type === "think" || last.type === "tool");
+		return blocks.some(
+			(block) =>
+				block.type === "think" ||
+				block.type === "tool" ||
+				block.type === "elicitation" ||
+				block.type === "plan"
+		);
 	});
 
 	$effect(() => {
@@ -356,6 +261,12 @@
 	// `text-smd` (0.94rem); re-applying it here keeps answer text — and every
 	// em-scaled child (code, pre, lists, tables, KaTeX) — in line with the rest
 	// of the UI. Single source for both the streaming and final render branches.
+	// Every process row (thinking, tools, an answered question) keeps one rhythm:
+	// 4px between rows, more against prose. The elicitation wrapper needs it too:
+	// the BlockWrapper inside it is always its parent's last child, so its own
+	// not-last margin never applies.
+	const processBlockClasses = "not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3";
+
 	const proseClasses =
 		"prose max-w-none text-smd dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900";
 
@@ -375,6 +286,16 @@
 		}
 	});
 </script>
+
+{#snippet notice(text: string)}
+	<div
+		data-exclude-from-copy
+		class="flex items-start gap-1.5 text-xs text-gray-500 not-last:mb-2 dark:text-gray-400 [.prose+&]:mt-2"
+	>
+		<CarbonInformation class="mt-0.5 flex-none" />
+		<span>{text}</span>
+	</div>
+{/snippet}
 
 {#if message.from === "assistant"}
 	<div
@@ -398,7 +319,8 @@
 		>
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
-					{#each message.files as file (file.value)}
+					<!-- Not keyed by hash alone: it is the content hash, and the same content can be attached twice (each_key_duplicate). -->
+					{#each message.files as file, i (`${file.value}-${i}`)}
 						<UploadedFile {file} canClose={false} />
 					{/each}
 				</div>
@@ -407,13 +329,13 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<div bind:this={contentEl} oncopy={handleCopy} onclick={handleContentClick}>
-				{#if isLast && loading && blocks.length === 0}
+				{#if isLast && loading && awaitingFirstBlock}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
 				{#if isProcessStreaming}
-					<!-- Streaming the thinking / tool phase: render every block flat and
-					     inline, exactly like today. Nesting kicks in once the answer starts. -->
-					{#each blocks as block, blockIndex (block.type === "tool" ? `tool-${block.uuid}-${blockIndex}` : `block-${blockIndex}`)}
+					<!-- A streaming turn that used thinking / tools: every block renders flat
+					     and inline until the turn ends, then the nested summary takes over. -->
+					{#each blocks as block, blockIndex (block.type === "tool" ? `tool-${block.uuid}-${blockIndex}` : block.type === "plan" ? `plan-${block.update.version}` : `block-${blockIndex}`)}
 						{#if block.type === "text"}
 							{#if block.content.trim().length > 0}
 								<div class={proseClasses}>
@@ -422,12 +344,34 @@
 							{/if}
 						{:else if block.type === "artifact"}
 							<ArtifactCard op={block.op} messageId={message.id} opIndex={block.opIndex} />
+						{:else if block.type === "elicitation"}
+							<div data-exclude-from-copy class={processBlockClasses}>
+								<ElicitationForm
+									conversationId={page.params.id ?? ""}
+									request={block.request}
+									expiresAt={block.expiresAt}
+									resolved={block.resolved}
+								/>
+							</div>
+						{:else if block.type === "plan"}
+							<div data-exclude-from-copy>
+								<PlanCard update={block.update} />
+							</div>
+						{:else if block.type === "harnessEvent"}
+							<div data-exclude-from-copy class={processBlockClasses}>
+								<HarnessEventChip update={block.update} />
+							</div>
+						{:else if block.type === "notice"}
+							{@render notice(block.text)}
 						{:else}
-							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
+							<div data-exclude-from-copy class={processBlockClasses}>
 								{#if block.type === "think"}
+									<!-- Only the trailing block can still be streaming: an earlier
+									     unclosed think is a stream artifact (e.g. a lost close marker)
+									     and must not keep shimmering or re-expanding on every render. -->
 									<OpenReasoningResults
 										content={block.content}
-										loading={isLast && loading && !block.closed}
+										loading={isLast && loading && !block.closed && blockIndex === blocks.length - 1}
 									/>
 								{:else}
 									<ToolUpdate tool={block.updates} {loading} />
@@ -435,9 +379,12 @@
 							</div>
 						{/if}
 					{/each}
+					{#if !trailingBlockShowsProgress}
+						<IconLoading classNames="loading mt-1 inline first:ml-0" />
+					{/if}
 				{:else}
 					<!-- Answer started or generation finished: nest the process blocks. -->
-					{#each renderUnits as unit, unitIndex (`${unit.kind}-${unitIndex}`)}
+					{#each renderUnits as unit, unitIndex (unit.kind === "plan" ? `plan-${unit.update.version}` : `${unit.kind}-${unitIndex}`)}
 						{#if unit.kind === "text"}
 							{#if isLast && loading && unit.content.length === 0}
 								<IconLoading classNames="loading inline ml-2 first:ml-0" />
@@ -448,8 +395,27 @@
 							{/if}
 						{:else if unit.kind === "artifact"}
 							<ArtifactCard op={unit.op} messageId={message.id} opIndex={unit.opIndex} />
+						{:else if unit.kind === "elicitation"}
+							<div data-exclude-from-copy class={processBlockClasses}>
+								<ElicitationForm
+									conversationId={page.params.id ?? ""}
+									request={unit.request}
+									expiresAt={unit.expiresAt}
+									resolved={unit.resolved}
+								/>
+							</div>
+						{:else if unit.kind === "plan"}
+							<div data-exclude-from-copy>
+								<PlanCard update={unit.update} />
+							</div>
+						{:else if unit.kind === "harnessEvent"}
+							<div data-exclude-from-copy class={processBlockClasses}>
+								<HarnessEventChip update={unit.update} />
+							</div>
+						{:else if unit.kind === "notice"}
+							{@render notice(unit.text)}
 						{:else if unit.kind === "group"}
-							<div data-exclude-from-copy class="not-last:mb-1 has-[+.prose]:mb-2! [.prose+&]:mt-3">
+							<div data-exclude-from-copy class={processBlockClasses}>
 								{#if unit.blocks.length > 1}
 									<!-- Collapse the whole run into a single summary -->
 									<ToolCallsSummary blocks={unit.blocks} toolCount={unit.toolCount} />
@@ -467,9 +433,19 @@
 					{/each}
 				{/if}
 			</div>
+
+			{#if waitingState}
+				<TurnWaitBanner
+					until={waitingState.until ?? 0}
+					reason={waitingState.reason}
+					conversationId={page.params.id ?? ""}
+					messageId={message.id}
+					canWake={isAuthor && !readOnly}
+				/>
+			{/if}
 		</div>
 
-		{#if message.routerMetadata || (!loading && message.content)}
+		{#if message.routerMetadata || (!loading && fullContent)}
 			<div
 				class="absolute -bottom-3.5 {message.routerMetadata && messageInfoWidth > messageWidth
 					? 'left-1 pl-1 @2xl:pl-7'

@@ -1,6 +1,6 @@
 import { getContext, setContext } from "svelte";
 import type { ArtifactRegistry } from "./artifacts";
-import type { artifactPanel } from "$lib/stores/artifactPanel.svelte";
+import type { sidePane } from "$lib/stores/sidePane.svelte";
 
 /**
  * Context bridging ChatWindow (which derives the artifact registry from the
@@ -9,7 +9,7 @@ import type { artifactPanel } from "$lib/stores/artifactPanel.svelte";
  */
 export interface ArtifactsContext {
 	readonly registry: ArtifactRegistry;
-	panel: typeof artifactPanel;
+	panel: typeof sidePane;
 	/**
 	 * Sends a preview-error fix request straight to the chat as a user message,
 	 * returning whether it was dispatched. Undefined while the conversation

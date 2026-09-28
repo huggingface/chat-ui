@@ -1,0 +1,83 @@
+import { injectArtifactsPrompt } from "./artifacts";
+import {
+	ML_ASSISTANT_BUDGET_RULES,
+	mlAssistantPreprompt,
+	mlAssistantSessionContext,
+} from "$lib/server/mlAssistantPrompt";
+import type { MlBudget } from "$lib/types/Conversation";
+import { formatMicroUsd, remainingMicroUsd } from "$lib/utils/mlBudget";
+
+export interface PrepromptInput {
+	/** The conversation's stored system prompt. */
+	conversationPreprompt?: string;
+	/** Whether this conversation runs the ML Assistant preset. */
+	mlAssistant: boolean;
+	/** whether the file tools are offered this turn, decides the scripts section, defaults on like the switch */
+	virtualFiles?: boolean;
+	/** whether the turn carries the session state block, defaults on like the switch */
+	stateBlock?: boolean;
+	/** Per-model user override for artifacts, from the model settings page. */
+	artifactsOverride?: boolean;
+	/** Whether the model advertises artifact support (supportsArtifacts). */
+	supportsArtifacts?: boolean;
+	/** Signed-in user's Hub username. The preset's namespace rule reads it back. */
+	username?: string;
+	/** IANA zone from the request, so the stamped time is the user's. */
+	timezone?: string;
+	/** Injectable clock, for tests. */
+	now?: Date;
+	/** The conversation's compute budget; presence turns on the budget rules. */
+	budget?: MlBudget;
+	/** Organization namespace the mode's compute runs under; stamped as BillTo. */
+	billTo?: string;
+	/** Resource group within BillTo used for cost attribution. */
+	billingResourceGroup?: string;
+}
+
+/**
+ * The system prompt for one generation.
+ *
+ * Artifacts are unchanged by the preset: outside it they stay opt-in per model
+ * with a per-model user override, exactly as before. The preset force-enables
+ * them on top of that — it is not a gate, and a conversation that would have got
+ * the artifacts prompt still gets it whether or not the mode exists.
+ */
+export function resolvePreprompt({
+	conversationPreprompt,
+	mlAssistant,
+	virtualFiles,
+	stateBlock,
+	artifactsOverride,
+	supportsArtifacts,
+	username,
+	timezone,
+	now,
+	budget,
+	billTo,
+	billingResourceGroup,
+}: PrepromptInput): string | undefined {
+	const base = mlAssistant
+		? mlAssistantPreprompt({ virtualFiles: virtualFiles ?? true, stateBlock: stateBlock ?? true })
+		: conversationPreprompt;
+	const artifacts = mlAssistant || (artifactsOverride ?? supportsArtifacts);
+	const resolved = artifacts ? injectArtifactsPrompt(base) : base;
+	if (!mlAssistant) return resolved;
+	// The mode is always budget-gated; a conversation without a stored budget is
+	// a zero budget, and the rules — including how to ask for a grant — must
+	// reach the model exactly then.
+	const effective = budget ?? { totalMicroUsd: 0, spentMicroUsd: 0, reservations: [] };
+	// Stamped last, after the artifacts prompt, because the preset reads the User
+	// value back out of it — and stamped here rather than onto the tool preprompt
+	// so it still reaches the model on the plain generation path, which has none.
+	return `${resolved}\n\n${ML_ASSISTANT_BUDGET_RULES}\n\n${mlAssistantSessionContext({
+		username,
+		timezone,
+		now,
+		budget: {
+			remaining: formatMicroUsd(remainingMicroUsd(effective)),
+			total: formatMicroUsd(effective.totalMicroUsd),
+		},
+		billTo,
+		billingResourceGroup,
+	})}`;
+}

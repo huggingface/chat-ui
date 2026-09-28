@@ -1,8 +1,26 @@
 import { GridFSBucket, MongoClient, ReadPreference } from "mongodb";
+// The mongodb driver require()s these lazily at runtime when the connection
+// string uses authMechanism=MONGODB-AWS (IRSA / web identity in prod). Import
+// them statically so dependency-cleanup passes don't strip them from
+// package.json again — that already happened twice (97bf7184, 6d842efc) and
+// the second time crash-looped prod with MongoMissingDependencyError.
+import "aws4";
+import "@aws-sdk/credential-providers";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Generation, GenerationEvent } from "$lib/types/Generation";
+import type { TurnState } from "$lib/types/TurnState";
+import type { McpElicitation } from "$lib/types/McpElicitation";
+import type { ParkedCall } from "$lib/types/ParkedCall";
+import type { NestedAgentCall } from "$lib/types/NestedAgentCall";
+import type { MlFile } from "$lib/types/MlFile";
+import { ML_FILE_VERSION_INDEX } from "$lib/server/mlFiles/indexes";
+import type { MlService } from "$lib/types/MlService";
+import type { MlArtefact } from "$lib/types/MlArtefact";
+import type { MlAgentRun } from "$lib/types/MlAgentRun";
+import type { MlSource } from "$lib/types/MlSource";
+import type { MlSessionLabel } from "$lib/types/MlSessionLabel";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
@@ -131,6 +149,16 @@ export class Database {
 		const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
 		const generations = db.collection<Generation>("generations");
 		const generationEvents = db.collection<GenerationEvent>("generationEvents");
+		const turnStates = db.collection<TurnState>("turnStates");
+		const mcpElicitations = db.collection<McpElicitation>("mcpElicitations");
+		const parkedCalls = db.collection<ParkedCall>("parkedCalls");
+		const nestedAgentCalls = db.collection<NestedAgentCall>("nestedAgentCalls");
+		const mlFiles = db.collection<MlFile>("mlFiles");
+		const mlServices = db.collection<MlService>("mlServices");
+		const mlArtefacts = db.collection<MlArtefact>("mlArtefacts");
+		const mlAgentRuns = db.collection<MlAgentRun>("mlAgentRuns");
+		const mlSources = db.collection<MlSource>("mlSources");
+		const mlSessionLabels = db.collection<MlSessionLabel>("mlSessionLabels");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
@@ -162,6 +190,16 @@ export class Database {
 			abortedGenerations,
 			generations,
 			generationEvents,
+			turnStates,
+			mcpElicitations,
+			parkedCalls,
+			nestedAgentCalls,
+			mlFiles,
+			mlServices,
+			mlArtefacts,
+			mlAgentRuns,
+			mlSources,
+			mlSessionLabels,
 			settings,
 			users,
 			sessions,
@@ -190,6 +228,16 @@ export class Database {
 			abortedGenerations,
 			generations,
 			generationEvents,
+			turnStates,
+			mcpElicitations,
+			parkedCalls,
+			nestedAgentCalls,
+			mlFiles,
+			mlServices,
+			mlArtefacts,
+			mlAgentRuns,
+			mlSources,
+			mlSessionLabels,
 			settings,
 			users,
 			sessions,
@@ -313,9 +361,126 @@ export class Database {
 			.catch((e) =>
 				logger.error(e, "Error creating index for generationEvents by generationId and seq")
 			);
+		// The turn-scoped replay/tail scan, and the max-seq read a resumed producer
+		// seeds its counter from. Not unique: legacy events lack the keys, and the
+		// parked-call lease is what guarantees a single writer.
+		generationEvents
+			.createIndex({ conversationId: 1, messageId: 1, seq: 1 })
+			.catch((e) => logger.error(e, "Error creating turn-scoped index for generationEvents"));
 		generationEvents
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for generationEvents by createdAt"));
+
+		// Expired on the same 24h clock as generationEvents.
+		nestedAgentCalls
+			.createIndex({ conversationId: 1, messageId: 1, createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating turn-scoped index for nestedAgentCalls"));
+		nestedAgentCalls
+			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for nestedAgentCalls by createdAt"));
+
+		mlFiles
+			.createIndex(ML_FILE_VERSION_INDEX.keys, ML_FILE_VERSION_INDEX.options)
+			.catch((e) =>
+				logger.error(e, "Error creating index for mlFiles by conversationId, name and version")
+			);
+		// no ttl, these rows are the durable record of what a session created
+		mlServices
+			.createIndex({ conversationId: 1, kind: 1, jobId: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating unique index for mlServices by job"));
+		mlServices
+			.createIndex({ conversationId: 1, createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for mlServices by conversationId"));
+		// the poller claim, open rows that are due, oldest first
+		mlServices
+			.createIndex({ stage: 1, nextPollAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for mlServices by due time"));
+		// read every tool round of a mode turn, partial because few rows ever carry the mark
+		mlServices
+			.createIndex(
+				{ conversationId: 1, eventPendingSince: 1 },
+				{ partialFilterExpression: { eventPendingSince: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for mlServices by pending event"));
+		mlArtefacts
+			.createIndex({ conversationId: 1, uri: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating unique index for mlArtefacts by uri"));
+		mlArtefacts
+			.createIndex({ conversationId: 1, createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for mlArtefacts by conversationId"));
+		mlAgentRuns
+			.createIndex({ conversationId: 1, startedAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for mlAgentRuns by conversationId"));
+		mlSources
+			.createIndex({ conversationId: 1, url: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating unique index for mlSources by url"));
+		mlSessionLabels
+			.createIndex({ reconcileAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for mlSessionLabels by due time"));
+
+		// One state document per turn; the unique key is what makes the upsert in
+		// turnState.ts race-safe. Ended turns expire like ended generations do.
+		turnStates
+			.createIndex({ conversationId: 1, messageId: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating unique turn index for turnStates"));
+		turnStates
+			.createIndex({ endedAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for turnStates by endedAt"));
+		// Serve the live feed's per-tick owner scan, like the same pair on `generations`.
+		turnStates
+			.createIndex(
+				{ userId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { userId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for turnStates by userId"));
+		turnStates
+			.createIndex(
+				{ sessionId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { sessionId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for turnStates by sessionId"));
+
+		parkedCalls
+			.createIndex({ parkedCallId: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating index for parkedCalls by parkedCallId"));
+		// The sweep itself: due rows, oldest first. Compound so a waiting row that is
+		// not yet due costs nothing to skip.
+		parkedCalls
+			.createIndex({ status: 1, resumeAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for parkedCalls by status and resumeAt"));
+		parkedCalls
+			.createIndex({ conversationId: 1 })
+			.catch((e) => logger.error(e, "Error creating index for parkedCalls by conversationId"));
+		// Rows outlive their usefulness once resumed; a week is long enough to debug a
+		// run and short enough that the collection stays small.
+		parkedCalls
+			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for parkedCalls by createdAt"));
+
+		mcpElicitations
+			.createIndex({ elicitationId: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating index for mcpElicitations by elicitationId"));
+		// Keyed off expiry, not creation: MCP_ELICITATION_TIMEOUT_MS is unbounded, and a row
+		// swept while its form is still on screen makes answering it 404.
+		mcpElicitations
+			.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for mcpElicitations by expiresAt"));
+
+		// Answered questions: the sweep for ones nothing continued, and the per-conversation
+		// lookup the message route makes before every ML turn. Partial, because rows with a
+		// parked call never expire and only the model's own questions are ever looked up.
+		mcpElicitations
+			.createIndex(
+				{ status: 1, resolvedAt: 1 },
+				{ partialFilterExpression: { "pending.kind": "ask" } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for mcpElicitations by resolvedAt"));
+		mcpElicitations
+			.createIndex(
+				{ conversationId: 1, status: 1 },
+				{ partialFilterExpression: { "pending.kind": "ask" } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for mcpElicitations by conversationId"));
 
 		sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch((e) => logger.error(e));
 		settings

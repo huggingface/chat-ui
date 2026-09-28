@@ -34,13 +34,27 @@ export interface Generation extends Timestamps {
 }
 
 /**
- * Append-only log of a run's updates. `event` is the wire type the client already
- * parses, so there is no second serialization format to keep in sync.
+ * Append-only log of a TURN's updates — the event log a subscriber replays and
+ * tails. `event` is the wire type the client already parses, so there is no
+ * second serialization format to keep in sync.
+ *
+ * The log is keyed by the turn (conversationId + messageId), not the run: a
+ * parked turn is resumed by a new producer with a new generationId, and a
+ * per-run log would force every subscriber to discover the new producer and
+ * reset its cursor — the flakiness the turn-scoped key exists to remove.
+ * `generationId` remains as provenance: which producer appended the event.
  */
 export interface GenerationEvent {
 	_id: ObjectId;
 	generationId: string;
-	/** Contiguous from 1, per generation. */
+	/** Absent only on events persisted before the log became turn-scoped. */
+	conversationId?: Conversation["_id"];
+	messageId?: Message["id"];
+	/**
+	 * Contiguous from 1 across the turn's whole life: a resumed producer
+	 * continues where the durable log ends (single writer under the parked-call
+	 * lease), so `subscribe(messageId, fromSeq)` is always well-defined.
+	 */
 	seq: number;
 	event: MessageUpdate;
 	createdAt: Date;

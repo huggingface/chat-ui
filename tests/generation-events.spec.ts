@@ -82,7 +82,7 @@ test("an attached run is visible in the database while it is still running", asy
 	const { conversationId, rootMessageId } = await api.createConversation();
 	await mockOpenAI.setScenario(conversationId, {
 		content: Array.from({ length: 40 }, (_, i) => `w${i} `),
-		chunkDelayMs: 500,
+		chunkDelayMs: 150,
 		finishReason: "stop",
 	});
 
@@ -93,8 +93,8 @@ test("an attached run is visible in the database while it is still running", asy
 		content: "attached visibility",
 	});
 
-	// Well before the run ends, and past a couple of materialisation windows.
-	await new Promise((r) => setTimeout(r, 8000));
+	// Well before the run ends (~6s), and past a few 500ms materialisation windows.
+	await new Promise((r) => setTimeout(r, 2000));
 	expect(gen.isDone(), "run should still be in flight").toBe(false);
 
 	const state = await readAssistant(db, conversationId);
@@ -115,7 +115,7 @@ test("materializedSeq describes exactly the content that was written", async ({
 	const { conversationId, rootMessageId } = await api.createConversation();
 	await mockOpenAI.setScenario(conversationId, {
 		content: Array.from({ length: 60 }, (_, i) => `w${i} `),
-		chunkDelayMs: 300,
+		chunkDelayMs: 100,
 		finishReason: "stop",
 	});
 
@@ -130,7 +130,7 @@ test("materializedSeq describes exactly the content that was written", async ({
 	// clean reattach and one that duplicates or drops a span of tokens, and it is
 	// invisible without this reconstruction.
 	for (let i = 0; i < 5; i++) {
-		await new Promise((r) => setTimeout(r, 2500));
+		await new Promise((r) => setTimeout(r, 900));
 		if (gen.isDone()) break;
 
 		const state = await readAssistant(db, conversationId);
@@ -161,7 +161,7 @@ test("materialize persists the updates under the cursor, not only content", asyn
 	const { conversationId, rootMessageId } = await api.createConversation();
 	await mockOpenAI.setScenario(conversationId, {
 		content: Array.from({ length: 40 }, (_, i) => `w${i} `),
-		chunkDelayMs: 400,
+		chunkDelayMs: 150,
 		finishReason: "stop",
 	});
 
@@ -177,8 +177,8 @@ test("materialize persists the updates under the cursor, not only content", asyn
 	// resumes strictly after the cursor, so anything missing here (tool/file/router
 	// events ≤ the cursor) would be dropped for them and lost if the run then died.
 	let sawUpdates = false;
-	for (let i = 0; i < 8; i++) {
-		await new Promise((r) => setTimeout(r, 1500));
+	for (let i = 0; i < 12; i++) {
+		await new Promise((r) => setTimeout(r, 400));
 		if (gen.isDone()) break;
 		const state = await readAssistant(db, conversationId);
 		if ((state.materializedSeq ?? 0) > 0 && (state.updates?.length ?? 0) > 0) {
@@ -248,7 +248,7 @@ test("the run is marked completed and a second viewer renders it", async ({
 	const { conversationId, rootMessageId } = await api.createConversation();
 	await mockOpenAI.setScenario(conversationId, {
 		content: Array.from({ length: 30 }, (_, i) => `w${i} `),
-		chunkDelayMs: 400,
+		chunkDelayMs: 250,
 		finishReason: "stop",
 	});
 
@@ -259,7 +259,7 @@ test("the run is marked completed and a second viewer renders it", async ({
 		content: "second viewer",
 	});
 
-	await new Promise((r) => setTimeout(r, 6000));
+	await new Promise((r) => setTimeout(r, 1500));
 	expect(gen.isDone()).toBe(false);
 
 	// The regression this whole phase exists for: another tab used to render "".

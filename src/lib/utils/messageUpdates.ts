@@ -6,9 +6,16 @@ import {
 	type MessageToolResultUpdate,
 	type MessageToolErrorUpdate,
 	type MessageToolProgressUpdate,
+	type MessageElicitationUpdate,
+	type MessageElicitationRequestUpdate,
+	type MessageElicitationResolvedUpdate,
+	type MessagePlanUpdate,
+	type MessageHarnessEventUpdate,
+	type MessageNoticeUpdate,
 	MessageUpdateType,
 	MessageUpdateStatus,
 	MessageToolUpdateType,
+	MessageElicitationUpdateType,
 } from "$lib/types/MessageUpdate";
 import type { StreamingMode } from "$lib/types/Settings";
 import type { KeyValuePair } from "$lib/types/Tool";
@@ -19,6 +26,8 @@ type MessageUpdateRequestOptions = {
 	messageId?: string;
 	isRetry: boolean;
 	isContinue?: boolean;
+	/** Continue the tool call a durable elicitation parked, before generating. */
+	resumeElicitationId?: string;
 	// Client-chosen id for this generation run, echoed back by stop-generating
 	// so the server can match a stop point to the run it belongs to
 	generationId?: string;
@@ -65,6 +74,7 @@ export async function fetchMessageUpdates(
 		inputs: opts.inputs,
 		id: opts.messageId,
 		is_retry: opts.isRetry,
+		...(opts.resumeElicitationId ? { resumeElicitationId: opts.resumeElicitationId } : {}),
 		is_continue: Boolean(opts.isContinue),
 		generationId: opts.generationId,
 		// Will be ignored server-side if unsupported
@@ -378,6 +388,30 @@ export const isMessageToolProgressUpdate = (
 	update: MessageUpdate
 ): update is MessageToolProgressUpdate =>
 	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Progress;
+
+export const isMessageElicitationUpdate = (
+	update: MessageUpdate
+): update is MessageElicitationUpdate => update.type === MessageUpdateType.Elicitation;
+
+export const isMessageElicitationRequestUpdate = (
+	update: MessageUpdate
+): update is MessageElicitationRequestUpdate =>
+	isMessageElicitationUpdate(update) && update.subtype === MessageElicitationUpdateType.Request;
+
+export const isMessageElicitationResolvedUpdate = (
+	update: MessageUpdate
+): update is MessageElicitationResolvedUpdate =>
+	isMessageElicitationUpdate(update) && update.subtype === MessageElicitationUpdateType.Resolved;
+
+export const isMessagePlanUpdate = (update: MessageUpdate): update is MessagePlanUpdate =>
+	update.type === MessageUpdateType.Plan;
+
+export const isMessageHarnessEventUpdate = (
+	update: MessageUpdate
+): update is MessageHarnessEventUpdate => update.type === MessageUpdateType.HarnessEvent;
+
+export const isMessageNoticeUpdate = (update: MessageUpdate): update is MessageNoticeUpdate =>
+	update.type === MessageUpdateType.Notice;
 
 const defaultSleep = (ms: number): Promise<void> =>
 	new Promise((resolve) => setTimeout(resolve, ms));

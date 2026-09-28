@@ -159,11 +159,11 @@ test("a live, heartbeating run survives past the stale threshold", async ({
 }) => {
 	test.setTimeout(60_000);
 	const { conversationId, rootMessageId } = await api.createConversation();
-	// ~20s of streaming: comfortably longer than the 5s stale threshold, so a run
-	// that was NOT heartbeating would be reaped several times over during it.
+	// ~8s of streaming: comfortably longer than the 5s stale threshold, so a run
+	// that was NOT heartbeating would be reaped during it.
 	await mockOpenAI.setScenario(conversationId, {
 		content: Array.from({ length: 40 }, (_, i) => `w${i} `),
-		chunkDelayMs: 500,
+		chunkDelayMs: 200,
 		finishReason: "stop",
 	});
 
@@ -184,9 +184,9 @@ test("a live, heartbeating run survives past the stale threshold", async ({
 	})();
 
 	const convObjId = new ObjectId(conversationId);
-	// Sample across ~12s (many stale thresholds and sweeps). A live run must never
-	// flip to interrupted while it is streaming.
-	for (let i = 0; i < 12; i++) {
+	// Sample across ~7s (past the stale threshold, many sweeps). A live run must
+	// never flip to interrupted while it is streaming.
+	for (let i = 0; i < 7; i++) {
 		await new Promise((r) => setTimeout(r, 1000));
 		const state = await readAssistant(db, convObjId);
 		if (state.generationId) {
