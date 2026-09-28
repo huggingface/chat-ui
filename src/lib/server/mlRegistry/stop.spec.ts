@@ -140,6 +140,21 @@ describe.sequential("stopSandbox", () => {
 		expect((await readService(service._id)).stopRequestedAt).toBeUndefined();
 	});
 
+	it("marks the row before it looks for a running turn, so a turn starting after the look sees the mark", async () => {
+		const conversationId = newConversation();
+		const service = await insertSandbox(conversationId);
+		stubCancel({ ok: true, status: 200 });
+		let markWhenChecked: Date | undefined;
+		const count = collections.turnStates.countDocuments.bind(collections.turnStates);
+		vi.spyOn(collections.turnStates, "countDocuments").mockImplementation(async (...args) => {
+			markWhenChecked = (await readService(service._id)).stopRequestedAt;
+			return count(...args);
+		});
+
+		expect(await stop(conversationId, service, TOKEN)).toEqual({ ok: true });
+		expect(markWhenChecked).toEqual(NOW);
+	});
+
 	it("stops it while the turn is parked on a wait or a question", async () => {
 		for (const status of ["waiting", "awaiting_input", "done"] as const) {
 			const conversationId = newConversation();

@@ -37,18 +37,11 @@ export async function stopSandbox({
 	}
 	// a repeat could fail on a sandbox already stopping and take back the mark the first one left
 	if (service.stopRequestedAt) return { ok: true };
-	const running = await collections.turnStates.countDocuments(
-		{ conversationId, status: "running" satisfies TurnStatus },
-		{ limit: 1 }
-	);
-	if (running > 0) {
-		return refused(409, "The intern may be using this sandbox. Stop it once the turn ends.");
-	}
 	// pinned first like the poller, a sandbox created under it can only be stopped as it
 	const token = pinnedHubToken() ?? requestToken;
 	if (!token) return refused(403, "Sign in again to stop this sandbox.");
 
-	// marked before the cancel so a poll that reads the end in between still sees it
+	// marked first, so a turn starting after the check and a poll reading the end both see it
 	const marked = await collections.mlServices.updateOne(
 		{ _id: serviceId, stage: { $nin: [...TERMINAL_STAGES] }, stopRequestedAt: { $exists: false } },
 		{ $set: { stopRequestedAt: now, updatedAt: now } }
@@ -60,6 +53,20 @@ export async function stopSandbox({
 			? { ok: true }
 			: refused(409, "This sandbox has already ended.");
 	}
+	const unmark = () =>
+		collections.mlServices.updateOne(
+			{ _id: serviceId, stopRequestedAt: now },
+			{ $unset: { stopRequestedAt: "" } }
+		);
+
+	const running = await collections.turnStates.countDocuments(
+		{ conversationId, status: "running" satisfies TurnStatus },
+		{ limit: 1 }
+	);
+	if (running > 0) {
+		await unmark();
+		return refused(409, "The intern may be using this sandbox. Stop it once the turn ends.");
+	}
 
 	const result = await cancelJob({ namespace: service.namespace, jobId: service.jobId, token });
 	const logFields = { conversationId: conversationId.toString(), jobId: service.jobId };
@@ -68,10 +75,7 @@ export async function stopSandbox({
 		return { ok: true };
 	}
 
-	await collections.mlServices.updateOne(
-		{ _id: serviceId, stopRequestedAt: now },
-		{ $unset: { stopRequestedAt: "" } }
-	);
+	await unmark();
 	logger.warn({ ...logFields, ...result }, "[mlRegistry] stopping a sandbox failed");
 	return result.state === "refused"
 		? refused(502, `The Hub refused to stop the sandbox (HTTP ${result.status}).`)

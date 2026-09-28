@@ -192,6 +192,23 @@ describe.sequential("marking an end", () => {
 		expect(row.lastReportedStage).toBeUndefined();
 	});
 
+	it("finds a stop the user made after the poller claimed the row, and wakes nothing", async () => {
+		const conversationId = await insertConversation();
+		const claimed = await insertService(conversationId, { kind: "sandbox" });
+		await collections.mlServices.updateOne(
+			{ _id: claimed._id },
+			{ $set: { stopRequestedAt: new Date(NOW.getTime() - SECOND) } }
+		);
+		stubJobApi({ status: { stage: "CANCELED" } });
+
+		await pollService(claimed, TOKEN, NOW);
+
+		const row = await readService(claimed._id);
+		expect(row.stage).toBe("CANCELED");
+		expect(row.eventPendingSince).toBeUndefined();
+		expect(row.lastReportedStage).toBeUndefined();
+	});
+
 	it("does not report a discovered row that had already ended on its first poll", async () => {
 		const conversationId = await insertConversation();
 		const service = await insertService(conversationId, { origin: "discovered", stage: "UNKNOWN" });

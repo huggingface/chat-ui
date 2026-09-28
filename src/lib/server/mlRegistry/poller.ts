@@ -130,6 +130,16 @@ async function settleHold(service: MlService, lookup: EndedJobLookup): Promise<v
 	});
 }
 
+// the pane marks before it cancels, so a fresh read after a seen end has the mark
+async function withStopMark(service: MlService): Promise<MlService> {
+	if (service.kind !== "sandbox" || service.stopRequestedAt) return service;
+	const fresh = await collections.mlServices.findOne(
+		{ _id: service._id },
+		{ projection: { stopRequestedAt: 1 } }
+	);
+	return fresh?.stopRequestedAt ? { ...service, stopRequestedAt: fresh.stopRequestedAt } : service;
+}
+
 /** every path writes the next due time or unsets it for good, so a claimed row never sits on its lease */
 export async function pollService(
 	service: MlService,
@@ -177,6 +187,9 @@ export async function pollService(
 		const pushes = mlPushChecksEnabled()
 			? await checkServicePushes({ service, startedAt, endedAt, token })
 			: undefined;
+		const eventFields = mlServiceEventsEnabled()
+			? endEventFields(await withStopMark(service), stage, now)
+			: {};
 		await writeRow(service, {
 			$set: {
 				stage,
@@ -188,7 +201,7 @@ export async function pollService(
 				...(job ? fillFromBody(service, job) : {}),
 				stageBeforeEnd: previousStage,
 				...(pushes?.length ? { pushes } : {}),
-				...(mlServiceEventsEnabled() ? endEventFields(service, stage, now) : {}),
+				...eventFields,
 			},
 			$unset: {
 				nextPollAt: "",
