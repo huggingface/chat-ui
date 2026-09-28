@@ -41,11 +41,33 @@ export type Message = Partial<Timestamps> & {
 		provider?: InferenceProvider;
 	};
 
+	/** what the latest run ran under, ml assistant only, never sent to the model */
+	harness?: MessageHarness;
+
 	// needed for conversation trees
 	ancestors?: Message["id"][];
 
 	// goes one level deep
 	children?: Message["id"][];
+};
+
+export type MessageHarness = {
+	/** PUBLIC_COMMIT_SHA of the build, dev when unset */
+	build: string;
+	/** first 12 hex of the sha256 of the preset prompt, tool doctrine and builtin tool text sent */
+	prompt: string;
+	features: {
+		virtualFiles: boolean;
+		stateBlock: boolean;
+		servicePoller: boolean;
+		serviceEvents: boolean;
+		slidingWindow: boolean;
+	};
+	model: string;
+	/** the provider ML_ASSISTANT_MODELS pins the model to, when it pins one */
+	provider?: string;
+	/** runs stamped on this message, this one included */
+	runs: number;
 };
 
 export type MessageFile = {

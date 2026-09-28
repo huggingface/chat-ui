@@ -2,7 +2,7 @@ import type { InferenceProvider } from "@huggingface/inference";
 import type { ToolCall, ToolResult } from "$lib/types/Tool";
 import type { PlanStep } from "$lib/types/Plan";
 import type { TurnStatus } from "$lib/types/TurnState";
-import type { MlServiceKind } from "$lib/types/MlService";
+import type { MlServiceKind, ServicePush } from "$lib/types/MlService";
 import type {
 	ElicitationAction,
 	ElicitationRequestPayload,
@@ -23,7 +23,8 @@ export type MessageUpdate =
 	| MessagePlanUpdate
 	| MessageBudgetUpdate
 	| MessageTurnStateUpdate
-	| MessageHarnessEventUpdate;
+	| MessageHarnessEventUpdate
+	| MessageNoticeUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -39,6 +40,7 @@ export enum MessageUpdateType {
 	Budget = "budget",
 	TurnState = "turnState",
 	HarnessEvent = "harnessEvent",
+	Notice = "notice",
 }
 
 /**
@@ -273,6 +275,7 @@ export interface HarnessServiceEvent {
 	from: string;
 	to: string;
 	ranSeconds?: number;
+	pushes?: ServicePush[];
 	/** epoch ms */
 	at: number;
 }
@@ -286,4 +289,10 @@ export interface MessageHarnessEventUpdate {
 	events: HarnessServiceEvent[];
 	text: string;
 	afterToolUuid: string;
+}
+
+/** shown to the user in the turn and never sent to the model, like how much of a file it saw */
+export interface MessageNoticeUpdate {
+	type: MessageUpdateType.Notice;
+	text: string;
 }

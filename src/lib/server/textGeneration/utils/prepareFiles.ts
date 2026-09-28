@@ -1,7 +1,5 @@
-import type { MessageFile } from "$lib/types/Message";
 import type { EndpointMessage } from "$lib/server/endpoints/endpoints";
 import type { OpenAI } from "openai";
-import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
 import { stripThink } from "$lib/utils/stripThink";
 import { stripLoneSurrogates } from "./loneSurrogates";
 import type { makeImageProcessor } from "$lib/server/endpoints/images";
@@ -31,6 +29,7 @@ import {
 	windowLimitChars,
 	type HistoryUnit,
 } from "./historyWindow";
+import { prepareAttachments, type AttachmentMode, type AttachmentReport } from "./attachmentBudget";
 
 type ChatMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -350,6 +349,11 @@ export type HistoryOptions = {
 	slidingWindow?: boolean;
 	/** where the window start is kept, without it every request picks its own start */
 	window?: { conversationId: ObjectId; stored?: StoredHistoryWindow };
+	/** minimal after the provider refused the request for its size */
+	attachments?: AttachmentMode;
+	/** the truncation marker points at jobs and sandboxes */
+	mlAssistant?: boolean;
+	onAttachments?: (report: AttachmentReport) => void;
 };
 
 /**
@@ -383,6 +387,7 @@ export async function prepareMessagesWithFiles(
 	options?: HistoryOptions
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
 	const history = await prepareHistory(messages, imageProcessor, isMultimodal, options);
+	options?.onAttachments?.(history.attachments);
 	if (!history.units || !options?.contextLengthTokens) return history.messages;
 	const limitChars = windowLimitChars(options.contextLengthTokens, options.maxOutputTokens);
 	const fixedChars = PROMPT_OVERHEAD_TOKENS * CHARS_PER_TOKEN;
@@ -408,14 +413,20 @@ export async function prepareHistory(
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
 	isMultimodal: boolean,
 	options?: HistoryOptions
-): Promise<{ messages: ChatMessageParam[]; units?: HistoryUnit[] }> {
+): Promise<{ messages: ChatMessageParam[]; units?: HistoryUnit[]; attachments: AttachmentReport }> {
 	const sliding = Boolean(
 		options?.slidingWindow && options.contextLengthTokens && options.contextLengthTokens > 0
 	);
-	const prepared = await prepareEntries(messages, imageProcessor, isMultimodal, options, !sliding);
-	if (!sliding) return { messages: legacyBudget(prepared, options) };
+	const { prepared, attachments } = await prepareEntries(
+		messages,
+		imageProcessor,
+		isMultimodal,
+		options,
+		!sliding
+	);
+	if (!sliding) return { messages: legacyBudget(prepared, options), attachments };
 	const units = historyUnits(messages, prepared);
-	return { messages: units.flatMap((unit) => unit.messages), units };
+	return { messages: units.flatMap((unit) => unit.messages), units, attachments };
 }
 
 function historyUnits(messages: HistoryMessage[], prepared: PreparedEntry[]): HistoryUnit[] {
@@ -448,77 +459,67 @@ async function prepareEntries(
 	isMultimodal: boolean,
 	options: HistoryOptions | undefined,
 	capToolOutputs: boolean
-): Promise<PreparedEntry[]> {
-	return Promise.all(
-		messages.map(async (message): Promise<PreparedEntry> => {
-			if (message.from === "user" && message.files && message.files.length > 0) {
-				const { imageParts, textContent } = await prepareFiles(
-					imageProcessor,
-					message.files,
-					isMultimodal
-				);
+): Promise<{ prepared: PreparedEntry[]; attachments: AttachmentReport }> {
+	const { contentOf, report } = await prepareAttachments(messages, imageProcessor, isMultimodal, {
+		limitChars: options?.contextLengthTokens
+			? windowLimitChars(options.contextLengthTokens, options.maxOutputTokens)
+			: undefined,
+		mode: options?.attachments,
+		mlAssistant: options?.mlAssistant,
+	});
+	const prepared = messages.map((message, index): PreparedEntry => {
+		if (message.from === "user") {
+			return [{ role: "user", content: contentOf(index) }];
+		}
+		if (message.from === "assistant") {
+			const wantsReasoning =
+				(options?.replayToolHistory
+					? (options?.attachReasoning ?? true)
+					: Boolean(options?.attachReasoning)) &&
+				reasoningProducerMatches(message, options?.currentProducerModel);
 
-				let messageText = message.content;
-				if (textContent.length > 0) {
-					messageText = textContent + "\n\n" + message.content;
-				}
-
-				if (imageParts.length > 0 && isMultimodal) {
-					const parts = [{ type: "text" as const, text: messageText }, ...imageParts];
-					return [{ role: message.from, content: parts }];
-				}
-
-				return [{ role: message.from, content: messageText }];
-			}
-			if (message.from === "assistant") {
-				const wantsReasoning =
-					(options?.replayToolHistory
-						? (options?.attachReasoning ?? true)
-						: Boolean(options?.attachReasoning)) &&
-					reasoningProducerMatches(message, options?.currentProducerModel);
-
-				// flat forms need every round text, which the rounds shape keeps out of content
-				const legacy = rebuildLegacyContent(message);
-				if (options?.replayToolHistory) {
-					// The budget-fallback `flat` must still strip <think>, not just
-					// drop the reasoning_content/tool-replay enrichments: the raw
-					// string leaks reasoning as visible content to every model that
-					// falls back to it, including ones (e.g. Gemma) whose vendor
-					// requires historical thoughts to be stripped regardless of the
-					// replay budget.
-					const flat: ChatMessageParam = {
-						role: "assistant",
-						content: stripThink(legacy.content),
-					};
-					return {
-						replay: replayAssistantTurn(message, wantsReasoning, capToolOutputs),
-						flat,
-					};
-				}
-				const { visible, parts } = splitReasoning(legacy.content, legacy.reasoning);
-				const reasoning = parts.join("\n");
-				if (!wantsReasoning || reasoning.length === 0) {
-					// Either nothing to attach, or attachment is disabled/gated:
-					// either way `visible` (think-stripped) is the correct shape,
-					// never the raw `message.content` — but a turn interrupted
-					// before any visible text (or one whose only content was
-					// reasoning this call is gated from attaching) must not replay
-					// as a phantom `{role: assistant, content: ""}` with nothing
-					// else attached; omit it entirely instead.
-					return visible.length > 0 ? [{ role: "assistant", content: visible }] : [];
-				}
-				// Candidate, not a plain array, so the reasoning payload goes
-				// through the same newest-first budget as tool replay. The
-				// fallback keeps the same stripped `visible` text and just
-				// drops reasoning_content, for the same reason as above.
+			// flat forms need every round text, which the rounds shape keeps out of content
+			const legacy = rebuildLegacyContent(message);
+			if (options?.replayToolHistory) {
+				// The budget-fallback `flat` must still strip <think>, not just
+				// drop the reasoning_content/tool-replay enrichments: the raw
+				// string leaks reasoning as visible content to every model that
+				// falls back to it, including ones (e.g. Gemma) whose vendor
+				// requires historical thoughts to be stripped regardless of the
+				// replay budget.
+				const flat: ChatMessageParam = {
+					role: "assistant",
+					content: stripThink(legacy.content),
+				};
 				return {
-					replay: [{ role: "assistant", content: visible, reasoning_content: reasoning }],
-					flat: { role: "assistant", content: visible },
+					replay: replayAssistantTurn(message, wantsReasoning, capToolOutputs),
+					flat,
 				};
 			}
-			return [{ role: message.from, content: message.content }];
-		})
-	);
+			const { visible, parts } = splitReasoning(legacy.content, legacy.reasoning);
+			const reasoning = parts.join("\n");
+			if (!wantsReasoning || reasoning.length === 0) {
+				// Either nothing to attach, or attachment is disabled/gated:
+				// either way `visible` (think-stripped) is the correct shape,
+				// never the raw `message.content` — but a turn interrupted
+				// before any visible text (or one whose only content was
+				// reasoning this call is gated from attaching) must not replay
+				// as a phantom `{role: assistant, content: ""}` with nothing
+				// else attached; omit it entirely instead.
+				return visible.length > 0 ? [{ role: "assistant", content: visible }] : [];
+			}
+			// Candidate, not a plain array, so the reasoning payload goes
+			// through the same newest-first budget as tool replay. The
+			// fallback keeps the same stripped `visible` text and just
+			// drops reasoning_content, for the same reason as above.
+			return {
+				replay: [{ role: "assistant", content: visible, reasoning_content: reasoning }],
+				flat: { role: "assistant", content: visible },
+			};
+		}
+		return [{ role: message.from, content: message.content }];
+	});
+	return { prepared, attachments: report };
 }
 
 function legacyBudget(prepared: PreparedEntry[], options?: HistoryOptions): ChatMessageParam[] {
@@ -579,50 +580,4 @@ function legacyBudget(prepared: PreparedEntry[], options?: HistoryOptions): Chat
 		resolved[i] = entry.replay;
 	}
 	return resolved.flat();
-}
-
-async function prepareFiles(
-	imageProcessor: ReturnType<typeof makeImageProcessor>,
-	files: MessageFile[],
-	isMultimodal: boolean
-): Promise<{
-	imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[];
-	textContent: string;
-}> {
-	const imageFiles = files.filter((file) => file.mime.startsWith("image/"));
-	const textFiles = files.filter((file) => {
-		const mime = (file.mime || "").toLowerCase();
-		const [fileType, fileSubtype] = mime.split("/");
-		return TEXT_MIME_ALLOWLIST.some((allowed) => {
-			const [type, subtype] = allowed.toLowerCase().split("/");
-			const typeOk = type === "*" || type === fileType;
-			const subOk = subtype === "*" || subtype === fileSubtype;
-			return typeOk && subOk;
-		});
-	});
-
-	let imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[] = [];
-	if (isMultimodal && imageFiles.length > 0) {
-		const processedFiles = await Promise.all(imageFiles.map(imageProcessor));
-		imageParts = processedFiles.map((file) => ({
-			type: "image_url" as const,
-			image_url: {
-				url: `data:${file.mime};base64,${file.image.toString("base64")}`,
-				detail: "auto",
-			},
-		}));
-	}
-
-	let textContent = "";
-	if (textFiles.length > 0) {
-		const textParts = await Promise.all(
-			textFiles.map(async (file) => {
-				const content = Buffer.from(file.value, "base64").toString("utf-8");
-				return `<document name="${file.name}" type="${file.mime}">\n${content}\n</document>`;
-			})
-		);
-		textContent = textParts.join("\n\n");
-	}
-
-	return { imageParts, textContent };
 }

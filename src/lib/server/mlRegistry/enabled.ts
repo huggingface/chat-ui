@@ -12,3 +12,8 @@ export function mlServicePollerEnabled(): boolean {
 export function mlServiceEventsEnabled(): boolean {
 	return mlServicePollerEnabled() && config.ML_ASSISTANT_SERVICE_EVENTS !== "false";
 }
+
+// its hub reads spend the rate limit of the user token, a few per job end
+export function mlPushChecksEnabled(): boolean {
+	return mlServicePollerEnabled() && config.ML_ASSISTANT_PUSH_CHECKS !== "false";
+}

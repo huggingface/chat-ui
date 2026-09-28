@@ -286,6 +286,19 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("Unpinned is not the safe middle");
 	});
 
+	it("reserves the push destination with create_repo and names it literally in the script", () => {
+		// the push check reads the id out of the script, one built at runtime goes unchecked
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("Reserve it first");
+		expect(jobs).toContain("create the destination repo with create_repo");
+		expect(jobs).toContain("the way create_trackio reserves a dashboard");
+		expect(jobs).toContain(
+			'put its id in the script literally — hub_model_id="<namespace>/<name>"'
+		);
+		expect(jobs).toContain("never an id built at runtime");
+	});
+
 	it("names the dashboard through create_trackio, and verifies a metric lands", () => {
 		// init() succeeds and reports a live dashboard against a Space that 500s
 		// every write; reading a metric back is what catches it.

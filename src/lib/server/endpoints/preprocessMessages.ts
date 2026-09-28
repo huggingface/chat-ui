@@ -9,35 +9,21 @@ export async function preprocessMessages(
 ): Promise<EndpointMessage[]> {
 	return Promise.resolve(messages)
 		.then((msgs) => downloadFiles(msgs, convId))
-		.then((msgs) => injectClipboardFiles(msgs))
 		.then(stripEmptyInitialSystemMessage);
 }
 
+/** pasted text stays a file, the prompt builder inlines it within the attachment budget */
 async function downloadFiles(messages: Message[], convId: ObjectId): Promise<EndpointMessage[]> {
 	return Promise.all(
 		messages.map<Promise<EndpointMessage>>((message) =>
-			Promise.all((message.files ?? []).map((file) => downloadFile(file.value, convId))).then(
-				(files) => ({ ...message, files })
-			)
+			Promise.all(
+				(message.files ?? []).map(async (file) => {
+					const downloaded = await downloadFile(file.value, convId);
+					// the bucket names a file by conversation id and hash, the message keeps the uploaded name
+					return { ...downloaded, name: file.name || downloaded.name };
+				})
+			).then((files) => ({ ...message, files }))
 		)
-	);
-}
-
-async function injectClipboardFiles(messages: EndpointMessage[]) {
-	return Promise.all(
-		messages.map((message) => {
-			const plaintextFiles = message.files
-				?.filter((file) => file.mime === "application/vnd.chatui.clipboard")
-				.map((file) => Buffer.from(file.value, "base64").toString("utf-8"));
-
-			if (!plaintextFiles || plaintextFiles.length === 0) return message;
-
-			return {
-				...message,
-				content: `${plaintextFiles.join("\n\n")}\n\n${message.content}`,
-				files: message.files?.filter((file) => file.mime !== "application/vnd.chatui.clipboard"),
-			};
-		})
 	);
 }
 

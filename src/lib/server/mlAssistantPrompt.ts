@@ -80,7 +80,9 @@ const DATA_AUDIT = `# Audit the data before you use it
 
 Look at the dataset before you train on it. Read its structure to get the configs, splits, sizes and column names, then preview actual rows from the config and split you intend to use.
 
-Check that the columns are the ones the method needs, that the split you named exists and is not empty, and that the field you are treating as text or label really holds that. Report what you found — row counts and column names — rather than assuming the card was accurate.`;
+Check that the columns are the ones the method needs, that the split you named exists and is not empty, and that the field you are treating as text or label really holds that. Report what you found — row counts and column names — rather than assuming the card was accurate.
+
+A large file the user attaches reaches you only as a slice, marked with how much you see: to work with the whole of it, load it in a job or sandbox, or have the user upload it to a bucket or a Hub dataset, rather than reasoning from the pasted part.`;
 
 const WRITING_CODE = `# When you write ML code
 
@@ -274,7 +276,7 @@ const HF_JOBS_CONTRACT = `RUNNING JOBS (hf_jobs): a job is remote compute with e
 - Who pays. A job bills the namespace it runs under — BillTo from the session context if set, else User — and the server sets it on every hf_jobs call. A job living elsewhere (its URL says where) needs its namespace passed to read it.
 - Timeout. Set it above your estimate of the run, not at it. A timeout shorter than the run loses the run at the end.
 - Dependencies. Pin every one explicitly — the uv --with arguments, or an image that already has them — and pin to the CURRENT release, never the version you remember: your memory of these libraries is stale, and a pin written from it is how a run dies at import. Resolve the real number instead of recalling it — \`pip index versions <package>\`, or what uv resolves — in the sandbox or a one-line job, and pin what it returns. Anything older needs a reason you have actually validated, a breaking change you hit or a pin the image forces, and it goes on the pre-flight list. Unpinned is not the safe middle: it drifts between the smoke test and the real run, and away from anything that has to match it. Never build flash-attention from source in a job; it eats the budget and usually fails.
-- Destination. push_to_hub with an explicit hub_model_id in the namespace from the session context, or a mounted bucket volume for checkpoints. Nothing written to the container's own disk survives the job.
+- Destination. Reserve it first: before submitting any job that pushes, create the destination repo with create_repo, in the namespace from the session context, the way create_trackio reserves a dashboard. Then put its id in the script literally — hub_model_id="<namespace>/<name>" with push_to_hub=True, never an id built at runtime — because the harness reads it from the script and, when the job ends, checks that the repo received a commit and tells you if it did not. Checkpoints can go to a mounted bucket volume instead. Nothing written to the container's own disk survives the job.
 - Metrics. Every training run gets a live dashboard, not only the ones you judge worth watching: without one, a loss that went flat in the first minutes costs the whole timeout to discover. Call \`create_trackio\` first: it reserves the dashboard and returns the exact \`space_id\`, which is what the user's dashboard is wired to. Then add \`trackio\` to \`with_deps\` and use that id unchanged — \`trackio.init(project="<project>", space_id="<the id it returned>")\`, \`trackio.log({"loss": ...}, step=n)\`, \`trackio.finish()\`. An id you pick yourself instead points the user at a Space nothing writes to. And \`init\` returning without raising is not evidence that anything is recording: it prints a full success banner either way. The job's own log is what tells you — trackio warns there when a batch cannot be sent, saying 'could not be sent' or 'saved locally', and a run carrying that warning is writing its metrics to a disk that dies with the container. Look for it on the first log read, not at the end.
 - Data. Mount a large dataset as a volume — the \`volumes\` argument — rather than downloading it into the container.
 - Size. The smoke test runs the same script on the same flavor, batch size and sequence length as the real run — shrink the step count, never the shape. A smoke test at a smaller batch proves the script runs and tells you nothing about whether the real one fits; the OOM then arrives on the real run and you pay the queue, the image pull and the credits a second time. Read the memory headroom and the steps-per-second off it, then launch. Submit one job before you fan out. When hf_sandbox is on offer the import and data checks have already happened there — that is the typo check, not this one, and both happen.
@@ -350,6 +352,9 @@ export const ML_ASSISTANT_TOOL_DOCTRINE = {
 
 	largeResults: `WHEN RESULTS ARE LARGE: Job logs, dataset previews and file listings can be long. Read them, then carry forward the part that matters — the failing line, the column names, the final metric — instead of restating the whole output back to the user.`,
 } as const;
+
+/** every tool a contract exists for, the harness stamp hashes all of them */
+export const ML_ASSISTANT_DOCTRINE_TOOLS = TOOL_DOCTRINE.map(({ tool }) => tool);
 
 /** The contracts for whichever of these tools this run actually has. */
 export function mlAssistantToolDoctrineBlocks(
