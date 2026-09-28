@@ -149,7 +149,8 @@ describe("ToolUpdate virtual file chips", () => {
 		expect(sidePane.registryFocus).toEqual({ name: "train.py", version: 2 });
 		await vi.waitFor(() => {
 			const row = pane.container.querySelector(".ml-version[data-version='2']");
-			expect(row?.querySelector(".ml-version-toggle")?.getAttribute("aria-pressed")).toBe("true");
+			const pill = pane.container.querySelector(".ml-version-pill[data-version='2']");
+			expect(pill?.getAttribute("aria-pressed")).toBe("true");
 			expect(row?.querySelector(".ml-file-code .diff-add")?.textContent).toBe("+ print(2)");
 		});
 		expect(pane.container.querySelector(".ml-file-toggle")?.getAttribute("aria-expanded")).toBe(

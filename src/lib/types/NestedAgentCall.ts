@@ -13,6 +13,8 @@ export interface NestedAgentCall {
 	conversationId?: Conversation["_id"];
 	messageId?: Message["id"];
 	generationId?: string;
+	/** the mlAgentRuns row of the run that made the call, which outlives this one */
+	agentRunId?: string;
 	/** "sandbox", "research", "job-watcher". */
 	label: string;
 	iteration: number;

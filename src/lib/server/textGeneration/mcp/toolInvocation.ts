@@ -114,7 +114,7 @@ export interface ExecuteToolCallsParams {
 	 * what a builtin records its writes under when there is no elicitation context, a
 	 * sub-agent version lands on the parent message
 	 */
-	attribution?: { messageId?: string; generationId?: string; agent?: string };
+	attribution?: { messageId?: string; generationId?: string; agent?: string; agentRunId?: string };
 	/** Locally-executed tools, dispatched before the MCP mapping lookup. */
 	builtinTools?: BuiltinTool[];
 	/** Policy gate consulted around every MCP dispatch (not builtins) — see toolGuard.ts. */
@@ -418,6 +418,7 @@ export async function* executeToolCalls({
 					messageId: elicitation?.messageId ?? attribution?.messageId,
 					generationId: elicitation?.generationId ?? attribution?.generationId,
 					...(attribution?.agent ? { agent: attribution.agent } : {}),
+					...(attribution?.agentRunId ? { agentRunId: attribution.agentRunId } : {}),
 					elicitationSink,
 					abortSignal,
 				});

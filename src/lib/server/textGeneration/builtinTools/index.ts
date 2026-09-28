@@ -46,7 +46,7 @@ export function getEnabledBuiltinTools(params: {
 		askUserQuestionBuiltin,
 		createPlanTool(params.conv),
 		createWaitTool({ serviceEvents: mlServiceEventsEnabled() }),
-		...githubGroundingBuiltins(),
+		...githubGroundingBuiltins(params.conv._id),
 		createResearchTool(),
 		createSandboxTool({ virtualFiles }),
 		createJobCheckTool({ virtualFiles }),

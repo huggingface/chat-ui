@@ -1,6 +1,7 @@
 import MlAssistantStrip from "./MlAssistantStrip.svelte";
 import { render } from "vitest-browser-svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { tick } from "svelte";
 import type { MlPlanStep } from "$lib/types/MlAssistant";
 import { sidePane } from "$lib/stores/sidePane.svelte";
 
@@ -555,7 +556,7 @@ describe("MlAssistantStrip services control", () => {
 
 	const NEUTRAL_INK = "rgb(87, 83, 78)";
 	const control = (root: ParentNode) =>
-		root.querySelector<HTMLButtonElement>("button[aria-label^='Services and artefacts']");
+		root.querySelector<HTMLButtonElement>("button[aria-label^='Services and artifacts']");
 
 	it("stays hidden until the registry holds anything", () => {
 		expect(control(mount().container)).toBeNull();
@@ -588,11 +589,27 @@ describe("MlAssistantStrip services control", () => {
 		expect(queued?.querySelector(".ml-registry-live")).toBeNull();
 	});
 
-	it("opens the registry view of the side pane", () => {
+	it("opens the registry view of the side pane, and closes it when clicked again", async () => {
 		const { container } = mount({ registry: { rows: 2, open: 1, running: 1 } });
-		control(container)?.click();
+		const button = control(container);
+		button?.click();
 
 		expect(sidePane.open).toBe(true);
+		expect(sidePane.view).toBe("registry");
+		await tick();
+		expect(button?.getAttribute("aria-expanded")).toBe("true");
+		expect(button?.getAttribute("aria-label")).toBe(
+			"Services and artifacts: 1 running. Close the list"
+		);
+
+		button?.click();
+		expect(sidePane.open).toBe(false);
+	});
+
+	it("opens the registry when another view holds the side pane", () => {
+		const { container } = mount({ registry: { rows: 2, open: 0, running: 0 } });
+		sidePane.openTrackio("https://x.hf.space", "x/y");
+		control(container)?.click();
 		expect(sidePane.view).toBe("registry");
 	});
 
