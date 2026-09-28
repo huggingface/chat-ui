@@ -872,6 +872,31 @@ describe("claiming an answered prompt's continuation", () => {
 		});
 	});
 
+	it("does not let a stalled holder consume a claim a pod on older code took over", async () => {
+		const elicitationId = await answeredRow();
+		const stale = await claimElicitationResume(conversationId, elicitationId);
+		if (!stale?.resume) throw new Error("expected the claim");
+		const takenOverAt = new Date(stale.resume.takenAt.getTime() + RESUME_LEASE_MS + 1_000);
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId },
+			{
+				$set: {
+					"resume.status": "resuming",
+					"resume.takenAt": takenOverAt,
+					updatedAt: takenOverAt,
+				},
+				$inc: { "resume.attempts": 1 },
+			}
+		);
+
+		await finishElicitationResume(stale);
+		await releaseElicitationResume(stale);
+
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "resuming", takenAt: takenOverAt, claimId: stale.resume.claimId },
+		});
+	});
+
 	it("moves updatedAt, so an answer replacing a system close cannot land under a claim", async () => {
 		const closedAt = new Date(Date.now() - 5_000);
 		const elicitationId = await answeredRow({
