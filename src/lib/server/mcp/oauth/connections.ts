@@ -68,12 +68,19 @@ export class OAuthAuthorizationRequiredError extends Error {
 	}
 }
 
+function hasUsableTokens(tokens: MCPOAuthTokens | undefined): boolean {
+	if (!tokens) return false;
+	return Boolean(tokens.refresh_token) || !accessTokenHasExpired(tokens);
+}
+
 export function publicOAuthState(connection: MCPOAuthConnection): MCPOAuthState {
 	return {
 		connectionId: connection._id.toString(),
 		issuer: connection.asMetadata.issuer,
 		status:
-			connection.tokens && !connection.scopeChallenge ? "authorized" : "authorization_required",
+			hasUsableTokens(connection.tokens) && !connection.scopeChallenge
+				? "authorized"
+				: "authorization_required",
 		refreshable: Boolean(connection.tokens?.refresh_token),
 		scope:
 			connection.scopeChallenge?.scope ?? connection.tokens?.scope ?? connection.requestedScope,
@@ -190,6 +197,11 @@ export async function saveAuthorizationFlow(
 				flow: encryptFlow(input.flow),
 				status: "authorization_required",
 				updatedAt: new Date(),
+				// Discovery gave it 15 minutes; a user registering a client in the AS console first can
+				// start later than that, so restart the clock or the TTL monitor deletes it mid-flow.
+				...(connection.tokens
+					? {}
+					: { deleteAt: new Date(Date.now() + ABANDONED_CONNECTION_TTL_MS) }),
 			},
 			$inc: { version: 1 },
 		},
@@ -232,10 +244,13 @@ export async function storeAuthorizationTokens(
 	tokens: MCPOAuthTokens
 ): Promise<MCPOAuthConnection> {
 	const sessionOwned = Boolean(oauthConnectionOwner(locals).sessionId);
+	// Guarded on grantVersion, not version: a newer authorization must win over a stale exchange, but
+	// a refresh or scope challenge from another tab while the popup was open must not discard a code
+	// that has already been exchanged.
 	const updated = await collections.mcpOAuthConnections.findOneAndUpdate(
 		{
 			...connectionFilter(locals, connection._id.toString()),
-			version: connection.version,
+			grantVersion: connection.grantVersion ?? { $exists: false },
 		},
 		{
 			$set: {
@@ -250,7 +265,7 @@ export async function storeAuthorizationTokens(
 				updatedAt: new Date(),
 			},
 			$unset: { scopeChallenge: "" },
-			$inc: { version: 1 },
+			$inc: { version: 1, grantVersion: 1 },
 		},
 		{ returnDocument: "after", includeResultMetadata: false }
 	);
@@ -302,6 +317,13 @@ async function refreshConnection(
 			throw new OAuthAuthorizationRequiredError("OAuth client registration is missing");
 		}
 
+		// Guard writes on the token set we refreshed rather than the document version: a scope challenge
+		// or flow start bumps the version too, and missing the write would drop a rotated refresh token
+		// the AS has already invalidated the old one for.
+		const sameTokens: Filter<MCPOAuthConnection> = {
+			...connectionFilter(locals, connectionId),
+			"tokens.expires_at": current.tokens.expires_at,
+		};
 		let fresh: MCPOAuthTokens;
 		try {
 			const response = await refreshTokens({
@@ -313,17 +335,11 @@ async function refreshConnection(
 			fresh = tokensWithExpiresAt(response);
 		} catch (error) {
 			if (isRefreshGrantRejected(error)) {
-				await collections.mcpOAuthConnections.updateOne(
-					{
-						...connectionFilter(locals, connectionId),
-						version: current.version,
-					},
-					{
-						$unset: { tokens: "" },
-						$set: { status: "authorization_required", updatedAt: new Date() },
-						$inc: { version: 1 },
-					}
-				);
+				await collections.mcpOAuthConnections.updateOne(sameTokens, {
+					$unset: { tokens: "" },
+					$set: { status: "authorization_required", updatedAt: new Date() },
+					$inc: { version: 1 },
+				});
 				throw new OAuthAuthorizationRequiredError("MCP authorization must be renewed");
 			}
 			throw error;
@@ -334,12 +350,9 @@ async function refreshConnection(
 			refresh_token: fresh.refresh_token ?? current.tokens.refresh_token,
 		};
 		const updated = await collections.mcpOAuthConnections.findOneAndUpdate(
+			sameTokens,
 			{
-				...connectionFilter(locals, connectionId),
-				version: current.version,
-			},
-			{
-				$set: { tokens: encryptTokens(nextTokens), status: "authorized", updatedAt: new Date() },
+				$set: { tokens: encryptTokens(nextTokens), updatedAt: new Date() },
 				$inc: { version: 1 },
 			},
 			{ returnDocument: "after", includeResultMetadata: false }
@@ -354,10 +367,13 @@ async function refreshConnection(
 export async function resolveOAuthAccessToken(
 	locals: App.Locals,
 	connectionId: string,
-	expectedServerUrl: string
+	expectedServerUrl: string | undefined
 ): Promise<{ accessToken: string; state: MCPOAuthState }> {
 	let connection = await getOAuthConnection(locals, connectionId);
-	if (connection.serverUrl !== canonicalizeMcpUri(expectedServerUrl)) {
+	if (
+		expectedServerUrl !== undefined &&
+		connection.serverUrl !== canonicalizeMcpUri(expectedServerUrl)
+	) {
 		throw new OAuthConnectionAccessError("OAuth connection is bound to a different MCP resource");
 	}
 	if (connection.scopeChallenge) {
@@ -437,7 +453,7 @@ export async function captureInsufficientScopeResponse(
 
 // Revoke every token the connection holds (RFC 7009). Returns true only if every attempted
 // revocation was confirmed, so a partial failure is treated as "may still be live".
-async function revokeConnectionTokens(connection: MCPOAuthConnection): Promise<boolean> {
+export async function revokeConnectionTokens(connection: MCPOAuthConnection): Promise<boolean> {
 	const asMetadata = connection.asMetadata as AuthorizationServerMetadata;
 	const clientInfo = connection.clientInfo as OAuthClientInformationFull;
 	const results: boolean[] = [];

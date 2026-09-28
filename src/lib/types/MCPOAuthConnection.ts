@@ -44,5 +44,7 @@ export interface MCPOAuthConnection extends Timestamps {
 	flow?: MCPOAuthAuthorizationFlow;
 	status: "authorization_required" | "authorized";
 	version: number;
+	/** Bumped only when an authorization's tokens are stored; refreshes and scope challenges leave it. */
+	grantVersion?: number;
 	deleteAt?: Date;
 }

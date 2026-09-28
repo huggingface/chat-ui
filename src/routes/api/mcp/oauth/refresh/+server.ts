@@ -2,7 +2,7 @@ import { z } from "zod";
 import { error, json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { logger } from "$lib/server/logger";
-import { getOAuthConnection, resolveOAuthAccessToken } from "$lib/server/mcp/oauth/connections";
+import { resolveOAuthAccessToken } from "$lib/server/mcp/oauth/connections";
 
 const Body = z.object({
 	connectionId: z.string().min(1),
@@ -17,8 +17,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	try {
-		const connection = await getOAuthConnection(locals, parsed.connectionId);
-		const result = await resolveOAuthAccessToken(locals, parsed.connectionId, connection.serverUrl);
+		const result = await resolveOAuthAccessToken(locals, parsed.connectionId, undefined);
 		return json({ connection: result.state });
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : "Refresh failed";

@@ -17,13 +17,19 @@ import {
 	parseClientInformation,
 } from "./validation";
 
-const REVOKE_TIMEOUT_MS = 10_000;
+// Bounds every token/refresh/revoke request: a refresh runs on the chat send path while holding the
+// per-connection refresh lock, so a hung AS would otherwise stall every send for that connection.
+const OAUTH_ENDPOINT_TIMEOUT_MS = 10_000;
 
 // Token/refresh/revoke requests carry the code, PKCE verifier, client secret, and refresh token —
 // reject redirects so a token endpoint can't forward them to another origin (a compliant endpoint
 // never redirects these). `ssrfSafeFetch`'s default would follow the redirect and resend the body.
 function oauthEndpointFetch(url: string | URL, init?: RequestInit): Promise<Response> {
-	return ssrfSafeFetch(url, { ...init, redirect: "error" });
+	return ssrfSafeFetch(url, {
+		...init,
+		redirect: "error",
+		signal: init?.signal ?? AbortSignal.timeout(OAUTH_ENDPOINT_TIMEOUT_MS),
+	});
 }
 
 export async function buildAuthorizationUrl(args: {
@@ -55,6 +61,7 @@ export async function exchangeCodeForTokens(args: {
 	resource: string;
 	code: string;
 	codeVerifier: string;
+	iss?: string;
 }): Promise<OAuthTokens> {
 	const metadata = parseAuthorizationServerMetadata(args.asMetadata);
 	const clientInformation = parseClientInformation(args.clientInfo);
@@ -63,6 +70,7 @@ export async function exchangeCodeForTokens(args: {
 		metadata,
 		clientInformation,
 		authorizationCode: args.code,
+		iss: args.iss,
 		codeVerifier: args.codeVerifier,
 		redirectUri: args.redirectUri,
 		resource: new URL(args.resource),
@@ -131,8 +139,6 @@ export async function tryRevokeToken(args: {
 				Accept: "application/json",
 			},
 			body,
-			// Bound the request so an AS that accepts but never responds can't hang disconnect forever.
-			signal: AbortSignal.timeout(REVOKE_TIMEOUT_MS),
 		});
 		try {
 			await res.body?.cancel();

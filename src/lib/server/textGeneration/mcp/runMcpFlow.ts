@@ -302,38 +302,43 @@ export async function* runMcpFlow({
 			// Deduplicate by server name (request takes precedence)
 			const byName = new Map<string, McpServerConfig>();
 			for (const s of servers) byName.set(s.name, s);
-			for (const s of custom) {
-				if (!s.oauthConnectionId) {
-					byName.set(s.name, s);
-					continue;
-				}
-				try {
-					const connectionId = s.oauthConnectionId;
-					if (!locals) throw new Error("MCP OAuth requires request ownership context");
-					if (hasAuthHeader(s.headers)) {
-						throw new Error("Use either an OAuth connection or a manual Authorization header");
+			// Resolved together: each can mean a token-endpoint round trip, which sits before the first token.
+			const resolvedCustom = await Promise.all(
+				custom.map(async (s): Promise<McpServerConfig | null> => {
+					if (!s.oauthConnectionId) return s;
+					try {
+						const connectionId = s.oauthConnectionId;
+						if (!locals) throw new Error("MCP OAuth requires request ownership context");
+						if (hasAuthHeader(s.headers)) {
+							throw new Error("Use either an OAuth connection or a manual Authorization header");
+						}
+						const resolved = await resolveOAuthAccessToken(locals, connectionId, s.url);
+						return {
+							name: s.name,
+							url: s.url,
+							headers: {
+								...(s.headers ?? {}),
+								Authorization: `Bearer ${resolved.accessToken}`,
+							},
+							oauthConnectionId: connectionId,
+							oauthChallengeHandler: async (response) => {
+								await captureInsufficientScopeResponse(locals, connectionId, s.url, response);
+							},
+						};
+					} catch (error) {
+						logger.warn(
+							{ server: s.name, err: error instanceof Error ? error.message : String(error) },
+							"[mcp] rejected OAuth connection"
+						);
+						return null;
 					}
-					const resolved = await resolveOAuthAccessToken(locals, s.oauthConnectionId, s.url);
-					byName.set(s.name, {
-						name: s.name,
-						url: s.url,
-						headers: {
-							...(s.headers ?? {}),
-							Authorization: `Bearer ${resolved.accessToken}`,
-						},
-						oauthConnectionId: connectionId,
-						oauthChallengeHandler: async (response) => {
-							await captureInsufficientScopeResponse(locals, connectionId, s.url, response);
-						},
-					});
-				} catch (error) {
-					byName.delete(s.name);
-					logger.warn(
-						{ server: s.name, err: error instanceof Error ? error.message : String(error) },
-						"[mcp] rejected OAuth connection"
-					);
-				}
-			}
+				})
+			);
+			custom.forEach((s, i) => {
+				const resolved = resolvedCustom[i];
+				if (resolved) byName.set(s.name, resolved);
+				else byName.delete(s.name);
+			});
 			servers = [...byName.values()];
 			try {
 				logger.debug(

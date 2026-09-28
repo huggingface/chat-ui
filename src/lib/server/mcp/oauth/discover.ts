@@ -139,6 +139,9 @@ export async function discoverServerOAuth(
 	const discoveredMetadata = await discoverAuthorizationServerMetadata(asUrl, {
 		fetchFn: ssrfSafeFetch as unknown as typeof fetch,
 		protocolVersion: MCP_OAUTH_PROTOCOL_VERSION,
+		// assertIssuerMatches below compares normalised URLs; the SDK's exact-string check would
+		// reject an issuer that differs from the advertised AS only by a trailing slash.
+		skipIssuerValidation: true,
 	});
 	if (!discoveredMetadata) {
 		throw new Error(`Could not load authorization server metadata for ${asUrl}`);

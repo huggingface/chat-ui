@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { error, json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import { getOAuthConnection, publicOAuthState } from "$lib/server/mcp/oauth/connections";
+import {
+	getOAuthConnection,
+	OAuthConnectionAccessError,
+	publicOAuthState,
+} from "$lib/server/mcp/oauth/connections";
 
 const Body = z.object({
 	connectionIds: z.array(z.string().min(1)).max(50),
@@ -23,11 +27,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			try {
 				const connection = await getOAuthConnection(locals, connectionId);
 				return { connectionId, state: publicOAuthState(connection) };
-			} catch {
-				return { connectionId, missing: true as const };
+			} catch (e) {
+				// Only a definite not-found may clear client state; a transient failure is left out so
+				// the client keeps what it has instead of orphaning a live grant.
+				if (e instanceof OAuthConnectionAccessError) {
+					return { connectionId, missing: true as const };
+				}
+				return undefined;
 			}
 		})
 	);
 
-	return json({ states });
+	return json({ states: states.filter((s) => s !== undefined) });
 };

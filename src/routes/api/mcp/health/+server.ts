@@ -5,8 +5,14 @@ import type { KeyValuePair, MCPOAuthState } from "$lib/types/Tool";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import type { RequestHandler } from "./$types";
-import { isValidUrl, mcpFetch } from "$lib/server/urlSafety";
-import { isStrictHfMcpLogin, hasNonEmptyToken, isExaMcpServer } from "$lib/server/mcp/hf";
+import { isValidUrl } from "$lib/server/urlSafety";
+import {
+	hasAuthHeader,
+	isStrictHfMcpLogin,
+	hasNonEmptyToken,
+	isExaMcpServer,
+} from "$lib/server/mcp/hf";
+import { mcpFetchForServer } from "$lib/server/mcp/fetch";
 import {
 	captureInsufficientScopeResponse,
 	getOAuthConnection,
@@ -36,10 +42,13 @@ interface HealthCheckResponse {
 export const POST: RequestHandler = async ({ request, locals }) => {
 	let client: Client | undefined;
 	let oauthState: MCPOAuthState | undefined;
+	let oauthConnectionId: string | undefined;
 
 	try {
 		const body: HealthCheckRequest = await request.json();
-		const { url, headers, oauthConnectionId } = body;
+		const { url, headers } = body;
+		const connectionId = body.oauthConnectionId;
+		oauthConnectionId = connectionId;
 
 		if (!url) {
 			return new Response(JSON.stringify({ ready: false, error: "URL is required" }), {
@@ -82,8 +91,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const headersRecord: Record<string, string> = headers?.length
 			? Object.fromEntries(headers.map((h) => [h.key, h.value]))
 			: {};
-		if (oauthConnectionId) {
-			if (Object.keys(headersRecord).some((key) => key.toLowerCase() === "authorization")) {
+		if (connectionId) {
+			if (hasAuthHeader(headersRecord)) {
 				return new Response(
 					JSON.stringify({
 						ready: false,
@@ -92,8 +101,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					{ status: 400, headers: { "Content-Type": "application/json" } }
 				);
 			}
-			oauthState = publicOAuthState(await getOAuthConnection(locals, oauthConnectionId));
-			const resolved = await resolveOAuthAccessToken(locals, oauthConnectionId, url);
+			const resolved = await resolveOAuthAccessToken(locals, connectionId, url);
 			headersRecord["Authorization"] = `Bearer ${resolved.accessToken}`;
 			oauthState = resolved.state;
 		}
@@ -124,31 +132,21 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			headers: headersRecord,
 			signal,
 		};
-		const outboundFetch: typeof fetch = async (input, init) => {
-			const response = await mcpFetch(
-				input instanceof Request ? input.url : input,
-				input instanceof Request
-					? {
-							method: input.method,
-							headers: input.headers,
-							body: input.body,
-							signal: input.signal,
-							...init,
-						}
-					: init
-			);
-			// Only on error responses: cloning a 2xx (SSE) body deadlocks the stream the MCP SDK reads.
-			if (oauthConnectionId && !response.ok) {
-				const challenged = await captureInsufficientScopeResponse(
-					locals,
-					oauthConnectionId,
-					url,
-					response.clone()
-				).catch(() => undefined);
-				if (challenged) oauthState = challenged;
-			}
-			return response;
-		};
+		const outboundFetch = mcpFetchForServer({
+			name: url,
+			url,
+			oauthChallengeHandler: connectionId
+				? async (response) => {
+						const challenged = await captureInsufficientScopeResponse(
+							locals,
+							connectionId,
+							url,
+							response
+						);
+						if (challenged) oauthState = challenged;
+					}
+				: undefined,
+		});
 
 		let httpError: Error | undefined;
 		let lastError: Error | undefined;
@@ -327,6 +325,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return res;
 	} catch (error) {
 		logger.error(error, "MCP health check failed");
+
+		// Token resolution failed before any state was captured; report the stored state so the card
+		// can offer Authorize.
+		if (oauthConnectionId && !oauthState) {
+			oauthState = await getOAuthConnection(locals, oauthConnectionId)
+				.then(publicOAuthState)
+				.catch(() => undefined);
+		}
 
 		// Clean up client if it exists
 		try {

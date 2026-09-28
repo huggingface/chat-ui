@@ -16,6 +16,7 @@ import type {
 	MCPTool,
 } from "$lib/types/Tool";
 import { disconnectOAuthConnection, discoverServer } from "$lib/utils/mcpOAuth";
+import { error as errorMessage } from "$lib/stores/errors";
 
 // Namespace storage by app identity to avoid collisions across apps
 function toKeyPart(s: string | undefined): string {
@@ -31,6 +32,7 @@ const STORAGE_KEYS = {
 	CUSTOM_SERVERS: `${KEY_PREFIX}:mcp:custom-servers`,
 	SELECTED_IDS: `${KEY_PREFIX}:mcp:selected-ids`,
 	DISABLED_BASE_IDS: `${KEY_PREFIX}:mcp:disabled-base-ids`,
+	BASE_OAUTH: `${KEY_PREFIX}:mcp:base-oauth`,
 } as const;
 
 // No migration needed per request — read/write only namespaced keys
@@ -55,33 +57,87 @@ function loadCustomServers(): MCPServer[] {
 function stripLegacyOAuthSecrets(server: MCPServer): MCPServer {
 	const raw = server.oauth as unknown;
 	if (!raw || typeof raw !== "object") return server;
+	const oauth = sanitizeOAuthState(raw);
+	if (!oauth) {
+		const clean = { ...server };
+		delete clean.oauth;
+		return {
+			...clean,
+			authRequired: Boolean(server.authRequired || (raw as Record<string, unknown>).tokens),
+		};
+	}
+	return { ...server, oauth };
+}
+
+function sanitizeOAuthState(raw: unknown): MCPOAuthState | undefined {
+	if (!raw || typeof raw !== "object") return undefined;
 	const oauth = raw as Record<string, unknown>;
 	if (
 		typeof oauth.connectionId !== "string" ||
 		typeof oauth.issuer !== "string" ||
 		(oauth.status !== "authorized" && oauth.status !== "authorization_required")
 	) {
-		const clean = { ...server };
-		delete clean.oauth;
-		return { ...clean, authRequired: Boolean(server.authRequired || oauth.tokens) };
+		return undefined;
 	}
 	return {
-		...server,
-		oauth: {
-			connectionId: oauth.connectionId,
-			issuer: oauth.issuer,
-			status: oauth.status,
-			refreshable: typeof oauth.refreshable === "boolean" ? oauth.refreshable : undefined,
-			scope: typeof oauth.scope === "string" ? oauth.scope : undefined,
-			expiresAt: typeof oauth.expiresAt === "number" ? oauth.expiresAt : undefined,
-			manualClientRequired:
-				typeof oauth.manualClientRequired === "boolean" ? oauth.manualClientRequired : undefined,
-			clientWasManuallyEntered:
-				typeof oauth.clientWasManuallyEntered === "boolean"
-					? oauth.clientWasManuallyEntered
-					: undefined,
-		},
+		connectionId: oauth.connectionId,
+		issuer: oauth.issuer,
+		status: oauth.status,
+		refreshable: typeof oauth.refreshable === "boolean" ? oauth.refreshable : undefined,
+		scope: typeof oauth.scope === "string" ? oauth.scope : undefined,
+		expiresAt: typeof oauth.expiresAt === "number" ? oauth.expiresAt : undefined,
+		manualClientRequired:
+			typeof oauth.manualClientRequired === "boolean" ? oauth.manualClientRequired : undefined,
+		clientWasManuallyEntered:
+			typeof oauth.clientWasManuallyEntered === "boolean"
+				? oauth.clientWasManuallyEntered
+				: undefined,
 	};
+}
+
+type BaseOAuthEntry = { url: string; oauth: MCPOAuthState };
+
+// Base servers are rebuilt from the server list on every load, so their OAuth connection is kept
+// here, keyed by id and pinned to the URL it was authorized for.
+function loadBaseOAuth(): Map<string, BaseOAuthEntry> {
+	if (!browser) return new Map();
+	try {
+		const json = localStorage.getItem(STORAGE_KEYS.BASE_OAUTH);
+		const parsed = json ? (JSON.parse(json) as unknown) : {};
+		if (!parsed || typeof parsed !== "object") return new Map();
+		const entries = new Map<string, BaseOAuthEntry>();
+		for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
+			const entry = value as Record<string, unknown> | null;
+			const oauth = sanitizeOAuthState(entry?.oauth);
+			if (oauth && typeof entry?.url === "string") entries.set(id, { url: entry.url, oauth });
+		}
+		return entries;
+	} catch (error) {
+		console.error("Failed to load MCP base-server OAuth state from localStorage:", error);
+		return new Map();
+	}
+}
+
+function saveBaseOAuth(servers: MCPServer[]) {
+	if (!browser) return;
+	try {
+		const entries: Record<string, BaseOAuthEntry> = {};
+		for (const s of servers) {
+			if (s.type === "base" && s.oauth) entries[s.id] = { url: s.url, oauth: s.oauth };
+		}
+		localStorage.setItem(STORAGE_KEYS.BASE_OAUTH, JSON.stringify(entries));
+	} catch (error) {
+		console.error("Failed to save MCP base-server OAuth state to localStorage:", error);
+	}
+}
+
+function withStoredBaseOAuth(baseServers: MCPServer[]): MCPServer[] {
+	const stored = loadBaseOAuth();
+	return baseServers.map((server) => {
+		const entry = stored.get(server.id);
+		if (!entry || entry.url !== server.url) return server;
+		return { ...server, oauth: entry.oauth, authRequired: entry.oauth.status !== "authorized" };
+	});
 }
 
 // Load selected server IDs from localStorage
@@ -189,7 +245,8 @@ export const allBaseServersEnabled = derived(
  * the SSR payload, so the store is ready before any child onMount fires.
  * The background refreshMcpServers() call still runs to pick up status changes.
  */
-export function initWithServers(baseServers: MCPServer[]): void {
+export function initWithServers(fetchedBaseServers: MCPServer[]): void {
+	const baseServers = withStoredBaseOAuth(fetchedBaseServers);
 	const customServers = loadCustomServers();
 
 	// Merge base and custom servers
@@ -373,7 +430,7 @@ export function setServerOAuth(id: string, oauth: MCPOAuthState) {
 			...(s.id === id ? { oauth, authRequired: oauth.status !== "authorized" } : {}),
 		}))
 	);
-	persistCustomServers();
+	persistServers();
 }
 
 // Delete the connection, best-effort revoke, then re-discover so the server stays re-authorizable.
@@ -397,13 +454,13 @@ export async function disconnectServerOAuth(
 	);
 	try {
 		if (!rediscover) {
-			persistCustomServers();
+			persistServers();
 			return true;
 		}
 		const discovery = await discoverServer(server.url);
 		if (discovery.connection) setServerOAuth(id, discovery.connection);
 	} catch {
-		persistCustomServers();
+		persistServers();
 	}
 	return true;
 }
@@ -446,13 +503,14 @@ export async function reconcileOAuthConnections(): Promise<void> {
 			setServerOAuth(server.id, entry.state);
 		}
 	}
-	persistCustomServers();
+	persistServers();
 }
 
-function persistCustomServers() {
+function persistServers() {
 	const all = get(allMcpServers);
 	const customs = all.filter((s) => s.type === "custom");
 	saveCustomServers(customs);
+	saveBaseOAuth(all);
 }
 
 /**
@@ -518,7 +576,10 @@ async function consumeOAuthRedirectIfAny() {
 	const result = consumeRedirectHandoff();
 	if (!result) return;
 	const { payload, serverId } = result;
-	if (!payload.ok || !payload.connection) return;
+	if (!payload.ok || !payload.connection) {
+		errorMessage.set(`MCP authorization failed: ${payload.error ?? "unknown error"}`);
+		return;
+	}
 	setServerOAuth(serverId, payload.connection);
 	if (!get(selectedServerIds).has(serverId)) {
 		toggleServer(serverId);

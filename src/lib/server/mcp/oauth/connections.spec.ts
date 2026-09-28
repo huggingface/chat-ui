@@ -190,20 +190,11 @@ describe.sequential("server-side MCP OAuth connections", () => {
 	it("does not let a stale token result overwrite a newer rotated credential", async () => {
 		const locals = createTestLocals();
 		const stale = await createConnection(locals);
-		await collections.mcpOAuthConnections.updateOne(
-			{ _id: stale._id, version: stale.version },
-			{
-				$set: {
-					tokens: {
-						access_token: "winner-access",
-						refresh_token: "winner-refresh",
-						token_type: "Bearer",
-					},
-					status: "authorized",
-				},
-				$inc: { version: 1 },
-			}
-		);
+		await storeAuthorizationTokens(locals, stale, {
+			access_token: "winner-access",
+			refresh_token: "winner-refresh",
+			token_type: "Bearer",
+		});
 
 		await expect(
 			storeAuthorizationTokens(locals, stale, {
@@ -216,6 +207,59 @@ describe.sequential("server-side MCP OAuth connections", () => {
 		const persisted = await collections.mcpOAuthConnections.findOne({ _id: stale._id });
 		expect(persisted?.tokens?.access_token).toBe("winner-access");
 		expect(persisted?.tokens?.refresh_token).toBe("winner-refresh");
+	});
+
+	it("stores an exchanged code even if a scope challenge bumped the version meanwhile", async () => {
+		const locals = createTestLocals();
+		const connection = await createConnection(locals);
+		await recordInsufficientScope(
+			locals,
+			connection._id.toString(),
+			connection.serverUrl,
+			"tools:write"
+		);
+
+		const stored = await storeAuthorizationTokens(locals, connection, {
+			access_token: "fresh-access",
+			token_type: "Bearer",
+		});
+		expect(stored.tokens?.access_token).toBe("fresh-access");
+	});
+
+	it("keeps a pending connection alive for the whole authorization flow", async () => {
+		const locals = createTestLocals();
+		const connection = await createConnection(locals);
+		const discoveryExpiry = connection.deleteAt?.getTime() ?? 0;
+		await collections.mcpOAuthConnections.updateOne(
+			{ _id: connection._id },
+			{ $set: { deleteAt: new Date(Date.now() + 60_000) } }
+		);
+
+		await saveAuthorizationFlow(locals, connection, {
+			clientInfo,
+			clientWasManuallyEntered: false,
+			flow: {
+				id: crypto.randomUUID(),
+				expectedState: crypto.randomUUID(),
+				verifier: "abcdefghijklmnopqrstuvwxyz-abcdefghijklmnopqrstuvwxyz",
+				redirectUri: "https://chat.example.com/api/mcp/oauth/callback",
+				popupMode: true,
+				expiresAt: new Date(Date.now() + 10 * 60_000),
+			},
+		});
+
+		const persisted = await collections.mcpOAuthConnections.findOne({ _id: connection._id });
+		expect(persisted?.deleteAt?.getTime()).toBeGreaterThanOrEqual(discoveryExpiry);
+	});
+
+	it("reports an expired token that cannot be refreshed as needing authorization", async () => {
+		const locals = createTestLocals();
+		const connection = await createConnection(locals);
+		const state = publicOAuthState({
+			...connection,
+			tokens: { access_token: "a", token_type: "Bearer", expires_at: Date.now() - 1_000 },
+		});
+		expect(state.status).toBe("authorization_required");
 	});
 
 	it("records bounded runtime scope upgrades without counting duplicate responses", async () => {

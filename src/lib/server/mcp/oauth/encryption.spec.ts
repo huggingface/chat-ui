@@ -89,4 +89,23 @@ describe("MCP OAuth credential encryption", () => {
 		expect(decrypted.clientInfo?.client_secret).toBe("csecret");
 		expect(decrypted.flow?.verifier).toBe("pkce-verifier");
 	});
+
+	it("drops secrets it cannot decrypt so the connection needs re-authorization", () => {
+		const tampered = (value: string) => value.slice(0, -2) + (value.endsWith("AA") ? "BB" : "AA");
+		const tokens = encryptTokens({
+			access_token: "acc",
+			refresh_token: "ref",
+			token_type: "Bearer",
+		});
+		const decrypted = decryptConnection({
+			tokens: { ...tokens, access_token: tampered(tokens.access_token) },
+			clientInfo: encryptClientInfo({
+				client_id: "cid",
+				client_secret: "csecret",
+				redirect_uris: ["https://x/cb"],
+			}),
+		} as unknown as MCPOAuthConnection);
+		expect(decrypted.tokens).toBeUndefined();
+		expect(decrypted.clientInfo?.client_secret).toBe("csecret");
+	});
 });

@@ -6,14 +6,17 @@ import { oauthCallbackUri, safeLocalReturnPath } from "$lib/server/mcp/oauth/red
 import {
 	consumeAuthorizationFlow,
 	publicOAuthState,
+	revokeConnectionTokens,
 	storeAuthorizationTokens,
 } from "$lib/server/mcp/oauth/connections";
+import { base } from "$app/paths";
+import { config } from "$lib/server/config";
 import { assertAuthorizationResponseIssuer } from "$lib/server/mcp/oauth/validation";
 import type { MCPOAuthState } from "$lib/types/Tool";
 import type {
 	AuthorizationServerMetadata,
 	OAuthClientInformationFull,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@modelcontextprotocol/client";
 
 interface PopupResultMessage {
 	ok: boolean;
@@ -31,8 +34,18 @@ function jsonForInlineScript(value: unknown): string {
 		.replace(/[\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
 }
 
+function escapeHtml(value: string): string {
+	return value
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
+}
+
 function popupResponse(origin: string, message: PopupResultMessage): Response {
 	const json = jsonForInlineScript(message);
+	const appName = escapeHtml(config.PUBLIC_APP_NAME || "chat-ui");
 	const nonce = randomBytes(18).toString("base64");
 	const body = `<!doctype html>
 <html lang="en">
@@ -50,11 +63,21 @@ function popupResponse(origin: string, message: PopupResultMessage): Response {
 <body>
   <div class="card">
     <h1>${message.ok ? "Authorization complete" : "Authorization failed"}</h1>
-    <p>You can close this window.</p>
+    ${message.error ? `<p>${escapeHtml(message.error)}</p>` : ""}
+    <p id="close-hint">You can close this window.</p>
+    <p id="return-link" hidden><a href="${escapeHtml(`${base}/`)}">Return to ${appName}</a></p>
   </div>
   <script nonce="${nonce}">
     (function () {
       var msg = ${json};
+      // No opener: either a popup whose opener was severed (COOP) or the main tab of a full-page
+      // flow whose state is gone. close() only works for the former; the link covers the latter.
+      if (!window.opener) {
+        document.getElementById("close-hint").hidden = true;
+        document.getElementById("return-link").hidden = false;
+        try { window.close(); } catch (e) {}
+        return;
+      }
       try {
         if (window.opener) {
           window.opener.postMessage({ type: "mcp-oauth-result", payload: msg }, ${jsonForInlineScript(
@@ -172,25 +195,38 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		});
 	}
 
+	let tokens: ReturnType<typeof tokensWithExpiresAt>;
 	try {
-		const tokens = await exchangeCodeForTokens({
-			asMetadata: connection.asMetadata as unknown as AuthorizationServerMetadata,
-			clientInfo: connection.clientInfo as unknown as OAuthClientInformationFull,
-			redirectUri: flow.redirectUri,
-			resource: connection.resource,
-			code,
-			codeVerifier: flow.verifier,
-		});
-		const updated = await storeAuthorizationTokens(locals, connection, tokensWithExpiresAt(tokens));
+		tokens = tokensWithExpiresAt(
+			await exchangeCodeForTokens({
+				asMetadata: connection.asMetadata as unknown as AuthorizationServerMetadata,
+				clientInfo: connection.clientInfo as unknown as OAuthClientInformationFull,
+				redirectUri: flow.redirectUri,
+				resource: connection.resource,
+				code,
+				codeVerifier: flow.verifier,
+				iss: url.searchParams.get("iss") ?? undefined,
+			})
+		);
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : "Token exchange failed";
+		logger.warn({ err: msg, flowId: flow.id }, "[mcp-oauth] code exchange failed");
+		return respond({ ok: false, flowId: flow.id, error: "Token exchange failed" });
+	}
+
+	try {
+		const updated = await storeAuthorizationTokens(locals, connection, tokens);
 		return respond({
 			ok: true,
 			flowId: flow.id,
 			connection: publicOAuthState(updated),
 		});
 	} catch (e) {
-		const msg = e instanceof Error ? e.message : "Token exchange failed";
-		logger.warn({ err: msg, flowId: flow.id }, "[mcp-oauth] code exchange failed");
-		return respond({ ok: false, flowId: flow.id, error: "Token exchange failed" });
+		const msg = e instanceof Error ? e.message : "Could not save authorization";
+		logger.warn({ err: msg, flowId: flow.id }, "[mcp-oauth] storing tokens failed");
+		// The grant exists at the AS but nowhere we can reach it again; don't leave it live.
+		await revokeConnectionTokens({ ...connection, tokens }).catch(() => false);
+		return respond({ ok: false, flowId: flow.id, error: "Could not save authorization" });
 	}
 };
 

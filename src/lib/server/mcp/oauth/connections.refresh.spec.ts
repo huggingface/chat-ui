@@ -93,6 +93,31 @@ describe.sequential("MCP OAuth JIT token refresh", () => {
 		expect(persisted?.status).toBe("authorized");
 	});
 
+	it("saves a rotated refresh token even if the version moved during the refresh", async () => {
+		const locals = createTestLocals();
+		const connection = await createConnection(locals);
+		await seedExpiringTokens(connection);
+		refreshTokensMock.mockImplementation(async () => {
+			// A scope challenge recorded while the refresh request is in flight.
+			await collections.mcpOAuthConnections.updateOne(
+				{ _id: connection._id },
+				{ $inc: { version: 1 } }
+			);
+			return {
+				access_token: "new-access",
+				refresh_token: "new-refresh",
+				token_type: "Bearer",
+				expires_in: 3600,
+			};
+		});
+
+		const resolved = await resolveOAuthAccessToken(locals, connection._id.toString(), serverUrl);
+
+		expect(resolved.accessToken).toBe("new-access");
+		const persisted = await collections.mcpOAuthConnections.findOne({ _id: connection._id });
+		expect(persisted?.tokens?.refresh_token).toBe("new-refresh");
+	});
+
 	it("keeps the existing refresh token when the response omits one", async () => {
 		const locals = createTestLocals();
 		const connection = await createConnection(locals);

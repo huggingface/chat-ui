@@ -10,7 +10,7 @@ import type { MCPClientInformation } from "$lib/types/Tool";
 import type {
 	AuthorizationServerMetadata,
 	OAuthClientInformationFull,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@modelcontextprotocol/client";
 
 const Body = z.object({
 	connectionId: z.string().min(1),
