@@ -160,6 +160,29 @@ describe("the turn-scoped event log", () => {
 		});
 	});
 
+	it("keeps a finalizing generation alive until interruption is published", async () => {
+		const conversationId = new ObjectId();
+		const messageId = randomUUID();
+		const now = new Date();
+		await collections.generations.insertOne({
+			_id: new ObjectId(),
+			generationId: randomUUID(),
+			conversationId,
+			messageId,
+			status: "finalizing",
+			seq: 0,
+			lastHeartbeatAt: now,
+			startedAt: now,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		expect(await isTurnAlive(conversationId, messageId)).toEqual({
+			alive: true,
+			status: "finalizing",
+		});
+	});
+
 	it("reports an unknown turn as gone", async () => {
 		expect(await isTurnAlive(new ObjectId(), randomUUID())).toEqual({
 			alive: false,

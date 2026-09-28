@@ -27,13 +27,18 @@ function reapAfterMs(): number {
 	return 90_000;
 }
 
-// A run whose pod died stays `status: running` with a frozen heartbeat forever;
-// nothing else finalizes it, so it would spin or present its partial output as a
-// finished answer. Mark it interrupted instead.
+// A run whose pod died either stays `running` with a frozen heartbeat or is left
+// `finalizing` after claiming interruption but before marking its message. Sweep
+// both so a partial finalization can be resumed instead of becoming permanent.
 export async function reapStaleGenerations(): Promise<void> {
 	const threshold = new Date(Date.now() - reapAfterMs());
 	const stale = await collections.generations
-		.find({ status: "running", lastHeartbeatAt: { $lt: threshold } })
+		.find({
+			$or: [
+				{ status: "running", lastHeartbeatAt: { $lt: threshold } },
+				{ status: "finalizing", updatedAt: { $lt: threshold } },
+			],
+		})
 		.limit(REAP_BATCH)
 		.toArray();
 	if (stale.length === 0) return;

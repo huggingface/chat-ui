@@ -60,7 +60,7 @@ export const GET: RequestHandler = async ({ locals, request }) => {
 			const tick = async (): Promise<boolean> => {
 				const running = await collections.generations
 					.find(
-						{ status: "running", ...auth },
+						{ status: { $in: ["running", "finalizing"] }, ...auth },
 						{ projection: { generationId: 1, conversationId: 1 } }
 					)
 					.toArray();

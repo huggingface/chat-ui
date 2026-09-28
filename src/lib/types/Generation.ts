@@ -5,7 +5,7 @@ import type { MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 
-export type GenerationStatus = "running" | "completed" | "interrupted" | "error";
+export type GenerationStatus = "running" | "finalizing" | "completed" | "interrupted" | "error";
 
 /**
  * One generation run. Small and written often (heartbeat), so it is deliberately

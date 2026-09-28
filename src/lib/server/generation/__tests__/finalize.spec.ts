@@ -4,13 +4,14 @@ import { randomUUID } from "node:crypto";
 
 import { collections, ready } from "$lib/server/database";
 import { markGenerationInterrupted } from "../finalize";
+import { reapStaleGenerations } from "../reaper";
 
 beforeAll(async () => {
 	await ready;
 });
 
 interface SeedOpts {
-	status: "running" | "completed" | "error";
+	status: "running" | "finalizing" | "completed" | "interrupted" | "error";
 }
 
 async function seed({ status }: SeedOpts) {
@@ -97,6 +98,30 @@ describe.sequential("markGenerationInterrupted", () => {
 		expect(await messageInterrupted(conversationId, messageId)).toBe(true);
 	});
 
+	it("resumes a finalization interrupted after the generation claim", async () => {
+		const { conversationId, messageId, generationId } = await seed({ status: "finalizing" });
+
+		await markGenerationInterrupted(generationId, { conversationId, messageId });
+
+		const gen = await collections.generations.findOne({ generationId });
+		expect(gen?.status).toBe("interrupted");
+		expect(await messageInterrupted(conversationId, messageId)).toBe(true);
+	});
+
+	it("reaps a stale finalizing generation", async () => {
+		const { conversationId, messageId, generationId } = await seed({ status: "finalizing" });
+		await collections.generations.updateOne(
+			{ generationId },
+			{ $set: { updatedAt: new Date(Date.now() - 120_000) } }
+		);
+
+		await reapStaleGenerations();
+
+		const gen = await collections.generations.findOne({ generationId });
+		expect(gen?.status).toBe("interrupted");
+		expect(await messageInterrupted(conversationId, messageId)).toBe(true);
+	});
+
 	// The race the reaper's own status filter cannot prevent: it selects a running run, but
 	// the owner pod finishes it before this update lands. The claim must fail closed.
 	it("leaves a message untouched when the run already completed", async () => {
@@ -119,6 +144,14 @@ describe.sequential("markGenerationInterrupted", () => {
 
 		const gen = await collections.generations.findOne({ generationId });
 		expect(gen?.status).toBe("error");
+		expect(await messageInterrupted(conversationId, messageId)).toBe(false);
+	});
+
+	it("leaves a message untouched when the run was already interrupted", async () => {
+		const { conversationId, messageId, generationId } = await seed({ status: "interrupted" });
+
+		await markGenerationInterrupted(generationId, { conversationId, messageId });
+
 		expect(await messageInterrupted(conversationId, messageId)).toBe(false);
 	});
 
