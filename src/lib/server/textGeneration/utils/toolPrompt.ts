@@ -4,7 +4,7 @@ import {
 	ML_ASSISTANT_TOOL_DOCTRINE,
 	mlAssistantToolDoctrineBlocks,
 } from "$lib/server/mlAssistantPrompt";
-import { mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
+import { mlJobLabelsEnabled, mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
 
 export function buildToolPreprompt(
 	tools: OpenAiTool[],
@@ -22,6 +22,8 @@ export function buildToolPreprompt(
 		mlAssistant?: boolean;
 		/** whether a job end wakes a parked wait, read from the deployment unless given */
 		serviceEvents?: boolean;
+		/** whether submissions are labelled for the session, read from the deployment unless given */
+		jobLabels?: boolean;
 	}
 ): string {
 	if (!Array.isArray(tools) || tools.length === 0) return "";
@@ -94,6 +96,7 @@ export function buildToolPreprompt(
 	const doctrine = mlAssistant
 		? mlAssistantToolDoctrineBlocks(names, {
 				serviceEvents: options?.serviceEvents ?? mlServiceEventsEnabled(),
+				jobLabels: options?.jobLabels ?? mlJobLabelsEnabled(),
 			})
 		: [];
 	return [general, ...doctrine].join("\n\n");

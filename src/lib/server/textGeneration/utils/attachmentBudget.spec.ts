@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BadRequestError } from "openai";
 import type { OpenAI } from "openai";
 import type { MessageFile } from "$lib/types/Message";
@@ -17,6 +17,23 @@ import {
 	truncateText,
 	type AttachmentReport,
 } from "./attachmentBudget";
+
+const env = vi.hoisted(() => ({}) as Record<string, string>);
+
+vi.mock("$lib/server/config", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("$lib/server/config")>();
+	return {
+		...actual,
+		config: new Proxy(actual.config, {
+			get: (target, prop) =>
+				typeof prop === "string" && prop in env ? env[prop] : Reflect.get(target, prop),
+		}),
+	};
+});
+
+afterEach(() => {
+	for (const key of Object.keys(env)) delete env[key];
+});
 
 type Sent = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -348,6 +365,60 @@ describe("images", () => {
 			true
 		);
 		expect(attachments.images).toEqual([{ index: 0, name: "huge.png", sent: true }]);
+	});
+});
+
+describe("the ATTACHMENT_BUDGET switch", () => {
+	const csv = syntheticCsv(400_000);
+	const megabyte = 1_000_000;
+	const history: HistoryMessage[] = [
+		{
+			from: "user",
+			content: "old",
+			files: Array.from({ length: 9 }, (_, i) => image(`shot${i}.png`, megabyte)),
+		},
+		{ from: "assistant", content: "ok" },
+		{
+			from: "user",
+			content: "summarise this",
+			files: [
+				textFile("data.csv", csv),
+				textFile("Pasted Content", "pasted words", CLIPBOARD_MIME),
+				image("new.png", megabyte),
+			],
+		},
+	];
+
+	it("cuts files and images with the switch unset", async () => {
+		const { attachments } = await prepareHistory(history, passThrough, true, {
+			contextLengthTokens: WINDOW_1M,
+		});
+
+		expect(attachments.texts.find((t) => t.name === "data.csv")?.shown).toBeLessThan(csv.length);
+		expect(attachments.images.filter((i) => i.sent).length).toBeLessThan(10);
+		expect(budgetNotice(attachments)).toBeDefined();
+		expect(canCutAttachments(attachments)).toBe(true);
+	});
+
+	it("sends every file and image whole with it off, as before the budget, and never retries", async () => {
+		env.ATTACHMENT_BUDGET = "false";
+		const whole = await prepareHistory(history, passThrough, true, {
+			contextLengthTokens: WINDOW_1M,
+		});
+		const retry = await prepareHistory(history, passThrough, true, {
+			contextLengthTokens: WINDOW_1M,
+			attachments: "minimal",
+		});
+
+		expect(textOf(whole.messages[2])).toBe(
+			`<document name="data.csv" type="text/csv">\n${csv}\n</document>\n\npasted words\n\nsummarise this`
+		);
+		expect(textOf(whole.messages[0])).toBe("old");
+		expect(whole.attachments.images.every((i) => i.sent)).toBe(true);
+		expect(whole.attachments.images).toHaveLength(10);
+		expect(budgetNotice(whole.attachments)).toBeUndefined();
+		expect(canCutAttachments(whole.attachments)).toBe(false);
+		expect(retry.messages).toEqual(whole.messages);
 	});
 });
 

@@ -22,6 +22,7 @@ import { resolvePreprompt } from "./preprompt";
 import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
 import { mlStateBlockEnabled } from "$lib/server/mlRegistry/stateBlock";
 import { AttachmentOverflowError } from "./utils/attachmentBudget";
+import { attachmentBudgetEnabled } from "./utils/attachmentBudgetFlag";
 
 /** Updates that mean the user has already been shown something for this turn. */
 function isVisibleWork(update: MessageUpdate): boolean {
@@ -113,6 +114,7 @@ async function* textGenerationWithoutTitle(
 		mlAssistant,
 		virtualFiles: mlVirtualFilesEnabled(conv),
 		stateBlock: mlStateBlockEnabled(conv),
+		attachmentBudget: attachmentBudgetEnabled(),
 		artifactsOverride: ctx.artifactsOverride,
 		supportsArtifacts: ctx.model.supportsArtifacts,
 		username: ctx.username,

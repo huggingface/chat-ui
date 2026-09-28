@@ -20,8 +20,11 @@ const tool = (name: string): OpenAiTool =>
 const HF_TOOLS = [tool("hf_jobs"), tool("hf_fs"), tool("hub_repo_details")];
 
 /** The preset's system message, as `runMcpFlow` asks for it. */
-const inMode = (tools: OpenAiTool[], { serviceEvents = false } = {}) =>
-	buildToolPreprompt(tools, undefined, undefined, { mlAssistant: true, serviceEvents });
+const inMode = (
+	tools: OpenAiTool[],
+	{ serviceEvents = false, jobLabels }: { serviceEvents?: boolean; jobLabels?: boolean } = {}
+) =>
+	buildToolPreprompt(tools, undefined, undefined, { mlAssistant: true, serviceEvents, jobLabels });
 
 describe("ML Assistant preprompt", () => {
 	it("ships text that does not depend on the model or a template engine", () => {
@@ -78,6 +81,17 @@ describe("ML Assistant preprompt", () => {
 			expect(ML_ASSISTANT_PREPROMPT).not.toContain(absent);
 		}
 	});
+
+	it("says a large attachment arrives as a slice only while the budget cuts it", () => {
+		expect(ML_ASSISTANT_PREPROMPT).toContain("reaches you only as a slice");
+		const off = mlAssistantPreprompt({
+			virtualFiles: true,
+			stateBlock: true,
+			attachmentBudget: false,
+		});
+		expect(off).not.toContain("reaches you only as a slice");
+		expect(off).toContain("assuming the card was accurate.\n\n# When you write ML code");
+	});
 });
 
 describe("ML Assistant virtual files", () => {
@@ -112,7 +126,11 @@ describe("ML Assistant virtual files", () => {
 	});
 
 	it("goes back to the inline shape when the switch is off, naming no tool the model lacks", () => {
-		const off = mlAssistantPreprompt({ virtualFiles: false, stateBlock: true });
+		const off = mlAssistantPreprompt({
+			virtualFiles: false,
+			stateBlock: true,
+			attachmentBudget: true,
+		});
 		expect(off).not.toContain("v-file://");
 		expect(off).not.toContain("write_file");
 		expect(off).toContain("# Scripts: artifact or payload");
@@ -153,13 +171,26 @@ describe("ML Assistant session state", () => {
 	});
 
 	it("says nothing about a block the turn will not carry when the switch is off", () => {
-		const off = mlAssistantPreprompt({ virtualFiles: true, stateBlock: false });
+		const off = mlAssistantPreprompt({
+			virtualFiles: true,
+			stateBlock: false,
+			attachmentBudget: true,
+		});
 		expect(off).not.toContain("SESSION STATE");
 		expect(off).not.toContain("# Session state");
 	});
 });
 
 describe("ML Assistant tool-keyed doctrine", () => {
+	it("says submissions keep their name and session label only while they are added", () => {
+		expect(inMode([tool("hf_jobs")])).toContain(
+			"The name goes out prefixed with ml-intern-, and every submission carries an ml-intern-session label"
+		);
+		const off = inMode([tool("hf_jobs")], { jobLabels: false });
+		expect(off).not.toContain("ml-intern");
+		expect(off).toContain("the experiment they belong to.\n- Token.");
+	});
+
 	it("sends the job contract only to a run that can submit jobs", () => {
 		// It restates rules the preset prompt already carries, deliberately, at the
 		// surface they get violated at — but a run without the tool would be

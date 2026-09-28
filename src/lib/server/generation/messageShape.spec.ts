@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { convertFinishedMessage, convertMessageShape, type ShapeSkipReason } from "./messageShape";
-import { messageForStorage } from "./compressUpdates";
+import { compressUpdatesForStorage, messageForStorage } from "./compressUpdates";
 import {
 	rebuildLegacyContent,
 	restoreRunningShape,
@@ -18,6 +18,23 @@ import {
 	streamed,
 	toolRound,
 } from "./__tests__/turnFixtures";
+
+const env = vi.hoisted(() => ({}) as Record<string, string>);
+
+vi.mock("$lib/server/config", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("$lib/server/config")>();
+	return {
+		...actual,
+		config: new Proxy(actual.config, {
+			get: (target, prop) =>
+				typeof prop === "string" && prop in env ? env[prop] : Reflect.get(target, prop),
+		}),
+	};
+});
+
+afterEach(() => {
+	for (const key of Object.keys(env)) delete env[key];
+});
 
 function converted(message: Message): Message {
 	const result = convertMessageShape(message);
@@ -250,6 +267,38 @@ describe("messageForStorage", () => {
 		expect(stored.contentShape).toBe(2);
 		expect(stored.content).toBe("Sunny.");
 		expect(stored.updates?.some((u) => u.type === MessageUpdateType.Stream && u.token)).toBe(false);
+	});
+});
+
+describe("the MESSAGE_ROUNDS_SHAPE switch", () => {
+	const raw = () => {
+		const message = assistantMessage([
+			...toolRound({ reasoning: "Plan.", text: "Let me check." }),
+			...finalAnswer("Done.", "Sunny."),
+		]);
+		return { ...message, updates: [...(message.updates ?? []), stream("")] };
+	};
+
+	it("stores a finished turn converted with the switch unset", () => {
+		expect(messageForStorage(raw()).contentShape).toBe(2);
+	});
+
+	it("stores it compressed only, as before the conversion, with the switch off", () => {
+		env.MESSAGE_ROUNDS_SHAPE = "false";
+		const message = raw();
+
+		const stored = messageForStorage(message);
+		expect(stored).toEqual({ ...message, updates: compressUpdatesForStorage(message.updates) });
+		expect(stored).not.toHaveProperty("contentShape");
+		expect(stored.content).toBe("<think>Plan.</think>Let me check.<think>Done.</think>Sunny.");
+		expect(stored.updates?.some((u) => u.type === MessageUpdateType.Stream)).toBe(true);
+	});
+
+	it("leaves a message stored converted as it is with the switch off", () => {
+		const stored = messageForStorage(raw());
+		env.MESSAGE_ROUNDS_SHAPE = "false";
+
+		expect(messageForStorage(stored)).toEqual(stored);
 	});
 });
 

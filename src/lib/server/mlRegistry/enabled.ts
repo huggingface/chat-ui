@@ -17,3 +17,8 @@ export function mlServiceEventsEnabled(): boolean {
 export function mlPushChecksEnabled(): boolean {
 	return mlServicePollerEnabled() && config.ML_ASSISTANT_PUSH_CHECKS !== "false";
 }
+
+// one switch so the prompt never promises labels the rewrite does not add
+export function mlJobLabelsEnabled(): boolean {
+	return config.ML_ASSISTANT_JOB_LABELS !== "false";
+}

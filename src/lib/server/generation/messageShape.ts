@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import type { Message } from "$lib/types/Message";
+import { config } from "$lib/server/config";
 import {
 	MessageToolUpdateType,
 	MessageUpdateType,
@@ -144,6 +145,10 @@ function slimRoundsShape(message: Message): Message {
 		if (slim) updates.push(slim);
 	}
 	return changed ? { ...message, updates } : message;
+}
+
+export function messageRoundsShapeEnabled(): boolean {
+	return config.MESSAGE_ROUNDS_SHAPE !== "false";
 }
 
 /** the rounds shape when the turn has ended and converts losslessly, else the message as it was */

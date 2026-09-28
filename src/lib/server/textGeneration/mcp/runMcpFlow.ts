@@ -73,7 +73,7 @@ import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlB
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
 import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
 import { PARENT_READER } from "$lib/types/MlSource";
-import { mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
+import { mlJobLabelsEnabled, mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
 import { markHarnessEventDelivered, pendingHarnessEvent } from "$lib/server/mlRegistry/midTurn";
 import {
 	buildSessionStateBlock,
@@ -230,15 +230,16 @@ export async function* runMcpFlow({
 	// an argument rather than a header — see mcp/hubBilling.ts.
 	const payer = mlAssistant ? mlAssistantPayerTarget(locals) : undefined;
 	// a turn whose labels cannot be read submits unlabelled rather than not at all
-	const jobLabels = mlAssistant
-		? await loadSessionJobLabels(conv._id).catch((err) => {
-				logger.warn(
-					{ err: String(err), conversationId: conv._id.toString() },
-					"[mcp] session job labels unavailable; this turn's jobs go unlabelled"
-				);
-				return undefined;
-			})
-		: undefined;
+	const jobLabels =
+		mlAssistant && mlJobLabelsEnabled()
+			? await loadSessionJobLabels(conv._id).catch((err) => {
+					logger.warn(
+						{ err: String(err), conversationId: conv._id.toString() },
+						"[mcp] session job labels unavailable; this turn's jobs go unlabelled"
+					);
+					return undefined;
+				})
+			: undefined;
 	const rewriteArgs = composeRewrites([
 		payer ? createHubBillingRewrite(payer) : undefined,
 		jobLabels ? createJobLabelRewrite(jobLabels) : undefined,
