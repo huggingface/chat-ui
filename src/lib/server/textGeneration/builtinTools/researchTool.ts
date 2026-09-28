@@ -115,11 +115,19 @@ const definition: OpenAiTool = {
 	},
 };
 
+export const RESEARCH_REPEAT_REFUSAL =
+	"This exact research task was already run in this turn, so it was not run again: its summary " +
+	"is the result of your other research call. Write your answer from that summary now. Call " +
+	"research again only with a different task, for something the summary genuinely lacks.";
+
 export function createResearchTool(): ResearchBuiltinTool {
 	// Definition and enablement are static; the request plumbing (client,
 	// sampling params, the turn's listed MCP tools) only exists inside
 	// runMcpFlow, which binds it here before the tool loop starts.
 	let deps: ResearchRuntimeDeps | undefined;
+	// builtins skip the repeated call guard, the tool is built once per run
+	// research only, an identical check_job or sandbox_task call is a poll
+	const ranThisRun = new Set<string>();
 	return {
 		name: RESEARCH_TOOL_NAME,
 		definition,
@@ -129,9 +137,23 @@ export function createResearchTool(): ResearchBuiltinTool {
 			deps = next;
 		},
 		async execute(args, ctx) {
-			return runResearch(args, ctx, deps);
+			const key = repeatKey(args);
+			if (key === undefined) return runResearch(args, ctx, deps);
+			if (ranThisRun.has(key)) return { error: RESEARCH_REPEAT_REFUSAL };
+			// released on failure, the rate limit error tells the model to retry the same task
+			ranThisRun.add(key);
+			const outcome = await runResearch(args, ctx, deps);
+			if (!("resultText" in outcome)) ranThisRun.delete(key);
+			return outcome;
 		},
 	};
+}
+
+function repeatKey(args: Record<string, unknown>): string | undefined {
+	const task = typeof args.task === "string" ? args.task.trim() : "";
+	if (!task) return undefined;
+	const context = typeof args.context === "string" ? args.context.trim() : "";
+	return JSON.stringify([task, context]);
 }
 
 async function runResearch(
