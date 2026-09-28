@@ -142,9 +142,14 @@ export function createResearchTool(): ResearchBuiltinTool {
 			if (ranThisRun.has(key)) return { error: RESEARCH_REPEAT_REFUSAL };
 			// released on failure, the rate limit error tells the model to retry the same task
 			ranThisRun.add(key);
-			const outcome = await runResearch(args, ctx, deps);
-			if (!("resultText" in outcome)) ranThisRun.delete(key);
-			return outcome;
+			let summarized = false;
+			try {
+				const outcome = await runResearch(args, ctx, deps);
+				summarized = "resultText" in outcome;
+				return outcome;
+			} finally {
+				if (!summarized) ranThisRun.delete(key);
+			}
 		},
 	};
 }

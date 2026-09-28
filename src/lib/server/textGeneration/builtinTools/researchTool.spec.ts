@@ -397,6 +397,26 @@ describe("repeated research within a run", () => {
 		});
 	});
 
+	it("lets a task whose run threw be retried unchanged", async () => {
+		createCompletion.mockResolvedValue(respond({ content: "the summary" }));
+		const deps = makeDeps();
+		let throwOnce = true;
+		Object.defineProperty(deps, "hostBuiltinTools", {
+			get: () => {
+				if (!throwOnce) return [fakeHfFs];
+				throwOnce = false;
+				throw new Error("boom");
+			},
+		});
+		const tool = createResearchTool();
+		tool.bind(deps);
+
+		await expect(tool.execute({ task: "survey memory" }, ctx)).rejects.toThrow("boom");
+		expect(await tool.execute({ task: "survey memory" }, ctx)).toEqual({
+			resultText: "the summary",
+		});
+	});
+
 	it("starts clean for the next run", async () => {
 		createCompletion.mockResolvedValue(respond({ content: "the summary" }));
 
