@@ -42,7 +42,13 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 			return held === undefined ? row : { ...row, heldMicroUsd: held };
 		}),
 		artefacts: artefacts.map(
-			({ _id, conversationId: _conversationId, serviceId, ...artefact }): MlRegistryArtefact => ({
+			({
+				_id,
+				conversationId: _conversationId,
+				serviceId,
+				putCommits: _putCommits,
+				...artefact
+			}): MlRegistryArtefact => ({
 				...artefact,
 				id: _id.toString(),
 				...(serviceId ? { serviceId: serviceId.toString() } : {}),

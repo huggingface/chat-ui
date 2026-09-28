@@ -2,7 +2,7 @@ import type { InferenceProvider } from "@huggingface/inference";
 import type { ToolCall, ToolResult } from "$lib/types/Tool";
 import type { PlanStep } from "$lib/types/Plan";
 import type { TurnStatus } from "$lib/types/TurnState";
-import type { MlServiceKind } from "$lib/types/MlService";
+import type { MlServiceKind, ServicePush } from "$lib/types/MlService";
 import type {
 	ElicitationAction,
 	ElicitationRequestPayload,
@@ -273,6 +273,7 @@ export interface HarnessServiceEvent {
 	from: string;
 	to: string;
 	ranSeconds?: number;
+	pushes?: ServicePush[];
 	/** epoch ms */
 	at: number;
 }

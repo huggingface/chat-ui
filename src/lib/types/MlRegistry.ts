@@ -16,7 +16,7 @@ export interface MlRegistryService extends Omit<MlService, "_id" | "conversation
 
 export interface MlRegistryArtefact extends Omit<
 	MlArtefact,
-	"_id" | "conversationId" | "serviceId"
+	"_id" | "conversationId" | "serviceId" | "putCommits"
 > {
 	id: string;
 	serviceId?: string;

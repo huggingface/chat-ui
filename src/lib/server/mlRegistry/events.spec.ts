@@ -7,10 +7,11 @@ import type { ParkedCall } from "$lib/types/ParkedCall";
 import { claimServiceEvents, conversationsAwaitingEvents, deliverServiceEvents } from "./events";
 import { pollDueServices, pollService } from "./poller";
 
-const switches = vi.hoisted(() => ({ events: true }));
+const switches = vi.hoisted(() => ({ events: true, pushChecks: false }));
 vi.mock("./enabled", () => ({
 	mlServicePollerEnabled: () => true,
 	mlServiceEventsEnabled: () => switches.events,
+	mlPushChecksEnabled: () => switches.pushChecks,
 }));
 
 beforeAll(async () => {
@@ -22,6 +23,7 @@ const sessionIds: string[] = [];
 
 afterEach(async () => {
 	switches.events = true;
+	switches.pushChecks = false;
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 	await collections.mlServices.deleteMany({ conversationId: { $in: conversationIds } });
@@ -228,6 +230,97 @@ describe.sequential("marking an end", () => {
 			expect(row.eventPendingSince).toBeUndefined();
 			expect(row.lastReportedStage).toBeUndefined();
 		}
+	});
+});
+
+describe.sequential("checking pushes at the end", () => {
+	const PUSHED = "a".repeat(40);
+	const jobEnd = {
+		status: { stage: "COMPLETED" },
+		startedAt: new Date(NOW.getTime() - 3 * MINUTE).toISOString(),
+		finishedAt: new Date(NOW.getTime() - 10 * SECOND).toISOString(),
+	};
+
+	function stubHub(repo: (url: URL, init?: RequestInit) => Promise<Response>) {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+				const url = new URL(String(input));
+				return url.pathname.startsWith("/api/jobs/")
+					? new Response(JSON.stringify(jobEnd), { status: 200 })
+					: repo(url, init);
+			})
+		);
+	}
+
+	it("carries what the job pushed into its event", async () => {
+		switches.pushChecks = true;
+		const conversationId = await insertConversation();
+		const service = await insertService(conversationId, {
+			expectedPushes: [{ kind: "model", uri: "hf://models/testuser/qwen-sft" }],
+		});
+		stubHub(async (url) =>
+			url.pathname === "/api/models/testuser/qwen-sft"
+				? new Response(
+						JSON.stringify({
+							sha: PUSHED,
+							lastModified: new Date(NOW.getTime() - MINUTE).toISOString(),
+							createdAt: new Date(NOW.getTime() - 5 * MINUTE).toISOString(),
+						}),
+						{ status: 200 }
+					)
+				: new Response("[]", { status: 200 })
+		);
+
+		await pollService(service, TOKEN, NOW);
+
+		const pushes = [{ uri: "hf://models/testuser/qwen-sft", status: "pushed", commit: PUSHED }];
+		expect(await readService(service._id)).toMatchObject({
+			stage: "COMPLETED",
+			eventPendingSince: NOW,
+			pushes,
+		});
+		const [event] = await claimServiceEvents(conversationId, NOW);
+		expect(event.pushes).toEqual(pushes);
+	});
+
+	it("still marks the end when the Hub does not answer in time, without push info", async () => {
+		switches.pushChecks = true;
+		const conversationId = await insertConversation();
+		const service = await insertService(conversationId, {
+			expectedPushes: [{ kind: "model", uri: "hf://models/testuser/qwen-sft" }],
+			pushes: [{ uri: "hf://models/testuser/stale", status: "pushed" }],
+		});
+		stubHub(
+			(_url, init) =>
+				new Promise<Response>((_, reject) =>
+					init?.signal?.addEventListener("abort", () => reject(new Error("aborted")))
+				)
+		);
+
+		const started = Date.now();
+		await pollService(service, TOKEN, NOW);
+		expect(Date.now() - started).toBeLessThan(5_000);
+
+		const row = await readService(service._id);
+		expect(row).toMatchObject({ stage: "COMPLETED", eventPendingSince: NOW });
+		expect(row.pushes).toBeUndefined();
+		const [event] = await claimServiceEvents(conversationId, NOW);
+		expect(event).not.toHaveProperty("pushes");
+	}, 10_000);
+
+	it("reads nothing past the job's own status with the switch off", async () => {
+		const conversationId = await insertConversation();
+		const service = await insertService(conversationId, {
+			expectedPushes: [{ kind: "model", uri: "hf://models/testuser/qwen-sft" }],
+		});
+		const repo = vi.fn(async () => new Response("[]", { status: 200 }));
+		stubHub(repo);
+
+		await pollService(service, TOKEN, NOW);
+
+		expect(repo).not.toHaveBeenCalled();
+		expect((await readService(service._id)).eventPendingSince).toEqual(NOW);
 	});
 });
 

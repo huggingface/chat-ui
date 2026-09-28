@@ -15,8 +15,9 @@ import {
 import { rebuildIdentity } from "$lib/server/generation/parkedSweeper";
 import type { MlService } from "$lib/types/MlService";
 import { backoffDelayMs, nextPollDelayMs } from "./schedule";
-import { mlServiceEventsEnabled } from "./enabled";
+import { mlPushChecksEnabled, mlServiceEventsEnabled } from "./enabled";
 import { conversationsAwaitingEvents, deliverServiceEvents, endEventFields } from "./events";
+import { checkServicePushes } from "./pushCheck";
 import { claimDueReconcile, reconcileSession } from "./reconcile";
 
 // status only and never logs, an end is marked on the row for deliverServiceEvents
@@ -172,6 +173,10 @@ export async function pollService(
 		const startedAt = job?.startedAt ?? service.startedAt;
 		const endedAt = job?.finishedAt ?? service.endedAt ?? now;
 		await settleHold(service, lookup);
+		// before the end is marked, so every path that tells it carries what landed on the hub
+		const pushes = mlPushChecksEnabled()
+			? await checkServicePushes({ service, startedAt, endedAt, token })
+			: undefined;
 		await writeRow(service, {
 			$set: {
 				stage,
@@ -182,6 +187,7 @@ export async function pollService(
 				updatedAt: now,
 				...(job ? fillFromBody(service, job) : {}),
 				stageBeforeEnd: previousStage,
+				...(pushes?.length ? { pushes } : {}),
 				...(mlServiceEventsEnabled() ? endEventFields(service, stage, now) : {}),
 			},
 			$unset: {
@@ -189,6 +195,7 @@ export async function pollService(
 				pollFailures: "",
 				tokenMissingSince: "",
 				...(job?.message ? {} : { stageMessage: "" }),
+				...(pushes?.length ? {} : { pushes: "" }),
 			},
 			...(stage !== previousStage ? historyEntry(stage, now) : {}),
 		});

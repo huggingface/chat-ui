@@ -195,6 +195,56 @@ describe("renderSessionStateBlock", () => {
 		expect(block).toContain("· COMPLETED after 5m 00s ·");
 	});
 
+	it("says what a completed job pushed, and what it was meant to push and did not", () => {
+		const ended = { startedAt: ago(80 * MIN), endedAt: ago(8 * MIN) };
+		const block = render({
+			services: [
+				service({
+					name: "qwen-sft",
+					stage: "COMPLETED",
+					...ended,
+					pushes: [
+						{ uri: "hf://models/ns/qwen-sft", status: "pushed", commit: "abc1234def" },
+						{ uri: "hf://datasets/ns/evals", status: "missing" },
+					],
+				}),
+			],
+		});
+		expect(linesOf(block)).toContain(
+			`- job qwen-sft · COMPLETED after 1h 12m · id ${JOB_ID} → pushed ns/qwen-sft, nothing pushed to ns/evals`
+		);
+	});
+
+	it("names a failed job's pushes but not the ones it never made", () => {
+		const block = render({
+			services: [
+				service({
+					name: "qwen-sft",
+					stage: "ERROR",
+					startedAt: ago(10 * MIN),
+					endedAt: ago(5 * MIN),
+					pushes: [
+						{ uri: "hf://models/ns/qwen-sft-ckpt", status: "pushed" },
+						{ uri: "hf://models/ns/qwen-sft", status: "missing" },
+					],
+				}),
+				service({
+					jobId: hexId(),
+					name: "smoke",
+					stage: "ERROR",
+					startedAt: ago(10 * MIN),
+					endedAt: ago(5 * MIN),
+					pushes: [{ uri: "hf://models/ns/smoke", status: "missing" }],
+				}),
+			],
+		});
+		const lines = linesOf(block);
+		expect(lines.find((line) => line.includes("qwen-sft ·"))).toMatch(
+			/ → pushed ns\/qwen-sft-ckpt$/
+		);
+		expect(lines.find((line) => line.includes("smoke"))).not.toContain("→");
+	});
+
 	it("lists an ended service until it has been reported, and an open one every time", () => {
 		const running = service({ name: "running", lastReportedStage: "RUNNING" });
 		const reported = service({ name: "reported", stage: "ERROR", lastReportedStage: "ERROR" });
