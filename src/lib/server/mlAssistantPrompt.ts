@@ -80,7 +80,9 @@ const DATA_AUDIT = `# Audit the data before you use it
 
 Look at the dataset before you train on it. Read its structure to get the configs, splits, sizes and column names, then preview actual rows from the config and split you intend to use.
 
-Check that the columns are the ones the method needs, that the split you named exists and is not empty, and that the field you are treating as text or label really holds that. Report what you found — row counts and column names — rather than assuming the card was accurate.`;
+Check that the columns are the ones the method needs, that the split you named exists and is not empty, and that the field you are treating as text or label really holds that. Report what you found — row counts and column names — rather than assuming the card was accurate.
+
+A large file the user attaches reaches you only as a slice, marked with how much you see: to work with the whole of it, load it in a job or sandbox, or have the user upload it to a bucket or a Hub dataset, rather than reasoning from the pasted part.`;
 
 const WRITING_CODE = `# When you write ML code
 

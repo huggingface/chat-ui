@@ -10,6 +10,16 @@ import type { EndpointMessage } from "../endpoints/endpoints";
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 import { generateSummaryOfReasoning } from "./reasoning";
 import { logger } from "../logger";
+import {
+	AttachmentOverflowError,
+	budgetNotice,
+	canCutAttachments,
+	isContextOverflowError,
+	noticeFor,
+	retryNotice,
+	type AttachmentMode,
+	type AttachmentReport,
+} from "./utils/attachmentBudget";
 
 type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: EndpointMessage[] };
 
@@ -27,6 +37,7 @@ export async function* generate(
 		reasoningOverride,
 		locals,
 		abortController,
+		messageId,
 	}: GenerateContext,
 	preprompt?: string
 ): AsyncIterable<MessageUpdate> {
@@ -53,20 +64,47 @@ export async function* generate(
 		};
 	}
 
-	const stream = await endpoint({
-		messages,
-		preprompt,
-		generateSettings: assistant?.generateSettings,
-		// Allow user-level override to force multimodal
-		isMultimodal: (forceMultimodal ?? false) || model.multimodal,
-		conversationId: conv._id,
-		historyWindow: conv.historyWindow,
-		locals,
-		abortSignal: abortController.signal,
-		provider,
-		reasoningEffort,
-		reasoningOverride,
-	});
+	const sent: { attachments?: AttachmentReport } = {};
+	const request = (attachments: AttachmentMode) =>
+		endpoint({
+			messages,
+			preprompt,
+			generateSettings: assistant?.generateSettings,
+			// Allow user-level override to force multimodal
+			isMultimodal: (forceMultimodal ?? false) || model.multimodal,
+			conversationId: conv._id,
+			historyWindow: conv.historyWindow,
+			locals,
+			abortSignal: abortController.signal,
+			provider,
+			reasoningEffort,
+			reasoningOverride,
+			attachments,
+			onAttachments: (report) => {
+				sent.attachments = report;
+			},
+		});
+	let stream: Awaited<ReturnType<typeof request>>;
+	let notice: string | undefined;
+	try {
+		stream = await request("budget");
+		notice = sent.attachments && budgetNotice(sent.attachments);
+	} catch (err) {
+		if (!isContextOverflowError(err) || !sent.attachments || !canCutAttachments(sent.attachments)) {
+			throw err;
+		}
+		// the file stays in history, so without a cut every later turn fails the same way
+		logger.warn({ err: String(err) }, "[generate] request too large; retrying attachments cut");
+		try {
+			stream = await request("minimal");
+		} catch (retryErr) {
+			if (!isContextOverflowError(retryErr)) throw retryErr;
+			throw new AttachmentOverflowError(sent.attachments, retryErr);
+		}
+		notice = retryNotice(sent.attachments);
+	}
+	const noticeUpdate = noticeFor(conv, messageId, notice);
+	if (noticeUpdate) yield noticeUpdate;
 
 	for await (const output of stream) {
 		// Check if this output contains router metadata. Emit if either:

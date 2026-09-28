@@ -40,6 +40,15 @@ import { createVirtualFileExpander } from "$lib/server/mlFiles/expand";
 import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
 import { prepareHistory } from "$lib/server/textGeneration/utils/prepareFiles";
 import {
+	AttachmentOverflowError,
+	budgetNotice,
+	canCutAttachments,
+	isContextOverflowError,
+	noticeFor,
+	retryNotice,
+	type AttachmentMode,
+} from "$lib/server/textGeneration/utils/attachmentBudget";
+import {
 	createHistoryWindow,
 	historyCost,
 	windowLimitChars,
@@ -618,22 +627,6 @@ export async function* runMcpFlow({
 			? Math.max(catalogMaxTokens ?? 0, clampedFloor)
 			: catalogMaxTokens;
 
-		const history = await prepareHistory(messages, imageProcessor, mmEnabled, {
-			replayToolHistory: true,
-			attachReasoning: mayEchoReasoning,
-			// The model resolved for THIS turn. Under the "omni" router alias a
-			// prior turn in the same conversation can have been produced by a
-			// different model (per-message routing, no user action needed); this
-			// gates reasoning_content to only replay onto its own producer.
-			currentProducerModel: candidateModelId ?? targetModel.id ?? targetModel.name,
-			// The resolved target's window, not the router alias's: under "omni"
-			// the alias itself has none, and the candidate is what serves this
-			// request.
-			contextLengthTokens: targetContextLength,
-			maxOutputTokens: maxTokens,
-			slidingWindow: historyWindowEnabled(),
-		});
-		let messagesOpenAI: ChatCompletionMessageParam[] = history.messages;
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
 		// In the mode the doctrine paragraphs are swapped, not appended to: the
 		// generic restraint rule tells the model not to reach for a tool unless it
@@ -650,55 +643,80 @@ export async function* runMcpFlow({
 			prepromptPieces.push(preprompt);
 		}
 		const mergedPreprompt = prepromptPieces.join("\n\n");
-		const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
-		if (hasSystemMessage) {
-			if (mergedPreprompt.length > 0) {
-				const existing = messagesOpenAI[0].content ?? "";
-				const existingText = typeof existing === "string" ? existing : "";
-				messagesOpenAI[0].content = mergedPreprompt + (existingText ? "\n\n" + existingText : "");
+		const stateBlock = mlStateBlockEnabled(conv) ? await buildSessionStateBlock(conv) : undefined;
+		let unreadEnded: SessionStateBlock["ended"] = stateBlock?.ended ?? [];
+
+		// built again, attachments cut, when the provider refuses the request for its size
+		const buildPrompt = async (attachments: AttachmentMode) => {
+			const history = await prepareHistory(messages, imageProcessor, mmEnabled, {
+				replayToolHistory: true,
+				attachReasoning: mayEchoReasoning,
+				// The model resolved for THIS turn. Under the "omni" router alias a
+				// prior turn in the same conversation can have been produced by a
+				// different model (per-message routing, no user action needed); this
+				// gates reasoning_content to only replay onto its own producer.
+				currentProducerModel: candidateModelId ?? targetModel.id ?? targetModel.name,
+				// The resolved target's window, not the router alias's: under "omni"
+				// the alias itself has none, and the candidate is what serves this
+				// request.
+				contextLengthTokens: targetContextLength,
+				maxOutputTokens: maxTokens,
+				slidingWindow: historyWindowEnabled(),
+				attachments,
+				mlAssistant,
+			});
+			let prompt: ChatCompletionMessageParam[] = history.messages;
+			const hasSystemMessage = prompt.length > 0 && prompt[0]?.role === "system";
+			if (hasSystemMessage) {
+				if (mergedPreprompt.length > 0) {
+					const existing = prompt[0].content ?? "";
+					const existingText = typeof existing === "string" ? existing : "";
+					prompt[0].content = mergedPreprompt + (existingText ? "\n\n" + existingText : "");
+				}
+			} else if (mergedPreprompt.length > 0) {
+				prompt = [{ role: "system", content: mergedPreprompt }, ...prompt];
 			}
-		} else if (mergedPreprompt.length > 0) {
-			messagesOpenAI = [{ role: "system", content: mergedPreprompt }, ...messagesOpenAI];
-		}
 
-		const historyWindow =
-			history.units && targetContextLength
-				? createHistoryWindow({
-						conversationId: conv._id,
-						units: history.units,
-						offset: messagesOpenAI.length - history.messages.length,
-						limitChars: windowLimitChars(targetContextLength, maxTokens),
-						fixedChars: historyCost(oaTools),
-						stored: conv.historyWindow,
-						liveMessageId: messageId,
-					})
-				: undefined;
+			const window =
+				history.units && targetContextLength
+					? createHistoryWindow({
+							conversationId: conv._id,
+							units: history.units,
+							offset: prompt.length - history.messages.length,
+							limitChars: windowLimitChars(targetContextLength, maxTokens),
+							fixedChars: historyCost(oaTools),
+							stored: conv.historyWindow,
+							liveMessageId: messageId,
+						})
+					: undefined;
 
-		// Tail-injected once per turn; within the turn, freshness travels in the tool
-		// results. Gated on the tool being offered so a stale plan can't tell the model
-		// to call a tool it doesn't have.
-		if (conv.plan && builtinTools.some((tool) => tool.name === PLAN_TOOL_NAME)) {
-			messagesOpenAI = injectPlanState(messagesOpenAI, conv.plan);
-		}
-		let unreadEnded: SessionStateBlock["ended"] = [];
-		if (mlStateBlockEnabled(conv)) {
-			const block = await buildSessionStateBlock(conv);
-			if (block) {
-				messagesOpenAI = injectSessionState(messagesOpenAI, block.text);
-				unreadEnded = block.ended;
+			// Tail-injected once per turn; within the turn, freshness travels in the tool
+			// results. Gated on the tool being offered so a stale plan can't tell the model
+			// to call a tool it doesn't have.
+			if (conv.plan && builtinTools.some((tool) => tool.name === PLAN_TOOL_NAME)) {
+				prompt = injectPlanState(prompt, conv.plan);
 			}
-		}
+			if (stateBlock) {
+				prompt = injectSessionState(prompt, stateBlock.text);
+			}
 
-		// Work around servers that reject `system` role
-		if (
-			typeof config.OPENAI_BASE_URL === "string" &&
-			config.OPENAI_BASE_URL.length > 0 &&
-			(config.OPENAI_BASE_URL.includes("hf.space") ||
-				config.OPENAI_BASE_URL.includes("gradio.app")) &&
-			messagesOpenAI[0]?.role === "system"
-		) {
-			messagesOpenAI[0] = { ...messagesOpenAI[0], role: "user" };
-		}
+			// Work around servers that reject `system` role
+			if (
+				typeof config.OPENAI_BASE_URL === "string" &&
+				config.OPENAI_BASE_URL.length > 0 &&
+				(config.OPENAI_BASE_URL.includes("hf.space") ||
+					config.OPENAI_BASE_URL.includes("gradio.app")) &&
+				prompt[0]?.role === "system"
+			) {
+				prompt[0] = { ...prompt[0], role: "user" };
+			}
+			return { prompt, window, attachments: history.attachments };
+		};
+		let built = await buildPrompt("budget");
+		let messagesOpenAI = built.prompt;
+		let historyWindow = built.window;
+		let attachmentsCut = false;
+		let pendingNotice = budgetNotice(built.attachments);
 
 		const stopSequences =
 			typeof parameters?.stop === "string"
@@ -829,38 +847,71 @@ export async function* runMcpFlow({
 			// non-blank delta last round — it never became part of a real trace.
 			pendingReasoningWhitespace = "";
 
-			const requestMessages = historyWindow
+			let requestMessages = historyWindow
 				? await historyWindow.fit(messagesOpenAI)
 				: messagesOpenAI;
-			const completionRequest: ChatCompletionCreateParamsStreaming = {
-				...completionBase,
-				messages: requestMessages,
-			};
 
 			// A turn several productive rounds deep must not die on one throttled
 			// request, or on a gateway that has no backend ready for a moment;
 			// absorb what outlasts the SDK's quick retries.
-			const completionStream: Stream<ChatCompletionChunk> = await withUpstreamRetry(
-				() =>
-					openai.chat.completions.create(completionRequest, {
-						signal: abortSignal,
-						headers: {
-							"ChatUI-Conversation-ID": conv._id.toString(),
-							"X-use-cache": "false",
-							...(config.USE_USER_TOKEN === "true" && locals?.token
-								? { Authorization: `Bearer ${locals.token}` }
-								: {}),
-						},
-					}),
-				{
-					signal: abortSignal,
-					onBackoff: (attempt, delayMs, err) =>
-						logger.warn(
-							{ loop, attempt, delayMs, err: String(err) },
-							"[mcp] upstream failure; backing off in-loop"
+			const createStream = (request: ChatCompletionMessageParam[]) =>
+				withUpstreamRetry(
+					() =>
+						openai.chat.completions.create(
+							{ ...completionBase, messages: request },
+							{
+								signal: abortSignal,
+								headers: {
+									"ChatUI-Conversation-ID": conv._id.toString(),
+									"X-use-cache": "false",
+									...(config.USE_USER_TOKEN === "true" && locals?.token
+										? { Authorization: `Bearer ${locals.token}` }
+										: {}),
+								},
+							}
 						),
+					{
+						signal: abortSignal,
+						onBackoff: (attempt, delayMs, err) =>
+							logger.warn(
+								{ loop, attempt, delayMs, err: String(err) },
+								"[mcp] upstream failure; backing off in-loop"
+							),
+					}
+				);
+			let completionStream: Stream<ChatCompletionChunk>;
+			try {
+				completionStream = await createStream(requestMessages);
+			} catch (err) {
+				if (
+					attachmentsCut ||
+					!isContextOverflowError(err) ||
+					!canCutAttachments(built.attachments)
+				) {
+					throw err;
 				}
-			);
+				// the file stays in history, so without a cut every later turn fails the same way
+				logger.warn(
+					{ loop, err: String(err) },
+					"[mcp] request too large; retrying attachments cut"
+				);
+				attachmentsCut = true;
+				const live = messagesOpenAI.slice(built.prompt.length);
+				built = await buildPrompt("minimal");
+				messagesOpenAI = [...built.prompt, ...live];
+				historyWindow = built.window;
+				requestMessages = historyWindow ? await historyWindow.fit(messagesOpenAI) : messagesOpenAI;
+				try {
+					completionStream = await createStream(requestMessages);
+				} catch (retryErr) {
+					if (!isContextOverflowError(retryErr)) throw retryErr;
+					throw new AttachmentOverflowError(built.attachments, retryErr);
+				}
+				pendingNotice = retryNotice(built.attachments);
+			}
+			const notice = noticeFor(conv, messageId, pendingNotice);
+			pendingNotice = undefined;
+			if (notice) yield notice;
 
 			// If provider header was exposed, notify UI so it can render "via {provider}".
 			if (providerHeader) {
@@ -1406,6 +1457,8 @@ export async function* runMcpFlow({
 		// already streamed to the user. Only a failure before anything was shown is
 		// recoverable that way.
 		if (producedOutput) throw err;
+		// the answer without tools carries the same attachments and would only fail twice more
+		if (err instanceof AttachmentOverflowError) throw err;
 		logger.warn({ err: msg }, "[mcp] flow failed before any output; falling back");
 	}
 	// Note: pooled MCP clients are shared across concurrent requests, so they must NOT be

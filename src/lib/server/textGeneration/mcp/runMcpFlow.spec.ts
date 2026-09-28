@@ -8,7 +8,7 @@ import {
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { RETRY_BACKOFF_MS } from "$lib/server/textGeneration/utils/upstreamRetry";
-import { APIConnectionError } from "openai";
+import { APIConnectionError, BadRequestError } from "openai";
 import type { McpFlowResult, RunMcpFlowContext } from "./runMcpFlow";
 
 // ---------------------------------------------------------------------------
@@ -44,7 +44,15 @@ const mocks = vi.hoisted(() => ({
 		async () => undefined
 	),
 	markHarnessEventDelivered: vi.fn(async () => undefined),
+	prepareHistory: vi.fn(),
 }));
+
+type HistoryOptionsArg = { attachments?: "budget" | "minimal" };
+
+const plainHistory = async (messages: Array<{ from: string; content: string }>) => ({
+	messages: messages.map((m) => ({ role: m.from, content: m.content })),
+	attachments: { newest: messages.length - 1, texts: [], images: [] },
+});
 
 // The gate itself is real; only the build flag behind it is forced on.
 vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
@@ -104,9 +112,7 @@ vi.mock("$lib/server/mlRegistry/sessionLabel", () => ({
 }));
 
 vi.mock("$lib/server/textGeneration/utils/prepareFiles", () => ({
-	prepareHistory: async (messages: Array<{ from: string; content: string }>) => ({
-		messages: messages.map((m) => ({ role: m.from, content: m.content })),
-	}),
+	prepareHistory: mocks.prepareHistory,
 }));
 
 vi.mock("$lib/server/endpoints/images", () => ({ makeImageProcessor: () => () => undefined }));
@@ -283,6 +289,8 @@ beforeEach(() => {
 	mocks.pendingHarnessEvent.mockResolvedValue(undefined);
 	mocks.markHarnessEventDelivered.mockReset();
 	mocks.markHarnessEventDelivered.mockResolvedValue(undefined);
+	mocks.prepareHistory.mockReset();
+	mocks.prepareHistory.mockImplementation(plainHistory);
 	scriptToolResults();
 });
 
@@ -1323,5 +1331,165 @@ describe("leaked tool-call markup", () => {
 
 		expect(mocks.create).toHaveBeenCalledTimes(1);
 		expect(finalAnswer(updates)).toContain("<do_thing_output>");
+	});
+});
+
+describe("attachments over the provider's limit", () => {
+	const contextError = () =>
+		new BadRequestError(
+			400,
+			{
+				message:
+					"This model's maximum context length is 1048576 tokens. However, your request resolved to 2700000 input tokens.",
+			},
+			undefined,
+			{}
+		);
+	const tooLargeError = () =>
+		Object.assign(new Error("413 Request Entity Too Large"), { status: 413 });
+
+	function scriptAttachmentHistory() {
+		mocks.prepareHistory.mockImplementation(
+			async (
+				messages: Array<{ from: string; content: string }>,
+				_processor: unknown,
+				_multimodal: unknown,
+				options: HistoryOptionsArg
+			) => {
+				const minimal = options.attachments === "minimal";
+				return {
+					messages: [{ role: "user", content: minimal ? "HEAD ONLY" : "WHOLE CSV" }],
+					attachments: {
+						newest: 0,
+						texts: [
+							{
+								index: 0,
+								name: "data.csv",
+								total: 8_000_000,
+								shown: minimal ? 5_000 : 150_000,
+							},
+						],
+						images: [],
+					},
+				};
+			}
+		);
+	}
+
+	const notices = (updates: MessageUpdate[]) =>
+		updates.flatMap((u) => (u.type === MessageUpdateType.Notice ? [u.text] : []));
+
+	it.each([
+		["a context-length 400", contextError],
+		["a 413", tooLargeError],
+	])("retries once with attachments cut after %s and tells the user", async (_label, error) => {
+		scriptAttachmentHistory();
+		scriptRounds([{ error: error() }, { content: "read the head" }]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(JSON.stringify(requestMessages(0))).toContain("WHOLE CSV");
+		expect(JSON.stringify(requestMessages(1))).toContain("HEAD ONLY");
+		expect(notices(updates)).toEqual([
+			"The model refused the request as too large, so it was sent again with attachments cut: data.csv to its first 5,000 of 8,000,000 characters.",
+		]);
+		expect(finalAnswer(updates)).toBe("read the head");
+	});
+
+	it("names the attachment instead of the provider error when the retry is refused too", async () => {
+		scriptAttachmentHistory();
+		scriptRounds([{ error: contextError() }, { error: contextError() }]);
+
+		const failure = await runFlow().catch((err: unknown) => err);
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(failure).toBeInstanceOf(Error);
+		expect((failure as Error).name).toBe("AttachmentOverflowError");
+		expect((failure as Error).message).toContain("data.csv (8,000,000 characters)");
+		expect((failure as Error).message).not.toContain("maximum context length");
+	});
+
+	it("does not retry a size refusal when there is nothing attached to cut", async () => {
+		scriptRounds([{ error: contextError() }]);
+
+		const { result } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(result).toBe("not_applicable");
+	});
+
+	it("does not retry other bad requests", async () => {
+		scriptAttachmentHistory();
+		scriptRounds([
+			{
+				error: new BadRequestError(
+					400,
+					{ message: "messages.2.assistant.reasoning_content is unsupported" },
+					undefined,
+					{}
+				),
+			},
+		]);
+
+		const { result } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(result).toBe("not_applicable");
+	});
+
+	it("tells the user once when the file just sent was cut to the budget", async () => {
+		mocks.prepareHistory.mockImplementation(async () => ({
+			messages: [{ role: "user", content: "WHOLE CSV" }],
+			attachments: {
+				newest: 0,
+				texts: [{ index: 0, name: "data.csv", total: 8_000_000, shown: 149_990 }],
+				images: [],
+			},
+		}));
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{
+				content: "done",
+			},
+		]);
+
+		const { updates } = await runFlow();
+
+		expect(notices(updates)).toEqual([
+			"data.csv is too long to send whole: the model sees 149,990 of its 8,000,000 characters, from the start and the end.",
+		]);
+	});
+
+	it("does not repeat a notice the message already shows, as on a resume", async () => {
+		mocks.prepareHistory.mockImplementation(async () => ({
+			messages: [{ role: "user", content: "WHOLE CSV" }],
+			attachments: {
+				newest: 0,
+				texts: [{ index: 0, name: "data.csv", total: 8_000_000, shown: 149_990 }],
+				images: [],
+			},
+		}));
+		scriptRounds([{ content: "done" }]);
+		const text =
+			"data.csv is too long to send whole: the model sees 149,990 of its 8,000,000 characters, from the start and the end.";
+		const conv = {
+			_id: new ObjectId(),
+			messages: [
+				{
+					id: "a1",
+					from: "assistant",
+					content: "",
+					updates: [{ type: MessageUpdateType.Notice, text }],
+				},
+			],
+		};
+
+		const { updates } = await runFlow({ conv, messageId: "a1" } as unknown as Partial<
+			Parameters<typeof runMcpFlow>[0]
+		>);
+
+		expect(notices(updates)).toEqual([]);
 	});
 });
