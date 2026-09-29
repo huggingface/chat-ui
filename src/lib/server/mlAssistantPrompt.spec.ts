@@ -49,6 +49,10 @@ describe("ML Assistant preprompt", () => {
 		}
 	});
 
+	it("tags repos made for a paper so they show up on its Hub page", () => {
+		expect(ML_ASSISTANT_PREPROMPT).toContain("arxiv:<arxiv_id>");
+	});
+
 	it("names each failure mode it wants the model to recognize", () => {
 		for (const mode of [
 			"HALLUCINATED IMPORTS",
@@ -476,6 +480,9 @@ describe("ML Assistant system message size", () => {
 		//
 		// 35k to 35,500 for the sandbox lifecycle, argued by idle sandboxes billing until their
 		// timeout, it landed at 35,364
+		//
+		// 35,500 to 36k for tagging paper reproductions with arxiv:<id>, argued by discoverability,
+		// an untagged repo never shows on the paper's Hub page, main had already reached 35,545 and this lands at 35,730
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -500,7 +507,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(35_500);
+		expect(composed.length).toBeLessThan(36_000);
 	});
 });
 

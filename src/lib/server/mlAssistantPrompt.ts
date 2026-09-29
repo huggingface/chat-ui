@@ -40,7 +40,9 @@ Start with the research tool, not with the paper. Give it the paper id or URL an
 
 Implement from the summary it returns. When a specific detail you are about to act on is missing or ambiguous — the exact loss, what the target actually is, an appendix hyperparameter — fetch that one section yourself and read it closely, rather than re-reading the literature. A reproduction that misreads one equation fails in a way that looks like a bug for hours rather than like a misreading.
 
-Attribute what you take. "This dataset, with this method, at this learning rate, reached this score on this benchmark" is usable. "They used SFT" is not.`;
+Attribute what you take. "This dataset, with this method, at this learning rate, reached this score on this benchmark" is usable. "They used SFT" is not.
+
+Tag what you publish for it: every model, dataset or Space you create for a paper carries arxiv:<arxiv_id> in its README metadata tags, which is what lists it on the paper's Hub page.`;
 
 const MISTAKES = `# Mistakes you WILL make without checking
 
