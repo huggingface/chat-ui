@@ -7,6 +7,7 @@ import type { makeImageProcessor } from "$lib/server/endpoints/images";
 import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
 import { CHARS_PER_TOKEN } from "./historyWindow";
 import { stripLoneSurrogates } from "./loneSurrogates";
+import { attachmentBudgetEnabled } from "./attachmentBudgetFlag";
 
 type ImagePart = OpenAI.Chat.Completions.ChatCompletionContentPartImage;
 type TextPart = OpenAI.Chat.Completions.ChatCompletionContentPartText;
@@ -30,6 +31,9 @@ export const CLIPBOARD_MIME = "application/vnd.chatui.clipboard";
 /** budget is the normal request, minimal is the one retry after the provider refused the size */
 export type AttachmentMode = "budget" | "minimal";
 
+/** whole is the budget switched off, every file and image sent as is */
+type Plan = AttachmentMode | "whole";
+
 export type AttachmentReport = {
 	/** index of the newest user message, the one whose files are never shrunk by the request budget */
 	newest: number;
@@ -38,6 +42,8 @@ export type AttachmentReport = {
 };
 
 type Keep = { head: number; tail: number };
+
+const WHOLE: Keep = { head: Infinity, tail: 0 };
 
 type TextAttachment = {
 	index: number;
@@ -129,8 +135,9 @@ const renderedChars = (shown: number, total: number) =>
 /** each file holds one of two sizes, so a later message moves an earlier one at most once */
 function planText(
 	texts: TextAttachment[],
-	opts: { newest: number; limitChars?: number; mode: AttachmentMode }
+	opts: { newest: number; limitChars?: number; mode: Plan }
 ): Keep[] {
+	if (opts.mode === "whole") return texts.map(() => WHOLE);
 	const requestChars =
 		opts.limitChars !== undefined
 			? Math.floor(opts.limitChars * ATTACHMENT_WINDOW_SHARE)
@@ -156,16 +163,17 @@ function planText(
 async function planImages(
 	images: ImageAttachment[],
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
-	opts: { newest: number; mode: AttachmentMode }
+	opts: { newest: number; mode: Plan }
 ): Promise<Map<MessageFile, ImagePart>> {
+	const whole = opts.mode === "whole";
 	const pool = opts.mode === "minimal" ? images.filter((i) => i.index === opts.newest) : images;
-	const picked = pool.slice(-MAX_IMAGES);
+	const picked = whole ? pool : pool.slice(-MAX_IMAGES);
 	const processed = await Promise.all(picked.map(({ file }) => imageProcessor(file)));
 	const sent = new Map<MessageFile, ImagePart>();
 	let bytes = 0;
 	for (let i = picked.length - 1; i >= 0; i -= 1) {
 		const url = `data:${processed[i].mime};base64,${processed[i].image.toString("base64")}`;
-		if (sent.size > 0 && bytes + url.length > MAX_IMAGE_BYTES) break;
+		if (!whole && sent.size > 0 && bytes + url.length > MAX_IMAGE_BYTES) break;
 		bytes += url.length;
 		sent.set(picked[i].file, { type: "image_url", image_url: { url, detail: "auto" } });
 	}
@@ -181,7 +189,7 @@ export async function prepareAttachments(
 	isMultimodal: boolean,
 	opts: { limitChars?: number; mode?: AttachmentMode; mlAssistant?: boolean }
 ): Promise<{ contentOf: (index: number) => UserContent; report: AttachmentReport }> {
-	const mode = opts.mode ?? "budget";
+	const mode: Plan = attachmentBudgetEnabled() ? (opts.mode ?? "budget") : "whole";
 	const newest = messages.findLastIndex((message) => message.from === "user");
 	const { texts, images } = collect(messages);
 	const keeps = planText(texts, { newest, limitChars: opts.limitChars, mode });
@@ -230,6 +238,8 @@ export async function prepareAttachments(
 
 /** whether the minimal retry would send less than this request did, marker included */
 export function canCutAttachments(report: AttachmentReport): boolean {
+	// switched off the retry is sent whole too
+	if (!attachmentBudgetEnabled()) return false;
 	return (
 		report.texts.some(
 			(t) =>

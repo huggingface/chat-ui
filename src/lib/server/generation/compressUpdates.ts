@@ -8,7 +8,7 @@ import {
 } from "$lib/types/MessageUpdate";
 import type { Message } from "$lib/types/Message";
 import { ToolResultStatus } from "$lib/types/Tool";
-import { convertFinishedMessage } from "./messageShape";
+import { convertFinishedMessage, messageRoundsShapeEnabled } from "./messageShape";
 
 /**
  * A conversation is one MongoDB document, and Mongo caps a document at 16MB.
@@ -121,8 +121,7 @@ export function compressUpdatesForStorage(updates: Message["updates"]): Message[
 
 /** end of turn saves only, a running turn appends to content so materialise stores it as is */
 export function messageForStorage(message: Message): Message {
-	return convertFinishedMessage({
-		...message,
-		updates: compressUpdatesForStorage(message.updates),
-	});
+	const compressed = { ...message, updates: compressUpdatesForStorage(message.updates) };
+	// every reader takes both shapes so off leaves a converted message as it is
+	return messageRoundsShapeEnabled() ? convertFinishedMessage(compressed) : compressed;
 }

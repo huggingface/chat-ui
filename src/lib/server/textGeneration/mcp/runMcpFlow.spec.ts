@@ -36,6 +36,14 @@ const mocks = vi.hoisted(() => ({
 		name: string;
 		url: string;
 	}>,
+	mapping: { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } } as Record<
+		string,
+		{ fnName: string; server: string; tool: string }
+	>,
+	loadSessionJobLabels: vi.fn(async () => ({
+		session: "0123456789abcdef",
+		ownJobs: new Map<string, string | undefined>(),
+	})),
 	listMlServices: vi.fn(async (): Promise<unknown[]> => []),
 	listMlArtefacts: vi.fn(async (): Promise<unknown[]> => []),
 	listMlFiles: vi.fn(async (): Promise<unknown[]> => []),
@@ -91,7 +99,7 @@ vi.mock("$lib/server/mcp/tools", () => ({
 			? { tools: [], mapping: {} }
 			: {
 					tools: mocks.mcpTools,
-					mapping: { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } },
+					mapping: mocks.mapping,
 				},
 }));
 
@@ -108,7 +116,7 @@ vi.mock("./toolInvocation", async (importOriginal) => ({
 	executeToolCalls: mocks.executeToolCalls,
 }));
 vi.mock("$lib/server/mlRegistry/sessionLabel", () => ({
-	loadSessionJobLabels: async () => ({ session: "0123456789abcdef", ownJobs: new Map() }),
+	loadSessionJobLabels: mocks.loadSessionJobLabels,
 }));
 
 vi.mock("$lib/server/textGeneration/utils/prepareFiles", () => ({
@@ -278,6 +286,8 @@ beforeEach(() => {
 	mocks.getAbortTime.mockReset();
 	mocks.mcpTools = [{ type: "function", function: { name: "do_thing" } }];
 	mocks.servers = [{ name: "hf", url: "https://example.test/mcp" }];
+	mocks.mapping = { do_thing: { fnName: "do_thing", server: "hf", tool: "do_thing" } };
+	mocks.loadSessionJobLabels.mockClear();
 	mocks.getAbortTime.mockReturnValue(undefined);
 	for (const list of [mocks.listMlServices, mocks.listMlArtefacts, mocks.listMlFiles]) {
 		list.mockReset();
@@ -1210,6 +1220,53 @@ describe("runMcpFlow mid-turn service events", () => {
 	);
 });
 
+describe("runMcpFlow job labels", () => {
+	const inMode = () =>
+		({ conv: { _id: new ObjectId(), mlAssistant: true } }) as unknown as Partial<
+			Parameters<typeof runMcpFlow>[0]
+		>;
+	const submission = {
+		operation: "run",
+		args: { name: "sft-smoke", image: "python:3.12", command: ["python", "train.py"] },
+	};
+	const dispatched = () =>
+		JSON.parse(mocks.executeToolCalls.mock.calls[0][0].calls[0].arguments) as typeof submission;
+
+	beforeEach(() => {
+		mocks.servers = [{ name: "hf", url: "https://huggingface.co/mcp" }];
+		mocks.mcpTools = [{ type: "function", function: { name: "hf_jobs" } }];
+		mocks.mapping = { hf_jobs: { fnName: "hf_jobs", server: "hf", tool: "hf_jobs" } };
+		scriptRounds([
+			{
+				toolCalls: [{ id: "call_1", name: "hf_jobs", arguments: JSON.stringify(submission) }],
+			},
+			{ content: "submitted" },
+		]);
+	});
+
+	it("names and labels a submission for the session with the switch unset", async () => {
+		await runFlow(inMode());
+
+		expect(dispatched().args).toEqual({
+			image: "python:3.12",
+			command: ["python", "train.py"],
+			labels: { name: "ml-intern-sft-smoke", "ml-intern-session": "0123456789abcdef" },
+		});
+	});
+
+	it("sends a submission as the model wrote it with ML_ASSISTANT_JOB_LABELS off", async () => {
+		config.ML_ASSISTANT_JOB_LABELS = "false";
+		try {
+			await runFlow(inMode());
+		} finally {
+			config.ML_ASSISTANT_JOB_LABELS = "";
+		}
+
+		expect(dispatched()).toEqual(submission);
+		expect(mocks.loadSessionJobLabels).not.toHaveBeenCalled();
+	});
+});
+
 describe("leaked tool-call markup", () => {
 	// Observed with GLM-class models: the provider template leaks the model's
 	// native tool syntax into content, so the "call" is text the user sees and
@@ -1409,6 +1466,20 @@ describe("attachments over the provider's limit", () => {
 		expect((failure as Error).name).toBe("AttachmentOverflowError");
 		expect((failure as Error).message).toContain("data.csv (8,000,000 characters)");
 		expect((failure as Error).message).not.toContain("maximum context length");
+	});
+
+	it("does not retry a size refusal with ATTACHMENT_BUDGET off", async () => {
+		scriptAttachmentHistory();
+		scriptRounds([{ error: contextError() }]);
+		config.ATTACHMENT_BUDGET = "false";
+		try {
+			const { updates, result } = await runFlow();
+			expect(result).toBe("not_applicable");
+			expect(notices(updates)).toEqual([]);
+		} finally {
+			config.ATTACHMENT_BUDGET = "";
+		}
+		expect(mocks.create).toHaveBeenCalledTimes(1);
 	});
 
 	it("does not retry a size refusal when there is nothing attached to cut", async () => {

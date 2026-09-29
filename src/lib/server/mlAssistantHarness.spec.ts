@@ -79,6 +79,8 @@ describe("stampMlHarness", () => {
 				servicePoller: true,
 				serviceEvents: true,
 				slidingWindow: true,
+				jobLabels: true,
+				attachmentBudget: true,
 			},
 			model: MODEL.id,
 			runs: 1,
@@ -125,6 +127,8 @@ describe("stampMlHarness", () => {
 		["ML_ASSISTANT_SERVICE_POLLER", { servicePoller: false, serviceEvents: false }],
 		["ML_ASSISTANT_SERVICE_EVENTS", { serviceEvents: false }],
 		["HISTORY_SLIDING_WINDOW", { slidingWindow: false }],
+		["ML_ASSISTANT_JOB_LABELS", { jobLabels: false }],
+		["ATTACHMENT_BUDGET", { attachmentBudget: false }],
 	])("reads %s off like the code does", (key, off) => {
 		env[key] = "false";
 		expect(stampMlHarness(blank(), mlConv(), MODEL)?.features).toEqual({
@@ -133,6 +137,8 @@ describe("stampMlHarness", () => {
 			servicePoller: true,
 			serviceEvents: true,
 			slidingWindow: true,
+			jobLabels: true,
+			attachmentBudget: true,
 			...off,
 		});
 	});
@@ -175,6 +181,8 @@ describe("mlAssistantPromptHash", () => {
 		"ML_ASSISTANT_VIRTUAL_FILES",
 		"ML_ASSISTANT_STATE_BLOCK",
 		"ML_ASSISTANT_SERVICE_EVENTS",
+		"ML_ASSISTANT_JOB_LABELS",
+		"ATTACHMENT_BUDGET",
 	])("moves with %s, which changes the text sent", (key) => {
 		const conv = mlConv();
 		const before = mlAssistantPromptHash(conv);
@@ -182,12 +190,15 @@ describe("mlAssistantPromptHash", () => {
 		expect(mlAssistantPromptHash(conv)).not.toBe(before);
 	});
 
-	it("stays put for the sliding window, which sends no text of its own", () => {
-		const conv = mlConv();
-		const before = mlAssistantPromptHash(conv);
-		env.HISTORY_SLIDING_WINDOW = "false";
-		expect(mlAssistantPromptHash(conv)).toBe(before);
-	});
+	it.each(["HISTORY_SLIDING_WINDOW", "MESSAGE_ROUNDS_SHAPE"])(
+		"stays put for %s, which sends no text of its own",
+		(key) => {
+			const conv = mlConv();
+			const before = mlAssistantPromptHash(conv);
+			env[key] = "false";
+			expect(mlAssistantPromptHash(conv)).toBe(before);
+		}
+	);
 });
 
 describe("a stamped message", () => {

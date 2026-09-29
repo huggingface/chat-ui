@@ -7,6 +7,7 @@ import {
 } from "$lib/server/api/__tests__/testHelpers";
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
+import { MessageUpdateType } from "$lib/types/MessageUpdate";
 import { streamFor, type Round } from "$lib/server/textGeneration/__tests__/replayHarness";
 
 const mocks = vi.hoisted(() => ({
@@ -58,7 +59,22 @@ const { resumeParkedCall } = await import("../parkedSweeper");
 
 const MODEL_ID = "test-org/test-model";
 
+const PLAN: Round = {
+	content: "Let me plan.",
+	toolCalls: [
+		{
+			id: "call_plan",
+			name: "update_plan",
+			arguments: JSON.stringify({
+				goal: "Answer the question",
+				steps: [{ step: "answer", status: "in_progress", label: "Answering" }],
+			}),
+		},
+	],
+};
+
 const ASK: Round = {
+	content: "Let me ask.",
 	toolCalls: [
 		{
 			id: "call_ask",
@@ -81,6 +97,7 @@ const ASK: Round = {
 };
 
 const WAIT: Round = {
+	content: "Let me wait.",
 	toolCalls: [
 		{
 			id: "call_wait",
@@ -99,7 +116,7 @@ function scriptRounds(rounds: Round[]) {
 	});
 }
 
-async function newConversation(overrides: Partial<Conversation> = {}) {
+async function newConversation() {
 	const { locals } = await createTestUser();
 	const rootId = crypto.randomUUID();
 	const conv = await createTestConversation(locals, {
@@ -118,7 +135,6 @@ async function newConversation(overrides: Partial<Conversation> = {}) {
 				updatedAt: new Date(),
 			},
 		],
-		...overrides,
 	});
 	return { conv, locals };
 }
@@ -167,6 +183,54 @@ const turnDone = (conv: Conversation, messageId: string) =>
 		{ timeout: 10_000, interval: 25 }
 	);
 
+const producers: Record<string, (off: boolean) => Promise<Message>> = {
+	route: async (off) => {
+		if (off) mocks.env.MESSAGE_ROUNDS_SHAPE = "false";
+		const { conv, locals } = await newConversation();
+		scriptRounds([PLAN, { content: "Done." }]);
+		await sendMessage(conv, locals, "Plan it.");
+		const message = await lastAssistant(conv);
+		await turnDone(conv, message.id);
+		return lastAssistant(conv);
+	},
+	askResume: async (off) => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "Done." }]);
+		await sendMessage(conv, locals, "Build me a pipeline.");
+		const parked = await lastAssistant(conv);
+		const row = await collections.mcpElicitations.findOne({ conversationId: conv._id });
+		if (!row) throw new Error("the turn did not park on a question");
+
+		if (off) mocks.env.MESSAGE_ROUNDS_SHAPE = "false";
+		await ANSWER({
+			request: new Request(`http://localhost/conversation/${conv._id}/elicitation`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					elicitationId: row.elicitationId,
+					action: "accept",
+					content: { q1: "Postgres" },
+				}),
+			}),
+			locals,
+			params: { id: conv._id.toString() },
+		} as never);
+		await turnDone(conv, parked.id);
+		return lastAssistant(conv);
+	},
+	parkedSweeper: async (off) => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([WAIT, { content: "Done." }]);
+		await sendMessage(conv, locals, "Train it.");
+		const row = await collections.parkedCalls.findOne({ conversationId: conv._id });
+		if (!row) throw new Error("the turn did not park on a wait");
+
+		if (off) mocks.env.MESSAGE_ROUNDS_SHAPE = "false";
+		await resumeParkedCall(row);
+		return lastAssistant(conv);
+	},
+};
+
 beforeAll(async () => {
 	await ready;
 });
@@ -187,96 +251,28 @@ afterEach(async () => {
 	]);
 });
 
-describe("the harness stamp", () => {
-	it("is set on a fresh turn in the mode", async () => {
-		mocks.env.PUBLIC_COMMIT_SHA = "abc1234";
-		const { conv, locals } = await newConversation();
-		scriptRounds([{ content: "Hello." }]);
+describe("MESSAGE_ROUNDS_SHAPE at the end of a turn", () => {
+	it.each(Object.keys(producers))(
+		"%s stores the turn converted with the switch unset",
+		async (name) => {
+			const stored = await producers[name](false);
 
-		await sendMessage(conv, locals, "hi");
+			expect(stored.contentShape).toBe(2);
+			expect(stored.content).toBe("Done.");
+			expect(stored.updates?.some((u) => u.type === MessageUpdateType.Stream)).toBe(false);
+		}
+	);
 
-		const message = await lastAssistant(conv);
-		expect(message.content).toBe("Hello.");
-		expect(message.harness).toEqual({
-			build: "abc1234",
-			prompt: expect.stringMatching(/^[0-9a-f]{12}$/),
-			features: {
-				virtualFiles: true,
-				stateBlock: true,
-				servicePoller: true,
-				serviceEvents: true,
-				slidingWindow: true,
-				jobLabels: true,
-				attachmentBudget: true,
-			},
-			model: MODEL_ID,
-			runs: 1,
-		});
-	});
+	it.each(Object.keys(producers))(
+		"%s stores it in the old shape with the switch off",
+		async (name) => {
+			const stored = await producers[name](true);
 
-	it("is absent outside the mode", async () => {
-		const { conv, locals } = await newConversation({ mlAssistant: false });
-		scriptRounds([{ content: "Hello." }]);
-
-		await sendMessage(conv, locals, "hi");
-
-		const message = await lastAssistant(conv);
-		expect(message.content).toBe("Hello.");
-		expect(message).not.toHaveProperty("harness");
-	});
-
-	it("is overwritten when an answered question resumes the turn", async () => {
-		const { conv, locals } = await newConversation();
-		scriptRounds([ASK, { content: "Postgres it is." }]);
-		await sendMessage(conv, locals, "Build me a pipeline.");
-		const parked = await lastAssistant(conv);
-		expect(parked.harness).toMatchObject({ features: { stateBlock: true }, runs: 1 });
-		const row = await collections.mcpElicitations.findOne({ conversationId: conv._id });
-		if (!row) throw new Error("the turn did not park on a question");
-
-		mocks.env.ML_ASSISTANT_STATE_BLOCK = "false";
-		await ANSWER({
-			request: new Request(`http://localhost/conversation/${conv._id}/elicitation`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					elicitationId: row.elicitationId,
-					action: "accept",
-					content: { q1: "Postgres" },
-				}),
-			}),
-			locals,
-			params: { id: conv._id.toString() },
-		} as never);
-		await turnDone(conv, parked.id);
-
-		const resumed = await lastAssistant(conv);
-		expect(resumed.id).toBe(parked.id);
-		expect(resumed.content).toContain("Postgres it is.");
-		expect(resumed.harness).toMatchObject({ features: { stateBlock: false }, runs: 2 });
-		expect(resumed.harness?.prompt).not.toBe(parked.harness?.prompt);
-	});
-
-	it("is overwritten when a parked wait resumes the turn after a deploy", async () => {
-		mocks.env.PUBLIC_COMMIT_SHA = "old-build";
-		const { conv, locals } = await newConversation();
-		scriptRounds([WAIT, { content: "The job finished." }]);
-		await sendMessage(conv, locals, "Train it.");
-		const parked = await lastAssistant(conv);
-		expect(parked.harness).toMatchObject({ build: "old-build", runs: 1 });
-		const row = await collections.parkedCalls.findOne({ conversationId: conv._id });
-		if (!row) throw new Error("the turn did not park on a wait");
-
-		mocks.env.PUBLIC_COMMIT_SHA = "new-build";
-		await resumeParkedCall(row);
-
-		const resumed = await lastAssistant(conv);
-		expect(resumed.id).toBe(parked.id);
-		expect(resumed.content).toContain("The job finished.");
-		expect(resumed.harness).toMatchObject({
-			build: "new-build",
-			prompt: parked.harness?.prompt,
-			runs: 2,
-		});
-	});
+			expect(stored).not.toHaveProperty("contentShape");
+			expect(stored.content).toMatch(/^Let me \w+\.[\s\S]*Done\.$/);
+			expect(stored.updates?.some((u) => u.type === MessageUpdateType.Stream)).toBe(true);
+			const answer = stored.updates?.find((u) => u.type === MessageUpdateType.FinalAnswer);
+			expect(answer?.type === MessageUpdateType.FinalAnswer && answer.text).toContain("Done.");
+		}
+	);
 });

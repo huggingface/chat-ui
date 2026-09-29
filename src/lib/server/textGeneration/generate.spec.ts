@@ -1,10 +1,27 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ObjectId } from "mongodb";
 import { BadRequestError } from "openai";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { EndpointParameters } from "$lib/server/endpoints/endpoints";
 import type { AttachmentReport } from "./utils/attachmentBudget";
 import { generate } from "./generate";
+
+const env = vi.hoisted(() => ({}) as Record<string, string>);
+
+vi.mock("$lib/server/config", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("$lib/server/config")>();
+	return {
+		...actual,
+		config: new Proxy(actual.config, {
+			get: (target, prop) =>
+				typeof prop === "string" && prop in env ? env[prop] : Reflect.get(target, prop),
+		}),
+	};
+});
+
+afterEach(() => {
+	for (const key of Object.keys(env)) delete env[key];
+});
 
 const report = (shown: number): AttachmentReport => ({
 	newest: 0,
@@ -70,6 +87,14 @@ describe("generate without tools", () => {
 			text: "The model refused the request as too large, so it was sent again with attachments cut: data.csv to its first 5,000 of 8,000,000 characters.",
 		});
 		expect(updates.at(-1)).toMatchObject({ type: MessageUpdateType.FinalAnswer, text: "ok" });
+	});
+
+	it("passes the refusal on without a retry when ATTACHMENT_BUDGET is off", async () => {
+		env.ATTACHMENT_BUDGET = "false";
+		const endpoint = endpointRefusing(1);
+
+		await expect(run(endpoint)).rejects.toThrow("maximum context length");
+		expect(endpoint).toHaveBeenCalledTimes(1);
 	});
 
 	it("names the attachment when the retry is refused too", async () => {

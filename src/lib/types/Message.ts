@@ -62,6 +62,9 @@ export type MessageHarness = {
 		servicePoller: boolean;
 		serviceEvents: boolean;
 		slidingWindow: boolean;
+		/** absent on stamps written by older builds */
+		jobLabels?: boolean;
+		attachmentBudget?: boolean;
 	};
 	model: string;
 	/** the provider ML_ASSISTANT_MODELS pins the model to, when it pins one */

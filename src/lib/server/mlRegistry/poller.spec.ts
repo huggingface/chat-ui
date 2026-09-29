@@ -8,6 +8,19 @@ import { claimDueService, pollDueServices, pollService } from "./poller";
 import { recordDiscoveredService, recordDispatchedService, sandboxHandle } from "./store";
 import { loadSessionJobLabels, markLabelledSubmission, RECONCILE_DELAY_MS } from "./sessionLabel";
 
+const env = vi.hoisted(() => ({}) as Record<string, string>);
+
+vi.mock("$lib/server/config", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("$lib/server/config")>();
+	return {
+		...actual,
+		config: new Proxy(actual.config, {
+			get: (target, prop) =>
+				typeof prop === "string" && prop in env ? env[prop] : Reflect.get(target, prop),
+		}),
+	};
+});
+
 beforeAll(async () => {
 	await ready;
 });
@@ -16,6 +29,7 @@ const conversationIds: ObjectId[] = [];
 const sessionIds: string[] = [];
 
 afterEach(async () => {
+	for (const key of Object.keys(env)) delete env[key];
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 	await collections.mlServices.deleteMany({ conversationId: { $in: conversationIds } });
@@ -523,6 +537,27 @@ describe.sequential("store", () => {
 });
 
 describe.sequential("pollDueServices: reconcile", () => {
+	it("leaves a due session alone with ML_ASSISTANT_JOB_LABELS off", async () => {
+		env.ML_ASSISTANT_JOB_LABELS = "false";
+		const conversationId = await insertConversation();
+		await loadSessionJobLabels(conversationId);
+		await markLabelledSubmission({
+			conversationId,
+			namespace: "testuser",
+			timeoutSeconds: 3600,
+			now: new Date(NOW.getTime() - RECONCILE_DELAY_MS),
+		});
+		const fetchMock = vi.fn();
+		vi.stubGlobal("fetch", fetchMock);
+
+		await pollDueServices(NOW);
+
+		expect(fetchMock).not.toHaveBeenCalled();
+		expect(await collections.mlSessionLabels.findOne({ _id: conversationId })).toMatchObject({
+			reconcileAt: new Date(NOW.getTime()),
+		});
+	});
+
 	it("lists a due session's jobs with the conversation's token and records what it missed", async () => {
 		const conversationId = await insertConversation();
 		const { session } = await loadSessionJobLabels(conversationId);

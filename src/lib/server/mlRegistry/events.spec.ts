@@ -12,6 +12,7 @@ vi.mock("./enabled", () => ({
 	mlServicePollerEnabled: () => true,
 	mlServiceEventsEnabled: () => switches.events,
 	mlPushChecksEnabled: () => switches.pushChecks,
+	mlJobLabelsEnabled: () => true,
 }));
 
 beforeAll(async () => {

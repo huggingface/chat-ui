@@ -80,9 +80,9 @@ const DATA_AUDIT = `# Audit the data before you use it
 
 Look at the dataset before you train on it. Read its structure to get the configs, splits, sizes and column names, then preview actual rows from the config and split you intend to use.
 
-Check that the columns are the ones the method needs, that the split you named exists and is not empty, and that the field you are treating as text or label really holds that. Report what you found — row counts and column names — rather than assuming the card was accurate.
+Check that the columns are the ones the method needs, that the split you named exists and is not empty, and that the field you are treating as text or label really holds that. Report what you found — row counts and column names — rather than assuming the card was accurate.`;
 
-A large file the user attaches reaches you only as a slice, marked with how much you see: to work with the whole of it, load it in a job or sandbox, or have the user upload it to a bucket or a Hub dataset, rather than reasoning from the pasted part.`;
+const ATTACHED_SLICES = `A large file the user attaches reaches you only as a slice, marked with how much you see: to work with the whole of it, load it in a job or sandbox, or have the user upload it to a bucket or a Hub dataset, rather than reasoning from the pasted part.`;
 
 const WRITING_CODE = `# When you write ML code
 
@@ -138,14 +138,17 @@ The user's latest message can end with a [SESSION STATE] block, written by the h
 
 /**
  * the preset system prompt, sections in the order they are read, virtualFiles follows the
- * switch in mlFiles/enabled.ts and stateBlock the one in mlRegistry/stateBlock.ts
+ * switch in mlFiles/enabled.ts, stateBlock the one in mlRegistry/stateBlock.ts and
+ * attachmentBudget the one in textGeneration/utils/attachmentBudgetFlag.ts
  */
 export function mlAssistantPreprompt({
 	virtualFiles,
 	stateBlock,
+	attachmentBudget,
 }: {
 	virtualFiles: boolean;
 	stateBlock: boolean;
+	attachmentBudget: boolean;
 }): string {
 	return [
 		IDENTITY,
@@ -154,6 +157,7 @@ export function mlAssistantPreprompt({
 		MISTAKES,
 		BEFORE_A_RUN,
 		DATA_AUDIT,
+		...(attachmentBudget ? [ATTACHED_SLICES] : []),
 		WRITING_CODE,
 		JOBS(virtualFiles ? '"v-file://train.py"' : '"<the whole script>"'),
 		virtualFiles ? SCRIPTS_ARE_FILES : ARTIFACTS_VS_JOBS,
@@ -166,6 +170,7 @@ export function mlAssistantPreprompt({
 export const ML_ASSISTANT_PREPROMPT = mlAssistantPreprompt({
 	virtualFiles: true,
 	stateBlock: true,
+	attachmentBudget: true,
 });
 
 /**
@@ -268,9 +273,13 @@ Put the hold next to the estimate in every pre-flight: "holds $2.00 of budget, e
  * The rules here restate ones the prompt already carries. That is the point:
  * they are restated at the surface where they get violated.
  */
-const HF_JOBS_CONTRACT = `RUNNING JOBS (hf_jobs): a job is remote compute with ephemeral storage, a wall-clock limit, and per-minute billing against the user's credits. Every hf_jobs call carries an explicit \`operation\` — 'run' or 'uv' to submit, 'ps'/'logs'/'inspect'/'cancel' to read or stop; a call without one routes nowhere and is refused. These lines go on the pre-flight list you print before submitting, and every one of them has to be true. The list is printed so the user can stop you before the credits are spent, not after.
+const JOB_LABELS_KEPT = ` The name goes out prefixed with ml-intern-, and every submission carries an ml-intern-session label; never set or remove that label. update-labels replaces the whole set, so send every label the job should keep; the name and the session label are kept for you.`;
 
-- Name. Every submission carries a name saying what the run is — method, model, dataset, and whether it is the smoke test or the real thing (sft-qwen3-0.6b-capybara-smoke). Skip it and the job lands in the user's dashboard as an image tag plus a hash, indistinguishable from every other unnamed run. Add further labels where they would help the user filter — the dataset, the base model, the experiment they belong to. The name goes out prefixed with ml-intern-, and every submission carries an ml-intern-session label; never set or remove that label. update-labels replaces the whole set, so send every label the job should keep; the name and the session label are kept for you.
+const HF_JOBS_CONTRACT = (
+	jobLabels: boolean
+) => `RUNNING JOBS (hf_jobs): a job is remote compute with ephemeral storage, a wall-clock limit, and per-minute billing against the user's credits. Every hf_jobs call carries an explicit \`operation\` — 'run' or 'uv' to submit, 'ps'/'logs'/'inspect'/'cancel' to read or stop; a call without one routes nowhere and is refused. These lines go on the pre-flight list you print before submitting, and every one of them has to be true. The list is printed so the user can stop you before the credits are spent, not after.
+
+- Name. Every submission carries a name saying what the run is — method, model, dataset, and whether it is the smoke test or the real thing (sft-qwen3-0.6b-capybara-smoke). Skip it and the job lands in the user's dashboard as an image tag plus a hash, indistinguishable from every other unnamed run. Add further labels where they would help the user filter — the dataset, the base model, the experiment they belong to.${jobLabels ? JOB_LABELS_KEPT : ""}
 - Token. Pushing to the Hub from inside a job needs the token passed in explicitly as a secret (HF_TOKEN). Leave it out and the run trains for an hour and then fails at the push, which is the most expensive mistake available here.
 - Hardware. The default flavor is cpu-basic: two CPU cores. A training job that does not name a GPU flavor does not fail, it crawls. Name the flavor, what it costs per hour, and how long you expect the run to take.
 - Who pays. A job bills the namespace it runs under — BillTo from the session context if set, else User — and the server sets it on every hf_jobs call. A job living elsewhere (its URL says where) needs its namespace passed to read it.
@@ -316,6 +325,8 @@ const WEB_SEARCH_RULES = `SEARCHING THE WEB (web_search_exa): for what the Hub d
 interface ToolDoctrineOptions {
 	/** whether a job or sandbox ending wakes a parked wait */
 	serviceEvents: boolean;
+	/** whether submissions get the name prefix and session label */
+	jobLabels: boolean;
 }
 
 /** Keyed by tool name as the model sees it in the schema. */
@@ -325,8 +336,8 @@ const TOOL_DOCTRINE: ReadonlyArray<{
 }> = [
 	{
 		tool: "hf_jobs",
-		text: ({ serviceEvents }) =>
-			`${HF_JOBS_CONTRACT}\n\n${serviceEvents ? AFTER_SUBMIT_WATCHED : AFTER_SUBMIT_POLLED}`,
+		text: ({ serviceEvents, jobLabels }) =>
+			`${HF_JOBS_CONTRACT(jobLabels)}\n\n${serviceEvents ? AFTER_SUBMIT_WATCHED : AFTER_SUBMIT_POLLED}`,
 	},
 	{ tool: "hf_fs", text: HF_FS_FINDING_RULES },
 	{ tool: "hf_fs_write", text: HF_FS_WRITE_RULES },

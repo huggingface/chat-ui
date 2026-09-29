@@ -15,7 +15,7 @@ import {
 import { rebuildIdentity } from "$lib/server/generation/parkedSweeper";
 import type { MlService } from "$lib/types/MlService";
 import { backoffDelayMs, nextPollDelayMs } from "./schedule";
-import { mlPushChecksEnabled, mlServiceEventsEnabled } from "./enabled";
+import { mlJobLabelsEnabled, mlPushChecksEnabled, mlServiceEventsEnabled } from "./enabled";
 import { conversationsAwaitingEvents, deliverServiceEvents, endEventFields } from "./events";
 import { checkServicePushes } from "./pushCheck";
 import { claimDueReconcile, reconcileSession } from "./reconcile";
@@ -314,10 +314,12 @@ export async function pollDueServices(now = new Date()): Promise<PollOutcome[]> 
 			"[mlPoller] stage changed"
 		);
 	}
-	// a reconcile that throws must not cost the tick its event delivery
-	await reconcileDueSessions(tokens, now).catch((err) =>
-		logger.error({ err }, "[mlReconcile] claiming a due reconcile failed")
-	);
+	if (mlJobLabelsEnabled()) {
+		// a reconcile that throws must not cost the tick its event delivery
+		await reconcileDueSessions(tokens, now).catch((err) =>
+			logger.error({ err }, "[mlReconcile] claiming a due reconcile failed")
+		);
+	}
 	if (mlServiceEventsEnabled()) {
 		await deliverServiceEvents(await conversationsAwaitingEvents(), now);
 	}
