@@ -10,7 +10,11 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
-	await Promise.all([collections.mlFiles.deleteMany({}), collections.mlAgentRuns.deleteMany({})]);
+	await Promise.all([
+		collections.mlFiles.deleteMany({}),
+		collections.mlAgentRuns.deleteMany({}),
+		collections.nestedAgentCalls.deleteMany({}),
+	]);
 });
 
 const CONVERSATION = {
@@ -65,6 +69,21 @@ describe("buildConversationTrace", () => {
 			agentRun(conversationId, "sandbox"),
 			agentRun(other, "research"),
 		]);
+		const run = agentRun(conversationId, "research");
+		await collections.nestedAgentCalls.insertMany(
+			[conversationId, conversationId, other].map((owner, iteration) => ({
+				_id: new ObjectId(),
+				conversationId: owner,
+				agentRunId: run._id.toString(),
+				label: "research",
+				iteration,
+				toolName: "hf_fs",
+				arguments: `ls ${iteration}`,
+				repeatCount: 1,
+				status: "success" as const,
+				createdAt: new Date(Date.now() + iteration),
+			}))
+		);
 		await writeMlFileVersion({ conversationId, name: "train.py", content: "v1", origin: "write" });
 		await writeMlFileVersion({ conversationId, name: "train.py", content: "v2", origin: "edit" });
 
@@ -77,6 +96,7 @@ describe("buildConversationTrace", () => {
 		expect(trace.agentRuns.map((run) => run.label)).toEqual(["research", "sandbox"]);
 		expect(trace.agentRuns[0]).toMatchObject({ summary: "done", calls: [{ tool: "hf_fs" }] });
 		expect(trace.agentRuns[0]).not.toHaveProperty("conversationId");
+		expect(trace.agentCalls.map((call) => call.arguments)).toEqual(["ls 0", "ls 1"]);
 		expect(trace.files.map((file) => [file.version, file.content])).toEqual([
 			[1, "v1"],
 			[2, "v2"],

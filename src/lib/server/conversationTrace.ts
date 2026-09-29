@@ -21,7 +21,7 @@ export function traceFilename(id: string, title: string): string {
 	return `${slug ? `${id}-${slug}` : id}.json`;
 }
 
-type Row = { _id: ObjectId; conversationId: ObjectId };
+type Row = { _id: ObjectId; conversationId?: ObjectId };
 
 const withId = <T extends Row>({ _id, conversationId: _conversationId, ...row }: T) => ({
 	id: _id.toString(),
@@ -37,10 +37,11 @@ export async function buildConversationTrace(
 	> &
 		Partial<Pick<Conversation, "mlAssistant" | "mlBudget" | "plan" | "historyWindow">>
 ) {
-	const [services, artefacts, agentRuns, sources, files] = await Promise.all([
+	const [services, artefacts, agentRuns, agentCalls, sources, files] = await Promise.all([
 		collections.mlServices.find({ conversationId }).sort({ createdAt: 1, _id: 1 }).toArray(),
 		collections.mlArtefacts.find({ conversationId }).sort({ createdAt: 1, _id: 1 }).toArray(),
 		collections.mlAgentRuns.find({ conversationId }).sort({ startedAt: 1, _id: 1 }).toArray(),
+		collections.nestedAgentCalls.find({ conversationId }).sort({ createdAt: 1, _id: 1 }).toArray(),
 		collections.mlSources.find({ conversationId }).sort({ firstSeenAt: 1, _id: 1 }).toArray(),
 		collections.mlFiles.find({ conversationId }).sort({ name: 1, version: 1 }).toArray(),
 	]);
@@ -66,6 +67,8 @@ export async function buildConversationTrace(
 		services: services.map(withId),
 		artefacts: artefacts.map(withId),
 		agentRuns: agentRuns.map(withId),
+		// every call a sub-agent made, runs keep only the first ones but these expire after 24 hours
+		agentCalls: agentCalls.map(withId),
 		sources: sources.map(withId),
 		files: files.map(withId),
 	};
