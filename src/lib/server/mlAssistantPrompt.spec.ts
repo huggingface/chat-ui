@@ -476,9 +476,6 @@ describe("ML Assistant system message size", () => {
 		//
 		// 35k to 35,500 for the sandbox lifecycle, argued by idle sandboxes billing until their
 		// timeout, it landed at 35,364
-		//
-		// 35,500 to 36k for tagging paper reproductions with arxiv:<id>, argued by discoverability,
-		// an untagged repo never shows on the paper's Hub page, main had already reached 35,545 and this lands at 35,666
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
