@@ -393,6 +393,23 @@ describe("MlRegistryPane", () => {
 		expect(text(rows[1])).toContain("dashboard");
 	});
 
+	it("folds a repo's files away and back", async () => {
+		const { container } = mount();
+		const repo = all(container, ".ml-artefact")[0];
+		const toggle = find(repo, ".ml-artefact-files-toggle");
+		expect(text(toggle)).toBe("2 files");
+		expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+		toggle.click();
+		await tick();
+		expect(repo.querySelector(".ml-artefact-files")).toBeNull();
+		expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+		toggle.click();
+		await tick();
+		expect(all(repo, ".ml-artefact-files li")).toHaveLength(2);
+	});
+
 	it("lists what a job pushed with its commit, and what it was meant to push and did not", () => {
 		const { container } = mount(
 			payload({
@@ -1123,6 +1140,23 @@ describe("MlRegistryPane sub-agent runs and sources", () => {
 		const research = runRow(container, RESEARCH.id);
 		expect(research.closest("#ml-registry-settled")).not.toBeNull();
 		expect(find(research, ".ml-file-toggle").getAttribute("aria-expanded")).toBe("true");
+	});
+
+	it("folds the whole sources section from its heading", async () => {
+		serveRun();
+		const { container } = mountRuns();
+		await tick();
+		const toggle = find(container, "#ml-registry-sources button");
+		expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+		toggle.click();
+		await tick();
+		expect(container.querySelector(".ml-source-group")).toBeNull();
+		expect(text(find(container, "#ml-registry-sources"))).toBe("Sources 5");
+
+		toggle.click();
+		await tick();
+		expect(all(container, ".ml-source-group")).toHaveLength(3);
 	});
 
 	it("renders a payload from a server that predates runs and sources", async () => {
