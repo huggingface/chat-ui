@@ -118,13 +118,17 @@
 	const shownVersions = new SvelteMap<string, number>();
 	const openRuns = new SvelteSet<string>();
 	const openGroups = new SvelteSet<string>();
+	const foldedRepos = new SvelteSet<string>();
 	let showSettled = $state(false);
+	// not reset with the conversation, folding a long list is a choice about the pane
+	let showSources = $state(true);
 
 	const fileRowId = (name: string) => `ml-file-${name}`;
 	const versionNumbers = (latest: number) =>
 		Array.from({ length: latest }, (_, index) => latest - index);
 	const runRowId = (id: string) => `ml-run-${id}`;
 	const groupRowId = (key: string) => `ml-sources-${key}`;
+	const repoFilesId = (id: string) => `ml-repo-${id}-files`;
 
 	function closeFile(name: string) {
 		openFiles.delete(name);
@@ -157,6 +161,11 @@
 		else openGroups.add(key);
 	}
 
+	function toggleRepo(id: string) {
+		if (foldedRepos.has(id)) foldedRepos.delete(id);
+		else foldedRepos.add(id);
+	}
+
 	function revealRun(id: string) {
 		openRuns.add(id);
 		if (settled.settled.some((row) => row.key === `run:${id}`)) showSettled = true;
@@ -181,6 +190,7 @@
 			shownVersions.clear();
 			openRuns.clear();
 			openGroups.clear();
+			foldedRepos.clear();
 			showSettled = false;
 		});
 	});
@@ -764,8 +774,24 @@
 										</p>
 									{/if}
 									{#if files.length}
+										{@const folded = foldedRepos.has(repo.id)}
+										<button
+											type="button"
+											class="ml-file-toggle ml-artefact-files-toggle mt-1 flex items-center gap-2.5 rounded pr-1.5 text-xs text-[#78716c] dark:text-[#a8a29e]"
+											aria-expanded={!folded}
+											aria-controls={repoFilesId(repo.id)}
+											onclick={() => toggleRepo(repo.id)}
+										>
+											<CarbonChevronRight
+												class="ml-file-chevron size-[14px] flex-none text-[#a8a29e] dark:text-[#78716c]"
+											/>
+											<span class="tabular-nums">{plural(files.length, "file")}</span>
+										</button>
+									{/if}
+									{#if files.length && !foldedRepos.has(repo.id)}
 										<ul
-											class="ml-artefact-files mt-1.5 ml-[6px] border-l border-[#ececea] pl-[15px] dark:border-[#262626]"
+											id={repoFilesId(repo.id)}
+											class="ml-artefact-files mt-1 ml-[6px] border-l border-[#ececea] pl-[15px] dark:border-[#262626]"
 										>
 											{#each files as file (file.id)}
 												<li class="flex items-center gap-2 py-[3px] text-xs">
@@ -1018,78 +1044,93 @@
 				</section>
 
 				<section aria-labelledby="ml-registry-sources">
-					<h3 id="ml-registry-sources" class="ml-registry-heading">
-						Sources
-						{#if sources.length}
-							<span class="ml-registry-count">{sources.length}</span>
-						{/if}
+					<h3 id="ml-registry-sources">
+						<button
+							type="button"
+							class="ml-registry-heading ml-file-toggle w-full text-left"
+							aria-expanded={showSources}
+							aria-controls="ml-registry-sources-body"
+							onclick={() => (showSources = !showSources)}
+						>
+							Sources
+							{#if sources.length}
+								<span class="ml-registry-count">{sources.length}</span>
+							{/if}
+							<CarbonChevronRight
+								class="ml-file-chevron ml-auto size-[14px] flex-none self-center text-[#a8a29e] dark:text-[#78716c]"
+							/>
+						</button>
 					</h3>
-					{#if sources.length === 0}
-						<p class="ml-registry-empty">
-							No sources yet. Papers, docs, repos and web pages the intern reads appear here.
-						</p>
-					{:else}
-						<ul class="ml-registry-list">
-							{#each sourceGroups as group (group.key)}
-								{@const Icon = SOURCE_ICON[group.kind]}
-								{@const isOpen = openGroups.has(group.key)}
-								<li class="ml-source-group" id={groupRowId(group.key)} data-kind={group.kind}>
-									<button
-										type="button"
-										class="ml-file-toggle flex w-full items-center gap-2.5 px-4 py-2.5 text-left"
-										aria-expanded={isOpen}
-										aria-controls="{groupRowId(group.key)}-paths"
-										onclick={() => toggleGroup(group.key)}
-									>
-										<CarbonChevronRight
-											class="ml-file-chevron size-[14px] flex-none text-[#a8a29e] dark:text-[#78716c]"
-										/>
-										<Icon class="size-[14px] flex-none text-[#78716c] dark:text-[#a8a29e]" />
-										<span
-											class="ml-source-label min-w-0 flex-1 truncate font-medium text-[#1c1917] dark:text-[#f5f5f4]"
-										>
-											{group.label}
-										</span>
-										<span
-											class="flex flex-none items-baseline gap-1.5 text-xs text-[#78716c] tabular-nums dark:text-[#a8a29e]"
-										>
-											{#if group.opened.length}
-												<span class="ml-source-read">{group.opened.length} read</span>
-											{/if}
-											{#if group.found.length}
-												<span class="ml-source-found-count">{group.found.length} found</span>
-											{/if}
-										</span>
-									</button>
-									{#if isOpen}
-										<div id="{groupRowId(group.key)}-paths" class="pr-4 pb-3 pl-[40px]">
-											{#if group.opened.length}
-												<ul
-													class="ml-source-paths border-l border-[#ececea] dark:border-[#262626]"
-													aria-label="Pages read on {group.label}"
+					{#if showSources}
+						<div id="ml-registry-sources-body">
+							{#if sources.length === 0}
+								<p class="ml-registry-empty">
+									No sources yet. Papers, docs, repos and web pages the intern reads appear here.
+								</p>
+							{:else}
+								<ul class="ml-registry-list">
+									{#each sourceGroups as group (group.key)}
+										{@const Icon = SOURCE_ICON[group.kind]}
+										{@const isOpen = openGroups.has(group.key)}
+										<li class="ml-source-group" id={groupRowId(group.key)} data-kind={group.kind}>
+											<button
+												type="button"
+												class="ml-file-toggle flex w-full items-center gap-2.5 px-4 py-2.5 text-left"
+												aria-expanded={isOpen}
+												aria-controls="{groupRowId(group.key)}-paths"
+												onclick={() => toggleGroup(group.key)}
+											>
+												<CarbonChevronRight
+													class="ml-file-chevron size-[14px] flex-none text-[#a8a29e] dark:text-[#78716c]"
+												/>
+												<Icon class="size-[14px] flex-none text-[#78716c] dark:text-[#a8a29e]" />
+												<span
+													class="ml-source-label min-w-0 flex-1 truncate font-medium text-[#1c1917] dark:text-[#f5f5f4]"
 												>
-													{#each group.opened as source (source.id)}
-														{@render sourceItem(source, source.openedBy)}
-													{/each}
-												</ul>
-											{/if}
-											{#if group.found.length}
-												<p class="ml-source-found-heading">Only in search results</p>
-												<ul
-													class="ml-source-paths border-l border-[#ececea] dark:border-[#262626]"
-													data-found="true"
-													aria-label="Links to {group.label} only in search results"
+													{group.label}
+												</span>
+												<span
+													class="flex flex-none items-baseline gap-1.5 text-xs text-[#78716c] tabular-nums dark:text-[#a8a29e]"
 												>
-													{#each group.found as source (source.id)}
-														{@render sourceItem(source, source.readBy)}
-													{/each}
-												</ul>
+													{#if group.opened.length}
+														<span class="ml-source-read">{group.opened.length} read</span>
+													{/if}
+													{#if group.found.length}
+														<span class="ml-source-found-count">{group.found.length} found</span>
+													{/if}
+												</span>
+											</button>
+											{#if isOpen}
+												<div id="{groupRowId(group.key)}-paths" class="pr-4 pb-3 pl-[40px]">
+													{#if group.opened.length}
+														<ul
+															class="ml-source-paths border-l border-[#ececea] dark:border-[#262626]"
+															aria-label="Pages read on {group.label}"
+														>
+															{#each group.opened as source (source.id)}
+																{@render sourceItem(source, source.openedBy)}
+															{/each}
+														</ul>
+													{/if}
+													{#if group.found.length}
+														<p class="ml-source-found-heading">Only in search results</p>
+														<ul
+															class="ml-source-paths border-l border-[#ececea] dark:border-[#262626]"
+															data-found="true"
+															aria-label="Links to {group.label} only in search results"
+														>
+															{#each group.found as source (source.id)}
+																{@render sourceItem(source, source.readBy)}
+															{/each}
+														</ul>
+													{/if}
+												</div>
 											{/if}
-										</div>
-									{/if}
-								</li>
-							{/each}
-						</ul>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
 					{/if}
 				</section>
 			{/if}
@@ -1113,6 +1154,10 @@
 
 	:global(.dark) .ml-registry-heading {
 		color: #a8a29e;
+	}
+
+	.ml-registry-heading[aria-expanded="false"] {
+		padding-bottom: 14px;
 	}
 
 	.ml-registry-count {
