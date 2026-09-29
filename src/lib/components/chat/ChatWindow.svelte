@@ -887,7 +887,11 @@
 		style="--scrollbar-gutter: {chatScroll.gutterHalfPx}px"
 	>
 		{#if shareModalOpen}
-			<ShareConversationModal open={shareModalOpen} onclose={() => shareModal.close()} />
+			<ShareConversationModal
+				open={shareModalOpen}
+				onclose={() => shareModal.close()}
+				downloadTrace={mlModeOn}
+			/>
 		{/if}
 		{#if canShare}
 			<!-- Lives in the chat column (not the layout) so it stays visible when
