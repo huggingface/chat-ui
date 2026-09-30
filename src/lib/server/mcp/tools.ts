@@ -2,7 +2,7 @@ import { createMcpClient } from "./client";
 import { StreamableHTTPClientTransport, SSEClientTransport } from "@modelcontextprotocol/client";
 import type { McpServerConfig } from "./httpClient";
 import { logger } from "$lib/server/logger";
-import { mcpFetch } from "$lib/server/urlSafety";
+import { mcpFetchForServer } from "./fetch";
 // use console.* for lightweight diagnostics in production logs
 
 export type OpenAiTool = {
@@ -143,7 +143,7 @@ function serverCacheKey(server: McpServerConfig): string {
 	const headers = server.headers
 		? Object.entries(server.headers).sort(([a], [b]) => a.localeCompare(b))
 		: [];
-	return JSON.stringify([server.url, headers]);
+	return JSON.stringify([server.url, server.oauthConnectionId, headers]);
 }
 
 function evictExpired(now: number) {
@@ -194,17 +194,18 @@ async function listServerTools(
 ): Promise<ListedTool[]> {
 	const url = new URL(server.url);
 	const client = createMcpClient();
+	const fetch = mcpFetchForServer(server);
 	try {
 		try {
 			const transport = new StreamableHTTPClientTransport(url, {
 				requestInit: { headers: server.headers, signal: opts.signal },
-				fetch: mcpFetch,
+				fetch,
 			});
 			await client.connect(transport);
 		} catch {
 			const transport = new SSEClientTransport(url, {
 				requestInit: { headers: server.headers, signal: opts.signal },
-				fetch: mcpFetch,
+				fetch,
 			});
 			await client.connect(transport);
 		}

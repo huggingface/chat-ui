@@ -21,7 +21,7 @@
 	import { consumeReattachStream } from "$lib/utils/consumeReattachStream";
 	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
-	import { enabledServers, mcpServersLoaded } from "$lib/stores/mcpServers";
+	import { enabledServers, mcpServersLoaded, effectiveServerHeaders } from "$lib/stores/mcpServers";
 	import { get } from "svelte/store";
 	import { browser } from "$app/environment";
 	import { ReattachClosedError, reattachStream } from "$lib/utils/reattachStream";
@@ -339,7 +339,8 @@
 					selectedMcpServers: $enabledServers.map((s) => ({
 						name: s.name,
 						url: s.url,
-						headers: s.headers,
+						headers: effectiveServerHeaders(s),
+						oauthConnectionId: s.oauth?.connectionId,
 					})),
 					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 					streamingMode,
