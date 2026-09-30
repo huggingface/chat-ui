@@ -26,6 +26,7 @@
 			view: sidePane.view,
 			identifier: sidePane.identifier,
 			trackioUrl: sidePane.trackio?.url,
+			spaceUrl: sidePane.space?.url,
 		})
 	);
 
@@ -33,6 +34,7 @@
 		const item = items[n];
 		if (!item) return;
 		if (item.kind === "artifact") sidePane.openArtifact(item.identifier, null);
+		else if (item.kind === "space") sidePane.openSpace(item.url, item.label);
 		else sidePane.openTrackio(item.url, item.label);
 	}
 

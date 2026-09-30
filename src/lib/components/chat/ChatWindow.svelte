@@ -4,6 +4,15 @@
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import TrackioPane from "./TrackioPane.svelte";
+	import SpacePreviewPane from "./SpacePreviewPane.svelte";
+	import { collectSpacePreviews } from "$lib/utils/spacePreview";
+	import { agentMode } from "$lib/stores/agentMode.svelte";
+	import {
+		PAPERPAGE_PLACEHOLDER,
+		PAPERPAGE_PREVIEW_TOOLS,
+		PAPERPAGE_UPLOAD_MIME,
+		paperPageExamples,
+	} from "$lib/constants/paperPage";
 	import MlRegistryPane from "./MlRegistryPane.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
@@ -190,7 +199,30 @@
 	// One ordered list of everything the pane can show, so its next/previous walks
 	// artifacts and dashboards together instead of each view navigating only its
 	// own kind.
-	let paneItems = $derived(collectPaneItems(messages, artifactRegistry, trackioDashboards));
+	// --- PaperPage Intern (see $lib/server/paperPage) --------------------------
+
+	// the conversation's stored mode, or on a new chat the mode its link asked for; off when the
+	// deployment no longer configures it
+	let paperPageOn = $derived(
+		(page.params?.id ? agentMode.current : agentMode.pending) === "paperpage" &&
+			(page.data as { paperPageEnabled?: boolean }).paperPageEnabled === true
+	);
+	$effect(() => {
+		const conversationId = page.params?.id;
+		const stored = (page.data as { agentMode?: "paperpage" }).agentMode;
+		untrack(() => {
+			agentMode.current = conversationId ? (stored ?? null) : null;
+		});
+	});
+
+	// live Space previews, only from the tools trusted to announce one: the workshop's, in its mode
+	let spacePreviews = $derived(
+		collectSpacePreviews(messages, paperPageOn ? PAPERPAGE_PREVIEW_TOOLS : [])
+	);
+
+	let paneItems = $derived(
+		collectPaneItems(messages, artifactRegistry, trackioDashboards, spacePreviews)
+	);
 
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
@@ -489,6 +521,15 @@
 		sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
 	});
 
+	// Open the workshop preview when it is announced during a run, and whenever a PaperPage
+	// conversation is opened: there the page is the work, not a side output. Desktop only, as above.
+	$effect(() => {
+		const latest = spacePreviews.at(-1);
+		if (!latest || !(loading || paperPageOn)) return;
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
+		sidePane.maybeAutoOpenSpace(latest.url, latest.label);
+	});
+
 	// Shared conversations containing artifacts usually exist to show one off:
 	// open the most recent artifact on load. Desktop only, since on mobile the
 	// panel is a fullscreen overlay that would hide the conversation entirely.
@@ -530,6 +571,7 @@
 		Array.from(
 			new Set([
 				...TEXT_MIME_ALLOWLIST,
+				...(paperPageOn ? PAPERPAGE_UPLOAD_MIME : []),
 				...(modelIsMultimodal
 					? (currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT])
 					: []),
@@ -571,6 +613,7 @@
 	);
 	let mlPillVisible = $derived(
 		ML_ASSISTANT_MODE &&
+			!paperPageOn &&
 			!shared &&
 			!isReadOnly &&
 			!mlTaskRunning &&
@@ -696,7 +739,13 @@
 	// ML Assistant mode brings its own chip set; otherwise use MCP examples when all
 	// base servers are enabled, and router examples when they are not.
 	let activeExamples = $derived<RouterExample[]>(
-		mlModeOn ? mlAssistantExamples : $allBaseServersEnabled ? mcpExamples : routerExamples
+		paperPageOn
+			? paperPageExamples
+			: mlModeOn
+				? mlAssistantExamples
+				: $allBaseServersEnabled
+					? mcpExamples
+					: routerExamples
 	);
 	let routerFollowUps = $derived<RouterFollowUp[]>(
 		activeRouterExamplePrompt
@@ -764,7 +813,7 @@
 		// ML Intern chips seed the composer instead of dispatching. Their prompts
 		// are complete, but they name one specific paper, model or dataset, and a
 		// task at this price is one the user should read before it starts.
-		if (mlModeOn) {
+		if (mlModeOn || paperPageOn) {
 			draft = example.prompt;
 			return;
 		}
@@ -890,7 +939,7 @@
 			<ShareConversationModal
 				open={shareModalOpen}
 				onclose={() => shareModal.close()}
-				downloadTrace={mlModeOn}
+				downloadTrace={mlModeOn || paperPageOn}
 			/>
 		{/if}
 		{#if canShare}
@@ -1052,7 +1101,7 @@
 			max-sm:py-0 sm:px-[calc(1.25rem+var(--scrollbar-gutter,0px))]
 			md:pb-4 xl:max-w-4xl dark:border-gray-800 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0"
 		>
-			{#if !draft.length && !messages.length && !sources.length && !loading && (mlModeOn || currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
+			{#if !draft.length && !messages.length && !sources.length && !loading && (mlModeOn || paperPageOn || currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
 				<div
 					class="mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 select-none dark:text-gray-500"
 				>
@@ -1152,6 +1201,22 @@
 					}}
 					style:--composer-actions-width={transcriptionEnabled && !loading ? "84px" : "44px"}
 				>
+					{#if paperPageOn && messages.length === 0 && !page.params?.id}
+						<div
+							class="flex items-center gap-2 border-b border-gray-200 px-3 py-1.5 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400"
+						>
+							<span class="font-medium text-gray-700 dark:text-gray-200">PaperPage Intern</span>
+							<span class="truncate"
+								>builds your paper's project page, live, on a Hugging Face Space</span
+							>
+							<button
+								type="button"
+								class="ml-auto rounded px-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+								title="Leave PaperPage Intern"
+								onclick={() => agentMode.clearPending()}>✕</button
+							>
+						</div>
+					{/if}
 					{#if ML_ASSISTANT_MODE}
 						<MlAssistantStrip
 							visible={mlStripVisible}
@@ -1194,9 +1259,11 @@
 									<ChatInput
 										placeholder={isReadOnly
 											? "This conversation is read-only."
-											: mlModeOn
-												? ML_ASSISTANT_PLACEHOLDER
-												: "Ask anything"}
+											: paperPageOn
+												? PAPERPAGE_PLACEHOLDER
+												: mlModeOn
+													? ML_ASSISTANT_PLACEHOLDER
+													: "Ask anything"}
 										{loading}
 										bind:value={draft}
 										bind:files
@@ -1373,6 +1440,7 @@
 		onsend={canSendFix ? sendFixRequest : undefined}
 	/>
 	<TrackioPane items={paneItems} />
+	<SpacePreviewPane items={paneItems} />
 	{#if ML_ASSISTANT_MODE}
 		<MlRegistryPane />
 	{/if}

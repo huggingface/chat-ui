@@ -1,6 +1,6 @@
 import { browser } from "$app/environment";
 import type { Message } from "$lib/types/Message";
-import type { DeployedSpace, MlBudget } from "$lib/types/Conversation";
+import type { Conversation, DeployedSpace, MlBudget } from "$lib/types/Conversation";
 import type { PlanState } from "$lib/types/Plan";
 import type { TurnStateSnapshot } from "$lib/types/TurnState";
 
@@ -18,6 +18,7 @@ export interface ConversationData {
 	shared: boolean;
 	deployedSpaces?: Record<string, DeployedSpace>;
 	mlAssistant?: boolean;
+	agentMode?: Conversation["agentMode"];
 	mlBudget?: MlBudget;
 	plan?: PlanState;
 	turnState?: TurnStateSnapshot;

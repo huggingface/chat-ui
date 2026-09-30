@@ -129,6 +129,8 @@ export interface ToolCallExecutionResult {
 	finalAnswer?: { text: string; interrupted: boolean };
 	/** A 2026-era prompt is open; this round has no result until it is answered. */
 	awaitingInput?: boolean;
+	/** images tools returned this round; the caller shows them to a model that can see them */
+	images?: Array<{ tool: string; data: string; mimeType: string }>;
 }
 
 export type ToolExecutionEvent =
@@ -193,6 +195,8 @@ export async function* executeToolCalls({
 		output?: string;
 		structured?: unknown;
 		blocks?: unknown[];
+		/** images a builtin returned, for a model that can look at them */
+		images?: Array<{ data: string; mimeType: string }>;
 		error?: string;
 		awaiting?: boolean;
 		uuid: string;
@@ -442,6 +446,7 @@ export async function* executeToolCalls({
 				results.push({
 					index,
 					output: outcome.resultText,
+					...(outcome.images?.length ? { images: outcome.images } : {}),
 					uuid: p.uuid,
 					paramsClean: p.paramsClean,
 				});
@@ -452,7 +457,14 @@ export async function* executeToolCalls({
 					result: {
 						status: ToolResultStatus.Success,
 						call: { name: p.call.name, parameters: {} },
-						outputs: [{ text: outcome.resultText } as unknown as Record<string, unknown>],
+						outputs: [
+							{
+								text: outcome.resultText,
+								...(outcome.images?.length
+									? { content: outcome.images.map((image) => ({ type: "image", ...image })) }
+									: {}),
+							} as unknown as Record<string, unknown>,
+						],
 						display: true,
 					},
 				});
@@ -760,6 +772,7 @@ export async function* executeToolCalls({
 
 	// Collate outputs in original call order
 	results.sort((a, b) => a.index - b.index);
+	const images: NonNullable<ToolCallExecutionResult["images"]> = [];
 	for (const r of results) {
 		const name = prepared[r.index].call.name;
 		const id = prepared[r.index].call.id;
@@ -769,6 +782,7 @@ export async function* executeToolCalls({
 			toolRuns.push({ name, parameters: r.paramsClean, output });
 			// For the LLM follow-up call, we keep only the textual output
 			toolMessages.push({ role: "tool", tool_call_id: id, content: output });
+			for (const image of r.images ?? []) images.push({ tool: name, ...image });
 		} else {
 			// Communicate error to LLM so it doesn't hallucinate success
 			toolMessages.push({ role: "tool", tool_call_id: id, content: `Error: ${r.error}` });
@@ -777,6 +791,11 @@ export async function* executeToolCalls({
 
 	yield {
 		type: "complete",
-		summary: { toolMessages, toolRuns, ...(awaitingInput ? { awaitingInput: true } : {}) },
+		summary: {
+			toolMessages,
+			toolRuns,
+			...(awaitingInput ? { awaitingInput: true } : {}),
+			...(images.length ? { images } : {}),
+		},
 	};
 }

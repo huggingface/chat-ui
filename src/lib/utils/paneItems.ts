@@ -2,6 +2,7 @@ import type { Message } from "$lib/types/Message";
 import type { SidePaneView } from "$lib/stores/sidePane.svelte";
 import type { ArtifactRegistry } from "./artifacts";
 import type { TrackioDashboard } from "./trackio";
+import type { SpacePreview } from "./spacePreview";
 
 /**
  * Everything the side pane can show for one conversation, as a single ordered
@@ -19,13 +20,15 @@ import type { TrackioDashboard } from "./trackio";
 
 export type PaneItem =
 	| { kind: "artifact"; identifier: string; label: string }
-	| { kind: "trackio"; url: string; label: string };
+	| { kind: "trackio"; url: string; label: string }
+	| { kind: "space"; url: string; label: string };
 
 /** The pane's current selection, as the store holds it. */
 export interface PaneSelection {
 	view: SidePaneView;
 	identifier: string | null;
 	trackioUrl?: string;
+	spaceUrl?: string;
 }
 
 /**
@@ -40,7 +43,8 @@ export interface PaneSelection {
 export function collectPaneItems(
 	messages: Array<Pick<Message, "id">>,
 	registry: ArtifactRegistry,
-	dashboards: TrackioDashboard[]
+	dashboards: TrackioDashboard[],
+	previews: SpacePreview[] = []
 ): PaneItem[] {
 	const position = new Map<Message["id"], number>();
 	messages.forEach((message, index) => position.set(message.id, index));
@@ -57,6 +61,14 @@ export function collectPaneItems(
 		entries.push({
 			item: { kind: "trackio", url: dashboard.url, label: dashboard.label },
 			message: at(dashboard.messageId),
+			withinMessage: 0,
+		});
+	}
+
+	for (const preview of previews) {
+		entries.push({
+			item: { kind: "space", url: preview.url, label: preview.label },
+			message: at(preview.messageId),
 			withinMessage: 0,
 		});
 	}
@@ -86,8 +98,11 @@ export function collectPaneItems(
 
 /** Whether an item is the one the pane is currently showing. */
 export function isPaneItemSelected(item: PaneItem, selection: PaneSelection): boolean {
-	return item.kind === "artifact"
-		? selection.view === "artifact" && selection.identifier === item.identifier
+	if (item.kind === "artifact") {
+		return selection.view === "artifact" && selection.identifier === item.identifier;
+	}
+	return item.kind === "space"
+		? selection.view === "space" && selection.spaceUrl === item.url
 		: selection.view === "trackio" && selection.trackioUrl === item.url;
 }
 

@@ -21,6 +21,7 @@ import type { MlArtefact } from "$lib/types/MlArtefact";
 import type { MlAgentRun } from "$lib/types/MlAgentRun";
 import type { MlSource } from "$lib/types/MlSource";
 import type { MlSessionLabel } from "$lib/types/MlSessionLabel";
+import type { PaperPageWorkshop } from "$lib/types/PaperPageWorkshop";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
@@ -159,6 +160,7 @@ export class Database {
 		const mlAgentRuns = db.collection<MlAgentRun>("mlAgentRuns");
 		const mlSources = db.collection<MlSource>("mlSources");
 		const mlSessionLabels = db.collection<MlSessionLabel>("mlSessionLabels");
+		const paperPageWorkshops = db.collection<PaperPageWorkshop>("paperPageWorkshops");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
@@ -200,6 +202,7 @@ export class Database {
 			mlAgentRuns,
 			mlSources,
 			mlSessionLabels,
+			paperPageWorkshops,
 			settings,
 			users,
 			sessions,

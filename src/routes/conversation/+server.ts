@@ -7,12 +7,13 @@ import { z } from "zod";
 import type { Message } from "$lib/types/Message";
 import { models, validateModel } from "$lib/server/models";
 import { v4 } from "uuid";
-import { authCondition } from "$lib/server/auth";
+import { authCondition, loginEnabled } from "$lib/server/auth";
 import { usageLimits } from "$lib/server/usageLimits";
 import { MetricsServer } from "$lib/server/metrics";
 import superjson from "superjson";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 import { resolveMlAssistantModel } from "$lib/server/mlAssistantModels";
+import { paperPageEnabled } from "$lib/server/paperPage/mode";
 import { usdToMicroUsd } from "$lib/utils/mlBudget";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
@@ -26,6 +27,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			model: validateModel(models),
 			preprompt: z.string().optional(),
 			mlAssistant: z.boolean().optional(),
+			agentMode: z.literal("paperpage").optional(),
 			mlBudgetUsd: z.number().finite().min(0).max(10_000).optional(),
 		})
 		.safeParse(JSON.parse(body));
@@ -43,6 +45,12 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	// Only builds that ship ML Assistant mode can start a conversation in it.
 	const isMlAssistant = ML_ASSISTANT_MODE && values.mlAssistant === true;
+	// Only while the deployment configures its workshop template; exclusive with ML Assistant.
+	const isPaperPage = !isMlAssistant && values.agentMode === "paperpage" && paperPageEnabled();
+	// the mode creates Spaces with the user's own token, so it needs a user wherever there can be one
+	if (isPaperPage && loginEnabled && !locals.user) {
+		error(401, "Sign in with Hugging Face to use PaperPage Intern.");
+	}
 
 	let model = models.find((m) => (m.id || m.name) === values.model);
 
@@ -117,7 +125,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	// Storing nothing here keeps the user's per-model custom prompt out of the
 	// conversation entirely — the endpoint appends a stored system message after
 	// the preprompt, so leaving one would compose the two.
-	if (isMlAssistant) {
+	if (isMlAssistant || isPaperPage) {
 		values.preprompt = "";
 	}
 
@@ -144,6 +152,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		// Only builds that ship ML Assistant mode can mark a conversation with it.
 		...(isMlAssistant ? { mlAssistant: true } : {}),
 		...(isMlAssistant && mlBudget ? { mlBudget } : {}),
+		...(isPaperPage ? { agentMode: "paperpage" as const } : {}),
 	});
 
 	if (MetricsServer.isEnabled()) {
@@ -175,6 +184,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				shared: false,
 				deployedSpaces: undefined,
 				mlAssistant: isMlAssistant ? true : undefined,
+				agentMode: isPaperPage ? "paperpage" : undefined,
 				mlBudget,
 			}),
 		}),

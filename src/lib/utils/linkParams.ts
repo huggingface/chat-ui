@@ -21,10 +21,11 @@ export interface LinkPromptRequest {
 
 export const LINK_PARAM_NAMES = ["q", "prompt", "attachments"] as const;
 
-export type LinkMode = "ml-intern";
+export type LinkMode = "ml-intern" | "paperpage-intern";
 
 export function readLinkMode(params: URLSearchParams): LinkMode | null {
-	return params.get("mode")?.trim().toLowerCase() === "ml-intern" ? "ml-intern" : null;
+	const mode = params.get("mode")?.trim().toLowerCase();
+	return mode === "ml-intern" || mode === "paperpage-intern" ? mode : null;
 }
 
 /**

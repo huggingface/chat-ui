@@ -21,6 +21,15 @@ describe("buildToolPreprompt", () => {
 		expect(prompt).toContain("Never fabricate URLs, citations, or facts");
 	});
 
+	it("lets a mode replace the restraint and drop single-file apps", () => {
+		const prompt = buildToolPreprompt([tool("page_exec")], undefined, [], {
+			usingTools: "USING TOOLS: build in the workshop.",
+		});
+		expect(prompt).toContain("build in the workshop");
+		expect(prompt).not.toContain("INTERACTIVE APPS");
+		expect(prompt).not.toContain("Do NOT call a tool unless");
+	});
+
 	it("tells the model to follow up instead of answering from memory", () => {
 		const prompt = buildToolPreprompt([tool("web_search_exa")]);
 		expect(prompt).toContain("instead of answering from memory");

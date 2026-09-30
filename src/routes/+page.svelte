@@ -27,6 +27,7 @@
 	import LinkPromptModal from "$lib/components/LinkPromptModal.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { agentMode } from "$lib/stores/agentMode.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 
 	let { data } = $props();
@@ -52,8 +53,8 @@
 			const validModels = data.models.map((model) => model.id);
 
 			let model;
-			if (validModels.includes($settings.activeModel)) {
-				model = $settings.activeModel;
+			if (validModels.includes(selectedModel)) {
+				model = selectedModel;
 			} else {
 				model = data.models[0].id;
 			}
@@ -75,6 +76,7 @@
 					// The composer latches the mode before handing the message over, so
 					// the conversation this creates is marked with it from the start.
 					mlAssistant: mlAssistant.taskStarted,
+					agentMode: agentMode.pending ?? undefined,
 				}),
 			});
 
@@ -97,6 +99,7 @@
 			}
 
 			const { conversationId, conversation } = await res.json();
+			agentMode.clearPending();
 
 			// The create response embeds the conversation payload; hand it to the
 			// conversation page as a one-shot seed so its load skips the GET and
@@ -169,6 +172,23 @@
 	});
 
 	let linkMode = $derived(readLinkMode(page.url.searchParams));
+	// The PaperPage link sets the mode, and preselects its model, for the next new conversation.
+	// The param is stripped once read, so coming back here (from settings, to pick another model)
+	// neither re-applies the link nor loses the mode.
+	onMount(() => {
+		if (readLinkMode(page.url.searchParams) !== "paperpage-intern") return;
+		if (!data.paperPageEnabled || requireAuthUser()) return;
+		const url = new URL(page.url);
+		url.searchParams.delete("mode");
+		tick().then(() => replaceState(url, page.state));
+		agentMode.pending = "paperpage";
+		const preferred = data.paperPageModel;
+		agentMode.preferredModel =
+			preferred && data.models.some((m) => m.id === preferred)
+				? { id: preferred, over: $settings.activeModel }
+				: null;
+	});
+	let selectedModel = $derived(agentMode.modelFor($settings.activeModel));
 	$effect(() => {
 		if (linkMode !== "ml-intern") return;
 		untrack(() => {
@@ -213,7 +233,7 @@
 		}
 	}
 
-	let currentModel = $derived(findCurrentModel(data.models, data.oldModels, $settings.activeModel));
+	let currentModel = $derived(findCurrentModel(data.models, data.oldModels, selectedModel));
 </script>
 
 <svelte:head>
