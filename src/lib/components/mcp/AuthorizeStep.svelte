@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from "svelte";
+	import { onDestroy, untrack } from "svelte";
 	import type { DiscoveryResponse } from "$lib/utils/mcpOAuth";
 	import {
 		openAuthPopup,
@@ -23,13 +23,39 @@
 
 	let { discovery, serverUrl, serverId, onauthorized, oncancel }: Props = $props();
 
-	let phase = $state<"idle" | "starting" | "popup" | "manual" | "error" | "done">(
+	let phase = $state<"idle" | "starting" | "popup" | "waiting" | "manual" | "error" | "done">(
 		untrack(() => (discovery.connection?.manualClientRequired ? "manual" : "idle"))
 	);
 	let errorMessage = $state<string | null>(null);
 	let manualClientId = $state("");
 	let manualClientSecret = $state("");
 	let popupBlocked = $state(false);
+
+	const STATE_POLL_MS = 2_000;
+	const WAIT_FOR_SIGN_IN_MS = 10 * 60 * 1000;
+	// Bumped on every new attempt and on teardown, so a superseded wait stops polling.
+	let attempt = 0;
+	onDestroy(() => attempt++);
+
+	// A login page served with Cross-Origin-Opener-Policy severs our popup handle, so `closed` reads
+	// true while the user is still signing in and the result message never arrives. Treat "closed" as
+	// unknown and watch the server-side connection instead, leaving Authorize enabled for a real close.
+	async function waitForAuthorization(connectionId: string, flowId: string, current: number) {
+		const deadline = Date.now() + WAIT_FOR_SIGN_IN_MS;
+		while (current === attempt && Date.now() < deadline) {
+			const state = await fetchOAuthConnectionState(connectionId);
+			if (current !== attempt) return;
+			if (state?.status === "authorized") {
+				phase = "done";
+				onauthorized({ ok: true, flowId, connection: state });
+				return;
+			}
+			await new Promise((resolve) => setTimeout(resolve, STATE_POLL_MS));
+		}
+		if (current !== attempt) return;
+		phase = "idle";
+		errorMessage = "Authorization window was closed before completing.";
+	}
 
 	const issuerHost = $derived.by(() => {
 		const issuer = discovery.connection?.issuer;
@@ -55,6 +81,7 @@
 	}
 
 	async function handleAuthorize() {
+		const current = ++attempt;
 		errorMessage = null;
 		const clientInfo = buildClientInfo();
 		if (!discovery.connection || (discovery.connection.manualClientRequired && !clientInfo)) {
@@ -102,21 +129,23 @@
 					});
 					return;
 				}
-				if (code === "popup-closed" || code === "timeout") {
-					// The popup can close before its result message reaches us (e.g. a PUBLIC_ORIGIN
-					// mismatch drops the postMessage). The exchange may still have completed server-side,
-					// so confirm the connection before treating it as a failure.
+				if (code === "popup-closed") {
+					phase = "waiting";
+					await waitForAuthorization(discovery.connection.connectionId, flowId, current);
+					return;
+				}
+				if (code === "timeout") {
+					// The exchange may still have completed server-side (e.g. a PUBLIC_ORIGIN mismatch drops
+					// the postMessage), so confirm the connection before treating it as a failure.
 					const recovered = await fetchOAuthConnectionState(discovery.connection.connectionId);
+					if (current !== attempt) return;
 					if (recovered?.status === "authorized") {
 						phase = "done";
 						onauthorized({ ok: true, flowId, connection: recovered });
 						return;
 					}
 					phase = "idle";
-					errorMessage =
-						code === "timeout"
-							? "Authorization timed out before completing."
-							: "Authorization window was closed before completing.";
+					errorMessage = "Authorization timed out before completing.";
 					return;
 				}
 				phase = "error";
@@ -176,6 +205,16 @@
 		<div class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
 			<span class="size-3 animate-pulse rounded-full bg-blue-500"></span>
 			Waiting for you to complete authorization in the popup window…
+		</div>
+	{/if}
+
+	{#if phase === "waiting"}
+		<div class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+			<span class="mt-1.5 size-3 flex-none animate-pulse rounded-full bg-blue-500"></span>
+			<span>
+				Waiting for sign-in to finish in the other window… If you closed it, click Authorize to try
+				again.
+			</span>
 		</div>
 	{/if}
 

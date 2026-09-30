@@ -73,7 +73,6 @@ function popupResponse(origin: string, message: PopupResultMessage): Response {
       // No opener: either a popup whose opener was severed (COOP) or the main tab of a full-page
       // flow whose state is gone. close() only works for the former; the link covers the latter.
       if (!window.opener) {
-        document.getElementById("close-hint").hidden = true;
         document.getElementById("return-link").hidden = false;
         try { window.close(); } catch (e) {}
         return;
