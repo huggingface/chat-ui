@@ -17,7 +17,6 @@
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonDocument from "~icons/carbon/document";
 	import LucideTriangleAlert from "~icons/lucide/triangle-alert";
-	import LucideCheck from "~icons/lucide/check";
 	import BlockWrapper from "./BlockWrapper.svelte";
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 
@@ -35,7 +34,7 @@
 	// only a conversation the registry is bound to has a pane to open, a share has none
 	let canOpenFiles = $derived(mlRegistry.conversationId !== undefined);
 	// A result can come back with an error status as well as a separate error
-	// update; either way the call failed and must not earn the checkmark.
+	// update; either way the call failed and the row must say so.
 	let toolError = $derived(
 		tool.some(
 			(update) =>
@@ -149,19 +148,14 @@
 				>
 					<!-- Errors here are often recoverable (the model retries or works around
 				     them), so the header stays in the same muted gray as every other
-				     state; the icon is the only signal until the row is expanded.
+				     state; the amber icon is the only signal until the row is expanded.
+				     A successful call gets no icon: "Called" already says it.
 				     role="img" is what gets a bare svg's aria-label announced. -->
 					{#if toolError}
 						<LucideTriangleAlert
 							class="size-3.5 shrink-0 text-amber-500 dark:text-amber-400"
 							role="img"
 							aria-label="Failed"
-						/>
-					{:else if toolDone}
-						<LucideCheck
-							class="size-3.5 shrink-0 text-green-600 dark:text-green-400"
-							role="img"
-							aria-label="Succeeded"
 						/>
 					{/if}
 					<span
