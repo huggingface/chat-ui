@@ -2,7 +2,7 @@
 
 PaperPage Intern is an agent mode that builds a research project page (the page that goes with a paper) together with the user. The page is a SvelteKit project running live in a Hugging Face Space; the user watches it change in the side pane while the agent edits, and the finished page is published as a static Space.
 
-Open it with the deep link `/?mode=paperpage-intern`.
+Turn it on with the "PaperPage Intern" switch in the composer of a new conversation (beside ML Intern's; one mode per conversation), or open the deep link `/?mode=paperpage-intern`.
 
 ## Enabling
 

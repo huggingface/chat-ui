@@ -613,12 +613,21 @@
 	);
 	let mlPillVisible = $derived(
 		ML_ASSISTANT_MODE &&
-			!paperPageOn &&
 			!shared &&
 			!isReadOnly &&
 			!mlTaskRunning &&
 			messages.length === 0 &&
 			mlModelSet.length > 0
+	);
+
+	// PaperPage Intern's switch, beside ML Intern's, on a new conversation only
+	let paperPagePillVisible = $derived(
+		(page.data as { paperPageEnabled?: boolean }).paperPageEnabled === true &&
+			!page.params?.id &&
+			!shared &&
+			!isReadOnly &&
+			!mlTaskRunning &&
+			messages.length === 0
 	);
 
 	// ML Intern launch card under the home-screen logo (HuggingChat only). Temporary,
@@ -1209,12 +1218,6 @@
 							<span class="truncate"
 								>builds your paper's project page, live, on a Hugging Face Space</span
 							>
-							<button
-								type="button"
-								class="ml-auto rounded px-1 hover:bg-gray-200 dark:hover:bg-gray-700"
-								title="Leave PaperPage Intern"
-								onclick={() => agentMode.clearPending()}>✕</button
-							>
 						</div>
 					{/if}
 					{#if ML_ASSISTANT_MODE}
@@ -1274,6 +1277,7 @@
 										{modelIsMultimodal}
 										{modelSupportsTools}
 										showMlPill={mlPillVisible}
+										showPaperPagePill={paperPagePillVisible}
 										bind:focused
 									/>
 								{/if}

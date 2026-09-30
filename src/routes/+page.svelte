@@ -181,12 +181,8 @@
 		const url = new URL(page.url);
 		url.searchParams.delete("mode");
 		tick().then(() => replaceState(url, page.state));
-		agentMode.pending = "paperpage";
-		const preferred = data.paperPageModel;
-		agentMode.preferredModel =
-			preferred && data.models.some((m) => m.id === preferred)
-				? { id: preferred, over: $settings.activeModel }
-				: null;
+		agentMode.start("paperpage", data.paperPageModel, data.models, $settings.activeModel);
+		mlAssistant.toggle(false);
 	});
 	let selectedModel = $derived(agentMode.modelFor($settings.activeModel));
 	$effect(() => {

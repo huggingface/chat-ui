@@ -2,7 +2,7 @@
  * Agent modes other than ML Assistant (which keeps its own store). Two separate facts:
  *
  * - `pending`: the mode the next new conversation starts in, set by the `?mode=paperpage-intern`
- *   link and cleared from the composer or once that conversation exists. It survives trips to
+ *   link or the composer's pill and cleared from the pill or once that conversation exists. It survives trips to
  *   other pages (settings, to pick a model) until then.
  * - `current`: the stored mode of the conversation on screen, synced by ChatWindow.
  *
@@ -15,6 +15,18 @@ class AgentModeStore {
 	pending = $state<AgentMode | null>(null);
 	current = $state<AgentMode | null>(null);
 	preferredModel = $state<{ id: string; over: string } | null>(null);
+
+	/** start `mode` for the next new conversation, preselecting `model` when the list has it */
+	start(
+		mode: AgentMode,
+		model: string | null | undefined,
+		models: { id: string }[],
+		saved: string
+	) {
+		this.pending = mode;
+		this.preferredModel =
+			model && models.some((m) => m.id === model) ? { id: model, over: saved } : null;
+	}
 
 	/** the preselected model while it still applies, else the saved one */
 	modelFor(saved: string): string {
