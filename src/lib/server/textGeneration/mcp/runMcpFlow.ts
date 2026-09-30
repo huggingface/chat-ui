@@ -1,5 +1,9 @@
 import { config } from "$lib/server/config";
-import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
+import {
+	MessageToolUpdateType,
+	MessageUpdateType,
+	type MessageUpdate,
+} from "$lib/types/MessageUpdate";
 import { getMcpServers } from "$lib/server/mcp/registry";
 import { isValidUrl } from "$lib/server/urlSafety";
 import { getOpenAiToolsForMcp } from "$lib/server/mcp/tools";
@@ -18,7 +22,12 @@ import {
 	withRewrittenArguments,
 	type NormalizedToolCall,
 } from "./toolInvocation";
-import { hasTruncatedToolCall, parseToolArguments, withParseableArguments } from "./toolArgs";
+import {
+	composeRewrites,
+	hasTruncatedToolCall,
+	parseToolArguments,
+	withParseableArguments,
+} from "./toolArgs";
 import type { TextGenerationContext } from "../types";
 import {
 	hasAuthHeader,
@@ -27,7 +36,25 @@ import {
 	isExaMcpServer,
 } from "$lib/server/mcp/hf";
 import { buildImageRefResolver } from "./fileRefs";
-import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
+import { createVirtualFileExpander } from "$lib/server/mlFiles/expand";
+import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
+import { prepareHistory } from "$lib/server/textGeneration/utils/prepareFiles";
+import {
+	AttachmentOverflowError,
+	budgetNotice,
+	canCutAttachments,
+	isContextOverflowError,
+	noticeFor,
+	retryNotice,
+	type AttachmentMode,
+} from "$lib/server/textGeneration/utils/attachmentBudget";
+import {
+	createHistoryWindow,
+	historyCost,
+	windowLimitChars,
+} from "$lib/server/textGeneration/utils/historyWindow";
+import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWindowFlag";
+import { withHarnessEventOnLastTool } from "$lib/server/textGeneration/utils/harnessEvent";
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
@@ -39,8 +66,24 @@ import {
 	withMlAssistantServers,
 } from "$lib/server/mlAssistant";
 import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
+import { createJobLabelRewrite } from "$lib/server/mcp/jobLabels";
+import { loadSessionJobLabels } from "$lib/server/mlRegistry/sessionLabel";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
+import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
+import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
+import { PARENT_READER } from "$lib/types/MlSource";
+import { mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
+import { markHarnessEventDelivered, pendingHarnessEvent } from "$lib/server/mlRegistry/midTurn";
+import {
+	buildSessionStateBlock,
+	injectSessionState,
+	markSessionStateRead,
+	mlStateBlockEnabled,
+	type SessionStateBlock,
+} from "$lib/server/mlRegistry/stateBlock";
+import { readMlBudget } from "$lib/server/mlBudget/budget";
+import { appendToLastToolMessage, budgetChangeNote } from "$lib/server/mlBudget/budgetNote";
 import { createRepeatedCallGuard } from "./repeatedCallGuard";
 import { withRepairedToolSchemas } from "$lib/server/mcp/schemaRepair";
 import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
@@ -159,6 +202,7 @@ export async function* runMcpFlow({
 	// Read once: the preset decides the servers, the round budget and which tool
 	// doctrine is sent, and they must all agree within a run.
 	const mlAssistant = isMlAssistantConversation(conv);
+	const harnessEvents = mlAssistant && mlServiceEventsEnabled();
 
 	// Every mode conversation is gated — one without a stored budget is a zero
 	// budget, not an ungated one. Settle already ran this turn
@@ -178,10 +222,41 @@ export async function* runMcpFlow({
 			})
 		: undefined;
 
+	// The total the model was last told: the session-context line's, which the
+	// preprompt read from this same ledger after the turn-start settle.
+	let budgetTotalSeen = conv.mlBudget?.totalMicroUsd ?? 0;
+
 	// A job bills the namespace it runs under, so the billing setting travels as
 	// an argument rather than a header — see mcp/hubBilling.ts.
 	const payer = mlAssistant ? mlAssistantPayerTarget(locals) : undefined;
-	const rewriteArgs = payer ? createHubBillingRewrite(payer) : undefined;
+	// a turn whose labels cannot be read submits unlabelled rather than not at all
+	const jobLabels = mlAssistant
+		? await loadSessionJobLabels(conv._id).catch((err) => {
+				logger.warn(
+					{ err: String(err), conversationId: conv._id.toString() },
+					"[mcp] session job labels unavailable; this turn's jobs go unlabelled"
+				);
+				return undefined;
+			})
+		: undefined;
+	const rewriteArgs = composeRewrites([
+		payer ? createHubBillingRewrite(payer) : undefined,
+		jobLabels ? createJobLabelRewrite(jobLabels) : undefined,
+	]);
+	const recordingGuard = mlAssistant
+		? createMlRecordingGuard({
+				conversationId: conv._id,
+				generationId: generationId ?? conv._id.toString(),
+				messageId,
+				namespace:
+					payer?.namespace ??
+					(locals as unknown as { user?: { username?: string } })?.user?.username,
+				...(jobLabels ? { jobLabels } : {}),
+			})
+		: undefined;
+	const sourcesGuardFor = mlAssistant
+		? (readBy: string) => createMlSourcesGuard({ conversationId: conv._id, readBy })
+		: undefined;
 	if (mlAssistant) {
 		logger.info(
 			{ conversationId: conv._id.toString(), payer: payer ?? null },
@@ -392,6 +467,9 @@ export async function* runMcpFlow({
 	}
 
 	const resolveFileRef = buildImageRefResolver(messages);
+	const expandVirtualFiles = mlVirtualFilesEnabled(conv)
+		? createVirtualFileExpander(conv._id)
+		: undefined;
 	const imageProcessor = makeImageProcessor({
 		supportedMimeTypes: ["image/png", "image/jpeg"],
 		preferredMimeType: "image/jpeg",
@@ -445,15 +523,20 @@ export async function* runMcpFlow({
 		// Applied to every conversation, mode or not: the Hub tools whose real
 		// interface is a grammar in prose misfire the same way whoever is calling
 		// them. See mcp/schemaRepair.ts for what the traces showed.
-		const shapedMcpTools = withRepairedToolSchemas(gatedMcpTools, mapping, servers);
+		const shapedMcpTools = withRepairedToolSchemas(gatedMcpTools, mapping, servers, {
+			virtualFiles: expandVirtualFiles !== undefined,
+		});
 		// Cheapest first, and only the last link may book anything (see
 		// composeGuards): a repeat of a call that already failed the same way, then
 		// arguments that cannot satisfy the tool's own schema, then the budget.
 		// The first two run for every conversation — getting a tool's arguments
 		// wrong is not a mode-specific failure.
+		// the recorder goes ahead of the budget so the budget update still reaches the stream
 		const guard = [
 			repeatedCallGuard,
 			createSchemaPreflightGuard(mapping),
+			...(recordingGuard ? [recordingGuard] : []),
+			...(sourcesGuardFor ? [sourcesGuardFor(PARENT_READER)] : []),
 			...(budgetGuard ? [budgetGuard] : []),
 		].reduce(composeGuards);
 		const oaTools = [
@@ -550,26 +633,6 @@ export async function* runMcpFlow({
 			? Math.max(catalogMaxTokens ?? 0, clampedFloor)
 			: catalogMaxTokens;
 
-		let messagesOpenAI: ChatCompletionMessageParam[] = await prepareMessagesWithFiles(
-			messages,
-			imageProcessor,
-			mmEnabled,
-			{
-				replayToolHistory: true,
-				attachReasoning: mayEchoReasoning,
-				// The model resolved for THIS turn. Under the "omni" router alias a
-				// prior turn in the same conversation can have been produced by a
-				// different model (per-message routing, no user action needed); this
-				// gates reasoning_content to only replay onto its own producer.
-				currentProducerModel: candidateModelId ?? targetModel.id ?? targetModel.name,
-				// The resolved target's window, not the router alias's: under "omni"
-				// the alias itself has none, and the candidate is what serves this
-				// request. Tool schemas are prepended after this returns, which is
-				// part of what CONTEXT_RESERVE_TOKENS holds back.
-				contextLengthTokens: targetContextLength,
-				maxOutputTokens: maxTokens,
-			}
-		);
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
 		// In the mode the doctrine paragraphs are swapped, not appended to: the
 		// generic restraint rule tells the model not to reach for a tool unless it
@@ -586,34 +649,80 @@ export async function* runMcpFlow({
 			prepromptPieces.push(preprompt);
 		}
 		const mergedPreprompt = prepromptPieces.join("\n\n");
-		const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
-		if (hasSystemMessage) {
-			if (mergedPreprompt.length > 0) {
-				const existing = messagesOpenAI[0].content ?? "";
-				const existingText = typeof existing === "string" ? existing : "";
-				messagesOpenAI[0].content = mergedPreprompt + (existingText ? "\n\n" + existingText : "");
+		const stateBlock = mlStateBlockEnabled(conv) ? await buildSessionStateBlock(conv) : undefined;
+		let unreadEnded: SessionStateBlock["ended"] = stateBlock?.ended ?? [];
+
+		// built again, attachments cut, when the provider refuses the request for its size
+		const buildPrompt = async (attachments: AttachmentMode) => {
+			const history = await prepareHistory(messages, imageProcessor, mmEnabled, {
+				replayToolHistory: true,
+				attachReasoning: mayEchoReasoning,
+				// The model resolved for THIS turn. Under the "omni" router alias a
+				// prior turn in the same conversation can have been produced by a
+				// different model (per-message routing, no user action needed); this
+				// gates reasoning_content to only replay onto its own producer.
+				currentProducerModel: candidateModelId ?? targetModel.id ?? targetModel.name,
+				// The resolved target's window, not the router alias's: under "omni"
+				// the alias itself has none, and the candidate is what serves this
+				// request.
+				contextLengthTokens: targetContextLength,
+				maxOutputTokens: maxTokens,
+				slidingWindow: historyWindowEnabled(),
+				attachments,
+				mlAssistant,
+			});
+			let prompt: ChatCompletionMessageParam[] = history.messages;
+			const hasSystemMessage = prompt.length > 0 && prompt[0]?.role === "system";
+			if (hasSystemMessage) {
+				if (mergedPreprompt.length > 0) {
+					const existing = prompt[0].content ?? "";
+					const existingText = typeof existing === "string" ? existing : "";
+					prompt[0].content = mergedPreprompt + (existingText ? "\n\n" + existingText : "");
+				}
+			} else if (mergedPreprompt.length > 0) {
+				prompt = [{ role: "system", content: mergedPreprompt }, ...prompt];
 			}
-		} else if (mergedPreprompt.length > 0) {
-			messagesOpenAI = [{ role: "system", content: mergedPreprompt }, ...messagesOpenAI];
-		}
 
-		// Tail-injected once per turn; within the turn, freshness travels in the tool
-		// results. Gated on the tool being offered so a stale plan can't tell the model
-		// to call a tool it doesn't have.
-		if (conv.plan && builtinTools.some((tool) => tool.name === PLAN_TOOL_NAME)) {
-			messagesOpenAI = injectPlanState(messagesOpenAI, conv.plan);
-		}
+			const window =
+				history.units && targetContextLength
+					? createHistoryWindow({
+							conversationId: conv._id,
+							units: history.units,
+							offset: prompt.length - history.messages.length,
+							limitChars: windowLimitChars(targetContextLength, maxTokens),
+							fixedChars: historyCost(oaTools),
+							stored: conv.historyWindow,
+							liveMessageId: messageId,
+						})
+					: undefined;
 
-		// Work around servers that reject `system` role
-		if (
-			typeof config.OPENAI_BASE_URL === "string" &&
-			config.OPENAI_BASE_URL.length > 0 &&
-			(config.OPENAI_BASE_URL.includes("hf.space") ||
-				config.OPENAI_BASE_URL.includes("gradio.app")) &&
-			messagesOpenAI[0]?.role === "system"
-		) {
-			messagesOpenAI[0] = { ...messagesOpenAI[0], role: "user" };
-		}
+			// Tail-injected once per turn; within the turn, freshness travels in the tool
+			// results. Gated on the tool being offered so a stale plan can't tell the model
+			// to call a tool it doesn't have.
+			if (conv.plan && builtinTools.some((tool) => tool.name === PLAN_TOOL_NAME)) {
+				prompt = injectPlanState(prompt, conv.plan);
+			}
+			if (stateBlock) {
+				prompt = injectSessionState(prompt, stateBlock.text);
+			}
+
+			// Work around servers that reject `system` role
+			if (
+				typeof config.OPENAI_BASE_URL === "string" &&
+				config.OPENAI_BASE_URL.length > 0 &&
+				(config.OPENAI_BASE_URL.includes("hf.space") ||
+					config.OPENAI_BASE_URL.includes("gradio.app")) &&
+				prompt[0]?.role === "system"
+			) {
+				prompt[0] = { ...prompt[0], role: "user" };
+			}
+			return { prompt, window, attachments: history.attachments };
+		};
+		let built = await buildPrompt("budget");
+		let messagesOpenAI = built.prompt;
+		let historyWindow = built.window;
+		let attachmentsCut = false;
+		let pendingNotice = budgetNotice(built.attachments);
 
 		const stopSequences =
 			typeof parameters?.stop === "string"
@@ -672,6 +781,8 @@ export async function* runMcpFlow({
 			hostBuiltinTools: builtinTools,
 			contextLengthTokens: targetContextLength,
 			...(rewriteArgs ? { rewriteArgs } : {}),
+			...(expandVirtualFiles ? { expandVirtualFiles } : {}),
+			...(sourcesGuardFor ? { sourcesGuard: sourcesGuardFor } : {}),
 		};
 		for (const tool of builtinTools) {
 			if (isNestedAgentTool(tool)) tool.bind(nestedAgentDeps);
@@ -743,35 +854,71 @@ export async function* runMcpFlow({
 			// non-blank delta last round — it never became part of a real trace.
 			pendingReasoningWhitespace = "";
 
-			const completionRequest: ChatCompletionCreateParamsStreaming = {
-				...completionBase,
-				messages: messagesOpenAI,
-			};
+			let requestMessages = historyWindow
+				? await historyWindow.fit(messagesOpenAI)
+				: messagesOpenAI;
 
 			// A turn several productive rounds deep must not die on one throttled
 			// request, or on a gateway that has no backend ready for a moment;
 			// absorb what outlasts the SDK's quick retries.
-			const completionStream: Stream<ChatCompletionChunk> = await withUpstreamRetry(
-				() =>
-					openai.chat.completions.create(completionRequest, {
-						signal: abortSignal,
-						headers: {
-							"ChatUI-Conversation-ID": conv._id.toString(),
-							"X-use-cache": "false",
-							...(config.USE_USER_TOKEN === "true" && locals?.token
-								? { Authorization: `Bearer ${locals.token}` }
-								: {}),
-						},
-					}),
-				{
-					signal: abortSignal,
-					onBackoff: (attempt, delayMs, err) =>
-						logger.warn(
-							{ loop, attempt, delayMs, err: String(err) },
-							"[mcp] upstream failure; backing off in-loop"
+			const createStream = (request: ChatCompletionMessageParam[]) =>
+				withUpstreamRetry(
+					() =>
+						openai.chat.completions.create(
+							{ ...completionBase, messages: request },
+							{
+								signal: abortSignal,
+								headers: {
+									"ChatUI-Conversation-ID": conv._id.toString(),
+									"X-use-cache": "false",
+									...(config.USE_USER_TOKEN === "true" && locals?.token
+										? { Authorization: `Bearer ${locals.token}` }
+										: {}),
+								},
+							}
 						),
+					{
+						signal: abortSignal,
+						onBackoff: (attempt, delayMs, err) =>
+							logger.warn(
+								{ loop, attempt, delayMs, err: String(err) },
+								"[mcp] upstream failure; backing off in-loop"
+							),
+					}
+				);
+			let completionStream: Stream<ChatCompletionChunk>;
+			try {
+				completionStream = await createStream(requestMessages);
+			} catch (err) {
+				if (
+					attachmentsCut ||
+					!isContextOverflowError(err) ||
+					!canCutAttachments(built.attachments)
+				) {
+					throw err;
 				}
-			);
+				// the file stays in history, so without a cut every later turn fails the same way
+				logger.warn(
+					{ loop, err: String(err) },
+					"[mcp] request too large; retrying attachments cut"
+				);
+				attachmentsCut = true;
+				const live = messagesOpenAI.slice(built.prompt.length);
+				built = await buildPrompt("minimal");
+				messagesOpenAI = [...built.prompt, ...live];
+				historyWindow = built.window;
+				requestMessages = historyWindow ? await historyWindow.fit(messagesOpenAI) : messagesOpenAI;
+				try {
+					completionStream = await createStream(requestMessages);
+				} catch (retryErr) {
+					if (!isContextOverflowError(retryErr)) throw retryErr;
+					throw new AttachmentOverflowError(built.attachments, retryErr);
+				}
+				pendingNotice = retryNotice(built.attachments);
+			}
+			const notice = noticeFor(conv, messageId, pendingNotice);
+			pendingNotice = undefined;
+			if (notice) yield notice;
 
 			// If provider header was exposed, notify UI so it can render "via {provider}".
 			if (providerHeader) {
@@ -928,6 +1075,12 @@ export async function* runMcpFlow({
 				return "aborted";
 			}
 
+			// marked only after a completion read the block, a failed request lists the rows again
+			if (unreadEnded.length > 0) {
+				await markSessionStateRead(unreadEnded);
+				unreadEnded = [];
+			}
+
 			// Auto-close any unclosed <think> block so reasoning from this loop
 			// doesn't swallow content from subsequent iterations.  The client-side
 			// regex matches `<think>` to end-of-string, so an unclosed block would
@@ -992,7 +1145,7 @@ export async function* runMcpFlow({
 					const nonStream = await withUpstreamRetry(
 						() =>
 							openai.chat.completions.create(
-								{ ...completionBase, messages: messagesOpenAI, stream: false },
+								{ ...completionBase, messages: requestMessages, stream: false },
 								{
 									signal: abortSignal,
 									headers: {
@@ -1091,6 +1244,7 @@ export async function* runMcpFlow({
 					servers,
 					parseArgs,
 					resolveFileRef,
+					...(expandVirtualFiles ? { expandVirtualFiles } : {}),
 					toPrimitive,
 					processToolOutput,
 					abortSignal,
@@ -1115,9 +1269,16 @@ export async function* runMcpFlow({
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;
+				let lastCallUuid: string | undefined;
 				for await (const event of exec) {
 					if (event.type === "update") {
 						producedOutput = true;
+						if (
+							event.update.type === MessageUpdateType.Tool &&
+							event.update.subtype === MessageToolUpdateType.Call
+						) {
+							lastCallUuid = event.update.uuid;
+						}
 						yield event.update;
 					} else {
 						if (event.summary.awaitingInput) {
@@ -1129,6 +1290,19 @@ export async function* runMcpFlow({
 							assistantToolMessage,
 							...(event.summary.toolMessages ?? []),
 						];
+						if (budgetGuard) {
+							try {
+								const budget = await readMlBudget(conv._id);
+								const note = budgetChangeNote(budgetTotalSeen, budget);
+								if (note) {
+									messagesOpenAI = appendToLastToolMessage(messagesOpenAI, note);
+									budgetTotalSeen = budget?.totalMicroUsd ?? 0;
+								}
+							} catch (err) {
+								// The gate still reads the live ledger; only the model's view lags.
+								logger.warn({ err: String(err) }, "[mlBudget] mid-turn budget read failed");
+							}
+						}
 						toolMsgCount = event.summary.toolMessages?.length ?? 0;
 						toolRunCount = event.summary.toolRuns?.length ?? 0;
 						logger.info(
@@ -1148,6 +1322,16 @@ export async function* runMcpFlow({
 				if (checkAborted()) {
 					logger.info({ loop }, "[mcp] aborting after tool execution");
 					return "aborted";
+				}
+				// no completion follows the last round, its events wait for the next state block
+				if (harnessEvents && lastCallUuid && toolMsgCount > 0 && loop + 1 < maxToolRounds) {
+					const pending = await pendingHarnessEvent(conv._id, lastCallUuid);
+					if (pending) {
+						// emitted before the rows are cleared, a run that dies in between tells them again
+						yield pending.update;
+						messagesOpenAI = withHarnessEventOnLastTool(messagesOpenAI, pending.update.text);
+						await markHarnessEventDelivered(conv._id, pending.services);
+					}
 				}
 				// Continue loop: next iteration will use tool messages to get the final content
 				continue;
@@ -1280,6 +1464,8 @@ export async function* runMcpFlow({
 		// already streamed to the user. Only a failure before anything was shown is
 		// recoverable that way.
 		if (producedOutput) throw err;
+		// the answer without tools carries the same attachments and would only fail twice more
+		if (err instanceof AttachmentOverflowError) throw err;
 		logger.warn({ err: msg }, "[mcp] flow failed before any output; falling back");
 	}
 	// Note: pooled MCP clients are shared across concurrent requests, so they must NOT be

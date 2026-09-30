@@ -37,6 +37,10 @@ export interface BuiltinToolContext {
 	 */
 	messageId?: string;
 	generationId?: string;
+	/** label of the sub-agent whose nested run this call belongs to, absent in the parent loop */
+	agent?: string;
+	/** the mlAgentRuns id of that run */
+	agentRunId?: string;
 	/** Absent when there is no chat to prompt (no elicitation context for the run). */
 	elicitationSink?: ElicitationSink;
 	/**

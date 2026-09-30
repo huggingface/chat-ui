@@ -1,5 +1,7 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
+import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
+import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
 import { config } from "$lib/server/config";
 import { models, validModelIdSchema } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
@@ -27,9 +29,14 @@ import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
+import { stampMlHarness } from "$lib/server/mlAssistantHarness";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
-import { compressUpdatesForStorage } from "$lib/server/generation/compressUpdates";
+import {
+	compressUpdatesForStorage,
+	messageForStorage,
+} from "$lib/server/generation/compressUpdates";
+import { restoreRunningShape } from "$lib/utils/messageShape";
 import { applyUpdateToMessage } from "$lib/server/generation/applyUpdate";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
@@ -401,6 +408,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	if (!messageToWriteTo) {
 		error(500, "Failed to create message");
 	}
+	restoreRunningShape(messageToWriteTo);
 	if (messagesForPrompt.length === 0) {
 		error(500, "Failed to create prompt");
 	}
@@ -408,6 +416,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// The stamp is what tells a reader a log exists; every run records one.
 	const effectiveGenerationId = generationId ?? randomUUID();
 	messageToWriteTo.generationId = effectiveGenerationId;
+	stampMlHarness(messageToWriteTo, conv, model);
 
 	// update the conversation with the new messages
 	await collections.conversations.updateOne(
@@ -435,10 +444,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		if (generationWriter && messageToWriteTo) {
 			messageToWriteTo.materializedSeq = generationWriter.currentSeq();
 		}
-		const messagesForSave = conv.messages.map((msg) => ({
-			...msg,
-			updates: compressUpdatesForStorage(msg.updates),
-		}));
+		const messagesForSave = conv.messages.map(messageForStorage);
 
 		await collections.conversations.updateOne(
 			{ _id: convId },
@@ -870,6 +876,8 @@ export async function DELETE({ locals, params }) {
 	}
 
 	await collections.conversations.deleteOne({ _id: conv._id });
+	await deleteMlFilesOf([conv._id]);
+	await deleteMlRegistry([conv._id]);
 
 	return new Response();
 }

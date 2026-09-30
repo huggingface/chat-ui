@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
+import { logger } from "$lib/server/logger";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
 import type { MlBudget } from "$lib/types/Conversation";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "./guard";
@@ -26,6 +27,7 @@ const createdIds: ObjectId[] = [];
 
 afterEach(async () => {
 	vi.unstubAllGlobals();
+	vi.restoreAllMocks();
 	await collections.conversations.deleteMany({ _id: { $in: createdIds } });
 	createdIds.length = 0;
 });
@@ -88,6 +90,7 @@ describe.sequential("mlBudget guard: what is gated", () => {
 			["hf_jobs", { operation: "ps" }],
 			["hf_jobs", { operation: "inspect", args: { job_id: "x" } }],
 			["hf_jobs", { operation: "cancel", args: { job_id: "x" } }],
+			["hf_jobs", { operation: "update-labels", args: { job_id: "x", labels: {} } }],
 			["hf_sandbox", { cmd: "status", args: ["handle"] }],
 			["hf_sandbox", { cmd: "terminate", args: ["handle"] }],
 			["hf_sandbox", { cmd: "kill", args: ["handle", "1"] }],
@@ -100,9 +103,14 @@ describe.sequential("mlBudget guard: what is gated", () => {
 	it("refuses scheduled jobs outright", { timeout: 15000 }, async () => {
 		const id = await insertConversation(budgetOf(100_000_000));
 		const { before } = makeGuard(id);
-		const verdict = await before("hf_jobs", { operation: "scheduled run", args: {} });
-		expect(verdict.allow).toBe(false);
-		if (!verdict.allow) expect(verdict.message).toContain("Scheduled jobs");
+		for (const operation of ["scheduled run", "scheduled uv", "scheduled update-labels"]) {
+			const verdict = await before("hf_jobs", { operation, args: {} });
+			expect(verdict.allow).toBe(false);
+			if (!verdict.allow) {
+				expect(verdict.message).toContain("Scheduled jobs");
+				expect(verdict.message).not.toContain("unrecognized");
+			}
+		}
 	});
 
 	// The observed bypass: submission-shaped args with no operation sailed
@@ -239,20 +247,194 @@ describe.sequential("mlBudget guard: pricing the submission", () => {
 });
 
 describe.sequential("mlBudget guard: reconciling the outcome", () => {
-	async function reserve(id: ObjectId) {
+	async function reserve(id: ObjectId, kind: "job" | "sandbox" = "job") {
 		const { guard, before } = makeGuard(id);
-		const verdict = await before("hf_jobs", {
-			operation: "uv",
-			args: {
-				flavor: "t4-small",
-				timeout: "10m",
-				namespace: "my-org",
-				resource_group_id: "65f000000000000000000001",
-			},
-		});
+		const verdict =
+			kind === "job"
+				? await before("hf_jobs", {
+						operation: "uv",
+						args: {
+							flavor: "t4-small",
+							timeout: "10m",
+							namespace: "my-org",
+							resource_group_id: "65f000000000000000000001",
+						},
+					})
+				: await before("hf_sandbox", {
+						cmd: "create",
+						args: ["create", "--flavor", "t4-small", "--timeout", "10m", "--namespace", "my-org"],
+					});
 		if (!verdict.allow || verdict.ticket === undefined) throw new Error("expected a ticket");
 		return { guard, ticket: verdict.ticket };
 	}
+
+	const JOB_ID = "0123456789abcdef01234567";
+	const SANDBOX_JOB_ID = "abcdefabcdefabcdefabcdef";
+	const OTHER_ID = "fedcba9876543210fedcba98";
+
+	const jobResult = (job: Record<string, unknown>) => ({
+		operation: "uv",
+		outcome: { kind: "job", job, logs: ["..."], logs_finished: false, logs_truncated: false },
+		total_results: 1,
+		results_shared: 1,
+	});
+	const JOB = {
+		id: JOB_ID,
+		url: `https://huggingface.co/jobs/testuser/${JOB_ID}`,
+		flavor: "a10g-small",
+		status: { stage: "SCHEDULING", message: null },
+		owner: { id: "u1", name: "testuser", type: "user" },
+		timeout_seconds: 1800,
+	};
+
+	it("takes a job's id and owner from the structured result", { timeout: 15000 }, async () => {
+		const id = await insertConversation(budgetOf(10_000_000));
+		const { guard, ticket } = await reserve(id);
+		await guard.after(ticket, {
+			status: "success",
+			text: "Job started.",
+			structured: jobResult(JOB),
+		});
+		const budget = await readMlBudget(id);
+		expect(budget?.reservations[0].jobId).toBe(JOB_ID);
+		expect(budget?.reservations[0].namespace).toBe("testuser");
+	});
+
+	it(
+		"takes a sandbox's id and namespace from the structured result",
+		{ timeout: 15000 },
+		async () => {
+			const id = await insertConversation(budgetOf(10_000_000));
+			const { guard, ticket } = await reserve(id, "sandbox");
+			await guard.after(ticket, {
+				status: "success",
+				text: "Sandbox ready.",
+				structured: {
+					op: "create",
+					handle: `hfsb2:testuser:${SANDBOX_JOB_ID}`,
+					name: "smoke",
+					namespace: "testuser",
+					job_id: SANDBOX_JOB_ID,
+					url: `https://${SANDBOX_JOB_ID}--49983.hf.jobs`,
+					job_url: `https://huggingface.co/jobs/testuser/${SANDBOX_JOB_ID}`,
+					volumes: [],
+				},
+			});
+			const budget = await readMlBudget(id);
+			expect(budget?.reservations[0].jobId).toBe(SANDBOX_JOB_ID);
+			expect(budget?.reservations[0].namespace).toBe("testuser");
+		}
+	);
+
+	it("believes the structured id over a job url the job printed", { timeout: 15000 }, async () => {
+		const id = await insertConversation(budgetOf(10_000_000));
+		const { guard, ticket } = await reserve(id);
+		await guard.after(ticket, {
+			status: "success",
+			text: `Job started: ${JOB_ID}\n\nLogs:\nresuming from https://huggingface.co/jobs/someone-else/${OTHER_ID}`,
+			structured: jobResult(JOB),
+		});
+		const budget = await readMlBudget(id);
+		expect(budget?.reservations[0].jobId).toBe(JOB_ID);
+		expect(budget?.reservations[0].namespace).toBe("testuser");
+	});
+
+	it("falls back to the submission's namespace when the owner is unusable", async () => {
+		const id = await insertConversation(budgetOf(10_000_000));
+		const { guard, ticket } = await reserve(id);
+		await guard.after(ticket, {
+			status: "success",
+			text: "Job started.",
+			structured: jobResult({ ...JOB, owner: { name: "../../api/whoami" } }),
+		});
+		const budget = await readMlBudget(id);
+		expect(budget?.reservations[0].jobId).toBe(JOB_ID);
+		expect(budget?.reservations[0].namespace).toBe("my-org");
+	});
+
+	it("reads a bare id from the text when there is no structured result", async () => {
+		const id = await insertConversation(budgetOf(10_000_000));
+		const { guard, ticket } = await reserve(id);
+		const warn = vi.spyOn(logger, "warn");
+		await guard.after(ticket, { status: "success", text: `Job started: ${JOB_ID}` });
+		const budget = await readMlBudget(id);
+		expect(budget?.reservations[0].jobId).toBe(JOB_ID);
+		expect(budget?.reservations[0].namespace).toBe("my-org");
+		expect(warn).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		["is not an object", "job started"],
+		["has an id of the wrong type", jobResult({ ...JOB, id: 42 })],
+		["has an id that is not 24 lowercase hex", jobResult({ ...JOB, id: JOB_ID.toUpperCase() })],
+		["has an id with something appended", jobResult({ ...JOB, id: `${JOB_ID}/../x` })],
+	])(
+		"falls back to the text, and says so, when the structured result %s",
+		{ timeout: 15000 },
+		async (_label, structured) => {
+			const id = await insertConversation(budgetOf(10_000_000));
+			const { guard, ticket } = await reserve(id);
+			const warn = vi.spyOn(logger, "warn");
+			await guard.after(ticket, {
+				status: "success",
+				text: `Job started: https://huggingface.co/jobs/my-org/${OTHER_ID}`,
+				structured,
+			});
+			const budget = await readMlBudget(id);
+			expect(budget?.reservations[0].jobId).toBe(OTHER_ID);
+			expect(budget?.reservations[0].namespace).toBe("my-org");
+			expect(warn).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.stringContaining("structured result had no usable job id")
+			);
+		}
+	);
+
+	it("keeps the hold, and warns, when neither part names a job", { timeout: 15000 }, async () => {
+		const id = await insertConversation(budgetOf(10_000_000));
+		const { guard, ticket } = await reserve(id);
+		const warn = vi.spyOn(logger, "warn");
+		await guard.after(ticket, {
+			status: "success",
+			text: "Job started.",
+			structured: jobResult({ ...JOB, id: "nope" }),
+		});
+		const budget = await readMlBudget(id);
+		expect(budget?.reservations).toHaveLength(1);
+		expect(budget?.reservations[0].jobId).toBeUndefined();
+		expect(warn).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.stringContaining("no job id was found")
+		);
+	});
+
+	it(
+		"refunds a usage-help reply even when its text quotes a job id",
+		{ timeout: 15000 },
+		async () => {
+			const id = await insertConversation(budgetOf(10_000_000));
+			const { guard, ticket } = await reserve(id);
+			const update = await guard.after(ticket, {
+				status: "success",
+				text: `# Command help: uv\n\nExample: hf jobs logs ${OTHER_ID}`,
+				structured: {
+					operation: "uv",
+					outcome: {
+						kind: "help",
+						operation: "uv",
+						reason: "requested",
+						instructions: "# Command help: uv ...",
+					},
+					total_results: 0,
+					results_shared: 0,
+				},
+			});
+			const budget = await readMlBudget(id);
+			expect(budget?.reservations).toHaveLength(0);
+			expect(budget?.spentMicroUsd).toBe(0);
+			expect(update).toMatchObject({ type: MessageUpdateType.Budget, reservedMicroUsd: 0 });
+		}
+	);
 
 	it("attaches the job id from a submission response", { timeout: 15000 }, async () => {
 		const id = await insertConversation(budgetOf(10_000_000));

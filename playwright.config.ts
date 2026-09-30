@@ -130,6 +130,9 @@ export default defineConfig({
 				GENERATION_REAP_INTERVAL_MS: "1000",
 				GENERATION_REAP_AFTER_MS: "5000",
 				GENERATION_HEARTBEAT_MS: "1000",
+				// Production writes a run's progress onto its message every 3000ms. Scaled down
+				// so the specs that watch materialisation see several windows in a few seconds.
+				GENERATION_MATERIALIZE_MS: "500",
 				LLM_ROUTER_ROUTES_PATH: "",
 				LLM_ROUTER_ARCH_BASE_URL: "",
 				ALLOW_IFRAME: "true",

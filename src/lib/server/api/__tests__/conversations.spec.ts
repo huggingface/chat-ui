@@ -11,6 +11,10 @@ import {
 import { testRequest } from "$lib/server/__tests__/testRequest";
 
 import { GET, DELETE } from "../../../../routes/api/v2/conversations/+server";
+import { listMlServices, recordDispatchedService } from "$lib/server/mlRegistry/store";
+import { listMlAgentRuns, startAgentRun } from "$lib/server/mlRegistry/agentRuns";
+import { listMlSources, recordSources } from "$lib/server/mlRegistry/sources";
+import { PARENT_READER } from "$lib/types/MlSource";
 
 async function parseResponse<T = unknown>(res: Response): Promise<T> {
 	return superjson.parse(await res.text()) as T;
@@ -201,6 +205,41 @@ describe.sequential("DELETE /api/v2/conversations", () => {
 		});
 
 		expect(res.status).toBe(401);
+	});
+
+	it("takes the registry rows of the removed conversations and no others", async () => {
+		const { locals: localsA } = await createTestUser();
+		const { locals: localsB } = await createTestUser();
+		const mine = await createTestConversation(localsA, { title: "Mine" });
+		const theirs = await createTestConversation(localsB, { title: "Theirs" });
+		for (const conversationId of [mine._id, theirs._id]) {
+			await recordDispatchedService({
+				conversationId,
+				kind: "sandbox",
+				jobId: "abcdefabcdefabcdefabcdef",
+				namespace: "testuser",
+				stage: "RUNNING",
+			});
+			await startAgentRun({
+				conversationId,
+				label: "research",
+				displayName: "Research",
+				task: "t",
+				parent: { tool: "research", toolUuid: "tool-1" },
+			}).finish({ status: "completed", summary: "s", iterations: 1 });
+			await recordSources(conversationId, PARENT_READER, [
+				{ url: "https://example.com", group: "example.com", kind: "web", opened: true },
+			]);
+		}
+
+		await testRequest(DELETE, { path: conversationsPath(), method: "DELETE", locals: localsA });
+
+		expect(await listMlServices(mine._id)).toHaveLength(0);
+		expect(await listMlAgentRuns(mine._id)).toHaveLength(0);
+		expect(await listMlSources(mine._id)).toHaveLength(0);
+		expect(await listMlServices(theirs._id)).toHaveLength(1);
+		expect(await listMlAgentRuns(theirs._id)).toHaveLength(1);
+		expect(await listMlSources(theirs._id)).toHaveLength(1);
 	});
 
 	it("does not remove other users' conversations", async () => {

@@ -7,6 +7,7 @@ import {
 	readMlBudget,
 	releaseReservation,
 	reserveMlBudget,
+	setMlBudgetLeft,
 	setMlBudgetTotal,
 	settleReservation,
 } from "./budget";
@@ -200,5 +201,62 @@ describe.sequential("setMlBudgetTotal", () => {
 		});
 		expect(matched).toBe(false);
 		expect(await readMlBudget(id)).toBeUndefined();
+	});
+});
+
+describe.sequential("setMlBudgetLeft", () => {
+	const MAX = 10_000_000_000;
+
+	it("sums left, spent and held against the ledger it writes", { timeout: 15000 }, async () => {
+		const id = await insertConversation({ ...freshBudget(1_000_000), spentMicroUsd: 250_000 });
+		await reserveMlBudget({
+			conversationId: id,
+			reservation: reservation({ ceilingMicroUsd: 100_000 }),
+		});
+		const result = await setMlBudgetLeft({
+			conversationId: id,
+			leftMicroUsd: 500_000,
+			maxTotalMicroUsd: MAX,
+		});
+		expect(result.outcome).toBe("set");
+		const budget = await readMlBudget(id);
+		expect(budget?.totalMicroUsd).toBe(850_000);
+		expect(budget?.reservations).toHaveLength(1);
+	});
+
+	it("creates a budget where none exists", { timeout: 15000 }, async () => {
+		const id = await insertConversation();
+		await setMlBudgetLeft({ conversationId: id, leftMicroUsd: 2_000_000, maxTotalMicroUsd: MAX });
+		expect(await readMlBudget(id)).toEqual({
+			totalMicroUsd: 2_000_000,
+			spentMicroUsd: 0,
+			reservations: [],
+		});
+	});
+
+	it(
+		"refuses a total over the ceiling and leaves the ledger alone",
+		{ timeout: 15000 },
+		async () => {
+			const id = await insertConversation({ ...freshBudget(1_000_000), spentMicroUsd: 600_000 });
+			const result = await setMlBudgetLeft({
+				conversationId: id,
+				leftMicroUsd: 500_000,
+				maxTotalMicroUsd: 1_000_000,
+			});
+			expect(result.outcome).toBe("over_ceiling");
+			expect((await readMlBudget(id))?.totalMicroUsd).toBe(1_000_000);
+		}
+	);
+
+	it("reports a conversation the filter excludes as not found", { timeout: 15000 }, async () => {
+		const id = await insertConversation();
+		const result = await setMlBudgetLeft({
+			conversationId: id,
+			leftMicroUsd: 1,
+			maxTotalMicroUsd: MAX,
+			extraFilter: { mlAssistant: { $ne: true } },
+		});
+		expect(result.outcome).toBe("not_found");
 	});
 });

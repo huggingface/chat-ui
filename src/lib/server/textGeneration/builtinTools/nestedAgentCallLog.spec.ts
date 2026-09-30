@@ -7,7 +7,8 @@ vi.mock("$lib/server/database", () => ({
 	collections: { nestedAgentCalls: { insertMany: (...args: unknown[]) => insertMany(...args) } },
 }));
 
-const { recordNestedAgentCalls, redactSecrets } = await import("./nestedAgentCallLog");
+const { recordNestedAgentCalls } = await import("./nestedAgentCallLog");
+const { redactSecrets } = await import("$lib/utils/redactSecrets");
 
 const ctx = { conversationId: new ObjectId(), messageId: "msg-1", generationId: "gen-1" };
 
@@ -126,6 +127,20 @@ describe("nested agent call log", () => {
 		expect(rows[0]).toMatchObject({ toolName: "hf_jobs", status: "error", repeatCount: 3 });
 		expect(rows[0].arguments).toContain("uv");
 		expect(rows[0].error).toContain("not available");
+	});
+
+	it("names the run each call belongs to, when there is one", () => {
+		insertMany.mockClear();
+		recordNestedAgentCalls(
+			{ ...ctx, agentRunId: "65f000000000000000000001" },
+			"research",
+			0,
+			[call("c1", "hf_fs", "{}")],
+			[ok("c1")]
+		);
+		const [row] = insertMany.mock.calls[0][0] as Array<Record<string, unknown>>;
+		expect(row.agentRunId).toBe("65f000000000000000000001");
+		expect(rowsFrom([call("c1", "hf_fs", "{}")], [ok("c1")])[0]).not.toHaveProperty("agentRunId");
 	});
 
 	it("writes nothing when the iteration made no calls", () => {

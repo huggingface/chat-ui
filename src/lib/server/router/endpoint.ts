@@ -17,6 +17,7 @@ import {
 	pickToolsCapableModel,
 } from "./toolsRoute";
 import { getConfiguredMultimodalModelId } from "./multimodal";
+import { toLegacyShape } from "$lib/utils/messageShape";
 
 const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
@@ -90,10 +91,11 @@ function stripReasoningBlocks(text: string): string {
 }
 
 function stripReasoningFromMessage(message: EndpointMessage): EndpointMessage {
+	const legacy = toLegacyShape(message);
 	const content =
-		typeof message.content === "string" ? stripReasoningBlocks(message.content) : message.content;
+		typeof legacy.content === "string" ? stripReasoningBlocks(legacy.content) : legacy.content;
 	return {
-		...message,
+		...legacy,
 		content,
 	};
 }

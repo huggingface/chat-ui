@@ -1,3 +1,5 @@
+import type { ToolArgsRewrite } from "./toolInvocation";
+
 /**
  * Decode the `arguments` string of a streamed tool call.
  *
@@ -69,4 +71,13 @@ export function withParseableArguments<T extends { function?: { arguments?: stri
 		}
 		return call;
 	});
+}
+
+/** each rewrite reads the previous result, the same object back when none changed it */
+export function composeRewrites(
+	rewrites: (ToolArgsRewrite | undefined)[]
+): ToolArgsRewrite | undefined {
+	const present = rewrites.filter((rewrite): rewrite is ToolArgsRewrite => rewrite !== undefined);
+	if (present.length === 0) return undefined;
+	return (call) => present.reduce((args, rewrite) => rewrite({ ...call, args }), call.args);
 }

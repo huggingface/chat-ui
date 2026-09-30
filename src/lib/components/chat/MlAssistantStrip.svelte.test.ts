@@ -1,7 +1,9 @@
 import MlAssistantStrip from "./MlAssistantStrip.svelte";
 import { render } from "vitest-browser-svelte";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { tick } from "svelte";
 import type { MlPlanStep } from "$lib/types/MlAssistant";
+import { sidePane } from "$lib/stores/sidePane.svelte";
 
 /**
  * The design handoff pins exact colours, sizes and timings, so these assert
@@ -351,7 +353,7 @@ describe("MlAssistantStrip budget", () => {
 		);
 	});
 
-	it("commits an edited total on Enter", async () => {
+	it("commits an edited amount left on Enter, on top of what is spent and held", async () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
@@ -363,6 +365,7 @@ describe("MlAssistantStrip budget", () => {
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 
+		// Only the amount left goes up; the server adds spent and held.
 		expect(onbudgetchange).toHaveBeenCalledWith(25);
 		// The editor closes back to the readout.
 		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
@@ -406,12 +409,12 @@ describe("MlAssistantStrip budget", () => {
 		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
 		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
-		expect(input.value).toBe("10");
+		expect(input.value).toBe("7.50");
 
-		input.value = "10a";
+		input.value = "7.50a";
 		input.dispatchEvent(new Event("input", { bubbles: true }));
 		await Promise.resolve();
-		expect(input.value).toBe("10");
+		expect(input.value).toBe("7.50");
 	});
 
 	it("keeps a pasted figure's cents, and caps the cleaned figure at the widest total", async () => {
@@ -442,7 +445,7 @@ describe("MlAssistantStrip budget", () => {
 		expect(input.value).toBe("12345678");
 	});
 
-	it("commits zero, which pauses spend rather than abandoning the edit", async () => {
+	it("commits zero left, which pauses spend rather than abandoning the edit", async () => {
 		const onbudgetchange = vi.fn();
 		const { container } = mount({ budget: BUDGET, onbudgetchange });
 
@@ -451,6 +454,55 @@ describe("MlAssistantStrip budget", () => {
 		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
 		input.value = "0";
 		input.dispatchEvent(new Event("input", { bubbles: true }));
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		await Promise.resolve();
+
+		expect(onbudgetchange).toHaveBeenCalledWith(0);
+	});
+
+	it("lands on $0.00 left, not -$0.01, when zeroed under sub-cent spend", async () => {
+		const onbudgetchange = vi.fn();
+		const budget = { totalMicroUsd: 5_000_000, spentMicroUsd: 4_321, reservedMicroUsd: 0 };
+		const { container } = mount({ budget, onbudgetchange });
+
+		find(container, "button[aria-label^='Compute budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		input.value = "0";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		await Promise.resolve();
+
+		expect(onbudgetchange).toHaveBeenCalledWith(0);
+	});
+
+	it("seeds the editor with what is left, and an unchanged commit changes nothing", async () => {
+		const onbudgetchange = vi.fn();
+		// $5.00 total, a sub-cent spend: the readout rounds up to $5.00 left.
+		const budget = { totalMicroUsd: 5_000_000, spentMicroUsd: 4_321, reservedMicroUsd: 0 };
+		const { container } = mount({ budget, onbudgetchange });
+
+		find(container, "button[aria-label^='Compute budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		expect(input.value).toBe("5.00");
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		await Promise.resolve();
+
+		// Committing the rounded figure would have nudged the total up by the rounding.
+		expect(onbudgetchange).not.toHaveBeenCalled();
+	});
+
+	it("commits the prefilled zero when the balance is already negative", async () => {
+		const onbudgetchange = vi.fn();
+		// A total lowered under money already spent: -$0.50 left, opened as "0.00".
+		const budget = { totalMicroUsd: 1_000_000, spentMicroUsd: 1_500_000, reservedMicroUsd: 0 };
+		const { container } = mount({ budget, onbudgetchange });
+
+		find(container, "button[aria-label^='Compute budget']").click();
+		await Promise.resolve();
+		const input = find(container, "input[aria-label^='Compute budget']") as HTMLInputElement;
+		expect(input.value).toBe("0.00");
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		await Promise.resolve();
 
@@ -496,5 +548,99 @@ describe("MlAssistantStrip budget", () => {
 		find(container, "button[aria-label^='Compute budget']").click();
 		await Promise.resolve();
 		expect(container.querySelector("input[aria-label^='Compute budget']")).toBeNull();
+	});
+});
+
+describe("MlAssistantStrip services control", () => {
+	afterEach(() => sidePane.reset());
+
+	const NEUTRAL_INK = "rgb(87, 83, 78)";
+	const control = (root: ParentNode) =>
+		root.querySelector<HTMLButtonElement>("button[aria-label^='Services and artifacts']");
+
+	it("stays hidden until the registry holds anything", () => {
+		expect(control(mount().container)).toBeNull();
+		expect(control(mount({ registry: { rows: 0, open: 0, running: 0 } }).container)).toBeNull();
+		expect(control(mount({ registry: { rows: 1, open: 0, running: 0 } }).container)).not.toBeNull();
+	});
+
+	it("reads Services in neutral ink while nothing is open", () => {
+		const { container } = mount({ registry: { rows: 3, open: 0, running: 0 } });
+		const button = control(container);
+		if (!button) throw new Error("no control");
+
+		expect(button.textContent?.trim()).toBe("Services");
+		expect(style(button).color).toBe(NEUTRAL_INK);
+		expect(button.querySelector(".ml-registry-live")).toBeNull();
+	});
+
+	it("counts what is open in orange, with a live dot only for what runs", () => {
+		const running = control(mount({ registry: { rows: 5, open: 2, running: 1 } }).container);
+		if (!running) throw new Error("no control");
+		expect(running.textContent?.trim()).toBe("2 running");
+		expect(style(running).color).toBe(ORANGE_INK);
+		const dot = running.querySelector(".ml-registry-live");
+		expect(dot).not.toBeNull();
+		expect(dot && style(dot).backgroundColor).toBe(ORANGE_SOLID);
+		expect(dot && style(dot).animationName).toContain("ml-registry-live");
+
+		const queued = control(mount({ registry: { rows: 1, open: 1, running: 0 } }).container);
+		expect(queued?.textContent?.trim()).toBe("1 running");
+		expect(queued?.querySelector(".ml-registry-live")).toBeNull();
+	});
+
+	it("opens the registry view of the side pane, and closes it when clicked again", async () => {
+		const { container } = mount({ registry: { rows: 2, open: 1, running: 1 } });
+		const button = control(container);
+		button?.click();
+
+		expect(sidePane.open).toBe(true);
+		expect(sidePane.view).toBe("registry");
+		await tick();
+		expect(button?.getAttribute("aria-expanded")).toBe("true");
+		expect(button?.getAttribute("aria-label")).toBe(
+			"Services and artifacts: 1 running. Close the list"
+		);
+
+		button?.click();
+		expect(sidePane.open).toBe(false);
+	});
+
+	it("opens the registry when another view holds the side pane", () => {
+		const { container } = mount({ registry: { rows: 2, open: 0, running: 0 } });
+		sidePane.openTrackio("https://x.hf.space", "x/y");
+		control(container)?.click();
+		expect(sidePane.view).toBe("registry");
+	});
+
+	it("drops its label below the comfortable width and keeps a round 28px target", () => {
+		const seen = (width: number) => {
+			const { container } = mount({ registry: { rows: 2, open: 1, running: 1 } });
+			container.style.width = `${width}px`;
+			const button = control(container);
+			if (!button) throw new Error("no control");
+			const label = [...button.querySelectorAll("span")].find(
+				(el) => el.textContent === "1 running"
+			);
+			return {
+				label: !!label && style(label).display !== "none",
+				size: box(button),
+				radius: style(button).borderRadius,
+			};
+		};
+
+		expect(seen(700).label).toBe(true);
+		expect(seen(700).radius).toBe("6px");
+		expect(seen(400)).toMatchObject({ label: false, size: { width: 28, height: 28 } });
+		expect(parseFloat(seen(400).radius)).toBeGreaterThanOrEqual(14);
+	});
+
+	it("keeps the divider between the controls and the budget when only the registry shows", () => {
+		const { container } = mount({ budget: BUDGET, registry: { rows: 1, open: 0, running: 0 } });
+		container.style.width = "700px";
+		const dividers = [...container.querySelectorAll('[aria-hidden="true"]')].filter(
+			(el) => Math.round(el.getBoundingClientRect().width) === 1
+		);
+		expect(dividers).toHaveLength(1);
 	});
 });

@@ -2,6 +2,7 @@ import ChatMessage from "./ChatMessage.svelte";
 import { render } from "vitest-browser-svelte";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { tick } from "svelte";
+import { MessageUpdateType } from "$lib/types/MessageUpdate";
 
 beforeEach(() => vi.stubGlobal("fetch", async () => new Response("{}", { status: 200 })));
 afterEach(() => vi.unstubAllGlobals());
@@ -207,5 +208,112 @@ describe("collapsed process blocks during streaming", () => {
 		await screen.rerender({ loading: false } as never);
 		await tick();
 		expect(summaries(screen.baseElement as HTMLElement).length).toBeGreaterThan(0);
+	});
+});
+
+describe("a finished turn stored in the rounds shape", () => {
+	const args = '{"path":"/work","recursive":true}';
+	const callUpdate = (parameters: Record<string, unknown>) => ({
+		type: "tool",
+		subtype: "call",
+		uuid: "u1",
+		call: { name: "hf_fs", parameters },
+		argumentsRaw: args,
+		reasoning: "I need the files.",
+		content: "Let me look.",
+	});
+	const resultUpdate = {
+		type: "tool",
+		subtype: "result",
+		uuid: "u1",
+		result: { status: 0, call: { name: "hf_fs", parameters: {} }, outputs: [{ text: "ok" }] },
+	};
+	const round = "<think>I need the files.</think>Let me look.";
+	const answer = "<think>All there.</think>Everything is in **/work**.";
+	const legacy = {
+		id: "m1",
+		from: "assistant",
+		content: round + answer,
+		children: [],
+		updates: [
+			{ type: "stream", token: "", len: round.length },
+			callUpdate({ path: "/work", recursive: true }),
+			resultUpdate,
+			{ type: "stream", token: "", len: answer.length },
+			{ type: "finalAnswer", text: answer, interrupted: false },
+		],
+	};
+	const rounds = {
+		id: "m1",
+		from: "assistant",
+		content: "Everything is in **/work**.",
+		reasoning: "All there.",
+		contentShape: 2,
+		children: [],
+		updates: [
+			callUpdate({}),
+			resultUpdate,
+			{ type: "finalAnswer", text: "", len: answer.length, interrupted: false },
+		],
+	};
+	const show = (message: unknown) =>
+		render(ChatMessage, { message, loading: false, isLast: false } as never).container;
+
+	it("renders what its legacy form rendered", async () => {
+		const fromLegacy = show(legacy);
+		const fromRounds = show(rounds);
+		await vi.waitFor(() => {
+			expect(fromLegacy.querySelector("strong")?.textContent).toBe("/work");
+			expect(fromRounds.querySelector("strong")?.textContent).toBe("/work");
+		});
+
+		expect(fromRounds.innerHTML).toBe(fromLegacy.innerHTML);
+		expect(fromRounds.textContent?.match(/Let me look\./g)).toHaveLength(1);
+	});
+
+	it("copies every visible text, the round's preamble included", async () => {
+		const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+		const copy = show(rounds).querySelector<HTMLButtonElement>("button[title='Copy to clipboard']");
+		copy?.click();
+
+		await vi.waitFor(() =>
+			expect(writeText).toHaveBeenCalledWith("Let me look.Everything is in **/work**.")
+		);
+	});
+});
+
+describe("a notice on an assistant turn", () => {
+	const text =
+		"data.csv is too long to send whole: the model sees 150,000 of its 2,340,112 characters, from the start and the end.";
+	const notice = { type: MessageUpdateType.Notice, text };
+	const noticeWrapper = (el: HTMLElement) =>
+		[...el.querySelectorAll("span")]
+			.find((span) => span.textContent === text)
+			?.closest("[data-exclude-from-copy]");
+
+	it("shows with the answer and stays out of what is copied", async () => {
+		const { container } = render(ChatMessage, {
+			message: {
+				id: "m1",
+				from: "assistant",
+				content: "Summary.",
+				children: [],
+				updates: [
+					notice,
+					{ type: MessageUpdateType.FinalAnswer, text: "Summary.", interrupted: false },
+				],
+			},
+			loading: false,
+			isLast: true,
+		} as never);
+
+		await vi.waitFor(() => expect(container.textContent).toContain("Summary."));
+		expect(noticeWrapper(container)).toBeTruthy();
+	});
+
+	it("keeps the spinner while it is all that has arrived", () => {
+		const { container } = mount([notice]);
+		expect(noticeWrapper(container)).toBeTruthy();
+		expect(spinners(container)).toBe(1);
 	});
 });

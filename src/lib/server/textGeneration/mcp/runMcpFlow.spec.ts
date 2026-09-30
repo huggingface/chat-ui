@@ -8,7 +8,7 @@ import {
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { RETRY_BACKOFF_MS } from "$lib/server/textGeneration/utils/upstreamRetry";
-import { APIConnectionError } from "openai";
+import { APIConnectionError, BadRequestError } from "openai";
 import type { McpFlowResult, RunMcpFlowContext } from "./runMcpFlow";
 
 // ---------------------------------------------------------------------------
@@ -36,7 +36,23 @@ const mocks = vi.hoisted(() => ({
 		name: string;
 		url: string;
 	}>,
+	listMlServices: vi.fn(async (): Promise<unknown[]> => []),
+	listMlArtefacts: vi.fn(async (): Promise<unknown[]> => []),
+	listMlFiles: vi.fn(async (): Promise<unknown[]> => []),
+	markServicesReported: vi.fn(async () => undefined),
+	pendingHarnessEvent: vi.fn<(conversationId: unknown, afterToolUuid: string) => Promise<unknown>>(
+		async () => undefined
+	),
+	markHarnessEventDelivered: vi.fn(async () => undefined),
+	prepareHistory: vi.fn(),
 }));
+
+type HistoryOptionsArg = { attachments?: "budget" | "minimal" };
+
+const plainHistory = async (messages: Array<{ from: string; content: string }>) => ({
+	messages: messages.map((m) => ({ role: m.from, content: m.content })),
+	attachments: { newest: messages.length - 1, texts: [], images: [] },
+});
 
 // The gate itself is real; only the build flag behind it is forced on.
 vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
@@ -86,11 +102,17 @@ vi.mock("./routerResolution", () => ({
 	}),
 }));
 
-vi.mock("./toolInvocation", () => ({ executeToolCalls: mocks.executeToolCalls }));
+vi.mock("./toolInvocation", async (importOriginal) => ({
+	withRewrittenArguments: (await importOriginal<typeof import("./toolInvocation")>())
+		.withRewrittenArguments,
+	executeToolCalls: mocks.executeToolCalls,
+}));
+vi.mock("$lib/server/mlRegistry/sessionLabel", () => ({
+	loadSessionJobLabels: async () => ({ session: "0123456789abcdef", ownJobs: new Map() }),
+}));
 
 vi.mock("$lib/server/textGeneration/utils/prepareFiles", () => ({
-	prepareMessagesWithFiles: async (messages: Array<{ from: string; content: string }>) =>
-		messages.map((m) => ({ role: m.from, content: m.content })),
+	prepareHistory: mocks.prepareHistory,
 }));
 
 vi.mock("$lib/server/endpoints/images", () => ({ makeImageProcessor: () => () => undefined }));
@@ -101,8 +123,23 @@ vi.mock("$lib/server/logger", () => ({
 vi.mock("$lib/server/abortedGenerations", () => ({
 	AbortedGenerations: { getInstance: () => ({ getAbortTime: mocks.getAbortTime }) },
 }));
+vi.mock("$lib/server/mlRegistry/store", async (importOriginal) => ({
+	...(await importOriginal<typeof import("$lib/server/mlRegistry/store")>()),
+	listMlServices: mocks.listMlServices,
+	listMlArtefacts: mocks.listMlArtefacts,
+	markServicesReported: mocks.markServicesReported,
+}));
+vi.mock("$lib/server/mlRegistry/midTurn", () => ({
+	pendingHarnessEvent: mocks.pendingHarnessEvent,
+	markHarnessEventDelivered: mocks.markHarnessEventDelivered,
+}));
+vi.mock("$lib/server/mlFiles/store", async (importOriginal) => ({
+	...(await importOriginal<typeof import("$lib/server/mlFiles/store")>()),
+	listMlFiles: mocks.listMlFiles,
+}));
 
 const { runMcpFlow } = await import("./runMcpFlow");
+const { config } = await import("$lib/server/config");
 
 type ScriptedCall = { id?: string; name?: string; arguments: string };
 
@@ -242,6 +279,18 @@ beforeEach(() => {
 	mocks.mcpTools = [{ type: "function", function: { name: "do_thing" } }];
 	mocks.servers = [{ name: "hf", url: "https://example.test/mcp" }];
 	mocks.getAbortTime.mockReturnValue(undefined);
+	for (const list of [mocks.listMlServices, mocks.listMlArtefacts, mocks.listMlFiles]) {
+		list.mockReset();
+		list.mockResolvedValue([]);
+	}
+	mocks.markServicesReported.mockReset();
+	mocks.markServicesReported.mockResolvedValue(undefined);
+	mocks.pendingHarnessEvent.mockReset();
+	mocks.pendingHarnessEvent.mockResolvedValue(undefined);
+	mocks.markHarnessEventDelivered.mockReset();
+	mocks.markHarnessEventDelivered.mockResolvedValue(undefined);
+	mocks.prepareHistory.mockReset();
+	mocks.prepareHistory.mockImplementation(plainHistory);
 	scriptToolResults();
 });
 
@@ -685,6 +734,10 @@ describe("runMcpFlow offering the question tool", () => {
 			"sandbox_task",
 			"check_job",
 			"create_trackio",
+			"write_file",
+			"edit_file",
+			"read_file",
+			"import_file",
 		]);
 	});
 
@@ -844,6 +897,319 @@ describe("runMcpFlow under the ML Assistant preset", () => {
 	});
 });
 
+describe("runMcpFlow session state block", () => {
+	const mlConv = () =>
+		({ _id: new ObjectId(), mlAssistant: true }) as unknown as Parameters<
+			typeof runMcpFlow
+		>[0]["conv"];
+
+	const job = (stage: string) => ({
+		_id: new ObjectId(),
+		conversationId: new ObjectId(),
+		kind: "job",
+		jobId: "0123456789abcdef01234567",
+		namespace: "ns",
+		name: "sft-smoke",
+		stage,
+		origin: "dispatched",
+		hubUrl: "https://huggingface.co/jobs/ns/0123456789abcdef01234567",
+		createdAt: new Date(Date.now() - 60_000),
+		updatedAt: new Date(),
+	});
+
+	const lastUserText = (n: number) =>
+		String(requestMessages(n).findLast((m) => m.role === "user")?.content);
+	const blocksIn = (text: string) => text.split("[SESSION STATE").length - 1;
+
+	it("appends the block to the last user message once, and keeps it across the run's rounds", async () => {
+		mocks.listMlServices.mockResolvedValue([job("RUNNING")]);
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		for (const n of [0, 1]) {
+			const text = lastUserText(n);
+			expect(text.startsWith("hello\n\n[SESSION STATE")).toBe(true);
+			expect(blocksIn(text)).toBe(1);
+			expect(text).toContain("- job sft-smoke · RUNNING");
+		}
+		expect(mocks.listMlServices).toHaveBeenCalledTimes(1);
+	});
+
+	it("rebuilds the block when the next run starts, a resume included", async () => {
+		mocks.listMlServices.mockResolvedValue([job("RUNNING")]);
+		scriptRounds([{ content: "waiting" }]);
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		mocks.create.mockClear();
+		mocks.listMlServices.mockResolvedValue([{ ...job("ERROR"), endedAt: new Date() }]);
+		scriptRounds([{ content: "it failed" }]);
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(lastUserText(0)).toContain("- job sft-smoke · ERROR after");
+		expect(lastUserText(0)).not.toContain("RUNNING");
+	});
+
+	it("marks the ended jobs it listed as told once the first completion has read the block", async () => {
+		const ended = { ...job("ERROR"), endedAt: new Date() };
+		mocks.listMlServices.mockResolvedValue([job("RUNNING"), ended]);
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(mocks.markServicesReported).toHaveBeenCalledTimes(1);
+		expect(mocks.markServicesReported).toHaveBeenCalledWith([
+			{ _id: ended._id, stage: "ERROR", reported: "ERROR" },
+		]);
+	});
+
+	it("leaves the ended jobs to the next block when the request fails before the model reads it", async () => {
+		mocks.listMlServices.mockResolvedValue([{ ...job("ERROR"), endedAt: new Date() }]);
+		scriptRounds([{ error: new Error("upstream exploded") }]);
+
+		const { result } = await runFlow({ conv: mlConv() } as Partial<
+			Parameters<typeof runMcpFlow>[0]
+		>);
+
+		expect(result).toBe("not_applicable");
+		expect(mocks.markServicesReported).not.toHaveBeenCalled();
+	});
+
+	it("marks nothing when the block lists no ended job", async () => {
+		mocks.listMlServices.mockResolvedValue([job("RUNNING")]);
+		scriptRounds([{ content: "the answer" }]);
+
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(mocks.markServicesReported).not.toHaveBeenCalled();
+	});
+
+	it("sends no block outside the mode", async () => {
+		mocks.listMlServices.mockResolvedValue([job("RUNNING")]);
+		scriptRounds([{ content: "the answer" }]);
+
+		await runFlow();
+
+		expect(lastUserText(0)).toBe("hello");
+		expect(mocks.listMlServices).not.toHaveBeenCalled();
+	});
+
+	it("sends no block when the switch is off", async () => {
+		mocks.listMlServices.mockResolvedValue([job("RUNNING")]);
+		scriptRounds([{ content: "the answer" }]);
+		config.ML_ASSISTANT_STATE_BLOCK = "false";
+		try {
+			await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+		} finally {
+			config.ML_ASSISTANT_STATE_BLOCK = "";
+		}
+
+		expect(lastUserText(0)).toBe("hello");
+		expect(mocks.listMlServices).not.toHaveBeenCalled();
+	});
+
+	it("sends no block while the registry is empty", async () => {
+		scriptRounds([{ content: "the answer" }]);
+
+		await runFlow({ conv: mlConv() } as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(lastUserText(0)).toBe("hello");
+		expect(mocks.listMlServices).toHaveBeenCalledTimes(1);
+	});
+
+	it("runs the turn without the block when the registry cannot be read", async () => {
+		mocks.listMlArtefacts.mockRejectedValue(new Error("connection reset"));
+		mocks.listMlServices.mockResolvedValue([job("RUNNING")]);
+		scriptRounds([{ content: "the answer" }]);
+
+		const { result } = await runFlow({ conv: mlConv() } as Partial<
+			Parameters<typeof runMcpFlow>[0]
+		>);
+
+		expect(result).toBe("completed");
+		expect(lastUserText(0)).toBe("hello");
+	});
+});
+
+describe("runMcpFlow mid-turn service events", () => {
+	const mlConv = () =>
+		({ _id: new ObjectId(), mlAssistant: true }) as unknown as Parameters<
+			typeof runMcpFlow
+		>[0]["conv"];
+	const inMode = () => ({ conv: mlConv() }) as Partial<Parameters<typeof runMcpFlow>[0]>;
+
+	const EVENT_TEXT =
+		"[Harness event, not part of this tool result]\nJob sft-smoke (a10g-small) failed: ERROR after 2m17s. Read its logs with check_job before changing anything.";
+	const eventUpdate = (afterToolUuid: string) => ({
+		type: MessageUpdateType.HarnessEvent,
+		events: [
+			{
+				serviceId: "svc",
+				kind: "job",
+				jobId: "0123456789abcdef01234567",
+				name: "sft-smoke",
+				from: "RUNNING",
+				to: "ERROR",
+				ranSeconds: 137,
+				at: 0,
+			},
+		],
+		text: EVENT_TEXT,
+		afterToolUuid,
+	});
+	const services = [{ jobId: "0123456789abcdef01234567" }];
+	const pendingOnce = () =>
+		mocks.pendingHarnessEvent.mockImplementationOnce(async (_id, uuid) => ({
+			update: eventUpdate(uuid),
+			services,
+		}));
+	const harnessUpdates = (updates: MessageUpdate[]) =>
+		updates.filter((u) => u.type === MessageUpdateType.HarnessEvent);
+
+	it("appends the event to the round's last tool result before the next request", async () => {
+		pendingOnce();
+		scriptRounds([
+			{
+				toolCalls: [
+					{ id: "call_1", name: "do_thing", arguments: "{}" },
+					{ id: "call_2", name: "do_thing", arguments: "{}" },
+				],
+			},
+			{ content: "reading the logs" },
+		]);
+
+		const { updates, result } = await runFlow(inMode());
+
+		expect(result).toBe("completed");
+		expect(mocks.pendingHarnessEvent).toHaveBeenCalledTimes(1);
+		expect(mocks.pendingHarnessEvent.mock.calls[0][1]).toBe("call_2");
+		expect(harnessUpdates(updates)).toEqual([eventUpdate("call_2")]);
+		const next = requestMessages(1);
+		expect(next.at(-2)).toEqual({ role: "tool", tool_call_id: "call_1", content: "tool ok" });
+		expect(next.at(-1)).toEqual({
+			role: "tool",
+			tool_call_id: "call_2",
+			content: `tool ok\n\n${EVENT_TEXT}`,
+		});
+		expect(mocks.markHarnessEventDelivered).toHaveBeenCalledWith(expect.anything(), services);
+	});
+
+	it("emits the update before it clears the rows", async () => {
+		pendingOnce();
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+		const order: string[] = [];
+		mocks.markHarnessEventDelivered.mockImplementation(async () => {
+			order.push("mark");
+		});
+
+		const generator = runMcpFlow({ ...context(), ...inMode() } as Parameters<typeof runMcpFlow>[0]);
+		for (let step = await generator.next(); !step.done; step = await generator.next()) {
+			order.push(step.value.type);
+		}
+
+		const emitted = order.indexOf(MessageUpdateType.HarnessEvent);
+		expect(emitted).toBeGreaterThan(-1);
+		expect(order.indexOf("mark")).toBeGreaterThan(emitted);
+	});
+
+	it("looks once per round and changes nothing while no end is pending", async () => {
+		const toolRound: Round = { toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] };
+		scriptRounds([toolRound, toolRound, toolRound, { content: "done" }]);
+
+		const { updates } = await runFlow(inMode());
+
+		expect(mocks.pendingHarnessEvent).toHaveBeenCalledTimes(3);
+		expect(harnessUpdates(updates)).toEqual([]);
+		expect(mocks.markHarnessEventDelivered).not.toHaveBeenCalled();
+		expect(requestMessages(3).at(-1)).toMatchObject({ role: "tool", content: "tool ok" });
+	});
+
+	it("delivers each end in the round it is found and once only", async () => {
+		pendingOnce();
+		const toolRound: Round = { toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] };
+		scriptRounds([toolRound, toolRound, { content: "done" }]);
+
+		const { updates } = await runFlow(inMode());
+
+		expect(harnessUpdates(updates)).toHaveLength(1);
+		expect(mocks.markHarnessEventDelivered).toHaveBeenCalledTimes(1);
+		expect(String(requestMessages(1).at(-1)?.content)).toContain(EVENT_TEXT);
+		expect(requestMessages(2).at(-1)).toMatchObject({ role: "tool", content: "tool ok" });
+	});
+
+	it("delivers nothing when the model answers without calling a tool", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow(inMode());
+		expect(mocks.pendingHarnessEvent).not.toHaveBeenCalled();
+	});
+
+	it("leaves the events for the next run when no completion follows the round", async () => {
+		const toolRound: Round = { toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] };
+		scriptRounds(Array.from({ length: 100 }, () => toolRound));
+
+		const { result } = await runFlow(inMode());
+
+		expect(result).toBe("exhausted");
+		expect(mocks.pendingHarnessEvent).toHaveBeenCalledTimes(99);
+	});
+
+	it("leaves the events to the wait when the round parks", async () => {
+		mocks.executeToolCalls.mockImplementation(async function* () {
+			yield {
+				type: "update",
+				update: {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Call,
+					uuid: "call_1",
+					call: { name: "wait", parameters: {} },
+				},
+			};
+			yield { type: "complete", summary: { toolMessages: [], toolRuns: [], awaitingInput: true } };
+		});
+		scriptRounds([{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] }]);
+
+		const { result } = await runFlow(inMode());
+
+		expect(result).toBe("awaiting_input");
+		expect(mocks.pendingHarnessEvent).not.toHaveBeenCalled();
+	});
+
+	it("delivers nothing outside the mode", async () => {
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+		await runFlow();
+		expect(mocks.pendingHarnessEvent).not.toHaveBeenCalled();
+	});
+
+	it.each([["ML_ASSISTANT_SERVICE_EVENTS"], ["ML_ASSISTANT_SERVICE_POLLER"]] as const)(
+		"delivers nothing with %s off",
+		async (key) => {
+			scriptRounds([
+				{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+				{ content: "done" },
+			]);
+			config[key] = "false";
+			try {
+				await runFlow(inMode());
+			} finally {
+				config[key] = "";
+			}
+			expect(mocks.pendingHarnessEvent).not.toHaveBeenCalled();
+		}
+	);
+});
+
 describe("leaked tool-call markup", () => {
 	// Observed with GLM-class models: the provider template leaks the model's
 	// native tool syntax into content, so the "call" is text the user sees and
@@ -965,5 +1331,165 @@ describe("leaked tool-call markup", () => {
 
 		expect(mocks.create).toHaveBeenCalledTimes(1);
 		expect(finalAnswer(updates)).toContain("<do_thing_output>");
+	});
+});
+
+describe("attachments over the provider's limit", () => {
+	const contextError = () =>
+		new BadRequestError(
+			400,
+			{
+				message:
+					"This model's maximum context length is 1048576 tokens. However, your request resolved to 2700000 input tokens.",
+			},
+			undefined,
+			{}
+		);
+	const tooLargeError = () =>
+		Object.assign(new Error("413 Request Entity Too Large"), { status: 413 });
+
+	function scriptAttachmentHistory() {
+		mocks.prepareHistory.mockImplementation(
+			async (
+				messages: Array<{ from: string; content: string }>,
+				_processor: unknown,
+				_multimodal: unknown,
+				options: HistoryOptionsArg
+			) => {
+				const minimal = options.attachments === "minimal";
+				return {
+					messages: [{ role: "user", content: minimal ? "HEAD ONLY" : "WHOLE CSV" }],
+					attachments: {
+						newest: 0,
+						texts: [
+							{
+								index: 0,
+								name: "data.csv",
+								total: 8_000_000,
+								shown: minimal ? 5_000 : 150_000,
+							},
+						],
+						images: [],
+					},
+				};
+			}
+		);
+	}
+
+	const notices = (updates: MessageUpdate[]) =>
+		updates.flatMap((u) => (u.type === MessageUpdateType.Notice ? [u.text] : []));
+
+	it.each([
+		["a context-length 400", contextError],
+		["a 413", tooLargeError],
+	])("retries once with attachments cut after %s and tells the user", async (_label, error) => {
+		scriptAttachmentHistory();
+		scriptRounds([{ error: error() }, { content: "read the head" }]);
+
+		const { updates, result } = await runFlow();
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(JSON.stringify(requestMessages(0))).toContain("WHOLE CSV");
+		expect(JSON.stringify(requestMessages(1))).toContain("HEAD ONLY");
+		expect(notices(updates)).toEqual([
+			"The model refused the request as too large, so it was sent again with attachments cut: data.csv to its first 5,000 of 8,000,000 characters.",
+		]);
+		expect(finalAnswer(updates)).toBe("read the head");
+	});
+
+	it("names the attachment instead of the provider error when the retry is refused too", async () => {
+		scriptAttachmentHistory();
+		scriptRounds([{ error: contextError() }, { error: contextError() }]);
+
+		const failure = await runFlow().catch((err: unknown) => err);
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(failure).toBeInstanceOf(Error);
+		expect((failure as Error).name).toBe("AttachmentOverflowError");
+		expect((failure as Error).message).toContain("data.csv (8,000,000 characters)");
+		expect((failure as Error).message).not.toContain("maximum context length");
+	});
+
+	it("does not retry a size refusal when there is nothing attached to cut", async () => {
+		scriptRounds([{ error: contextError() }]);
+
+		const { result } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(result).toBe("not_applicable");
+	});
+
+	it("does not retry other bad requests", async () => {
+		scriptAttachmentHistory();
+		scriptRounds([
+			{
+				error: new BadRequestError(
+					400,
+					{ message: "messages.2.assistant.reasoning_content is unsupported" },
+					undefined,
+					{}
+				),
+			},
+		]);
+
+		const { result } = await runFlow();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(result).toBe("not_applicable");
+	});
+
+	it("tells the user once when the file just sent was cut to the budget", async () => {
+		mocks.prepareHistory.mockImplementation(async () => ({
+			messages: [{ role: "user", content: "WHOLE CSV" }],
+			attachments: {
+				newest: 0,
+				texts: [{ index: 0, name: "data.csv", total: 8_000_000, shown: 149_990 }],
+				images: [],
+			},
+		}));
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{
+				content: "done",
+			},
+		]);
+
+		const { updates } = await runFlow();
+
+		expect(notices(updates)).toEqual([
+			"data.csv is too long to send whole: the model sees 149,990 of its 8,000,000 characters, from the start and the end.",
+		]);
+	});
+
+	it("does not repeat a notice the message already shows, as on a resume", async () => {
+		mocks.prepareHistory.mockImplementation(async () => ({
+			messages: [{ role: "user", content: "WHOLE CSV" }],
+			attachments: {
+				newest: 0,
+				texts: [{ index: 0, name: "data.csv", total: 8_000_000, shown: 149_990 }],
+				images: [],
+			},
+		}));
+		scriptRounds([{ content: "done" }]);
+		const text =
+			"data.csv is too long to send whole: the model sees 149,990 of its 8,000,000 characters, from the start and the end.";
+		const conv = {
+			_id: new ObjectId(),
+			messages: [
+				{
+					id: "a1",
+					from: "assistant",
+					content: "",
+					updates: [{ type: MessageUpdateType.Notice, text }],
+				},
+			],
+		};
+
+		const { updates } = await runFlow({ conv, messageId: "a1" } as unknown as Partial<
+			Parameters<typeof runMcpFlow>[0]
+		>);
+
+		expect(notices(updates)).toEqual([]);
 	});
 });

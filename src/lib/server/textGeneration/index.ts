@@ -19,6 +19,9 @@ import { settleMlBudget } from "$lib/server/mlBudget/settle";
 import { reservedMicroUsd } from "$lib/utils/mlBudget";
 import { logger } from "$lib/server/logger";
 import { resolvePreprompt } from "./preprompt";
+import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
+import { mlStateBlockEnabled } from "$lib/server/mlRegistry/stateBlock";
+import { AttachmentOverflowError } from "./utils/attachmentBudget";
 
 /** Updates that mean the user has already been shown something for this turn. */
 function isVisibleWork(update: MessageUpdate): boolean {
@@ -108,6 +111,8 @@ async function* textGenerationWithoutTitle(
 	const preprompt = resolvePreprompt({
 		conversationPreprompt: conv.preprompt,
 		mlAssistant,
+		virtualFiles: mlVirtualFilesEnabled(conv),
+		stateBlock: mlStateBlockEnabled(conv),
 		artifactsOverride: ctx.artifactsOverride,
 		supportsArtifacts: ctx.model.supportsArtifacts,
 		username: ctx.username,
@@ -169,8 +174,8 @@ async function* textGenerationWithoutTitle(
 					err.message.includes("Request was aborted")));
 		if (isAbort) {
 			// nothing to recover; the partial message is already what the user saw
-		} else if (mcpProducedOutput) {
-			// Falling back here would discard the tool work and answer as if none of it ran.
+		} else if (mcpProducedOutput || err instanceof AttachmentOverflowError) {
+			// falling back would discard the tool work, or resend the attachments just refused
 			throw err;
 		} else {
 			// Nothing was shown yet, so a clean tool-free retry is a real recovery.

@@ -207,3 +207,83 @@ describe("withRepairedToolSchemas", () => {
 		expect(out).toEqual(sandboxExec());
 	});
 });
+
+describe("withRepairedToolSchemas and virtual files", () => {
+	const jobs = (): OpenAiTool => ({
+		type: "function",
+		function: {
+			name: "hf_jobs",
+			parameters: { type: "object", properties: { operation: {}, args: { type: "object" } } },
+		},
+	});
+	const fsWrite = (withContent: boolean): OpenAiTool => ({
+		type: "function",
+		function: {
+			name: "hf_fs_write",
+			parameters: {
+				type: "object",
+				properties: {
+					cmd: { type: "string" },
+					args: { type: "array" },
+					...(withContent ? { content: { type: "string", description: "File content." } } : {}),
+				},
+			},
+		},
+	});
+	const sandboxFs = (): OpenAiTool => ({
+		type: "function",
+		function: {
+			name: "hf_sandbox_fs",
+			parameters: { type: "object", properties: { cmd: {}, args: { type: "array" } } },
+		},
+	});
+	const descriptions = (tool: OpenAiTool) =>
+		tool.function.parameters?.properties as Record<string, { description?: string }>;
+
+	it("teaches the reference in the mode, at each of the three positions", () => {
+		const [j, w, s] = withRepairedToolSchemas(
+			[jobs(), fsWrite(true), sandboxFs()],
+			{
+				...mapping("hf_jobs", "hf_jobs"),
+				...mapping("hf_fs_write", "hf_fs_write"),
+				...mapping("hf_sandbox_fs", "hf_sandbox_fs"),
+			},
+			HUB,
+			{ virtualFiles: true }
+		);
+
+		expect(descriptions(j).args.description).toContain('"script": "v-file://train.py"');
+		expect(descriptions(j).args.description).toContain("write_file");
+		expect(descriptions(j).args.description).not.toContain("<the whole script>");
+		expect(descriptions(w).content.description).toContain('"v-file://<name>"');
+		expect(descriptions(s).args.description).toContain('"--text", "v-file://train.py"');
+	});
+
+	it("says nothing about references outside the mode, where nothing expands them", () => {
+		for (const options of [undefined, {}, { virtualFiles: false }]) {
+			const repaired = withRepairedToolSchemas(
+				[jobs(), fsWrite(true), sandboxFs()],
+				{
+					...mapping("hf_jobs", "hf_jobs"),
+					...mapping("hf_fs_write", "hf_fs_write"),
+					...mapping("hf_sandbox_fs", "hf_sandbox_fs"),
+				},
+				HUB,
+				options
+			);
+			expect(JSON.stringify(repaired)).not.toContain("v-file://");
+			expect(descriptions(repaired[0]).args.description).toContain("<the whole script>");
+			expect(descriptions(repaired[1]).content.description).toBe("File content.");
+		}
+	});
+
+	it("does not invent a content property the server stopped advertising", () => {
+		const [w] = withRepairedToolSchemas(
+			[fsWrite(false)],
+			mapping("hf_fs_write", "hf_fs_write"),
+			HUB,
+			{ virtualFiles: true }
+		);
+		expect(Object.keys(descriptions(w))).toEqual(["cmd", "args"]);
+	});
+});

@@ -1,6 +1,8 @@
+import { logger } from "$lib/server/logger";
 import type { OpenAiTool } from "$lib/server/mcp/tools";
+import { recordDashboardArtefact } from "$lib/server/mlRegistry/store";
 import { trackioSpaceId } from "$lib/server/trackioSpace";
-import type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
+import type { BuiltinTool, BuiltinToolContext } from "./types";
 
 export const CREATE_TRACKIO_TOOL_NAME = "create_trackio";
 
@@ -55,8 +57,25 @@ export function createTrackioTool(namespace: () => string | undefined): BuiltinT
 			`trackio.init(space_id=...) exactly as given. The user's dashboard is wired to that Space ` +
 			`from the moment you call this, so it fills in as the run logs — an id you chose yourself ` +
 			`instead points them at a Space nothing writes to.`,
-		async execute(args: Record<string, unknown>, _ctx: BuiltinToolContext) {
-			return reserve(args, namespace());
+		async execute(args: Record<string, unknown>, ctx: BuiltinToolContext) {
+			const reserved = reserve(args, namespace());
+			if ("error" in reserved) return reserved;
+			// builtins bypass the recording guard, and the reply must not wait on or fail with the database
+			if (ctx.conversationId) {
+				void recordDashboardArtefact({
+					conversationId: ctx.conversationId,
+					spaceId: reserved.spaceId,
+					toolUuid: ctx.uuid,
+					...(ctx.messageId ? { messageId: ctx.messageId } : {}),
+					...(ctx.generationId ? { generationId: ctx.generationId } : {}),
+				}).catch((err) => {
+					logger.error(
+						{ err: String(err), spaceId: reserved.spaceId },
+						"[mlRegistry] recording the dashboard failed"
+					);
+				});
+			}
+			return { resultText: reserved.resultText };
 		},
 	};
 }
@@ -64,7 +83,9 @@ export function createTrackioTool(namespace: () => string | undefined): BuiltinT
 /** `owner`, as the Hub spells one: no slash, no spaces. */
 const NAMESPACE = /^[A-Za-z0-9][\w.-]*$/;
 
-function reserve(args: Record<string, unknown>, sessionNamespace?: string): BuiltinToolResult {
+type Reservation = { error: string } | { resultText: string; spaceId: string };
+
+function reserve(args: Record<string, unknown>, sessionNamespace?: string): Reservation {
 	const project = typeof args.project === "string" ? args.project.trim() : "";
 	if (!project) return { error: "No project name provided." };
 
@@ -89,6 +110,7 @@ function reserve(args: Record<string, unknown>, sessionNamespace?: string): Buil
 	// lets the chip poll for readiness. The URL here is chat-ui's own, which is
 	// what makes it safe to frame — see TRACKIO_SOURCE_TOOL_REGEX.
 	return {
+		spaceId,
 		resultText: [
 			`Trackio dashboard reserved: https://huggingface.co/spaces/${spaceId}`,
 			"",

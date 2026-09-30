@@ -97,6 +97,13 @@ describe("resolvePreprompt", () => {
 		expect(resolved).not.toContain("You are a pirate.");
 	});
 
+	it("drops the session state section when the block is switched off", () => {
+		expect(resolvePreprompt({ mlAssistant: true })).toContain("# Session state");
+		expect(resolvePreprompt({ mlAssistant: true, stateBlock: false })).not.toContain(
+			"# Session state"
+		);
+	});
+
 	it("force-enables artifacts for the preset even when the model and override say no", () => {
 		const now = new Date("2026-08-24T09:07:00Z");
 
