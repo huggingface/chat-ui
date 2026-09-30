@@ -26,7 +26,9 @@ export type GETModelsResponse = Array<{
 }>;
 
 export type GETModelResponse = GETModelsResponse[number] & {
-	providers?: Array<{ provider: string } & Record<string, unknown>>;
+	// Deliberately just the provider name: the rest of the upstream router's
+	// provider object is server-internal and never crosses the API boundary.
+	providers?: Array<{ provider: string }>;
 	parameters: BackendModel["parameters"];
 };
 
