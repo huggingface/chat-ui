@@ -34,7 +34,7 @@
 	// only a conversation the registry is bound to has a pane to open, a share has none
 	let canOpenFiles = $derived(mlRegistry.conversationId !== undefined);
 	// A result can come back with an error status as well as a separate error
-	// update; either way the call failed and the row must say so.
+	// update; either way the call failed.
 	let toolError = $derived(
 		tool.some(
 			(update) =>
@@ -148,8 +148,7 @@
 				>
 					<!-- Errors here are often recoverable (the model retries or works around
 				     them), so the header stays in the same muted gray as every other
-				     state; the amber icon is the only signal until the row is expanded.
-				     A successful call gets no icon: "Called" already says it.
+				     state; the icon is the only signal until the row is expanded.
 				     role="img" is what gets a bare svg's aria-label announced. -->
 					{#if toolError}
 						<LucideTriangleAlert

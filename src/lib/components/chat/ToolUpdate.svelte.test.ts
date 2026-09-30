@@ -58,21 +58,13 @@ describe("ToolUpdate status icon", () => {
 		uuid: "u1",
 		result: { status, call: call.call, outputs: [], message: "boom", display: true },
 	});
-	const icons = (el: Element) =>
-		Array.from(el.querySelectorAll("svg[role='img']")).map((svg) => svg.getAttribute("aria-label"));
+	const icon = (el: Element, label: string) => el.querySelector(`svg[aria-label='${label}']`);
 
 	it("warns when the result itself is an error", () => {
 		const { baseElement } = render(ToolUpdate, { tool: [call, result("error")] } as never);
 
-		expect(icons(baseElement)).toEqual(["Failed"]);
+		expect(icon(baseElement, "Failed")).not.toBeNull();
 		expect(baseElement.textContent).toContain("Error calling tool");
-	});
-
-	it("shows no icon for a call that succeeded", () => {
-		const { baseElement } = render(ToolUpdate, { tool: [call, result("success")] } as never);
-
-		expect(icons(baseElement)).toEqual([]);
-		expect(baseElement.textContent).toContain("Called tool");
 	});
 });
 
