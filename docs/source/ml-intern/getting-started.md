@@ -8,12 +8,18 @@ ML Intern is a mode in [HuggingChat](https://huggingface.co/chat) that plans and
 - build a demo and deploy it as a Space
 - run a model against a benchmark
 
+
+
+https://github.com/user-attachments/assets/06cf239d-dcac-440a-a20d-72ef0f91f9a9
+
+
+
 ## Before you start
 
 You need:
 
 - **A Hugging Face account.** Sign up at [huggingface.co](https://huggingface.co/join).
-- **Credits for compute.** ML Intern runs [Hugging Face Jobs](https://huggingface.co/docs/huggingface_hub/guides/jobs) and sandboxes, billed to your Hugging Face credits or to an organization you belong to (see [Step 3](#step-3-choose-who-pays)). Chatting with the model is billed separately, as [Inference Providers](https://huggingface.co/docs/inference-providers/pricing) usage.
+- **Credits for compute.** ML Intern runs [Hugging Face Jobs](https://huggingface.co/docs/huggingface_hub/guides/jobs) and sandboxes, billed to your Hugging Face credits or to an organization you belong to (see [Step 3](#step-3-choose-who-pays)).
 
 ## Step 1: Open HuggingChat and switch on ML Intern
 
