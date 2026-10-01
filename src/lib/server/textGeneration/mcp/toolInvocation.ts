@@ -16,6 +16,7 @@ import { getClient } from "$lib/server/mcp/clientPool";
 import type { BuiltinTool } from "../builtinTools/types";
 import { openDurableElicitation, type ElicitationSink } from "$lib/server/mcp/elicitation";
 import { turnAwaitingInput } from "$lib/server/generation/turnState";
+import { slimToolOutput } from "$lib/server/generation/compressUpdates";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { ResolvedVirtualFileRef, VirtualFileExpander } from "$lib/server/mlFiles/expand";
 import type { ToolCallGuard } from "./toolGuard";
@@ -109,6 +110,11 @@ export interface ExecuteToolCallsParams {
 	elicitation?: { conversationId: ObjectId; generationId?: string; messageId?: string };
 	/** Identity the turn runs as, for a builtin that has to be resumable later. */
 	owner?: { userId?: ObjectId; sessionId?: string };
+	/**
+	 * what a builtin records its writes under when there is no elicitation context, a
+	 * sub-agent version lands on the parent message
+	 */
+	attribution?: { messageId?: string; generationId?: string; agent?: string; agentRunId?: string };
 	/** Locally-executed tools, dispatched before the MCP mapping lookup. */
 	builtinTools?: BuiltinTool[];
 	/** Policy gate consulted around every MCP dispatch (not builtins) — see toolGuard.ts. */
@@ -172,6 +178,7 @@ export async function* executeToolCalls({
 	roundContent,
 	elicitation,
 	owner,
+	attribution,
 	builtinTools,
 	guard,
 	clientKind,
@@ -408,8 +415,10 @@ export async function* executeToolCalls({
 					conversationId: elicitation?.conversationId,
 					userId: owner?.userId,
 					sessionId: owner?.sessionId,
-					messageId: elicitation?.messageId,
-					generationId: elicitation?.generationId,
+					messageId: elicitation?.messageId ?? attribution?.messageId,
+					generationId: elicitation?.generationId ?? attribution?.generationId,
+					...(attribution?.agent ? { agent: attribution.agent } : {}),
+					...(attribution?.agentRunId ? { agentRunId: attribution.agentRunId } : {}),
 					elicitationSink,
 					abortSignal,
 				});
@@ -442,7 +451,7 @@ export async function* executeToolCalls({
 					uuid: p.uuid,
 					result: {
 						status: ToolResultStatus.Success,
-						call: { name: p.call.name, parameters: p.paramsClean },
+						call: { name: p.call.name, parameters: {} },
 						outputs: [{ text: outcome.resultText } as unknown as Record<string, unknown>],
 						display: true,
 					},
@@ -523,6 +532,7 @@ export async function* executeToolCalls({
 				tool: mappingEntry.tool,
 				fnName: p.call.name,
 				args: argsObj,
+				...(p.fileRefs ? { fileRefs: p.fileRefs } : {}),
 				callUuid: p.uuid,
 			});
 			if (verdict.update) updatesQueue.push(verdict.update);
@@ -692,13 +702,13 @@ export async function* executeToolCalls({
 				uuid: p.uuid,
 				result: {
 					status: ToolResultStatus.Success,
-					call: { name: p.call.name, parameters: p.paramsClean },
+					call: { name: p.call.name, parameters: {} },
 					outputs: [
-						{
+						slimToolOutput({
 							text: annotated ?? "",
 							structured: toolResponse.structured,
 							content: toolResponse.content,
-						} as unknown as Record<string, unknown>,
+						}),
 					],
 					display: true,
 				},

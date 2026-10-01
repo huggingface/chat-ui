@@ -20,8 +20,11 @@ const tool = (name: string): OpenAiTool =>
 const HF_TOOLS = [tool("hf_jobs"), tool("hf_fs"), tool("hub_repo_details")];
 
 /** The preset's system message, as `runMcpFlow` asks for it. */
-const inMode = (tools: OpenAiTool[]) =>
-	buildToolPreprompt(tools, undefined, undefined, { mlAssistant: true });
+const inMode = (
+	tools: OpenAiTool[],
+	{ serviceEvents = false, jobLabels }: { serviceEvents?: boolean; jobLabels?: boolean } = {}
+) =>
+	buildToolPreprompt(tools, undefined, undefined, { mlAssistant: true, serviceEvents, jobLabels });
 
 describe("ML Assistant preprompt", () => {
 	it("ships text that does not depend on the model or a template engine", () => {
@@ -78,6 +81,17 @@ describe("ML Assistant preprompt", () => {
 			expect(ML_ASSISTANT_PREPROMPT).not.toContain(absent);
 		}
 	});
+
+	it("says a large attachment arrives as a slice only while the budget cuts it", () => {
+		expect(ML_ASSISTANT_PREPROMPT).toContain("reaches you only as a slice");
+		const off = mlAssistantPreprompt({
+			virtualFiles: true,
+			stateBlock: true,
+			attachmentBudget: false,
+		});
+		expect(off).not.toContain("reaches you only as a slice");
+		expect(off).toContain("assuming the card was accurate.\n\n# When you write ML code");
+	});
 });
 
 describe("ML Assistant virtual files", () => {
@@ -112,7 +126,11 @@ describe("ML Assistant virtual files", () => {
 	});
 
 	it("goes back to the inline shape when the switch is off, naming no tool the model lacks", () => {
-		const off = mlAssistantPreprompt({ virtualFiles: false });
+		const off = mlAssistantPreprompt({
+			virtualFiles: false,
+			stateBlock: true,
+			attachmentBudget: true,
+		});
 		expect(off).not.toContain("v-file://");
 		expect(off).not.toContain("write_file");
 		expect(off).toContain("# Scripts: artifact or payload");
@@ -127,11 +145,52 @@ describe("ML Assistant virtual files", () => {
 		});
 		expect(withTools).toContain("VIRTUAL FILES:");
 		expect(withTools).toContain("exactly three places");
+		expect(withTools).toContain("comes back with import_file");
 		expect(inMode(HF_TOOLS)).not.toContain("VIRTUAL FILES:");
 	});
 });
 
+describe("ML Assistant session state", () => {
+	it("gives the block its own section, away from the job rules", () => {
+		const prompt = ML_ASSISTANT_PREPROMPT;
+		expect(prompt).toContain("# Session state");
+		expect(prompt.indexOf("# Session state")).toBeGreaterThan(prompt.indexOf("# Finishing"));
+	});
+
+	it("makes the block the source for ids and stages, and check_job the one for logs", () => {
+		const prompt = ML_ASSISTANT_PREPROMPT;
+		expect(prompt).toContain("[SESSION STATE] block");
+		expect(prompt).toContain(
+			"authoritative, as of its timestamp, for every job and sandbox that has not ended and for every repo and file"
+		);
+		expect(prompt).toContain("A job that ended is listed once");
+		expect(prompt).toContain("rather than searching back through the conversation");
+		expect(prompt).toContain("Do not call hf_jobs ps or inspect to learn a stage it already shows");
+		expect(prompt).toContain("anything started after that is not in it yet");
+		expect(prompt).toContain("are still check_job");
+	});
+
+	it("says nothing about a block the turn will not carry when the switch is off", () => {
+		const off = mlAssistantPreprompt({
+			virtualFiles: true,
+			stateBlock: false,
+			attachmentBudget: true,
+		});
+		expect(off).not.toContain("SESSION STATE");
+		expect(off).not.toContain("# Session state");
+	});
+});
+
 describe("ML Assistant tool-keyed doctrine", () => {
+	it("says submissions keep their name and session label only while they are added", () => {
+		expect(inMode([tool("hf_jobs")])).toContain(
+			"The name goes out prefixed with ml-intern-, and every submission carries an ml-intern-session label"
+		);
+		const off = inMode([tool("hf_jobs")], { jobLabels: false });
+		expect(off).not.toContain("ml-intern");
+		expect(off).toContain("the experiment they belong to.\n- Token.");
+	});
+
 	it("sends the job contract only to a run that can submit jobs", () => {
 		// It restates rules the preset prompt already carries, deliberately, at the
 		// surface they get violated at — but a run without the tool would be
@@ -203,13 +262,25 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("span the real spectrum");
 	});
 
-	it("front-loads the first status check after a submit", () => {
+	it("front-loads the first status check after a submit where nothing wakes a wait", () => {
 		// Dogfooding: models set long waits uniformly, so a job that died on a bad
 		// dependency in its first minute sat undiscovered for twenty.
 		const jobs = inMode([tool("hf_jobs")]);
 
 		expect(jobs).toContain("failures cluster at the start");
 		expect(jobs).toContain("SHORT wait");
+		expect(jobs).not.toContain("wakes you the moment");
+	});
+
+	it("sizes waits for the work where the harness wakes the turn on a job's end", () => {
+		const jobs = inMode([tool("hf_jobs")], { serviceEvents: true });
+
+		expect(jobs).toContain("wakes you the moment one ends or fails");
+		expect(jobs).toContain("you do not need short first waits");
+		expect(jobs).toContain("confirm the dashboard has rows in it");
+		expect(jobs).toContain("read them before you change anything");
+		expect(jobs).not.toContain("SHORT wait");
+		expect(jobs).not.toContain("failures cluster at the start");
 	});
 
 	it("sends smoke checks to the sandbox first when it is on offer", () => {
@@ -244,6 +315,19 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("pin to the CURRENT release, never the version you remember");
 		expect(jobs).toContain("pip index versions <package>");
 		expect(jobs).toContain("Unpinned is not the safe middle");
+	});
+
+	it("reserves the push destination with create_repo and names it literally in the script", () => {
+		// the push check reads the id out of the script, one built at runtime goes unchecked
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("Reserve it first");
+		expect(jobs).toContain("create the destination repo with create_repo");
+		expect(jobs).toContain("the way create_trackio reserves a dashboard");
+		expect(jobs).toContain(
+			'put its id in the script literally — hub_model_id="<namespace>/<name>"'
+		);
+		expect(jobs).toContain("never an id built at runtime");
 	});
 
 	it("names the dashboard through create_trackio, and verifies a metric lands", () => {
@@ -290,6 +374,14 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(sandbox).toContain("hf_jobs");
 		expect(sandbox).toContain("do not retry");
 		expect(inMode([tool("hf_jobs")])).not.toContain("SANDBOXES (hf_sandbox)");
+	});
+
+	it("has the intern terminate a sandbox it will not use on the next message", () => {
+		const sandbox = inMode([tool("hf_sandbox")]);
+
+		expect(sandbox).toContain("hf_sandbox terminate <handle>");
+		expect(sandbox).toContain("before your final answer terminate every sandbox");
+		expect(sandbox).toContain("stopped by the user");
 	});
 
 	it("puts metrics on the pre-flight list, not only in the bullets", () => {
@@ -378,6 +470,12 @@ describe("ML Assistant system message size", () => {
 		// 32k to 34k for virtual files, the scripts section plus the write_file guidance, argued
 		// by what they remove, 930 hf_jobs uv calls in the ten largest conversations each re-sent
 		// a whole script averaging 3.7k characters and a 30 character reference now replaces it
+		//
+		// 34k to 35k for the session state section, argued by the hf_jobs ps and inspect calls and
+		// the reads back through old tool results it replaces, it landed at 34,079
+		//
+		// 35k to 35,500 for the sandbox lifecycle, argued by idle sandboxes billing until their
+		// timeout, it landed at 35,364
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -402,7 +500,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(34_000);
+		expect(composed.length).toBeLessThan(35_500);
 	});
 });
 

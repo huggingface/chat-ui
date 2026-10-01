@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Switch } from "bits-ui";
-	import { untrack } from "svelte";
+	import { onDestroy, untrack } from "svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
@@ -9,7 +9,6 @@
 	const settings = useSettingsStore();
 
 	let enabled = $derived(mlAssistant.enabled);
-	let onboardingOpen = $state(false);
 
 	function ontoggle(next: boolean) {
 		if (requireAuthUser()) return;
@@ -23,7 +22,7 @@
 		const on = enabled;
 		const seen = $settings.mlInternOnboardingSeen;
 		untrack(() => {
-			if (on && wasEnabled === false && !seen) onboardingOpen = true;
+			if (on && wasEnabled === false && !seen) mlAssistant.onboardingOpen = true;
 			wasEnabled = on;
 		});
 	});
@@ -31,10 +30,14 @@
 	function closeOnboarding() {
 		// Escape reaches Modal's window and dialog handlers before the unmount
 		// lands, so this runs twice; one acknowledgement is enough.
-		if (!onboardingOpen) return;
-		onboardingOpen = false;
+		if (!mlAssistant.onboardingOpen) return;
+		mlAssistant.onboardingOpen = false;
 		settings.instantSet({ mlInternOnboardingSeen: true });
 	}
+
+	onDestroy(() => {
+		mlAssistant.onboardingOpen = false;
+	});
 </script>
 
 <!-- The mode's pre-task switch, sitting beside the MCP pill. Only offered while
@@ -75,7 +78,7 @@
 	</Switch.Root>
 </div>
 
-{#if onboardingOpen}
+{#if mlAssistant.onboardingOpen && $settings.welcomeModalSeen}
 	<MlInternOnboardingModal close={closeOnboarding} />
 {/if}
 

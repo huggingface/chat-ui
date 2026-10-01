@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
 import type { MlBudget, MlBudgetReservation } from "$lib/types/Conversation";
 import { readMlBudget } from "./budget";
-import { settleMlBudget } from "./settle";
+import { listLabelledJobs, settleHoldFromLookup, settleMlBudget } from "./settle";
 
 beforeAll(async () => {
 	await ready;
@@ -177,5 +177,151 @@ describe.sequential("settleMlBudget", () => {
 		});
 		expect(settled.spentMicroUsd).toBe(400_020);
 		expect(settled.reservations.map((r) => r.key)).toEqual(["gen:young"]);
+	});
+});
+
+describe.sequential("settleHoldFromLookup", () => {
+	const completed = {
+		state: "terminal" as const,
+		billedMinutes: 10,
+		job: { stage: "COMPLETED" },
+	};
+
+	it("settles the hold with the key, at the minutes already looked up", async () => {
+		const id = await insertConversation(budgetWith(traceable(), traceable({ key: "gen:call-2" })));
+		const settled = await settleHoldFromLookup({
+			conversationId: id,
+			budget: (await readMlBudget(id)) as MlBudget,
+			reservationKey: "gen:call-1",
+			jobId: "0123456789abcdef01234567",
+			lookup: completed,
+		});
+		expect(settled).toBe(true);
+		const budget = await readMlBudget(id);
+		expect(budget?.reservations.map((r) => r.key)).toEqual(["gen:call-2"]);
+		expect(budget?.spentMicroUsd).toBe(6667 * 10);
+	});
+
+	it("falls back to the job id and charges the ceiling for a job that is gone", async () => {
+		const id = await insertConversation(budgetWith(traceable()));
+		const settled = await settleHoldFromLookup({
+			conversationId: id,
+			budget: (await readMlBudget(id)) as MlBudget,
+			jobId: "0123456789abcdef01234567",
+			lookup: { state: "gone" },
+		});
+		expect(settled).toBe(true);
+		expect((await readMlBudget(id))?.spentMicroUsd).toBe(400_020);
+	});
+
+	it("settles nothing when no hold matches", async () => {
+		const id = await insertConversation(budgetWith(traceable()));
+		const settled = await settleHoldFromLookup({
+			conversationId: id,
+			budget: (await readMlBudget(id)) as MlBudget,
+			reservationKey: "gen:unknown",
+			jobId: "ffffffffffffffffffffffff",
+			lookup: completed,
+		});
+		expect(settled).toBe(false);
+		expect((await readMlBudget(id))?.reservations).toHaveLength(1);
+	});
+});
+
+describe("listLabelledJobs", () => {
+	const JOB = (id: string, stage: string, labels: Record<string, unknown> = {}) => ({
+		id,
+		createdAt: "2026-09-25T11:00:00.000Z",
+		status: { stage, message: null },
+		owner: { id: "u1", name: "acme", type: "org" },
+		flavor: "t4-small",
+		labels,
+		timeout_seconds: 3600,
+	});
+
+	function stubPages(pages: { body: unknown; link?: string; status?: number }[]) {
+		const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
+			const page = pages.shift();
+			if (!page) throw new Error("no more pages");
+			return {
+				ok: (page.status ?? 200) < 400,
+				status: page.status ?? 200,
+				headers: new Headers(page.link ? { link: page.link } : {}),
+				json: async () => page.body,
+			};
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		return fetchMock;
+	}
+
+	it("asks the hub to filter by every label and follows the pages", async () => {
+		const next = "https://huggingface.co/api/jobs/acme?label=ml-intern-session%3Dabc&cursor=2";
+		const fetchMock = stubPages([
+			{
+				body: [JOB("0123456789abcdef01234567", "RUNNING", { name: "ml-intern-a", n: 1 })],
+				link: `<${next}>; rel="next"`,
+			},
+			{ body: [JOB("fedcbafedcbafedcbafedcba", "COMPLETED"), { id: "not-a-job" }] },
+		]);
+
+		const jobs = await listLabelledJobs({
+			namespace: "acme",
+			labels: { "ml-intern-session": "abc" },
+			token: "hf_test",
+		});
+
+		const [firstUrl, init] = fetchMock.mock.calls[0];
+		expect(String(firstUrl)).toBe(
+			"https://huggingface.co/api/jobs/acme?label=ml-intern-session%3Dabc"
+		);
+		expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer hf_test");
+		expect(String(fetchMock.mock.calls[1][0])).toBe(next);
+		expect(jobs).toEqual([
+			{
+				jobId: "0123456789abcdef01234567",
+				stage: "RUNNING",
+				flavor: "t4-small",
+				timeoutSeconds: 3600,
+				createdAt: new Date("2026-09-25T11:00:00.000Z"),
+				labels: { name: "ml-intern-a" },
+			},
+			{
+				jobId: "fedcbafedcbafedcbafedcba",
+				stage: "COMPLETED",
+				flavor: "t4-small",
+				timeoutSeconds: 3600,
+				createdAt: new Date("2026-09-25T11:00:00.000Z"),
+				labels: {},
+			},
+		]);
+	});
+
+	it("does not send the token to a next page off the hub", async () => {
+		const fetchMock = stubPages([
+			{
+				body: [JOB("0123456789abcdef01234567", "RUNNING")],
+				link: '<https://elsewhere.example/api/jobs/acme?cursor=2>; rel="next"',
+			},
+		]);
+		const jobs = await listLabelledJobs({ namespace: "acme", labels: { k: "v" }, token: "t" });
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(jobs).toHaveLength(1);
+	});
+
+	it("is undefined when any page cannot be read", async () => {
+		stubPages([
+			{
+				body: [JOB("0123456789abcdef01234567", "RUNNING")],
+				link: '</api/jobs/acme?c=2>; rel="next"',
+			},
+			{ body: {}, status: 500 },
+		]);
+		expect(
+			await listLabelledJobs({ namespace: "acme", labels: { k: "v" }, token: "t" })
+		).toBeUndefined();
+		stubPages([{ body: { error: "not a list" } }]);
+		expect(
+			await listLabelledJobs({ namespace: "acme", labels: { k: "v" }, token: "t" })
+		).toBeUndefined();
 	});
 });

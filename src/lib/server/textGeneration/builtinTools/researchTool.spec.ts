@@ -18,6 +18,7 @@ const {
 	isResearchTool,
 	truncateResearchToolOutput,
 	MAX_RESEARCH_ITERATIONS,
+	RESEARCH_REPEAT_REFUSAL,
 	RESEARCH_TOOL_NAME,
 } = await import("./researchTool");
 const { RESEARCH_CONTEXT_MAX_PROMPT, RESEARCH_CONTEXT_WARN_PROMPT, RESEARCH_REPETITION_PROMPT } =
@@ -157,6 +158,31 @@ describe("the nested loop", () => {
 		expect(toolMessage.tool_call_id).toBe("t1");
 		expect(toolMessage.content).toContain("...(truncated)...");
 		expect(toolMessage.content.length).toBe(4800 + 3200 + "\n...(truncated)...\n".length);
+	});
+
+	it("leaves the virtual file tools out even when the turn has them", async () => {
+		createCompletion.mockResolvedValueOnce(respond({ content: "done" }));
+		const fileTool = (name: string): BuiltinTool => ({
+			name,
+			definition: { type: "function", function: { name, parameters: { type: "object" } } },
+			execute: vi.fn(async () => ({ resultText: "" })),
+		});
+		const tool = boundTool({
+			hostBuiltinTools: [
+				fakeHfFs,
+				fileTool("write_file"),
+				fileTool("edit_file"),
+				fileTool("read_file"),
+				fileTool("import_file"),
+			],
+		});
+
+		await tool.execute({ task: "t" }, ctx);
+
+		const request = createCompletion.mock.calls[0][0];
+		expect(request.tools.map((t: { function: { name: string } }) => t.function.name)).toEqual([
+			"hf_fs",
+		]);
 	});
 
 	it("refuses tools outside the allowlist without executing anything", async () => {
@@ -323,6 +349,80 @@ describe("the nested loop", () => {
 		createCompletion.mockRejectedValueOnce(new Error("boom"));
 		expect(await boundTool().execute({ task: "t" }, ctx)).toEqual({
 			error: "Research agent LLM error: boom",
+		});
+	});
+});
+
+describe("repeated research within a run", () => {
+	it("refuses a repeat of a finished task without running the sub-agent again", async () => {
+		createCompletion.mockResolvedValue(respond({ content: "the summary" }));
+		const tool = boundTool();
+
+		await tool.execute({ task: "survey memory", context: "user builds X" }, ctx);
+		expect(await tool.execute({ task: " survey memory ", context: "user builds X" }, ctx)).toEqual({
+			error: RESEARCH_REPEAT_REFUSAL,
+		});
+		expect(createCompletion).toHaveBeenCalledTimes(1);
+
+		await tool.execute({ task: "survey memory", context: "user builds Y" }, ctx);
+		await tool.execute({ task: "survey retrieval", context: "user builds X" }, ctx);
+		expect(createCompletion).toHaveBeenCalledTimes(3);
+	});
+
+	it("refuses a duplicate dispatched in the same round while the first is running", async () => {
+		let finish: (value: unknown) => void = () => {};
+		createCompletion.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+		const tool = boundTool();
+
+		const first = tool.execute({ task: "survey memory" }, ctx);
+		expect(await tool.execute({ task: "survey memory" }, ctx)).toEqual({
+			error: RESEARCH_REPEAT_REFUSAL,
+		});
+		finish(respond({ content: "the summary" }));
+		expect(await first).toEqual({ resultText: "the summary" });
+		expect(createCompletion).toHaveBeenCalledTimes(1);
+	});
+
+	it("lets a failed task be retried unchanged", async () => {
+		createCompletion
+			.mockRejectedValueOnce(new Error("boom"))
+			.mockResolvedValueOnce(respond({ content: "the summary" }));
+		const tool = boundTool();
+
+		expect(await tool.execute({ task: "survey memory" }, ctx)).toEqual({
+			error: "Research agent LLM error: boom",
+		});
+		expect(await tool.execute({ task: "survey memory" }, ctx)).toEqual({
+			resultText: "the summary",
+		});
+	});
+
+	it("lets a task whose run threw be retried unchanged", async () => {
+		createCompletion.mockResolvedValue(respond({ content: "the summary" }));
+		const deps = makeDeps();
+		let throwOnce = true;
+		Object.defineProperty(deps, "hostBuiltinTools", {
+			get: () => {
+				if (!throwOnce) return [fakeHfFs];
+				throwOnce = false;
+				throw new Error("boom");
+			},
+		});
+		const tool = createResearchTool();
+		tool.bind(deps);
+
+		await expect(tool.execute({ task: "survey memory" }, ctx)).rejects.toThrow("boom");
+		expect(await tool.execute({ task: "survey memory" }, ctx)).toEqual({
+			resultText: "the summary",
+		});
+	});
+
+	it("starts clean for the next run", async () => {
+		createCompletion.mockResolvedValue(respond({ content: "the summary" }));
+
+		await boundTool().execute({ task: "survey memory" }, ctx);
+		expect(await boundTool().execute({ task: "survey memory" }, ctx)).toEqual({
+			resultText: "the summary",
 		});
 	});
 });

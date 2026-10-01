@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { extractTrackioDashboards, TRACKIO_FRAME_SANDBOX } from "$lib/utils/trackio";
+import {
+	collectTrackioDashboards,
+	extractTrackioDashboards,
+	TRACKIO_FRAME_SANDBOX,
+} from "$lib/utils/trackio";
+import { compressUpdatesForStorage } from "$lib/server/generation/compressUpdates";
+import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
+import type { MessageUpdate } from "$lib/types/MessageUpdate";
+import { ToolResultStatus } from "$lib/types/Tool";
 
 describe("trackio dashboard iframe grants", () => {
 	// The attribute string is a security contract: a Trackio Space is framed
@@ -77,5 +85,40 @@ describe("trackio dashboard extraction", () => {
 			expect(new URL(dashboard.url).hostname.endsWith(".hf.space")).toBe(true);
 		}
 		expect(found.map((d) => d.url)).toEqual(["https://abidlabs-trackio.hf.space"]);
+	});
+
+	it("still finds a dashboard in a job result as it is stored", () => {
+		const parameters = { operation: "run", script: "train.py" };
+		const updates: MessageUpdate[] = [
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Call,
+				uuid: "u1",
+				call: { name: "hf_jobs", parameters },
+			},
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: "u1",
+				result: {
+					status: ToolResultStatus.Success,
+					call: { name: "hf_jobs", parameters },
+					outputs: [
+						{
+							text: REAL_LOG,
+							structured: { log: REAL_LOG },
+							content: [{ type: "text", text: REAL_LOG }],
+						},
+					],
+					display: true,
+				},
+			},
+		];
+
+		const found = collectTrackioDashboards([
+			{ id: "m1", from: "assistant", updates: compressUpdatesForStorage(updates) },
+		]);
+
+		expect(found.map((d) => d.url)).toEqual(["https://abidlabs-trackio-mnist-smoke.hf.space"]);
 	});
 });

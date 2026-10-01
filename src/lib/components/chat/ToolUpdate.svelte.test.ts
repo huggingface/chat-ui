@@ -1,7 +1,11 @@
 import ToolUpdate from "./ToolUpdate.svelte";
+import MlRegistryPane from "./MlRegistryPane.svelte";
 import { render } from "vitest-browser-svelte";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { tick } from "svelte";
+import superjson from "superjson";
+import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
+import { sidePane } from "$lib/stores/sidePane.svelte";
 
 const call = {
 	type: "tool",
@@ -62,5 +66,156 @@ describe("ToolUpdate status icon", () => {
 		expect(icon(baseElement, "Failed")).not.toBeNull();
 		expect(icon(baseElement, "Succeeded")).toBeNull();
 		expect(baseElement.textContent).toContain("Error calling tool");
+	});
+});
+
+describe("ToolUpdate stored output", () => {
+	const onePixelPng =
+		"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+	const stored = {
+		type: "tool",
+		subtype: "result",
+		uuid: "u1",
+		result: {
+			status: "success",
+			call: { name: "sandbox_task", parameters: {} },
+			outputs: [
+				{ text: "plotted", content: [{ type: "image", data: onePixelPng, mimeType: "image/png" }] },
+			],
+			display: true,
+		},
+	};
+
+	it("renders the image and text a stripped output kept, and no metadata block", async () => {
+		const screen = render(ToolUpdate, { tool: [call, stored] } as never);
+
+		await screen.getByRole("button", { name: "Expand" }).click();
+
+		const image = screen.getByRole("img", { name: "Tool result image 1" });
+		await expect.element(image).toHaveAttribute("src", `data:image/png;base64,${onePixelPng}`);
+		const blocks = Array.from(screen.baseElement.querySelectorAll("pre")).map((b) => b.textContent);
+		expect(blocks).toEqual(["{}", "plotted"]);
+	});
+});
+
+describe("ToolUpdate virtual file chips", () => {
+	const submit = {
+		...call,
+		call: { name: "hf_jobs", parameters: { operation: "uv" } },
+		fileRefs: [{ ref: "v-file://train.py@v2", name: "train.py", version: 2 }],
+	};
+	const versions = [3, 2, 1].map((version) => ({
+		version,
+		size: 9,
+		origin: version === 1 ? "write" : "edit",
+		createdAt: new Date(version * 1000),
+	}));
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		sidePane.reset();
+		mlRegistry.reset();
+	});
+
+	it("names the version the call sent and opens the files list at it", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: RequestInfo | URL) => {
+				const url = new URL(String(input));
+				if (!url.pathname.endsWith("/files/train.py")) return new Response("{}", { status: 500 });
+				const version = url.searchParams.get("version");
+				const body = version
+					? { name: "train.py", ...versions[3 - Number(version)], content: `print(${version})\n` }
+					: { name: "train.py", versions };
+				return new Response(superjson.stringify(body), { status: 200 });
+			})
+		);
+		mlRegistry.bind("conv-1");
+		mlRegistry.apply({
+			services: [],
+			artefacts: [],
+			files: [{ name: "train.py", version: 3, size: 9, updatedAt: new Date(3000) }],
+			serverNow: Date.now(),
+		});
+		const pane = render(MlRegistryPane);
+		const card = render(ToolUpdate, { tool: [submit] } as never);
+
+		const chip = card.container.querySelector<HTMLButtonElement>("button.tool-file-ref");
+		expect(chip?.textContent?.trim()).toBe("train.py v2");
+		chip?.click();
+
+		expect(sidePane.open).toBe(true);
+		expect(sidePane.view).toBe("registry");
+		expect(sidePane.registryFocus).toEqual({ name: "train.py", version: 2 });
+		await vi.waitFor(() => {
+			const row = pane.container.querySelector(".ml-version[data-version='2']");
+			const pill = pane.container.querySelector(".ml-version-pill[data-version='2']");
+			expect(pill?.getAttribute("aria-pressed")).toBe("true");
+			expect(row?.querySelector(".ml-file-code .diff-add")?.textContent).toBe("+ print(2)");
+		});
+		expect(pane.container.querySelector(".ml-file-toggle")?.getAttribute("aria-expanded")).toBe(
+			"true"
+		);
+	});
+
+	it("shows the version without a way to open it where there is no registry, as on a share", () => {
+		const { container } = render(ToolUpdate, { tool: [submit] } as never);
+
+		expect(container.querySelector("button.tool-file-ref")).toBeNull();
+		expect(container.querySelector("span.tool-file-ref")?.textContent?.trim()).toBe("train.py v2");
+	});
+
+	it("shows no chip for a call that carried no reference", () => {
+		mlRegistry.bind("conv-1");
+		const { container } = render(ToolUpdate, { tool: [call] } as never);
+		expect(container.querySelector(".tool-file-ref")).toBeNull();
+	});
+});
+
+describe("ToolUpdate input", () => {
+	const job = {
+		operation: "uv",
+		args: {
+			script: "v-file://train.py@v2",
+			flavor: "a10g-large",
+			timeout: "2h",
+			secrets: { HF_TOKEN: "$HF_TOKEN", WANDB_API_KEY: "wandb-live-1234" },
+			env: { MAX_TOKENS: 512, COMMAND: "train --token=abcd1234efgh --epochs 3" },
+		},
+	};
+	const input = async (update: Record<string, unknown>) => {
+		const screen = render(ToolUpdate, { tool: [update] } as never);
+		await screen.getByRole("button", { name: "Expand" }).click();
+		return screen.container.querySelector("pre")?.textContent ?? "";
+	};
+
+	it("shows the arguments the model sent, nested ones included, with secrets hidden", async () => {
+		const shown = await input({
+			...call,
+			call: { name: "hf_jobs", parameters: {} },
+			argumentsRaw: JSON.stringify(job),
+		});
+
+		const { operation, args } = JSON.parse(shown);
+		expect(operation).toBe("uv");
+		expect(args).toMatchObject({
+			script: "v-file://train.py@v2",
+			flavor: "a10g-large",
+			timeout: "2h",
+			secrets: { HF_TOKEN: "<redacted>", WANDB_API_KEY: "<redacted>" },
+			env: { MAX_TOKENS: 512 },
+		});
+		expect(args.env.COMMAND).not.toContain("abcd1234efgh");
+		expect(args.env.COMMAND).toMatch(/^train.*--epochs 3$/);
+	});
+
+	it("falls back to the parameters of a call stored without argumentsRaw, redacted too", async () => {
+		const shown = await input({
+			...call,
+			call: { name: "hf_sandbox_exec", parameters: { command: "login --password hunter2" } },
+		});
+
+		expect(shown).not.toContain("hunter2");
+		expect(JSON.parse(shown).command).toMatch(/^login.*<redacted>$/);
 	});
 });

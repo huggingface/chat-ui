@@ -23,7 +23,7 @@ const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]');
 
 /** The slice of the layout's settings context the pill reads and writes. */
 function settingsContext(mlInternOnboardingSeen: boolean) {
-	const store = writable({ mlInternOnboardingSeen });
+	const store = writable({ mlInternOnboardingSeen, welcomeModalSeen: true });
 	const set = vi.fn((patch: Record<string, unknown>) => store.update((s) => ({ ...s, ...patch })));
 	return {
 		set,

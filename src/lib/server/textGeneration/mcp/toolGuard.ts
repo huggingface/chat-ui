@@ -14,7 +14,10 @@ export interface GuardedToolCall {
 	tool: string;
 	/** Name the model called, and the key into this request's tool mapping. */
 	fnName: string;
+	/** expanded, a virtual file reference is already replaced by its content */
 	args: Record<string, unknown>;
+	/** the virtual file versions args were expanded from */
+	fileRefs?: { name: string; version: number }[];
 	/**
 	 * The dispatch uuid, unique per execution. Deliberately not the provider's
 	 * tool call id: some providers reuse ids ("call_0") across rounds, and a

@@ -4,6 +4,7 @@
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import TrackioPane from "./TrackioPane.svelte";
+	import MlRegistryPane from "./MlRegistryPane.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
 	import { collectTrackioDashboards } from "$lib/utils/trackio";
@@ -68,6 +69,7 @@
 	import MlAssistantStrip from "./MlAssistantStrip.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 	import MlInternSpotlight from "./MlInternSpotlight.svelte";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { MediaQuery } from "svelte/reactivity";
@@ -648,6 +650,18 @@
 		});
 	});
 
+	// read from the registry, not derived from the messages, a stage changes between turns
+	// loading is the live signal, so a turn ending reruns this and the store refetches once
+	$effect(() => {
+		const conversationId = page.params?.id;
+		if (!mlTaskRunning || shared || !conversationId) {
+			// nothing to watch here, a remount on another route must not keep the last rows
+			mlRegistry.reset();
+			return;
+		}
+		return mlRegistry.watch(conversationId, { live: loading });
+	});
+
 	const budgetClient = useAPIClient();
 
 	/**
@@ -870,7 +884,11 @@
 		style="--scrollbar-gutter: {chatScroll.gutterHalfPx}px"
 	>
 		{#if shareModalOpen}
-			<ShareConversationModal open={shareModalOpen} onclose={() => shareModal.close()} />
+			<ShareConversationModal
+				open={shareModalOpen}
+				onclose={() => shareModal.close()}
+				downloadTrace={mlModeOn}
+			/>
 		{/if}
 		{#if canShare}
 			<!-- Lives in the chat column (not the layout) so it stays visible when
@@ -1140,6 +1158,7 @@
 							budget={mlAssistant.budget}
 							onbudgetchange={page.params?.id ? changeMlBudget : undefined}
 							dashboard={trackioDashboards.at(-1)}
+							registry={mlRegistry.summary}
 						/>
 					{/if}
 					<!-- The composer box is a column so the ML Assistant strip can stack on
@@ -1351,6 +1370,9 @@
 		onsend={canSendFix ? sendFixRequest : undefined}
 	/>
 	<TrackioPane items={paneItems} />
+	{#if ML_ASSISTANT_MODE}
+		<MlRegistryPane />
+	{/if}
 </div>
 
 <style>

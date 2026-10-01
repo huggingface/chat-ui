@@ -1,5 +1,6 @@
 import type { EndpointParameters } from "./server/endpoints/endpoints";
 import type { BackendModel } from "./server/models";
+import { toLegacyShape } from "./utils/messageShape";
 
 type buildPromptOptions = Pick<EndpointParameters, "messages" | "preprompt"> & {
 	model: BackendModel;
@@ -10,7 +11,7 @@ export async function buildPrompt({
 	model,
 	preprompt,
 }: buildPromptOptions): Promise<string> {
-	const filteredMessages = messages;
+	const filteredMessages = messages.map(toLegacyShape);
 
 	if (filteredMessages[0].from === "system" && preprompt) {
 		filteredMessages[0].content = preprompt;

@@ -2,6 +2,7 @@ import type { InferenceProvider } from "@huggingface/inference";
 import type { ToolCall, ToolResult } from "$lib/types/Tool";
 import type { PlanStep } from "$lib/types/Plan";
 import type { TurnStatus } from "$lib/types/TurnState";
+import type { MlServiceKind, ServicePush } from "$lib/types/MlService";
 import type {
 	ElicitationAction,
 	ElicitationRequestPayload,
@@ -21,7 +22,9 @@ export type MessageUpdate =
 	| MessageElicitationUpdate
 	| MessagePlanUpdate
 	| MessageBudgetUpdate
-	| MessageTurnStateUpdate;
+	| MessageTurnStateUpdate
+	| MessageHarnessEventUpdate
+	| MessageNoticeUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -36,6 +39,8 @@ export enum MessageUpdateType {
 	Plan = "plan",
 	Budget = "budget",
 	TurnState = "turnState",
+	HarnessEvent = "harnessEvent",
+	Notice = "notice",
 }
 
 /**
@@ -188,6 +193,8 @@ export interface MessageFinalAnswerUpdate {
 	type: MessageUpdateType.FinalAnswer;
 	text: string;
 	interrupted: boolean;
+	/** length of the text, stored in its place when the rounds shape holds the answer in content */
+	len?: number;
 }
 export interface MessageRouterMetadataUpdate {
 	type: MessageUpdateType.RouterMetadata;
@@ -255,4 +262,37 @@ export interface MessageBudgetUpdate {
 	spentMicroUsd: number;
 	/** Sum of open reservation ceilings — held, not yet settled. */
 	reservedMicroUsd: number;
+}
+
+/** a service change as the transcript keeps it, plain json so it streams and persists as is */
+export interface HarnessServiceEvent {
+	serviceId: string;
+	kind: MlServiceKind;
+	jobId: string;
+	handle?: string;
+	name?: string;
+	flavor?: string;
+	from: string;
+	to: string;
+	ranSeconds?: number;
+	pushes?: ServicePush[];
+	/** epoch ms */
+	at: number;
+}
+
+/**
+ * services that ended while the turn was busy, told to the model at a round boundary, the text
+ * is replayed verbatim after the result of afterToolUuid, the last call of the round
+ */
+export interface MessageHarnessEventUpdate {
+	type: MessageUpdateType.HarnessEvent;
+	events: HarnessServiceEvent[];
+	text: string;
+	afterToolUuid: string;
+}
+
+/** shown to the user in the turn and never sent to the model, like how much of a file it saw */
+export interface MessageNoticeUpdate {
+	type: MessageUpdateType.Notice;
+	text: string;
 }

@@ -10,6 +10,13 @@ import {
 } from "./testHelpers";
 
 import { GET, DELETE, PATCH } from "../../../../routes/api/v2/conversations/[id]/+server";
+import { convertFinishedMessage } from "$lib/server/generation/messageShape";
+import {
+	assistantMessage,
+	finalAnswer,
+	toolRound,
+} from "$lib/server/generation/__tests__/turnFixtures";
+import type { Message } from "$lib/types/Message";
 import {
 	listMlArtefacts,
 	listMlServices,
@@ -60,6 +67,31 @@ describe.sequential("GET /api/v2/conversations/[id]", () => {
 		expect(data.model).toBe("test-model");
 		expect(data.preprompt).toBe("You are helpful.");
 		expect(data.id).toBe(conv._id.toString());
+	});
+
+	it("returns a converted turn as stored, which the client renders by its rounds", async () => {
+		const { locals } = await createTestUser();
+		const legacy = assistantMessage([
+			...toolRound({ reasoning: "Plan.", text: "Let me check." }),
+			...finalAnswer("Done.", "Sunny."),
+		]);
+		const stored = convertFinishedMessage(legacy);
+		expect(stored.contentShape).toBe(2);
+		const conv = await createTestConversation(locals, { messages: [stored] });
+
+		const res = await GET({
+			locals,
+			params: { id: conv._id.toString() },
+			url: mockUrl(),
+		} as never);
+
+		const data = await parseResponse<{ messages: Message[] }>(res);
+		const returned = data.messages.find((m) => m.id === stored.id);
+		expect(returned?.contentShape).toBe(2);
+		expect(returned?.content).toBe("Sunny.");
+		expect(returned?.reasoning).toBe("Done.");
+		expect(returned?.updates).toEqual(stored.updates);
+		expect(JSON.stringify(returned).length).toBeLessThan(JSON.stringify(legacy).length);
 	});
 
 	it("throws 404 for non-existent conversation", async () => {

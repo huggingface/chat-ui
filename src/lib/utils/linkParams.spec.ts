@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	isTrustedAttachmentUrl,
 	linkPromptNeedsConfirmation,
+	readLinkMode,
 	readLinkPromptRequest,
 } from "./linkParams";
 import { MAX_PARAM_LENGTH } from "./urlParams";
@@ -172,5 +173,23 @@ describe("linkPromptNeedsConfirmation", () => {
 		expect(
 			linkPromptNeedsConfirmation({ prompt: null, attachmentUrls: [url(untrusted)], send: false })
 		).toBe(true);
+	});
+});
+
+describe("readLinkMode", () => {
+	it("reads mode=ml-intern, ignoring case and surrounding space", () => {
+		expect(readLinkMode(params("mode=ml-intern"))).toBe("ml-intern");
+		expect(readLinkMode(params("mode=ML-Intern"))).toBe("ml-intern");
+		expect(readLinkMode(params("mode=%20ml-intern%20"))).toBe("ml-intern");
+	});
+
+	it("ignores a missing or unknown mode", () => {
+		expect(readLinkMode(params(""))).toBeNull();
+		expect(readLinkMode(params("mode="))).toBeNull();
+		expect(readLinkMode(params("mode=research"))).toBeNull();
+	});
+
+	it("does not turn a mode-only link into a composer request", () => {
+		expect(readLinkPromptRequest(params("mode=ml-intern"))).toBeNull();
 	});
 });

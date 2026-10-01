@@ -165,6 +165,30 @@ describe.each([
 		);
 	});
 
+	it("persists ML Intern from a confirmed link without locking before creation", async () => {
+		const { fetchSpy, prepend, resolveAttachments } = mountOnLink(component, url, params);
+		let confirmCreate: (response: Response) => void = () => {};
+		fetchSpy.mockImplementationOnce(
+			() =>
+				new Promise<Response>((resolve) => {
+					confirmCreate = resolve;
+				})
+		);
+		mlAssistant.toggle(true);
+		await confirmSend();
+		resolveAttachments({ files: [], errors: [] });
+		await settle();
+
+		const [[, init]] = conversationPosts(fetchSpy);
+		expect(JSON.parse(String(init?.body))).toMatchObject({ mlAssistant: true });
+		expect(mlAssistant.taskStarted).toBe(false);
+
+		confirmCreate(createdResponse(true));
+		await settle();
+		expect(mlAssistant.taskStarted).toBe(true);
+		expect(prepend).toHaveBeenCalledWith(expect.objectContaining({ mlAssistant: true }));
+	});
+
 	it("uses the mode the server returned instead of the requested toggle", async () => {
 		const { fetchSpy, prepend } = mountOnLink(component, url.split("?")[0] ?? "/", params);
 		fetchSpy.mockResolvedValueOnce(createdResponse(false));

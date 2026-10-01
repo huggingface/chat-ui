@@ -98,6 +98,7 @@ const FREE_JOB_OPERATIONS = new Set([
 	"logs",
 	"inspect",
 	"cancel",
+	"update-labels",
 	"scheduled ps",
 	"scheduled inspect",
 	"scheduled delete",
@@ -114,17 +115,14 @@ export function classifySubmission(
 ): GatedSubmission | { blocked: string } | null {
 	if (call.tool === "hf_jobs") {
 		const operation = call.args.operation;
-		if (
-			operation === "scheduled run" ||
-			operation === "scheduled uv" ||
-			operation === "scheduled resume"
-		) {
+		if (typeof operation === "string" && FREE_JOB_OPERATIONS.has(operation)) return null;
+		// by prefix so a scheduled operation added upstream gets this reason too
+		if (typeof operation === "string" && operation.startsWith("scheduled ")) {
 			return {
 				blocked:
-					"Scheduled jobs are not available in this session: a recurring run cannot be held to the session budget. Nothing was scheduled or resumed. Run the work directly with operation 'run' or 'uv'.",
+					"Scheduled jobs are not available in this session: a recurring run cannot be held to the session budget. Nothing was scheduled or changed. Run the work directly with operation 'run' or 'uv'.",
 			};
 		}
-		if (typeof operation === "string" && FREE_JOB_OPERATIONS.has(operation)) return null;
 		if (operation !== "run" && operation !== "uv") {
 			// Not a budget matter — the call names no operation to route, and a
 			// call this gate cannot recognize it cannot let through unpriced.
@@ -201,7 +199,7 @@ export function createMlAssistantOnlyComputeGuard(): ToolCallGuard {
 		allowParking: true,
 		async before(call): Promise<GuardVerdict> {
 			if (!isHfMcpServer(call.serverUrl)) return { allow: true };
-			const classified = classify(call);
+			const classified = classifySubmission(call);
 			if (classified === null) return { allow: true };
 			return {
 				allow: false,

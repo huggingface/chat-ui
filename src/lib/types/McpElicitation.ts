@@ -131,6 +131,8 @@ export interface McpElicitation extends Timestamps {
 export interface ElicitationResume {
 	status: "resuming" | "resumed" | "abandoned";
 	takenAt: Date;
+	/** unique per claim, unlike takenAt and attempts which a successor can repeat */
+	claimId?: string;
 	attempts: number;
 	resumedAt?: Date;
 	abandonedReason?: string;

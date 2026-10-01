@@ -46,6 +46,7 @@ describe("getEnabledBuiltinTools", () => {
 			"write_file",
 			"edit_file",
 			"read_file",
+			"import_file",
 		]);
 	});
 

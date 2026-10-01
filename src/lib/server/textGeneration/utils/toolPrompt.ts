@@ -4,6 +4,7 @@ import {
 	ML_ASSISTANT_TOOL_DOCTRINE,
 	mlAssistantToolDoctrineBlocks,
 } from "$lib/server/mlAssistantPrompt";
+import { mlJobLabelsEnabled, mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
 
 export function buildToolPreprompt(
 	tools: OpenAiTool[],
@@ -17,7 +18,13 @@ export function buildToolPreprompt(
 	 * the model either way, and a parallel copy silently loses whatever is added
 	 * to this one next.
 	 */
-	options?: { mlAssistant?: boolean }
+	options?: {
+		mlAssistant?: boolean;
+		/** whether a job end wakes a parked wait, read from the deployment unless given */
+		serviceEvents?: boolean;
+		/** whether submissions are labelled for the session, read from the deployment unless given */
+		jobLabels?: boolean;
+	}
 ): string {
 	if (!Array.isArray(tools) || tools.length === 0) return "";
 	const names = tools
@@ -86,5 +93,11 @@ export function buildToolPreprompt(
 	// Blocks, not sentences: a tool contract is a list the model reads down before
 	// acting, so it keeps its own paragraphs instead of being flattened into the
 	// run of general guidance. Empty outside the mode, where the join is a no-op.
-	return [general, ...(mlAssistant ? mlAssistantToolDoctrineBlocks(names) : [])].join("\n\n");
+	const doctrine = mlAssistant
+		? mlAssistantToolDoctrineBlocks(names, {
+				serviceEvents: options?.serviceEvents ?? mlServiceEventsEnabled(),
+				jobLabels: options?.jobLabels ?? mlJobLabelsEnabled(),
+			})
+		: [];
+	return [general, ...doctrine].join("\n\n");
 }

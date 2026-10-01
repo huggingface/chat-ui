@@ -18,6 +18,8 @@ class MlAssistantStore {
 	steps = $state<MlPlanStep[]>([]);
 	/** Compute budget ledger, when the conversation carries one. */
 	budget = $state<MlBudgetSnapshot | undefined>(undefined);
+	/** First-run onboarding is pending or showing; other dialogs wait on it. */
+	onboardingOpen = $state(false);
 
 	/** Conversation the state above belongs to, so a different one starts clean. */
 	#conversationKey: string | undefined;

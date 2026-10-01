@@ -3,13 +3,23 @@ import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
 import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
+import {
+	createJobLabelRewrite,
+	SESSION_LABEL_KEY,
+	type SessionJobLabels,
+} from "$lib/server/mcp/jobLabels";
 import { createMlBudgetGuard } from "$lib/server/mlBudget/guard";
 import { readMlBudget } from "$lib/server/mlBudget/budget";
 import { resetPriceCacheForTests } from "$lib/server/mlBudget/pricing";
-import { composeGuards, type GuardOutcome } from "$lib/server/textGeneration/mcp/toolGuard";
+import {
+	composeGuards,
+	type GuardedToolCall,
+	type GuardOutcome,
+} from "$lib/server/textGeneration/mcp/toolGuard";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
 import { createMlRecordingGuard } from "./recordingGuard";
 import { listMlArtefacts, listMlServices } from "./store";
+import { loadSessionJobLabels, RECONCILE_DELAY_MS } from "./sessionLabel";
 
 beforeAll(async () => {
 	await ready;
@@ -32,6 +42,7 @@ afterEach(async () => {
 	vi.restoreAllMocks();
 	await collections.mlServices.deleteMany({ conversationId: { $in: conversationIds } });
 	await collections.mlArtefacts.deleteMany({ conversationId: { $in: conversationIds } });
+	await collections.mlSessionLabels.deleteMany({ _id: { $in: conversationIds } });
 	await collections.conversations.deleteMany({ _id: { $in: conversationIds } });
 	conversationIds.length = 0;
 });
@@ -118,26 +129,31 @@ const ok = (structured?: unknown, text = "ok"): GuardOutcome => ({
 	...(structured !== undefined ? { structured } : {}),
 });
 
-function makeGuard(conversationId: ObjectId) {
+function makeGuard(conversationId: ObjectId, jobLabels?: SessionJobLabels) {
 	let n = 0;
 	const guard = createMlRecordingGuard({
 		conversationId,
 		generationId: "gen-1",
 		messageId: "msg-1",
 		namespace: "testuser",
+		...(jobLabels ? { jobLabels } : {}),
 	});
 	/** after only with a ticket, as executeToolCalls does */
 	const dispatch = async (
 		tool: string,
 		args: Record<string, unknown>,
 		outcome: GuardOutcome,
-		serverUrl = HF_URL
+		{
+			serverUrl = HF_URL,
+			fileRefs,
+		}: { serverUrl?: string; fileRefs?: GuardedToolCall["fileRefs"] } = {}
 	) => {
 		const verdict = await guard.before({
 			serverUrl,
 			tool,
 			fnName: tool,
 			args,
+			...(fileRefs ? { fileRefs } : {}),
 			callUuid: `uuid-${++n}`,
 		});
 		if (!verdict.allow) throw new Error("the recording guard refused a call");
@@ -182,6 +198,68 @@ describe.sequential("mlRegistry recording guard: services", () => {
 		});
 		expect(services[0]).not.toHaveProperty("stageMessage");
 		expect(services[0]).not.toHaveProperty("handle");
+		expect(services[0]).not.toHaveProperty("scriptRefs");
+	});
+
+	it("records which virtual file version a job's script was expanded from", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+		const resolved = { ref: "v-file://train.py", name: "train.py", version: 4 };
+
+		await dispatch(
+			"hf_jobs",
+			{ operation: "uv", args: { script: "print(4)", flavor: "a10g-small", timeout: "30m" } },
+			ok(JOB_REPLY),
+			{ fileRefs: [resolved] }
+		);
+
+		const [service] = await listMlServices(conversationId);
+		expect(service.jobId).toBe(JOB_ID);
+		expect(service.scriptRefs).toEqual([{ name: "train.py", version: 4 }]);
+	});
+
+	it("records where the expanded script says the job will push", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+
+		await dispatch(
+			"hf_jobs",
+			{
+				operation: "uv",
+				args: {
+					script: [
+						'HUB_ID = "testuser/qwen-sft"',
+						"cfg = SFTConfig(push_to_hub=True, hub_model_id=HUB_ID)",
+						'trackio.init(project="sft", space_id="testuser/sft-trackio")',
+						'evals.push_to_hub(f"{user}/evals")',
+					].join("\n"),
+					script_args: ["--epochs", "3"],
+					flavor: "a10g-small",
+					timeout: "2h",
+				},
+			},
+			ok(JOB_REPLY),
+			{ fileRefs: [{ name: "train.py", version: 2 }] }
+		);
+
+		const [service] = await listMlServices(conversationId);
+		expect(service.expectedPushes).toEqual([
+			{ kind: "model", uri: "hf://models/testuser/qwen-sft" },
+		]);
+	});
+
+	it("records no destinations for a script that names none", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+
+		await dispatch(
+			"hf_jobs",
+			{ operation: "uv", args: { script: "print(1)", flavor: "a10g-small", timeout: "30m" } },
+			ok(JOB_REPLY)
+		);
+
+		const [service] = await listMlServices(conversationId);
+		expect(service).not.toHaveProperty("expectedPushes");
 	});
 
 	it("falls back to the arguments when the reply is text only", async () => {
@@ -272,7 +350,7 @@ describe.sequential("mlRegistry recording guard: services", () => {
 			"hf_jobs",
 			{ operation: "uv", args: { script: "x" } },
 			ok(JOB_REPLY),
-			"https://other.example/mcp"
+			{ serverUrl: "https://other.example/mcp" }
 		);
 
 		expect(verdict).toEqual({ allow: true });
@@ -327,6 +405,7 @@ describe.sequential("mlRegistry recording guard: artefacts", () => {
 			url: "https://huggingface.co/datasets/testuser/demo/blob/main/README.md",
 			origin: "dispatched",
 			commit: SHA_2,
+			putCommits: [SHA_1, SHA_2],
 			toolUuid: "uuid-2",
 		});
 		expect(file.updatedAt.getTime()).toBeGreaterThanOrEqual(file.createdAt.getTime());
@@ -347,6 +426,31 @@ describe.sequential("mlRegistry recording guard: artefacts", () => {
 		const file = (await listMlArtefacts(conversationId)).find((a) => a.kind === "file");
 		expect(file).toMatchObject({ uri: "hf://datasets/testuser/demo/README.md" });
 		expect(file).not.toHaveProperty("commit");
+	});
+
+	it("records the virtual file version a put uploaded, and forgets it when a later put is inline", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+		const put = (content: string) => ({
+			cmd: "put",
+			args: ["put", "hf://datasets/testuser/demo/train.py"],
+			content,
+		});
+		const fileRow = async () =>
+			(await listMlArtefacts(conversationId)).find((a) => a.kind === "file");
+
+		await dispatch("hf_fs_write", put("print(2)"), ok(putReply("train.py", SHA_1)), {
+			fileRefs: [{ name: "train.py", version: 2 }],
+		});
+		expect(await fileRow()).toMatchObject({
+			commit: SHA_1,
+			fromFile: { name: "train.py", version: 2 },
+		});
+
+		await dispatch("hf_fs_write", put("print(3)"), ok(putReply("train.py", SHA_2)));
+		const file = await fileRow();
+		expect(file?.commit).toBe(SHA_2);
+		expect(file).not.toHaveProperty("fromFile");
 	});
 
 	it("gives a file written into a repo the session never created a discovered parent", async () => {
@@ -562,6 +666,7 @@ describe.sequential("mlRegistry recording guard: in the chain", () => {
 			tool: "hf_jobs",
 			fnName: "hf_jobs",
 			args: { operation: "uv", args: { script: "x", flavor: "a10g-small", timeout: "30m" } },
+			fileRefs: [{ name: "train.py", version: 1 }],
 			callUuid: "uuid-1",
 		});
 		if (!verdict.allow) throw new Error(verdict.message);
@@ -572,7 +677,11 @@ describe.sequential("mlRegistry recording guard: in the chain", () => {
 
 		expect(update).toMatchObject({ type: MessageUpdateType.Budget });
 		const [service] = await listMlServices(conversationId);
-		expect(service).toMatchObject({ jobId: JOB_ID, reservationKey: "gen-1:uuid-1" });
+		expect(service).toMatchObject({
+			jobId: JOB_ID,
+			reservationKey: "gen-1:uuid-1",
+			scriptRefs: [{ name: "train.py", version: 1 }],
+		});
 		expect((await readMlBudget(conversationId))?.reservations).toEqual([
 			expect.objectContaining({ key: "gen-1:uuid-1", jobId: JOB_ID }),
 		]);
@@ -613,5 +722,138 @@ describe.sequential("mlRegistry recording guard: in the chain", () => {
 
 		expect(verdict.allow).toBe(false);
 		expect(await listMlServices(conversationId)).toHaveLength(0);
+	});
+});
+
+describe.sequential("mlRegistry recording guard: session labels", () => {
+	const labelled = (jobLabels: SessionJobLabels, args: Record<string, unknown>) =>
+		createJobLabelRewrite(jobLabels)({ serverUrl: HF_URL, tool: "hf_jobs", args });
+
+	it("records the name the rewrite sent and adds the job to the session's own", async () => {
+		const conversationId = newConversationId();
+		const jobLabels = await loadSessionJobLabels(conversationId);
+		const { dispatch } = makeGuard(conversationId, jobLabels);
+
+		await dispatch(
+			"hf_jobs",
+			labelled(jobLabels, {
+				operation: "uv",
+				args: { script: "print(1)", flavor: "a10g-small", timeout: "30m", name: "sft-smoke" },
+			}),
+			ok(JOB_REPLY)
+		);
+
+		const [service] = await listMlServices(conversationId);
+		expect(service.name).toBe("ml-intern-sft-smoke");
+		expect(jobLabels.ownJobs.get(JOB_ID)).toBe("ml-intern-sft-smoke");
+	});
+
+	it("marks the reconcile due before dispatch, so a lost reply still gets one", async () => {
+		const conversationId = newConversationId();
+		const jobLabels = await loadSessionJobLabels(conversationId);
+		const { dispatch } = makeGuard(conversationId, jobLabels);
+		const before = Date.now();
+
+		await dispatch(
+			"hf_jobs",
+			labelled(jobLabels, {
+				operation: "run",
+				args: { command: ["python", "train.py"], flavor: "t4-small", timeout: "1h" },
+			}),
+			{ status: "transport_error" }
+		);
+
+		expect(await listMlServices(conversationId)).toHaveLength(0);
+		const row = await collections.mlSessionLabels.findOne({ _id: conversationId });
+		expect(row).toMatchObject({
+			value: jobLabels.session,
+			namespaces: ["testuser"],
+			submissions: 1,
+		});
+		expect(row?.reconcileAt?.getTime()).toBeGreaterThanOrEqual(before + RECONCILE_DELAY_MS);
+		expect(row?.reconcileUntil?.getTime()).toBeGreaterThan(before + 60 * 60 * 1000);
+	});
+
+	it("marks nothing for a turn that stamps no labels", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+		await dispatch(
+			"hf_jobs",
+			{ operation: "uv", args: { script: "print(1)", flavor: "a10g-small", timeout: "30m" } },
+			ok(JOB_REPLY)
+		);
+		expect(await collections.mlSessionLabels.findOne({ _id: conversationId })).toBeNull();
+	});
+
+	it("follows a relabel into the row and the session's own jobs", async () => {
+		const conversationId = newConversationId();
+		const jobLabels = await loadSessionJobLabels(conversationId);
+		const { dispatch } = makeGuard(conversationId, jobLabels);
+		await dispatch(
+			"hf_jobs",
+			labelled(jobLabels, {
+				operation: "uv",
+				args: { script: "x", flavor: "a10g-small", timeout: "30m", name: "first" },
+			}),
+			ok(JOB_REPLY)
+		);
+
+		const relabel = labelled(jobLabels, {
+			operation: "update-labels",
+			args: { job_id: JOB_ID, labels: { name: "second", stage: "eval" } },
+		});
+		expect((relabel.args as { labels: Record<string, string> }).labels).toEqual({
+			name: "ml-intern-second",
+			stage: "eval",
+			[SESSION_LABEL_KEY]: jobLabels.session,
+		});
+		await dispatch("hf_jobs", relabel, { status: "error", text: "no" });
+		expect((await listMlServices(conversationId))[0].name).toBe("ml-intern-first");
+
+		await dispatch("hf_jobs", relabel, ok());
+		expect((await listMlServices(conversationId))[0].name).toBe("ml-intern-second");
+		expect(jobLabels.ownJobs.get(JOB_ID)).toBe("ml-intern-second");
+	});
+
+	it("refuses to relabel a sandbox it recorded, and still lets a job through", async () => {
+		const conversationId = newConversationId();
+		const { guard, dispatch } = makeGuard(conversationId);
+		await dispatch(
+			"hf_sandbox",
+			{
+				cmd: "create",
+				args: ["create", "--name", "smoke", "--flavor", "cpu-basic", "--timeout", "1h"],
+			},
+			ok(SANDBOX_REPLY)
+		);
+		const relabel = (jobId: string) =>
+			guard.before({
+				serverUrl: HF_URL,
+				tool: "hf_jobs",
+				fnName: "hf_jobs",
+				args: { operation: "update-labels", args: { job_id: jobId, labels: {} } },
+				callUuid: `relabel-${jobId}`,
+			});
+
+		const sandbox = await relabel(SANDBOX_JOB_ID);
+		expect(sandbox.allow).toBe(false);
+		if (!sandbox.allow) expect(sandbox.message).toContain("is a sandbox");
+		expect((await relabel(OTHER_JOB_ID)).allow).toBe(true);
+	});
+
+	it("records a relabel that dropped the name on a job it does not own", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+		await dispatch("hf_jobs", { operation: "logs", args: { job_id: OTHER_JOB_ID } }, ok());
+		await collections.mlServices.updateOne(
+			{ conversationId, jobId: OTHER_JOB_ID },
+			{ $set: { name: "theirs" } }
+		);
+		await dispatch(
+			"hf_jobs",
+			{ operation: "update-labels", args: { job_id: OTHER_JOB_ID, labels: {} } },
+			ok()
+		);
+		expect((await listMlServices(conversationId))[0]).not.toHaveProperty("name");
 	});
 });

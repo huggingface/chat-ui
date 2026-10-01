@@ -167,7 +167,7 @@ function argsError(tool: string, error: z.ZodError): string {
 	return `Invalid ${tool} arguments${path ? ` at ${path}` : ""}: ${issue?.message ?? "unknown"}.`;
 }
 
-const bytes = (size: number) => `${size.toLocaleString("en-US")} bytes`;
+export const describeBytes = (size: number) => `${size.toLocaleString("en-US")} bytes`;
 
 const excerpt = (text: string, max = 80): string => {
 	const flat = text.replace(/\s+/g, " ").trim();
@@ -180,7 +180,7 @@ function describeListing(files: MlFileListing[]): string {
 	}
 	const lines = files.map((file) => {
 		const when = file.updatedAt.toISOString().slice(0, 16).replace("T", " ");
-		return `  ${file.name}  v${file.version}  ${bytes(file.size)}  ${when}${
+		return `  ${file.name}  v${file.version}  ${describeBytes(file.size)}  ${when}${
 			file.summary ? `  — ${file.summary}` : ""
 		}`;
 	});
@@ -196,10 +196,11 @@ async function noSuchFile(conversationId: Conversation["_id"], name: string): Pr
 	return `No virtual file named "${name}". ${known}`;
 }
 
-function attribution(ctx: BuiltinToolContext) {
+export function fileAttribution(ctx: BuiltinToolContext) {
 	return {
 		...(ctx.messageId ? { messageId: ctx.messageId } : {}),
 		...(ctx.generationId ? { generationId: ctx.generationId } : {}),
+		...(ctx.agent ? { agent: ctx.agent } : {}),
 		toolUuid: ctx.uuid,
 	};
 }
@@ -222,7 +223,7 @@ async function writeFile(
 		content: content.value,
 		origin: "write",
 		summary: parsed.data.summary,
-		attribution: attribution(ctx),
+		attribution: fileAttribution(ctx),
 	});
 	logger.info(
 		{ conversationId: conv._id.toString(), name: written.name, version: written.version },
@@ -230,7 +231,7 @@ async function writeFile(
 	);
 	return {
 		resultText:
-			`Wrote ${written.name} v${written.version} (${bytes(written.size)}, ${written.lineCount} lines). ` +
+			`Wrote ${written.name} v${written.version} (${describeBytes(written.size)}, ${written.lineCount} lines). ` +
 			`Reference it as ${formatVirtualFileRef(written.name)} for the latest version or ` +
 			`${formatVirtualFileRef(written.name, written.version)} for this one.`,
 	};
@@ -279,7 +280,7 @@ async function editFile(
 		content: content.value,
 		origin: "edit",
 		summary: parsed.data.summary,
-		attribution: attribution(ctx),
+		attribution: fileAttribution(ctx),
 		baseVersion: current.version,
 	});
 	if ("conflict" in written) {
@@ -303,7 +304,7 @@ async function editFile(
 		resultText: [
 			`${written.name} v${written.version} (was v${current.version}): ${edits.length} ${
 				edits.length === 1 ? "edit" : "edits"
-			} applied, now ${bytes(written.size)}, ${written.lineCount} lines.`,
+			} applied, now ${describeBytes(written.size)}, ${written.lineCount} lines.`,
 			...(changes ? [changes] : ["(no textual change)"]),
 		].join("\n"),
 	};
@@ -355,7 +356,7 @@ async function readFile(
 		length += line.length + 1;
 		last = n;
 	}
-	const header = `${file.name} v${file.version} — lines ${start}-${last} of ${total} (${bytes(file.size)})`;
+	const header = `${file.name} v${file.version} — lines ${start}-${last} of ${total} (${describeBytes(file.size)})`;
 	const trailer =
 		last < end
 			? `… truncated at line ${last} of ${total}; call ${READ_FILE_TOOL_NAME} with start_line=${

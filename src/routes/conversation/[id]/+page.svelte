@@ -43,6 +43,7 @@
 		isConversationGenerationActive,
 		isTurnSubscribable,
 	} from "$lib/utils/generationState";
+	import { restoreRunningShape } from "$lib/utils/messageShape";
 	import { noteServerNow } from "$lib/utils/clockSkew.svelte";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
@@ -302,6 +303,8 @@
 			if (!messageToWriteTo) {
 				throw new Error("Message to write to not found");
 			}
+			// the server does the same, updates stream against the content it continues
+			restoreRunningShape(messageToWriteTo);
 
 			const streamingMode = resolveStreamingMode($settings);
 

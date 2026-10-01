@@ -66,9 +66,9 @@ function propertyDescriptions(
 			args:
 				"Arguments for this operation as a JSON object — the one Hub tool that takes an object rather than a token list. " +
 				(virtualFiles
-					? 'Submitting with uv: {"script": "v-file://train.py", "with_deps": ["trl"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}} — `script` is a v-file:// reference to a file you wrote with write_file (expanded to its content before the call is sent), never the script pasted inline. '
-					: 'Submitting with uv: {"script": "<the whole script>", "with_deps": ["trl"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}}. ') +
-				'Submitting with run (Docker): {"image": "python:3.12", "command": ["python", "train.py"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}} — `command` is an array, not a string. ' +
+					? 'Submitting with uv: {"name": "sft-qwen-smoke", "script": "v-file://train.py", "with_deps": ["trl"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}} — `script` is a v-file:// reference to a file you wrote with write_file (expanded to its content before the call is sent), never the script pasted inline. '
+					: 'Submitting with uv: {"name": "sft-qwen-smoke", "script": "<the whole script>", "with_deps": ["trl"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}}. ') +
+				'Submitting with run (Docker): {"name": "sft-qwen-smoke", "image": "python:3.12", "command": ["python", "train.py"], "flavor": "a10g-small", "timeout": "20m", "secrets": {"HF_TOKEN": "$HF_TOKEN"}} — `command` is an array, not a string. ' +
 				"The Hub's Jobs documentation describes the `hf jobs` CLI, not this API, so translate its flags rather than copying them: " +
 				'`--timeout 6h` is "timeout": "6h", a string and never a number; a repeated `--secrets FOO` is "secrets": {"FOO": "$FOO"}, an object and never an array; ' +
 				'`-v SRC:/mnt` is "volumes": ["hf://datasets/<owner>/<name>:/data"], strings and never objects.',

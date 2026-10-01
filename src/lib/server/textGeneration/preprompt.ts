@@ -14,6 +14,10 @@ export interface PrepromptInput {
 	mlAssistant: boolean;
 	/** whether the file tools are offered this turn, decides the scripts section, defaults on like the switch */
 	virtualFiles?: boolean;
+	/** whether the turn carries the session state block, defaults on like the switch */
+	stateBlock?: boolean;
+	/** whether large attachments reach the model cut, defaults on like the switch */
+	attachmentBudget?: boolean;
 	/** Per-model user override for artifacts, from the model settings page. */
 	artifactsOverride?: boolean;
 	/** Whether the model advertises artifact support (supportsArtifacts). */
@@ -44,6 +48,8 @@ export function resolvePreprompt({
 	conversationPreprompt,
 	mlAssistant,
 	virtualFiles,
+	stateBlock,
+	attachmentBudget,
 	artifactsOverride,
 	supportsArtifacts,
 	username,
@@ -54,7 +60,11 @@ export function resolvePreprompt({
 	billingResourceGroup,
 }: PrepromptInput): string | undefined {
 	const base = mlAssistant
-		? mlAssistantPreprompt({ virtualFiles: virtualFiles ?? true })
+		? mlAssistantPreprompt({
+				virtualFiles: virtualFiles ?? true,
+				stateBlock: stateBlock ?? true,
+				attachmentBudget: attachmentBudget ?? true,
+			})
 		: conversationPreprompt;
 	const artifacts = mlAssistant || (artifactsOverride ?? supportsArtifacts);
 	const resolved = artifacts ? injectArtifactsPrompt(base) : base;

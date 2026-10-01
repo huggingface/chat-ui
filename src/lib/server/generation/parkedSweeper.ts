@@ -9,6 +9,7 @@ import { buildSubtree } from "$lib/utils/tree/buildSubtree";
 import { textGeneration } from "$lib/server/textGeneration";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
+import { stampMlHarness } from "$lib/server/mlAssistantHarness";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { waitResumeResultText } from "$lib/server/textGeneration/builtinTools/waitTool";
 import { ToolResultStatus } from "$lib/types/Tool";
@@ -24,7 +25,8 @@ import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { createGenerationWriter } from "./writer";
 import { applyUpdateToMessage } from "./applyUpdate";
 import { turnAbandoned, turnEnded, turnRunning, turnUnsaved } from "./turnState";
-import { compressUpdatesForStorage } from "./compressUpdates";
+import { compressUpdatesForStorage, messageForStorage } from "./compressUpdates";
+import { restoreRunningShape } from "$lib/utils/messageShape";
 
 const SWEEP_BATCH = 5;
 /** A row this many attempts deep is not going to resume; stop burning turns on it. */
@@ -177,7 +179,17 @@ export async function wakeParkedCallEarly(
 	// much of the wait was skipped.
 	const result = await collections.parkedCalls.updateOne(
 		{ conversationId, messageId, status: "waiting" },
-		[{ $set: { plannedResumeAt: "$resumeAt", resumeAt: now, wokeEarlyAt: now, updatedAt: now } }]
+		[
+			{
+				$set: {
+					// a harness wake may already have moved resumeAt
+					plannedResumeAt: { $ifNull: ["$plannedResumeAt", "$resumeAt"] },
+					resumeAt: now,
+					wokeEarlyAt: now,
+					updatedAt: now,
+				},
+			},
+		]
 	);
 	if (result.matchedCount === 0) return false;
 	logger.info(
@@ -293,6 +305,7 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 	const { locals, settings, tokenExpired } = await rebuildIdentity(park);
 
 	const generationId = randomUUID();
+	restoreRunningShape(message);
 	const initialContent = message.content;
 	const promptedAt = new Date();
 	const abortController = new AbortController();
@@ -301,9 +314,16 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 	// generationId. A resumed run that leaves the parked turn's id in place is
 	// invisible: its output only appears on a manual refresh.
 	message.generationId = generationId;
+	const harness = stampMlHarness(message, conv, model);
 	await collections.conversations.updateOne(
 		{ _id: conv._id, "messages.id": message.id },
-		{ $set: { "messages.$.generationId": generationId, updatedAt: new Date() } }
+		{
+			$set: {
+				"messages.$.generationId": generationId,
+				...(harness ? { "messages.$.harness": harness } : {}),
+				updatedAt: new Date(),
+			},
+		}
 	);
 
 	const writer = await createGenerationWriter({
@@ -339,10 +359,7 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 			{ _id: conv._id },
 			{
 				$set: {
-					messages: conv.messages.map((m) => ({
-						...m,
-						updates: compressUpdatesForStorage(m.updates),
-					})),
+					messages: conv.messages.map(messageForStorage),
 					title: conv.title,
 					updatedAt: new Date(),
 				},

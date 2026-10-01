@@ -7,7 +7,7 @@ import {
 	githubToken,
 } from "./client";
 import { partialRatioScore, tokenSetRatio, tokenSetRatioAtLeast } from "./fuzzy";
-import { parseRepo, repoSlug, type RepoRef } from "./repoRef";
+import { blobUrl, parseRepo, repoSlug, type RepoRef } from "./repoRef";
 import type { GithubToolResult } from "./types";
 
 /**
@@ -315,6 +315,12 @@ async function didYouMean(ref: RepoRef, signal?: AbortSignal): Promise<GithubToo
 	};
 }
 
+// Abbreviating is safe for a SHA and destroys a branch name: truncating a
+// default branch called `development` to `develop` advertises a ref that does
+// not exist and breaks the find-to-read chain outright.
+const shownRef = (commit: string | undefined, branch: string): string =>
+	commit ? commit.slice(0, 7) : branch;
+
 function formatResults({
 	ref,
 	keyword,
@@ -334,10 +340,7 @@ function formatResults({
 	truncatedTree: boolean;
 }): string {
 	const slug = repoSlug(ref);
-	// Abbreviating is safe for a SHA and destroys a branch name: truncating a
-	// default branch called `development` to `develop` advertises a ref that does
-	// not exist and breaks the find-to-read chain outright.
-	const readRef = commit ? commit.slice(0, 7) : branch;
+	const readRef = shownRef(commit, branch);
 	const suffix = keyword ? ` matching '${keyword}'` : "";
 	const header =
 		matches.length > shown.length
@@ -360,7 +363,7 @@ function formatResults({
 		return [
 			`${index + 1}. **${file.path}**`,
 			`   Size: ${file.size.toLocaleString("en-US")} bytes`,
-			`   URL: https://github.com/${slug}/blob/${encodeURIComponent(readRef)}/${encodePath(file.path)}`,
+			`   URL: ${blobUrl(ref, readRef, file.path)}`,
 			`   To read, use: ${readArgs}`,
 		].join("\n");
 	});
@@ -438,16 +441,23 @@ export async function findExamples(
 		};
 	}
 
+	const shown = matches.slice(0, maxResults);
+	const readRef = shownRef(commit, branch);
 	return {
 		text: formatResults({
 			ref,
 			keyword,
 			matches,
-			shown: matches.slice(0, maxResults),
+			shown,
 			...(commit ? { commit } : {}),
 			branch,
 			truncatedTree,
 		}),
 		isError: false,
+		files: shown.map((file) => ({
+			repo: repoSlug(ref),
+			url: blobUrl(ref, readRef, file.path),
+			opened: false,
+		})),
 	};
 }

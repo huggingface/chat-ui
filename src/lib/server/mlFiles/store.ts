@@ -2,7 +2,9 @@ import { createHash } from "crypto";
 import type { ObjectId } from "mongodb";
 import { MongoServerError } from "mongodb";
 import { collections } from "$lib/server/database";
-import type { MlFile } from "$lib/types/MlFile";
+import type { MlFile, MlFileListing, MlFileVersionListing } from "$lib/types/MlFile";
+
+export type { MlFileListing };
 
 /**
  * mongodb is canonical, nothing is pushed anywhere unless the model passes a reference
@@ -72,6 +74,7 @@ export interface MlFileAttribution {
 	messageId?: string;
 	generationId?: string;
 	toolUuid?: string;
+	agent?: string;
 }
 
 export interface WrittenMlFile {
@@ -106,6 +109,7 @@ interface WriteMlFileParams {
 	name: string;
 	content: string;
 	origin: MlFile["origin"];
+	source?: string;
 	summary?: string;
 	attribution?: MlFileAttribution;
 }
@@ -150,12 +154,14 @@ export async function writeMlFileVersion(
 				size,
 				sha256,
 				origin,
+				...(params.source ? { source: params.source } : {}),
 				createdAt: new Date(),
 				...(params.attribution?.messageId ? { messageId: params.attribution.messageId } : {}),
 				...(params.attribution?.generationId
 					? { generationId: params.attribution.generationId }
 					: {}),
 				...(params.attribution?.toolUuid ? { toolUuid: params.attribution.toolUuid } : {}),
+				...(params.attribution?.agent ? { agent: params.attribution.agent } : {}),
 				...(summary ? { summary } : {}),
 			} as MlFile);
 			return { name, version, size, lineCount: countLines(content), sha256 };
@@ -190,15 +196,6 @@ export async function readMlFile(
 	return collections.mlFiles.findOne({ conversationId, name }, { sort: { version: -1 } });
 }
 
-export interface MlFileListing {
-	name: string;
-	/** the latest version, also how many exist */
-	version: number;
-	size: number;
-	updatedAt: Date;
-	summary?: string;
-}
-
 /** the latest version of every file by name, without content */
 export async function listMlFiles(conversationId: ObjectId): Promise<MlFileListing[]> {
 	const rows = await collections.mlFiles
@@ -226,4 +223,38 @@ export async function listMlFiles(conversationId: ObjectId): Promise<MlFileListi
 		updatedAt: row.updatedAt,
 		...(row.summary ? { summary: row.summary } : {}),
 	}));
+}
+
+export function toMlFileVersionListing({
+	version,
+	size,
+	origin,
+	source,
+	agent,
+	summary,
+	createdAt,
+	messageId,
+}: Omit<MlFile, "content">): MlFileVersionListing {
+	return {
+		version,
+		size,
+		origin,
+		createdAt,
+		...(source ? { source } : {}),
+		...(agent ? { agent } : {}),
+		...(summary ? { summary } : {}),
+		...(messageId ? { messageId } : {}),
+	};
+}
+
+/** every version of one file, newest first, without content */
+export async function listMlFileVersions(
+	conversationId: ObjectId,
+	name: string
+): Promise<MlFileVersionListing[]> {
+	const rows = await collections.mlFiles
+		.find<Omit<MlFile, "content">>({ conversationId, name }, { projection: { content: 0 } })
+		.sort({ version: -1 })
+		.toArray();
+	return rows.map(toMlFileVersionListing);
 }

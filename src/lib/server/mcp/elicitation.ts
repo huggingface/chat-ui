@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { ObjectId } from "mongodb";
+import { ObjectId, type Filter } from "mongodb";
 import type { Client } from "@modelcontextprotocol/client";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
@@ -315,7 +315,12 @@ export async function claimElicitationResume(
 			],
 		},
 		{
-			$set: { "resume.status": "resuming", "resume.takenAt": now, updatedAt: now },
+			$set: {
+				"resume.status": "resuming",
+				"resume.takenAt": now,
+				"resume.claimId": randomUUID(),
+				updatedAt: now,
+			},
 			$inc: { "resume.attempts": 1 },
 		},
 		{ returnDocument: "after" }
@@ -323,6 +328,14 @@ export async function claimElicitationResume(
 	// Driver v5: findOneAndUpdate returns ModifyResult unless told otherwise.
 	return claimed?.value ?? null;
 }
+
+/** takenAt as well, a pod on older code claims without replacing claimId */
+const heldClaim = (row: McpElicitation): Filter<McpElicitation> => ({
+	_id: row._id,
+	"resume.status": "resuming",
+	"resume.claimId": row.resume?.claimId,
+	"resume.takenAt": row.resume?.takenAt,
+});
 
 /**
  * Consume a claim. Keyed on the claim this caller took, so a holder that stalled past its
@@ -335,17 +348,14 @@ export async function finishElicitationResume(
 	outcome: { abandoned?: string } = {}
 ): Promise<void> {
 	const now = new Date();
-	await collections.mcpElicitations.updateOne(
-		{ _id: row._id, "resume.status": "resuming", "resume.takenAt": row.resume?.takenAt },
-		{
-			$set: {
-				...(outcome.abandoned
-					? { "resume.status": "abandoned", "resume.abandonedReason": outcome.abandoned }
-					: { "resume.status": "resumed", "resume.resumedAt": now }),
-				updatedAt: now,
-			},
-		}
-	);
+	await collections.mcpElicitations.updateOne(heldClaim(row), {
+		$set: {
+			...(outcome.abandoned
+				? { "resume.status": "abandoned", "resume.abandonedReason": outcome.abandoned }
+				: { "resume.status": "resumed", "resume.resumedAt": now }),
+			updatedAt: now,
+		},
+	});
 }
 
 /**
@@ -592,13 +602,10 @@ export async function releaseElicitationResume(
 	{ uncounted = false }: { uncounted?: boolean } = {}
 ): Promise<void> {
 	await collections.mcpElicitations
-		.updateOne(
-			{ _id: row._id, "resume.status": "resuming", "resume.takenAt": row.resume?.takenAt },
-			{
-				$set: { "resume.takenAt": new Date(0) },
-				...(uncounted ? { $inc: { "resume.attempts": -1 } } : {}),
-			}
-		)
+		.updateOne(heldClaim(row), {
+			$set: { "resume.takenAt": new Date(0) },
+			...(uncounted ? { $inc: { "resume.attempts": -1 } } : {}),
+		})
 		.catch((err) =>
 			logger.error({ err, elicitationId: row.elicitationId }, "[mcp] failed to release a claim")
 		);

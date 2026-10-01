@@ -21,6 +21,12 @@ export interface LinkPromptRequest {
 
 export const LINK_PARAM_NAMES = ["q", "prompt", "attachments"] as const;
 
+export type LinkMode = "ml-intern";
+
+export function readLinkMode(params: URLSearchParams): LinkMode | null {
+	return params.get("mode")?.trim().toLowerCase() === "ml-intern" ? "ml-intern" : null;
+}
+
 /**
  * Attachment sources that need no confirmation: content Hugging Face itself
  * publishes, matched by path prefix. The Hub's "Ask HuggingChat" boxes and

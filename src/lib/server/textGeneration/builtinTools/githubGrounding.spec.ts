@@ -127,6 +127,7 @@ describe("registration", () => {
 			"write_file",
 			"edit_file",
 			"read_file",
+			"import_file",
 		]);
 	});
 
@@ -151,6 +152,7 @@ describe("registration", () => {
 			"write_file",
 			"edit_file",
 			"read_file",
+			"import_file",
 		]);
 	});
 });
