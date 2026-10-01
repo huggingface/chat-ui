@@ -19,7 +19,7 @@
      links go to the Hub rather than to in-app settings because the mode runs on
      the Hub's MCP server with the user's own token: which tools it can reach and
      what it can spend are decided on the user's Hugging Face account, not here. -->
-<Modal onclose={close} labelledBy="ml-intern-onboarding-title" width="max-w-[440px]! m-4!">
+<Modal onclose={close} labelledBy="ml-intern-onboarding-title" width="max-w-[600px]! m-4!">
 	<div
 		class="flex w-full flex-col gap-6 bg-white bg-linear-to-b to-transparent px-6 pb-6 dark:bg-black dark:from-white/10 dark:to-white/5"
 	>
@@ -84,12 +84,10 @@
 						Face credits. The compute budget you set in the chat caps that spend for this
 						conversation. It does not cover anything those Jobs start themselves, or other Hugging
 						Face products. Account-wide, your credit balance is the ceiling: Jobs stop when it runs
-						out. Enterprise organizations can also set a spend limit on a resource group. Chatting
-						with the model does not use the compute budget.
+						out. Chatting with the model does not use the compute budget.
 					</p>
 					<p class="text-sm leading-relaxed">
-						Jobs and sandboxes bill to the organization set in HuggingChat's settings, or to you
-						otherwise; Spaces, dashboards and repositories always stay on your account.
+						Jobs and sandboxes bill to the organization set in HuggingChat's settings.
 					</p>
 					<a
 						href={BILLING_SETTINGS_URL}
