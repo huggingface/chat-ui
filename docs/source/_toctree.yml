@@ -24,6 +24,12 @@
       title: Metrics
     - local: configuration/common-issues
       title: Common Issues
+- title: ML Intern
+  sections:
+    - local: ml-intern/getting-started
+      title: Getting Started
+    - local: ml-intern/local-development
+      title: Running Locally
 - title: Developing
   sections:
     - local: developing/architecture
