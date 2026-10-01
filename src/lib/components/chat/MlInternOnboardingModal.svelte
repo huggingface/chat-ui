@@ -76,7 +76,7 @@
 				</p>
 				<p class="col-span-2 text-sm leading-relaxed sm:col-span-1 sm:col-start-2">
 					The session budget caps compute spending from this chat, but not spending by jobs it
-					starts. Set an account limit for extra protection.
+					starts. Check your credits in billing settings.
 				</p>
 				<p class="col-span-2 mt-[5px] text-sm leading-relaxed sm:col-span-1 sm:col-start-2 sm:mt-0">
 					Jobs and sandboxes bill to the organization set in HuggingChat's settings.
