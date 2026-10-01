@@ -8,9 +8,6 @@ ML Intern is a mode in [HuggingChat](https://huggingface.co/chat) that plans and
 - build a demo and deploy it as a Space
 - run a model against a benchmark
 
-> [!WARNING]
-> ML Intern is experimental. It launches real Jobs on your account, and those cost money. Set a compute budget (see [Step 5](#step-5-set-a-compute-budget)) and check what it does.
-
 ## Before you start
 
 You need:
