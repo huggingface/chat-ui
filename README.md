@@ -9,7 +9,8 @@ A chat interface for LLMs. It is a SvelteKit app and it powers the [HuggingChat 
 2. [Launch](#launch)
 3. [Optional Docker Image](#optional-docker-image)
 4. [Extra parameters](#extra-parameters)
-5. [Building](#building)
+5. [ML Intern](#ml-intern)
+6. [Building](#building)
 
 > [!NOTE]
 > Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol (llama.cpp server, Ollama, OpenRouter, etc.) will work by default.
@@ -174,6 +175,15 @@ Use tools in the UI:
 Per‑model overrides:
 
 - In Settings → Model, you can toggle “Tool calling (functions)” and “Multimodal input” per model. These overrides apply even if the provider metadata doesn’t advertise the capability.
+
+## ML Intern
+
+ML Intern is an experimental mode that plans and runs machine-learning work on the Hugging Face Hub: reproducing papers, finetuning and evaluating models, building datasets, and deploying demos as Spaces. It reads papers, models and datasets, writes scripts, and runs them as [Hugging Face Jobs](https://huggingface.co/docs/huggingface_hub/guides/jobs) and sandboxes, within a compute budget you set for each conversation.
+
+Try it on HuggingChat at [huggingface.co/chat/?mode=ml-intern](https://huggingface.co/chat/?mode=ml-intern).
+
+- [Getting started with ML Intern](docs/source/ml-intern/getting-started.md): set up your account and billing, write your first task, and keep spending under control.
+- [Running Chat UI with ML Intern locally](docs/source/ml-intern/local-development.md): configure and run ML Intern in your own Chat UI, choose models, and find your way around the code.
 
 ## Building
 
