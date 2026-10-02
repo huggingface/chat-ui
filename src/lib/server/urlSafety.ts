@@ -1,8 +1,9 @@
 import { Address4, Address6 } from "ip-address";
-import { isIP } from "node:net";
+import { isIP, type LookupFunction } from "node:net";
 import dns from "node:dns";
 import { Agent, fetch as undiciFetch } from "undici";
 import { env } from "$env/dynamic/private";
+import { logger } from "$lib/server/logger";
 
 const UNSAFE_IPV4_SUBNETS = [
 	"0.0.0.0/8",
@@ -146,36 +147,42 @@ export function assertSafeIp(address: string, hostname: string): void {
 }
 
 /**
+ * The SSRF agent's DNS hook: validates resolved IPs at connection time (preventing TOCTOU DNS
+ * rebinding) and logs every resolution, allowed or blocked. Host and addresses only, never the
+ * URL: with the request context the logger adds, that is what ties a DNS event seen by a runtime
+ * sensor to the request that caused it.
+ */
+export function ssrfLookup(exempt: (hostname: string) => boolean = () => false): LookupFunction {
+	return (hostname, options, callback) => {
+		dns.lookup(hostname, options, (err, address, family) => {
+			if (err) return callback(err, "", 4);
+			const addresses =
+				typeof address === "string" ? [address] : address.map((entry) => entry.address);
+			if (!exempt(hostname.toLowerCase())) {
+				for (const resolved of addresses) {
+					try {
+						assertSafeIp(resolved, hostname);
+					} catch (e) {
+						logger.warn(
+							{ fetch_host: hostname, fetch_addresses: addresses },
+							"Outbound fetch blocked: host resolves to an internal address (SSRF)"
+						);
+						return callback(e as Error, "", 4);
+					}
+				}
+			}
+			logger.info({ fetch_host: hostname, fetch_addresses: addresses }, "Outbound fetch resolved");
+			return callback(null, address, family);
+		});
+	};
+}
+
+/**
  * Undici agent that validates resolved IPs at connection time,
  * preventing TOCTOU DNS rebinding attacks.
  */
-function createSsrfAgent(exempt: (hostname: string) => boolean = () => false): Agent {
-	return new Agent({
-		connect: {
-			lookup: (hostname, options, callback) => {
-				dns.lookup(hostname, options, (err, address, family) => {
-					if (err) return callback(err, "", 4);
-					if (exempt(hostname.toLowerCase())) return callback(null, address, family);
-					if (typeof address === "string") {
-						try {
-							assertSafeIp(address, hostname);
-						} catch (e) {
-							return callback(e as Error, "", 4);
-						}
-					} else if (Array.isArray(address)) {
-						for (const entry of address) {
-							try {
-								assertSafeIp(entry.address, hostname);
-							} catch (e) {
-								return callback(e as Error, "", 4);
-							}
-						}
-					}
-					return callback(null, address, family);
-				});
-			},
-		},
-	});
+function createSsrfAgent(exempt?: (hostname: string) => boolean): Agent {
+	return new Agent({ connect: { lookup: ssrfLookup(exempt) } });
 }
 
 const ssrfSafeAgent = createSsrfAgent();
@@ -217,6 +224,7 @@ function stripCredentialHeaders(init: RequestInit | undefined): RequestInit | un
 function assertSafeUrlHost(urlString: string, allowLocal: boolean): void {
 	const host = stripBrackets(new URL(urlString).hostname.toLowerCase());
 	if (isIP(host) && isUnsafeIp(host) && !(allowLocal && isLocalMcpIp(host))) {
+		logger.warn({ fetch_host: host }, "Outbound fetch blocked: unsafe IP literal (SSRF)");
 		throw new Error(`Blocked request to unsafe IP (SSRF): ${host}`);
 	}
 }
