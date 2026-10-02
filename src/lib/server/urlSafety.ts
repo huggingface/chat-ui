@@ -136,51 +136,32 @@ export function isValidUrl(
 }
 
 /**
- * Assert that a resolved IP address is safe (not internal/private).
- * Throws if the IP is internal. Used in undici's custom DNS lookup
- * to validate IPs at connection time (prevents TOCTOU DNS rebinding).
- */
-export function assertSafeIp(address: string, hostname: string): void {
-	if (isUnsafeIp(address)) {
-		throw new Error(`Resolved IP for ${hostname} is internal (${address})`);
-	}
-}
-
-/**
  * The SSRF agent's DNS hook: validates resolved IPs at connection time (preventing TOCTOU DNS
- * rebinding) and logs every resolution, allowed or blocked. Host and addresses only, never the
- * URL: with the request context the logger adds, that is what ties a DNS event seen by a runtime
- * sensor to the request that caused it.
+ * rebinding) and logs every lookup, failed, blocked or allowed. With the request context the
+ * logger adds, that is what ties a DNS event seen by a runtime sensor to the request behind it.
  */
 export function ssrfLookup(exempt: (hostname: string) => boolean = () => false): LookupFunction {
 	return (hostname, options, callback) => {
 		dns.lookup(hostname, options, (err, address, family) => {
-			if (err) return callback(err, "", 4);
+			if (err) {
+				logger.info({ fetchHost: hostname, err }, "Outbound fetch lookup failed");
+				return callback(err, "", 4);
+			}
 			const addresses =
 				typeof address === "string" ? [address] : address.map((entry) => entry.address);
-			if (!exempt(hostname.toLowerCase())) {
-				for (const resolved of addresses) {
-					try {
-						assertSafeIp(resolved, hostname);
-					} catch (e) {
-						logger.warn(
-							{ fetch_host: hostname, fetch_addresses: addresses },
-							"Outbound fetch blocked: host resolves to an internal address (SSRF)"
-						);
-						return callback(e as Error, "", 4);
-					}
-				}
+			const fields = { fetchHost: hostname, fetchAddresses: addresses };
+			// Compared to undefined, not tested for truthiness: `isUnsafeIp("")` is true.
+			const unsafe = exempt(hostname.toLowerCase()) ? undefined : addresses.find(isUnsafeIp);
+			if (unsafe !== undefined) {
+				logger.warn(fields, "Outbound fetch blocked: host resolves to an internal address (SSRF)");
+				return callback(new Error(`Resolved IP for ${hostname} is internal (${unsafe})`), "", 4);
 			}
-			logger.info({ fetch_host: hostname, fetch_addresses: addresses }, "Outbound fetch resolved");
+			logger.info(fields, "Outbound fetch resolved");
 			return callback(null, address, family);
 		});
 	};
 }
 
-/**
- * Undici agent that validates resolved IPs at connection time,
- * preventing TOCTOU DNS rebinding attacks.
- */
 function createSsrfAgent(exempt?: (hostname: string) => boolean): Agent {
 	return new Agent({ connect: { lookup: ssrfLookup(exempt) } });
 }
@@ -216,7 +197,7 @@ function stripCredentialHeaders(init: RequestInit | undefined): RequestInit | un
  * Assert that a URL's host is safe before we connect to it.
  *
  * The agent's `lookup` hook only runs for hosts undici resolves through DNS, so a URL carrying a
- * raw IP literal would otherwise reach the network without `assertSafeIp` ever running. Checks
+ * raw IP literal would otherwise reach the network without the hook's check ever running. Checks
  * `isUnsafeIp` rather than `isValidUrl` because the latter also demands HTTPS, which would break
  * plain-HTTP MCP servers. When `allowLocal` is set (opt-in insecure MCP), local literals are
  * exempted so `mcpFetch` can still reach a `127.0.0.1`/LAN server before the socket opens.
@@ -224,7 +205,7 @@ function stripCredentialHeaders(init: RequestInit | undefined): RequestInit | un
 function assertSafeUrlHost(urlString: string, allowLocal: boolean): void {
 	const host = stripBrackets(new URL(urlString).hostname.toLowerCase());
 	if (isIP(host) && isUnsafeIp(host) && !(allowLocal && isLocalMcpIp(host))) {
-		logger.warn({ fetch_host: host }, "Outbound fetch blocked: unsafe IP literal (SSRF)");
+		logger.warn({ fetchHost: host }, "Outbound fetch blocked: unsafe IP literal (SSRF)");
 		throw new Error(`Blocked request to unsafe IP (SSRF): ${host}`);
 	}
 }

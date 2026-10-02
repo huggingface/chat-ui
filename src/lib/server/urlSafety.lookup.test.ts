@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { logger } from "$lib/server/logger";
+import { ssrfLookup, ssrfSafeFetch } from "./urlSafety";
 
 type Resolved = string | { address: string; family: number }[];
 const RESOLUTIONS: Record<string, Resolved> = {
@@ -30,9 +32,6 @@ vi.mock("$lib/server/logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
 
-const { logger } = await import("$lib/server/logger");
-const { ssrfLookup, ssrfSafeFetch } = await import("./urlSafety");
-
 function lookup(hostname: string, exempt?: (hostname: string) => boolean) {
 	return new Promise<{ err: Error | null; address: unknown }>((resolve) =>
 		ssrfLookup(exempt)(hostname, {}, (err, address) => resolve({ err, address }))
@@ -42,42 +41,38 @@ function lookup(hostname: string, exempt?: (hostname: string) => boolean) {
 describe("ssrfLookup logging", () => {
 	beforeEach(() => vi.clearAllMocks());
 
-	it("logs the host and addresses of an allowed resolution", async () => {
-		const { err, address } = await lookup("example.com");
+	it.each([
+		{ host: "example.com", addresses: ["93.184.216.34"] },
+		{ host: "localhost", addresses: ["127.0.0.1"], exempt: (h: string) => h === "localhost" },
+	])("lets $host through and logs it at info", async ({ host, addresses, exempt }) => {
+		const { err } = await lookup(host, exempt);
 		expect(err).toBeNull();
-		expect(address).toBe("93.184.216.34");
 		expect(logger.info).toHaveBeenCalledWith(
-			{ fetch_host: "example.com", fetch_addresses: ["93.184.216.34"] },
+			{ fetchHost: host, fetchAddresses: addresses },
 			"Outbound fetch resolved"
 		);
 		expect(logger.warn).not.toHaveBeenCalled();
 	});
 
-	it("blocks and logs a public name that resolves to loopback", async () => {
-		const { err } = await lookup("127.0.0.1.nip.io");
+	it.each([
+		{ host: "127.0.0.1.nip.io", addresses: ["127.0.0.1"] },
+		{ host: "mixed.example", addresses: ["93.184.216.34", "169.254.169.254"] },
+	])("blocks $host and logs every address at warn", async ({ host, addresses }) => {
+		const { err } = await lookup(host);
 		expect(err?.message).toContain("is internal");
 		expect(logger.warn).toHaveBeenCalledWith(
-			{ fetch_host: "127.0.0.1.nip.io", fetch_addresses: ["127.0.0.1"] },
+			{ fetchHost: host, fetchAddresses: addresses },
 			expect.stringContaining("blocked")
 		);
 		expect(logger.info).not.toHaveBeenCalled();
 	});
 
-	it("blocks when any address of a multi-address answer is internal, and logs them all", async () => {
-		const { err } = await lookup("mixed.example");
-		expect(err).not.toBeNull();
-		expect(logger.warn).toHaveBeenCalledWith(
-			{ fetch_host: "mixed.example", fetch_addresses: ["93.184.216.34", "169.254.169.254"] },
-			expect.stringContaining("blocked")
-		);
-	});
-
-	it("lets an exempt host through and still logs it", async () => {
-		const { err } = await lookup("localhost", (hostname) => hostname === "localhost");
-		expect(err).toBeNull();
+	it("logs a failed lookup, which the DNS query still shows", async () => {
+		const { err } = await lookup("nxdomain.example");
+		expect(err?.message).toContain("ENOTFOUND");
 		expect(logger.info).toHaveBeenCalledWith(
-			{ fetch_host: "localhost", fetch_addresses: ["127.0.0.1"] },
-			"Outbound fetch resolved"
+			{ fetchHost: "nxdomain.example", err },
+			"Outbound fetch lookup failed"
 		);
 	});
 
@@ -86,7 +81,7 @@ describe("ssrfLookup logging", () => {
 			"unsafe IP"
 		);
 		expect(logger.warn).toHaveBeenCalledWith(
-			{ fetch_host: "169.254.169.254" },
+			{ fetchHost: "169.254.169.254" },
 			expect.stringContaining("unsafe IP literal")
 		);
 	});
