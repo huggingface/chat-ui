@@ -100,6 +100,44 @@ describe("login", () => {
 		await collections.conversations.deleteMany({ userId: insertedId });
 	});
 
+	it("should migrate pre-existing MCP OAuth connections", async () => {
+		const userId = await insertRandomUser();
+		const connectionId = new ObjectId();
+		await collections.mcpOAuthConnections.insertOne({
+			_id: connectionId,
+			sessionId: locals.sessionId,
+			serverUrl: "https://mcp.example.com/mcp",
+			resource: "https://mcp.example.com/mcp",
+			asMetadata: {
+				issuer: "https://auth.example.com",
+				authorization_endpoint: "https://auth.example.com/authorize",
+				token_endpoint: "https://auth.example.com/token",
+			},
+			tokens: {
+				access_token: "mcp-access-token",
+				token_type: "Bearer",
+			},
+			status: "authorized",
+			version: 1,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			deleteAt: new Date(Date.now() + 60_000),
+		});
+
+		await updateUser({ userData, locals, cookies: cookiesMock, token });
+
+		const migrated = await collections.mcpOAuthConnections.findOne({ _id: connectionId });
+		expect(migrated).toEqual(
+			expect.objectContaining({
+				userId,
+				status: "authorized",
+			})
+		);
+		expect(migrated?.sessionId).toBeUndefined();
+		// Authenticated connections carry a sliding idle TTL rather than living forever.
+		expect(migrated?.deleteAt?.getTime()).toBeGreaterThan(Date.now() + 80 * 24 * 60 * 60 * 1000);
+	});
+
 	it("should create default settings for new user", async () => {
 		await updateUser({ userData, locals, cookies: cookiesMock, token });
 
@@ -155,6 +193,7 @@ describe("login", () => {
 afterEach(async () => {
 	await collections.users.deleteMany({ hfUserId: userData.sub });
 	await collections.sessions.deleteMany({});
+	await collections.mcpOAuthConnections.deleteMany({});
 
 	locals.userId = "1234567890";
 	locals.sessionId = "1234567890";

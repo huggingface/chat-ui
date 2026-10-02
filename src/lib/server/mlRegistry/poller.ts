@@ -15,12 +15,15 @@ import {
 import { rebuildIdentity } from "$lib/server/generation/parkedSweeper";
 import type { MlService } from "$lib/types/MlService";
 import { backoffDelayMs, nextPollDelayMs } from "./schedule";
-import { mlServiceEventsEnabled } from "./enabled";
+import { mlJobLabelsEnabled, mlPushChecksEnabled, mlServiceEventsEnabled } from "./enabled";
 import { conversationsAwaitingEvents, deliverServiceEvents, endEventFields } from "./events";
+import { checkServicePushes } from "./pushCheck";
+import { claimDueReconcile, reconcileSession } from "./reconcile";
 
 // status only and never logs, an end is marked on the row for deliverServiceEvents
 
 const CLAIM_BATCH = 20;
+const RECONCILE_BATCH = 5;
 /** a pod that dies mid poll leaves its rows due again once this has passed */
 const CLAIM_LEASE_MS = 60_000;
 const NO_TOKEN_DELAY_MS = 5 * 60_000;
@@ -127,6 +130,16 @@ async function settleHold(service: MlService, lookup: EndedJobLookup): Promise<v
 	});
 }
 
+// the pane marks before it cancels, so a fresh read after a seen end has the mark
+async function withStopMark(service: MlService): Promise<MlService> {
+	if (service.kind !== "sandbox" || service.stopRequestedAt) return service;
+	const fresh = await collections.mlServices.findOne(
+		{ _id: service._id },
+		{ projection: { stopRequestedAt: 1 } }
+	);
+	return fresh?.stopRequestedAt ? { ...service, stopRequestedAt: fresh.stopRequestedAt } : service;
+}
+
 /** every path writes the next due time or unsets it for good, so a claimed row never sits on its lease */
 export async function pollService(
 	service: MlService,
@@ -170,6 +183,13 @@ export async function pollService(
 		const startedAt = job?.startedAt ?? service.startedAt;
 		const endedAt = job?.finishedAt ?? service.endedAt ?? now;
 		await settleHold(service, lookup);
+		// before the end is marked, so every path that tells it carries what landed on the hub
+		const pushes = mlPushChecksEnabled()
+			? await checkServicePushes({ service, startedAt, endedAt, token })
+			: undefined;
+		const eventFields = mlServiceEventsEnabled()
+			? endEventFields(await withStopMark(service), stage, now)
+			: {};
 		await writeRow(service, {
 			$set: {
 				stage,
@@ -180,13 +200,15 @@ export async function pollService(
 				updatedAt: now,
 				...(job ? fillFromBody(service, job) : {}),
 				stageBeforeEnd: previousStage,
-				...(mlServiceEventsEnabled() ? endEventFields(service, stage, now) : {}),
+				...(pushes?.length ? { pushes } : {}),
+				...eventFields,
 			},
 			$unset: {
 				nextPollAt: "",
 				pollFailures: "",
 				tokenMissingSince: "",
 				...(job?.message ? {} : { stageMessage: "" }),
+				...(pushes?.length ? {} : { pushes: "" }),
 			},
 			...(stage !== previousStage ? historyEntry(stage, now) : {}),
 		});
@@ -292,10 +314,31 @@ export async function pollDueServices(now = new Date()): Promise<PollOutcome[]> 
 			"[mlPoller] stage changed"
 		);
 	}
+	if (mlJobLabelsEnabled()) {
+		// a reconcile that throws must not cost the tick its event delivery
+		await reconcileDueSessions(tokens, now).catch((err) =>
+			logger.error({ err }, "[mlReconcile] claiming a due reconcile failed")
+		);
+	}
 	if (mlServiceEventsEnabled()) {
 		await deliverServiceEvents(await conversationsAwaitingEvents(), now);
 	}
 	return results;
+}
+
+async function reconcileDueSessions(tokens: TokenCache, now: Date): Promise<void> {
+	for (let i = 0; i < RECONCILE_BATCH; i++) {
+		const session = await claimDueReconcile(now);
+		if (!session) return;
+		try {
+			await reconcileSession(session, await tokenFor(session._id, tokens), now);
+		} catch (err) {
+			logger.error(
+				{ err, conversationId: session._id.toString() },
+				"[mlReconcile] reconcile failed"
+			);
+		}
+	}
 }
 
 export class MlServicePoller {

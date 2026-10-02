@@ -18,6 +18,9 @@ import type { MlFile } from "$lib/types/MlFile";
 import { ML_FILE_VERSION_INDEX } from "$lib/server/mlFiles/indexes";
 import type { MlService } from "$lib/types/MlService";
 import type { MlArtefact } from "$lib/types/MlArtefact";
+import type { MlAgentRun } from "$lib/types/MlAgentRun";
+import type { MlSource } from "$lib/types/MlSource";
+import type { MlSessionLabel } from "$lib/types/MlSessionLabel";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
@@ -38,6 +41,7 @@ import { existsSync, mkdirSync } from "fs";
 import { findRepoRoot } from "./findRepoRoot";
 import type { ConfigKey } from "$lib/types/ConfigKey";
 import { config } from "$lib/server/config";
+import type { MCPOAuthConnection } from "$lib/types/MCPOAuthConnection";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
@@ -152,10 +156,14 @@ export class Database {
 		const mlFiles = db.collection<MlFile>("mlFiles");
 		const mlServices = db.collection<MlService>("mlServices");
 		const mlArtefacts = db.collection<MlArtefact>("mlArtefacts");
+		const mlAgentRuns = db.collection<MlAgentRun>("mlAgentRuns");
+		const mlSources = db.collection<MlSource>("mlSources");
+		const mlSessionLabels = db.collection<MlSessionLabel>("mlSessionLabels");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
+		const mcpOAuthConnections = db.collection<MCPOAuthConnection>("mcpOAuthConnections");
 		const sharedConversations = db.collection<SharedConversation>("sharedConversations");
 		const bucket = new GridFSBucket(db, { bucketName: "files" });
 
@@ -189,6 +197,9 @@ export class Database {
 			mlFiles,
 			mlServices,
 			mlArtefacts,
+			mlAgentRuns,
+			mlSources,
+			mlSessionLabels,
 			settings,
 			users,
 			sessions,
@@ -199,6 +210,7 @@ export class Database {
 			tokenCaches,
 			tools,
 			config: configCollection,
+			mcpOAuthConnections,
 		};
 	}
 
@@ -223,6 +235,9 @@ export class Database {
 			mlFiles,
 			mlServices,
 			mlArtefacts,
+			mlAgentRuns,
+			mlSources,
+			mlSessionLabels,
 			settings,
 			users,
 			sessions,
@@ -230,6 +245,7 @@ export class Database {
 			semaphores,
 			tokenCaches,
 			config,
+			mcpOAuthConnections,
 		} = this.getCollections();
 
 		conversations
@@ -379,12 +395,28 @@ export class Database {
 		mlServices
 			.createIndex({ stage: 1, nextPollAt: 1 })
 			.catch((e) => logger.error(e, "Error creating index for mlServices by due time"));
+		// read every tool round of a mode turn, partial because few rows ever carry the mark
+		mlServices
+			.createIndex(
+				{ conversationId: 1, eventPendingSince: 1 },
+				{ partialFilterExpression: { eventPendingSince: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for mlServices by pending event"));
 		mlArtefacts
 			.createIndex({ conversationId: 1, uri: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating unique index for mlArtefacts by uri"));
 		mlArtefacts
 			.createIndex({ conversationId: 1, createdAt: 1 })
 			.catch((e) => logger.error(e, "Error creating index for mlArtefacts by conversationId"));
+		mlAgentRuns
+			.createIndex({ conversationId: 1, startedAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for mlAgentRuns by conversationId"));
+		mlSources
+			.createIndex({ conversationId: 1, url: 1 }, { unique: true })
+			.catch((e) => logger.error(e, "Error creating unique index for mlSources by url"));
+		mlSessionLabels
+			.createIndex({ reconcileAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for mlSessionLabels by due time"));
 
 		// One state document per turn; the unique key is what makes the upsert in
 		// turnState.ts race-safe. Ended turns expire like ended generations do.
@@ -557,6 +589,24 @@ export class Database {
 		config
 			.createIndex({ key: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating index for config by key"));
+		mcpOAuthConnections
+			.createIndex(
+				{ userId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { userId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for MCP OAuth connections by user"));
+		mcpOAuthConnections
+			.createIndex(
+				{ sessionId: 1, updatedAt: -1 },
+				{ partialFilterExpression: { sessionId: { $exists: true } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for MCP OAuth connections by session"));
+		mcpOAuthConnections
+			.createIndex({ deleteAt: 1 }, { expireAfterSeconds: 0 })
+			.catch((e) => logger.error(e, "Error creating expiry index for MCP OAuth connections"));
+		mcpOAuthConnections
+			.createIndex({ "flow.expectedState": 1 }, { unique: true, sparse: true })
+			.catch((e) => logger.error(e, "Error creating state index for MCP OAuth connections"));
 	}
 }
 

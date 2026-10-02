@@ -4,6 +4,7 @@
 	import { page } from "$app/state";
 	import CarbonLink from "~icons/carbon/link";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonDownload from "~icons/carbon/download";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import { onMount } from "svelte";
@@ -13,9 +14,17 @@
 		open?: boolean;
 		onclose?: () => void;
 		oncopied?: () => void;
+		downloadTrace?: boolean;
 	}
 
-	let { open = false, onclose, oncopied }: Props = $props();
+	let { open = false, onclose, oncopied, downloadTrace = false }: Props = $props();
+
+	// the reader of a share snapshot is not its owner
+	let traceUrl = $derived(
+		downloadTrace && page.params.id && page.params.id.length !== 7
+			? `${base}/api/v2/conversations/${page.params.id}/export`
+			: undefined
+	);
 
 	let creating = $state(false);
 	let createdUrl: string | null = $state(null);
@@ -177,6 +186,27 @@
 					</button>
 				{/if}
 			</div>
+
+			{#if traceUrl}
+				<div
+					class="flex items-center gap-3 border-t border-gray-100 pt-3 sm:pt-5 dark:border-gray-800"
+				>
+					<div class="min-w-0 flex-1">
+						<div class="text-sm font-medium text-gray-800 dark:text-gray-200">Download trace</div>
+						<div class="text-sm text-gray-600 dark:text-gray-400">
+							Every message, tool call, job and file as JSON. Nothing is made public.
+						</div>
+					</div>
+					<a
+						href={traceUrl}
+						download
+						class="inline-flex flex-none items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+					>
+						<CarbonDownload class="text-[1.05em]" />
+						Download
+					</a>
+				</div>
+			{/if}
 		</div>
 	</Modal>
 {/if}

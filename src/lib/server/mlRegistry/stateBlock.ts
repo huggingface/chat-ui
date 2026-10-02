@@ -10,6 +10,7 @@ import type { MlArtefact } from "$lib/types/MlArtefact";
 import type { MlFileListing } from "$lib/types/MlFile";
 import type { MlService } from "$lib/types/MlService";
 import {
+	billedUntil,
 	groupArtefacts,
 	hubLabel,
 	isTerminalStage,
@@ -70,20 +71,50 @@ const reportedAs = (service: MlService) => (isUntracked(service) ? UNTRACKED_STA
 
 const endTime = (service: MlService) => (service.endedAt ?? service.updatedAt).getTime();
 
+const utcTime = (at: Date, now: Date) => {
+	const iso = at.toISOString();
+	return iso.slice(0, 10) === now.toISOString().slice(0, 10)
+		? `${iso.slice(11, 16)} UTC`
+		: `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
+};
+
 function serviceStatus(service: MlService, now: Date): string {
 	const lastSeen = service.stage === UNKNOWN_STAGE ? "" : `, last seen ${service.stage}`;
 	// a row stopped for want of a token keeps tokenMissingSince so stopped is checked first
 	if (isUntracked(service)) {
 		return `no longer tracked${lastSeen}`;
 	}
+	if (service.stopRequestedAt && !isTerminalStage(service.stage)) {
+		return "being stopped by the user";
+	}
 	if (service.tokenMissingSince) return `status unknown: the user's session expired${lastSeen}`;
 	if (service.stage === UNKNOWN_STAGE) return "status not checked yet";
 	const elapsed = serviceElapsed(service, now.getTime());
 	if (service.stage === "SCHEDULING") return elapsed ?? "queued";
+	if (service.stopRequestedAt && service.stage === "CANCELED") {
+		return elapsed ? `stopped by the user after ${elapsed}` : "stopped by the user";
+	}
 	if (!elapsed) return service.stage;
 	return isTerminalStage(service.stage)
 		? `${service.stage} after ${elapsed}`
 		: `${service.stage} ${elapsed}`;
+}
+
+// ended rows only, a retried dispatch reopens a row with its pushes still on it, and missing only
+// on a completed run, the same rule as the event this line can stand in for
+function pushSuffix(service: MlService): string {
+	if (!isTerminalStage(service.stage)) return "";
+	const pushes = service.pushes ?? [];
+	const pushed = pushes.filter((push) => push.status === "pushed").map((p) => hubLabel(p.uri));
+	const missing =
+		service.stage === "COMPLETED"
+			? pushes.filter((push) => push.status === "missing").map((p) => hubLabel(p.uri))
+			: [];
+	const parts = [
+		...(pushed.length > 0 ? [`pushed ${pushed.join(", ")}`] : []),
+		...(missing.length > 0 ? [`nothing pushed to ${missing.join(", ")}`] : []),
+	];
+	return parts.length > 0 ? ` → ${parts.join(", ")}` : "";
 }
 
 function serviceLine(service: MlService, now: Date): string {
@@ -93,12 +124,14 @@ function serviceLine(service: MlService, now: Date): string {
 	];
 	if (!isEnded(service) && service.flavor) parts.push(service.flavor);
 	parts.push(serviceStatus(service, now));
+	const until = service.kind === "sandbox" && !isEnded(service) ? billedUntil(service) : undefined;
+	if (until && !service.stopRequestedAt) parts.push(`billed until ${utcTime(until, now)}`);
 	parts.push(
 		service.kind === "sandbox"
 			? (service.handle ?? sandboxHandle(service.namespace, service.jobId))
 			: `id ${service.jobId}`
 	);
-	return `- ${parts.join(" · ")}`;
+	return `- ${parts.join(" · ")}${pushSuffix(service)}`;
 }
 
 function artefactRows(artefacts: readonly MlArtefact[]): string[] {

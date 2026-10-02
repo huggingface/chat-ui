@@ -2,7 +2,7 @@ import { StreamableHTTPClientTransport, SSEClientTransport } from "@modelcontext
 import type { Client } from "@modelcontextprotocol/client";
 import { createMcpClient, type McpClientKind } from "./client";
 import type { McpServerConfig } from "./httpClient";
-import { mcpFetch } from "$lib/server/urlSafety";
+import { mcpFetchForServer } from "./fetch";
 
 type PoolEntry = {
 	client: Client;
@@ -13,6 +13,8 @@ type PoolEntry = {
 };
 
 const pool = new Map<string, PoolEntry>();
+// In-flight connects, keyed like the pool, so concurrent cold-misses share one connect.
+const inflight = new Map<string, Promise<Client>>();
 
 /**
  * Entries by client, so retain/release still find one after it leaves the pool, and
@@ -65,7 +67,7 @@ function keyOf(server: McpServerConfig, isolation?: string, kind: McpClientKind 
 	// The kind is part of the key, not decoration: it is sent once at initialize,
 	// so a connection opened as one identity would otherwise be handed to a
 	// caller that means to be the other, and the server would see the wrong name.
-	return `${server.url}|${headers}|${isolation ?? ""}|${kind}`;
+	return `${server.url}|${server.oauthConnectionId ?? ""}|${headers}|${isolation ?? ""}|${kind}`;
 }
 
 export async function getClient(
@@ -89,26 +91,49 @@ export async function getClient(
 			if (signal?.aborted) throw err;
 			// Stale connection; evict it (unless a concurrent caller already replaced it) and reconnect.
 			if (pool.get(key) === existing) pool.delete(key);
-			existing.client.close?.().catch(() => {});
+			// Another caller may be mid-call on it; the last release closes it instead.
+			if (existing.activeCalls > 0) {
+				existing.retired = true;
+			} else {
+				entries.delete(existing.client);
+				existing.client.close?.().catch(() => {});
+			}
 		}
 	}
 
+	// Single-flight: concurrent cold-misses share one connect, so we never authenticate a client
+	// that no one tracks (unreleasable, unsweepable, and holding the bearer until process exit).
+	const pending = inflight.get(key);
+	if (pending) return pending;
+
+	const connectPromise = connectAndPool(server, key, kind);
+	inflight.set(key, connectPromise);
+	try {
+		return await connectPromise;
+	} finally {
+		inflight.delete(key);
+	}
+}
+
+async function connectAndPool(
+	server: McpServerConfig,
+	key: string,
+	kind: McpClientKind
+): Promise<Client> {
 	let firstError: unknown;
 	const client = createMcpClient(kind);
 	const url = new URL(server.url);
 	// Pooled clients outlive the request that created them, so never bind the per-request
 	// abort signal to the transport. Per-call cancellation goes through RequestOptions instead.
 	const requestInit: RequestInit = { headers: server.headers };
+	const fetch = mcpFetchForServer(server);
 	try {
 		try {
-			await client.connect(
-				new StreamableHTTPClientTransport(url, { requestInit, fetch: mcpFetch })
-			);
+			await client.connect(new StreamableHTTPClientTransport(url, { requestInit, fetch }));
 		} catch (httpErr) {
-			// Remember the original HTTP transport error so we can surface it if the fallback also fails.
-			// Today we always show the SSE message, which is misleading when the real failure was HTTP (e.g. 500).
+			// Remember the HTTP transport error so we can surface it if the SSE fallback also fails.
 			firstError = httpErr;
-			await client.connect(new SSEClientTransport(url, { requestInit, fetch: mcpFetch }));
+			await client.connect(new SSEClientTransport(url, { requestInit, fetch }));
 		}
 	} catch (err) {
 		try {

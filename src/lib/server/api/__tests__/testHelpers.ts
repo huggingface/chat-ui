@@ -111,10 +111,13 @@ export async function cleanupTestData() {
 		collections.messageEvents.deleteMany({}),
 		collections.mlServices.deleteMany({}),
 		collections.mlArtefacts.deleteMany({}),
+		collections.mlAgentRuns.deleteMany({}),
+		collections.mlSources.deleteMany({}),
 		collections.semaphores.deleteMany({}),
 		collections.migrationResults.deleteMany({}),
 		collections.tokenCaches.deleteMany({}),
 		collections.tools.deleteMany({}),
+		collections.mcpOAuthConnections.deleteMany({}),
 		cleanupGridFS(),
 	]);
 }

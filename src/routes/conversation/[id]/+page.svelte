@@ -23,7 +23,7 @@
 	import { consumeReattachStream } from "$lib/utils/consumeReattachStream";
 	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
-	import { enabledServers, mcpServersLoaded } from "$lib/stores/mcpServers";
+	import { enabledServers, mcpServersLoaded, effectiveServerHeaders } from "$lib/stores/mcpServers";
 	import { get } from "svelte/store";
 	import { browser } from "$app/environment";
 	import { ReattachClosedError, reattachStream } from "$lib/utils/reattachStream";
@@ -45,6 +45,7 @@
 		isConversationGenerationActive,
 		isTurnSubscribable,
 	} from "$lib/utils/generationState";
+	import { restoreRunningShape } from "$lib/utils/messageShape";
 	import { noteServerNow } from "$lib/utils/clockSkew.svelte";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
@@ -340,6 +341,8 @@
 			if (!messageToWriteTo) {
 				throw new Error("Message to write to not found");
 			}
+			// the server does the same, updates stream against the content it continues
+			restoreRunningShape(messageToWriteTo);
 
 			const streamingMode = resolveStreamingMode($settings);
 
@@ -375,7 +378,8 @@
 					selectedMcpServers: $enabledServers.map((s) => ({
 						name: s.name,
 						url: s.url,
-						headers: s.headers,
+						headers: effectiveServerHeaders(s),
+						oauthConnectionId: s.oauth?.connectionId,
 					})),
 					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 					streamingMode,

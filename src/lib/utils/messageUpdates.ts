@@ -11,6 +11,8 @@ import {
 	type MessageElicitationRequestUpdate,
 	type MessageElicitationResolvedUpdate,
 	type MessagePlanUpdate,
+	type MessageHarnessEventUpdate,
+	type MessageNoticeUpdate,
 	MessageUpdateType,
 	MessageUpdateStatus,
 	MessageToolUpdateType,
@@ -36,7 +38,12 @@ type MessageUpdateRequestOptions = {
 	// Optional: pass selected MCP server names (client-side selection)
 	selectedMcpServerNames?: string[];
 	// Optional: pass selected MCP server configs (for custom client-defined servers)
-	selectedMcpServers?: Array<{ name: string; url: string; headers?: KeyValuePair[] }>;
+	selectedMcpServers?: Array<{
+		name: string;
+		url: string;
+		headers?: KeyValuePair[];
+		oauthConnectionId?: string;
+	}>;
 	// User's IANA timezone (e.g. "America/New_York")
 	timezone?: string;
 	streamingMode?: StreamingMode;
@@ -402,6 +409,13 @@ export const isMessageElicitationResolvedUpdate = (
 
 export const isMessagePlanUpdate = (update: MessageUpdate): update is MessagePlanUpdate =>
 	update.type === MessageUpdateType.Plan;
+
+export const isMessageHarnessEventUpdate = (
+	update: MessageUpdate
+): update is MessageHarnessEventUpdate => update.type === MessageUpdateType.HarnessEvent;
+
+export const isMessageNoticeUpdate = (update: MessageUpdate): update is MessageNoticeUpdate =>
+	update.type === MessageUpdateType.Notice;
 
 const defaultSleep = (ms: number): Promise<void> =>
 	new Promise((resolve) => setTimeout(resolve, ms));

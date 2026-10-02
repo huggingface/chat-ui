@@ -1,5 +1,13 @@
+import type { MlAgentRunFailure } from "$lib/types/MlAgentRun";
 import type { MlFile, MlFileRef } from "$lib/types/MlFile";
-import type { MlRegistryArtefact, MlRegistryService } from "$lib/types/MlRegistry";
+import type {
+	MlRegistryAgentRun,
+	MlRegistryArtefact,
+	MlRegistrySource,
+	MlRegistryService,
+} from "$lib/types/MlRegistry";
+import { PARENT_READER, type MlSourceKind } from "$lib/types/MlSource";
+import type { HarnessServiceEvent } from "$lib/types/MessageUpdate";
 
 /** the hub stages after which a job is never billed again */
 const TERMINAL_STAGES = new Set(["COMPLETED", "CANCELED", "ERROR", "DELETED"]);
@@ -63,6 +71,17 @@ export function formatElapsed(ms: number): string {
 	return `${seconds}s`;
 }
 
+/** the chip text a mid turn event leaves in the message, like sft-smoke failed after 2m 17s */
+export function harnessEventLabel(
+	event: Pick<HarnessServiceEvent, "name" | "jobId" | "to" | "ranSeconds">
+): string {
+	const badge = stageBadge(event.to);
+	const verb = badge.tone === "error" ? "failed" : badge.tone === "unknown" ? "ended" : badge.label;
+	const after =
+		event.ranSeconds !== undefined ? ` after ${formatElapsed(event.ranSeconds * 1000)}` : "";
+	return `${serviceDisplayName(event)} ${verb}${after}`;
+}
+
 /**
  * what the row says about time given a skew corrected now, nothing for a discovered row
  * because its createdAt is when the id was first seen in an argument, not when anything started
@@ -86,6 +105,43 @@ export function serviceElapsed(
 	return formatElapsed(end - start);
 }
 
+/** when the hub stops it unless someone stops it first, from the start so never too early */
+export function billedUntil(
+	service: Pick<MlRegistryService, "createdAt" | "startedAt" | "timeoutSeconds">
+): Date | undefined {
+	if (!service.timeoutSeconds) return undefined;
+	const start = (service.startedAt ?? service.createdAt).getTime();
+	return new Date(start + service.timeoutSeconds * 1000);
+}
+
+/** only one this conversation created and the hub would still bill, the server checks it again */
+export function isStoppableSandbox(
+	service: Pick<MlRegistryService, "kind" | "origin" | "stage" | "heldMicroUsd">
+): boolean {
+	return service.kind === "sandbox" && service.origin === "dispatched" && isServiceOpen(service);
+}
+
+/** a sandbox bills whether or not anything runs in it, and between turns nothing does */
+export function isIdleSandbox(
+	service: Pick<MlRegistryService, "kind" | "stage" | "stopRequestedAt">,
+	turnRunning: boolean
+): boolean {
+	return (
+		service.kind === "sandbox" &&
+		service.stage === "RUNNING" &&
+		!turnRunning &&
+		!service.stopRequestedAt
+	);
+}
+
+/** the time alone today, with the weekday on any other day, in the local zone */
+export function formatClock(at: Date, now: number): string {
+	const time = at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+	return at.toDateString() === new Date(now).toDateString()
+		? time
+		: `${at.toLocaleDateString([], { weekday: "short" })} ${time}`;
+}
+
 /** running, then the rest of what is open, then everything else, newest first within each */
 export function sortServices(services: readonly MlRegistryService[]): MlRegistryService[] {
 	const rank = (service: MlRegistryService) =>
@@ -93,6 +149,213 @@ export function sortServices(services: readonly MlRegistryService[]): MlRegistry
 	return [...services].sort(
 		(a, b) => rank(a) - rank(b) || b.createdAt.getTime() - a.createdAt.getTime()
 	);
+}
+
+export function runBadge(run: Pick<MlRegistryAgentRun, "status">): StageBadge {
+	switch (run.status) {
+		case "running":
+			return { label: "running", tone: "running" };
+		case "completed":
+			return { label: "completed", tone: "completed" };
+		case "failed":
+			return { label: "failed", tone: "error" };
+		case "aborted":
+			return { label: "stopped", tone: "cancelled" };
+		case "interrupted":
+			return { label: "interrupted", tone: "unknown" };
+	}
+}
+
+export function runElapsed(
+	run: Pick<MlRegistryAgentRun, "status" | "startedAt" | "endedAt">,
+	now: number
+): string | undefined {
+	if (run.endedAt) return formatElapsed(run.endedAt.getTime() - run.startedAt.getTime());
+	return run.status === "running" ? formatElapsed(now - run.startedAt.getTime()) : undefined;
+}
+
+export const RUN_FAILURE_LABEL: Record<MlAgentRunFailure, string> = {
+	no_tools: "had no tools to use",
+	context_limit: "ran out of context",
+	iteration_limit: "hit its step limit",
+	no_summary: "returned no summary",
+	rate_limited: "was rate limited",
+	llm_error: "model request failed",
+	internal_error: "crashed",
+};
+
+export const RUN_FORCED_LABEL: Record<NonNullable<MlRegistryAgentRun["forcedBy"]>, string> = {
+	context_limit: "summary forced by the context limit",
+	iteration_limit: "summary forced by the step limit",
+};
+
+export type ServiceRow =
+	| { type: "service"; key: string; service: MlRegistryService }
+	| { type: "run"; key: string; run: MlRegistryAgentRun };
+
+/** hub services and sub-agent runs in one list, running first, then open, then the rest, newest first */
+export function sortServiceRows(
+	services: readonly MlRegistryService[],
+	runs: readonly MlRegistryAgentRun[]
+): ServiceRow[] {
+	const rows = [
+		...services.map((service) => ({
+			row: { type: "service", key: `service:${service.id}`, service } as const,
+			rank: service.stage === "RUNNING" ? 0 : isServiceOpen(service) ? 1 : 2,
+			at: service.createdAt.getTime(),
+		})),
+		...runs.map((run) => ({
+			row: { type: "run", key: `run:${run.id}`, run } as const,
+			rank: run.status === "running" ? 0 : 2,
+			at: run.startedAt.getTime(),
+		})),
+	];
+	return rows.sort((a, b) => a.rank - b.rank || b.at - a.at).map(({ row }) => row);
+}
+
+/**
+ * ended and already told to the agent, nothing left to watch, a run hands its result to the
+ * agent when it ends but an interrupted one never did
+ */
+export function isSettledRow(row: ServiceRow): boolean {
+	if (row.type === "run") return row.run.status !== "running" && row.run.status !== "interrupted";
+	const { stage, lastReportedStage } = row.service;
+	return isTerminalStage(stage) && lastReportedStage === stage;
+}
+
+/** what still needs watching, and underneath it what has settled */
+export function splitSettled(rows: readonly ServiceRow[]): {
+	active: ServiceRow[];
+	settled: ServiceRow[];
+} {
+	return {
+		active: rows.filter((row) => !isSettledRow(row)),
+		settled: rows.filter(isSettledRow),
+	};
+}
+
+export interface SourceGroup {
+	key: string;
+	label: string;
+	kind: MlSourceKind;
+	/** read, most recent first */
+	opened: MlRegistrySource[];
+	/** only in search results, most recent first */
+	found: MlRegistrySource[];
+}
+
+const byLastSeen = (a: MlRegistrySource, b: MlRegistrySource) =>
+	b.lastSeenAt.getTime() - a.lastSeenAt.getTime();
+
+/** by group, a github repo and a hub repo of one name stay apart, the most read groups first */
+export function groupSources(sources: readonly MlRegistrySource[]): SourceGroup[] {
+	const groups = new Map<string, SourceGroup>();
+	for (const source of sources) {
+		const key = `${source.kind === "github" ? "github" : source.kind === "hub" ? "hub" : "site"}:${source.group}`;
+		let group = groups.get(key);
+		if (!group) {
+			group = { key, label: source.group, kind: source.kind, opened: [], found: [] };
+			groups.set(key, group);
+		}
+		(source.opened ? group.opened : group.found).push(source);
+	}
+	for (const group of groups.values()) {
+		group.opened.sort(byLastSeen);
+		group.found.sort(byLastSeen);
+	}
+	return [...groups.values()].sort(
+		(a, b) =>
+			b.opened.length - a.opened.length ||
+			b.opened.length + b.found.length - (a.opened.length + a.found.length) ||
+			a.label.localeCompare(b.label)
+	);
+}
+
+const safeDecode = (text: string) => {
+	try {
+		return decodeURIComponent(text);
+	} catch {
+		return text;
+	}
+};
+
+/** where in its group a source sits, the path a person would recognise */
+export function sourcePath(source: Pick<MlRegistrySource, "url" | "kind">): string {
+	let url: URL;
+	try {
+		url = new URL(source.url);
+	} catch {
+		return source.url;
+	}
+	const path = safeDecode(url.pathname);
+	switch (source.kind) {
+		case "paper":
+			return path.replace(/^\/papers\//, "");
+		case "docs":
+			return path.replace(/^\/docs\//, "");
+		case "github":
+		case "hub": {
+			const blob = /\/(?:blob|resolve)\/[^/]+\/(.+)$/.exec(path);
+			return blob ? blob[1] : "repo page";
+		}
+		case "web":
+			return `${path === "/" ? "" : path}${safeDecode(url.search)}` || "/";
+	}
+}
+
+export interface ReaderSources {
+	/** what this reader opened, most recent first */
+	opened: MlRegistrySource[];
+	/** what only came back to this reader in search results, even if another reader opened it */
+	found: MlRegistrySource[];
+}
+
+/** the sources of each reader, the run detail lists what that run read */
+export function sourcesByReader(sources: readonly MlRegistrySource[]): Map<string, ReaderSources> {
+	const byReader = new Map<string, ReaderSources>();
+	for (const source of sources) {
+		for (const reader of source.readBy) {
+			let entry = byReader.get(reader);
+			if (!entry) {
+				entry = { opened: [], found: [] };
+				byReader.set(reader, entry);
+			}
+			(source.openedBy.includes(reader) ? entry.opened : entry.found).push(source);
+		}
+	}
+	for (const entry of byReader.values()) {
+		entry.opened.sort(byLastSeen);
+		entry.found.sort(byLastSeen);
+	}
+	return byReader;
+}
+
+export interface SourceReader {
+	key: string;
+	label: string;
+	title: string;
+	/** the run that read it, when the listing still has it */
+	runId?: string;
+}
+
+/** readers by name, the main agent as main and each sub-agent run by its label */
+export function sourceReaders(
+	readers: readonly string[],
+	runs: readonly MlRegistryAgentRun[]
+): SourceReader[] {
+	return readers.map((reader) => {
+		if (reader === PARENT_READER) {
+			return { key: reader, label: "main", title: "Read by the main agent" };
+		}
+		const run = runs.find((candidate) => candidate.id === reader);
+		if (!run) return { key: reader, label: "sub-agent", title: "Read by a sub-agent" };
+		return {
+			key: reader,
+			label: run.label,
+			title: `Read by the ${run.displayName.toLowerCase()} sub-agent started ${run.startedAt.toLocaleString()}`,
+			runId: run.id,
+		};
+	});
 }
 
 type GroupableArtefact = Pick<MlRegistryArtefact, "kind" | "uri" | "createdAt">;
@@ -146,6 +409,23 @@ export function hubLabel(uri: string): string {
 }
 
 export const shortCommit = (commit: string): string => commit.slice(0, 7);
+
+/** the hub page of an hf:// model or dataset repo */
+export function repoPageUrl(uri: string): string | undefined {
+	const match = /^hf:\/\/(models|datasets)\/([^/\s]+\/[^/\s]+)$/.exec(uri);
+	if (!match) return undefined;
+	return `https://huggingface.co/${match[1] === "datasets" ? "datasets/" : ""}${match[2]}`;
+}
+
+/** the job whose end found a commit on this repo, while the registry still lists it */
+export function pushingService(
+	artefact: Pick<MlRegistryArtefact, "serviceId">,
+	services: readonly MlRegistryService[]
+): MlRegistryService | undefined {
+	return artefact.serviceId
+		? services.find((service) => service.id === artefact.serviceId)
+		: undefined;
+}
 
 export const formatFileRef = ({ name, version }: MlFileRef): string => `${name} v${version}`;
 

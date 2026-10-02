@@ -40,7 +40,7 @@ Start with the research tool, not with the paper. Give it the paper id or URL an
 
 Implement from the summary it returns. When a specific detail you are about to act on is missing or ambiguous — the exact loss, what the target actually is, an appendix hyperparameter — fetch that one section yourself and read it closely, rather than re-reading the literature. A reproduction that misreads one equation fails in a way that looks like a bug for hours rather than like a misreading.
 
-Attribute what you take. "This dataset, with this method, at this learning rate, reached this score on this benchmark" is usable. "They used SFT" is not.`;
+Attribute what you take. "This dataset, with this method, at this learning rate, reached this score on this benchmark" is usable. "They used SFT" is not. Tag every repo you create for a paper that has an arXiv id with arxiv:<arxiv_id> in its README metadata, so it shows on the paper's Hub page.`;
 
 const MISTAKES = `# Mistakes you WILL make without checking
 
@@ -81,6 +81,8 @@ const DATA_AUDIT = `# Audit the data before you use it
 Look at the dataset before you train on it. Read its structure to get the configs, splits, sizes and column names, then preview actual rows from the config and split you intend to use.
 
 Check that the columns are the ones the method needs, that the split you named exists and is not empty, and that the field you are treating as text or label really holds that. Report what you found — row counts and column names — rather than assuming the card was accurate.`;
+
+const ATTACHED_SLICES = `A large file the user attaches reaches you only as a slice, marked with how much you see: to work with the whole of it, load it in a job or sandbox, or have the user upload it to a bucket or a Hub dataset, rather than reasoning from the pasted part.`;
 
 const WRITING_CODE = `# When you write ML code
 
@@ -136,14 +138,17 @@ The user's latest message can end with a [SESSION STATE] block, written by the h
 
 /**
  * the preset system prompt, sections in the order they are read, virtualFiles follows the
- * switch in mlFiles/enabled.ts and stateBlock the one in mlRegistry/stateBlock.ts
+ * switch in mlFiles/enabled.ts, stateBlock the one in mlRegistry/stateBlock.ts and
+ * attachmentBudget the one in textGeneration/utils/attachmentBudgetFlag.ts
  */
 export function mlAssistantPreprompt({
 	virtualFiles,
 	stateBlock,
+	attachmentBudget,
 }: {
 	virtualFiles: boolean;
 	stateBlock: boolean;
+	attachmentBudget: boolean;
 }): string {
 	return [
 		IDENTITY,
@@ -152,6 +157,7 @@ export function mlAssistantPreprompt({
 		MISTAKES,
 		BEFORE_A_RUN,
 		DATA_AUDIT,
+		...(attachmentBudget ? [ATTACHED_SLICES] : []),
 		WRITING_CODE,
 		JOBS(virtualFiles ? '"v-file://train.py"' : '"<the whole script>"'),
 		virtualFiles ? SCRIPTS_ARE_FILES : ARTIFACTS_VS_JOBS,
@@ -164,6 +170,7 @@ export function mlAssistantPreprompt({
 export const ML_ASSISTANT_PREPROMPT = mlAssistantPreprompt({
 	virtualFiles: true,
 	stateBlock: true,
+	attachmentBudget: true,
 });
 
 /**
@@ -266,15 +273,19 @@ Put the hold next to the estimate in every pre-flight: "holds $2.00 of budget, e
  * The rules here restate ones the prompt already carries. That is the point:
  * they are restated at the surface where they get violated.
  */
-const HF_JOBS_CONTRACT = `RUNNING JOBS (hf_jobs): a job is remote compute with ephemeral storage, a wall-clock limit, and per-minute billing against the user's credits. Every hf_jobs call carries an explicit \`operation\` — 'run' or 'uv' to submit, 'ps'/'logs'/'inspect'/'cancel' to read or stop; a call without one routes nowhere and is refused. These lines go on the pre-flight list you print before submitting, and every one of them has to be true. The list is printed so the user can stop you before the credits are spent, not after.
+const JOB_LABELS_KEPT = ` The name goes out prefixed with ml-intern-, and every submission carries an ml-intern-session label; never set or remove that label. update-labels replaces the whole set, so send every label the job should keep; the name and the session label are kept for you.`;
 
-- Name. Every submission carries a name saying what the run is — method, model, dataset, and whether it is the smoke test or the real thing (sft-qwen3-0.6b-capybara-smoke). Skip it and the job lands in the user's dashboard as an image tag plus a hash, indistinguishable from every other unnamed run. Add further labels where they would help the user filter — the dataset, the base model, the experiment they belong to.
+const HF_JOBS_CONTRACT = (
+	jobLabels: boolean
+) => `RUNNING JOBS (hf_jobs): a job is remote compute with ephemeral storage, a wall-clock limit, and per-minute billing against the user's credits. Every hf_jobs call carries an explicit \`operation\` — 'run' or 'uv' to submit, 'ps'/'logs'/'inspect'/'cancel' to read or stop; a call without one routes nowhere and is refused. These lines go on the pre-flight list you print before submitting, and every one of them has to be true. The list is printed so the user can stop you before the credits are spent, not after.
+
+- Name. Every submission carries a name saying what the run is — method, model, dataset, and whether it is the smoke test or the real thing (sft-qwen3-0.6b-capybara-smoke). Skip it and the job lands in the user's dashboard as an image tag plus a hash, indistinguishable from every other unnamed run. Add further labels where they would help the user filter — the dataset, the base model, the experiment they belong to.${jobLabels ? JOB_LABELS_KEPT : ""}
 - Token. Pushing to the Hub from inside a job needs the token passed in explicitly as a secret (HF_TOKEN). Leave it out and the run trains for an hour and then fails at the push, which is the most expensive mistake available here.
 - Hardware. The default flavor is cpu-basic: two CPU cores. A training job that does not name a GPU flavor does not fail, it crawls. Name the flavor, what it costs per hour, and how long you expect the run to take.
 - Who pays. A job bills the namespace it runs under — BillTo from the session context if set, else User — and the server sets it on every hf_jobs call. A job living elsewhere (its URL says where) needs its namespace passed to read it.
 - Timeout. Set it above your estimate of the run, not at it. A timeout shorter than the run loses the run at the end.
 - Dependencies. Pin every one explicitly — the uv --with arguments, or an image that already has them — and pin to the CURRENT release, never the version you remember: your memory of these libraries is stale, and a pin written from it is how a run dies at import. Resolve the real number instead of recalling it — \`pip index versions <package>\`, or what uv resolves — in the sandbox or a one-line job, and pin what it returns. Anything older needs a reason you have actually validated, a breaking change you hit or a pin the image forces, and it goes on the pre-flight list. Unpinned is not the safe middle: it drifts between the smoke test and the real run, and away from anything that has to match it. Never build flash-attention from source in a job; it eats the budget and usually fails.
-- Destination. push_to_hub with an explicit hub_model_id in the namespace from the session context, or a mounted bucket volume for checkpoints. Nothing written to the container's own disk survives the job.
+- Destination. Reserve it first: before submitting any job that pushes, create the destination repo with create_repo, in the namespace from the session context, the way create_trackio reserves a dashboard. Then put its id in the script literally — hub_model_id="<namespace>/<name>" with push_to_hub=True, never an id built at runtime — because the harness reads it from the script and, when the job ends, checks that the repo received a commit and tells you if it did not. Checkpoints can go to a mounted bucket volume instead. Nothing written to the container's own disk survives the job.
 - Metrics. Every training run gets a live dashboard, not only the ones you judge worth watching: without one, a loss that went flat in the first minutes costs the whole timeout to discover. Call \`create_trackio\` first: it reserves the dashboard and returns the exact \`space_id\`, which is what the user's dashboard is wired to. Then add \`trackio\` to \`with_deps\` and use that id unchanged — \`trackio.init(project="<project>", space_id="<the id it returned>")\`, \`trackio.log({"loss": ...}, step=n)\`, \`trackio.finish()\`. An id you pick yourself instead points the user at a Space nothing writes to. And \`init\` returning without raising is not evidence that anything is recording: it prints a full success banner either way. The job's own log is what tells you — trackio warns there when a batch cannot be sent, saying 'could not be sent' or 'saved locally', and a run carrying that warning is writing its metrics to a disk that dies with the container. Look for it on the first log read, not at the end.
 - Data. Mount a large dataset as a volume — the \`volumes\` argument — rather than downloading it into the container.
 - Size. The smoke test runs the same script on the same flavor, batch size and sequence length as the real run — shrink the step count, never the shape. A smoke test at a smaller batch proves the script runs and tells you nothing about whether the real one fits; the OOM then arrives on the real run and you pay the queue, the image pull and the credits a second time. Read the memory headroom and the steps-per-second off it, then launch. Submit one job before you fan out. When hf_sandbox is on offer the import and data checks have already happened there — that is the typo check, not this one, and both happen.
@@ -295,6 +306,8 @@ const AFTER_SUBMIT_WATCHED = `${AFTER_SUBMIT} The harness watches every job and 
 
 const HF_SANDBOX_RULES = `SANDBOXES (hf_sandbox): a sandbox is a machine you run commands in directly, which makes it the right place for the fast checks — does the script import, does the dataset load, are the shapes what you think. A job queues, pulls an image, and only then tells you about a typo; a sandbox tells you in seconds. When you have this tool, the fast checks go here FIRST, every time — not in a smoke job out of habit. A job's queue time is the wrong price for finding a typo. What it cannot do is stand in for the GPU smoke test: it has no GPU, so it tells you the script imports and the columns are right, and nothing at all about whether the batch fits in memory or how fast a step is. A sandbox is a job and bills like one, under BillTo when set; its handle, hfsb2:<namespace>:<id>, says where.
 
+A sandbox bills until it is terminated or times out, idle or not. Terminate it with hf_sandbox terminate <handle> once you are done, and before your final answer terminate every sandbox you will not use on the user's next message, saying which you kept and why. One the session state lists as stopped by the user was stopped on purpose: do not replace it unless your next step needs one.
+
 These tools and hf_jobs take different argument shapes, and mixing them is the most common rejected call. Here \`cmd\` only selects the operation and everything else is a token in the \`args\` array — the timeout among them, as the pair \`--timeout 55\` — while hf_jobs takes an object with \`timeout\` as a key inside it. Each tool's own parameter descriptions carry its exact grammar; read those rather than reasoning across from the sibling.
 
 It is experimental, and whether it is available depends on the account and how this deployment is configured. So treat it as an optimisation, never a dependency: if creating one fails — 403 or anything else — do not retry it, do not look for another way in, and do not tell the user the task is blocked. Run the same check as a small hf_jobs run instead and carry on. A smoke-test job is slower, not worse.`;
@@ -312,6 +325,8 @@ const WEB_SEARCH_RULES = `SEARCHING THE WEB (web_search_exa): for what the Hub d
 interface ToolDoctrineOptions {
 	/** whether a job or sandbox ending wakes a parked wait */
 	serviceEvents: boolean;
+	/** whether submissions get the name prefix and session label */
+	jobLabels: boolean;
 }
 
 /** Keyed by tool name as the model sees it in the schema. */
@@ -321,8 +336,8 @@ const TOOL_DOCTRINE: ReadonlyArray<{
 }> = [
 	{
 		tool: "hf_jobs",
-		text: ({ serviceEvents }) =>
-			`${HF_JOBS_CONTRACT}\n\n${serviceEvents ? AFTER_SUBMIT_WATCHED : AFTER_SUBMIT_POLLED}`,
+		text: ({ serviceEvents, jobLabels }) =>
+			`${HF_JOBS_CONTRACT(jobLabels)}\n\n${serviceEvents ? AFTER_SUBMIT_WATCHED : AFTER_SUBMIT_POLLED}`,
 	},
 	{ tool: "hf_fs", text: HF_FS_FINDING_RULES },
 	{ tool: "hf_fs_write", text: HF_FS_WRITE_RULES },
@@ -350,6 +365,9 @@ export const ML_ASSISTANT_TOOL_DOCTRINE = {
 
 	largeResults: `WHEN RESULTS ARE LARGE: Job logs, dataset previews and file listings can be long. Read them, then carry forward the part that matters — the failing line, the column names, the final metric — instead of restating the whole output back to the user.`,
 } as const;
+
+/** every tool a contract exists for, the harness stamp hashes all of them */
+export const ML_ASSISTANT_DOCTRINE_TOOLS = TOOL_DOCTRINE.map(({ tool }) => tool);
 
 /** The contracts for whichever of these tools this run actually has. */
 export function mlAssistantToolDoctrineBlocks(

@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 import { logger } from "$lib/server/logger";
 import { isHfMcpServer } from "$lib/server/mcp/hf";
+import type { SessionJobLabels } from "$lib/server/mcp/jobLabels";
 import { classifySubmission, tokenAfter } from "$lib/server/mlBudget/guard";
 import { isHelpReply, jobRefFromStructured, jobRefFromText } from "$lib/server/mlBudget/jobRef";
 import { parseTimeoutSeconds } from "$lib/server/mlBudget/pricing";
@@ -11,7 +12,8 @@ import type {
 	ToolCallGuard,
 } from "$lib/server/textGeneration/mcp/toolGuard";
 import type { MlFileRef } from "$lib/types/MlFile";
-import type { MlServiceKind } from "$lib/types/MlService";
+import type { ExpectedPush, MlServiceKind } from "$lib/types/MlService";
+import { expectedPushesOfJob } from "./expectedPushes";
 import { fileUri, fileUrl, parseHfUri, repoUri, repoUrl } from "./hubUri";
 import {
 	ensureArtefact,
@@ -19,9 +21,12 @@ import {
 	recordArtefact,
 	recordDiscoveredService,
 	recordDispatchedService,
+	isRecordedSandbox,
+	recordServiceName,
 	sandboxHandle,
 	UNKNOWN_STAGE,
 } from "./store";
+import { markLabelledSubmission } from "./sessionLabel";
 
 // books nothing in before and emits no update, so it can sit ahead of the budget guard
 // a failed write is logged and never thrown, bookkeeping must not break the tool round
@@ -35,11 +40,15 @@ type SubmissionTicket = {
 	timeoutSeconds?: number;
 	namespace?: string;
 	scriptRefs?: MlFileRef[];
+	expectedPushes?: ExpectedPush[];
 };
 
 type FileTicket = { kind: "file"; callUuid: string; uri: string; fromFile?: MlFileRef };
 
-type Ticket = SubmissionTicket | { kind: "repo"; callUuid: string; uri: string } | FileTicket;
+type RelabelTicket = { kind: "relabel"; callUuid: string; jobId: string; name?: string };
+
+type Ticket =
+	SubmissionTicket | { kind: "repo"; callUuid: string; uri: string } | FileTicket | RelabelTicket;
 
 const JOB_ID = /^[0-9a-f]{24}$/;
 const NAMESPACE = "[A-Za-z0-9][\\w.-]*";
@@ -91,22 +100,34 @@ export function createMlRecordingGuard({
 	generationId,
 	messageId,
 	namespace,
+	jobLabels,
 }: {
 	conversationId: ObjectId;
 	generationId: string;
 	messageId?: string;
 	/** where compute runs by default, the billing namespace else the user */
 	namespace?: string;
+	/** what the rewrite stamps, its map of own jobs is kept current here */
+	jobLabels?: SessionJobLabels;
 }): ToolCallGuard {
 	const provenance = { generationId, ...(messageId ? { messageId } : {}) };
 
 	function classify(call: GuardedToolCall): Ticket | undefined {
+		if (call.tool === "hf_jobs" && call.args.operation === "update-labels") {
+			const jobArgs = asRecord(call.args.args);
+			const jobId = asString(jobArgs?.job_id);
+			if (!jobId || !JOB_ID.test(jobId)) return undefined;
+			const name = asString(asRecord(jobArgs?.labels)?.name);
+			return { kind: "relabel", callUuid: call.callUuid, jobId, ...(name ? { name } : {}) };
+		}
 		if (call.tool === "hf_jobs" || call.tool === "hf_sandbox") {
 			const gated = classifySubmission(call);
 			if (!gated || "blocked" in gated) return undefined;
 			const name = submissionName(call);
 			const timeoutSeconds = parseTimeoutSeconds(gated.timeoutRaw);
 			const scriptRefs = fileRefsOf(call);
+			const expectedPushes =
+				gated.kind === "job" ? expectedPushesOfJob(asRecord(call.args.args) ?? {}) : [];
 			return {
 				kind: gated.kind,
 				callUuid: call.callUuid,
@@ -116,6 +137,7 @@ export function createMlRecordingGuard({
 				...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
 				...(gated.namespace ? { namespace: gated.namespace } : {}),
 				...(scriptRefs.length ? { scriptRefs } : {}),
+				...(expectedPushes.length ? { expectedPushes } : {}),
 			};
 		}
 		if (call.tool === "create_repo") {
@@ -161,6 +183,43 @@ export function createMlRecordingGuard({
 		});
 	}
 
+	// update-labels replaces every label, and one the server set on a sandbox is part of its auth
+	async function refuseSandboxRelabel(call: GuardedToolCall): Promise<GuardVerdict | undefined> {
+		if (call.tool !== "hf_jobs" || call.args.operation !== "update-labels") return undefined;
+		const jobId = asString(asRecord(call.args.args)?.job_id);
+		if (!jobId) return undefined;
+		try {
+			if (!(await isRecordedSandbox(conversationId, jobId))) return undefined;
+		} catch (err) {
+			logger.error(
+				{ err: String(err), conversationId: conversationId.toString(), jobId },
+				"[mlRegistry] checking a relabel against the recorded sandboxes failed"
+			);
+			return undefined;
+		}
+		return {
+			allow: false,
+			message: `Refused: ${jobId} is a sandbox, not a job. update-labels replaces every label, and one of the labels the sandbox server set authenticates the sandbox, so relabelling it would break it. Nothing was changed. Relabel jobs only.`,
+		};
+	}
+
+	async function markForReconcile(ticket: SubmissionTicket): Promise<void> {
+		const jobNamespace = ticket.namespace ?? namespace;
+		if (!jobNamespace || ticket.timeoutSeconds === undefined) return;
+		try {
+			await markLabelledSubmission({
+				conversationId,
+				namespace: jobNamespace,
+				timeoutSeconds: ticket.timeoutSeconds,
+			});
+		} catch (err) {
+			logger.error(
+				{ err: String(err), conversationId: conversationId.toString() },
+				"[mlRegistry] marking a labelled submission for reconcile failed"
+			);
+		}
+	}
+
 	async function recordSubmission(ticket: SubmissionTicket, outcome: GuardOutcome): Promise<void> {
 		if (outcome.status !== "success") return;
 		if (isHelpReply(outcome.structured)) return;
@@ -184,9 +243,11 @@ export function createMlRecordingGuard({
 			reservationKey: ticket.reservationKey,
 			toolUuid: ticket.callUuid,
 			...(ticket.scriptRefs ? { scriptRefs: ticket.scriptRefs } : {}),
+			...(ticket.expectedPushes ? { expectedPushes: ticket.expectedPushes } : {}),
 			...provenance,
 		};
 		if (ticket.kind === "job") {
+			jobLabels?.ownJobs.set(ref.jobId, ticket.name);
 			const job = asRecord(asRecord(root?.outcome)?.job);
 			const status = asRecord(job?.status);
 			const stageMessage = asString(status?.message);
@@ -213,6 +274,12 @@ export function createMlRecordingGuard({
 			hubUrl: asString(root?.job_url) ?? hubJobUrl(jobNamespace, ref.jobId),
 			name: ticket.name ?? asString(root?.name),
 		});
+	}
+
+	async function recordRelabel(ticket: RelabelTicket, outcome: GuardOutcome): Promise<void> {
+		if (outcome.status !== "success") return;
+		if (jobLabels?.ownJobs.has(ticket.jobId)) jobLabels.ownJobs.set(ticket.jobId, ticket.name);
+		await recordServiceName({ conversationId, jobId: ticket.jobId, name: ticket.name });
 	}
 
 	async function recordRepo(ticket: { uri: string; callUuid: string }, outcome: GuardOutcome) {
@@ -274,6 +341,8 @@ export function createMlRecordingGuard({
 
 		async before(call: GuardedToolCall): Promise<GuardVerdict> {
 			if (!isHfMcpServer(call.serverUrl)) return { allow: true };
+			const refusal = await refuseSandboxRelabel(call);
+			if (refusal) return refusal;
 			try {
 				await discover(call);
 			} catch (err) {
@@ -283,6 +352,7 @@ export function createMlRecordingGuard({
 				);
 			}
 			const ticket = classify(call);
+			if (jobLabels && ticket?.kind === "job") await markForReconcile(ticket);
 			return ticket ? { allow: true, ticket } : { allow: true };
 		},
 
@@ -299,6 +369,9 @@ export function createMlRecordingGuard({
 						break;
 					case "file":
 						await recordFile(ticket, outcome);
+						break;
+					case "relabel":
+						await recordRelabel(ticket, outcome);
 						break;
 				}
 			} catch (err) {

@@ -11,12 +11,14 @@
 	import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 	import { formatFileRef } from "$lib/utils/mlRegistry";
+	import { callArguments } from "$lib/utils/messageShape";
+	import { redactToolArguments } from "$lib/utils/redactSecrets";
 	import { page } from "$app/state";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonDocument from "~icons/carbon/document";
 	import LucideTriangleAlert from "~icons/lucide/triangle-alert";
-	import LucideCheck from "~icons/lucide/check";
 	import BlockWrapper from "./BlockWrapper.svelte";
+	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 
 	interface Props {
 		tool: MessageToolUpdate[];
@@ -32,7 +34,7 @@
 	// only a conversation the registry is bound to has a pane to open, a share has none
 	let canOpenFiles = $derived(mlRegistry.conversationId !== undefined);
 	// A result can come back with an error status as well as a separate error
-	// update; either way the call failed and must not earn the checkmark.
+	// update; either way the call failed.
 	let toolError = $derived(
 		tool.some(
 			(update) =>
@@ -121,6 +123,18 @@
 		}));
 </script>
 
+{#snippet copyable(text: string, preClass: string)}
+	<div class="group/snippet relative">
+		<pre
+			class="{preClass} rounded-lg p-2 pr-8 font-mono text-xs break-all whitespace-pre-wrap">{text}</pre>
+		<CopyToClipBoardBtn
+			value={text}
+			classNames="btn absolute top-1 right-1 rounded-md p-1 text-gray-400 opacity-0 transition-opacity group-hover/snippet:opacity-100 hover:text-gray-600 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 dark:hover:text-gray-200"
+			iconClassNames="size-3"
+		/>
+	</div>
+{/snippet}
+
 {#if toolFnName}
 	<BlockWrapper>
 		<!-- Header row -->
@@ -141,12 +155,6 @@
 							class="size-3.5 shrink-0 text-amber-500 dark:text-amber-400"
 							role="img"
 							aria-label="Failed"
-						/>
-					{:else if toolDone}
-						<LucideCheck
-							class="size-3.5 shrink-0 text-green-600 dark:text-green-400"
-							role="img"
-							aria-label="Succeeded"
 						/>
 					{/if}
 					<span
@@ -213,18 +221,20 @@
 							<div class="text-[10px] font-semibold text-gray-400 uppercase dark:text-gray-500">
 								Input
 							</div>
-							<pre
-								class="rounded-lg bg-gray-100 p-2 font-mono text-xs break-all whitespace-pre-wrap dark:bg-gray-800/70">{formatValue(
-									update.call.parameters
-								)}</pre>
+							{@render copyable(
+								formatValue(redactToolArguments(callArguments(update))),
+								"bg-gray-100 dark:bg-gray-800/70"
+							)}
 						</div>
 					{:else if update.subtype === MessageToolUpdateType.Error}
 						<div class="space-y-1">
 							<div class="text-[10px] font-semibold text-amber-600 uppercase dark:text-amber-400">
 								Error
 							</div>
-							<pre
-								class="rounded-lg bg-amber-50 p-2 font-mono text-xs break-all whitespace-pre-wrap text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{update.message}</pre>
+							{@render copyable(
+								update.message,
+								"bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+							)}
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Success && update.result.display}
 						<div class="space-y-1">
@@ -234,8 +244,10 @@
 							{#each parseToolOutputs(update.result.outputs) as parsedOutput}
 								<div class="space-y-2">
 									{#if parsedOutput.text}
-										<pre
-											class="scrollbar-custom max-h-60 overflow-y-auto rounded-lg bg-gray-100 p-2 font-mono text-xs break-all whitespace-pre-wrap dark:bg-gray-800/70">{parsedOutput.text}</pre>
+										{@render copyable(
+											parsedOutput.text,
+											"scrollbar-custom max-h-60 overflow-y-auto bg-gray-100 dark:bg-gray-800/70"
+										)}
 									{/if}
 
 									{#if parsedOutput.images.length > 0}
@@ -251,10 +263,10 @@
 									{/if}
 
 									{#if parsedOutput.metadata.length > 0}
-										<pre
-											class="rounded-lg bg-gray-100 p-2 font-mono text-xs break-all whitespace-pre-wrap dark:bg-gray-800/70">{formatValue(
-												Object.fromEntries(parsedOutput.metadata)
-											)}</pre>
+										{@render copyable(
+											formatValue(Object.fromEntries(parsedOutput.metadata)),
+											"bg-gray-100 dark:bg-gray-800/70"
+										)}
 									{/if}
 								</div>
 							{/each}
@@ -264,9 +276,10 @@
 							<div class="text-[10px] font-semibold text-amber-600 uppercase dark:text-amber-400">
 								Error
 							</div>
-							<pre
-								class="rounded-lg bg-amber-50 p-2 font-mono text-xs break-all whitespace-pre-wrap text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{update
-									.result.message}</pre>
+							{@render copyable(
+								update.result.message,
+								"bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+							)}
 						</div>
 					{/if}
 				{/each}

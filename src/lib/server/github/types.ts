@@ -12,4 +12,14 @@
 export interface GithubToolResult {
 	text: string;
 	isError: boolean;
+	/** the files the text names, read or only listed, recorded as sources */
+	files?: GithubFileRef[];
+}
+
+export interface GithubFileRef {
+	/** owner/repo */
+	repo: string;
+	url: string;
+	/** whether the file itself was read, not just listed */
+	opened: boolean;
 }

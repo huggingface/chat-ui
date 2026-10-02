@@ -31,13 +31,14 @@ import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
+import { stampMlHarness } from "$lib/server/mlAssistantHarness";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
 import {
 	compressUpdatesForStorage,
 	messageForStorage,
 } from "$lib/server/generation/compressUpdates";
-import { restoreRunningShape } from "$lib/server/generation/messageShape";
+import { restoreRunningShape } from "$lib/utils/messageShape";
 import { applyUpdateToMessage } from "$lib/server/generation/applyUpdate";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createGenerationWriter, type GenerationWriter } from "$lib/server/generation/writer";
@@ -208,6 +209,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							headers: z
 								.optional(z.array(z.object({ key: z.string(), value: z.string() })))
 								.default([]),
+							oauthConnectionId: z.string().optional(),
 						})
 					)
 				)
@@ -239,6 +241,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					s.headers && s.headers.length > 0
 						? Object.fromEntries(s.headers.map((h) => [h.key, h.value]))
 						: undefined,
+				oauthConnectionId: s.oauthConnectionId,
 			})),
 		};
 	} catch {
@@ -425,6 +428,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// The stamp is what tells a reader a log exists; every run records one.
 	const effectiveGenerationId = generationId ?? randomUUID();
 	messageToWriteTo.generationId = effectiveGenerationId;
+	stampMlHarness(messageToWriteTo, conv, model);
 
 	// update the conversation with the new messages
 	await collections.conversations.updateOne(

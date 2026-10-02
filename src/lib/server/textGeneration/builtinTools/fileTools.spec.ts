@@ -36,6 +36,7 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+	vi.restoreAllMocks();
 	await collections.mlFiles.deleteMany({});
 });
 
@@ -159,6 +160,17 @@ describe("edit_file", () => {
 	it("keeps one of two concurrent edits and refuses the other instead of losing it", async () => {
 		const { conv, write, edit } = tools();
 		await write.execute({ name: "train.py", content: "lr = 1\nsteps = 1\n" }, ctx);
+		// without this hold, expected_version can refuse the loser before the unique index does
+		const insertOne = collections.mlFiles.insertOne.bind(collections.mlFiles);
+		let arrived = 0;
+		let release = () => {};
+		const bothReady = new Promise<void>((resolve) => (release = resolve));
+		vi.spyOn(collections.mlFiles, "insertOne").mockImplementation(async (doc, options) => {
+			arrived += 1;
+			if (arrived === 2) release();
+			await bothReady;
+			return insertOne(doc, options);
+		});
 
 		const outcomes = await Promise.all([
 			edit.execute(
@@ -173,7 +185,10 @@ describe("edit_file", () => {
 
 		const texts = outcomes.map(textOf);
 		expect(texts.filter((text) => text.includes("v2 (was v1)"))).toHaveLength(1);
-		expect(texts.filter((text) => text.includes("moved from v1 to v2"))).toHaveLength(1);
+		// the loser either read v1 and lost the insert, or read after the winner wrote v2
+		expect(texts.filter((text) => /moved from v1 to v2|is at v2, not v1/.test(text))).toHaveLength(
+			1
+		);
 		const versions = await collections.mlFiles
 			.find({ conversationId: conv._id })
 			.sort({ version: 1 })

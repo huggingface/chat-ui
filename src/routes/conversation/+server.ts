@@ -14,7 +14,6 @@ import superjson from "superjson";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 import { resolveMlAssistantModel } from "$lib/server/mlAssistantModels";
 import { usdToMicroUsd } from "$lib/utils/mlBudget";
-import { toLegacyShape } from "$lib/utils/messageShape";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -162,7 +161,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		JSON.stringify({
 			conversationId,
 			conversation: superjson.stringify({
-				messages: messages.map(toLegacyShape),
+				messages,
 				title: storedTitle,
 				model: values.model,
 				preprompt: values.preprompt,

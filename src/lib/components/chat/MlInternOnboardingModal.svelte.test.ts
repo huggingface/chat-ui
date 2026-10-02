@@ -23,14 +23,12 @@ describe("MlInternOnboardingModal", () => {
 		expect(text).toContain("ML Intern is experimental");
 		expect(text).toContain("Enable all MCP tools");
 		expect(text).toContain("Cap what ML Intern can spend");
-		// A personal account has no spend limit to set on the billing page, so the
-		// copy has to name what is actually charged and what actually stops it.
-		expect(text).toContain("paid for with your Hugging Face credits");
-		expect(text).toContain("your credit balance is the ceiling");
-		expect(text).not.toContain("set a budget in your billing settings");
 		// Honest about the limit: the chat's cap does not reach everything.
-		expect(text).toContain("does not cover anything those Jobs start themselves");
-		expect(text).toContain("Chatting with the model does not use the compute budget");
+		expect(text).toContain("The session budget caps compute spending from this chat");
+		expect(text).toContain("but not spending by jobs it starts");
+		// Personal accounts can check credits but cannot set a general spending limit.
+		expect(text).toContain("Check your credits in billing settings");
+		expect(text).not.toContain("Set an account limit");
 		expect(text).toContain("bill to the organization set in HuggingChat's settings");
 	});
 

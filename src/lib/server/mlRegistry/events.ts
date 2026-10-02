@@ -18,6 +18,8 @@ export function endEventFields(
 ): Pick<MlService, "eventPendingSince" | "lastReportedStage"> {
 	// a retried dispatch reopens a row the model was already told about
 	if (service.lastReportedStage === stage) return {};
+	// woken by it the intern would recreate the sandbox, the next state block lists it once instead
+	if (service.stopRequestedAt) return {};
 	// a discovered row found already over was named by the model after it ended, not news
 	const seenOpen = service.stage !== UNKNOWN_STAGE && !TERMINAL_STAGES.has(service.stage);
 	return service.origin === "dispatched" || seenOpen
@@ -41,6 +43,7 @@ export function serviceEventFrom(service: MlService, now: Date): ServiceEvent {
 					ranSeconds: Math.max(0, Math.round((at.getTime() - service.startedAt.getTime()) / 1000)),
 				}
 			: {}),
+		...(service.pushes?.length ? { pushes: service.pushes } : {}),
 		at,
 	};
 }
@@ -159,16 +162,28 @@ export async function deliverServiceEvents(
 	}
 }
 
+/** read without claiming, for a caller that stores the events before it marks them */
+export const pendingServiceEvents = pendingFor;
+
+/** the rows this call marked, one another caller marked first was told there as well */
+export async function markServiceEventsReported(
+	services: MlService[],
+	now = new Date()
+): Promise<MlService[]> {
+	const marked: MlService[] = [];
+	for (const service of services) {
+		const { filter, update } = markReported(service, now);
+		const { modifiedCount } = await collections.mlServices.updateOne(filter, update);
+		if (modifiedCount === 1) marked.push(service);
+	}
+	return marked;
+}
+
 /** for a wait about to park, a crash after the claim loses the line, an ended job is listed once */
 export async function claimServiceEvents(
 	conversationId: ObjectId,
 	now = new Date()
 ): Promise<ServiceEvent[]> {
-	const claimed: ServiceEvent[] = [];
-	for (const service of await pendingFor(conversationId)) {
-		const { filter, update } = markReported(service, now);
-		const { modifiedCount } = await collections.mlServices.updateOne(filter, update);
-		if (modifiedCount === 1) claimed.push(serviceEventFrom(service, now));
-	}
-	return claimed;
+	const claimed = await markServiceEventsReported(await pendingFor(conversationId), now);
+	return claimed.map((service) => serviceEventFrom(service, now));
 }

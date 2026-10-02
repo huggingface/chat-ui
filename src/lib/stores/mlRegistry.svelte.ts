@@ -7,9 +7,12 @@ import type {
 	MlFileVersions,
 } from "$lib/types/MlFile";
 import type {
+	MlAgentRunDetail,
+	MlRegistryAgentRun,
 	MlRegistryArtefact,
 	MlRegistryPayload,
 	MlRegistryService,
+	MlRegistrySource,
 	MlRegistrySummary,
 } from "$lib/types/MlRegistry";
 import { noteServerNow } from "$lib/utils/clockSkew.svelte";
@@ -22,7 +25,20 @@ type FetchFn = typeof globalThis.fetch;
 export type FileLoad<T> =
 	{ status: "loading" } | { status: "ready"; value: T } | { status: "error" };
 
+export type StopRequest = { status: "stopping" } | { status: "error"; message: string };
+
+const STOP_UNREACHABLE = "Could not reach the server. Try again.";
+
+const errorMessage = (body: unknown): string =>
+	typeof body === "object" && body !== null && "message" in body && typeof body.message === "string"
+		? body.message
+		: "Could not stop the sandbox. Try again.";
+
 const contentKey = (name: string, version: number) => `${version}:${name}`;
+
+/** what changes while a run goes on, a detail with the same stamp as the listing is current */
+const runStamp = (run: Pick<MlRegistryAgentRun, "status" | "callCount" | "iterations">) =>
+	`${run.status}:${run.callCount}:${run.iterations}`;
 
 /**
  * what the harness recorded for a conversation, read from the registry endpoint and nothing else
@@ -31,8 +47,10 @@ const contentKey = (name: string, version: number) => `${version}:${name}`;
  */
 export class MlRegistryStore {
 	services = $state<MlRegistryService[]>([]);
+	agentRuns = $state<MlRegistryAgentRun[]>([]);
 	artefacts = $state<MlRegistryArtefact[]>([]);
 	files = $state<MlFileListing[]>([]);
+	sources = $state<MlRegistrySource[]>([]);
 	/** the server clock on the last payload, effects reseed from it */
 	serverNow = $state<number | undefined>(undefined);
 	/** whether a payload has arrived for the current conversation */
@@ -40,11 +58,18 @@ export class MlRegistryStore {
 
 	/** the conversation the rows belong to, undefined once it is left */
 	conversationId = $state<string | undefined>(undefined);
+	/** whether a turn is generating, a parked or finished one is not */
+	turnRunning = $state(false);
+
+	/** by service id, a stop in flight until a payload carries its mark, or why it failed */
+	stops = new SvelteMap<string, StopRequest>();
 
 	/** by file name, refetched once the registry lists a newer version */
 	#versions = new SvelteMap<string, FileLoad<MlFileVersionListing[]>>();
 	/** by version and name, a version never changes so it is fetched once */
 	#contents = new SvelteMap<string, FileLoad<string>>();
+	/** by run id, refetched once the listing shows the run moved on */
+	#runDetails = new SvelteMap<string, FileLoad<MlAgentRunDetail>>();
 	#fileRequests = new Map<string, Promise<void>>();
 
 	#live = false;
@@ -66,7 +91,12 @@ export class MlRegistryStore {
 
 	get summary(): MlRegistrySummary {
 		return {
-			rows: this.services.length + this.artefacts.length + this.files.length,
+			rows:
+				this.services.length +
+				this.agentRuns.length +
+				this.artefacts.length +
+				this.files.length +
+				this.sources.length,
 			open: this.openServices.length,
 			running: this.services.filter((service) => service.stage === "RUNNING").length,
 		};
@@ -80,6 +110,7 @@ export class MlRegistryStore {
 		this.bind(conversationId);
 		const turnEnded = this.#live && !live;
 		this.#live = live;
+		this.turnRunning = live;
 		this.#watching = true;
 		if (!this.loaded || turnEnded) void this.refresh();
 		this.#reschedule();
@@ -110,6 +141,32 @@ export class MlRegistryStore {
 			}
 		})();
 		return this.#inflight;
+	}
+
+	async stop(serviceId: string): Promise<void> {
+		const conversationId = this.conversationId;
+		if (!conversationId || this.stops.get(serviceId)?.status === "stopping") return;
+		const epoch = this.#epoch;
+		this.stops.set(serviceId, { status: "stopping" });
+		let failure: string | undefined;
+		try {
+			const response = await this.#client()
+				.conversations({ id: conversationId })
+				.registry.stop(serviceId)
+				.post();
+			if (response.error !== null) failure = errorMessage(response.error);
+		} catch {
+			failure = STOP_UNREACHABLE;
+		}
+		if (this.#epoch !== epoch) return;
+		if (failure) {
+			this.stops.set(serviceId, { status: "error", message: failure });
+			return;
+		}
+		// one already in flight was asked before the mark was written
+		if (this.#inflight) await this.#inflight;
+		await this.refresh();
+		if (this.#epoch === epoch) this.stops.delete(serviceId);
 	}
 
 	fileVersions(name: string): FileLoad<MlFileVersionListing[]> | undefined {
@@ -163,6 +220,41 @@ export class MlRegistryStore {
 		});
 	}
 
+	runDetail(id: string): FileLoad<MlAgentRunDetail> | undefined {
+		return this.#runDetails.get(id);
+	}
+
+	/** a detail kept on show while a newer one loads, like the file versions */
+	loadRunDetail(id: string): Promise<void> {
+		const listed = this.#listedRunStamp(id);
+		const cached = this.#runDetails.get(id);
+		if (cached?.status === "ready" && runStamp(cached.value) === listed) {
+			return Promise.resolve();
+		}
+		return this.#request(`run:${id}`, async (conversationId, client) => {
+			if (cached?.status !== "ready") this.#runDetails.set(id, { status: "loading" });
+			try {
+				const response = await client.conversations({ id: conversationId }).runs(id).get();
+				const detail = handleResponse(response) as MlAgentRunDetail;
+				return () => {
+					this.#runDetails.set(id, { status: "ready", value: detail });
+					// a poll that moved the run on mid flight was coalesced into this request
+					const now = this.#listedRunStamp(id);
+					return now !== listed && now !== runStamp(detail) ? this.loadRunDetail(id) : undefined;
+				};
+			} catch {
+				return () => {
+					if (cached?.status !== "ready") this.#runDetails.set(id, { status: "error" });
+				};
+			}
+		});
+	}
+
+	#listedRunStamp(id: string): string | undefined {
+		const run = this.agentRuns.find((candidate) => candidate.id === id);
+		return run && runStamp(run);
+	}
+
 	/** one request per key at a time, and an answer that lands after a reset lands nowhere */
 	#request(
 		key: string,
@@ -191,8 +283,10 @@ export class MlRegistryStore {
 
 	apply(payload: MlRegistryPayload): void {
 		this.services = payload.services;
+		this.agentRuns = payload.agentRuns ?? [];
 		this.artefacts = payload.artefacts;
 		this.files = payload.files;
+		this.sources = payload.sources ?? [];
 		this.serverNow = payload.serverNow;
 		this.loaded = true;
 		noteServerNow(payload.serverNow);
@@ -204,12 +298,17 @@ export class MlRegistryStore {
 		this.#inflight = undefined;
 		this.conversationId = undefined;
 		this.#live = false;
+		this.turnRunning = false;
 		this.#watching = false;
+		this.stops.clear();
 		this.services = [];
+		this.agentRuns = [];
 		this.artefacts = [];
 		this.files = [];
+		this.sources = [];
 		this.#versions.clear();
 		this.#contents.clear();
+		this.#runDetails.clear();
 		this.#fileRequests.clear();
 		this.serverNow = undefined;
 		this.loaded = false;

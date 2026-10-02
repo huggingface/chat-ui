@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ObjectId } from "mongodb";
 import type { OpenAI } from "openai";
-import { createHistoryWindow } from "./historyWindow";
+import { createHistoryWindow, windowLimitChars } from "./historyWindow";
 import { prepareHistory, type HistoryMessage } from "./prepareFiles";
 import type { makeImageProcessor } from "$lib/server/endpoints/images";
 import {
@@ -168,5 +168,55 @@ describe("history window in the tool loop", () => {
 		expect(JSON.stringify(recomputed)).not.toContain("[Earlier history omitted");
 		expect(toolIds(recomputed)).toHaveLength(4);
 		expect(smaller.saved).toEqual([]);
+	});
+});
+
+describe("a brief with a huge attachment", () => {
+	it("fits the window, which keeps the brief on every request", async () => {
+		const rows = Array.from({ length: 600_000 }, (_, i) => `${i},sample_${i % 101},${i * 7}`);
+		const csv = ["id,label,value", ...rows].join("\n");
+		const limitChars = windowLimitChars(1_048_576);
+		expect(csv.length).toBeGreaterThan(limitChars);
+
+		const prepared = await prepareHistory(
+			[
+				{
+					id: "u0",
+					from: "user",
+					content: "BRIEF",
+					files: [
+						{
+							type: "base64",
+							name: "data.csv",
+							value: Buffer.from(csv).toString("base64"),
+							mime: "text/csv",
+						},
+					],
+				},
+				storedTurn("a0", 3, 1_000),
+				{ id: "u1", from: "user", content: "GO" },
+			],
+			imageProcessor,
+			false,
+			{ replayToolHistory: true, contextLengthTokens: 1_048_576, slidingWindow: true }
+		);
+		if (!prepared.units) throw new Error("expected the sliding window to apply");
+		const window = createHistoryWindow({
+			conversationId: new ObjectId(),
+			units: prepared.units,
+			offset: 0,
+			limitChars,
+			fixedChars: 0,
+			save: vi.fn(async () => undefined),
+		});
+
+		const sent = await window.fit(prepared.messages);
+
+		expect(JSON.stringify(sent).length).toBeLessThan(limitChars * 0.1);
+		expect(String(sent[0].content)).toMatch(
+			/^<document name="data\.csv" type="text\/csv">\nid,label,value\n/
+		);
+		expect(String(sent[0].content)).toContain("characters of data.csv.");
+		expect(String(sent[0].content).endsWith("</document>\n\nBRIEF")).toBe(true);
 	});
 });

@@ -795,7 +795,7 @@ describe("virtual file expansion at dispatch", () => {
 	it("leaves a reference outside the allowlisted positions, or inside a longer string, alone", async () => {
 		const { expandVirtualFiles } = await seeded();
 		const inCommand =
-			'{"operation":"run","args":{"image":"python:3.12","command":["v-file://train.py"]}}';
+			'{"operation":"run","args":{"image":"python:3.12","command":["python","-c","print(\'v-file://train.py\')"]}}';
 		const inProse = '{"operation":"uv","args":{"script":"# see v-file://train.py\\nprint(3)"}}';
 
 		const events = await drainExpanding(

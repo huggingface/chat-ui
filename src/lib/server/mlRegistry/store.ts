@@ -2,7 +2,7 @@ import type { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import type { MlArtefact, MlArtefactKind } from "$lib/types/MlArtefact";
 import type { MlFileRef } from "$lib/types/MlFile";
-import type { MlService, MlServiceKind } from "$lib/types/MlService";
+import type { ExpectedPush, MlService, MlServiceKind } from "$lib/types/MlService";
 
 // every write is an upsert keyed on the external id, so a retried round or a discovery racing a
 // dispatch converge on one row
@@ -17,6 +17,8 @@ export const hubJobUrl = (namespace: string, jobId: string): string =>
 
 export const sandboxHandle = (namespace: string, jobId: string): string =>
 	`hfsb2:${namespace}:${jobId}`;
+
+const PUT_COMMITS_CAP = 50;
 
 interface Provenance {
 	messageId?: string;
@@ -43,6 +45,7 @@ export interface DispatchedService extends Provenance {
 	hubUrl?: string;
 	reservationKey?: string;
 	scriptRefs?: MlFileRef[];
+	expectedPushes?: ExpectedPush[];
 }
 
 /** what the reply said overrides whatever was there */
@@ -60,6 +63,7 @@ export async function recordDispatchedService(service: DispatchedService): Promi
 				origin: "dispatched",
 				updatedAt: now,
 			},
+			$unset: { reconciled: "" },
 		},
 		{ upsert: true }
 	);
@@ -96,6 +100,73 @@ export async function recordDiscoveredService({
 			},
 		},
 		{ upsert: true }
+	);
+}
+
+export interface ReconciledService {
+	conversationId: ObjectId;
+	jobId: string;
+	namespace: string;
+	stage: string;
+	name?: string;
+	flavor?: string;
+	timeoutSeconds?: number;
+	/** from the hub so the poller deadline counts from the submission, not the listing */
+	createdAt?: Date;
+}
+
+/** insert only and keyed like a discovery, a row that exists in any form is left as it is */
+export async function recordReconciledService(service: ReconciledService): Promise<boolean> {
+	const now = new Date();
+	const { conversationId, jobId, namespace, createdAt, ...rest } = service;
+	try {
+		const result = await collections.mlServices.updateOne(
+			{ conversationId, jobId },
+			{
+				$setOnInsert: {
+					kind: "job",
+					namespace,
+					...compact(rest),
+					origin: "dispatched",
+					reconciled: true,
+					hubUrl: hubJobUrl(namespace, jobId),
+					createdAt: createdAt ?? now,
+					updatedAt: now,
+					nextPollAt: now,
+				},
+			},
+			{ upsert: true }
+		);
+		return result.upsertedCount > 0;
+	} catch (err) {
+		// a dispatch that inserted the row between the match and the insert
+		if ((err as { code?: number }).code === 11000) return false;
+		throw err;
+	}
+}
+
+export async function isRecordedSandbox(conversationId: ObjectId, jobId: string): Promise<boolean> {
+	const count = await collections.mlServices.countDocuments(
+		{ conversationId, jobId, kind: "sandbox" },
+		{ limit: 1 }
+	);
+	return count > 0;
+}
+
+/** update-labels replaces the whole set, so a relabel without a name leaves the job unnamed */
+export async function recordServiceName({
+	conversationId,
+	jobId,
+	name,
+}: {
+	conversationId: ObjectId;
+	jobId: string;
+	name?: string;
+}): Promise<void> {
+	const now = new Date();
+	await collections.mlServices.updateOne(
+		{ conversationId, kind: "job", jobId },
+		name ? { $set: { name, updatedAt: now } } : { $unset: { name: "" }, $set: { updatedAt: now } }
 	);
 }
 
@@ -139,6 +210,7 @@ export async function recordArtefact(artefact: ArtefactRecord): Promise<void> {
 				...compact({ commit, fromFile, serviceId }),
 			},
 			...(Object.keys(unset).length ? { $unset: unset } : {}),
+			...(commit ? { $push: { putCommits: { $each: [commit], $slice: -PUT_COMMITS_CAP } } } : {}),
 		},
 		{ upsert: true }
 	);
@@ -164,6 +236,33 @@ export async function ensureArtefact({
 	);
 }
 
+/** a repo a job pushed to, discovered when the registry did not know it, who made it stays */
+export async function recordPushedRepo({
+	conversationId,
+	kind,
+	uri,
+	url,
+	commit,
+	serviceId,
+}: {
+	conversationId: ObjectId;
+	kind: "model" | "dataset";
+	uri: string;
+	url: string;
+	commit?: string;
+	serviceId: ObjectId;
+}): Promise<void> {
+	const now = new Date();
+	await collections.mlArtefacts.updateOne(
+		{ conversationId, uri },
+		{
+			$setOnInsert: { kind, url, origin: "discovered", createdAt: now },
+			$set: { serviceId, updatedAt: now, ...compact({ commit }) },
+		},
+		{ upsert: true }
+	);
+}
+
 export function recordDashboardArtefact({
 	conversationId,
 	spaceId,
@@ -185,6 +284,9 @@ export async function deleteMlRegistry(conversationIds: ObjectId[]): Promise<voi
 	await Promise.all([
 		collections.mlServices.deleteMany(filter),
 		collections.mlArtefacts.deleteMany(filter),
+		collections.mlAgentRuns.deleteMany(filter),
+		collections.mlSources.deleteMany(filter),
+		collections.mlSessionLabels.deleteMany({ _id: { $in: conversationIds } }),
 	]);
 }
 

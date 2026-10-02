@@ -2,7 +2,7 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { z } from "zod";
 import { ObjectId } from "mongodb";
-import { rebuildLegacyContent } from "$lib/utils/messageShape";
+import { toLegacyShape } from "$lib/utils/messageShape";
 
 export async function GET({ locals, params }) {
 	const id = z.string().parse(params.id);
@@ -20,8 +20,8 @@ export async function GET({ locals, params }) {
 				title: conv.title,
 				updatedAt: conv.updatedAt,
 				modelId: conv.model,
-				messages: conv.messages.map((message) => ({
-					content: rebuildLegacyContent(message).content,
+				messages: conv.messages.map(toLegacyShape).map((message) => ({
+					content: message.content,
 					from: message.from,
 					id: message.id,
 					createdAt: message.createdAt,

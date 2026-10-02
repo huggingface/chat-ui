@@ -1,21 +1,40 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { convertFinishedMessage, convertMessageShape, type ShapeSkipReason } from "./messageShape";
+import { compressUpdatesForStorage, messageForStorage } from "./compressUpdates";
 import {
-	convertFinishedMessage,
-	convertMessageShape,
+	rebuildLegacyContent,
 	restoreRunningShape,
-	type ShapeSkipReason,
-} from "./messageShape";
-import { messageForStorage } from "./compressUpdates";
-import { rebuildLegacyContent, toLegacyShape, toolRounds } from "$lib/utils/messageShape";
+	toLegacyShape,
+	toolRounds,
+} from "$lib/utils/messageShape";
 import type { Message } from "$lib/types/Message";
-import { MessageUpdateType } from "$lib/types/MessageUpdate";
+import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import {
 	assistantMessage,
+	convertingTurns,
 	finalAnswer,
+	preamblesTrimmed,
 	stream,
 	streamed,
 	toolRound,
 } from "./__tests__/turnFixtures";
+
+const env = vi.hoisted(() => ({}) as Record<string, string>);
+
+vi.mock("$lib/server/config", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("$lib/server/config")>();
+	return {
+		...actual,
+		config: new Proxy(actual.config, {
+			get: (target, prop) =>
+				typeof prop === "string" && prop in env ? env[prop] : Reflect.get(target, prop),
+		}),
+	};
+});
+
+afterEach(() => {
+	for (const key of Object.keys(env)) delete env[key];
+});
 
 function converted(message: Message): Message {
 	const result = convertMessageShape(message);
@@ -251,6 +270,154 @@ describe("messageForStorage", () => {
 	});
 });
 
+describe("the MESSAGE_ROUNDS_SHAPE switch", () => {
+	const raw = () => {
+		const message = assistantMessage([
+			...toolRound({ reasoning: "Plan.", text: "Let me check." }),
+			...finalAnswer("Done.", "Sunny."),
+		]);
+		return { ...message, updates: [...(message.updates ?? []), stream("")] };
+	};
+
+	it("stores a finished turn converted with the switch unset", () => {
+		expect(messageForStorage(raw()).contentShape).toBe(2);
+	});
+
+	it("stores it compressed only, as before the conversion, with the switch off", () => {
+		env.MESSAGE_ROUNDS_SHAPE = "false";
+		const message = raw();
+
+		const stored = messageForStorage(message);
+		expect(stored).toEqual({ ...message, updates: compressUpdatesForStorage(message.updates) });
+		expect(stored).not.toHaveProperty("contentShape");
+		expect(stored.content).toBe("<think>Plan.</think>Let me check.<think>Done.</think>Sunny.");
+		expect(stored.updates?.some((u) => u.type === MessageUpdateType.Stream)).toBe(true);
+	});
+
+	it("leaves a message stored converted as it is with the switch off", () => {
+		const stored = messageForStorage(raw());
+		env.MESSAGE_ROUNDS_SHAPE = "false";
+
+		expect(messageForStorage(stored)).toEqual(stored);
+	});
+});
+
+describe("what a converted message stores", () => {
+	const turn = () =>
+		assistantMessage([
+			...toolRound({ reasoning: "Plan.", text: "Let me check." }),
+			...toolRound({ text: "And again." }),
+			...finalAnswer("Done.", "Sunny."),
+		]);
+	const ofType = (message: Message, type: MessageUpdateType) =>
+		(message.updates ?? []).filter((u) => u.type === type);
+	const calls = (message: Message) => toolRounds(message.updates ?? []).flatMap((r) => r.calls);
+
+	it("drops the stream markers, the answer text and the parameters argumentsRaw repeats", () => {
+		const legacy = turn();
+		expect(ofType(legacy, MessageUpdateType.Stream).length).toBeGreaterThan(0);
+
+		const next = converted(legacy);
+		expect(ofType(next, MessageUpdateType.Stream)).toEqual([]);
+		expect(ofType(next, MessageUpdateType.FinalAnswer)).toEqual([
+			{
+				type: MessageUpdateType.FinalAnswer,
+				text: "",
+				len: "<think>Done.</think>Sunny.".length,
+				interrupted: false,
+			},
+		]);
+		expect(calls(next).map((u) => u.call.parameters)).toEqual([{}, {}]);
+		expect(calls(next).map((u) => u.argumentsRaw)).toEqual([
+			'{"city":"Paris"}',
+			'{"city":"Paris"}',
+		]);
+	});
+
+	it("keeps parameters argumentsRaw cannot give back", () => {
+		const legacy = turn();
+		const [first, second] = calls(legacy);
+		delete first.argumentsRaw;
+		second.call.parameters = { city: "Lyon" };
+
+		expect(calls(converted(legacy)).map((u) => u.call.parameters)).toEqual([
+			{ city: "Paris" },
+			{ city: "Lyon" },
+		]);
+	});
+
+	it("leaves a message that stays in the old shape as it was", () => {
+		const legacy = assistantMessage(
+			[
+				...toolRound({ reasoning: "Plan.", text: "Let me check." }),
+				...finalAnswer(undefined, "Sunny."),
+			],
+			"running"
+		);
+
+		const stored = messageForStorage(legacy);
+		expect(stored.contentShape).toBeUndefined();
+		expect(stored.updates).toEqual(legacy.updates);
+	});
+
+	it("slims a message converted before it did, and only once", () => {
+		const legacy = turn();
+		const unslimmed = { ...converted(legacy), updates: legacy.updates };
+
+		const once = messageForStorage(unslimmed);
+		expect(ofType(once, MessageUpdateType.Stream)).toEqual([]);
+		expect(calls(once).map((u) => u.call.parameters)).toEqual([{}, {}]);
+		expect(messageForStorage(once)).toEqual(once);
+		expect(convertFinishedMessage(once)).toBe(once);
+	});
+});
+
+describe("a turn told of a service end between rounds", () => {
+	const event = (afterToolUuid: string): MessageUpdate => ({
+		type: MessageUpdateType.HarnessEvent,
+		events: [
+			{
+				serviceId: "svc",
+				kind: "job",
+				jobId: "0123456789abcdef01234567",
+				from: "RUNNING",
+				to: "ERROR",
+				at: 0,
+			},
+		],
+		text: "[Harness event, not part of this tool result]\nJob 0123456789abcdef01234567 failed: ERROR.",
+		afterToolUuid,
+	});
+
+	it("stores the event where it was emitted, after its round's results and before the next round", () => {
+		const first = toolRound({ reasoning: "Plan.", text: "Let me check." });
+		const second = toolRound({ reasoning: "Now the forecast." });
+		const calls = toolRounds(first);
+		const told = event(calls[0].calls[0].uuid);
+		const message = assistantMessage([
+			...first,
+			told,
+			...second,
+			...finalAnswer("Done.", "Sunny."),
+		]);
+
+		const stored = messageForStorage(message);
+
+		expect(stored.contentShape).toBe(2);
+		const updates = stored.updates ?? [];
+		const at = updates.indexOf(told);
+		expect(at).toBeGreaterThan(-1);
+		const rounds = toolRounds(updates);
+		expect(at).toBeGreaterThan(rounds[0].start);
+		expect(at).toBeLessThan(rounds[1].start);
+		expect(roundTexts(stored)).toEqual([
+			{ reasoning: "Plan.", content: "Let me check." },
+			{ reasoning: "Now the forecast.", content: undefined },
+		]);
+		expect(rebuildLegacyContent(stored)).toEqual({ content: message.content });
+	});
+});
+
 describe("restoreRunningShape", () => {
 	it("puts a converted message back as the buffer a turn appends to", () => {
 		const message = assistantMessage([
@@ -263,5 +430,15 @@ describe("restoreRunningShape", () => {
 		expect(next.content).toBe(message.content);
 		expect(next.contentShape).toBeUndefined();
 		expect(next.reasoning).toBeUndefined();
+	});
+
+	it("puts back the stream markers the next conversion cuts rounds at", () => {
+		for (const [name, legacy] of Object.entries(convertingTurns())) {
+			const restored = converted(legacy);
+			restoreRunningShape(restored);
+
+			expect(preamblesTrimmed(restored), name).toEqual(legacy);
+			expect(converted(restored), name).toEqual(converted(legacy));
+		}
 	});
 });

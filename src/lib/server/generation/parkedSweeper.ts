@@ -9,6 +9,7 @@ import { buildSubtree } from "$lib/utils/tree/buildSubtree";
 import { textGeneration } from "$lib/server/textGeneration";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
+import { stampMlHarness } from "$lib/server/mlAssistantHarness";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { waitResumeResultText } from "$lib/server/textGeneration/builtinTools/waitTool";
 import { ToolResultStatus } from "$lib/types/Tool";
@@ -25,7 +26,7 @@ import { createGenerationWriter } from "./writer";
 import { applyUpdateToMessage } from "./applyUpdate";
 import { turnAbandoned, turnEnded, turnRunning, turnUnsaved } from "./turnState";
 import { compressUpdatesForStorage, messageForStorage } from "./compressUpdates";
-import { restoreRunningShape } from "./messageShape";
+import { restoreRunningShape } from "$lib/utils/messageShape";
 
 const SWEEP_BATCH = 5;
 /** A row this many attempts deep is not going to resume; stop burning turns on it. */
@@ -313,9 +314,16 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 	// generationId. A resumed run that leaves the parked turn's id in place is
 	// invisible: its output only appears on a manual refresh.
 	message.generationId = generationId;
+	const harness = stampMlHarness(message, conv, model);
 	await collections.conversations.updateOne(
 		{ _id: conv._id, "messages.id": message.id },
-		{ $set: { "messages.$.generationId": generationId, updatedAt: new Date() } }
+		{
+			$set: {
+				"messages.$.generationId": generationId,
+				...(harness ? { "messages.$.harness": harness } : {}),
+				updatedAt: new Date(),
+			},
+		}
 	);
 
 	const writer = await createGenerationWriter({

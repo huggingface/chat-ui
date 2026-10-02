@@ -60,11 +60,10 @@ describe("ToolUpdate status icon", () => {
 	});
 	const icon = (el: Element, label: string) => el.querySelector(`svg[aria-label='${label}']`);
 
-	it("warns instead of checking when the result itself is an error", () => {
+	it("warns when the result itself is an error", () => {
 		const { baseElement } = render(ToolUpdate, { tool: [call, result("error")] } as never);
 
 		expect(icon(baseElement, "Failed")).not.toBeNull();
-		expect(icon(baseElement, "Succeeded")).toBeNull();
 		expect(baseElement.textContent).toContain("Error calling tool");
 	});
 });
@@ -149,7 +148,8 @@ describe("ToolUpdate virtual file chips", () => {
 		expect(sidePane.registryFocus).toEqual({ name: "train.py", version: 2 });
 		await vi.waitFor(() => {
 			const row = pane.container.querySelector(".ml-version[data-version='2']");
-			expect(row?.querySelector(".ml-version-toggle")?.getAttribute("aria-pressed")).toBe("true");
+			const pill = pane.container.querySelector(".ml-version-pill[data-version='2']");
+			expect(pill?.getAttribute("aria-pressed")).toBe("true");
 			expect(row?.querySelector(".ml-file-code .diff-add")?.textContent).toBe("+ print(2)");
 		});
 		expect(pane.container.querySelector(".ml-file-toggle")?.getAttribute("aria-expanded")).toBe(
@@ -168,5 +168,53 @@ describe("ToolUpdate virtual file chips", () => {
 		mlRegistry.bind("conv-1");
 		const { container } = render(ToolUpdate, { tool: [call] } as never);
 		expect(container.querySelector(".tool-file-ref")).toBeNull();
+	});
+});
+
+describe("ToolUpdate input", () => {
+	const job = {
+		operation: "uv",
+		args: {
+			script: "v-file://train.py@v2",
+			flavor: "a10g-large",
+			timeout: "2h",
+			secrets: { HF_TOKEN: "$HF_TOKEN", WANDB_API_KEY: "wandb-live-1234" },
+			env: { MAX_TOKENS: 512, COMMAND: "train --token=abcd1234efgh --epochs 3" },
+		},
+	};
+	const input = async (update: Record<string, unknown>) => {
+		const screen = render(ToolUpdate, { tool: [update] } as never);
+		await screen.getByRole("button", { name: "Expand" }).click();
+		return screen.container.querySelector("pre")?.textContent ?? "";
+	};
+
+	it("shows the arguments the model sent, nested ones included, with secrets hidden", async () => {
+		const shown = await input({
+			...call,
+			call: { name: "hf_jobs", parameters: {} },
+			argumentsRaw: JSON.stringify(job),
+		});
+
+		const { operation, args } = JSON.parse(shown);
+		expect(operation).toBe("uv");
+		expect(args).toMatchObject({
+			script: "v-file://train.py@v2",
+			flavor: "a10g-large",
+			timeout: "2h",
+			secrets: { HF_TOKEN: "<redacted>", WANDB_API_KEY: "<redacted>" },
+			env: { MAX_TOKENS: 512 },
+		});
+		expect(args.env.COMMAND).not.toContain("abcd1234efgh");
+		expect(args.env.COMMAND).toMatch(/^train.*--epochs 3$/);
+	});
+
+	it("falls back to the parameters of a call stored without argumentsRaw, redacted too", async () => {
+		const shown = await input({
+			...call,
+			call: { name: "hf_sandbox_exec", parameters: { command: "login --password hunter2" } },
+		});
+
+		expect(shown).not.toContain("hunter2");
+		expect(JSON.parse(shown).command).toMatch(/^login.*<redacted>$/);
 	});
 });

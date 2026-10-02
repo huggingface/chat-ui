@@ -90,6 +90,7 @@ describe.sequential("mlBudget guard: what is gated", () => {
 			["hf_jobs", { operation: "ps" }],
 			["hf_jobs", { operation: "inspect", args: { job_id: "x" } }],
 			["hf_jobs", { operation: "cancel", args: { job_id: "x" } }],
+			["hf_jobs", { operation: "update-labels", args: { job_id: "x", labels: {} } }],
 			["hf_sandbox", { cmd: "status", args: ["handle"] }],
 			["hf_sandbox", { cmd: "terminate", args: ["handle"] }],
 			["hf_sandbox", { cmd: "kill", args: ["handle", "1"] }],
@@ -102,9 +103,14 @@ describe.sequential("mlBudget guard: what is gated", () => {
 	it("refuses scheduled jobs outright", { timeout: 15000 }, async () => {
 		const id = await insertConversation(budgetOf(100_000_000));
 		const { before } = makeGuard(id);
-		const verdict = await before("hf_jobs", { operation: "scheduled run", args: {} });
-		expect(verdict.allow).toBe(false);
-		if (!verdict.allow) expect(verdict.message).toContain("Scheduled jobs");
+		for (const operation of ["scheduled run", "scheduled uv", "scheduled update-labels"]) {
+			const verdict = await before("hf_jobs", { operation, args: {} });
+			expect(verdict.allow).toBe(false);
+			if (!verdict.allow) {
+				expect(verdict.message).toContain("Scheduled jobs");
+				expect(verdict.message).not.toContain("unrecognized");
+			}
+		}
 	});
 
 	// The observed bypass: submission-shaped args with no operation sailed
