@@ -2,6 +2,7 @@ import type { Message } from "$lib/types/Message";
 import type { EndpointMessage } from "./endpoints";
 import { downloadFile } from "../files/downloadFile";
 import type { ObjectId } from "mongodb";
+import { withTrackioViewContext } from "$lib/utils/trackioView";
 
 export async function preprocessMessages(
 	messages: Message[],
@@ -9,6 +10,7 @@ export async function preprocessMessages(
 ): Promise<EndpointMessage[]> {
 	return Promise.resolve(messages)
 		.then((msgs) => downloadFiles(msgs, convId))
+		.then(injectTrackioViews)
 		.then(stripEmptyInitialSystemMessage);
 }
 
@@ -24,6 +26,15 @@ async function downloadFiles(messages: Message[], convId: ObjectId): Promise<End
 				})
 			).then((files) => ({ ...message, files }))
 		)
+	);
+}
+
+/** A user message's attached dashboard views become text the model reads with it. */
+function injectTrackioViews(messages: EndpointMessage[]): EndpointMessage[] {
+	return messages.map((message) =>
+		message.from === "user" && message.dashboardViews?.length
+			? { ...message, content: withTrackioViewContext(message.content, message.dashboardViews) }
+			: message
 	);
 }
 

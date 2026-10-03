@@ -64,9 +64,17 @@ describe("fetchTrackioSpaceStatus", () => {
 		await expect(fetchTrackioSpaceStatus("a/b")).resolves.toBe("failed");
 	});
 
-	it("keeps polling when the lookup itself fails", async () => {
-		// A lookup that failed is not a Space that failed.
+	it("is unknown, not building, when the lookup itself fails", async () => {
+		// A lookup that failed is not a Space that failed, nor one still starting:
+		// the button must stay usable while polling carries on.
 		vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network")));
-		await expect(fetchTrackioSpaceStatus("a/b")).resolves.toBe("building");
+		await expect(fetchTrackioSpaceStatus("a/b")).resolves.toBe("unknown");
+		respond(429, {});
+		await expect(fetchTrackioSpaceStatus("a/b")).resolves.toBe("unknown");
+	});
+
+	it("counts a sleeping Space as openable, since framing it wakes it", async () => {
+		respond(200, { runtime: { stage: "SLEEPING" } });
+		await expect(fetchTrackioSpaceStatus("a/b")).resolves.toBe("live");
 	});
 });
