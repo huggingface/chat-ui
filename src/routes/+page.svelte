@@ -9,8 +9,7 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { storePendingFiles } from "$lib/utils/pendingFiles";
-	import superjson from "superjson";
-	import { seedPendingConversation, type ConversationData } from "$lib/utils/pendingConversation";
+	import { seedCreatedConversation } from "$lib/utils/pendingConversation";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
@@ -42,6 +41,7 @@
 	const settings = useSettingsStore();
 
 	async function createConversation(message: string) {
+		const requestedMlAssistant = mlAssistant.enabled;
 		try {
 			$loading = true;
 
@@ -58,7 +58,7 @@
 				model = data.models[0].id;
 			}
 			// The mode runs on its own fixed set; the server enforces this too.
-			if (mlAssistant.taskStarted && data.mlAssistantModels.length > 0) {
+			if (requestedMlAssistant && data.mlAssistantModels.length > 0) {
 				model = data.mlAssistantModels.includes(model) ? model : data.mlAssistantModels[0];
 			}
 			const res = await fetch(`${base}/conversation`, {
@@ -72,9 +72,7 @@
 						($settings.customPromptsEnabled?.[$settings.activeModel] ?? true)
 							? $settings.customPrompts[$settings.activeModel]
 							: "",
-					// The composer latches the mode before handing the message over, so
-					// the conversation this creates is marked with it from the start.
-					mlAssistant: mlAssistant.taskStarted,
+					mlAssistant: requestedMlAssistant,
 				}),
 			});
 
@@ -91,23 +89,13 @@
 				}
 				error.set(errorMessage);
 				console.error("Error while creating conversation: ", errorMessage);
-				// The composer latched the mode for a conversation that never happened.
-				mlAssistant.abortTask();
 				return;
 			}
 
 			const { conversationId, conversation } = await res.json();
-
-			// The create response embeds the conversation payload; hand it to the
-			// conversation page as a one-shot seed so its load skips the GET and
-			// the first generation request starts one round-trip sooner.
-			if (typeof conversation === "string") {
-				try {
-					seedPendingConversation(conversationId, superjson.parse<ConversationData>(conversation));
-				} catch {
-					// Malformed seed: the page load falls back to a normal fetch.
-				}
-			}
+			const createdConversation = seedCreatedConversation(conversationId, conversation);
+			const createdInMlMode = createdConversation?.mlAssistant === true;
+			if (createdConversation) mlAssistant.confirmCreation(createdInMlMode);
 
 			// Pass the first message text via SvelteKit history state (JSON-serializable).
 			// File objects are not serializable, so they are stored in a client-side Map
@@ -122,11 +110,9 @@
 			convsStore.prepend({
 				id: conversationId,
 				title: "New Chat",
-				model,
+				model: createdConversation?.model ?? model,
 				updatedAt: new Date(),
-				// Latched before the create request, so the sidebar row carries the
-				// mode's designation from the moment it appears.
-				mlAssistant: mlAssistant.taskStarted,
+				mlAssistant: createdInMlMode,
 			});
 			await goto(`${base}/conversation/${conversationId}`, {
 				state: { pendingMessage: message, pendingFilesNonce },
@@ -134,8 +120,6 @@
 		} catch (err) {
 			error.set((err as Error).message || ERROR_MESSAGES.default);
 			console.error(err);
-			// The composer latched the mode for a conversation that never happened.
-			mlAssistant.abortTask();
 		} finally {
 			$loading = false;
 		}
@@ -203,7 +187,6 @@
 				}
 			}
 			if (request.send && request.prompt) {
-				mlAssistant.startTask();
 				await createConversation(request.prompt);
 			} else if (request.prompt && !draft) {
 				draft = request.prompt;

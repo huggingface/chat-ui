@@ -74,7 +74,11 @@ import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
 import { createJobLabelRewrite } from "$lib/server/mcp/jobLabels";
 import { loadSessionJobLabels } from "$lib/server/mlRegistry/sessionLabel";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
-import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
+import {
+	createMlAssistantOnlyComputeGuard,
+	createMlBudgetGuard,
+	withRequiredDiscriminators,
+} from "$lib/server/mlBudget/guard";
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
 import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
 import { PARENT_READER } from "$lib/types/MlSource";
@@ -97,6 +101,7 @@ import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { withUpstreamRetry } from "../utils/upstreamRetry";
 import { getEnabledBuiltinTools, isNestedAgentTool, shouldSkipMcpFlow } from "../builtinTools";
 import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
+import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 import { inferenceBillingHeaders } from "$lib/server/billing";
 
 export type RunMcpFlowContext = Pick<
@@ -209,11 +214,11 @@ export async function* runMcpFlow({
 	const mlAssistant = isMlAssistantConversation(conv);
 	const harnessEvents = mlAssistant && mlServiceEventsEnabled();
 
-	// Every mode conversation is gated — one without a stored budget is a zero
-	// budget, not an ungated one. Settle already ran this turn
-	// (textGeneration/index.ts), so the ledger the guard reserves against is as
-	// fresh as it gets.
-	const budgetGuard = mlAssistant
+	// In builds that ship the mode, Hub compute cannot be started ungated. In the
+	// mode, a missing stored budget is a zero budget; outside it, submissions and
+	// sandbox creation are refused. Settle already ran this turn (textGeneration/index.ts),
+	// so the ledger the budget guard reserves against is as fresh as it gets.
+	const computeGuard = mlAssistant
 		? createMlBudgetGuard({
 				conversationId: conv._id,
 				generationId: generationId ?? conv._id.toString(),
@@ -225,7 +230,9 @@ export async function* runMcpFlow({
 					(locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
 					(locals as unknown as { token?: string } | undefined)?.token,
 			})
-		: undefined;
+		: ML_ASSISTANT_MODE
+			? createMlAssistantOnlyComputeGuard()
+			: undefined;
 
 	// The total the model was last told: the session-context line's, which the
 	// preprompt read from this same ledger after the turn-start settle.
@@ -560,10 +567,10 @@ export async function* runMcpFlow({
 				"[mcp] dropped MCP tools shadowed by builtin tools"
 			);
 		}
-		// In the mode, gated tools advertise their routing discriminator as
-		// required — the Hub's own schema doesn't, and calls without one can only
-		// bounce off the budget gate's fail-closed path.
-		const gatedMcpTools = mlAssistant ? withRequiredDiscriminators(mcpTools, mapping) : mcpTools;
+		// Whenever compute policy is active, gated tools advertise their routing
+		// discriminator as required. The Hub's own schema doesn't, and calls without
+		// one can only bounce off the fail-closed guard without saying read or submit.
+		const gatedMcpTools = computeGuard ? withRequiredDiscriminators(mcpTools, mapping) : mcpTools;
 		// Applied to every conversation, mode or not: the Hub tools whose real
 		// interface is a grammar in prose misfire the same way whoever is calling
 		// them. See mcp/schemaRepair.ts for what the traces showed.
@@ -572,16 +579,15 @@ export async function* runMcpFlow({
 		});
 		// Cheapest first, and only the last link may book anything (see
 		// composeGuards): a repeat of a call that already failed the same way, then
-		// arguments that cannot satisfy the tool's own schema, then the budget.
-		// The first two run for every conversation — getting a tool's arguments
-		// wrong is not a mode-specific failure.
-		// the recorder goes ahead of the budget so the budget update still reaches the stream
+		// arguments that cannot satisfy the tool's own schema, then the compute
+		// policy (a budget in the mode, a no-create boundary outside it). The first
+		// two run for every conversation — malformed arguments are not mode-specific.
 		const guard = [
 			repeatedCallGuard,
 			createSchemaPreflightGuard(mapping),
 			...(recordingGuard ? [recordingGuard] : []),
 			...(sourcesGuardFor ? [sourcesGuardFor(PARENT_READER)] : []),
-			...(budgetGuard ? [budgetGuard] : []),
+			...(computeGuard ? [computeGuard] : []),
 		].reduce(composeGuards);
 		const oaTools = [
 			...builtinTools.map((tool) => tool.definition),
@@ -1334,7 +1340,7 @@ export async function* runMcpFlow({
 							assistantToolMessage,
 							...(event.summary.toolMessages ?? []),
 						];
-						if (budgetGuard) {
+						if (computeGuard) {
 							try {
 								const budget = await readMlBudget(conv._id);
 								const note = budgetChangeNote(budgetTotalSeen, budget);
