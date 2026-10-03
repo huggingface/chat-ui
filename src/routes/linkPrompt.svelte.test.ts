@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { tick } from "svelte";
 import { writable } from "svelte/store";
 import type { Component } from "svelte";
@@ -7,6 +7,7 @@ import { setPage } from "$lib/components/__tests__/appMocks";
 import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
 import HomePage from "./+page.svelte";
 import ModelPage from "./models/[...model]/+page.svelte";
+import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 
 vi.mock("$lib/components/chat/ChatWindow.svelte", async () => ({
 	default: (await import("$lib/components/__tests__/ChatWindowStub.svelte")).default,
@@ -16,6 +17,11 @@ vi.mock("$lib/utils/loadAttachmentsFromUrls", () => ({ loadAttachmentsFromUrls: 
 afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
+});
+
+beforeEach(() => {
+	mlAssistant.reset();
+	mlAssistant.syncConversation(undefined);
 });
 
 type Loaded = Awaited<ReturnType<typeof loadAttachmentsFromUrls>>;
@@ -81,6 +87,39 @@ describe.each([
 	["home route", HomePage as Component, `/${LINK}`, {}],
 	["model route", ModelPage as Component, `/models/test${LINK}`, { model: "test" }],
 ])("%s", (_name, component, url, params) => {
+	it("creates an ML Intern conversation from a prompt example when the mode is enabled", async () => {
+		mlAssistant.toggle(true);
+		const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+			new Response(JSON.stringify({ conversationId: "created" }), { status: 200 })
+		);
+		vi.stubGlobal("fetch", fetchSpy);
+
+		const settings = Object.assign(
+			writable({ activeModel: "test", customPrompts: {}, welcomeModalSeen: true }),
+			{ instantSet: vi.fn(async () => undefined) }
+		);
+		renderWithApp(
+			component,
+			{ data: { models: [{ id: "test" }], oldModels: [], mlAssistantModels: [] } } as never,
+			{
+				context: new Map<unknown, unknown>([
+					["settings", settings],
+					["conversationsStore", { prepend: vi.fn() }],
+				]),
+				page: { url, params, data: { loginEnabled: false } },
+			}
+		);
+
+		(document.querySelector('[data-testid="send-example"]') as HTMLButtonElement).click();
+		await tick();
+
+		const request = fetchSpy.mock.calls.find(([input]) => String(input).endsWith("/conversation"));
+		expect(request).toBeDefined();
+		const init = request?.[1] as RequestInit;
+		expect(JSON.parse(init.body as string)).toMatchObject({ mlAssistant: true });
+		expect(mlAssistant.taskStarted).toBe(true);
+	});
+
 	it("does not send once the user has left while an attachment was still loading", async () => {
 		const { screen, fetchSpy, resolveAttachments } = mountOnLink(component, url, params);
 		await confirmSend();
