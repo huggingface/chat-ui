@@ -1,8 +1,9 @@
 import { Address4, Address6 } from "ip-address";
-import { isIP } from "node:net";
+import { isIP, type LookupFunction } from "node:net";
 import dns from "node:dns";
 import { Agent, fetch as undiciFetch } from "undici";
 import { env } from "$env/dynamic/private";
+import { logger } from "$lib/server/logger";
 
 const UNSAFE_IPV4_SUBNETS = [
 	"0.0.0.0/8",
@@ -135,47 +136,34 @@ export function isValidUrl(
 }
 
 /**
- * Assert that a resolved IP address is safe (not internal/private).
- * Throws if the IP is internal. Used in undici's custom DNS lookup
- * to validate IPs at connection time (prevents TOCTOU DNS rebinding).
+ * The SSRF agent's DNS hook: validates resolved IPs at connection time (preventing TOCTOU DNS
+ * rebinding) and logs every lookup, failed, blocked or allowed. With the request context the
+ * logger adds, that is what ties a DNS event seen by a runtime sensor to the request behind it.
  */
-export function assertSafeIp(address: string, hostname: string): void {
-	if (isUnsafeIp(address)) {
-		throw new Error(`Resolved IP for ${hostname} is internal (${address})`);
-	}
+export function ssrfLookup(exempt: (hostname: string) => boolean = () => false): LookupFunction {
+	return (hostname, options, callback) => {
+		dns.lookup(hostname, options, (err, address, family) => {
+			if (err) {
+				logger.info({ fetchHost: hostname, err }, "Outbound fetch lookup failed");
+				return callback(err, "", 4);
+			}
+			const addresses =
+				typeof address === "string" ? [address] : address.map((entry) => entry.address);
+			const fields = { fetchHost: hostname, fetchAddresses: addresses };
+			// Compared to undefined, not tested for truthiness: `isUnsafeIp("")` is true.
+			const unsafe = exempt(hostname.toLowerCase()) ? undefined : addresses.find(isUnsafeIp);
+			if (unsafe !== undefined) {
+				logger.warn(fields, "Outbound fetch blocked: host resolves to an internal address (SSRF)");
+				return callback(new Error(`Resolved IP for ${hostname} is internal (${unsafe})`), "", 4);
+			}
+			logger.info(fields, "Outbound fetch resolved");
+			return callback(null, address, family);
+		});
+	};
 }
 
-/**
- * Undici agent that validates resolved IPs at connection time,
- * preventing TOCTOU DNS rebinding attacks.
- */
-function createSsrfAgent(exempt: (hostname: string) => boolean = () => false): Agent {
-	return new Agent({
-		connect: {
-			lookup: (hostname, options, callback) => {
-				dns.lookup(hostname, options, (err, address, family) => {
-					if (err) return callback(err, "", 4);
-					if (exempt(hostname.toLowerCase())) return callback(null, address, family);
-					if (typeof address === "string") {
-						try {
-							assertSafeIp(address, hostname);
-						} catch (e) {
-							return callback(e as Error, "", 4);
-						}
-					} else if (Array.isArray(address)) {
-						for (const entry of address) {
-							try {
-								assertSafeIp(entry.address, hostname);
-							} catch (e) {
-								return callback(e as Error, "", 4);
-							}
-						}
-					}
-					return callback(null, address, family);
-				});
-			},
-		},
-	});
+function createSsrfAgent(exempt?: (hostname: string) => boolean): Agent {
+	return new Agent({ connect: { lookup: ssrfLookup(exempt) } });
 }
 
 const ssrfSafeAgent = createSsrfAgent();
@@ -209,7 +197,7 @@ function stripCredentialHeaders(init: RequestInit | undefined): RequestInit | un
  * Assert that a URL's host is safe before we connect to it.
  *
  * The agent's `lookup` hook only runs for hosts undici resolves through DNS, so a URL carrying a
- * raw IP literal would otherwise reach the network without `assertSafeIp` ever running. Checks
+ * raw IP literal would otherwise reach the network without the hook's check ever running. Checks
  * `isUnsafeIp` rather than `isValidUrl` because the latter also demands HTTPS, which would break
  * plain-HTTP MCP servers. When `allowLocal` is set (opt-in insecure MCP), local literals are
  * exempted so `mcpFetch` can still reach a `127.0.0.1`/LAN server before the socket opens.
@@ -217,6 +205,7 @@ function stripCredentialHeaders(init: RequestInit | undefined): RequestInit | un
 function assertSafeUrlHost(urlString: string, allowLocal: boolean): void {
 	const host = stripBrackets(new URL(urlString).hostname.toLowerCase());
 	if (isIP(host) && isUnsafeIp(host) && !(allowLocal && isLocalMcpIp(host))) {
+		logger.warn({ fetchHost: host }, "Outbound fetch blocked: unsafe IP literal (SSRF)");
 		throw new Error(`Blocked request to unsafe IP (SSRF): ${host}`);
 	}
 }
