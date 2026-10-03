@@ -9,6 +9,7 @@ import { setMlAssistantCatalog } from "./mlAssistantModels";
 import { logger } from "$lib/server/logger";
 import { preservesReasoningByDefault } from "$lib/server/reasoningPolicy";
 import { makeRouterEndpoint } from "$lib/server/router/endpoint";
+import { dedupeModelsById } from "$lib/utils/models";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -272,7 +273,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 		const parsed = listSchema.parse(json);
 		logger.info({ count: parsed.data.length }, "[models] Parsed models count");
 
-		let modelsRaw = parsed.data.map((m) => {
+		let modelsRaw = dedupeModelsById(parsed.data).map((m) => {
 			let logoUrl: string | undefined = undefined;
 			if (isHFRouter && m.id.includes("/")) {
 				const org = m.id.split("/")[0];
