@@ -46,4 +46,8 @@ export interface FeatureFlags {
 	taskModelId: string | null;
 	/** Models ML Intern conversations may use, in order; the first is the default. Empty when the mode is off. */
 	mlAssistantModels: string[];
+	/** Whether PaperPage Intern mode is configured (PAPERPAGE_TEMPLATE_SPACE). */
+	paperPageEnabled: boolean;
+	/** Model the PaperPage link preselects, when configured. */
+	paperPageModel: string | null;
 }

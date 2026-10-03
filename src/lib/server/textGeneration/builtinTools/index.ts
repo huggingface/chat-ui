@@ -12,6 +12,8 @@ import { createJobCheckTool } from "./jobCheckTool";
 import { createTrackioTool } from "./createTrackioTool";
 import { createFileTools } from "./fileTools";
 import { createImportFileTool } from "./importFileTool";
+import { createPaperPageTools } from "./paperPageTools";
+import { isPaperPageConversation } from "$lib/server/paperPage/mode";
 import type { BuiltinTool } from "./types";
 
 export type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
@@ -26,15 +28,28 @@ export { isNestedAgentTool } from "./nestedAgent";
 
 /**
  * Enablement policy lives here, per tool — never in the dispatch or gate
- * plumbing, which treats every builtin the same. All of these are part of the
- * ML Assistant preset: outside a mode conversation (or in a build without the
- * mode) there are no builtin tools at all.
+ * plumbing, which treats every builtin the same. Every one belongs to an agent
+ * mode (ML Assistant or PaperPage): outside a mode conversation there are no
+ * builtin tools at all.
  */
 export function getEnabledBuiltinTools(params: {
-	conv: Pick<Conversation, "_id" | "plan" | "mlAssistant">;
+	conv: Pick<Conversation, "_id" | "plan" | "mlAssistant" | "agentMode">;
 	/** Hub namespace to name a Trackio Space in; absent when the run has no user. */
 	namespace?: string;
+	/** the user's Hub token, read when a PaperPage tool runs; absent when the run has none */
+	hubToken?: () => string | undefined;
 }): BuiltinTool[] {
+	if (isPaperPageConversation(params.conv)) {
+		// the generic helpers plus the workshop, none of the ML preset's job and file tools
+		return [
+			askUserQuestionBuiltin,
+			createPlanTool(params.conv),
+			...createPaperPageTools({
+				conversationId: params.conv._id,
+				hubToken: params.hubToken ?? (() => undefined),
+			}),
+		];
+	}
 	if (!isMlAssistantConversation(params.conv)) return [];
 	// The GitHub tools carry a second condition of their own — they withhold
 	// themselves without a GITHUB_TOKEN — which is still policy, so it lives with

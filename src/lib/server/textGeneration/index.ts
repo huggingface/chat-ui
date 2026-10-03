@@ -19,6 +19,7 @@ import { settleMlBudget } from "$lib/server/mlBudget/settle";
 import { reservedMicroUsd } from "$lib/utils/mlBudget";
 import { logger } from "$lib/server/logger";
 import { resolvePreprompt } from "./preprompt";
+import { isPaperPageConversation } from "$lib/server/paperPage/mode";
 import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
 import { mlStateBlockEnabled } from "$lib/server/mlRegistry/stateBlock";
 import { AttachmentOverflowError } from "./utils/attachmentBudget";
@@ -109,9 +110,11 @@ async function* textGenerationWithoutTitle(
 	}
 
 	const promptBillingTarget = mlAssistant ? mlAssistantBillingTarget(ctx.locals) : undefined;
+	const paperPage = isPaperPageConversation(conv);
 	const preprompt = resolvePreprompt({
 		conversationPreprompt: conv.preprompt,
 		mlAssistant,
+		paperPage,
 		virtualFiles: mlVirtualFilesEnabled(conv),
 		stateBlock: mlStateBlockEnabled(conv),
 		attachmentBudget: attachmentBudgetEnabled(),
@@ -138,7 +141,7 @@ async function* textGenerationWithoutTitle(
 			messages: processedMessages,
 			assistant: ctx.assistant,
 			forceMultimodal: ctx.forceMultimodal,
-			forceTools: mlAssistant || ctx.forceTools,
+			forceTools: mlAssistant || paperPage || ctx.forceTools,
 			provider: ctx.provider,
 			reasoningEffort: ctx.reasoningEffort,
 			reasoningOverride: ctx.reasoningOverride,

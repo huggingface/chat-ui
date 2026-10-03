@@ -54,6 +54,8 @@ type TextAttachment = {
 };
 
 type ImageAttachment = { index: number; file: MessageFile };
+/** neither text nor an image (a PDF, an archive, a video): the model only learns it exists */
+type OtherAttachment = { index: number; file: MessageFile };
 
 const formatCount = (n: number) => n.toLocaleString("en-US");
 
@@ -107,6 +109,7 @@ function isTextMime(mime: string): boolean {
 function collect(messages: EndpointMessage[]) {
 	const texts: TextAttachment[] = [];
 	const images: ImageAttachment[] = [];
+	const others: OtherAttachment[] = [];
 	messages.forEach((message, index) => {
 		if (message.from !== "user") return;
 		for (const file of message.files ?? []) {
@@ -116,10 +119,12 @@ function collect(messages: EndpointMessage[]) {
 				texts.push({ index, name: file.name, mime: file.mime, text, paste });
 			} else if (file.mime.startsWith("image/")) {
 				images.push({ index, file });
+			} else {
+				others.push({ index, file });
 			}
 		}
 	});
-	return { texts, images };
+	return { texts, images, others };
 }
 
 /** bounds the marker, whose length varies with its counts and the file name */
@@ -191,7 +196,7 @@ export async function prepareAttachments(
 ): Promise<{ contentOf: (index: number) => UserContent; report: AttachmentReport }> {
 	const mode: Plan = attachmentBudgetEnabled() ? (opts.mode ?? "budget") : "whole";
 	const newest = messages.findLastIndex((message) => message.from === "user");
-	const { texts, images } = collect(messages);
+	const { texts, images, others } = collect(messages);
 	const keeps = planText(texts, { newest, limitChars: opts.limitChars, mode });
 	const rendered = texts.map((t, i) =>
 		truncateText(t.text, t.name, keeps[i], opts.mlAssistant ?? false)
@@ -223,6 +228,10 @@ export async function prepareAttachments(
 		let text = message.content;
 		if (pastes.length > 0) text = `${pastes.join("\n\n")}\n\n${text}`;
 		if (documents.length > 0) text = `${documents.join("\n\n")}\n\n${text}`;
+		const unread = others.filter((other) => other.index === index);
+		if (unread.length > 0) {
+			text += `\n\n${unread.map(({ file }) => `[attached file, not shown to you: ${file.name.replace(/\s+/g, " ")} (${file.mime})]`).join("\n")}`;
+		}
 		if (!isMultimodal) return text;
 		const ownImages = images.filter((image) => image.index === index);
 		const omitted = ownImages.filter(({ file }) => !sent.has(file));

@@ -96,6 +96,8 @@ import { composeGuards } from "./toolGuard";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { withUpstreamRetry } from "../utils/upstreamRetry";
 import { getEnabledBuiltinTools, isNestedAgentTool, shouldSkipMcpFlow } from "../builtinTools";
+import { isPaperPageConversation } from "$lib/server/paperPage/mode";
+import { PAPERPAGE_USING_TOOLS } from "$lib/server/paperPage/prompt";
 import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
 import { inferenceBillingHeaders } from "$lib/server/billing";
 
@@ -132,6 +134,10 @@ const MAX_TOOL_ROUNDS = 10;
 // apology instead of an answer. Only the preset gets the larger budget — an
 // ordinary conversation that loops is still stopped early.
 const ML_ASSISTANT_MAX_TOOL_ROUNDS = 100;
+
+// A PaperPage build writes a whole page and its interactive pieces in one turn, each write
+// checked and each piece tried in the browser: that is hundreds of small rounds, not a loop.
+const PAPERPAGE_MAX_TOOL_ROUNDS = 300;
 
 // Each retry costs a tool round, so give up quickly and answer without the tool.
 const MAX_TRUNCATED_TOOL_CALL_RETRIES = 2;
@@ -200,9 +206,20 @@ export async function* runMcpFlow({
 		}
 		return false;
 	};
+	// PaperPage shares the agent-sized budgets (rounds, reply floor), nothing of the ML preset
+	const paperPage = isPaperPageConversation(conv);
+	// PaperPage acts on the Hub; an operator-pinned token stands in for the user's only on a
+	// deployment without login, so an anonymous visitor never works under the operator's account.
+	// Imported lazily so other runs, and the tests that drive them, never load auth, which parses
+	// the OpenID config as it loads.
+	const operatorTokenAllowed = paperPage ? !(await import("$lib/server/auth")).loginEnabled : true;
 	const builtinTools = getEnabledBuiltinTools({
 		conv,
 		namespace: (locals as unknown as { user?: { username?: string } })?.user?.username,
+		hubToken: () =>
+			(locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
+			(locals as unknown as { token?: string } | undefined)?.token ??
+			(operatorTokenAllowed ? pinnedHubToken() : undefined),
 	});
 	// Read once: the preset decides the servers, the round budget and which tool
 	// doctrine is sent, and they must all agree within a run.
@@ -673,9 +690,8 @@ export async function* runMcpFlow({
 		const clampedFloor = targetContextLength
 			? Math.min(ML_ASSISTANT_MIN_COMPLETION_TOKENS, Math.floor(targetContextLength / 2))
 			: ML_ASSISTANT_MIN_COMPLETION_TOKENS;
-		const maxTokens = mlAssistant
-			? Math.max(catalogMaxTokens ?? 0, clampedFloor)
-			: catalogMaxTokens;
+		const maxTokens =
+			mlAssistant || paperPage ? Math.max(catalogMaxTokens ?? 0, clampedFloor) : catalogMaxTokens;
 
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
 		// In the mode the doctrine paragraphs are swapped, not appended to: the
@@ -684,6 +700,7 @@ export async function* runMcpFlow({
 		// which is the inverse of the preset's doctrine.
 		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone, builtinTools, {
 			mlAssistant,
+			...(paperPage ? { usingTools: PAPERPAGE_USING_TOOLS } : {}),
 		});
 		const prepromptPieces: string[] = [];
 		if (toolPreprompt.trim().length > 0) {
@@ -764,6 +781,9 @@ export async function* runMcpFlow({
 		};
 		let built = await buildPrompt("budget");
 		let messagesOpenAI = built.prompt;
+		// images a tool returned, sent with the next request only: tool messages carry text, and
+		// keeping images in the running history would resend them with every later round
+		let pendingImages: ChatCompletionMessageParam | undefined;
 		let historyWindow = built.window;
 		let attachmentsCut = false;
 		let pendingNotice = budgetNotice(built.attachments);
@@ -848,7 +868,11 @@ export async function* runMcpFlow({
 			sources: { index: number; link: string }[];
 		} => ({ annotated: text, sources: [] });
 
-		const maxToolRounds = mlAssistant ? ML_ASSISTANT_MAX_TOOL_ROUNDS : MAX_TOOL_ROUNDS;
+		const maxToolRounds = paperPage
+			? PAPERPAGE_MAX_TOOL_ROUNDS
+			: mlAssistant
+				? ML_ASSISTANT_MAX_TOOL_ROUNDS
+				: MAX_TOOL_ROUNDS;
 
 		let lastAssistantContent = "";
 		let streamedContent = false;
@@ -898,9 +922,13 @@ export async function* runMcpFlow({
 			// non-blank delta last round — it never became part of a real trace.
 			pendingReasoningWhitespace = "";
 
-			let requestMessages = historyWindow
-				? await historyWindow.fit(messagesOpenAI)
-				: messagesOpenAI;
+			const roundImages = pendingImages;
+			pendingImages = undefined;
+			const withRoundImages = (request: ChatCompletionMessageParam[]) =>
+				roundImages ? [...request, roundImages] : request;
+			let requestMessages = withRoundImages(
+				historyWindow ? await historyWindow.fit(messagesOpenAI) : messagesOpenAI
+			);
 
 			// A turn several productive rounds deep must not die on one throttled
 			// request, or on a gateway that has no backend ready for a moment;
@@ -951,7 +979,9 @@ export async function* runMcpFlow({
 				built = await buildPrompt("minimal");
 				messagesOpenAI = [...built.prompt, ...live];
 				historyWindow = built.window;
-				requestMessages = historyWindow ? await historyWindow.fit(messagesOpenAI) : messagesOpenAI;
+				requestMessages = withRoundImages(
+					historyWindow ? await historyWindow.fit(messagesOpenAI) : messagesOpenAI
+				);
 				try {
 					completionStream = await createStream(requestMessages);
 				} catch (retryErr) {
@@ -1334,6 +1364,22 @@ export async function* runMcpFlow({
 							assistantToolMessage,
 							...(event.summary.toolMessages ?? []),
 						];
+						// only a model that can see them gets them, as the user's own attachment
+						if (mmEnabled && event.summary.images?.length) {
+							pendingImages = {
+								role: "user",
+								content: [
+									{
+										type: "text",
+										text: `Images returned by ${[...new Set(event.summary.images.map((i) => i.tool))].join(", ")}:`,
+									},
+									...event.summary.images.map((image) => ({
+										type: "image_url" as const,
+										image_url: { url: `data:${image.mimeType};base64,${image.data}` },
+									})),
+								],
+							};
+						}
 						if (budgetGuard) {
 							try {
 								const budget = await readMlBudget(conv._id);

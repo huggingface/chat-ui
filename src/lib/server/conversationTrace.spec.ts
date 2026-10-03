@@ -105,4 +105,23 @@ describe("buildConversationTrace", () => {
 		const parsed = JSON.parse(JSON.stringify(trace));
 		expect(parsed.agentRuns[0].id).toMatch(/^[0-9a-f]{24}$/);
 	});
+
+	it("names a PaperPage conversation's Spaces, never its sandbox token", async () => {
+		const conversationId = new ObjectId();
+		await collections.paperPageWorkshops.insertOne({
+			_id: conversationId,
+			spaceId: "u/page-dev",
+			host: "u-page-dev.hf.space",
+			sbxToken: "secret",
+			publishedSpaceId: "u/page",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+
+		const trace = await buildConversationTrace(conversationId, CONVERSATION);
+
+		expect(trace.paperPage).toEqual({ spaceId: "u/page-dev", publishedSpaceId: "u/page" });
+		expect(JSON.stringify(trace)).not.toContain("secret");
+		expect((await buildConversationTrace(new ObjectId(), CONVERSATION)).paperPage).toBeUndefined();
+	});
 });

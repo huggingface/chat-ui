@@ -97,6 +97,22 @@ describe("resolvePreprompt", () => {
 		expect(resolved).not.toContain("You are a pirate.");
 	});
 
+	it("gives PaperPage its own prompt, without the user's prompt or artifacts", () => {
+		const resolved = resolvePreprompt({
+			conversationPreprompt: "You are a pirate.",
+			mlAssistant: false,
+			paperPage: true,
+			supportsArtifacts: true,
+			username: "alice",
+		});
+
+		expect(resolved).toContain("You are PaperPage Intern");
+		expect(resolved).toContain("User=alice");
+		expect(resolved).not.toContain("You are a pirate.");
+		expect(resolved).not.toBe(injectArtifactsPrompt(resolved));
+		expect(resolved).not.toContain("<artifact");
+	});
+
 	it("drops the session state section when the block is switched off", () => {
 		expect(resolvePreprompt({ mlAssistant: true })).toContain("# Session state");
 		expect(resolvePreprompt({ mlAssistant: true, stateBlock: false })).not.toContain(

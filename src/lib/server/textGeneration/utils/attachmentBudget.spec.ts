@@ -151,6 +151,26 @@ describe("per-file text budget", () => {
 });
 
 describe("attachments in the prompt", () => {
+	it("tells the model a file it cannot read exists, without its content", async () => {
+		const { messages } = await prepareHistory(
+			[
+				{
+					from: "user",
+					content: "here is my paper",
+					files: [textFile("paper.pdf", "%PDF-1.7 binary", "application/pdf")],
+				},
+			],
+			noImages,
+			false,
+			{ contextLengthTokens: WINDOW_1M }
+		);
+
+		const text = textOf(messages[0]);
+		expect(text).toBe(
+			"here is my paper\n\n[attached file, not shown to you: paper.pdf (application/pdf)]"
+		);
+	});
+
 	it("sends an 8 MB CSV brief as about 50k tokens instead of 2.7M", async () => {
 		const csv = syntheticCsv(8 * 1024 * 1024);
 		// alone the file is past a million token window at 3 chars a token, the shape of the provider 400s
