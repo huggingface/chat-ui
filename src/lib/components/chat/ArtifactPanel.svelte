@@ -43,6 +43,7 @@
 	import CarbonCamera from "~icons/carbon/camera";
 	import CarbonDownload from "~icons/carbon/download";
 	import CarbonRocket from "~icons/carbon/rocket";
+	import CarbonRenew from "~icons/carbon/renew";
 	import CarbonMaximize from "~icons/carbon/maximize";
 	import LucideWrapText from "~icons/lucide/wrap-text";
 	import LucideDiff from "~icons/lucide/diff";
@@ -420,9 +421,23 @@
 
 	// ----- actions -----
 	let fullscreenOpen = $state(false);
-	let fullscreenSupported = $derived(
+	// Gates refresh + fullscreen, which both act on the live iframe preview
+	let livePreviewSupported = $derived(
 		!!version && version.complete && version.type !== "markdown" && version.type !== "code"
 	);
+	// Bumped to remount the iframe, restarting the preview with a fresh document
+	let previewReloadNonce = $state(0);
+	function refreshPreview() {
+		// Remounting mid-capture would leave the in-flight screenshot holding a
+		// detached iframe. The refresh button is disabled while capturing; this
+		// covers any non-pointer path.
+		if (capturing) return;
+		// The document restarts, so captured errors describe a run that no longer
+		// exists; previewLoaded gates capture until the new document commits
+		errors = [];
+		previewLoaded = false;
+		previewReloadNonce += 1;
+	}
 
 	function download() {
 		if (!version) return;
@@ -546,12 +561,12 @@
 				{#if canDeploy}
 					<button
 						type="button"
-						class="btn gap-1 rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 @min-[580px]:pr-2 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+						class="btn gap-1 rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 @min-[610px]:pr-2 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 						title={currentDeployment ? "Update Space" : "Deploy to Space"}
 						onclick={() => (deployModalOpen = true)}
 					>
 						<CarbonRocket />
-						<span class="hidden font-medium @min-[580px]:inline">
+						<span class="hidden font-medium @min-[610px]:inline">
 							{currentDeployment ? "Update" : "Deploy"}
 						</span>
 					</button>
@@ -569,7 +584,20 @@
 				>
 					<CarbonDownload />
 				</button>
-				{#if fullscreenSupported}
+				{#if livePreviewSupported}
+					<!-- Disabled (not hidden) on the code tab, where no live preview is
+					     mounted to reload — hiding it would shift the icon row on every
+					     tab switch. Also disabled mid-capture: remounting would pull the
+					     document out from under the in-flight screenshot. -->
+					<button
+						type="button"
+						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+						title="Refresh preview"
+						disabled={effectiveTab !== "preview" || capturing}
+						onclick={refreshPreview}
+					>
+						<CarbonRenew />
+					</button>
 					<button
 						type="button"
 						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
@@ -611,18 +639,21 @@
 				</div>
 			{:else if srcdoc}
 				<!-- Backing matches the panel theme so opening the preview doesn't flash
-				     white in dark mode while the document paints its own background -->
-				<iframe
-					bind:this={iframeEl}
-					title="Artifact preview"
-					class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
-					sandbox={PREVIEW_SANDBOX}
-					allow={PREVIEW_ALLOW}
-					allowfullscreen
-					referrerpolicy="no-referrer"
-					onload={() => (previewLoaded = true)}
-					{srcdoc}
-				></iframe>
+				     white in dark mode while the document paints its own background;
+				     keyed so the refresh action can remount it for a fresh document -->
+				{#key previewReloadNonce}
+					<iframe
+						bind:this={iframeEl}
+						title="Artifact preview"
+						class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
+						sandbox={PREVIEW_SANDBOX}
+						allow={PREVIEW_ALLOW}
+						allowfullscreen
+						referrerpolicy="no-referrer"
+						onload={() => (previewLoaded = true)}
+						{srcdoc}
+					></iframe>
+				{/key}
 			{/if}
 		{:else}
 			<!-- Same .prose pre styling as chat code blocks so the syntax theme matches
