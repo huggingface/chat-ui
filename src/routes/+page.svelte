@@ -44,6 +44,9 @@
 	async function createConversation(message: string) {
 		try {
 			$loading = true;
+			// Every initial-send path arrives here, including prompt examples. Use the
+			// toggle rather than a composer-only latch so those paths create the mode.
+			const isMlAssistant = mlAssistant.enabled;
 
 			// check if $settings.activeModel is a valid model
 			// else check if it's an assistant, and use that model
@@ -58,7 +61,7 @@
 				model = data.models[0].id;
 			}
 			// The mode runs on its own fixed set; the server enforces this too.
-			if (mlAssistant.taskStarted && data.mlAssistantModels.length > 0) {
+			if (isMlAssistant && data.mlAssistantModels.length > 0) {
 				model = data.mlAssistantModels.includes(model) ? model : data.mlAssistantModels[0];
 			}
 			const res = await fetch(`${base}/conversation`, {
@@ -72,9 +75,7 @@
 						($settings.customPromptsEnabled?.[$settings.activeModel] ?? true)
 							? $settings.customPrompts[$settings.activeModel]
 							: "",
-					// The composer latches the mode before handing the message over, so
-					// the conversation this creates is marked with it from the start.
-					mlAssistant: mlAssistant.taskStarted,
+					mlAssistant: isMlAssistant,
 				}),
 			});
 
@@ -91,12 +92,15 @@
 				}
 				error.set(errorMessage);
 				console.error("Error while creating conversation: ", errorMessage);
-				// The composer latched the mode for a conversation that never happened.
 				mlAssistant.abortTask();
 				return;
 			}
 
 			const { conversationId, conversation } = await res.json();
+
+			// Only lock the toggle once the server accepted the marked conversation.
+			// This keeps a failed create retryable while covering non-composer sends.
+			if (isMlAssistant) mlAssistant.startTask();
 
 			// The create response embeds the conversation payload; hand it to the
 			// conversation page as a one-shot seed so its load skips the GET and
@@ -124,9 +128,7 @@
 				title: "New Chat",
 				model,
 				updatedAt: new Date(),
-				// Latched before the create request, so the sidebar row carries the
-				// mode's designation from the moment it appears.
-				mlAssistant: mlAssistant.taskStarted,
+				mlAssistant: isMlAssistant,
 			});
 			await goto(`${base}/conversation/${conversationId}`, {
 				state: { pendingMessage: message, pendingFilesNonce },
@@ -134,7 +136,6 @@
 		} catch (err) {
 			error.set((err as Error).message || ERROR_MESSAGES.default);
 			console.error(err);
-			// The composer latched the mode for a conversation that never happened.
 			mlAssistant.abortTask();
 		} finally {
 			$loading = false;

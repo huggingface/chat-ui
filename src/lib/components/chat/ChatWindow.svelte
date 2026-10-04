@@ -208,9 +208,6 @@
 		if (requireAuthUser() || loading || !draft) return;
 		tap();
 		chatScroll.notifySend();
-		// Latches the mode onto the conversation, so the strip stays and swaps its
-		// tool note for the plan progress row. No-op when the mode is off.
-		mlAssistant.startTask();
 		onmessage?.(draft);
 		draft = "";
 	};
