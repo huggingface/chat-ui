@@ -55,6 +55,16 @@ TASK_MODEL=meta-llama/Llama-3.1-8B-Instruct
 
 If not set, the current conversation model is used.
 
+## Reasoning
+
+Reasoning-capable models stream their chain-of-thought. To also generate short, periodic natural-language summaries of that reasoning (shown as status updates while the model thinks), enable:
+
+```ini
+REASONING_SUMMARY=true
+```
+
+This issues additional LLM calls (using `TASK_MODEL` if set, otherwise the conversation model), so it is **disabled by default**. Leave it unset or empty to keep reasoning summaries off.
+
 ## Voice Transcription
 
 Enable voice input with Whisper:
