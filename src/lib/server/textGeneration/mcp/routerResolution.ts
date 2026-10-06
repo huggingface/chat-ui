@@ -11,6 +11,11 @@ import {
 	pickToolsCapableModel,
 } from "$lib/server/router/toolsRoute";
 import { findConfiguredMultimodalModel } from "$lib/server/router/multimodal";
+import {
+	findFreeUserMultimodalModel,
+	getFreeUserModel,
+	resolveUserTier,
+} from "$lib/server/router/userTier";
 import type { ProcessedModel } from "../../models";
 import { logger } from "../../logger";
 
@@ -45,9 +50,15 @@ export async function resolveRouterTarget({
 		const mod = await import("../../models");
 		const allModels = mod.models as ProcessedModel[];
 
-		// Multimodal bypass
+		// Multimodal bypass. A multimodal-capable free-user model also serves free users'
+		// image requests; with a text-only free model the tier is irrelevant and never
+		// resolved, and image requests keep the regular multimodal model.
 		if (hasImageInput) {
-			const multimodalCandidate = findConfiguredMultimodalModel(allModels);
+			const freeUserMultimodal = findFreeUserMultimodalModel(allModels);
+			const multimodalCandidate =
+				freeUserMultimodal && (await resolveUserTier(locals)) === "free"
+					? freeUserMultimodal
+					: findConfiguredMultimodalModel(allModels);
 			if (!multimodalCandidate) {
 				runMcp = false;
 				logger.warn(
@@ -62,11 +73,16 @@ export async function resolveRouterTarget({
 			return { runMcp, targetModel, candidateModelId, resolvedRoute };
 		}
 
-		// Tools bypass
+		// Resolved after the multimodal bypass, which is tier-independent — image requests
+		// never pay for the billing lookup.
+		const tier = await resolveUserTier(locals);
+
+		// Tools bypass. Free users skip it and get pinned to the free-tier model by the
+		// heuristic path below, which still reports the agentic route.
 		const toolsEnabled = isRouterToolsBypassEnabled();
 		const hasToolsActive = hasActiveToolsSelection(locals);
 
-		if (toolsEnabled && hasToolsActive) {
+		if (toolsEnabled && hasToolsActive && tier !== "free") {
 			const found = pickToolsCapableModel(allModels);
 			if (found) {
 				targetModel = found;
@@ -87,11 +103,19 @@ export async function resolveRouterTarget({
 		});
 		resolvedRoute = routeName;
 
-		const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || model.id;
-		const { candidates } = resolveRouteModels(routeName, routes, fallbackModel);
-		const primaryCandidateId = candidates[0];
+		// Free-tier users skip the route policy and get pinned to the configured cheap model;
+		// if it can't be resolved, runMcp=false defers to the plain-generation router path.
+		let primaryCandidateId: string | undefined;
+		if (tier === "free") {
+			primaryCandidateId = getFreeUserModel();
+		} else {
+			const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || model.id;
+			const { candidates } = resolveRouteModels(routeName, routes, fallbackModel);
+			primaryCandidateId =
+				candidates[0] && candidates[0] !== fallbackModel ? candidates[0] : undefined;
+		}
 
-		if (!primaryCandidateId || primaryCandidateId === fallbackModel) {
+		if (!primaryCandidateId) {
 			runMcp = false;
 		} else {
 			const found = allModels?.find(
