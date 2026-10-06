@@ -378,16 +378,20 @@
 				hub.move(-1);
 				return;
 			}
-			// Tab accepts the first result outright; Enter only accepts once the
-			// user has arrowed into the list. Otherwise `ping @john` would be
-			// rewritten and the send swallowed by whatever the Hub matched, and on
-			// a phone Enter is the newline key with no Escape to back out with.
+			// Tab and Enter take the highlighted result, the first one until the user
+			// moves it. On a phone Enter is the newline key with no Escape to back
+			// out with, so there it only takes a highlight the user chose.
 			if (event.key === "Tab" && !event.shiftKey && hub.results.length > 0) {
 				event.preventDefault();
 				void selectHubResult(hub.activeResult ?? hub.results[0]);
 				return;
 			}
-			if (event.key === "Enter" && !event.shiftKey && hub.activeResult) {
+			if (
+				event.key === "Enter" &&
+				!event.shiftKey &&
+				hub.activeResult &&
+				(hub.chosen || !isVirtualKeyboard())
+			) {
 				event.preventDefault();
 				void selectHubResult(hub.activeResult);
 				return;

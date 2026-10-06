@@ -277,3 +277,32 @@ describe("fallbackBlocks (SSR / initial render)", () => {
 		expect(a[0].tokens).toEqual(b[0].tokens);
 	});
 });
+
+describe("inline $ math", () => {
+	const html = (content: string) =>
+		processTokensSync(content, [])
+			.map((token) => (token.type === "text" && typeof token.html === "string" ? token.html : ""))
+			.join("");
+	const mathCount = (content: string) => (html(content).match(/class="katex"/g) ?? []).length;
+
+	test("leaves prices alone", () => {
+		expect(
+			mathCount(
+				"This session has $0.00 of compute budget, so I need a grant. A baseline eval is ~30–60 min on an A10G (~$1); the SFT experiment is 2–3 h (~$3)."
+			)
+		).toBe(0);
+		expect(mathCount("It costs $5 and $10 to run.")).toBe(0);
+		expect(mathCount("Somewhere between $5-$10 per run.")).toBe(0);
+	});
+
+	test("still renders real math, including next to punctuation and words", () => {
+		expect(mathCount("Let $x^2 + y^2 = r^2$.")).toBe(1);
+		expect(mathCount("$x$")).toBe(1);
+		expect(mathCount("the $n$th term and $\\alpha$-stable laws")).toBe(2);
+		expect(mathCount("It costs $5, and $x = 2$ here.")).toBe(1);
+	});
+
+	test("needs its content to hug the dollars", () => {
+		expect(mathCount("$ x $")).toBe(0);
+	});
+});

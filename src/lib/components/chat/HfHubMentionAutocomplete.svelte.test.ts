@@ -151,4 +151,22 @@ describe("HfHubMentionAutocomplete", () => {
 		// The live region announces state changes from outside the listbox.
 		expect(loading.querySelector('[role="status"][aria-live="polite"]')).not.toBeNull();
 	});
+
+	it("takes a hover only from a pointer that moved", () => {
+		// The panel opens upward under a resting mouse; the browser reports that
+		// as a hover with no movement, which must not steal the first result.
+		const onactivechange = vi.fn();
+		const { container } = render(HfHubMentionAutocomplete, {
+			...common,
+			results,
+			status: "success",
+			onactivechange,
+		});
+		const dataset = container.querySelector<HTMLElement>('[data-result-index="1"]');
+		dataset?.dispatchEvent(new PointerEvent("pointermove", { bubbles: true }));
+		expect(onactivechange).not.toHaveBeenCalled();
+
+		dataset?.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, movementY: 3 }));
+		expect(onactivechange).toHaveBeenCalledWith(1);
+	});
 });

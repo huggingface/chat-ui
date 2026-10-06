@@ -81,17 +81,18 @@ describe("HubMentionState", () => {
 		expect(hub.results).toEqual([fast]);
 	});
 
-	it("does not accept on Enter until the user has entered the list", async () => {
-		// `ping @john` + Enter must send the message, not rewrite the name.
+	it("highlights the first result, and remembers when the user moves it", async () => {
 		const { hub } = makeState();
 		hub.update("ping @john", 10);
 		await settle();
-		expect(hub.activeIndex).toBe(-1);
-		expect(hub.activeResult).toBeUndefined();
-
-		hub.move(1);
+		// The top of the list, not whatever row the panel happened to open under.
 		expect(hub.activeIndex).toBe(0);
 		expect(hub.activeResult).toEqual(MODEL);
+		// Not chosen yet: on a touch keyboard Enter stays a newline.
+		expect(hub.chosen).toBe(false);
+
+		hub.move(1);
+		expect(hub.chosen).toBe(true);
 	});
 
 	it("closes when the tracked mention leaves the value", async () => {
