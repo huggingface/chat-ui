@@ -9,9 +9,11 @@
 		onopen?: () => void;
 		/** Present only while the chip is still in the composer. */
 		onremove?: () => void;
+		/** Sits in a line of text rather than in a row of its own. */
+		inline?: boolean;
 	}
 
-	let { view, onopen, onremove }: Props = $props();
+	let { view, onopen, onremove, inline = false }: Props = $props();
 
 	let parts = $derived(trackioViewChipParts(view));
 	let title = $derived(
@@ -26,12 +28,15 @@
 	);
 </script>
 
-<!-- Orange as ink, like the rest of the ML Intern chrome; the range is the part
-     that tells one view from the next, so it alone reads in the body color. -->
+<!-- Orange as ink throughout, like the rest of the ML Intern chrome. -->
 <span
-	class="inline-flex max-w-full min-w-0 items-center gap-1 rounded-lg border border-[#f5d0b5] bg-[#fff6ef] py-[3px] pr-1 pl-2 text-[12.5px] leading-tight text-[#c4511a] dark:border-[#5a3a22] dark:bg-[#2a1d14] dark:text-[#f0a468] {onremove
-		? ''
-		: 'pr-2'}"
+	class={[
+		"inline-flex max-w-full min-w-0 items-center gap-1 border border-[#f5d0b5] bg-[#fff6ef] text-[#c4511a] dark:border-[#5a3a22] dark:bg-[#2a1d14] dark:text-[#f0a468]",
+		inline
+			? "mx-0.5 rounded-md px-1.5 align-[-0.15em] text-[0.92em] leading-snug"
+			: "rounded-lg py-[3px] pl-2 text-[12.5px] leading-tight",
+		!inline && (onremove ? "pr-1" : "pr-2"),
+	]}
 >
 	<button
 		type="button"
@@ -45,7 +50,7 @@
 		<span aria-hidden="true" class="shrink-0 text-[10px] opacity-60">•</span>
 		<span class="shrink-0 whitespace-nowrap">{parts.runs}</span>
 		<span aria-hidden="true" class="shrink-0 text-[10px] opacity-60">•</span>
-		<span class="shrink-0 whitespace-nowrap text-gray-800 dark:text-gray-100">{parts.range}</span>
+		<span class="shrink-0 whitespace-nowrap">{parts.range}</span>
 	</button>
 	{#if onremove}
 		<button

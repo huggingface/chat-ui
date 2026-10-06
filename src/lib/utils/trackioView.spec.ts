@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+	findViewTokens,
 	parseTrackioView,
+	segmentViewText,
+	stripOrphanViewMarks,
 	trackioViewChipParts,
+	trackioViewLabel,
+	trackioViewToken,
+	viewsInText,
+	VIEW_TOKEN_MARK,
 	withTrackioViewContext,
 	type TrackioDashboardView,
 } from "./trackioView";
@@ -63,19 +70,65 @@ describe("chip and model context", () => {
 			runs: "2 runs",
 			range: "steps 1,000–1,500",
 		});
+		// One run reads as its name, not as a count.
 		expect(trackioViewChipParts({ ...view, xRange: null, runs: [view.runs[0]] })).toMatchObject({
-			runs: "1 run",
+			runs: "baseline",
 			range: "all steps",
 		});
 	});
 
 	it("appends a view block the model can act on after the user's text", () => {
 		const content = withTrackioViewContext("what happened here?", [view]);
-		expect(content.startsWith("what happened here?\n\n<trackio_dashboard_view")).toBe(true);
+		expect(content.startsWith('what happened here?\n\n<trackio_dashboard_view id="1"')).toBe(true);
 		expect(content).toContain("range: 1000 to 1500 (the user zoomed to this)");
 		expect(content).toContain("charts on screen: train/loss");
 		expect(content).toContain("other metrics shown: eval/loss");
 		expect(content).toContain("read_trackio");
 		expect(withTrackioViewContext("hi", [])).toBe("hi");
+	});
+});
+
+describe("inline view tokens", () => {
+	const a = parseTrackioView(RAW, DASH) as TrackioDashboardView;
+	const b = {
+		...a,
+		xRange: [3000, 3500] as [number, number],
+		capturedAt: "2026-09-24T00:01:00.000Z",
+	};
+	const text = `why is the loss going up here ${trackioViewToken(a)}, but not here ${trackioViewToken(b)}?`;
+
+	it("reads as its label, with a mark either side", () => {
+		expect(trackioViewLabel(a)).toBe("mnist • 2 runs • steps 1,000–1,500");
+		// Padded inside the marks, so the chip's padding is real text.
+		expect(trackioViewToken(a).startsWith(`${VIEW_TOKEN_MARK}\u2003\u2005mnist`)).toBe(true);
+		// Unbreakable inside, so a chip never wraps mid-label.
+		expect(trackioViewToken(a)).not.toMatch(/[ -]/);
+		expect(findViewTokens(text).map((t) => t.label)).toEqual([
+			trackioViewLabel(a),
+			trackioViewLabel(b),
+		]);
+	});
+
+	it("splits a message into words and the views its chips name", () => {
+		expect(segmentViewText(text, [b, a]).map((s) => (s.kind === "view" ? s.view : s.text))).toEqual(
+			["why is the loss going up here ", a, ", but not here ", b, "?"]
+		);
+		expect(viewsInText(text, [b, a])).toEqual([a, b]);
+	});
+
+	it("tells the model which block each mention means", () => {
+		const content = withTrackioViewContext(text, [b, a]);
+		expect(
+			content.startsWith("why is the loss going up here [view 1], but not here [view 2]?")
+		).toBe(true);
+		expect(content.indexOf('id="1"')).toBeLessThan(content.indexOf('id="2"'));
+		expect(content).toContain("range: 1000 to 1500");
+		expect(content).not.toContain(VIEW_TOKEN_MARK);
+	});
+
+	it("keeps the words of a token cut in half, without its stray mark", () => {
+		const cut = text.slice(0, text.indexOf(VIEW_TOKEN_MARK) + 5);
+		expect(stripOrphanViewMarks(cut)).not.toContain(VIEW_TOKEN_MARK);
+		expect(stripOrphanViewMarks(text)).toBe(text);
 	});
 });

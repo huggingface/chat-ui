@@ -50,8 +50,12 @@
 	import ShareConversationModal from "../ShareConversationModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import UploadedFile from "./UploadedFile.svelte";
-	import TrackioViewChip from "./TrackioViewChip.svelte";
-	import { MAX_VIEWS_PER_MESSAGE, type TrackioDashboardView } from "$lib/utils/trackioView";
+	import {
+		MAX_VIEWS_PER_MESSAGE,
+		trackioViewToken,
+		viewsInText,
+		type TrackioDashboardView,
+	} from "$lib/utils/trackioView";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { error } from "$lib/stores/errors";
 	import ModelSwitch from "./ModelSwitch.svelte";
@@ -548,6 +552,12 @@
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
 	let composerForm = $state<HTMLFormElement>();
+	// Until the composer has had focus, its selection says nothing about where
+	// the user wants a chip, so one goes at the end of the draft instead.
+	let composerUsed = false;
+	$effect(() => {
+		if (focused) composerUsed = true;
+	});
 
 	// --- ML Assistant mode (build flag, see $lib/utils/mlAssistantFlag) --------
 
@@ -759,20 +769,56 @@
 			const currentDraft = untrack(() => draft);
 			draft = currentDraft.trim() ? `${currentDraft}\n\n${pending.text}` : pending.text;
 		}
-		if (pending.dashboardViews?.length) {
-			dashboardViews = [...untrack(() => dashboardViews), ...pending.dashboardViews].slice(
-				-MAX_VIEWS_PER_MESSAGE
-			);
-			// Straight to typing the question about it; not on touch, where
-			// focusing raises the keyboard over the chip.
-			if (!isVirtualKeyboard()) {
-				void tick().then(() =>
-					composerForm?.querySelector("textarea")?.focus({ preventScroll: true })
-				);
-			}
-		}
+		for (const view of pending.dashboardViews ?? []) insertViewToken(view);
 		pendingComposerPayload.set(undefined);
 	});
+
+	/**
+	 * Dashboard views live in the draft as inline tokens (see trackioView), so
+	 * the message's views are whatever its tokens name. Every view this composer
+	 * has held stays known, so undoing a deleted chip brings its view back.
+	 */
+	const knownViews = new Map<string, TrackioDashboardView>();
+	$effect(() => {
+		const text = draft;
+		untrack(() => {
+			for (const view of dashboardViews) knownViews.set(trackioViewToken(view), view);
+			const next = viewsInText(text, knownViews.values());
+			const same =
+				next.length === dashboardViews.length && next.every((v, i) => v === dashboardViews[i]);
+			if (!same) dashboardViews = next;
+		});
+	});
+
+	/**
+	 * Puts a view's chip at the caret (or the end, before the composer has been
+	 * used), spaced off its neighbours. Through the editing stack where it can,
+	 * so the insert is one Cmd+Z away like anything typed.
+	 */
+	function insertViewToken(view: TrackioDashboardView) {
+		if (untrack(() => dashboardViews).length >= MAX_VIEWS_PER_MESSAGE) return;
+		const token = trackioViewToken(view);
+		knownViews.set(token, view);
+		const textarea = composerForm?.querySelector("textarea");
+		const current = untrack(() => draft);
+		const start = textarea && composerUsed ? textarea.selectionStart : current.length;
+		const end = textarea && composerUsed ? textarea.selectionEnd : current.length;
+		const before = current.slice(0, start);
+		const after = current.slice(end);
+		const insert = `${before && !/\s$/.test(before) ? " " : ""}${token}${/^\s/.test(after) ? "" : " "}`;
+		const caret = start + insert.length;
+		if (textarea && !isVirtualKeyboard()) {
+			textarea.focus({ preventScroll: true });
+			textarea.setSelectionRange(start, end);
+			if (document.execCommand("insertText", false, insert)) return;
+		}
+		draft = before + insert + after;
+		void tick().then(() => {
+			if (!textarea || isVirtualKeyboard()) return;
+			textarea.focus({ preventScroll: true });
+			textarea.setSelectionRange(caret, caret);
+		});
+	}
 
 	function triggerPrompt(prompt: string) {
 		if (requireAuthUser() || loading) return;
@@ -1186,21 +1232,6 @@
 							dashboard={trackioDashboards.at(-1)}
 							registry={mlRegistry.summary}
 						/>
-					{/if}
-					{#if dashboardViews.length}
-						<!-- Inside the box, above the text: these go with the message typed
-						     below them, unlike uploads, which sit outside. -->
-						<div class="flex flex-wrap gap-1.5 px-3 pt-2.5" data-exclude-from-copy>
-							{#each dashboardViews as view, index (view.capturedAt + index)}
-								<TrackioViewChip
-									{view}
-									onopen={() => sidePane.openTrackio(view.dashboardUrl, view.project, view.viewUrl)}
-									onremove={() => {
-										dashboardViews = dashboardViews.filter((_, i) => i !== index);
-									}}
-								/>
-							{/each}
-						</div>
 					{/if}
 					<!-- The composer box is a column so the ML Assistant strip can stack on
 					     top; this row is the composer proper and keeps its own layout. -->

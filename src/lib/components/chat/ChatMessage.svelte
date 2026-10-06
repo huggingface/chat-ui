@@ -15,6 +15,7 @@
 	import CarbonInformation from "~icons/carbon/information";
 	import UploadedFile from "./UploadedFile.svelte";
 	import TrackioViewChip from "./TrackioViewChip.svelte";
+	import { segmentViewText, viewsInText } from "$lib/utils/trackioView";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
@@ -273,6 +274,16 @@
 		"prose max-w-none text-smd dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:cursor-pointer prose-img:rounded-lg dark:prose-pre:bg-gray-900";
 
 	let editMode = $derived(editMsdgId === message.id);
+
+	// A user message's dashboard views render where their chips sit in the text.
+	let contentSegments = $derived(
+		segmentViewText(message.content.trim(), message.dashboardViews ?? [])
+	);
+	let unplacedViews = $derived.by(() => {
+		const views = message.dashboardViews ?? [];
+		const placed = viewsInText(message.content, views);
+		return views.filter((v) => !placed.includes(v));
+	});
 	$effect(() => {
 		if (editMode) {
 			tick();
@@ -553,9 +564,10 @@
 					{/each}
 				</div>
 			{/if}
-			{#if message.dashboardViews?.length}
+			{#if unplacedViews.length}
+				<!-- Views no chip in the text names: messages from before chips went inline. -->
 				<div class="flex flex-wrap gap-1.5 px-5" data-exclude-from-copy>
-					{#each message.dashboardViews as view, index (view.capturedAt + index)}
+					{#each unplacedViews as view, index (view.capturedAt + index)}
 						<TrackioViewChip
 							{view}
 							onopen={() => sidePane.openTrackio(view.dashboardUrl, view.project, view.viewUrl)}
@@ -569,7 +581,16 @@
 					<p
 						class="disabled w-full appearance-none bg-inherit px-5 py-3.5 text-wrap wrap-break-word whitespace-break-spaces text-gray-500 dark:text-gray-400"
 					>
-						{message.content.trim()}
+						{#each contentSegments as segment, i (i)}{#if segment.kind === "view"}<TrackioViewChip
+									view={segment.view}
+									inline
+									onopen={() =>
+										sidePane.openTrackio(
+											segment.view.dashboardUrl,
+											segment.view.project,
+											segment.view.viewUrl
+										)}
+								/>{:else}{segment.text}{/if}{/each}
 					</p>
 				{:else}
 					<form
