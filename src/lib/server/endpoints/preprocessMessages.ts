@@ -3,6 +3,7 @@ import type { EndpointMessage } from "./endpoints";
 import { downloadFile } from "../files/downloadFile";
 import type { ObjectId } from "mongodb";
 import { withTrackioViewContext } from "$lib/utils/trackioView";
+import { plainMentions } from "$lib/utils/mentionTokens";
 
 export async function preprocessMessages(
 	messages: Message[],
@@ -29,13 +30,21 @@ async function downloadFiles(messages: Message[], convId: ObjectId): Promise<End
 	);
 }
 
-/** A user message's attached dashboard views become text the model reads with it. */
+/**
+ * A user message's attached dashboard views become text the model reads with
+ * it, and accepted @-mentions lose the composer's marks, so the model reads
+ * plain `@owner/name`.
+ */
 function injectTrackioViews(messages: EndpointMessage[]): EndpointMessage[] {
-	return messages.map((message) =>
-		message.from === "user" && message.dashboardViews?.length
-			? { ...message, content: withTrackioViewContext(message.content, message.dashboardViews) }
-			: message
-	);
+	return messages.map((message) => {
+		if (message.from !== "user") return message;
+		const content = plainMentions(message.content);
+		return message.dashboardViews?.length
+			? { ...message, content: withTrackioViewContext(content, message.dashboardViews) }
+			: content === message.content
+				? message
+				: { ...message, content };
+	});
 }
 
 /**

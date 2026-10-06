@@ -32,6 +32,12 @@
 	import { HubMentionState } from "$lib/utils/hubMention.svelte";
 	import { getCaretCoordinates } from "$lib/utils/caretCoordinates";
 	import { findViewTokens, stripOrphanViewMarks, VIEW_TOKEN_MARK } from "$lib/utils/trackioView";
+	import {
+		findMentionTokens,
+		MENTION_MARK,
+		mentionToken,
+		stripOrphanMentionMarks,
+	} from "$lib/utils/mentionTokens";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { page } from "$app/state";
 
@@ -84,25 +90,36 @@
 	let textareaElement: HTMLTextAreaElement | undefined = $state();
 
 	/**
-	 * Dashboard views sit in the text as marked labels (see trackioView). The
-	 * textarea stays a textarea — paste, mentions, IME and undo all keep their
-	 * native behavior — and a layer behind it, laid out identically, draws each
-	 * token as a chip while the textarea's own glyphs go transparent. Only
-	 * while a token is present, so ordinary typing never depends on the layer.
+	 * Dashboard views (see trackioView) and accepted Hub mentions (see
+	 * mentionTokens) sit in the text as marked spans. The textarea stays a
+	 * textarea — paste, IME and undo all keep their native behavior — and a layer
+	 * behind it, laid out identically, draws each token (a chip, a link-colored
+	 * mention) while the textarea's own glyphs go transparent. Only while a token
+	 * is present, so ordinary typing never depends on the layer.
 	 */
-	let viewTokens = $derived(findViewTokens(value));
+	type InlineToken = { start: number; end: number; kind: "view" | "mention" };
+	let inlineTokens = $derived<InlineToken[]>(
+		[
+			...findViewTokens(value).map((t) => ({ start: t.start, end: t.end, kind: "view" as const })),
+			...findMentionTokens(value).map((t) => ({
+				start: t.start,
+				end: t.end,
+				kind: "mention" as const,
+			})),
+		].sort((a, b) => a.start - b.start)
+	);
 	let mirrorElement: HTMLDivElement | undefined = $state();
 	// Drawn from the raw token, padding and marks included, so every glyph is
 	// the textarea's own.
 	let mirrorSegments = $derived.by(() => {
-		const segments: Array<{ text: string; token: boolean }> = [];
+		const segments: Array<{ text: string; kind?: InlineToken["kind"] }> = [];
 		let last = 0;
-		for (const token of viewTokens) {
-			segments.push({ text: value.slice(last, token.start), token: false });
-			segments.push({ text: value.slice(token.start, token.end), token: true });
+		for (const token of inlineTokens) {
+			segments.push({ text: value.slice(last, token.start) });
+			segments.push({ text: value.slice(token.start, token.end), kind: token.kind });
 			last = token.end;
 		}
-		segments.push({ text: value.slice(last), token: false });
+		segments.push({ text: value.slice(last) });
 		return segments;
 	});
 
@@ -121,12 +138,14 @@
 	}
 
 	/** A token is one unit: Backspace/Delete beside it removes it whole. */
-	function handleViewTokenKeys(event: KeyboardEvent): boolean {
-		if (!textareaElement || !viewTokens.length || isCompositionOn) return false;
+	function handleTokenKeys(event: KeyboardEvent): boolean {
+		if (!textareaElement || !inlineTokens.length || isCompositionOn) return false;
 		if (event.key !== "Backspace" && event.key !== "Delete") return false;
 		const { selectionStart: s, selectionEnd: e } = textareaElement;
 		if (s !== e) return false;
-		const token = viewTokens.find((t) => (event.key === "Backspace" ? t.end === s : t.start === s));
+		const token = inlineTokens.find((t) =>
+			event.key === "Backspace" ? t.end === s : t.start === s
+		);
 		if (!token) return false;
 		event.preventDefault();
 		deleteRange(token.start, token.end);
@@ -135,11 +154,11 @@
 
 	/** Keeps the caret out of a token, and widens a selection to whole tokens. */
 	function snapSelectionToTokens() {
-		if (!textareaElement || !viewTokens.length) return;
+		if (!textareaElement || !inlineTokens.length) return;
 		const { selectionStart: s, selectionEnd: e, selectionDirection } = textareaElement;
 		let ns = s;
 		let ne = e;
-		for (const t of viewTokens) {
+		for (const t of inlineTokens) {
 			if (s === e && s > t.start && s < t.end) {
 				ns = ne = s - t.start < t.end - s ? t.start : t.end;
 				break;
@@ -306,8 +325,8 @@
 		const target = event.currentTarget as HTMLTextAreaElement;
 		if (disabled) return;
 		// An edit that cut a token in half leaves a stray mark; the words stay.
-		if (target.value.includes(VIEW_TOKEN_MARK)) {
-			const cleaned = stripOrphanViewMarks(target.value);
+		if (target.value.includes(VIEW_TOKEN_MARK) || target.value.includes(MENTION_MARK)) {
+			const cleaned = stripOrphanMentionMarks(stripOrphanViewMarks(target.value));
 			if (cleaned !== target.value) {
 				const caret = target.selectionStart - (target.value.length - cleaned.length);
 				value = cleaned;
@@ -328,16 +347,26 @@
 	async function selectHubResult(result: HfHubResource) {
 		const replacement = hub.accept(value, result);
 		if (!replacement) return;
-		value = replacement.value;
+		// The accepted repo becomes one token: marked, so it draws as a link and
+		// deletes whole. The plain `@id` the replacement wrote ends at the caret,
+		// or one before it when a space was added after.
+		const plain = `@${result.id}`;
+		const end = replacement.value.startsWith(plain, replacement.caret - plain.length)
+			? replacement.caret
+			: replacement.caret - 1;
+		const start = end - plain.length;
+		value =
+			replacement.value.slice(0, start) + mentionToken(result.id) + replacement.value.slice(end);
+		const caret = replacement.caret + 2;
 
 		await tick();
 		textareaElement?.focus();
-		textareaElement?.setSelectionRange(replacement.caret, replacement.caret);
+		textareaElement?.setSelectionRange(caret, caret);
 		adjustTextareaHeight();
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
-		if (handleViewTokenKeys(event)) return;
+		if (handleTokenKeys(event)) return;
 		if (isHubMentionOpen && !isCompositionOn) {
 			if (event.key === "ArrowDown" && hub.results.length > 0) {
 				event.preventDefault();
@@ -449,7 +478,7 @@
 			/>
 		{/if}
 
-		{#if viewTokens.length}
+		{#if inlineTokens.length}
 			<!-- Same box, font and wrapping as the textarea above it, so every glyph
 			     lands where the textarea would have drawn it. -->
 			<div
@@ -458,8 +487,9 @@
 				class="view-token-mirror pointer-events-none absolute inset-0 scrollbar-custom overflow-x-hidden overflow-y-auto px-2.5 py-2.5 sm:px-3"
 				class:text-gray-400={disabled}
 			>
-				{#each mirrorSegments as segment, i (i)}{#if segment.token}<span class="view-token"
-							>{segment.text}</span
+				{#each mirrorSegments as segment, i (i)}{#if segment.kind === "view"}<span
+							class="view-token">{segment.text}</span
+						>{:else if segment.kind === "mention"}<span class="mention-token">{segment.text}</span
 						>{:else}{segment.text}{/if}{/each}{"\u200b"}
 			</div>
 		{/if}
@@ -477,7 +507,7 @@
 				: undefined}
 			class="relative scrollbar-custom max-h-[4lh] w-full resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent px-2.5 py-2.5 outline-hidden focus:ring-0 focus-visible:ring-0 sm:px-3 md:max-h-[8lh]"
 			class:text-gray-400={disabled}
-			class:has-view-tokens={viewTokens.length > 0}
+			class:has-view-tokens={inlineTokens.length > 0}
 			bind:value
 			bind:this={textareaElement}
 			oninput={handleInput}
@@ -802,6 +832,19 @@
 		background: currentColor;
 		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 11l4-4 3 3 5-5M10 5h4v4'/%3E%3C/svg%3E")
 			center / contain no-repeat;
+	}
+	/* An accepted Hub repo: link-colored with a faint tint, so it reads as one
+	   thing. Same no-width rule as the chips: shadows only, no padding. */
+	.mention-token {
+		color: #2563eb;
+		border-radius: 4px;
+		background: rgb(37 99 235 / 0.08);
+		box-shadow: 0 0 0 1px rgb(37 99 235 / 0.08);
+	}
+	:global(.dark) .mention-token {
+		color: #60a5fa;
+		background: rgb(96 165 250 / 0.12);
+		box-shadow: 0 0 0 1px rgb(96 165 250 / 0.12);
 	}
 	:global(.dark) .view-token {
 		color: #f0a468;
