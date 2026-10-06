@@ -198,8 +198,11 @@ const katexInlineExtension: TokenizerExtension & RendererExtension = {
 	},
 
 	tokenizer(src: string): katexInlineToken | undefined {
-		// 1) $...$
-		const rule1 = /^\$([^$]+?)\$/;
+		// 1) $...$, by Pandoc's rules, so prices are not read as math: the opening $
+		// is followed by a non-space, the closing $ follows a non-space and is not
+		// followed by a digit, and both sit on one line. Without them "$0.00 of
+		// budget … (~$1)" renders everything between the two dollars as math.
+		const rule1 = /^\$(?=[^\s$])([^$\n]*?[^\s$\\])\$(?!\d)/;
 		const match1 = rule1.exec(src);
 		if (match1) {
 			const token: katexInlineToken = {
