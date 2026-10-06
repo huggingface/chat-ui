@@ -1214,8 +1214,10 @@
 					class={{
 						"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
 						"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
-						"border-[#e2ddd6] dark:border-[#2c2c2c]": mlModeOn && (mlStripVisible || mlPillVisible),
-						"dark:border-gray-700": !(mlModeOn && (mlStripVisible || mlPillVisible)),
+						// The mode's orange on the border, so the composer itself says which
+						// mode a message will go to.
+						"border-[#efc9ad] dark:border-[#5a3a22]": mlModeOn,
+						"dark:border-gray-700": !mlModeOn,
 						"opacity-30": isReadOnly,
 						"max-sm:mb-4": focused && isVirtualKeyboard(),
 					}}
