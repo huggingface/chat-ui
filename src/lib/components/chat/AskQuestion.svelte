@@ -78,8 +78,11 @@
 		// Or a typed answer would still show as chosen beside the picked one.
 		if (!multiple) showOther = { ...showOther, [f.name]: false };
 		error = null;
-		// Never off the last question: sending is the user's own act.
-		if (!multiple && !isLast) step += 1;
+		if (multiple) return;
+		// One click is the whole answer: on to the next question, or, on the last,
+		// sent with the rest.
+		if (isLast) void finish("accept");
+		else step += 1;
 	}
 
 	let otherInput = $state<HTMLInputElement>();
@@ -175,10 +178,14 @@
 		unregisterQuestion(request.elicitationId);
 	}
 
-	const rowClass =
-		"flex w-full cursor-pointer items-start gap-3 rounded-md px-2 py-1.5 text-left transition-colors " +
-		"hover:bg-gray-100 dark:hover:bg-gray-700/60 " +
-		"focus:ring-2 focus:ring-gray-300 focus:outline-hidden dark:focus:ring-gray-700";
+	// A picked row is shaded, not outlined. The keyboard ring is inset: the options
+	// scroll, so a ring drawn outside the row would be clipped at its sides.
+	const rowClass = (picked: boolean) =>
+		[
+			"flex w-full cursor-pointer items-start gap-3 rounded-md px-2 py-1.5 text-left transition-colors outline-hidden",
+			"focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-inset dark:focus-visible:ring-gray-600",
+			picked ? "bg-gray-100 dark:bg-gray-700/60" : "hover:bg-gray-100/70 dark:hover:bg-gray-700/40",
+		].join(" ");
 </script>
 
 <!-- Sized against the visible viewport: this sits in the composer overlay, outside the chat's
@@ -247,7 +254,7 @@
 					{@const picked = chosen(select.name).includes(option.value)}
 					<button
 						type="button"
-						class={rowClass}
+						class={rowClass(picked)}
 						aria-pressed={picked}
 						disabled={submitting}
 						onclick={() => toggle(select, option.value)}
@@ -289,7 +296,7 @@
 					{@const on = showOther[select.name] === true}
 					<button
 						type="button"
-						class={rowClass}
+						class={rowClass(on)}
 						aria-pressed={on}
 						disabled={submitting}
 						onclick={() => toggleOther(select)}
