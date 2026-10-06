@@ -810,24 +810,21 @@
 	}
 
 	/* No padding or border: either would widen the token and push the mirror's
-	   wrapping off the textarea's. The token's own wide spaces are the padding,
-	   the spread shadows a ring and a little height, and the icon is painted
-	   into the leading space. */
+	   wrapping off the textarea's. A faint tint with a 1px soft edge, like a
+	   mention; the icon is painted into the token's leading no-break spaces. */
 	.view-token {
 		position: relative;
 		color: #c4511a;
-		border-radius: 6px;
-		background: rgb(196 81 26 / 0.13);
-		box-shadow:
-			0 0 0 1px rgb(196 81 26 / 0.13),
-			0 0 0 2px rgb(196 81 26 / 0.42);
+		border-radius: 4px;
+		background: rgb(196 81 26 / 0.1);
+		box-shadow: 0 0 0 1px rgb(196 81 26 / 0.1);
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
 	}
 	.view-token::before {
 		content: "";
 		position: absolute;
-		left: 4px;
+		left: 1px;
 		/* From the first line's top, not 50%: a chip too long for its line still
 		   breaks, and its box then spans both lines. */
 		top: calc(0.62em - 6.5px);
@@ -852,9 +849,7 @@
 	}
 	:global(.dark) .view-token {
 		color: #f0a468;
-		background: rgb(240 164 104 / 0.15);
-		box-shadow:
-			0 0 0 1px rgb(240 164 104 / 0.15),
-			0 0 0 2px rgb(240 164 104 / 0.42);
+		background: rgb(240 164 104 / 0.13);
+		box-shadow: 0 0 0 1px rgb(240 164 104 / 0.13);
 	}
 </style>

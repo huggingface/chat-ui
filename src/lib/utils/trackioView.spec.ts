@@ -100,9 +100,9 @@ describe("inline view tokens", () => {
 	it("reads as its label, with a mark either side", () => {
 		expect(trackioViewLabel(a)).toBe("mnist • 2 runs • steps 1,000–1,500");
 		// Padded inside the marks, so the chip's padding is real text.
-		expect(trackioViewToken(a).startsWith(`${VIEW_TOKEN_MARK}${"\u00a0".repeat(5)}mnist`)).toBe(
-			true
-		);
+		expect(
+			trackioViewToken(a).startsWith(`${VIEW_TOKEN_MARK}${"\u00a0".repeat(4)}\u202fmnist`)
+		).toBe(true);
 		// Unbreakable inside, so a chip never wraps mid-label.
 		expect(trackioViewToken(a)).not.toMatch(/[ -]/);
 		expect(findViewTokens(text).map((t) => t.label)).toEqual([

@@ -172,8 +172,8 @@ export const VIEW_TOKEN_MARK = "\u2063";
  */
 // No-break spaces, not the wider en/em spaces: those are line-break points,
 // and a chip would wrap with its icon stranded at the end of the line.
-const VIEW_TOKEN_LEAD = "\u00a0".repeat(5);
-const VIEW_TOKEN_TAIL = "\u00a0".repeat(2);
+const VIEW_TOKEN_LEAD = "\u00a0".repeat(4) + "\u202f";
+const VIEW_TOKEN_TAIL = "";
 const VIEW_TOKEN = /\u2063([^\u2063\n]{1,400})\u2063/g;
 
 export function trackioViewLabel(view: TrackioDashboardView): string {
