@@ -45,10 +45,16 @@ export class HubMentionState {
 	results = $state<HfHubResource[]>([]);
 	status = $state<HubSearchStatus>(null);
 	/**
-	 * -1 means "nothing chosen". Enter only accepts once the user has arrowed
-	 * into the list, so an ordinary `@name` in prose never swallows a send.
+	 * The highlighted result; -1 while there are none. The first result is
+	 * highlighted as soon as results arrive, so Tab and Enter take it.
 	 */
 	activeIndex = $state(-1);
+	/**
+	 * Whether the user moved the highlight themselves (arrows, a real pointer
+	 * move). On a touch keyboard Enter is the newline key with no Escape to back
+	 * out with, so there it only accepts a highlight the user chose.
+	 */
+	chosen = $state(false);
 
 	#enabled: boolean;
 	#search: typeof searchHfHub;
@@ -128,10 +134,12 @@ export class HubMentionState {
 		if (this.results.length === 0) return;
 		const from = this.activeIndex < 0 ? (delta > 0 ? -1 : 0) : this.activeIndex;
 		this.activeIndex = (from + delta + this.results.length) % this.results.length;
+		this.chosen = true;
 	}
 
 	setActiveIndex(index: number): void {
 		this.activeIndex = index;
+		this.chosen = true;
 	}
 
 	/** Apply a result to the text, and suppress the mention it just completed. */
@@ -163,6 +171,7 @@ export class HubMentionState {
 		this.results = [];
 		this.status = null;
 		this.activeIndex = -1;
+		this.chosen = false;
 	}
 
 	destroy(): void {
@@ -177,6 +186,7 @@ export class HubMentionState {
 		this.#abort = null;
 		this.results = [];
 		this.activeIndex = -1;
+		this.chosen = false;
 		// Deliberately NOT `loading` yet: flipping it here would flash the panel
 		// over the composer on every keystroke of ordinary typing, before the
 		// debounce has even started.
@@ -192,6 +202,7 @@ export class HubMentionState {
 				const results = await this.#search(query, controller.signal);
 				if (sequence !== this.#sequence) return;
 				this.results = results;
+				this.activeIndex = results.length > 0 ? 0 : -1;
 				this.status = "success";
 			} catch (error) {
 				if (controller.signal.aborted || sequence !== this.#sequence) return;
