@@ -170,8 +170,10 @@ export const VIEW_TOKEN_MARK = "\u2063";
  * it out of line with the text the textarea lays out. The leading run is wide
  * enough to hold the chip's icon, which the composer paints into it.
  */
-const VIEW_TOKEN_LEAD = "\u2003\u2005";
-const VIEW_TOKEN_TAIL = "\u2002";
+// No-break spaces, not the wider en/em spaces: those are line-break points,
+// and a chip would wrap with its icon stranded at the end of the line.
+const VIEW_TOKEN_LEAD = "\u00a0".repeat(5);
+const VIEW_TOKEN_TAIL = "\u00a0".repeat(2);
 const VIEW_TOKEN = /\u2063([^\u2063\n]{1,400})\u2063/g;
 
 export function trackioViewLabel(view: TrackioDashboardView): string {
