@@ -66,15 +66,17 @@
 	$effect(() => subscribeToTheme((theme) => (isDark = theme.isDark)));
 
 	/**
-	 * The framed URL, with the two display parameters the pane wants:
+	 * The framed URL, with the display parameter the pane wants:
 	 *
-	 * - `sidebar=hidden` — Trackio's own embed parameter. The pane is narrower
-	 *   than a full tab and already names the run in its header, so the charts
-	 *   get the width instead of the project/run picker.
 	 * - `__theme` — Gradio's theme override, which Trackio inherits by being a
 	 *   Gradio app. Read at page load, so a toggle necessarily reloads the frame
 	 *   (and drops in-dashboard state like an expanded section); a theme change
 	 *   is rare enough that matching the app is worth it.
+	 *
+	 * No `sidebar` parameter: `hidden` removes the run picker and x-axis settings
+	 * outright, and Trackio already collapses its sidebar to a toggle in a frame
+	 * this narrow. A captured view's URL can still carry one from an older frame,
+	 * so it is dropped rather than left to decide.
 	 *
 	 * Built through `URLSearchParams` rather than string concatenation because the
 	 * extracted URL may already carry a query (see `$lib/utils/trackio`).
@@ -83,7 +85,7 @@
 		if (!dashboard) return undefined;
 		try {
 			const url = new URL(dashboard.viewUrl ?? dashboard.url);
-			url.searchParams.set("sidebar", "hidden");
+			url.searchParams.delete("sidebar");
 			url.searchParams.set("__theme", isDark ? "dark" : "light");
 			return url.toString();
 		} catch {
