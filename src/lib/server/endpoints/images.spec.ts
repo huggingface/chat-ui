@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { makeImageProcessor } from "./images";
 
@@ -24,10 +25,16 @@ describe("makeImageProcessor", () => {
 	});
 
 	it("accepts PNG content declared as image/png", async () => {
-		const png = Buffer.from(
-			"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAF/gL+4ZQnWQAAAABJRU5ErkJggg==",
-			"base64"
-		);
+		const png = await sharp({
+			create: {
+				width: 1,
+				height: 1,
+				channels: 4,
+				background: { r: 255, g: 0, b: 0, alpha: 1 },
+			},
+		})
+			.png()
+			.toBuffer();
 
 		const result = await imageProcessor({
 			type: "base64",
