@@ -17,6 +17,7 @@
 	import IconMCP from "$lib/components/icons/IconMCP.svelte";
 	import HfHubMentionAutocomplete from "./HfHubMentionAutocomplete.svelte";
 	import MlInternPill from "./MlInternPill.svelte";
+	import PaperPagePill from "./PaperPagePill.svelte";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
@@ -47,6 +48,8 @@
 		modelSupportsTools?: boolean;
 		// Offers the ML Intern mode switch beside the MCP pill (empty conversations only)
 		showMlPill?: boolean;
+		// Offers the PaperPage Intern mode switch beside it (new conversations only)
+		showPaperPagePill?: boolean;
 		children?: import("svelte").Snippet;
 		onPaste?: (e: ClipboardEvent) => void;
 		focused?: boolean;
@@ -64,6 +67,7 @@
 		modelIsMultimodal = false,
 		modelSupportsTools = true,
 		showMlPill = false,
+		showPaperPagePill = false,
 		children,
 		onPaste,
 		focused = $bindable(false),
@@ -412,7 +416,7 @@
 		></textarea>
 	</div>
 
-	{#if !showNoTools || showMlPill}
+	{#if !showNoTools || showMlPill || showPaperPagePill}
 		<div
 			class={[
 				// Stops short of the trailing action buttons; ChatWindow reports their width.
@@ -629,6 +633,9 @@
 
 			{#if showMlPill}
 				<MlInternPill />
+			{/if}
+			{#if showPaperPagePill}
+				<PaperPagePill />
 			{/if}
 		</div>
 	{/if}

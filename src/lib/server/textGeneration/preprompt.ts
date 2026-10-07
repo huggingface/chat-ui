@@ -6,12 +6,15 @@ import {
 } from "$lib/server/mlAssistantPrompt";
 import type { MlBudget } from "$lib/types/Conversation";
 import { formatMicroUsd, remainingMicroUsd } from "$lib/utils/mlBudget";
+import { paperPagePreprompt } from "$lib/server/paperPage/prompt";
 
 export interface PrepromptInput {
 	/** The conversation's stored system prompt. */
 	conversationPreprompt?: string;
 	/** Whether this conversation runs the ML Assistant preset. */
 	mlAssistant: boolean;
+	/** Whether this conversation runs the PaperPage preset. */
+	paperPage?: boolean;
 	/** whether the file tools are offered this turn, decides the scripts section, defaults on like the switch */
 	virtualFiles?: boolean;
 	/** whether the turn carries the session state block, defaults on like the switch */
@@ -47,6 +50,7 @@ export interface PrepromptInput {
 export function resolvePreprompt({
 	conversationPreprompt,
 	mlAssistant,
+	paperPage,
 	virtualFiles,
 	stateBlock,
 	attachmentBudget,
@@ -59,6 +63,8 @@ export function resolvePreprompt({
 	billTo,
 	billingResourceGroup,
 }: PrepromptInput): string | undefined {
+	// the page is the deliverable, so the mode replaces the user's prompt and never gets artifacts
+	if (paperPage) return paperPagePreprompt({ username, timezone, now });
 	const base = mlAssistant
 		? mlAssistantPreprompt({
 				virtualFiles: virtualFiles ?? true,

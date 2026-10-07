@@ -10,7 +10,7 @@ export const SIDE_PANE_MAX_WIDTH = 2400;
 export const SIDE_PANE_DEFAULT_FRACTION = "60%";
 
 /** Which view owns the pane. One slot, so the views are mutually exclusive. */
-export type SidePaneView = "artifact" | "trackio" | "registry";
+export type SidePaneView = "artifact" | "trackio" | "space" | "registry";
 
 /**
  * UI state for the side pane. Its content is always derived from the
@@ -27,6 +27,8 @@ class SidePaneStore {
 	view = $state<SidePaneView>("artifact");
 	/** The framed Trackio dashboard, when `view` is "trackio". */
 	trackio = $state<{ url: string; label: string } | null>(null);
+	/** The framed live Space preview, when `view` is "space". */
+	space = $state<{ url: string; label: string } | null>(null);
 	/** the file version the registry view scrolls to and opens */
 	registryFocus = $state<MlFileRef | null>(null);
 	identifier = $state<string | null>(null);
@@ -105,6 +107,21 @@ class SidePaneStore {
 		this.openTrackio(url, label);
 	}
 
+	openSpace(url: string, label: string) {
+		this.view = "space";
+		this.space = { url, label };
+		this.open = true;
+		this.revealNonce += 1;
+	}
+
+	/** Open a Space preview the first time it is announced, once per URL, like a dashboard. */
+	maybeAutoOpenSpace(url: string, label: string) {
+		const key = `space:${url}`;
+		if (this.autoOpenedKeys.has(key)) return;
+		this.autoOpenedKeys.add(key);
+		this.openSpace(url, label);
+	}
+
 	/** a list, not an item, so it has no place in the item nav */
 	openRegistry(focus: MlFileRef | null = null) {
 		this.view = "registry";
@@ -136,6 +153,7 @@ class SidePaneStore {
 		this.open = false;
 		this.view = "artifact";
 		this.trackio = null;
+		this.space = null;
 		this.registryFocus = null;
 		this.identifier = null;
 		this.version = null;

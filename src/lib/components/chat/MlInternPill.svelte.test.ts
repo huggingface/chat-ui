@@ -70,10 +70,10 @@ describe("MlInternPill", () => {
 	it("draws an off switch on the specified geometry", () => {
 		const { container } = render();
 
-		expect(box(find(container, ".ml-pill-track"))).toEqual({ width: 30, height: 17 });
-		expect(box(find(container, ".ml-pill-knob"))).toEqual({ width: 13, height: 13 });
-		expect(style(find(container, ".ml-pill-knob")).left).toBe("2px");
-		expect(style(find(container, ".ml-pill-track")).backgroundColor).toBe("rgb(216, 216, 221)");
+		expect(box(find(container, ".mode-pill-track"))).toEqual({ width: 30, height: 17 });
+		expect(box(find(container, ".mode-pill-knob"))).toEqual({ width: 13, height: 13 });
+		expect(style(find(container, ".mode-pill-knob")).left).toBe("2px");
+		expect(style(find(container, ".mode-pill-track")).backgroundColor).toBe("rgb(216, 216, 221)");
 	});
 
 	it("toggles the mode on click, retinting the pill and crossing the knob", async () => {
@@ -83,8 +83,8 @@ describe("MlInternPill", () => {
 		expect(mlAssistant.enabled).toBe(true);
 		await vi.waitFor(() => {
 			expect(find(container, '[role="switch"]').getAttribute("aria-checked")).toBe("true");
-			expect(style(find(container, ".ml-pill-knob")).left).toBe("15px");
-			expect(style(find(container, ".ml-pill-track")).backgroundColor).toBe(ACCENT);
+			expect(style(find(container, ".mode-pill-knob")).left).toBe("15px");
+			expect(style(find(container, ".mode-pill-track")).backgroundColor).toBe(ACCENT);
 		});
 	});
 

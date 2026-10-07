@@ -20,6 +20,8 @@
       title: MCP Tools
     - local: configuration/llm-router
       title: LLM Router
+    - local: configuration/paperpage
+      title: PaperPage Intern
     - local: configuration/metrics
       title: Metrics
     - local: configuration/common-issues

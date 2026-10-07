@@ -183,6 +183,11 @@ describe("readLinkMode", () => {
 		expect(readLinkMode(params("mode=%20ml-intern%20"))).toBe("ml-intern");
 	});
 
+	it("reads mode=paperpage-intern", () => {
+		expect(readLinkMode(params("mode=paperpage-intern"))).toBe("paperpage-intern");
+		expect(readLinkMode(params("mode=PaperPage-Intern"))).toBe("paperpage-intern");
+	});
+
 	it("ignores a missing or unknown mode", () => {
 		expect(readLinkMode(params(""))).toBeNull();
 		expect(readLinkMode(params("mode="))).toBeNull();

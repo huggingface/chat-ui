@@ -4,8 +4,15 @@ import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import type { ElicitationSink } from "$lib/server/mcp/elicitation";
 
 export type BuiltinToolResult =
-	/** The call finished; `resultText` becomes the tool message the model reads next round. */
-	| { resultText: string; extraUpdates?: MessageUpdate[] }
+	/**
+	 * The call finished; `resultText` becomes the tool message the model reads next round. `images`
+	 * are shown with the result, and sent with the next request to a model that reads images.
+	 */
+	| {
+			resultText: string;
+			extraUpdates?: MessageUpdate[];
+			images?: Array<{ data: string; mimeType: string }>;
+	  }
 	/** Model-readable failure; surfaces as a tool error the model can retry on. */
 	| { error: string }
 	/**

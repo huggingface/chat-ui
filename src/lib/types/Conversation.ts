@@ -35,6 +35,13 @@ export interface Conversation extends Timestamps {
 	mlAssistant?: boolean;
 
 	/**
+	 * Set when the conversation was started in an agent mode other than ML Assistant. Like
+	 * `mlAssistant` it is fixed at creation; only ever written while the mode is enabled (see
+	 * `$lib/server/paperPage`).
+	 */
+	agentMode?: "paperpage";
+
+	/**
 	 * Spaces this conversation's artifacts have been deployed to, keyed by the
 	 * stable artifact `identifier`. Lets a re-deploy push a new commit to the same
 	 * Space instead of creating a new one. Only Spaces created through this app's

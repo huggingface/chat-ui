@@ -20,6 +20,12 @@ export function buildToolPreprompt(
 	 */
 	options?: {
 		mlAssistant?: boolean;
+		/**
+		 * A mode's own rule for when to use tools, in place of the generic restraint. A mode that
+		 * builds with its tools also drops the single-HTML-file rule for apps, which would steer the
+		 * model away from them.
+		 */
+		usingTools?: string;
 		/** whether a job end wakes a parked wait, read from the deployment unless given */
 		serviceEvents?: boolean;
 		/** whether submissions are labelled for the session, read from the deployment unless given */
@@ -63,15 +69,17 @@ export function buildToolPreprompt(
 		.map((builtin) => builtin.preprompt?.trim() ?? "")
 		.filter((text) => text.length > 0);
 	const mlAssistant = options?.mlAssistant ?? false;
+	const usingTools = options?.usingTools;
 	// In the mode there is no blanket restraint for a tool to be exempt from: the
 	// paragraph that would name the exemptions is the one being replaced.
 	const restraint = mlAssistant
 		? ML_ASSISTANT_TOOL_DOCTRINE.usingTools
-		: `IMPORTANT: Do NOT call a tool unless the user's request requires capabilities you lack (e.g., real-time data, image generation, code execution) or external information you do not have. For tasks like writing code, creative writing, math, or building apps, respond directly without tools. When in doubt, do not use a tool.${
+		: (usingTools ??
+			`IMPORTANT: Do NOT call a tool unless the user's request requires capabilities you lack (e.g., real-time data, image generation, code execution) or external information you do not have. For tasks like writing code, creative writing, math, or building apps, respond directly without tools. When in doubt, do not use a tool.${
 				exemptNames.length > 0
 					? ` This does not apply to ${exemptNames.join(" or ")}, covered below.`
 					: ""
-			}`;
+			}`);
 	const general = [
 		`You have access to these tools: ${names.join(", ")}.`,
 		`Current date and time: ${currentDateTime} (${isoDate}).${locationLine}`,
@@ -83,7 +91,11 @@ export function buildToolPreprompt(
 			: [
 					`SEARCH: Use 3-6 precise keywords. For historical events, include the year the event occurred. For recent or current topics, use today's year (${now.getFullYear()}). When a tool accepts date-range parameters (e.g., startPublishedDate, endPublishedDate), always use today's date (${isoDate}) as the end date unless the user specifies otherwise. For multi-part questions, search each part separately. If the results only partially cover the question, run a follow-up search or crawl the most relevant result URL instead of answering from memory.`,
 					`GROUNDING: When you answer from tool results, the results are your only source of facts. Do not supplement them with specifics from your own knowledge — details not present in the results are likely wrong, even when they sound plausible. If a fact is missing, search again or say you could not verify it. Attribute key facts to their sources with markdown links to the result URLs. If results conflict, say so. Never fabricate URLs, citations, or facts.`,
-					`INTERACTIVE APPS: When asked to build an interactive application, game, or visualization without a specific language/framework preference, create a single self-contained HTML file with embedded CSS and JavaScript.`,
+					...(usingTools
+						? []
+						: [
+								`INTERACTIVE APPS: When asked to build an interactive application, game, or visualization without a specific language/framework preference, create a single self-contained HTML file with embedded CSS and JavaScript.`,
+							]),
 				]),
 		`If a tool generates an image, you can inline it directly: ![alt text](image_url).`,
 		`If a tool needs an image, set its image field ("input_image", "image", or "image_url") to a reference like "image_1", "image_2", etc. (ordered by when the user uploaded them).`,

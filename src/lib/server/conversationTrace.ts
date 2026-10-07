@@ -35,15 +35,20 @@ export async function buildConversationTrace(
 		Conversation,
 		"title" | "model" | "preprompt" | "createdAt" | "updatedAt" | "rootMessageId" | "messages"
 	> &
-		Partial<Pick<Conversation, "mlAssistant" | "mlBudget" | "plan" | "historyWindow">>
+		Partial<Pick<Conversation, "agentMode" | "mlAssistant" | "mlBudget" | "plan" | "historyWindow">>
 ) {
-	const [services, artefacts, agentRuns, agentCalls, sources, files] = await Promise.all([
+	const [services, artefacts, agentRuns, agentCalls, sources, files, workshop] = await Promise.all([
 		collections.mlServices.find({ conversationId }).sort({ createdAt: 1, _id: 1 }).toArray(),
 		collections.mlArtefacts.find({ conversationId }).sort({ createdAt: 1, _id: 1 }).toArray(),
 		collections.mlAgentRuns.find({ conversationId }).sort({ startedAt: 1, _id: 1 }).toArray(),
 		collections.nestedAgentCalls.find({ conversationId }).sort({ createdAt: 1, _id: 1 }).toArray(),
 		collections.mlSources.find({ conversationId }).sort({ firstSeenAt: 1, _id: 1 }).toArray(),
 		collections.mlFiles.find({ conversationId }).sort({ name: 1, version: 1 }).toArray(),
+		// the Spaces a PaperPage conversation built, never the workshop's sandbox token
+		collections.paperPageWorkshops.findOne(
+			{ _id: conversationId },
+			{ projection: { _id: 0, spaceId: 1, publishedSpaceId: 1 } }
+		),
 	]);
 
 	return {
@@ -57,6 +62,7 @@ export async function buildConversationTrace(
 			preprompt: conversation.preprompt,
 			createdAt: conversation.createdAt,
 			updatedAt: conversation.updatedAt,
+			agentMode: conversation.agentMode,
 			mlAssistant: conversation.mlAssistant,
 			mlBudget: conversation.mlBudget,
 			plan: conversation.plan,
@@ -71,5 +77,6 @@ export async function buildConversationTrace(
 		agentCalls: agentCalls.map(withId),
 		sources: sources.map(withId),
 		files: files.map(withId),
+		...(workshop && { paperPage: workshop }),
 	};
 }
