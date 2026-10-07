@@ -93,9 +93,8 @@
 	// Tab visible, bfcache restore and network back tend to fire together on wake-up.
 	const RECONNECT_DEBOUNCE_MS = 300;
 
-	// The composer belongs to the conversation it was written in. This page is
-	// reused across conversations, so its content is swapped on every switch and
-	// kept for when the user comes back.
+	// This page is reused across conversations, so the composer is swapped on
+	// every switch.
 	const initialDraft = takeComposerDraft(untrack(() => convId));
 	let draft = $state(initialDraft.draft);
 	let files: File[] = $state(initialDraft.files);

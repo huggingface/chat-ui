@@ -9,7 +9,6 @@
 	}
 	let { onstore }: Props = $props();
 
-	// The stores the root layout provides, so the watcher can run on its own.
 	const activeGenerations = createActiveGenerationsStore();
 	createConversationsStore();
 	createNotificationsStore();

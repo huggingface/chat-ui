@@ -176,8 +176,7 @@
 		unregisterQuestion(request.elicitationId);
 	}
 
-	// A picked row is shaded, not outlined. The keyboard ring is inset: the options
-	// scroll, so a ring drawn outside the row would be clipped at its sides.
+	// The keyboard ring is inset: the options scroll, so an outer ring would be clipped.
 	const rowClass = (picked: boolean) =>
 		[
 			"flex w-full cursor-pointer items-start gap-3 rounded-md px-2 py-1.5 text-left transition-colors outline-hidden",

@@ -44,15 +44,11 @@ export class HubMentionState {
 	mention = $state<HfHubMention | null>(null);
 	results = $state<HfHubResource[]>([]);
 	status = $state<HubSearchStatus>(null);
-	/**
-	 * The highlighted result; -1 while there are none. The first result is
-	 * highlighted as soon as results arrive, so Tab and Enter take it.
-	 */
+	/** -1 while there are no results; the first is highlighted when they arrive. */
 	activeIndex = $state(-1);
 	/**
-	 * Whether the user moved the highlight themselves (arrows, a real pointer
-	 * move). Enter only accepts a highlight the user chose; until then it sends
-	 * the message as typed.
+	 * Whether the user moved the highlight. Enter only accepts then, so an
+	 * ordinary `@name` in prose never swallows a send.
 	 */
 	chosen = $state(false);
 
@@ -80,7 +76,6 @@ export class HubMentionState {
 		return this.status !== null;
 	}
 
-	/** The highlighted result, or undefined when nothing is highlighted. */
 	get activeResult(): HfHubResource | undefined {
 		return this.activeIndex >= 0 ? this.results[this.activeIndex] : undefined;
 	}

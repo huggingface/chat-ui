@@ -11,7 +11,6 @@ export function getApiToken(locals: App.Locals | undefined) {
 }
 
 /**
- * The signed-in user's token when it is a Hugging Face one, else undefined.
  * `locals.token` is whatever the deployment's OIDC provider issued, so it only
  * goes to huggingface.co when that provider is the Hub (or the operator opted
  * into user tokens).

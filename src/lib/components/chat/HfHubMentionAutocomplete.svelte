@@ -23,7 +23,6 @@
 		dataset: "Datasets",
 		space: "Spaces",
 	};
-	// The Hub's own quick-search header colors.
 	const headerTint: Record<HfHubResourceType, string> = {
 		model: "from-blue-50 text-blue-800 dark:from-blue-900",
 		dataset: "from-red-50 text-red-800 dark:from-red-900",

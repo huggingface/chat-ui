@@ -33,7 +33,6 @@ export type Message = Partial<Timestamps> & {
 	 * or the hash of the file stored on the server
 	 **/
 	files?: MessageFile[];
-	/** Trackio dashboard views the user attached to this message (ML Intern). */
 	dashboardViews?: TrackioDashboardView[];
 	interrupted?: boolean;
 

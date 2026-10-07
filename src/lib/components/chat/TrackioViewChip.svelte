@@ -4,9 +4,7 @@
 
 	interface Props {
 		view: TrackioDashboardView;
-		/** Reopens the dashboard at this view. */
 		onopen?: () => void;
-		/** Sits in a line of text rather than in a row of its own. */
 		inline?: boolean;
 	}
 

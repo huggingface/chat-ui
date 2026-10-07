@@ -69,11 +69,8 @@ function finite(value: unknown): number | undefined {
 	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-/**
- * Which dashboard to read. Only one the conversation's own tool output
- * produced — the same allowlist that decides what the pane may frame — so a
- * model-supplied URL can never point this at an arbitrary host.
- */
+// Only dashboards the conversation's own tool output produced, so a
+// model-supplied URL can never point this at an arbitrary host.
 function resolveDashboard(
 	messages: ReturnType<MessagesSource>,
 	requested?: string

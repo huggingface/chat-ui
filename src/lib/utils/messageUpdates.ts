@@ -33,7 +33,6 @@ type MessageUpdateRequestOptions = {
 	// so the server can match a stop point to the run it belongs to
 	generationId?: string;
 	files?: MessageFile[];
-	/** Trackio dashboard views attached to the message. */
 	dashboardViews?: TrackioDashboardView[];
 	// Optional: pass selected MCP server names (client-side selection)
 	selectedMcpServerNames?: string[];

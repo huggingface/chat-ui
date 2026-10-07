@@ -6,7 +6,6 @@ export interface ComposerPayload {
 	files?: File[];
 	/** Text appended to the current draft, still editable before sending */
 	text?: string;
-	/** Trackio dashboard views to attach as chips */
 	dashboardViews?: TrackioDashboardView[];
 }
 

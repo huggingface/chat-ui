@@ -215,7 +215,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				)
 				.default([]),
 			timezone: z.optional(z.string()),
-			// Shaped and checked against the conversation's dashboards below.
 			dashboardViews: z.optional(z.array(z.unknown()).max(MAX_VIEWS_PER_MESSAGE)),
 			files: z.optional(
 				z.array(

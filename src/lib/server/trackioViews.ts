@@ -7,10 +7,8 @@ import {
 } from "$lib/utils/trackioView";
 
 /**
- * The dashboard views a send may attach: re-shaped server-side, and only for
- * dashboards this conversation's own tool output produced. `dashboardUrl` is
- * what `read_trackio` later fetches from, so a view naming any other URL is
- * dropped rather than trusted.
+ * `dashboardUrl` is what `read_trackio` later fetches from, so only dashboards
+ * this conversation's own tool output produced are accepted.
  */
 export function acceptTrackioViews(
 	raw: unknown[] | undefined,

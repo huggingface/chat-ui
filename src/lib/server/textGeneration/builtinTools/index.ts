@@ -37,7 +37,6 @@ export function getEnabledBuiltinTools(params: {
 		Partial<Pick<Conversation, "messages">>;
 	/** Hub namespace to name a Trackio Space in; absent when the run has no user. */
 	namespace?: string;
-	/** The user's Hub token, for reading a private dashboard. */
 	hfToken?: string;
 }): BuiltinTool[] {
 	if (!isMlAssistantConversation(params.conv)) return [];

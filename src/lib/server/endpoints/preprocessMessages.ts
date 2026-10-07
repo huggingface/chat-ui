@@ -30,11 +30,6 @@ async function downloadFiles(messages: Message[], convId: ObjectId): Promise<End
 	);
 }
 
-/**
- * A user message's attached dashboard views become text the model reads with
- * it, and accepted @-mentions lose the composer's marks, so the model reads
- * plain `@owner/name`.
- */
 function injectTrackioViews(messages: EndpointMessage[]): EndpointMessage[] {
 	return messages.map((message) => {
 		if (message.from !== "user") return message;

@@ -25,10 +25,7 @@ export type SidePaneView = "artifact" | "trackio" | "registry";
 class SidePaneStore {
 	open = $state(false);
 	view = $state<SidePaneView>("artifact");
-	/**
-	 * The framed Trackio dashboard, when `view` is "trackio". `viewUrl` is a
-	 * captured view to show instead of the dashboard's default one.
-	 */
+	/** `viewUrl` is a captured view to show instead of the dashboard's default. */
 	trackio = $state<{ url: string; label: string; viewUrl?: string } | null>(null);
 	/** the file version the registry view scrolls to and opens */
 	registryFocus = $state<MlFileRef | null>(null);
@@ -134,7 +131,6 @@ class SidePaneStore {
 		this.open = false;
 	}
 
-	/** Pane state per conversation left this tab, restored on the way back. */
 	private saved = new Map<string, SavedPaneState>();
 	private static readonly MAX_SAVED = 20;
 

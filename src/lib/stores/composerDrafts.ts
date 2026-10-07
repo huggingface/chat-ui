@@ -7,11 +7,9 @@ export interface ComposerDraft {
 }
 
 /**
- * Unsent composer content per conversation, for this tab's lifetime. The
- * conversation page is reused across conversations, so without this whatever
- * was typed (or attached) in one chat would follow the user into the next.
- * In memory only: attachments are File objects, and a reload starting clean is
- * the existing behavior.
+ * The conversation page is reused across conversations, so without this a
+ * draft would follow the user into the next chat. In memory only: attachments
+ * are File objects.
  */
 const drafts = new Map<string, ComposerDraft>();
 const MAX_DRAFTS = 20;

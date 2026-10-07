@@ -1,13 +1,11 @@
 import type { TrackioDashboard } from "$lib/utils/trackio";
 
 const HUB = "https://huggingface.co";
-/** `owner/name`, the only shape a Space id takes. */
 const SPACE_ID = /^[A-Za-z0-9][\w.-]*\/[\w.-]+$/;
 
 /**
- * `bearer` is what the dashboard may be sent: nothing for a public Space, and
- * for a private one a JWT the Hub scopes to reading that Space alone. The
- * user's own token never leaves for the Space.
+ * `bearer` is nothing for a public Space, and for a private one a JWT scoped
+ * to reading that Space alone. The user's own token never goes to the Space.
  */
 export type TrackioSpaceCheck =
 	{ ok: true; spaceId: string; bearer?: string } | { ok: false; reason: string };
@@ -36,11 +34,8 @@ async function hubJson<T>(
 }
 
 /**
- * The Space id a dashboard claims to be. A dashboard found as a Hub page link
- * carries it; one found as a bare `*.hf.space` URL does not, since subdomains
- * cannot be turned back into ids, so the Space is asked what it calls itself.
- * Either way this is only a candidate: `verifyTrackioSpace` accepts it only if
- * the Hub serves that Space at this exact origin.
+ * A bare `*.hf.space` subdomain cannot be turned back into an id, so the Space
+ * is asked. Only a candidate: it counts once the Hub serves it at this origin.
  */
 async function candidateSpaceId(
 	dashboard: TrackioDashboard,
@@ -63,11 +58,6 @@ async function candidateSpaceId(
 	}
 }
 
-/**
- * Whether a dashboard may be read, and with what: it must be a Trackio Space
- * served at this exact origin. The user's token only ever goes to
- * huggingface.co, to see a private Space and to mint its read-only JWT.
- */
 export async function verifyTrackioSpace(
 	dashboard: TrackioDashboard,
 	token: string | undefined,

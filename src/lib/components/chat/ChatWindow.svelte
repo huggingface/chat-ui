@@ -121,7 +121,6 @@
 		models: Model[];
 		preprompt?: string | undefined;
 		files?: File[];
-		/** Trackio dashboard views attached to the next message. */
 		dashboardViews?: TrackioDashboardView[];
 		onmessage?: (content: string) => void;
 		onstop?: () => void;

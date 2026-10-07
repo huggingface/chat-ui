@@ -89,13 +89,8 @@
 
 	let textareaElement: HTMLTextAreaElement | undefined = $state();
 
-	/**
-	 * Dashboard views and accepted Hub mentions sit in the text as marked spans.
-	 * The textarea stays a textarea, so paste, IME and undo keep their native
-	 * behavior; a layer behind it draws the tokens while its own glyphs go
-	 * transparent. Only while a token is present, so plain typing never depends
-	 * on the layer.
-	 */
+	// Tokens are drawn by a layer behind the textarea while its glyphs go
+	// transparent, so paste, IME and undo stay native.
 	type InlineToken = { start: number; end: number; kind: "view" | "mention" };
 	let inlineTokens = $derived<InlineToken[]>(
 		[
@@ -321,7 +316,6 @@
 	function handleInput(event: Event) {
 		const target = event.currentTarget as HTMLTextAreaElement;
 		if (disabled) return;
-		// An edit that cut a token in half leaves a stray mark; the words stay.
 		if (target.value.includes(VIEW_TOKEN_MARK) || target.value.includes(MENTION_MARK)) {
 			const cleaned = stripOrphanMentionMarks(stripOrphanViewMarks(target.value));
 			if (cleaned !== target.value) {

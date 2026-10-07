@@ -73,10 +73,8 @@
 	 *   (and drops in-dashboard state like an expanded section); a theme change
 	 *   is rare enough that matching the app is worth it.
 	 *
-	 * No `sidebar` parameter: `hidden` removes the run picker and x-axis settings
-	 * outright, and Trackio already collapses its sidebar to a toggle in a frame
-	 * this narrow. A captured view's URL can still carry one from an older frame,
-	 * so it is dropped rather than left to decide.
+	 * `sidebar` is dropped, not set: `hidden` removes the run picker and x-axis
+	 * settings, and Trackio already collapses its sidebar in a narrow frame.
 	 *
 	 * Built through `URLSearchParams` rather than string concatenation because the
 	 * extracted URL may already carry a query (see `$lib/utils/trackio`).
@@ -100,12 +98,8 @@
 	 */
 	let reloadNonce = $state(0);
 
-	/**
-	 * "Add to chat". Trackio 0.39+ announces itself to the page framing it
-	 * (`ready`) and answers `getState` with its current view; older dashboards
-	 * stay silent, so the button only appears once one has spoken. Messages count
-	 * only from this frame's window at the dashboard's own origin.
-	 */
+	// Dashboards before Trackio 0.39 never send `ready`, so "Add to chat" waits
+	// for one. Only messages from this frame's window and origin count.
 	let frame = $state<HTMLIFrameElement>();
 	let viewReady = $state(false);
 	let capturing = $state(false);

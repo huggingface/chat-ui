@@ -117,9 +117,7 @@
 	// the time their window lapses, so only a timer can retire them.
 	const PRUNE_INTERVAL_MS = 60_000;
 
-	// Back from sleep, a hidden tab or a network drop: look again rather than trust a
-	// connection that may have died meanwhile, but only with something to track, like
-	// the error handler (a signed-out tab would otherwise 401 on every return).
+	// Gated like the error handler, or a signed-out tab would 401 on every return.
 	function recheck() {
 		if (document.visibilityState !== "visible") return;
 		if (tracking || get(loading)) open();
