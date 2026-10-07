@@ -133,7 +133,6 @@
 				text: activity?.verb ?? "Used a tool",
 				subject: activity?.subject,
 				mono: activity?.mono,
-				failure: undefined,
 				stopped: false,
 			};
 		}
@@ -143,7 +142,6 @@
 			text: lastThink ? thoughtLabel(labels, lastThink.round ?? 0, lastThink.content) : "Thought",
 			subject: undefined,
 			mono: false,
-			failure: undefined,
 			stopped: false,
 		};
 	});
@@ -203,10 +201,6 @@
 			>
 				{summary.subject}
 			</span>
-		{/if}
-		<!-- Muted like the rest of the line: one failed call among many is not an alarm. Rows flag it. -->
-		{#if !active && summary.failure}
-			<span class="shrink-0 text-sm text-gray-400 dark:text-gray-500">· {summary.failure}</span>
 		{/if}
 		{#if !active && summary.stopped}
 			<span class="shrink-0 text-sm text-gray-400 dark:text-gray-500">· stopped</span>

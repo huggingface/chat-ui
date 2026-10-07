@@ -246,7 +246,6 @@ describe("summarizeActivity", () => {
 		];
 		expect(summarizeActivity(tools)).toEqual({
 			text: "Read 2 pages, searched the web",
-			failure: undefined,
 			stopped: false,
 		});
 	});
@@ -260,7 +259,7 @@ describe("summarizeActivity", () => {
 		expect(summarizeActivity(tools).text).toBe("Ran 2 web searches, searched Hub models");
 	});
 
-	it("names what failed apart, so a retry that worked still reads as success", () => {
+	it("leaves a failed call to the rows, so a retry that worked reads as success", () => {
 		const tools = [
 			done("crawling_exa", { url: "https://artificialanalysis.ai/models" }),
 			failing("crawling_exa", { url: "https://lmarena.ai/leaderboard" }),
@@ -268,7 +267,6 @@ describe("summarizeActivity", () => {
 		];
 		expect(summarizeActivity(tools)).toEqual({
 			text: "Read artificialanalysis.ai, searched the web",
-			failure: "couldn't read lmarena.ai",
 			stopped: false,
 		});
 	});

@@ -59,10 +59,10 @@ describe("ActivityGroup", () => {
 		]),
 	];
 
-	it("sums up a finished run in one line and names what failed apart", () => {
+	it("sums up a finished run in one line, leaving a failed call to the rows", () => {
 		const { container } = render(ActivityGroup, { blocks: finishedRun, labels: noLabels });
 		expect(text(container.querySelector("button"))).toBe(
-			"Read artificialanalysis.ai, searched the web · couldn't read lmarena.ai"
+			"Read artificialanalysis.ai, searched the web"
 		);
 		expect(container.textContent).not.toContain("crawling_exa");
 	});

@@ -744,8 +744,6 @@ export function describeToolActivity(
 
 export interface ActivitySummary {
 	text: string;
-	/** what failed, shown apart so a retry that worked still reads as success */
-	failure?: string;
 	/** some calls never returned because the turn ended */
 	stopped: boolean;
 }
@@ -765,8 +763,9 @@ function failureText(failed: ToolActivity[]): string | undefined {
 }
 
 /**
- * One line for a finished run of calls: "Read 2 pages, searched the web". Failed calls are
- * named apart ("couldn't read lmarena.ai"), and calls with the same target are counted together.
+ * One line for a finished run of calls: "Read 2 pages, searched the web", calls with the same
+ * target counted together. Failed calls are left to the rows: next to a retry that worked, a
+ * failure in the summary reads as a contradiction. Only a run where everything failed says so.
  */
 export function summarizeActivity(tools: ToolActivity[]): ActivitySummary {
 	const failed = tools.filter((t) => t.status === "error");
@@ -780,7 +779,7 @@ export function summarizeActivity(tools: ToolActivity[]): ActivitySummary {
 	);
 	let text = parts.slice(0, 3).join(", ");
 	if (parts.length > 3) text += `, +${parts.length - 3} more`;
-	return { text: capFirst(text), failure: failureText(failed), stopped };
+	return { text: capFirst(text), stopped };
 }
 
 type ProcessBlock =
