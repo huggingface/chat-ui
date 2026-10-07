@@ -6,6 +6,7 @@ import {
 } from "$lib/types/MessageUpdate";
 import { AbortedGenerations } from "../abortedGenerations";
 import type { TextGenerationContext } from "./types";
+import type { ActivityLabeler } from "./activityLabels";
 import type { EndpointMessage } from "../endpoints/endpoints";
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 import { generateSummaryOfReasoning } from "./reasoning";
@@ -39,7 +40,9 @@ export async function* generate(
 		abortController,
 		messageId,
 	}: GenerateContext,
-	preprompt?: string
+	preprompt?: string,
+	/** fed the reasoning and answer as they stream, for the compact view's status lines */
+	activity?: ActivityLabeler
 ): AsyncIterable<MessageUpdate> {
 	// Reasoning mode support
 	let reasoning = false;
@@ -274,12 +277,15 @@ export async function* generate(
 				}
 			}
 
+			activity?.reasoning(output.token.text);
 			yield {
 				type: MessageUpdateType.Reasoning,
 				subtype: MessageReasoningUpdateType.Stream,
 				token: output.token.text,
 			};
 		} else {
+			// OpenAI-compatible endpoints stream reasoning inline as <think> blocks
+			activity?.stream(output.token.text);
 			yield { type: MessageUpdateType.Stream, token: output.token.text };
 		}
 

@@ -8,6 +8,7 @@ import { models } from "$lib/server/models";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree";
 import { textGeneration } from "$lib/server/textGeneration";
+import { activityFor } from "$lib/server/textGeneration/activityLabels";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
 import { stampMlHarness } from "$lib/server/mlAssistantHarness";
@@ -410,6 +411,7 @@ export async function resumeAnsweredAsk({
 					abortController,
 					generationId,
 					messageId: message.id,
+					activity: activityFor(settings),
 				};
 				for await (const event of textGeneration(ctx)) apply(event);
 			} catch (err) {

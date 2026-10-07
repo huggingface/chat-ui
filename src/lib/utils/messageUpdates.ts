@@ -12,6 +12,8 @@ import {
 	type MessagePlanUpdate,
 	type MessageHarnessEventUpdate,
 	type MessageNoticeUpdate,
+	type MessageActivityLabelUpdate,
+	type MessageActivityTimingUpdate,
 	MessageUpdateType,
 	MessageUpdateStatus,
 	MessageToolUpdateType,
@@ -412,6 +414,14 @@ export const isMessageHarnessEventUpdate = (
 
 export const isMessageNoticeUpdate = (update: MessageUpdate): update is MessageNoticeUpdate =>
 	update.type === MessageUpdateType.Notice;
+
+export const isMessageActivityLabelUpdate = (
+	update: MessageUpdate
+): update is MessageActivityLabelUpdate => update.type === MessageUpdateType.ActivityLabel;
+
+export const isMessageActivityTimingUpdate = (
+	update: MessageUpdate
+): update is MessageActivityTimingUpdate => update.type === MessageUpdateType.ActivityTiming;
 
 const defaultSleep = (ms: number): Promise<void> =>
 	new Promise((resolve) => setTimeout(resolve, ms));

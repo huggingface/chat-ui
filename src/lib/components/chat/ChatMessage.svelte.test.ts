@@ -317,3 +317,84 @@ describe("a notice on an assistant turn", () => {
 		expect(spinners(container)).toBe(1);
 	});
 });
+
+describe("compact activity", () => {
+	const searchCall = (uuid: string) => ({
+		type: "tool",
+		subtype: "call",
+		uuid,
+		call: { name: "web_search_exa", parameters: {} },
+		argumentsRaw: JSON.stringify({ query: "open models" }),
+	});
+	const searchResult = (uuid: string) => ({
+		type: "tool",
+		subtype: "result",
+		uuid,
+		result: {
+			status: "success",
+			call: { name: "web_search_exa", parameters: {} },
+			outputs: [{ text: "ok" }],
+			display: true,
+		},
+	});
+	const mountCompact = (updates: unknown[], loading = true) =>
+		render(ChatMessage, {
+			message: { id: "m1", from: "assistant", content: "", children: [], updates },
+			loading,
+			isLast: true,
+			isAuthor: true,
+			readOnly: false,
+			compactActivity: true,
+		} as never);
+	const headers = (el: HTMLElement) =>
+		[...el.querySelectorAll("button[aria-expanded]")].map((b) =>
+			b.textContent?.replace(/\s+/g, " ").trim()
+		);
+
+	it("shows the running step as one labeled line instead of a row per call", async () => {
+		const { container } = mountCompact([
+			{ type: "stream", token: "<think>Search both boards</think>" },
+			searchCall("u1"),
+			searchCall("u2"),
+			{ type: "activityLabel", round: 0, phase: "tools", text: "Searching the open leaderboards" },
+		]);
+		await tick();
+		const heads = headers(container);
+		expect(heads).toHaveLength(1);
+		expect(heads[0]).toContain("Searching the open leaderboards");
+		expect(container.querySelectorAll("code")).toHaveLength(0);
+	});
+
+	it("keeps the model's own message between runs and sums each finished run up", () => {
+		const { container } = mountCompact(
+			[
+				searchCall("u1"),
+				searchResult("u1"),
+				{ type: "stream", token: "Let me check the primary sources." },
+				searchCall("u2"),
+				searchResult("u2"),
+				{ type: "stream", token: "Here is the table." },
+			],
+			false
+		);
+		expect(headers(container)).toEqual([
+			"Searched the web open models",
+			"Searched the web open models",
+		]);
+		expect(container.textContent).toContain("Let me check the primary sources.");
+	});
+
+	it("drops a few words of reasoning once the turn is over", () => {
+		const { container } = mountCompact(
+			[{ type: "stream", token: "<think>Simple greeting.</think>Hello! How can I help?" }],
+			false
+		);
+		expect(headers(container)).toEqual([]);
+		expect(container.textContent).toContain("Hello! How can I help?");
+	});
+
+	it("says so when a turn ran steps but wrote no answer", () => {
+		const { container } = mountCompact([searchCall("u1"), searchResult("u1")], false);
+		expect(container.textContent).toContain("No answer was written.");
+	});
+});

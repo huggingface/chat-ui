@@ -25,6 +25,7 @@ import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
+import { activityFor } from "$lib/server/textGeneration/activityLabels";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
@@ -735,6 +736,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					abortController: ctrl,
 					generationId: effectiveGenerationId,
 					messageId: messageToWriteTo.id,
+					activity: activityFor(userSettings),
 				};
 				// run the text generation and send updates to the client. Skipped when the
 				// resumed call asked something else: the model has no round to answer yet.

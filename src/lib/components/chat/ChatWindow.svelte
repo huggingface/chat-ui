@@ -965,6 +965,7 @@
 										isAuthor={!shared}
 										readOnly={isReadOnly}
 										isLast={turnIdx === turns.length - 1 && msgIdx === turn.messages.length - 1}
+										compactActivity={$settings.compactActivity}
 										bind:editMsdgId
 										onretry={(payload) => {
 											// Edit-with-content mounts a fresh turn like a send; a
@@ -1258,7 +1259,7 @@
 					}}
 				>
 					{#if models.find((m) => m.id === currentModel.id)}
-						{#if loading && streamingToolCallName}
+						{#if loading && streamingToolCallName && !$settings.compactActivity}
 							<span class="inline-flex items-center gap-1 text-xs whitespace-nowrap">
 								<LucideHammer class="size-3" />
 								Calling tool

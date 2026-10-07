@@ -23,6 +23,8 @@ import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
 import { mlStateBlockEnabled } from "$lib/server/mlRegistry/stateBlock";
 import { AttachmentOverflowError } from "./utils/attachmentBudget";
 import { attachmentBudgetEnabled } from "./utils/attachmentBudgetFlag";
+import { createActivityLabeler, type ActivityLabeler } from "./activityLabels";
+import { toolRounds } from "$lib/utils/messageShape";
 
 /** Updates that mean the user has already been shown something for this turn. */
 function isVisibleWork(update: MessageUpdate): boolean {
@@ -44,21 +46,53 @@ async function* keepAlive(done: AbortSignal): AsyncGenerator<MessageUpdate, unde
 	}
 }
 
+/** Runs `onDone` however the generator ends: finished, thrown or returned early. */
+async function* finallyDo<T>(
+	gen: AsyncGenerator<T, undefined, undefined>,
+	onDone: () => Promise<void> | void
+): AsyncGenerator<T, undefined, undefined> {
+	try {
+		yield* gen;
+	} finally {
+		await onDone();
+	}
+}
+
 export async function* textGeneration(ctx: TextGenerationContext) {
 	const done = new AbortController();
 
 	const titleGen = generateTitleForConversation(ctx.conv, ctx.locals);
-	const textGen = textGenerationWithoutTitle(ctx, done);
+	// A resumed or continued turn writes into a message that already holds tool rounds, and the
+	// client counts rounds over all of them.
+	const target = ctx.conv.messages?.find((message) => message.id === ctx.messageId);
+	const labeler = ctx.activity
+		? createActivityLabeler({
+				userText: ctx.messages.findLast((m) => m.from === "user")?.content ?? "",
+				locals: ctx.locals,
+				labels: ctx.activity.labels,
+				startRound: toolRounds(target?.updates ?? []).length,
+			})
+		: undefined;
+	// A stopped turn closes at once; a finished one gives a summary still in flight a moment.
+	const textGen = finallyDo(textGenerationWithoutTitle(ctx, done, labeler), () =>
+		ctx.abortController.signal.aborted ? labeler?.close() : labeler?.finish()
+	);
 	const keepAliveGen = keepAlive(done.signal);
 
 	// keep alive until textGen is done
 
-	yield* mergeAsyncGenerators([titleGen, textGen, keepAliveGen]);
+	yield* mergeAsyncGenerators([
+		titleGen,
+		textGen,
+		keepAliveGen,
+		...(labeler ? [labeler.updates()] : []),
+	]);
 }
 
 async function* textGenerationWithoutTitle(
 	ctx: TextGenerationContext,
-	done: AbortController
+	done: AbortController,
+	activity?: ActivityLabeler
 ): AsyncGenerator<MessageUpdate, undefined, undefined> {
 	yield {
 		type: MessageUpdateType.Status,
@@ -149,6 +183,7 @@ async function* textGenerationWithoutTitle(
 			promptedAt: ctx.promptedAt,
 			generationId: ctx.generationId,
 			messageId: ctx.messageId,
+			activity,
 		});
 
 		let step = await mcpGen.next();
@@ -163,7 +198,7 @@ async function* textGenerationWithoutTitle(
 		// throw, and re-running would discard whatever the user has already been shown.
 		if (mcpResult === "not_applicable" && !mcpProducedOutput) {
 			// fallback to normal text generation
-			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
+			yield* generate({ ...ctx, messages: processedMessages }, preprompt, activity);
 		}
 		// Every other result already emitted a final answer; falling back would replace it.
 	} catch (err) {
@@ -181,7 +216,7 @@ async function* textGenerationWithoutTitle(
 			throw err;
 		} else {
 			// Nothing was shown yet, so a clean tool-free retry is a real recovery.
-			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
+			yield* generate({ ...ctx, messages: processedMessages }, preprompt, activity);
 		}
 	}
 	done.abort();

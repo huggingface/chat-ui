@@ -1,5 +1,6 @@
 import type { Message } from "$lib/types/Message";
 import {
+	MessageToolUpdateType,
 	MessageUpdateType,
 	type MessageElicitationResolvedUpdate,
 	type MessageHarnessEventUpdate,
@@ -29,10 +30,15 @@ export type ElicitationBlock = {
 	resolved?: MessageElicitationResolvedUpdate;
 };
 
+/**
+ * `round` on text, think and tool blocks is the tool round they belong to, counted like
+ * toolRounds(): reasoning and preamble go with the round whose calls follow them, and what comes
+ * after the last round's results with the round after it. Activity labels are keyed by it.
+ */
 export type MessageBlock =
-	| { type: "text"; content: string }
-	| { type: "think"; content: string; closed: boolean }
-	| { type: "tool"; uuid: string; updates: MessageToolUpdate[] }
+	| { type: "text"; content: string; round?: number }
+	| { type: "think"; content: string; closed: boolean; round?: number }
+	| { type: "tool"; uuid: string; updates: MessageToolUpdate[]; round?: number }
 	| { type: "artifact"; op: ArtifactOperation; opIndex: number }
 	| ElicitationBlock
 	| { type: "plan"; update: MessagePlanUpdate }
@@ -54,9 +60,14 @@ function expandThinkBlocks(input: MessageBlock[]): MessageBlock[] {
 			if (!part) continue;
 			if (part.startsWith("<think>")) {
 				const closed = part.endsWith("</think>");
-				out.push({ type: "think", content: part.slice(7, closed ? -8 : undefined), closed });
+				out.push({
+					type: "think",
+					content: part.slice(7, closed ? -8 : undefined),
+					closed,
+					round: block.round,
+				});
 			} else if (part.trim().length > 0) {
-				out.push({ type: "text", content: part });
+				out.push({ type: "text", content: part, round: block.round });
 			}
 		}
 	}
@@ -114,7 +125,7 @@ function collapseConsecutiveArtifactOps(input: MessageBlock[]): MessageBlock[] {
 }
 
 /** the updates that render the same in both shapes */
-function applyCardUpdate(res: MessageBlock[], update: MessageUpdate): void {
+function applyCardUpdate(res: MessageBlock[], update: MessageUpdate, round?: number): void {
 	if (isMessageToolUpdate(update)) {
 		const existingBlock = res.find(
 			(b): b is ToolBlock => b.type === "tool" && b.uuid === update.uuid
@@ -122,7 +133,7 @@ function applyCardUpdate(res: MessageBlock[], update: MessageUpdate): void {
 		if (existingBlock) {
 			existingBlock.updates.push(update);
 		} else {
-			res.push({ type: "tool" as const, uuid: update.uuid, updates: [update] });
+			res.push({ type: "tool" as const, uuid: update.uuid, updates: [update], round });
 		}
 	} else if (isMessageElicitationRequestUpdate(update)) {
 		res.push({
@@ -154,22 +165,37 @@ function applyCardUpdate(res: MessageBlock[], update: MessageUpdate): void {
 	}
 }
 
-function pushRoundText(res: MessageBlock[], reasoning: string | undefined, visible: string) {
-	if (reasoning !== undefined) res.push({ type: "think", content: reasoning, closed: true });
-	if (visible.trim().length > 0) res.push({ type: "text", content: visible });
+function pushRoundText(
+	res: MessageBlock[],
+	reasoning: string | undefined,
+	visible: string,
+	round: number
+) {
+	if (reasoning !== undefined) res.push({ type: "think", content: reasoning, closed: true, round });
+	if (visible.trim().length > 0) res.push({ type: "text", content: visible, round });
 }
 
 /** round text goes right before the first call of the round, where its stream markers were */
 function roundsShapeBlocks(message: Pick<Message, "content" | "reasoning" | "updates">) {
 	const updates = message.updates ?? [];
-	const firstCalls = new Map(toolRounds(updates).map((round) => [round.start, round.calls[0]]));
+	const rounds = toolRounds(updates);
+	const firstCalls = new Map(
+		rounds.map((round, index) => [round.start, { call: round.calls[0], index }])
+	);
+	const callRound = new Map(
+		rounds.flatMap((round, index) => round.calls.map((call) => [call.uuid, index] as const))
+	);
 	const res: MessageBlock[] = [];
 	for (const [index, update] of updates.entries()) {
 		const first = firstCalls.get(index);
-		if (first) pushRoundText(res, first.reasoning, first.content ?? "");
-		applyCardUpdate(res, update);
+		if (first) pushRoundText(res, first.call.reasoning, first.call.content ?? "", first.index);
+		applyCardUpdate(
+			res,
+			update,
+			isMessageToolUpdate(update) ? callRound.get(update.uuid) : undefined
+		);
 	}
-	pushRoundText(res, message.reasoning, message.content);
+	pushRoundText(res, message.reasoning, message.content, rounds.length);
 	return expandArtifactBlocks(res);
 }
 
@@ -183,6 +209,10 @@ export function messageBlocks(
 	const hasTools = updates.some(isMessageToolUpdate);
 	let contentCursor = 0;
 	let sawFinalAnswer = false;
+	// tool rounds as toolRounds() counts them: a Call after any Result or Error starts the next
+	let round = -1;
+	let roundHasOutcome = false;
+	const textRound = () => (round === -1 || roundHasOutcome ? round + 1 : round);
 
 	// Fast path: no tool updates at all
 	if (!hasTools && updates.length === 0) {
@@ -204,7 +234,7 @@ export function messageBlocks(
 			if (!chunk) continue;
 			const last = res.at(-1);
 			if (last?.type === "text") last.content += chunk;
-			else res.push({ type: "text" as const, content: chunk });
+			else res.push({ type: "text" as const, content: chunk, round: textRound() });
 		} else if (update.type === MessageUpdateType.FinalAnswer) {
 			sawFinalAnswer = true;
 			const finalText = update.text ?? "";
@@ -226,11 +256,24 @@ export function messageBlocks(
 				if (last?.type === "text") {
 					last.content += addedText;
 				} else {
-					res.push({ type: "text" as const, content: addedText });
+					res.push({ type: "text" as const, content: addedText, round: textRound() });
 				}
 			}
 		} else {
-			applyCardUpdate(res, update);
+			if (isMessageToolUpdate(update)) {
+				if (update.subtype === MessageToolUpdateType.Call) {
+					if (round === -1 || roundHasOutcome) {
+						round += 1;
+						roundHasOutcome = false;
+					}
+				} else if (
+					update.subtype === MessageToolUpdateType.Result ||
+					update.subtype === MessageToolUpdateType.Error
+				) {
+					roundHasOutcome = true;
+				}
+			}
+			applyCardUpdate(res, update, isMessageToolUpdate(update) ? round : undefined);
 		}
 	}
 
@@ -241,7 +284,7 @@ export function messageBlocks(
 		if (remaining.length > 0) {
 			const last = res.at(-1);
 			if (last?.type === "text") last.content += remaining;
-			else res.push({ type: "text" as const, content: remaining });
+			else res.push({ type: "text" as const, content: remaining, round: textRound() });
 		}
 	} else if (!res.some((b) => b.type === "text") && message.content) {
 		// Fallback: no text produced at all

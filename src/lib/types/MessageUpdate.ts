@@ -24,7 +24,9 @@ export type MessageUpdate =
 	| MessageBudgetUpdate
 	| MessageTurnStateUpdate
 	| MessageHarnessEventUpdate
-	| MessageNoticeUpdate;
+	| MessageNoticeUpdate
+	| MessageActivityLabelUpdate
+	| MessageActivityTimingUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -41,6 +43,8 @@ export enum MessageUpdateType {
 	TurnState = "turnState",
 	HarnessEvent = "harnessEvent",
 	Notice = "notice",
+	ActivityLabel = "activityLabel",
+	ActivityTiming = "activityTiming",
 }
 
 /**
@@ -295,4 +299,27 @@ export interface MessageHarnessEventUpdate {
 export interface MessageNoticeUpdate {
 	type: MessageUpdateType.Notice;
 	text: string;
+}
+
+/**
+ * a short status line for a round of thinking and tool calls, written by the task model while the
+ * turn runs. `round` counts tool rounds the way toolRounds() does: reasoning belongs to the round
+ * whose calls follow it, and the reasoning before the final answer to the round after the last one
+ */
+export interface MessageActivityLabelUpdate {
+	type: MessageUpdateType.ActivityLabel;
+	round: number;
+	/**
+	 * "thinking": progress while the round reasons, live only; "summary": the round's reasoning once
+	 * complete, kept as its row text; "tools": the calls the round is running
+	 */
+	phase: "thinking" | "summary" | "tools";
+	text: string;
+}
+
+/** how long a round has reasoned so far, stamped as its reasoning ends ("Thought for 12s") */
+export interface MessageActivityTimingUpdate {
+	type: MessageUpdateType.ActivityTiming;
+	round: number;
+	thinkingMs: number;
 }
