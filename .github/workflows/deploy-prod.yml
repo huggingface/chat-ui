@@ -66,7 +66,7 @@ jobs:
         run: |
           VALUES=$(cat <<-END
           image:
-            tag: "sha-${{ env.GITHUB_SHA_SHORT }}"
+            tag: "sha-${GITHUB_SHA_SHORT}"
           END
           )
           echo "VALUES=$(echo "$VALUES" | yq -o=json | jq tostring)" >> $GITHUB_ENV
