@@ -5,6 +5,8 @@ import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate"
 import type { Conversation } from "$lib/types/Conversation";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
 import { stripThink } from "$lib/utils/stripThink";
+import { plainMentions } from "$lib/utils/mentionTokens";
+import { plainViewText } from "$lib/utils/trackioView";
 
 export async function* generateTitleForConversation(
 	conv: Conversation,
@@ -15,7 +17,7 @@ export async function* generateTitleForConversation(
 		// HACK: detect if the conversation is new
 		if (conv.title !== "New Chat" || !userMessage) return;
 
-		const prompt = userMessage.content;
+		const prompt = plainViewText(plainMentions(userMessage.content));
 		const modelForTitle = config.TASK_MODEL?.trim() ? config.TASK_MODEL : conv.model;
 		const title = (await generateTitle(prompt, modelForTitle, locals)) ?? "New Chat";
 

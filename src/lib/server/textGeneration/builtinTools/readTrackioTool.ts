@@ -124,14 +124,14 @@ export function summarizeSeries(points: Point[], maxPoints: number) {
 async function fetchMetricValues(
 	origin: string,
 	body: Record<string, unknown>,
-	token: string | undefined,
+	bearer: string | undefined,
 	signal: AbortSignal
 ): Promise<Point[]> {
 	const response = await fetch(`${origin}/api/get_metric_values`, {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
-			...(token ? { Authorization: `Bearer ${token}` } : {}),
+			...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
 		},
 		body: JSON.stringify(body),
 		signal,
@@ -164,7 +164,6 @@ async function read(
 	args: Record<string, unknown>,
 	ctx: BuiltinToolContext,
 	messages: ReturnType<MessagesSource>,
-	token: string | undefined,
 	verify: (dashboard: TrackioDashboard) => Promise<TrackioSpaceCheck>
 ): Promise<BuiltinToolResult> {
 	const project = typeof args.project === "string" ? args.project.trim() : "";
@@ -189,8 +188,6 @@ async function read(
 	}
 	const dashboard = found.url;
 	const origin = new URL(dashboard).origin;
-	// The token goes to the dashboard only once the Hub vouches for it: a
-	// Trackio Space at this origin, owned by the user or an org they write to.
 	const check = await verify(found);
 	if (!check.ok) return { error: `Not reading ${dashboard}: ${check.reason}.` };
 
@@ -232,7 +229,7 @@ async function read(
 					await fetchMetricValues(
 						origin,
 						{ project, run, metric_name: metric, ...range },
-						token,
+						check.bearer,
 						signal
 					)
 				).filter(
@@ -268,7 +265,8 @@ export function createReadTrackioTool(
 	messages: MessagesSource,
 	token: () => string | undefined
 ): BuiltinTool {
-	// One check per dashboard per turn, however many reads the model makes.
+	// One check (and JWT) per dashboard per turn, however many reads the model
+	// makes. A failed check is dropped, so a retry after a Space wakes can pass.
 	const verified = new Map<string, Promise<TrackioSpaceCheck>>();
 	return {
 		name: READ_TRACKIO_TOOL_NAME,
@@ -278,9 +276,10 @@ export function createReadTrackioTool(
 			`DASHBOARD VIEWS: a user message can carry a <trackio_dashboard_view> block — the ` +
 			`Trackio dashboard as they were looking at it: project, runs, x-axis and zoomed range, and ` +
 			`the charts on screen. It holds coordinates, not values. When they ask about a view, call ` +
-			`${READ_TRACKIO_TOOL_NAME} with its project, runs and on-screen metrics, and its range as ` +
-			`x_min/x_max, then answer from the numbers it returns. The charts they saw are smoothed; ` +
-			`the values you read are raw.`,
+			`${READ_TRACKIO_TOOL_NAME} with its project, runs and on-screen metrics, and, when its ` +
+			`x_axis is step, its range as x_min/x_max (other axes are not steps: read the whole run), ` +
+			`then answer from the numbers it returns. The charts they saw are smoothed; the values ` +
+			`you read are raw.`,
 		async execute(args: Record<string, unknown>, ctx: BuiltinToolContext) {
 			const hfToken = token();
 			const verify = (dashboard: TrackioDashboard) => {
@@ -288,9 +287,11 @@ export function createReadTrackioTool(
 				if (cached) return cached;
 				const pending = verifyTrackioSpace(dashboard, hfToken, ctx.abortSignal);
 				verified.set(dashboard.url, pending);
+				const forget = () => verified.delete(dashboard.url);
+				pending.then((check) => !check.ok && forget(), forget);
 				return pending;
 			};
-			return read(args, ctx, messages(), hfToken, verify);
+			return read(args, ctx, messages(), verify);
 		},
 	};
 }

@@ -3,17 +3,21 @@ import { verifyTrackioSpace } from "./trackioVerify";
 
 const DASH = "https://me-mnist-trackio.hf.space";
 
-function hub(spaceIdFromSettings: string, host = DASH) {
-	const fetchMock = vi.fn(async (input: string | URL | Request, _init?: RequestInit) => {
+function hub(spaceIdFromSettings: string, { host = DASH, isPrivate = false } = {}) {
+	const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
 		const url = String(input);
+		const authed = JSON.stringify(init?.headers ?? {}).includes("hf_user");
 		if (url === `${DASH}/api/get_settings`) {
 			return new Response(JSON.stringify({ data: { space_id: spaceIdFromSettings } }));
 		}
-		if (url.startsWith("https://huggingface.co/api/spaces/")) {
-			return new Response(JSON.stringify({ author: "me", host, tags: ["trackio"] }));
+		if (url.endsWith("/jwt")) {
+			return authed
+				? new Response(JSON.stringify({ token: "space_jwt" }))
+				: new Response("{}", { status: 401 });
 		}
-		if (url === "https://huggingface.co/api/whoami-v2") {
-			return new Response(JSON.stringify({ name: "me" }));
+		if (url.startsWith("https://huggingface.co/api/spaces/")) {
+			if (isPrivate && !authed) return new Response("{}", { status: 404 });
+			return new Response(JSON.stringify({ host, tags: ["trackio"], private: isPrivate }));
 		}
 		return new Response("{}", { status: 404 });
 	});
@@ -36,15 +40,42 @@ describe("verifyTrackioSpace", () => {
 	});
 
 	it("rejects a Space that claims someone else's id", async () => {
-		hub("me/other-trackio", "https://me-other-trackio.hf.space");
+		hub("me/other-trackio", { host: "https://me-other-trackio.hf.space" });
 		const check = await verifyTrackioSpace({ url: DASH, label: "x" }, "hf_user");
 		expect(check).toMatchObject({ ok: false });
 	});
 
-	it("refuses without a login to check against", async () => {
+	it("reads a public Space without a login", async () => {
 		hub("me/mnist-trackio");
+		await expect(verifyTrackioSpace({ url: DASH, label: "x" }, undefined)).resolves.toEqual({
+			ok: true,
+			spaceId: "me/mnist-trackio",
+		});
+	});
+
+	it("hands a private Space a Space-scoped JWT, never the token", async () => {
+		hub("me/mnist-trackio", { isPrivate: true });
+		await expect(verifyTrackioSpace({ url: DASH, label: "x" }, "hf_user")).resolves.toEqual({
+			ok: true,
+			spaceId: "me/mnist-trackio",
+			bearer: "space_jwt",
+		});
 		await expect(verifyTrackioSpace({ url: DASH, label: "x" }, undefined)).resolves.toMatchObject({
 			ok: false,
 		});
+	});
+
+	it("reports a Hub that cannot be reached instead of throwing", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				throw new TypeError("fetch failed");
+			})
+		);
+		const check = await verifyTrackioSpace(
+			{ url: DASH, label: "x", spaceId: "me/mnist-trackio" },
+			"hf_user"
+		);
+		expect(check).toMatchObject({ ok: false });
 	});
 });

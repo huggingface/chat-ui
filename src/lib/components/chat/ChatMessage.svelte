@@ -275,7 +275,6 @@
 
 	let editMode = $derived(editMsdgId === message.id);
 
-	// A user message's dashboard views render where their chips sit in the text.
 	let contentSegments = $derived(
 		segmentViewText(message.content.trim(), message.dashboardViews ?? [])
 	);

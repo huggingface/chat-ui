@@ -51,8 +51,8 @@ export class HubMentionState {
 	activeIndex = $state(-1);
 	/**
 	 * Whether the user moved the highlight themselves (arrows, a real pointer
-	 * move). On a touch keyboard Enter is the newline key with no Escape to back
-	 * out with, so there it only accepts a highlight the user chose.
+	 * move). Enter only accepts a highlight the user chose; until then it sends
+	 * the message as typed.
 	 */
 	chosen = $state(false);
 
@@ -80,7 +80,7 @@ export class HubMentionState {
 		return this.status !== null;
 	}
 
-	/** The result Enter would accept, or undefined when nothing is chosen. */
+	/** The highlighted result, or undefined when nothing is highlighted. */
 	get activeResult(): HfHubResource | undefined {
 		return this.activeIndex >= 0 ? this.results[this.activeIndex] : undefined;
 	}

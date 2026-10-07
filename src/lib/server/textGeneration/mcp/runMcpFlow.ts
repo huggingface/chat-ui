@@ -1,4 +1,5 @@
 import { config } from "$lib/server/config";
+import { getUserHubToken } from "$lib/server/apiToken";
 import {
 	MessageToolUpdateType,
 	MessageUpdateType,
@@ -205,7 +206,7 @@ export async function* runMcpFlow({
 		namespace: (locals as unknown as { user?: { username?: string } })?.user?.username,
 		hfToken:
 			(locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
-			(locals as unknown as { token?: string } | undefined)?.token,
+			getUserHubToken(locals),
 	});
 	// Read once: the preset decides the servers, the round budget and which tool
 	// doctrine is sent, and they must all agree within a run.

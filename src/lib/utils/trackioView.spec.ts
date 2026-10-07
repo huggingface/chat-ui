@@ -80,7 +80,7 @@ describe("chip and model context", () => {
 	it("appends a view block the model can act on after the user's text", () => {
 		const content = withTrackioViewContext("what happened here?", [view]);
 		expect(content.startsWith('what happened here?\n\n<trackio_dashboard_view id="1"')).toBe(true);
-		expect(content).toContain("range: 1000 to 1500 (the user zoomed to this)");
+		expect(content).toContain("range: 1000 to 1500 (on the step axis; the user zoomed to this)");
 		expect(content).toContain("charts on screen: train/loss");
 		expect(content).toContain("other metrics shown: eval/loss");
 		expect(content).toContain("read_trackio");
@@ -126,6 +126,21 @@ describe("inline view tokens", () => {
 		expect(content.indexOf('id="1"')).toBeLessThan(content.indexOf('id="2"'));
 		expect(content).toContain("range: 1000 to 1500");
 		expect(content).not.toContain(VIEW_TOKEN_MARK);
+	});
+
+	it("keeps two views with the same label apart by key", () => {
+		const one = { ...a, key: "k1" };
+		const two = { ...a, metricsOnScreen: ["eval/loss"], key: "k2" };
+		expect(trackioViewLabel(one)).toBe(trackioViewLabel(two));
+		const both = `${trackioViewToken(one)} vs ${trackioViewToken(two)}`;
+		expect(findViewTokens(both).map((t) => t.key)).toEqual(["k1", "k2"]);
+		expect(viewsInText(both, [two, one])).toEqual([one, two]);
+		expect(withTrackioViewContext(both, [one, two])).toContain("[view 1] vs [view 2]");
+	});
+
+	it("gives the model a chip's plain label when no view backs it", () => {
+		const content = withTrackioViewContext(`look ${trackioViewToken({ ...a, key: "k1" })}`, []);
+		expect(content).toBe(`look ${trackioViewLabel(a)}`);
 	});
 
 	it("keeps the words of a token cut in half, without its stray mark", () => {

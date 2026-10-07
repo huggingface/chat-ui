@@ -79,8 +79,6 @@
 		if (!multiple) showOther = { ...showOther, [f.name]: false };
 		error = null;
 		if (multiple) return;
-		// One click is the whole answer: on to the next question, or, on the last,
-		// sent with the rest.
 		if (isLast) void finish("accept");
 		else step += 1;
 	}

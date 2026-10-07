@@ -90,12 +90,11 @@
 	let textareaElement: HTMLTextAreaElement | undefined = $state();
 
 	/**
-	 * Dashboard views (see trackioView) and accepted Hub mentions (see
-	 * mentionTokens) sit in the text as marked spans. The textarea stays a
-	 * textarea — paste, IME and undo all keep their native behavior — and a layer
-	 * behind it, laid out identically, draws each token (a chip, a link-colored
-	 * mention) while the textarea's own glyphs go transparent. Only while a token
-	 * is present, so ordinary typing never depends on the layer.
+	 * Dashboard views and accepted Hub mentions sit in the text as marked spans.
+	 * The textarea stays a textarea, so paste, IME and undo keep their native
+	 * behavior; a layer behind it draws the tokens while its own glyphs go
+	 * transparent. Only while a token is present, so plain typing never depends
+	 * on the layer.
 	 */
 	type InlineToken = { start: number; end: number; kind: "view" | "mention" };
 	let inlineTokens = $derived<InlineToken[]>(
@@ -137,7 +136,6 @@
 		}
 	}
 
-	/** A token is one unit: Backspace/Delete beside it removes it whole. */
 	function handleTokenKeys(event: KeyboardEvent): boolean {
 		if (!textareaElement || !inlineTokens.length || isCompositionOn) return false;
 		if (event.key !== "Backspace" && event.key !== "Delete") return false;
@@ -152,7 +150,6 @@
 		return true;
 	}
 
-	/** Keeps the caret out of a token, and widens a selection to whole tokens. */
 	function snapSelectionToTokens() {
 		if (!textareaElement || !inlineTokens.length) return;
 		const { selectionStart: s, selectionEnd: e, selectionDirection } = textareaElement;
@@ -328,7 +325,11 @@
 		if (target.value.includes(VIEW_TOKEN_MARK) || target.value.includes(MENTION_MARK)) {
 			const cleaned = stripOrphanMentionMarks(stripOrphanViewMarks(target.value));
 			if (cleaned !== target.value) {
-				const caret = target.selectionStart - (target.value.length - cleaned.length);
+				// Only marks are removed, so the caret moves back by those before it.
+				let caret = 0;
+				for (let i = 0; i < target.selectionStart; i += 1) {
+					if (target.value[i] === cleaned[caret]) caret += 1;
+				}
 				value = cleaned;
 				void tick().then(() => textareaElement?.setSelectionRange(caret, caret));
 			}
@@ -347,9 +348,8 @@
 	async function selectHubResult(result: HfHubResource) {
 		const replacement = hub.accept(value, result);
 		if (!replacement) return;
-		// The accepted repo becomes one token: marked, so it draws as a link and
-		// deletes whole. The plain `@id` the replacement wrote ends at the caret,
-		// or one before it when a space was added after.
+		// The plain `@id` the replacement wrote ends at the caret, or one before it
+		// when a space was added after.
 		const plain = `@${result.id}`;
 		const end = replacement.value.startsWith(plain, replacement.caret - plain.length)
 			? replacement.caret
@@ -378,20 +378,15 @@
 				hub.move(-1);
 				return;
 			}
-			// Tab and Enter take the highlighted result, the first one until the user
-			// moves it. On a phone Enter is the newline key with no Escape to back
-			// out with, so there it only takes a highlight the user chose.
+			// Tab takes the highlighted result, the first one until the user moves
+			// it. Enter only takes a highlight the user chose: otherwise it sends, so
+			// "thanks @abidlabs" is not rewritten to the Hub's first match.
 			if (event.key === "Tab" && !event.shiftKey && hub.results.length > 0) {
 				event.preventDefault();
 				void selectHubResult(hub.activeResult ?? hub.results[0]);
 				return;
 			}
-			if (
-				event.key === "Enter" &&
-				!event.shiftKey &&
-				hub.activeResult &&
-				(hub.chosen || !isVirtualKeyboard())
-			) {
+			if (event.key === "Enter" && !event.shiftKey && hub.activeResult && hub.chosen) {
 				event.preventDefault();
 				void selectHubResult(hub.activeResult);
 				return;

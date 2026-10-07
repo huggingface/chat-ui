@@ -88,7 +88,7 @@ describe("HubMentionState", () => {
 		// The top of the list, not whatever row the panel happened to open under.
 		expect(hub.activeIndex).toBe(0);
 		expect(hub.activeResult).toEqual(MODEL);
-		// Not chosen yet: on a touch keyboard Enter stays a newline.
+		// Not chosen yet: Enter still sends what was typed.
 		expect(hub.chosen).toBe(false);
 
 		hub.move(1);

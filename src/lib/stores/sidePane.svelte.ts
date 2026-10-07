@@ -136,12 +136,11 @@ class SidePaneStore {
 
 	/** Pane state per conversation left this tab, restored on the way back. */
 	private saved = new Map<string, SavedPaneState>();
+	private static readonly MAX_SAVED = 20;
 
 	/**
-	 * Leaving one conversation for another: remember how the pane was in the
-	 * one being left, then show the other as it was last left — or closed, for
-	 * a conversation not visited yet. A restored item that no longer exists is
-	 * closed by its view, the same way as after a branch switch.
+	 * A restored item that no longer exists is closed by its view, the same way
+	 * as after a branch switch.
 	 */
 	switchConversation(from: string | undefined, to: string | undefined) {
 		if (from) {
@@ -158,6 +157,11 @@ class SidePaneStore {
 				widthPx: this.widthPx,
 				autoOpenedKeys: new Set(this.autoOpenedKeys),
 			});
+			// Maps iterate oldest first.
+			for (const id of this.saved.keys()) {
+				if (this.saved.size <= SidePaneStore.MAX_SAVED) break;
+				this.saved.delete(id);
+			}
 		}
 		this.reset();
 		const next = to ? this.saved.get(to) : undefined;
@@ -176,7 +180,6 @@ class SidePaneStore {
 		this.open = next.open;
 	}
 
-	/** Full reset: everything closed and forgotten for the current conversation. */
 	reset() {
 		this.open = false;
 		this.view = "artifact";

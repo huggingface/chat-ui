@@ -29,34 +29,40 @@ const messages = [
 ] as unknown as Message[];
 
 interface HubFixture {
-	author?: string;
 	tags?: string[];
 	host?: string;
-	orgs?: Array<{ name: string; roleInOrg: string }>;
+	isPrivate?: boolean;
+	/** Status the Hub answers the Space lookup with, per call. */
+	spaceStatus?: () => number;
 }
 
 /** The Hub and the dashboard Space, answering the way each does. */
 function mockSpace(rows: Array<{ step: number; value: number }>, hub: HubFixture = {}) {
 	const fetchMock = vi.fn(async (input: string | URL | Request, _init?: RequestInit) => {
 		const url = String(input);
+		if (url === "https://huggingface.co/api/spaces/me/mnist-trackio/jwt") {
+			return new Response(JSON.stringify({ token: "space_jwt" }));
+		}
 		if (url === "https://huggingface.co/api/spaces/me/mnist-trackio") {
+			const status = hub.spaceStatus?.() ?? 200;
+			if (status !== 200) return new Response("{}", { status });
 			return new Response(
 				JSON.stringify({
 					id: "me/mnist-trackio",
-					author: hub.author ?? "me",
 					host: hub.host ?? DASH,
 					tags: hub.tags ?? ["gradio", "trackio"],
+					private: hub.isPrivate ?? false,
 				})
 			);
-		}
-		if (url === "https://huggingface.co/api/whoami-v2") {
-			return new Response(JSON.stringify({ name: "me", orgs: hub.orgs ?? [] }));
 		}
 		return new Response(JSON.stringify({ data: rows }));
 	});
 	vi.stubGlobal("fetch", fetchMock);
 	return fetchMock;
 }
+
+const authHeader = (init: RequestInit | undefined) =>
+	(init?.headers as Record<string, string> | undefined)?.Authorization;
 
 /** Calls that reached the dashboard itself, as opposed to the Hub. */
 const dashboardCalls = (fetchMock: ReturnType<typeof mockSpace>) =>
@@ -67,7 +73,7 @@ const dashboardCalls = (fetchMock: ReturnType<typeof mockSpace>) =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe("read_trackio", () => {
-	it("reads the conversation's dashboard for the range, with the user's token", async () => {
+	it("reads a public dashboard for the range, sending no credentials", async () => {
 		const fetchMock = mockSpace(
 			Array.from({ length: 11 }, (_, i) => ({ step: 995 + i * 50, value: i === 5 ? 9 : 1 }))
 		);
@@ -91,7 +97,7 @@ describe("read_trackio", () => {
 			around_step: 1200,
 			window: 201,
 		});
-		expect((init.headers as Record<string, string>).Authorization).toBe("Bearer hf_user");
+		expect(authHeader(init)).toBeUndefined();
 
 		const [series] = JSON.parse(result.resultText.split("\n")[1]);
 		expect(series).toMatchObject({
@@ -117,30 +123,42 @@ describe("read_trackio", () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it("reads a Space owned by an org the user can write to", async () => {
+	it("reads a private dashboard with a Space-scoped JWT, minted once per turn", async () => {
+		const fetchMock = mockSpace([{ step: 1, value: 1 }], { isPrivate: true });
+		const tool = createReadTrackioTool(
+			() => messages,
+			() => "hf_user"
+		);
+		await tool.execute({ project: "p", runs: ["r"], metrics: ["m"] }, ctx);
+		const result = await tool.execute({ project: "p", runs: ["r"], metrics: ["m"] }, ctx);
+		expect(result).toHaveProperty("resultText");
+
+		const calls = dashboardCalls(fetchMock);
+		expect(calls).toHaveLength(2);
+		for (const [, init] of calls) expect(authHeader(init)).toBe("Bearer space_jwt");
+		const mints = fetchMock.mock.calls.filter(([u]) => String(u).endsWith("/jwt"));
+		expect(mints).toHaveLength(1);
+	});
+
+	it("checks again after a failed check, rather than failing the whole turn", async () => {
+		const statuses = [503, 200];
 		const fetchMock = mockSpace([{ step: 1, value: 1 }], {
-			author: "lab",
-			orgs: [{ name: "lab", roleInOrg: "write" }],
+			spaceStatus: () => statuses.shift() ?? 200,
 		});
 		const tool = createReadTrackioTool(
 			() => messages,
 			() => "hf_user"
 		);
-		const result = await tool.execute({ project: "p", runs: ["r"], metrics: ["m"] }, ctx);
-		expect(result).toHaveProperty("resultText");
+		const args = { project: "p", runs: ["r"], metrics: ["m"] };
+		expect(await tool.execute(args, ctx)).toHaveProperty("error");
+		expect(await tool.execute(args, ctx)).toHaveProperty("resultText");
 		expect(dashboardCalls(fetchMock)).toHaveLength(1);
 	});
 
 	it.each([
 		["is not a Trackio Space", { tags: ["gradio"] }, "not a Trackio Space"],
-		["belongs to someone else", { author: "stranger" }, "cannot write to"],
-		[
-			"is only readable through an org",
-			{ author: "lab", orgs: [{ name: "lab", roleInOrg: "read" }] },
-			"cannot write to",
-		],
 		["is served somewhere else", { host: "https://elsewhere.hf.space" }, "is not the Space served"],
-	])("never sends the token to a Space that %s", async (_label, hub, reason) => {
+	])("never reads a Space that %s", async (_label, hub, reason) => {
 		const fetchMock = mockSpace([{ step: 1, value: 1 }], hub);
 		const tool = createReadTrackioTool(
 			() => messages,
@@ -151,6 +169,18 @@ describe("read_trackio", () => {
 		if (!("error" in result)) throw new Error("expected a refusal");
 		expect(result.error).toContain(reason);
 		expect(dashboardCalls(fetchMock)).toHaveLength(0);
+	});
+
+	it("never sends the user's token to the dashboard", async () => {
+		const fetchMock = mockSpace([{ step: 1, value: 1 }], { isPrivate: true });
+		const tool = createReadTrackioTool(
+			() => messages,
+			() => "hf_user"
+		);
+		await tool.execute({ project: "p", runs: ["r"], metrics: ["m"] }, ctx);
+		for (const [, init] of dashboardCalls(fetchMock)) {
+			expect(JSON.stringify(init ?? {})).not.toContain("hf_user");
+		}
 	});
 
 	it("keeps both ends when downsampling", () => {

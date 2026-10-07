@@ -43,6 +43,11 @@ export interface TrackioDashboardView {
 	capturedAt: string;
 	/** Dashboard URL that reproduces this view; same origin as `dashboardUrl`. */
 	viewUrl?: string;
+	/**
+	 * Short id the view's chip token carries, so two views with the same label
+	 * (three runs each, unzoomed) stay apart. Set when the chip is inserted.
+	 */
+	key?: string;
 }
 
 const MAX_NAME = 200;
@@ -50,6 +55,7 @@ const MAX_RUNS = 20;
 const MAX_METRICS = 60;
 /** More than a message should ever carry; the server enforces the same cap. */
 export const MAX_VIEWS_PER_MESSAGE = 8;
+const VIEW_KEY = /^[0-9a-z]{1,12}$/;
 
 function str(value: unknown, max = MAX_NAME): string | undefined {
 	if (typeof value !== "string") return undefined;
@@ -112,6 +118,7 @@ export function parseTrackioView(raw: unknown, dashboardUrl: string): TrackioDas
 	const onScreen = names(r.metrics_on_screen ?? r.metricsOnScreen);
 	const viewUrl = str(r.view_url ?? r.viewUrl, 2000);
 	const captured = str(r.captured_at ?? r.capturedAt, 40);
+	const key = str(r.key, 12);
 
 	return {
 		dashboardUrl,
@@ -126,7 +133,12 @@ export function parseTrackioView(raw: unknown, dashboardUrl: string): TrackioDas
 		capturedAt:
 			captured && !Number.isNaN(Date.parse(captured)) ? captured : new Date().toISOString(),
 		...(viewUrl && sameOrigin(viewUrl, dashboardUrl) ? { viewUrl } : {}),
+		...(key && VIEW_KEY.test(key) ? { key } : {}),
 	};
+}
+
+export function newTrackioViewKey(): string {
+	return Math.random().toString(36).slice(2, 8).padEnd(6, "0");
 }
 
 function fmt(n: number): string {
@@ -142,7 +154,6 @@ export function trackioViewRangeLabel(
 	return `${axis} ${fmt(Math.round(view.xRange[0]))}–${fmt(Math.round(view.xRange[1]))}`;
 }
 
-/** Chip text: project, the run (or how many), range. */
 export function trackioViewChipParts(view: TrackioDashboardView): {
 	project: string;
 	runs: string;
@@ -160,8 +171,9 @@ export function trackioViewChipParts(view: TrackioDashboardView): {
  * Views sit inline in the message text as their label wrapped in this
  * character (U+2063 INVISIBLE SEPARATOR). The label is what a plain-text reader
  * sees — a title, a copy, an edit — and the marks are what lets the composer
- * draw it as a chip and the server tell it from words the user typed. A view
- * is matched to its token by label, so a token needs no id of its own.
+ * draw it as a chip and the server tell it from words the user typed. The
+ * view's key follows the label as invisible tag characters, since two views
+ * can share a label.
  */
 export const VIEW_TOKEN_MARK = "\u2063";
 /**
@@ -173,8 +185,18 @@ export const VIEW_TOKEN_MARK = "\u2063";
 // No-break spaces, not the wider en/em spaces: those are line-break points,
 // and a chip would wrap with its icon stranded at the end of the line.
 const VIEW_TOKEN_LEAD = "\u00a0".repeat(4) + "\u202f";
-const VIEW_TOKEN_TAIL = "";
 const VIEW_TOKEN = /\u2063([^\u2063\n]{1,400})\u2063/g;
+/** Unicode tag characters: ASCII shifted to U+E0000, drawn as nothing. */
+const TAG_OFFSET = 0xe0000;
+const TAGGED_KEY = /[\u{E0030}-\u{E0039}\u{E0061}-\u{E007A}]+$/u;
+
+function encodeKey(key: string): string {
+	return [...key].map((c) => String.fromCodePoint(TAG_OFFSET + c.charCodeAt(0))).join("");
+}
+
+function decodeKey(tags: string): string {
+	return [...tags].map((c) => String.fromCharCode((c.codePointAt(0) ?? 0) - TAG_OFFSET)).join("");
+}
 
 export function trackioViewLabel(view: TrackioDashboardView): string {
 	const { project, runs, range } = trackioViewChipParts(view);
@@ -196,7 +218,8 @@ function breakable(label: string): string {
 
 export function trackioViewToken(view: TrackioDashboardView): string {
 	const label = unbreakable(trackioViewLabel(view));
-	return `${VIEW_TOKEN_MARK}${VIEW_TOKEN_LEAD}${label}${VIEW_TOKEN_TAIL}${VIEW_TOKEN_MARK}`;
+	const key = view.key ? encodeKey(view.key) : "";
+	return `${VIEW_TOKEN_MARK}${VIEW_TOKEN_LEAD}${label}${key}${VIEW_TOKEN_MARK}`;
 }
 
 export interface ViewTokenSpan {
@@ -205,15 +228,35 @@ export interface ViewTokenSpan {
 	/** Index just past the closing mark. */
 	end: number;
 	label: string;
+	key?: string;
 }
 
 export function findViewTokens(text: string): ViewTokenSpan[] {
 	if (!text.includes(VIEW_TOKEN_MARK)) return [];
-	return [...text.matchAll(VIEW_TOKEN)].map((m) => ({
-		start: m.index ?? 0,
-		end: (m.index ?? 0) + m[0].length,
-		label: breakable(m[1]).trim(),
-	}));
+	return [...text.matchAll(VIEW_TOKEN)].map((m) => {
+		const tags = TAGGED_KEY.exec(m[1])?.[0] ?? "";
+		const label = breakable(m[1].slice(0, m[1].length - tags.length)).trim();
+		return {
+			start: m.index ?? 0,
+			end: (m.index ?? 0) + m[0].length,
+			label,
+			...(tags ? { key: decodeKey(tags) } : {}),
+		};
+	});
+}
+
+/**
+ * Finds the view a token names: by key, or by label for a view stored before
+ * tokens carried keys.
+ */
+function viewMatcher(views: Iterable<TrackioDashboardView>) {
+	const byKey = new Map<string, TrackioDashboardView>();
+	const byLabel = new Map<string, TrackioDashboardView>();
+	for (const v of views) {
+		if (v.key) byKey.set(v.key, v);
+		else byLabel.set(trackioViewLabel(v), v);
+	}
+	return (token: ViewTokenSpan) => (token.key ? byKey.get(token.key) : byLabel.get(token.label));
 }
 
 /** Drops marks left over from a token that was cut in half, keeping the words. */
@@ -233,11 +276,11 @@ export type ViewTextSegment =
 	{ kind: "text"; text: string } | { kind: "view"; view: TrackioDashboardView; label: string };
 
 /**
- * Splits text into words and the views its tokens name. A token whose label
- * matches none of `views` reads as its label, so text is never lost.
+ * Splits text into words and the views its tokens name. A token that matches
+ * none of `views` reads as its label, so text is never lost.
  */
 export function segmentViewText(text: string, views: TrackioDashboardView[]): ViewTextSegment[] {
-	const byLabel = new Map(views.map((v) => [trackioViewLabel(v), v]));
+	const match = viewMatcher(views);
 	const segments: ViewTextSegment[] = [];
 	let last = 0;
 	const pushText = (t: string) => {
@@ -249,7 +292,7 @@ export function segmentViewText(text: string, views: TrackioDashboardView[]): Vi
 	};
 	for (const token of findViewTokens(text)) {
 		pushText(text.slice(last, token.start));
-		const view = byLabel.get(token.label);
+		const view = match(token);
 		if (view) segments.push({ kind: "view", view, label: token.label });
 		else pushText(token.label);
 		last = token.end;
@@ -267,25 +310,22 @@ export function viewsInText(
 	text: string,
 	known: Iterable<TrackioDashboardView>
 ): TrackioDashboardView[] {
-	const byLabel = new Map<string, TrackioDashboardView>();
-	for (const v of known) byLabel.set(trackioViewLabel(v), v);
+	const match = viewMatcher(known);
 	const out: TrackioDashboardView[] = [];
 	for (const token of findViewTokens(text)) {
-		const view = byLabel.get(token.label);
+		const view = match(token);
 		if (view && !out.includes(view)) out.push(view);
 	}
 	return out;
 }
 
 /**
- * The text the model reads in place of a chip: a block per view, numbered so
- * an inline `[view N]` in the message can point at it. Names are listed as
- * data, and the reading path is spelled out so the model fetches numbers
- * rather than guessing them from coordinates.
+ * Names are listed as data, and the reading path is spelled out so the model
+ * fetches numbers rather than guessing them from coordinates.
  */
 export function formatTrackioViewContext(view: TrackioDashboardView, id = 1): string {
 	const range = view.xRange
-		? `${view.xRange[0]} to ${view.xRange[1]} (the user zoomed to this)`
+		? `${view.xRange[0]} to ${view.xRange[1]} (on the ${view.xAxis} axis; the user zoomed to this)`
 		: `the whole run${view.latestX !== null ? ` (latest ${view.xAxis} ${view.latestX})` : ""}`;
 	const others = view.metrics.filter((m) => !view.metricsOnScreen.includes(m));
 	const lines = [
@@ -294,6 +334,9 @@ export function formatTrackioViewContext(view: TrackioDashboardView, id = 1): st
 		`runs: ${view.runs.map((r) => r.name).join(", ") || "(none selected)"}`,
 		`x_axis: ${view.xAxis}`,
 		`range: ${range}`,
+		...(view.xAxis !== "step" && view.xRange
+			? [`(read_trackio ranges are in steps, so this range cannot be passed to it as x_min/x_max)`]
+			: []),
 		`charts on screen: ${view.metricsOnScreen.join(", ") || "(none)"}`,
 		`other metrics shown: ${others.join(", ") || "(none)"}`,
 	];
@@ -314,12 +357,11 @@ export const TRACKIO_VIEW_CONTEXT_NOTE =
 	"coordinates alone.";
 
 /**
- * A user message as the model reads it: each inline chip becomes `[view N]`,
- * and the views follow as blocks with those ids. Views no chip names (a
- * message sent before chips went inline) are appended after, numbered on.
+ * Each inline chip becomes `[view N]`, pointing at the block with that id.
+ * Views no chip names (sent before chips went inline) are numbered on after.
  */
 export function withTrackioViewContext(content: string, views: TrackioDashboardView[]): string {
-	if (!views.length) return stripOrphanViewMarks(content).replaceAll(VIEW_TOKEN_MARK, "");
+	if (!views.length) return plainViewText(content);
 	const ordered = viewsInText(content, views);
 	for (const v of views) if (!ordered.includes(v)) ordered.push(v);
 	const ids = new Map(ordered.map((v, i) => [v, i + 1]));
@@ -328,4 +370,12 @@ export function withTrackioViewContext(content: string, views: TrackioDashboardV
 		.join("");
 	const blocks = ordered.map((v) => formatTrackioViewContext(v, ids.get(v))).join("\n\n");
 	return `${text}${text ? "\n\n" : ""}${blocks}\n\n${TRACKIO_VIEW_CONTEXT_NOTE}`;
+}
+
+/** Text with each chip reduced to its plain label, for anything but the model's view context. */
+export function plainViewText(content: string): string {
+	if (!content.includes(VIEW_TOKEN_MARK)) return content;
+	return segmentViewText(content, [])
+		.map((seg) => (seg.kind === "text" ? seg.text : seg.label))
+		.join("");
 }

@@ -1,5 +1,6 @@
 import { error, type RequestHandler } from "@sveltejs/kit";
 import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
+import { getUserHubToken } from "$lib/server/apiToken";
 import { fetchTrackioSpaceStatus } from "$lib/server/trackioSpace";
 
 /** `owner/name`, the only shape a Space id takes. */
@@ -16,9 +17,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	const spaceId = url.searchParams.get("space") ?? "";
 	if (!SPACE_ID.test(spaceId)) error(400, "Bad Space id");
 
-	// The user's own token, whatever USE_USER_TOKEN says about inference: it only
-	// goes to the Hub, and without it a private dashboard reads as missing and an
-	// anonymous caller is the first to be rate-limited.
-	const token = locals.token;
+	// Without a token a private dashboard reads as missing, and an anonymous
+	// caller is the first to be rate-limited.
+	const token = getUserHubToken(locals);
 	return superjsonResponse({ status: await fetchTrackioSpaceStatus(spaceId, token) });
 };

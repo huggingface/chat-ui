@@ -38,12 +38,11 @@ async function downloadFiles(messages: Message[], convId: ObjectId): Promise<End
 function injectTrackioViews(messages: EndpointMessage[]): EndpointMessage[] {
 	return messages.map((message) => {
 		if (message.from !== "user") return message;
-		const content = plainMentions(message.content);
-		return message.dashboardViews?.length
-			? { ...message, content: withTrackioViewContext(content, message.dashboardViews) }
-			: content === message.content
-				? message
-				: { ...message, content };
+		const content = withTrackioViewContext(
+			plainMentions(message.content),
+			message.dashboardViews ?? []
+		);
+		return content === message.content ? message : { ...message, content };
 	});
 }
 

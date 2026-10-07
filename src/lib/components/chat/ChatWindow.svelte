@@ -52,6 +52,7 @@
 	import UploadedFile from "./UploadedFile.svelte";
 	import {
 		MAX_VIEWS_PER_MESSAGE,
+		newTrackioViewKey,
 		trackioViewToken,
 		viewsInText,
 		type TrackioDashboardView,
@@ -447,8 +448,8 @@
 		});
 	});
 
-	// Conversation switch swaps the side pane to the destination's own state:
-	// closed for one not visited yet, or as the user left it. This used to
+	// Conversation switch swaps the side pane to the destination's own state.
+	// This used to
 	// piggyback on a first-message-id heuristic that misfired when the first
 	// message was edited; the route param is the real signal.
 	let prevConversationKey = page.params?.id;
@@ -773,11 +774,8 @@
 		pendingComposerPayload.set(undefined);
 	});
 
-	/**
-	 * Dashboard views live in the draft as inline tokens (see trackioView), so
-	 * the message's views are whatever its tokens name. Every view this composer
-	 * has held stays known, so undoing a deleted chip brings its view back.
-	 */
+	// Every view this composer has held stays known, so undoing a deleted chip
+	// brings its view back.
 	const knownViews = new Map<string, TrackioDashboardView>();
 	$effect(() => {
 		const text = draft;
@@ -790,15 +788,15 @@
 		});
 	});
 
-	/**
-	 * Puts a view's chip at the caret (or the end, before the composer has been
-	 * used), spaced off its neighbours. Through the editing stack where it can,
-	 * so the insert is one Cmd+Z away like anything typed.
-	 */
+	// Through the editing stack where it can, so the insert is one Cmd+Z away.
 	function insertViewToken(view: TrackioDashboardView) {
-		if (untrack(() => dashboardViews).length >= MAX_VIEWS_PER_MESSAGE) return;
-		const token = trackioViewToken(view);
-		knownViews.set(token, view);
+		if (untrack(() => dashboardViews).length >= MAX_VIEWS_PER_MESSAGE) {
+			$error = `A message can carry at most ${MAX_VIEWS_PER_MESSAGE} dashboard views.`;
+			return;
+		}
+		const keyed = { ...view, key: newTrackioViewKey() };
+		const token = trackioViewToken(keyed);
+		knownViews.set(token, keyed);
 		const textarea = composerForm?.querySelector("textarea");
 		const current = untrack(() => draft);
 		const start = textarea && composerUsed ? textarea.selectionStart : current.length;
@@ -1214,8 +1212,6 @@
 					class={{
 						"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
 						"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
-						// The mode's orange on the border, so the composer itself says which
-						// mode a message will go to.
 						"border-[#efc9ad] dark:border-[#5a3a22]": mlModeOn,
 						"dark:border-gray-700": !mlModeOn,
 						"opacity-30": isReadOnly,

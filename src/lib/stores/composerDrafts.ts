@@ -14,6 +14,7 @@ export interface ComposerDraft {
  * the existing behavior.
  */
 const drafts = new Map<string, ComposerDraft>();
+const MAX_DRAFTS = 20;
 
 export function saveComposerDraft(conversationId: string, draft: ComposerDraft): void {
 	if (!conversationId) return;
@@ -21,10 +22,15 @@ export function saveComposerDraft(conversationId: string, draft: ComposerDraft):
 		drafts.delete(conversationId);
 		return;
 	}
+	drafts.delete(conversationId);
 	drafts.set(conversationId, draft);
+	// Maps iterate oldest first.
+	for (const id of drafts.keys()) {
+		if (drafts.size <= MAX_DRAFTS) break;
+		drafts.delete(id);
+	}
 }
 
-/** The conversation's saved draft, removed from the store, or an empty one. */
 export function takeComposerDraft(conversationId: string): ComposerDraft {
 	const draft = drafts.get(conversationId);
 	drafts.delete(conversationId);

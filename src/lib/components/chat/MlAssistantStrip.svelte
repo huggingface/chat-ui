@@ -63,7 +63,6 @@
 	// (rate limit, Hub error) must not lock the user out of a dashboard that may
 	// be up — the pane shows its own "starting" state until the frame paints.
 	let dashboardLive = $derived(dashboardStatus === "live" || dashboardStatus === "unknown");
-	// The button toggles: a second click on the dashboard it opened closes it.
 	let dashboardShowing = $derived(
 		!!dashboard &&
 			sidePane.open &&
