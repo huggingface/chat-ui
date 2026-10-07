@@ -129,17 +129,17 @@ describe("inline view tokens", () => {
 	});
 
 	it("keeps two views with the same label apart by key", () => {
-		const one = { ...a, key: "k1" };
-		const two = { ...a, metricsOnScreen: ["eval/loss"], key: "k2" };
+		const one = { ...a, key: "17" };
+		const two = { ...a, metricsOnScreen: ["eval/loss"], key: "52" };
 		expect(trackioViewLabel(one)).toBe(trackioViewLabel(two));
 		const both = `${trackioViewToken(one)} vs ${trackioViewToken(two)}`;
-		expect(findViewTokens(both).map((t) => t.key)).toEqual(["k1", "k2"]);
+		expect(findViewTokens(both).map((t) => t.key)).toEqual(["17", "52"]);
 		expect(viewsInText(both, [two, one])).toEqual([one, two]);
 		expect(withTrackioViewContext(both, [one, two])).toContain("[view 1] vs [view 2]");
 	});
 
 	it("gives the model a chip's plain label when no view backs it", () => {
-		const content = withTrackioViewContext(`look ${trackioViewToken({ ...a, key: "k1" })}`, []);
+		const content = withTrackioViewContext(`look ${trackioViewToken({ ...a, key: "17" })}`, []);
 		expect(content).toBe(`look ${trackioViewLabel(a)}`);
 	});
 

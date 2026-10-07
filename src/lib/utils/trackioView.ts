@@ -55,7 +55,7 @@ const MAX_RUNS = 20;
 const MAX_METRICS = 60;
 /** More than a message should ever carry; the server enforces the same cap. */
 export const MAX_VIEWS_PER_MESSAGE = 8;
-const VIEW_KEY = /^[0-9a-z]{1,12}$/;
+const VIEW_KEY = /^[0-7]{1,12}$/;
 
 function str(value: unknown, max = MAX_NAME): string | undefined {
 	if (typeof value !== "string") return undefined;
@@ -137,8 +137,11 @@ export function parseTrackioView(raw: unknown, dashboardUrl: string): TrackioDas
 	};
 }
 
+/** Octal, so each digit maps to one of the variation selectors a token hides it in. */
 export function newTrackioViewKey(): string {
-	return Math.random().toString(36).slice(2, 8).padEnd(6, "0");
+	return Math.floor(Math.random() * 8 ** 6)
+		.toString(8)
+		.padStart(6, "0");
 }
 
 function fmt(n: number): string {
@@ -172,8 +175,8 @@ export function trackioViewChipParts(view: TrackioDashboardView): {
  * character (U+2063 INVISIBLE SEPARATOR). The label is what a plain-text reader
  * sees — a title, a copy, an edit — and the marks are what lets the composer
  * draw it as a chip and the server tell it from words the user typed. The
- * view's key follows the label as invisible tag characters, since two views
- * can share a label.
+ * view's key follows the label as variation selectors, since two views can
+ * share a label.
  */
 export const VIEW_TOKEN_MARK = "\u2063";
 /**
@@ -186,16 +189,19 @@ export const VIEW_TOKEN_MARK = "\u2063";
 // and a chip would wrap with its icon stranded at the end of the line.
 const VIEW_TOKEN_LEAD = "\u00a0".repeat(4) + "\u202f";
 const VIEW_TOKEN = /\u2063([^\u2063\n]{1,400})\u2063/g;
-/** Unicode tag characters: ASCII shifted to U+E0000, drawn as nothing. */
-const TAG_OFFSET = 0xe0000;
-const TAGGED_KEY = /[\u{E0030}-\u{E0039}\u{E0061}-\u{E007A}]+$/u;
+/**
+ * VS1–VS8 (U+FE00–FE07): zero-width in every engine. Tag characters and the
+ * Mongolian selectors are not in WebKit, and VS15/VS16 switch emoji style.
+ */
+const KEY_DIGIT_BASE = 0xfe00;
+const ENCODED_KEY = /[\ufe00-\ufe07]+$/;
 
 function encodeKey(key: string): string {
-	return [...key].map((c) => String.fromCodePoint(TAG_OFFSET + c.charCodeAt(0))).join("");
+	return [...key].map((d) => String.fromCharCode(KEY_DIGIT_BASE + Number(d))).join("");
 }
 
-function decodeKey(tags: string): string {
-	return [...tags].map((c) => String.fromCharCode((c.codePointAt(0) ?? 0) - TAG_OFFSET)).join("");
+function decodeKey(encoded: string): string {
+	return [...encoded].map((c) => String(c.charCodeAt(0) - KEY_DIGIT_BASE)).join("");
 }
 
 export function trackioViewLabel(view: TrackioDashboardView): string {
@@ -234,13 +240,13 @@ export interface ViewTokenSpan {
 export function findViewTokens(text: string): ViewTokenSpan[] {
 	if (!text.includes(VIEW_TOKEN_MARK)) return [];
 	return [...text.matchAll(VIEW_TOKEN)].map((m) => {
-		const tags = TAGGED_KEY.exec(m[1])?.[0] ?? "";
-		const label = breakable(m[1].slice(0, m[1].length - tags.length)).trim();
+		const encoded = ENCODED_KEY.exec(m[1])?.[0] ?? "";
+		const label = breakable(m[1].slice(0, m[1].length - encoded.length)).trim();
 		return {
 			start: m.index ?? 0,
 			end: (m.index ?? 0) + m[0].length,
 			label,
-			...(tags ? { key: decodeKey(tags) } : {}),
+			...(encoded ? { key: decodeKey(encoded) } : {}),
 		};
 	});
 }
