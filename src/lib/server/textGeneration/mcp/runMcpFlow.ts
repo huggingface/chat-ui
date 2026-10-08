@@ -1357,6 +1357,7 @@ export async function* runMcpFlow({
 									multimodal: mmEnabled,
 									imageProcessor,
 									read: readToolImage,
+									maxImages: TOOL_IMAGE_CAPS.maxImages,
 								}
 							)),
 						];

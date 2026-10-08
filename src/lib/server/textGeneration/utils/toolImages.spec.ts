@@ -100,6 +100,7 @@ describe("withToolImages", () => {
 			multimodal: true,
 			imageProcessor: passThrough,
 			read: makeToolImageReader(),
+			maxImages: 8,
 		});
 		expect(out).toHaveLength(2);
 		expect(out[0]).toEqual(
@@ -118,6 +119,7 @@ describe("withToolImages", () => {
 			multimodal: false,
 			imageProcessor: passThrough,
 			read,
+			maxImages: 8,
 		});
 		expect(out).toEqual([
 			toolMessage(
@@ -136,9 +138,33 @@ describe("withToolImages", () => {
 			multimodal: true,
 			imageProcessor: failing,
 			read: makeToolImageReader(),
+			maxImages: 8,
 		});
 		expect(out).toHaveLength(1);
 		expect(String(out[0].content)).toMatch(/could not be shown to you/);
+	});
+
+	it("decodes only the newest images a request can send, and names the rest", async () => {
+		const processor = vi.fn(passThrough);
+		const out = await withToolImages(
+			[toolMessage("a", "first"), toolMessage("b", "second")],
+			[
+				{ toolCallId: "a", tool: "hf_fs", blocks: [{ mimeType: "image/png", data: "AAAA" }] },
+				{
+					toolCallId: "b",
+					tool: "hf_fs",
+					blocks: [
+						{ mimeType: "image/png", data: "BBBB" },
+						{ mimeType: "image/png", data: "CCCC" },
+					],
+				},
+			],
+			{ multimodal: true, imageProcessor: processor, read: makeToolImageReader(), maxImages: 2 }
+		);
+		expect(processor).toHaveBeenCalledTimes(2);
+		expect(String(out[0].content)).toMatch(/no longer shown to you/);
+		expect(String(out[1].content)).toMatch(/Images 1.2 from this result/);
+		expect(JSON.stringify(out[2])).not.toContain(url("AAAA"));
 	});
 
 	it("leaves a round without images untouched", async () => {
@@ -147,6 +173,7 @@ describe("withToolImages", () => {
 			multimodal: true,
 			imageProcessor: passThrough,
 			read: makeToolImageReader(),
+			maxImages: 8,
 		});
 		expect(out).toBe(messages);
 	});

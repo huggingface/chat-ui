@@ -150,7 +150,7 @@ export function withImageNote(output: string, note: string | undefined): string 
 	return output.trim().length > 0 ? `${output}\n\n${note}` : note;
 }
 
-/** the round tool results with image notes, then the images when the model can see them */
+/** the round tool results with image notes, then the images, only the last maxImages are decoded */
 export async function withToolImages(
 	toolMessages: ChatMessageParam[],
 	sources: ToolImageSource[],
@@ -158,16 +158,24 @@ export async function withToolImages(
 		multimodal: boolean;
 		imageProcessor: ReturnType<typeof makeImageProcessor>;
 		read: ToolImageReader;
+		maxImages: number;
 	}
 ): Promise<ChatMessageParam[]> {
 	if (sources.length === 0) return toolMessages;
-	const results = await Promise.all(
-		sources.map(async ({ toolCallId, tool, blocks }) => ({
-			toolCallId,
-			tool,
-			images: await Promise.all(blocks.map((block) => resolveToolImage(block, opts))),
-		}))
+	const flat = sources.flatMap((source) => source.blocks.map((block) => ({ source, block })));
+	const firstSent = flat.length - opts.maxImages;
+	const images = await Promise.all(
+		flat.map(({ block }, i) =>
+			i >= firstSent || !opts.multimodal
+				? resolveToolImage(block, opts)
+				: Promise.resolve<ResolvedToolImage>({ missing: "dropped" })
+		)
 	);
+	const results = sources.map(({ toolCallId, tool }) => ({
+		toolCallId,
+		tool,
+		images: images.filter((_, i) => flat[i].source.toolCallId === toolCallId),
+	}));
 	return annotateToolImages(toolMessages, results);
 }
 
