@@ -27,6 +27,7 @@ import {
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import type { MlService } from "$lib/types/MlService";
 import { ObjectId } from "mongodb";
+import sharp from "sharp";
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 import type { MessageToolCallUpdate } from "$lib/types/MessageUpdate";
@@ -1302,37 +1303,62 @@ describe.sequential("a job that ends while the turn is busy", () => {
 // ── Tool results that carry no text ───────────────────────────────────────────
 
 describe.sequential("tool results without text", () => {
-	/**
-	 * Characterisation, not an endorsement.
-	 *
-	 * An image-only MCP result reaches the model as `content: ""`. Manual testing
-	 * against the real router settled the two open questions: providers ACCEPT the
-	 * empty message (no 400), but the model is thereby told its tool produced
-	 * nothing and confabulates — a 1x1 transparent PNG was described back to the
-	 * user as "Swiss-style cheese with its characteristic holes". Meanwhile the UI
-	 * renders the real image from the same Result update, so it looks like it
-	 * worked.
-	 *
-	 * That bug pre-dates #2470 and belongs to the live loop, not replay:
-	 * toolInvocation.ts builds in-loop tool messages from the joined text blocks
-	 * alone ("we keep only the textual output"), so the first, non-replayed answer
-	 * is already fabricated. Replay merely carries the same empty message forward.
-	 *
-	 * The fix is upstream of here — represent the image rather than dropping it —
-	 * so this asserts today's behaviour instead of a shape replay should invent.
-	 * The data is available: the blocks are persisted one field away, at
-	 * `outputs[0].content`, while this path reads `outputs[0].text`. When that is
-	 * addressed, flip the final assertion to require a representation.
-	 */
-	it("replays an image-only tool result as empty content (known upstream gap)", async () => {
+	const png = async () =>
+		(
+			await sharp({
+				create: { width: 8, height: 8, channels: 3, background: { r: 0, g: 160, b: 160 } },
+			})
+				.png()
+				.toBuffer()
+		).toString("base64");
+
+	const roundOf = (messages: ChatMessage[]) => {
+		const at = messages.findIndex((m) => m.role === "tool");
+		return { tool: messages[at], next: messages[at + 1], callId: messages[at - 1]?.tool_calls };
+	};
+
+	const imageUrls = (message: ChatMessage | undefined) =>
+		Array.isArray(message?.content)
+			? (message.content as { type: string; image_url?: { url: string } }[]).flatMap((part) =>
+					part.type === "image_url" && part.image_url ? [part.image_url.url] : []
+				)
+			: [];
+
+	it("shows an image-only result to a vision model, live and on replay", async () => {
 		const { conv, locals } = await newConversation();
 		scriptRounds([
 			{ toolCalls: [{ id: "call_abc123", name: "get_weather", arguments: "{}" }] },
 			{ content: "Here is the chart." },
 			{ content: "Follow-up." },
 		]);
-		// `callMcpTool` joins only text blocks, so an image-only result has no
-		// text at all — the shape an image-generating MCP tool produces.
+		scriptToolResult({
+			text: "",
+			content: [{ type: "image", data: await png(), mimeType: "image/png" }],
+		});
+
+		await sendMessage(conv, locals, "Chart the weather?");
+		const stored = JSON.stringify((await reload(conv)).messages);
+		expect(stored).toMatch(/"type":"image","mimeType":"image\/png","sha":"[0-9a-f]{64}"/);
+		await sendMessage(await reload(conv), locals, "And now?");
+
+		for (const n of [1, 2]) {
+			const messages = outgoing(n);
+			const shape = describeMessages(messages);
+			const { tool, next, callId } = roundOf(messages);
+			expect(tool?.tool_call_id, shape).toBe(callId?.[0].id);
+			expect(String(tool?.content), shape).toContain("Image 1");
+			expect(next?.role, shape).toBe("user");
+			expect(imageUrls(next), shape).toEqual([expect.stringMatching(/^data:image\/png;base64,/)]);
+		}
+	});
+
+	it("tells the model an image it cannot decode was not shown, instead of sending nothing", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([
+			{ toolCalls: [{ id: "call_abc123", name: "get_weather", arguments: "{}" }] },
+			{ content: "Here is the chart." },
+			{ content: "Follow-up." },
+		]);
 		scriptToolResult({
 			text: "",
 			content: [{ type: "image", data: "iVBORw0KGgo=", mimeType: "image/png" }],
@@ -1341,19 +1367,13 @@ describe.sequential("tool results without text", () => {
 		await sendMessage(conv, locals, "Chart the weather?");
 		await sendMessage(await reload(conv), locals, "And now?");
 
-		const replayed = outgoing(2);
-		const shape = describeMessages(replayed);
-		const toolMessage = replayed.find((m) => m.role === "tool");
-		// The genuine invariant, and the one that must not regress: the result is
-		// still replayed and still paired with its call, so the assistant's
-		// tool_calls are never left orphaned.
-		expect(toolMessage, shape).toBeDefined();
-		expect(toolMessage?.tool_call_id, shape).toBe(
-			replayed.find((m) => m.tool_calls)?.tool_calls?.[0].id
-		);
-		// Pinned so that representing the image becomes a deliberate, visible
-		// change rather than a silent one. See the block comment above.
-		expect(String(toolMessage?.content), shape).toBe("");
+		for (const n of [1, 2]) {
+			const messages = outgoing(n);
+			const shape = describeMessages(messages);
+			const { tool, next } = roundOf(messages);
+			expect(String(tool?.content), shape).toMatch(/could not be shown to you/);
+			expect(next?.role, shape).not.toBe("user");
+		}
 	});
 });
 

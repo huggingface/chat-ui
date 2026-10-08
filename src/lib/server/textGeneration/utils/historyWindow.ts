@@ -4,6 +4,7 @@ import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
 import { ASK_USER_QUESTION_TOOL_NAME } from "$lib/server/askUserQuestion";
 import type { HistoryWindowStart, StoredHistoryWindow } from "$lib/types/Conversation";
+import { isToolImagesMessage } from "./toolImages";
 
 type ChatMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -74,7 +75,7 @@ export function groupRounds(messages: ChatMessageParam[]): ChatMessageParam[][] 
 	const groups: ChatMessageParam[][] = [];
 	for (const message of messages) {
 		const last = groups.at(-1);
-		if (message.role === "tool" && last) {
+		if ((message.role === "tool" || isToolImagesMessage(message)) && last) {
 			last.push(message);
 		} else {
 			groups.push([message]);

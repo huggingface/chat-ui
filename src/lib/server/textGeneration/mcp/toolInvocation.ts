@@ -21,6 +21,7 @@ import { offloadImageBlocks } from "$lib/server/files/toolImages";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { ResolvedVirtualFileRef, VirtualFileExpander } from "$lib/server/mlFiles/expand";
 import type { ToolCallGuard } from "./toolGuard";
+import { toolImageBlocks, type ToolImageSource } from "../utils/toolImages";
 import type { Client } from "@modelcontextprotocol/client";
 import type { ObjectId } from "mongodb";
 
@@ -127,6 +128,8 @@ export interface ExecuteToolCallsParams {
 export interface ToolCallExecutionResult {
 	toolMessages: ChatCompletionMessageParam[];
 	toolRuns: ToolRun[];
+	/** tool messages carry text only, so images travel separately */
+	images: ToolImageSource[];
 	finalAnswer?: { text: string; interrupted: boolean };
 	/** A 2026-era prompt is open; this round has no result until it is answered. */
 	awaitingInput?: boolean;
@@ -187,6 +190,7 @@ export async function* executeToolCalls({
 	const effectiveTimeoutMs = toolTimeoutMs ?? getMcpToolTimeoutMs();
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
+	const images: ToolImageSource[] = [];
 	const serverLookup = serverMap(servers);
 	// Pre-emit call + ETA updates and prepare tasks
 	type TaskResult = {
@@ -772,8 +776,9 @@ export async function* executeToolCalls({
 		if (!r.error) {
 			const output = r.output ?? "";
 			toolRuns.push({ name, parameters: r.paramsClean, output });
-			// For the LLM follow-up call, we keep only the textual output
 			toolMessages.push({ role: "tool", tool_call_id: id, content: output });
+			const blocks = toolImageBlocks(r.blocks);
+			if (blocks.length > 0) images.push({ toolCallId: id, tool: name, blocks });
 		} else {
 			// Communicate error to LLM so it doesn't hallucinate success
 			toolMessages.push({ role: "tool", tool_call_id: id, content: `Error: ${r.error}` });
@@ -782,6 +787,11 @@ export async function* executeToolCalls({
 
 	yield {
 		type: "complete",
-		summary: { toolMessages, toolRuns, ...(awaitingInput ? { awaitingInput: true } : {}) },
+		summary: {
+			toolMessages,
+			toolRuns,
+			images,
+			...(awaitingInput ? { awaitingInput: true } : {}),
+		},
 	};
 }
