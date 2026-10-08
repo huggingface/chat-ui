@@ -11,6 +11,12 @@ type InlineImageBlock = { type: "image"; data: string; mimeType: string };
 
 export type ToolImageRef = { type: "image"; mimeType: string; sha: string };
 
+const isImageRef = (block: unknown): block is ToolImageRef => {
+	if (typeof block !== "object" || block === null) return false;
+	const obj = block as Record<string, unknown>;
+	return obj.type === "image" && typeof obj.sha === "string" && typeof obj.mimeType === "string";
+};
+
 const isInlineImage = (block: unknown): block is InlineImageBlock => {
 	if (typeof block !== "object" || block === null) return false;
 	const obj = block as Record<string, unknown>;
@@ -86,24 +92,59 @@ export async function offloadStoredToolImages(
 	messages: Message[]
 ): Promise<number> {
 	let changed = 0;
-	for (const message of messages) {
-		for (const update of message.updates ?? []) {
-			if (
-				update.type !== MessageUpdateType.Tool ||
-				update.subtype !== MessageToolUpdateType.Result ||
-				update.result.status !== ToolResultStatus.Success
-			) {
-				continue;
-			}
-			const { result } = update;
-			for (let i = 0; i < result.outputs.length; i += 1) {
-				const output = result.outputs[i];
-				const content = await offloadImageBlocks(conversationId, output.content);
-				if (content === output.content) continue;
-				result.outputs[i] = { ...output, content };
-				changed += 1;
-			}
-		}
+	for (const output of successOutputs(messages)) {
+		const content = await offloadImageBlocks(conversationId, output.content);
+		if (content === output.content) continue;
+		output.content = content;
+		changed += 1;
 	}
 	return changed;
+}
+
+const successOutputs = (messages: Message[]) =>
+	messages.flatMap((message) =>
+		(message.updates ?? []).flatMap((update) =>
+			update.type === MessageUpdateType.Tool &&
+			update.subtype === MessageToolUpdateType.Result &&
+			update.result.status === ToolResultStatus.Success
+				? update.result.outputs
+				: []
+		)
+	);
+
+async function readBucketFile(filename: string): Promise<Buffer | null> {
+	const file = await collections.bucket.find({ filename }).limit(1).next();
+	if (!file) return null;
+	const chunks: Buffer[] = [];
+	for await (const chunk of collections.bucket.openDownloadStream(file._id)) {
+		chunks.push(chunk as Buffer);
+	}
+	return Buffer.concat(chunks);
+}
+
+/** every image the messages reference by sha, read back so a trace stands on its own */
+export async function readReferencedToolImages(
+	conversationId: ObjectId | string,
+	messages: Message[]
+): Promise<Array<ToolImageRef & { data: string | null }>> {
+	const refs = new Map<string, ToolImageRef>();
+	for (const output of successOutputs(messages)) {
+		if (!Array.isArray(output.content)) continue;
+		for (const block of output.content) if (isImageRef(block)) refs.set(block.sha, block);
+	}
+	return Promise.all(
+		[...refs.values()].map(async (ref) => {
+			const bytes = await readBucketFile(`${conversationId.toString()}-${ref.sha}`);
+			return { ...ref, data: bytes ? bytes.toString("base64") : null };
+		})
+	);
+}
+
+/** uploads and tool images alike, a share keeps its own copies under the share id */
+export async function deleteStoredFilesOf(conversationIds: ObjectId[]): Promise<void> {
+	if (conversationIds.length === 0) return;
+	const files = await collections.bucket
+		.find({ filename: { $in: conversationIds.map((id) => new RegExp(`^${id.toString()}-`)) } })
+		.toArray();
+	await Promise.all(files.map((file) => collections.bucket.delete(file._id)));
 }

@@ -12,7 +12,12 @@ import { messageForStorage } from "$lib/server/generation/compressUpdates";
 import type { Message } from "$lib/types/Message";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
-import { offloadStoredToolImages, storeToolImage } from "./toolImages";
+import {
+	deleteStoredFilesOf,
+	offloadStoredToolImages,
+	readReferencedToolImages,
+	storeToolImage,
+} from "./toolImages";
 import { GET } from "../../../routes/conversation/[id]/output/[sha256]/+server";
 
 beforeAll(async () => {
@@ -145,6 +150,35 @@ describe.sequential("tool result images in GridFS", () => {
 			new Set(results.flatMap((_, i) => [i % 26, (i * 7 + 3) % 26])).size
 		);
 	}, 60_000);
+
+	it("deletes a conversation's files and leaves its share and other conversations alone", async () => {
+		const deleted = new ObjectId();
+		const kept = new ObjectId();
+		const bytes = randomBytes(64);
+		await storeToolImage(deleted, inline(bytes));
+		await storeToolImage(deleted, inline(randomBytes(64)));
+		await storeToolImage(kept, inline(bytes));
+		await storeToolImage("abc1234", inline(bytes));
+
+		await deleteStoredFilesOf([deleted]);
+
+		expect(await filesOf(deleted)).toHaveLength(0);
+		expect(await filesOf(kept)).toHaveLength(1);
+		expect(await filesOf("abc1234")).toHaveLength(1);
+	});
+
+	it("reads back each referenced image once, and null for one whose file is gone", async () => {
+		const conversationId = new ObjectId();
+		const bytes = randomBytes(64);
+		const ref = await storeToolImage(conversationId, inline(bytes));
+		const missing = { type: "image", mimeType: "image/png", sha: "cd".repeat(32) };
+		const messages = [assistant([attachResult("a", [ref, missing]), attachResult("b", [ref])])];
+
+		expect(await readReferencedToolImages(conversationId, messages)).toEqual([
+			{ ...ref, data: bytes.toString("base64") },
+			{ ...missing, data: null },
+		]);
+	});
 
 	describe("served by the output route", () => {
 		const fetchImage = (id: string, sha: string, locals: App.Locals) =>
