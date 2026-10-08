@@ -642,9 +642,7 @@
 			class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
 		>
 			<div class="flex min-w-0 flex-1 items-baseline gap-2">
-				<h2 class="flex-none text-sm font-semibold text-gray-800 dark:text-gray-200">
-					Resources
-				</h2>
+				<h2 class="flex-none text-sm font-semibold text-gray-800 dark:text-gray-200">Resources</h2>
 				{#if openCount + liveRunCount > 0}
 					<span
 						class="hidden truncate text-xs text-[#78716c] @min-[400px]:inline dark:text-[#a8a29e]"
@@ -1089,7 +1087,7 @@
 											class="aspect-square w-full rounded-md border border-[#ececea] bg-[#fafaf9] object-cover dark:border-[#262626] dark:bg-[#1c1917]"
 										/>
 										<span class="flex min-w-0 items-baseline gap-1 text-xs">
-											<span class="truncate">{name}</span>
+											<span class="ml-image-name truncate"><bdi>{name}</bdi></span>
 											{#if image.count > 1}
 												<span class="ml-registry-count flex-none">×{image.count}</span>
 											{/if}
@@ -1267,6 +1265,12 @@
 
 	.ml-image img {
 		transition: border-color 120ms ease;
+	}
+
+	/* generated names differ at the end so the start is cut */
+	.ml-image-name {
+		direction: rtl;
+		text-align: left;
 	}
 
 	.ml-image:hover img,
