@@ -2,6 +2,10 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
 import { writeMlFileVersion } from "$lib/server/mlFiles/store";
+import { storeToolImage } from "$lib/server/files/toolImages";
+import type { Message } from "$lib/types/Message";
+import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
+import { ToolResultStatus } from "$lib/types/Tool";
 import type { MlAgentRun } from "$lib/types/MlAgentRun";
 import { buildConversationTrace, slugify, traceFilename } from "./conversationTrace";
 
@@ -14,6 +18,10 @@ afterEach(async () => {
 		collections.mlFiles.deleteMany({}),
 		collections.mlAgentRuns.deleteMany({}),
 		collections.nestedAgentCalls.deleteMany({}),
+		collections.bucket
+			.find({})
+			.toArray()
+			.then((files) => Promise.all(files.map((file) => collections.bucket.delete(file._id)))),
 	]);
 });
 
@@ -104,5 +112,39 @@ describe("buildConversationTrace", () => {
 
 		const parsed = JSON.parse(JSON.stringify(trace));
 		expect(parsed.agentRuns[0].id).toMatch(/^[0-9a-f]{24}$/);
+	});
+
+	it("bundles the tool images its messages reference by sha", async () => {
+		const conversationId = new ObjectId();
+		const ref = await storeToolImage(conversationId, {
+			type: "image",
+			data: "aGk=",
+			mimeType: "image/png",
+		});
+		const messages: Message[] = [
+			{
+				id: "m1",
+				from: "assistant",
+				content: "",
+				updates: [
+					{
+						type: MessageUpdateType.Tool,
+						subtype: MessageToolUpdateType.Result,
+						uuid: "u1",
+						result: {
+							status: ToolResultStatus.Success,
+							call: { name: "hf_fs", parameters: {} },
+							outputs: [{ text: "attached", content: [ref] }],
+							display: true,
+						},
+					},
+				],
+			},
+		];
+
+		const trace = await buildConversationTrace(conversationId, { ...CONVERSATION, messages });
+
+		expect(trace.toolImages).toEqual([{ ...ref, data: "aGk=" }]);
+		expect(trace.conversation.messages).toBe(messages);
 	});
 });

@@ -4,6 +4,7 @@ import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { resolveConversation } from "$lib/server/api/utils/resolveConversation";
 import { collections } from "$lib/server/database";
 import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
+import { deleteStoredFilesOf } from "$lib/server/files/toolImages";
 import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
 import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
@@ -79,6 +80,7 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 		error(404, "Conversation not found");
 	}
 	await deleteMlFilesOf([new ObjectId(id)]);
+	await deleteStoredFilesOf([new ObjectId(id)]);
 	await deleteMlRegistry([new ObjectId(id)]);
 
 	return superjsonResponse({ success: true });

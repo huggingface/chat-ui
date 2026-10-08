@@ -2,6 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
 import { writeMlFileVersion } from "$lib/server/mlFiles/store";
+import { storeToolImage } from "$lib/server/files/toolImages";
 import { cleanupTestData, createTestConversation, createTestUser } from "./testHelpers";
 
 vi.mock("$lib/server/logger", () => ({
@@ -25,12 +26,14 @@ afterEach(async () => {
 async function seed(conversationId: ObjectId, name: string) {
 	await writeMlFileVersion({ conversationId, name, content: "1", origin: "write" });
 	await writeMlFileVersion({ conversationId, name, content: "2", origin: "edit" });
+	await storeToolImage(conversationId, { type: "image", data: "aGk=", mimeType: "image/png" });
 }
 
-const filesOf = (conversationId: ObjectId) =>
-	collections.mlFiles.countDocuments({ conversationId });
+const filesOf = async (conversationId: ObjectId) =>
+	(await collections.mlFiles.countDocuments({ conversationId })) +
+	(await collections.bucket.find({ filename: { $regex: `^${conversationId}-` } }).toArray()).length;
 
-describe("deleting a conversation deletes its virtual files", () => {
+describe("deleting a conversation deletes its virtual and stored files", () => {
 	it("on the v2 single delete", async () => {
 		const { locals } = await createTestUser();
 		const conv = await createTestConversation(locals, { title: "mine" });
@@ -41,7 +44,7 @@ describe("deleting a conversation deletes its virtual files", () => {
 		await deleteOneV2({ locals, params: { id: conv._id.toString() } } as never);
 
 		expect(await filesOf(conv._id)).toBe(0);
-		expect(await filesOf(kept._id)).toBe(2);
+		expect(await filesOf(kept._id)).toBe(3);
 	});
 
 	it("on the v2 bulk delete, for every conversation the user owns", async () => {
@@ -58,7 +61,7 @@ describe("deleting a conversation deletes its virtual files", () => {
 
 		expect(await filesOf(a._id)).toBe(0);
 		expect(await filesOf(b._id)).toBe(0);
-		expect(await filesOf(theirs._id)).toBe(2);
+		expect(await filesOf(theirs._id)).toBe(3);
 	});
 
 	it("on the legacy bulk delete", async () => {

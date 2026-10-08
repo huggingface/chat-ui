@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
+import { readReferencedToolImages } from "$lib/server/files/toolImages";
 
 export const TRACE_FORMAT_VERSION = 1;
 
@@ -37,14 +38,19 @@ export async function buildConversationTrace(
 	> &
 		Partial<Pick<Conversation, "mlAssistant" | "mlBudget" | "plan" | "historyWindow">>
 ) {
-	const [services, artefacts, agentRuns, agentCalls, sources, files] = await Promise.all([
-		collections.mlServices.find({ conversationId }).sort({ createdAt: 1, _id: 1 }).toArray(),
-		collections.mlArtefacts.find({ conversationId }).sort({ createdAt: 1, _id: 1 }).toArray(),
-		collections.mlAgentRuns.find({ conversationId }).sort({ startedAt: 1, _id: 1 }).toArray(),
-		collections.nestedAgentCalls.find({ conversationId }).sort({ createdAt: 1, _id: 1 }).toArray(),
-		collections.mlSources.find({ conversationId }).sort({ firstSeenAt: 1, _id: 1 }).toArray(),
-		collections.mlFiles.find({ conversationId }).sort({ name: 1, version: 1 }).toArray(),
-	]);
+	const [services, artefacts, agentRuns, agentCalls, sources, files, toolImages] =
+		await Promise.all([
+			collections.mlServices.find({ conversationId }).sort({ createdAt: 1, _id: 1 }).toArray(),
+			collections.mlArtefacts.find({ conversationId }).sort({ createdAt: 1, _id: 1 }).toArray(),
+			collections.mlAgentRuns.find({ conversationId }).sort({ startedAt: 1, _id: 1 }).toArray(),
+			collections.nestedAgentCalls
+				.find({ conversationId })
+				.sort({ createdAt: 1, _id: 1 })
+				.toArray(),
+			collections.mlSources.find({ conversationId }).sort({ firstSeenAt: 1, _id: 1 }).toArray(),
+			collections.mlFiles.find({ conversationId }).sort({ name: 1, version: 1 }).toArray(),
+			readReferencedToolImages(conversationId, conversation.messages),
+		]);
 
 	return {
 		format: "chat-ui-conversation-trace",
@@ -71,5 +77,7 @@ export async function buildConversationTrace(
 		agentCalls: agentCalls.map(withId),
 		sources: sources.map(withId),
 		files: files.map(withId),
+		// messages reference these by sha, data is null when the stored file is gone
+		toolImages,
 	};
 }
