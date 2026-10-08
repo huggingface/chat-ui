@@ -5,7 +5,6 @@ import superjson from "superjson";
 import { tick } from "svelte";
 import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 import { sidePane } from "$lib/stores/sidePane.svelte";
-import { paths } from "$lib/components/__tests__/appMocks";
 import type { MlFileListing, MlFileVersionListing } from "$lib/types/MlFile";
 import type {
 	MlAgentRunDetail,
@@ -143,7 +142,6 @@ describe("MlRegistryPane", () => {
 		vi.unstubAllGlobals();
 		sidePane.reset();
 		mlRegistry.reset();
-		paths.base = "";
 	});
 
 	it("only renders as the registry view of the side pane", () => {
@@ -481,8 +479,11 @@ describe("MlRegistryPane", () => {
 
 	it("shows the images tools returned, named by where they were read from, and opens one", async () => {
 		const sheet = "a".repeat(64);
-		// a real path would reach the test server, whose sveltekit handler cannot start there
-		paths.base = "about:blank#";
+		// image requests would reach the test server, whose sveltekit handler cannot start
+		const csp = document.createElement("meta");
+		csp.httpEquiv = "Content-Security-Policy";
+		csp.content = "img-src data:";
+		document.head.append(csp);
 		const { container } = mount(
 			payload({
 				images: [
