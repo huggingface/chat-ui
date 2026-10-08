@@ -636,14 +636,14 @@
 {/snippet}
 
 {#if showing}
-	<SidePane label="Services and artifacts">
+	<SidePane label="Resources">
 		<!-- container query, the pane is resizable and at phone width the title and controls take the row -->
 		<header
 			class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
 		>
 			<div class="flex min-w-0 flex-1 items-baseline gap-2">
 				<h2 class="flex-none text-sm font-semibold text-gray-800 dark:text-gray-200">
-					Services and artifacts
+					Resources
 				</h2>
 				{#if openCount + liveRunCount > 0}
 					<span

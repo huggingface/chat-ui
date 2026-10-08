@@ -156,8 +156,8 @@ describe("MlRegistryPane", () => {
 		expect(closed.container.querySelector("aside, [role=dialog]")).toBeNull();
 
 		const { container } = mount();
-		const pane = find(container, "[aria-label='Services and artifacts']");
-		expect(text(pane.querySelector("h2"))).toBe("Services and artifacts");
+		const pane = find(container, "[aria-label='Resources']");
+		expect(text(pane.querySelector("h2"))).toBe("Resources");
 	});
 
 	it("closes from its own header", () => {
