@@ -131,13 +131,29 @@ describe("mlRegistry store", () => {
 		expect(store.summary).toEqual({ rows: 3, open: 0, running: 0 });
 	});
 
-	it("reads a payload from a server that predates runs and sources as empty lists", () => {
+	it("counts images among the rows, so a conversation with only images shows the control", () => {
 		const store = new MlRegistryStore(fakeFetch().fetcher);
 		store.bind("conv-1");
-		store.apply({ ...payload(), agentRuns: [agentRun()], sources: [source()] });
+		store.apply({
+			...payload(),
+			images: [{ sha: "a".repeat(64), mimeType: "image/png", tool: "plot", count: 2 }],
+		});
+		expect(store.summary).toEqual({ rows: 1, open: 0, running: 0 });
+	});
+
+	it("reads a payload from a server that predates runs, sources and images as empty lists", () => {
+		const store = new MlRegistryStore(fakeFetch().fetcher);
+		store.bind("conv-1");
+		store.apply({
+			...payload(),
+			agentRuns: [agentRun()],
+			sources: [source()],
+			images: [{ sha: "a".repeat(64), mimeType: "image/png", tool: "plot", count: 1 }],
+		});
 		store.apply(payload([service()]));
 		expect(store.agentRuns).toEqual([]);
 		expect(store.sources).toEqual([]);
+		expect(store.images).toEqual([]);
 		expect(store.summary.rows).toBe(1);
 	});
 

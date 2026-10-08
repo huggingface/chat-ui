@@ -43,6 +43,18 @@ export interface MlRegistrySource extends Omit<MlSource, "_id" | "conversationId
 	id: string;
 }
 
+/** an image a tool returned, served from the conversation output route by its sha */
+export interface MlRegistryImage {
+	sha: string;
+	mimeType: string;
+	/** the tool that returned it most recently */
+	tool: string;
+	/** the uri it was read from, when the call named one */
+	source?: string;
+	/** how many results returned the same bytes */
+	count: number;
+}
+
 export interface MlRegistryPayload {
 	services: MlRegistryService[];
 	/** absent from a server that predates runs and sources, which a rolling deploy can still answer from */
@@ -50,13 +62,15 @@ export interface MlRegistryPayload {
 	artefacts: MlRegistryArtefact[];
 	files: MlFileListing[];
 	sources?: MlRegistrySource[];
+	/** absent from a server that predates them, newest first */
+	images?: MlRegistryImage[];
 	/** the server clock when it answered, epoch ms, for skew corrected elapsed times */
 	serverNow: number;
 }
 
 /** what the strip control needs, counted once in the store */
 export interface MlRegistrySummary {
-	/** services, sub-agent runs, artefacts, files and sources, the control hides at zero */
+	/** services, sub-agent runs, artefacts, files, sources and images, the control hides at zero */
 	rows: number;
 	/** services the Hub would still bill */
 	open: number;

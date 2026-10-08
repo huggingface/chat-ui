@@ -8,6 +8,9 @@ import { recordSources } from "$lib/server/mlRegistry/sources";
 import { PARENT_READER } from "$lib/types/MlSource";
 import { writeMlFileVersion } from "$lib/server/mlFiles/store";
 import type { MlAgentRunDetail, MlRegistryPayload } from "$lib/types/MlRegistry";
+import type { Message } from "$lib/types/Message";
+import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
+import { ToolResultStatus } from "$lib/types/Tool";
 import {
 	cleanupTestData,
 	createTestConversation,
@@ -81,8 +84,51 @@ describe.sequential("GET /api/v2/conversations/[id]/registry", () => {
 		expect(payload.files).toEqual([]);
 		expect(payload.agentRuns).toEqual([]);
 		expect(payload.sources).toEqual([]);
+		expect(payload.images).toEqual([]);
 		expect(payload.serverNow).toBeGreaterThanOrEqual(before);
 		expect(payload.serverNow).toBeLessThanOrEqual(Date.now());
+	});
+
+	it("lists the images the conversation's tool results stored", async () => {
+		const { locals } = await createTestUser();
+		const sha = "a".repeat(64);
+		const uri = "hf://models/pngwn/lora/sheet_cat.jpg";
+		const conv = await createTestConversation(locals, {
+			messages: [
+				{
+					id: "m1",
+					from: "assistant",
+					content: "",
+					updates: [
+						{
+							type: MessageUpdateType.Tool,
+							subtype: MessageToolUpdateType.Call,
+							uuid: "u1",
+							call: { name: "hf_fs", parameters: {} },
+							argumentsRaw: JSON.stringify({ operations: [{ cmd: "attach", args: [uri] }] }),
+						},
+						{
+							type: MessageUpdateType.Tool,
+							subtype: MessageToolUpdateType.Result,
+							uuid: "u1",
+							result: {
+								status: ToolResultStatus.Success,
+								call: { name: "hf_fs", parameters: {} },
+								outputs: [
+									{ text: "attached", content: [{ type: "image", mimeType: "image/jpeg", sha }] },
+								],
+								display: true,
+							},
+						},
+					],
+				} as Message,
+			],
+		});
+
+		const payload = await parseResponse(await get(locals, conv._id.toString()));
+		expect(payload.images).toEqual([
+			{ sha, mimeType: "image/jpeg", tool: "hf_fs", source: uri, count: 1 },
+		]);
 	});
 
 	it("returns the conversation's services, artefacts and files with string ids", async () => {
