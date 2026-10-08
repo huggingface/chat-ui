@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { createHash } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
 import {
@@ -169,14 +170,20 @@ describe("resuming a parked tool call", () => {
 			extraServers: SERVERS,
 		});
 
+		const sha = createHash("sha256").update(Buffer.from(image.data, "base64")).digest("hex");
 		const result = done.updates.find((u) => u.type === "tool" && u.subtype === "result");
 		expect(result).toMatchObject({
 			result: {
 				call: { name: "confirm_twice", parameters: {} },
-				outputs: [{ text: "all done", content: [image] }],
+				outputs: [{ text: "all done", content: [{ type: "image", mimeType: "image/png", sha }] }],
 			},
 		});
 		expect(result).not.toHaveProperty("result.outputs.0.structured");
+		expect(result).not.toHaveProperty("result.outputs.0.content.0.data");
+		const stored = await collections.bucket
+			.find({ filename: `${conversationId}-${sha}` })
+			.toArray();
+		expect(stored).toHaveLength(1);
 	});
 
 	it("surfaces a failing tool call as an error on the same block", async () => {

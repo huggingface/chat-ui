@@ -6,6 +6,7 @@ import { tick } from "svelte";
 import superjson from "superjson";
 import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 import { sidePane } from "$lib/stores/sidePane.svelte";
+import { setPage } from "$lib/components/__tests__/appMocks";
 
 const call = {
 	type: "tool",
@@ -94,6 +95,24 @@ describe("ToolUpdate stored output", () => {
 		await expect.element(image).toHaveAttribute("src", `data:image/png;base64,${onePixelPng}`);
 		const blocks = Array.from(screen.baseElement.querySelectorAll("pre")).map((b) => b.textContent);
 		expect(blocks).toEqual(["{}", "plotted"]);
+	});
+
+	it("loads an image stored by reference from the conversation it is viewed under", async () => {
+		const sha = "ab".repeat(32);
+		setPage({ params: { id: "abc1234" } });
+		const byRef = {
+			...stored,
+			result: {
+				...stored.result,
+				outputs: [{ text: "plotted", content: [{ type: "image", mimeType: "image/png", sha }] }],
+			},
+		};
+		const screen = render(ToolUpdate, { tool: [call, byRef] } as never);
+
+		await screen.getByRole("button", { name: "Expand" }).click();
+
+		const image = screen.getByRole("img", { name: "Tool result image 1" });
+		await expect.element(image).toHaveAttribute("src", `/conversation/abc1234/output/${sha}`);
 	});
 });
 
