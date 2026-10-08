@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createHash } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
@@ -528,6 +529,30 @@ describe("executeToolCalls with a guard", () => {
 		if (result?.subtype === MessageToolUpdateType.Result) {
 			expect(result.result).not.toHaveProperty("outputs.0.structured");
 		}
+	});
+
+	it("stores image blocks under the conversation and streams a reference in their place", async () => {
+		await ready;
+		const image = { type: "image", data: "aGk=", mimeType: "image/png" };
+		mcpMock.callMcpTool.mockResolvedValue(
+			mcpResult({ text: "attached", content: [{ type: "text", text: "attached" }, image, image] })
+		);
+		const conversationId = new ObjectId();
+
+		const events = await drain([CALL], { conversationId });
+
+		const sha = createHash("sha256").update(Buffer.from(image.data, "base64")).digest("hex");
+		const ref = { type: "image", mimeType: "image/png", sha };
+		const result = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Result);
+		expect(result).toMatchObject({
+			result: { outputs: [{ text: "attached", content: [ref, ref] }] },
+		});
+		expect(JSON.stringify(result)).not.toContain(image.data);
+		const stored = await collections.bucket
+			.find({ filename: `${conversationId}-${sha}` })
+			.toArray();
+		expect(stored).toHaveLength(1);
+		expect(summaryOf(events).toolMessages[0]).toMatchObject({ content: "attached" });
 	});
 
 	it("streams structured when the tool answered with nothing else", async () => {

@@ -146,6 +146,13 @@ describe("compressUpdatesForStorage", () => {
 			]);
 		});
 
+		it("keeps an image stored by reference as it is", () => {
+			const ref = { type: "image", mimeType: "image/png", sha: "ab".repeat(32) };
+			const [stored] = compressUpdatesForStorage([storedAsToday([textBlock, ref])]) ?? [];
+
+			expect(stored).toMatchObject({ result: { outputs: [{ content: [ref] }] } });
+		});
+
 		it("omits content when only text blocks were in it", () => {
 			const [stored] = compressUpdatesForStorage([storedAsToday([textBlock])]) ?? [];
 

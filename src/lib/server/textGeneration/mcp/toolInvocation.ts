@@ -17,6 +17,7 @@ import type { BuiltinTool } from "../builtinTools/types";
 import { openDurableElicitation, type ElicitationSink } from "$lib/server/mcp/elicitation";
 import { turnAwaitingInput } from "$lib/server/generation/turnState";
 import { slimToolOutput } from "$lib/server/generation/compressUpdates";
+import { offloadImageBlocks } from "$lib/server/files/toolImages";
 import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { ResolvedVirtualFileRef, VirtualFileExpander } from "$lib/server/mlFiles/expand";
 import type { ToolCallGuard } from "./toolGuard";
@@ -688,6 +689,10 @@ export async function* executeToolCalls({
 				{ server: mappingEntry.server, tool: mappingEntry.tool },
 				"[mcp] tool call completed"
 			);
+			// sub agent results never reach a message so there is nothing to store under
+			const content = elicitation?.conversationId
+				? await offloadImageBlocks(elicitation.conversationId, toolResponse.content)
+				: toolResponse.content;
 			results.push({
 				index,
 				output: annotated,
@@ -707,7 +712,7 @@ export async function* executeToolCalls({
 						slimToolOutput({
 							text: annotated ?? "",
 							structured: toolResponse.structured,
-							content: toolResponse.content,
+							content,
 						}),
 					],
 					display: true,

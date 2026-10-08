@@ -26,6 +26,7 @@ import { createGenerationWriter } from "./writer";
 import { applyUpdateToMessage } from "./applyUpdate";
 import { turnAbandoned, turnEnded, turnRunning, turnUnsaved } from "./turnState";
 import { compressUpdatesForStorage, messageForStorage } from "./compressUpdates";
+import { offloadStoredToolImages } from "$lib/server/files/toolImages";
 import { restoreRunningShape } from "$lib/utils/messageShape";
 
 const SWEEP_BATCH = 5;
@@ -303,6 +304,9 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 	if (!model) return abandon(park, `model ${conv.model} is no longer available`);
 
 	const { locals, settings, tokenExpired } = await rebuildIdentity(park);
+
+	// persist rewrites every message, inline tool images must move out first
+	await offloadStoredToolImages(conv._id, conv.messages);
 
 	const generationId = randomUUID();
 	restoreRunningShape(message);
