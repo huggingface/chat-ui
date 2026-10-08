@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy, untrack } from "svelte";
+	import { onDestroy, tick, untrack } from "svelte";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import TrackioPane from "./TrackioPane.svelte";
@@ -50,6 +50,13 @@
 	import ShareConversationModal from "../ShareConversationModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import UploadedFile from "./UploadedFile.svelte";
+	import {
+		MAX_VIEWS_PER_MESSAGE,
+		newTrackioViewKey,
+		trackioViewToken,
+		viewsInText,
+		type TrackioDashboardView,
+	} from "$lib/utils/trackioView";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { error } from "$lib/stores/errors";
 	import ModelSwitch from "./ModelSwitch.svelte";
@@ -114,6 +121,7 @@
 		models: Model[];
 		preprompt?: string | undefined;
 		files?: File[];
+		dashboardViews?: TrackioDashboardView[];
 		onmessage?: (content: string) => void;
 		onstop?: () => void;
 		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
@@ -132,6 +140,7 @@
 		models,
 		preprompt = undefined,
 		files = $bindable([]),
+		dashboardViews = $bindable([]),
 		draft = $bindable(""),
 		onmessage,
 		onstop,
@@ -300,18 +309,21 @@
 		if (requireAuthUser() || loading) return false;
 		tap();
 		chatScroll.notifySend();
-		// Queued attachments belong to the user's next message, not to this
+		// Queued attachments (and dashboard views) belong to the user's next message, not to this
 		// machine-composed one. The send handler snapshots the bound `files`
 		// synchronously before its first await, so emptying around the call is
 		// enough to keep them out of the request — and it skips clearing them
 		// post-send when it consumed none (see writeMessage), so the restored
 		// queue survives.
 		const queuedFiles = files;
+		const queuedViews = dashboardViews;
 		files = [];
+		dashboardViews = [];
 		try {
 			onmessage?.(text);
 		} finally {
 			files = queuedFiles;
+			dashboardViews = queuedViews;
 		}
 		return true;
 	}
@@ -435,15 +447,16 @@
 		});
 	});
 
-	// Conversation switch also resets the artifact panel. This used to
+	// Conversation switch swaps the side pane to the destination's own state.
+	// This used to
 	// piggyback on a first-message-id heuristic that misfired when the first
 	// message was edited; the route param is the real signal.
 	let prevConversationKey = page.params?.id;
 	$effect(() => {
 		const key = page.params?.id;
 		if (key !== prevConversationKey) {
+			sidePane.switchConversation(prevConversationKey, key);
 			prevConversationKey = key;
-			sidePane.reset();
 		}
 	});
 
@@ -538,6 +551,13 @@
 	);
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
+	let composerForm = $state<HTMLFormElement>();
+	// Until the composer has had focus, its selection says nothing about where
+	// the user wants a chip, so one goes at the end of the draft instead.
+	let composerUsed = false;
+	$effect(() => {
+		if (focused) composerUsed = true;
+	});
 
 	// --- ML Assistant mode (build flag, see $lib/utils/mlAssistantFlag) --------
 
@@ -749,8 +769,53 @@
 			const currentDraft = untrack(() => draft);
 			draft = currentDraft.trim() ? `${currentDraft}\n\n${pending.text}` : pending.text;
 		}
+		for (const view of pending.dashboardViews ?? []) insertViewToken(view);
 		pendingComposerPayload.set(undefined);
 	});
+
+	// Every view this composer has held stays known, so undoing a deleted chip
+	// brings its view back.
+	const knownViews = new Map<string, TrackioDashboardView>();
+	$effect(() => {
+		const text = draft;
+		untrack(() => {
+			for (const view of dashboardViews) knownViews.set(trackioViewToken(view), view);
+			const next = viewsInText(text, knownViews.values());
+			const same =
+				next.length === dashboardViews.length && next.every((v, i) => v === dashboardViews[i]);
+			if (!same) dashboardViews = next;
+		});
+	});
+
+	// Through the editing stack where it can, so the insert is one Cmd+Z away.
+	function insertViewToken(view: TrackioDashboardView) {
+		if (untrack(() => dashboardViews).length >= MAX_VIEWS_PER_MESSAGE) {
+			$error = `A message can carry at most ${MAX_VIEWS_PER_MESSAGE} dashboard views.`;
+			return;
+		}
+		const keyed = { ...view, key: newTrackioViewKey() };
+		const token = trackioViewToken(keyed);
+		knownViews.set(token, keyed);
+		const textarea = composerForm?.querySelector("textarea");
+		const current = untrack(() => draft);
+		const start = textarea && composerUsed ? textarea.selectionStart : current.length;
+		const end = textarea && composerUsed ? textarea.selectionEnd : current.length;
+		const before = current.slice(0, start);
+		const after = current.slice(end);
+		const insert = `${before && !/\s$/.test(before) ? " " : ""}${token}${/^\s/.test(after) ? "" : " "}`;
+		const caret = start + insert.length;
+		if (textarea && !isVirtualKeyboard()) {
+			textarea.focus({ preventScroll: true });
+			textarea.setSelectionRange(start, end);
+			if (document.execCommand("insertText", false, insert)) return;
+		}
+		draft = before + insert + after;
+		void tick().then(() => {
+			if (!textarea || isVirtualKeyboard()) return;
+			textarea.focus({ preventScroll: true });
+			textarea.setSelectionRange(caret, caret);
+		});
+	}
 
 	function triggerPrompt(prompt: string) {
 		if (requireAuthUser() || loading) return;
@@ -1136,6 +1201,7 @@
 					{/if}
 				</div>
 				<form
+					bind:this={composerForm}
 					tabindex="-1"
 					aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
 					onsubmit={(e) => {
@@ -1145,8 +1211,8 @@
 					class={{
 						"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
 						"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
-						"border-[#e2ddd6] dark:border-[#2c2c2c]": mlModeOn && (mlStripVisible || mlPillVisible),
-						"dark:border-gray-700": !(mlModeOn && (mlStripVisible || mlPillVisible)),
+						"border-[#efc9ad] dark:border-[#5a3a22]": mlModeOn,
+						"dark:border-gray-700": !mlModeOn,
 						"opacity-30": isReadOnly,
 						"max-sm:mb-4": focused && isVirtualKeyboard(),
 					}}

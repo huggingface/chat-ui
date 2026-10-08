@@ -59,7 +59,9 @@ class TrackioStatusStore {
 				const response = await fetch(
 					`${base}/api/v2/trackio/status?space=${encodeURIComponent(spaceId)}`
 				);
-				if (response.ok) {
+				if (!response.ok) {
+					this.#byUrl = { ...this.#byUrl, [url]: "unknown" };
+				} else {
 					const { json } = (await response.json()) as { json: { status: TrackioSpaceStatus } };
 					this.#byUrl = { ...this.#byUrl, [url]: json.status };
 					// Live and failed are terminal: nothing more to learn by asking.

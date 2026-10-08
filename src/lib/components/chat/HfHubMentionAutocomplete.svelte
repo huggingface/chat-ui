@@ -23,6 +23,11 @@
 		dataset: "Datasets",
 		space: "Spaces",
 	};
+	const headerTint: Record<HfHubResourceType, string> = {
+		model: "from-blue-50 text-blue-800 dark:from-blue-900",
+		dataset: "from-red-50 text-red-800 dark:from-red-900",
+		space: "from-orange-50 text-orange-800 dark:from-orange-900",
+	};
 	/**
 	 * Group once, carrying each option's flat index with it. The template used to
 	 * filter three times and recover the index with `indexOf` per row — O(n²) on
@@ -72,7 +77,7 @@
 		id="hf-hub-mention-listbox"
 		role="listbox"
 		aria-label="Hugging Face Hub suggestions"
-		class="pointer-events-auto scrollbar-custom max-h-64 w-72 max-w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 text-[13px] shadow-lg dark:border-gray-700 dark:bg-gray-900"
+		class="pointer-events-auto scrollbar-custom max-h-64 w-72 max-w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-gray-200 bg-white pb-1 text-[13px] shadow-lg dark:border-gray-700 dark:bg-gray-900"
 	>
 		{#if status === "loading"}
 			<p class="px-2.5 py-1.5 text-gray-400 dark:text-gray-500">Searching…</p>
@@ -83,11 +88,14 @@
 		{:else}
 			{#each groups as group (group.type)}
 				<!-- Kept per review: the type is what disambiguates two repos that share
-				     a name. Quiet enough to read as a divider rather than a row. -->
+				     a name. -->
 				<div role="group" aria-label={labels[group.type]}>
 					<div
 						data-resource-header={group.type}
-						class="px-2.5 pt-2 pb-1 text-[10px] font-medium tracking-wide text-gray-400 uppercase dark:text-gray-500"
+						class={[
+							"flex h-7 items-center bg-linear-to-r to-white px-2.5 font-semibold dark:to-gray-900 dark:text-gray-300",
+							headerTint[group.type],
+						]}
 					>
 						{labels[group.type]}
 					</div>
@@ -106,7 +114,14 @@
 									: "hover:bg-gray-50 dark:hover:bg-gray-800/60",
 							]}
 							onpointerdown={(event) => event.preventDefault()}
-							onmouseenter={() => onactivechange(option.index)}
+							onpointermove={(event) => {
+								// Only a pointer that moved. The panel opens upward from the caret,
+								// often right under a resting mouse, and the browser reports that
+								// as a hover with no movement; it would grab the bottom row.
+								if ((event.movementX || event.movementY) && option.index !== activeIndex) {
+									onactivechange(option.index);
+								}
+							}}
 							onclick={() => onselect(option.result)}
 						>
 							<!-- Only Spaces carry a mark, and only their own emoji: a generic

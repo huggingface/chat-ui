@@ -134,12 +134,16 @@ describe("a question from the assistant", () => {
 	// Rendered one per test: two mounts share a document, so the helpers would find the
 	// first panel's controls.
 	it("keeps a single-pick question to one answer", async () => {
-		const { baseElement } = mount([ask("q1", "Which database?")]);
+		const { baseElement } = mount([ask("q1", "Which database?"), ask("q2", "Which host?")]);
 		rowFor(baseElement, "Postgres")?.click();
+		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which host?"));
+		button(baseElement, "Back")?.click();
+		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which database?"));
 		rowFor(baseElement, "Mongo")?.click();
-		button(baseElement, "Send")?.click();
+		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which host?"));
+		rowFor(baseElement, "Mongo")?.click();
 		await vi.waitFor(() => expect(sent).toHaveLength(1));
-		expect(sent[0]).toMatchObject({ content: { q1: "Mongo" } });
+		expect(sent[0]).toMatchObject({ content: { q1: "Mongo", q2: "Mongo" } });
 	});
 
 	it("keeps every pick when the question allows more than one", async () => {
@@ -171,8 +175,16 @@ describe("a question from the assistant", () => {
 		await vi.waitFor(() => expect(baseElement.textContent).toContain("Which host?"));
 	});
 
-	it("never sends on its own, however the last question is answered", async () => {
+	it("sends on the click that answers the last single-pick question", async () => {
 		const { baseElement } = mount([ask("q1", "Which database?")]);
+		rowFor(baseElement, "Postgres")?.click();
+
+		await vi.waitFor(() => expect(sent).toHaveLength(1));
+		expect(sent[0]).toMatchObject({ action: "accept", content: { q1: "Postgres" } });
+	});
+
+	it("waits for Send when the last question takes more than one answer", async () => {
+		const { baseElement } = mount([ask("q1", "Which databases?", { multiple: true })]);
 		rowFor(baseElement, "Postgres")?.click();
 
 		await new Promise((resolve) => setTimeout(resolve, 50));

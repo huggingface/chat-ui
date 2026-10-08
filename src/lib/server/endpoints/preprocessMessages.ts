@@ -2,6 +2,8 @@ import type { Message } from "$lib/types/Message";
 import type { EndpointMessage } from "./endpoints";
 import { downloadFile } from "../files/downloadFile";
 import type { ObjectId } from "mongodb";
+import { withTrackioViewContext } from "$lib/utils/trackioView";
+import { plainMentions } from "$lib/utils/mentionTokens";
 
 export async function preprocessMessages(
 	messages: Message[],
@@ -9,6 +11,7 @@ export async function preprocessMessages(
 ): Promise<EndpointMessage[]> {
 	return Promise.resolve(messages)
 		.then((msgs) => downloadFiles(msgs, convId))
+		.then(injectTrackioViews)
 		.then(stripEmptyInitialSystemMessage);
 }
 
@@ -25,6 +28,17 @@ async function downloadFiles(messages: Message[], convId: ObjectId): Promise<End
 			).then((files) => ({ ...message, files }))
 		)
 	);
+}
+
+function injectTrackioViews(messages: EndpointMessage[]): EndpointMessage[] {
+	return messages.map((message) => {
+		if (message.from !== "user") return message;
+		const content = withTrackioViewContext(
+			plainMentions(message.content),
+			message.dashboardViews ?? []
+		);
+		return content === message.content ? message : { ...message, content };
+	});
 }
 
 /**
