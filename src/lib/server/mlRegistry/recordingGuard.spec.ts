@@ -556,6 +556,25 @@ describe.sequential("mlRegistry recording guard: reserved repo conflicts", () =>
 		expect(verdict.note).toContain('create_repo("testuser/minilm")');
 	});
 
+	it("names every unsafe call on one repo, and the repo once", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+		await dispatch("create_repo", { uri: "hf://models/testuser/minilm" }, ok(MODEL_REPO_REPLY));
+
+		const verdict = await dispatch(
+			"hf_jobs",
+			submit(stScript('create_repo("testuser/minilm")\nmodel.push_to_hub("testuser/minilm")')),
+			ok(JOB_REPLY)
+		);
+
+		if (!verdict.allow) throw new Error("refused");
+		expect(verdict.note).toContain(
+			'create_repo("testuser/minilm") and SentenceTransformer.push_to_hub("testuser/minilm")'
+		);
+		expect(verdict.note).toContain("already created that repo, so each call raises");
+		expect(verdict.note).toContain("on those calls");
+	});
+
 	it("stays quiet when the script tolerates the repo, or the repo is not one the conversation knows", async () => {
 		const conversationId = newConversationId();
 		const { dispatch } = makeGuard(conversationId);

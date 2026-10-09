@@ -212,7 +212,7 @@ export function unguardedCreatesIn(sources: readonly string[]): UnguardedCreate[
 	const source = codeOnly(sources.join("\n"));
 	const constants = literalConstants(source);
 	const sentenceTransformers = SENTENCE_TRANSFORMERS_IMPORT.test(source);
-	const byUri = new Map<string, UnguardedCreate>();
+	const byCall = new Map<string, UnguardedCreate>();
 	for (const match of source.matchAll(PUSH_CALL)) {
 		const [, receiver, name] = match;
 		if (name !== "create_repo" && name !== "push_to_hub") continue;
@@ -230,9 +230,10 @@ export function unguardedCreatesIn(sources: readonly string[]): UnguardedCreate[
 		const candidate = fromCall(name, receiver, args, constants);
 		if (!candidate || !REPO_ID.test(candidate.id) || TRACKIO.test(candidate.id)) continue;
 		const uri = `hf://${candidate.kind}s/${candidate.id}`;
-		if (!byUri.has(uri)) byUri.set(uri, { uri, repo: candidate.id, call: name });
+		const key = `${name} ${uri}`;
+		if (!byCall.has(key)) byCall.set(key, { uri, repo: candidate.id, call: name });
 	}
-	return [...byUri.values()];
+	return [...byCall.values()];
 }
 
 const stringValues = (value: unknown): string[] =>

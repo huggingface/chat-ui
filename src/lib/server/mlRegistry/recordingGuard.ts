@@ -104,8 +104,9 @@ function repoConflictNote(creates: UnguardedCreate[]): string {
 				: `create_repo("${repo}")`
 		)
 		.join(" and ");
-	const one = creates.length === 1;
-	return `Warning: this job is set to lose what it trains at the push. The script calls ${calls} without exist_ok=True, and this conversation already created ${one ? "that repo" : "those repos"}, so the call raises 409 Conflict when it runs, after training, and nothing on the container's disk survives the job. Cancel it and resubmit with exist_ok=True on ${one ? "that call" : "those calls"}, or save_pretrained to a directory and upload_folder it.`;
+	const oneRepo = new Set(creates.map(({ uri }) => uri)).size === 1;
+	const oneCall = creates.length === 1;
+	return `Warning: this job is set to lose what it trains at the push. The script calls ${calls} without exist_ok=True, and this conversation already created ${oneRepo ? "that repo" : "those repos"}, so ${oneCall ? "the call raises" : "each call raises"} 409 Conflict when it runs, after training, and nothing on the container's disk survives the job. Cancel it and resubmit with exist_ok=True on ${oneCall ? "that call" : "those calls"}, or save_pretrained to a directory and upload_folder it.`;
 }
 
 export function createMlRecordingGuard({

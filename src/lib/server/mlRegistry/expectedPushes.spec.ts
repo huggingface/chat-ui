@@ -287,6 +287,22 @@ describe("unguardedCreatesIn", () => {
 		).toEqual([]);
 	});
 
+	it("keeps both calls when a script creates and pushes the same repo", () => {
+		expect(
+			unguardedCreatesIn(
+				script(
+					"from sentence_transformers import SentenceTransformer",
+					'create_repo("pngwn/a")',
+					'model.push_to_hub("pngwn/a")',
+					'create_repo("pngwn/a", private=True)'
+				)
+			)
+		).toEqual([
+			{ uri: "hf://models/pngwn/a", repo: "pngwn/a", call: "create_repo" },
+			{ uri: "hf://models/pngwn/a", repo: "pngwn/a", call: "push_to_hub" },
+		]);
+	});
+
 	it("ignores comments, docstrings, trackio and ids built at runtime", () => {
 		expect(
 			unguardedCreatesIn(
