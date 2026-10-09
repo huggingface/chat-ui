@@ -35,6 +35,7 @@ describe("ML Assistant preprompt", () => {
 	it("keeps every section that carries a rule", () => {
 		for (const heading of [
 			"# Your knowledge of the HF libraries is outdated",
+			"# Find out what it is for before you decide how to build it",
 			"# Reproducing or implementing a paper",
 			"# Mistakes you WILL make without checking",
 			"# Before you propose a training or evaluation run",
@@ -61,6 +62,7 @@ describe("ML Assistant preprompt", () => {
 			"NEVER COMPILE FLASH-ATTENTION",
 			"PERMISSION ERRORS ARE NOT RETRIES",
 			"SCOPE-CHANGING FIXES",
+			"PROXY SUCCESS",
 		]) {
 			expect(ML_ASSISTANT_PREPROMPT).toContain(mode);
 		}
@@ -90,7 +92,18 @@ describe("ML Assistant preprompt", () => {
 			attachmentBudget: false,
 		});
 		expect(off).not.toContain("reaches you only as a slice");
-		expect(off).toContain("assuming the card was accurate.\n\n# When you write ML code");
+		expect(off).toContain("not a detail to work around.\n\n# When you write ML code");
+	});
+
+	it("settles what the result is for before any technical choice", () => {
+		expect(ML_ASSISTANT_PREPROMPT.indexOf("# Find out what it is for")).toBeLessThan(
+			ML_ASSISTANT_PREPROMPT.indexOf("# Before you propose a training or evaluation run")
+		);
+		expect(ML_ASSISTANT_PREPROMPT).toContain(
+			"A requirement the user has not stated is a real choice even when the request has only one obvious reading"
+		);
+		expect(ML_ASSISTANT_PREPROMPT).toContain("the input length it trains and evaluates at");
+		expect(ML_ASSISTANT_PREPROMPT).toContain("Then check it against the use, not only the method.");
 	});
 });
 
@@ -476,6 +489,10 @@ describe("ML Assistant system message size", () => {
 		//
 		// 35k to 35,500 for the sandbox lifecycle, argued by idle sandboxes billing until their
 		// timeout, it landed at 35,364
+		//
+		// 36k to 39k for establishing what the result is for, argued by finished classifiers that
+		// passed their eval and failed in use because they trained on truncated inputs nobody asked
+		// for, hours of compute each, it landed at 38,332
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -500,7 +517,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(36_000);
+		expect(composed.length).toBeLessThan(39_000);
 	});
 });
 
