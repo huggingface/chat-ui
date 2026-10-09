@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { tick, untrack } from "svelte";
 	import { SvelteMap, SvelteSet } from "svelte/reactivity";
+	import { base } from "$app/paths";
 	import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 	import type {
 		MlRegistryAgentRun,
 		MlRegistryArtefact,
+		MlRegistryImage,
 		MlRegistryService,
 		MlRegistrySource,
 	} from "$lib/types/MlRegistry";
@@ -44,6 +46,7 @@
 		type ServiceRow,
 		type StageBadge,
 	} from "$lib/utils/mlRegistry";
+	import Modal from "../Modal.svelte";
 	import MlFileVersionView from "./MlFileVersionView.svelte";
 	import SidePane from "./SidePane.svelte";
 
@@ -113,6 +116,16 @@
 	let sources = $derived(mlRegistry.sources);
 	let sourceGroups = $derived(groupSources(sources));
 	let readByRun = $derived(sourcesByReader(sources));
+	let images = $derived(mlRegistry.images);
+	let shownImage = $state<MlRegistryImage | undefined>(undefined);
+
+	const imageUrl = (image: MlRegistryImage) =>
+		`${base}/conversation/${mlRegistry.conversationId}/output/${image.sha}`;
+	const imageName = (image: MlRegistryImage) => image.source?.split("/").at(-1) || image.tool;
+	const imageTitle = (image: MlRegistryImage) =>
+		[image.source ?? image.tool, image.count > 1 ? `returned ${image.count} times` : ""]
+			.filter(Boolean)
+			.join(", ");
 
 	const openFiles = new SvelteSet<string>();
 	const shownVersions = new SvelteMap<string, number>();
@@ -192,6 +205,7 @@
 			openGroups.clear();
 			foldedRepos.clear();
 			showSettled = false;
+			shownImage = undefined;
 		});
 	});
 
@@ -622,15 +636,13 @@
 {/snippet}
 
 {#if showing}
-	<SidePane label="Services and artifacts">
+	<SidePane label="Resources">
 		<!-- container query, the pane is resizable and at phone width the title and controls take the row -->
 		<header
 			class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
 		>
 			<div class="flex min-w-0 flex-1 items-baseline gap-2">
-				<h2 class="flex-none text-sm font-semibold text-gray-800 dark:text-gray-200">
-					Services and artifacts
-				</h2>
+				<h2 class="flex-none text-sm font-semibold text-gray-800 dark:text-gray-200">Resources</h2>
 				{#if openCount + liveRunCount > 0}
 					<span
 						class="hidden truncate text-xs text-[#78716c] @min-[400px]:inline dark:text-[#a8a29e]"
@@ -1043,6 +1055,50 @@
 					{/if}
 				</section>
 
+				<section aria-labelledby="ml-registry-images">
+					<h3 id="ml-registry-images" class="ml-registry-heading">
+						Images
+						{#if images.length}
+							<span class="ml-registry-count">{images.length}</span>
+						{/if}
+					</h3>
+					{#if images.length === 0}
+						<p class="ml-registry-empty">
+							No images yet. Plots, samples and sheets the intern opens appear here.
+						</p>
+					{:else}
+						<ul
+							class="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-x-2 gap-y-3 px-4 pt-1 pb-4"
+						>
+							{#each images as image (image.sha)}
+								{@const name = imageName(image)}
+								<li class="min-w-0">
+									<button
+										type="button"
+										class="ml-image flex w-full flex-col gap-1 text-left"
+										title={imageTitle(image)}
+										onclick={() => (shownImage = image)}
+									>
+										<img
+											src={imageUrl(image)}
+											alt={name}
+											loading="lazy"
+											decoding="async"
+											class="aspect-square w-full rounded-md border border-[#ececea] bg-[#fafaf9] object-cover dark:border-[#262626] dark:bg-[#1c1917]"
+										/>
+										<span class="flex min-w-0 items-baseline gap-1 text-xs">
+											<span class="ml-image-name truncate"><bdi>{name}</bdi></span>
+											{#if image.count > 1}
+												<span class="ml-registry-count flex-none">×{image.count}</span>
+											{/if}
+										</span>
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</section>
+
 				<section aria-labelledby="ml-registry-sources">
 					<h3 id="ml-registry-sources">
 						<button
@@ -1138,6 +1194,17 @@
 	</SidePane>
 {/if}
 
+{#if showing && shownImage}
+	<Modal width="xl:max-w-[75dvw]" onclose={() => (shownImage = undefined)}>
+		<figure class="flex flex-col">
+			<img src={imageUrl(shownImage)} alt={imageName(shownImage)} class="aspect-auto" />
+			<figcaption class="truncate px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
+				{shownImage.source ?? shownImage.tool}
+			</figcaption>
+		</figure>
+	</Modal>
+{/if}
+
 <style>
 	/* the strip language, a neutral surface with orange as ink */
 	.ml-registry-heading {
@@ -1194,6 +1261,21 @@
 	:global(.dark) section + section,
 	:global(.dark) .ml-registry-list + .ml-settled {
 		border-top-color: #262626;
+	}
+
+	.ml-image img {
+		transition: border-color 120ms ease;
+	}
+
+	/* generated names differ at the end so the start is cut */
+	.ml-image-name {
+		direction: rtl;
+		text-align: left;
+	}
+
+	.ml-image:hover img,
+	.ml-image:focus-visible img {
+		border-color: #e8622a;
 	}
 
 	.ml-registry-link {

@@ -10,6 +10,7 @@ import type {
 	MlAgentRunDetail,
 	MlRegistryAgentRun,
 	MlRegistryArtefact,
+	MlRegistryImage,
 	MlRegistryPayload,
 	MlRegistryService,
 	MlRegistrySource,
@@ -51,6 +52,7 @@ export class MlRegistryStore {
 	artefacts = $state<MlRegistryArtefact[]>([]);
 	files = $state<MlFileListing[]>([]);
 	sources = $state<MlRegistrySource[]>([]);
+	images = $state<MlRegistryImage[]>([]);
 	/** the server clock on the last payload, effects reseed from it */
 	serverNow = $state<number | undefined>(undefined);
 	/** whether a payload has arrived for the current conversation */
@@ -96,7 +98,8 @@ export class MlRegistryStore {
 				this.agentRuns.length +
 				this.artefacts.length +
 				this.files.length +
-				this.sources.length,
+				this.sources.length +
+				this.images.length,
 			open: this.openServices.length,
 			running: this.services.filter((service) => service.stage === "RUNNING").length,
 		};
@@ -287,6 +290,7 @@ export class MlRegistryStore {
 		this.artefacts = payload.artefacts;
 		this.files = payload.files;
 		this.sources = payload.sources ?? [];
+		this.images = payload.images ?? [];
 		this.serverNow = payload.serverNow;
 		this.loaded = true;
 		noteServerNow(payload.serverNow);
@@ -306,6 +310,7 @@ export class MlRegistryStore {
 		this.artefacts = [];
 		this.files = [];
 		this.sources = [];
+		this.images = [];
 		this.#versions.clear();
 		this.#contents.clear();
 		this.#runDetails.clear();
