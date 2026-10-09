@@ -25,6 +25,7 @@ export const settingsSchema = z
 		streamingMode: z.enum(["raw", "smooth"]).optional(),
 		directPaste: z.boolean().default(false),
 		hapticsEnabled: z.boolean().default(true),
+		compactActivity: z.boolean().default(DEFAULT_SETTINGS.compactActivity),
 		hidePromptExamples: z.record(z.boolean()).default({}),
 		billingOrganization: z.string().optional(),
 		billingResourceGroup: z

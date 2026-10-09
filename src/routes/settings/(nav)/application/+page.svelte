@@ -41,6 +41,12 @@
 	function setDirectPaste(v: boolean) {
 		settings.update((s) => ({ ...s, directPaste: v }));
 	}
+	function getCompactActivity() {
+		return $settings.compactActivity;
+	}
+	function setCompactActivity(v: boolean) {
+		settings.update((s) => ({ ...s, compactActivity: v }));
+	}
 	function getHapticsEnabled() {
 		return $settings.hapticsEnabled;
 	}
@@ -277,6 +283,19 @@
 						</p>
 					</div>
 					<Switch name="directPaste" bind:checked={getDirectPaste, setDirectPaste} />
+				</div>
+
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+							Compact tool activity
+						</div>
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
+							Group thinking and tool calls into one line per step, with short labels. Turn off to
+							see every call and the raw reasoning.
+						</p>
+					</div>
+					<Switch name="compactActivity" bind:checked={getCompactActivity, setCompactActivity} />
 				</div>
 
 				{#if supportsHaptics()}

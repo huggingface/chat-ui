@@ -23,9 +23,11 @@
 	interface Props {
 		tool: MessageToolUpdate[];
 		loading?: boolean;
+		/** Only the call's name, input and output, always shown: the row around it is the header */
+		detailsOnly?: boolean;
 	}
 
-	let { tool, loading = false }: Props = $props();
+	let { tool, loading = false, detailsOnly = false }: Props = $props();
 
 	let isOpen = $state(false);
 
@@ -135,7 +137,113 @@
 	</div>
 {/snippet}
 
-{#if toolFnName}
+{#snippet fileRefChips()}
+	{#each fileRefs as ref (formatFileRef(ref))}
+		{#if canOpenFiles}
+			<button
+				type="button"
+				class="tool-file-ref inline-flex cursor-pointer items-center gap-1 rounded-sm border border-gray-200 px-1 py-px font-mono text-xs text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600 dark:hover:text-gray-100"
+				title="Open {formatFileRef(ref)} in the files list"
+				onclick={() => sidePane.openRegistry(ref)}
+			>
+				<CarbonDocument class="size-3 shrink-0" />
+				{formatFileRef(ref)}
+			</button>
+		{:else}
+			<span
+				class="tool-file-ref inline-flex items-center gap-1 rounded-sm border border-gray-200 px-1 py-px font-mono text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400"
+			>
+				<CarbonDocument class="size-3 shrink-0" />
+				{formatFileRef(ref)}
+			</span>
+		{/if}
+	{/each}
+{/snippet}
+
+{#snippet details()}
+	{#each tool as update, i (`${update.subtype}-${i}`)}
+		{#if update.subtype === MessageToolUpdateType.Call}
+			<div class="space-y-1">
+				<div class="text-[10px] font-semibold text-gray-400 uppercase dark:text-gray-500">
+					Input
+				</div>
+				{@render copyable(
+					formatValue(redactToolArguments(callArguments(update))),
+					"bg-gray-100 dark:bg-gray-800/70"
+				)}
+			</div>
+		{:else if update.subtype === MessageToolUpdateType.Error}
+			<div class="space-y-1">
+				<div class="text-[10px] font-semibold text-amber-600 uppercase dark:text-amber-400">
+					Error
+				</div>
+				{@render copyable(
+					update.message,
+					"bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+				)}
+			</div>
+		{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Success && update.result.display}
+			<div class="space-y-1">
+				<div class="text-[10px] font-semibold text-gray-400 uppercase dark:text-gray-500">
+					Output
+				</div>
+				{#each parseToolOutputs(update.result.outputs) as parsedOutput}
+					<div class="space-y-2">
+						{#if parsedOutput.text}
+							{@render copyable(
+								parsedOutput.text,
+								"scrollbar-custom max-h-60 overflow-y-auto bg-gray-100 dark:bg-gray-800/70"
+							)}
+						{/if}
+
+						{#if parsedOutput.images.length > 0}
+							<div class="flex flex-wrap gap-2">
+								{#each parsedOutput.images as image, imageIndex}
+									<img
+										alt={`Tool result image ${imageIndex + 1}`}
+										class="max-h-60 cursor-pointer rounded-sm border border-gray-200 dark:border-gray-700"
+										src={`data:${image.mimeType};base64,${image.data}`}
+									/>
+								{/each}
+							</div>
+						{/if}
+
+						{#if parsedOutput.metadata.length > 0}
+							{@render copyable(
+								formatValue(Object.fromEntries(parsedOutput.metadata)),
+								"bg-gray-100 dark:bg-gray-800/70"
+							)}
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
+			<div class="space-y-1">
+				<div class="text-[10px] font-semibold text-amber-600 uppercase dark:text-amber-400">
+					Error
+				</div>
+				{@render copyable(
+					update.result.message,
+					"bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+				)}
+			</div>
+		{/if}
+	{/each}
+{/snippet}
+
+{#if toolFnName && detailsOnly}
+	<div class="space-y-3 text-gray-500 dark:text-gray-400">
+		<div class="flex max-w-full flex-wrap items-center gap-1.5 select-none">
+			<code
+				class="min-w-0 truncate rounded-sm bg-blue-50 px-1 py-px font-mono text-xs text-blue-700 opacity-90 dark:bg-blue-900/30 dark:text-blue-300"
+			>
+				{toolFnName}
+			</code>
+			{@render fileRefChips()}
+		</div>
+		{@render details()}
+	</div>
+{:else if toolFnName}
 	<BlockWrapper>
 		<!-- Header row -->
 		<div class="flex max-w-full flex-col items-start gap-1 select-none">
@@ -181,26 +289,7 @@
 							: 'text-gray-400'}"
 					/>
 				</button>
-				{#each fileRefs as ref (formatFileRef(ref))}
-					{#if canOpenFiles}
-						<button
-							type="button"
-							class="tool-file-ref inline-flex cursor-pointer items-center gap-1 rounded-sm border border-gray-200 px-1 py-px font-mono text-xs text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600 dark:hover:text-gray-100"
-							title="Open {formatFileRef(ref)} in the files list"
-							onclick={() => sidePane.openRegistry(ref)}
-						>
-							<CarbonDocument class="size-3 shrink-0" />
-							{formatFileRef(ref)}
-						</button>
-					{:else}
-						<span
-							class="tool-file-ref inline-flex items-center gap-1 rounded-sm border border-gray-200 px-1 py-px font-mono text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400"
-						>
-							<CarbonDocument class="size-3 shrink-0" />
-							{formatFileRef(ref)}
-						</span>
-					{/if}
-				{/each}
+				{@render fileRefChips()}
 			</div>
 			{#if isExecuting && progressLines.length}
 				<div class="flex min-w-0 flex-col gap-0.5">
@@ -215,74 +304,7 @@
 		<!-- Expandable content -->
 		{#if isOpen}
 			<div class="mt-2 mb-4 space-y-3 text-gray-500 dark:text-gray-400">
-				{#each tool as update, i (`${update.subtype}-${i}`)}
-					{#if update.subtype === MessageToolUpdateType.Call}
-						<div class="space-y-1">
-							<div class="text-[10px] font-semibold text-gray-400 uppercase dark:text-gray-500">
-								Input
-							</div>
-							{@render copyable(
-								formatValue(redactToolArguments(callArguments(update))),
-								"bg-gray-100 dark:bg-gray-800/70"
-							)}
-						</div>
-					{:else if update.subtype === MessageToolUpdateType.Error}
-						<div class="space-y-1">
-							<div class="text-[10px] font-semibold text-amber-600 uppercase dark:text-amber-400">
-								Error
-							</div>
-							{@render copyable(
-								update.message,
-								"bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
-							)}
-						</div>
-					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Success && update.result.display}
-						<div class="space-y-1">
-							<div class="text-[10px] font-semibold text-gray-400 uppercase dark:text-gray-500">
-								Output
-							</div>
-							{#each parseToolOutputs(update.result.outputs) as parsedOutput}
-								<div class="space-y-2">
-									{#if parsedOutput.text}
-										{@render copyable(
-											parsedOutput.text,
-											"scrollbar-custom max-h-60 overflow-y-auto bg-gray-100 dark:bg-gray-800/70"
-										)}
-									{/if}
-
-									{#if parsedOutput.images.length > 0}
-										<div class="flex flex-wrap gap-2">
-											{#each parsedOutput.images as image, imageIndex}
-												<img
-													alt={`Tool result image ${imageIndex + 1}`}
-													class="max-h-60 cursor-pointer rounded-sm border border-gray-200 dark:border-gray-700"
-													src={`data:${image.mimeType};base64,${image.data}`}
-												/>
-											{/each}
-										</div>
-									{/if}
-
-									{#if parsedOutput.metadata.length > 0}
-										{@render copyable(
-											formatValue(Object.fromEntries(parsedOutput.metadata)),
-											"bg-gray-100 dark:bg-gray-800/70"
-										)}
-									{/if}
-								</div>
-							{/each}
-						</div>
-					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
-						<div class="space-y-1">
-							<div class="text-[10px] font-semibold text-amber-600 uppercase dark:text-amber-400">
-								Error
-							</div>
-							{@render copyable(
-								update.result.message,
-								"bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
-							)}
-						</div>
-					{/if}
-				{/each}
+				{@render details()}
 			</div>
 		{/if}
 	</BlockWrapper>

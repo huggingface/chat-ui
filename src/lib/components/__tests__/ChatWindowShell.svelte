@@ -32,6 +32,7 @@
 		streamingMode: "raw",
 		directPaste: false,
 		hapticsEnabled: false,
+		compactActivity: true,
 	});
 	createConversationsStore();
 </script>

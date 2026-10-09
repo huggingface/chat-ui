@@ -7,6 +7,7 @@ import { onExit } from "$lib/server/exitHandler";
 import { models } from "$lib/server/models";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree";
 import { textGeneration } from "$lib/server/textGeneration";
+import { activityFor } from "$lib/server/textGeneration/activityLabels";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
 import { stampMlHarness } from "$lib/server/mlAssistantHarness";
@@ -442,6 +443,7 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 			abortController,
 			generationId,
 			messageId: message.id,
+			activity: activityFor(settings),
 		};
 
 		for await (const event of textGeneration(ctx)) apply(event);

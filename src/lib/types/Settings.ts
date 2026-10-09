@@ -85,6 +85,12 @@ export interface Settings extends Timestamps {
 	hapticsEnabled: boolean;
 
 	/**
+	 * Group thinking and tool calls into one line per step, with short labels.
+	 * Off shows every call and the raw reasoning, as before.
+	 */
+	compactActivity?: boolean;
+
+	/**
 	 * Organization to bill inference requests, and the Jobs and sandboxes ML Intern
 	 * launches, to (HuggingChat only). Nothing else on the Hub follows it: Spaces,
 	 * repositories and Endpoints bill their own owner. Stores the org's
@@ -117,4 +123,5 @@ export const DEFAULT_SETTINGS = {
 	streamingMode: "smooth",
 	directPaste: false,
 	hapticsEnabled: true,
+	compactActivity: true,
 } satisfies SettingsEditable;

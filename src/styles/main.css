@@ -296,9 +296,9 @@ body {
 .dark .router-shimmer {
 	background-image: linear-gradient(
 		90deg,
-		rgba(255, 255, 255, 0.15) 0%,
-		rgba(255, 255, 255, 0.7) 50%,
-		rgba(255, 255, 255, 0.15) 100%
+		rgba(255, 255, 255, 0.45) 0%,
+		rgba(255, 255, 255, 0.85) 50%,
+		rgba(255, 255, 255, 0.45) 100%
 	);
 }
 
@@ -308,5 +308,41 @@ body {
 	}
 	100% {
 		background-position: -200% 0;
+	}
+}
+
+/* A new live activity label fades in where the previous one was (compact activity view). */
+@keyframes activity-label-in {
+	from {
+		opacity: 0;
+		transform: translateY(2px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.activity-label-in {
+	animation: activity-label-in 0.3s ease-out both;
+}
+
+.router-shimmer.activity-label-in {
+	animation:
+		router-shimmer 2.8s linear infinite,
+		activity-label-in 0.3s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.activity-label-in,
+	.router-shimmer.activity-label-in {
+		animation: none;
+	}
+
+	/* without the moving gradient the clipped text would sit on its dimmest stop */
+	.router-shimmer.activity-label-in {
+		background: none;
+		color: inherit;
+		-webkit-text-fill-color: currentColor;
 	}
 }

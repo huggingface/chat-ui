@@ -31,4 +31,9 @@ export interface TextGenerationContext {
 	generationId?: string;
 	/** The assistant message this run writes into; a durable prompt resumes against it. */
 	messageId?: string;
+	/**
+	 * Set when the user has the compact activity view: stamp how long each round reasons, and write
+	 * live status lines with the task model when `labels` is on
+	 */
+	activity?: { labels: boolean };
 }

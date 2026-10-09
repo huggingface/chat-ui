@@ -79,3 +79,58 @@ it("keeps a question, a plan card and a harness event where the legacy form had 
 		"text",
 	]);
 });
+
+describe("tool rounds on blocks", () => {
+	const rounds = (message: Parameters<typeof messageBlocks>[0]) =>
+		messageBlocks(message)
+			.filter((block) => block.type === "think" || block.type === "tool")
+			.map((block) => [block.type, block.round]);
+
+	it.each(Object.entries(convertingTurns()))(
+		"%s: the same in its stored shape",
+		(_name, legacy) => {
+			expect(rounds(messageForStorage(legacy))).toEqual(rounds(legacy));
+		}
+	);
+
+	it("gives reasoning the round of the calls that follow it while a turn streams", () => {
+		const stream = (token: string) => ({ type: MessageUpdateType.Stream, token }) as const;
+		const call = (uuid: string) =>
+			({
+				type: MessageUpdateType.Tool,
+				subtype: "call",
+				uuid,
+				call: { name: "web_search_exa", parameters: {} },
+			}) as never;
+		const result = (uuid: string) =>
+			({
+				type: MessageUpdateType.Tool,
+				subtype: "result",
+				uuid,
+				result: {
+					status: "success",
+					call: { name: "web_search_exa", parameters: {} },
+					outputs: [],
+				},
+			}) as never;
+		const updates = [
+			stream("<think>Search both boards</think>"),
+			call("a"),
+			call("b"),
+			result("a"),
+			result("b"),
+			stream("<think>Now the model cards</think>Checking the cards."),
+			call("c"),
+			result("c"),
+			stream("<think>Enough to answer</think>Here is the table."),
+		];
+		expect(rounds({ content: "", updates })).toEqual([
+			["think", 0],
+			["tool", 0],
+			["tool", 0],
+			["think", 1],
+			["tool", 1],
+			["think", 2],
+		]);
+	});
+});

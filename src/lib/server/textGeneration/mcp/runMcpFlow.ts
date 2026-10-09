@@ -99,6 +99,7 @@ import { withUpstreamRetry } from "../utils/upstreamRetry";
 import { getEnabledBuiltinTools, isNestedAgentTool, shouldSkipMcpFlow } from "../builtinTools";
 import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
 import { inferenceBillingHeaders } from "$lib/server/billing";
+import type { ActivityLabeler } from "../activityLabels";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -181,11 +182,14 @@ export async function* runMcpFlow({
 	abortSignal,
 	abortController,
 	promptedAt,
+	activity,
 }: RunMcpFlowContext & {
 	preprompt?: string;
 	abortSignal?: AbortSignal;
 	abortController?: AbortController;
 	promptedAt?: Date;
+	/** fed the reasoning and calls of each round, writes the live status lines */
+	activity?: ActivityLabeler;
 }): AsyncGenerator<MessageUpdate, McpFlowResult, undefined> {
 	// Helper to check if generation should be aborted via DB polling
 	// Also triggers the abort controller to cancel active streams/requests
@@ -898,6 +902,7 @@ export async function* runMcpFlow({
 
 			lastAssistantContent = "";
 			streamedContent = false;
+			activity?.iterationStart();
 			// Discard any whitespace-only reasoning buffered but never flushed by a
 			// non-blank delta last round — it never became part of a real trace.
 			pendingReasoningWhitespace = "";
@@ -1057,6 +1062,9 @@ export async function* runMcpFlow({
 							: typeof deltaFields?.reasoning_text === "string"
 								? deltaFields.reasoning_text
 								: "";
+
+				activity?.reasoning(deltaReasoning);
+				activity?.stream(deltaContent);
 
 				// Merge reasoning + content into a single combined token stream, mirroring
 				// the OpenAI adapter so the UI can auto-detect <think> blocks.
@@ -1286,6 +1294,8 @@ export async function* runMcpFlow({
 						: {}),
 				};
 
+				activity?.toolCalls(calls);
+
 				const exec = executeToolCalls({
 					calls,
 					mapping,
@@ -1371,6 +1381,8 @@ export async function* runMcpFlow({
 					logger.info({ loop }, "[mcp] aborting after tool execution");
 					return "aborted";
 				}
+				// every call emits a Call update, which is what the client counts rounds by
+				if (calls.length > 0) activity?.roundDone();
 				// no completion follows the last round, its events wait for the next state block
 				if (harnessEvents && lastCallUuid && toolMsgCount > 0 && loop + 1 < maxToolRounds) {
 					const pending = await pendingHarnessEvent(conv._id, lastCallUuid);

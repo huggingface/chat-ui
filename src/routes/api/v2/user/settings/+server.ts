@@ -42,6 +42,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		streamingMode,
 		directPaste: settings?.directPaste ?? DEFAULT_SETTINGS.directPaste,
 		hapticsEnabled: settings?.hapticsEnabled ?? DEFAULT_SETTINGS.hapticsEnabled,
+		compactActivity: settings?.compactActivity ?? DEFAULT_SETTINGS.compactActivity,
 		hidePromptExamples: settings?.hidePromptExamples ?? DEFAULT_SETTINGS.hidePromptExamples,
 		shareConversationsWithModelAuthors:
 			settings?.shareConversationsWithModelAuthors ??

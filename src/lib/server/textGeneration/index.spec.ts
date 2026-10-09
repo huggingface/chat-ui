@@ -13,10 +13,12 @@ import { AttachmentOverflowError } from "./utils/attachmentBudget";
 const mocks = vi.hoisted(() => ({
 	runMcpFlow: vi.fn(),
 	generate: vi.fn(),
+	createActivityLabeler: vi.fn(),
 }));
 
 vi.mock("./mcp/runMcpFlow", () => ({ runMcpFlow: mocks.runMcpFlow }));
 vi.mock("./generate", () => ({ generate: mocks.generate }));
+vi.mock("./activityLabels", () => ({ createActivityLabeler: mocks.createActivityLabeler }));
 // eslint-disable-next-line require-yield
 async function* noUpdates() {
 	return undefined;
@@ -76,6 +78,7 @@ async function collect(ctx: TextGenerationContext) {
 
 beforeEach(() => {
 	mocks.runMcpFlow.mockReset();
+	mocks.createActivityLabeler.mockReset();
 	mocks.generate.mockReset();
 	mocks.generate.mockImplementation(noUpdates);
 });
@@ -161,5 +164,92 @@ describe("textGeneration MCP fallback", () => {
 		await collect(ctx);
 
 		expect(mocks.generate).not.toHaveBeenCalled();
+	});
+});
+
+describe("activity labels", () => {
+	const label: MessageUpdate = {
+		type: MessageUpdateType.ActivityLabel,
+		round: 0,
+		phase: "tools",
+		text: "Searching the web",
+	};
+
+	it("feeds the tool flow a labeler, streams its labels and finishes it after the turn", async () => {
+		let closed = false;
+		mocks.createActivityLabeler.mockImplementation(() => ({
+			async *updates() {
+				yield label;
+			},
+			close() {
+				closed = true;
+			},
+			async finish() {
+				closed = true;
+			},
+		}));
+		mocks.runMcpFlow.mockImplementation(mcpFlow({ updates: [TOOL_UPDATE] }));
+
+		const updates = await collect({
+			...makeContext(),
+			activity: { labels: true },
+			messages: [{ from: "user", content: "Cherche les modèles" }],
+		} as unknown as TextGenerationContext);
+
+		expect(updates).toContainEqual(label);
+		expect(mocks.runMcpFlow.mock.calls[0][0].activity).toBeDefined();
+		expect(mocks.createActivityLabeler.mock.calls[0][0]).toMatchObject({
+			userText: "Cherche les modèles",
+			labels: true,
+		});
+		expect(closed).toBe(true);
+	});
+
+	it("starts counting rounds after the ones a resumed message already holds", async () => {
+		mocks.createActivityLabeler.mockImplementation(() => ({
+			// eslint-disable-next-line require-yield
+			async *updates() {
+				return undefined;
+			},
+			close() {},
+			async finish() {},
+		}));
+		mocks.runMcpFlow.mockImplementation(mcpFlow({ updates: [TOOL_UPDATE] }));
+		const result = (uuid: string): MessageUpdate =>
+			({
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid,
+				result: { status: "success", call: { name: "hf_fs", parameters: {} }, outputs: [] },
+			}) as never;
+		const ctx = makeContext();
+		const parked = {
+			id: "m1",
+			from: "assistant",
+			content: "",
+			updates: [
+				{ ...TOOL_UPDATE, uuid: "a" },
+				result("a"),
+				{ ...TOOL_UPDATE, uuid: "b" },
+				result("b"),
+			],
+		};
+		await collect({
+			...ctx,
+			conv: { ...ctx.conv, messages: [parked] },
+			messageId: "m1",
+			activity: { labels: true },
+		} as unknown as TextGenerationContext);
+
+		expect(mocks.createActivityLabeler.mock.calls[0][0].startRound).toBe(2);
+	});
+
+	it("writes no labels for a turn that has them off", async () => {
+		mocks.runMcpFlow.mockImplementation(mcpFlow({ updates: [TOOL_UPDATE] }));
+
+		await collect(makeContext());
+
+		expect(mocks.createActivityLabeler).not.toHaveBeenCalled();
+		expect(mocks.runMcpFlow.mock.calls[0][0].activity).toBeUndefined();
 	});
 });

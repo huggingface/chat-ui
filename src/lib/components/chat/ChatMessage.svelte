@@ -28,6 +28,8 @@
 	import TurnWaitBanner from "./TurnWaitBanner.svelte";
 	import { turnStateOf } from "$lib/utils/generationState";
 	import ToolCallsSummary from "./ToolCallsSummary.svelte";
+	import ActivityGroup from "./ActivityGroup.svelte";
+	import { activityLabels, isTrivialThinking } from "$lib/utils/activity";
 	import ArtifactCard from "./ArtifactCard.svelte";
 	import ElicitationForm from "./ElicitationForm.svelte";
 	import PlanCard from "./PlanCard.svelte";
@@ -55,6 +57,8 @@
 		alternatives?: Message["id"][];
 		editMsdgId?: Message["id"] | null;
 		isLast?: boolean;
+		/** One labeled line per run of thinking and tool calls (the user's "Compact tool activity") */
+		compactActivity?: boolean;
 		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
 		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
 	}
@@ -68,6 +72,7 @@
 		alternatives = [],
 		editMsdgId = $bindable(null),
 		isLast = false,
+		compactActivity = false,
 		onretry,
 		onshowAlternateMsg,
 	}: Props = $props();
@@ -242,6 +247,8 @@
 	// rows into the collapsed summary, or every new round visibly "re-expands"
 	// them. The nested summary takes over only once the turn is over.
 	let isProcessStreaming = $derived.by(() => {
+		// The compact view groups from the first block on, so there is nothing to regroup.
+		if (compactActivity) return false;
 		if (!isLast || !loading) return false;
 		return blocks.some(
 			(block) =>
@@ -251,6 +258,46 @@
 				block.type === "plan"
 		);
 	});
+
+	let labels = $derived(activityLabels(message.updates));
+
+	/** cards that report on the run without ending it, unlike prose or a question */
+	const quietAfterGroup = (unit: RenderUnit) =>
+		unit.kind === "plan" ||
+		unit.kind === "notice" ||
+		unit.kind === "harnessEvent" ||
+		(unit.kind === "text" && unit.content.trim().length === 0);
+
+	/** the run the turn is working on: the last one with nothing the user reads after it */
+	let activeGroupIndex = $derived.by(() => {
+		if (!compactActivity || !isLast || !loading) return -1;
+		const index = renderUnits.findLastIndex((unit) => unit.kind === "group");
+		return index !== -1 && renderUnits.slice(index + 1).every(quietAfterGroup) ? index : -1;
+	});
+
+	// A compact run animates its own label; anything else still working says so here.
+	let compactNeedsSpinner = $derived(
+		compactActivity &&
+			isLast &&
+			loading &&
+			!awaitingFirstBlock &&
+			activeGroupIndex === -1 &&
+			!trailingBlockShowsProgress
+	);
+
+	/** a finished turn that ran steps but wrote nothing for the user to read */
+	let noAnswer = $derived(
+		compactActivity &&
+			!(isLast && loading) &&
+			renderUnits.some((unit) => unit.kind === "group") &&
+			!renderUnits.some(
+				(unit) =>
+					(unit.kind === "text" && unit.content.trim().length > 0) ||
+					unit.kind === "artifact" ||
+					unit.kind === "elicitation" ||
+					unit.kind === "plan"
+			)
+	);
 
 	$effect(() => {
 		if (isCopied) {
@@ -426,6 +473,18 @@
 							</div>
 						{:else if unit.kind === "notice"}
 							{@render notice(unit.text)}
+						{:else if unit.kind === "group" && compactActivity}
+							<!-- A few words of reasoning are not worth a line once the run is over. -->
+							{#if unitIndex === activeGroupIndex || !isTrivialThinking(unit.blocks)}
+								<div data-exclude-from-copy class={processBlockClasses}>
+									<ActivityGroup
+										blocks={unit.blocks}
+										{labels}
+										active={unitIndex === activeGroupIndex}
+										loading={isLast && loading}
+									/>
+								</div>
+							{/if}
 						{:else if unit.kind === "group"}
 							<div data-exclude-from-copy class={processBlockClasses}>
 								{#if unit.blocks.length > 1}
@@ -443,6 +502,31 @@
 							</div>
 						{/if}
 					{/each}
+					{#if compactNeedsSpinner}
+						<IconLoading classNames="loading mt-1 inline first:ml-0" />
+					{/if}
+					{#if noAnswer}
+						<div
+							data-exclude-from-copy
+							class="mt-2 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400"
+						>
+							<CarbonInformation class="flex-none" />
+							<span
+								>{message.interrupted
+									? "Stopped before writing an answer."
+									: "No answer was written."}</span
+							>
+							{#if isAuthor && !readOnly && onretry}
+								<button
+									type="button"
+									class="font-medium text-gray-600 underline underline-offset-2 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100"
+									onclick={() => onretry?.({ id: message.id })}
+								>
+									Retry
+								</button>
+							{/if}
+						</div>
+					{/if}
 				{/if}
 			</div>
 

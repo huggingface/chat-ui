@@ -8,6 +8,8 @@ export async function* generateFromDefaultEndpoint({
 	generateSettings,
 	modelId,
 	locals,
+	abortSignal,
+	provider,
 }: {
 	messages: EndpointMessage[];
 	preprompt?: string;
@@ -15,12 +17,23 @@ export async function* generateFromDefaultEndpoint({
 	/** Optional: use this model instead of the default task model */
 	modelId?: string;
 	locals: App.Locals | undefined;
+	/** Ends the request early, e.g. on a timeout for a label nobody waits for */
+	abortSignal?: AbortSignal;
+	/** Inference provider for the request (e.g. "fastest" or a provider name); router default when unset */
+	provider?: string;
 }): AsyncGenerator<MessageUpdate, string, undefined> {
 	try {
 		// Choose endpoint based on provided modelId, else fall back to taskModel
 		const model = modelId ? (models.find((m) => m.id === modelId) ?? taskModel) : taskModel;
 		const endpoint = await model.getEndpoint();
-		const tokenStream = await endpoint({ messages, preprompt, generateSettings, locals });
+		const tokenStream = await endpoint({
+			messages,
+			preprompt,
+			generateSettings,
+			locals,
+			abortSignal,
+			provider,
+		});
 
 		for await (const output of tokenStream) {
 			// if not generated_text is here it means the generation is not done
