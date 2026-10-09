@@ -236,6 +236,18 @@ export async function ensureArtefact({
 	);
 }
 
+/** any row means the repo exists, whichever path recorded it */
+export async function knownArtefactUris(
+	conversationId: ObjectId,
+	uris: readonly string[]
+): Promise<Set<string>> {
+	if (uris.length === 0) return new Set();
+	const rows = await collections.mlArtefacts
+		.find({ conversationId, uri: { $in: [...uris] } }, { projection: { uri: 1 } })
+		.toArray();
+	return new Set(rows.map((row) => row.uri));
+}
+
 /** a repo a job pushed to, discovered when the registry did not know it, who made it stays */
 export async function recordPushedRepo({
 	conversationId,

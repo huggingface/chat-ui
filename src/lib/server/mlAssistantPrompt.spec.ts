@@ -344,6 +344,15 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("never an id built at runtime");
 	});
 
+	it("makes the job's own create steps tolerate the reserved repo", () => {
+		const jobs = inMode([tool("hf_jobs")]);
+
+		expect(jobs).toContain("every create in the job needs exist_ok=True");
+		expect(jobs).toContain("SentenceTransformer.push_to_hub");
+		expect(jobs).toContain("The smoke test runs the push too");
+		expect(jobs).toContain("mounted bucket volume before pushing");
+	});
+
 	it("names the dashboard through create_trackio, and verifies a metric lands", () => {
 		// init() succeeds and reports a live dashboard against a Space that 500s
 		// every write; reading a metric back is what catches it.

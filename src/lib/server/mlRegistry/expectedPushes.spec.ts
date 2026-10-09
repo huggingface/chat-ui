@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { expectedPushesIn, expectedPushesOfJob } from "./expectedPushes";
+import {
+	expectedPushesIn,
+	expectedPushesOfJob,
+	unguardedCreatesIn,
+	unguardedCreatesOfJob,
+} from "./expectedPushes";
 
 const script = (...lines: string[]) => [lines.join("\n")];
 
@@ -194,5 +199,140 @@ describe("expectedPushesOfJob", () => {
 				script: "https://raw.githubusercontent.com/huggingface/trl/main/trl/scripts/sft.py",
 			})
 		).toEqual([]);
+	});
+});
+
+describe("unguardedCreatesIn", () => {
+	it("flags create_repo left at exist_ok=False, in any spelling", () => {
+		expect(
+			unguardedCreatesIn(
+				script(
+					"from huggingface_hub import HfApi, create_repo",
+					'create_repo("pngwn/a")',
+					'HfApi().create_repo(repo_id="pngwn/b", private=True)',
+					"api = HfApi()",
+					'api.create_repo("pngwn/c", repo_type="dataset", exist_ok=False)'
+				)
+			)
+		).toEqual([
+			{ uri: "hf://models/pngwn/a", repo: "pngwn/a", call: "create_repo" },
+			{ uri: "hf://models/pngwn/b", repo: "pngwn/b", call: "create_repo" },
+			{ uri: "hf://datasets/pngwn/c", repo: "pngwn/c", call: "create_repo" },
+		]);
+	});
+
+	it("passes create_repo with exist_ok set, or with kwargs that may carry it", () => {
+		expect(
+			unguardedCreatesIn(
+				script(
+					'create_repo("pngwn/a", exist_ok=True)',
+					'api.create_repo(repo_id="pngwn/b", exist_ok=tolerate)',
+					'create_repo("pngwn/c", **repo_options)'
+				)
+			)
+		).toEqual([]);
+	});
+
+	it("flags SentenceTransformer.push_to_hub in a sentence_transformers script, the way the lost runs were written", () => {
+		expect(
+			unguardedCreatesIn(
+				script(
+					"from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer",
+					'REPO_ID = "pngwn/minilm-retrieval"',
+					'model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")',
+					"trainer = SentenceTransformerTrainer(model=model, args=args, train_dataset=train_ds)",
+					"trainer.train()",
+					"model.push_to_hub(REPO_ID)"
+				)
+			)
+		).toEqual([
+			{
+				uri: "hf://models/pngwn/minilm-retrieval",
+				repo: "pngwn/minilm-retrieval",
+				call: "push_to_hub",
+			},
+		]);
+		expect(
+			unguardedCreatesIn(
+				script("import sentence_transformers", 'model.push_to_hub(repo_id="pngwn/a")')
+			)
+		).toHaveLength(1);
+	});
+
+	it("passes the pushes that create with exist_ok=True themselves", () => {
+		expect(
+			unguardedCreatesIn(
+				script(
+					"from sentence_transformers import SentenceTransformer",
+					"from sentence_transformers import SentenceTransformerTrainingArguments",
+					'args = SentenceTransformerTrainingArguments(output_dir="out", push_to_hub=True, hub_model_id="pngwn/a")',
+					"trainer.push_to_hub()",
+					'sentence_trainer.push_to_hub("pngwn/b")',
+					'train_ds.push_to_hub("pngwn/c")',
+					'dataset.push_to_hub("pngwn/d")',
+					'model.push_to_hub("pngwn/e", exist_ok=True)',
+					'model.push_to_hub("pngwn/f", repo_type="model")',
+					'api.upload_folder(folder_path="out", repo_id="pngwn/g")'
+				)
+			)
+		).toEqual([]);
+		expect(
+			unguardedCreatesIn(
+				script(
+					"from transformers import AutoModelForCausalLM",
+					'model.push_to_hub("pngwn/a")',
+					'tokenizer.push_to_hub("pngwn/a")'
+				)
+			)
+		).toEqual([]);
+	});
+
+	it("keeps both calls when a script creates and pushes the same repo", () => {
+		expect(
+			unguardedCreatesIn(
+				script(
+					"from sentence_transformers import SentenceTransformer",
+					'create_repo("pngwn/a")',
+					'model.push_to_hub("pngwn/a")',
+					'create_repo("pngwn/a", private=True)'
+				)
+			)
+		).toEqual([
+			{ uri: "hf://models/pngwn/a", repo: "pngwn/a", call: "create_repo" },
+			{ uri: "hf://models/pngwn/a", repo: "pngwn/a", call: "push_to_hub" },
+		]);
+	});
+
+	it("ignores comments, docstrings, trackio and ids built at runtime", () => {
+		expect(
+			unguardedCreatesIn(
+				script(
+					"from sentence_transformers import SentenceTransformer",
+					'# create_repo("pngwn/a")',
+					'"""model.push_to_hub("pngwn/b")"""',
+					'trackio.create_repo("pngwn/c")',
+					'create_repo(f"{user}/d")',
+					"model.push_to_hub(repo_name)"
+				)
+			)
+		).toEqual([]);
+	});
+});
+
+describe("unguardedCreatesOfJob", () => {
+	it("reads a uv script and a docker command", () => {
+		expect(unguardedCreatesOfJob({ script: 'create_repo("pngwn/a")' })).toEqual([
+			{ uri: "hf://models/pngwn/a", repo: "pngwn/a", call: "create_repo" },
+		]);
+		expect(
+			unguardedCreatesOfJob({
+				image: "python:3.12",
+				command: [
+					"python",
+					"-c",
+					'import os; from sentence_transformers import SentenceTransformer; m.push_to_hub("pngwn/b")',
+				],
+			})
+		).toEqual([{ uri: "hf://models/pngwn/b", repo: "pngwn/b", call: "push_to_hub" }]);
 	});
 });
