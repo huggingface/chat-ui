@@ -1,5 +1,6 @@
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { config } from "$lib/server/config";
+import { lastUserMessageIndex } from "$lib/server/textGeneration/utils/toolImages";
 import { logger } from "$lib/server/logger";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
@@ -270,7 +271,7 @@ export function injectSessionState(
 	messages: ChatCompletionMessageParam[],
 	block: string
 ): ChatCompletionMessageParam[] {
-	const lastUserIndex = messages.findLastIndex((message) => message.role === "user");
+	const lastUserIndex = lastUserMessageIndex(messages);
 	if (lastUserIndex === -1) return messages;
 	const target = messages[lastUserIndex];
 	if (target.role !== "user") return messages;

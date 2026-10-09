@@ -19,6 +19,7 @@ import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
 import { composeGuards, type ToolCallGuard } from "../mcp/toolGuard";
 import { parseToolArguments, withParseableArguments } from "../mcp/toolArgs";
 import { stripLoneSurrogates } from "../utils/loneSurrogates";
+import { annotateToolImages } from "../utils/toolImages";
 import { isRateLimitError, withUpstreamRetry } from "../utils/upstreamRetry";
 import type { VirtualFileExpander } from "$lib/server/mlFiles/expand";
 import {
@@ -535,7 +536,14 @@ async function runLoop(
 				// whole point is that only the summary reaches the outer
 				// conversation. Progress is reported on the parent call itself.
 				if (event.type === "complete") {
-					toolMessages = event.summary.toolMessages;
+					// nested agents see text only, the note stops them describing images
+					toolMessages = annotateToolImages(
+						event.summary.toolMessages,
+						event.summary.images.map((source) => ({
+							...source,
+							images: source.blocks.map(() => ({ missing: "hidden" as const })),
+						}))
+					);
 				}
 			}
 		}

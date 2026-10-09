@@ -6,6 +6,7 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { PlanState, PlanStep } from "$lib/types/Plan";
 import { MessageUpdateType, type MessagePlanUpdate } from "$lib/types/MessageUpdate";
 import type { BuiltinTool } from "./types";
+import { lastUserMessageIndex } from "../utils/toolImages";
 
 export const PLAN_TOOL_NAME = "update_plan";
 
@@ -183,7 +184,7 @@ export function injectPlanState(
 		`If it is stale or the request has changed, revise it with ${PLAN_TOOL_NAME}.]\n` +
 		renderPlanBlock(plan);
 
-	const lastUserIndex = messages.findLastIndex((message) => message.role === "user");
+	const lastUserIndex = lastUserMessageIndex(messages);
 	if (lastUserIndex === -1) {
 		logger.debug({}, "[plan] no user message to attach the plan to; skipping injection");
 		return messages;

@@ -30,6 +30,16 @@ import {
 	type HistoryUnit,
 } from "./historyWindow";
 import { prepareAttachments, type AttachmentMode, type AttachmentReport } from "./attachmentBudget";
+import {
+	makeToolImageReader,
+	REPLAYED_TOOL_IMAGES,
+	renderToolImages,
+	resolveToolImage,
+	toolImageBlocks,
+	withImageNote,
+	type ResolvedToolImage,
+	type ToolImageReader,
+} from "./toolImages";
 
 type ChatMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -223,7 +233,9 @@ function legacyFinalAnswer(
 function replayAssistantTurn(
 	message: EndpointMessage,
 	includeReasoning: boolean,
-	capToolOutputs: boolean
+	capToolOutputs: boolean,
+	images: Map<string, ResolvedToolImage[]>,
+	beforeUser: boolean
 ): AssistantReplayMessage[] {
 	const updates = message.updates ?? [];
 	const { rounds, final } = turnRounds(message);
@@ -242,10 +254,8 @@ function replayAssistantTurn(
 		};
 	};
 
-	if (rounds.length === 0) {
-		const finalMessage = buildFinalMessage();
-		return finalMessage ? [finalMessage] : [];
-	}
+	const finalMessage = buildFinalMessage();
+	if (rounds.length === 0) return finalMessage ? [finalMessage] : [];
 
 	const outputsByUuid = new Map<string, string>();
 	const eventsByUuid = new Map<string, string[]>();
@@ -275,8 +285,17 @@ function replayAssistantTurn(
 		rounds.flatMap(({ calls }) => calls).map((u) => [u.uuid, toToolCallId(u.uuid, usedIds)])
 	);
 
+	// two user messages in a row are refused by chat templates that enforce alternation
+	const imagesOf = (uuid: string, last: boolean): ResolvedToolImage[] =>
+		(images.get(uuid) ?? []).map((image) =>
+			last && beforeUser && !finalMessage && "part" in image ? { missing: "dropped" } : image
+		);
+
 	const replayed: AssistantReplayMessage[] = [];
-	for (const { calls: callsInRound, reasoning, content: roundContent } of rounds) {
+	for (const [
+		roundIndex,
+		{ calls: callsInRound, reasoning, content: roundContent },
+	] of rounds.entries()) {
 		const roundReasoning = includeReasoning ? reasoning : "";
 		// `content` is included only when a preamble was actually persisted
 		// (messages recorded before this field existed have none); omitted
@@ -307,6 +326,13 @@ function replayAssistantTurn(
 			...(roundContent.trim().length > 0 ? { content: roundContent } : {}),
 			...(roundReasoning ? { reasoning_content: roundReasoning } : {}),
 		});
+		const { notes, message: imageMessage } = renderToolImages(
+			callsInRound.map((u) => ({
+				toolCallId: idByUuid.get(u.uuid) ?? u.uuid,
+				tool: u.call.name,
+				images: imagesOf(u.uuid, roundIndex === rounds.length - 1),
+			}))
+		);
 		for (const u of callsInRound) {
 			// A call with no persisted outcome means the run was aborted
 			// mid-execution; say so instead of fabricating an empty success.
@@ -318,15 +344,19 @@ function replayAssistantTurn(
 					? stripLoneSurrogates(output.slice(0, MAX_REPLAYED_TOOL_OUTPUT_CHARS)) +
 						"\n[...truncated]"
 					: output;
+			const toolCallId = idByUuid.get(u.uuid) ?? u.uuid;
 			replayed.push({
 				role: "tool",
-				tool_call_id: idByUuid.get(u.uuid) ?? u.uuid,
-				// the event goes on after the cap, a long output never cuts it
-				content: (eventsByUuid.get(u.uuid) ?? []).reduce(withHarnessEvent, capped),
+				tool_call_id: toolCallId,
+				// the note and the event go on after the cap, a long output never cuts them
+				content: (eventsByUuid.get(u.uuid) ?? []).reduce(
+					withHarnessEvent,
+					withImageNote(capped, notes.get(toolCallId))
+				),
 			});
 		}
+		if (imageMessage) replayed.push(imageMessage);
 	}
-	const finalMessage = buildFinalMessage();
 	if (finalMessage) replayed.push(finalMessage);
 	return replayed;
 }
@@ -354,6 +384,8 @@ export type HistoryOptions = {
 	/** the truncation marker points at jobs and sandboxes */
 	mlAssistant?: boolean;
 	onAttachments?: (report: AttachmentReport) => void;
+	/** where replayed tool images are read from, inline data only without it */
+	readToolImage?: ToolImageReader;
 };
 
 /**
@@ -467,6 +499,13 @@ async function prepareEntries(
 		mode: options?.attachments,
 		mlAssistant: options?.mlAssistant,
 	});
+	const toolImages = options?.replayToolHistory
+		? await replayedToolImages(messages, {
+				multimodal: isMultimodal,
+				imageProcessor,
+				read: options.readToolImage ?? makeToolImageReader(),
+			})
+		: new Map<string, ResolvedToolImage[]>();
 	const prepared = messages.map((message, index): PreparedEntry => {
 		if (message.from === "user") {
 			return [{ role: "user", content: contentOf(index) }];
@@ -492,7 +531,13 @@ async function prepareEntries(
 					content: stripThink(legacy.content),
 				};
 				return {
-					replay: replayAssistantTurn(message, wantsReasoning, capToolOutputs),
+					replay: replayAssistantTurn(
+						message,
+						wantsReasoning,
+						capToolOutputs,
+						toolImages,
+						messages[index + 1]?.from === "user"
+					),
 					flat,
 				};
 			}
@@ -520,6 +565,38 @@ async function prepareEntries(
 		return [{ role: message.from, content: message.content }];
 	});
 	return { prepared, attachments: report };
+}
+
+/** only the newest few are sent again, older ones are named in their result */
+async function replayedToolImages(
+	messages: HistoryMessage[],
+	opts: Parameters<typeof resolveToolImage>[1]
+): Promise<Map<string, ResolvedToolImage[]>> {
+	const found = messages.flatMap((message) =>
+		message.from === "assistant"
+			? (message.updates ?? []).filter(isToolResultUpdate).flatMap((update) =>
+					update.result.status === ToolResultStatus.Success
+						? toolImageBlocks(update.result.outputs[0]?.content).map((block) => ({
+								uuid: update.uuid,
+								block,
+							}))
+						: []
+				)
+			: []
+	);
+	const firstSent = found.length - REPLAYED_TOOL_IMAGES;
+	const images = await Promise.all(
+		found.map(({ block }, i) =>
+			i >= firstSent || !opts.multimodal
+				? resolveToolImage(block, opts)
+				: Promise.resolve<ResolvedToolImage>({ missing: "dropped" })
+		)
+	);
+	const resolved = new Map<string, ResolvedToolImage[]>();
+	for (const [i, { uuid }] of found.entries()) {
+		resolved.set(uuid, [...(resolved.get(uuid) ?? []), images[i]]);
+	}
+	return resolved;
 }
 
 function legacyBudget(prepared: PreparedEntry[], options?: HistoryOptions): ChatMessageParam[] {

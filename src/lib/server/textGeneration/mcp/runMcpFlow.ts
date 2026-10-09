@@ -45,6 +45,8 @@ import {
 	budgetNotice,
 	canCutAttachments,
 	isContextOverflowError,
+	MAX_IMAGE_BYTES,
+	MAX_IMAGES,
 	noticeFor,
 	retryNotice,
 	type AttachmentMode,
@@ -57,6 +59,11 @@ import {
 import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWindowFlag";
 import { withHarnessEventOnLastTool } from "$lib/server/textGeneration/utils/harnessEvent";
 import { makeImageProcessor } from "$lib/server/endpoints/images";
+import {
+	limitToolImages,
+	makeToolImageReader,
+	withToolImages,
+} from "$lib/server/textGeneration/utils/toolImages";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import {
@@ -125,6 +132,7 @@ export type McpFlowResult =
 	/** A 2026-era prompt is open; the run ends here and resumes when it is answered. */
 	| "awaiting_input";
 
+const TOOL_IMAGE_CAPS = { maxImages: MAX_IMAGES, maxBytes: MAX_IMAGE_BYTES };
 const MAX_TOOL_ROUNDS = 10;
 
 // ML Assistant runs jobs, and the round budget is what it spends grounding ids,
@@ -701,9 +709,11 @@ export async function* runMcpFlow({
 		let unreadEnded: SessionStateBlock["ended"] = stateBlock?.ended ?? [];
 
 		// built again, attachments cut, when the provider refuses the request for its size
+		const readToolImage = makeToolImageReader(conv._id);
 		const buildPrompt = async (attachments: AttachmentMode) => {
 			const history = await prepareHistory(messages, imageProcessor, mmEnabled, {
 				replayToolHistory: true,
+				readToolImage,
 				attachReasoning: mayEchoReasoning,
 				// The model resolved for THIS turn. Under the "omni" router alias a
 				// prior turn in the same conversation can have been produced by a
@@ -902,9 +912,10 @@ export async function* runMcpFlow({
 			// non-blank delta last round — it never became part of a real trace.
 			pendingReasoningWhitespace = "";
 
-			let requestMessages = historyWindow
-				? await historyWindow.fit(messagesOpenAI)
-				: messagesOpenAI;
+			let requestMessages = limitToolImages(
+				historyWindow ? await historyWindow.fit(messagesOpenAI) : messagesOpenAI,
+				TOOL_IMAGE_CAPS
+			);
 
 			// A turn several productive rounds deep must not die on one throttled
 			// request, or on a gateway that has no backend ready for a moment;
@@ -955,7 +966,10 @@ export async function* runMcpFlow({
 				built = await buildPrompt("minimal");
 				messagesOpenAI = [...built.prompt, ...live];
 				historyWindow = built.window;
-				requestMessages = historyWindow ? await historyWindow.fit(messagesOpenAI) : messagesOpenAI;
+				requestMessages = limitToolImages(
+					historyWindow ? await historyWindow.fit(messagesOpenAI) : messagesOpenAI,
+					TOOL_IMAGE_CAPS
+				);
 				try {
 					completionStream = await createStream(requestMessages);
 				} catch (retryErr) {
@@ -1336,7 +1350,16 @@ export async function* runMcpFlow({
 						messagesOpenAI = [
 							...messagesOpenAI,
 							assistantToolMessage,
-							...(event.summary.toolMessages ?? []),
+							...(await withToolImages(
+								event.summary.toolMessages ?? [],
+								event.summary.images ?? [],
+								{
+									multimodal: mmEnabled,
+									imageProcessor,
+									read: readToolImage,
+									maxImages: TOOL_IMAGE_CAPS.maxImages,
+								}
+							)),
 						];
 						if (budgetGuard) {
 							try {

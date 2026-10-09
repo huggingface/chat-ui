@@ -1,10 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import type { OpenAI } from "openai";
 import { prepareHistory, prepareMessagesWithFiles, type HistoryMessage } from "./prepareFiles";
-import { omittedMarker, planWindow, renderWindow, type HistoryUnit } from "./historyWindow";
+import {
+	historyCost,
+	omittedMarker,
+	planWindow,
+	renderWindow,
+	type HistoryUnit,
+} from "./historyWindow";
 import type { EndpointMessage } from "$lib/server/endpoints/endpoints";
 import type { makeImageProcessor } from "$lib/server/endpoints/images";
 import {
@@ -1464,5 +1470,158 @@ describe("harness events in replay", () => {
 		expect(round?.rounds).toBe(1);
 		expect(round?.start).toEqual({ messageId: "a0", round: 0 });
 		expect(textOf(round?.messages.at(-1))).toContain(EVENT_TEXT);
+	});
+});
+
+describe("tool images in replay", () => {
+	const passThrough = (async (file: { value: string; mime: string }) => ({
+		image: Buffer.from(file.value, "base64"),
+		mime: file.mime,
+	})) as unknown as ReturnType<typeof makeImageProcessor>;
+
+	const imageResult = (uuid: string, ...blocks: Record<string, unknown>[]) =>
+		({
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Result,
+			uuid,
+			result: {
+				status: ToolResultStatus.Success,
+				call: { name: "hf_fs", parameters: {} },
+				outputs: [{ text: `attached ${uuid}`, content: blocks }],
+			},
+		}) satisfies MessageUpdate;
+
+	const png = (data: string) => ({ type: "image", data, mimeType: "image/png" });
+
+	const turnsAttaching = (...turns: Record<string, unknown>[][]): EndpointMessage[] =>
+		turns.flatMap((blocks, i) => [
+			{ from: "user" as const, content: `q${i}` },
+			{
+				from: "assistant" as const,
+				content: `a${i}`,
+				updates: [callUpdate(`call${i}`, "hf_fs", {}), imageResult(`call${i}`, ...blocks)],
+			},
+		]);
+
+	const sentImages = (messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]) =>
+		messages.flatMap((m) =>
+			m.role === "user" && Array.isArray(m.content)
+				? m.content.flatMap((p) => (p.type === "image_url" ? [p.image_url.url] : []))
+				: []
+		);
+
+	it("re-sends only the newest images, after their round's results, and names the rest", async () => {
+		const messages = turnsAttaching(
+			[png("AAAA")],
+			[png("BBBB"), png("CCCC")],
+			[png("DDDD"), png("EEEE")]
+		);
+		const prepared = await prepareMessagesWithFiles(messages, passThrough, true, {
+			replayToolHistory: true,
+		});
+		expect(sentImages(prepared)).toEqual(
+			["BBBB", "CCCC", "DDDD", "EEEE"].map((d) => `data:image/png;base64,${d}`)
+		);
+		const firstTool = prepared.find((m) => m.role === "tool");
+		expect(String(firstTool?.content)).toBe(
+			"attached call0\n\n[This result included an image no longer shown to you, to keep the request small. Attach it again if you need to look.]"
+		);
+		const at = prepared.findIndex(
+			(m) => m.role === "tool" && m.tool_call_id !== firstTool?.tool_call_id
+		);
+		expect(prepared[at + 1]).toMatchObject({ role: "user" });
+		expect(prepared[at + 2]).toEqual({ role: "assistant", content: "a1" });
+	});
+
+	it("only notes the images for a model without image input", async () => {
+		const prepared = await prepareMessagesWithFiles(
+			turnsAttaching([png("AAAA")]),
+			passThrough,
+			false,
+			{
+				replayToolHistory: true,
+			}
+		);
+		expect(sentImages(prepared)).toEqual([]);
+		expect(prepared.map((m) => m.role)).toEqual(["user", "assistant", "tool", "assistant"]);
+		expect(String(prepared[2].content)).toMatch(/that was not passed to you/);
+	});
+
+	it("reads an image stored by hash through the reader", async () => {
+		const readToolImage = vi.fn(async () => ({
+			type: "base64" as const,
+			name: "stored",
+			value: "SHAA",
+			mime: "image/jpeg",
+		}));
+		const prepared = await prepareMessagesWithFiles(
+			turnsAttaching([{ type: "image", sha: "f00d", mimeType: "image/jpeg" }]),
+			passThrough,
+			true,
+			{ replayToolHistory: true, readToolImage }
+		);
+		expect(readToolImage).toHaveBeenCalledWith({ mimeType: "image/jpeg", sha: "f00d" });
+		expect(sentImages(prepared)).toEqual(["data:image/jpeg;base64,SHAA"]);
+	});
+
+	it("keeps a replayed image inside its round's unit and charges it the nominal image cost", async () => {
+		const big = "x".repeat(200_000);
+		const { units } = await prepareHistory(turnsAttaching([png(big)]), passThrough, true, {
+			replayToolHistory: true,
+			contextLengthTokens: 1_000_000,
+			slidingWindow: true,
+		});
+		const round = units?.find((unit) => unit.rounds === 1);
+		expect(round?.messages.map((m) => m.role)).toEqual(["assistant", "tool", "user"]);
+		expect(historyCost(round?.messages)).toBeLessThan(10_000);
+	});
+});
+
+describe("tool images before the next user message", () => {
+	const passThrough = (async (file: { value: string; mime: string }) => ({
+		image: Buffer.from(file.value, "base64"),
+		mime: file.mime,
+	})) as unknown as ReturnType<typeof makeImageProcessor>;
+
+	const interrupted: EndpointMessage = {
+		from: "assistant",
+		content: "",
+		updates: [
+			callUpdate("call0", "hf_fs", {}),
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: "call0",
+				result: {
+					status: ToolResultStatus.Success,
+					call: { name: "hf_fs", parameters: {} },
+					outputs: [
+						{ text: "attached", content: [{ type: "image", data: "AAAA", mimeType: "image/png" }] },
+					],
+				},
+			},
+		],
+	};
+
+	it("never puts the images straight before the next user message", async () => {
+		const prepared = await prepareMessagesWithFiles(
+			[{ from: "user", content: "q0" }, interrupted, { from: "user", content: "q1" }],
+			passThrough,
+			true,
+			{ replayToolHistory: true }
+		);
+		expect(prepared.map((m) => m.role)).toEqual(["user", "assistant", "tool", "user"]);
+		expect(String(prepared[2].content)).toMatch(/no longer shown to you/);
+	});
+
+	it("still sends them when the turn is the one being continued", async () => {
+		const prepared = await prepareMessagesWithFiles(
+			[{ from: "user", content: "q0" }, interrupted],
+			passThrough,
+			true,
+			{ replayToolHistory: true }
+		);
+		expect(prepared.map((m) => m.role)).toEqual(["user", "assistant", "tool", "user"]);
+		expect(JSON.stringify(prepared[3])).toContain("data:image/png;base64,AAAA");
 	});
 });
