@@ -154,8 +154,8 @@ describe("MlRegistryPane", () => {
 		expect(closed.container.querySelector("aside, [role=dialog]")).toBeNull();
 
 		const { container } = mount();
-		const pane = find(container, "[aria-label='Services and artifacts']");
-		expect(text(pane.querySelector("h2"))).toBe("Services and artifacts");
+		const pane = find(container, "[aria-label='Resources']");
+		expect(text(pane.querySelector("h2"))).toBe("Resources");
 	});
 
 	it("closes from its own header", () => {
@@ -468,12 +468,52 @@ describe("MlRegistryPane", () => {
 	it("shows an empty state per section", () => {
 		const { container } = mount(payload({ services: [], artefacts: [] }));
 		const empties = all(container, ".ml-registry-empty").map(text);
-		expect(empties).toHaveLength(4);
+		expect(empties).toHaveLength(5);
 		expect(empties[0]).toMatch(/^No jobs, sandboxes or research runs yet/);
 		expect(empties[1]).toMatch(/^Nothing on the Hub yet/);
 		expect(empties[2]).toMatch(/^No files yet/);
-		expect(empties[3]).toMatch(/^No sources yet/);
+		expect(empties[3]).toMatch(/^No images yet/);
+		expect(empties[4]).toMatch(/^No sources yet/);
 		expect(container.querySelector(".ml-registry-list")).toBeNull();
+	});
+
+	it("shows the images tools returned, named by where they were read from, and opens one", async () => {
+		const sheet = "a".repeat(64);
+		// image requests would reach the test server, whose sveltekit handler cannot start
+		const csp = document.createElement("meta");
+		csp.httpEquiv = "Content-Security-Policy";
+		csp.content = "img-src data:";
+		document.head.append(csp);
+		const { container } = mount(
+			payload({
+				images: [
+					{
+						sha: sheet,
+						mimeType: "image/jpeg",
+						tool: "hf_fs",
+						source: "hf://models/pngwn/lora/benchmarks/sheet_cat.jpg",
+						count: 3,
+					},
+					{ sha: "b".repeat(64), mimeType: "image/png", tool: "generate_image", count: 1 },
+				],
+			})
+		);
+		expect(text(find(container, "#ml-registry-images"))).toBe("Images 2");
+		const thumbs = all(container, ".ml-image");
+		expect(thumbs.map(text)).toEqual(["sheet_cat.jpg ×3", "generate_image"]);
+		expect(thumbs[0].title).toBe(
+			"hf://models/pngwn/lora/benchmarks/sheet_cat.jpg, returned 3 times"
+		);
+		expect(find(thumbs[0], "img").getAttribute("src")).toMatch(
+			new RegExp(`/conversation/conv-1/output/${sheet}$`)
+		);
+
+		thumbs[0].click();
+		await vi.waitFor(() =>
+			expect(text(document.querySelector("[role=dialog] figcaption"))).toBe(
+				"hf://models/pngwn/lora/benchmarks/sheet_cat.jpg"
+			)
+		);
 	});
 
 	it("says it is loading until the first payload lands", () => {

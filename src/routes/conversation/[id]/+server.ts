@@ -38,6 +38,7 @@ import {
 	compressUpdatesForStorage,
 	messageForStorage,
 } from "$lib/server/generation/compressUpdates";
+import { deleteStoredFilesOf, offloadStoredToolImages } from "$lib/server/files/toolImages";
 import { restoreRunningShape } from "$lib/utils/messageShape";
 import { applyUpdateToMessage } from "$lib/server/generation/applyUpdate";
 import { AbortRegistry } from "$lib/server/abortRegistry";
@@ -428,6 +429,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const effectiveGenerationId = generationId ?? randomUUID();
 	messageToWriteTo.generationId = effectiveGenerationId;
 	stampMlHarness(messageToWriteTo, conv, model);
+
+	// a conversation stored with inline tool images can be too big to take this write
+	await offloadStoredToolImages(convId, conv.messages);
 
 	// update the conversation with the new messages
 	await collections.conversations.updateOne(
@@ -888,6 +892,7 @@ export async function DELETE({ locals, params }) {
 
 	await collections.conversations.deleteOne({ _id: conv._id });
 	await deleteMlFilesOf([conv._id]);
+	await deleteStoredFilesOf([conv._id]);
 	await deleteMlRegistry([conv._id]);
 
 	return new Response();

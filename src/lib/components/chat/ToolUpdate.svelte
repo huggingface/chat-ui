@@ -14,6 +14,7 @@
 	import { callArguments } from "$lib/utils/messageShape";
 	import { redactToolArguments } from "$lib/utils/redactSecrets";
 	import { page } from "$app/state";
+	import { base } from "$app/paths";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonDocument from "~icons/carbon/document";
 	import LucideTriangleAlert from "~icons/lucide/triangle-alert";
@@ -63,11 +64,8 @@
 	);
 
 	type ToolOutput = Record<string, unknown>;
-	type McpImageContent = {
-		type: "image";
-		data: string;
-		mimeType: string;
-	};
+	// older results and failed uploads keep inline data
+	type McpImageContent = { type: "image"; mimeType: string } & ({ data: string } | { sha: string });
 
 	const formatValue = (value: unknown): string => {
 		if (value == null) return "";
@@ -92,10 +90,16 @@
 		const obj = value as Record<string, unknown>;
 		return (
 			obj["type"] === "image" &&
-			typeof obj["data"] === "string" &&
-			typeof obj["mimeType"] === "string"
+			typeof obj["mimeType"] === "string" &&
+			(typeof obj["data"] === "string" || typeof obj["sha"] === "string")
 		);
 	};
+
+	// a share is served from the same route under its own id
+	const imageSrc = (image: McpImageContent): string =>
+		"data" in image
+			? `data:${image.mimeType};base64,${image.data}`
+			: `${base}/conversation/${page.params.id}/output/${image.sha}`;
 
 	const getImageBlocks = (output: ToolOutput): McpImageContent[] => {
 		const blocks = output["content"];
@@ -256,7 +260,7 @@
 												<img
 													alt={`Tool result image ${imageIndex + 1}`}
 													class="max-h-60 cursor-pointer rounded-sm border border-gray-200 dark:border-gray-700"
-													src={`data:${image.mimeType};base64,${image.data}`}
+													src={imageSrc(image)}
 												/>
 											{/each}
 										</div>

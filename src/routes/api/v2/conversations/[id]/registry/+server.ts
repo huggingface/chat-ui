@@ -6,6 +6,7 @@ import { resolveConversation } from "$lib/server/api/utils/resolveConversation";
 import { listMlArtefacts, listMlServices } from "$lib/server/mlRegistry/store";
 import { listMlAgentRuns } from "$lib/server/mlRegistry/agentRuns";
 import { listMlSources } from "$lib/server/mlRegistry/sources";
+import { listToolImages } from "$lib/server/mlRegistry/images";
 import { listMlFiles } from "$lib/server/mlFiles/store";
 import type {
 	MlRegistryAgentRun,
@@ -80,6 +81,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 			...source,
 			id: _id.toString(),
 		})),
+		images: listToolImages(conversation.messages),
 		serverNow: Date.now(),
 	};
 	return superjsonResponse(payload);

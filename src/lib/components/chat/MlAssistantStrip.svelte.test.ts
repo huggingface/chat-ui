@@ -573,7 +573,7 @@ describe("MlAssistantStrip services control", () => {
 
 	const NEUTRAL_INK = "rgb(87, 83, 78)";
 	const control = (root: ParentNode) =>
-		root.querySelector<HTMLButtonElement>("button[aria-label^='Services and artifacts']");
+		root.querySelector<HTMLButtonElement>("button[aria-label^='Resources']");
 
 	it("stays hidden until the registry holds anything", () => {
 		expect(control(mount().container)).toBeNull();
@@ -586,7 +586,7 @@ describe("MlAssistantStrip services control", () => {
 		const button = control(container);
 		if (!button) throw new Error("no control");
 
-		expect(button.textContent?.trim()).toBe("Services");
+		expect(button.textContent?.trim()).toBe("Resources");
 		expect(style(button).color).toBe(NEUTRAL_INK);
 		expect(button.querySelector(".ml-registry-live")).toBeNull();
 	});
@@ -615,9 +615,7 @@ describe("MlAssistantStrip services control", () => {
 		expect(sidePane.view).toBe("registry");
 		await tick();
 		expect(button?.getAttribute("aria-expanded")).toBe("true");
-		expect(button?.getAttribute("aria-label")).toBe(
-			"Services and artifacts: 1 running. Close the list"
-		);
+		expect(button?.getAttribute("aria-label")).toBe("Resources: 1 running. Close the list");
 
 		button?.click();
 		expect(sidePane.open).toBe(false);

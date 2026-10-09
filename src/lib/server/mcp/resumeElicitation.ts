@@ -14,6 +14,7 @@ import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { McpServerConfig } from "./httpClient";
 import { ASK_USER_QUESTION_TOOL_NAME, answerToToolResult } from "$lib/server/askUserQuestion";
 import { slimToolOutput } from "$lib/server/generation/compressUpdates";
+import { offloadImageBlocks } from "$lib/server/files/toolImages";
 
 /**
  * Re-issue the tool call a durable prompt parked, now that it has an answer.
@@ -162,7 +163,7 @@ export async function resumeParkedToolCall({
 							slimToolOutput({
 								text: response.text ?? "",
 								structured: response.structured,
-								content: response.content,
+								content: await offloadImageBlocks(conversationId, response.content),
 							}),
 						],
 						display: true,

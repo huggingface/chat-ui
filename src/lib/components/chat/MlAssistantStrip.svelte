@@ -40,14 +40,14 @@
 	let registryVisible = $derived(!!registry && registry.rows > 0);
 	// the count is everything the Hub still bills, queued included, the dot is only what runs
 	let registryLabel = $derived(
-		registry && registry.open > 0 ? `${registry.open} running` : "Services"
+		registry && registry.open > 0 ? `${registry.open} running` : "Resources"
 	);
 	let registryShown = $derived(sidePane.open && sidePane.view === "registry");
 	let registryTitle = $derived.by(() => {
 		const verb = registryShown ? "close" : "open";
 		return registry && registry.open > 0
-			? `Services and artifacts: ${registry.open} running. ${verb === "close" ? "Close" : "Open"} the list`
-			: `Services and artifacts: ${verb} the list`;
+			? `Resources: ${registry.open} running. ${verb === "close" ? "Close" : "Open"} the list`
+			: `Resources: ${verb} the list`;
 	});
 
 	$effect(() => {

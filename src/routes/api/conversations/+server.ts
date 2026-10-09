@@ -1,5 +1,6 @@
 import { collections } from "$lib/server/database";
 import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
+import { deleteStoredFilesOf } from "$lib/server/files/toolImages";
 import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
 import type { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
@@ -50,6 +51,7 @@ export async function DELETE({ locals }) {
 		await collections.conversations.deleteMany({ _id: { $in: ids } });
 		await deleteMlRegistry(ids);
 		await deleteMlFilesOf(ids);
+		await deleteStoredFilesOf(ids);
 	}
 
 	return new Response();

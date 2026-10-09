@@ -69,10 +69,11 @@ The compute budget only covers Jobs and sandboxes that ML Intern launches. It do
 
 While ML Intern works, you can:
 
-- **Open "Services and artifacts"** from the status bar to see everything the conversation has created:
+- **Open "Resources"** from the status bar to see everything the conversation has created:
   - running and finished Jobs and sandboxes
   - repositories and Spaces it pushed to
   - the scripts it wrote, with every version and the Jobs that ran each one
+  - the images its tools returned, such as sample grids and plots
 - **Watch training live.** When a training run logs to [Trackio](https://huggingface.co/docs/trackio), a live metrics dashboard opens in a side panel.
 - **Answer its questions.** ML Intern sometimes asks you to choose between options or confirm a step before it continues.
 - **Resume after a failure.** If a turn fails partway, use **Resume** to continue from where it stopped rather than starting the whole turn again.
