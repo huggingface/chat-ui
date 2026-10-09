@@ -612,6 +612,40 @@ describe("executeToolCalls with a guard", () => {
 		expect(toolMessagesOf(events)[0].content).toContain("Nothing was charged");
 	});
 
+	it("appends the guard's note to a result, after the guard has read the raw text", async () => {
+		mcpMock.callMcpTool.mockResolvedValue(mcpResult({ text: "job 123 started" }));
+		const { guard, after } = fakeGuard({
+			before: vi.fn(
+				async () =>
+					({ allow: true, ticket: { key: "k" }, note: "Warning: check the push" }) as const
+			),
+		});
+		const events = await drain([CALL], undefined, undefined, guard);
+
+		expect(after).toHaveBeenCalledWith(
+			{ key: "k" },
+			{ status: "success", text: "job 123 started" }
+		);
+		expect(toolMessagesOf(events)[0].content).toBe("job 123 started\n\nWarning: check the push");
+		const result = toolUpdatesOf(events).find((u) => u.subtype === MessageToolUpdateType.Result);
+		expect(result).toMatchObject({
+			result: { outputs: [{ text: "job 123 started\n\nWarning: check the push" }] },
+		});
+	});
+
+	it("drops the note when the call failed, since it was about a job that never started", async () => {
+		mcpMock.callMcpTool.mockResolvedValue(mcpResult({ text: "bad image", isError: true }));
+		const { guard } = fakeGuard({
+			before: vi.fn(
+				async () =>
+					({ allow: true, ticket: { key: "k" }, note: "Warning: check the push" }) as const
+			),
+		});
+		const events = await drain([CALL], undefined, undefined, guard);
+
+		expect(toolMessagesOf(events)[0].content).toBe("Error: bad image");
+	});
+
 	it("streams the budget updates the guard returns", async () => {
 		const budgetUpdate = {
 			type: MessageUpdateType.Budget,

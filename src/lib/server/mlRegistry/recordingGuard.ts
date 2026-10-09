@@ -13,7 +13,7 @@ import type {
 } from "$lib/server/textGeneration/mcp/toolGuard";
 import type { MlFileRef } from "$lib/types/MlFile";
 import type { ExpectedPush, MlServiceKind } from "$lib/types/MlService";
-import { expectedPushesOfJob } from "./expectedPushes";
+import { expectedPushesOfJob, unguardedCreatesOfJob, type UnguardedCreate } from "./expectedPushes";
 import { fileUri, fileUrl, parseHfUri, repoUri, repoUrl } from "./hubUri";
 import {
 	ensureArtefact,
@@ -22,6 +22,7 @@ import {
 	recordDiscoveredService,
 	recordDispatchedService,
 	isRecordedSandbox,
+	knownArtefactUris,
 	recordServiceName,
 	sandboxHandle,
 	UNKNOWN_STAGE,
@@ -93,6 +94,18 @@ function sandboxRefFromTokens(
 			return { namespace: fallbackNamespace, jobId: token };
 	}
 	return undefined;
+}
+
+function repoConflictNote(creates: UnguardedCreate[]): string {
+	const calls = creates
+		.map(({ call, repo }) =>
+			call === "push_to_hub"
+				? `SentenceTransformer.push_to_hub("${repo}")`
+				: `create_repo("${repo}")`
+		)
+		.join(" and ");
+	const one = creates.length === 1;
+	return `Warning: this job is set to lose what it trains at the push. The script calls ${calls} without exist_ok=True, and this conversation already created ${one ? "that repo" : "those repos"}, so the call raises 409 Conflict when it runs, after training, and nothing on the container's disk survives the job. Cancel it and resubmit with exist_ok=True on ${one ? "that call" : "those calls"}, or save_pretrained to a directory and upload_folder it.`;
 }
 
 export function createMlRecordingGuard({
@@ -201,6 +214,26 @@ export function createMlRecordingGuard({
 			allow: false,
 			message: `Refused: ${jobId} is a sandbox, not a job. update-labels replaces every label, and one of the labels the sandbox server set authenticates the sandbox, so relabelling it would break it. Nothing was changed. Relabel jobs only.`,
 		};
+	}
+
+	// a warning not a refusal, the parse can be wrong and the job belongs to the user
+	async function repoConflictWarning(call: GuardedToolCall): Promise<string | undefined> {
+		const creates = unguardedCreatesOfJob(asRecord(call.args.args) ?? {});
+		if (creates.length === 0) return undefined;
+		try {
+			const known = await knownArtefactUris(
+				conversationId,
+				creates.map(({ uri }) => uri)
+			);
+			const conflicting = creates.filter(({ uri }) => known.has(uri));
+			return conflicting.length ? repoConflictNote(conflicting) : undefined;
+		} catch (err) {
+			logger.error(
+				{ err: String(err), conversationId: conversationId.toString() },
+				"[mlRegistry] checking a job's create calls against the recorded repos failed"
+			);
+			return undefined;
+		}
 	}
 
 	async function markForReconcile(ticket: SubmissionTicket): Promise<void> {
@@ -352,8 +385,10 @@ export function createMlRecordingGuard({
 				);
 			}
 			const ticket = classify(call);
-			if (jobLabels && ticket?.kind === "job") await markForReconcile(ticket);
-			return ticket ? { allow: true, ticket } : { allow: true };
+			if (ticket?.kind !== "job") return ticket ? { allow: true, ticket } : { allow: true };
+			if (jobLabels) await markForReconcile(ticket);
+			const note = await repoConflictWarning(call);
+			return { allow: true, ticket, ...(note ? { note } : {}) };
 		},
 
 		async after(rawTicket: unknown, outcome: GuardOutcome) {

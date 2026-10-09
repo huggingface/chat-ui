@@ -531,6 +531,7 @@ export async function* executeToolCalls({
 		// Consulted before anything leaves the process: a refusal is an ordinary
 		// tool error the model recovers from, and nothing was dispatched.
 		let guardTicket: unknown;
+		let guardNote: string | undefined;
 		if (guard) {
 			const verdict = await guard.before({
 				serverUrl: serverCfg.url,
@@ -557,6 +558,7 @@ export async function* executeToolCalls({
 				return;
 			}
 			guardTicket = verdict.ticket;
+			guardNote = verdict.note;
 		}
 
 		try {
@@ -657,7 +659,7 @@ export async function* executeToolCalls({
 				return;
 			}
 
-			const { annotated } = processToolOutput(toolResponse.text ?? "");
+			const { annotated: serverText } = processToolOutput(toolResponse.text ?? "");
 
 			if (guardTicket !== undefined) {
 				// Raw text, not the annotated form: the guard parses identifiers out
@@ -674,7 +676,7 @@ export async function* executeToolCalls({
 			}
 
 			if (toolResponse.isError) {
-				const message = annotated.trim() || "The tool reported an error with no message.";
+				const message = serverText.trim() || "The tool reported an error with no message.";
 				logger.warn(
 					{ server: mappingEntry.server, tool: mappingEntry.tool, err: message },
 					"[mcp] tool returned an error result"
@@ -693,6 +695,7 @@ export async function* executeToolCalls({
 				{ server: mappingEntry.server, tool: mappingEntry.tool },
 				"[mcp] tool call completed"
 			);
+			const annotated = guardNote ? `${serverText}\n\n${guardNote}` : serverText;
 			// sub agent results never reach a message so there is nothing to store under
 			const content = elicitation?.conversationId
 				? await offloadImageBlocks(elicitation.conversationId, toolResponse.content)

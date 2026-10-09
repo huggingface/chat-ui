@@ -136,13 +136,9 @@ const looksLikeDataset = (receiver: string | undefined): boolean => {
 	return /(?:^|_)ds(?:$|_)|data/i.test(last);
 };
 
-function fromCall(
-	name: string,
-	receiver: string | undefined,
-	args: string,
-	constants: Map<string, string>
-): Candidate | undefined {
-	if (receiver?.split(".")[0] === "trackio") return undefined;
+type CallArguments = { positional: string[]; keywords: Map<string, string> };
+
+function parseArguments(args: string): CallArguments {
 	const positional: string[] = [];
 	const keywords = new Map<string, string>();
 	for (const arg of splitArguments(args)) {
@@ -150,6 +146,16 @@ function fromCall(
 		if (keyword) keywords.set(keyword[1], keyword[2].trim());
 		else positional.push(arg);
 	}
+	return { positional, keywords };
+}
+
+function fromCall(
+	name: string,
+	receiver: string | undefined,
+	{ positional, keywords }: CallArguments,
+	constants: Map<string, string>
+): Candidate | undefined {
+	if (receiver?.split(".")[0] === "trackio") return undefined;
 	const idExpression =
 		keywords.get("repo_id") ??
 		(name === "push_to_hub" || name === "create_repo" ? positional[0] : undefined);
@@ -179,7 +185,8 @@ export function expectedPushesIn(sources: readonly string[]): ExpectedPush[] {
 	}
 	for (const match of source.matchAll(PUSH_CALL)) {
 		const open = match.index + match[0].length - 1;
-		const candidate = fromCall(match[2], match[1], callArguments(source, open), constants);
+		const args = parseArguments(callArguments(source, open));
+		const candidate = fromCall(match[2], match[1], args, constants);
 		if (candidate) found.push({ index: match.index, candidate });
 	}
 
@@ -196,6 +203,38 @@ export function expectedPushesIn(sources: readonly string[]): ExpectedPush[] {
 	}));
 }
 
+export type UnguardedCreate = { uri: string; repo: string; call: "create_repo" | "push_to_hub" };
+
+const SENTENCE_TRANSFORMERS_IMPORT = /\b(?:from|import)[ \t]+sentence_transformers\b/;
+
+/** calls that 409 on an existing repo, both default exist_ok to False */
+export function unguardedCreatesIn(sources: readonly string[]): UnguardedCreate[] {
+	const source = codeOnly(sources.join("\n"));
+	const constants = literalConstants(source);
+	const sentenceTransformers = SENTENCE_TRANSFORMERS_IMPORT.test(source);
+	const byUri = new Map<string, UnguardedCreate>();
+	for (const match of source.matchAll(PUSH_CALL)) {
+		const [, receiver, name] = match;
+		if (name !== "create_repo" && name !== "push_to_hub") continue;
+		if (name === "push_to_hub") {
+			if (!sentenceTransformers || looksLikeDataset(receiver)) continue;
+			if (/trainer/i.test(receiver?.split(".").pop() ?? "")) continue;
+		}
+		const open = match.index + match[0].length - 1;
+		const args = parseArguments(callArguments(source, open));
+		const existOk = args.keywords.get("exist_ok");
+		if (existOk !== undefined && existOk !== "False") continue;
+		if (args.positional.some((arg) => arg.startsWith("**"))) continue;
+		// SentenceTransformer.push_to_hub takes no repo_type, a call that passes one is another push
+		if (name === "push_to_hub" && args.keywords.has("repo_type")) continue;
+		const candidate = fromCall(name, receiver, args, constants);
+		if (!candidate || !REPO_ID.test(candidate.id) || TRACKIO.test(candidate.id)) continue;
+		const uri = `hf://${candidate.kind}s/${candidate.id}`;
+		if (!byUri.has(uri)) byUri.set(uri, { uri, repo: candidate.id, call: name });
+	}
+	return [...byUri.values()];
+}
+
 const stringValues = (value: unknown): string[] =>
 	typeof value === "string"
 		? [value]
@@ -204,11 +243,15 @@ const stringValues = (value: unknown): string[] =>
 			: [];
 
 /** the script, its arguments and a docker command, as the guard sees them after expansion */
-export function expectedPushesOfJob(jobArgs: Record<string, unknown>): ExpectedPush[] {
-	return expectedPushesIn([
-		...stringValues(jobArgs.script),
-		// a token per line, so a hash in one does not comment out the rest
-		stringValues(jobArgs.script_args).join("\n"),
-		stringValues(jobArgs.command).join("\n"),
-	]);
-}
+const jobSources = (jobArgs: Record<string, unknown>): string[] => [
+	...stringValues(jobArgs.script),
+	// a token per line, so a hash in one does not comment out the rest
+	stringValues(jobArgs.script_args).join("\n"),
+	stringValues(jobArgs.command).join("\n"),
+];
+
+export const expectedPushesOfJob = (jobArgs: Record<string, unknown>): ExpectedPush[] =>
+	expectedPushesIn(jobSources(jobArgs));
+
+export const unguardedCreatesOfJob = (jobArgs: Record<string, unknown>): UnguardedCreate[] =>
+	unguardedCreatesIn(jobSources(jobArgs));

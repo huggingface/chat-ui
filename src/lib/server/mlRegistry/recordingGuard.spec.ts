@@ -499,6 +499,151 @@ describe.sequential("mlRegistry recording guard: artefacts", () => {
 	});
 });
 
+describe.sequential("mlRegistry recording guard: reserved repo conflicts", () => {
+	const MODEL_REPO_REPLY = {
+		action: "created",
+		id: "68d000000000000000000002",
+		repo: "testuser/minilm",
+		repo_type: "model",
+		uri: "hf://models/testuser/minilm",
+		url: "https://huggingface.co/testuser/minilm",
+	};
+	const stScript = (push: string) =>
+		[
+			"from sentence_transformers import SentenceTransformer",
+			'model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")',
+			"trainer.train()",
+			push,
+		].join("\n");
+	const submit = (script: string) => ({
+		operation: "uv",
+		args: { script, flavor: "a10g-small", timeout: "2h" },
+	});
+
+	it("warns, and still lets the job through, when the script would re-create a repo the conversation reserved", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+		await dispatch("create_repo", { uri: "hf://models/testuser/minilm" }, ok(MODEL_REPO_REPLY));
+
+		const verdict = await dispatch(
+			"hf_jobs",
+			submit(stScript('model.push_to_hub("testuser/minilm")')),
+			ok(JOB_REPLY)
+		);
+
+		expect(verdict).toMatchObject({ allow: true, ticket: { kind: "job" } });
+		if (!verdict.allow) throw new Error("refused");
+		expect(verdict.note).toContain('SentenceTransformer.push_to_hub("testuser/minilm")');
+		expect(verdict.note).toContain("without exist_ok=True");
+		expect(verdict.note).toContain("409");
+		expect(await listMlServices(conversationId)).toHaveLength(1);
+	});
+
+	it("names a bare create_repo the same way", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+		await dispatch("create_repo", { uri: "hf://models/testuser/minilm" }, ok(MODEL_REPO_REPLY));
+
+		const verdict = await dispatch(
+			"hf_jobs",
+			submit(
+				'create_repo("testuser/minilm")\napi.upload_folder(folder_path="out", repo_id="testuser/minilm")'
+			),
+			ok(JOB_REPLY)
+		);
+
+		if (!verdict.allow) throw new Error("refused");
+		expect(verdict.note).toContain('create_repo("testuser/minilm")');
+	});
+
+	it("stays quiet when the script tolerates the repo, or the repo is not one the conversation knows", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+		await dispatch("create_repo", { uri: "hf://models/testuser/minilm" }, ok(MODEL_REPO_REPLY));
+
+		const tolerant = await dispatch(
+			"hf_jobs",
+			submit(stScript('model.push_to_hub("testuser/minilm", exist_ok=True)')),
+			ok(JOB_REPLY)
+		);
+		const fresh = await dispatch(
+			"hf_jobs",
+			submit(stScript('model.push_to_hub("testuser/never-reserved")')),
+			ok(JOB_REPLY)
+		);
+		const trainer = await dispatch(
+			"hf_jobs",
+			submit(
+				[
+					"from sentence_transformers import SentenceTransformerTrainingArguments",
+					'args = SentenceTransformerTrainingArguments(output_dir="out", push_to_hub=True, hub_model_id="testuser/minilm")',
+					"trainer.push_to_hub()",
+				].join("\n")
+			),
+			ok(JOB_REPLY)
+		);
+
+		for (const verdict of [tolerant, fresh, trainer]) {
+			expect(verdict).not.toHaveProperty("note");
+		}
+	});
+
+	it("still allows the job, without a note, when the lookup fails", async () => {
+		const conversationId = newConversationId();
+		const { dispatch } = makeGuard(conversationId);
+		await dispatch("create_repo", { uri: "hf://models/testuser/minilm" }, ok(MODEL_REPO_REPLY));
+		vi.spyOn(collections.mlArtefacts, "find").mockImplementation(() => {
+			throw new Error("db down");
+		});
+		vi.spyOn(logger, "error").mockImplementation(() => undefined);
+
+		const verdict = await dispatch(
+			"hf_jobs",
+			submit(stScript('model.push_to_hub("testuser/minilm")')),
+			ok(JOB_REPLY)
+		);
+
+		expect(verdict).toMatchObject({ allow: true, ticket: { kind: "job" } });
+		expect(verdict).not.toHaveProperty("note");
+	});
+
+	it("carries the note through the chain to the budget guard", async () => {
+		const conversationId = newConversationId();
+		await collections.conversations.insertOne({
+			_id: conversationId,
+			title: "chain test",
+			model: "test-model",
+			messages: [],
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			sessionId: `chain-test-${conversationId.toString()}`,
+			mlAssistant: true,
+			mlBudget: { totalMicroUsd: 10_000_000, spentMicroUsd: 0, reservations: [] },
+		});
+		const { guard: recording, dispatch } = makeGuard(conversationId);
+		await dispatch("create_repo", { uri: "hf://models/testuser/minilm" }, ok(MODEL_REPO_REPLY));
+		const budget = createMlBudgetGuard({
+			conversationId,
+			generationId: "gen-1",
+			username: "testuser",
+		});
+		const guard = [createSchemaPreflightGuard({}), recording, budget].reduce(composeGuards);
+
+		const verdict = await guard.before({
+			serverUrl: HF_URL,
+			tool: "hf_jobs",
+			fnName: "hf_jobs",
+			args: submit(stScript('model.push_to_hub("testuser/minilm")')),
+			callUuid: "uuid-9",
+		});
+
+		if (!verdict.allow) throw new Error(verdict.message);
+		expect(verdict.update).toMatchObject({ type: MessageUpdateType.Budget });
+		expect(verdict.note).toContain("409");
+		await guard.after(verdict.ticket, ok(JOB_REPLY));
+	});
+});
+
 describe.sequential("mlRegistry recording guard: the discovered rule", () => {
 	it("records a job id first seen in a read, once", async () => {
 		const conversationId = newConversationId();

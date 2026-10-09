@@ -27,7 +27,8 @@ export interface GuardedToolCall {
 }
 
 export type GuardVerdict =
-	| { allow: true; ticket?: unknown; update?: MessageUpdate }
+	/** note is appended to the result the model reads, only when the call succeeds */
+	| { allow: true; ticket?: unknown; update?: MessageUpdate; note?: string }
 	/** Refused: `message` goes back to the model as the tool error. Nothing was dispatched. */
 	| { allow: false; message: string; update?: MessageUpdate };
 
@@ -71,10 +72,12 @@ export function composeGuards(first: ToolCallGuard, second: ToolCallGuard): Tool
 			if (!firstVerdict.allow) return firstVerdict;
 			const secondVerdict = await second.before(call);
 			if (!secondVerdict.allow) return secondVerdict;
+			const notes = [firstVerdict.note, secondVerdict.note].filter(Boolean);
 			return {
 				allow: true,
 				ticket: { first: firstVerdict.ticket, second: secondVerdict.ticket } satisfies Tickets,
 				update: secondVerdict.update,
+				...(notes.length ? { note: notes.join("\n\n") } : {}),
 			};
 		},
 		async after(ticket, outcome) {
