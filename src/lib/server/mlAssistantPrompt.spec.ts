@@ -102,6 +102,7 @@ describe("ML Assistant preprompt", () => {
 		expect(ML_ASSISTANT_PREPROMPT).toContain(
 			"A requirement the user has not stated is a real choice even when the request has only one obvious reading"
 		);
+		expect(ML_ASSISTANT_PREPROMPT).toContain("a choice form cannot carry a full-length input");
 		expect(ML_ASSISTANT_PREPROMPT).toContain("the input length it trains and evaluates at");
 		expect(ML_ASSISTANT_PREPROMPT).toContain("Then check it against the use, not only the method.");
 	});
