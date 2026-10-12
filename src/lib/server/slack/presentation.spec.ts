@@ -4,6 +4,8 @@ import {
 	activityText,
 	questionBlocks,
 	inlineField,
+	latestPublicUpdate,
+	createdSpaceLinks,
 	answerSummary,
 	chunks,
 	questionModal,
@@ -217,4 +219,26 @@ describe("Inline Slack questions", () => {
 		const modal = questionModal(question, "T:C:1");
 		expect(modal.blocks.filter((b) => b.type === "section").length).toBeGreaterThanOrEqual(4);
 	});
+});
+
+it("shows only bounded public commentary and confirmed created Space links", () => {
+	expect(latestPublicUpdate("<think>secret</think>Uploaded files.\n\nWaiting for the build.")).toBe(
+		"Waiting for the build."
+	);
+	expect(latestPublicUpdate("<think>unfinished private reasoning")).toBe("");
+	expect(latestPublicUpdate("x".repeat(500)).length).toBeLessThanOrEqual(320);
+	expect(
+		createdSpaceLinks([
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: "repo",
+				result: {
+					status: "success",
+					call: { name: "create_repo", parameters: { uri: "hf://spaces/org/demo" } },
+					outputs: [],
+				},
+			} as import("$lib/types/MessageUpdate").MessageUpdate,
+		])
+	).toEqual(["https://huggingface.co/spaces/org/demo"]);
 });

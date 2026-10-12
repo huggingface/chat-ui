@@ -411,3 +411,30 @@ export function answerSummary(
 		})
 		.join("\n\n");
 }
+
+/** Public assistant prose only; never reasoning streams or tool arguments. */
+export function latestPublicUpdate(content: string): string {
+	const paragraphs = visibleText(content)
+		.split(/\n\s*\n/)
+		.map((p) => p.trim())
+		.filter(Boolean);
+	const latest = paragraphs.at(-1)?.replace(/\s+/g, " ") ?? "";
+	return latest.length > 320 ? `${latest.slice(0, 317)}…` : latest;
+}
+export function createdSpaceLinks(updates: MessageUpdate[] = []): string[] {
+	const links = new Set<string>();
+	for (const update of updates) {
+		if (
+			update.type !== MessageUpdateType.Tool ||
+			update.subtype !== MessageToolUpdateType.Result ||
+			update.result.status !== "success" ||
+			update.result.call.name !== "create_repo"
+		)
+			continue;
+		const uri = update.result.call.parameters.uri;
+		if (typeof uri !== "string") continue;
+		const match = /^hf:\/\/spaces\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)$/.exec(uri);
+		if (match) links.add(`https://huggingface.co/spaces/${match[1]}`);
+	}
+	return [...links].slice(-3);
+}

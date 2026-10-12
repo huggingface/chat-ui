@@ -21,6 +21,8 @@ import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store"
 import type { SlackThread } from "./types";
 import {
 	PICK_ACTION,
+	latestPublicUpdate,
+	createdSpaceLinks,
 	inlineField,
 	questionBlocks,
 	answerSummary,
@@ -527,13 +529,25 @@ export class MlSlackBot {
 				) * 10
 			);
 			text += `\nElapsed: ${elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`}`;
-			const steps = conv.plan?.steps
-				.map(
-					(s) =>
-						`${s.status === "completed" ? "✓" : s.status === "in_progress" ? "→" : "·"} ${s.step}`
-				)
-				.join("\n");
-			if (steps) text += `\n\n${steps}`;
+
+			if (state.status === "waiting" && state.waitUntil) {
+				const remaining = Math.max(
+					0,
+					Math.ceil((new Date(state.waitUntil).getTime() - Date.now()) / 30000) * 30
+				);
+				text += remaining
+					? ` · Next check in ~${remaining < 60 ? `${remaining}s` : `${Math.ceil(remaining / 60)}m`}`
+					: " · Next check is due";
+			}
+			const latest = latestPublicUpdate(message.content);
+			if (latest) text += `\n\nLatest update: ${latest}`;
+			const steps = conv.plan?.steps ?? [];
+			const current = steps.find((s) => s.status === "in_progress");
+			if (steps.length)
+				text += `\n\n${steps.filter((s) => s.status === "completed").length}/${steps.length} steps complete${current ? ` · ${current.step.slice(0, 200)}` : ""}`;
+			const links = createdSpaceLinks(message.updates);
+			if (links.length)
+				text += `\n\nSpace created (setup may still be in progress):\n${links.join("\n")}`;
 		} else {
 			text =
 				visibleText(message.content) ||
