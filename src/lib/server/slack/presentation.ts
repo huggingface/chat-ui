@@ -1,3 +1,8 @@
+import {
+	MessageUpdateType,
+	MessageToolUpdateType,
+	type MessageUpdate,
+} from "$lib/types/MessageUpdate";
 import { Lexer, type Token } from "marked";
 import type { types, ViewStateValue } from "@slack/bolt";
 import type { ElicitationRequestPayload, ElicitationValue } from "$lib/types/McpElicitation";
@@ -277,4 +282,31 @@ export function readAnswers(
 		}
 	}
 	return { content, errors };
+}
+
+/** Activity labels come from tool types, never private reasoning or tool arguments. */
+export function activityText(updates: MessageUpdate[] = [], completedLookups = 0): string {
+	const active = new Map<string, string>();
+	let usedTools = false;
+	for (const update of updates) {
+		if (update.type !== MessageUpdateType.Tool) continue;
+		if (update.subtype === MessageToolUpdateType.Call) {
+			active.set(update.uuid, update.call.name);
+			usedTools = true;
+		} else if (
+			update.subtype === MessageToolUpdateType.Result ||
+			update.subtype === MessageToolUpdateType.Error
+		) {
+			active.delete(update.uuid);
+		}
+	}
+	const names = [...active.values()];
+	if (names.includes("research"))
+		return `Researching sources…${completedLookups ? ` (${completedLookups} lookups completed)` : ""}`;
+	if (names.some((n) => ["hf_fs", "hub_repo_details", "web_search", "web_fetch"].includes(n)))
+		return "Looking up sources on the web and Hugging Face…";
+	if (names.some((n) => ["hf_jobs", "hf_sandbox"].includes(n)))
+		return "Working with remote compute…";
+	if (names.length) return "Running tools…";
+	return usedTools ? "Preparing the response…" : "Reviewing your request…";
 }

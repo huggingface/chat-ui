@@ -50,14 +50,16 @@ export async function enqueueInput(
 		| "expectedMessageId"
 		| "expectedGenerationId"
 	>
-): Promise<void> {
+): Promise<boolean> {
 	const now = new Date();
+	let inserted = false;
 	try {
-		await collections.slackInputs.updateOne(
+		const result = await collections.slackInputs.updateOne(
 			{ _id: input._id },
 			{ $setOnInsert: { ...input, status: "queued", createdAt: now, updatedAt: now } },
 			{ upsert: true }
 		);
+		inserted = result.upsertedCount === 1;
 	} catch (err) {
 		if (!duplicate(err)) throw err;
 	}
@@ -65,6 +67,7 @@ export async function enqueueInput(
 		{ _id: input.threadId },
 		{ $set: { watching: true, updatedAt: now } }
 	);
+	return inserted;
 }
 
 /** One Socket Mode consumer/worker per workspace, even during rolling deployments. */

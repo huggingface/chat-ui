@@ -1,5 +1,13 @@
+import { MessageUpdateType, MessageToolUpdateType } from "$lib/types/MessageUpdate";
 import { describe, expect, it } from "vitest";
-import { chunks, questionModal, readAnswers, visibleText, slackMarkdown } from "./presentation";
+import {
+	activityText,
+	chunks,
+	questionModal,
+	readAnswers,
+	visibleText,
+	slackMarkdown,
+} from "./presentation";
 import { isWorkspaceMember, threadKey, threadPrompt } from "./context";
 import type { ElicitationRequestPayload } from "$lib/types/McpElicitation";
 
@@ -153,5 +161,31 @@ describe("Slack context boundaries", () => {
 			{ team_id: "T1", deleted: true },
 		])
 			expect(isWorkspaceMember(user, "T1")).toBe(false);
+	});
+});
+
+describe("Slack progress", () => {
+	it("reports active research without exposing reasoning or raw arguments", () => {
+		const call = {
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Call,
+			uuid: "research-1",
+			call: { name: "research", parameters: {} },
+			reasoning: "private reasoning",
+			argumentsRaw: "private arguments",
+		} as const;
+		expect(activityText([call], 9)).toBe("Researching sources… (9 lookups completed)");
+		expect(
+			activityText([
+				call,
+				{
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid: "research-1",
+					message: "error",
+				},
+			])
+		).toBe("Preparing the response…");
+		expect(activityText([])).toBe("Reviewing your request…");
 	});
 });

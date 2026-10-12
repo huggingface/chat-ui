@@ -56,6 +56,7 @@ beforeEach(async () => {
 	mocks.users.mockImplementation(async ({ user }: { user: string }) => ({
 		user: { id: user, team_id: "T123" },
 	}));
+	mocks.ephemeral.mockResolvedValue({ ok: true });
 	mocks.channels.mockResolvedValue({ channel: { is_ext_shared: false } });
 	mocks.replies.mockResolvedValue({ messages: [] });
 });
@@ -64,6 +65,24 @@ afterEach(async () => {
 });
 
 describe("Slack transport authorization", () => {
+	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {
+		const { user } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		const event = { channel: "C123", user: "OWNER", text: "Research this", ts: "100.0" };
+		await bot.receive(event, "T123", "ACK1");
+		await bot.receive(event, "T123", "ACK1");
+		expect(mocks.ephemeral).toHaveBeenCalledTimes(1);
+		expect(mocks.ephemeral).toHaveBeenCalledWith(
+			expect.objectContaining({
+				channel: "C123",
+				thread_ts: "100.0",
+				user: "OWNER",
+				text: expect.stringContaining("Request received"),
+			})
+		);
+		expect(mocks.run).not.toHaveBeenCalled();
+		expect(await collections.slackInputs.countDocuments({ status: "queued" })).toBe(1);
+	});
 	it("runs different users' threads concurrently without sharing prompts or conversations", async () => {
 		const { user } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);

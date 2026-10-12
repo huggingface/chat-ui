@@ -20,6 +20,7 @@ import { isWorkspaceMember, threadPrompt, type ThreadMessage } from "./context";
 import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store";
 import type { SlackThread } from "./types";
 import {
+	activityText,
 	ANSWER_ACTION,
 	ANSWER_VIEW,
 	STOP_ACTION,
@@ -307,13 +308,23 @@ export class MlSlackBot {
 			);
 			return;
 		}
-		await enqueueInput({
+		const inserted = await enqueueInput({
 			_id: inputKey(teamId, eventId),
 			threadId: thread._id,
 			user: event.user,
 			text: event.text,
 			ts: event.ts,
 		});
+		if (inserted) {
+			await this.app.client.chat
+				.postEphemeral({
+					channel: thread.channel,
+					thread_ts: thread.threadTs,
+					user: event.user,
+					text: "Request received. Progress and results will appear in this thread. Requests in a busy session wait for its current turn.",
+				})
+				.catch(() => logger.warn("[slack] Acknowledgement failed; request remains queued."));
+		}
 	}
 
 	private async context(
@@ -439,7 +450,22 @@ export class MlSlackBot {
 			text =
 				state.status === "waiting"
 					? `Waiting: ${state.waitReason ?? "for compute to finish"}`
-					: "ML Intern is working…";
+					: activityText(
+							message.updates,
+							await collections.nestedAgentCalls.countDocuments({
+								conversationId: conv._id,
+								generationId: message.generationId,
+								label: "research",
+								status: "success",
+							})
+						);
+			const elapsed = Math.max(
+				0,
+				Math.floor(
+					(Date.now() - new Date(message.createdAt ?? state.createdAt).getTime()) / 10000
+				) * 10
+			);
+			text += `\nElapsed: ${elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`}`;
 			const steps = conv.plan?.steps
 				.map(
 					(s) =>
