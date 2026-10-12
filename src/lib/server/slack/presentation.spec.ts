@@ -261,3 +261,11 @@ it("uses the matching creation call when result metadata omits its URI", () => {
 		] as import("$lib/types/MessageUpdate").MessageUpdate[])
 	).toEqual(["https://huggingface.co/spaces/org/demo"]);
 });
+
+it("separates public updates across reasoning rounds", () => {
+	expect(
+		latestPublicUpdate(
+			"Old status.<think>private</think>Current status.<think>still private</think>"
+		)
+	).toBe("Current status.");
+});

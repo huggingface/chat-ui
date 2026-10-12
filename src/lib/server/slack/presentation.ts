@@ -414,7 +414,7 @@ export function answerSummary(
 
 /** Public assistant prose only; never reasoning streams or tool arguments. */
 export function latestPublicUpdate(content: string): string {
-	const paragraphs = visibleText(content)
+	const paragraphs = visibleText(content.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "\n\n"))
 		.split(/\n\s*\n/)
 		.map((p) => p.trim())
 		.filter(Boolean);
