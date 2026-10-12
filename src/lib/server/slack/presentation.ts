@@ -1,0 +1,280 @@
+import { Lexer, type Token } from "marked";
+import type { types, ViewStateValue } from "@slack/bolt";
+import type { ElicitationRequestPayload, ElicitationValue } from "$lib/types/McpElicitation";
+
+type KnownBlock = types.KnownBlock;
+type ModalView = types.ModalView;
+
+export const ANSWER_ACTION = "ml_intern_answer";
+export const ANSWER_VIEW = "ml_intern_answers";
+export const STOP_ACTION = "ml_intern_stop";
+export const RESUME_ACTION = "ml_intern_resume";
+
+const plain = (text: string) => ({ type: "plain_text" as const, text, emoji: false });
+export function chunks(text: string, size = 2800): string[] {
+	// Split on code points, never between the halves of an emoji.
+	const chars = Array.from(text || "No response text.");
+	const parts: string[] = [];
+	for (let i = 0; i < chars.length; i += size) parts.push(chars.slice(i, i + size).join(""));
+	return parts;
+}
+
+export function visibleText(text: string): string {
+	return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
+}
+
+/** Render Markdown as Slack mrkdwn, without allowing model-authored Slack mentions. */
+export function slackMarkdown(text: string): string {
+	const escape = (value: string) =>
+		value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	// Marked escapes inline text; decode its entities once before Slack escaping.
+	const inlineText = (value: string) =>
+		escape(
+			value.replace(
+				/&(amp|lt|gt|quot|#39);/g,
+				(entity) =>
+					({ "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" })[entity] ??
+					entity
+			)
+		);
+	const render = (tokens: Token[] = []): string =>
+		tokens
+			.map((token): string => {
+				switch (token.type) {
+					case "space":
+						return "";
+					case "paragraph":
+						return `${render(token.tokens)}\n\n`;
+					case "heading":
+						return `*${render(token.tokens)}*\n\n`;
+					case "strong":
+						return `*${render(token.tokens)}*`;
+					case "em":
+						return `_${render(token.tokens)}_`;
+					case "del":
+						return `~${render(token.tokens)}~`;
+					case "br":
+						return "\n";
+					case "code":
+						return `\`\`\`\n${escape(token.text)}\n\`\`\`\n\n`;
+					case "codespan":
+						return `\`${inlineText(token.text)}\``;
+					case "blockquote":
+						return (
+							render(token.tokens)
+								.trim()
+								.split("\n")
+								.map((line) => `> ${line}`)
+								.join("\n") + "\n\n"
+						);
+					case "list":
+						return (
+							token.items
+								.map(
+									(item: { tokens: Token[]; task?: boolean; checked?: boolean }, index: number) => {
+										const prefix = token.ordered ? `${Number(token.start) + index}.` : "•";
+										const body = render(item.tokens).trim().replace(/\n/g, "\n  ");
+										return `${prefix} ${item.task ? (item.checked ? "☑ " : "☐ ") : ""}${body}`;
+									}
+								)
+								.join("\n") + "\n\n"
+						);
+					case "link": {
+						const label = render(token.tokens).replace(/\|/g, " ");
+						if (!/^https?:\/\//i.test(token.href)) return label;
+						const url = escape(token.href).replace(/\|/g, "%7C");
+						return label === url ? `<${url}>` : `<${url}|${label}>`;
+					}
+					case "image":
+						return /^https?:\/\//i.test(token.href)
+							? `<${escape(token.href).replace(/\|/g, "%7C")}|${escape(token.text).replace(/\|/g, " ") || "Image"}>`
+							: escape(token.text);
+					case "hr":
+						return "———\n\n";
+					case "html":
+						return escape(token.raw);
+					case "def":
+						return "";
+					default:
+						return "tokens" in token && token.tokens
+							? render(token.tokens)
+							: inlineText("text" in token ? token.text : token.raw);
+				}
+			})
+			.join("");
+	return render(Lexer.lex(text, { gfm: true })).trim();
+}
+
+export function messageBlocks(
+	text: string,
+	actions: Array<{ id: string; label: string; value: string }> = []
+): KnownBlock[] {
+	const formatted = slackMarkdown(text);
+	return [
+		{
+			type: "section",
+			text:
+				formatted.length <= 3000
+					? { type: "mrkdwn", text: formatted, verbatim: true }
+					: plain(text),
+		},
+		...(actions.length
+			? [
+					{
+						type: "actions" as const,
+						elements: actions.map((a) => ({
+							type: "button" as const,
+							action_id: a.id,
+							text: plain(a.label),
+							value: a.value,
+						})),
+					},
+				]
+			: []),
+	];
+}
+
+/** Full question/option copy remains visible; Slack's short option labels carry opaque indices. */
+export function questionModal(request: ElicitationRequestPayload, threadId: string): ModalView {
+	const blocks: KnownBlock[] = [];
+	for (const [index, field] of (request.fields ?? []).entries()) {
+		const key = `q${index}`;
+		const description = [
+			field.description ?? field.title ?? field.name,
+			...(field.kind === "select"
+				? field.options.map(
+						(o, i) =>
+							`${i + 1}. ${o.setBudgetUsd !== undefined ? `Set budget to $${o.setBudgetUsd.toFixed(2)}` : o.label}${o.description ? ` — ${o.description}` : ""}`
+					)
+				: []),
+		].join("\n\n");
+		for (const part of chunks(description)) blocks.push({ type: "section", text: plain(part) });
+		const label = plain((field.title ?? field.name).slice(0, 150));
+		if (field.kind === "select") {
+			const options = field.options.map((option, i) => ({
+				text: plain(
+					`${i + 1}. ${option.setBudgetUsd !== undefined ? `$${option.setBudgetUsd.toFixed(2)} budget` : option.label}`.slice(
+						0,
+						75
+					)
+				),
+				value: String(i),
+			}));
+			if (field.allowOther) options.push({ text: plain("Other (write below)"), value: "other" });
+			blocks.push({
+				type: "input",
+				block_id: key,
+				label,
+				optional: !field.required,
+				element: {
+					type: field.multiple ? "multi_static_select" : "static_select",
+					action_id: "answer",
+					options,
+				},
+			});
+			if (field.allowOther)
+				blocks.push({
+					type: "input",
+					block_id: `${key}_other`,
+					optional: true,
+					label: plain("Your own answer"),
+					element: { type: "plain_text_input", action_id: "answer", max_length: 200 },
+				});
+		} else if (field.kind === "boolean") {
+			blocks.push({
+				type: "input",
+				block_id: key,
+				label,
+				optional: !field.required,
+				element: {
+					type: "static_select",
+					action_id: "answer",
+					options: ["true", "false"].map((value) => ({
+						text: plain(value === "true" ? "Yes" : "No"),
+						value,
+					})),
+				},
+			});
+		} else {
+			blocks.push({
+				type: "input",
+				block_id: key,
+				label,
+				optional: !field.required,
+				element: {
+					type: "plain_text_input",
+					action_id: "answer",
+					max_length: Math.min(field.kind === "string" ? (field.maxLength ?? 3000) : 100, 3000),
+				},
+			});
+		}
+	}
+	if (!blocks.length || blocks.length > 100)
+		throw new Error("This question cannot fit in a Slack form.");
+	return {
+		type: "modal",
+		callback_id: ANSWER_VIEW,
+		title: plain("ML Intern question"),
+		submit: plain("Send answer"),
+		close: plain("Later"),
+		private_metadata: JSON.stringify({ threadId, elicitationId: request.elicitationId }),
+		blocks,
+	};
+}
+
+export function readAnswers(
+	request: ElicitationRequestPayload,
+	values: Record<string, Record<string, ViewStateValue>>
+): { content: Record<string, ElicitationValue>; errors: Record<string, string> } {
+	const content: Record<string, ElicitationValue> = {};
+	const errors: Record<string, string> = {};
+	for (const [index, field] of (request.fields ?? []).entries()) {
+		const key = `q${index}`;
+		const input = values[key]?.answer;
+		if (field.kind === "select") {
+			const picked = field.multiple
+				? (input?.selected_options ?? [])
+				: input?.selected_option
+					? [input.selected_option]
+					: [];
+			const selected: string[] = [];
+			for (const option of picked) {
+				if (option.value === "other" && field.allowOther) {
+					const other = values[`${key}_other`]?.answer?.value?.trim();
+					if (!other) errors[`${key}_other`] = "Write your answer here.";
+					else selected.push(other);
+				} else {
+					const n = Number(option.value);
+					if (!/^\d+$/.test(option.value) || !field.options[n])
+						errors[key] = "Choose one of the offered options.";
+					else selected.push(field.options[n].value);
+				}
+			}
+			if (field.required && !selected.length && !errors[`${key}_other`])
+				errors[key] = "Choose an answer.";
+			if (selected.length) content[field.name] = field.multiple ? selected : selected[0];
+		} else if (field.kind === "boolean") {
+			const selected = input?.selected_option?.value;
+			if (selected === "true" || selected === "false") content[field.name] = selected === "true";
+			else if (field.required) errors[key] = "Choose Yes or No.";
+		} else {
+			const value = input?.value?.trim();
+			if (!value) {
+				if (field.required) errors[key] = "Enter an answer.";
+				continue;
+			}
+			if (field.kind === "number") {
+				const number = Number(value);
+				if (
+					!Number.isFinite(number) ||
+					(field.integer && !Number.isInteger(number)) ||
+					(field.minimum !== undefined && number < field.minimum) ||
+					(field.maximum !== undefined && number > field.maximum)
+				)
+					errors[key] = "Enter a number within the requested range.";
+				else content[field.name] = number;
+			} else content[field.name] = value;
+		}
+	}
+	return { content, errors };
+}

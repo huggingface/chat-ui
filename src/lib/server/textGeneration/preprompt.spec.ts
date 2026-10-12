@@ -227,3 +227,14 @@ describe("resolvePreprompt: who pays", () => {
 		).toBe("You are a pirate.");
 	});
 });
+
+it("keeps the publishing destination separate from identity and billing", () => {
+	const prompt = resolvePreprompt({
+		mlAssistant: true,
+		username: "alice",
+		publishNamespace: "ML-Intern-lab",
+		billTo: "compute-org",
+	});
+	expect(prompt).toContain("User=alice, PublishTo=ML-Intern-lab, BillTo=compute-org");
+	expect(resolvePreprompt({ mlAssistant: true, username: "alice" })).not.toContain("PublishTo=");
+});

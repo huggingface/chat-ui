@@ -17,6 +17,8 @@ declare global {
 			billingOrganization?: string;
 			/** Enterprise resource group within billingOrganization used for cost attribution. */
 			billingResourceGroup?: string;
+			/** Server-configured default Hub publishing namespace. */
+			publishNamespace?: string;
 		}
 
 		interface Error {

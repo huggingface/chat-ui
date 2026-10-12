@@ -72,6 +72,9 @@ jobs:
       - name: "Tests (node)"
         run: npm run test
 
+      - name: "Slack Space snapshot restore"
+        run: node --test integrations/slack/space/state.test.mjs
+
       - name: "Tests (browser)"
         run: npm run test:client
 

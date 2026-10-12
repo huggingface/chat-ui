@@ -211,7 +211,7 @@ export async function* runMcpFlow({
 	};
 	const builtinTools = getEnabledBuiltinTools({
 		conv,
-		namespace: (locals as unknown as { user?: { username?: string } })?.user?.username,
+		namespace: locals?.publishNamespace ?? locals?.user?.username,
 		hfToken:
 			(locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
 			getUserHubToken(locals),

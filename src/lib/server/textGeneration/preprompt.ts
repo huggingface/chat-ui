@@ -24,6 +24,8 @@ export interface PrepromptInput {
 	supportsArtifacts?: boolean;
 	/** Signed-in user's Hub username. The preset's namespace rule reads it back. */
 	username?: string;
+	/** Default output namespace, independent of the compute payer. */
+	publishNamespace?: string;
 	/** IANA zone from the request, so the stamped time is the user's. */
 	timezone?: string;
 	/** Injectable clock, for tests. */
@@ -53,6 +55,7 @@ export function resolvePreprompt({
 	artifactsOverride,
 	supportsArtifacts,
 	username,
+	publishNamespace,
 	timezone,
 	now,
 	budget,
@@ -78,6 +81,7 @@ export function resolvePreprompt({
 	// so it still reaches the model on the plain generation path, which has none.
 	return `${resolved}\n\n${ML_ASSISTANT_BUDGET_RULES}\n\n${mlAssistantSessionContext({
 		username,
+		publishNamespace,
 		timezone,
 		now,
 		budget: {
