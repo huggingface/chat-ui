@@ -646,7 +646,13 @@ export class MlSlackBot {
 							type: "section",
 							text: { type: "mrkdwn", text: `*Answers confirmed by <@${thread.owner}>*` },
 						},
-						{ type: "section", text: { type: "plain_text", text: part } },
+						{
+							type: "section",
+							text: {
+								type: "mrkdwn",
+								text: part.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
+							},
+						},
 					],
 					unfurl_links: false,
 					unfurl_media: false,

@@ -329,16 +329,22 @@ function optionLabel(option: { label: string; setBudgetUsd?: number }): string {
 		? option.label
 		: `Set budget to $${option.setBudgetUsd.toFixed(2)}`;
 }
+function questionText(text: string) {
+	return {
+		type: "mrkdwn" as const,
+		text: text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
+	};
+}
 function fieldBlocks(field: ElicitationField): KnownBlock[] {
 	const blocks: KnownBlock[] = [];
 	for (const part of chunks(field.description || field.title || field.name))
-		blocks.push({ type: "section", text: plain(part) });
+		blocks.push({ type: "section", text: questionText(part) });
 	if (field.kind === "select")
 		for (const [i, option] of field.options.entries()) {
 			for (const part of chunks(
-				`${i + 1}. ${optionLabel(option)}${option.description ? `\n${option.description}` : ""}`
+				`${i + 1}. *${optionLabel(option)}*${option.description ? `\n${option.description}` : ""}`
 			))
-				blocks.push({ type: "section", text: plain(part) });
+				blocks.push({ type: "section", text: questionText(part) });
 		}
 	return blocks;
 }
