@@ -20,6 +20,10 @@ import { isWorkspaceMember, threadPrompt, type ThreadMessage } from "./context";
 import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store";
 import type { SlackThread } from "./types";
 import {
+	PICK_ACTION,
+	inlineField,
+	questionBlocks,
+	answerSummary,
 	activityText,
 	ANSWER_ACTION,
 	ANSWER_VIEW,
@@ -127,6 +131,57 @@ export class MlSlackBot {
 			if ("channel_type" in event && event.channel_type === "im")
 				await this.receive(event, body.team_id, body.event_id);
 		});
+		for (let i = 0; i < 5; i++)
+			this.app.action(`${PICK_ACTION}${i}`, async ({ ack, body, action }) => {
+				await ack();
+				if (!("value" in action)) return;
+				const parsed = metadata
+					.extend({ optionIndex: z.number().int().min(0).max(4) })
+					.safeParse(parseMetadata(action.value));
+				if (!parsed.success) return;
+				const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
+				if (!thread) return;
+				const question = await collections.mcpElicitations.findOne({
+					conversationId: thread.conversationId,
+					elicitationId: parsed.data.elicitationId,
+					status: "pending",
+					"pending.kind": "ask",
+				});
+				const field = question && inlineField(question.request);
+				const option = field && field.options[parsed.data.optionIndex];
+				if (!question || !field || !option) return;
+				await collections.mcpElicitations.updateOne(
+					{ _id: question._id, status: "pending" },
+					{ $set: { slackShareAnswer: true } }
+				);
+				const result = await submitElicitationAnswer({
+					conversationId: thread.conversationId,
+					elicitationId: question.elicitationId,
+					action: "accept",
+					content: { [field.name]: option.value },
+				});
+				if (!result.ok) {
+					await this.tell(
+						thread.channel,
+						body.user.id,
+						"This answer could not be applied, or the question was already answered. Please check the current question."
+					);
+					return;
+				}
+				if (result.resume)
+					await enqueueInput({
+						_id: inputKey(this.settings.teamId, `answer:${question.elicitationId}`),
+						threadId: thread._id,
+						user: body.user.id,
+						text: "",
+						ts: thread.threadTs,
+						resumeElicitationId: question.elicitationId,
+					});
+				await collections.slackThreads.updateOne(
+					{ _id: thread._id },
+					{ $set: { watching: true, updatedAt: new Date() } }
+				);
+			});
 		this.app.action(ANSWER_ACTION, async ({ ack, body, action }) => {
 			await ack();
 			if (!("value" in action) || !("trigger_id" in body)) return;
@@ -176,6 +231,12 @@ export class MlSlackBot {
 				await ack({ response_action: "errors", errors: answer.errors });
 				return;
 			}
+			if (question.pending?.kind === "ask")
+				await collections.mcpElicitations.updateOne(
+					{ _id: question._id, status: "pending" },
+					{ $set: { slackShareAnswer: true } }
+				);
+
 			const result = await submitElicitationAnswer({
 				conversationId: thread.conversationId,
 				elicitationId: question.elicitationId,
@@ -503,7 +564,10 @@ export class MlSlackBot {
 			const parts = chunks(text);
 			for (let index = 0; index < Math.max(parts.length, delivery.parts.length); index++) {
 				const part = parts[index] ?? "(continued above)";
-				const blocks = messageBlocks(part, index === parts.length - 1 ? actions : []);
+				const blocks =
+					question?.pending?.kind === "ask" && index === 0
+						? [...questionBlocks(question.request, thread._id), ...messageBlocks(part, actions)]
+						: messageBlocks(part, index === parts.length - 1 ? actions : []);
 				const ts = delivery.parts[index];
 				if (ts)
 					await this.app.client.chat.update({
@@ -554,6 +618,57 @@ export class MlSlackBot {
 		}
 	}
 
+	private async publishAnswers(thread: SlackThread): Promise<void> {
+		const questions = await collections.mcpElicitations
+			.find({
+				conversationId: thread.conversationId,
+				status: "resolved",
+				action: "accept",
+				resolution: "user",
+				slackShareAnswer: true,
+				"pending.kind": "ask",
+			})
+			.toArray();
+		for (const question of questions) {
+			if (!question.content) continue;
+			const _id = `${thread._id}:answer:${question.elicitationId}`;
+			const delivery = await collections.slackDeliveries.findOne({ _id });
+			const text = answerSummary(question.request, question.content);
+			const parts: string[] = delivery?.parts ?? [];
+			const texts = chunks(text);
+			for (const part of texts.slice(parts.length)) {
+				const sent = await this.app.client.chat.postMessage({
+					channel: thread.channel,
+					thread_ts: thread.threadTs,
+					text: `Answers from <@${thread.owner}>\n${part}`,
+					blocks: [
+						{
+							type: "section",
+							text: { type: "mrkdwn", text: `*Answers confirmed by <@${thread.owner}>*` },
+						},
+						{ type: "section", text: { type: "plain_text", text: part } },
+					],
+					unfurl_links: false,
+					unfurl_media: false,
+				});
+				if (!sent.ts) throw new Error("Slack did not return a message timestamp");
+				parts.push(sent.ts);
+				await collections.slackDeliveries.updateOne(
+					{ _id },
+					{
+						$set: {
+							threadId: thread._id,
+							messageId: question.elicitationId,
+							parts,
+							updatedAt: new Date(),
+						},
+					},
+					{ upsert: true }
+				);
+			}
+		}
+	}
+
 	async tick(): Promise<void> {
 		if (this.ticking || this.stopped) return;
 		this.ticking = true;
@@ -564,6 +679,12 @@ export class MlSlackBot {
 				.limit(200)
 				.toArray();
 			for (const thread of threads) {
+				try {
+					await this.publishAnswers(thread);
+				} catch {
+					logger.warn("[slack] Answer summary delivery failed; will retry.");
+					continue;
+				}
 				if (!this.active.has(thread._id) && this.active.size < 4) {
 					const run = this.dispatch(thread)
 						.catch(() => logger.error("[slack] Dispatch failed"))

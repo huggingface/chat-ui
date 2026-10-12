@@ -5,7 +5,11 @@ import {
 } from "$lib/types/MessageUpdate";
 import { Lexer, type Token } from "marked";
 import type { types, ViewStateValue } from "@slack/bolt";
-import type { ElicitationRequestPayload, ElicitationValue } from "$lib/types/McpElicitation";
+import type {
+	ElicitationField,
+	ElicitationRequestPayload,
+	ElicitationValue,
+} from "$lib/types/McpElicitation";
 
 type KnownBlock = types.KnownBlock;
 type ModalView = types.ModalView;
@@ -141,19 +145,18 @@ export function messageBlocks(
 
 /** Full question/option copy remains visible; Slack's short option labels carry opaque indices. */
 export function questionModal(request: ElicitationRequestPayload, threadId: string): ModalView {
-	const blocks: KnownBlock[] = [];
+	const blocks: KnownBlock[] = [
+		{
+			type: "section",
+			text: plain(
+				"Answers to assistant questions will be shared in this Slack thread when submitted."
+			),
+		},
+	];
 	for (const [index, field] of (request.fields ?? []).entries()) {
 		const key = `q${index}`;
-		const description = [
-			field.description ?? field.title ?? field.name,
-			...(field.kind === "select"
-				? field.options.map(
-						(o, i) =>
-							`${i + 1}. ${o.setBudgetUsd !== undefined ? `Set budget to $${o.setBudgetUsd.toFixed(2)}` : o.label}${o.description ? ` — ${o.description}` : ""}`
-					)
-				: []),
-		].join("\n\n");
-		for (const part of chunks(description)) blocks.push({ type: "section", text: plain(part) });
+		if (index) blocks.push({ type: "divider" });
+		blocks.push(...fieldBlocks(field));
 		const label = plain((field.title ?? field.name).slice(0, 150));
 		if (field.kind === "select") {
 			const options = field.options.map((option, i) => ({
@@ -220,7 +223,7 @@ export function questionModal(request: ElicitationRequestPayload, threadId: stri
 		type: "modal",
 		callback_id: ANSWER_VIEW,
 		title: plain("ML Intern question"),
-		submit: plain("Send answer"),
+		submit: plain("Share answers"),
 		close: plain("Later"),
 		private_metadata: JSON.stringify({ threadId, elicitationId: request.elicitationId }),
 		blocks,
@@ -309,4 +312,96 @@ export function activityText(updates: MessageUpdate[] = [], completedLookups = 0
 		return "Working with remote compute…";
 	if (names.length) return "Running tools…";
 	return usedTools ? "Preparing the response…" : "Reviewing your request…";
+}
+
+export const PICK_ACTION = "ml_intern_pick_";
+export function inlineField(request: ElicitationRequestPayload) {
+	const field = request.fields?.[0];
+	return request.fields?.length === 1 &&
+		field?.kind === "select" &&
+		!field.multiple &&
+		field.options.length <= 5
+		? field
+		: undefined;
+}
+function optionLabel(option: { label: string; setBudgetUsd?: number }): string {
+	return option.setBudgetUsd === undefined
+		? option.label
+		: `Set budget to $${option.setBudgetUsd.toFixed(2)}`;
+}
+function fieldBlocks(field: ElicitationField): KnownBlock[] {
+	const blocks: KnownBlock[] = [];
+	for (const part of chunks(field.description || field.title || field.name))
+		blocks.push({ type: "section", text: plain(part) });
+	if (field.kind === "select")
+		for (const [i, option] of field.options.entries()) {
+			for (const part of chunks(
+				`${i + 1}. ${optionLabel(option)}${option.description ? `\n${option.description}` : ""}`
+			))
+				blocks.push({ type: "section", text: plain(part) });
+		}
+	return blocks;
+}
+export function questionBlocks(request: ElicitationRequestPayload, threadId: string): KnownBlock[] {
+	const blocks: KnownBlock[] = [
+		{
+			type: "section",
+			text: plain(
+				"Please choose how to proceed. Only the person who started this task can submit answers. Confirmed answers will be shared in this thread."
+			),
+		},
+	];
+	for (const field of request.fields ?? []) {
+		blocks.push({ type: "divider" }, ...fieldBlocks(field));
+	}
+	const field = inlineField(request);
+	if (field)
+		blocks.push({
+			type: "actions",
+			elements: field.options.map((option, i) => ({
+				type: "button",
+				action_id: `${PICK_ACTION}${i}`,
+				text: plain(optionLabel(option).slice(0, 75)),
+				value: JSON.stringify({ threadId, elicitationId: request.elicitationId, optionIndex: i }),
+				confirm: {
+					title: plain(
+						option.setBudgetUsd !== undefined ? "Approve compute budget" : "Confirm answer"
+					),
+					text: plain(`${optionLabel(option)}\nYour answer will be shared in this thread.`),
+					confirm: plain("Confirm"),
+					deny: plain("Cancel"),
+				},
+			})),
+		});
+	// Large forms remain available in the modal; never exceed Slack's 50-block message limit.
+	return blocks.length <= 45
+		? blocks
+		: [
+				{
+					type: "section",
+					text: plain(
+						"This question has many options. Open Answer questions to review them. Your submitted answers will be shared in this thread."
+					),
+				},
+			];
+}
+export function answerSummary(
+	request: ElicitationRequestPayload,
+	content: Record<string, ElicitationValue>
+): string {
+	return (request.fields ?? [])
+		.map((field) => {
+			const value = content[field.name];
+			const values = Array.isArray(value) ? value : [value];
+			const answer = values
+				.filter((v) => v !== undefined)
+				.map((v) => {
+					const option =
+						field.kind === "select" ? field.options.find((o) => o.value === v) : undefined;
+					return option ? optionLabel(option) : String(v);
+				})
+				.join(", ");
+			return `${field.description || field.title || field.name}\nAnswer: ${answer || "Not provided"}`;
+		})
+		.join("\n\n");
 }

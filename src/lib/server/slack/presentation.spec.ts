@@ -2,6 +2,9 @@ import { MessageUpdateType, MessageToolUpdateType } from "$lib/types/MessageUpda
 import { describe, expect, it } from "vitest";
 import {
 	activityText,
+	questionBlocks,
+	inlineField,
+	answerSummary,
 	chunks,
 	questionModal,
 	readAnswers,
@@ -187,5 +190,31 @@ describe("Slack progress", () => {
 			])
 		).toBe("Preparing the response…");
 		expect(activityText([])).toBe("Reviewing your request…");
+	});
+});
+
+describe("Inline Slack questions", () => {
+	it("separates question and options and confirms the stored budget amount", () => {
+		const blocks = questionBlocks(question, "T:C:1");
+		const actions = blocks.find((b) => b.type === "actions");
+		expect(actions?.type).toBe("actions");
+		expect(JSON.stringify(actions)).toContain("Approve compute budget");
+		expect(JSON.stringify(actions)).toContain("Set budget to $5.00");
+		expect(JSON.stringify(actions)).not.toContain('"setBudgetUsd"');
+		const sections = blocks.filter((b) => b.type === "section");
+		expect(sections.length).toBeGreaterThanOrEqual(4);
+		expect(answerSummary(question, { q1: "Set budget to $5.00" })).toContain(
+			"Answer: Set budget to $5.00"
+		);
+	});
+	it("keeps multi-question and multi-select forms in the modal", () => {
+		expect(
+			inlineField({ ...question, fields: [...(question.fields ?? []), ...(question.fields ?? [])] })
+		).toBeUndefined();
+		const field = question.fields?.[0];
+		if (field?.kind !== "select") throw Error("Bad fixture");
+		expect(inlineField({ ...question, fields: [{ ...field, multiple: true }] })).toBeUndefined();
+		const modal = questionModal(question, "T:C:1");
+		expect(modal.blocks.filter((b) => b.type === "section").length).toBeGreaterThanOrEqual(4);
 	});
 });

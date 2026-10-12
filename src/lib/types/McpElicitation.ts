@@ -100,6 +100,8 @@ export interface ElicitationRequestPayload {
 
 /** In the database because the pod serving the answer need not be the one waiting on it. */
 export interface McpElicitation extends Timestamps {
+	/** The Slack submitter explicitly shares this assistant question answer in its thread. */
+	slackShareAnswer?: boolean;
 	_id: ObjectId;
 	elicitationId: string;
 	conversationId: Conversation["_id"];

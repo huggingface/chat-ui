@@ -1,3 +1,4 @@
+import { ObjectId } from "mongodb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { collections, ready } from "$lib/server/database";
 import {
@@ -6,7 +7,7 @@ import {
 	createTestConversation,
 } from "$lib/server/api/__tests__/testHelpers";
 import { MlSlackBot } from "./bot";
-import { ANSWER_VIEW, RESUME_ACTION } from "./presentation";
+import { ANSWER_VIEW, RESUME_ACTION, PICK_ACTION } from "./presentation";
 
 type Handler = (args: Record<string, unknown>) => Promise<void>;
 const mocks = vi.hoisted(() => ({
@@ -65,6 +66,81 @@ afterEach(async () => {
 });
 
 describe("Slack transport authorization", () => {
+	it("applies an inline grant only for the owner from a stored option, then shares it once", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Build", ts: "100.0" },
+			"T123",
+			"INLINE"
+		);
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		await collections.slackInputs.updateMany({}, { $set: { status: "done" } });
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			mlAssistant: true,
+			mlBudget: { totalMicroUsd: 0, spentMicroUsd: 0, reservations: [] },
+		});
+		const elicitationId = crypto.randomUUID();
+		const now = new Date();
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			conversationId: thread.conversationId,
+			elicitationId,
+			status: "pending",
+			createdAt: now,
+			updatedAt: now,
+			pending: { kind: "ask", messageId: "m1", toolCallId: "c1", toolUuid: "u1" },
+			request: {
+				elicitationId,
+				server: "",
+				source: "assistant",
+				mode: "form",
+				message: "Budget?",
+				fields: [
+					{
+						kind: "select",
+						name: "q1",
+						required: true,
+						multiple: false,
+						options: [{ value: "five", label: "Run", setBudgetUsd: 5 }],
+					},
+				],
+			},
+		});
+		const handler = mocks.handlers.get(`${PICK_ACTION}0`);
+		if (!handler) throw Error("Missing handler");
+		const action = {
+			value: JSON.stringify({
+				threadId: thread._id,
+				elicitationId,
+				optionIndex: 0,
+				setBudgetUsd: 999,
+			}),
+		};
+		await handler({ ack: vi.fn(), body: { user: { id: "OTHER" }, team: { id: "T123" } }, action });
+		expect(
+			(await collections.conversations.findOne({ _id: thread.conversationId }))?.mlBudget
+				?.totalMicroUsd
+		).toBe(0);
+		await handler({ ack: vi.fn(), body: { user: { id: "OWNER" }, team: { id: "T123" } }, action });
+		expect(
+			(await collections.conversations.findOne({ _id: thread.conversationId }))?.mlBudget
+				?.totalMicroUsd
+		).toBe(5000000);
+		expect((await collections.mcpElicitations.findOne({ elicitationId }))?.slackShareAnswer).toBe(
+			true
+		);
+		// Suppress execution: this test verifies the transport's durable answer delivery.
+		await collections.slackInputs.updateMany({}, { $set: { status: "done" } });
+		mocks.post.mockResolvedValue({ ts: "101.0" });
+		await bot.tick();
+		await bot.tick();
+		const summaries = mocks.post.mock.calls.filter(([v]) => v.text.includes("Answers from"));
+		expect(summaries).toHaveLength(1);
+		expect(summaries[0][0].text).toContain("Set budget to $5.00");
+	});
 	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {
 		const { user } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);
