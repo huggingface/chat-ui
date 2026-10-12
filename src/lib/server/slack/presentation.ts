@@ -423,7 +423,14 @@ export function latestPublicUpdate(content: string): string {
 }
 export function createdSpaceLinks(updates: MessageUpdate[] = []): string[] {
 	const links = new Set<string>();
+	const calls = new Map<string, Record<string, string | number | boolean>>();
 	for (const update of updates) {
+		if (
+			update.type === MessageUpdateType.Tool &&
+			update.subtype === MessageToolUpdateType.Call &&
+			update.call.name === "create_repo"
+		)
+			calls.set(update.uuid, update.call.parameters);
 		if (
 			update.type !== MessageUpdateType.Tool ||
 			update.subtype !== MessageToolUpdateType.Result ||
@@ -431,7 +438,7 @@ export function createdSpaceLinks(updates: MessageUpdate[] = []): string[] {
 			update.result.call.name !== "create_repo"
 		)
 			continue;
-		const uri = update.result.call.parameters.uri;
+		const uri = calls.get(update.uuid)?.uri ?? update.result.call.parameters.uri;
 		if (typeof uri !== "string") continue;
 		const match = /^hf:\/\/spaces\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)$/.exec(uri);
 		if (match) links.add(`https://huggingface.co/spaces/${match[1]}`);

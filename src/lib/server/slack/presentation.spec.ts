@@ -242,3 +242,22 @@ it("shows only bounded public commentary and confirmed created Space links", () 
 		])
 	).toEqual(["https://huggingface.co/spaces/org/demo"]);
 });
+
+it("uses the matching creation call when result metadata omits its URI", () => {
+	expect(
+		createdSpaceLinks([
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Call,
+				uuid: "created",
+				call: { name: "create_repo", parameters: { uri: "hf://spaces/org/demo" } },
+			},
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: "created",
+				result: { status: "success", call: { name: "create_repo", parameters: {} }, outputs: [] },
+			},
+		] as import("$lib/types/MessageUpdate").MessageUpdate[])
+	).toEqual(["https://huggingface.co/spaces/org/demo"]);
+});
