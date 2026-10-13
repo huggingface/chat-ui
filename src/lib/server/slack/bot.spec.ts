@@ -234,11 +234,49 @@ describe("Slack transport authorization", () => {
 		};
 		await bot.receive(event, "T123", "E1");
 		await bot.receive(event, "T123", "E1");
-		await bot.receive({ ...event, user: "U999" }, "T123", "E2");
-		expect(await collections.slackInputs.countDocuments({})).toBe(1);
+		await bot.receive({ ...event, user: "U999", ts: "100.2" }, "T123", "E2");
+		expect(await collections.slackInputs.countDocuments({})).toBe(2);
+		expect(await collections.slackThreads.countDocuments({})).toBe(1);
 		expect((await collections.slackThreads.findOne({}))?.owner).toBe("U123");
 		expect(mocks.ephemeral).toHaveBeenCalledWith(expect.objectContaining({ user: "U999" }));
 		expect(mocks.run).not.toHaveBeenCalled();
+	});
+
+	it("dispatches another member's request in the owner's conversation with correct attribution", async () => {
+		const { user } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		mocks.run.mockResolvedValue(undefined);
+		await bot.receive(
+			{ channel: "C123", user: "ALICE", text: "Start", ts: "100.0" },
+			"T123",
+			"SHARED1"
+		);
+		await bot.tick();
+		await vi.waitFor(async () =>
+			expect(await collections.slackInputs.countDocuments({ status: "done" })).toBe(1)
+		);
+		await bot.receive(
+			{
+				channel: "C123",
+				thread_ts: "100.0",
+				user: "BOB",
+				text: "Compare another model",
+				ts: "101.0",
+			},
+			"T123",
+			"SHARED2"
+		);
+		await bot.tick();
+		await vi.waitFor(async () =>
+			expect(await collections.slackInputs.countDocuments({ status: "done" })).toBe(2)
+		);
+		expect(mocks.run).toHaveBeenCalledTimes(2);
+		const [first, second] = mocks.run.mock.calls;
+		expect(second[0].conversationId).toEqual(first[0].conversationId);
+		expect(second[0].owner).toBe("ALICE");
+		expect(second[2].text).toContain("invoking Slack user is BOB");
+		expect(second[2].text).toContain("task owner is ALICE");
+		expect(second[2].text).toContain("Compare another model");
 	});
 	it("rejects other workspaces, guests, bot events and external channels before queuing work", async () => {
 		const { user } = await createTestUser();

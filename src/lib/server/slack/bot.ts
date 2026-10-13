@@ -363,14 +363,6 @@ export class MlSlackBot {
 			event.thread_ts ?? event.ts,
 			event.user
 		);
-		if (thread.owner !== event.user) {
-			await this.tell(
-				event.channel,
-				event.user,
-				"This task belongs to the person who invoked it. Start a new thread to run your own task."
-			);
-			return;
-		}
 		const inserted = await enqueueInput({
 			_id: inputKey(teamId, eventId),
 			threadId: thread._id,
@@ -408,7 +400,7 @@ export class MlSlackBot {
 			messages.push(...(page.messages ?? []));
 			cursor = page.response_metadata?.next_cursor || undefined;
 		} while (cursor && messages.length < 200);
-		return threadPrompt(messages, input, this.botUserId, Boolean(cursor));
+		return threadPrompt(messages, input, this.botUserId, Boolean(cursor), thread.owner);
 	}
 
 	private async dispatch(thread: SlackThread): Promise<void> {
@@ -450,7 +442,7 @@ export class MlSlackBot {
 					await this.tell(
 						thread.channel,
 						input.user,
-						"ML Intern is still working or waiting for your answer. Answer its form, or stop the current run before sending another task."
+						"ML Intern is still working or waiting for the task owner. The owner can answer its form or stop the current run; mention me again when that turn is finished."
 					);
 				} else {
 					const text = input.retry ? undefined : await this.context(thread, input);
