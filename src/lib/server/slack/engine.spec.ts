@@ -3,7 +3,7 @@ import { collections, ready } from "$lib/server/database";
 import { createTestUser, cleanupTestData } from "$lib/server/api/__tests__/testHelpers";
 import { streamFor, type Round } from "$lib/server/textGeneration/__tests__/replayHarness";
 import { getOrCreateThread, enqueueInput, inputKey, SlackLeader } from "./store";
-import { ensureConversation, runSlackTurn, stopSlackTurn } from "./engine";
+import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } from "./engine";
 import { questionModal, readAnswers } from "./presentation";
 import { submitElicitationAnswer } from "$lib/server/mcp/elicitation";
 import { kickAnsweredAsk } from "$lib/server/generation/askResume";
@@ -158,6 +158,68 @@ describe("Slack ML Intern persistence", () => {
 		expect(await second.acquire()).toBe(false);
 		await first.release();
 		expect(await second.acquire()).toBe(true);
+	});
+
+	it("skips a pending budget question without granting spend and accepts a fresh turn", async () => {
+		const { thread, user } = await setup();
+		rounds(
+			{
+				toolCalls: [
+					{
+						id: "ask",
+						name: "ask_user_question",
+						arguments: JSON.stringify({
+							questions: [
+								{
+									question: "Grant budget?",
+									header: "Budget",
+									multiSelect: false,
+									options: [
+										{ label: "Grant", description: "Grant $5", setBudgetUsd: 5 },
+										{ label: "Skip", description: "No grant" },
+									],
+								},
+							],
+						}),
+					},
+				],
+			},
+			{ content: "Handling the new request." }
+		);
+		await runSlackTurn(thread, user, { text: "Ask first" });
+		const q = await collections.mcpElicitations.findOne({
+			conversationId: thread.conversationId,
+			status: "pending",
+		});
+		if (!q?.pending) throw Error("No question");
+		await collections.mcpElicitations.updateOne(
+			{ _id: q._id },
+			{ $set: { slackSubmitting: true } }
+		);
+		expect(await skipSlackQuestion(thread, user, q.pending.messageId, "new-input")).toBe(false);
+		await collections.mcpElicitations.updateOne(
+			{ _id: q._id },
+			{ $unset: { slackSubmitting: "" } }
+		);
+		expect(await skipSlackQuestion(thread, user, q.pending.messageId, "new-input")).toBe(true);
+		expect(await collections.mcpElicitations.findOne({ _id: q._id })).toMatchObject({
+			status: "resolved",
+			action: "cancel",
+			resolution: "user",
+			resume: { status: "abandoned" },
+		});
+		const late = await submitElicitationAnswer({
+			conversationId: thread.conversationId,
+			elicitationId: q.elicitationId,
+			action: "accept",
+			content: { q0: "Grant" },
+		});
+		expect(late.ok).toBe(false);
+		await runSlackTurn(thread, user, { text: "New request" });
+		const conv = await collections.conversations.findOne({ _id: thread.conversationId });
+		expect(conv?.mlBudget?.totalMicroUsd).toBe(0);
+		expect(conv?.messages.at(-1)?.content).toContain("Handling the new request");
+		expect(conv?.messages.at(-1)?.id).not.toBe(q.pending.messageId);
 	});
 
 	it("runs the real harness, asks a Slack question, applies its budget grant, and resumes using the configured token", async () => {

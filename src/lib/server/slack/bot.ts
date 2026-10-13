@@ -16,7 +16,7 @@ import { reservedMicroUsd, formatMicroUsd } from "$lib/utils/mlBudget";
 import type { User } from "$lib/types/User";
 import { slackConfig, type SlackConfig } from "./config";
 import { provisionSlackIdentity } from "./identity";
-import { ensureConversation, runSlackTurn, stopSlackTurn } from "./engine";
+import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } from "./engine";
 import { isWorkspaceMember, threadPrompt, type ThreadMessage } from "./context";
 import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store";
 import type { SlackThread } from "./types";
@@ -583,16 +583,23 @@ export class MlSlackBot {
 						latest?.generationId !== input.expectedGenerationId)
 				)
 					throw new Error("This resume refers to an older turn.");
-				if (
+				const busy =
 					latest?.from === "assistant" &&
-					(await isTurnAlive(thread.conversationId, latest.id)).alive
-				) {
+					(await isTurnAlive(thread.conversationId, latest.id)).alive;
+				const skipped =
+					busy &&
+					!input.retry &&
+					input.user === thread.owner &&
+					(await skipSlackQuestion(thread, this.user, latest.id, input._id));
+				if (busy && !skipped) {
 					await this.tell(
 						thread.channel,
 						input.user,
-						"ML Intern is still working or waiting for the task owner. The owner can answer its form or stop the current run; mention me again when that turn is finished."
+						"ML Intern is still working or waiting for the task owner. The owner can answer its form, send a new request to skip a pending question, or stop the current run.",
+						thread.threadTs
 					);
 				} else {
+					if (skipped) await this.render(thread);
 					const context = input.retry ? undefined : await this.context(thread, input);
 					await runSlackTurn(thread, this.user, { ...context, retry: input.retry });
 				}
@@ -624,6 +631,7 @@ export class MlSlackBot {
 		const next = previous
 			.catch(() => {})
 			.then(async () => {
+				await this.publishSkippedQuestions(thread);
 				await this.publishAnswers(thread);
 				await this.publish(thread);
 			});
@@ -643,6 +651,16 @@ export class MlSlackBot {
 			messageId: message.id,
 		});
 		if (!state) return;
+		if (
+			await collections.mcpElicitations.findOne({
+				conversationId: conv._id,
+				"pending.messageId": message.id,
+				slackSkippedByInputId: { $exists: true },
+			})
+		) {
+			await this.publishSessionStatus(thread, "↪️ Continued with a new message", []);
+			return;
+		}
 		const live = await isTurnAlive(conv._id, message.id);
 		const question = await collections.mcpElicitations.findOne({
 			conversationId: conv._id,
@@ -977,6 +995,36 @@ export class MlSlackBot {
 				},
 			}
 		);
+	}
+
+	private async publishSkippedQuestions(thread: SlackThread): Promise<void> {
+		const questions = await collections.mcpElicitations
+			.find({ conversationId: thread.conversationId, slackSkippedByInputId: { $exists: true } })
+			.toArray();
+		for (const question of questions) {
+			const card = await collections.slackDeliveries.findOne({
+				threadId: thread._id,
+				questionId: question.elicitationId,
+			});
+			if (!card || card.questionFinalized) continue;
+			const text = "Question skipped — continued with a new message.";
+			const blocks = [
+				{ type: "section" as const, text: { type: "plain_text" as const, text } },
+				...confirmedQuestionBlocks(question.request, {}),
+			];
+			for (const ts of card.parts)
+				await this.app.client.chat.update({
+					channel: thread.channel,
+					ts,
+					text,
+					blocks: blocks.slice(0, 49),
+					parse: "none",
+				});
+			await collections.slackDeliveries.updateOne(
+				{ _id: card._id },
+				{ $set: { questionFinalized: true } }
+			);
+		}
 	}
 
 	private async publishAnswers(thread: SlackThread): Promise<void> {

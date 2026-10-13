@@ -146,3 +146,44 @@ export async function stopSlackTurn(thread: SlackThread, user: User): Promise<vo
 		{ $set: { watching: true, updatedAt: now } }
 	);
 }
+
+/** An owner's new request supersedes a pending assistant question, never a budget approval. */
+export async function skipSlackQuestion(
+	thread: SlackThread,
+	user: User,
+	messageId: string,
+	inputId: string
+): Promise<boolean> {
+	const now = new Date();
+	const result = await collections.mcpElicitations.findOneAndUpdate(
+		{
+			conversationId: thread.conversationId,
+			"pending.kind": "ask",
+			"pending.messageId": messageId,
+			$or: [
+				{ status: "pending", slackSubmitting: { $ne: true } },
+				{ slackSkippedByInputId: inputId },
+			],
+		},
+		{
+			$set: {
+				status: "resolved",
+				action: "cancel",
+				resolution: "user",
+				resolvedAt: now,
+				updatedAt: now,
+				slackSkippedByInputId: inputId,
+				resume: {
+					status: "abandoned",
+					takenAt: now,
+					attempts: 0,
+					abandonedReason: "Continued with a new Slack message",
+				},
+			},
+		},
+		{ returnDocument: "after" }
+	);
+	if (!result.value) return false;
+	await stopSlackTurn(thread, user);
+	return true;
+}

@@ -105,6 +105,7 @@ export interface McpElicitation extends Timestamps {
 	slackChoices?: Record<string, number>;
 	slackChoiceRevision?: number;
 	slackSubmitting?: boolean;
+	slackSkippedByInputId?: string;
 	_id: ObjectId;
 	elicitationId: string;
 	conversationId: Conversation["_id"];

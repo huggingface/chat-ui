@@ -24,12 +24,13 @@ The **owner** is the person who first invoked ML Intern in that thread, which ma
 | Request work using the thread's existing approved budget     |            ✓            |            |
 | Set or change the compute budget                             |                         |     ✓      |
 | Submit answers through question buttons or forms             |                         |     ✓      |
+| Skip a pending question by sending a new request             |                         |     ✓      |
 | Stop the assistant                                           |                         |     ✓      |
 | Resume an interrupted or failed task                         |                         |     ✓      |
 
 “Everyone” means eligible members of the same Slack workspace. Guests, bots, and external shared channels are excluded; the configured channel allowlist also applies. A trace download posts the file only to its original thread.
 
-Each thread has its own conversation and budget. DMs are separate private sessions, with the person messaging the bot as owner. Follow-up requests in channels require another mention. If the current turn is still running or waiting for input, wait for it to finish or have the owner answer or stop it before sending another request.
+Each thread has its own conversation and budget. DMs are separate private sessions, with the person messaging the bot as owner. Follow-up requests in channels require another mention. If the assistant is waiting on its own question, a new request from the task owner skips that question and starts a new turn with the shared context and existing budget. The old card is marked as skipped and its buttons are removed. Skipping never grants a budget, and stale answer buttons cannot approve a skipped question. Other participants cannot dismiss the owner’s question. If the model is actively working without a pending question, wait for it to finish or have the owner stop it.
 
 ## Install in a workspace
 

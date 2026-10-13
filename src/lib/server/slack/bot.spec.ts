@@ -7,6 +7,7 @@ import {
 	createTestConversation,
 } from "$lib/server/api/__tests__/testHelpers";
 import { MlSlackBot } from "./bot";
+import { skipSlackQuestion } from "./engine";
 import {
 	ANSWER_VIEW,
 	RESUME_ACTION,
@@ -52,6 +53,7 @@ vi.mock("./engine", () => ({
 	ensureConversation: vi.fn(),
 	runSlackTurn: mocks.run,
 	stopSlackTurn: vi.fn(),
+	skipSlackQuestion: vi.fn().mockResolvedValue(false),
 }));
 const settings = {
 	teamId: "T123",
@@ -494,6 +496,51 @@ describe("Slack transport authorization", () => {
 		expect(mocks.update).toHaveBeenCalledTimes(1);
 		expect(mocks.update.mock.calls[0][0].ts).toBe("201.0");
 		expect(await collections.slackDeliveries.countDocuments({ threadId: thread._id })).toBe(2);
+	});
+
+	it("only lets the owner replace a pending question with a new request", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Start", ts: "100.0" },
+			"T123",
+			"start"
+		);
+		await collections.slackInputs.updateMany({}, { $set: { status: "done" } });
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		const messageId = crypto.randomUUID();
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			messages: [{ id: messageId, from: "assistant", content: "Question" }],
+		});
+		await collections.turnStates.insertOne({
+			_id: new ObjectId(),
+			conversationId: thread.conversationId,
+			messageId,
+			status: "awaiting_input",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+		await bot.receive(
+			{ channel: "C123", user: "OTHER", text: "New", ts: "101.0", thread_ts: "100.0" },
+			"T123",
+			"other"
+		);
+		await bot["dispatch"](thread);
+		expect(skipSlackQuestion).not.toHaveBeenCalled();
+		expect(mocks.run).not.toHaveBeenCalled();
+		expect(mocks.ephemeral.mock.lastCall?.[0].thread_ts).toBe("100.0");
+		vi.mocked(skipSlackQuestion).mockResolvedValueOnce(true);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Move on", ts: "102.0", thread_ts: "100.0" },
+			"T123",
+			"owner"
+		);
+		await bot["dispatch"](thread);
+		expect(skipSlackQuestion).toHaveBeenCalledTimes(1);
+		expect(mocks.run).toHaveBeenCalledTimes(1);
+		expect(mocks.run.mock.lastCall?.[2].text).toContain("Move on");
 	});
 
 	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {
