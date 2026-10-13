@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
 	channels: vi.fn(),
 	replies: vi.fn(),
 	post: vi.fn(),
+	update: vi.fn(),
 	ephemeral: vi.fn(),
 	run: vi.fn(),
 	react: vi.fn(),
@@ -34,7 +35,7 @@ vi.mock("@slack/bolt", () => ({
 			files: { uploadV2: mocks.upload },
 			reactions: { add: mocks.react },
 			conversations: { info: mocks.channels, replies: mocks.replies },
-			chat: { postMessage: mocks.post, postEphemeral: mocks.ephemeral },
+			chat: { postMessage: mocks.post, postEphemeral: mocks.ephemeral, update: mocks.update },
 		};
 		event() {}
 		action(id: string, handler: Handler) {
@@ -308,6 +309,136 @@ describe("Slack transport authorization", () => {
 			(await collections.conversations.findOne({ _id: thread.conversationId }))?.mlBudget
 				?.totalMicroUsd
 		).toBe(5000000);
+	});
+
+	it("refreshes selections immediately and posts continuation below immutable questions and answers", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Ask", ts: "100.0" },
+			"T123",
+			"RENDER"
+		);
+		await collections.slackInputs.updateMany({}, { $set: { status: "done" } });
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		const messageId = crypto.randomUUID(),
+			generationId = crypto.randomUUID(),
+			elicitationId = crypto.randomUUID();
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			messages: [
+				{
+					id: messageId,
+					generationId,
+					from: "assistant",
+					content: "Questions",
+					createdAt: new Date(),
+				},
+			],
+		});
+		await collections.turnStates.insertOne({
+			_id: new ObjectId(),
+			conversationId: thread.conversationId,
+			messageId,
+			producerId: generationId,
+			status: "awaiting_input",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			conversationId: thread.conversationId,
+			generationId,
+			elicitationId,
+			status: "pending",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			pending: { kind: "ask", messageId, toolCallId: "c", toolUuid: "u" },
+			request: {
+				elicitationId,
+				source: "assistant",
+				server: "",
+				mode: "form",
+				message: "Questions",
+				fields: [0, 1].map((i) => ({
+					kind: "select" as const,
+					name: `q${i}`,
+					required: true,
+					multiple: false,
+					options: [
+						{ value: "a", label: "Alpha" },
+						{ value: "b", label: "Beta" },
+					],
+				})),
+			},
+		});
+		await collections.slackDeliveries.insertOne({
+			_id: `${thread._id}:${messageId}`,
+			threadId: thread._id,
+			messageId,
+			questionId: elicitationId,
+			parts: ["101.0"],
+			updatedAt: new Date(),
+		});
+		const select = async (index: number) => {
+			const handler = mocks.handlers.get(`${SELECT_ACTION}0_${index}`);
+			if (!handler) throw Error("No select");
+			await handler({
+				ack: vi.fn(),
+				body: { user: { id: "OWNER" }, team: { id: "T123" } },
+				action: {
+					value: JSON.stringify({
+						threadId: thread._id,
+						elicitationId,
+						fieldIndex: 0,
+						optionIndex: index,
+					}),
+				},
+			});
+		};
+		await select(0);
+		expect(mocks.update).toHaveBeenCalledWith(
+			expect.objectContaining({ ts: "101.0", blocks: expect.any(Array) })
+		);
+		expect(JSON.stringify(mocks.update.mock.calls.at(-1))).toContain("✓ A. Alpha");
+		await select(1);
+		expect(JSON.stringify(mocks.update.mock.calls.at(-1))).toContain("✓ B. Beta");
+		// Simulate the harness resolving and resuming in the same assistant message.
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId },
+			{
+				$set: {
+					status: "resolved",
+					action: "accept",
+					resolution: "user",
+					slackShareAnswer: true,
+					content: { q0: "b", q1: "a" },
+				},
+			}
+		);
+		await collections.conversations.updateOne(
+			{ _id: thread.conversationId },
+			{
+				$set: {
+					"messages.0.generationId": crypto.randomUUID(),
+					"messages.0.content": "Here is the follow-up response",
+				},
+			}
+		);
+		await collections.turnStates.updateOne({ messageId }, { $set: { status: "done" } });
+		mocks.post.mockResolvedValueOnce({ ts: "102.0" }).mockResolvedValueOnce({ ts: "103.0" });
+		await bot.tick();
+		expect(mocks.post.mock.calls[0][0].text).toContain("Answers from");
+		expect(mocks.post.mock.calls[1][0].text).toContain("Here is the follow-up response");
+		expect(
+			mocks.update.mock.calls.some(([v]) => v.ts === "101.0" && v.text.includes("follow-up"))
+		).toBe(false);
+		const frozen = mocks.update.mock.calls.find(([v]) => v.text.startsWith("Questions answered"));
+		expect(frozen?.[0].blocks.some((b: { type: string }) => b.type === "actions")).toBe(false);
+		await collections.slackThreads.updateOne({ _id: thread._id }, { $set: { watching: true } });
+		await bot.tick();
+		expect(mocks.post).toHaveBeenCalledTimes(2);
 	});
 	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {
 		const { user } = await createTestUser();

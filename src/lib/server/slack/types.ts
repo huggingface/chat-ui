@@ -32,6 +32,8 @@ export interface SlackInput {
 }
 
 export interface SlackDelivery {
+	questionId?: string;
+	questionFinalized?: boolean;
 	_id: string;
 	threadId: string;
 	messageId: string;

@@ -78,6 +78,7 @@ export class MlSlackBot {
 	private runningConversations = new Map<string, string>();
 	private members = new Map<string, { allowed: boolean; until: number }>();
 	private ticking = false;
+	private renders = new Map<string, Promise<void>>();
 	private timer?: ReturnType<typeof setInterval>;
 	private stopped = false;
 	constructor(
@@ -172,6 +173,9 @@ export class MlSlackBot {
 					await collections.slackThreads.updateOne(
 						{ _id: thread._id },
 						{ $set: { watching: true } }
+					);
+					await this.render(thread).catch(() =>
+						logger.warn("[slack] Immediate selection update failed; polling will retry.")
 					);
 				});
 		this.app.action(SUBMIT_ACTION, async ({ ack, body, action }) => {
@@ -589,6 +593,22 @@ export class MlSlackBot {
 		}
 	}
 
+	/** Serialize click-driven and background updates so old renders cannot overwrite new choices. */
+	private async render(thread: SlackThread): Promise<void> {
+		const previous = this.renders.get(thread._id) ?? Promise.resolve();
+		const next = previous
+			.catch(() => {})
+			.then(async () => {
+				await this.publishAnswers(thread);
+				await this.publish(thread);
+			});
+		this.renders.set(thread._id, next);
+		try {
+			await next;
+		} finally {
+			if (this.renders.get(thread._id) === next) this.renders.delete(thread._id);
+		}
+	}
 	private async publish(thread: SlackThread): Promise<void> {
 		const conv = await collections.conversations.findOne({ _id: thread.conversationId });
 		const message = conv?.messages[conv.messages.length - 1];
@@ -688,7 +708,29 @@ export class MlSlackBot {
 				})
 			)
 			.digest("hex");
-		const _id = `${thread._id}:${message.id}`;
+		const answered = await collections.mcpElicitations
+			.find({
+				conversationId: conv._id,
+				"pending.messageId": message.id,
+				"pending.kind": "ask",
+				status: "resolved",
+				action: "accept",
+				slackShareAnswer: true,
+			})
+			.sort({ createdAt: -1, _id: -1 })
+			.limit(1)
+			.next();
+		// An answer may resolve while a refresh is reading state. Never publish its continuation before its answer summary.
+		if (
+			answered &&
+			!(await collections.slackDeliveries.findOne({
+				_id: `${thread._id}:answer:${answered.elicitationId}`,
+			}))
+		)
+			return;
+		// A resolved question and its continuation share a harness message ID, but must not share a Slack post.
+		if (answered && !question && message.generationId === answered.generationId) return;
+		const _id = `${thread._id}:${message.id}${answered ? `:after:${answered.elicitationId}` : ""}`;
 		let delivery = await collections.slackDeliveries.findOne({ _id });
 		if (delivery?.digest !== digest) {
 			if (!delivery) {
@@ -696,6 +738,7 @@ export class MlSlackBot {
 					_id,
 					threadId: thread._id,
 					messageId: message.id,
+					questionId: question?.pending?.kind === "ask" ? question.elicitationId : undefined,
 					parts: [],
 					updatedAt: new Date(),
 				};
@@ -745,7 +788,13 @@ export class MlSlackBot {
 			}
 			await collections.slackDeliveries.updateOne(
 				{ _id },
-				{ $set: { digest, updatedAt: new Date() } }
+				{
+					$set: {
+						digest,
+						updatedAt: new Date(),
+						...(question?.pending?.kind === "ask" ? { questionId: question.elicitationId } : {}),
+					},
+				}
 			);
 		}
 		if (
@@ -781,6 +830,38 @@ export class MlSlackBot {
 			if (!question.content) continue;
 			const _id = `${thread._id}:answer:${question.elicitationId}`;
 			const delivery = await collections.slackDeliveries.findOne({ _id });
+			// Leave the question card in place, removing only its now-inactive controls.
+			const card = await collections.slackDeliveries.findOne({
+				threadId: thread._id,
+				questionId: question.elicitationId,
+			});
+			if (card && !card.questionFinalized) {
+				const blocks = questionBlocks(
+					question.request,
+					thread._id,
+					question.slackChoices,
+					question.slackChoiceRevision
+				).filter((b) => b.type !== "actions" && b.type !== "context");
+				blocks[0] = {
+					type: "section",
+					text: {
+						type: "plain_text",
+						text: "Questions answered. Confirmed answers are posted below.",
+					},
+				};
+				for (const ts of card.parts)
+					await this.app.client.chat.update({
+						channel: thread.channel,
+						ts,
+						text: "Questions answered. Confirmed answers are posted below.",
+						blocks,
+						parse: "none",
+					});
+				await collections.slackDeliveries.updateOne(
+					{ _id: card._id },
+					{ $set: { questionFinalized: true } }
+				);
+			}
 			const text = answerSummary(question.request, question.content);
 			const parts: string[] = delivery?.parts ?? [];
 			const texts = chunks(text);
@@ -834,9 +915,9 @@ export class MlSlackBot {
 				.toArray();
 			for (const thread of threads) {
 				try {
-					await this.publishAnswers(thread);
+					await this.render(thread);
 				} catch {
-					logger.warn("[slack] Answer summary delivery failed; will retry.");
+					logger.warn("[slack] Delivery failed; will retry.");
 					continue;
 				}
 				if (!this.active.has(thread._id) && this.active.size < 4) {
@@ -845,7 +926,6 @@ export class MlSlackBot {
 						.finally(() => this.active.delete(thread._id));
 					this.active.set(thread._id, run);
 				}
-				await this.publish(thread).catch(() => logger.warn("[slack] Delivery failed; will retry."));
 				const failures = await collections.slackInputs
 					.find({ threadId: thread._id, status: "failed", failureNotified: { $ne: true } })
 					.limit(5)
