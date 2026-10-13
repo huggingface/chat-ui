@@ -311,3 +311,35 @@ backup to finish before every source upload or deployment update.
 Files attached to the invoking message or earlier human messages in the same Slack thread are downloaded with the bot token and attached to the ML Intern conversation through Chat UI's upload pipeline. This supports image requests such as OCR. Files posted after the invocation and bot-uploaded files are excluded. Limits are 10 distinct files, 10 MB per file, and 25 MB total per invocation. Start a fresh thread to select a smaller set. Download failures are reported privately in the thread rather than silently running without the image.
 
 The app requires the **files:read** bot scope. For an existing installation, add it under **OAuth & Permissions → Bot Token Scopes**, then reinstall the app to your workspace. Updating the repository manifest alone does not grant permission to an already-installed bot. Attachments stay in the conversation's file storage; they are not made public on Slack.
+
+## Read-only session viewer
+
+The optional viewer runs on the bot's Chat UI host, not `hf.co/chat`. When configured, **Open session** appears on each Slack status card. It shows the conversation, expandable tool arguments/results/errors, run state, compute reservations, and latest worker heartbeat. It refreshes every 15 seconds while visible, with a manual refresh button. It does not offer sending messages, submitting answers, approving budgets, stopping runs, or resuming them. Those actions remain in Slack.
+
+### Enable Slack sign-in
+
+1. In your Slack app, open **Basic Information → App Credentials** and obtain its **Client ID** and **Client Secret**. Bot and Socket Mode tokens cannot replace these credentials.
+2. In **OAuth & Permissions → Redirect URLs**, add the exact callback URL for your bot host: `https://YOUR-BOT-HOST/slack/view/callback`. With an application base path, include that path before `/slack/view/callback`.
+3. Configure the following on the bot server, storing secrets in Space **Secrets**, never committed files:
+
+   | Setting                          | Value                                                                                  |
+   | -------------------------------- | -------------------------------------------------------------------------------------- |
+   | `SLACK_ML_VIEWER_ORIGIN`         | The HTTPS origin only, e.g. `https://abidlabs-ml-intern-slackbot-server.hf.space`      |
+   | `SLACK_ML_VIEWER_CLIENT_ID`      | Slack app Client ID                                                                    |
+   | `SLACK_ML_VIEWER_CLIENT_SECRET`  | Slack app Client Secret                                                                |
+   | `SLACK_ML_VIEWER_SESSION_SECRET` | Random signing secret of at least 32 characters, e.g. output of `openssl rand -hex 32` |
+
+4. Restart the bot. Open **Open session** on a status card, then **Sign in with Slack**. This uses Slack's separate OpenID flow with only the `openid` scope, not a new bot installation grant. Existing `users:read`, `channels:read`, and `groups:read` bot scopes are used to verify membership.
+
+For `abidlabs/ml-intern-slackbot-server`, the callback is `https://abidlabs-ml-intern-slackbot-server.hf.space/slack/view/callback`. The host must also be reachable by the intended viewers. A private HF Space still enforces its own Hugging Face access requirements; signing in with Slack does not bypass them. Do not expose the rest of a privately configured Chat UI installation merely to publish this viewer; a reverse proxy can expose only `/slack/view/` if broader access is needed.
+
+### Access and data handling
+
+- Sign-in is restricted to the bot's configured Slack workspace. Each data refresh rechecks current user eligibility and channel membership using the bot token. Guests, deactivated users, and Slack Connect channels are denied. Slack API outages or rate limits fail closed.
+- Channel sessions require channel membership. DM sessions require the original task owner. The bot's channel allowlist still applies.
+- URLs contain a conversation ID, not a bearer credential. Forwarding a URL does not grant access. Slack browser sessions are independent of HuggingChat sessions and cannot authorize existing Chat UI mutation endpoints.
+- OAuth uses signed, short-lived state cookies and OpenID validation of signature, issuer, audience, expiration, state, and nonce. The session cookie is Secure, HttpOnly, SameSite=Lax, and expires after one hour. Slack OAuth access tokens are not persisted. Rotating the session signing secret invalidates all viewer logins.
+- Pages and API responses are `no-store`, cannot be framed, and send no referrer. Trace text is rendered as text, never HTML. Private reasoning, recognized credentials and inline binary data are excluded. Tool outputs may still contain sensitive workspace content, so access is restricted to the original audience.
+- The viewer displays the latest 100 non-system messages and up to 200 diagnostic events per message, with long values limited to 24,000 characters. It is a bounded diagnostic view, not a full raw trace export. The existing **Download trace** action in Slack remains available for complete traces.
+
+OAuth must be tested against your real Slack app after configuration. Automated tests cover access denial, state/nonce handoff, cookie tampering, redaction, and browser rendering; they do not substitute for a real Slack consent flow.

@@ -1,3 +1,4 @@
+import { base } from "$app/paths";
 import { building } from "$app/environment";
 import type { Handle, HandleServerError, ServerInit, HandleFetch } from "@sveltejs/kit";
 import { initServer } from "$lib/server/hooks/init";
@@ -17,6 +18,25 @@ export const handle: Handle = async (input) => {
 		return input.resolve(input.event, {
 			transformPageChunk: ({ html }) => html.replace("%gaId%", ""),
 		});
+	}
+	// Slack viewer routes have their own OIDC identity and per-thread authorization.
+	// Do not turn a Slack browser session into a HuggingChat user session.
+	if (input.event.url.pathname.startsWith(`${base}/slack/view/`)) {
+		const resolved = await input.resolve(input.event);
+		const response = new Response(resolved.body, {
+			status: resolved.status,
+			statusText: resolved.statusText,
+			headers: resolved.headers,
+		});
+		response.headers.set("Cache-Control", "private, no-store");
+		response.headers.set("Referrer-Policy", "no-referrer");
+		response.headers.set("X-Content-Type-Options", "nosniff");
+		response.headers.set("X-Frame-Options", "DENY");
+		response.headers.set(
+			"Content-Security-Policy",
+			"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+		);
+		return response;
 	}
 	return handleRequest(input);
 };

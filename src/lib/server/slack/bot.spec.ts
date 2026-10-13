@@ -518,6 +518,7 @@ describe("Slack transport authorization", () => {
 			_id: new ObjectId(),
 			conversationId: thread.conversationId,
 			messageId,
+			producerId: crypto.randomUUID(),
 			status: "awaiting_input",
 			createdAt: new Date(),
 			updatedAt: new Date(),

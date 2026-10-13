@@ -1,0 +1,29 @@
+import { randomBytes } from "node:crypto";
+import { error, redirect } from "@sveltejs/kit";
+import type { RequestHandler } from "./$types";
+import {
+	cookieOptions,
+	flowCookie,
+	oidcClient,
+	sign,
+	viewerConfig,
+} from "$lib/server/slack/viewer/auth";
+import { slackConfig } from "$lib/server/slack/config";
+export const GET: RequestHandler = async ({ url, cookies }) => {
+	const settings = viewerConfig(),
+		slack = slackConfig();
+	if (!settings || !slack) error(503, "Slack viewer is not configured.");
+	const target = url.searchParams.get("session");
+	if (!target || !/^[a-f0-9]{24}$/.test(target)) error(400, "Invalid session.");
+	const state = randomBytes(32).toString("base64url"),
+		nonce = randomBytes(32).toString("base64url");
+	cookies.set(
+		flowCookie,
+		sign({ state, nonce, target, expires: Date.now() + 600000 }, settings.secret),
+		{ ...cookieOptions, maxAge: 600 }
+	);
+	redirect(
+		302,
+		(await oidcClient()).authorizationUrl({ scope: "openid", state, nonce, team: slack.teamId })
+	);
+};

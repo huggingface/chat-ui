@@ -1,3 +1,4 @@
+import { viewerLink } from "./viewer/auth";
 import { downloadAttachments } from "./attachments";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createHash } from "node:crypto";
@@ -142,6 +143,9 @@ export class MlSlackBot {
 	}
 
 	private register(): void {
+		this.app.action("ml_intern_view", async ({ ack }) => {
+			await ack();
+		});
 		this.app.event("app_mention", async ({ event, body }) => {
 			await this.receive(event, body.team_id, body.event_id);
 		});
@@ -905,12 +909,33 @@ export class MlSlackBot {
 		const delivery = await collections.slackDeliveries.findOne({ _id });
 		const budget = conv?.mlBudget;
 		const text = `**Session status**\n\n${status}\n💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
-		const digest = createHash("sha256").update(JSON.stringify({ text, actions })).digest("hex");
+		const viewUrl = viewerLink(thread.conversationId.toHexString());
+		const digest = createHash("sha256")
+			.update(JSON.stringify({ text, actions, viewUrl }))
+			.digest("hex");
 		if (delivery?.digest === digest) return;
 		const payload = {
 			channel: thread.channel,
 			text,
-			blocks: [...messageBlocks(text, actions), { type: "divider" as const }],
+			blocks: [
+				...messageBlocks(text, actions),
+				...(viewUrl
+					? [
+							{
+								type: "actions" as const,
+								elements: [
+									{
+										type: "button" as const,
+										action_id: "ml_intern_view",
+										text: { type: "plain_text" as const, text: "Open session" },
+										url: viewUrl,
+									},
+								],
+							},
+						]
+					: []),
+				{ type: "divider" as const },
+			],
 			parse: "none" as const,
 		};
 		let ts = delivery?.parts[0];
