@@ -10,6 +10,7 @@ import { MlSlackBot } from "./bot";
 import {
 	ANSWER_VIEW,
 	RESUME_ACTION,
+	STOP_ACTION,
 	PICK_ACTION,
 	SELECT_ACTION,
 	SUBMIT_ACTION,
@@ -548,6 +549,33 @@ describe("Slack transport authorization", () => {
 		);
 		expect(mocks.update).toHaveBeenCalledTimes(2);
 		expect(mocks.post).toHaveBeenCalledTimes(1);
+	});
+
+	it("posts the private stop confirmation inside the stopped thread", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive({ channel: "C123", user: "OWNER", text: "Run", ts: "100.0" }, "T123", "STOP");
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		const messageId = crypto.randomUUID(),
+			generationId = crypto.randomUUID();
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			messages: [{ id: messageId, generationId, from: "assistant", content: "Working" }],
+		});
+		const handler = mocks.handlers.get(STOP_ACTION);
+		if (!handler) throw Error("No handler");
+		await handler({
+			ack: vi.fn(),
+			body: { user: { id: "OWNER" }, team: { id: "T123" } },
+			action: { value: JSON.stringify({ threadId: thread._id, messageId, generationId }) },
+		});
+		expect(mocks.ephemeral).toHaveBeenCalledWith({
+			channel: "C123",
+			user: "OWNER",
+			thread_ts: "100.0",
+			text: expect.stringContaining("Stopped the assistant."),
+		});
 	});
 
 	it("refuses a stale Resume button rather than replaying a newer completed turn", async () => {

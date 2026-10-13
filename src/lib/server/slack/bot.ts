@@ -127,8 +127,18 @@ export class MlSlackBot {
 		return collections.slackThreads.findOne({ _id: threadId, teamId, owner: userId });
 	}
 
-	private async tell(channel: string, user: string, text: string): Promise<void> {
-		await this.app.client.chat.postEphemeral({ channel, user, text });
+	private async tell(
+		channel: string,
+		user: string,
+		text: string,
+		threadTs?: string
+	): Promise<void> {
+		await this.app.client.chat.postEphemeral({
+			channel,
+			user,
+			text,
+			...(threadTs ? { thread_ts: threadTs } : {}),
+		});
 	}
 
 	private register(): void {
@@ -384,7 +394,8 @@ export class MlSlackBot {
 			await this.tell(
 				thread.channel,
 				body.user.id,
-				"Stopped the assistant. Jobs already running on Hugging Face keep running until cancelled or timed out."
+				"Stopped the assistant. Jobs already running on Hugging Face keep running until cancelled or timed out.",
+				thread.threadTs
 			);
 		});
 		this.app.action(RESUME_ACTION, async ({ ack, body, action }) => {
