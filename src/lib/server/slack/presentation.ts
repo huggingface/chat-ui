@@ -461,7 +461,11 @@ export function questionBlocks(
 					title: plain(
 						option.setBudgetUsd !== undefined ? "Approve compute budget" : "Confirm answer"
 					),
-					text: plain(`${optionLabel(option)}\nYour answer will be shared in this thread.`),
+					text: plain(
+						option.setBudgetUsd !== undefined
+							? `${optionLabel(option)} for this ML Intern session`
+							: `${optionLabel(option)}\nYour answer will be shared in this thread.`
+					),
 					confirm: plain("Confirm"),
 					deny: plain("Cancel"),
 				},
