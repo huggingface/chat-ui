@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	activityText,
 	questionBlocks,
+	questionFormLabel,
 	inlineField,
 	latestPublicUpdate,
 	createdSpaceLinks,
@@ -268,4 +269,22 @@ it("separates public updates across reasoning rounds", () => {
 			"Old status.<think>private</think>Current status.<think>still private</think>"
 		)
 	).toBe("Current status.");
+});
+
+it("numbers questions, letters choices and omits redundant form controls for inline choices", () => {
+	const field = question.fields?.[0];
+	if (field?.kind !== "select") throw Error("Bad fixture");
+	const single = { ...question, fields: [{ ...field, allowOther: false }] };
+	expect(questionFormLabel(single)).toBeUndefined();
+	expect(questionFormLabel(question)).toBe("Other answer");
+	const multiple = {
+		...question,
+		fields: [field, { ...field, name: "q2", description: "Which input?" }],
+	};
+	expect(questionFormLabel(multiple)).toBe("Answer questions");
+	const copy = JSON.stringify(questionBlocks(multiple, "thread"));
+	expect(copy).toContain("1. How much compute?");
+	expect(copy).toContain("2. Which input?");
+	expect(copy).toContain("A. *Set budget to $5.00*");
+	expect(copy).toContain("B. *No compute*");
 });

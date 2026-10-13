@@ -25,6 +25,7 @@ import {
 	createdSpaceLinks,
 	inlineField,
 	questionBlocks,
+	questionFormLabel,
 	answerSummary,
 	activityText,
 	ANSWER_ACTION,
@@ -513,14 +514,17 @@ export class MlSlackBot {
 		});
 		let text: string;
 		if (question) {
-			text = question.request.message;
-			if (question.request.mode === "form")
-				actions.push({
-					id: ANSWER_ACTION,
-					label: "Answer questions",
-					value: JSON.stringify({ threadId: thread._id, elicitationId: question.elicitationId }),
-				});
-			else text += `\n\nOpen this link to continue: ${question.request.url ?? ""}`;
+			const structured = question.pending?.kind === "ask" && !!question.request.fields?.length;
+			text = structured ? "" : question.request.message;
+			if (question.request.mode === "form") {
+				const label = structured ? questionFormLabel(question.request) : "Answer questions";
+				if (label)
+					actions.push({
+						id: ANSWER_ACTION,
+						label,
+						value: JSON.stringify({ threadId: thread._id, elicitationId: question.elicitationId }),
+					});
+			} else text += `\n\nOpen this link to continue: ${question.request.url ?? ""}`;
 		} else if (live.alive) {
 			text =
 				state.status === "waiting"
@@ -573,7 +577,10 @@ export class MlSlackBot {
 		if (live.alive) actions.push({ id: STOP_ACTION, label: "Stop assistant", value: turnValue });
 		if (conv.mlBudget)
 			text += `\n\nCompute: ${formatMicroUsd(conv.mlBudget.spentMicroUsd)} spent · ${formatMicroUsd(reservedMicroUsd(conv.mlBudget))} reserved · ${formatMicroUsd(conv.mlBudget.totalMicroUsd)} budget`;
-		const digest = createHash("sha256").update(JSON.stringify({ text, actions })).digest("hex");
+		text = text.trim() || "Waiting for your answer.";
+		const digest = createHash("sha256")
+			.update(JSON.stringify({ text, actions, question: question?.request, questionLayout: 2 }))
+			.digest("hex");
 		const _id = `${thread._id}:${message.id}`;
 		let delivery = await collections.slackDeliveries.findOne({ _id });
 		if (delivery?.digest !== digest) {

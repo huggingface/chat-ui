@@ -156,12 +156,12 @@ export function questionModal(request: ElicitationRequestPayload, threadId: stri
 	for (const [index, field] of (request.fields ?? []).entries()) {
 		const key = `q${index}`;
 		if (index) blocks.push({ type: "divider" });
-		blocks.push(...fieldBlocks(field));
+		blocks.push(...fieldBlocks(field, index));
 		const label = plain((field.title ?? field.name).slice(0, 150));
 		if (field.kind === "select") {
 			const options = field.options.map((option, i) => ({
 				text: plain(
-					`${i + 1}. ${option.setBudgetUsd !== undefined ? `$${option.setBudgetUsd.toFixed(2)} budget` : option.label}`.slice(
+					`${choiceLetter(i)}. ${option.setBudgetUsd !== undefined ? `$${option.setBudgetUsd.toFixed(2)} budget` : option.label}`.slice(
 						0,
 						75
 					)
@@ -335,14 +335,24 @@ function questionText(text: string) {
 		text: text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
 	};
 }
-function fieldBlocks(field: ElicitationField): KnownBlock[] {
+function choiceLetter(index: number): string {
+	let label = "";
+	for (let n = index + 1; n > 0; n = Math.floor((n - 1) / 26))
+		label = String.fromCharCode(65 + ((n - 1) % 26)) + label;
+	return label;
+}
+export function questionFormLabel(request: ElicitationRequestPayload): string | undefined {
+	const field = inlineField(request);
+	return field ? (field.allowOther ? "Other answer" : undefined) : "Answer questions";
+}
+function fieldBlocks(field: ElicitationField, index: number): KnownBlock[] {
 	const blocks: KnownBlock[] = [];
-	for (const part of chunks(field.description || field.title || field.name))
+	for (const part of chunks(`${index + 1}. ${field.description || field.title || field.name}`))
 		blocks.push({ type: "section", text: questionText(part) });
 	if (field.kind === "select")
 		for (const [i, option] of field.options.entries()) {
 			for (const part of chunks(
-				`${i + 1}. *${optionLabel(option)}*${option.description ? `\n${option.description}` : ""}`
+				`${choiceLetter(i)}. *${optionLabel(option)}*${option.description ? `\n${option.description}` : ""}`
 			))
 				blocks.push({ type: "section", text: questionText(part) });
 		}
@@ -357,8 +367,8 @@ export function questionBlocks(request: ElicitationRequestPayload, threadId: str
 			),
 		},
 	];
-	for (const field of request.fields ?? []) {
-		blocks.push({ type: "divider" }, ...fieldBlocks(field));
+	for (const [index, field] of (request.fields ?? []).entries()) {
+		blocks.push({ type: "divider" }, ...fieldBlocks(field, index));
 	}
 	const field = inlineField(request);
 	if (field)
@@ -367,7 +377,7 @@ export function questionBlocks(request: ElicitationRequestPayload, threadId: str
 			elements: field.options.map((option, i) => ({
 				type: "button",
 				action_id: `${PICK_ACTION}${i}`,
-				text: plain(optionLabel(option).slice(0, 75)),
+				text: plain(`${choiceLetter(i)}. ${optionLabel(option)}`.slice(0, 75)),
 				value: JSON.stringify({ threadId, elicitationId: request.elicitationId, optionIndex: i }),
 				confirm: {
 					title: plain(
@@ -386,9 +396,10 @@ export function questionBlocks(request: ElicitationRequestPayload, threadId: str
 				{
 					type: "section",
 					text: plain(
-						"This question has many options. Open Answer questions to review them. Your submitted answers will be shared in this thread."
+						"This question is too long to display in full. Choose an option below or open the question form if available. Confirmed answers will be shared in this thread."
 					),
 				},
+				...blocks.filter((block) => block.type === "actions"),
 			];
 }
 export function answerSummary(
