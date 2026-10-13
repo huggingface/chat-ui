@@ -468,6 +468,34 @@ describe("Slack transport authorization", () => {
 		await bot.tick();
 		expect(mocks.post).toHaveBeenCalledTimes(2);
 	});
+	it("creates a new status for a follow-up invocation and keeps earlier status unchanged", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "First", ts: "100.0" },
+			"T123",
+			"STATUS1"
+		);
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		const first = { id: crypto.randomUUID(), from: "assistant" as const, content: "First result" };
+		await createTestConversation(locals, { _id: thread.conversationId, messages: [first] });
+		mocks.post.mockResolvedValueOnce({ ts: "101.0" }).mockResolvedValueOnce({ ts: "201.0" });
+		await bot["publishSessionStatus"](thread, "✅ Finished", []);
+		const second = { ...first, id: crypto.randomUUID(), content: "Second result" };
+		await collections.conversations.updateOne(
+			{ _id: thread.conversationId },
+			{ $push: { messages: second } }
+		);
+		await bot["publishSessionStatus"](thread, "🕐 Working for 0s", []);
+		// A resumed generation keeps the same assistant message and updates its own card.
+		await bot["publishSessionStatus"](thread, "🕑 Running for 10s", []);
+		expect(mocks.post).toHaveBeenCalledTimes(2);
+		expect(mocks.update).toHaveBeenCalledTimes(1);
+		expect(mocks.update.mock.calls[0][0].ts).toBe("201.0");
+		expect(await collections.slackDeliveries.countDocuments({ threadId: thread._id })).toBe(2);
+	});
+
 	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {
 		const { user } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);

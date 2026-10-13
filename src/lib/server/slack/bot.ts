@@ -601,8 +601,6 @@ export class MlSlackBot {
 		const next = previous
 			.catch(() => {})
 			.then(async () => {
-				if (!(await collections.slackDeliveries.findOne({ _id: `${thread._id}:status` })))
-					await this.publishSessionStatus(thread, "⏳ Queued", []);
 				await this.publishAnswers(thread);
 				await this.publish(thread);
 			});
@@ -858,9 +856,12 @@ export class MlSlackBot {
 		status: string,
 		actions: Array<{ id: string; label: string; value: string }>
 	): Promise<void> {
-		const _id = `${thread._id}:status`;
-		const delivery = await collections.slackDeliveries.findOne({ _id });
 		const conv = await collections.conversations.findOne({ _id: thread.conversationId });
+		const message = conv?.messages.at(-1);
+		if (message?.from !== "assistant") return;
+		// A fresh invocation gets a new assistant message; question continuations keep its ID.
+		const _id = `${thread._id}:status:${message.id}`;
+		const delivery = await collections.slackDeliveries.findOne({ _id });
 		const budget = conv?.mlBudget;
 		const text = `**Session status**\n\n${status}\n💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
 		const digest = createHash("sha256").update(JSON.stringify({ text, actions })).digest("hex");
@@ -888,7 +889,7 @@ export class MlSlackBot {
 			{
 				$set: {
 					threadId: thread._id,
-					messageId: "status",
+					messageId: message.id,
 					parts: [ts],
 					digest,
 					updatedAt: new Date(),
