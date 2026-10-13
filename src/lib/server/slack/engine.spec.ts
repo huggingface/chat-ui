@@ -115,6 +115,28 @@ describe("Slack ML Intern persistence", () => {
 		).toBe("failed");
 	});
 
+	it("passes image attachments through the real upload pathway into the conversation", async () => {
+		const { thread, user } = await setup();
+		rounds({ content: "Image received." });
+		const png = Buffer.from(
+			"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+			"base64"
+		);
+		await runSlackTurn(thread, user, {
+			text: "Read this image",
+			files: [new File([png], "image.png", { type: "image/png" })],
+		});
+		const conv = await collections.conversations.findOne({ _id: thread.conversationId });
+		const file = conv?.messages.find((m) => m.from === "user")?.files?.[0];
+		expect(file).toMatchObject({ type: "hash", name: "image.png", mime: "image/png" });
+		const stored: Buffer[] = [];
+		for await (const chunk of collections.bucket.openDownloadStreamByName(
+			`${thread.conversationId}-${file?.value}`
+		))
+			stored.push(chunk);
+		expect(Buffer.concat(stored)).toEqual(png);
+	});
+
 	it("deduplicates Slack retries, keeps threads separate, and elects only one worker", async () => {
 		const thread = await getOrCreateThread("T123", "C123", "100.0", "U123");
 		const input = {

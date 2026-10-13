@@ -56,7 +56,7 @@ export async function ensureConversation(
 export async function runSlackTurn(
 	thread: SlackThread,
 	user: User,
-	input: { text?: string; resumeElicitationId?: string; retry?: boolean }
+	input: { text?: string; files?: File[]; resumeElicitationId?: string; retry?: boolean }
 ): Promise<void> {
 	const conv = await collections.conversations.findOne({
 		_id: thread.conversationId,
@@ -75,6 +75,13 @@ export async function runSlackTurn(
 			generationId: randomUUID(),
 		})
 	);
+	for (const file of input.files ?? []) {
+		data.append(
+			"files",
+			new Blob([Buffer.from(await file.arrayBuffer()).toString("base64")], { type: file.type }),
+			`base64;${file.name}`
+		);
+	}
 	const response = await generateConversationResponse({
 		request: new Request("http://slack.internal/conversation", { method: "POST", body: data }),
 		locals: slackLocals(user),

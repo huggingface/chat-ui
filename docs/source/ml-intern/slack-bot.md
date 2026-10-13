@@ -304,3 +304,9 @@ Do not connect workers using different databases to the same Slack app concurren
 The shared-database lease protects replicas using the same MongoDB, but independent
 Space databases cannot coordinate through it. Pause the Space and allow its final
 backup to finish before every source upload or deployment update.
+
+## Attachments
+
+Files attached to the invoking message or earlier human messages in the same Slack thread are downloaded with the bot token and attached to the ML Intern conversation through Chat UI's upload pipeline. This supports image requests such as OCR. Files posted after the invocation and bot-uploaded files are excluded. Limits are 10 distinct files, 10 MB per file, and 25 MB total per invocation. Start a fresh thread to select a smaller set. Download failures are reported privately in the thread rather than silently running without the image.
+
+The app requires the **files:read** bot scope. For an existing installation, add it under **OAuth & Permissions → Bot Token Scopes**, then reinstall the app to your workspace. Updating the repository manifest alone does not grant permission to an already-installed bot. Attachments stay in the conversation's file storage; they are not made public on Slack.

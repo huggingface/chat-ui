@@ -1,4 +1,6 @@
+import type { SlackFile } from "./attachments";
 export interface ThreadMessage {
+	files?: SlackFile[];
 	user?: string;
 	text?: string;
 	ts?: string;
@@ -15,7 +17,12 @@ export function threadPrompt(
 ): string {
 	const history = messages
 		.filter((m) => m.ts && m.ts < invocation.ts && m.user !== botUserId)
-		.map((m) => ({ user: m.user ?? "bot", ts: m.ts, text: m.text ?? "" }));
+		.map((m) => ({
+			user: m.user ?? "bot",
+			ts: m.ts,
+			text: m.text ?? "",
+			files: m.files?.map((f) => ({ name: f.name, type: f.mimetype })),
+		}));
 	let context = JSON.stringify(history);
 	if (context.length > 24_000) {
 		while (history.length && JSON.stringify(history).length > 24_000) history.shift();

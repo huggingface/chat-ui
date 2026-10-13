@@ -21,7 +21,8 @@
 				"im:history",
 				"im:read",
 				"users:read",
-				"files:write"
+				"files:write",
+				"files:read"
 			]
 		}
 	},

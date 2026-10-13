@@ -1,3 +1,4 @@
+import { downloadAttachments } from "./attachments";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createHash } from "node:crypto";
 import { App } from "@slack/bolt";
@@ -467,7 +468,12 @@ export class MlSlackBot {
 		const parsed = mention.safeParse(raw);
 		if (!parsed.success || teamId !== this.settings.teamId) return;
 		const event = parsed.data;
-		if (event.bot_id || event.subtype || event.user === this.botUserId) return;
+		if (
+			event.bot_id ||
+			(event.subtype && event.subtype !== "file_share") ||
+			event.user === this.botUserId
+		)
+			return;
 		if (
 			this.settings.allowedChannels.length &&
 			!this.settings.allowedChannels.includes(event.channel)
@@ -510,7 +516,7 @@ export class MlSlackBot {
 	private async context(
 		thread: SlackThread,
 		input: { text: string; user: string; ts: string }
-	): Promise<string> {
+	): Promise<{ text: string; files: File[] }> {
 		let cursor: string | undefined;
 		const messages: ThreadMessage[] = [];
 		do {
@@ -525,7 +531,24 @@ export class MlSlackBot {
 			messages.push(...(page.messages ?? []));
 			cursor = page.response_metadata?.next_cursor || undefined;
 		} while (cursor && messages.length < 200);
-		return threadPrompt(messages, input, this.botUserId, Boolean(cursor), thread.owner);
+		const text = threadPrompt(messages, input, this.botUserId, Boolean(cursor), thread.owner);
+		try {
+			const files = await downloadAttachments(
+				messages,
+				input.ts,
+				this.botUserId,
+				this.settings.botToken
+			);
+			return { text, files };
+		} catch (error) {
+			await this.tell(
+				thread.channel,
+				input.user,
+				error instanceof Error ? error.message : "Could not read Slack attachments.",
+				thread.threadTs
+			);
+			throw error;
+		}
 	}
 
 	private async dispatch(thread: SlackThread): Promise<void> {
@@ -570,8 +593,8 @@ export class MlSlackBot {
 						"ML Intern is still working or waiting for the task owner. The owner can answer its form or stop the current run; mention me again when that turn is finished."
 					);
 				} else {
-					const text = input.retry ? undefined : await this.context(thread, input);
-					await runSlackTurn(thread, this.user, { text, retry: input.retry });
+					const context = input.retry ? undefined : await this.context(thread, input);
+					await runSlackTurn(thread, this.user, { ...context, retry: input.retry });
 				}
 			}
 			await collections.slackInputs.updateOne(
