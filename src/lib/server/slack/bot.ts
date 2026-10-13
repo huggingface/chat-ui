@@ -1000,6 +1000,7 @@ export class MlSlackBot {
 								text: part.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
 							},
 						},
+						...(parts.length === texts.length - 1 ? [{ type: "divider" as const }] : []),
 					],
 					unfurl_links: false,
 					unfurl_media: false,
