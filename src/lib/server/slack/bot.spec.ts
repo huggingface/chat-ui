@@ -501,6 +501,55 @@ describe("Slack transport authorization", () => {
 			expect(await collections.slackInputs.countDocuments({ status: "done" })).toBe(2)
 		);
 	});
+	it("retains public updates across new output, retries and bot restarts without leaking reasoning", async () => {
+		const { user } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Train", ts: "100.0" },
+			"T123",
+			"UPDATES"
+		);
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		mocks.post.mockResolvedValue({ ts: "201.0" });
+		const first = "Trackio: https://example.com/metrics\n\nValidation accuracy: 98%.";
+		await bot["publishPublicUpdates"](
+			thread,
+			"updates-test",
+			"message",
+			`<think>secret</think>${first}`
+		);
+		expect(mocks.post).toHaveBeenCalledTimes(1);
+		const restarted = new MlSlackBot(settings, user);
+		await restarted["publishPublicUpdates"](
+			thread,
+			"updates-test",
+			"message",
+			`${first}\n\nUploading weights.`
+		);
+		expect(mocks.update.mock.lastCall?.[0].text).toContain(first);
+		expect(mocks.update.mock.lastCall?.[0].text).toContain("Uploading weights.");
+		await restarted["publishPublicUpdates"](
+			thread,
+			"updates-test",
+			"message",
+			"Deployment ready.<think>private"
+		);
+		const text = mocks.update.mock.lastCall?.[0].text;
+		expect(text).toContain(first);
+		expect(text).toContain("Uploading weights.");
+		expect(text).toContain("Deployment ready.");
+		expect(text).not.toMatch(/secret|private/);
+		await restarted["publishPublicUpdates"](
+			thread,
+			"updates-test",
+			"message",
+			"Deployment ready.<think>private"
+		);
+		expect(mocks.update).toHaveBeenCalledTimes(2);
+		expect(mocks.post).toHaveBeenCalledTimes(1);
+	});
+
 	it("refuses a stale Resume button rather than replaying a newer completed turn", async () => {
 		const { user, locals } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);

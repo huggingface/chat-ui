@@ -550,3 +550,21 @@ export function createdSpaceLinks(updates: MessageUpdate[] = []): string[] {
 	}
 	return [...links].slice(-3);
 }
+
+/** Keep all observed public prose, including when a resumed generation replaces its content. */
+export function retainPublicUpdates(
+	previous: string,
+	snapshot: string,
+	content: string
+): { text: string; snapshot: string } {
+	const current = visibleText(content.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "\n\n"));
+	if (!current || current === snapshot || snapshot.startsWith(current))
+		return { text: previous, snapshot };
+	const text =
+		snapshot && current.startsWith(snapshot)
+			? previous + current.slice(snapshot.length)
+			: previous
+				? `${previous}\n\n${current}`
+				: current;
+	return { text, snapshot: current };
+}

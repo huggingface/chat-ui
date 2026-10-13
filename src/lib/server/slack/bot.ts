@@ -25,7 +25,7 @@ import {
 	SUBMIT_ACTION,
 	inlineQuestions,
 	selectedAnswers,
-	latestPublicUpdate,
+	retainPublicUpdates,
 	createdSpaceLinks,
 	inlineField,
 	questionBlocks,
@@ -665,8 +665,7 @@ export class MlSlackBot {
 					? ` · Next check in ~${remaining < 60 ? `${remaining}s` : `${Math.ceil(remaining / 60)}m`}`
 					: " · Next check is due";
 			}
-			const latest = latestPublicUpdate(message.content);
-			if (latest) text += `\n\nLatest update: ${latest}`;
+
 			const steps = conv.plan?.steps ?? [];
 			const current = steps.find((s) => s.status === "in_progress");
 			if (steps.length)
@@ -799,6 +798,9 @@ export class MlSlackBot {
 				}
 			);
 		}
+		// Keep public prose in a separate, cumulative post so status, questions and final results cannot erase it.
+		if (live.alive && !question)
+			await this.publishPublicUpdates(thread, `${_id}:updates`, message.id, message.content);
 		if (
 			!live.alive &&
 			!this.active.has(thread._id) &&
@@ -815,6 +817,63 @@ export class MlSlackBot {
 				{ $set: { watching: false } }
 			);
 		}
+	}
+
+	private async publishPublicUpdates(
+		thread: SlackThread,
+		_id: string,
+		messageId: string,
+		content: string
+	): Promise<void> {
+		let delivery = await collections.slackDeliveries.findOne({ _id });
+		const retained = retainPublicUpdates(
+			delivery?.publicText ?? "",
+			delivery?.publicSnapshot ?? "",
+			content
+		);
+		if (!retained.text || retained.text === delivery?.publicText) return;
+		if (!delivery) {
+			delivery = { _id, threadId: thread._id, messageId, parts: [], updatedAt: new Date() };
+			await collections.slackDeliveries.insertOne(delivery);
+		}
+		const parts = chunks(`**Run updates**\n\n${retained.text}`);
+		const previous = delivery.publicText ? chunks(`**Run updates**\n\n${delivery.publicText}`) : [];
+		for (let index = 0; index < parts.length; index++) {
+			const text = parts[index];
+			if (text === previous[index] && delivery.parts[index]) continue;
+			const payload = {
+				channel: thread.channel,
+				text,
+				blocks: messageBlocks(text, []),
+				parse: "none" as const,
+			};
+			const ts = delivery.parts[index];
+			if (ts) await this.app.client.chat.update({ ...payload, ts });
+			else {
+				const sent = await this.app.client.chat.postMessage({
+					...payload,
+					thread_ts: thread.threadTs,
+					unfurl_links: false,
+					unfurl_media: false,
+				});
+				if (!sent.ts) throw new Error("Slack did not return a message timestamp.");
+				delivery.parts.push(sent.ts);
+				await collections.slackDeliveries.updateOne(
+					{ _id },
+					{ $set: { parts: delivery.parts, updatedAt: new Date() } }
+				);
+			}
+		}
+		await collections.slackDeliveries.updateOne(
+			{ _id },
+			{
+				$set: {
+					publicText: retained.text,
+					publicSnapshot: retained.snapshot,
+					updatedAt: new Date(),
+				},
+			}
+		);
 	}
 
 	private async publishAnswers(thread: SlackThread): Promise<void> {

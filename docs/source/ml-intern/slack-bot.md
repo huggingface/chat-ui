@@ -302,3 +302,5 @@ Do not connect workers using different databases to the same Slack app concurren
 The shared-database lease protects replicas using the same MongoDB, but independent
 Space databases cannot coordinate through it. Pause the Space and allow its final
 backup to finish before every source upload or deployment update.
+
+Public run updates are retained in a separate, cumulative message in the Slack thread. Earlier results, links, and instructions remain readable as the compact status card changes or becomes a question or final response. Only public assistant text is shown, never private reasoning. Long updates continue in additional messages.

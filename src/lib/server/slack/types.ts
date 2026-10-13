@@ -32,6 +32,9 @@ export interface SlackInput {
 }
 
 export interface SlackDelivery {
+	/** Public progress retained independently of the changing status card. */
+	publicText?: string;
+	publicSnapshot?: string;
 	questionId?: string;
 	questionFinalized?: boolean;
 	_id: string;
