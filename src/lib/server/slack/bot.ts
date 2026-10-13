@@ -31,7 +31,6 @@ import {
 	questionBlocks,
 	questionFormLabel,
 	confirmedQuestionBlocks,
-	activityText,
 	ANSWER_ACTION,
 	ANSWER_VIEW,
 	STOP_ACTION,
@@ -602,6 +601,8 @@ export class MlSlackBot {
 		const next = previous
 			.catch(() => {})
 			.then(async () => {
+				if (!(await collections.slackDeliveries.findOne({ _id: `${thread._id}:status` })))
+					await this.publishSessionStatus(thread, "⏳ Queued", []);
 				await this.publishAnswers(thread);
 				await this.publish(thread);
 			});
@@ -670,43 +671,7 @@ export class MlSlackBot {
 					});
 			} else text += `\n\nOpen this link to continue: ${question.request.url ?? ""}`;
 		} else if (live.alive) {
-			text =
-				state.status === "waiting"
-					? `Waiting: ${state.waitReason ?? "for compute to finish"}`
-					: activityText(
-							message.updates,
-							await collections.nestedAgentCalls.countDocuments({
-								conversationId: conv._id,
-								generationId: message.generationId,
-								label: "research",
-								status: "success",
-							})
-						);
-			const elapsed = Math.max(
-				0,
-				Math.floor(
-					(Date.now() - new Date(message.createdAt ?? state.createdAt).getTime()) / 10000
-				) * 10
-			);
-			text += `\nElapsed: ${elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`}`;
-
-			if (state.status === "waiting" && state.waitUntil) {
-				const remaining = Math.max(
-					0,
-					Math.ceil((new Date(state.waitUntil).getTime() - Date.now()) / 30000) * 30
-				);
-				text += remaining
-					? ` · Next check in ~${remaining < 60 ? `${remaining}s` : `${Math.ceil(remaining / 60)}m`}`
-					: " · Next check is due";
-			}
-
-			const steps = conv.plan?.steps ?? [];
-			const current = steps.find((s) => s.status === "in_progress");
-			if (steps.length)
-				text += `\n\n${steps.filter((s) => s.status === "completed").length}/${steps.length} steps complete${current ? ` · ${current.step.slice(0, 200)}` : ""}`;
-			const links = createdSpaceLinks(message.updates);
-			if (links.length)
-				text += `\n\nSpace created (setup may still be in progress):\n${links.join("\n")}`;
+			text = "";
 		} else {
 			text =
 				visibleText(phaseContent) ||
@@ -717,9 +682,31 @@ export class MlSlackBot {
 				actions.push({ id: RESUME_ACTION, label: "Resume", value: turnValue });
 			actions.push({ id: "ml_intern_trace", label: "Download trace", value: thread._id });
 		}
-		if (live.alive) actions.push({ id: STOP_ACTION, label: "Stop assistant", value: turnValue });
-		if (conv.mlBudget)
-			text += `\n\nCompute: ${formatMicroUsd(conv.mlBudget.spentMicroUsd)} spent · ${formatMicroUsd(reservedMicroUsd(conv.mlBudget))} reserved · ${formatMicroUsd(conv.mlBudget.totalMicroUsd)} budget`;
+		const elapsed = Math.max(
+			0,
+			Math.floor(
+				((live.alive ? Date.now() : new Date(state.updatedAt).getTime()) -
+					new Date(message.createdAt ?? state.createdAt).getTime()) /
+					10000
+			) * 10
+		);
+		const duration = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
+		const status = question
+			? "⏳ Waiting for your answer"
+			: live.alive
+				? `⏳ ${state.status === "waiting" ? "Waiting" : "Working"} for ${duration}`
+				: message.interrupted
+					? "⏹️ Stopped"
+					: state.status === "failed"
+						? "⚠️ Run failed"
+						: `✅ Finished · ${duration}`;
+		await this.publishSessionStatus(
+			thread,
+			status,
+			live.alive
+				? [{ id: STOP_ACTION, label: "Stop assistant", value: turnValue }]
+				: actions.filter((a) => a.id === RESUME_ACTION)
+		);
 		text = text.trim() || "Waiting for your answer.";
 		const digest = createHash("sha256")
 			.update(
@@ -746,8 +733,18 @@ export class MlSlackBot {
 		const phaseId = `${thread._id}:${message.id}${answered ? `:after:${answered.elicitationId}` : ""}`;
 		// Flush public commentary before posting a question. Resumed turns share a harness message,
 		// so only prose after the question's saved boundary belongs below its answer.
-		if (question || live.alive)
+		if (question || live.alive) {
 			await this.publishPublicUpdates(thread, `${phaseId}:updates`, message.id, phaseContent);
+			const links = createdSpaceLinks(message.updates);
+			if (links.length)
+				await this.publishPublicUpdates(
+					thread,
+					`${thread._id}:${message.id}:spaces`,
+					message.id,
+					`Spaces created (setup may still be in progress):\n${links.join("\n")}`
+				);
+		}
+		if (live.alive && !question) return;
 		const existingQuestion = question
 			? await collections.slackDeliveries.findOne({
 					threadId: thread._id,
@@ -759,12 +756,6 @@ export class MlSlackBot {
 			: live.alive
 				? phaseId
 				: `${phaseId}:result`;
-		if (question || !live.alive)
-			await this.closeStatus(
-				thread,
-				phaseId,
-				question ? "Waiting for your answer below." : "Run ended. Results are posted below."
-			);
 		let delivery = await collections.slackDeliveries.findOne({ _id });
 		if (
 			delivery &&
@@ -801,7 +792,7 @@ export class MlSlackBot {
 									question.slackChoices,
 									question.slackChoiceRevision
 								),
-								...messageBlocks(part, actions),
+								...messageBlocks(part, actions).filter((block) => block.type === "actions"),
 							]
 						: messageBlocks(part, index === parts.length - 1 ? actions : []);
 				const ts = delivery.parts[index];
@@ -862,18 +853,49 @@ export class MlSlackBot {
 		}
 	}
 
-	private async closeStatus(thread: SlackThread, id: string, text: string): Promise<void> {
-		const delivery = await collections.slackDeliveries.findOne({ _id: id });
-		if (!delivery || delivery.questionId || delivery.statusClosed) return;
-		for (const ts of delivery.parts)
-			await this.app.client.chat.update({
-				channel: thread.channel,
-				ts,
-				text,
-				blocks: messageBlocks(text, []),
-				parse: "none",
+	private async publishSessionStatus(
+		thread: SlackThread,
+		status: string,
+		actions: Array<{ id: string; label: string; value: string }>
+	): Promise<void> {
+		const _id = `${thread._id}:status`;
+		const delivery = await collections.slackDeliveries.findOne({ _id });
+		const conv = await collections.conversations.findOne({ _id: thread.conversationId });
+		const budget = conv?.mlBudget;
+		const text = `**Session status**\n\n${status}\n💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
+		const digest = createHash("sha256").update(JSON.stringify({ text, actions })).digest("hex");
+		if (delivery?.digest === digest) return;
+		const payload = {
+			channel: thread.channel,
+			text,
+			blocks: [...messageBlocks(text, actions), { type: "divider" as const }],
+			parse: "none" as const,
+		};
+		let ts = delivery?.parts[0];
+		if (ts) await this.app.client.chat.update({ ...payload, ts });
+		else {
+			const sent = await this.app.client.chat.postMessage({
+				...payload,
+				thread_ts: thread.threadTs,
+				unfurl_links: false,
+				unfurl_media: false,
 			});
-		await collections.slackDeliveries.updateOne({ _id: id }, { $set: { statusClosed: true } });
+			if (!sent.ts) throw new Error("Slack did not return a message timestamp.");
+			ts = sent.ts;
+		}
+		await collections.slackDeliveries.updateOne(
+			{ _id },
+			{
+				$set: {
+					threadId: thread._id,
+					messageId: "status",
+					parts: [ts],
+					digest,
+					updatedAt: new Date(),
+				},
+			},
+			{ upsert: true }
+		);
 	}
 
 	private async publishPublicUpdates(

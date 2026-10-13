@@ -71,6 +71,7 @@ beforeEach(async () => {
 	}));
 	mocks.ephemeral.mockResolvedValue({ ok: true });
 	mocks.react.mockResolvedValue({ ok: true });
+	mocks.post.mockImplementation(async () => ({ ts: crypto.randomUUID() }));
 	mocks.channels.mockResolvedValue({ channel: { is_ext_shared: false } });
 	mocks.replies.mockResolvedValue({ messages: [] });
 });
@@ -397,16 +398,17 @@ describe("Slack transport authorization", () => {
 		await bot["render"](thread);
 		await select(0);
 		expect(mocks.update).toHaveBeenCalledWith(
-			expect.objectContaining({ ts: "101.0", blocks: expect.any(Array) })
+			expect.objectContaining({ ts: "102.0", blocks: expect.any(Array) })
 		);
 		expect(JSON.stringify(mocks.update.mock.calls.at(-1))).toContain("✓ A. Alpha");
 		await select(1);
 		expect(JSON.stringify(mocks.update.mock.calls.at(-1))).toContain("✓ B. Beta");
 		// Simulate the harness resolving and resuming in the same assistant message.
-		expect(mocks.post.mock.calls[0][0].text).toContain("Run updates");
-		expect(mocks.post.mock.calls[0][0].text).toContain("Questions");
+		expect(mocks.post.mock.calls[0][0].text).toContain("Session status");
+		expect(mocks.post.mock.calls[1][0].text).toContain("Run updates");
+		expect(mocks.post.mock.calls[1][0].text).toContain("Questions");
 		expect(
-			mocks.post.mock.calls[1][0].blocks.some((b: { type: string }) => b.type === "actions")
+			mocks.post.mock.calls[2][0].blocks.some((b: { type: string }) => b.type === "actions")
 		).toBe(true);
 		mocks.post.mockClear();
 		await collections.mcpElicitations.updateOne(
@@ -433,22 +435,30 @@ describe("Slack transport authorization", () => {
 
 		await bot["render"](thread);
 		expect(mocks.post.mock.calls.some(([v]) => v.text.includes("Answers from"))).toBe(false);
-		expect(mocks.post.mock.calls[0][0].text).not.toContain("Questions");
+		expect(mocks.post).not.toHaveBeenCalled();
 		expect(mocks.post.mock.calls.some(([v]) => v.text.includes("Run updates"))).toBe(false);
 		await collections.conversations.updateOne(
 			{ _id: thread.conversationId },
 			{ $set: { "messages.0.content": "Questions\n\nHere is the follow-up response" } }
 		);
 		await bot["render"](thread);
-		expect(mocks.post.mock.calls[1][0].text).toContain("Here is the follow-up response");
-		expect(mocks.post.mock.calls[1][0].text).not.toContain("Questions");
+		expect(mocks.post.mock.calls[0][0].text).toContain("Here is the follow-up response");
+		expect(mocks.post.mock.calls[0][0].text).not.toContain("Questions");
 		await collections.turnStates.updateOne({ messageId }, { $set: { status: "done" } });
 		await bot["render"](thread);
-		expect(mocks.post.mock.calls[2][0].text).toContain("Here is the follow-up response");
-		expect(mocks.post.mock.calls[2][0].text).not.toContain("Questions");
+		expect(mocks.post.mock.calls[1][0].text).toContain("Here is the follow-up response");
+		expect(mocks.post.mock.calls[1][0].text).not.toContain("Questions");
 		expect(
-			mocks.update.mock.calls.some(([v]) => v.ts === "101.0" && v.text.includes("follow-up"))
+			mocks.update.mock.calls.some(([v]) => v.ts === "102.0" && v.text.includes("follow-up"))
 		).toBe(false);
+		expect(
+			mocks.update.mock.calls
+				.filter(([v]) => v.text.includes("Session status"))
+				.every(([v]) => v.ts === "100.0")
+		).toBe(true);
+		expect(
+			mocks.update.mock.calls.some(([v]) => v.ts === "100.0" && v.text.includes("Finished"))
+		).toBe(true);
 		const frozen = mocks.update.mock.calls.find(([v]) => v.text.startsWith("Questions answered"));
 		expect(JSON.stringify(frozen?.[0].blocks)).toContain("*Beta* ✅");
 		expect(JSON.stringify(frozen?.[0].blocks)).toContain("*Alpha* ✅");
@@ -456,7 +466,7 @@ describe("Slack transport authorization", () => {
 		expect(frozen?.[0].blocks.some((b: { type: string }) => b.type === "actions")).toBe(false);
 		await collections.slackThreads.updateOne({ _id: thread._id }, { $set: { watching: true } });
 		await bot.tick();
-		expect(mocks.post).toHaveBeenCalledTimes(3);
+		expect(mocks.post).toHaveBeenCalledTimes(2);
 	});
 	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {
 		const { user } = await createTestUser();
