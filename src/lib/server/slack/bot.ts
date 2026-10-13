@@ -21,6 +21,10 @@ import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store"
 import type { SlackThread } from "./types";
 import {
 	PICK_ACTION,
+	SELECT_ACTION,
+	SUBMIT_ACTION,
+	inlineQuestions,
+	selectedAnswers,
 	latestPublicUpdate,
 	createdSpaceLinks,
 	inlineField,
@@ -133,6 +137,100 @@ export class MlSlackBot {
 		this.app.event("message", async ({ event, body }) => {
 			if ("channel_type" in event && event.channel_type === "im")
 				await this.receive(event, body.team_id, body.event_id);
+		});
+
+		for (let f = 0; f < 5; f++)
+			for (let i = 0; i < 5; i++)
+				this.app.action(`${SELECT_ACTION}${f}_${i}`, async ({ ack, body, action }) => {
+					await ack();
+					if (!("value" in action)) return;
+					const parsed = metadata
+						.extend({
+							fieldIndex: z.number().int().min(0).max(4),
+							optionIndex: z.number().int().min(0).max(4),
+						})
+						.safeParse(parseMetadata(action.value));
+					if (!parsed.success) return;
+					const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
+					if (!thread) return;
+					const question = await collections.mcpElicitations.findOne({
+						conversationId: thread.conversationId,
+						elicitationId: parsed.data.elicitationId,
+						status: "pending",
+						"pending.kind": "ask",
+					});
+					if (!question || !inlineQuestions(question.request)) return;
+					const field = question.request.fields?.[parsed.data.fieldIndex];
+					if (field?.kind !== "select" || !field.options[parsed.data.optionIndex]) return;
+					await collections.mcpElicitations.updateOne(
+						{ _id: question._id, status: "pending", slackSubmitting: { $ne: true } },
+						{
+							$set: { [`slackChoices.${parsed.data.fieldIndex}`]: parsed.data.optionIndex },
+							$inc: { slackChoiceRevision: 1 },
+						}
+					);
+					await collections.slackThreads.updateOne(
+						{ _id: thread._id },
+						{ $set: { watching: true } }
+					);
+				});
+		this.app.action(SUBMIT_ACTION, async ({ ack, body, action }) => {
+			await ack();
+			if (!("value" in action)) return;
+			const parsed = metadata
+				.extend({ revision: z.number().int().min(1) })
+				.safeParse(parseMetadata(action.value));
+			if (!parsed.success) return;
+			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
+			if (!thread) return;
+			const question = await collections.mcpElicitations.findOne({
+				conversationId: thread.conversationId,
+				elicitationId: parsed.data.elicitationId,
+				status: "pending",
+				"pending.kind": "ask",
+			});
+			const content = question && selectedAnswers(question.request, question.slackChoices);
+			if (!question || !content || question.slackChoiceRevision !== parsed.data.revision) return;
+			const locked = await collections.mcpElicitations.updateOne(
+				{
+					_id: question._id,
+					status: "pending",
+					slackChoiceRevision: parsed.data.revision,
+					slackSubmitting: { $ne: true },
+				},
+				{ $set: { slackSubmitting: true, slackShareAnswer: true } }
+			);
+			if (!locked.modifiedCount) {
+				await this.tell(
+					thread.channel,
+					body.user.id,
+					"Your selections changed or were already submitted. Review the current choices and submit again."
+				);
+				return;
+			}
+			try {
+				const result = await submitElicitationAnswer({
+					conversationId: thread.conversationId,
+					elicitationId: question.elicitationId,
+					action: "accept",
+					content,
+				});
+				if (result.ok && result.resume)
+					await enqueueInput({
+						_id: inputKey(this.settings.teamId, `answer:${question.elicitationId}`),
+						threadId: thread._id,
+						user: body.user.id,
+						text: "",
+						ts: thread.threadTs,
+						resumeElicitationId: question.elicitationId,
+					});
+			} finally {
+				await collections.mcpElicitations.updateOne(
+					{ _id: question._id },
+					{ $unset: { slackSubmitting: "" } }
+				);
+				await collections.slackThreads.updateOne({ _id: thread._id }, { $set: { watching: true } });
+			}
 		});
 		for (let i = 0; i < 5; i++)
 			this.app.action(`${PICK_ACTION}${i}`, async ({ ack, body, action }) => {
@@ -579,7 +677,16 @@ export class MlSlackBot {
 			text += `\n\nCompute: ${formatMicroUsd(conv.mlBudget.spentMicroUsd)} spent · ${formatMicroUsd(reservedMicroUsd(conv.mlBudget))} reserved · ${formatMicroUsd(conv.mlBudget.totalMicroUsd)} budget`;
 		text = text.trim() || "Waiting for your answer.";
 		const digest = createHash("sha256")
-			.update(JSON.stringify({ text, actions, question: question?.request, questionLayout: 2 }))
+			.update(
+				JSON.stringify({
+					text,
+					actions,
+					question: question?.request,
+					questionLayout: 3,
+					choices: question?.slackChoices,
+					revision: question?.slackChoiceRevision,
+				})
+			)
 			.digest("hex");
 		const _id = `${thread._id}:${message.id}`;
 		let delivery = await collections.slackDeliveries.findOne({ _id });
@@ -599,7 +706,15 @@ export class MlSlackBot {
 				const part = parts[index] ?? "(continued above)";
 				const blocks =
 					question?.pending?.kind === "ask" && index === 0
-						? [...questionBlocks(question.request, thread._id), ...messageBlocks(part, actions)]
+						? [
+								...questionBlocks(
+									question.request,
+									thread._id,
+									question.slackChoices,
+									question.slackChoiceRevision
+								),
+								...messageBlocks(part, actions),
+							]
 						: messageBlocks(part, index === parts.length - 1 ? actions : []);
 				const ts = delivery.parts[index];
 				if (ts)

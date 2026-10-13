@@ -4,6 +4,9 @@ import {
 	activityText,
 	questionBlocks,
 	questionFormLabel,
+	SELECT_ACTION,
+	SUBMIT_ACTION,
+	selectedAnswers,
 	inlineField,
 	latestPublicUpdate,
 	createdSpaceLinks,
@@ -281,10 +284,26 @@ it("numbers questions, letters choices and omits redundant form controls for inl
 		...question,
 		fields: [field, { ...field, name: "q2", description: "Which input?" }],
 	};
-	expect(questionFormLabel(multiple)).toBe("Answer questions");
+	expect(questionFormLabel(multiple)).toBe("Other answers");
 	const copy = JSON.stringify(questionBlocks(multiple, "thread"));
 	expect(copy).toContain("1. How much compute?");
 	expect(copy).toContain("2. Which input?");
 	expect(copy).toContain("A. *Set budget to $5.00*");
 	expect(copy).toContain("B. *No compute*");
+});
+
+it("keeps multiple choices as drafts until all are selected and adds a final divider", () => {
+	const field = question.fields?.[0];
+	if (!field) throw Error("Missing fixture");
+	const req = { ...question, fields: [field, { ...field, name: "q2" }] };
+	const partial = questionBlocks(req, "thread", { "0": 0 }, 1);
+	expect(JSON.stringify(partial)).toContain(`${SELECT_ACTION}1_1`);
+	expect(JSON.stringify(partial)).not.toContain(SUBMIT_ACTION);
+	expect(selectedAnswers(req, { "0": 0 })).toBeUndefined();
+	const complete = questionBlocks(req, "thread", { "0": 0, "1": 1 }, 2);
+	expect(JSON.stringify(complete)).toContain("✓ A.");
+	expect(JSON.stringify(complete)).toContain(SUBMIT_ACTION);
+	expect(JSON.stringify(complete)).toContain("Set budget to $5.00");
+	expect(complete.at(-1)).toEqual({ type: "divider" });
+	expect(selectedAnswers(req, { "0": 0, "1": 1 })).toEqual({ q1: "Set budget to $5.00", q2: "No" });
 });

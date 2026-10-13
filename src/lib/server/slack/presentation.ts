@@ -341,8 +341,38 @@ function choiceLetter(index: number): string {
 		label = String.fromCharCode(65 + ((n - 1) % 26)) + label;
 	return label;
 }
+export const SELECT_ACTION = "ml_intern_select_";
+export const SUBMIT_ACTION = "ml_intern_submit";
+export function inlineQuestions(request: ElicitationRequestPayload) {
+	const fields = request.fields ?? [];
+	return (
+		fields.length > 1 &&
+		fields.length <= 5 &&
+		fields.every(
+			(f) => f.kind === "select" && !f.multiple && f.options.length > 0 && f.options.length <= 5
+		)
+	);
+}
+export function selectedAnswers(
+	request: ElicitationRequestPayload,
+	choices: Record<string, number> = {}
+): Record<string, ElicitationValue> | undefined {
+	if (!inlineQuestions(request)) return;
+	const content: Record<string, ElicitationValue> = {};
+	for (const [i, field] of (request.fields ?? []).entries()) {
+		if (field.kind !== "select") return;
+		const index = choices[String(i)];
+		if (!Number.isInteger(index) || !field.options[index]) return;
+		content[field.name] = field.options[index].value;
+	}
+	return content;
+}
 export function questionFormLabel(request: ElicitationRequestPayload): string | undefined {
 	const field = inlineField(request);
+	if (inlineQuestions(request))
+		return request.fields?.some((f) => f.kind === "select" && f.allowOther)
+			? "Other answers"
+			: undefined;
 	return field ? (field.allowOther ? "Other answer" : undefined) : "Answer questions";
 }
 function fieldBlocks(field: ElicitationField, index: number): KnownBlock[] {
@@ -358,7 +388,12 @@ function fieldBlocks(field: ElicitationField, index: number): KnownBlock[] {
 		}
 	return blocks;
 }
-export function questionBlocks(request: ElicitationRequestPayload, threadId: string): KnownBlock[] {
+export function questionBlocks(
+	request: ElicitationRequestPayload,
+	threadId: string,
+	choices: Record<string, number> = {},
+	revision = 0
+): KnownBlock[] {
 	const blocks: KnownBlock[] = [
 		{
 			type: "section",
@@ -369,6 +404,27 @@ export function questionBlocks(request: ElicitationRequestPayload, threadId: str
 	];
 	for (const [index, field] of (request.fields ?? []).entries()) {
 		blocks.push({ type: "divider" }, ...fieldBlocks(field, index));
+		if (inlineQuestions(request) && field.kind === "select")
+			blocks.push({
+				type: "actions",
+				elements: field.options.map((option, i) => ({
+					type: "button",
+					action_id: `${SELECT_ACTION}${index}_${i}`,
+					text: plain(
+						`${choices[String(index)] === i ? "✓ " : ""}${choiceLetter(i)}. ${optionLabel(option)}`.slice(
+							0,
+							75
+						)
+					),
+					...(choices[String(index)] === i ? { style: "primary" as const } : {}),
+					value: JSON.stringify({
+						threadId,
+						elicitationId: request.elicitationId,
+						fieldIndex: index,
+						optionIndex: i,
+					}),
+				})),
+			});
 	}
 	const field = inlineField(request);
 	if (field)
@@ -389,6 +445,43 @@ export function questionBlocks(request: ElicitationRequestPayload, threadId: str
 				},
 			})),
 		});
+	if (inlineQuestions(request)) {
+		const content = selectedAnswers(request, choices);
+		if (content) {
+			const confirmation = (request.fields ?? [])
+				.map((field, i) => {
+					if (field.kind !== "select") return "";
+					const option = field.options[choices[String(i)]];
+					return `${i + 1}: ${choiceLetter(choices[String(i)])}${option.setBudgetUsd !== undefined ? ` — Set budget to $${option.setBudgetUsd.toFixed(2)}` : ""}`;
+				})
+				.join("\n");
+			blocks.push({
+				type: "actions",
+				elements: [
+					{
+						type: "button",
+						action_id: SUBMIT_ACTION,
+						style: "primary",
+						text: plain("Submit answers"),
+						value: JSON.stringify({ threadId, elicitationId: request.elicitationId, revision }),
+						confirm: {
+							title: plain("Confirm answers"),
+							text: plain(
+								`${confirmation}\nSubmit these selections and share them in this thread?`
+							),
+							confirm: plain("Submit"),
+							deny: plain("Cancel"),
+						},
+					},
+				],
+			});
+		} else
+			blocks.push({
+				type: "context",
+				elements: [plain("Choose one answer for each question, then submit them together.")],
+			});
+	}
+	blocks.push({ type: "divider" });
 	// Large forms remain available in the modal; never exceed Slack's 50-block message limit.
 	return blocks.length <= 45
 		? blocks
@@ -400,6 +493,7 @@ export function questionBlocks(request: ElicitationRequestPayload, threadId: str
 					),
 				},
 				...blocks.filter((block) => block.type === "actions"),
+				{ type: "divider" },
 			];
 }
 export function answerSummary(

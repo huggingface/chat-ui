@@ -102,6 +102,9 @@ export interface ElicitationRequestPayload {
 export interface McpElicitation extends Timestamps {
 	/** The Slack submitter explicitly shares this assistant question answer in its thread. */
 	slackShareAnswer?: boolean;
+	slackChoices?: Record<string, number>;
+	slackChoiceRevision?: number;
+	slackSubmitting?: boolean;
 	_id: ObjectId;
 	elicitationId: string;
 	conversationId: Conversation["_id"];

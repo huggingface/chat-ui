@@ -7,7 +7,13 @@ import {
 	createTestConversation,
 } from "$lib/server/api/__tests__/testHelpers";
 import { MlSlackBot } from "./bot";
-import { ANSWER_VIEW, RESUME_ACTION, PICK_ACTION } from "./presentation";
+import {
+	ANSWER_VIEW,
+	RESUME_ACTION,
+	PICK_ACTION,
+	SELECT_ACTION,
+	SUBMIT_ACTION,
+} from "./presentation";
 
 type Handler = (args: Record<string, unknown>) => Promise<void>;
 const mocks = vi.hoisted(() => ({
@@ -198,6 +204,110 @@ describe("Slack transport authorization", () => {
 		const summaries = mocks.post.mock.calls.filter(([v]) => v.text.includes("Answers from"));
 		expect(summaries).toHaveLength(1);
 		expect(summaries[0][0].text).toContain("Set budget to $5.00");
+	});
+
+	it("collects owner-only choices without spending, rejects stale submissions, and submits together", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Start", ts: "100.0" },
+			"T123",
+			"MULTI"
+		);
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			mlAssistant: true,
+			mlBudget: { totalMicroUsd: 0, spentMicroUsd: 0, reservations: [] },
+		});
+		const elicitationId = crypto.randomUUID();
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			conversationId: thread.conversationId,
+			elicitationId,
+			status: "pending",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			pending: { kind: "ask", messageId: "m1", toolCallId: "c1", toolUuid: "u1" },
+			request: {
+				elicitationId,
+				server: "",
+				source: "assistant",
+				mode: "form",
+				message: "Choose",
+				fields: [
+					{
+						kind: "select",
+						name: "budget",
+						required: true,
+						multiple: false,
+						options: [
+							{ value: "five", label: "Five", setBudgetUsd: 5 },
+							{ value: "zero", label: "Zero", setBudgetUsd: 0 },
+						],
+					},
+					{
+						kind: "select",
+						name: "input",
+						required: true,
+						multiple: false,
+						options: [
+							{ value: "text", label: "Text" },
+							{ value: "image", label: "Image" },
+						],
+					},
+				],
+			},
+		});
+		const select = async (f: number, i: number, user = "OWNER") => {
+			const handler = mocks.handlers.get(`${SELECT_ACTION}${f}_${i}`);
+			if (!handler) throw Error("Missing select");
+			await handler({
+				ack: vi.fn(),
+				body: { user: { id: user }, team: { id: "T123" } },
+				action: {
+					value: JSON.stringify({
+						threadId: thread._id,
+						elicitationId,
+						fieldIndex: f,
+						optionIndex: i,
+					}),
+				},
+			});
+		};
+		const submit = async (revision: number, user = "OWNER") => {
+			const handler = mocks.handlers.get(SUBMIT_ACTION);
+			if (!handler) throw Error("Missing submit");
+			await handler({
+				ack: vi.fn(),
+				body: { user: { id: user }, team: { id: "T123" } },
+				action: { value: JSON.stringify({ threadId: thread._id, elicitationId, revision }) },
+			});
+		};
+		await select(0, 0, "OTHER");
+		expect(
+			(await collections.mcpElicitations.findOne({ elicitationId }))?.slackChoices
+		).toBeUndefined();
+		await select(0, 0);
+		await submit(1);
+		expect((await collections.mcpElicitations.findOne({ elicitationId }))?.status).toBe("pending");
+		await select(1, 0);
+		await submit(2, "OTHER");
+		await select(1, 1);
+		await submit(2);
+		expect(
+			(await collections.conversations.findOne({ _id: thread.conversationId }))?.mlBudget
+				?.totalMicroUsd
+		).toBe(0);
+		await submit(3);
+		const q = await collections.mcpElicitations.findOne({ elicitationId });
+		expect(q?.content).toEqual({ budget: "five", input: "image" });
+		expect(q?.status).toBe("resolved");
+		expect(
+			(await collections.conversations.findOne({ _id: thread.conversationId }))?.mlBudget
+				?.totalMicroUsd
+		).toBe(5000000);
 	});
 	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {
 		const { user } = await createTestUser();
