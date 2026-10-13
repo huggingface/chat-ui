@@ -10,6 +10,25 @@ Each thread has its own persistent conversation, scripts, compute budget and ser
 
 This takes the thread/session and Socket Mode approach described in [Moon Bot](https://huggingface.co/blog/huggingface/moon-bot), while reusing ML Intern's MongoDB state and tool harness instead of creating a separate Pi agent. **Download trace** uploads the conversation as JSONL to the original Slack thread. Long answers are split into messages; no public conversation share is created.
 
+## Thread permissions
+
+The **owner** is the person who first invoked ML Intern in that thread, which may be different from the person who posted the thread's first message.
+
+| Action                                                       | Everyone in the channel | Owner only |
+| ------------------------------------------------------------ | :---------------------: | :--------: |
+| Mention ML Intern to ask questions or request follow-up work |            ✓            |            |
+| View responses, progress, questions, and confirmed answers   |            ✓            |            |
+| Download the thread's trace                                  |            ✓            |            |
+| Request work using the thread's existing approved budget     |            ✓            |            |
+| Set or change the compute budget                             |                         |     ✓      |
+| Submit answers through question buttons or forms             |                         |     ✓      |
+| Stop the assistant                                           |                         |     ✓      |
+| Resume an interrupted or failed task                         |                         |     ✓      |
+
+“Everyone” means eligible members of the same Slack workspace. Guests, bots, and external shared channels are excluded; the configured channel allowlist also applies. A trace download posts the file only to its original thread.
+
+Each thread has its own conversation and budget. DMs are separate private sessions, with the person messaging the bot as owner. Follow-up requests in channels require another mention. If the current turn is still running or waiting for input, wait for it to finish or have the owner answer or stop it before sending another request.
+
 ## Install in a workspace
 
 1. Create a Slack app **from a manifest**, using [`integrations/slack/manifest.json`](https://github.com/huggingface/chat-ui/blob/main/integrations/slack/manifest.json).
