@@ -448,15 +448,7 @@ describe("Slack transport authorization", () => {
 		await bot.receive(event, "T123", "ACK1");
 		expect(mocks.react).toHaveBeenCalledTimes(1);
 		expect(mocks.react).toHaveBeenCalledWith({ channel: "C123", timestamp: "100.0", name: "eyes" });
-		expect(mocks.ephemeral).toHaveBeenCalledTimes(1);
-		expect(mocks.ephemeral).toHaveBeenCalledWith(
-			expect.objectContaining({
-				channel: "C123",
-				thread_ts: "100.0",
-				user: "OWNER",
-				text: expect.stringContaining("Request received"),
-			})
-		);
+		expect(mocks.ephemeral).not.toHaveBeenCalled();
 		expect(mocks.run).not.toHaveBeenCalled();
 		expect(await collections.slackInputs.countDocuments({ status: "queued" })).toBe(1);
 	});
@@ -472,7 +464,7 @@ describe("Slack transport authorization", () => {
 		);
 		expect(mocks.react).toHaveBeenCalledWith({ channel: "C123", timestamp: "101.0", name: "eyes" });
 		expect(await collections.slackInputs.countDocuments({ status: "queued" })).toBe(1);
-		expect(mocks.ephemeral).toHaveBeenCalled();
+		expect(mocks.ephemeral).not.toHaveBeenCalled();
 		expect(mocks.run).not.toHaveBeenCalled();
 	});
 	it("runs different users' threads concurrently without sharing prompts or conversations", async () => {
@@ -554,7 +546,7 @@ describe("Slack transport authorization", () => {
 		expect(await collections.slackInputs.countDocuments({})).toBe(2);
 		expect(await collections.slackThreads.countDocuments({})).toBe(1);
 		expect((await collections.slackThreads.findOne({}))?.owner).toBe("U123");
-		expect(mocks.ephemeral).toHaveBeenCalledWith(expect.objectContaining({ user: "U999" }));
+		expect(mocks.react).toHaveBeenCalledTimes(2);
 		expect(mocks.run).not.toHaveBeenCalled();
 	});
 

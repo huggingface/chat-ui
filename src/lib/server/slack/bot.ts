@@ -494,14 +494,6 @@ export class MlSlackBot {
 						"[slack] Reaction failed; request remains queued. Check reactions:write permission."
 					)
 				);
-			await this.app.client.chat
-				.postEphemeral({
-					channel: thread.channel,
-					thread_ts: thread.threadTs,
-					user: event.user,
-					text: "Request received. Progress and results will appear in this thread. Requests in a busy session wait for its current turn.",
-				})
-				.catch(() => logger.warn("[slack] Acknowledgement failed; request remains queued."));
 		}
 	}
 
