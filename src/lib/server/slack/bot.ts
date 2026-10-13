@@ -319,8 +319,21 @@ export class MlSlackBot {
 		this.app.action("ml_intern_trace", async ({ ack, body, action }) => {
 			await ack();
 			if (!("value" in action)) return;
-			const thread = await this.owned(action.value ?? "", body.user.id, body.team?.id);
-			if (!thread) return;
+			if (body.team?.id !== this.settings.teamId || !(await this.member(body.user.id))) return;
+			const thread = await collections.slackThreads.findOne({
+				_id: action.value ?? "",
+				teamId: this.settings.teamId,
+			});
+			if (!thread || !("channel" in body) || body.channel?.id !== thread.channel) return;
+			// DMs remain private to their owner; channel trace buttons are shared.
+			if (thread.channel.startsWith("D") && thread.owner !== body.user.id) return;
+			if (
+				this.settings.allowedChannels.length &&
+				!this.settings.allowedChannels.includes(thread.channel)
+			)
+				return;
+			const channel = await this.app.client.conversations.info({ channel: thread.channel });
+			if (channel.channel?.is_ext_shared) return;
 			const conv = await collections.conversations.findOne({ _id: thread.conversationId });
 			if (!conv) return;
 			// Uploaded only to the original thread, never a public shared-conversation URL.

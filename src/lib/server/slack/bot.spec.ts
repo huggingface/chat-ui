@@ -18,11 +18,13 @@ const mocks = vi.hoisted(() => ({
 	post: vi.fn(),
 	ephemeral: vi.fn(),
 	run: vi.fn(),
+	upload: vi.fn(),
 }));
 vi.mock("@slack/bolt", () => ({
 	App: class {
 		client = {
 			users: { info: mocks.users },
+			files: { uploadV2: mocks.upload },
 			conversations: { info: mocks.channels, replies: mocks.replies },
 			chat: { postMessage: mocks.post, postEphemeral: mocks.ephemeral },
 		};
@@ -66,6 +68,59 @@ afterEach(async () => {
 });
 
 describe("Slack transport authorization", () => {
+	it("lets another workspace member upload the trace only to its original channel thread", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Start", ts: "100.0" },
+			"T123",
+			"TRACE"
+		);
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		await createTestConversation(locals, { _id: thread.conversationId });
+		const handler = mocks.handlers.get("ml_intern_trace");
+		if (!handler) throw Error("No handler");
+		const args = {
+			ack: vi.fn(),
+			body: { user: { id: "OTHER" }, team: { id: "T123" }, channel: { id: "C123" } },
+			action: { value: thread._id },
+		};
+		await handler(args);
+		expect(mocks.upload).toHaveBeenCalledWith(
+			expect.objectContaining({
+				channel_id: "C123",
+				thread_ts: "100.0",
+				filename: `ml-intern-${thread.conversationId}.jsonl`,
+			})
+		);
+		mocks.upload.mockClear();
+		await handler({ ...args, body: { ...args.body, channel: { id: "C999" } } });
+		await handler({ ...args, body: { ...args.body, team: { id: "T999" } } });
+		mocks.users.mockResolvedValue({ user: { team_id: "T123", is_restricted: true } });
+		await handler({ ...args, body: { ...args.body, user: { id: "GUEST" } } });
+		mocks.channels.mockResolvedValue({ channel: { is_ext_shared: true } });
+		await handler(args);
+		expect(mocks.upload).not.toHaveBeenCalled();
+	});
+	it("keeps DM traces private to the owner", async () => {
+		const { user } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "D123", user: "OWNER", text: "Start", ts: "100.0" },
+			"T123",
+			"DMTRACE"
+		);
+		const thread = await collections.slackThreads.findOne({});
+		const handler = mocks.handlers.get("ml_intern_trace");
+		if (!thread || !handler) throw Error("Missing setup");
+		await handler({
+			ack: vi.fn(),
+			body: { user: { id: "OTHER" }, team: { id: "T123" }, channel: { id: "D123" } },
+			action: { value: thread._id },
+		});
+		expect(mocks.upload).not.toHaveBeenCalled();
+	});
 	it("applies an inline grant only for the owner from a stored option, then shares it once", async () => {
 		const { user, locals } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);
