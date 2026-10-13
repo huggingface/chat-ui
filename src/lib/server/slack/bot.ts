@@ -694,7 +694,7 @@ export class MlSlackBot {
 		const status = question
 			? "⏳ Waiting for your answer"
 			: live.alive
-				? `⏳ ${state.status === "waiting" ? "Waiting" : "Working"} for ${duration}`
+				? `${["🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛"][Math.floor(elapsed / 10) % 12]} ${state.status === "waiting" ? "Waiting" : "Working"} for ${duration}`
 				: message.interrupted
 					? "⏹️ Stopped"
 					: state.status === "failed"
