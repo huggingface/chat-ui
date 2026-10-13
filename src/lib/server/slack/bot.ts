@@ -732,6 +732,16 @@ export class MlSlackBot {
 		if (answered && !question && message.generationId === answered.generationId) return;
 		const _id = `${thread._id}:${message.id}${answered ? `:after:${answered.elicitationId}` : ""}`;
 		let delivery = await collections.slackDeliveries.findOne({ _id });
+		if (
+			delivery &&
+			question?.pending?.kind === "ask" &&
+			delivery.questionId !== question.elicitationId
+		) {
+			await collections.slackDeliveries.updateOne(
+				{ _id },
+				{ $set: { questionId: question.elicitationId } }
+			);
+		}
 		if (delivery?.digest !== digest) {
 			if (!delivery) {
 				delivery = {
