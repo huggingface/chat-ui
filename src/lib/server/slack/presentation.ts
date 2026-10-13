@@ -375,18 +375,40 @@ export function questionFormLabel(request: ElicitationRequestPayload): string | 
 			: undefined;
 	return field ? (field.allowOther ? "Other answer" : undefined) : "Answer questions";
 }
-function fieldBlocks(field: ElicitationField, index: number): KnownBlock[] {
+function fieldBlocks(
+	field: ElicitationField,
+	index: number,
+	answer?: ElicitationValue
+): KnownBlock[] {
+	const answers = Array.isArray(answer) ? answer : [answer];
 	const blocks: KnownBlock[] = [];
 	for (const part of chunks(`${index + 1}. ${field.description || field.title || field.name}`))
 		blocks.push({ type: "section", text: questionText(part) });
 	if (field.kind === "select")
 		for (const [i, option] of field.options.entries()) {
 			for (const part of chunks(
-				`${choiceLetter(i)}. *${optionLabel(option)}*${option.description ? `\n${option.description}` : ""}`
+				`${choiceLetter(i)}. *${optionLabel(option)}*${answers.includes(option.value) ? " ✅" : ""}${option.description ? `\n${option.description}` : ""}`
 			))
 				blocks.push({ type: "section", text: questionText(part) });
 		}
+	if (answer !== undefined) {
+		const custom = answers.filter(
+			(value) => field.kind !== "select" || !field.options.some((option) => option.value === value)
+		);
+		if (custom.length)
+			for (const part of chunks(`Answer: ${custom.join(", ")} ✅`))
+				blocks.push({ type: "section", text: questionText(part) });
+	}
 	return blocks;
+}
+export function confirmedQuestionBlocks(
+	request: ElicitationRequestPayload,
+	content: Record<string, ElicitationValue>
+): KnownBlock[] {
+	return (request.fields ?? []).flatMap((field, index) => [
+		...fieldBlocks(field, index, content[field.name]),
+		{ type: "divider" as const },
+	]);
 }
 export function questionBlocks(
 	request: ElicitationRequestPayload,

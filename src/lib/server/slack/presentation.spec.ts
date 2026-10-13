@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	activityText,
 	questionBlocks,
+	confirmedQuestionBlocks,
 	questionFormLabel,
 	SELECT_ACTION,
 	SUBMIT_ACTION,
@@ -306,4 +307,29 @@ it("keeps multiple choices as drafts until all are selected and adds a final div
 	expect(JSON.stringify(complete)).toContain("Set budget to $5.00");
 	expect(complete.at(-1)).toEqual({ type: "divider" });
 	expect(selectedAnswers(req, { "0": 0, "1": 1 })).toEqual({ q1: "Set budget to $5.00", q2: "No" });
+});
+
+it("marks accepted values rather than drafts and retains custom answers safely", () => {
+	const request: ElicitationRequestPayload = {
+		...question,
+		fields: [
+			{
+				kind: "select",
+				name: "q",
+				multiple: true,
+				allowOther: true,
+				options: [
+					{ value: "one", label: "First" },
+					{ value: "two", label: "Second" },
+				],
+			},
+		],
+	};
+	const blocks = confirmedQuestionBlocks(request, { q: ["two", "<custom>"] });
+	const text = JSON.stringify(blocks);
+	expect(text).toContain("Second* ✅");
+	expect(text).not.toContain("First* ✅");
+	expect(text).toContain("&lt;custom&gt; ✅");
+	expect(blocks.at(-1)).toEqual({ type: "divider" });
+	expect(blocks.some((b) => b.type === "actions")).toBe(false);
 });

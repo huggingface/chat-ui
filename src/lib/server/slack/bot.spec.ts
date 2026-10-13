@@ -203,9 +203,11 @@ describe("Slack transport authorization", () => {
 		mocks.post.mockResolvedValue({ ts: "101.0" });
 		await bot.tick();
 		await bot.tick();
-		const summaries = mocks.post.mock.calls.filter(([v]) => v.text.includes("Answers from"));
+		const summaries = mocks.post.mock.calls.filter(([v]) =>
+			v.text.startsWith("Questions answered")
+		);
 		expect(summaries).toHaveLength(1);
-		expect(summaries[0][0].text).toContain("Set budget to $5.00");
+		expect(JSON.stringify(summaries[0][0].blocks)).toContain("Set budget to $5.00* ✅");
 	});
 
 	it("collects owner-only choices without spending, rejects stale submissions, and submits together", async () => {
@@ -430,28 +432,31 @@ describe("Slack transport authorization", () => {
 		);
 
 		await bot["render"](thread);
-		expect(mocks.post.mock.calls[0][0].text).toContain("Answers from");
-		expect(mocks.post.mock.calls[1][0].text).not.toContain("Questions");
+		expect(mocks.post.mock.calls.some(([v]) => v.text.includes("Answers from"))).toBe(false);
+		expect(mocks.post.mock.calls[0][0].text).not.toContain("Questions");
 		expect(mocks.post.mock.calls.some(([v]) => v.text.includes("Run updates"))).toBe(false);
 		await collections.conversations.updateOne(
 			{ _id: thread.conversationId },
 			{ $set: { "messages.0.content": "Questions\n\nHere is the follow-up response" } }
 		);
 		await bot["render"](thread);
-		expect(mocks.post.mock.calls[2][0].text).toContain("Here is the follow-up response");
-		expect(mocks.post.mock.calls[2][0].text).not.toContain("Questions");
+		expect(mocks.post.mock.calls[1][0].text).toContain("Here is the follow-up response");
+		expect(mocks.post.mock.calls[1][0].text).not.toContain("Questions");
 		await collections.turnStates.updateOne({ messageId }, { $set: { status: "done" } });
 		await bot["render"](thread);
-		expect(mocks.post.mock.calls[3][0].text).toContain("Here is the follow-up response");
-		expect(mocks.post.mock.calls[3][0].text).not.toContain("Questions");
+		expect(mocks.post.mock.calls[2][0].text).toContain("Here is the follow-up response");
+		expect(mocks.post.mock.calls[2][0].text).not.toContain("Questions");
 		expect(
 			mocks.update.mock.calls.some(([v]) => v.ts === "101.0" && v.text.includes("follow-up"))
 		).toBe(false);
 		const frozen = mocks.update.mock.calls.find(([v]) => v.text.startsWith("Questions answered"));
+		expect(JSON.stringify(frozen?.[0].blocks)).toContain("*Beta* ✅");
+		expect(JSON.stringify(frozen?.[0].blocks)).toContain("*Alpha* ✅");
+		expect(frozen?.[0].blocks.at(-1)).toEqual({ type: "divider" });
 		expect(frozen?.[0].blocks.some((b: { type: string }) => b.type === "actions")).toBe(false);
 		await collections.slackThreads.updateOne({ _id: thread._id }, { $set: { watching: true } });
 		await bot.tick();
-		expect(mocks.post).toHaveBeenCalledTimes(4);
+		expect(mocks.post).toHaveBeenCalledTimes(3);
 	});
 	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {
 		const { user } = await createTestUser();

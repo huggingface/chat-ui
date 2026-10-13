@@ -30,7 +30,7 @@ import {
 	inlineField,
 	questionBlocks,
 	questionFormLabel,
-	answerSummary,
+	confirmedQuestionBlocks,
 	activityText,
 	ANSWER_ACTION,
 	ANSWER_VIEW,
@@ -948,78 +948,54 @@ export class MlSlackBot {
 			if (!question.content) continue;
 			const _id = `${thread._id}:answer:${question.elicitationId}`;
 			const delivery = await collections.slackDeliveries.findOne({ _id });
-			// Leave the question card in place, removing only its now-inactive controls.
+			if (delivery) continue;
 			const card = await collections.slackDeliveries.findOne({
 				threadId: thread._id,
 				questionId: question.elicitationId,
 			});
-			if (card && !card.questionFinalized) {
-				const blocks = questionBlocks(
-					question.request,
-					thread._id,
-					question.slackChoices,
-					question.slackChoiceRevision
-				).filter((b) => b.type !== "actions" && b.type !== "context");
-				blocks[0] = {
-					type: "section",
-					text: {
-						type: "plain_text",
-						text: "Questions answered. Confirmed answers are posted below.",
-					},
+			const blocks = [
+				{
+					type: "section" as const,
+					text: { type: "mrkdwn" as const, text: `*Answers confirmed by <@${thread.owner}>*` },
+				},
+				{ type: "divider" as const },
+				...confirmedQuestionBlocks(question.request, question.content),
+			];
+			const parts = [...(card?.parts ?? [])];
+			for (let index = 0; index < Math.max(Math.ceil(blocks.length / 45), parts.length); index++) {
+				const payload = {
+					channel: thread.channel,
+					text: "Questions answered. Selected answers are marked ✅.",
+					blocks: blocks.slice(index * 45, (index + 1) * 45),
+					parse: "none" as const,
 				};
-				for (const ts of card.parts)
-					await this.app.client.chat.update({
-						channel: thread.channel,
-						ts,
-						text: "Questions answered. Confirmed answers are posted below.",
-						blocks,
-						parse: "none",
+				if (parts[index]) await this.app.client.chat.update({ ...payload, ts: parts[index] });
+				else {
+					const sent = await this.app.client.chat.postMessage({
+						...payload,
+						thread_ts: thread.threadTs,
+						unfurl_links: false,
+						unfurl_media: false,
 					});
+					if (!sent.ts) throw new Error("Slack did not return a message timestamp");
+					parts.push(sent.ts);
+					if (card)
+						await collections.slackDeliveries.updateOne({ _id: card._id }, { $set: { parts } });
+				}
+			}
+			if (card)
 				await collections.slackDeliveries.updateOne(
 					{ _id: card._id },
 					{ $set: { questionFinalized: true } }
 				);
-			}
-			const text = answerSummary(question.request, question.content);
-			const parts: string[] = delivery?.parts ?? [];
-			const texts = chunks(text);
-			for (const part of texts.slice(parts.length)) {
-				const sent = await this.app.client.chat.postMessage({
-					channel: thread.channel,
-					thread_ts: thread.threadTs,
-					text: `Answers from <@${thread.owner}>\n${part}`,
-					blocks: [
-						{
-							type: "section",
-							text: { type: "mrkdwn", text: `*Answers confirmed by <@${thread.owner}>*` },
-						},
-						{
-							type: "section",
-							text: {
-								type: "mrkdwn",
-								text: part.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
-							},
-						},
-						...(parts.length === texts.length - 1 ? [{ type: "divider" as const }] : []),
-					],
-					unfurl_links: false,
-					unfurl_media: false,
-				});
-				if (!sent.ts) throw new Error("Slack did not return a message timestamp");
-				parts.push(sent.ts);
-				await collections.slackDeliveries.updateOne(
-					{ _id },
-					{
-						$set: {
-							threadId: thread._id,
-							messageId: question.elicitationId,
-							parts,
-							updatedAt: new Date(),
-						},
-					},
-					{ upsert: true }
-				);
-			}
+			// This durable marker gates continuation until the original card has been updated.
+			await collections.slackDeliveries.insertOne({
+				_id,
+				threadId: thread._id,
+				messageId: question.elicitationId,
+				parts,
+				updatedAt: new Date(),
+			});
 		}
 	}
 
