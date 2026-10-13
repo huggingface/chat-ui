@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 	post: vi.fn(),
 	ephemeral: vi.fn(),
 	run: vi.fn(),
+	react: vi.fn(),
 	upload: vi.fn(),
 }));
 vi.mock("@slack/bolt", () => ({
@@ -25,6 +26,7 @@ vi.mock("@slack/bolt", () => ({
 		client = {
 			users: { info: mocks.users },
 			files: { uploadV2: mocks.upload },
+			reactions: { add: mocks.react },
 			conversations: { info: mocks.channels, replies: mocks.replies },
 			chat: { postMessage: mocks.post, postEphemeral: mocks.ephemeral },
 		};
@@ -60,6 +62,7 @@ beforeEach(async () => {
 		user: { id: user, team_id: "T123" },
 	}));
 	mocks.ephemeral.mockResolvedValue({ ok: true });
+	mocks.react.mockResolvedValue({ ok: true });
 	mocks.channels.mockResolvedValue({ channel: { is_ext_shared: false } });
 	mocks.replies.mockResolvedValue({ messages: [] });
 });
@@ -202,6 +205,8 @@ describe("Slack transport authorization", () => {
 		const event = { channel: "C123", user: "OWNER", text: "Research this", ts: "100.0" };
 		await bot.receive(event, "T123", "ACK1");
 		await bot.receive(event, "T123", "ACK1");
+		expect(mocks.react).toHaveBeenCalledTimes(1);
+		expect(mocks.react).toHaveBeenCalledWith({ channel: "C123", timestamp: "100.0", name: "eyes" });
 		expect(mocks.ephemeral).toHaveBeenCalledTimes(1);
 		expect(mocks.ephemeral).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -213,6 +218,21 @@ describe("Slack transport authorization", () => {
 		);
 		expect(mocks.run).not.toHaveBeenCalled();
 		expect(await collections.slackInputs.countDocuments({ status: "queued" })).toBe(1);
+	});
+
+	it("reacts to the invoking reply and keeps requests queued if Slack reactions fail", async () => {
+		const { user } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		mocks.react.mockRejectedValueOnce(new Error("missing_scope"));
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Hello", ts: "101.0", thread_ts: "100.0" },
+			"T123",
+			"REACT"
+		);
+		expect(mocks.react).toHaveBeenCalledWith({ channel: "C123", timestamp: "101.0", name: "eyes" });
+		expect(await collections.slackInputs.countDocuments({ status: "queued" })).toBe(1);
+		expect(mocks.ephemeral).toHaveBeenCalled();
+		expect(mocks.run).not.toHaveBeenCalled();
 	});
 	it("runs different users' threads concurrently without sharing prompts or conversations", async () => {
 		const { user } = await createTestUser();

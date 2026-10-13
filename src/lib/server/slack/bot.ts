@@ -384,6 +384,13 @@ export class MlSlackBot {
 			ts: event.ts,
 		});
 		if (inserted) {
+			await this.app.client.reactions
+				.add({ channel: event.channel, timestamp: event.ts, name: "eyes" })
+				.catch(() =>
+					logger.warn(
+						"[slack] Reaction failed; request remains queued. Check reactions:write permission."
+					)
+				);
 			await this.app.client.chat
 				.postEphemeral({
 					channel: thread.channel,
