@@ -316,6 +316,7 @@ it("marks accepted values rather than drafts and retains custom answers safely",
 			{
 				kind: "select",
 				name: "q",
+				required: true,
 				multiple: true,
 				allowOther: true,
 				options: [
