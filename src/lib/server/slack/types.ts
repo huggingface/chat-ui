@@ -36,6 +36,8 @@ export interface SlackDelivery {
 	publicText?: string;
 	publicSnapshot?: string;
 	questionId?: string;
+	questionSnapshot?: string;
+	statusClosed?: boolean;
 	questionFinalized?: boolean;
 	_id: string;
 	threadId: string;

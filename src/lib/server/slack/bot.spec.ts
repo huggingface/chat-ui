@@ -374,14 +374,8 @@ describe("Slack transport authorization", () => {
 				})),
 			},
 		});
-		await collections.slackDeliveries.insertOne({
-			_id: `${thread._id}:${messageId}`,
-			threadId: thread._id,
-			messageId,
-			questionId: elicitationId,
-			parts: ["101.0"],
-			updatedAt: new Date(),
-		});
+		let posted = 100;
+		mocks.post.mockImplementation(async () => ({ ts: `${posted++}.0` }));
 		const select = async (index: number) => {
 			const handler = mocks.handlers.get(`${SELECT_ACTION}0_${index}`);
 			if (!handler) throw Error("No select");
@@ -398,6 +392,7 @@ describe("Slack transport authorization", () => {
 				},
 			});
 		};
+		await bot["render"](thread);
 		await select(0);
 		expect(mocks.update).toHaveBeenCalledWith(
 			expect.objectContaining({ ts: "101.0", blocks: expect.any(Array) })
@@ -406,6 +401,12 @@ describe("Slack transport authorization", () => {
 		await select(1);
 		expect(JSON.stringify(mocks.update.mock.calls.at(-1))).toContain("✓ B. Beta");
 		// Simulate the harness resolving and resuming in the same assistant message.
+		expect(mocks.post.mock.calls[0][0].text).toContain("Run updates");
+		expect(mocks.post.mock.calls[0][0].text).toContain("Questions");
+		expect(
+			mocks.post.mock.calls[1][0].blocks.some((b: { type: string }) => b.type === "actions")
+		).toBe(true);
+		mocks.post.mockClear();
 		await collections.mcpElicitations.updateOne(
 			{ elicitationId },
 			{
@@ -423,15 +424,26 @@ describe("Slack transport authorization", () => {
 			{
 				$set: {
 					"messages.0.generationId": crypto.randomUUID(),
-					"messages.0.content": "Here is the follow-up response",
+					"messages.0.content": "Questions",
 				},
 			}
 		);
-		await collections.turnStates.updateOne({ messageId }, { $set: { status: "done" } });
-		mocks.post.mockResolvedValueOnce({ ts: "102.0" }).mockResolvedValueOnce({ ts: "103.0" });
-		await bot.tick();
+
+		await bot["render"](thread);
 		expect(mocks.post.mock.calls[0][0].text).toContain("Answers from");
-		expect(mocks.post.mock.calls[1][0].text).toContain("Here is the follow-up response");
+		expect(mocks.post.mock.calls[1][0].text).not.toContain("Questions");
+		expect(mocks.post.mock.calls.some(([v]) => v.text.includes("Run updates"))).toBe(false);
+		await collections.conversations.updateOne(
+			{ _id: thread.conversationId },
+			{ $set: { "messages.0.content": "Questions\n\nHere is the follow-up response" } }
+		);
+		await bot["render"](thread);
+		expect(mocks.post.mock.calls[2][0].text).toContain("Here is the follow-up response");
+		expect(mocks.post.mock.calls[2][0].text).not.toContain("Questions");
+		await collections.turnStates.updateOne({ messageId }, { $set: { status: "done" } });
+		await bot["render"](thread);
+		expect(mocks.post.mock.calls[3][0].text).toContain("Here is the follow-up response");
+		expect(mocks.post.mock.calls[3][0].text).not.toContain("Questions");
 		expect(
 			mocks.update.mock.calls.some(([v]) => v.ts === "101.0" && v.text.includes("follow-up"))
 		).toBe(false);
@@ -439,7 +451,7 @@ describe("Slack transport authorization", () => {
 		expect(frozen?.[0].blocks.some((b: { type: string }) => b.type === "actions")).toBe(false);
 		await collections.slackThreads.updateOne({ _id: thread._id }, { $set: { watching: true } });
 		await bot.tick();
-		expect(mocks.post).toHaveBeenCalledTimes(2);
+		expect(mocks.post).toHaveBeenCalledTimes(4);
 	});
 	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {
 		const { user } = await createTestUser();

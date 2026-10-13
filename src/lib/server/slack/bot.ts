@@ -627,6 +627,29 @@ export class MlSlackBot {
 			status: "pending",
 			$or: [{ "pending.messageId": message.id }, { generationId: message.generationId }],
 		});
+		const answered = await collections.mcpElicitations
+			.find({
+				conversationId: conv._id,
+				"pending.messageId": message.id,
+				"pending.kind": "ask",
+				status: "resolved",
+				action: "accept",
+				slackShareAnswer: true,
+			})
+			.sort({ createdAt: -1, _id: -1 })
+			.limit(1)
+			.next();
+		const previousQuestion = answered
+			? await collections.slackDeliveries.findOne({
+					threadId: thread._id,
+					questionId: answered.elicitationId,
+				})
+			: null;
+		const baseline = previousQuestion?.questionSnapshot ?? "";
+		const phaseContent =
+			baseline && message.content.startsWith(baseline)
+				? message.content.slice(baseline.length)
+				: message.content;
 		const actions: Array<{ id: string; label: string; value: string }> = [];
 		const turnValue = JSON.stringify({
 			threadId: thread._id,
@@ -686,7 +709,7 @@ export class MlSlackBot {
 				text += `\n\nSpace created (setup may still be in progress):\n${links.join("\n")}`;
 		} else {
 			text =
-				visibleText(message.content) ||
+				visibleText(phaseContent) ||
 				(state.status === "failed"
 					? "The run failed. You can resume it below."
 					: "The run ended without a text response.");
@@ -710,18 +733,6 @@ export class MlSlackBot {
 				})
 			)
 			.digest("hex");
-		const answered = await collections.mcpElicitations
-			.find({
-				conversationId: conv._id,
-				"pending.messageId": message.id,
-				"pending.kind": "ask",
-				status: "resolved",
-				action: "accept",
-				slackShareAnswer: true,
-			})
-			.sort({ createdAt: -1, _id: -1 })
-			.limit(1)
-			.next();
 		// An answer may resolve while a refresh is reading state. Never publish its continuation before its answer summary.
 		if (
 			answered &&
@@ -732,16 +743,37 @@ export class MlSlackBot {
 			return;
 		// A resolved question and its continuation share a harness message ID, but must not share a Slack post.
 		if (answered && !question && message.generationId === answered.generationId) return;
-		const _id = `${thread._id}:${message.id}${answered ? `:after:${answered.elicitationId}` : ""}`;
+		const phaseId = `${thread._id}:${message.id}${answered ? `:after:${answered.elicitationId}` : ""}`;
+		// Flush public commentary before posting a question. Resumed turns share a harness message,
+		// so only prose after the question's saved boundary belongs below its answer.
+		if (question || live.alive)
+			await this.publishPublicUpdates(thread, `${phaseId}:updates`, message.id, phaseContent);
+		const existingQuestion = question
+			? await collections.slackDeliveries.findOne({
+					threadId: thread._id,
+					questionId: question.elicitationId,
+				})
+			: null;
+		const _id = question
+			? (existingQuestion?._id ?? `${phaseId}:question:${question.elicitationId}`)
+			: live.alive
+				? phaseId
+				: `${phaseId}:result`;
+		if (question || !live.alive)
+			await this.closeStatus(
+				thread,
+				phaseId,
+				question ? "Waiting for your answer below." : "Run ended. Results are posted below."
+			);
 		let delivery = await collections.slackDeliveries.findOne({ _id });
 		if (
 			delivery &&
 			question?.pending?.kind === "ask" &&
-			delivery.questionId !== question.elicitationId
+			(delivery.questionId !== question.elicitationId || delivery.questionSnapshot === undefined)
 		) {
 			await collections.slackDeliveries.updateOne(
 				{ _id },
-				{ $set: { questionId: question.elicitationId } }
+				{ $set: { questionId: question.elicitationId, questionSnapshot: message.content } }
 			);
 		}
 		if (delivery?.digest !== digest) {
@@ -751,6 +783,7 @@ export class MlSlackBot {
 					threadId: thread._id,
 					messageId: message.id,
 					questionId: question?.pending?.kind === "ask" ? question.elicitationId : undefined,
+					questionSnapshot: question ? message.content : undefined,
 					parts: [],
 					updatedAt: new Date(),
 				};
@@ -804,14 +837,13 @@ export class MlSlackBot {
 					$set: {
 						digest,
 						updatedAt: new Date(),
-						...(question?.pending?.kind === "ask" ? { questionId: question.elicitationId } : {}),
+						...(question?.pending?.kind === "ask"
+							? { questionId: question.elicitationId, questionSnapshot: message.content }
+							: {}),
 					},
 				}
 			);
 		}
-		// Keep public prose in a separate, cumulative post so status, questions and final results cannot erase it.
-		if (live.alive && !question)
-			await this.publishPublicUpdates(thread, `${_id}:updates`, message.id, message.content);
 		if (
 			!live.alive &&
 			!this.active.has(thread._id) &&
@@ -828,6 +860,20 @@ export class MlSlackBot {
 				{ $set: { watching: false } }
 			);
 		}
+	}
+
+	private async closeStatus(thread: SlackThread, id: string, text: string): Promise<void> {
+		const delivery = await collections.slackDeliveries.findOne({ _id: id });
+		if (!delivery || delivery.questionId || delivery.statusClosed) return;
+		for (const ts of delivery.parts)
+			await this.app.client.chat.update({
+				channel: thread.channel,
+				ts,
+				text,
+				blocks: messageBlocks(text, []),
+				parse: "none",
+			});
+		await collections.slackDeliveries.updateOne({ _id: id }, { $set: { statusClosed: true } });
 	}
 
 	private async publishPublicUpdates(
