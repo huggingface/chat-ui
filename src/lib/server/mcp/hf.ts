@@ -30,10 +30,22 @@ export const isHfMcpServer = (urlString: string): boolean => {
 	}
 };
 
+export const redactSecret = (text: string, secret: unknown): string =>
+	hasNonEmptyToken(secret)
+		? text.replaceAll(secret, "[redacted]").replaceAll(encodeURIComponent(secret), "[redacted]")
+		: text;
+
 export const isExaMcpServer = (urlString: string): boolean => {
 	try {
 		const u = new URL(urlString);
-		return u.protocol === "https:" && u.hostname.toLowerCase() === "mcp.exa.ai";
+		// fetch errors on a credentialed url echo the whole url, injected key included
+		return (
+			u.protocol === "https:" &&
+			u.hostname.toLowerCase() === "mcp.exa.ai" &&
+			!u.username &&
+			!u.password &&
+			!u.port
+		);
 	} catch {
 		return false;
 	}

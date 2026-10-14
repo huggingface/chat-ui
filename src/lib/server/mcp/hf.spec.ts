@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isHfMcpServer, isStrictHfMcpLogin } from "./hf";
+import { isExaMcpServer, isHfMcpServer, isStrictHfMcpLogin, redactSecret } from "./hf";
 
 describe("isHfMcpServer", () => {
 	it("matches the Hub MCP endpoint in every spelling that dispatches", () => {
@@ -44,5 +44,42 @@ describe("isStrictHfMcpLogin", () => {
 		// `gradio` names a Space the server would hand the forwarded token to.
 		expect(isStrictHfMcpLogin("https://hf.co/mcp?login&gradio=evil/space")).toBe(false);
 		expect(isStrictHfMcpLogin("https://hf.co/mcp?login&mix=proxy")).toBe(false);
+	});
+});
+
+describe("isExaMcpServer", () => {
+	it("matches the Exa MCP endpoint", () => {
+		expect(isExaMcpServer("https://mcp.exa.ai/mcp")).toBe(true);
+		expect(isExaMcpServer("https://MCP.exa.ai/mcp?tools=web_search_exa")).toBe(true);
+		expect(isExaMcpServer("https://mcp.exa.ai:443/mcp")).toBe(true);
+	});
+
+	it("rejects URLs that would leak the injected key through a fetch error", () => {
+		expect(isExaMcpServer("https://1:1@mcp.exa.ai/mcp")).toBe(false);
+		expect(isExaMcpServer("https://user@mcp.exa.ai/mcp")).toBe(false);
+		expect(isExaMcpServer("https://:pass@mcp.exa.ai/mcp")).toBe(false);
+		expect(isExaMcpServer("https://mcp.exa.ai:8443/mcp")).toBe(false);
+	});
+
+	it("rejects everything else", () => {
+		expect(isExaMcpServer("http://mcp.exa.ai/mcp")).toBe(false);
+		expect(isExaMcpServer("https://mcp.exa.ai.evil.example/mcp")).toBe(false);
+		expect(isExaMcpServer("not a url")).toBe(false);
+	});
+});
+
+describe("redactSecret", () => {
+	it("replaces the raw and URL-encoded secret", () => {
+		expect(redactSecret("https://mcp.exa.ai/mcp?exaApiKey=k/1", "k/1")).toBe(
+			"https://mcp.exa.ai/mcp?exaApiKey=[redacted]"
+		);
+		expect(redactSecret("https://mcp.exa.ai/mcp?exaApiKey=k%2F1", "k/1")).toBe(
+			"https://mcp.exa.ai/mcp?exaApiKey=[redacted]"
+		);
+	});
+
+	it("leaves text alone when there is no secret", () => {
+		expect(redactSecret("https://mcp.exa.ai/mcp", undefined)).toBe("https://mcp.exa.ai/mcp");
+		expect(redactSecret("https://mcp.exa.ai/mcp", " ")).toBe("https://mcp.exa.ai/mcp");
 	});
 });
