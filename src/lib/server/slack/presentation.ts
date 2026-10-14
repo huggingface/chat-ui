@@ -136,6 +136,18 @@ export function messageBlocks(
 							action_id: a.id,
 							text: plain(a.label),
 							value: a.value,
+							...(a.id === RESUME_ACTION
+								? {
+										confirm: {
+											title: plain("Retry this request?"),
+											text: plain(
+												"This regenerates the original request and may repeat compute. Inspect existing jobs before retrying."
+											),
+											confirm: plain("Retry"),
+											deny: plain("Cancel"),
+										},
+									}
+								: {}),
 						})),
 					},
 				]
@@ -285,33 +297,6 @@ export function readAnswers(
 		}
 	}
 	return { content, errors };
-}
-
-/** Activity labels come from tool types, never private reasoning or tool arguments. */
-export function activityText(updates: MessageUpdate[] = [], completedLookups = 0): string {
-	const active = new Map<string, string>();
-	let usedTools = false;
-	for (const update of updates) {
-		if (update.type !== MessageUpdateType.Tool) continue;
-		if (update.subtype === MessageToolUpdateType.Call) {
-			active.set(update.uuid, update.call.name);
-			usedTools = true;
-		} else if (
-			update.subtype === MessageToolUpdateType.Result ||
-			update.subtype === MessageToolUpdateType.Error
-		) {
-			active.delete(update.uuid);
-		}
-	}
-	const names = [...active.values()];
-	if (names.includes("research"))
-		return `Researching sources…${completedLookups ? ` (${completedLookups} lookups completed)` : ""}`;
-	if (names.some((n) => ["hf_fs", "hub_repo_details", "web_search", "web_fetch"].includes(n)))
-		return "Looking up sources on the web and Hugging Face…";
-	if (names.some((n) => ["hf_jobs", "hf_sandbox"].includes(n)))
-		return "Working with remote compute…";
-	if (names.length) return "Running tools…";
-	return usedTools ? "Preparing the response…" : "Reviewing your request…";
 }
 
 export const PICK_ACTION = "ml_intern_pick_";
@@ -521,36 +506,6 @@ export function questionBlocks(
 				...blocks.filter((block) => block.type === "actions"),
 				{ type: "divider" },
 			];
-}
-export function answerSummary(
-	request: ElicitationRequestPayload,
-	content: Record<string, ElicitationValue>
-): string {
-	return (request.fields ?? [])
-		.map((field) => {
-			const value = content[field.name];
-			const values = Array.isArray(value) ? value : [value];
-			const answer = values
-				.filter((v) => v !== undefined)
-				.map((v) => {
-					const option =
-						field.kind === "select" ? field.options.find((o) => o.value === v) : undefined;
-					return option ? optionLabel(option) : String(v);
-				})
-				.join(", ");
-			return `${field.description || field.title || field.name}\nAnswer: ${answer || "Not provided"}`;
-		})
-		.join("\n\n");
-}
-
-/** Public assistant prose only; never reasoning streams or tool arguments. */
-export function latestPublicUpdate(content: string): string {
-	const paragraphs = visibleText(content.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "\n\n"))
-		.split(/\n\s*\n/)
-		.map((p) => p.trim())
-		.filter(Boolean);
-	const latest = paragraphs.at(-1)?.replace(/\s+/g, " ") ?? "";
-	return latest.length > 320 ? `${latest.slice(0, 317)}…` : latest;
 }
 export function createdSpaceLinks(updates: MessageUpdate[] = []): string[] {
 	const links = new Set<string>();

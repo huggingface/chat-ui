@@ -8,6 +8,9 @@ export interface SlackThread {
 	owner: string;
 	watching: boolean;
 	pollAt?: Date;
+	contextThroughTs?: string;
+	renderFailures?: number;
+	nextRenderAt?: Date;
 	conversationId: ObjectId;
 	createdAt: Date;
 	updatedAt: Date;

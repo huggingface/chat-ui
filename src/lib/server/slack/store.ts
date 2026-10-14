@@ -53,19 +53,29 @@ export async function enqueueInput(
 ): Promise<boolean> {
 	const now = new Date();
 	let inserted = false;
+	if (input.retry) {
+		const retried = await collections.slackInputs.updateOne(
+			{ _id: input._id, threadId: input.threadId, status: "failed" },
+			{
+				$set: { status: "queued", updatedAt: now },
+				$unset: { error: "", failureNotified: "" },
+			}
+		);
+		inserted = retried.modifiedCount === 1;
+	}
 	try {
 		const result = await collections.slackInputs.updateOne(
 			{ _id: input._id },
 			{ $setOnInsert: { ...input, status: "queued", createdAt: now, updatedAt: now } },
 			{ upsert: true }
 		);
-		inserted = result.upsertedCount === 1;
+		inserted ||= result.upsertedCount === 1;
 	} catch (err) {
 		if (!duplicate(err)) throw err;
 	}
 	await collections.slackThreads.updateOne(
 		{ _id: input.threadId },
-		{ $set: { watching: true, updatedAt: now } }
+		{ $set: { watching: true, updatedAt: now, renderFailures: 0, nextRenderAt: now } }
 	);
 	return inserted;
 }
@@ -73,6 +83,10 @@ export async function enqueueInput(
 /** One Socket Mode consumer/worker per workspace, even during rolling deployments. */
 export class SlackLeader {
 	readonly owner = randomUUID();
+	private validUntil = 0;
+	isValid() {
+		return Date.now() < this.validUntil;
+	}
 	constructor(readonly teamId: string) {}
 	async acquire(): Promise<boolean> {
 		const now = new Date();
@@ -82,7 +96,9 @@ export class SlackLeader {
 				{ $set: { owner: this.owner, until: new Date(now.getTime() + 60_000) } },
 				{ upsert: true, returnDocument: "after" }
 			);
-			return result.value?.owner === this.owner;
+			const held = result.value?.owner === this.owner;
+			this.validUntil = held ? now.getTime() + 50000 : 0;
+			return held;
 		} catch (err) {
 			if (duplicate(err)) return false;
 			throw err;

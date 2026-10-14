@@ -1,7 +1,6 @@
 import { MessageUpdateType, MessageToolUpdateType } from "$lib/types/MessageUpdate";
 import { describe, expect, it } from "vitest";
 import {
-	activityText,
 	questionBlocks,
 	confirmedQuestionBlocks,
 	questionFormLabel,
@@ -9,9 +8,7 @@ import {
 	SUBMIT_ACTION,
 	selectedAnswers,
 	inlineField,
-	latestPublicUpdate,
 	createdSpaceLinks,
-	answerSummary,
 	chunks,
 	questionModal,
 	readAnswers,
@@ -174,32 +171,6 @@ describe("Slack context boundaries", () => {
 	});
 });
 
-describe("Slack progress", () => {
-	it("reports active research without exposing reasoning or raw arguments", () => {
-		const call = {
-			type: MessageUpdateType.Tool,
-			subtype: MessageToolUpdateType.Call,
-			uuid: "research-1",
-			call: { name: "research", parameters: {} },
-			reasoning: "private reasoning",
-			argumentsRaw: "private arguments",
-		} as const;
-		expect(activityText([call], 9)).toBe("Researching sources… (9 lookups completed)");
-		expect(
-			activityText([
-				call,
-				{
-					type: MessageUpdateType.Tool,
-					subtype: MessageToolUpdateType.Error,
-					uuid: "research-1",
-					message: "error",
-				},
-			])
-		).toBe("Preparing the response…");
-		expect(activityText([])).toBe("Reviewing your request…");
-	});
-});
-
 describe("Inline Slack questions", () => {
 	it("separates question and options and confirms the stored budget amount", () => {
 		const blocks = questionBlocks(question, "T:C:1");
@@ -210,9 +181,6 @@ describe("Inline Slack questions", () => {
 		expect(JSON.stringify(actions)).not.toContain('"setBudgetUsd"');
 		const sections = blocks.filter((b) => b.type === "section");
 		expect(sections.length).toBeGreaterThanOrEqual(4);
-		expect(answerSummary(question, { q1: "Set budget to $5.00" })).toContain(
-			"Answer: Set budget to $5.00"
-		);
 	});
 	it("keeps multi-question and multi-select forms in the modal", () => {
 		expect(
@@ -227,11 +195,6 @@ describe("Inline Slack questions", () => {
 });
 
 it("shows only bounded public commentary and confirmed created Space links", () => {
-	expect(latestPublicUpdate("<think>secret</think>Uploaded files.\n\nWaiting for the build.")).toBe(
-		"Waiting for the build."
-	);
-	expect(latestPublicUpdate("<think>unfinished private reasoning")).toBe("");
-	expect(latestPublicUpdate("x".repeat(500)).length).toBeLessThanOrEqual(320);
 	expect(
 		createdSpaceLinks([
 			{
@@ -265,14 +228,6 @@ it("uses the matching creation call when result metadata omits its URI", () => {
 			},
 		] as import("$lib/types/MessageUpdate").MessageUpdate[])
 	).toEqual(["https://huggingface.co/spaces/org/demo"]);
-});
-
-it("separates public updates across reasoning rounds", () => {
-	expect(
-		latestPublicUpdate(
-			"Old status.<think>private</think>Current status.<think>still private</think>"
-		)
-	).toBe("Current status.");
 });
 
 it("numbers questions, letters choices and omits redundant form controls for inline choices", () => {

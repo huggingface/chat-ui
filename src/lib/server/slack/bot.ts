@@ -1,3 +1,4 @@
+import { isHttpError } from "@sveltejs/kit";
 import { downloadAttachments } from "./attachments";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createHash } from "node:crypto";
@@ -81,6 +82,7 @@ export class MlSlackBot {
 	private renders = new Map<string, Promise<void>>();
 	private timer?: ReturnType<typeof setInterval>;
 	private stopped = false;
+	private statusIntervalMs = 10000;
 	constructor(
 		readonly settings: SlackConfig,
 		readonly user: User
@@ -470,7 +472,7 @@ export class MlSlackBot {
 		const event = parsed.data;
 		if (
 			event.bot_id ||
-			(event.subtype && event.subtype !== "file_share") ||
+			(event.subtype && !["file_share", "thread_broadcast"].includes(event.subtype)) ||
 			event.user === this.botUserId
 		)
 			return;
@@ -518,20 +520,33 @@ export class MlSlackBot {
 		input: { text: string; user: string; ts: string }
 	): Promise<{ text: string; files: File[] }> {
 		let cursor: string | undefined;
+		let omitted = false;
 		const messages: ThreadMessage[] = [];
 		do {
 			const page = await this.app.client.conversations.replies({
 				channel: thread.channel,
 				ts: thread.threadTs,
 				latest: input.ts,
+				oldest: thread.contextThroughTs,
 				inclusive: true,
 				limit: 100,
 				cursor,
 			});
-			messages.push(...(page.messages ?? []));
+			messages.push(
+				...(page.messages ?? []).filter(
+					(m) =>
+						m.user !== this.botUserId &&
+						!m.bot_id &&
+						(!thread.contextThroughTs || !m.ts || m.ts > thread.contextThroughTs)
+				)
+			);
+			if (messages.length > 200) {
+				messages.splice(0, messages.length - 200);
+				omitted = true;
+			}
 			cursor = page.response_metadata?.next_cursor || undefined;
-		} while (cursor && messages.length < 200);
-		const text = threadPrompt(messages, input, this.botUserId, Boolean(cursor), thread.owner);
+		} while (cursor);
+		const text = threadPrompt(messages, input, this.botUserId, omitted, thread.owner);
 		try {
 			const files = await downloadAttachments(
 				messages,
@@ -602,20 +617,31 @@ export class MlSlackBot {
 					if (skipped) await this.render(thread);
 					const context = input.retry ? undefined : await this.context(thread, input);
 					await runSlackTurn(thread, this.user, { ...context, retry: input.retry });
+					if (!input.retry)
+						await collections.slackThreads.updateOne(
+							{ _id: thread._id },
+							{ $max: { contextThroughTs: input.ts } }
+						);
 				}
 			}
 			await collections.slackInputs.updateOne(
 				{ _id: input._id },
 				{ $set: { status: "done", updatedAt: new Date() } }
 			);
-		} catch {
+		} catch (error) {
+			const status = isHttpError(error) ? error.status : undefined;
+			logger.warn({ status: status ?? "internal" }, "[slack] Request failed");
 			await collections.slackInputs.updateOne(
 				{ _id: input._id },
 				{
 					$set: {
 						status: "failed",
 						error:
-							"The bot could not complete this request. Check bot configuration and use Resume or mention it again.",
+							status === 429
+								? "ML Intern reached a rate limit. Wait before trying again. The workspace shares request limits."
+								: status
+									? `ML Intern rejected this request (HTTP ${status}). Check permissions, request length, and model configuration.`
+									: "The bot could not complete this request. Check bot configuration. Retry regenerates the request and may repeat compute; inspect existing jobs first.",
 						updatedAt: new Date(),
 					},
 				}
@@ -643,7 +669,10 @@ export class MlSlackBot {
 		}
 	}
 	private async publish(thread: SlackThread): Promise<void> {
-		const conv = await collections.conversations.findOne({ _id: thread.conversationId });
+		const conv = await collections.conversations.findOne(
+			{ _id: thread.conversationId },
+			{ projection: { messages: { $slice: -1 }, mlBudget: 1 } }
+		);
 		const message = conv?.messages[conv.messages.length - 1];
 		if (!conv || message?.from !== "assistant") return;
 		const state = await collections.turnStates.findOne({
@@ -718,7 +747,7 @@ export class MlSlackBot {
 					? "The run failed. You can resume it below."
 					: "The run ended without a text response.");
 			if (message.interrupted || state.status === "failed")
-				actions.push({ id: RESUME_ACTION, label: "Resume", value: turnValue });
+				actions.push({ id: RESUME_ACTION, label: "Retry", value: turnValue });
 			actions.push({ id: "ml_intern_trace", label: "Download trace", value: thread._id });
 		}
 		const elapsed = Math.max(
@@ -726,14 +755,15 @@ export class MlSlackBot {
 			Math.floor(
 				((live.alive ? Date.now() : new Date(state.updatedAt).getTime()) -
 					new Date(message.createdAt ?? state.createdAt).getTime()) /
-					10000
-			) * 10
+					this.statusIntervalMs
+			) *
+				(this.statusIntervalMs / 1000)
 		);
 		const duration = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
 		const status = question
 			? "⏳ Waiting for your answer"
 			: live.alive
-				? `${["🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛"][Math.floor(elapsed / 10) % 12]} ${state.status === "waiting" ? "Running" : "Working"} for ${duration}`
+				? `${["🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛"][Math.floor(elapsed / (this.statusIntervalMs / 1000)) % 12]} ${state.status === "waiting" ? "Running" : "Working"} for ${duration}`
 				: message.interrupted
 					? "⏹️ Stopped"
 					: state.status === "failed"
@@ -897,7 +927,10 @@ export class MlSlackBot {
 		status: string,
 		actions: Array<{ id: string; label: string; value: string }>
 	): Promise<void> {
-		const conv = await collections.conversations.findOne({ _id: thread.conversationId });
+		const conv = await collections.conversations.findOne(
+			{ _id: thread.conversationId },
+			{ projection: { "messages.id": 1, "messages.from": 1, mlBudget: 1 } }
+		);
 		const message = conv?.messages.at(-1);
 		if (message?.from !== "assistant") return;
 		// A fresh invocation gets a new assistant message; question continuations keep its ID.
@@ -1093,6 +1126,25 @@ export class MlSlackBot {
 		}
 	}
 
+	private async deliveryFailure(thread: SlackThread): Promise<void> {
+		const row = await collections.slackThreads.findOneAndUpdate(
+			{ _id: thread._id },
+			{ $inc: { renderFailures: 1 } },
+			{ returnDocument: "after" }
+		);
+		const failures = row.value?.renderFailures ?? 1;
+		await collections.slackThreads.updateOne(
+			{ _id: thread._id },
+			{
+				$set: {
+					nextRenderAt: new Date(Date.now() + Math.min(300000, 3000 * 2 ** failures)),
+					...(failures >= 5 ? { watching: false } : {}),
+				},
+			}
+		);
+		logger.warn({ failures }, "[slack] Delivery failed; backing off (paused after five failures)");
+	}
+
 	async tick(): Promise<void> {
 		if (this.ticking || this.stopped) return;
 		this.ticking = true;
@@ -1102,14 +1154,25 @@ export class MlSlackBot {
 				.sort({ pollAt: 1 })
 				.limit(200)
 				.toArray();
+			this.statusIntervalMs = Math.max(10000, threads.length * 2000);
 			for (const thread of threads) {
-				try {
-					await this.render(thread);
-				} catch {
-					logger.warn("[slack] Delivery failed; will retry.");
-					continue;
-				}
-				if (!this.active.has(thread._id) && this.active.size < 4) {
+				let deliveryFailed = false;
+				if (!thread.nextRenderAt || thread.nextRenderAt <= new Date()) {
+					try {
+						await this.render(thread);
+					} catch {
+						deliveryFailed = true;
+						await this.deliveryFailure(thread);
+					}
+				} else deliveryFailed = true;
+				if (
+					!this.active.has(thread._id) &&
+					this.active.size < 4 &&
+					(await collections.slackInputs.countDocuments(
+						{ threadId: thread._id, status: "queued" },
+						{ limit: 1 }
+					))
+				) {
 					const run = this.dispatch(thread)
 						.catch(() => logger.error("[slack] Dispatch failed"))
 						.finally(() => this.active.delete(thread._id));
@@ -1126,20 +1189,46 @@ export class MlSlackBot {
 							thread_ts: thread.threadTs,
 							text:
 								failure.error ??
-								"The request was interrupted. Use Resume or mention me again; existing compute has not been resubmitted.",
+								"The request was interrupted. Retry regenerates the request and may repeat compute; inspect existing jobs first.",
 						});
 						await collections.slackInputs.updateOne(
 							{ _id: failure._id },
 							{ $set: { failureNotified: true } }
 						);
 					} catch {
-						logger.warn("[slack] Failure notification will retry.");
+						deliveryFailed = true;
+						await this.deliveryFailure(thread);
 					}
 				}
 				await collections.slackThreads.updateOne(
 					{ _id: thread._id },
-					{ $set: { pollAt: new Date() } }
+					{ $set: { pollAt: new Date(), ...(!deliveryFailed ? { renderFailures: 0 } : {}) } }
 				);
+				if (
+					!deliveryFailed &&
+					!this.active.has(thread._id) &&
+					!(await collections.slackInputs.countDocuments(
+						{
+							threadId: thread._id,
+							$or: [
+								{ status: { $in: ["queued", "running"] } },
+								{ status: "failed", failureNotified: { $ne: true } },
+							],
+						},
+						{ limit: 1 }
+					))
+				) {
+					const latest = await collections.conversations.findOne(
+						{ _id: thread.conversationId },
+						{ projection: { messages: { $slice: -1 } } }
+					);
+					const message = latest?.messages.at(-1);
+					if (!message || !(await isTurnAlive(thread.conversationId, message.id)).alive)
+						await collections.slackThreads.updateOne(
+							{ _id: thread._id, updatedAt: thread.updatedAt },
+							{ $set: { watching: false } }
+						);
+				}
 			}
 		} finally {
 			this.ticking = false;
@@ -1153,6 +1242,7 @@ export class MlSlackBot {
 		this.botUserId = auth.user_id;
 		await collections.slackInputs.createIndex({ threadId: 1, status: 1, ts: 1 });
 		await collections.slackThreads.createIndex({ teamId: 1, watching: 1, pollAt: 1 });
+		await collections.slackDeliveries.createIndex({ threadId: 1, questionId: 1 });
 		// A previous worker may have submitted compute before it died. Never replay an uncertain dispatch.
 		const threads = await collections.slackThreads
 			.find({ teamId: this.settings.teamId })
@@ -1163,7 +1253,8 @@ export class MlSlackBot {
 			{
 				$set: {
 					status: "failed",
-					error: "Worker restarted; use Resume instead of resubmitting compute.",
+					error:
+						"Worker restarted. Retry regenerates the request and may repeat compute; inspect existing jobs first.",
 					updatedAt: new Date(),
 				},
 			}
@@ -1196,7 +1287,7 @@ export async function startSlackBot(): Promise<void> {
 		);
 	if (pinnedHubToken() && pinnedHubToken() !== settings.hfToken)
 		throw new Error("Slack ML cannot share a deployment with a different pinned Hub MCP token.");
-	const user = await provisionSlackIdentity(settings);
+
 	const leader = new SlackLeader(settings.teamId);
 	let bot: MlSlackBot | undefined;
 	let ticking = false;
@@ -1210,6 +1301,7 @@ export async function startSlackBot(): Promise<void> {
 				bot = undefined;
 			}
 			if (held && !bot) {
+				const user = await provisionSlackIdentity(settings);
 				const candidate = new MlSlackBot(settings, user);
 				try {
 					await candidate.start();
@@ -1220,7 +1312,7 @@ export async function startSlackBot(): Promise<void> {
 				}
 			}
 		} catch {
-			if (bot) {
+			if (bot && !leader.isValid()) {
 				await bot.stop();
 				bot = undefined;
 			}
@@ -1234,7 +1326,16 @@ export async function startSlackBot(): Promise<void> {
 		void acquire();
 	}, 10_000);
 	timer.unref?.();
+	const expiryTimer = setInterval(() => {
+		if (bot && !leader.isValid()) {
+			const expired = bot;
+			bot = undefined;
+			void expired.stop().catch(() => logger.error("[slack] Expired lease shutdown failed"));
+		}
+	}, 1000);
+	expiryTimer.unref?.();
 	onExit(async () => {
+		clearInterval(expiryTimer);
 		clearInterval(timer);
 		await bot?.stop();
 		await leader.release();

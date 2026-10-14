@@ -113,6 +113,15 @@ describe("Slack ML Intern persistence", () => {
 		expect(
 			(await collections.turnStates.findOne({ conversationId: thread.conversationId }))?.status
 		).toBe("failed");
+		expect(
+			await collections.abortedGenerations.countDocuments({ conversationId: thread.conversationId })
+		).toBe(0);
+		rounds({ content: "A fresh task can run immediately." });
+		await runSlackTurn(thread, user, { text: "Start fresh" });
+		expect(
+			(await collections.conversations.findOne({ _id: thread.conversationId }))?.messages.at(-1)
+				?.content
+		).toContain("fresh task");
 	});
 
 	it("passes image attachments through the real upload pathway into the conversation", async () => {
@@ -332,4 +341,28 @@ describe("Slack ML Intern persistence", () => {
 		).toBe("failed");
 		expect(mocks.create).toHaveBeenCalledTimes(1);
 	});
+});
+
+it("allows an explicit retry of a failed input but deduplicates concurrent clicks", async () => {
+	const { thread } = await setup();
+	const input = {
+		_id: "retry-test",
+		threadId: thread._id,
+		user: "U123",
+		text: "",
+		ts: "100.0",
+		retry: true,
+		expectedGenerationId: "original",
+	};
+	expect(await enqueueInput(input)).toBe(true);
+	await collections.slackInputs.updateOne(
+		{ _id: input._id },
+		{ $set: { status: "failed", failureNotified: true, error: "429" } }
+	);
+	const results = await Promise.all([enqueueInput(input), enqueueInput(input)]);
+	expect(results.filter(Boolean)).toHaveLength(1);
+	const row = await collections.slackInputs.findOne({ _id: input._id });
+	expect(row?.status).toBe("queued");
+	expect(row?.error).toBeUndefined();
+	expect(row?.failureNotified).toBeUndefined();
 });
