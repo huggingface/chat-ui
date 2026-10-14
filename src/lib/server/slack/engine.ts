@@ -3,11 +3,12 @@ import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
 import { resolveMlAssistantModel } from "$lib/server/mlAssistantModels";
 import { generateConversationResponse } from "$lib/server/generation/conversationRequest";
-import { slackLocals } from "./identity";
+import { threadLocals } from "./identity";
 import type { User } from "$lib/types/User";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SlackConfig } from "./config";
 import type { SlackThread } from "./types";
+import { linkedSessionId } from "./connections";
 import { usdToMicroUsd } from "$lib/utils/mlBudget";
 
 export async function ensureConversation(
@@ -31,6 +32,7 @@ export async function ensureConversation(
 	const conversation: Conversation = {
 		_id: thread.conversationId,
 		userId: user._id,
+		...(thread.hfUserId ? { sessionId: linkedSessionId(thread) } : {}),
 		model,
 		title: "Slack ML Intern",
 		preprompt: "",
@@ -40,7 +42,7 @@ export async function ensureConversation(
 		createdAt: now,
 		updatedAt: now,
 		mlBudget: {
-			totalMicroUsd: usdToMicroUsd(settings.budgetUsd),
+			totalMicroUsd: usdToMicroUsd(thread.hfUserId ? 0 : settings.budgetUsd),
 			spentMicroUsd: 0,
 			reservations: [],
 		},
@@ -84,7 +86,7 @@ export async function runSlackTurn(
 	}
 	const response = await generateConversationResponse({
 		request: new Request("http://slack.internal/conversation", { method: "POST", body: data }),
-		locals: slackLocals(user),
+		locals: await threadLocals(thread, user),
 		params: { id: thread.conversationId.toHexString() },
 		getClientAddress: () => "slack",
 	});
@@ -105,7 +107,11 @@ export async function stopSlackTurn(thread: SlackThread, user: User): Promise<vo
 	const { stopConversation } = await import("$lib/server/generation/stopConversation");
 	await stopConversation({
 		params: { id: thread.conversationId.toHexString() },
-		locals: slackLocals(user),
+		locals: {
+			user,
+			sessionId: thread.hfUserId ? linkedSessionId(thread) : `slack-ml:${thread.teamId}`,
+			isAdmin: false,
+		},
 		request: new Request("http://slack.internal/stop", { method: "POST" }),
 	});
 	const now = new Date();

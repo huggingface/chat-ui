@@ -240,6 +240,18 @@ async function abandon(park: ParkedCall, reason: string): Promise<void> {
  * tool result, so it can say so rather than failing opaquely on the first call.
  */
 export async function rebuildIdentity(park: Pick<ParkedCall, "userId" | "sessionId">) {
+	if (park.sessionId?.startsWith("slack-user:")) {
+		const thread = await collections.slackThreads.findOne({
+			_id: park.sessionId.slice("slack-user:".length),
+		});
+		if (!thread?.hfUserId || !park.userId?.equals(thread.hfUserId))
+			throw new Error("Slack session owner no longer matches.");
+		const { connectedLocals } = await import("$lib/server/slack/connections");
+		const locals = await connectedLocals(thread);
+		const settings = await collections.settings.findOne({ userId: thread.hfUserId });
+		return { locals, settings, tokenExpired: false };
+	}
+
 	const user = park.userId
 		? ((await collections.users.findOne({ _id: park.userId })) ?? undefined)
 		: undefined;

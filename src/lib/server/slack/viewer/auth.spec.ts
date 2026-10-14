@@ -79,3 +79,7 @@ describe("Slack viewer access", () => {
 		await expect(canView(thread, viewer, c)).rejects.toThrow();
 	});
 });
+
+it("does not expose personal HuggingChat conversations through Slack-only viewer auth", async () => {
+	expect(await canView({ ...thread, hfUserId: new ObjectId() }, viewer, client())).toBe(false);
+});

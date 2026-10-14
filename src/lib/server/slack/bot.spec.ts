@@ -30,6 +30,18 @@ const mocks = vi.hoisted(() => ({
 	react: vi.fn(),
 	upload: vi.fn(),
 }));
+vi.mock("$lib/server/config", async (original) => {
+	const m = await original<typeof import("$lib/server/config")>();
+	return {
+		...m,
+		config: new Proxy(m.config, {
+			get(target, key) {
+				if (key === "PUBLIC_ORIGIN") return "https://huggingface.co";
+				return Reflect.get(target, key);
+			},
+		}),
+	};
+});
 vi.mock("@slack/bolt", () => ({
 	App: class {
 		client = {
@@ -809,4 +821,24 @@ describe("Slack transport authorization", () => {
 		expect(await collections.slackInputs.countDocuments({})).toBe(0);
 		expect(mocks.users).not.toHaveBeenCalled();
 	});
+});
+
+it("privately asks an unconnected user to connect, without queueing a paid session", async () => {
+	const bot = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
+	await bot.receive(
+		{ user: "U123", channel: "C123", ts: "500.0", text: "Train a model" },
+		"T123",
+		"link-event"
+	);
+	expect(mocks.ephemeral).toHaveBeenCalledWith(
+		expect.objectContaining({
+			user: "U123",
+			channel: "C123",
+			thread_ts: "500.0",
+			text: expect.stringContaining("Connect Hugging Face"),
+		})
+	);
+	expect(mocks.post).not.toHaveBeenCalled();
+	expect(await collections.slackInputs.countDocuments({})).toBe(0);
+	expect(await collections.slackThreads.countDocuments({})).toBe(0);
 });

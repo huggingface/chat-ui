@@ -27,12 +27,62 @@ The **owner** is the person who first invoked ML Intern in that thread, which ma
 | Skip a pending question by sending a new request             |                         |     ✓      |
 | Stop the assistant                                           |                         |     ✓      |
 | Resume an interrupted or failed task                         |                         |     ✓      |
+| Open a personal session in HuggingChat                        |                         |     ✓      |
 
 “Everyone” means eligible members of the same Slack workspace. Guests, bots, and external shared channels are excluded; the configured channel allowlist also applies. A trace download posts the file only to its original thread.
 
 Each thread has its own conversation and budget. DMs are separate private sessions, with the person messaging the bot as owner. Follow-up requests in channels require another mention. If the assistant is waiting on its own question, a new request from the task owner skips that question and starts a new turn with the shared context and existing budget. The old card is marked as skipped and its buttons are removed. Skipping never grants a budget, and stale answer buttons cannot approve a skipped question. Other participants cannot dismiss the owner’s question. If the model is actively working without a pending question, wait for it to finish or have the owner stop it.
 
-## Install in a workspace
+## Connect personal Hugging Face accounts
+
+Use `SLACK_ML_ACCOUNT_MODE=user` to create Slack sessions in the owner's HuggingChat history and run them using that person's existing HF authorization. This mode uses the **same Chat UI server and database as the web application**. For sessions to appear on `hf.co/chat`, deploy the worker with the HuggingChat backend, not a standalone Space with its own database. A separate worker replica is possible if it shares the application's database, configuration, and OAuth credentials. The workspace lease still elects one Socket Mode consumer.
+
+This design reuses HuggingChat login rather than introducing a new OAuth scope, OAuth client, remote execution API, or conversation synchronization service. The standalone Space mode remains available below for installations that want a shared account. Deploying a standalone Space does not create conversations in production HuggingChat.
+
+### Server configuration
+
+Keep the normal HuggingChat HF OAuth, model, and database configuration, and set:
+
+```env
+SLACK_ML_ACCOUNT_MODE=user
+SLACK_ML_ENABLED=true
+SLACK_ML_TEAM_ID=T0123456789
+SLACK_ML_BOT_TOKEN=xoxb-your-bot-token
+SLACK_ML_APP_TOKEN=xapp-your-app-token
+PUBLIC_ORIGIN=https://huggingface.co
+ML_ASSISTANT_MODE=true
+USE_USER_TOKEN=true
+MCP_FORWARD_HF_USER_TOKEN=true
+```
+
+Use the deployment's actual HTTPS origin for `PUBLIC_ORIGIN`; the configured application base path (for example `/chat`) is appended automatically. HF must be the configured OpenID provider. No `SLACK_ML_VIEWER_*` configuration is needed for personal sessions. Do not configure a pinned Authorization header on the Hub MCP server: startup rejects that configuration because it would override the user's credentials. The normal startup model-catalog credential is still needed.
+
+The existing HF OAuth grant must permit the requested work. The normal ML Intern scopes include `openid profile inference-api read-mcp read-billing jobs`; repository operations also depend on the permissions granted to the tools by HF. Configure any additional existing HF scopes required by your deployment and have users sign in again after changing them. This integration does not manufacture permissions or upgrade an existing token's scopes. Validate the production OAuth grant with a small job and repository creation before rollout.
+
+### User connection and access
+
+1. Mention ML Intern. The bot sends a private, thread-scoped **Connect Hugging Face** link to an unconnected user. It does not queue the original request or start inference.
+2. Sign in using the existing HuggingChat HF login. The confirmation page identifies the HF account and Slack user/workspace and explains billing and collaboration. Confirm only a link you requested yourself.
+3. Mention ML Intern again. The new session belongs to that HF account, appears in its chat history, and includes an **Open in HuggingChat** button on the Slack status card.
+4. Approve any compute budget explicitly. New personal sessions always start at **$0**, even if `SLACK_ML_BUDGET_USD` is nonzero. OAuth authorization and account connection never approve a job budget. Inference can incur charges separately.
+
+The session's original Slack owner and HF owner are pinned. Other eligible Slack participants can contribute requests using the existing approved budget; their account connections never replace the owner's credentials. Only the owner can approve budgets or answer the bot's forms. The normal HuggingChat authorization checks protect the private browser conversation; Slack channel membership alone does not grant browser access. Channel participants can still see the Slack messages and download traces under the existing thread rules. Treat the conversation as shared with Slack participants, including content you add in the browser; use a separate conversation for private work.
+
+Personal sessions use the owner's current HuggingChat billing organization/resource-group settings, or personal billing if none is selected. Their default publishing namespace is their HF username, with explicit task destinations subject to HF permissions. Shared deployment settings (`SLACK_ML_HF_TOKEN`, `SLACK_ML_PUBLISH_NAMESPACE`, and `SLACK_ML_BILLING_*`) do not supply credentials or defaults for personal sessions. Choosing a publishing org does not select it as the payer.
+
+Connections store a reference to the user's existing HuggingChat OAuth session, not a duplicate access token. Existing HF token refresh is reused. Automatic question and timed-wait continuations resolve the pinned connection, never whichever browser session was most recently used. Expiration, logout, disconnection, or a mismatch with the original HF account blocks continuation instead of falling back to the shared token. Reconnect the original HF account and mention the bot again or use Resume; uncertain submissions are not automatically replayed.
+
+Visit `/slack/connect` under the application's base path to disconnect all Slack connections for the signed-in HF account. This prevents new Slack requests and future automatic continuations using those connections; it does not cancel already running turns or Hub Jobs. Existing Slack Stop controls remain usable without a valid compute token. Connection links are private bearer links, expire after ten minutes, are stored only as hashes, and can be confirmed only once using a signed-in browser and a same-origin POST. Do not forward them. Connection pages are uncached and suppress referrers.
+
+Existing shared-token threads are not transferred to personal accounts. If their original state is retained in the same deployment, keep the original shared token to continue them; otherwise leave them on the old installation. New threads use personal accounts after enabling user mode. Switching an account connection to another HF account does not reassign older personal threads; those require reconnecting their original account.
+
+### Rollout
+
+Deploy this branch and the parent Slack PR to the HuggingChat backend, configure Socket Mode there, then enable user mode. Do not run the same Slack app simultaneously against two independent databases: their worker leases cannot coordinate. Stop the old Space worker before switching Slack event handling to production. Back up legacy Space state before retiring it; importing that state is not part of account linking.
+
+Before rollout, verify HF login/consent, private connection links, chat-history visibility, a small explicitly budgeted job, and two users in separate threads on a staging deployment. Local tests exercise identity isolation, expiration, single-use linking, budget approval/resume, and the existing Slack flows; they do not validate production HF consent or billable jobs.
+
+## Install in a workspace (shared account)
 
 1. Create a Slack app **from a manifest**, using [`integrations/slack/manifest.json`](https://github.com/huggingface/chat-ui/blob/main/integrations/slack/manifest.json).
 2. Install it in the workspace and copy its bot token (`xoxb-…`).
@@ -312,7 +362,7 @@ Files attached to the invoking message or earlier human messages in the same Sla
 
 The app requires the **files:read** bot scope. For an existing installation, add it under **OAuth & Permissions → Bot Token Scopes**, then reinstall the app to your workspace. Updating the repository manifest alone does not grant permission to an already-installed bot. Attachments stay in the conversation's file storage; they are not made public on Slack.
 
-## Read-only session viewer
+## Read-only session viewer (legacy shared-account sessions)
 
 The optional viewer runs on the bot's Chat UI host, not `hf.co/chat`. When configured, **Open session** appears on each Slack status card. It shows the conversation, expandable tool arguments/results/errors, run state, compute reservations, and latest worker heartbeat. It refreshes every 15 seconds while visible, with a manual refresh button. It does not offer sending messages, submitting answers, approving budgets, stopping runs, or resuming them. Those actions remain in Slack.
 

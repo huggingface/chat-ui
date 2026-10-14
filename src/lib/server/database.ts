@@ -43,7 +43,14 @@ import type { ConfigKey } from "$lib/types/ConfigKey";
 import { config } from "$lib/server/config";
 import type { MCPOAuthConnection } from "$lib/types/MCPOAuthConnection";
 
-import type { SlackThread, SlackInput, SlackDelivery, SlackLease } from "./slack/types";
+import type {
+	SlackThread,
+	SlackInput,
+	SlackDelivery,
+	SlackLease,
+	SlackConnection,
+	SlackLink,
+} from "./slack/types";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
@@ -143,6 +150,8 @@ export class Database {
 		);
 
 		// Collections with default readPreference (primary) - critical for read-after-write consistency
+		const slackConnections = db.collection<SlackConnection>("slack.connections");
+		const slackLinks = db.collection<SlackLink>("slack.links");
 		const slackThreads = db.collection<SlackThread>("slack.threads");
 		const slackInputs = db.collection<SlackInput>("slack.inputs");
 		const slackDeliveries = db.collection<SlackDelivery>("slack.deliveries");
@@ -188,6 +197,8 @@ export class Database {
 			readPreference: secondaryPreferred,
 		});
 		return {
+			slackConnections,
+			slackLinks,
 			slackThreads,
 			slackInputs,
 			slackDeliveries,

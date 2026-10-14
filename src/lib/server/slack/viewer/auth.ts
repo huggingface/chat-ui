@@ -103,7 +103,7 @@ export async function canView(
 	viewer: ViewerIdentity,
 	client: WebClient
 ): Promise<boolean> {
-	if (viewer.team !== thread.teamId) return false;
+	if (thread.hfUserId || viewer.team !== thread.teamId) return false;
 	const result = await client.users.info({ user: viewer.user });
 	if (!result.user || !isWorkspaceMember(result.user, thread.teamId)) return false;
 	if (thread.channel.startsWith("D")) return thread.owner === viewer.user;

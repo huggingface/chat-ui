@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 	create: vi.fn(),
 	settings: {
 		teamId: "T123",
+		accountMode: "user" as const,
 		botToken: "xoxb-test",
 		appToken: "xapp-test",
 		hfToken: "hf-test-token",
@@ -22,6 +23,19 @@ const mocks = vi.hoisted(() => ({
 		publishNamespace: "ML-Intern-lab",
 	},
 }));
+vi.mock("$lib/server/config", async (original) => {
+	const m = await original<typeof import("$lib/server/config")>();
+	return {
+		...m,
+		config: new Proxy(m.config, {
+			get(target, key) {
+				if (key === "PUBLIC_ORIGIN") return "https://huggingface.co";
+				if (key === "USE_USER_TOKEN" || key === "MCP_FORWARD_HF_USER_TOKEN") return "true";
+				return Reflect.get(target, key);
+			},
+		}),
+	};
+});
 vi.mock("./config", () => ({ slackConfig: () => mocks.settings }));
 vi.mock("openai", async (original) => ({
 	...(await original<typeof import("openai")>()),
@@ -332,4 +346,91 @@ describe("Slack ML Intern persistence", () => {
 		).toBe("failed");
 		expect(mocks.create).toHaveBeenCalledTimes(1);
 	});
+});
+
+it("creates a zero-budget HF-owned chat and resumes its budget question with the same personal identity", async () => {
+	const { user, session } = await createTestUser();
+	await collections.sessions.updateOne(
+		{ _id: session._id },
+		{
+			$set: {
+				oauth: { token: { value: "hf-personal-test", expiresAt: new Date(Date.now() + 3600000) } },
+			},
+		}
+	);
+	await collections.slackConnections.insertOne({
+		_id: "T123:U123",
+		teamId: "T123",
+		slackUserId: "U123",
+		userId: user._id,
+		sessionId: session.sessionId,
+		updatedAt: new Date(),
+	});
+	const thread = await getOrCreateThread("T123", "C123", "200.0", "U123", user._id);
+	await ensureConversation(thread, user, { ...mocks.settings, budgetUsd: 50 });
+	let conv = await collections.conversations.findOne({ _id: thread.conversationId });
+	expect(conv?.userId).toEqual(user._id);
+	expect(conv?.mlBudget?.totalMicroUsd).toBe(0);
+	rounds(
+		{
+			toolCalls: [
+				{
+					id: "budget",
+					name: "ask_user_question",
+					arguments: JSON.stringify({
+						questions: [
+							{
+								header: "Budget",
+								question: "Approve $1?",
+								multiSelect: false,
+								options: [
+									{ label: "Approve", description: "One dollar", setBudgetUsd: 1 },
+									{ label: "Skip", description: "No spending" },
+								],
+							},
+						],
+					}),
+				},
+			],
+		},
+		{ content: "Approved personal run." }
+	);
+	await runSlackTurn(thread, user, { text: "Run this with my account" });
+	expect(mocks.create.mock.calls[0][1]?.headers?.Authorization).toBe("Bearer hf-personal-test");
+	const q = await collections.mcpElicitations.findOne({
+		conversationId: thread.conversationId,
+		status: "pending",
+	});
+	if (!q) throw new Error("Missing question");
+	const identity = await rebuildIdentity({ userId: user._id, sessionId: conv?.sessionId });
+	expect(identity.locals.token).toBe("hf-personal-test");
+	expect(identity.locals.billingOrganization).toBeUndefined();
+	expect(identity.locals.publishNamespace).toBe(user.username);
+	expect(
+		(
+			await submitElicitationAnswer({
+				conversationId: thread.conversationId,
+				elicitationId: q.elicitationId,
+				action: "accept",
+				content: readAnswers(q.request, {
+					q0: {
+						answer: {
+							type: "static_select",
+							selected_option: { value: "0", text: { type: "plain_text", text: "0" } },
+						},
+					},
+				}).content,
+			})
+		).ok
+	).toBe(true);
+	await kickAnsweredAsk(thread.conversationId, q.elicitationId);
+	await expect
+		.poll(
+			async () =>
+				(await collections.conversations.findOne({ _id: thread.conversationId }))?.messages.at(-1)
+					?.content
+		)
+		.toContain("Approved personal run");
+	conv = await collections.conversations.findOne({ _id: thread.conversationId });
+	expect(conv?.mlBudget?.totalMicroUsd).toBe(1000000);
 });

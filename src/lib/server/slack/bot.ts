@@ -1,3 +1,10 @@
+import {
+	chatLink,
+	chatOrigin,
+	createConnectionLink,
+	connectionKey,
+	connectedLocals,
+} from "./connections";
 import { viewerLink } from "./viewer/auth";
 import { downloadAttachments } from "./attachments";
 import { AbortRegistry } from "$lib/server/abortRegistry";
@@ -84,7 +91,7 @@ export class MlSlackBot {
 	private stopped = false;
 	constructor(
 		readonly settings: SlackConfig,
-		readonly user: User
+		readonly user?: User
 	) {
 		this.app = new App({
 			token: settings.botToken,
@@ -394,7 +401,11 @@ export class MlSlackBot {
 			if (!thread) return;
 			const conv = await collections.conversations.findOne({ _id: thread.conversationId });
 			if (conv?.messages.at(-1)?.id !== parsed.data.messageId) return;
-			await stopSlackTurn(thread, this.user);
+			const owner = thread.hfUserId
+				? await collections.users.findOne({ _id: thread.hfUserId })
+				: this.user;
+			if (!owner) return;
+			await stopSlackTurn(thread, owner);
 			await this.tell(
 				thread.channel,
 				body.user.id,
@@ -493,12 +504,47 @@ export class MlSlackBot {
 			);
 			return;
 		}
+		const existing = await collections.slackThreads.findOne({
+			teamId,
+			channel: event.channel,
+			threadTs: event.thread_ts ?? event.ts,
+		});
+		let hfUserId = existing?.hfUserId;
+		if (this.settings.accountMode === "user" && !existing) {
+			const connection = await collections.slackConnections.findOne({
+				_id: connectionKey(teamId, event.user),
+			});
+			if (!connection) {
+				const link = await createConnectionLink(teamId, event.user);
+				await this.tell(
+					event.channel,
+					event.user,
+					`<${link}|Connect Hugging Face> to start sessions in your HuggingChat history using your own account. Then mention me again.`,
+					event.thread_ts ?? event.ts
+				);
+				return;
+			}
+			hfUserId = connection.userId;
+		}
 		const thread = await getOrCreateThread(
 			teamId,
 			event.channel,
 			event.thread_ts ?? event.ts,
-			event.user
+			event.user,
+			hfUserId
 		);
+		if (thread.hfUserId) {
+			try {
+				await connectedLocals(thread);
+			} catch {
+				const message =
+					event.user === thread.owner
+						? `<${await createConnectionLink(teamId, thread.owner)}|Reconnect the original Hugging Face account> to continue this session. Then mention me again.`
+						: "The session owner needs to reconnect their Hugging Face account before this session can continue.";
+				await this.tell(event.channel, event.user, message, thread.threadTs);
+				return;
+			}
+		}
 		const inserted = await enqueueInput({
 			_id: inputKey(teamId, eventId),
 			threadId: thread._id,
@@ -568,7 +614,9 @@ export class MlSlackBot {
 			if (!(await this.member(input.user)))
 				throw new Error("The invoking user is no longer a workspace member.");
 			if (this.stopped) throw new Error("Slack worker stopped.");
-			await ensureConversation(thread, this.user, this.settings);
+			const user = thread.hfUserId ? (await connectedLocals(thread)).user : this.user;
+			if (!user) throw new Error("Slack session owner is unavailable.");
+			await ensureConversation(thread, user, this.settings);
 			if (input.resumeElicitationId) {
 				const question = await collections.mcpElicitations.findOne({
 					conversationId: thread.conversationId,
@@ -576,8 +624,7 @@ export class MlSlackBot {
 				});
 				if (question?.pending?.kind === "ask")
 					await kickAnsweredAsk(thread.conversationId, input.resumeElicitationId);
-				else
-					await runSlackTurn(thread, this.user, { resumeElicitationId: input.resumeElicitationId });
+				else await runSlackTurn(thread, user, { resumeElicitationId: input.resumeElicitationId });
 			} else {
 				const conv = await collections.conversations.findOne({ _id: thread.conversationId });
 				const latest = conv?.messages[conv.messages.length - 1];
@@ -594,7 +641,7 @@ export class MlSlackBot {
 					busy &&
 					!input.retry &&
 					input.user === thread.owner &&
-					(await skipSlackQuestion(thread, this.user, latest.id, input._id));
+					(await skipSlackQuestion(thread, user, latest.id, input._id));
 				if (busy && !skipped) {
 					await this.tell(
 						thread.channel,
@@ -605,7 +652,7 @@ export class MlSlackBot {
 				} else {
 					if (skipped) await this.render(thread);
 					const context = input.retry ? undefined : await this.context(thread, input);
-					await runSlackTurn(thread, this.user, { ...context, retry: input.retry });
+					await runSlackTurn(thread, user, { ...context, retry: input.retry });
 				}
 			}
 			await collections.slackInputs.updateOne(
@@ -909,7 +956,7 @@ export class MlSlackBot {
 		const delivery = await collections.slackDeliveries.findOne({ _id });
 		const budget = conv?.mlBudget;
 		const text = `**Session status**\n\n${status}\n💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
-		const viewUrl = viewerLink(thread.conversationId.toHexString());
+		const viewUrl = chatLink(thread) ?? viewerLink(thread.conversationId.toHexString());
 		const digest = createHash("sha256")
 			.update(JSON.stringify({ text, actions, viewUrl }))
 			.digest("hex");
@@ -927,7 +974,10 @@ export class MlSlackBot {
 									{
 										type: "button" as const,
 										action_id: "ml_intern_view",
-										text: { type: "plain_text" as const, text: "Open session" },
+										text: {
+											type: "plain_text" as const,
+											text: thread.hfUserId ? "Open in HuggingChat" : "Open session",
+										},
 										url: viewUrl,
 									},
 								],
@@ -1219,9 +1269,16 @@ export async function startSlackBot(): Promise<void> {
 		throw new Error(
 			"Slack ML needs ML_ASSISTANT_MODE, USE_USER_TOKEN and MCP_FORWARD_HF_USER_TOKEN enabled."
 		);
+	if (settings.accountMode === "user") {
+		const { loginEnabled } = await import("$lib/server/auth");
+		if (!loginEnabled) throw new Error("User-account Slack mode requires HuggingChat OAuth login.");
+		chatOrigin();
+		if (pinnedHubToken())
+			throw new Error("User-account Slack mode cannot use a pinned Hub MCP token.");
+	}
 	if (pinnedHubToken() && pinnedHubToken() !== settings.hfToken)
 		throw new Error("Slack ML cannot share a deployment with a different pinned Hub MCP token.");
-	const user = await provisionSlackIdentity(settings);
+	const user = settings.hfToken ? await provisionSlackIdentity(settings) : undefined;
 	const leader = new SlackLeader(settings.teamId);
 	let bot: MlSlackBot | undefined;
 	let ticking = false;

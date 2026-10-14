@@ -1,11 +1,27 @@
 import type { ObjectId } from "mongodb";
 
+export interface SlackConnection {
+	_id: string;
+	teamId: string;
+	slackUserId: string;
+	userId: ObjectId;
+	sessionId: string;
+	updatedAt: Date;
+}
+export interface SlackLink {
+	_id: string;
+	teamId: string;
+	slackUserId: string;
+	expiresAt: Date;
+}
 export interface SlackThread {
 	_id: string;
 	teamId: string;
 	channel: string;
 	threadTs: string;
 	owner: string;
+	/** Absent on legacy shared-token threads. Never changed after creation. */
+	hfUserId?: ObjectId;
 	watching: boolean;
 	pollAt?: Date;
 	conversationId: ObjectId;
@@ -50,5 +66,7 @@ export interface SlackDelivery {
 export interface SlackLease {
 	_id: string;
 	owner: string;
+	/** Absent on legacy shared-token threads. Never changed after creation. */
+	hfUserId?: ObjectId;
 	until: Date;
 }
