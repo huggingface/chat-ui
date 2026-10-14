@@ -1,3 +1,4 @@
+import { slackLocals } from "$lib/server/slack/identity";
 import { randomUUID } from "crypto";
 import { MongoInvalidArgumentError, MongoServerError } from "mongodb";
 import { collections } from "$lib/server/database";
@@ -242,6 +243,9 @@ export async function rebuildIdentity(park: Pick<ParkedCall, "userId" | "session
 	const user = park.userId
 		? ((await collections.users.findOne({ _id: park.userId })) ?? undefined)
 		: undefined;
+
+	if (user?.slackBotTeamId)
+		return { locals: slackLocals(user), settings: null, tokenExpired: false };
 
 	const session = park.userId
 		? await collections.sessions.find({ userId: park.userId }).sort({ updatedAt: -1 }).next()

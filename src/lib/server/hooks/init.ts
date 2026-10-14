@@ -64,6 +64,11 @@ export async function initServer(): Promise<void> {
 		appName: config.PUBLIC_APP_NAME,
 	}).catch((err) => logger.warn({ err }, "Failed to warm up share thumbnail renderer"));
 
+	if (config.SLACK_ML_ENABLED === "true") {
+		const { startSlackBot } = await import("$lib/server/slack/bot");
+		await startSlackBot();
+	}
+
 	adminTokenManager.displayToken();
 
 	if (config.EXPOSE_API) {

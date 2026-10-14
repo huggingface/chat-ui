@@ -1,0 +1,36 @@
+{
+	"display_information": {
+		"name": "ML Intern",
+		"description": "Research, train and deploy on Hugging Face from a Slack thread.",
+		"background_color": "#FFD21E"
+	},
+	"features": {
+		"bot_user": { "display_name": "ML Intern", "always_online": false },
+		"app_home": { "messages_tab_enabled": true, "messages_tab_read_only_enabled": false }
+	},
+	"oauth_config": {
+		"scopes": {
+			"bot": [
+				"app_mentions:read",
+				"chat:write",
+				"reactions:write",
+				"channels:history",
+				"channels:read",
+				"groups:history",
+				"groups:read",
+				"im:history",
+				"im:read",
+				"users:read",
+				"files:write",
+				"files:read"
+			]
+		}
+	},
+	"settings": {
+		"event_subscriptions": { "bot_events": ["app_mention", "message.im"] },
+		"interactivity": { "is_enabled": true },
+		"org_deploy_enabled": false,
+		"socket_mode_enabled": true,
+		"token_rotation_enabled": false
+	}
+}

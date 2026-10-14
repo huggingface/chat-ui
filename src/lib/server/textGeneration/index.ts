@@ -118,6 +118,7 @@ async function* textGenerationWithoutTitle(
 		artifactsOverride: ctx.artifactsOverride,
 		supportsArtifacts: ctx.model.supportsArtifacts,
 		username: ctx.username,
+		publishNamespace: ctx.locals?.publishNamespace,
 		timezone: (ctx.locals as unknown as { timezone?: string } | undefined)?.timezone,
 		budget: conv.mlBudget,
 		// The same target the dispatch rewrite uses. BillTo remains the valid Hub
