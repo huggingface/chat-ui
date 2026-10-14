@@ -30,10 +30,14 @@ export const isHfMcpServer = (urlString: string): boolean => {
 	}
 };
 
-export const redactSecret = (text: string, secret: unknown): string =>
-	hasNonEmptyToken(secret)
-		? text.replaceAll(secret, "[redacted]").replaceAll(encodeURIComponent(secret), "[redacted]")
-		: text;
+export const redactSecret = (text: string, secret: unknown): string => {
+	if (!hasNonEmptyToken(secret)) return text;
+	const queryEncoded = new URLSearchParams({ s: secret }).toString().slice("s=".length);
+	return [secret, encodeURIComponent(secret), queryEncoded].reduce(
+		(out, form) => out.replaceAll(form, "[redacted]"),
+		text
+	);
+};
 
 export const isExaMcpServer = (urlString: string): boolean => {
 	try {

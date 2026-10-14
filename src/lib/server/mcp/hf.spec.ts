@@ -78,6 +78,14 @@ describe("redactSecret", () => {
 		);
 	});
 
+	it("replaces the secret as URLSearchParams serializes it", () => {
+		const url = new URL("https://mcp.exa.ai/mcp");
+		url.searchParams.set("exaApiKey", "a b!c");
+		expect(redactSecret(url.toString(), "a b!c")).toBe(
+			"https://mcp.exa.ai/mcp?exaApiKey=[redacted]"
+		);
+	});
+
 	it("leaves text alone when there is no secret", () => {
 		expect(redactSecret("https://mcp.exa.ai/mcp", undefined)).toBe("https://mcp.exa.ai/mcp");
 		expect(redactSecret("https://mcp.exa.ai/mcp", " ")).toBe("https://mcp.exa.ai/mcp");
