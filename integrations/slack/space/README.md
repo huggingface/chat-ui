@@ -24,3 +24,24 @@ shutdown. An abrupt crash can lose updates since the last completed backup.
 Run one replica only; pause before deploying to avoid overlapping writers.
 Slack and Hugging Face tokens belong in Space secrets, never in this repository.
 See `docs/source/ml-intern/slack-bot.md`.
+
+## Personal-account staging
+
+Use a separate Space, private bucket, and Slack app to test personal-account mode.
+Never reuse the live app's bot or Socket Mode tokens across independent databases.
+Set `SLACK_ML_ACCOUNT_MODE=user`, restrict `SLACK_ML_ALLOWED_CHANNELS` to a test
+channel, and enable Slack only after configuring the test app's credentials.
+
+To use the Space's built-in HF login, add `hf_oauth: true` and
+`hf_oauth_scopes: [inference-api, read-mcp, read-billing, jobs]` to its README
+metadata. The startup script maps the injected `OAUTH_CLIENT_ID`,
+`OAUTH_CLIENT_SECRET`, and `OAUTH_SCOPES` to Chat UI's `OPENID_*` settings unless
+an explicit `OPENID_CLIENT_ID` is already configured. Set `PUBLIC_ORIGIN` to the
+Space's HTTPS app origin. Login and compute consent still require the user's
+approval. Test conversations appear in this Space's chat history, not hf.co/chat.
+
+Keep the Space private for an owner-only test; other testers will need access
+to the deployment. Seed a fresh empty state bucket rather than copying production
+sessions. Give the backup process a bucket-only `SLACK_ML_STATE_TOKEN`; do not
+install the operator's deployment token in the Space. Personal mode does not need
+a shared compute token.
