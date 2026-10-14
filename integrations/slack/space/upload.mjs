@@ -5,6 +5,7 @@ const require = createRequire(`${process.cwd()}/package.json`);
 const { uploadFiles } = require("@huggingface/hub");
 const { parse } = require("dotenv");
 const env = parse(fs.readFileSync(".env.local"));
+if (!env.SLACK_ML_DEPLOY_TOKEN) throw new Error("Set SLACK_ML_DEPLOY_TOKEN in .env.local");
 if (!process.argv[2])
 	throw new Error("Usage: node integrations/slack/space/upload.mjs owner/space");
 const repo = { type: "space", name: process.argv[2] };
@@ -45,7 +46,9 @@ files.push(
 for (const file of files) {
 	const text = await file.content.text();
 	for (const key of [
+		"SLACK_ML_DEPLOY_TOKEN",
 		"SLACK_ML_HF_TOKEN",
+		"SLACK_ML_STATE_TOKEN",
 		"SLACK_ML_BOT_TOKEN",
 		"SLACK_ML_APP_TOKEN",
 		"OPENAI_API_KEY",
@@ -58,7 +61,7 @@ for (let i = Number(process.env.UPLOAD_START ?? 0); i < files.length; i += 200) 
 	try {
 		await uploadFiles({
 			repo,
-			accessToken: env.SLACK_ML_HF_TOKEN,
+			accessToken: env.SLACK_ML_DEPLOY_TOKEN,
 			files: files.slice(i, i + 200),
 			commitTitle: `Deploy ML Intern Slack worker (${Math.floor(i / 200) + 1})`,
 		});

@@ -24,6 +24,9 @@ export interface SlackThread {
 	hfUserId?: ObjectId;
 	watching: boolean;
 	pollAt?: Date;
+	contextThroughTs?: string;
+	renderFailures?: number;
+	nextRenderAt?: Date;
 	conversationId: ObjectId;
 	createdAt: Date;
 	updatedAt: Date;

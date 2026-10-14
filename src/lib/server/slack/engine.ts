@@ -1,3 +1,4 @@
+import { error } from "@sveltejs/kit";
 import { randomUUID } from "node:crypto";
 import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
@@ -90,7 +91,7 @@ export async function runSlackTurn(
 		params: { id: thread.conversationId.toHexString() },
 		getClientAddress: () => "slack",
 	});
-	if (!response.ok) throw new Error(`ML Intern rejected this turn (${response.status}).`);
+	if (!response.ok) error(response.status, `ML Intern rejected this turn (${response.status}).`);
 	const reader = response.body?.getReader();
 	if (!reader) return;
 	try {
@@ -142,11 +143,16 @@ export async function stopSlackTurn(thread: SlackThread, user: User): Promise<vo
 		{ $set: { status: "failed", error: "Stopped from Slack", endedAt: now, updatedAt: now } },
 		{ returnDocument: "after" }
 	);
-	if (parked.value)
+	if (parked.value) {
+		await collections.abortedGenerations.deleteOne({
+			conversationId: thread.conversationId,
+			updatedAt: { $lte: now },
+		});
 		await collections.conversations.updateOne(
 			{ _id: thread.conversationId, "messages.id": parked.value.messageId },
 			{ $set: { "messages.$.interrupted": true, updatedAt: now } }
 		);
+	}
 	await collections.slackThreads.updateOne(
 		{ _id: thread._id },
 		{ $set: { watching: true, updatedAt: now } }

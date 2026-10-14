@@ -842,3 +842,81 @@ it("privately asks an unconnected user to connect, without queueing a paid sessi
 	expect(await collections.slackInputs.countDocuments({})).toBe(0);
 	expect(await collections.slackThreads.countDocuments({})).toBe(0);
 });
+
+it("dispatches despite render errors, advances polling, and pauses persistent delivery failures", async () => {
+	const { user } = await createTestUser();
+	const bot = new MlSlackBot(settings, user);
+	mocks.run.mockResolvedValue(undefined);
+	await bot.receive(
+		{ channel: "C123", user: "OWNER", text: "Build", ts: "100.0" },
+		"T123",
+		"delivery-test"
+	);
+	const thread = await collections.slackThreads.findOne({});
+	if (!thread) throw new Error("No thread");
+	bot["render"] = vi.fn().mockRejectedValue(new Error("channel archived"));
+	await bot.tick();
+	await vi.waitFor(() => expect(mocks.run).toHaveBeenCalled());
+	expect((await collections.slackThreads.findOne({ _id: thread._id }))?.pollAt).toBeDefined();
+	for (let i = 0; i < 4; i++) {
+		await collections.slackThreads.updateOne(
+			{ _id: thread._id },
+			{ $set: { nextRenderAt: new Date(0) } }
+		);
+		await bot.tick();
+	}
+	expect((await collections.slackThreads.findOne({ _id: thread._id }))?.watching).toBe(false);
+});
+
+it("unwatches a failed initial dispatch after its failure notice is delivered", async () => {
+	const { user } = await createTestUser();
+	const bot = new MlSlackBot(settings, user);
+	mocks.run.mockRejectedValueOnce(new Error("model unavailable"));
+	await bot.receive(
+		{ channel: "C123", user: "OWNER", text: "Build", ts: "100.0" },
+		"T123",
+		"failed-first"
+	);
+	await bot.tick();
+	await vi.waitFor(async () =>
+		expect(await collections.slackInputs.countDocuments({ status: "failed" })).toBe(1)
+	);
+	await bot.tick();
+	expect((await collections.slackThreads.findOne({}))?.watching).toBe(false);
+});
+
+it("accepts broadcast replies and paginates past old bot posts, then quotes only new context", async () => {
+	const { user } = await createTestUser();
+	const bot = new MlSlackBot(settings, user);
+	mocks.run.mockResolvedValue(undefined);
+	await bot.receive(
+		{ channel: "C123", user: "OWNER", text: "Start", ts: "100.0", subtype: "thread_broadcast" },
+		"T123",
+		"broadcast"
+	);
+	const thread = await collections.slackThreads.findOne({});
+	if (!thread) throw new Error("No thread");
+	mocks.replies
+		.mockResolvedValueOnce({
+			messages: Array.from({ length: 200 }, () => ({ bot_id: "B1", text: "old bot" })),
+			response_metadata: { next_cursor: "recent" },
+		})
+		.mockResolvedValueOnce({
+			messages: [{ user: "U2", ts: "099.0", text: "recent model reference" }],
+		});
+	await bot["dispatch"](thread);
+	expect(mocks.run.mock.lastCall?.[2].text).toContain("recent model reference");
+	const next = await collections.slackThreads.findOne({ _id: thread._id });
+	if (!next) throw new Error("No thread");
+	expect(next.contextThroughTs).toBe("100.0");
+	mocks.replies.mockResolvedValue({
+		messages: [
+			{ user: "U2", ts: "099.0", text: "old reference" },
+			{ user: "U2", ts: "101.0", text: "new reference" },
+		],
+	});
+	const context = await bot["context"](next, { user: "OWNER", ts: "102.0", text: "Follow up" });
+	expect(context.text).toContain("new reference");
+	expect(context.text).not.toContain("old reference");
+	expect(mocks.replies.mock.lastCall?.[0].oldest).toBe("100.0");
+});

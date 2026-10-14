@@ -8,7 +8,7 @@ The bot reads that thread, then runs the same ML Intern harness used by HuggingC
 
 Public run updates are retained in a separate, cumulative message in the Slack thread. Earlier results, links, and instructions remain readable as the compact status card changes or becomes a question or final response. Only public assistant text is shown, never private reasoning. Long updates continue in additional messages. Public commentary is published before the question it leads to. After an answer, only new commentary appears below it; earlier text is not replayed. Final results are posted as a new message after progress updates.
 
-Each thread has its own persistent conversation, scripts, compute budget and service registry. MongoDB keeps this state across restarts. A worker lease prevents multiple Chat UI replicas from consuming the same Slack workspace at once. Questions and timed waits resume through the existing server sweepers. Interrupted submissions are not automatically replayed: use **Resume** to continue a failed run. **Stop assistant** stops the agent, including a parked wait; it does not cancel Jobs already launched on the Hub. The private stop confirmation appears inside that same Slack thread.
+Each thread has its own persistent conversation, scripts, compute budget and service registry. MongoDB keeps this state across restarts. A worker lease prevents multiple Chat UI replicas from consuming the same Slack workspace at once. Questions and timed waits resume through the existing server sweepers. Interrupted submissions are not automatically replayed. **Retry** regenerates the original request, omitting the interrupted assistant turn, and may repeat compute. Inspect existing jobs before confirming Retry. **Stop assistant** stops the agent, including a parked wait; it does not cancel Jobs already launched on the Hub. The private stop confirmation appears inside that same Slack thread.
 
 This takes the thread/session and Socket Mode approach described in [Moon Bot](https://huggingface.co/blog/huggingface/moon-bot), while reusing ML Intern's MongoDB state and tool harness instead of creating a separate Pi agent. **Download trace** uploads the conversation as JSONL to the original Slack thread. Long answers are split into messages; no public conversation share is created.
 
@@ -26,8 +26,8 @@ The **owner** is the person who first invoked ML Intern in that thread, which ma
 | Submit answers through question buttons or forms             |                         |     ✓      |
 | Skip a pending question by sending a new request             |                         |     ✓      |
 | Stop the assistant                                           |                         |     ✓      |
-| Resume an interrupted or failed task                         |                         |     ✓      |
-| Open a personal session in HuggingChat                        |                         |     ✓      |
+| Retry an interrupted or failed task                          |                         |     ✓      |
+| Open a personal session in HuggingChat                       |                         |     ✓      |
 
 “Everyone” means eligible members of the same Slack workspace. Guests, bots, and external shared channels are excluded; the configured channel allowlist also applies. A trace download posts the file only to its original thread.
 
@@ -146,9 +146,9 @@ end-to-end with this bot; the tested path uses a member token with organization 
 
 The shared token needs Inference Providers access, access to the Hub MCP tools,
 permission to run Jobs under the intended payer, and permission to create/write
-repos and Spaces in the publishing organization. For the bucket-backed deployment,
-it also needs read/write access to the state bucket. The upload helper uses that
-same token to update the server Space. Check the organization's billing setup,
+repos and Spaces in the publishing organization. It must not access the state bucket
+or modify the bot server Space. Use a separate bucket-only `SLACK_ML_STATE_TOKEN`
+for persistence and an operator-only `SLACK_ML_DEPLOY_TOKEN` for server uploads. Check the organization's billing setup,
 credits, and hardware quotas for the operations you intend to allow.
 
 Replace `your-company-org` with the actual HF organization slug:
@@ -159,6 +159,7 @@ SLACK_ML_BILLING_ORGANIZATION=your-company-org
 # Optional resource group for billing; requires the billing organization above.
 SLACK_ML_BILLING_RESOURCE_GROUP=
 SLACK_ML_STATE_BUCKET=your-company-org/ml-intern-slackbot-state
+SLACK_ML_STATE_TOKEN=hf_separate_bucket_only_token
 ```
 
 These settings serve different purposes:
@@ -216,8 +217,9 @@ hardware, and disable sleeping (sleep time `-1`). Keep the Space paused during
 setup and upload; the helper uploads several commits and does not configure
 hardware, secrets, or variables for you.
 
-Create an ignored `.env.local` in the checkout with `SLACK_ML_HF_TOKEN` and
-`SLACK_ML_STATE_BUCKET` from the company configuration above. The upload helper
+Create an ignored `.env.local` in the checkout with `SLACK_ML_DEPLOY_TOKEN`,
+`SLACK_ML_STATE_TOKEN`, and `SLACK_ML_STATE_BUCKET`. Keep the deployment token local;
+do not install it in the worker Space. The upload helper
 reads its token from this file. Do not commit it. Creating a Space does not copy
 your local environment into its settings.
 
@@ -240,8 +242,8 @@ import { writeBackup } from "./integrations/slack/space/state.mjs";
 
 config({ path: ".env.local", quiet: true });
 const bucket = process.env.SLACK_ML_STATE_BUCKET;
-const token = process.env.SLACK_ML_HF_TOKEN;
-if (!bucket || !token) throw new Error("Set SLACK_ML_STATE_BUCKET and SLACK_ML_HF_TOKEN");
+const token = process.env.SLACK_ML_STATE_TOKEN;
+if (!bucket || !token) throw new Error("Set SLACK_ML_STATE_BUCKET and SLACK_ML_STATE_TOKEN");
 await createRepo({
   repo: { type: "bucket", name: bucket },
   visibility: "private",
@@ -300,6 +302,7 @@ SLACK_ML_BUDGET_USD=0
 SLACK_ML_PUBLISH_NAMESPACE=your-company-org
 SLACK_ML_BILLING_ORGANIZATION=your-company-org
 SLACK_ML_STATE_BUCKET=your-company-org/ml-intern-slackbot-state
+SLACK_ML_STATE_TOKEN=hf_separate_bucket_only_token
 MONGODB_DB_NAME=ml-intern-slackbot
 PUBLIC_ORIGIN=https://your-company-org-ml-intern-slackbot-server.hf.space
 ```
@@ -341,12 +344,11 @@ Wait for a completed backup, pause and resume the Space, and confirm an existing
 thread still works. Verify a pending question can be answered after restart. Then
 expand the channel allowlist if desired. Keep the local worker stopped.
 
-Snapshots briefly lock writes while reading all collections, then unlock before
-compression/upload. BSON IDs, dates, and indexes survive restore.
+Snapshots use consistent snapshot reads and stream compressed records without
+locking application writes. BSON IDs, dates, and indexes survive restore.
 
 Backups run every 30 seconds after the preceding upload completes and on graceful
-shutdown. An abrupt crash can lose changes since the last completed backup. Three
-consecutive backup failures stop the worker. This is a single-replica pilot, not a
+shutdown. An abrupt crash can lose changes since the last completed backup. Backup failures retain the live database and back off retries; monitor the logs. This is a single-replica pilot, not a
 lossless database service. Pause the Space before deploying/restarting it and wait
 for shutdown to finish; never run two replicas with independent local databases
 against this bucket. A MongoDB lease cannot coordinate independent databases.
@@ -361,6 +363,16 @@ backup to finish before every source upload or deployment update.
 Files attached to the invoking message or earlier human messages in the same Slack thread are downloaded with the bot token and attached to the ML Intern conversation through Chat UI's upload pipeline. This supports image requests such as OCR. Files posted after the invocation and bot-uploaded files are excluded. Limits are 10 distinct files, 10 MB per file, and 25 MB total per invocation. Start a fresh thread to select a smaller set. Download failures are reported privately in the thread rather than silently running without the image.
 
 The app requires the **files:read** bot scope. For an existing installation, add it under **OAuth & Permissions → Bot Token Scopes**, then reinstall the app to your workspace. Updating the repository manifest alone does not grant permission to an already-installed bot. Attachments stay in the conversation's file storage; they are not made public on Slack.
+
+### State isolation and backup format
+
+`SLACK_ML_STATE_TOKEN` must be a separate fine-grained token with access only to the private state bucket. Restrict the compute token so it cannot read or write that bucket, even if both tokens belong to the same account. Merely issuing two broad tokens does not isolate state. Startup rejects identical tokens and rejects compute credentials that can read the seeded snapshot. The state token is removed from the Chat UI worker's environment and is never forwarded to tools. Existing installations must configure this new secret before deploying this change.
+
+The Space starts a local single-node MongoDB replica set for snapshot reads. Backups use one snapshot read timestamp, stream individual BSON-preserving EJSON records through gzip into a temporary file, and upload from disk. There is no global write lock or database-sized string. Temporary files are removed after upload. Version 1 seeds/backups remain readable for migration; the first successful backup rewrites them as version 2. Legacy version 1 import still requires memory for its single JSON document. When using `snapshot`/`readBackup` directly, their result is now a temporary file path; call `removeBackup(path)` in a `finally` block after use.
+
+Backup failures retain the running database and retry with increasing delay instead of restarting into an older snapshot. Operators must monitor `[state] Backup failed` logs; a crash while backups are failing can still lose data. Local disk must have room for the compressed snapshot.
+
+Thread delivery retries back off and pause after five consecutive failures; a new mention re-enables delivery. Polling advances even when delivery fails, and inactive threads with no pending inputs are unwatched. Status animation slows as watched-thread count grows, targeting at most 30 status updates/minute across the workspace (other Slack calls also consume rate limits). Delivery records are retained to prevent replay; an index supports question-card lookups. Follow-ups quote only human context since the last successfully submitted invocation; long initial threads keep the most recent 200 human messages.
 
 ## Read-only session viewer (legacy shared-account sessions)
 

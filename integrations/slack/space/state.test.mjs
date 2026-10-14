@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MongoMemoryServer } from "mongodb-memory-server";
+import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { MongoClient, ObjectId } from "mongodb";
-import { snapshot, restore } from "./state.mjs";
+import { snapshot, restore, removeBackup } from "./state.mjs";
 test("consistent snapshot restores BSON, indexes, and isolated collections; rejects corrupt data", async () => {
-	const server = await MongoMemoryServer.create();
+	const server = await MongoMemoryReplSet.create();
 	const client = await new MongoClient(server.getUri()).connect();
 	try {
 		const id = new ObjectId(),
@@ -29,7 +29,8 @@ test("consistent snapshot restores BSON, indexes, and isolated collections; reje
 		await assert.rejects(restore(client, "target", bytes), /empty database/);
 		await assert.rejects(restore(client, "bad", Buffer.from("bad")));
 		assert.equal((await client.db("bad").listCollections().toArray()).length, 0);
-		// Snapshot unlocks MongoDB, so subsequent writes complete normally.
+		await removeBackup(bytes);
+		// Snapshot reads never lock application writes.
 		await client.db("source").collection("threads").insertOne({ owner: "charlie" });
 	} finally {
 		await client.close();
