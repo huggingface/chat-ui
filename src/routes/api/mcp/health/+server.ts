@@ -11,6 +11,7 @@ import {
 	isStrictHfMcpLogin,
 	hasNonEmptyToken,
 	isExaMcpServer,
+	redactSecret,
 } from "$lib/server/mcp/hf";
 import { mcpFetchForServer } from "$lib/server/mcp/fetch";
 import {
@@ -43,6 +44,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	let client: Client | undefined;
 	let oauthState: MCPOAuthState | undefined;
 	let oauthConnectionId: string | undefined;
+	let injectedExaKey: string | undefined;
+	const redactExaKey = (err: unknown): Error => {
+		const e = err instanceof Error ? err : new Error(String(err));
+		if (!injectedExaKey) return e;
+		// the original error and its cause can embed finalUrl, so keep only the scrubbed message
+		return new Error(redactSecret(e.message, injectedExaKey));
+	};
 
 	try {
 		const body: HealthCheckRequest = await request.json();
@@ -78,6 +86,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				if (!urlObj.searchParams.has("exaApiKey")) {
 					urlObj.searchParams.set("exaApiKey", exaApiKey);
 					finalUrl = urlObj.toString();
+					injectedExaKey = exaApiKey;
 					logger.debug({}, "[MCP Health] injected Exa API key");
 				}
 			}
@@ -205,7 +214,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				return res;
 			}
 		} catch (error) {
-			httpError = error instanceof Error ? error : new Error(String(error));
+			httpError = redactExaKey(error);
 			lastError = httpError;
 			logger.warn({ err: lastError }, "Streamable HTTP failed, trying SSE transport...");
 
@@ -270,13 +279,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					return res;
 				}
 			} catch (sseError) {
-				lastError = sseError instanceof Error ? sseError : new Error(String(sseError));
+				lastError = redactExaKey(sseError);
 				// Prefer the HTTP error when both failed so UI shows the primary failure (e.g., HTTP 500) instead
 				// of the fallback SSE message.
 				if (httpError) {
 					lastError = new Error(
 						`HTTP transport failed: ${httpError.message}; SSE fallback failed: ${lastError.message}`,
-						{ cause: sseError instanceof Error ? sseError : undefined }
+						{ cause: lastError }
 					);
 				}
 				logger.error(lastError, "Both transports failed.");
@@ -323,7 +332,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		);
 		clearTimeout(timeoutId);
 		return res;
-	} catch (error) {
+	} catch (rawError) {
+		const error = redactExaKey(rawError);
 		logger.error(error, "MCP health check failed");
 
 		// Token resolution failed before any state was captured; report the stored state so the card
@@ -343,9 +353,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		const response: HealthCheckResponse = {
 			ready: false,
-			error: error instanceof Error ? error.message : "Unknown error",
+			error: error.message,
 			authRequired:
-				error instanceof OAuthAuthorizationRequiredError ||
+				rawError instanceof OAuthAuthorizationRequiredError ||
 				oauthState?.status === "authorization_required",
 			oauth: oauthState,
 		};

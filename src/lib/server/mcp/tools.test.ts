@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { sanitizeJsonSchema, getOpenAiToolsForMcp, resetMcpToolsCache } from "./tools";
 import type { McpServerConfig } from "./httpClient";
+import { logger } from "$lib/server/logger";
+
+vi.mock("$lib/server/config", () => ({ config: { EXA_API_KEY: "exa-secret-key" } }));
 
 // In-memory MCP servers keyed by URL: each listTools call is recorded so tests
 // can assert exactly which servers were (re-)listed vs served from the cache.
@@ -392,5 +395,37 @@ describe("getOpenAiToolsForMcp tool annotations", () => {
 
 		expect(mcpMock.listToolsCalls).toEqual([SERVER_A.url]);
 		expect(cached.mapping.search.annotations).toEqual({ destructiveHint: true });
+	});
+});
+
+describe("getOpenAiToolsForMcp logging", () => {
+	beforeEach(() => {
+		resetMcpToolsCache();
+		mcpMock.listToolsCalls.length = 0;
+		mcpMock.responses.clear();
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("never logs the injected Exa key", async () => {
+		const debug = vi.spyOn(logger, "debug");
+		const ok: McpServerConfig = {
+			name: "exa",
+			url: "https://mcp.exa.ai/mcp?exaApiKey=exa-secret-key",
+		};
+		const failing: McpServerConfig = {
+			name: "exa-failing",
+			url: "https://mcp.exa.ai/mcp?tools=web_search_exa&exaApiKey=exa-secret-key",
+		};
+		mcpMock.responses.set(ok.url, { tools: [{ name: "search", inputSchema: {} }] });
+		mcpMock.responses.set(failing.url, new Error(`listing failed for ${failing.url}`));
+
+		await getOpenAiToolsForMcp([ok, failing]);
+
+		const logged = JSON.stringify(debug.mock.calls);
+		expect(logged).toContain("[redacted]");
+		expect(logged).not.toContain("exa-secret-key");
 	});
 });
