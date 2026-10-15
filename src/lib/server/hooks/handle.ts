@@ -15,6 +15,7 @@ import { adminTokenManager } from "$lib/server/adminToken";
 import { isHostLocalhost } from "$lib/server/isURLLocal";
 import { runWithRequestContext, updateRequestContext } from "$lib/server/requestContext";
 import { config, ready } from "$lib/server/config";
+import { parseRequestOrigin } from "./origin";
 
 type HandleInput = Parameters<Handle>[0];
 
@@ -154,7 +155,8 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 						...(config.PUBLIC_ORIGIN ? [new URL(config.PUBLIC_ORIGIN).host] : []),
 					];
 
-					if (!validOrigins.includes(new URL(origin).host)) {
+					const parsedOrigin = parseRequestOrigin(origin);
+					if (!parsedOrigin || !validOrigins.includes(parsedOrigin.host)) {
 						return errorResponse(403, "Invalid referer for POST request");
 					}
 				}
@@ -224,6 +226,7 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 			if (event.url.pathname.startsWith(`${base}/api/`)) {
 				// get origin from the request
 				const requestOrigin = event.request.headers.get("origin");
+				const parsedRequestOrigin = parseRequestOrigin(requestOrigin);
 
 				// get origin from the config if its defined
 				let allowedOrigin = config.PUBLIC_ORIGIN ? new URL(config.PUBLIC_ORIGIN).origin : undefined;
@@ -231,7 +234,7 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				if (
 					dev || // if we're in dev mode
 					!requestOrigin || // or the origin is null (SSR)
-					isHostLocalhost(new URL(requestOrigin).hostname) // or the origin is localhost
+					(parsedRequestOrigin !== undefined && isHostLocalhost(parsedRequestOrigin.hostname)) // or the origin is localhost
 				) {
 					allowedOrigin = "*"; // allow all origins
 				} else if (allowedOrigin === requestOrigin) {
