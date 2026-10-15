@@ -568,7 +568,8 @@ export class MlSlackBot {
 					event.user === thread.owner
 						? `<${await createConnectionLink(teamId, thread.owner)}|Reconnect the original Hugging Face account> to continue this session. Then mention me again.`
 						: "The session owner needs to reconnect their Hugging Face account before this session can continue.";
-				await this.tell(event.channel, event.user, message, thread.threadTs);
+				// A root mention has no visible thread until a non-ephemeral reply exists.
+				await this.tell(event.channel, event.user, message, event.thread_ts);
 				return;
 			}
 		}

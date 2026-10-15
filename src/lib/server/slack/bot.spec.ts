@@ -7,6 +7,7 @@ import {
 	createTestConversation,
 } from "$lib/server/api/__tests__/testHelpers";
 import { MlSlackBot } from "./bot";
+import { connectionKey } from "./connections";
 import { skipSlackQuestion } from "./engine";
 import {
 	ANSWER_VIEW,
@@ -957,3 +958,34 @@ it("rejects non-owner requests before queueing in a personal HF session", async 
 		expect.objectContaining({ text: expect.stringContaining("Only the session owner") })
 	);
 });
+
+it.each([undefined, "499.0"])(
+	"shows reconnection prompts where the mention was sent (thread %s)",
+	async (threadTs) => {
+		const { user } = await createTestUser();
+		await collections.slackConnections.insertOne({
+			_id: connectionKey("T123", "U123"),
+			teamId: "T123",
+			slackUserId: "U123",
+			userId: user._id,
+			sessionId: "expired-session",
+			updatedAt: new Date(),
+		});
+		const bot = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
+		await bot.receive(
+			{ user: "U123", channel: "C123", ts: "500.0", thread_ts: threadTs, text: "Hello" },
+			"T123",
+			"reconnect-event"
+		);
+		expect(mocks.ephemeral).toHaveBeenCalledWith(
+			expect.objectContaining({
+				user: "U123",
+				channel: "C123",
+				...(threadTs ? { thread_ts: threadTs } : {}),
+				text: expect.stringContaining("Reconnect the original Hugging Face account"),
+			})
+		);
+		if (!threadTs) expect(mocks.ephemeral.mock.calls[0][0]).not.toHaveProperty("thread_ts");
+		expect(await collections.slackInputs.countDocuments({})).toBe(0);
+	}
+);
