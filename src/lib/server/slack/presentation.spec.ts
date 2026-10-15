@@ -289,3 +289,26 @@ it("marks accepted values rather than drafts and retains custom answers safely",
 	expect(blocks.at(-1)).toEqual({ type: "divider" });
 	expect(blocks.some((b) => b.type === "actions")).toBe(false);
 });
+
+describe("Slack long replies and tables", () => {
+	it("renders table rows as labeled fields with clickable links", () => {
+		const table =
+			"| Model | Details |\n|---|---|\n| [Demo](https://example.com/demo) | **Fast** & small |\n| Other | Multi-speaker |";
+		const rendered = chunks(table, 100).map(slackMarkdown).join("\n");
+		expect(rendered).toContain("*Model:* <https://example.com/demo|Demo>");
+		expect(rendered).toContain("*Details:* *Fast* &amp; small");
+		expect(rendered).toContain("*Model:* Other");
+		expect(rendered).not.toContain("|---|");
+	});
+	it("prefers paragraphs over filling a message to its limit", () => {
+		const text = "First paragraph.\n\nSecond paragraph is longer than the remaining space.";
+		expect(chunks(text, 50)[0]).toBe("First paragraph.\n\n");
+		expect(chunks(text, 50).join("")).toBe(text);
+	});
+	it("uses sentences before words and preserves all text", () => {
+		const text = "First sentence. Second sentence is quite a bit longer. Final sentence.";
+		expect(chunks(text, 40)[0]).toBe("First sentence. ");
+		expect(chunks(text, 40).join("")).toBe(text);
+		expect(chunks("😀".repeat(20), 7).map((x) => Array.from(x).length)).toEqual([7, 7, 6]);
+	});
+});
