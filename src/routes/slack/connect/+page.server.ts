@@ -5,7 +5,7 @@ import { connectAccount, readConnectionLink, ConnectionError } from "$lib/server
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ locals, url, setHeaders }) => {
-	setHeaders({ "cache-control": "private, no-store", "referrer-policy": "no-referrer" });
+	setHeaders({ "cache-control": "private, no-store", "referrer-policy": "same-origin" });
 	if (!locals.user)
 		redirect(303, `${base}/login?next=${encodeURIComponent(url.pathname + url.search)}`);
 	const token = url.searchParams.get("ticket");

@@ -6,7 +6,7 @@
 <svelte:head
 	><title>Connect Slack to HuggingChat</title><meta
 		name="referrer"
-		content="no-referrer"
+		content="same-origin"
 	/></svelte:head
 >
 <div class="mx-auto max-w-xl space-y-5 p-8">
