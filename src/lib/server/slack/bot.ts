@@ -522,7 +522,8 @@ export class MlSlackBot {
 					event.channel,
 					event.user,
 					`<${link}|Connect Hugging Face> to start sessions in your HuggingChat history using your own account. Then mention me again.`,
-					event.thread_ts ?? event.ts
+					// Ephemeral-only replies do not create a visible thread in Slack.
+					event.thread_ts
 				);
 				return;
 			}

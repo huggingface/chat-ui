@@ -823,25 +823,29 @@ describe("Slack transport authorization", () => {
 	});
 });
 
-it("privately asks an unconnected user to connect, without queueing a paid session", async () => {
-	const bot = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
-	await bot.receive(
-		{ user: "U123", channel: "C123", ts: "500.0", text: "Train a model" },
-		"T123",
-		"link-event"
-	);
-	expect(mocks.ephemeral).toHaveBeenCalledWith(
-		expect.objectContaining({
-			user: "U123",
-			channel: "C123",
-			thread_ts: "500.0",
-			text: expect.stringContaining("Connect Hugging Face"),
-		})
-	);
-	expect(mocks.post).not.toHaveBeenCalled();
-	expect(await collections.slackInputs.countDocuments({})).toBe(0);
-	expect(await collections.slackThreads.countDocuments({})).toBe(0);
-});
+it.each([undefined, "499.0"])(
+	"shows the private connection prompt where the mention was sent (thread %s)",
+	async (threadTs) => {
+		const bot = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
+		await bot.receive(
+			{ user: "U123", channel: "C123", ts: "500.0", thread_ts: threadTs, text: "Train a model" },
+			"T123",
+			"link-event"
+		);
+		expect(mocks.ephemeral).toHaveBeenCalledWith(
+			expect.objectContaining({
+				user: "U123",
+				channel: "C123",
+				...(threadTs ? { thread_ts: threadTs } : {}),
+				text: expect.stringContaining("Connect Hugging Face"),
+			})
+		);
+		if (!threadTs) expect(mocks.ephemeral.mock.calls[0][0]).not.toHaveProperty("thread_ts");
+		expect(mocks.post).not.toHaveBeenCalled();
+		expect(await collections.slackInputs.countDocuments({})).toBe(0);
+		expect(await collections.slackThreads.countDocuments({})).toBe(0);
+	}
+);
 
 it("dispatches despite render errors, advances polling, and pauses persistent delivery failures", async () => {
 	const { user } = await createTestUser();
