@@ -37,7 +37,7 @@ export async function ensureConversation(
 		userId: user._id,
 		...(thread.hfUserId ? { sessionId: linkedSessionId(thread) } : {}),
 		model,
-		title: `Slack · ${thread.channel} · ${new Date(Number(thread.threadTs) * 1000).toISOString().slice(0, 16)}`,
+		title: "[Slack] New Chat",
 		managedBy: {
 			kind: "slack",
 			continueUrl: `https://app.slack.com/client/${encodeURIComponent(thread.teamId)}/${encodeURIComponent(thread.channel)}/thread/${encodeURIComponent(thread.channel)}-${encodeURIComponent(thread.threadTs)}`,

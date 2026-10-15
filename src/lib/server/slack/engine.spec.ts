@@ -29,6 +29,8 @@ vi.mock("$lib/server/config", async (original) => {
 		...m,
 		config: new Proxy(m.config, {
 			get(target, key) {
+				// Keep replayed model rounds focused on the assistant, not title inference.
+				if (key === "LLM_SUMMARIZATION") return "false";
 				if (key === "PUBLIC_ORIGIN") return "https://huggingface.co";
 				if (key === "USE_USER_TOKEN" || key === "MCP_FORWARD_HF_USER_TOKEN") return "true";
 				return Reflect.get(target, key);
