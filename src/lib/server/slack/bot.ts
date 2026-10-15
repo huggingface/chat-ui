@@ -1018,33 +1018,36 @@ export class MlSlackBot {
 		const budget = conv?.mlBudget;
 		const text = `**Session status**\n\n${status}\n💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
 		const viewUrl = chatLink(thread) ?? viewerLink(thread.conversationId.toHexString());
-		const digest = createHash("sha256")
-			.update(JSON.stringify({ text, actions, viewUrl }))
-			.digest("hex");
+		const buttons = [
+			...actions.map((action) => ({
+				type: "button" as const,
+				action_id: action.id,
+				text: { type: "plain_text" as const, text: action.label },
+				value: action.value,
+				...(action.id === STOP_ACTION ? { style: "danger" as const } : {}),
+			})),
+			...(viewUrl
+				? [
+						{
+							type: "button" as const,
+							action_id: "ml_intern_view",
+							text: {
+								type: "plain_text" as const,
+								text: thread.hfUserId ? "Open in HuggingChat" : "Open session",
+							},
+							url: viewUrl,
+						},
+					]
+				: []),
+		];
+		const digest = createHash("sha256").update(JSON.stringify({ text, buttons })).digest("hex");
 		if (delivery?.digest === digest) return;
 		const payload = {
 			channel: thread.channel,
 			text,
 			blocks: [
-				...messageBlocks(text, actions),
-				...(viewUrl
-					? [
-							{
-								type: "actions" as const,
-								elements: [
-									{
-										type: "button" as const,
-										action_id: "ml_intern_view",
-										text: {
-											type: "plain_text" as const,
-											text: thread.hfUserId ? "Open in HuggingChat" : "Open session",
-										},
-										url: viewUrl,
-									},
-								],
-							},
-						]
-					: []),
+				...messageBlocks(text, []),
+				...(buttons.length ? [{ type: "actions" as const, elements: buttons }] : []),
 				{ type: "divider" as const },
 			],
 			parse: "none" as const,
