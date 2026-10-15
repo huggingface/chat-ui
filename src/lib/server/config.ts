@@ -80,10 +80,14 @@ class ConfigManager {
 	}
 
 	get(key: ConfigKey): string {
-		if (!this.ConfigManagerEnabled) {
-			return keysFromEnv[key] || "";
+		const value = !this.ConfigManagerEnabled
+			? keysFromEnv[key] || ""
+			: this.keysFromDB[key] || keysFromEnv[key] || "";
+		// Trailing slash on PUBLIC_ORIGIN produced //asset paths (#2489).
+		if (key === "PUBLIC_ORIGIN" && value) {
+			return value.replace(/\/+$/, "");
 		}
-		return this.keysFromDB[key] || keysFromEnv[key] || "";
+		return value;
 	}
 
 	async updateSemaphore() {
@@ -140,9 +144,15 @@ class ConfigManager {
 
 		const publicEnvKeys = Object.keys(publicEnv);
 
-		return Object.fromEntries(
+		const publicConfig = Object.fromEntries(
 			Object.entries(config).filter(([key]) => publicEnvKeys.includes(key))
 		) as Record<PublicConfigKey, string>;
+
+		if (publicConfig.PUBLIC_ORIGIN) {
+			publicConfig.PUBLIC_ORIGIN = publicConfig.PUBLIC_ORIGIN.replace(/\/+$/, "");
+		}
+
+		return publicConfig;
 	}
 }
 
