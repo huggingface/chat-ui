@@ -37,6 +37,7 @@
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
 	import SubscribeModal from "$lib/components/SubscribeModal.svelte";
+	import { paymentErrorNotice } from "$lib/utils/paymentErrors";
 	import { loading } from "$lib/stores/loading.js";
 	import { streamStart } from "$lib/utils/haptics";
 	import { requireAuthUser } from "$lib/utils/auth.js";
@@ -431,7 +432,11 @@
 					noteServerNow(update.serverNow);
 				},
 				onError: (update) => {
-					if (update.statusCode === 402) {
+					const paymentNotice =
+						update.statusCode === 402 ? paymentErrorNotice(update.errorCode) : undefined;
+					if (paymentNotice) {
+						$error = paymentNotice;
+					} else if (update.statusCode === 402) {
 						showSubscribeModal = true;
 					} else if (
 						update.statusCode === 401 &&

@@ -30,6 +30,7 @@ import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { requestProvider } from "$lib/server/requestProvider";
+import { upstreamErrorCode } from "$lib/server/endpoints/openai/providerFallback";
 import { stampMlHarness } from "$lib/server/mlAssistantHarness";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
@@ -783,11 +784,13 @@ export async function generateConversationResponse({
 					const statusCode =
 						(typeof errObj.statusCode === "number" ? errObj.statusCode : undefined) ||
 						(typeof errObj.status === "number" ? errObj.status : undefined);
+					const errorCode = upstreamErrorCode(err);
 					await update({
 						type: MessageUpdateType.Status,
 						status: MessageUpdateStatus.Error,
 						message: err.message,
 						...(statusCode && { statusCode }),
+						...(errorCode && { errorCode }),
 					});
 					logger.error(err, "Error in conversation stream");
 				}
