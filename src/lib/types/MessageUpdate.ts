@@ -72,6 +72,8 @@ export interface MessageStatusUpdate {
 	status: MessageUpdateStatus;
 	message?: string;
 	statusCode?: number;
+	/** upstream x-error-code, tells the causes of a 402 apart */
+	errorCode?: string;
 }
 
 // Everything else

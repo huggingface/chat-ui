@@ -29,7 +29,8 @@ import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
-import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
+import { requestProvider } from "$lib/server/requestProvider";
+import { upstreamErrorCode } from "$lib/server/endpoints/openai/providerFallback";
 import { stampMlHarness } from "$lib/server/mlAssistantHarness";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
@@ -730,13 +731,7 @@ export async function generateConversationResponse({
 					forceMultimodal:
 						!config.isHuggingChat && Boolean(userSettings?.multimodalOverrides?.[model.id]),
 					forceTools: !config.isHuggingChat && Boolean(userSettings?.toolsOverrides?.[model.id]),
-					// Inference provider preference (HuggingChat only, skip for router models)
-					provider:
-						config.isHuggingChat && !model.isRouter
-							? isMlAssistantConversation(conv)
-								? mlAssistantProviderFor(model.id, userSettings?.providerOverrides?.[model.id])
-								: userSettings?.providerOverrides?.[model.id]
-							: undefined,
+					provider: requestProvider(model, conv, userSettings?.providerOverrides),
 					// Thinking-effort override (only forwarded for reasoning-capable models;
 					// per-user override can force-enable on self-hosted). The ML Assistant
 					// preset pins its own effort here rather than writing the user's saved
@@ -789,11 +784,13 @@ export async function generateConversationResponse({
 					const statusCode =
 						(typeof errObj.statusCode === "number" ? errObj.statusCode : undefined) ||
 						(typeof errObj.status === "number" ? errObj.status : undefined);
+					const errorCode = upstreamErrorCode(err);
 					await update({
 						type: MessageUpdateType.Status,
 						status: MessageUpdateStatus.Error,
 						message: err.message,
 						...(statusCode && { statusCode }),
+						...(errorCode && { errorCode }),
 					});
 					logger.error(err, "Error in conversation stream");
 				}
