@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("$app/environment", () => ({ dev: false }));
-vi.mock("$lib/server/database", () => ({ collections: {} }));
+vi.mock("$lib/server/database", () => ({
+	collections: { slackThreads: { findOne: vi.fn(async () => ({ _id: "slack-thread" })) } },
+}));
 vi.mock("$lib/server/config", () => ({
 	config: { PUBLIC_ORIGIN: "https://chat.example", checkForUpdates: vi.fn() },
 	ready: Promise.resolve(),
@@ -23,6 +25,7 @@ function event(method: string, origin: string) {
 		url,
 		route: { id: "/api/v2/user/settings" },
 		locals: {},
+		params: {},
 		request: new Request(url, {
 			method,
 			headers: { origin, "content-type": "application/x-www-form-urlencoded" },
@@ -48,4 +51,14 @@ describe("opaque request origins", () => {
 			expect(resolve).not.toHaveBeenCalled();
 		}
 	);
+});
+
+it("rejects Slack conversation mutations before the route handler runs", async () => {
+	const request = event("POST", "https://chat.example");
+	request.params.id = "6ad03a4c353929f19edc560f";
+	request.route.id = "/conversation/[id]";
+	const resolve = vi.fn();
+	const response = await handleRequest({ event: request, resolve });
+	expect(response.status).toBe(403);
+	expect(resolve).not.toHaveBeenCalled();
 });
