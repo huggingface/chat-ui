@@ -1080,6 +1080,10 @@ export class MlSlackBot {
 		const budget = conv?.mlBudget;
 		const text = `**Session status**\n\n${status}\n💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
 		const viewUrl = chatLink(thread) ?? viewerLink(thread.conversationId.toHexString());
+		const owner =
+			viewUrl && thread.hfUserId
+				? await collections.users.findOne({ _id: thread.hfUserId }, { projection: { username: 1 } })
+				: undefined;
 		const buttons = [
 			...messageBlocks("", actions).flatMap((block) =>
 				block.type === "actions" ? block.elements : []
@@ -1091,7 +1095,9 @@ export class MlSlackBot {
 							action_id: "ml_intern_view",
 							text: {
 								type: "plain_text" as const,
-								text: thread.hfUserId ? "Open in HuggingChat (owner only)" : "Open session",
+								text: thread.hfUserId
+									? `Open in HuggingChat (${owner?.username || "owner only"})`.slice(0, 75)
+									: "Open session",
 							},
 							url: viewUrl,
 						},
