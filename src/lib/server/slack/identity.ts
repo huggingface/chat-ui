@@ -1,3 +1,4 @@
+import { connectedLocals } from "./ownerIdentity";
 import { createHash } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
@@ -60,7 +61,6 @@ export async function threadLocals(
 	legacyUser?: User
 ): Promise<App.Locals> {
 	if (thread.hfUserId) {
-		const { connectedLocals } = await import("./connections");
 		return connectedLocals(thread);
 	}
 	if (!legacyUser)

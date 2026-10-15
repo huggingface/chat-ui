@@ -97,8 +97,32 @@ export async function oidcClient() {
 		id_token_signed_response_alg: "RS256",
 	});
 }
-/** Recheck membership on every data request; failure or Slack outage never falls back to access. */
+const membershipCache = new Map<string, { until: number; value: Promise<boolean> }>();
+const viewerRequests = new Map<string, number>();
+/** Bounded 60s cache; concurrent tabs share the same membership lookup. Failures are evicted. */
 export async function canView(
+	thread: SlackThread,
+	viewer: ViewerIdentity,
+	client: WebClient
+): Promise<boolean> {
+	if (thread.hfUserId || viewer.team !== thread.teamId || viewer.expires <= Date.now())
+		return false;
+	const key = `${viewer.team}:${viewer.user}:${thread.channel}:${thread.owner}`;
+	const now = Date.now();
+	for (const [key, value] of membershipCache) if (value.until <= now) membershipCache.delete(key);
+	const cached = membershipCache.get(key);
+	if (cached) return cached.value;
+	if (membershipCache.size >= 1000)
+		membershipCache.delete(membershipCache.keys().next().value ?? "");
+	const value = checkMembership(thread, viewer, client).catch((error) => {
+		membershipCache.delete(key);
+		throw error;
+	});
+	membershipCache.set(key, { until: now + 60_000, value });
+	return value;
+}
+/** Check Slack membership; outages never fall back to access. */
+async function checkMembership(
 	thread: SlackThread,
 	viewer: ViewerIdentity,
 	client: WebClient
@@ -124,6 +148,13 @@ export async function canView(
 export async function authorizedThread(event: RequestEvent) {
 	const viewer = identity(event);
 	if (!viewer) error(401, "Sign in with Slack to inspect this session.");
+	const throttleKey = `${viewer.team}:${viewer.user}`;
+	const now = Date.now();
+	for (const [key, until] of viewerRequests) if (until <= now) viewerRequests.delete(key);
+	if (viewerRequests.has(throttleKey))
+		error(429, "Please wait a moment before refreshing this session.");
+	if (viewerRequests.size >= 1000) error(503, "Viewer is busy. Try again shortly.");
+	viewerRequests.set(throttleKey, now + 2000);
 	const settings = slackConfig();
 	if (!settings || !viewerConfig()) error(503, "Slack viewer is not configured.");
 	const id = event.params.id;

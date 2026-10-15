@@ -39,6 +39,26 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				config.checkForUpdates();
 			});
 
+			// Slack viewer routes have their own OIDC identity and per-thread authorization.
+			// Do not turn a Slack browser session into a HuggingChat user session.
+			if (event.url.pathname.startsWith(`${base}/slack/view/`)) {
+				const resolved = await resolve(event);
+				const response = new Response(resolved.body, {
+					status: resolved.status,
+					statusText: resolved.statusText,
+					headers: resolved.headers,
+				});
+				response.headers.set("Cache-Control", "private, no-store");
+				response.headers.set("Referrer-Policy", "no-referrer");
+				response.headers.set("X-Content-Type-Options", "nosniff");
+				response.headers.set("X-Frame-Options", "DENY");
+				response.headers.set(
+					"Content-Security-Policy",
+					"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+				);
+				return response;
+			}
+
 			logger.debug(
 				{
 					locals: event.locals,
@@ -53,7 +73,7 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				const sendJson =
 					event.request.headers.get("accept")?.includes("application/json") ||
 					event.request.headers.get("content-type")?.includes("application/json");
-				return new Response(sendJson ? JSON.stringify({ error: message }) : message, {
+				return new Response(sendJson ? JSON.stringify({ error: message, message }) : message, {
 					status,
 					headers: {
 						"content-type": sendJson ? "application/json" : "text/plain",
@@ -126,16 +146,6 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 			event.locals.user = auth.user || undefined;
 			event.locals.token = auth.token;
 
-			// Slack's trusted runner calls generation directly; browser/API callers are view-only.
-			if (
-				await isSlackConversationMutation(event.request.method, event.route.id, event.params.id)
-			) {
-				return errorResponse(
-					403,
-					"This session is managed in Slack. Continue in its Slack thread."
-				);
-			}
-
 			// Update request context with user after authentication
 			if (auth.user?.username) {
 				updateRequestContext({ user: auth.user.username });
@@ -198,6 +208,21 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				return errorResponse(401, ERROR_MESSAGES.authOnly);
 			}
 
+			// Slack's trusted runner calls generation directly; browser/API callers are view-only.
+			if (
+				await isSlackConversationMutation(
+					event.request.method,
+					event.route.id,
+					event.params.id,
+					event.locals
+				)
+			) {
+				return errorResponse(
+					403,
+					"This session is managed in Slack. Continue in its Slack thread."
+				);
+			}
+
 			let replaced = false;
 
 			const response = await resolve(event, {
@@ -208,7 +233,10 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 					}
 					replaced = true;
 
-					return chunk.html.replace("%gaId%", config.PUBLIC_GOOGLE_ANALYTICS_ID);
+					return chunk.html.replace(
+						"%gaId%",
+						event.url.pathname.startsWith(`${base}/slack/`) ? "" : config.PUBLIC_GOOGLE_ANALYTICS_ID
+					);
 				},
 				filterSerializedResponseHeaders: (header) => {
 					return header.includes("content-type");

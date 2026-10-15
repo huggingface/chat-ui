@@ -156,7 +156,8 @@
 
 	const publicConfig = usePublicConfig();
 	let canShare = $derived(
-		publicConfig.isHuggingChat &&
+		!slackThreadUrl &&
+			publicConfig.isHuggingChat &&
 			Boolean(page.params?.id) &&
 			page.route.id?.startsWith("/conversation/")
 	);
@@ -1179,6 +1180,17 @@
 
 			<div class="w-full">
 				{#if slackThreadUrl}
+					{#if ML_ASSISTANT_MODE}
+						<MlAssistantStrip
+							visible={mlStripVisible}
+							steps={mlAssistant.steps}
+							statusLabel={mlAssistant.statusLabel}
+							complete={mlAssistant.complete}
+							budget={mlAssistant.budget}
+							dashboard={trackioDashboards.at(-1)}
+							registry={mlRegistry.summary}
+						/>
+					{/if}
 					<div class="rounded-xl border p-4 text-sm">
 						<p>This session is managed in Slack. This view is read-only.</p>
 						<a class="font-medium underline" href={slackThreadUrl} target="_blank" rel="noreferrer"

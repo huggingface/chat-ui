@@ -1,3 +1,5 @@
+import { WebClient } from "@slack/web-api";
+import { slackConfig } from "$lib/server/slack/config";
 import { error, fail, redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import { collections } from "$lib/server/database";
@@ -30,13 +32,37 @@ export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies })
 			slackUserId: 1,
 		})
 		.toArray();
+	const settings = slackConfig();
+	if (!settings && (ticket || connections.length)) error(503, "Slack is unavailable.");
+	const client = new WebClient(settings?.botToken, { retryConfig: { retries: 0 }, timeout: 10000 });
+	const describe = async (teamId: string, userId: string) => {
+		const [team, user] = await Promise.all([
+			client.auth.test(),
+			client.users.info({ user: userId }),
+		]);
+		if (!team.team || team.team_id !== teamId || !user.user || user.user.team_id !== teamId)
+			error(503, "Could not verify Slack account details. Try again shortly.");
+		return {
+			workspaceName: team.team,
+			displayName:
+				user.user.profile?.display_name || user.user.real_name || user.user.name || userId,
+		};
+	};
+	const slackNames = ticket ? await describe(ticket.teamId, ticket.slackUserId) : undefined;
+	const namedConnections = await Promise.all(
+		connections.map(async (connection) => ({
+			...connection,
+			...(await describe(connection.teamId, connection.slackUserId)),
+		}))
+	);
 	return {
 		username: locals.user.username,
 		ticket: token,
 		slackUser: ticket?.slackUserId,
 		slackTeam: ticket?.teamId,
 		connected: connections.length > 0,
-		connections,
+		connections: namedConnections,
+		slackNames,
 	};
 };
 export const actions: Actions = {

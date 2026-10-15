@@ -9,6 +9,7 @@ export interface Conversation extends Timestamps {
 	_id: ObjectId;
 
 	sessionId?: string;
+	managedBy?: { kind: "slack"; continueUrl: string };
 	userId?: User["_id"];
 
 	model: string;

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ObjectId } from "mongodb";
 import { WebClient } from "@slack/web-api";
 import { canView, sign, verify } from "./auth";
@@ -15,7 +15,14 @@ const thread: SlackThread = {
 	createdAt: new Date(),
 	updatedAt: new Date(),
 };
-const viewer = { team: "T1", user: "U1", expires: Date.now() + 60000 };
+const viewer = { team: "T1", user: "U1", expires: Date.now() + 864000000 };
+let clock = Date.now();
+beforeEach(() => {
+	vi.useFakeTimers();
+	clock += 61000;
+	vi.setSystemTime(clock);
+});
+afterEach(() => vi.useRealTimers());
 function client() {
 	const c = new WebClient("test");
 	vi.spyOn(c.users, "info").mockResolvedValue({ ok: true, user: { id: "U1", team_id: "T1" } });
@@ -39,6 +46,9 @@ describe("Slack viewer access", () => {
 		const c = client();
 		expect(await canView(thread, viewer, c)).toBe(true);
 		vi.mocked(c.conversations.members).mockResolvedValue({ ok: true, members: [] });
+		expect(await canView(thread, viewer, c)).toBe(true);
+		expect(c.conversations.members).toHaveBeenCalledTimes(1);
+		vi.advanceTimersByTime(61000);
 		expect(await canView(thread, viewer, c)).toBe(false);
 		expect(await canView(thread, { ...viewer, team: "T2" }, c)).toBe(false);
 	});
@@ -75,6 +85,7 @@ describe("Slack viewer access", () => {
 			limit: 1000,
 			cursor: "next",
 		});
+		vi.advanceTimersByTime(61000);
 		vi.mocked(c.users.info).mockRejectedValue(new Error("Slack unavailable"));
 		await expect(canView(thread, viewer, c)).rejects.toThrow();
 	});

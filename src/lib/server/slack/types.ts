@@ -17,6 +17,7 @@ export interface SlackLink {
 	expiresAt: Date;
 }
 export interface SlackThread {
+	deletedAt?: Date;
 	_id: string;
 	teamId: string;
 	channel: string;

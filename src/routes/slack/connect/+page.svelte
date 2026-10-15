@@ -20,8 +20,9 @@
 		</p>
 	{:else if data.ticket}
 		<p>
-			Connect this account to Slack user {data.slackUser} in workspace {data.slackTeam}. Only
-			continue if you requested it yourself.
+			Connect this account to Slack user {data.slackNames?.displayName} ({data.slackUser}) in
+			workspace {data.slackNames?.workspaceName} ({data.slackTeam}). Only continue if you requested
+			it yourself.
 		</p>
 		<p>
 			New sessions you start will appear in your HuggingChat history and use your HF permissions and
@@ -49,7 +50,10 @@
 			Your account is connected. Return to Slack and mention ML Intern again to start your request.
 		</p>
 		{#each data.connections as connection}
-			<p>Slack user {connection.slackUserId} in workspace {connection.teamId}</p>
+			<p>
+				Slack user {connection.displayName} ({connection.slackUserId}) in workspace {connection.workspaceName}
+				({connection.teamId})
+			</p>
 			<form method="POST">
 				<input type="hidden" name="connectionId" value={connection._id} />
 				<button class="rounded border px-4 py-2" name="action" value="disconnect"

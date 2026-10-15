@@ -1,4 +1,4 @@
-import { nonSlackConversationIds } from "$lib/server/slack/readOnly";
+import { retireSlackConversations } from "$lib/server/slack/readOnly";
 import { collections } from "$lib/server/database";
 import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
 import { deleteStoredFilesOf } from "$lib/server/files/toolImages";
@@ -44,7 +44,7 @@ export async function GET({ locals, url }) {
 
 export async function DELETE({ locals }) {
 	if (locals.user?._id || locals.sessionId) {
-		const ids = await nonSlackConversationIds(
+		const ids = await retireSlackConversations(
 			await collections.conversations
 				.find(authCondition(locals))
 				.project<{ _id: ObjectId }>({ _id: 1 })

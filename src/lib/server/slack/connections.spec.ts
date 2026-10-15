@@ -193,3 +193,31 @@ it("requires old unverified account connections to reconnect", async () => {
 	const thread = await getOrCreateThread("T123", "C123", "5.0", "U123", a.user._id);
 	await expect(connectedLocals(thread)).rejects.toThrow("reconnect");
 });
+
+it("keeps multiple unexpired connection links usable", async () => {
+	const a = await account();
+	const second = await createConnectionLink("T123", a.slackUser);
+	expect(await readConnectionLink(a.ticket)).not.toBeNull();
+	expect(await readConnectionLink(new URL(second).searchParams.get("ticket") ?? "")).not.toBeNull();
+});
+it("extends active owner sessions and exposes expired continuations without credentials", async () => {
+	const a = await account();
+	await connectAccount(a.ticket, a.user, a.session.sessionId, {
+		team: "T123",
+		user: a.slackUser,
+		expires: Date.now() + 60000,
+	});
+	const thread = await getOrCreateThread("T123", "C123", "1.0", a.slackUser, a.user._id);
+	await collections.sessions.updateOne(
+		{ _id: a.session._id },
+		{ $set: { expiresAt: new Date(Date.now() + 60000) } }
+	);
+	await connectedLocals(thread);
+	expect(
+		(await collections.sessions.findOne({ _id: a.session._id }))?.expiresAt.getTime()
+	).toBeGreaterThan(Date.now() + 13 * 86400000);
+	await collections.sessions.deleteOne({ _id: a.session._id });
+	const resumed = await rebuildIdentity({ userId: a.user._id, sessionId: linkedSessionId(thread) });
+	expect(resumed.tokenExpired).toBe(true);
+	expect(resumed.locals.token).toBeUndefined();
+});

@@ -1,3 +1,4 @@
+import { ConnectionError } from "./links";
 import {
 	chatLink,
 	chatOrigin,
@@ -132,10 +133,28 @@ export class MlSlackBot {
 	private async owned(
 		threadId: string,
 		userId: string,
-		teamId: string | undefined
+		teamId: string | undefined,
+		requireConnection = true
 	): Promise<SlackThread | null> {
 		if (teamId !== this.settings.teamId || !(await this.member(userId))) return null;
-		return collections.slackThreads.findOne({ _id: threadId, teamId, owner: userId });
+		const thread = await collections.slackThreads.findOne({ _id: threadId, teamId, owner: userId });
+		if (thread?.deletedAt) return null;
+		if (thread?.hfUserId && requireConnection) {
+			try {
+				await connectedLocals(thread);
+			} catch (error) {
+				await this.tell(
+					thread.channel,
+					userId,
+					error instanceof ConnectionError
+						? "Reconnect the original Hugging Face account before answering or resuming this session."
+						: "Could not verify your connection. Please try again shortly.",
+					thread.threadTs
+				);
+				return null;
+			}
+		}
+		return thread;
 	}
 
 	private async tell(
@@ -400,7 +419,7 @@ export class MlSlackBot {
 			if (!("value" in action)) return;
 			const parsed = turnAction.safeParse(parseMetadata(action.value));
 			if (!parsed.success) return;
-			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
+			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id, false);
 			if (!thread) return;
 			const conv = await collections.conversations.findOne({ _id: thread.conversationId });
 			if (conv?.messages.at(-1)?.id !== parsed.data.messageId) return;
@@ -457,8 +476,9 @@ export class MlSlackBot {
 				teamId: this.settings.teamId,
 			});
 			if (!thread || !("channel" in body) || body.channel?.id !== thread.channel) return;
-			// DMs remain private to their owner; channel trace buttons are shared.
-			if (thread.channel.startsWith("D") && thread.owner !== body.user.id) return;
+			// Personal traces and DMs are owner-only; legacy channel traces remain shared.
+			if ((thread.hfUserId || thread.channel.startsWith("D")) && thread.owner !== body.user.id)
+				return;
 			if (
 				this.settings.allowedChannels.length &&
 				!this.settings.allowedChannels.includes(thread.channel)
@@ -468,14 +488,34 @@ export class MlSlackBot {
 			if (channel.channel?.is_ext_shared) return;
 			const conv = await collections.conversations.findOne({ _id: thread.conversationId });
 			if (!conv) return;
-			// Uploaded only to the original thread, never a public shared-conversation URL.
-			await this.app.client.files.uploadV2({
-				channel_id: thread.channel,
-				thread_ts: thread.threadTs,
-				filename: `ml-intern-${conv._id}.jsonl`,
-				content: conv.messages.map((m) => JSON.stringify(m)).join("\n"),
-				title: "ML Intern conversation trace",
-			});
+			try {
+				// Personal traces include private tool results: deliver only to the owner DM.
+				const destination = thread.hfUserId
+					? (await this.app.client.conversations.open({ users: thread.owner })).channel?.id
+					: thread.channel;
+				if (!destination) return;
+				const upload = {
+					filename: `ml-intern-${conv._id}.jsonl`,
+					content: conv.messages.map((m) => JSON.stringify(m)).join("\n"),
+					title: "ML Intern conversation trace",
+				};
+				if (thread.hfUserId) {
+					await this.app.client.files.uploadV2({ ...upload, channel_id: destination });
+				} else {
+					await this.app.client.files.uploadV2({
+						...upload,
+						channel_id: destination,
+						thread_ts: thread.threadTs,
+					});
+				}
+			} catch {
+				await this.tell(
+					thread.channel,
+					body.user.id,
+					"Could not deliver the trace. For personal traces, the Slack app needs im:write and files:write permissions; an administrator may need to reinstall it. Please try again after checking the installation.",
+					thread.threadTs
+				);
+			}
 		});
 		this.app.error(async () => {
 			logger.error("[slack] Could not handle a Slack event; no credentials or payload logged.");
@@ -512,6 +552,15 @@ export class MlSlackBot {
 			channel: event.channel,
 			threadTs: event.thread_ts ?? event.ts,
 		});
+		if (existing?.deletedAt) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"This conversation was deleted by its owner. Start a new Slack thread.",
+				event.thread_ts
+			);
+			return;
+		}
 		if (existing?.hfUserId && existing.owner !== event.user) {
 			await this.tell(
 				event.channel,
@@ -560,19 +609,6 @@ export class MlSlackBot {
 			event.user,
 			hfUserId
 		);
-		if (thread.hfUserId) {
-			try {
-				await connectedLocals(thread);
-			} catch {
-				const message =
-					event.user === thread.owner
-						? `<${await createConnectionLink(teamId, thread.owner)}|Reconnect the original Hugging Face account> to continue this session. Then mention me again.`
-						: "The session owner needs to reconnect their Hugging Face account before this session can continue.";
-				// A root mention has no visible thread until a non-ephemeral reply exists.
-				await this.tell(event.channel, event.user, message, event.thread_ts);
-				return;
-			}
-		}
 		const inserted = await enqueueInput({
 			_id: inputKey(teamId, eventId),
 			threadId: thread._id,
@@ -611,6 +647,7 @@ export class MlSlackBot {
 			messages.push(
 				...(page.messages ?? []).filter(
 					(m) =>
+						(!thread.hfUserId || m.user === thread.owner) &&
 						m.user !== this.botUserId &&
 						!m.bot_id &&
 						(!thread.contextThroughTs || !m.ts || m.ts > thread.contextThroughTs)
@@ -622,7 +659,14 @@ export class MlSlackBot {
 			}
 			cursor = page.response_metadata?.next_cursor || undefined;
 		} while (cursor);
-		const text = threadPrompt(messages, input, this.botUserId, omitted, thread.owner);
+		const text = threadPrompt(
+			messages,
+			input,
+			this.botUserId,
+			omitted,
+			thread.owner,
+			!!thread.hfUserId
+		);
 		try {
 			const files = await downloadAttachments(
 				messages,
@@ -657,7 +701,8 @@ export class MlSlackBot {
 			if (!(await this.member(input.user)))
 				throw new Error("The invoking user is no longer a workspace member.");
 			if (this.stopped) throw new Error("Slack worker stopped.");
-			const user = thread.hfUserId ? (await connectedLocals(thread)).user : this.user;
+			const locals = thread.hfUserId ? await connectedLocals(thread) : undefined;
+			const user = locals?.user ?? this.user;
 			if (!user) throw new Error("Slack session owner is unavailable.");
 			await ensureConversation(thread, user, this.settings);
 			if (input.resumeElicitationId) {
@@ -667,7 +712,13 @@ export class MlSlackBot {
 				});
 				if (question?.pending?.kind === "ask")
 					await kickAnsweredAsk(thread.conversationId, input.resumeElicitationId);
-				else await runSlackTurn(thread, user, { resumeElicitationId: input.resumeElicitationId });
+				else
+					await runSlackTurn(
+						thread,
+						user,
+						{ resumeElicitationId: input.resumeElicitationId },
+						locals
+					);
 			} else {
 				const conv = await collections.conversations.findOne({ _id: thread.conversationId });
 				const latest = conv?.messages[conv.messages.length - 1];
@@ -695,7 +746,7 @@ export class MlSlackBot {
 				} else {
 					if (skipped) await this.render(thread);
 					const context = input.retry ? undefined : await this.context(thread, input);
-					await runSlackTurn(thread, user, { ...context, retry: input.retry });
+					await runSlackTurn(thread, user, { ...context, retry: input.retry }, locals);
 					if (!input.retry)
 						await collections.slackThreads.updateOne(
 							{ _id: thread._id },
@@ -708,6 +759,17 @@ export class MlSlackBot {
 				{ $set: { status: "done", updatedAt: new Date() } }
 			);
 		} catch (error) {
+			if (error instanceof ConnectionError) {
+				const link = await createConnectionLink(thread.teamId, thread.owner).catch(() => undefined);
+				await this.tell(
+					thread.channel,
+					thread.owner,
+					link
+						? `<${link}|Reconnect the original Hugging Face account> to continue. Then mention me again.`
+						: "Use your recent connection link to reconnect the original Hugging Face account, then mention me again.",
+					input.ts === thread.threadTs ? undefined : thread.threadTs
+				);
+			}
 			const status = isHttpError(error) ? error.status : undefined;
 			logger.warn({ status: status ?? "internal" }, "[slack] Request failed");
 			await collections.slackInputs.updateOne(
@@ -1019,13 +1081,9 @@ export class MlSlackBot {
 		const text = `**Session status**\n\n${status}\n💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
 		const viewUrl = chatLink(thread) ?? viewerLink(thread.conversationId.toHexString());
 		const buttons = [
-			...actions.map((action) => ({
-				type: "button" as const,
-				action_id: action.id,
-				text: { type: "plain_text" as const, text: action.label },
-				value: action.value,
-				...(action.id === STOP_ACTION ? { style: "danger" as const } : {}),
-			})),
+			...messageBlocks("", actions).flatMap((block) =>
+				block.type === "actions" ? block.elements : []
+			),
 			...(viewUrl
 				? [
 						{
@@ -1033,7 +1091,7 @@ export class MlSlackBot {
 							action_id: "ml_intern_view",
 							text: {
 								type: "plain_text" as const,
-								text: thread.hfUserId ? "Open in HuggingChat" : "Open session",
+								text: thread.hfUserId ? "Open in HuggingChat (owner only)" : "Open session",
 							},
 							url: viewUrl,
 						},
@@ -1381,8 +1439,30 @@ export class MlSlackBot {
 }
 
 export async function startSlackBot(): Promise<void> {
+	try {
+		await startConfiguredSlackBot();
+	} catch {
+		logger.error(
+			"[slack] Disabled: invalid configuration. Check Slack account mode, OAuth origins and required settings."
+		);
+	}
+}
+async function startConfiguredSlackBot(): Promise<void> {
 	const settings = slackConfig();
 	if (!settings) return;
+	for await (const thread of collections.slackThreads.find({ deletedAt: { $exists: false } })) {
+		await collections.conversations.updateOne(
+			{ _id: thread.conversationId, managedBy: { $exists: false } },
+			{
+				$set: {
+					managedBy: {
+						kind: "slack",
+						continueUrl: `https://app.slack.com/client/${thread.teamId}/${thread.channel}/thread/${thread.channel}-${thread.threadTs}`,
+					},
+				},
+			}
+		);
+	}
 	if (
 		!ML_ASSISTANT_MODE ||
 		config.USE_USER_TOKEN !== "true" ||

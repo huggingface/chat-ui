@@ -136,6 +136,7 @@ export function messageBlocks(
 							action_id: a.id,
 							text: plain(a.label),
 							value: a.value,
+							...(a.id === STOP_ACTION ? { style: "danger" as const } : {}),
 							...(a.id === RESUME_ACTION
 								? {
 										confirm: {

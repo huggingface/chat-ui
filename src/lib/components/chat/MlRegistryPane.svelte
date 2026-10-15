@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from "$app/state";
 	import { tick, untrack } from "svelte";
 	import { SvelteMap, SvelteSet } from "svelte/reactivity";
 	import { base } from "$app/paths";
@@ -323,7 +324,7 @@
 					</span>
 				{/if}
 			</div>
-			{#if isStoppableSandbox(service)}
+			{#if !page.data.slackThreadUrl && isStoppableSandbox(service)}
 				{@const note = billingNote(service, idle, now)}
 				<div
 					class="ml-sandbox-billing mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#78716c] dark:text-[#a8a29e]"

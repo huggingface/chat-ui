@@ -1,27 +1,37 @@
 import { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
+import { authCondition } from "$lib/server/auth";
+import { AbortRegistry } from "$lib/server/abortRegistry";
 
-/** All HTTP mutation routes for conversations, including legacy endpoints. */
+export async function retireSlackConversations(ids: ObjectId[]): Promise<ObjectId[]> {
+	await collections.slackThreads.updateMany(
+		{ conversationId: { $in: ids } },
+		{ $set: { deletedAt: new Date(), watching: false } }
+	);
+	for (const id of ids) AbortRegistry.getInstance().abort(id.toHexString());
+	return ids;
+}
+
+/** Enforce after ownership filtering, including route groups and legacy endpoints. */
 export async function isSlackConversationMutation(
 	method: string,
 	routeId: string | null,
-	id?: string
+	id: string | undefined,
+	locals?: App.Locals
 ) {
-	if (["GET", "HEAD", "OPTIONS"].includes(method) || !id || !ObjectId.isValid(id)) return false;
-	if (!routeId || !/^\/(?:api\/(?:v2\/)?)?conversations?\/\[id\](?:\/|$)/.test(routeId))
+	if (["GET", "HEAD", "OPTIONS"].includes(method) || !id || !ObjectId.isValid(id) || !locals)
 		return false;
-	return !!(await collections.slackThreads.findOne(
-		{ conversationId: new ObjectId(id) },
-		{ projection: { _id: 1 } }
-	));
-}
-
-/** Bulk deletion follows the same read-only policy as single-session deletion. */
-export async function nonSlackConversationIds(ids: ObjectId[]): Promise<ObjectId[]> {
-	const linked = await collections.slackThreads
-		.find({ conversationId: { $in: ids } })
-		.project<{ conversationId: ObjectId }>({ conversationId: 1 })
-		.toArray();
-	const protectedIds = new Set(linked.map((t) => t.conversationId.toString()));
-	return ids.filter((id) => !protectedIds.has(id.toString()));
+	const route = routeId?.replace(/\/\([^/]+\)/g, "");
+	if (!route || !/^\/(?:api\/(?:v2\/)?)?conversations?\/\[id\](?:\/|$)/.test(route)) return false;
+	const conv = await collections.conversations.findOne(
+		{ _id: new ObjectId(id), ...authCondition(locals) },
+		{ projection: { managedBy: 1, sessionId: 1 } }
+	);
+	if (!conv || !(conv.managedBy?.kind === "slack" || conv.sessionId?.startsWith("slack-user:")))
+		return false;
+	if (method === "DELETE" && /\/\[id\]$/.test(route)) {
+		await retireSlackConversations([conv._id]);
+		return false;
+	}
+	return true;
 }

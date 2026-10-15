@@ -17,6 +17,8 @@ export async function ensureConversation(
 	user: User,
 	settings: SlackConfig
 ): Promise<void> {
+	if ((await collections.slackThreads.findOne({ _id: thread._id }))?.deletedAt)
+		throw new Error("This Slack conversation was deleted. Start a new Slack thread.");
 	const model = resolveMlAssistantModel(undefined);
 	if (!model || !models.some((m) => m.id === model))
 		throw new Error("No ML Intern model is configured.");
@@ -35,7 +37,11 @@ export async function ensureConversation(
 		userId: user._id,
 		...(thread.hfUserId ? { sessionId: linkedSessionId(thread) } : {}),
 		model,
-		title: "Slack ML Intern",
+		title: `Slack · ${thread.channel} · ${new Date(Number(thread.threadTs) * 1000).toISOString().slice(0, 16)}`,
+		managedBy: {
+			kind: "slack",
+			continueUrl: `https://app.slack.com/client/${encodeURIComponent(thread.teamId)}/${encodeURIComponent(thread.channel)}/thread/${encodeURIComponent(thread.channel)}-${encodeURIComponent(thread.threadTs)}`,
+		},
 		preprompt: "",
 		mlAssistant: true,
 		rootMessageId: root.id,
@@ -53,13 +59,19 @@ export async function ensureConversation(
 		{ $setOnInsert: conversation },
 		{ upsert: true }
 	);
+	// Deletion can race initial creation. Never leave a resurrected history entry.
+	if ((await collections.slackThreads.findOne({ _id: thread._id }))?.deletedAt) {
+		await collections.conversations.deleteOne({ _id: thread.conversationId });
+		throw new Error("This Slack conversation was deleted. Start a new Slack thread.");
+	}
 }
 
 /** Consume the same response as the web UI. Persistence, guards, waits and asks stay in the harness. */
 export async function runSlackTurn(
 	thread: SlackThread,
 	user: User,
-	input: { text?: string; files?: File[]; resumeElicitationId?: string; retry?: boolean }
+	input: { text?: string; files?: File[]; resumeElicitationId?: string; retry?: boolean },
+	resolvedLocals?: App.Locals
 ): Promise<void> {
 	const conv = await collections.conversations.findOne({
 		_id: thread.conversationId,
@@ -87,7 +99,7 @@ export async function runSlackTurn(
 	}
 	const response = await generateConversationResponse({
 		request: new Request("http://slack.internal/conversation", { method: "POST", body: data }),
-		locals: await threadLocals(thread, user),
+		locals: resolvedLocals ?? (await threadLocals(thread, user)),
 		params: { id: thread.conversationId.toHexString() },
 		getClientAddress: () => "slack",
 	});

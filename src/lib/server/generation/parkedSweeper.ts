@@ -1,3 +1,9 @@
+import {
+	parseLinkedSessionId,
+	connectedLocals,
+	linkedSessionId,
+} from "$lib/server/slack/ownerIdentity";
+import { ConnectionError } from "$lib/server/slack/links";
 import { slackLocals } from "$lib/server/slack/identity";
 import { randomUUID } from "crypto";
 import { MongoInvalidArgumentError, MongoServerError } from "mongodb";
@@ -240,16 +246,26 @@ async function abandon(park: ParkedCall, reason: string): Promise<void> {
  * tool result, so it can say so rather than failing opaquely on the first call.
  */
 export async function rebuildIdentity(park: Pick<ParkedCall, "userId" | "sessionId">) {
-	if (park.sessionId?.startsWith("slack-user:")) {
+	const slackThreadId = parseLinkedSessionId(park.sessionId);
+	if (slackThreadId) {
 		const thread = await collections.slackThreads.findOne({
-			_id: park.sessionId.slice("slack-user:".length),
+			_id: slackThreadId,
 		});
-		if (!thread?.hfUserId || !park.userId?.equals(thread.hfUserId))
+		if (!thread?.hfUserId || thread.deletedAt || !park.userId?.equals(thread.hfUserId))
 			throw new Error("Slack session owner no longer matches.");
-		const { connectedLocals } = await import("$lib/server/slack/connections");
-		const locals = await connectedLocals(thread);
+		let locals: App.Locals;
+		let tokenExpired = false;
+		try {
+			locals = await connectedLocals(thread);
+		} catch (error) {
+			if (!(error instanceof ConnectionError)) throw error;
+			const user = await collections.users.findOne({ _id: thread.hfUserId });
+			if (!user) throw error;
+			locals = { user, sessionId: linkedSessionId(thread), isAdmin: false };
+			tokenExpired = true;
+		}
 		const settings = await collections.settings.findOne({ userId: thread.hfUserId });
-		return { locals, settings, tokenExpired: false };
+		return { locals, settings, tokenExpired };
 	}
 
 	const user = park.userId
@@ -400,6 +416,11 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 	let hasError = false;
 	try {
 		apply(await turnRunning(turnKey));
+		if (parseLinkedSessionId(park.sessionId) && tokenExpired) {
+			throw new Error(
+				"Reconnect the original Hugging Face account in Slack, then resume this session."
+			);
+		}
 
 		// A re-claim after a pod died mid-resume finds the result already stored,
 		// followed by whatever that run did next; the turn carries on from there.

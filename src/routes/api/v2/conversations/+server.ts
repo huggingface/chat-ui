@@ -1,4 +1,4 @@
-import { nonSlackConversationIds } from "$lib/server/slack/readOnly";
+import { retireSlackConversations } from "$lib/server/slack/readOnly";
 import type { RequestHandler } from "@sveltejs/kit";
 import type { ObjectId } from "mongodb";
 import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
@@ -19,11 +19,14 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 
 	const convs = await collections.conversations
 		.find(authCondition(locals))
-		.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "mlAssistant">>({
+		.project<
+			Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "mlAssistant" | "managedBy">
+		>({
 			title: 1,
 			updatedAt: 1,
 			model: 1,
 			mlAssistant: 1,
+			managedBy: 1,
 		})
 		.sort({ updatedAt: -1 })
 		.skip(p * pageSize)
@@ -35,6 +38,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		_id: conv._id,
 		id: conv._id, // legacy param iOS
 		title: conv.title,
+		managedBy: conv.managedBy,
 		updatedAt: conv.updatedAt,
 		model: conv.model,
 		modelId: conv.model, // legacy param iOS
@@ -47,7 +51,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 export const DELETE: RequestHandler = async ({ locals }) => {
 	requireAuth(locals);
 
-	const ids = await nonSlackConversationIds(
+	const ids = await retireSlackConversations(
 		await collections.conversations
 			.find(authCondition(locals))
 			.project<{ _id: ObjectId }>({ _id: 1 })
