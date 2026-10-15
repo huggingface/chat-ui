@@ -10,6 +10,7 @@ interface ConversationListItem {
 	updatedAt: Date | string;
 	model?: string;
 	mlAssistant?: boolean;
+	managedBy?: { kind: "slack"; continueUrl: string };
 }
 
 interface UserInfo {
@@ -87,6 +88,7 @@ export const load = async ({ fetch, url }) => {
 			model: conv.model ?? defaultModel?.id,
 			updatedAt: new Date(conv.updatedAt),
 			mlAssistant: conv.mlAssistant ?? false,
+			managedBy: conv.managedBy,
 		} satisfies ConvSidebar;
 	});
 

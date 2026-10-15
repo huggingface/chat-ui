@@ -20,6 +20,7 @@
 				"groups:read",
 				"im:history",
 				"im:read",
+				"im:write",
 				"users:read",
 				"files:write",
 				"files:read"

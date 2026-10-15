@@ -1,3 +1,12 @@
+import { ConnectionError } from "./links";
+import {
+	chatLink,
+	chatOrigin,
+	createConnectionLink,
+	connectionKey,
+	connectedLocals,
+} from "./connections";
+import { viewerLink, viewerConfig } from "./viewer/auth";
 import { isHttpError } from "@sveltejs/kit";
 import { downloadAttachments } from "./attachments";
 import { AbortRegistry } from "$lib/server/abortRegistry";
@@ -77,6 +86,7 @@ export class MlSlackBot {
 	private botUserId = "";
 	private active = new Map<string, Promise<void>>();
 	private runningConversations = new Map<string, string>();
+	private linkPrompts = new Map<string, number>();
 	private members = new Map<string, { allowed: boolean; until: number }>();
 	private ticking = false;
 	private renders = new Map<string, Promise<void>>();
@@ -85,7 +95,7 @@ export class MlSlackBot {
 	private statusIntervalMs = 10000;
 	constructor(
 		readonly settings: SlackConfig,
-		readonly user: User
+		readonly user?: User
 	) {
 		this.app = new App({
 			token: settings.botToken,
@@ -123,10 +133,28 @@ export class MlSlackBot {
 	private async owned(
 		threadId: string,
 		userId: string,
-		teamId: string | undefined
+		teamId: string | undefined,
+		requireConnection = true
 	): Promise<SlackThread | null> {
 		if (teamId !== this.settings.teamId || !(await this.member(userId))) return null;
-		return collections.slackThreads.findOne({ _id: threadId, teamId, owner: userId });
+		const thread = await collections.slackThreads.findOne({ _id: threadId, teamId, owner: userId });
+		if (thread?.deletedAt) return null;
+		if (thread?.hfUserId && requireConnection) {
+			try {
+				await connectedLocals(thread);
+			} catch (error) {
+				await this.tell(
+					thread.channel,
+					userId,
+					error instanceof ConnectionError
+						? "Reconnect the original Hugging Face account before answering or resuming this session."
+						: "Could not verify your connection. Please try again shortly.",
+					thread.threadTs
+				);
+				return null;
+			}
+		}
+		return thread;
 	}
 
 	private async tell(
@@ -144,6 +172,9 @@ export class MlSlackBot {
 	}
 
 	private register(): void {
+		this.app.action("ml_intern_view", async ({ ack }) => {
+			await ack();
+		});
 		this.app.event("app_mention", async ({ event, body }) => {
 			await this.receive(event, body.team_id, body.event_id);
 		});
@@ -388,11 +419,15 @@ export class MlSlackBot {
 			if (!("value" in action)) return;
 			const parsed = turnAction.safeParse(parseMetadata(action.value));
 			if (!parsed.success) return;
-			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
+			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id, false);
 			if (!thread) return;
 			const conv = await collections.conversations.findOne({ _id: thread.conversationId });
 			if (conv?.messages.at(-1)?.id !== parsed.data.messageId) return;
-			await stopSlackTurn(thread, this.user);
+			const owner = thread.hfUserId
+				? await collections.users.findOne({ _id: thread.hfUserId })
+				: this.user;
+			if (!owner) return;
+			await stopSlackTurn(thread, owner);
 			await this.tell(
 				thread.channel,
 				body.user.id,
@@ -441,8 +476,9 @@ export class MlSlackBot {
 				teamId: this.settings.teamId,
 			});
 			if (!thread || !("channel" in body) || body.channel?.id !== thread.channel) return;
-			// DMs remain private to their owner; channel trace buttons are shared.
-			if (thread.channel.startsWith("D") && thread.owner !== body.user.id) return;
+			// Personal traces and DMs are owner-only; legacy channel traces remain shared.
+			if ((thread.hfUserId || thread.channel.startsWith("D")) && thread.owner !== body.user.id)
+				return;
 			if (
 				this.settings.allowedChannels.length &&
 				!this.settings.allowedChannels.includes(thread.channel)
@@ -452,14 +488,34 @@ export class MlSlackBot {
 			if (channel.channel?.is_ext_shared) return;
 			const conv = await collections.conversations.findOne({ _id: thread.conversationId });
 			if (!conv) return;
-			// Uploaded only to the original thread, never a public shared-conversation URL.
-			await this.app.client.files.uploadV2({
-				channel_id: thread.channel,
-				thread_ts: thread.threadTs,
-				filename: `ml-intern-${conv._id}.jsonl`,
-				content: conv.messages.map((m) => JSON.stringify(m)).join("\n"),
-				title: "ML Intern conversation trace",
-			});
+			try {
+				// Personal traces include private tool results: deliver only to the owner DM.
+				const destination = thread.hfUserId
+					? (await this.app.client.conversations.open({ users: thread.owner })).channel?.id
+					: thread.channel;
+				if (!destination) return;
+				const upload = {
+					filename: `ml-intern-${conv._id}.jsonl`,
+					content: conv.messages.map((m) => JSON.stringify(m)).join("\n"),
+					title: "ML Intern conversation trace",
+				};
+				if (thread.hfUserId) {
+					await this.app.client.files.uploadV2({ ...upload, channel_id: destination });
+				} else {
+					await this.app.client.files.uploadV2({
+						...upload,
+						channel_id: destination,
+						thread_ts: thread.threadTs,
+					});
+				}
+			} catch {
+				await this.tell(
+					thread.channel,
+					body.user.id,
+					"Could not deliver the trace. For personal traces, the Slack app needs im:write and files:write permissions; an administrator may need to reinstall it. Please try again after checking the installation.",
+					thread.threadTs
+				);
+			}
 		});
 		this.app.error(async () => {
 			logger.error("[slack] Could not handle a Slack event; no credentials or payload logged.");
@@ -491,11 +547,67 @@ export class MlSlackBot {
 			);
 			return;
 		}
+		const existing = await collections.slackThreads.findOne({
+			teamId,
+			channel: event.channel,
+			threadTs: event.thread_ts ?? event.ts,
+		});
+		if (existing?.deletedAt) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"This conversation was deleted by its owner. Start a new Slack thread.",
+				event.thread_ts
+			);
+			return;
+		}
+		if (existing?.hfUserId && existing.owner !== event.user) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"Only the session owner can make requests using their personal Hugging Face account. Start your own thread to use yours.",
+				event.thread_ts
+			);
+			return;
+		}
+		if (existing && !existing.hfUserId && !this.user) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"This legacy session needs the original shared HF token configured by the operator. Start a new thread to use your own account.",
+				event.thread_ts
+			);
+			return;
+		}
+		let hfUserId = existing?.hfUserId;
+		if (this.settings.accountMode === "user" && !existing) {
+			const connection = await collections.slackConnections.findOne({
+				_id: connectionKey(teamId, event.user),
+			});
+			if (!connection) {
+				const now = Date.now();
+				for (const [user, until] of this.linkPrompts)
+					if (until <= now) this.linkPrompts.delete(user);
+				if (this.linkPrompts.has(event.user)) return;
+				this.linkPrompts.set(event.user, now + 30000);
+				const link = await createConnectionLink(teamId, event.user);
+				await this.tell(
+					event.channel,
+					event.user,
+					`<${link}|Connect Hugging Face> to start sessions in your HuggingChat history using your own account. Then mention me again.`,
+					// Ephemeral-only replies do not create a visible thread in Slack.
+					event.thread_ts
+				);
+				return;
+			}
+			hfUserId = connection.userId;
+		}
 		const thread = await getOrCreateThread(
 			teamId,
 			event.channel,
 			event.thread_ts ?? event.ts,
-			event.user
+			event.user,
+			hfUserId
 		);
 		const inserted = await enqueueInput({
 			_id: inputKey(teamId, eventId),
@@ -535,6 +647,7 @@ export class MlSlackBot {
 			messages.push(
 				...(page.messages ?? []).filter(
 					(m) =>
+						(!thread.hfUserId || m.user === thread.owner) &&
 						m.user !== this.botUserId &&
 						!m.bot_id &&
 						(!thread.contextThroughTs || !m.ts || m.ts > thread.contextThroughTs)
@@ -546,7 +659,14 @@ export class MlSlackBot {
 			}
 			cursor = page.response_metadata?.next_cursor || undefined;
 		} while (cursor);
-		const text = threadPrompt(messages, input, this.botUserId, omitted, thread.owner);
+		const text = threadPrompt(
+			messages,
+			input,
+			this.botUserId,
+			omitted,
+			thread.owner,
+			!!thread.hfUserId
+		);
 		try {
 			const files = await downloadAttachments(
 				messages,
@@ -576,10 +696,15 @@ export class MlSlackBot {
 		if (!input) return;
 		this.runningConversations.set(thread._id, thread.conversationId.toHexString());
 		try {
+			if (thread.hfUserId && input.user !== thread.owner)
+				throw new Error("Only the personal session owner may submit requests.");
 			if (!(await this.member(input.user)))
 				throw new Error("The invoking user is no longer a workspace member.");
 			if (this.stopped) throw new Error("Slack worker stopped.");
-			await ensureConversation(thread, this.user, this.settings);
+			const locals = thread.hfUserId ? await connectedLocals(thread) : undefined;
+			const user = locals?.user ?? this.user;
+			if (!user) throw new Error("Slack session owner is unavailable.");
+			await ensureConversation(thread, user, this.settings);
 			if (input.resumeElicitationId) {
 				const question = await collections.mcpElicitations.findOne({
 					conversationId: thread.conversationId,
@@ -588,7 +713,12 @@ export class MlSlackBot {
 				if (question?.pending?.kind === "ask")
 					await kickAnsweredAsk(thread.conversationId, input.resumeElicitationId);
 				else
-					await runSlackTurn(thread, this.user, { resumeElicitationId: input.resumeElicitationId });
+					await runSlackTurn(
+						thread,
+						user,
+						{ resumeElicitationId: input.resumeElicitationId },
+						locals
+					);
 			} else {
 				const conv = await collections.conversations.findOne({ _id: thread.conversationId });
 				const latest = conv?.messages[conv.messages.length - 1];
@@ -605,7 +735,7 @@ export class MlSlackBot {
 					busy &&
 					!input.retry &&
 					input.user === thread.owner &&
-					(await skipSlackQuestion(thread, this.user, latest.id, input._id));
+					(await skipSlackQuestion(thread, user, latest.id, input._id));
 				if (busy && !skipped) {
 					await this.tell(
 						thread.channel,
@@ -616,7 +746,7 @@ export class MlSlackBot {
 				} else {
 					if (skipped) await this.render(thread);
 					const context = input.retry ? undefined : await this.context(thread, input);
-					await runSlackTurn(thread, this.user, { ...context, retry: input.retry });
+					await runSlackTurn(thread, user, { ...context, retry: input.retry }, locals);
 					if (!input.retry)
 						await collections.slackThreads.updateOne(
 							{ _id: thread._id },
@@ -629,6 +759,17 @@ export class MlSlackBot {
 				{ $set: { status: "done", updatedAt: new Date() } }
 			);
 		} catch (error) {
+			if (error instanceof ConnectionError) {
+				const link = await createConnectionLink(thread.teamId, thread.owner).catch(() => undefined);
+				await this.tell(
+					thread.channel,
+					thread.owner,
+					link
+						? `<${link}|Reconnect the original Hugging Face account> to continue. Then mention me again.`
+						: "Use your recent connection link to reconnect the original Hugging Face account, then mention me again.",
+					input.ts === thread.threadTs ? undefined : thread.threadTs
+				);
+			}
 			const status = isHttpError(error) ? error.status : undefined;
 			logger.warn({ status: status ?? "internal" }, "[slack] Request failed");
 			await collections.slackInputs.updateOne(
@@ -938,12 +1079,41 @@ export class MlSlackBot {
 		const delivery = await collections.slackDeliveries.findOne({ _id });
 		const budget = conv?.mlBudget;
 		const text = `**Session status**\n\n${status}\n💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
-		const digest = createHash("sha256").update(JSON.stringify({ text, actions })).digest("hex");
+		const viewUrl = chatLink(thread) ?? viewerLink(thread.conversationId.toHexString());
+		const owner =
+			viewUrl && thread.hfUserId
+				? await collections.users.findOne({ _id: thread.hfUserId }, { projection: { username: 1 } })
+				: undefined;
+		const buttons = [
+			...messageBlocks("", actions).flatMap((block) =>
+				block.type === "actions" ? block.elements : []
+			),
+			...(viewUrl
+				? [
+						{
+							type: "button" as const,
+							action_id: "ml_intern_view",
+							text: {
+								type: "plain_text" as const,
+								text: thread.hfUserId
+									? `Open in HuggingChat (${owner?.username || "owner only"})`.slice(0, 75)
+									: "Open session",
+							},
+							url: viewUrl,
+						},
+					]
+				: []),
+		];
+		const digest = createHash("sha256").update(JSON.stringify({ text, buttons })).digest("hex");
 		if (delivery?.digest === digest) return;
 		const payload = {
 			channel: thread.channel,
 			text,
-			blocks: [...messageBlocks(text, actions), { type: "divider" as const }],
+			blocks: [
+				...messageBlocks(text, []),
+				...(buttons.length ? [{ type: "actions" as const, elements: buttons }] : []),
+				{ type: "divider" as const },
+			],
 			parse: "none" as const,
 		};
 		let ts = delivery?.parts[0];
@@ -1275,8 +1445,30 @@ export class MlSlackBot {
 }
 
 export async function startSlackBot(): Promise<void> {
+	try {
+		await startConfiguredSlackBot();
+	} catch {
+		logger.error(
+			"[slack] Disabled: invalid configuration. Check Slack account mode, OAuth origins and required settings."
+		);
+	}
+}
+async function startConfiguredSlackBot(): Promise<void> {
 	const settings = slackConfig();
 	if (!settings) return;
+	for await (const thread of collections.slackThreads.find({ deletedAt: { $exists: false } })) {
+		await collections.conversations.updateOne(
+			{ _id: thread.conversationId, managedBy: { $exists: false } },
+			{
+				$set: {
+					managedBy: {
+						kind: "slack",
+						continueUrl: `https://app.slack.com/client/${thread.teamId}/${thread.channel}/thread/${thread.channel}-${thread.threadTs}`,
+					},
+				},
+			}
+		);
+	}
 	if (
 		!ML_ASSISTANT_MODE ||
 		config.USE_USER_TOKEN !== "true" ||
@@ -1285,6 +1477,28 @@ export async function startSlackBot(): Promise<void> {
 		throw new Error(
 			"Slack ML needs ML_ASSISTANT_MODE, USE_USER_TOKEN and MCP_FORWARD_HF_USER_TOKEN enabled."
 		);
+	if (settings.accountMode === "user") {
+		const { loginEnabled } = await import("$lib/server/auth");
+		if (!loginEnabled) throw new Error("User-account Slack mode requires HuggingChat OAuth login.");
+		if (viewerConfig()?.origin !== chatOrigin()) {
+			const missing = (
+				[
+					"SLACK_ML_VIEWER_ORIGIN",
+					"SLACK_ML_VIEWER_CLIENT_ID",
+					"SLACK_ML_VIEWER_CLIENT_SECRET",
+					"SLACK_ML_VIEWER_SESSION_SECRET",
+				] as const
+			).filter((key) => !config[key]);
+			throw new Error(
+				"Personal Slack sessions require Slack OIDC configured on PUBLIC_ORIGIN to verify account ownership. " +
+					(missing.length
+						? `Missing: ${missing.join(", ")}.`
+						: "Check origin equality and that the session signing secret has at least 32 characters.")
+			);
+		}
+		if (pinnedHubToken())
+			throw new Error("User-account Slack mode cannot use a pinned Hub MCP token.");
+	}
 	if (pinnedHubToken() && pinnedHubToken() !== settings.hfToken)
 		throw new Error("Slack ML cannot share a deployment with a different pinned Hub MCP token.");
 
@@ -1301,7 +1515,7 @@ export async function startSlackBot(): Promise<void> {
 				bot = undefined;
 			}
 			if (held && !bot) {
-				const user = await provisionSlackIdentity(settings);
+				const user = settings.hfToken ? await provisionSlackIdentity(settings) : undefined;
 				const candidate = new MlSlackBot(settings, user);
 				try {
 					await candidate.start();

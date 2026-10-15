@@ -359,6 +359,7 @@
 						{:else if block.type === "elicitation"}
 							<div data-exclude-from-copy class={processBlockClasses}>
 								<ElicitationForm
+									{readOnly}
 									conversationId={page.params.id ?? ""}
 									request={block.request}
 									expiresAt={block.expiresAt}
@@ -410,6 +411,7 @@
 						{:else if unit.kind === "elicitation"}
 							<div data-exclude-from-copy class={processBlockClasses}>
 								<ElicitationForm
+									{readOnly}
 									conversationId={page.params.id ?? ""}
 									request={unit.request}
 									expiresAt={unit.expiresAt}
@@ -518,16 +520,18 @@
 						value={contentWithoutThink}
 						iconClassNames="text-xs"
 					/>
-					<button
-						class="btn rounded-xs p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
-						title="Retry"
-						type="button"
-						onclick={() => {
-							onretry?.({ id: message.id });
-						}}
-					>
-						<CarbonRotate360 />
-					</button>
+					{#if !readOnly}
+						<button
+							class="btn rounded-xs p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+							title="Retry"
+							type="button"
+							onclick={() => {
+								onretry?.({ id: message.id });
+							}}
+						>
+							<CarbonRotate360 />
+						</button>
+					{/if}
 					{#if alternatives.length > 1 && editMsdgId === null}
 						<Alternatives
 							{message}
@@ -644,20 +648,22 @@
 					/>
 				{/if}
 				{#if (alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode)}
-					<button
-						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:bg-gray-100 hover:text-gray-500 lg:-right-2 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300 {isTapped
-							? '[@media(hover:none)]:flex'
-							: ''}"
-						title="Edit"
-						type="button"
-						onclick={() => {
-							if (requireAuthUser()) return;
-							editMsdgId = message.id;
-						}}
-					>
-						<CarbonPen />
-						Edit
-					</button>
+					{#if !readOnly}
+						<button
+							class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:bg-gray-100 hover:text-gray-500 lg:-right-2 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300 {isTapped
+								? '[@media(hover:none)]:flex'
+								: ''}"
+							title="Edit"
+							type="button"
+							onclick={() => {
+								if (requireAuthUser()) return;
+								editMsdgId = message.id;
+							}}
+						>
+							<CarbonPen />
+							Edit
+						</button>
+					{/if}
 					<button
 						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs group-hover:flex hover:flex hover:bg-gray-100 lg:-right-2 dark:hover:bg-gray-800 {isTapped
 							? '[@media(hover:none)]:flex'

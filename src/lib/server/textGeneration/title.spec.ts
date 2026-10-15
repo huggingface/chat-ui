@@ -67,3 +67,63 @@ describe("generateTitleForConversation", () => {
 		expect(title).toBe("how do I reverse a");
 	});
 });
+
+describe("Slack conversation titles", () => {
+	const request = "find small OCR models on the Hub";
+	function slackConversation(title = "[Slack] New Chat") {
+		const conv = newConversation(
+			`The invoking Slack user is U123. Reply in this thread.\n\n<slack_thread_context>\n[]\n</slack_thread_context>\n\nInvoking user's request:\n${request}`
+		);
+		conv.title = title;
+		conv.managedBy = { kind: "slack", continueUrl: "https://app.slack.com/client/T/C" };
+		return conv;
+	}
+	async function updatesFor(conv: Conversation, locals?: App.Locals) {
+		const updates = [];
+		for await (const update of generateTitleForConversation(conv, locals)) updates.push(update);
+		return updates;
+	}
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mocks.config.LLM_SUMMARIZATION = "true";
+		mocks.config.TASK_MODEL = "";
+		mocks.generateFromDefaultEndpoint.mockImplementation(endpointReturning("Small OCR models"));
+	});
+	it("uses regular title generation on the request with the owner's credentials", async () => {
+		const locals = {} as App.Locals;
+		mocks.config.TASK_MODEL = "title-model";
+		expect(await updatesFor(slackConversation(), locals)).toEqual([
+			{ type: MessageUpdateType.Title, title: "[Slack] Small OCR models" },
+		]);
+		expect(mocks.generateFromDefaultEndpoint).toHaveBeenCalledWith(
+			expect.objectContaining({
+				messages: [{ from: "user", content: `User message: "${request}"` }],
+				modelId: "title-model",
+				locals,
+			})
+		);
+	});
+	it("renames legacy placeholders on the next turn", async () => {
+		expect(await updatesFor(slackConversation("Slack · C0C8Q8HHA6M · 2026-10-15T19:40"))).toEqual([
+			{ type: MessageUpdateType.Title, title: "[Slack] Small OCR models" },
+		]);
+	});
+	it("keeps existing summaries and user-edited titles", async () => {
+		for (const title of ["[Slack] Small OCR models", "My custom title"]) {
+			expect(await updatesFor(slackConversation(title))).toEqual([]);
+		}
+		expect(mocks.generateFromDefaultEndpoint).not.toHaveBeenCalled();
+	});
+	it("does not migrate matching titles on regular conversations", async () => {
+		const conv = slackConversation("Slack · C123 · 2026-10-15T19:40");
+		delete conv.managedBy;
+		expect(await updatesFor(conv)).toEqual([]);
+	});
+	it("uses the regular fallback on the request when summarization is disabled", async () => {
+		mocks.config.LLM_SUMMARIZATION = "false";
+		expect(await updatesFor(slackConversation())).toEqual([
+			{ type: MessageUpdateType.Title, title: "[Slack] find small OCR models on" },
+		]);
+		expect(mocks.generateFromDefaultEndpoint).not.toHaveBeenCalled();
+	});
+});

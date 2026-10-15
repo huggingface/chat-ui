@@ -7,6 +7,7 @@ import {
 	createTestConversation,
 } from "$lib/server/api/__tests__/testHelpers";
 import { MlSlackBot } from "./bot";
+import { connectionKey } from "./connections";
 import { skipSlackQuestion } from "./engine";
 import {
 	ANSWER_VIEW,
@@ -29,14 +30,27 @@ const mocks = vi.hoisted(() => ({
 	run: vi.fn(),
 	react: vi.fn(),
 	upload: vi.fn(),
+	open: vi.fn(),
 }));
+vi.mock("$lib/server/config", async (original) => {
+	const m = await original<typeof import("$lib/server/config")>();
+	return {
+		...m,
+		config: new Proxy(m.config, {
+			get(target, key) {
+				if (key === "PUBLIC_ORIGIN") return "https://huggingface.co";
+				return Reflect.get(target, key);
+			},
+		}),
+	};
+});
 vi.mock("@slack/bolt", () => ({
 	App: class {
 		client = {
 			users: { info: mocks.users },
 			files: { uploadV2: mocks.upload },
 			reactions: { add: mocks.react },
-			conversations: { info: mocks.channels, replies: mocks.replies },
+			conversations: { info: mocks.channels, replies: mocks.replies, open: mocks.open },
 			chat: { postMessage: mocks.post, postEphemeral: mocks.ephemeral, update: mocks.update },
 		};
 		event() {}
@@ -811,6 +825,31 @@ describe("Slack transport authorization", () => {
 	});
 });
 
+it.each([undefined, "499.0"])(
+	"shows the private connection prompt where the mention was sent (thread %s)",
+	async (threadTs) => {
+		const bot = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
+		await bot.receive(
+			{ user: "U123", channel: "C123", ts: "500.0", thread_ts: threadTs, text: "Train a model" },
+			"T123",
+			"link-event"
+		);
+		expect(mocks.ephemeral).toHaveBeenCalledWith(
+			expect.objectContaining({
+				user: "U123",
+				channel: "C123",
+				...(threadTs ? { thread_ts: threadTs } : {}),
+				text: expect.stringContaining("Connect Hugging Face"),
+			})
+		);
+		if (!threadTs) expect(mocks.ephemeral.mock.calls[0][0]).not.toHaveProperty("thread_ts");
+		expect(mocks.post).not.toHaveBeenCalled();
+		expect(await collections.slackInputs.countDocuments({})).toBe(0);
+		expect(mocks.run).not.toHaveBeenCalled();
+		expect(await collections.slackThreads.countDocuments({})).toBe(0);
+	}
+);
+
 it("dispatches despite render errors, advances polling, and pauses persistent delivery failures", async () => {
 	const { user } = await createTestUser();
 	const bot = new MlSlackBot(settings, user);
@@ -887,4 +926,149 @@ it("accepts broadcast replies and paginates past old bot posts, then quotes only
 	expect(context.text).toContain("new reference");
 	expect(context.text).not.toContain("old reference");
 	expect(mocks.replies.mock.lastCall?.[0].oldest).toBe("100.0");
+});
+
+it("rejects non-owner requests before queueing in a personal HF session", async () => {
+	const { user } = await createTestUser();
+	const bot = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
+	const now = new Date();
+	await collections.slackThreads.insertOne({
+		_id: "T123:C123:500.0",
+		teamId: "T123",
+		channel: "C123",
+		threadTs: "500.0",
+		owner: "U123",
+		hfUserId: user._id,
+		conversationId: new ObjectId(),
+		watching: false,
+		createdAt: now,
+		updatedAt: now,
+	});
+	await bot.receive(
+		{
+			user: "OTHER",
+			channel: "C123",
+			ts: "501.0",
+			thread_ts: "500.0",
+			text: "Read the owner's private repos",
+		},
+		"T123",
+		"non-owner"
+	);
+	expect(await collections.slackInputs.countDocuments({})).toBe(0);
+	expect(mocks.run).not.toHaveBeenCalled();
+	expect(mocks.ephemeral).toHaveBeenCalledWith(
+		expect.objectContaining({ text: expect.stringContaining("Only the session owner") })
+	);
+});
+
+it.each([undefined, "499.0"])(
+	"shows reconnection prompts where the mention was sent (thread %s)",
+	async (threadTs) => {
+		const { user } = await createTestUser();
+		await collections.slackConnections.insertOne({
+			_id: connectionKey("T123", "U123"),
+			teamId: "T123",
+			slackUserId: "U123",
+			userId: user._id,
+			sessionId: "expired-session",
+			updatedAt: new Date(),
+		});
+		const bot = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
+		await bot.receive(
+			{ user: "U123", channel: "C123", ts: "500.0", thread_ts: threadTs, text: "Hello" },
+			"T123",
+			"reconnect-event"
+		);
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("Missing thread");
+		await bot["dispatch"](thread);
+		expect(mocks.ephemeral).toHaveBeenCalledWith(
+			expect.objectContaining({
+				user: "U123",
+				channel: "C123",
+				...(threadTs ? { thread_ts: threadTs } : {}),
+				text: expect.stringContaining("Reconnect the original Hugging Face account"),
+			})
+		);
+		if (!threadTs) expect(mocks.ephemeral.mock.calls[0][0]).not.toHaveProperty("thread_ts");
+		expect(await collections.slackInputs.countDocuments({ status: "failed" })).toBe(1);
+		expect(mocks.run).not.toHaveBeenCalled();
+	}
+);
+
+it("excludes non-owner messages and files before downloading personal context", async () => {
+	const { user } = await createTestUser();
+	const bot = new MlSlackBot(settings, user);
+	await bot.receive(
+		{ channel: "C123", user: "OWNER", text: "Start", ts: "100.0" },
+		"T123",
+		"CONTEXT"
+	);
+	const thread = await collections.slackThreads.findOne({});
+	if (!thread) throw Error("Missing thread");
+	mocks.replies.mockResolvedValue({
+		messages: [
+			{
+				user: "OTHER",
+				ts: "101.0",
+				text: "malicious instruction",
+				files: [{ id: "F1", name: "private.png", url_private: "https://invalid.example/file" }],
+			},
+			{ user: "OWNER", ts: "102.0", text: "my model" },
+		],
+	});
+	const result = await bot["context"](
+		{ ...thread, hfUserId: user._id },
+		{ user: "OWNER", ts: "103.0", text: "inspect" }
+	);
+	expect(result.text).toContain("my model");
+	expect(result.text).not.toContain("malicious instruction");
+	expect(result.text).not.toContain("private.png");
+	expect(result.files).toEqual([]);
+});
+it("delivers personal raw traces only to the owner's DM", async () => {
+	const { user, locals } = await createTestUser();
+	const bot = new MlSlackBot(settings, user);
+	await bot.receive(
+		{ channel: "C123", user: "OWNER", text: "Start", ts: "100.0" },
+		"T123",
+		"PRIVATE_TRACE"
+	);
+	const thread = await collections.slackThreads.findOne({});
+	if (!thread) throw Error("Missing thread");
+	await collections.slackThreads.updateOne({ _id: thread._id }, { $set: { hfUserId: user._id } });
+	await createTestConversation(locals, { _id: thread.conversationId });
+	mocks.open.mockResolvedValue({ channel: { id: "DOWNER" } });
+	const handler = mocks.handlers.get("ml_intern_trace");
+	if (!handler) throw Error("Missing handler");
+	const args = {
+		ack: vi.fn(),
+		body: { user: { id: "OTHER" }, team: { id: "T123" }, channel: { id: "C123" } },
+		action: { value: thread._id },
+	};
+	await handler(args);
+	expect(mocks.upload).not.toHaveBeenCalled();
+	await handler({ ...args, body: { ...args.body, user: { id: "OWNER" } } });
+	expect(mocks.open).toHaveBeenCalledWith({ users: "OWNER" });
+	expect(mocks.upload).toHaveBeenCalledWith(expect.objectContaining({ channel_id: "DOWNER" }));
+	expect(mocks.upload.mock.calls[0][0]).not.toHaveProperty("thread_ts");
+});
+
+it("rejects personal answer actions after disconnect while allowing owner Stop", async () => {
+	const { user } = await createTestUser();
+	const bot = new MlSlackBot(settings, user);
+	await bot.receive(
+		{ channel: "C123", user: "OWNER", text: "Start", ts: "100.0" },
+		"T123",
+		"STALE"
+	);
+	const thread = await collections.slackThreads.findOne({});
+	if (!thread) throw Error("Missing thread");
+	await collections.slackThreads.updateOne({ _id: thread._id }, { $set: { hfUserId: user._id } });
+	expect(await bot["owned"](thread._id, "OWNER", "T123")).toBeNull();
+	expect(mocks.ephemeral).toHaveBeenCalledWith(
+		expect.objectContaining({ text: expect.stringContaining("Reconnect the original") })
+	);
+	expect(await bot["owned"](thread._id, "OWNER", "T123", false)).toMatchObject({ _id: thread._id });
 });

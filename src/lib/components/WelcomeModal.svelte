@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { loginInNewTab } from "$lib/utils/auth";
 	import Modal from "$lib/components/Modal.svelte";
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
@@ -54,6 +55,10 @@
 			</p>
 		</div>
 
+		{#if $loginInNewTab}<p class="text-sm">
+				Continue signing in in the new tab. If you return here after signing in, reload this page.
+				If your browser blocks embedded cookies, use the app in the new tab.
+			</p>{/if}
 		<button
 			class="k w-full rounded-xl bg-black px-5 py-2.5 text-base font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
 			onclick={close}
