@@ -5,6 +5,7 @@ import { collections } from "$lib/server/database";
 import { config } from "$lib/server/config";
 import type { SlackThread } from "./types";
 import type { User } from "$lib/types/User";
+import type { ViewerIdentity } from "./viewer/auth";
 import { slackConfig } from "./config";
 
 export const connectionKey = (team: string, user: string) => `${team}:${user}`;
@@ -26,14 +27,19 @@ export function chatOrigin(): string {
 	return url.origin;
 }
 export function chatLink(thread: SlackThread): string | undefined {
-	return thread.hfUserId
-		? `${chatOrigin()}${base}/conversation/${thread.conversationId}`
-		: undefined;
+	try {
+		return thread.hfUserId
+			? `${chatOrigin()}${base}/conversation/${thread.conversationId}`
+			: undefined;
+	} catch {
+		return undefined;
+	}
 }
 /** Sent ephemerally to the Slack user, never placed in a shared thread or log. */
 export async function createConnectionLink(teamId: string, slackUserId: string): Promise<string> {
 	const token = randomBytes(32).toString("base64url");
-	await collections.slackLinks.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+	// Keep only the newest link per Slack account, preventing unbounded live tickets.
+	await collections.slackLinks.deleteMany({ teamId, slackUserId });
 	await collections.slackLinks.insertOne({
 		_id: hash(token),
 		teamId,
@@ -54,11 +60,25 @@ export async function readConnectionLink(token: string) {
 }
 export class ConnectionError extends Error {}
 
-export async function connectAccount(token: string, user: User, sessionId: string) {
+export async function connectAccount(
+	token: string,
+	user: User,
+	sessionId: string,
+	slackIdentity: ViewerIdentity | undefined
+) {
 	const ticket = await readConnectionLink(token);
 	if (!ticket)
 		throw new ConnectionError(
 			"This connection link has expired. Mention the bot again for a new link."
+		);
+	if (
+		!slackIdentity ||
+		slackIdentity.expires <= Date.now() ||
+		slackIdentity.team !== ticket.teamId ||
+		slackIdentity.user !== ticket.slackUserId
+	)
+		throw new ConnectionError(
+			"Sign in with the Slack account that requested this connection link."
 		);
 	const session = await collections.sessions.findOne({
 		sessionId,
@@ -77,6 +97,7 @@ export async function connectAccount(token: string, user: User, sessionId: strin
 		{ _id: connectionKey(ticket.teamId, ticket.slackUserId) },
 		{
 			$set: {
+				verifiedSlackIdentity: true,
 				teamId: ticket.teamId,
 				slackUserId: ticket.slackUserId,
 				userId: user._id,
@@ -95,7 +116,11 @@ export async function connectedLocals(thread: SlackThread): Promise<App.Locals> 
 	const connection = await collections.slackConnections.findOne({
 		_id: connectionKey(thread.teamId, thread.owner),
 	});
-	if (!thread.hfUserId || !connection?.userId.equals(thread.hfUserId))
+	if (
+		!thread.hfUserId ||
+		!connection?.verifiedSlackIdentity ||
+		!connection.userId.equals(thread.hfUserId)
+	)
 		throw new Error("The session owner must reconnect the original Hugging Face account.");
 	const session = await collections.sessions.findOne({
 		sessionId: connection.sessionId,

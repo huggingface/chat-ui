@@ -11,10 +11,10 @@ import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { base } from "$app/paths";
 
-export const sessionCookie = "__Secure-ml-slack-viewer";
+export const sessionCookie = "__Secure-ml-slack-identity-v2";
 export const flowCookie = "__Secure-ml-slack-login";
 export const cookieOptions = {
-	path: `${base}/slack/view`,
+	path: `${base}/slack`,
 	httpOnly: true,
 	secure: true,
 	sameSite: "lax" as const,

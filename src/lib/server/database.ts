@@ -241,6 +241,8 @@ export class Database {
 	 */
 	private initDatabase() {
 		const {
+			slackThreads,
+			slackLinks,
 			conversations,
 			conversationStats,
 			assistants,
@@ -530,6 +532,11 @@ export class Database {
 		messageEvents
 			.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 1 })
 			.catch((e) => logger.error(e, "Error creating index for messageEvents by expiresAt"));
+		slackThreads.createIndex({ conversationId: 1 }).catch((e) => logger.error(e));
+		slackLinks
+			.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+			.catch((e) => logger.error(e));
+		slackLinks.createIndex({ teamId: 1, slackUserId: 1 }).catch((e) => logger.error(e));
 		sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch((e) => logger.error(e));
 		sessions
 			.createIndex({ sessionId: 1 }, { unique: true })

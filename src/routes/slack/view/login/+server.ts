@@ -13,13 +13,15 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	const settings = viewerConfig(),
 		slack = slackConfig();
 	if (!settings || !slack) error(503, "Slack viewer is not configured.");
+	const connect = url.searchParams.get("connect");
 	const target = url.searchParams.get("session");
-	if (!target || !/^[a-f0-9]{24}$/.test(target)) error(400, "Invalid session.");
+	if (connect ? !/^[\w-]{43}$/.test(connect) : !target || !/^[a-f0-9]{24}$/.test(target))
+		error(400, "Invalid session.");
 	const state = randomBytes(32).toString("base64url"),
 		nonce = randomBytes(32).toString("base64url");
 	cookies.set(
 		flowCookie,
-		sign({ state, nonce, target, expires: Date.now() + 600000 }, settings.secret),
+		sign({ state, nonce, target, connect, expires: Date.now() + 600000 }, settings.secret),
 		{ ...cookieOptions, maxAge: 600 }
 	);
 	redirect(

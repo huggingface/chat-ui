@@ -16,3 +16,12 @@ it("omits private reasoning, secrets and binary data from the viewer", () => {
 	expect(text).not.toMatch(/private|hidden|secret-value|hf_123|xoxb-|aGVsbG8|binary/);
 	expect(text).toContain("visible");
 });
+
+it("preserves dates in projected run metadata", () => {
+	const date = new Date("2026-10-15T00:00:00Z");
+	expect(scrub({ startedAt: date, updatedAt: date, waitUntil: date })).toEqual({
+		startedAt: date.toISOString(),
+		updatedAt: date.toISOString(),
+		waitUntil: date.toISOString(),
+	});
+});

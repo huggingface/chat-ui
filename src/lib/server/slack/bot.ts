@@ -5,7 +5,7 @@ import {
 	connectionKey,
 	connectedLocals,
 } from "./connections";
-import { viewerLink } from "./viewer/auth";
+import { viewerLink, viewerConfig } from "./viewer/auth";
 import { isHttpError } from "@sveltejs/kit";
 import { downloadAttachments } from "./attachments";
 import { AbortRegistry } from "$lib/server/abortRegistry";
@@ -85,6 +85,7 @@ export class MlSlackBot {
 	private botUserId = "";
 	private active = new Map<string, Promise<void>>();
 	private runningConversations = new Map<string, string>();
+	private linkPrompts = new Map<string, number>();
 	private members = new Map<string, { allowed: boolean; until: number }>();
 	private ticking = false;
 	private renders = new Map<string, Promise<void>>();
@@ -511,12 +512,35 @@ export class MlSlackBot {
 			channel: event.channel,
 			threadTs: event.thread_ts ?? event.ts,
 		});
+		if (existing?.hfUserId && existing.owner !== event.user) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"Only the session owner can make requests using their personal Hugging Face account. Start your own thread to use yours.",
+				event.thread_ts
+			);
+			return;
+		}
+		if (existing && !existing.hfUserId && !this.user) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"This legacy session needs the original shared HF token configured by the operator. Start a new thread to use your own account.",
+				event.thread_ts
+			);
+			return;
+		}
 		let hfUserId = existing?.hfUserId;
 		if (this.settings.accountMode === "user" && !existing) {
 			const connection = await collections.slackConnections.findOne({
 				_id: connectionKey(teamId, event.user),
 			});
 			if (!connection) {
+				const now = Date.now();
+				for (const [user, until] of this.linkPrompts)
+					if (until <= now) this.linkPrompts.delete(user);
+				if (this.linkPrompts.has(event.user)) return;
+				this.linkPrompts.set(event.user, now + 30000);
 				const link = await createConnectionLink(teamId, event.user);
 				await this.tell(
 					event.channel,
@@ -627,6 +651,8 @@ export class MlSlackBot {
 		if (!input) return;
 		this.runningConversations.set(thread._id, thread.conversationId.toHexString());
 		try {
+			if (thread.hfUserId && input.user !== thread.owner)
+				throw new Error("Only the personal session owner may submit requests.");
 			if (!(await this.member(input.user)))
 				throw new Error("The invoking user is no longer a workspace member.");
 			if (this.stopped) throw new Error("Slack worker stopped.");
@@ -1364,7 +1390,10 @@ export async function startSlackBot(): Promise<void> {
 	if (settings.accountMode === "user") {
 		const { loginEnabled } = await import("$lib/server/auth");
 		if (!loginEnabled) throw new Error("User-account Slack mode requires HuggingChat OAuth login.");
-		chatOrigin();
+		if (viewerConfig()?.origin !== chatOrigin())
+			throw new Error(
+				"Personal Slack sessions require Slack OIDC configured on PUBLIC_ORIGIN to verify account ownership."
+			);
 		if (pinnedHubToken())
 			throw new Error("User-account Slack mode cannot use a pinned Hub MCP token.");
 	}
@@ -1384,8 +1413,7 @@ export async function startSlackBot(): Promise<void> {
 				bot = undefined;
 			}
 			if (held && !bot) {
-				const user =
-					settings.accountMode === "user" ? undefined : await provisionSlackIdentity(settings);
+				const user = settings.hfToken ? await provisionSlackIdentity(settings) : undefined;
 				const candidate = new MlSlackBot(settings, user);
 				try {
 					await candidate.start();

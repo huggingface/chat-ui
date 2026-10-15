@@ -20,7 +20,16 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 		.object({
 			state: z.string(),
 			nonce: z.string(),
-			target: z.string().regex(/^[a-f0-9]{24}$/),
+			target: z
+				.string()
+				.regex(/^[a-f0-9]{24}$/)
+				.nullable()
+				.optional(),
+			connect: z
+				.string()
+				.regex(/^[\w-]{43}$/)
+				.nullable()
+				.optional(),
 			expires: z.number(),
 		})
 		.safeParse(verify(cookies.get(flowCookie), settings.secret));
@@ -55,5 +64,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 		...cookieOptions,
 		maxAge: 3600,
 	});
+	if (flow.data.connect) redirect(303, `${base}/slack/connect?ticket=${flow.data.connect}`);
+	if (!flow.data.target) error(400, "Invalid sign-in destination.");
 	redirect(303, `${base}/slack/view/${flow.data.target}`);
 };

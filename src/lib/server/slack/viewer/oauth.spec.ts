@@ -73,3 +73,17 @@ it("refuses a valid Slack login from another workspace", async () => {
 	});
 	expect(e.cookies.set).not.toHaveBeenCalled();
 });
+
+it("returns a verified Slack login to the account-link confirmation without consuming its ticket", async () => {
+	mocks.flow = {
+		state: "state",
+		nonce: "nonce",
+		target: null,
+		connect: "a".repeat(43),
+		expires: Date.now() + 60000,
+	};
+	await expect(GET(event() as unknown as Parameters<typeof GET>[0])).rejects.toMatchObject({
+		status: 303,
+		location: "/slack/connect?ticket=" + "a".repeat(43),
+	});
+});

@@ -1,3 +1,4 @@
+import { nonSlackConversationIds } from "$lib/server/slack/readOnly";
 import type { RequestHandler } from "@sveltejs/kit";
 import type { ObjectId } from "mongodb";
 import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
@@ -46,11 +47,13 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 export const DELETE: RequestHandler = async ({ locals }) => {
 	requireAuth(locals);
 
-	const ids = await collections.conversations
-		.find(authCondition(locals))
-		.project<{ _id: ObjectId }>({ _id: 1 })
-		.map((conv) => conv._id)
-		.toArray();
+	const ids = await nonSlackConversationIds(
+		await collections.conversations
+			.find(authCondition(locals))
+			.project<{ _id: ObjectId }>({ _id: 1 })
+			.map((conv) => conv._id)
+			.toArray()
+	);
 	const res = await collections.conversations.deleteMany({ _id: { $in: ids } });
 	await deleteMlRegistry(ids);
 	await deleteMlFilesOf(ids);

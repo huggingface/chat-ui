@@ -368,6 +368,7 @@ it("creates a zero-budget HF-owned chat and resumes its budget question with the
 		}
 	);
 	await collections.slackConnections.insertOne({
+		verifiedSlackIdentity: true,
 		_id: "T123:U123",
 		teamId: "T123",
 		slackUserId: "U123",

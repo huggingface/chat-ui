@@ -15,6 +15,7 @@ export function scrub(value: unknown, secrets: string[] = []): unknown {
 			.replace(/data:[^;,\s]+;base64,[A-Za-z0-9+/=]+/g, "[inline file omitted]")
 			.slice(0, 24000);
 	}
+	if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
 	if (Array.isArray(value)) return value.slice(0, 200).map((v) => scrub(v, secrets));
 	if (value && typeof value === "object")
 		return Object.fromEntries(

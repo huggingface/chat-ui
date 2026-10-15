@@ -46,14 +46,30 @@ async function account(slackUser = "U123") {
 	);
 	const link = await createConnectionLink("T123", slackUser);
 	const ticket = new URL(link).searchParams.get("ticket") ?? "";
-	return { ...fixture, ticket };
+	return { ...fixture, ticket, slackUser };
 }
 it("requires a live owner session, consumes private connection links once, and stores no token copy", async () => {
 	const a = await account();
 	const b = await account("U456");
-	await expect(connectAccount(a.ticket, b.user, a.session.sessionId)).rejects.toThrow("Sign in");
-	await connectAccount(a.ticket, a.user, a.session.sessionId);
-	await expect(connectAccount(a.ticket, a.user, a.session.sessionId)).rejects.toThrow("expired");
+	await expect(
+		connectAccount(a.ticket, b.user, a.session.sessionId, {
+			team: "T123",
+			user: b.slackUser,
+			expires: Date.now() + 60000,
+		})
+	).rejects.toThrow("Sign in");
+	await connectAccount(a.ticket, a.user, a.session.sessionId, {
+		team: "T123",
+		user: a.slackUser,
+		expires: Date.now() + 60000,
+	});
+	await expect(
+		connectAccount(a.ticket, a.user, a.session.sessionId, {
+			team: "T123",
+			user: a.slackUser,
+			expires: Date.now() + 60000,
+		})
+	).rejects.toThrow("expired");
 	const connection = await collections.slackConnections.findOne({ _id: "T123:U123" });
 	expect(connection?.userId).toEqual(a.user._id);
 	expect(JSON.stringify(connection)).not.toContain(`hf-${a.user._id}`);
@@ -62,13 +78,27 @@ it("rejects expired tickets even before Mongo's TTL cleanup", async () => {
 	const a = await account();
 	await collections.slackLinks.updateMany({}, { $set: { expiresAt: new Date(0) } });
 	expect(await readConnectionLink(a.ticket)).toBeNull();
-	await expect(connectAccount(a.ticket, a.user, a.session.sessionId)).rejects.toThrow("expired");
+	await expect(
+		connectAccount(a.ticket, a.user, a.session.sessionId, {
+			team: "T123",
+			user: a.slackUser,
+			expires: Date.now() + 60000,
+		})
+	).rejects.toThrow("expired");
 });
 it("pins the original owner across collaborators and reconstructs the same credentials on resume", async () => {
 	const a = await account();
 	const b = await account("U456");
-	await connectAccount(a.ticket, a.user, a.session.sessionId);
-	await connectAccount(b.ticket, b.user, b.session.sessionId);
+	await connectAccount(a.ticket, a.user, a.session.sessionId, {
+		team: "T123",
+		user: a.slackUser,
+		expires: Date.now() + 60000,
+	});
+	await connectAccount(b.ticket, b.user, b.session.sessionId, {
+		team: "T123",
+		user: b.slackUser,
+		expires: Date.now() + 60000,
+	});
 	const first = await getOrCreateThread("T123", "C123", "1.0", "U123", a.user._id);
 	const second = await getOrCreateThread("T123", "C123", "1.0", "U456", b.user._id);
 	expect(second.hfUserId).toEqual(a.user._id);
@@ -86,15 +116,27 @@ it("pins the original owner across collaborators and reconstructs the same crede
 });
 it("never switches an old thread to a different HF account after reconnecting", async () => {
 	const a = await account();
-	await connectAccount(a.ticket, a.user, a.session.sessionId);
+	await connectAccount(a.ticket, a.user, a.session.sessionId, {
+		team: "T123",
+		user: a.slackUser,
+		expires: Date.now() + 60000,
+	});
 	const thread = await getOrCreateThread("T123", "C123", "2.0", "U123", a.user._id);
 	const b = await account();
-	await connectAccount(b.ticket, b.user, b.session.sessionId);
+	await connectAccount(b.ticket, b.user, b.session.sessionId, {
+		team: "T123",
+		user: b.slackUser,
+		expires: Date.now() + 60000,
+	});
 	await expect(connectedLocals(thread)).rejects.toThrow("original");
 });
 it("does not use another browser session after expiry, logout, or disconnect", async () => {
 	const a = await account();
-	await connectAccount(a.ticket, a.user, a.session.sessionId);
+	await connectAccount(a.ticket, a.user, a.session.sessionId, {
+		team: "T123",
+		user: a.slackUser,
+		expires: Date.now() + 60000,
+	});
 	const thread = await getOrCreateThread("T123", "C123", "3.0", "U123", a.user._id);
 	await collections.sessions.updateOne(
 		{ _id: a.session._id },
@@ -110,4 +152,44 @@ it("does not use another browser session after expiry, logout, or disconnect", a
 	await expect(connectedLocals(thread)).rejects.toThrow("reconnect");
 	await collections.slackConnections.deleteMany({});
 	await expect(connectedLocals(thread)).rejects.toThrow("original");
+});
+
+it("rejects a forwarded ticket when the signed-in Slack identity differs", async () => {
+	const attacker = await account("U456");
+	const victim = await account("U123");
+	await expect(
+		connectAccount(attacker.ticket, victim.user, victim.session.sessionId, {
+			team: "T123",
+			user: "U123",
+			expires: Date.now() + 60000,
+		})
+	).rejects.toThrow("Slack account");
+	expect(await collections.slackConnections.findOne({ _id: "T123:U456" })).toBeNull();
+	expect(await readConnectionLink(attacker.ticket)).not.toBeNull();
+});
+it("rejects missing, expired, and cross-workspace Slack identity", async () => {
+	const a = await account();
+	for (const identity of [
+		undefined,
+		{ team: "T999", user: "U123", expires: Date.now() + 60000 },
+		{ team: "T123", user: "U123", expires: 0 },
+	]) {
+		await expect(connectAccount(a.ticket, a.user, a.session.sessionId, identity)).rejects.toThrow(
+			"Slack account"
+		);
+	}
+});
+
+it("requires old unverified account connections to reconnect", async () => {
+	const a = await account();
+	await collections.slackConnections.insertOne({
+		_id: "T123:U123",
+		teamId: "T123",
+		slackUserId: "U123",
+		userId: a.user._id,
+		sessionId: a.session.sessionId,
+		updatedAt: new Date(),
+	});
+	const thread = await getOrCreateThread("T123", "C123", "5.0", "U123", a.user._id);
+	await expect(connectedLocals(thread)).rejects.toThrow("reconnect");
 });

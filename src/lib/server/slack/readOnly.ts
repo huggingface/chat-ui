@@ -15,3 +15,13 @@ export async function isSlackConversationMutation(
 		{ projection: { _id: 1 } }
 	));
 }
+
+/** Bulk deletion follows the same read-only policy as single-session deletion. */
+export async function nonSlackConversationIds(ids: ObjectId[]): Promise<ObjectId[]> {
+	const linked = await collections.slackThreads
+		.find({ conversationId: { $in: ids } })
+		.project<{ conversationId: ObjectId }>({ conversationId: 1 })
+		.toArray();
+	const protectedIds = new Set(linked.map((t) => t.conversationId.toString()));
+	return ids.filter((id) => !protectedIds.has(id.toString()));
+}

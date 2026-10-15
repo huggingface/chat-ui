@@ -924,3 +924,36 @@ it("accepts broadcast replies and paginates past old bot posts, then quotes only
 	expect(context.text).not.toContain("old reference");
 	expect(mocks.replies.mock.lastCall?.[0].oldest).toBe("100.0");
 });
+
+it("rejects non-owner requests before queueing in a personal HF session", async () => {
+	const { user } = await createTestUser();
+	const bot = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
+	const now = new Date();
+	await collections.slackThreads.insertOne({
+		_id: "T123:C123:500.0",
+		teamId: "T123",
+		channel: "C123",
+		threadTs: "500.0",
+		owner: "U123",
+		hfUserId: user._id,
+		conversationId: new ObjectId(),
+		watching: false,
+		createdAt: now,
+		updatedAt: now,
+	});
+	await bot.receive(
+		{
+			user: "OTHER",
+			channel: "C123",
+			ts: "501.0",
+			thread_ts: "500.0",
+			text: "Read the owner's private repos",
+		},
+		"T123",
+		"non-owner"
+	);
+	expect(await collections.slackInputs.countDocuments({})).toBe(0);
+	expect(mocks.ephemeral).toHaveBeenCalledWith(
+		expect.objectContaining({ text: expect.stringContaining("Only the session owner") })
+	);
+});

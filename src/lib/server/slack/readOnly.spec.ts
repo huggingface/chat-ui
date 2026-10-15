@@ -1,7 +1,9 @@
 import { expect, it, vi, beforeEach } from "vitest";
 const findOne = vi.hoisted(() => vi.fn());
-vi.mock("$lib/server/database", () => ({ collections: { slackThreads: { findOne } } }));
-import { isSlackConversationMutation } from "./readOnly";
+const find = vi.hoisted(() => vi.fn());
+vi.mock("$lib/server/database", () => ({ collections: { slackThreads: { findOne, find } } }));
+import { ObjectId } from "mongodb";
+import { isSlackConversationMutation, nonSlackConversationIds } from "./readOnly";
 const id = "6ad03a4c353929f19edc560f";
 beforeEach(() => {
 	findOne.mockReset();
@@ -29,4 +31,11 @@ it("leaves normal conversations editable", async () => {
 it("does not affect unrelated routes", async () => {
 	expect(await isSlackConversationMutation("POST", "/models/[id]", id)).toBe(false);
 	expect(findOne).not.toHaveBeenCalled();
+});
+
+it("preserves Slack sessions during bulk history deletion", async () => {
+	const slack = new ObjectId(),
+		normal = new ObjectId();
+	find.mockReturnValue({ project: () => ({ toArray: async () => [{ conversationId: slack }] }) });
+	expect(await nonSlackConversationIds([slack, normal])).toEqual([normal]);
 });

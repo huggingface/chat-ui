@@ -29,9 +29,10 @@
 			session budget.
 		</p>
 		<p>
-			People in your Slack thread can contribute requests using that session's approved budget. Your
-			private HuggingChat conversation is accessible only to you unless you share it. Its contents
-			are available read-only in the browser. Continue the session and approve budgets in Slack.
+			Only you can issue requests in your personal Slack sessions. Your full HF permissions and
+			inference billing apply, not just the Jobs budget. Your private HuggingChat conversation is
+			accessible only to you unless you share it. Its contents are available read-only in the
+			browser. Continue the session and approve budgets in Slack.
 		</p>
 		<p>
 			The connection uses your current HuggingChat login. If it expires or is revoked, reconnect
@@ -47,11 +48,15 @@
 		<p>
 			Your account is connected. Return to Slack and mention ML Intern again to start your request.
 		</p>
-		<form method="POST">
-			<button class="rounded border px-4 py-2" name="action" value="disconnect"
-				>Disconnect Slack</button
-			>
-		</form>
+		{#each data.connections as connection}
+			<p>Slack user {connection.slackUserId} in workspace {connection.teamId}</p>
+			<form method="POST">
+				<input type="hidden" name="connectionId" value={connection._id} />
+				<button class="rounded border px-4 py-2" name="action" value="disconnect"
+					>Disconnect this Slack account</button
+				>
+			</form>
+		{/each}
 	{:else}
 		<p>Mention ML Intern in Slack to receive a private connection link.</p>
 	{/if}

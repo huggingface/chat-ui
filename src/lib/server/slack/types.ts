@@ -1,6 +1,8 @@
 import type { ObjectId } from "mongodb";
 
 export interface SlackConnection {
+	/** Only set after verified Slack OIDC identity matches the connection ticket. */
+	verifiedSlackIdentity?: boolean;
 	_id: string;
 	teamId: string;
 	slackUserId: string;
@@ -69,7 +71,5 @@ export interface SlackDelivery {
 export interface SlackLease {
 	_id: string;
 	owner: string;
-	/** Absent on legacy shared-token threads. Never changed after creation. */
-	hfUserId?: ObjectId;
 	until: Date;
 }
