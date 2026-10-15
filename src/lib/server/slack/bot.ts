@@ -1390,10 +1390,22 @@ export async function startSlackBot(): Promise<void> {
 	if (settings.accountMode === "user") {
 		const { loginEnabled } = await import("$lib/server/auth");
 		if (!loginEnabled) throw new Error("User-account Slack mode requires HuggingChat OAuth login.");
-		if (viewerConfig()?.origin !== chatOrigin())
+		if (viewerConfig()?.origin !== chatOrigin()) {
+			const missing = (
+				[
+					"SLACK_ML_VIEWER_ORIGIN",
+					"SLACK_ML_VIEWER_CLIENT_ID",
+					"SLACK_ML_VIEWER_CLIENT_SECRET",
+					"SLACK_ML_VIEWER_SESSION_SECRET",
+				] as const
+			).filter((key) => !config[key]);
 			throw new Error(
-				"Personal Slack sessions require Slack OIDC configured on PUBLIC_ORIGIN to verify account ownership."
+				"Personal Slack sessions require Slack OIDC configured on PUBLIC_ORIGIN to verify account ownership. " +
+					(missing.length
+						? `Missing: ${missing.join(", ")}.`
+						: "Check origin equality and that the session signing secret has at least 32 characters.")
 			);
+		}
 		if (pinnedHubToken())
 			throw new Error("User-account Slack mode cannot use a pinned Hub MCP token.");
 	}
