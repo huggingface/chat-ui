@@ -1,7 +1,7 @@
-import { beforeEach, afterEach, expect, it } from "vitest";
+import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { collections, ready } from "$lib/server/database";
 import { createTestUser, cleanupTestData } from "$lib/server/api/__tests__/testHelpers";
-import { actions } from "../../../routes/slack/connect/+page.server";
+import { actions, load } from "../../../routes/slack/connect/+page.server";
 beforeEach(async () => {
 	await ready;
 });
@@ -59,4 +59,18 @@ it("disconnects only the signed-in HF account's Slack connections", async () => 
 	} as Parameters<typeof action>[0]);
 	expect(await collections.slackConnections.findOne({ _id: "T123:U123" })).toBeNull();
 	expect(await collections.slackConnections.findOne({ _id: "T123:U456" })).not.toBeNull();
+});
+
+it("preserves same-origin form submissions while hiding link tickets from other sites", async () => {
+	const { locals } = await createTestUser();
+	const setHeaders = vi.fn();
+	await load({
+		locals,
+		url: new URL("https://chat.example/slack/connect"),
+		setHeaders,
+	} as Parameters<typeof load>[0]);
+	expect(setHeaders).toHaveBeenCalledWith({
+		"cache-control": "private, no-store",
+		"referrer-policy": "same-origin",
+	});
 });
