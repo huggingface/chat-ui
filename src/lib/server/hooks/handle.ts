@@ -15,6 +15,7 @@ import { adminTokenManager } from "$lib/server/adminToken";
 import { isHostLocalhost } from "$lib/server/isURLLocal";
 import { runWithRequestContext, updateRequestContext } from "$lib/server/requestContext";
 import { config, ready } from "$lib/server/config";
+import { isSlackConversationMutation } from "$lib/server/slack/readOnly";
 import { parseRequestOrigin } from "./origin";
 
 type HandleInput = Parameters<Handle>[0];
@@ -124,6 +125,16 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 
 			event.locals.user = auth.user || undefined;
 			event.locals.token = auth.token;
+
+			// Slack's trusted runner calls generation directly; browser/API callers are view-only.
+			if (
+				await isSlackConversationMutation(event.request.method, event.route.id, event.params.id)
+			) {
+				return errorResponse(
+					403,
+					"This session is managed in Slack. Continue in its Slack thread."
+				);
+			}
 
 			// Update request context with user after authentication
 			if (auth.user?.username) {

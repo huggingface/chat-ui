@@ -518,16 +518,18 @@
 						value={contentWithoutThink}
 						iconClassNames="text-xs"
 					/>
-					<button
-						class="btn rounded-xs p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
-						title="Retry"
-						type="button"
-						onclick={() => {
-							onretry?.({ id: message.id });
-						}}
-					>
-						<CarbonRotate360 />
-					</button>
+					{#if !readOnly}
+						<button
+							class="btn rounded-xs p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+							title="Retry"
+							type="button"
+							onclick={() => {
+								onretry?.({ id: message.id });
+							}}
+						>
+							<CarbonRotate360 />
+						</button>
+					{/if}
 					{#if alternatives.length > 1 && editMsdgId === null}
 						<Alternatives
 							{message}
@@ -643,7 +645,7 @@
 						onshowAlternateMsg={(payload) => onshowAlternateMsg?.(payload)}
 					/>
 				{/if}
-				{#if (alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode)}
+				{#if !readOnly && ((alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode))}
 					<button
 						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:bg-gray-100 hover:text-gray-500 lg:-right-2 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300 {isTapped
 							? '[@media(hover:none)]:flex'

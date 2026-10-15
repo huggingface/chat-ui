@@ -678,6 +678,7 @@
 	}
 
 	async function stopGeneration() {
+		if (data.slackThreadUrl) return;
 		// Snapshot the stop point first: the generation run this tab started
 		// (if any) and how many characters of the reply are on screen right
 		// now. The server clamps the persisted text back to this so the
@@ -771,10 +772,12 @@
 	});
 
 	async function onMessage(content: string) {
+		if (data.slackThreadUrl) return;
 		await writeMessage({ prompt: content });
 	}
 
 	async function onRetry(payload: { id: Message["id"]; content?: string }) {
+		if (data.slackThreadUrl) return;
 		if (requireAuthUser()) return;
 
 		const lastMsgId = payload.id;
@@ -925,6 +928,7 @@
 	messages={messagesPath as Message[]}
 	{messagesAlternatives}
 	shared={data.shared}
+	slackThreadUrl={data.slackThreadUrl}
 	preprompt={data.preprompt}
 	bind:draft
 	bind:files

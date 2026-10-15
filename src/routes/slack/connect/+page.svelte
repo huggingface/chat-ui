@@ -31,7 +31,7 @@
 		<p>
 			People in your Slack thread can contribute requests using that session's approved budget. Your
 			private HuggingChat conversation is accessible only to you unless you share it. Its contents
-			may also be posted to the Slack thread, including work you continue in the browser.
+			are available read-only in the browser. Continue the session and approve budgets in Slack.
 		</p>
 		<p>
 			The connection uses your current HuggingChat login. If it expires or is revoked, reconnect

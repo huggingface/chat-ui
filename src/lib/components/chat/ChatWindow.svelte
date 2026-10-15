@@ -117,6 +117,7 @@
 		pending?: boolean;
 		resuming?: boolean;
 		shared?: boolean;
+		slackThreadUrl?: string;
 		currentModel: Model;
 		models: Model[];
 		preprompt?: string | undefined;
@@ -136,6 +137,7 @@
 		pending = false,
 		resuming = false,
 		shared = false,
+		slackThreadUrl,
 		currentModel,
 		models,
 		preprompt = undefined,
@@ -148,7 +150,9 @@
 		onshowAlternateMsg,
 	}: Props = $props();
 
-	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
+	let isReadOnly = $derived(
+		!!slackThreadUrl || !models.some((model) => model.id === currentModel.id)
+	);
 
 	const publicConfig = usePublicConfig();
 	let canShare = $derived(
@@ -1059,7 +1063,7 @@
 								{/if}
 							</div>
 						{/each}
-						{#if isReadOnly}
+						{#if isReadOnly && !slackThreadUrl}
 							<ModelSwitch models={switchableModels} {currentModel} />
 						{/if}
 					</div>
@@ -1174,149 +1178,158 @@
 			{/if}
 
 			<div class="w-full">
-				{#if askQuestion}
-					<!-- Keyed: the next waiting question must not inherit this one's step and picks. -->
-					{#key askQuestion.request.elicitationId}
-						<AskQuestion
-							conversationId={askQuestion.conversationId}
-							request={askQuestion.request}
-						/>
-					{/key}
-				{/if}
-				<div class="flex w-full gap-2 *:mb-3">
-					{#if !loading && lastIsError}
-						{#if canResumeTurn}
-							<ResumeBtn classNames="ml-auto" onClick={sendResumeMessage} />
-						{/if}
-						<RetryBtn
-							classNames={canResumeTurn ? "" : "ml-auto"}
-							onClick={() => {
-								if (lastMessage && lastMessage.ancestors) {
-									onretry?.({
-										id: lastMessage.id,
-									});
-								}
-							}}
-						/>
-					{/if}
-				</div>
-				<form
-					bind:this={composerForm}
-					tabindex="-1"
-					aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
-					onsubmit={(e) => {
-						e.preventDefault();
-						handleSubmit();
-					}}
-					class={{
-						"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
-						"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
-						"border-[#efc9ad] dark:border-[#5a3a22]": mlModeOn,
-						"dark:border-gray-700": !mlModeOn,
-						"opacity-30": isReadOnly,
-						"max-sm:mb-4": focused && isVirtualKeyboard(),
-					}}
-					style:--composer-actions-width={transcriptionEnabled && !loading ? "84px" : "44px"}
-				>
-					{#if ML_ASSISTANT_MODE}
-						<MlAssistantStrip
-							visible={mlStripVisible}
-							steps={mlAssistant.steps}
-							statusLabel={mlAssistant.statusLabel}
-							complete={mlAssistant.complete}
-							budget={mlAssistant.budget}
-							onbudgetchange={page.params?.id ? changeMlBudget : undefined}
-							dashboard={trackioDashboards.at(-1)}
-							registry={mlRegistry.summary}
-						/>
-					{/if}
-					<!-- The composer box is a column so the ML Assistant strip can stack on
-					     top; this row is the composer proper and keeps its own layout. -->
-					<div class="flex w-full items-center">
-						{#if isRecording || isTranscribing}
-							<VoiceRecorder
-								{isTranscribing}
-								{isTouchDevice}
-								oncancel={() => {
-									isRecording = false;
-								}}
-								onconfirm={handleRecordingConfirm}
-								onsend={handleRecordingSend}
-								onerror={handleRecordingError}
+				{#if slackThreadUrl}
+					<div class="rounded-xl border p-4 text-sm">
+						<p>This session is managed in Slack. This view is read-only.</p>
+						<a class="font-medium underline" href={slackThreadUrl} target="_blank" rel="noreferrer"
+							>Continue in Slack</a
+						>
+					</div>
+				{:else}
+					{#if askQuestion}
+						<!-- Keyed: the next waiting question must not inherit this one's step and picks. -->
+						{#key askQuestion.request.elicitationId}
+							<AskQuestion
+								conversationId={askQuestion.conversationId}
+								request={askQuestion.request}
 							/>
-						{:else if onDrag && isFileUploadEnabled}
-							<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
-						{:else}
-							<div
-								class="flex w-full flex-1 rounded-xl border-none bg-transparent"
-								class:paste-glow={pastedLongContent}
-							>
-								{#if lastIsError}
-									<ChatInput
-										value="Sorry, something went wrong. Please try again."
-										disabled={true}
-									/>
-								{:else}
-									<ChatInput
-										placeholder={isReadOnly
-											? "This conversation is read-only."
-											: mlModeOn
-												? ML_ASSISTANT_PLACEHOLDER
-												: "Ask anything"}
-										{loading}
-										bind:value={draft}
-										bind:files
-										mimeTypes={activeMimeTypes}
-										onsubmit={handleSubmit}
-										{onPaste}
-										disabled={isReadOnly || lastIsError}
-										{modelIsMultimodal}
-										{modelSupportsTools}
-										showMlPill={mlPillVisible}
-										bind:focused
-									/>
-								{/if}
-
-								{#if loading}
-									<StopGeneratingBtn
-										onClick={() => {
-											hapticError();
-											onstop?.();
-										}}
-										showBorder={true}
-										classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow-sm transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
-									/>
-								{:else}
-									{#if transcriptionEnabled}
-										<button
-											type="button"
-											class="absolute right-10 bottom-2 mr-1.5 btn size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 sm:right-9 sm:size-7 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white"
-											disabled={isReadOnly}
-											onclick={() => {
-												isRecording = true;
-											}}
-											aria-label="Start voice recording"
-										>
-											<IconMic class="size-4" />
-										</button>
-									{/if}
-									<button
-										class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
-										isReadOnly
-											? ''
-											: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
-										disabled={!draft || isReadOnly}
-										type="submit"
-										aria-label="Send message"
-										name="submit"
-									>
-										<IconArrowUp />
-									</button>
-								{/if}
-							</div>
+						{/key}
+					{/if}
+					<div class="flex w-full gap-2 *:mb-3">
+						{#if !loading && lastIsError}
+							{#if canResumeTurn}
+								<ResumeBtn classNames="ml-auto" onClick={sendResumeMessage} />
+							{/if}
+							<RetryBtn
+								classNames={canResumeTurn ? "" : "ml-auto"}
+								onClick={() => {
+									if (lastMessage && lastMessage.ancestors) {
+										onretry?.({
+											id: lastMessage.id,
+										});
+									}
+								}}
+							/>
 						{/if}
 					</div>
-				</form>
+					<form
+						bind:this={composerForm}
+						tabindex="-1"
+						aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
+						onsubmit={(e) => {
+							e.preventDefault();
+							handleSubmit();
+						}}
+						class={{
+							"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
+							"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
+							"border-[#efc9ad] dark:border-[#5a3a22]": mlModeOn,
+							"dark:border-gray-700": !mlModeOn,
+							"opacity-30": isReadOnly,
+							"max-sm:mb-4": focused && isVirtualKeyboard(),
+						}}
+						style:--composer-actions-width={transcriptionEnabled && !loading ? "84px" : "44px"}
+					>
+						{#if ML_ASSISTANT_MODE}
+							<MlAssistantStrip
+								visible={mlStripVisible}
+								steps={mlAssistant.steps}
+								statusLabel={mlAssistant.statusLabel}
+								complete={mlAssistant.complete}
+								budget={mlAssistant.budget}
+								onbudgetchange={page.params?.id ? changeMlBudget : undefined}
+								dashboard={trackioDashboards.at(-1)}
+								registry={mlRegistry.summary}
+							/>
+						{/if}
+						<!-- The composer box is a column so the ML Assistant strip can stack on
+					     top; this row is the composer proper and keeps its own layout. -->
+						<div class="flex w-full items-center">
+							{#if isRecording || isTranscribing}
+								<VoiceRecorder
+									{isTranscribing}
+									{isTouchDevice}
+									oncancel={() => {
+										isRecording = false;
+									}}
+									onconfirm={handleRecordingConfirm}
+									onsend={handleRecordingSend}
+									onerror={handleRecordingError}
+								/>
+							{:else if onDrag && isFileUploadEnabled}
+								<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
+							{:else}
+								<div
+									class="flex w-full flex-1 rounded-xl border-none bg-transparent"
+									class:paste-glow={pastedLongContent}
+								>
+									{#if lastIsError}
+										<ChatInput
+											value="Sorry, something went wrong. Please try again."
+											disabled={true}
+										/>
+									{:else}
+										<ChatInput
+											placeholder={isReadOnly
+												? "This conversation is read-only."
+												: mlModeOn
+													? ML_ASSISTANT_PLACEHOLDER
+													: "Ask anything"}
+											{loading}
+											bind:value={draft}
+											bind:files
+											mimeTypes={activeMimeTypes}
+											onsubmit={handleSubmit}
+											{onPaste}
+											disabled={isReadOnly || lastIsError}
+											{modelIsMultimodal}
+											{modelSupportsTools}
+											showMlPill={mlPillVisible}
+											bind:focused
+										/>
+									{/if}
+
+									{#if loading}
+										<StopGeneratingBtn
+											onClick={() => {
+												hapticError();
+												onstop?.();
+											}}
+											showBorder={true}
+											classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow-sm transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
+										/>
+									{:else}
+										{#if transcriptionEnabled}
+											<button
+												type="button"
+												class="absolute right-10 bottom-2 mr-1.5 btn size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 sm:right-9 sm:size-7 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white"
+												disabled={isReadOnly}
+												onclick={() => {
+													isRecording = true;
+												}}
+												aria-label="Start voice recording"
+											>
+												<IconMic class="size-4" />
+											</button>
+										{/if}
+										<button
+											class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
+											isReadOnly
+												? ''
+												: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
+											disabled={!draft || isReadOnly}
+											type="submit"
+											aria-label="Send message"
+											name="submit"
+										>
+											<IconArrowUp />
+										</button>
+									{/if}
+								</div>
+							{/if}
+						</div>
+					</form>
+				{/if}
 				<div
 					class={{
 						"mt-1.5 flex h-5 items-center self-stretch px-0.5 text-xs whitespace-nowrap text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,

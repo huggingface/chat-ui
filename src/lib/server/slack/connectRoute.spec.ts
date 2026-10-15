@@ -68,7 +68,7 @@ it("preserves same-origin form submissions while hiding link tickets from other 
 		locals,
 		url: new URL("https://chat.example/slack/connect"),
 		setHeaders,
-	} as Parameters<typeof load>[0]);
+	} as unknown as Parameters<typeof load>[0]);
 	expect(setHeaders).toHaveBeenCalledWith({
 		"cache-control": "private, no-store",
 		"referrer-policy": "same-origin",
