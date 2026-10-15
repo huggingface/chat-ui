@@ -312,3 +312,11 @@ describe("Slack long replies and tables", () => {
 		expect(chunks("😀".repeat(20), 7).map((x) => Array.from(x).length)).toEqual([7, 7, 6]);
 	});
 });
+
+it("preserves columns when table cells contain Slack-style links", () => {
+	const text =
+		"| Model | Link | Notes |\n|---|---|---|\n| Alpha | <https://huggingface.co|huggingface.co> | **Fast** demo |";
+	const rendered = chunks(text).map(slackMarkdown).join("\n");
+	expect(rendered).toContain("*Link:* <https://huggingface.co|huggingface.co>");
+	expect(rendered).toContain("*Notes:* *Fast* demo");
+});

@@ -23,15 +23,24 @@ const plain = (text: string) => ({ type: "plain_text" as const, text, emoji: fal
 /** Slack mrkdwn has no Markdown table syntax. Preserve each row as labeled fields. */
 function readableTables(text: string): string {
 	return Lexer.lex(text, { gfm: true })
-		.map((token) =>
-			token.type === "table"
-				? token.rows
-						.map((row: Array<{ text: string }>) =>
-							row.map((cell, i) => `**${token.header[i].text}:** ${cell.text}`).join("\n")
-						)
-						.join("\n\n") + "\n\n"
-				: token.raw
-		)
+		.map((token) => {
+			if (token.type !== "table") return token.raw;
+			// Models sometimes mix Slack links into Markdown tables. Protect the link's
+			// pipe before parsing columns; leave fenced code and non-table text alone.
+			const normalized = token.raw.replace(
+				/<(https?:\/\/[^>|]+)\|([^>]+)>/g,
+				(_match: string, url: string, label: string) => `[${label.replace(/\|/g, "\\|")}](${url})`
+			);
+			const table = Lexer.lex(normalized, { gfm: true })[0];
+			if (table.type !== "table") return token.raw;
+			return (
+				table.rows
+					.map((row: Array<{ text: string }>) =>
+						row.map((cell, i) => `**${table.header[i].text}:** ${cell.text}`).join("\n")
+					)
+					.join("\n\n") + "\n\n"
+			);
+		})
 		.join("");
 }
 
