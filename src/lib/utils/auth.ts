@@ -10,7 +10,13 @@ export function requireAuthUser(): boolean {
 	if (page.data.loginEnabled && !page.data.user) {
 		const next = page.url.pathname + page.url.search;
 		const url = `${base}/login?next=${encodeURIComponent(next)}`;
-		goto(url, { invalidateAll: true });
+		// OAuth must run outside an embedded Space: provider cookies may be
+		// blocked in the iframe, causing sign-in redirect loops.
+		if (window.self !== window.top) {
+			window.open(new URL(url, page.url.origin).href, "_blank", "noopener,noreferrer");
+		} else {
+			goto(url, { invalidateAll: true });
+		}
 		return true;
 	}
 	return false;
