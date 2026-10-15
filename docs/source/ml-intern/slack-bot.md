@@ -14,6 +14,8 @@ This takes the thread/session and Socket Mode approach described in [Moon Bot](h
 
 ## Thread permissions
 
+The table below describes shared-token sessions. In personal-account mode, only the session owner can submit requests; other channel members can still read Slack messages and download traces.
+
 The **owner** is the person who first invoked ML Intern in that thread, which may be different from the person who posted the thread's first message.
 
 | Action                                                       | Everyone in the channel | Owner only |

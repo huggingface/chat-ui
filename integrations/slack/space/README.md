@@ -11,7 +11,8 @@ suggested_hardware: cpu-upgrade
 ML Intern Slack worker, powered by the Chat UI ML Intern engine.
 
 Runs on upgraded CPU hardware with sleep disabled. Slack uses Socket Mode;
-no public Slack callback URL is required. One replica handles four active thread
+no public event callback URL is required. Account linking additionally uses a
+Slack OpenID callback. One replica handles four active thread
 sessions concurrently. Each thread has its own conversation, budget, files and
 question state; only its original invoker can answer or control that session.
 
@@ -31,6 +32,11 @@ Use a separate Space, private bucket, and Slack app to test personal-account mod
 Never reuse the live app's bot or Socket Mode tokens across independent databases.
 Set `SLACK_ML_ACCOUNT_MODE=user`, restrict `SLACK_ML_ALLOWED_CHANNELS` to a test
 channel, and enable Slack only after configuring the test app's credentials.
+Configure `SLACK_ML_VIEWER_ORIGIN` to match `PUBLIC_ORIGIN`, plus the Slack
+OpenID client ID, client secret, and session secret (`SLACK_ML_VIEWER_*`).
+Enable Sign in with Slack with the `openid` scope and register
+`https://<space-app-host>/slack/view/callback` as its redirect URL. Personal mode
+requires this identity verification before linking HF accounts.
 
 To use the Space's built-in HF login, add `hf_oauth: true` and
 `hf_oauth_scopes: [inference-api, read-mcp, read-billing, jobs]` to its README
