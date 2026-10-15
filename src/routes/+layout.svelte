@@ -198,6 +198,7 @@
 	// Show the welcome modal once on first app load
 	let showWelcome = $derived(
 		!$settings.welcomeModalSeen &&
+			!page.data.slackThreadUrl &&
 			!(page.data.shared === true && page.route.id?.startsWith("/conversation/"))
 	);
 
