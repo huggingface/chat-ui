@@ -9,7 +9,7 @@ import { AbortRegistry } from "$lib/server/abortRegistry";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree";
 import { textGeneration } from "$lib/server/textGeneration";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
-import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
+import { requestProvider } from "$lib/server/requestProvider";
 import { stampMlHarness } from "$lib/server/mlAssistantHarness";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import {
@@ -395,12 +395,7 @@ export async function resumeAnsweredAsk({
 					promptedAt,
 					ip: "ask-resume",
 					username: locals.user?.username,
-					provider:
-						config.isHuggingChat && !model.isRouter
-							? isMlAssistantConversation(conv)
-								? mlAssistantProviderFor(model.id, settings?.providerOverrides?.[model.id])
-								: settings?.providerOverrides?.[model.id]
-							: undefined,
+					provider: requestProvider(model, conv, settings?.providerOverrides),
 					reasoningEffort: isMlAssistantConversation(conv)
 						? ML_ASSISTANT_EFFORT
 						: settings?.reasoningEffortOverrides?.[model.id],
