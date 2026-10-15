@@ -158,10 +158,27 @@
 	);
 
 	// Feature announcement toast: home screen only, gone as soon as a chat starts.
+	// Each announcement is shown once per browser (keyed by title), and never while
+	// the model it points to is already selected.
 	let featureAnnouncement = $derived(
 		getActiveAnnouncement(publicConfig.PUBLIC_FEATURE_ANNOUNCEMENTS)
 	);
-	let showFeatureAnnouncement = $derived(page.route.id === "/" && !messages.length && !loading);
+	const ANNOUNCEMENT_SEEN_KEY = "featureAnnouncementSeen";
+	// undefined until the browser has been asked, so SSR and hydration agree.
+	let seenAnnouncementTitle = $state<string | null | undefined>(undefined);
+	$effect(() => {
+		seenAnnouncementTitle = localStorage.getItem(ANNOUNCEMENT_SEEN_KEY);
+	});
+	let announcementDismissed = $state(false);
+	let showFeatureAnnouncement = $derived(
+		page.route.id === "/" &&
+			!messages.length &&
+			!loading &&
+			!announcementDismissed &&
+			seenAnnouncementTitle !== undefined &&
+			seenAnnouncementTitle !== featureAnnouncement?.title &&
+			featureAnnouncement?.link !== `/models/${currentModel.id}`
+	);
 
 	// Artifacts: fold <artifact> operations from the visible message path into a
 	// versioned registry, shared with the inline cards and the side panel.
@@ -622,6 +639,18 @@
 			!convsStore.list.some((conv) => conv.mlAssistant)
 	);
 
+	// Recorded as soon as it is on screen (not on mount), so a toast hidden behind
+	// the ML Intern spotlight still gets its one showing later. Visible for the rest
+	// of this view; gone on the next visit.
+	let featureAnnouncementVisible = $derived(
+		Boolean(featureAnnouncement) && showFeatureAnnouncement && !mlSpotlightVisible
+	);
+	$effect(() => {
+		if (featureAnnouncementVisible && featureAnnouncement) {
+			localStorage.setItem(ANNOUNCEMENT_SEEN_KEY, featureAnnouncement.title);
+		}
+	});
+
 	function dismissMlSpotlight() {
 		mlSpotlightDismissed = true;
 		localStorage.setItem(ML_SPOTLIGHT_KEY, "1");
@@ -972,8 +1001,11 @@
 				<IconShare />
 			</button>
 		{/if}
-		{#if featureAnnouncement && showFeatureAnnouncement && !mlSpotlightVisible}
-			<FeatureAnnouncementToast announcement={featureAnnouncement} />
+		{#if featureAnnouncement && featureAnnouncementVisible}
+			<FeatureAnnouncementToast
+				announcement={featureAnnouncement}
+				ondismiss={() => (announcementDismissed = true)}
+			/>
 		{/if}
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<!-- tabindex: the document never scrolls in this app, so without it
