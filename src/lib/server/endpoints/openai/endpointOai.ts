@@ -18,7 +18,7 @@ import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepa
 import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWindowFlag";
 import { windowLimitChars } from "$lib/server/textGeneration/utils/historyWindow";
 import { prepareAttachments } from "$lib/server/textGeneration/utils/attachmentBudget";
-import { withoutContentLength } from "$lib/server/undiciCompat";
+import { fetchWithProviderFallback } from "./providerFallback";
 import { inferenceBillingHeaders } from "$lib/server/billing";
 // uuid import removed (no tool call ids)
 
@@ -83,7 +83,7 @@ export async function endpointOai(
 
 	// Custom fetch wrapper to capture response headers for router metadata
 	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
-		const response = await fetch(url, withoutContentLength(init));
+		const response = await fetchWithProviderFallback(url, init);
 
 		// Capture router headers if present (fallback for non-streaming)
 		const routeHeader = response.headers.get("X-Router-Route");

@@ -71,7 +71,7 @@ import {
 	resolveOAuthAccessToken,
 } from "$lib/server/mcp/oauth/connections";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
-import { withoutContentLength } from "$lib/server/undiciCompat";
+import { fetchWithProviderFallback } from "$lib/server/endpoints/openai/providerFallback";
 import {
 	isMlAssistantConversation,
 	mlAssistantPayerTarget,
@@ -618,7 +618,7 @@ export async function* runMcpFlow({
 			input: RequestInfo | URL,
 			init?: RequestInit
 		): Promise<Response> => {
-			const res = await fetch(input, withoutContentLength(init));
+			const res = await fetchWithProviderFallback(input, init);
 			const p = res.headers.get("x-inference-provider");
 			if (p && !providerHeader) providerHeader = p;
 			return res;
