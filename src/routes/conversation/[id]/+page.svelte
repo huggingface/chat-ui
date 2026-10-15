@@ -66,6 +66,14 @@
 	let resuming = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
+
+	function showPaymentError(update: { statusCode?: number; errorCode?: string }): boolean {
+		if (update.statusCode !== 402) return false;
+		const notice = paymentErrorNotice(update.errorCode);
+		if (notice) $error = notice;
+		else showSubscribeModal = true;
+		return true;
+	}
 	// Conversation-scoped stop tombstone. A boolean reset on page.params.id
 	// changes resurrects the generating UI: invalidation reassigns page.params,
 	// which clears the flag while the stopped conversation's snapshot is still
@@ -432,13 +440,8 @@
 					noteServerNow(update.serverNow);
 				},
 				onError: (update) => {
-					const paymentNotice =
-						update.statusCode === 402 ? paymentErrorNotice(update.errorCode) : undefined;
-					if (paymentNotice) {
-						$error = paymentNotice;
-					} else if (update.statusCode === 402) {
-						showSubscribeModal = true;
-					} else if (
+					if (showPaymentError(update)) return;
+					if (
 						update.statusCode === 401 &&
 						typeof update.message === "string" &&
 						/oauth authorization|has been revoked|requested scopes/i.test(update.message)
@@ -566,7 +569,7 @@
 					noteServerNow(update.serverNow);
 				},
 				onError: (update) => {
-					$error = update.message ?? "An error has occurred";
+					if (!showPaymentError(update)) $error = update.message ?? "An error has occurred";
 				},
 			});
 		} catch (err) {

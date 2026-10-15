@@ -1,13 +1,14 @@
+import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 
-/** retries a 402 on a pinned provider once on auto, the router 402s billing disabled providers even for users with credits */
+/** retries a 402 on a pinned provider once on auto, the router 402s billing disabled providers even for users with credits, other backends use colons in model ids */
 export async function fetchWithProviderFallback(
 	input: RequestInfo | URL,
 	init?: RequestInit
 ): Promise<Response> {
 	const res = await fetch(input, withoutContentLength(init));
-	if (res.status !== 402 || typeof init?.body !== "string") return res;
+	if (res.status !== 402 || !config.isHuggingChat || typeof init?.body !== "string") return res;
 	const retry = withoutProviderSuffix(init.body);
 	if (!retry) return res;
 	logger.warn(

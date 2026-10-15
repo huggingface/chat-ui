@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const mocked = vi.hoisted(() => ({ isHuggingChat: true }));
+vi.mock("$lib/server/config", () => ({
+	config: {
+		get isHuggingChat() {
+			return mocked.isHuggingChat;
+		},
+	},
+}));
 vi.mock("$lib/server/logger", () => ({ logger: { warn: vi.fn() } }));
 
 import { fetchWithProviderFallback, upstreamErrorCode } from "./providerFallback";
@@ -58,6 +66,18 @@ describe("fetchWithProviderFallback", () => {
 			method: "POST",
 			body: body("zai-org/GLM-5.3-Flash"),
 		});
+		expect(res.status).toBe(402);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not retry outside HuggingChat, where colons belong to the model id", async () => {
+		mocked.isHuggingChat = false;
+		const fetchMock = respond(402, 200);
+		const res = await fetchWithProviderFallback(URL_, {
+			method: "POST",
+			body: body("llama3.2:70b"),
+		});
+		mocked.isHuggingChat = true;
 		expect(res.status).toBe(402);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
