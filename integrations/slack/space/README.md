@@ -39,12 +39,15 @@ Enable Sign in with Slack with the `openid` scope and register
 requires this identity verification before linking HF accounts.
 
 To use the Space's built-in HF login, add `hf_oauth: true` and
-`hf_oauth_scopes: [inference-api, read-mcp, read-billing, jobs]` to its README
+`hf_oauth_scopes: [inference-api, read-mcp, read-billing, contribute-repos, jobs]` to its README
 metadata. The startup script maps the injected `OAUTH_CLIENT_ID`,
 `OAUTH_CLIENT_SECRET`, and `OAUTH_SCOPES` to Chat UI's `OPENID_*` settings unless
 an explicit `OPENID_CLIENT_ID` is already configured. Set `PUBLIC_ORIGIN` to the
 Space's HTTPS app origin. Login and compute consent still require the user's
-approval. Test conversations appear in this Space's chat history, not hf.co/chat.
+approval. `contribute-repos` permits repository creation and access to repositories
+created by this OAuth app, including model artifacts and Spaces. After adding a
+scope, users must sign in again, approve the updated grant, and reconnect Slack;
+existing tokens do not automatically gain permissions. Test conversations appear in this Space's chat history, not hf.co/chat.
 
 Keep the Space private for an owner-only test; other testers will need access
 to the deployment. Seed a fresh empty state bucket rather than copying production
