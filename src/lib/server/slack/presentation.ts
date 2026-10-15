@@ -26,7 +26,7 @@ function readableTables(text: string): string {
 		.map((token) =>
 			token.type === "table"
 				? token.rows
-						.map((row) =>
+						.map((row: Array<{ text: string }>) =>
 							row.map((cell, i) => `**${token.header[i].text}:** ${cell.text}`).join("\n")
 						)
 						.join("\n\n") + "\n\n"
