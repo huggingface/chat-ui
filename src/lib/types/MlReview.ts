@@ -1,0 +1,130 @@
+import type { ObjectId } from "mongodb";
+import type { Conversation } from "./Conversation";
+import type { Message } from "./Message";
+import type { MlFileRef } from "./MlFile";
+
+export type ReviewFieldType =
+	"text" | "markdown" | "code" | "json" | "chat" | "image" | "number" | "category";
+
+interface ReviewFieldBase {
+	name: string;
+	title?: string;
+}
+
+export type ReviewField =
+	| (ReviewFieldBase & { type: Exclude<ReviewFieldType, "code"> })
+	| (ReviewFieldBase & { type: "code"; language?: string });
+
+export interface ReviewOption {
+	value: string;
+	title?: string;
+	description?: string;
+}
+
+interface ReviewQuestionBase {
+	name: string;
+	title?: string;
+	description?: string;
+	required: boolean;
+	/** a field name, the question is about that field rather than the whole record */
+	target?: string;
+}
+
+export type ReviewQuestion =
+	| (ReviewQuestionBase & { type: "label"; options: ReviewOption[] })
+	| (ReviewQuestionBase & {
+			type: "multi_label";
+			options: ReviewOption[];
+			min?: number;
+			max?: number;
+	  })
+	| (ReviewQuestionBase & { type: "rating"; min: number; max: number })
+	| (ReviewQuestionBase & { type: "boolean" })
+	| (ReviewQuestionBase & { type: "text"; maxLength: number });
+
+export type ReviewQuestionType = ReviewQuestion["type"];
+
+export type ReviewSuggestionsMode = "shown" | "after_answer" | "none";
+
+export interface ReviewSchema {
+	title: string;
+	instructions?: string;
+	idField: string;
+	fields: ReviewField[];
+	questions: ReviewQuestion[];
+	suggestions: ReviewSuggestionsMode;
+}
+
+export type ReviewAnswer = string | string[] | number | boolean;
+
+/** the model's own guess, kept apart from the human answer */
+export interface ReviewSuggestion {
+	value: ReviewAnswer;
+	score?: number;
+	rationale?: string;
+}
+
+export interface ReviewRecord {
+	id: string;
+	/** keyed by field name, which the declaration limits to safe Mongo keys */
+	values: Record<string, unknown>;
+	suggestions?: Record<string, ReviewSuggestion>;
+}
+
+export type ReviewDraftStatus = "pending" | "answered" | "skipped" | "discarded";
+
+export interface ReviewQuote {
+	exact: string;
+	prefix: string;
+	suffix: string;
+}
+
+export interface ReviewComment {
+	id: string;
+	/** absent means the comment is on the whole record */
+	field?: string;
+	quote?: ReviewQuote;
+	body: string;
+	createdAt: Date;
+}
+
+export interface ReviewDraft {
+	status: ReviewDraftStatus;
+	answers: Record<string, ReviewAnswer>;
+	comments: ReviewComment[];
+	updatedAt: Date;
+}
+
+export type ReviewVerdict = "approve" | "request_changes" | "comment";
+
+export type ReviewSource =
+	| { kind: "inline" }
+	| { kind: "file"; name: string; version: number }
+	| { kind: "sandbox"; handle: string; path: string }
+	| { kind: "hub"; uri: string };
+
+export type ReviewStatus = "open" | "submitted" | "detached" | "expired";
+
+export interface MlReview {
+	_id: ObjectId;
+	conversationId: Conversation["_id"];
+	messageId: Message["id"];
+	toolCallId: string;
+	toolUuid: string;
+	elicitationId: string;
+	schema: ReviewSchema;
+	schemaHash: string;
+	source: ReviewSource;
+	records: ReviewRecord[];
+	/** keyed by position, a model chosen id can hold dots or dollar signs that break $set */
+	drafts: Record<string, ReviewDraft>;
+	status: ReviewStatus;
+	verdict?: ReviewVerdict;
+	summary?: string;
+	result?: { text: string; files: MlFileRef[] };
+	createdAt: Date;
+	updatedAt: Date;
+	submittedAt?: Date;
+	detachedAt?: Date;
+	expiredAt?: Date;
+}

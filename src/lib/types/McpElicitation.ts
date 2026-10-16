@@ -145,7 +145,13 @@ export interface ElicitationResume {
 }
 
 /** Where the parked run picks up. `kind` is absent on rows written before ask existed. */
-export type PendingCall = PendingMcpCall | PendingAskCall;
+export type PendingCall = PendingMcpCall | PendingAskCall | PendingReviewCall;
+
+/** kinds the harness continues itself from the stored answer, with no server to call again */
+export type ServerResumedKind = "ask" | "review";
+export const SERVER_RESUMED_KINDS: readonly ServerResumedKind[] = ["ask", "review"];
+
+export type PendingKind = NonNullable<PendingCall["kind"]>;
 
 interface PendingCallBase {
 	messageId: string;
@@ -171,4 +177,10 @@ export interface PendingMcpCall extends PendingCallBase {
 /** Nothing to re-issue: the answer itself is the tool result. */
 export interface PendingAskCall extends PendingCallBase {
 	kind: "ask";
+}
+
+/** a review pane batch, its request stub is never shown and the result comes from mlReviews */
+export interface PendingReviewCall extends PendingCallBase {
+	kind: "review";
+	reviewId: string;
 }

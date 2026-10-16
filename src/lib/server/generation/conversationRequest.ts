@@ -321,11 +321,16 @@ export async function generateConversationResponse({
 	let claimedResume: McpElicitation | undefined;
 	/** Consumes the claims `settleAnsweredAsks` took, once the save carrying them has landed. */
 	let answeredAsksSaved: (() => Promise<void>) | undefined;
+	/** marks the reviews detachOpenReviews closed, once the same save has landed */
+	let reviewsDetached: (() => Promise<void>) | undefined;
 
 	// Asks exist only in ML Assistant conversations, so nothing else pays for the lookup.
 	if (!resumeElicitationId && isMlAssistantConversation(conv)) {
 		const { settleAnsweredAsks } = await import("$lib/server/generation/askResume");
 		answeredAsksSaved = await settleAnsweredAsks(conv);
+		// after the settle, so a submit that just landed is answered, not detached
+		const { detachOpenReviews } = await import("$lib/server/mlReviews/detach");
+		reviewsDetached = await detachOpenReviews(conv);
 	}
 
 	if (resumeElicitationId) {
@@ -470,6 +475,7 @@ export async function generateConversationResponse({
 			{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
 		);
 		await answeredAsksSaved?.();
+		await reviewsDetached?.();
 	} catch (err) {
 		await releaseTurnStart?.();
 		throw err;

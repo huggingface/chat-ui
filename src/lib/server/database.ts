@@ -16,7 +16,10 @@ import type { ParkedCall } from "$lib/types/ParkedCall";
 import type { QueuedInput } from "$lib/types/QueuedInput";
 import type { NestedAgentCall } from "$lib/types/NestedAgentCall";
 import type { MlFile } from "$lib/types/MlFile";
+import type { MlReview } from "$lib/types/MlReview";
 import { ML_FILE_VERSION_INDEX } from "$lib/server/mlFiles/indexes";
+import { ASK_ELICITATION_INDEXES } from "$lib/server/mcp/elicitationIndexes";
+import { ML_REVIEW_ELICITATION_INDEXES } from "$lib/server/mlReviews/indexes";
 import type { MlService } from "$lib/types/MlService";
 import type { MlArtefact } from "$lib/types/MlArtefact";
 import type { MlAgentRun } from "$lib/types/MlAgentRun";
@@ -171,6 +174,7 @@ export class Database {
 		const queuedInputs = db.collection<QueuedInput>("queuedInputs");
 		const nestedAgentCalls = db.collection<NestedAgentCall>("nestedAgentCalls");
 		const mlFiles = db.collection<MlFile>("mlFiles");
+		const mlReviews = db.collection<MlReview>("mlReviews");
 		const mlServices = db.collection<MlService>("mlServices");
 		const mlArtefacts = db.collection<MlArtefact>("mlArtefacts");
 		const mlAgentRuns = db.collection<MlAgentRun>("mlAgentRuns");
@@ -219,6 +223,7 @@ export class Database {
 			queuedInputs,
 			nestedAgentCalls,
 			mlFiles,
+			mlReviews,
 			mlServices,
 			mlArtefacts,
 			mlAgentRuns,
@@ -260,6 +265,7 @@ export class Database {
 			queuedInputs,
 			nestedAgentCalls,
 			mlFiles,
+			mlReviews,
 			mlServices,
 			mlArtefacts,
 			mlAgentRuns,
@@ -441,6 +447,10 @@ export class Database {
 		mlSources
 			.createIndex({ conversationId: 1, url: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating unique index for mlSources by url"));
+		// no ttl, a review is deleted with its conversation like the files it writes
+		mlReviews
+			.createIndex({ conversationId: 1, status: 1 })
+			.catch((e) => logger.error(e, "Error creating index for mlReviews by conversationId"));
 		mlSessionLabels
 			.createIndex({ reconcileAt: 1 })
 			.catch((e) => logger.error(e, "Error creating index for mlSessionLabels by due time"));
@@ -506,21 +516,19 @@ export class Database {
 			.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for mcpElicitations by expiresAt"));
 
-		// Answered questions: the sweep for ones nothing continued, and the per-conversation
-		// lookup the message route makes before every ML turn. Partial, because rows with a
-		// parked call never expire and only the model's own questions are ever looked up.
-		mcpElicitations
-			.createIndex(
-				{ status: 1, resolvedAt: 1 },
-				{ partialFilterExpression: { "pending.kind": "ask" } }
-			)
-			.catch((e) => logger.error(e, "Error creating index for mcpElicitations by resolvedAt"));
-		mcpElicitations
-			.createIndex(
-				{ conversationId: 1, status: 1 },
-				{ partialFilterExpression: { "pending.kind": "ask" } }
-			)
-			.catch((e) => logger.error(e, "Error creating index for mcpElicitations by conversationId"));
+		for (const index of ASK_ELICITATION_INDEXES) {
+			mcpElicitations
+				.createIndex(index.keys, index.options)
+				.catch((e) =>
+					logger.error(e, `Error creating index for mcpElicitations by ${index.label}`)
+				);
+		}
+		// named, on the ask keys with another filter a generated name collides and only logs
+		for (const index of ML_REVIEW_ELICITATION_INDEXES) {
+			mcpElicitations
+				.createIndex(index.keys, index.options)
+				.catch((e) => logger.error(e, `Error creating index ${index.options.name}`));
+		}
 
 		sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch((e) => logger.error(e));
 		settings

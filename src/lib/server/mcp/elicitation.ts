@@ -4,7 +4,13 @@ import type { Client } from "@modelcontextprotocol/client";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
 import { isTurnAlive } from "$lib/server/generation/turnLog";
-import type { ElicitationResume, McpElicitation, PendingMcpCall } from "$lib/types/McpElicitation";
+import type {
+	ElicitationResume,
+	McpElicitation,
+	PendingKind,
+	PendingMcpCall,
+	ServerResumedKind,
+} from "$lib/types/McpElicitation";
 import type {
 	AnsweredElicitation,
 	ElicitationAction,
@@ -266,14 +272,14 @@ export async function handleElicitationRequest(
 }
 
 export type SubmitResult =
-	| { ok: true; resume: boolean; messageId?: string; pendingKind?: "ask" | "mcp" }
+	| { ok: true; resume: boolean; messageId?: string; pendingKind?: PendingKind }
 	| { ok: false; status: 400 | 404 | 500; error: string }
 	| {
 			ok: false;
 			status: 409;
 			error: string;
 			answered?: AnsweredElicitation;
-			pendingKind?: "ask" | "mcp";
+			pendingKind?: PendingKind;
 	  };
 
 /**
@@ -296,7 +302,7 @@ export async function claimElicitationResume(
 	conversationId: ObjectId,
 	elicitationId: string,
 	/** Claim only a prompt of this kind, for a caller that can continue no other. */
-	only?: "ask"
+	only?: ServerResumedKind
 ): Promise<McpElicitation | null> {
 	const now = new Date();
 	const claimed = await collections.mcpElicitations.findOneAndUpdate(
@@ -407,6 +413,15 @@ export async function submitElicitationAnswer({
 	// Scoped by conversation: holding an id is not authority to answer someone else's prompt.
 	const doc = await collections.mcpElicitations.findOne({ elicitationId, conversationId });
 	if (!doc) return { ok: false, status: 404, error: "Unknown elicitation." };
+	// it has no fields, so an empty answer would validate and resolve the review unlabelled
+	if (doc.pending?.kind === "review") {
+		return {
+			ok: false,
+			status: 409,
+			error: "This is a review; submit it from the review pane.",
+			pendingKind: "review",
+		};
+	}
 
 	/** Set when this answer replaces a close nothing consumed; the write below keys on it. */
 	let replaces: Date | undefined;
@@ -624,9 +639,10 @@ export function resumableFrom(
 	row: McpElicitation
 ): { row: McpElicitation; inputResponses: InputResponses } | null {
 	if (!row.pending || row.status !== "resolved" || !row.action) return null;
-	// The model's own question is answered by the answer itself; there is no call to replay
-	// responses into.
-	if (row.pending.kind === "ask") return { row, inputResponses: {} };
+	// an ask or a review is answered by the stored answer itself, there is no call to replay
+	if (row.pending.kind === "ask" || row.pending.kind === "review") {
+		return { row, inputResponses: {} };
+	}
 	return {
 		row,
 		inputResponses: {

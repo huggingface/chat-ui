@@ -1,0 +1,449 @@
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { ObjectId } from "mongodb";
+import superjson from "superjson";
+import { collections, ready } from "$lib/server/database";
+import { ML_FILE_VERSION_INDEX } from "$lib/server/mlFiles/indexes";
+import { createReview } from "$lib/server/mlReviews/store";
+import type { MlReview, ReviewSchema } from "$lib/types/MlReview";
+import type { Conversation } from "$lib/types/Conversation";
+import {
+	cleanupTestData,
+	createTestConversation,
+	createTestLocals,
+	createTestUser,
+} from "./testHelpers";
+
+vi.mock("$lib/server/logger", () => ({
+	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), trace: vi.fn() },
+}));
+
+const { GET, PATCH } =
+	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/+server");
+const { POST: SUBMIT } =
+	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/submit/+server");
+
+const SCHEMA: ReviewSchema = {
+	title: "Triage batch 1",
+	idField: "id",
+	fields: [{ name: "body", type: "text" }],
+	questions: [
+		{
+			name: "kind",
+			type: "label",
+			required: true,
+			options: [{ value: "bug" }, { value: "feature" }],
+		},
+	],
+	suggestions: "after_answer",
+};
+
+async function seed(
+	locals: App.Locals,
+	records = 2
+): Promise<{ conv: Conversation; review: MlReview }> {
+	const conv = await createTestConversation(locals, { mlAssistant: true });
+	const elicitationId = crypto.randomUUID();
+	const review = await createReview({
+		conversationId: conv._id,
+		messageId: "msg-1",
+		toolCallId: "call-1",
+		toolUuid: "uuid-1",
+		elicitationId,
+		schema: SCHEMA,
+		schemaHash: "3f2a91c0",
+		source: { kind: "inline" },
+		records: Array.from({ length: records }, (_, i) => ({
+			id: `gh-${i + 1}`,
+			values: { body: `Body ${i + 1}` },
+			...(i === 0 ? { suggestions: { kind: { value: "bug" } } } : {}),
+		})),
+	});
+	const now = new Date();
+	await collections.mcpElicitations.insertOne({
+		_id: new ObjectId(),
+		elicitationId,
+		conversationId: conv._id,
+		status: "pending",
+		request: {
+			elicitationId,
+			source: "assistant",
+			server: "",
+			mode: "form",
+			message: SCHEMA.title,
+		},
+		pending: {
+			kind: "review",
+			reviewId: review._id.toString(),
+			messageId: "msg-1",
+			toolCallId: "call-1",
+			toolUuid: "uuid-1",
+		},
+		createdAt: now,
+		updatedAt: now,
+	});
+	return { conv, review };
+}
+
+const event = (locals: App.Locals, id: string, reviewId: string, body?: unknown) =>
+	({
+		locals,
+		params: { id, reviewId },
+		request: new Request("http://localhost/review", {
+			method: body === undefined ? "GET" : "POST",
+			...(body === undefined
+				? {}
+				: { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+		}),
+	}) as never;
+
+async function statusOf(promise: Response | Promise<Response>): Promise<number> {
+	try {
+		return (await promise).status;
+	} catch (e: unknown) {
+		const status = (e as { status?: unknown }).status;
+		if (typeof status !== "number") throw e;
+		return status;
+	}
+}
+
+async function errorOf(
+	promise: Response | Promise<Response>
+): Promise<{ status: number; message: string }> {
+	try {
+		const res = await promise;
+		return { status: res.status, message: "" };
+	} catch (e: unknown) {
+		const err = e as { status: number; body?: { message?: string } };
+		return { status: err.status, message: err.body?.message ?? "" };
+	}
+}
+
+const draft = (answers: Record<string, unknown>, comments: unknown[] = []) => ({
+	status: "answered",
+	answers,
+	comments,
+});
+
+const comments = (n: number, prefix = "c") =>
+	Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, body: `note ${i}` }));
+
+beforeAll(async () => {
+	await ready;
+	await collections.mlFiles.createIndex(ML_FILE_VERSION_INDEX.keys, ML_FILE_VERSION_INDEX.options);
+});
+
+afterEach(async () => {
+	await cleanupTestData();
+	await collections.mcpElicitations.deleteMany({});
+});
+
+describe.sequential("reviews endpoint access", () => {
+	it("returns the schema, records, drafts and status to the owner", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+
+		const res = await GET(event(locals, conv._id.toString(), review._id.toString()));
+
+		expect(res.status).toBe(200);
+		const payload = superjson.parse<Record<string, unknown>>(await res.text());
+		expect(payload).toMatchObject({
+			id: review._id.toString(),
+			schema: SCHEMA,
+			schemaHash: "3f2a91c0",
+			drafts: {},
+			status: "open",
+		});
+		expect(payload.records).toHaveLength(2);
+	});
+
+	it("is 404 to another user, whatever ids they hold", async () => {
+		const { locals: owner } = await createTestUser();
+		const { locals: other } = await createTestUser();
+		const { conv, review } = await seed(owner);
+		const otherConv = await createTestConversation(other);
+
+		expect(await statusOf(GET(event(other, conv._id.toString(), review._id.toString())))).toBe(404);
+		expect(await statusOf(GET(event(other, otherConv._id.toString(), review._id.toString())))).toBe(
+			404
+		);
+		expect(
+			await statusOf(
+				SUBMIT(event(other, conv._id.toString(), review._id.toString(), { verdict: "approve" }))
+			)
+		).toBe(404);
+	});
+
+	it("is 404 on a share id, whose reader is not the owner", async () => {
+		const { locals } = await createTestUser();
+		const { review } = await seed(locals);
+		expect(await statusOf(GET(event(locals, "abcdefg", review._id.toString())))).toBe(404);
+	});
+
+	it("is 401 without a session and 404 for a malformed review id", async () => {
+		const { locals } = await createTestUser();
+		const { conv } = await seed(locals);
+		const anonymous = createTestLocals({ sessionId: undefined, user: undefined });
+		expect(await statusOf(GET(event(anonymous, conv._id.toString(), "x")))).toBe(401);
+		expect(await statusOf(GET(event(locals, conv._id.toString(), "not-an-id")))).toBe(404);
+	});
+});
+
+describe.sequential("saving a draft", () => {
+	it("stores an invalid answer and flags it, so a half-done label survives a reload", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+
+		const res = await PATCH(
+			event(locals, conv._id.toString(), review._id.toString(), {
+				index: 1,
+				draft: draft({ kind: "nope" }, [{ id: "c1", field: "body", body: "typo here" }]),
+			})
+		);
+
+		expect(await res.json()).toEqual({
+			ok: true,
+			problems: [{ question: "kind", reason: '"nope" is not an option (bug, feature)' }],
+		});
+		const stored = await collections.mlReviews.findOne({ _id: review._id });
+		expect(stored?.drafts["1"]).toMatchObject({
+			status: "answered",
+			answers: { kind: "nope" },
+			comments: [{ id: "c1", field: "body", body: "typo here", createdAt: expect.any(Date) }],
+		});
+	});
+
+	it("holds the comment caps: 20 per record, 2,000 characters each, 200 per review", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals, 12);
+		const patch = (index: number, body: ReturnType<typeof draft>) =>
+			errorOf(
+				PATCH(event(locals, conv._id.toString(), review._id.toString(), { index, draft: body }))
+			);
+
+		expect(await patch(0, draft({}, comments(21)))).toMatchObject({
+			status: 400,
+			message: expect.stringContaining("at most 20 comments on one record"),
+		});
+		expect(await patch(0, draft({}, [{ id: "long", body: "x".repeat(2_001) }]))).toMatchObject({
+			status: 400,
+			message: expect.stringContaining("2000 characters"),
+		});
+
+		for (let index = 0; index < 10; index += 1) {
+			expect((await patch(index, draft({}, comments(20, `r${index}-`)))).status).toBe(200);
+		}
+		expect(await patch(10, draft({}, comments(1)))).toMatchObject({
+			status: 400,
+			message: "a review holds at most 200 comments",
+		});
+		expect((await patch(9, draft({}, comments(20, "again-")))).status).toBe(200);
+	});
+
+	it("refuses keys that would become Mongo keys without being declared", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		const patched = await errorOf(
+			PATCH(
+				event(locals, conv._id.toString(), review._id.toString(), {
+					index: 0,
+					draft: draft({ "$where.x": "bug" }),
+				})
+			)
+		);
+		expect(patched).toMatchObject({ status: 400, message: "answers.$where.x: no such question" });
+		expect(
+			await errorOf(
+				PATCH(
+					event(locals, conv._id.toString(), review._id.toString(), {
+						index: 2,
+						draft: draft({ kind: "bug" }),
+					})
+				)
+			)
+		).toMatchObject({ status: 400, message: "index: the review has 2 records" });
+	});
+});
+
+describe.sequential("submitting", () => {
+	it("answers 400 with the blockers while a required question is open", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		await PATCH(
+			event(locals, conv._id.toString(), review._id.toString(), {
+				index: 0,
+				draft: draft({ kind: "bug" }),
+			})
+		);
+
+		const res = await SUBMIT(
+			event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+		);
+
+		expect(res.status).toBe(400);
+		expect(await res.json()).toEqual({
+			message: "Some records still need answers.",
+			blockers: [{ record: 1, question: "kind", reason: "required" }],
+		});
+		expect((await collections.mlReviews.findOne({ _id: review._id }))?.status).toBe("open");
+	});
+
+	it("hands a detached review back as a message to send, resolving nothing", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId: review.elicitationId },
+			{ $set: { status: "resolved", action: "cancel", resolution: "withdrawn" } }
+		);
+		await collections.mlReviews.updateOne({ _id: review._id }, { $set: { status: "detached" } });
+		for (const [index, kind] of ["bug", "feature"].entries()) {
+			await PATCH(
+				event(locals, conv._id.toString(), review._id.toString(), {
+					index,
+					draft: draft({ kind }, index === 0 ? [{ id: "c", body: "dupe of #4" }] : []),
+				})
+			);
+		}
+
+		const res = await SUBMIT(
+			event(locals, conv._id.toString(), review._id.toString(), {
+				verdict: "comment",
+				summary: "Mostly fine.",
+			})
+		);
+
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.deliverAsMessage).toBe(true);
+		expect(body.text).toContain('Review "Triage batch 1" submitted (schema 3f2a91c0).');
+		expect(body.text).toContain('Verdict: comment. "Mostly fine."');
+		expect(body.text).toContain(
+			"Records: 2 answered, 0 skipped, 0 discarded, 0 not reviewed (of 2)."
+		);
+		expect(body.text).toContain("kind: bug 1, feature 1. Your suggestion matched on 1 of 1.");
+		expect(body.text).toContain("- gh-1 record: dupe of #4");
+		expect(body.text).toContain("- gh-2 (answered): kind=feature");
+		expect(body.text).toContain(
+			"All answers: v-file://reviews/triage-batch-1.responses.jsonl (version 1)"
+		);
+		const stored = await collections.mlReviews.findOne({ _id: review._id });
+		expect(stored).toMatchObject({
+			status: "submitted",
+			verdict: "comment",
+			summary: "Mostly fine.",
+		});
+		expect(
+			await collections.mcpElicitations.findOne({ elicitationId: review.elicitationId })
+		).toMatchObject({ resolution: "withdrawn" });
+
+		const file = await collections.mlFiles.findOne({
+			conversationId: conv._id,
+			name: "reviews/triage-batch-1.responses.jsonl",
+		});
+		expect(file?.origin).toBe("review");
+		expect(
+			file?.content
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line))
+		).toEqual([
+			{
+				id: "gh-1",
+				status: "answered",
+				answers: { kind: "bug" },
+				suggested: { kind: "bug" },
+				comments: [{ body: "dupe of #4" }],
+				schema: "3f2a91c0",
+			},
+			{
+				id: "gh-2",
+				status: "answered",
+				answers: { kind: "feature" },
+				suggested: {},
+				comments: [],
+				schema: "3f2a91c0",
+			},
+		]);
+	});
+
+	it("is 409 once the review expired, and once it was submitted", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		await collections.mlReviews.updateOne({ _id: review._id }, { $set: { status: "expired" } });
+		expect(
+			await errorOf(
+				SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }))
+			)
+		).toEqual({ status: 409, message: "This review expired." });
+		expect(
+			await errorOf(
+				PATCH(
+					event(locals, conv._id.toString(), review._id.toString(), {
+						index: 0,
+						draft: draft({ kind: "bug" }),
+					})
+				)
+			)
+		).toEqual({ status: 409, message: "This review expired." });
+
+		await collections.mlReviews.updateOne({ _id: review._id }, { $set: { status: "submitted" } });
+		expect(
+			await errorOf(
+				SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }))
+			)
+		).toEqual({ status: 409, message: "This review was already submitted." });
+	});
+
+	it("splits a responses file over 256 KiB into parts", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { mlAssistant: true });
+		const review = await createReview({
+			conversationId: conv._id,
+			messageId: "m",
+			toolCallId: "c",
+			toolUuid: "u",
+			elicitationId: crypto.randomUUID(),
+			schema: {
+				...SCHEMA,
+				questions: [{ name: "note", type: "text", required: false, maxLength: 4_000 }],
+			},
+			schemaHash: "abcd1234",
+			source: { kind: "inline" },
+			records: Array.from({ length: 100 }, (_, i) => ({ id: `r${i}`, values: {} })),
+		});
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{
+				$set: {
+					status: "detached",
+					drafts: Object.fromEntries(
+						Array.from({ length: 100 }, (_, i) => [
+							String(i),
+							{
+								status: "answered",
+								answers: { note: "n".repeat(4_000) },
+								comments: [],
+								updatedAt: new Date(),
+							},
+						])
+					),
+				},
+			}
+		);
+
+		const body = await (
+			await SUBMIT(
+				event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+			)
+		).json();
+
+		const files = await collections.mlFiles.find({ conversationId: conv._id }).toArray();
+		expect(files.map((f) => f.name).sort()).toEqual([
+			"reviews/triage-batch-1.responses.part-1.jsonl",
+			"reviews/triage-batch-1.responses.part-2.jsonl",
+		]);
+		expect(files.every((f) => f.size <= 256 * 1024)).toBe(true);
+		expect(files.flatMap((f) => f.content.trim().split("\n"))).toHaveLength(100);
+		expect(body.text).toContain("All answers, in 2 parts:");
+		expect(body.text).not.toContain("Answers:");
+	});
+});

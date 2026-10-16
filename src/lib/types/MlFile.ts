@@ -16,7 +16,7 @@ export interface MlFile {
 	/** utf8 bytes of content */
 	size: number;
 	sha256: string;
-	origin: "write" | "edit" | "import";
+	origin: "write" | "edit" | "import" | "review";
 	/** what an import read, the sandbox handle and path or the hf:// uri */
 	source?: string;
 	createdAt: Date;

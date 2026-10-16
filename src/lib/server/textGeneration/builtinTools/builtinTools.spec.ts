@@ -37,6 +37,7 @@ describe("getEnabledBuiltinTools", () => {
 	it("offers the preset's builtin tools in an ML Assistant conversation", () => {
 		expect(toolNames({ _id: new ObjectId(), mlAssistant: true })).toEqual([
 			"ask_user_question",
+			"request_review",
 			"update_plan",
 			"wait",
 			"research",

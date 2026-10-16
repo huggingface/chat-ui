@@ -27,7 +27,11 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import type { Conversation } from "$lib/types/Conversation";
-import type { McpElicitation } from "$lib/types/McpElicitation";
+import {
+	SERVER_RESUMED_KINDS,
+	type McpElicitation,
+	type ServerResumedKind,
+} from "$lib/types/McpElicitation";
 import type { Message } from "$lib/types/Message";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
@@ -183,14 +187,15 @@ export async function resumeAnsweredAsk({
 	conversationId,
 	elicitationId,
 	selection,
+	kind = "ask",
 }: {
 	conversationId: ObjectId;
 	elicitationId: string;
 	selection?: AskResumeSelection;
+	kind?: ServerResumedKind;
 }): Promise<{ outcome: AskResumeOutcome; run?: Promise<void> }> {
-	// Asks only: a parked MCP call is re-issued against a server that may exist only in the
-	// browser's configuration, so its continuation still starts from the route.
-	const row = await claimElicitationResume(conversationId, elicitationId, "ask");
+	// never an mcp call, its server may live only in the browser, so the route resumes it
+	const row = await claimElicitationResume(conversationId, elicitationId, kind);
 	const pending = row?.pending;
 	if (!row || !pending) return { outcome: "not_claimed" };
 
@@ -492,20 +497,26 @@ export async function settleAnsweredAsks(
 	conv: Pick<Conversation, "_id" | "messages">
 ): Promise<() => Promise<void>> {
 	const now = Date.now();
-	const rows = await collections.mcpElicitations
-		.find({
-			conversationId: conv._id,
-			status: "resolved",
-			"pending.kind": "ask",
-			$or: [
-				{ resume: { $exists: false } },
-				{
-					"resume.status": "resuming",
-					"resume.takenAt": { $lt: new Date(now - RESUME_LEASE_MS) },
-				},
-			],
-		})
-		.toArray();
+	const rows: McpElicitation[] = [];
+	// one equality match per kind, so each query uses its own partial index
+	for (const kind of SERVER_RESUMED_KINDS) {
+		rows.push(
+			...(await collections.mcpElicitations
+				.find({
+					conversationId: conv._id,
+					status: "resolved",
+					"pending.kind": kind,
+					$or: [
+						{ resume: { $exists: false } },
+						{
+							"resume.status": "resuming",
+							"resume.takenAt": { $lt: new Date(now - RESUME_LEASE_MS) },
+						},
+					],
+				})
+				.toArray())
+		);
+	}
 
 	const claimed: McpElicitation[] = [];
 	for (const candidate of rows) {
@@ -541,12 +552,16 @@ export async function settleAnsweredAsks(
 
 /** Answers whose process died before it could continue them. */
 export async function sweepAnsweredAsks(): Promise<void> {
+	for (const kind of SERVER_RESUMED_KINDS) await sweepAnswered(kind);
+}
+
+async function sweepAnswered(kind: ServerResumedKind): Promise<void> {
 	const now = Date.now();
 	const rows = await collections.mcpElicitations
 		.find(
 			{
 				status: "resolved",
-				"pending.kind": "ask",
+				"pending.kind": kind,
 				resolution: "user",
 				resolvedAt: {
 					$gte: new Date(now - SWEEP_MAX_AGE_MS),
@@ -567,8 +582,8 @@ export async function sweepAnsweredAsks(): Promise<void> {
 		.toArray();
 
 	for (const { conversationId, elicitationId } of rows) {
-		logger.info({ elicitationId }, "[ask] resuming an answered question nothing continued");
-		await kickAnsweredAsk(conversationId, elicitationId);
+		logger.info({ elicitationId, kind }, "[ask] resuming an answer nothing continued");
+		await kickAnsweredAsk(conversationId, elicitationId, undefined, kind);
 	}
 }
 
@@ -576,12 +591,14 @@ export async function sweepAnsweredAsks(): Promise<void> {
 export async function kickAnsweredAsk(
 	conversationId: ObjectId,
 	elicitationId: string,
-	selection?: AskResumeSelection
+	selection?: AskResumeSelection,
+	kind: ServerResumedKind = "ask"
 ): Promise<AskResumeOutcome | "failed"> {
 	try {
 		const { outcome, run } = await resumeAnsweredAsk({
 			conversationId,
 			elicitationId,
+			kind,
 			...(selection ? { selection } : {}),
 		});
 		run?.catch((err) => logger.error({ err, elicitationId }, "[ask] resumed turn crashed"));

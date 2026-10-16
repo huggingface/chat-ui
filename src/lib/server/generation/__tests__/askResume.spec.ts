@@ -773,3 +773,260 @@ describe("a new message after an answer nothing continued", () => {
 		expect(await turnStatus(conv, parked.id)).toBe("done");
 	});
 });
+
+const { POST: SUBMIT_REVIEW } =
+	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/submit/+server");
+const { PATCH: PATCH_REVIEW } =
+	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/+server");
+const { buildReviewResult } = await import("$lib/server/mlReviews/result");
+const { submitReview } = await import("$lib/server/mlReviews/store");
+
+const REVIEW: Round = {
+	toolCalls: [
+		{
+			id: "call_review",
+			name: "request_review",
+			arguments: JSON.stringify({
+				title: "Triage batch 1",
+				source: {
+					records: [
+						{ id: "gh-1", body: "Crash on empty prompt" },
+						{ id: "gh-2", body: "Add dark mode" },
+					],
+				},
+				fields: [{ name: "body", type: "text" }],
+				questions: [
+					{
+						name: "kind",
+						type: "label",
+						required: true,
+						options: [{ value: "bug" }, { value: "feature" }],
+					},
+				],
+				suggestions: "after_answer",
+			}),
+		},
+	],
+};
+
+async function parkOnReview(conv: Conversation, locals: App.Locals) {
+	await sendMessage(conv, locals, "Show me the issues to label.");
+	const row = await collections.mcpElicitations.findOne({ conversationId: conv._id });
+	if (row?.pending?.kind !== "review") throw new Error("the turn did not park on a review");
+	expect(row.status).toBe("pending");
+	return { elicitationId: row.elicitationId, reviewId: row.pending.reviewId };
+}
+
+const reviewRoute = async <T>(
+	run: () => Response | Promise<Response>
+): Promise<{ status: number; body: T }> => {
+	try {
+		const response = await run();
+		return { status: response.status, body: (await response.json()) as T };
+	} catch (err) {
+		const status = (err as { status?: unknown } | null)?.status;
+		if (typeof status !== "number") throw err;
+		return { status, body: undefined as T };
+	}
+};
+
+const routeArgs = (conv: Conversation, locals: App.Locals, reviewId: string, body: unknown) => ({
+	request: new Request("http://localhost/review", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(body),
+	}),
+	locals,
+	params: { id: conv._id.toString(), reviewId },
+});
+
+async function labelAll(conv: Conversation, locals: App.Locals, reviewId: string) {
+	for (const [index, kind] of ["bug", "feature"].entries()) {
+		const patched = await reviewRoute(() =>
+			PATCH_REVIEW(
+				routeArgs(conv, locals, reviewId, {
+					index,
+					draft: {
+						status: "answered",
+						answers: { kind },
+						comments:
+							index === 0 ? [{ id: "c1", field: "body", body: "repro needs a stack trace" }] : [],
+					},
+				}) as never
+			)
+		);
+		expect(patched.status).toBe(200);
+	}
+}
+
+const submitOverHttp = (conv: Conversation, locals: App.Locals, reviewId: string) =>
+	reviewRoute<Record<string, unknown>>(() =>
+		SUBMIT_REVIEW(
+			routeArgs(conv, locals, reviewId, {
+				verdict: "request_changes",
+				summary: "Fix the scraper first.",
+			}) as never
+		)
+	);
+
+async function submitAndDie(conv: Conversation, reviewId: string, elicitationId: string) {
+	const review = await collections.mlReviews.findOne({ conversationId: conv._id });
+	if (!review) throw new Error("no review");
+	const submission = { verdict: "request_changes" as const, summary: "Fix the scraper first." };
+	const result = await buildReviewResult(review, submission);
+	expect(await submitReview(review, { ...submission, result })).toBe(true);
+	const now = new Date();
+	await collections.mcpElicitations.updateOne(
+		{ elicitationId, status: "pending" },
+		{ $set: { status: "resolved", action: "accept", resolution: "user", resolvedAt: now } }
+	);
+	expect(reviewId).toBe(review._id.toString());
+}
+
+const reviewResolutions = (message: Message) =>
+	(message.updates ?? []).filter(
+		(u) => u.type === MessageUpdateType.Review && u.subtype === "resolved"
+	);
+
+describe("a submitted review", () => {
+	it("is continued by the server with the result as the tool message, once for two submits", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "On it: fixing the scraper." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		expect(await turnStatus(conv, parked.id)).toBe("awaiting_input");
+		await labelAll(conv, locals, reviewId);
+
+		const [first, second] = await Promise.all([
+			submitOverHttp(conv, locals, reviewId),
+			submitOverHttp(conv, locals, reviewId),
+		]);
+		await turnIs(conv, parked.id, "done");
+
+		expect([first.status, second.status].sort()).toEqual([200, 409]);
+		expect([first.body, second.body].find(Boolean)).toMatchObject({ ok: true });
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain('Review "Triage batch 1" submitted');
+		expect(result).toContain('Verdict: request changes. "Fix the scraper first."');
+		expect(result).toContain("kind: bug 1, feature 1.");
+		expect(result).toContain("- gh-1 body: repro needs a stack trace");
+		expect(result).toContain("v-file://reviews/triage-batch-1.responses.jsonl");
+
+		const message = lastAssistant(await reload(conv));
+		expect(message.id).toBe(parked.id);
+		expect(settlements(message, elicitationId)).toHaveLength(1);
+		expect(toolResults(message)).toHaveLength(1);
+		expect(reviewResolutions(message)).toHaveLength(1);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "resumed", attempts: 1 },
+		});
+	});
+
+	it("is run by the sweep after a holder persisted its resume updates and died", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "On it." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await labelAll(conv, locals, reviewId);
+		await submitAndDie(conv, reviewId, elicitationId);
+		await backdate(elicitationId, 10 * 60_000);
+		const row = await collections.mcpElicitations.findOne({ elicitationId });
+		if (!row) throw new Error("row vanished");
+		const { resumeParkedToolCall } = await import("$lib/server/mcp/resumeElicitation");
+		const delivered = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId,
+			claimed: row,
+		});
+		expect(delivered.updates.map((u) => [u.type, "subtype" in u ? u.subtype : ""])).toEqual([
+			[MessageUpdateType.Review, "resolved"],
+			[MessageUpdateType.Elicitation, MessageElicitationUpdateType.Resolved],
+			[MessageUpdateType.Tool, MessageToolUpdateType.Result],
+		]);
+		await collections.conversations.updateOne({ _id: conv._id, "messages.id": parked.id }, {
+			$push: { "messages.$.updates": { $each: delivered.updates } },
+		} as never);
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId },
+			{
+				$set: {
+					resume: {
+						status: "resuming",
+						attempts: 1,
+						takenAt: new Date(Date.now() - RESUME_LEASE_MS - 1_000),
+					},
+				},
+			}
+		);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, parked.id, "done");
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const message = lastAssistant(await reload(conv));
+		expect(settlements(message, elicitationId)).toHaveLength(1);
+		expect(toolResults(message)).toHaveLength(1);
+		expect(reviewResolutions(message)).toHaveLength(1);
+		expect(message.content).toContain("On it.");
+	});
+
+	it("is settled as the answer when the user sends a message after a submit nothing continued", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Fixing the scraper." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		await labelAll(conv, locals, reviewId);
+		await submitAndDie(conv, reviewId, elicitationId);
+
+		await sendMessage(conv, locals, "Did you see my review?");
+
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain('Review "Triage batch 1" submitted');
+		expect(result).not.toContain("still open");
+		expect((await collections.mlReviews.findOne({ conversationId: conv._id }))?.status).toBe(
+			"submitted"
+		);
+	});
+});
+
+describe("a review the user wrote past", () => {
+	it("is closed as still open, detached, and never resumed by a later submit", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Waiting for your review." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+
+		await sendMessage(conv, locals, "Hold on, first tell me where the issues came from.");
+
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toBe(
+			'Review "Triage batch 1" is still open: 0 of 2 answered, 0 comments. The user wrote instead; the review stays open and its submission will arrive as a user message.'
+		);
+		expect(await turnStatus(conv, parked.id)).toBe("done");
+		expect((await collections.mlReviews.findOne({ conversationId: conv._id }))?.status).toBe(
+			"detached"
+		);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			status: "resolved",
+			resolution: "withdrawn",
+			resume: { status: "abandoned", abandonedReason: "user wrote instead" },
+		});
+
+		await labelAll(conv, locals, reviewId);
+		const submitted = await submitOverHttp(conv, locals, reviewId);
+		expect(submitted.status).toBe(200);
+		expect(submitted.body).toMatchObject({ deliverAsMessage: true });
+		expect(String(submitted.body.text)).toContain('Review "Triage batch 1" submitted');
+
+		await backdate(elicitationId, 60_000);
+		await sweepAnsweredAsks();
+		expect(
+			await resumeAnsweredAsk({ conversationId: conv._id, elicitationId, kind: "review" })
+		).toEqual({ outcome: "not_claimed" });
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const settled = (await reload(conv)).messages.find((m) => m.id === parked.id);
+		if (!settled) throw new Error("parked message vanished");
+		expect(toolResults(settled)).toHaveLength(1);
+		expect(reviewResolutions(settled)).toHaveLength(0);
+	});
+});

@@ -615,6 +615,60 @@ describe("resuming a parked wait", () => {
 			})
 		);
 	});
+
+	it("a too-large save expires the review the resumed run opened, so the pane shows it closed", async () => {
+		const row = park();
+		await seedParkedTurn(row, { padBytes: NEAR_LIMIT_PAD });
+		const reviewId = new ObjectId();
+		const now = new Date();
+		await collections.mlReviews.insertOne({
+			_id: reviewId,
+			conversationId: row.conversationId,
+			messageId: row.messageId,
+			toolCallId: "call-2",
+			toolUuid: "uuid-2",
+			elicitationId: "r-mine",
+			schema: { title: "Batch", idField: "id", fields: [], questions: [], suggestions: "shown" },
+			schemaHash: "00000000",
+			source: { kind: "inline" },
+			records: [{ id: "a", values: {} }],
+			drafts: {},
+			status: "open",
+			createdAt: now,
+			updatedAt: now,
+		});
+		generation.run = async function* (ctx) {
+			yield { type: MessageUpdateType.Stream, token: BIG_ANSWER };
+			await collections.mcpElicitations.insertOne({
+				_id: new ObjectId(),
+				elicitationId: "r-mine",
+				conversationId: row.conversationId,
+				generationId: ctx.generationId ?? "",
+				status: "pending",
+				request: { elicitationId: "r-mine", server: "", mode: "form", message: "Batch" },
+				pending: {
+					kind: "review",
+					reviewId: reviewId.toString(),
+					messageId: row.messageId,
+					toolCallId: "call-2",
+					toolUuid: "uuid-2",
+				},
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			});
+		};
+
+		await sweepParkedCalls();
+
+		expect(await collections.mlReviews.findOne({ _id: reviewId })).toMatchObject({
+			status: "expired",
+			expiredAt: expect.any(Date),
+		});
+		expect(
+			(await collections.mcpElicitations.findOne({ elicitationId: "r-mine" }))?.expiresAt
+		).toBeInstanceOf(Date);
+		await collections.mlReviews.deleteMany({ conversationId: row.conversationId });
+	});
 });
 
 describe("isDocumentTooLarge", () => {

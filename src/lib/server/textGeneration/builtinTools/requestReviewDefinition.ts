@@ -1,0 +1,175 @@
+import type { OpenAiTool } from "$lib/server/mcp/tools";
+import {
+	REVIEW_FIELD_TYPES,
+	REVIEW_LIMITS,
+	REVIEW_QUESTION_TYPES,
+	REVIEW_SUGGESTION_MODES,
+} from "$lib/utils/review/schema";
+
+export const REQUEST_REVIEW_TOOL_NAME = "request_review";
+
+export const REVIEW_MAX_RECORDS = 500;
+export const REVIEW_MAX_BYTES = 4 * 1024 * 1024;
+export const REVIEW_MAX_INLINE_RECORDS = 20;
+export const REVIEW_MAX_INLINE_CHARS = 16_000;
+
+/** re-sent every round while offered, held to 600 characters by the prompt spec */
+export const REQUEST_REVIEW_PREPROMPT =
+	`REVIEWING DATA: show data to the user with ${REQUEST_REVIEW_TOOL_NAME} before you train on it or push it. ` +
+	`Golden and eval sets use suggestions "after_answer". ` +
+	`More than ${REVIEW_MAX_INLINE_RECORDS} records go in a file, never inline. One review per round.`;
+
+/** kept apart from the tool so the prompt specs can measure it without a database */
+export const requestReviewDefinition: OpenAiTool = {
+	type: "function",
+	function: {
+		name: REQUEST_REVIEW_TOOL_NAME,
+		description:
+			"Show the user a batch of records in a review pane and wait for their submission. " +
+			"Use it to have data looked at before you train on it or push it, and to have a golden " +
+			"or eval set labelled. Declare the record shape in `fields` and, to collect labels, the " +
+			"`questions`; with no questions the user approves or comments. The user can comment on " +
+			"any record, field or quoted span, and submits everything at once with a verdict. You get " +
+			"back the verdict, counts, tallies, every comment, and a virtual file of the per-record " +
+			"answers (inline too when there are 20 records or fewer). " +
+			`Records come from source: inline \`records\` for ${REVIEW_MAX_INLINE_RECORDS} or fewer, ` +
+			"otherwise a virtual file, a sandbox path or an hf:// file holding a JSON array or JSONL, " +
+			`at most ${REVIEW_MAX_RECORDS} records and 4 MB. Each record is an object with the ` +
+			"id_field, one key per field, and optionally `suggestions`: " +
+			'{"<question>": {"value": ..., "score": 0.7, "rationale": "..."}}, your own guess, kept ' +
+			"apart from the human answer. Never put suggestions into field values. A golden or eval " +
+			'set must use suggestions "after_answer" so your guesses do not anchor the labels.',
+		parameters: {
+			type: "object",
+			properties: {
+				title: {
+					type: "string",
+					description: 'Short name for the batch, e.g. "Issue triage golden set, batch 1".',
+				},
+				instructions: {
+					type: "string",
+					description: "Markdown shown above the records: what to look for, how to label.",
+				},
+				source: {
+					type: "object",
+					description: "Where the records are. Give exactly one key.",
+					properties: {
+						records: {
+							type: "array",
+							maxItems: REVIEW_MAX_INLINE_RECORDS,
+							description: `Inline records, ${REVIEW_MAX_INLINE_RECORDS} at most.`,
+							items: { type: "object" },
+						},
+						file: {
+							type: "string",
+							description:
+								"A virtual file name, e.g. triage/batch-1.jsonl, or name@v2 to pin a version.",
+						},
+						sandbox: {
+							type: "object",
+							properties: {
+								handle: { type: "string", description: "The sandbox handle." },
+								path: { type: "string", description: "Absolute path of the file in the sandbox." },
+							},
+							required: ["handle", "path"],
+						},
+						hub: {
+							type: "string",
+							description: "An hf:// file URI, e.g. hf://datasets/org/repo/sample.jsonl.",
+						},
+					},
+				},
+				id_field: {
+					type: "string",
+					description: 'The record key that holds a unique id. Defaults to "id".',
+				},
+				fields: {
+					type: "array",
+					maxItems: REVIEW_LIMITS.fields,
+					description: "How to show each record key. Omit when `schema` names a file.",
+					items: {
+						type: "object",
+						properties: {
+							name: { type: "string", description: "The record key, lowercase snake_case." },
+							type: {
+								type: "string",
+								enum: [...REVIEW_FIELD_TYPES],
+								description:
+									"text, markdown, code, json, chat (a list of {role, content}), image " +
+									"(an https or hf:// URL), number or category (shown as chips).",
+							},
+							title: { type: "string" },
+							language: { type: "string", description: "For code fields." },
+						},
+						required: ["name", "type"],
+					},
+				},
+				questions: {
+					type: "array",
+					maxItems: REVIEW_LIMITS.questions,
+					description: "What to ask about each record. Omit for a plain review.",
+					items: {
+						type: "object",
+						properties: {
+							name: { type: "string", description: "Lowercase snake_case, the answer key." },
+							type: {
+								type: "string",
+								enum: [...REVIEW_QUESTION_TYPES],
+								description:
+									"label (one option), multi_label (several), rating (an integer from min to max, " +
+									"at most 11 steps), boolean, or text.",
+							},
+							title: { type: "string" },
+							description: { type: "string" },
+							required: { type: "boolean" },
+							target: {
+								type: "string",
+								description: "A field name, to ask about that field instead of the whole record.",
+							},
+							options: {
+								type: "array",
+								minItems: REVIEW_LIMITS.minOptions,
+								maxItems: REVIEW_LIMITS.maxOptions,
+								description: "For label and multi_label.",
+								items: {
+									type: "object",
+									properties: {
+										value: { type: "string" },
+										title: { type: "string" },
+										description: { type: "string" },
+									},
+									required: ["value"],
+								},
+							},
+							min: {
+								type: "integer",
+								description: "rating: lowest value (default 1). multi_label: fewest picks.",
+							},
+							max: {
+								type: "integer",
+								description: "rating: highest value (default 5). multi_label: most picks.",
+							},
+							max_length: { type: "integer", description: "text: longest answer." },
+						},
+						required: ["name", "type"],
+					},
+				},
+				schema: {
+					type: "string",
+					description:
+						"A virtual file you already wrote, holding {fields, questions} as JSON, in place of " +
+						"inline fields and questions. Reuse one file across batches of the same set so their " +
+						"answers stay comparable. Omit it to declare fields and questions inline.",
+				},
+				suggestions: {
+					type: "string",
+					enum: [...REVIEW_SUGGESTION_MODES],
+					description:
+						'When the user sees your suggestions: "shown" (default), "after_answer" (required for ' +
+						'golden and eval sets) or "none".',
+				},
+			},
+			required: ["title", "source"],
+		},
+	},
+};
