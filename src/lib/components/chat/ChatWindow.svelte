@@ -586,8 +586,8 @@
 		const text = draft.trim();
 		draft = "";
 		tap();
-		void queuedInputs.enqueue(text).then((ok) => {
-			if (ok) return;
+		void queuedInputs.enqueue(text).then((outcome) => {
+			if (outcome !== "failed") return;
 			draft = draft ? `${text}\n\n${draft}` : text;
 			$error = "Could not queue the message. Try again.";
 		});

@@ -19,6 +19,8 @@ export class QueuedInputsStore {
 	#timer: ReturnType<typeof setTimeout> | undefined;
 	#idleSince = 0;
 	#generation = 0;
+	#takenBack = 0;
+	#sending = new Set<Promise<unknown>>();
 	#fetch: FetchFn;
 
 	constructor(fetchFn?: FetchFn) {
@@ -87,11 +89,12 @@ export class QueuedInputsStore {
 		this.#schedule();
 	}
 
-	/** false when the server refused it */
-	async enqueue(text: string): Promise<boolean> {
+	/** withdrawn when a stop took it back while it was in flight, the stop cancels it */
+	async enqueue(text: string): Promise<"queued" | "failed" | "withdrawn"> {
 		const conversationId = this.conversationId;
-		if (!conversationId) return false;
+		if (!conversationId) return "failed";
 		const generation = this.#generation;
+		const takenBack = this.#takenBack;
 		const temp: QueuedChip = {
 			id: `pending-${crypto.randomUUID()}`,
 			text,
@@ -100,25 +103,46 @@ export class QueuedInputsStore {
 			sending: true,
 		};
 		this.items = [...this.items, temp];
+		const request = this.#post(conversationId, text);
+		this.#sending.add(request);
+		const input = await request;
+		this.#sending.delete(request);
+		if (takenBack !== this.#takenBack) {
+			if (input) void this.remove(input.id);
+			return "withdrawn";
+		}
+		if (generation !== this.#generation) return input ? "queued" : "failed";
+		if (!input) {
+			this.items = this.items.filter((item) => item.id !== temp.id);
+			return "failed";
+		}
+		this.items = this.items.map((item) => (item.id === temp.id ? input : item));
+		this.#idleSince = Date.now();
+		this.#schedule();
+		return "queued";
+	}
+
+	async #post(conversationId: string, text: string): Promise<QueuedInputView | undefined> {
 		try {
 			const response = await this.#fetch(this.#url(conversationId), {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ text }),
 			});
-			if (!response.ok) throw new Error(String(response.status));
-			const { input } = (await response.json()) as { input: QueuedInputView };
-			if (generation !== this.#generation) return true;
-			this.items = this.items.map((item) => (item.id === temp.id ? input : item));
-			this.#idleSince = Date.now();
-			this.#schedule();
-			return true;
+			if (!response.ok) return undefined;
+			return ((await response.json()) as { input: QueuedInputView }).input;
 		} catch {
-			if (generation === this.#generation) {
-				this.items = this.items.filter((item) => item.id !== temp.id);
-			}
-			return false;
+			return undefined;
 		}
+	}
+
+	/** a stop sent before an insert lands would leave that message queued behind it */
+	async settled(timeoutMs = 5_000): Promise<void> {
+		if (this.#sending.size === 0) return;
+		await Promise.race([
+			Promise.allSettled([...this.#sending]),
+			new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+		]);
 	}
 
 	/** sent when the turn read it first, the chip goes either way */
@@ -150,6 +174,7 @@ export class QueuedInputsStore {
 
 	/** a stop cancels the queue on the server, the texts go back to the composer */
 	takeBack(): string[] {
+		this.#takenBack += 1;
 		const texts = this.items.map((item) => item.text);
 		this.items = [];
 		clearTimeout(this.#timer);

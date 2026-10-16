@@ -38,7 +38,7 @@ describe("QueuedInputsStore", () => {
 		expect(store.items).toMatchObject([{ text: "use lr 1e-4", sending: true }]);
 		answer(json({ input: view("q1") }));
 
-		expect(await sent).toBe(true);
+		expect(await sent).toBe("queued");
 		expect(store.items).toEqual([view("q1")]);
 		expect(fetchFn).toHaveBeenCalledWith(
 			"/conversation/c1/queue",
@@ -53,7 +53,7 @@ describe("QueuedInputsStore", () => {
 		const store = new QueuedInputsStore(fetchFn as unknown as typeof fetch);
 		store.watch("c1", { busy: true, onStarted: () => {} });
 
-		expect(await store.enqueue("too many")).toBe(false);
+		expect(await store.enqueue("too many")).toBe("failed");
 		expect(store.items).toEqual([]);
 	});
 
@@ -125,6 +125,54 @@ describe("QueuedInputsStore", () => {
 
 		expect(store.takeBack()).toEqual(["text q1", "text q2"]);
 		expect(store.items).toEqual([]);
+	});
+
+	it("lets a stop wait for an insert in flight and cancels it once it lands", async () => {
+		let answer: (response: Response) => void = () => {};
+		const fetchFn = vi.fn(async (_url: unknown, init?: RequestInit) => {
+			if (init?.method === "POST") return new Promise<Response>((resolve) => (answer = resolve));
+			if (init?.method === "DELETE") return json({ cancelled: true });
+			return json({ inputs: [] });
+		});
+		const store = new QueuedInputsStore(fetchFn as unknown as typeof fetch);
+		store.watch("c1", { busy: true, onStarted: () => {} });
+
+		const sent = store.enqueue("late");
+		expect(store.takeBack()).toEqual(["late"]);
+		let settled = false;
+		const waiting = store.settled().then(() => (settled = true));
+		await Promise.resolve();
+		expect(settled).toBe(false);
+
+		answer(json({ input: view("q9") }));
+		expect(await sent).toBe("withdrawn");
+		await waiting;
+		expect(store.items).toEqual([]);
+		expect(fetchFn).toHaveBeenCalledWith(
+			"/conversation/c1/queue",
+			expect.objectContaining({ method: "DELETE", body: JSON.stringify({ id: "q9" }) })
+		);
+	});
+
+	it("does not hand back a failed insert a stop already took back", async () => {
+		let answer: (response: Response) => void = () => {};
+		const fetchFn = vi.fn(async (_url: unknown, init?: RequestInit) =>
+			init?.method === "POST"
+				? new Promise<Response>((resolve) => (answer = resolve))
+				: json({ inputs: [] })
+		);
+		const store = new QueuedInputsStore(fetchFn as unknown as typeof fetch);
+		store.watch("c1", { busy: true, onStarted: () => {} });
+
+		const sent = store.enqueue("late");
+		store.takeBack();
+		answer(json({}, 500));
+
+		expect(await sent).toBe("withdrawn");
+		expect(fetchFn).not.toHaveBeenCalledWith(
+			"/conversation/c1/queue",
+			expect.objectContaining({ method: "DELETE" })
+		);
 	});
 
 	it("forgets the last conversation's queue on navigation", async () => {

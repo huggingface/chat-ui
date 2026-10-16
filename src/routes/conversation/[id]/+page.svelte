@@ -735,6 +735,7 @@
 		// generation watchers act on), so retry with backoff instead of giving
 		// up after a single transient failure.
 		stopRequestPromise = (async () => {
+			await queuedInputs.settled();
 			const delays = [0, 300, 1000, 3000];
 			for (const [attempt, delay] of delays.entries()) {
 				if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
