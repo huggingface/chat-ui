@@ -151,6 +151,7 @@ describe("answerSideQuestion", () => {
 		expect(params).not.toHaveProperty("tools");
 		expect(params.conversationId).toBeUndefined();
 		expect(params.generateSettings).toMatchObject({ top_p: 0.9, max_tokens: 4096 });
+		expect(params.reasoningEffort).toBeUndefined();
 		expect(params.messages).toHaveLength(1);
 		const prompt = String(params.messages[0].content);
 		expect(params.messages[0].from).toBe("user");
@@ -186,6 +187,26 @@ describe("answerSideQuestion", () => {
 		expect(prompt).toContain("CURRENT REASONING");
 		expect(prompt).not.toContain("OLD REASONING");
 		expect(prompt).toContain("The run is not active");
+	});
+
+	it("asks for low effort only where the model or the user enables reasoning", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { mlAssistant: true, messages: liveTurn() });
+		mocks.endpoint.mockImplementation(async () => streamOf(["ok"])());
+
+		await collect(
+			answerSideQuestion({
+				conversationId: conv._id,
+				question: "why?",
+				locals,
+				settings: { providerOverrides: {}, reasoningOverrides: { "test-model": true } },
+			})
+		);
+
+		expect(mocks.endpoint.mock.calls[0][0]).toMatchObject({
+			reasoningEffort: "low",
+			reasoningOverride: true,
+		});
 	});
 
 	it("refuses conversations outside ML Intern", async () => {

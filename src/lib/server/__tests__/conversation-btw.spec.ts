@@ -7,9 +7,13 @@ import {
 	createTestUser,
 } from "$lib/server/api/__tests__/testHelpers";
 
-const mocks = vi.hoisted(() => ({ answer: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+	answer: vi.fn(),
+	limits: {} as { messagesPerMinute?: number },
+}));
 
 vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
+vi.mock("$lib/server/usageLimits", () => ({ usageLimits: mocks.limits }));
 vi.mock("$lib/server/mlSideQuestion", () => ({
 	SIDE_QUESTION_MAX_CHARS: 4000,
 	answerSideQuestion: mocks.answer,
@@ -39,6 +43,8 @@ function ask(id: string, locals: App.Locals, body: unknown): Promise<Response> {
 describe.sequential("POST /conversation/[id]/btw", () => {
 	afterEach(async () => {
 		vi.clearAllMocks();
+		delete mocks.limits.messagesPerMinute;
+		await collections.messageEvents.deleteMany({});
 		await cleanupTestData();
 	});
 
@@ -84,6 +90,21 @@ describe.sequential("POST /conversation/[id]/btw", () => {
 		expect((await ask(ml._id.toString(), locals, { question: "   " })).status).toBe(400);
 		expect((await ask(new ObjectId().toString(), locals, { question: "hi" })).status).toBe(404);
 		expect(mocks.answer).not.toHaveBeenCalled();
+	});
+
+	it("rate limits side questions per address as well as per account", async () => {
+		mocks.limits.messagesPerMinute = 1;
+		mocks.answer.mockImplementation(async function* () {
+			yield "ok";
+		});
+		const first = await createTestUser();
+		const second = await createTestUser();
+		const a = await createTestConversation(first.locals, { mlAssistant: true });
+		const b = await createTestConversation(second.locals, { mlAssistant: true });
+
+		expect((await ask(a._id.toString(), first.locals, { question: "one" })).status).toBe(200);
+		expect((await ask(b._id.toString(), second.locals, { question: "two" })).status).toBe(429);
+		expect(mocks.answer).toHaveBeenCalledTimes(1);
 	});
 
 	it("answers an upstream failure before the first chunk with an error status", async () => {

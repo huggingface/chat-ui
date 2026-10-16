@@ -42,11 +42,13 @@ export const POST: RequestHandler = async ({ params, locals, request, getClientA
 			expiresAt: new Date(Date.now() + 60_000),
 			ip: getClientAddress(),
 		});
-		const recent = await collections.messageEvents.countDocuments({
-			userId,
-			type: "message",
-			expiresAt: { $gt: new Date() },
-		});
+		const live = { type: "message" as const, expiresAt: { $gt: new Date() } };
+		const recent = Math.max(
+			...(await Promise.all([
+				collections.messageEvents.countDocuments({ userId, ...live }),
+				collections.messageEvents.countDocuments({ ip: getClientAddress(), ...live }),
+			]))
+		);
 		if (recent > usageLimits.messagesPerMinute) error(429, ERROR_MESSAGES.rateLimited);
 	}
 
@@ -60,7 +62,7 @@ export const POST: RequestHandler = async ({ params, locals, request, getClientA
 		conversationId,
 		question: parsed.data.question,
 		locals,
-		providerOverrides: settings?.providerOverrides,
+		settings,
 		signal: abort.signal,
 	});
 	const encoder = new TextEncoder();

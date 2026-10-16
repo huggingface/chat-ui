@@ -17,6 +17,7 @@ import {
 } from "$lib/server/textGeneration/utils/historyWindow";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree";
 import { stripThink } from "$lib/utils/stripThink";
+import type { Settings } from "$lib/types/Settings";
 
 type ChatMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -44,8 +45,8 @@ const noImages = (async () => {
 }) as unknown as ReturnType<typeof makeImageProcessor>;
 
 function stripReasoning(message: ChatMessageParam): ChatMessageParam {
-	if (message.role !== "assistant" || !("reasoning_content" in message)) return message;
-	const rest: ChatMessageParam & { reasoning_content?: string } = { ...message };
+	if (message.role !== "assistant") return message;
+	const rest: ChatMessageParam & { reasoning_content?: unknown } = { ...message };
 	delete rest.reasoning_content;
 	return rest;
 }
@@ -118,7 +119,7 @@ export async function* answerSideQuestion(opts: {
 	conversationId: ObjectId;
 	question: string;
 	locals: App.Locals;
-	providerOverrides?: Record<string, string>;
+	settings?: Pick<Settings, "providerOverrides" | "reasoningOverrides"> | null;
 	signal?: AbortSignal;
 }): AsyncGenerator<string, void, void> {
 	const conv = await collections.conversations.findOne({ _id: opts.conversationId });
@@ -161,6 +162,7 @@ export async function* answerSideQuestion(opts: {
 		`<transcript>\n${renderTranscript(messages) || "(empty)"}\n</transcript>\n\n` +
 		`${status}\n\nSide question: ${question}`;
 
+	const reasoningOverride = opts.settings?.reasoningOverrides?.[model.id];
 	const endpoint = await model.getEndpoint();
 	// given a conversationId the endpoint would store a history window start
 	const stream = await endpoint({
@@ -173,8 +175,9 @@ export async function* answerSideQuestion(opts: {
 		isMultimodal: false,
 		locals: opts.locals,
 		abortSignal: opts.signal,
-		provider: requestProvider(model, conv, opts.providerOverrides),
-		reasoningEffort: "low",
+		provider: requestProvider(model, conv, opts.settings?.providerOverrides),
+		reasoningEffort: (reasoningOverride ?? model.supportsReasoning) ? "low" : undefined,
+		reasoningOverride,
 	});
 
 	let raw = "";

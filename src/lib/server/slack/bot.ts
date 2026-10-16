@@ -73,6 +73,9 @@ const mention = z.object({
 	subtype: z.string().optional(),
 });
 
+/** shared slack credentials pay for these, one per asker and a few across the workspace */
+const MAX_SLACK_SIDE_QUESTIONS = 4;
+
 /** Transport and delivery only. ML Intern's existing engine owns tool execution and resume. */
 export class MlSlackBot {
 	readonly app: App;
@@ -81,6 +84,7 @@ export class MlSlackBot {
 	private runningConversations = new Map<string, string>();
 	private members = new Map<string, { allowed: boolean; until: number }>();
 	private sideQuestionEvents = new Map<string, number>();
+	private sideQuestionAskers = new Set<string>();
 	private ticking = false;
 	private renders = new Map<string, Promise<void>>();
 	private timer?: ReturnType<typeof setInterval>;
@@ -564,6 +568,19 @@ export class MlSlackBot {
 			);
 			return;
 		}
+		if (
+			this.sideQuestionAskers.has(event.user) ||
+			this.sideQuestionAskers.size >= MAX_SLACK_SIDE_QUESTIONS
+		) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"ML Intern is still answering another btw question. Try again once it replies.",
+				thread.threadTs
+			);
+			return;
+		}
+		this.sideQuestionAskers.add(event.user);
 		await this.app.client.reactions
 			.add({ channel: event.channel, timestamp: event.ts, name: "eyes" })
 			.catch(() => {});
@@ -596,6 +613,8 @@ export class MlSlackBot {
 				"ML Intern could not answer that side question. The run is unaffected; try again shortly.",
 				thread.threadTs
 			);
+		} finally {
+			this.sideQuestionAskers.delete(event.user);
 		}
 	}
 

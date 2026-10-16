@@ -988,6 +988,35 @@ describe("Slack btw side questions", () => {
 		expect(await collections.slackInputs.countDocuments({})).toBe(1);
 	});
 
+	it("answers one btw at a time per asker", async () => {
+		const { bot } = await startedThread();
+		let release: (() => void) | undefined;
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		mocks.sideQuestion.mockImplementation(async function* () {
+			await held;
+			yield "done";
+		});
+		const ask = (eventId: string, ts: string) =>
+			bot.receive(
+				{ channel: "C123", user: "OTHER", text: "btw status?", ts, thread_ts: "100.0" },
+				"T123",
+				eventId
+			);
+
+		const first = ask("SLOW1", "101.0");
+		await vi.waitFor(() => expect(mocks.sideQuestion).toHaveBeenCalledTimes(1));
+		await ask("SLOW2", "102.0");
+		expect(mocks.ephemeral).toHaveBeenLastCalledWith(
+			expect.objectContaining({ user: "OTHER", text: expect.stringContaining("still answering") })
+		);
+		release?.();
+		await first;
+		await ask("SLOW3", "103.0");
+		expect(mocks.sideQuestion).toHaveBeenCalledTimes(2);
+	});
+
 	it("keeps btw questions and the bot's answers out of the next turn's thread context", async () => {
 		const { bot, thread } = await startedThread();
 		mocks.replies.mockResolvedValue({
