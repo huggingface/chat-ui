@@ -29,6 +29,15 @@ const mocks = vi.hoisted(() => ({
 	run: vi.fn(),
 	react: vi.fn(),
 	upload: vi.fn(),
+	sideQuestion: vi.fn(),
+}));
+vi.mock("$lib/server/mlSideQuestion", () => ({
+	answerSideQuestion: mocks.sideQuestion,
+	SIDE_QUESTION_MAX_CHARS: 4000,
+}));
+vi.mock("./identity", async (importOriginal) => ({
+	...(await importOriginal<typeof import("./identity")>()),
+	slackLocals: (user: unknown) => ({ user, sessionId: "slack-ml:T123", token: "hf-test" }),
 }));
 vi.mock("@slack/bolt", () => ({
 	App: class {
@@ -887,4 +896,181 @@ it("accepts broadcast replies and paginates past old bot posts, then quotes only
 	expect(context.text).toContain("new reference");
 	expect(context.text).not.toContain("old reference");
 	expect(mocks.replies.mock.lastCall?.[0].oldest).toBe("100.0");
+});
+
+describe("Slack btw side questions", () => {
+	async function startedThread() {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		bot["botUserId"] = "UBOT";
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Train a model", ts: "100.0" },
+			"T123",
+			"START"
+		);
+		const thread = await collections.slackThreads.findOne({ threadTs: "100.0" });
+		if (!thread) throw new Error("No thread");
+		await createTestConversation(locals, { _id: thread.conversationId });
+		return { bot, thread };
+	}
+
+	it("answers any member in the thread without queuing a turn, once per Slack event", async () => {
+		const { bot, thread } = await startedThread();
+		mocks.sideQuestion.mockImplementation(async function* () {
+			yield "Job 123 is ";
+			yield "still training.";
+		});
+		const event = {
+			channel: "C123",
+			user: "OTHER",
+			text: "<@UBOT> BTW: which job is running?",
+			ts: "101.0",
+			thread_ts: "100.0",
+		};
+		await bot.receive(event, "T123", "BTW1");
+		await bot.receive(event, "T123", "BTW1");
+
+		expect(mocks.sideQuestion).toHaveBeenCalledTimes(1);
+		const call = mocks.sideQuestion.mock.calls[0][0];
+		expect(call.question).toBe("which job is running?");
+		expect(call.conversationId.toString()).toBe(thread.conversationId.toString());
+		expect(mocks.post).toHaveBeenCalledWith(
+			expect.objectContaining({
+				channel: "C123",
+				thread_ts: "100.0",
+				text: expect.stringContaining("Job 123 is still training."),
+			})
+		);
+		expect(await collections.slackInputs.countDocuments({})).toBe(1);
+		expect(mocks.run).not.toHaveBeenCalled();
+		expect(mocks.ephemeral).not.toHaveBeenCalled();
+	});
+
+	it("treats btw outside a task thread as a request and hints at a bare btw", async () => {
+		const { user } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		bot["botUserId"] = "UBOT";
+		await bot.receive(
+			{ channel: "C123", user: "OTHER", text: "<@UBOT> btw can you fine-tune bert?", ts: "300.0" },
+			"T123",
+			"NOTASK"
+		);
+		expect(mocks.sideQuestion).not.toHaveBeenCalled();
+		expect(await collections.slackInputs.countDocuments({ text: /fine-tune bert/ })).toBe(1);
+
+		const { bot: threaded } = await startedThread();
+		await threaded.receive(
+			{ channel: "C123", user: "OTHER", text: "<@UBOT> btw", ts: "101.0", thread_ts: "100.0" },
+			"T123",
+			"BARE"
+		);
+		expect(mocks.sideQuestion).not.toHaveBeenCalled();
+		expect(mocks.ephemeral).toHaveBeenLastCalledWith(
+			expect.objectContaining({ user: "OTHER", text: expect.stringContaining("Add your question") })
+		);
+		expect(await collections.slackInputs.countDocuments({ text: "<@UBOT> btw" })).toBe(0);
+	});
+
+	it("reports a failed answer privately and leaves the run alone", async () => {
+		const { bot } = await startedThread();
+		// eslint-disable-next-line require-yield
+		mocks.sideQuestion.mockImplementation(async function* () {
+			throw new Error("upstream 500");
+		});
+		await bot.receive(
+			{ channel: "C123", user: "OTHER", text: "btw status?", ts: "101.0", thread_ts: "100.0" },
+			"T123",
+			"BTWFAIL"
+		);
+		expect(mocks.post).not.toHaveBeenCalled();
+		expect(mocks.ephemeral).toHaveBeenCalledWith(
+			expect.objectContaining({ user: "OTHER", thread_ts: "100.0" })
+		);
+		expect(await collections.slackInputs.countDocuments({})).toBe(1);
+	});
+
+	it("answers one btw at a time per asker", async () => {
+		const { bot } = await startedThread();
+		let release: (() => void) | undefined;
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		mocks.sideQuestion.mockImplementation(async function* () {
+			await held;
+			yield "done";
+		});
+		const ask = (eventId: string, ts: string) =>
+			bot.receive(
+				{ channel: "C123", user: "OTHER", text: "btw status?", ts, thread_ts: "100.0" },
+				"T123",
+				eventId
+			);
+
+		const first = ask("SLOW1", "101.0");
+		await vi.waitFor(() => expect(mocks.sideQuestion).toHaveBeenCalledTimes(1));
+		await ask("SLOW2", "102.0");
+		expect(mocks.ephemeral).toHaveBeenLastCalledWith(
+			expect.objectContaining({ user: "OTHER", text: expect.stringContaining("still answering") })
+		);
+		release?.();
+		await first;
+		await ask("SLOW3", "103.0");
+		expect(mocks.sideQuestion).toHaveBeenCalledTimes(2);
+	});
+
+	it("caps btw questions per asker per minute", async () => {
+		const { bot } = await startedThread();
+		mocks.sideQuestion.mockImplementation(async function* () {
+			yield "ok";
+		});
+		for (const n of [1, 2, 3, 4, 5, 6]) {
+			await bot.receive(
+				{ channel: "C123", user: "OTHER", text: "btw status?", ts: `10${n}.0`, thread_ts: "100.0" },
+				"T123",
+				`RATE${n}`
+			);
+		}
+		expect(mocks.sideQuestion).toHaveBeenCalledTimes(5);
+		expect(mocks.ephemeral).toHaveBeenLastCalledWith(
+			expect.objectContaining({ user: "OTHER", text: expect.stringContaining("last minute") })
+		);
+		await collections.messageEvents.deleteMany({});
+	});
+
+	it("keeps answered btw questions and the bot's answers out of the next turn's thread context", async () => {
+		const { bot } = await startedThread();
+		mocks.sideQuestion.mockImplementation(async function* () {
+			yield "the loss is 0.3";
+		});
+		await bot.receive(
+			{
+				channel: "C123",
+				user: "OTHER",
+				text: "<@UBOT> btw what is the eval loss?",
+				ts: "101.0",
+				thread_ts: "100.0",
+			},
+			"T123",
+			"ASKED"
+		);
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw new Error("No thread");
+		mocks.replies.mockResolvedValue({
+			messages: [
+				{ user: "OTHER", ts: "101.0", text: "<@UBOT> btw what is the eval loss?" },
+				{ user: "UBOT", bot_id: "B1", ts: "101.5", text: "btw answer: the loss is 0.3" },
+				{ user: "OTHER", ts: "102.0", text: "use the bigger dataset" },
+				{ user: "ALICE", ts: "102.5", text: "btw the dataset moved to org/x" },
+			],
+		});
+		const context = await bot["context"](thread, {
+			user: "OWNER",
+			ts: "103.0",
+			text: "Follow up",
+		});
+		expect(context.text).toContain("use the bigger dataset");
+		expect(context.text).toContain("the dataset moved to org/x");
+		expect(context.text).not.toContain("eval loss");
+		expect(context.text).not.toContain("0.3");
+	});
 });
