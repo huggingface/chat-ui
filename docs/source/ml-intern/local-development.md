@@ -6,7 +6,7 @@ ML Intern is a mode built into Chat UI. When it's on, a conversation:
 
 - runs on a fixed set of tool-capable models
 - connects to the Hugging Face MCP server with the Hub's `intern` tool set
-- gets extra built-in tools: planning, research, versioned script files, sandboxes, Trackio dashboards, and waiting on Jobs
+- gets extra built-in tools: planning, research, versioned script files, sandboxes, Trackio dashboards, gr.Workflow Spaces, and waiting on Jobs
 - carries a compute budget that the server enforces on every Job and sandbox it launches
 
 ## Prerequisites
@@ -108,18 +108,18 @@ Several parts of ML Intern have kill switches. Each is on unless set to `false`,
 
 ## Where the code lives
 
-| Area                                                                      | Location                                                                                                                            |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Build flag                                                                | `src/lib/utils/mlAssistantFlag.ts`, `vite.config.ts`                                                                                |
-| Mode, model set and Hub MCP preset                                        | `src/lib/server/mlAssistant.ts`, `src/lib/server/mlAssistantModels.ts`                                                              |
-| System prompt                                                             | `src/lib/server/mlAssistantPrompt.ts`                                                                                               |
-| Built-in tools (plan, research, sandbox, wait, files, Trackio, questions) | `src/lib/server/textGeneration/builtinTools/`                                                                                       |
-| Tool loop and MCP                                                         | `src/lib/server/textGeneration/mcp/`                                                                                                |
-| Jobs, sandboxes and repos the conversation created                        | `src/lib/server/mlRegistry/`                                                                                                        |
-| Versioned script files                                                    | `src/lib/server/mlFiles/`                                                                                                           |
-| Client state                                                              | `src/lib/stores/mlAssistant.svelte.ts`, `src/lib/stores/mlRegistry.svelte.ts`                                                       |
-| UI: switch, status bar, onboarding, side panel                            | `src/lib/components/chat/MlInternPill.svelte`, `MlAssistantStrip.svelte`, `MlInternOnboardingModal.svelte`, `MlRegistryPane.svelte` |
-| Copy, example prompts and preset constants                                | `src/lib/constants/mlAssistant.ts`                                                                                                  |
+| Area                                                                                 | Location                                                                                                                            |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Build flag                                                                           | `src/lib/utils/mlAssistantFlag.ts`, `vite.config.ts`                                                                                |
+| Mode, model set and Hub MCP preset                                                   | `src/lib/server/mlAssistant.ts`, `src/lib/server/mlAssistantModels.ts`                                                              |
+| System prompt                                                                        | `src/lib/server/mlAssistantPrompt.ts`                                                                                               |
+| Built-in tools (plan, research, sandbox, wait, files, Trackio, workflows, questions) | `src/lib/server/textGeneration/builtinTools/`                                                                                       |
+| Tool loop and MCP                                                                    | `src/lib/server/textGeneration/mcp/`                                                                                                |
+| Jobs, sandboxes and repos the conversation created                                   | `src/lib/server/mlRegistry/`                                                                                                        |
+| Versioned script files                                                               | `src/lib/server/mlFiles/`                                                                                                           |
+| Client state                                                                         | `src/lib/stores/mlAssistant.svelte.ts`, `src/lib/stores/mlRegistry.svelte.ts`                                                       |
+| UI: switch, status bar, onboarding, side panel                                       | `src/lib/components/chat/MlInternPill.svelte`, `MlAssistantStrip.svelte`, `MlInternOnboardingModal.svelte`, `MlRegistryPane.svelte` |
+| Copy, example prompts and preset constants                                           | `src/lib/constants/mlAssistant.ts`                                                                                                  |
 
 ## Testing
 
