@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import superjson from "superjson";
 import { z } from "zod";
 
 const { FAKE_MODELS, mlSet } = vi.hoisted(() => ({
@@ -39,8 +40,8 @@ beforeAll(async () => {
 	await ready;
 });
 
-async function create(locals: App.Locals, body: Record<string, unknown>) {
-	const response = await createConversation({
+async function createResponse(locals: App.Locals, body: Record<string, unknown>) {
+	return createConversation({
 		locals,
 		request: new Request("http://localhost/conversation", {
 			method: "POST",
@@ -48,6 +49,10 @@ async function create(locals: App.Locals, body: Record<string, unknown>) {
 			body: JSON.stringify(body),
 		}),
 	} as never);
+}
+
+async function create(locals: App.Locals, body: Record<string, unknown>) {
+	const response = await createResponse(locals, body);
 	const { conversationId } = (await response.json()) as { conversationId: string };
 	const { ObjectId } = await import("mongodb");
 	return collections.conversations.findOne({ _id: new ObjectId(conversationId) });
@@ -71,6 +76,20 @@ describe.sequential("ML Intern conversations run on the fixed model set", () => 
 		const { locals } = await createTestUser();
 		const conv = await create(locals, { model: "moonshotai/Kimi-K3", mlAssistant: true });
 		expect(conv?.model).toBe("moonshotai/Kimi-K3");
+	});
+
+	it("returns the persisted mode in the create seed", async () => {
+		const { locals } = await createTestUser();
+		const response = await createResponse(locals, {
+			model: "moonshotai/Kimi-K3",
+			mlAssistant: true,
+			mlBudgetUsd: 12,
+		});
+		const body = (await response.json()) as { conversation: string };
+		const seeded = superjson.parse<{ id: string; mlAssistant?: boolean; mlBudget?: unknown }>(
+			body.conversation
+		);
+		expect(seeded).toMatchObject({ mlAssistant: true, mlBudget: expect.any(Object) });
 	});
 
 	it("leaves ordinary conversations alone", async () => {
