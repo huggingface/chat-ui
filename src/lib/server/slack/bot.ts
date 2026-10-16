@@ -17,8 +17,8 @@ import { reservedMicroUsd, formatMicroUsd } from "$lib/utils/mlBudget";
 import type { User } from "$lib/types/User";
 import { slackConfig, type SlackConfig } from "./config";
 import { provisionSlackIdentity, slackLocals } from "./identity";
-import { answerSideQuestion } from "$lib/server/mlSideQuestion";
-import { isSlackSideQuestion, slackSideQuestion } from "$lib/utils/sideQuestion";
+import { answerSideQuestion, SIDE_QUESTION_MAX_CHARS } from "$lib/server/mlSideQuestion";
+import { slackSideQuestion } from "$lib/utils/sideQuestion";
 import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } from "./engine";
 import { isWorkspaceMember, threadKey, threadPrompt, type ThreadMessage } from "./context";
 import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store";
@@ -73,8 +73,11 @@ const mention = z.object({
 	subtype: z.string().optional(),
 });
 
-/** shared slack credentials pay for these, one per asker and a few across the workspace */
+/** shared slack credentials pay for these, so they are capped per asker and per workspace */
 const MAX_SLACK_SIDE_QUESTIONS = 4;
+const SLACK_SIDE_QUESTIONS_PER_MINUTE = 5;
+const SLACK_WORKSPACE_SIDE_QUESTIONS_PER_MINUTE = 20;
+const SLACK_SIDE_QUESTION_TIMEOUT_MS = 90_000;
 
 /** Transport and delivery only. ML Intern's existing engine owns tool execution and resume. */
 export class MlSlackBot {
@@ -498,11 +501,9 @@ export class MlSlackBot {
 			);
 			return;
 		}
-		const question = slackSideQuestion(event.text);
-		if (question !== undefined) {
-			await this.answerSideQuestion(event, teamId, eventId, question);
+		const question = slackSideQuestion(event.text, this.botUserId);
+		if (question !== undefined && (await this.answerSideQuestion(event, teamId, eventId, question)))
 			return;
-		}
 		const thread = await getOrCreateThread(
 			teamId,
 			event.channel,
@@ -527,19 +528,16 @@ export class MlSlackBot {
 		}
 	}
 
-	/** answered beside the run, never queued, and never part of the next turn's thread context */
+	/**
+	 * answered beside the run, never queued, and never part of the next turn's thread context,
+	 * false when the thread has no task so the message goes on as an ordinary request
+	 */
 	private async answerSideQuestion(
 		event: z.infer<typeof mention>,
 		teamId: string,
 		eventId: string,
 		question: string
-	): Promise<void> {
-		const now = Date.now();
-		for (const [id, until] of this.sideQuestionEvents)
-			if (until <= now) this.sideQuestionEvents.delete(id);
-		if (this.sideQuestionEvents.has(eventId)) return;
-		this.sideQuestionEvents.set(eventId, now + 10 * 60_000);
-
+	): Promise<boolean> {
 		const thread = await collections.slackThreads.findOne({
 			_id: threadKey(teamId, event.channel, event.thread_ts ?? event.ts),
 			teamId,
@@ -550,36 +548,33 @@ export class MlSlackBot {
 				{ _id: thread.conversationId },
 				{ limit: 1 }
 			));
-		if (!thread || !exists) {
-			await this.tell(
-				event.channel,
-				event.user,
-				"There is no ML Intern task in this thread to ask about yet. Ask btw questions in the task's thread.",
-				event.thread_ts
-			);
-			return;
-		}
-		if (!question) {
-			await this.tell(
-				event.channel,
-				event.user,
-				"Add your question after btw, e.g. `btw which job is running?`",
-				thread.threadTs
-			);
-			return;
-		}
+		if (!thread || !exists) return false;
+
+		const now = Date.now();
+		for (const [id, until] of this.sideQuestionEvents)
+			if (until <= now) this.sideQuestionEvents.delete(id);
+		if (this.sideQuestionEvents.has(eventId)) return true;
+		this.sideQuestionEvents.set(eventId, now + 10 * 60_000);
+		await collections.slackThreads.updateOne(
+			{ _id: thread._id },
+			{ $push: { sideQuestionTs: { $each: [event.ts], $slice: -200 } } }
+		);
+
+		const refuse = (text: string) =>
+			this.tell(event.channel, event.user, text, thread.threadTs).then(() => true);
+		if (!question) return refuse("Add your question after btw, e.g. `btw which job is running?`");
+		if (question.length > SIDE_QUESTION_MAX_CHARS)
+			return refuse(`Keep btw questions under ${SIDE_QUESTION_MAX_CHARS} characters.`);
 		if (
 			this.sideQuestionAskers.has(event.user) ||
 			this.sideQuestionAskers.size >= MAX_SLACK_SIDE_QUESTIONS
-		) {
-			await this.tell(
-				event.channel,
-				event.user,
-				"ML Intern is still answering another btw question. Try again once it replies.",
-				thread.threadTs
+		)
+			return refuse(
+				"ML Intern is still answering another btw question. Try again once it replies."
 			);
-			return;
-		}
+		if (!(await this.withinSideQuestionLimit(teamId, event.user)))
+			return refuse("Too many btw questions in the last minute. Try again shortly.");
+
 		this.sideQuestionAskers.add(event.user);
 		await this.app.client.reactions
 			.add({ channel: event.channel, timestamp: event.ts, name: "eyes" })
@@ -590,7 +585,7 @@ export class MlSlackBot {
 				conversationId: thread.conversationId,
 				question,
 				locals: slackLocals(this.user),
-				signal: AbortSignal.timeout(180_000),
+				signal: AbortSignal.timeout(SLACK_SIDE_QUESTION_TIMEOUT_MS),
 			}))
 				answer += chunk;
 			for (const text of chunks(`_btw answer, ML Intern does not see this_\n\n${answer.trim()}`)) {
@@ -616,6 +611,34 @@ export class MlSlackBot {
 		} finally {
 			this.sideQuestionAskers.delete(event.user);
 		}
+		return true;
+	}
+
+	/** counted in messageEvents so the limit holds across restarts and pods */
+	private async withinSideQuestionLimit(teamId: string, user: string): Promise<boolean> {
+		const now = new Date();
+		const live = { type: "message" as const, expiresAt: { $gt: now } };
+		const asker = `slack-btw:${teamId}:${user}`;
+		const workspace = `slack-btw:${teamId}`;
+		const [byAsker, byWorkspace] = await Promise.all([
+			collections.messageEvents.countDocuments({ userId: asker, ...live }),
+			collections.messageEvents.countDocuments({ userId: workspace, ...live }),
+		]);
+		if (
+			byAsker >= SLACK_SIDE_QUESTIONS_PER_MINUTE ||
+			byWorkspace >= SLACK_WORKSPACE_SIDE_QUESTIONS_PER_MINUTE
+		)
+			return false;
+		const expiresAt = new Date(now.getTime() + 60_000);
+		await collections.messageEvents.insertMany(
+			[asker, workspace].map((userId) => ({
+				type: "message" as const,
+				userId,
+				createdAt: now,
+				expiresAt,
+			}))
+		);
+		return true;
 	}
 
 	private async context(
@@ -640,7 +663,7 @@ export class MlSlackBot {
 					(m) =>
 						m.user !== this.botUserId &&
 						!m.bot_id &&
-						!isSlackSideQuestion(m.text) &&
+						!(m.ts && thread.sideQuestionTs?.includes(m.ts)) &&
 						(!thread.contextThroughTs || !m.ts || m.ts > thread.contextThroughTs)
 				)
 			);

@@ -72,7 +72,7 @@ export const POST: RequestHandler = async ({ params, locals, request, getClientA
 		}
 	};
 
-	// the first chunk is awaited here so an upstream refusal is an error status, not an empty 200
+	// held until the upstream answers so a refusal is an error status, not an empty 200
 	let first: IteratorResult<string, void>;
 	try {
 		first = await answer.next();
@@ -85,13 +85,15 @@ export const POST: RequestHandler = async ({ params, locals, request, getClientA
 		new ReadableStream<Uint8Array>({
 			start(controller) {
 				if (first.done) controller.close();
-				else controller.enqueue(encoder.encode(first.value));
+				else if (first.value) controller.enqueue(encoder.encode(first.value));
 			},
 			async pull(controller) {
 				try {
-					const next = await answer.next();
-					if (next.done) controller.close();
-					else controller.enqueue(encoder.encode(next.value));
+					for (;;) {
+						const next = await answer.next();
+						if (next.done) return controller.close();
+						if (next.value) return controller.enqueue(encoder.encode(next.value));
+					}
 				} catch (err) {
 					fail(err);
 					controller.error(err);

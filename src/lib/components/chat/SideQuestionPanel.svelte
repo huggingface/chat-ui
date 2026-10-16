@@ -22,6 +22,7 @@
 
 	const MAX_ITEMS = 3;
 	const GENERIC_ERROR = "Could not answer the side question.";
+	const EMPTY_HINT = "Type your question after /btw, e.g. /btw which job is running?";
 
 	let items: SideQuestion[] = $state([]);
 	let nextId = 0;
@@ -29,15 +30,17 @@
 	export function intercept(text: string): boolean {
 		if (!isWebSideQuestion(text)) return false;
 		const question = webSideQuestion(text);
-		if (!question) return true;
-
 		const id = nextId++;
 		const controller = new AbortController();
-		items.push({ id, question, answer: "", status: "loading", controller });
+		items.push(
+			question
+				? { id, question, answer: "", status: "loading", controller }
+				: { id, question: "/btw", answer: "", status: "error", error: EMPTY_HINT, controller }
+		);
 		while (items.length > MAX_ITEMS) {
 			items.shift()?.controller.abort();
 		}
-		void ask(id, question, controller);
+		if (question) void ask(id, question, controller);
 		return true;
 	}
 

@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	isSlackSideQuestion,
-	isWebSideQuestion,
-	slackSideQuestion,
-	webSideQuestion,
-} from "./sideQuestion";
+import { isWebSideQuestion, slackSideQuestion, webSideQuestion } from "./sideQuestion";
 
 describe("webSideQuestion", () => {
 	it("reads only a leading /btw", () => {
@@ -18,17 +13,16 @@ describe("webSideQuestion", () => {
 });
 
 describe("slackSideQuestion", () => {
-	it("accepts btw, btw: and /btw after mentions, in any case", () => {
-		expect(slackSideQuestion("btw which job?")).toBe("which job?");
-		expect(slackSideQuestion("<@U123> BTW: which job?")).toBe("which job?");
-		expect(slackSideQuestion("<@U123|intern> /btw which job?")).toBe("which job?");
-		expect(slackSideQuestion("btw")).toBe("");
-		expect(isSlackSideQuestion("<@U123> btw")).toBe(true);
+	it("accepts btw, btw: and /btw after the bot mention, in any case", () => {
+		expect(slackSideQuestion("btw which job?", "UBOT")).toBe("which job?");
+		expect(slackSideQuestion("<@UBOT> BTW: which job?", "UBOT")).toBe("which job?");
+		expect(slackSideQuestion("<@UBOT|intern> /btw which job?", "UBOT")).toBe("which job?");
+		expect(slackSideQuestion("<@UBOT> btw", "UBOT")).toBe("");
 	});
 
-	it("leaves ordinary requests alone", () => {
-		expect(slackSideQuestion("btwx")).toBeUndefined();
-		expect(slackSideQuestion("train it, btw use fp16")).toBeUndefined();
-		expect(isSlackSideQuestion(undefined)).toBe(false);
+	it("leaves ordinary requests and mentions of other people alone", () => {
+		expect(slackSideQuestion("btwx", "UBOT")).toBeUndefined();
+		expect(slackSideQuestion("train it, btw use fp16", "UBOT")).toBeUndefined();
+		expect(slackSideQuestion("<@ALICE> btw the dataset moved", "UBOT")).toBeUndefined();
 	});
 });

@@ -10,15 +10,11 @@ export function isWebSideQuestion(text: string): boolean {
 }
 
 /**
- * a slack message read as a side question, btw with an optional leading slash or trailing colon
- * after any mentions, empty for a bare btw so it is never queued as a task
+ * a slack message to the bot read as a side question, btw with an optional leading slash or
+ * trailing colon after the bot mention, empty for a bare btw
  */
-export function slackSideQuestion(text: string): string | undefined {
-	const withoutMentions = text.replace(/^(\s*<@[A-Z0-9]+(?:\|[^>]*)?>)+/i, "").trimStart();
-	const match = /^\/?btw\b:?\s*([\s\S]*)$/i.exec(withoutMentions);
+export function slackSideQuestion(text: string, botUserId: string): string | undefined {
+	const mention = new RegExp(`^(\\s*<@${botUserId}(?:\\|[^>]*)?>)+`);
+	const match = /^\/?btw\b:?\s*([\s\S]*)$/i.exec(text.replace(mention, "").trimStart());
 	return match ? match[1].trim() : undefined;
-}
-
-export function isSlackSideQuestion(text: string | undefined): boolean {
-	return slackSideQuestion(text ?? "") !== undefined;
 }

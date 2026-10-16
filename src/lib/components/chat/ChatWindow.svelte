@@ -24,6 +24,7 @@
 	import ChatInput from "./ChatInput.svelte";
 	import AskQuestion from "./AskQuestion.svelte";
 	import SideQuestionPanel from "./SideQuestionPanel.svelte";
+	import { isWebSideQuestion } from "$lib/utils/sideQuestion";
 	import { firstQuestionFor } from "$lib/stores/pendingQuestion";
 	import { shouldShowPendingPlaceholder } from "$lib/utils/pendingPlaceholder";
 	import VoiceRecorder from "./VoiceRecorder.svelte";
@@ -215,6 +216,7 @@
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
 
 	let sideQuestionPanel: ReturnType<typeof SideQuestionPanel> | undefined = $state();
+	let draftIsSideQuestion = $derived(Boolean(sideQuestionPanel) && isWebSideQuestion(draft));
 
 	const handleSubmit = () => {
 		if (sideQuestionPanel?.intercept(draft)) {
@@ -1289,7 +1291,7 @@
 									/>
 								{/if}
 
-								{#if loading}
+								{#if loading && !draftIsSideQuestion}
 									<StopGeneratingBtn
 										onClick={() => {
 											hapticError();
