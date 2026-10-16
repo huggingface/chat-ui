@@ -63,7 +63,9 @@ export async function startQueuedTurn(conversationId: ObjectId): Promise<QueuedT
 			request: new Request("http://queue.internal/conversation", { method: "POST", body: data }),
 			locals,
 			params: { id: conversationId.toHexString() },
-			getClientAddress: () => "queue",
+			// a shared constant would put every user in one ip rate limit bucket
+			getClientAddress: () =>
+				`queue:${rows[0].userId?.toString() ?? rows[0].sessionId ?? conversationId.toString()}`,
 		});
 		if (!response.ok || !response.body) throw new Error(`refused with ${response.status}`);
 		reader = response.body.getReader();

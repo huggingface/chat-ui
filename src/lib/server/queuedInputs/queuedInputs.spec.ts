@@ -239,6 +239,8 @@ describe.sequential("starting the next turn from the queue", async () => {
 			{ request: Request; params: { id: string } },
 		];
 		expect(params.id).toBe(conversationId.toHexString());
+		const [{ getClientAddress }] = generate.mock.calls[0] as [{ getClientAddress: () => string }];
+		expect(getClientAddress()).toBe("queue:s");
 		const body = JSON.parse(String((await request.formData()).get("data")));
 		expect(body).toMatchObject({ inputs: "first\n\nsecond", id: "a1" });
 		const rows = await collections.queuedInputs.find({ conversationId }).toArray();
