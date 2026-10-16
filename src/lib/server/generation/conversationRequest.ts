@@ -59,11 +59,14 @@ export async function generateConversationResponse({
 	locals,
 	params,
 	getClientAddress,
+	queuedStart = false,
 }: {
 	request: Request;
 	locals: App.Locals;
 	params: { id: string };
 	getClientAddress: () => string;
+	/** the queue drain already holds the turn start */
+	queuedStart?: boolean;
 }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
@@ -304,6 +307,15 @@ export async function generateConversationResponse({
 	);
 	const dashboardViews = acceptTrackioViews(rawDashboardViews, conv.messages);
 
+	// a racing send and a queued start would each save the whole messages array over the other
+	let releaseTurnStart: (() => Promise<void>) | undefined;
+	if (isMlAssistantConversation(conv) && !resumeElicitationId && !isRetry && !queuedStart) {
+		const { claimTurnStart, TURN_BUSY_MESSAGE } = await import("$lib/server/queuedInputs/drain");
+		releaseTurnStart =
+			(await claimTurnStart(convId, conv.messages.at(-1), "working")) ??
+			error(409, TURN_BUSY_MESSAGE);
+	}
+
 	// we will append tokens to the content of this message
 	let messageToWriteToId: Message["id"] | undefined = undefined;
 	// used for building the prompt, subtree of the conversation that goes from the latest message to the root
@@ -527,6 +539,7 @@ export async function generateConversationResponse({
 				}),
 			});
 			generationWriter = writer;
+			await releaseTurnStart?.();
 
 			let finalAnswerReceived = false;
 			// A turn can end having produced no text and still have done something —
@@ -844,6 +857,10 @@ export async function generateConversationResponse({
 			});
 			clearInterval(abortMarkerWatcher);
 			abortRegistry.unregister(conversationKey, ctrl);
+			if (endedUpdate && !abortedByUser && isMlAssistantConversation(conv)) {
+				const { kickQueuedTurn } = await import("$lib/server/queuedInputs/drain");
+				kickQueuedTurn(convId);
+			}
 
 			// Consume the stop marker once the stop has been honored and the
 			// interrupted state persisted. Markers are conversation-scoped, so a

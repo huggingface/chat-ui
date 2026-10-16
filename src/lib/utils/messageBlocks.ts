@@ -3,6 +3,7 @@ import {
 	MessageUpdateType,
 	type MessageElicitationResolvedUpdate,
 	type MessageHarnessEventUpdate,
+	type MessageQueuedInputUpdate,
 	type MessagePlanUpdate,
 	type MessageToolUpdate,
 	type MessageUpdate,
@@ -13,6 +14,7 @@ import {
 	isMessageElicitationResolvedUpdate,
 	isMessageHarnessEventUpdate,
 	isMessageNoticeUpdate,
+	isMessageQueuedInputUpdate,
 	isMessagePlanUpdate,
 	isMessageToolUpdate,
 } from "./messageUpdates";
@@ -37,6 +39,7 @@ export type MessageBlock =
 	| ElicitationBlock
 	| { type: "plan"; update: MessagePlanUpdate }
 	| { type: "harnessEvent"; update: MessageHarnessEventUpdate }
+	| { type: "queuedInput"; update: MessageQueuedInputUpdate }
 	| { type: "notice"; text: string };
 
 type ToolBlock = Extract<MessageBlock, { type: "tool" }>;
@@ -149,6 +152,8 @@ function applyCardUpdate(res: MessageBlock[], update: MessageUpdate): void {
 		res.push({ type: "plan", update });
 	} else if (isMessageHarnessEventUpdate(update)) {
 		res.push({ type: "harnessEvent", update });
+	} else if (isMessageQueuedInputUpdate(update)) {
+		res.push({ type: "queuedInput", update });
 	} else if (isMessageNoticeUpdate(update)) {
 		res.push({ type: "notice", text: update.text });
 	}
