@@ -7,10 +7,13 @@ import { waitResumeResultText } from "$lib/server/textGeneration/builtinTools/wa
 import {
 	MAX_QUEUED_INPUTS,
 	QueueFullError,
+	QueuedInputTooLongError,
+	cancelAllQueuedInputs,
 	cancelQueuedInput,
 	claimQueuedInputs,
 	enqueueInput,
 	listQueuedInputs,
+	queuedInputCharLimit,
 	releaseQueuedInputs,
 } from "./store";
 import { takeQueuedInputs, wakeParkForQueuedInput } from "./deliver";
@@ -21,16 +24,29 @@ const generate = vi.fn();
 vi.mock("$lib/server/generation/conversationRequest", () => ({
 	generateConversationResponse: (...args: unknown[]) => generate(...args),
 }));
+const identity = vi.hoisted(() => ({ tokenExpired: false }));
 vi.mock("$lib/server/generation/parkedSweeper", () => ({
 	rebuildIdentity: async () => ({
 		locals: { sessionId: "s" },
 		settings: null,
-		tokenExpired: false,
+		tokenExpired: identity.tokenExpired,
 	}),
 }));
+const userToken = vi.hoisted(() => ({ value: "false" }));
+vi.mock("$lib/server/config", async (importOriginal) => {
+	const original = await importOriginal<typeof import("$lib/server/config")>();
+	return {
+		...original,
+		config: new Proxy(original.config, {
+			get: (target, key) => (key === "USE_USER_TOKEN" ? userToken.value : Reflect.get(target, key)),
+		}),
+	};
+});
 
 beforeAll(async () => {
 	await ready;
+	// the turn start lock relies on it, and a fresh test database builds it in the background
+	await collections.semaphores.createIndex({ key: 1 }, { unique: true });
 });
 
 const conversationIds: ObjectId[] = [];
@@ -43,10 +59,14 @@ afterEach(async () => {
 		collections.generations.deleteMany(filter),
 		collections.turnStates.deleteMany(filter),
 		collections.conversations.deleteMany({ _id: { $in: conversationIds } }),
-		collections.semaphores.deleteMany({ key: { $regex: "^queue\\.drain:" } }),
+		collections.semaphores.deleteMany({
+			key: { $in: conversationIds.map((id) => `queue.drain:${id.toString()}`) },
+		}),
 	]);
 	conversationIds.length = 0;
 	generate.mockReset();
+	identity.tokenExpired = false;
+	userToken.value = "false";
 });
 
 function conversation(): ObjectId {
@@ -86,23 +106,86 @@ describe.sequential("queued inputs", () => {
 		expect(await cancelQueuedInput(conversationId, kept._id)).toBe(false);
 	});
 
-	it("refuses past the queue limit", async () => {
+	it("refuses past the queue limit, even when sends race", async () => {
 		const conversationId = conversation();
-		for (let i = 0; i < MAX_QUEUED_INPUTS; i += 1) await queue(conversationId, `m${i}`);
-		await expect(queue(conversationId, "one too many")).rejects.toBeInstanceOf(QueueFullError);
+		const results = await Promise.allSettled(
+			Array.from({ length: MAX_QUEUED_INPUTS + 4 }, (_, i) => queue(conversationId, `m${i}`))
+		);
+		const refused = results.filter((result) => result.status === "rejected");
+		expect(refused.length).toBeGreaterThanOrEqual(4);
+		expect(
+			refused.every(
+				(result) => result.status === "rejected" && result.reason instanceof QueueFullError
+			)
+		).toBe(true);
+		const queued = await collections.queuedInputs.countDocuments({
+			conversationId,
+			status: "queued",
+		});
+		expect(queued).toBeLessThanOrEqual(MAX_QUEUED_INPUTS);
 	});
 
-	it("puts refused starts back, and gives up after three", async () => {
+	it("refuses a message past the char limit wherever it comes from", async () => {
+		const conversationId = conversation();
+		await expect(
+			enqueueInput({
+				conversationId,
+				text: "x".repeat(queuedInputCharLimit() + 1),
+				source: "slack",
+			})
+		).rejects.toBeInstanceOf(QueuedInputTooLongError);
+	});
+
+	it("takes no more than fits in one message and leaves the rest queued", async () => {
+		const conversationId = conversation();
+		const half = "y".repeat(Math.floor(queuedInputCharLimit() / 2));
+		await queue(conversationId, half);
+		await queue(conversationId, half);
+		await queue(conversationId, "third");
+
+		const first = await claimQueuedInputs(conversationId, { status: "started" });
+		expect(first).toHaveLength(1);
+		const second = await claimQueuedInputs(conversationId, { status: "started" });
+		expect(second.map((row) => row.text)).toEqual([half, "third"]);
+	});
+
+	it("puts refused starts back, then fails them with the reason after three", async () => {
 		const conversationId = conversation();
 		await queue(conversationId, "retry me");
 		for (let attempt = 1; attempt <= 3; attempt += 1) {
 			const rows = await claimQueuedInputs(conversationId, { status: "started" });
 			expect(rows).toHaveLength(1);
-			await releaseQueuedInputs(rows);
+			await releaseQueuedInputs(rows, "rate limited");
 		}
 		const [row] = await collections.queuedInputs.find({ conversationId }).toArray();
-		expect(row.status).toBe("cancelled");
-		expect(row.attempts).toBe(3);
+		expect(row).toMatchObject({ status: "failed", error: "rate limited", attempts: 3 });
+		expect(await listQueuedInputs(conversationId)).toMatchObject([
+			{ status: "failed", error: "rate limited", text: "retry me" },
+		]);
+	});
+
+	it("reports only the rows a stop cancelled", async () => {
+		const conversationId = conversation();
+		const taken = await queue(conversationId, "taken");
+		await claimQueuedInputs(conversationId, { status: "started" });
+		const left = await queue(conversationId, "left");
+
+		expect(await cancelAllQueuedInputs(conversationId)).toEqual([left._id.toString()]);
+		expect(await collections.queuedInputs.findOne({ _id: taken._id })).toMatchObject({
+			status: "started",
+		});
+	});
+
+	it("keeps every queued row in the listing however much history there is", async () => {
+		const conversationId = conversation();
+		for (let i = 0; i < 25; i += 1) {
+			await queue(conversationId, `old ${i}`);
+			await claimQueuedInputs(conversationId, { status: "delivered", messageId: "a1" });
+		}
+		await queue(conversationId, "newest");
+
+		const listed = await listQueuedInputs(conversationId);
+		expect(listed.at(-1)).toMatchObject({ text: "newest", status: "queued" });
 	});
 
 	it("lists what is queued and what a turn took lately", async () => {
@@ -195,7 +278,18 @@ describe.sequential("waking a wait for a queued message", () => {
 });
 
 describe.sequential("starting the next turn from the queue", async () => {
-	const { startQueuedTurn } = await import("./drain");
+	const { claimTurnStart, startQueuedTurn, sweepQueuedInputs } = await import("./drain");
+
+	const awaitingInput = (conversationId: ObjectId) =>
+		collections.turnStates.insertOne({
+			_id: new ObjectId(),
+			conversationId,
+			messageId: "a1",
+			producerId: "p",
+			status: "awaiting_input",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		} as never);
 
 	const seedConversation = async (conversationId: ObjectId, mlAssistant = true) => {
 		const now = new Date();
@@ -291,6 +385,93 @@ describe.sequential("starting the next turn from the queue", async () => {
 		expect(await startQueuedTurn(conversationId)).toBe("failed");
 		const [row] = await collections.queuedInputs.find({ conversationId }).toArray();
 		expect(row).toMatchObject({ status: "queued", attempts: 1 });
+	});
+
+	it("does not bill a turn to the server key when the user token expired", async () => {
+		const conversationId = conversation();
+		await seedConversation(conversationId);
+		await queue(conversationId, "while signed out");
+		userToken.value = "true";
+		identity.tokenExpired = true;
+
+		expect(await startQueuedTurn(conversationId)).toBe("failed");
+		expect(generate).not.toHaveBeenCalled();
+		const [row] = await collections.queuedInputs.find({ conversationId }).toArray();
+		expect(row.status).toBe("failed");
+		expect(row.error).toMatch(/sign in again/i);
+	});
+
+	it("leaves the queue to a turn waiting on a question", async () => {
+		const conversationId = conversation();
+		await seedConversation(conversationId);
+		await queue(conversationId, "after the answer");
+		await awaitingInput(conversationId);
+
+		expect(await startQueuedTurn(conversationId)).toBe("busy");
+		expect(generate).not.toHaveBeenCalled();
+	});
+
+	it("refuses a normal send while a queued start holds the conversation", async () => {
+		const conversationId = conversation();
+		await seedConversation(conversationId);
+		const release = await claimTurnStart(conversationId, undefined, "alive");
+		expect(release).toBeDefined();
+
+		expect(await claimTurnStart(conversationId, undefined, "working")).toBeUndefined();
+		await release?.();
+		const again = await claimTurnStart(conversationId, undefined, "working");
+		expect(again).toBeDefined();
+		await again?.();
+	});
+
+	it("lets a normal send through during a question but not during a running turn", async () => {
+		const conversationId = conversation();
+		await seedConversation(conversationId);
+		await awaitingInput(conversationId);
+		const latest = { id: "a1", from: "assistant" as const };
+
+		const duringQuestion = await claimTurnStart(conversationId, latest, "working");
+		expect(duringQuestion).toBeDefined();
+		await duringQuestion?.();
+
+		await collections.generations.insertOne({
+			_id: new ObjectId(),
+			generationId: "g",
+			conversationId,
+			messageId: "a1",
+			status: "running",
+			startedAt: new Date(),
+			lastHeartbeatAt: new Date(),
+		} as never);
+		expect(await claimTurnStart(conversationId, latest, "working")).toBeUndefined();
+	});
+
+	it("rotates the orphan sweep so conversations stuck on a question cannot starve the rest", async () => {
+		const old = new Date(Date.now() - 60_000);
+		const ids = Array.from({ length: 25 }, () => conversation());
+		for (const id of ids) {
+			await seedConversation(id);
+			await collections.queuedInputs.insertOne({
+				_id: new ObjectId(),
+				conversationId: id,
+				text: "orphan",
+				status: "queued",
+				source: "web",
+				createdAt: old,
+				updatedAt: old,
+			});
+			await awaitingInput(id);
+		}
+		const unchecked = () =>
+			collections.queuedInputs.countDocuments({
+				conversationId: { $in: ids },
+				checkedAt: { $exists: false },
+			});
+
+		await sweepQueuedInputs(new Date());
+		expect(await unchecked()).toBe(5);
+		await sweepQueuedInputs(new Date(Date.now() + 1_000));
+		expect(await unchecked()).toBe(0);
 	});
 
 	it("drops a queue whose conversation left ML Intern", async () => {

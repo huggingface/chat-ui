@@ -60,8 +60,8 @@ export async function stopConversation({
 	);
 
 	AbortRegistry.getInstance().abort(conversationId.toString());
-	// a stop does not start what was queued, the browser puts the texts back in the composer
-	await cancelAllQueuedInputs(conversationId);
+	// a stop does not start what was queued, the browser puts back only what this cancelled
+	const cancelledQueuedInputs = await cancelAllQueuedInputs(conversationId);
 
-	return new Response();
+	return Response.json({ cancelledQueuedInputs });
 }

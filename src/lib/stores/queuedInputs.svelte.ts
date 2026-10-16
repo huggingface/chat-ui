@@ -8,11 +8,16 @@ const POLL_GIVE_UP_MS = 2 * 60_000;
 type FetchFn = typeof globalThis.fetch;
 
 export type QueuedChip = QueuedInputView & { sending?: boolean };
+export type ReturnedInput = { text: string; error?: string };
+
+type Withdrawal = { texts: Map<string, string>; answered: boolean };
 
 // the turn reports what it read in its stream, leftovers become a server started turn this polls for
 export class QueuedInputsStore {
 	items = $state<QueuedChip[]>([]);
 	conversationId = $state<string | undefined>(undefined);
+	/** texts that never reached a turn, for the composer to take back */
+	returned = $state<ReturnedInput[]>([]);
 
 	#busy = false;
 	#onStarted: (() => void) | undefined;
@@ -21,6 +26,7 @@ export class QueuedInputsStore {
 	#generation = 0;
 	#takenBack = 0;
 	#sending = new Set<Promise<unknown>>();
+	#withdrawal: Withdrawal | undefined;
 	#fetch: FetchFn;
 
 	constructor(fetchFn?: FetchFn) {
@@ -81,6 +87,11 @@ export class QueuedInputsStore {
 		const byId = new Map(inputs.map((input) => [input.id, input]));
 		const known = new Set(this.items.map((item) => item.id));
 		const started = this.items.some((item) => byId.get(item.id)?.status === "started");
+		const failed = this.items.flatMap((item) => {
+			const input = byId.get(item.id);
+			return input?.status === "failed" ? [{ text: item.text, error: input.error }] : [];
+		});
+		if (failed.length) this.#giveBack(...failed);
 		this.items = [
 			...this.items.filter((item) => item.sending || byId.get(item.id)?.status === "queued"),
 			...inputs.filter((input) => input.status === "queued" && !known.has(input.id)),
@@ -108,7 +119,14 @@ export class QueuedInputsStore {
 		const input = await request;
 		this.#sending.delete(request);
 		if (takenBack !== this.#takenBack) {
-			if (input) void this.remove(input.id);
+			const withdrawal = this.#withdrawal;
+			if (!input) this.#giveBack({ text });
+			else if (withdrawal && !withdrawal.answered) withdrawal.texts.set(input.id, text);
+			else {
+				void this.remove(input.id).then((outcome) => {
+					if (outcome === "cancelled") this.#giveBack({ text });
+				});
+			}
 			return "withdrawn";
 		}
 		if (generation !== this.#generation) return input ? "queued" : "failed";
@@ -172,13 +190,39 @@ export class QueuedInputsStore {
 		this.items = this.items.filter((item) => !ids.has(item.id));
 	}
 
-	/** a stop cancels the queue on the server, the texts go back to the composer */
-	takeBack(): string[] {
+	/** a stop hides the queue at once, stopped then gives back what the server cancelled */
+	takeBack() {
 		this.#takenBack += 1;
-		const texts = this.items.map((item) => item.text);
+		this.#withdrawal = {
+			texts: new Map(
+				this.items.filter((item) => !item.sending).map((item) => [item.id, item.text])
+			),
+			answered: false,
+		};
 		this.items = [];
 		clearTimeout(this.#timer);
-		return texts;
+	}
+
+	/** a row a turn took before the stop landed is not given back, it is in the transcript */
+	stopped(cancelledIds: readonly string[]) {
+		const withdrawal = this.#withdrawal;
+		if (!withdrawal) return;
+		withdrawal.answered = true;
+		const back = cancelledIds.flatMap((id) => {
+			const text = withdrawal.texts.get(id);
+			return text === undefined ? [] : [{ text }];
+		});
+		if (back.length) this.#giveBack(...back);
+	}
+
+	takeReturned(): ReturnedInput[] {
+		const returned = this.returned;
+		this.returned = [];
+		return returned;
+	}
+
+	#giveBack(...inputs: ReturnedInput[]) {
+		this.returned = [...this.returned, ...inputs];
 	}
 }
 

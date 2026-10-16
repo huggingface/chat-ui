@@ -12,7 +12,12 @@ import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 import { pinnedHubToken } from "$lib/server/mlAssistant";
 import { isTurnAlive } from "$lib/server/generation/turnLog";
 import { kickAnsweredAsk } from "$lib/server/generation/askResume";
-import { enqueueInput as queueForTurn, hasQueuedInputs } from "$lib/server/queuedInputs/store";
+import {
+	QueueFullError,
+	QueuedInputTooLongError,
+	enqueueInput as queueForTurn,
+	hasQueuedInputs,
+} from "$lib/server/queuedInputs/store";
 import { wakeParkForQueuedInput } from "$lib/server/queuedInputs/deliver";
 import { kickQueuedTurn } from "$lib/server/queuedInputs/drain";
 import { submitElicitationAnswer } from "$lib/server/mcp/elicitation";
@@ -644,9 +649,11 @@ export class MlSlackBot {
 						error:
 							status === 429
 								? "ML Intern reached a rate limit. Wait before trying again. The workspace shares request limits."
-								: status
-									? `ML Intern rejected this request (HTTP ${status}). Check permissions, request length, and model configuration.`
-									: "The bot could not complete this request. Check bot configuration. Retry regenerates the request and may repeat compute; inspect existing jobs first.",
+								: status === 409
+									? "ML Intern started working on this conversation just before your message arrived. Send it again to queue it for its next step."
+									: status
+										? `ML Intern rejected this request (HTTP ${status}). Check permissions, request length, and model configuration.`
+										: "The bot could not complete this request. Check bot configuration. Retry regenerates the request and may repeat compute; inspect existing jobs first.",
 						updatedAt: new Date(),
 					},
 				}
@@ -662,12 +669,26 @@ export class MlSlackBot {
 		input: { text: string; user: string; ts: string }
 	): Promise<void> {
 		const { text, files } = await this.context(thread, input);
-		await queueForTurn({
-			conversationId: thread.conversationId,
-			text,
-			source: "slack",
-			userId: this.user._id,
-		});
+		try {
+			await queueForTurn({
+				conversationId: thread.conversationId,
+				text,
+				source: "slack",
+				userId: this.user._id,
+			});
+		} catch (error) {
+			if (!(error instanceof QueueFullError || error instanceof QueuedInputTooLongError))
+				throw error;
+			await this.tell(
+				thread.channel,
+				input.user,
+				error instanceof QueueFullError
+					? "ML Intern already has 10 messages waiting for its next step. Send this once it catches up."
+					: "This message, with the thread around it, is too long to queue. Send it once ML Intern finishes.",
+				thread.threadTs
+			);
+			return;
+		}
 		await collections.slackThreads.updateOne(
 			{ _id: thread._id },
 			{ $max: { contextThroughTs: input.ts }, $set: { watching: true, updatedAt: new Date() } }

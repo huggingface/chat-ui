@@ -576,7 +576,13 @@
 
 	// a message sent during a question still goes the usual way
 	let turnWaiting = $derived(turnStateOf(messages.at(-1))?.state === "waiting");
-	let queueing = $derived(mlTaskRunning && !shared && !isReadOnly && (loading || turnWaiting));
+	// a normal send could race the turn the server starts from the queue
+	let queueing = $derived(
+		mlTaskRunning &&
+			!shared &&
+			!isReadOnly &&
+			(loading || turnWaiting || queuedInputs.items.length > 0)
+	);
 
 	function queueDraft() {
 		if (files.length > 0) {
@@ -616,6 +622,16 @@
 		return queuedInputs.watch(conversationId, {
 			busy: loading || turnWaiting,
 			onStarted: () => onqueuedturn?.(),
+		});
+	});
+
+	$effect(() => {
+		if (queuedInputs.returned.length === 0) return;
+		untrack(() => {
+			const returned = queuedInputs.takeReturned();
+			draft = [...returned.map((input) => input.text), draft].filter(Boolean).join("\n\n");
+			const reason = returned.find((input) => input.error)?.error;
+			if (reason) $error = reason;
 		});
 	});
 

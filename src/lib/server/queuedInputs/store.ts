@@ -1,12 +1,20 @@
 import { randomUUID } from "crypto";
 import { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
+import { usageLimits } from "$lib/server/usageLimits";
 import type { QueuedInput, QueuedInputView } from "$lib/types/QueuedInput";
 
 export const MAX_QUEUED_INPUTS = 10;
-export const MAX_QUEUED_INPUT_CHARS = 32_000;
+const MAX_QUEUED_INPUT_CHARS = 32_000;
+const JOIN = "\n\n";
+
+/** one message and the batch a turn takes at once, a started turn must pass the message limit */
+export function queuedInputCharLimit(): number {
+	return Math.min(MAX_QUEUED_INPUT_CHARS, usageLimits?.messageLength ?? Infinity);
+}
 
 export class QueueFullError extends Error {}
+export class QueuedInputTooLongError extends Error {}
 
 export async function enqueueInput(input: {
 	conversationId: ObjectId;
@@ -15,16 +23,15 @@ export async function enqueueInput(input: {
 	userId?: QueuedInput["userId"];
 	sessionId?: string;
 }): Promise<QueuedInput> {
-	const waiting = await collections.queuedInputs.countDocuments({
-		conversationId: input.conversationId,
-		status: "queued",
-	});
-	if (waiting >= MAX_QUEUED_INPUTS) throw new QueueFullError("Too many queued messages.");
+	const text = input.text.replace(/\r\n/g, "\n");
+	if (text.length > queuedInputCharLimit()) {
+		throw new QueuedInputTooLongError("This message is too long to queue.");
+	}
 	const now = new Date();
 	const row: QueuedInput = {
 		_id: new ObjectId(),
 		conversationId: input.conversationId,
-		text: input.text.replace(/\r\n/g, "\n"),
+		text,
 		status: "queued",
 		source: input.source,
 		...(input.userId ? { userId: input.userId } : {}),
@@ -33,6 +40,15 @@ export async function enqueueInput(input: {
 		updatedAt: now,
 	};
 	await collections.queuedInputs.insertOne(row);
+	// counted after the insert, so two racing sends cannot both pass a full queue
+	const waiting = await collections.queuedInputs.countDocuments({
+		conversationId: input.conversationId,
+		status: "queued",
+	});
+	if (waiting > MAX_QUEUED_INPUTS) {
+		await collections.queuedInputs.deleteOne({ _id: row._id, status: "queued" });
+		throw new QueueFullError("Too many queued messages.");
+	}
 	return row;
 }
 
@@ -45,11 +61,19 @@ export async function cancelQueuedInput(conversationId: ObjectId, id: ObjectId):
 	return result.matchedCount > 0;
 }
 
-export async function cancelAllQueuedInputs(conversationId: ObjectId): Promise<void> {
-	await collections.queuedInputs.updateMany(
-		{ conversationId, status: "queued" },
-		{ $set: { status: "cancelled", updatedAt: new Date() } }
-	);
+/** the ids it cancelled, a row a turn took first is not among them */
+export async function cancelAllQueuedInputs(conversationId: ObjectId): Promise<string[]> {
+	const cancelled: string[] = [];
+	for (let i = 0; i < MAX_QUEUED_INPUTS * 2; i += 1) {
+		const result = await collections.queuedInputs.findOneAndUpdate(
+			{ conversationId, status: "queued" },
+			{ $set: { status: "cancelled", updatedAt: new Date() } },
+			{ sort: { createdAt: 1 } }
+		);
+		if (!result.value) break;
+		cancelled.push(result.value._id.toString());
+	}
+	return cancelled;
 }
 
 export async function hasQueuedInputs(conversationId: ObjectId): Promise<boolean> {
@@ -61,17 +85,26 @@ export async function hasQueuedInputs(conversationId: ObjectId): Promise<boolean
 	);
 }
 
-// each row is its own CAS out of queued, so a cancel wins or loses whole and takers never share
+/** oldest first, one CAS per row, stops before the joined text passes the char limit */
 export async function claimQueuedInputs(
 	conversationId: ObjectId,
 	as: { status: "delivered"; messageId: string } | { status: "started" }
 ): Promise<QueuedInput[]> {
 	const claimToken = randomUUID();
+	const budget = queuedInputCharLimit();
 	const claimed: QueuedInput[] = [];
+	let chars = 0;
 	for (let i = 0; i < MAX_QUEUED_INPUTS * 2; i += 1) {
+		const next = await collections.queuedInputs.findOne(
+			{ conversationId, status: "queued" },
+			{ sort: { createdAt: 1 }, projection: { _id: 1, text: 1 } }
+		);
+		if (!next) break;
+		const joined = chars + (claimed.length > 0 ? JOIN.length : 0) + next.text.length;
+		if (claimed.length > 0 && joined > budget) break;
 		const now = new Date();
 		const result = await collections.queuedInputs.findOneAndUpdate(
-			{ conversationId, status: "queued" },
+			{ _id: next._id, status: "queued" },
 			{
 				$set: {
 					status: as.status,
@@ -81,18 +114,23 @@ export async function claimQueuedInputs(
 					...(as.status === "delivered" ? { messageId: as.messageId } : {}),
 				},
 			},
-			{ sort: { createdAt: 1 }, returnDocument: "after" }
+			{ returnDocument: "after" }
 		);
-		if (!result.value) break;
+		if (!result.value) continue;
 		claimed.push(result.value);
+		chars = joined;
 	}
 	return claimed;
+}
+
+export function joinQueuedInputs(rows: Pick<QueuedInput, "text">[]): string {
+	return rows.map((row) => row.text).join(JOIN);
 }
 
 const MAX_START_ATTEMPTS = 3;
 
 /** a started turn that never ran puts its messages back, they were not read */
-export async function releaseQueuedInputs(rows: QueuedInput[]): Promise<void> {
+export async function releaseQueuedInputs(rows: QueuedInput[], reason: string): Promise<void> {
 	if (rows.length === 0) return;
 	const now = new Date();
 	const ids = rows.map((row) => row._id);
@@ -104,32 +142,44 @@ export async function releaseQueuedInputs(rows: QueuedInput[]): Promise<void> {
 			$inc: { attempts: 1 },
 		}
 	);
-	// a refusal that repeats, a gone user or a rate limit that never lifts, would start forever
-	await collections.queuedInputs.updateMany(
+	// a refusal that repeats would start forever, failed rows go back to the composer
+	await failQueuedInputs(
 		{ _id: { $in: ids }, status: "queued", attempts: { $gte: MAX_START_ATTEMPTS } },
-		{ $set: { status: "cancelled", updatedAt: now } }
+		reason
 	);
+}
+
+export async function failQueuedInputs(
+	filter: Parameters<typeof collections.queuedInputs.updateMany>[0],
+	reason: string
+): Promise<void> {
+	const now = new Date();
+	await collections.queuedInputs.updateMany(filter, {
+		$set: { status: "failed", error: reason, takenAt: now, updatedAt: now },
+	});
 }
 
 const RECENT_MS = 10 * 60_000;
 
 /** also what a turn took lately, so the browser can tell where it went */
 export async function listQueuedInputs(conversationId: ObjectId): Promise<QueuedInputView[]> {
-	const rows = await collections.queuedInputs
-		.find({
-			conversationId,
-			$or: [
-				{ status: "queued" },
-				{
-					status: { $in: ["delivered", "started"] },
-					takenAt: { $gte: new Date(Date.now() - RECENT_MS) },
-				},
-			],
-		})
-		.sort({ createdAt: 1 })
-		.limit(MAX_QUEUED_INPUTS * 3)
-		.toArray();
-	return rows.map(queuedInputView);
+	const [queued, taken] = await Promise.all([
+		collections.queuedInputs
+			.find({ conversationId, status: "queued" })
+			.sort({ createdAt: 1 })
+			.limit(MAX_QUEUED_INPUTS * 2)
+			.toArray(),
+		collections.queuedInputs
+			.find({
+				conversationId,
+				status: { $in: ["delivered", "started", "failed"] },
+				takenAt: { $gte: new Date(Date.now() - RECENT_MS) },
+			})
+			.sort({ takenAt: -1 })
+			.limit(MAX_QUEUED_INPUTS * 2)
+			.toArray(),
+	]);
+	return [...taken.reverse(), ...queued].map(queuedInputView);
 }
 
 export function queuedInputView(row: QueuedInput): QueuedInputView {
@@ -138,5 +188,6 @@ export function queuedInputView(row: QueuedInput): QueuedInputView {
 		text: row.text,
 		status: row.status,
 		createdAt: row.createdAt.getTime(),
+		...(row.error ? { error: row.error } : {}),
 	};
 }

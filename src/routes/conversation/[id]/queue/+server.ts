@@ -5,8 +5,8 @@ import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { wakeParkForQueuedInput } from "$lib/server/queuedInputs/deliver";
 import { kickQueuedTurn } from "$lib/server/queuedInputs/drain";
 import {
-	MAX_QUEUED_INPUT_CHARS,
 	QueueFullError,
+	QueuedInputTooLongError,
 	cancelQueuedInput,
 	enqueueInput,
 	listQueuedInputs,
@@ -33,7 +33,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	return json({ inputs: await listQueuedInputs(conversationId) });
 };
 
-const postSchema = z.object({ text: z.string().trim().min(1).max(MAX_QUEUED_INPUT_CHARS) });
+const postSchema = z.object({ text: z.string().trim().min(1) });
 
 export const POST: RequestHandler = async ({ params, locals, request }) => {
 	const conversationId = await ownedMlConversation(params, locals);
@@ -51,6 +51,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		});
 	} catch (err) {
 		if (err instanceof QueueFullError) error(429, err.message);
+		if (err instanceof QueuedInputTooLongError) error(413, err.message);
 		throw err;
 	}
 	await wakeParkForQueuedInput(conversationId);

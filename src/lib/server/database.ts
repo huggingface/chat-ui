@@ -475,7 +475,7 @@ export class Database {
 			.createIndex({ conversationId: 1, status: 1, createdAt: 1 })
 			.catch((e) => logger.error(e, "Error creating index for queuedInputs by conversation"));
 		queuedInputs
-			.createIndex({ status: 1, createdAt: 1 })
+			.createIndex({ status: 1, checkedAt: 1, createdAt: 1 })
 			.catch((e) => logger.error(e, "Error creating index for queuedInputs by status"));
 		queuedInputs
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 })

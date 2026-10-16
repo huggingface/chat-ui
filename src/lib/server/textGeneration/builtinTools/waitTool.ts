@@ -117,8 +117,8 @@ export function createWaitTool({ serviceEvents }: { serviceEvents: boolean }): B
 			if (await hasQueuedInputs(ctx.conversationId)) {
 				return {
 					resultText:
-						"Did not wait: the user sent you a message, which follows. Read it, then wait again " +
-						"if it does not change what you are waiting for.",
+						"Did not wait: the user sent you a message. If it follows this result, read it " +
+						"first; wait again if nothing changes what you are waiting for.",
 				};
 			}
 

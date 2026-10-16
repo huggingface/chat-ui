@@ -8,7 +8,7 @@ export interface QueuedInput extends Timestamps {
 	_id: ObjectId;
 	conversationId: Conversation["_id"];
 	text: string;
-	status: "queued" | "delivered" | "started" | "cancelled";
+	status: "queued" | "delivered" | "started" | "cancelled" | "failed";
 	source: "web" | "slack";
 	/** the identity a turn started from the queue runs as, there is no request behind it */
 	userId?: User["_id"];
@@ -19,6 +19,10 @@ export interface QueuedInput extends Timestamps {
 	takenAt?: Date;
 	/** turns started from it that were refused before they ran */
 	attempts?: number;
+	/** why no turn could start from it, shown when the text goes back to the composer */
+	error?: string;
+	/** when the orphan sweep last looked, so it rotates through every waiting conversation */
+	checkedAt?: Date;
 }
 
 export interface QueuedInputView {
@@ -26,4 +30,5 @@ export interface QueuedInputView {
 	text: string;
 	status: QueuedInput["status"];
 	createdAt: number;
+	error?: string;
 }

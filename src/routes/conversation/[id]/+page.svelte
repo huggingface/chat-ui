@@ -699,9 +699,7 @@
 				: undefined;
 
 		stopRequestedFor = convId;
-		// the stop cancels them on the server too, they come back as an unsent draft
-		const queuedTexts = queuedInputs.takeBack();
-		if (queuedTexts.length) draft = [...queuedTexts, draft].filter(Boolean).join("\n\n");
+		queuedInputs.takeBack();
 		$isAborted = true;
 		$loading = false;
 		messageUpdatesAbortController.abort();
@@ -727,6 +725,10 @@
 			if (!response.ok) {
 				throw new Error(`Stop request failed: ${response.status}`);
 			}
+			const body = (await response.json().catch(() => ({}))) as {
+				cancelledQueuedInputs?: string[];
+			};
+			queuedInputs.stopped(body.cancelledQueuedInputs ?? []);
 		};
 
 		// Store the promise so writeMessage's finally block can await it
