@@ -16,9 +16,11 @@ import { submitElicitationAnswer } from "$lib/server/mcp/elicitation";
 import { reservedMicroUsd, formatMicroUsd } from "$lib/utils/mlBudget";
 import type { User } from "$lib/types/User";
 import { slackConfig, type SlackConfig } from "./config";
-import { provisionSlackIdentity } from "./identity";
+import { provisionSlackIdentity, slackLocals } from "./identity";
+import { answerSideQuestion } from "$lib/server/mlSideQuestion";
+import { isSlackSideQuestion, slackSideQuestion } from "$lib/utils/sideQuestion";
 import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } from "./engine";
-import { isWorkspaceMember, threadPrompt, type ThreadMessage } from "./context";
+import { isWorkspaceMember, threadKey, threadPrompt, type ThreadMessage } from "./context";
 import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store";
 import type { SlackThread } from "./types";
 import {
@@ -78,6 +80,7 @@ export class MlSlackBot {
 	private active = new Map<string, Promise<void>>();
 	private runningConversations = new Map<string, string>();
 	private members = new Map<string, { allowed: boolean; until: number }>();
+	private sideQuestionEvents = new Map<string, number>();
 	private ticking = false;
 	private renders = new Map<string, Promise<void>>();
 	private timer?: ReturnType<typeof setInterval>;
@@ -491,6 +494,11 @@ export class MlSlackBot {
 			);
 			return;
 		}
+		const question = slackSideQuestion(event.text);
+		if (question !== undefined) {
+			await this.answerSideQuestion(event, teamId, eventId, question);
+			return;
+		}
 		const thread = await getOrCreateThread(
 			teamId,
 			event.channel,
@@ -512,6 +520,82 @@ export class MlSlackBot {
 						"[slack] Reaction failed; request remains queued. Check reactions:write permission."
 					)
 				);
+		}
+	}
+
+	/** answered beside the run, never queued, and never part of the next turn's thread context */
+	private async answerSideQuestion(
+		event: z.infer<typeof mention>,
+		teamId: string,
+		eventId: string,
+		question: string
+	): Promise<void> {
+		const now = Date.now();
+		for (const [id, until] of this.sideQuestionEvents)
+			if (until <= now) this.sideQuestionEvents.delete(id);
+		if (this.sideQuestionEvents.has(eventId)) return;
+		this.sideQuestionEvents.set(eventId, now + 10 * 60_000);
+
+		const thread = await collections.slackThreads.findOne({
+			_id: threadKey(teamId, event.channel, event.thread_ts ?? event.ts),
+			teamId,
+		});
+		const exists =
+			thread &&
+			(await collections.conversations.countDocuments(
+				{ _id: thread.conversationId },
+				{ limit: 1 }
+			));
+		if (!thread || !exists) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"There is no ML Intern task in this thread to ask about yet. Ask btw questions in the task's thread.",
+				event.thread_ts
+			);
+			return;
+		}
+		if (!question) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"Add your question after btw, e.g. `btw which job is running?`",
+				thread.threadTs
+			);
+			return;
+		}
+		await this.app.client.reactions
+			.add({ channel: event.channel, timestamp: event.ts, name: "eyes" })
+			.catch(() => {});
+		try {
+			let answer = "";
+			for await (const chunk of answerSideQuestion({
+				conversationId: thread.conversationId,
+				question,
+				locals: slackLocals(this.user),
+				signal: AbortSignal.timeout(180_000),
+			}))
+				answer += chunk;
+			for (const text of chunks(`_btw answer, ML Intern does not see this_\n\n${answer.trim()}`)) {
+				await this.app.client.chat.postMessage({
+					channel: thread.channel,
+					thread_ts: thread.threadTs,
+					text,
+					blocks: messageBlocks(text, []),
+					parse: "none",
+					unfurl_links: false,
+					unfurl_media: false,
+				});
+			}
+		} catch (error) {
+			const status = isHttpError(error) ? error.status : undefined;
+			logger.warn({ status: status ?? "internal" }, "[slack] Side question failed");
+			await this.tell(
+				event.channel,
+				event.user,
+				"ML Intern could not answer that side question. The run is unaffected; try again shortly.",
+				thread.threadTs
+			);
 		}
 	}
 
@@ -537,6 +621,7 @@ export class MlSlackBot {
 					(m) =>
 						m.user !== this.botUserId &&
 						!m.bot_id &&
+						!isSlackSideQuestion(m.text) &&
 						(!thread.contextThroughTs || !m.ts || m.ts > thread.contextThroughTs)
 				)
 			);
