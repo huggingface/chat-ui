@@ -29,7 +29,9 @@ const mocks = vi.hoisted(() => ({
 	run: vi.fn(),
 	react: vi.fn(),
 	upload: vi.fn(),
+	kickQueuedTurn: vi.fn(),
 }));
+vi.mock("$lib/server/queuedInputs/drain", () => ({ kickQueuedTurn: mocks.kickQueuedTurn }));
 vi.mock("@slack/bolt", () => ({
 	App: class {
 		client = {
@@ -542,6 +544,62 @@ describe("Slack transport authorization", () => {
 		expect(skipSlackQuestion).toHaveBeenCalledTimes(1);
 		expect(mocks.run).toHaveBeenCalledTimes(1);
 		expect(mocks.run.mock.lastCall?.[2].text).toContain("Move on");
+	});
+
+	it("queues the owner's message into a running turn and still refuses everyone else", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Start", ts: "100.0" },
+			"T123",
+			"start"
+		);
+		await collections.slackInputs.updateMany({}, { $set: { status: "done" } });
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		const messageId = crypto.randomUUID();
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			messages: [{ id: messageId, from: "assistant", content: "Working" }],
+		});
+		await collections.generations.insertOne({
+			_id: new ObjectId(),
+			generationId: crypto.randomUUID(),
+			conversationId: thread.conversationId,
+			messageId,
+			status: "running",
+			startedAt: new Date(),
+			lastHeartbeatAt: new Date(),
+		} as never);
+
+		await bot.receive(
+			{ channel: "C123", user: "OTHER", text: "Me too", ts: "101.0", thread_ts: "100.0" },
+			"T123",
+			"other"
+		);
+		await bot["dispatch"](thread);
+		expect(mocks.ephemeral.mock.lastCall?.[0].text).toContain("still working");
+
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Use the 7B model", ts: "102.0", thread_ts: "100.0" },
+			"T123",
+			"owner"
+		);
+		await bot["dispatch"](thread);
+
+		expect(mocks.run).not.toHaveBeenCalled();
+		const queued = await collections.queuedInputs
+			.find({ conversationId: thread.conversationId })
+			.toArray();
+		expect(queued).toHaveLength(1);
+		expect(queued[0]).toMatchObject({ status: "queued", source: "slack", userId: user._id });
+		expect(queued[0].text).toContain("Use the 7B model");
+		expect(mocks.kickQueuedTurn).toHaveBeenCalledWith(thread.conversationId);
+		expect(mocks.ephemeral.mock.lastCall?.[0].text).toMatch(/^Queued/);
+		const after = await collections.slackThreads.findOne({ _id: thread._id });
+		expect(after?.contextThroughTs).toBe("102.0");
+		await collections.queuedInputs.deleteMany({ conversationId: thread.conversationId });
+		await collections.generations.deleteMany({ conversationId: thread.conversationId });
 	});
 
 	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {

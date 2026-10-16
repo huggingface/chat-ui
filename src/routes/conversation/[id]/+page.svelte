@@ -51,6 +51,7 @@
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { queuedInputs } from "$lib/stores/queuedInputs.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 	import { planStepsToMlSteps } from "$lib/utils/planProgress";
 
@@ -698,6 +699,9 @@
 				: undefined;
 
 		stopRequestedFor = convId;
+		// the stop cancels them on the server too, they come back as an unsent draft
+		const queuedTexts = queuedInputs.takeBack();
+		if (queuedTexts.length) draft = [...queuedTexts, draft].filter(Boolean).join("\n\n");
 		$isAborted = true;
 		$loading = false;
 		messageUpdatesAbortController.abort();
@@ -941,6 +945,7 @@
 	onretry={onRetry}
 	onshowAlternateMsg={onShowAlternateMsg}
 	onstop={stopGeneration}
+	onqueuedturn={() => resyncTurn()}
 	models={data.models}
 	currentModel={findCurrentModel(data.models, data.oldModels, data.model)}
 />

@@ -844,6 +844,10 @@ export async function generateConversationResponse({
 			});
 			clearInterval(abortMarkerWatcher);
 			abortRegistry.unregister(conversationKey, ctrl);
+			if (endedUpdate && !abortedByUser && isMlAssistantConversation(conv)) {
+				const { kickQueuedTurn } = await import("$lib/server/queuedInputs/drain");
+				kickQueuedTurn(convId);
+			}
 
 			// Consume the stop marker once the stop has been honored and the
 			// interrupted state persisted. Markers are conversation-scoped, so a

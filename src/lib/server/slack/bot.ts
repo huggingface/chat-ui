@@ -12,6 +12,9 @@ import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 import { pinnedHubToken } from "$lib/server/mlAssistant";
 import { isTurnAlive } from "$lib/server/generation/turnLog";
 import { kickAnsweredAsk } from "$lib/server/generation/askResume";
+import { enqueueInput as queueForTurn, hasQueuedInputs } from "$lib/server/queuedInputs/store";
+import { wakeParkForQueuedInput } from "$lib/server/queuedInputs/deliver";
+import { kickQueuedTurn } from "$lib/server/queuedInputs/drain";
 import { submitElicitationAnswer } from "$lib/server/mcp/elicitation";
 import { reservedMicroUsd, formatMicroUsd } from "$lib/utils/mlBudget";
 import type { User } from "$lib/types/User";
@@ -606,7 +609,9 @@ export class MlSlackBot {
 					!input.retry &&
 					input.user === thread.owner &&
 					(await skipSlackQuestion(thread, this.user, latest.id, input._id));
-				if (busy && !skipped) {
+				if (busy && !skipped && !input.retry && input.user === thread.owner) {
+					await this.queueIntoTurn(thread, input);
+				} else if (busy && !skipped) {
 					await this.tell(
 						thread.channel,
 						input.user,
@@ -649,6 +654,34 @@ export class MlSlackBot {
 		} finally {
 			this.runningConversations.delete(thread._id);
 		}
+	}
+
+	/** the owner message joins the busy turn at its next step or starts the next one */
+	private async queueIntoTurn(
+		thread: SlackThread,
+		input: { text: string; user: string; ts: string }
+	): Promise<void> {
+		const { text, files } = await this.context(thread, input);
+		await queueForTurn({
+			conversationId: thread.conversationId,
+			text,
+			source: "slack",
+			userId: this.user._id,
+		});
+		await collections.slackThreads.updateOne(
+			{ _id: thread._id },
+			{ $max: { contextThroughTs: input.ts }, $set: { watching: true, updatedAt: new Date() } }
+		);
+		await wakeParkForQueuedInput(thread.conversationId);
+		kickQueuedTurn(thread.conversationId);
+		await this.tell(
+			thread.channel,
+			input.user,
+			files.length > 0
+				? "Queued: ML Intern will read this at its next step. Attachments are not passed to a running task; send them again once it finishes."
+				: "Queued: ML Intern will read this at its next step.",
+			thread.threadTs
+		);
 	}
 
 	/** Serialize click-driven and background updates so old renders cannot overwrite new choices. */
@@ -907,6 +940,7 @@ export class MlSlackBot {
 		if (
 			!live.alive &&
 			!this.active.has(thread._id) &&
+			!(await hasQueuedInputs(thread.conversationId)) &&
 			!(await collections.slackInputs.countDocuments(
 				{
 					threadId: thread._id,
@@ -1223,7 +1257,10 @@ export class MlSlackBot {
 						{ projection: { messages: { $slice: -1 } } }
 					);
 					const message = latest?.messages.at(-1);
-					if (!message || !(await isTurnAlive(thread.conversationId, message.id)).alive)
+					if (
+						(!message || !(await isTurnAlive(thread.conversationId, message.id)).alive) &&
+						!(await hasQueuedInputs(thread.conversationId))
+					)
 						await collections.slackThreads.updateOne(
 							{ _id: thread._id, updatedAt: thread.updatedAt },
 							{ $set: { watching: false } }

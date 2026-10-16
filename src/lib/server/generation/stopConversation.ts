@@ -1,6 +1,7 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { AbortRegistry } from "$lib/server/abortRegistry";
+import { cancelAllQueuedInputs } from "$lib/server/queuedInputs/store";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
@@ -59,6 +60,8 @@ export async function stopConversation({
 	);
 
 	AbortRegistry.getInstance().abort(conversationId.toString());
+	// a stop does not start what was queued, the browser puts the texts back in the composer
+	await cancelAllQueuedInputs(conversationId);
 
 	return new Response();
 }
