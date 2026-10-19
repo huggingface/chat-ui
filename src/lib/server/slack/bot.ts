@@ -2,6 +2,7 @@ import { isHttpError } from "@sveltejs/kit";
 import { downloadAttachments } from "./attachments";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createHash } from "node:crypto";
+import { ObjectId } from "mongodb";
 import { App } from "@slack/bolt";
 import { z } from "zod";
 import { collections } from "$lib/server/database";
@@ -572,14 +573,14 @@ export class MlSlackBot {
 			return refuse(
 				"ML Intern is still answering another btw question. Try again once it replies."
 			);
-		if (!(await this.withinSideQuestionLimit(teamId, event.user)))
-			return refuse("Too many btw questions in the last minute. Try again shortly.");
-
+		// claimed before the next await so a second request from the same asker sees it
 		this.sideQuestionAskers.add(event.user);
-		await this.app.client.reactions
-			.add({ channel: event.channel, timestamp: event.ts, name: "eyes" })
-			.catch(() => {});
 		try {
+			if (!(await this.reserveSideQuestion(teamId, event.user)))
+				return await refuse("Too many btw questions in the last minute. Try again shortly.");
+			await this.app.client.reactions
+				.add({ channel: event.channel, timestamp: event.ts, name: "eyes" })
+				.catch(() => {});
 			let answer = "";
 			for await (const chunk of answerSideQuestion({
 				conversationId: thread.conversationId,
@@ -614,31 +615,32 @@ export class MlSlackBot {
 		return true;
 	}
 
-	/** counted in messageEvents so the limit holds across restarts and pods */
-	private async withinSideQuestionLimit(teamId: string, user: string): Promise<boolean> {
+	/**
+	 * a minute of quota in messageEvents, rows are inserted before counting so racing requests
+	 * can both back off but never both take the last slot
+	 */
+	private async reserveSideQuestion(teamId: string, user: string): Promise<boolean> {
 		const now = new Date();
-		const live = { type: "message" as const, expiresAt: { $gt: now } };
-		const asker = `slack-btw:${teamId}:${user}`;
-		const workspace = `slack-btw:${teamId}`;
-		const [byAsker, byWorkspace] = await Promise.all([
-			collections.messageEvents.countDocuments({ userId: asker, ...live }),
-			collections.messageEvents.countDocuments({ userId: workspace, ...live }),
-		]);
-		if (
-			byAsker >= SLACK_SIDE_QUESTIONS_PER_MINUTE ||
-			byWorkspace >= SLACK_WORKSPACE_SIDE_QUESTIONS_PER_MINUTE
-		)
-			return false;
 		const expiresAt = new Date(now.getTime() + 60_000);
+		const rows = [
+			{ userId: `slack-btw:${teamId}:${user}`, limit: SLACK_SIDE_QUESTIONS_PER_MINUTE },
+			{ userId: `slack-btw:${teamId}`, limit: SLACK_WORKSPACE_SIDE_QUESTIONS_PER_MINUTE },
+		].map((row) => ({ ...row, _id: new ObjectId() }));
 		await collections.messageEvents.insertMany(
-			[asker, workspace].map((userId) => ({
-				type: "message" as const,
-				userId,
-				createdAt: now,
-				expiresAt,
-			}))
+			rows.map(({ _id, userId }) => ({ _id, type: "message", userId, createdAt: now, expiresAt }))
 		);
-		return true;
+		const counts = await Promise.all(
+			rows.map(({ userId }) =>
+				collections.messageEvents.countDocuments({
+					userId,
+					type: "message",
+					expiresAt: { $gt: now },
+				})
+			)
+		);
+		if (rows.every((row, i) => counts[i] <= row.limit)) return true;
+		await collections.messageEvents.deleteMany({ _id: { $in: rows.map((row) => row._id) } });
+		return false;
 	}
 
 	private async context(

@@ -1018,6 +1018,53 @@ describe("Slack btw side questions", () => {
 		expect(mocks.sideQuestion).toHaveBeenCalledTimes(2);
 	});
 
+	it("admits only one of two btw questions from one asker arriving together", async () => {
+		const { bot } = await startedThread();
+		let release: (() => void) | undefined;
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		mocks.sideQuestion.mockImplementation(async function* () {
+			await held;
+			yield "done";
+		});
+		const ask = (eventId: string, ts: string) =>
+			bot.receive(
+				{ channel: "C123", user: "OTHER", text: "btw status?", ts, thread_ts: "100.0" },
+				"T123",
+				eventId
+			);
+
+		const both = Promise.all([ask("PAIR1", "101.0"), ask("PAIR2", "102.0")]);
+		await vi.waitFor(() =>
+			expect(mocks.ephemeral).toHaveBeenCalledWith(
+				expect.objectContaining({ user: "OTHER", text: expect.stringContaining("still answering") })
+			)
+		);
+		release?.();
+		await both;
+		expect(mocks.sideQuestion).toHaveBeenCalledTimes(1);
+		expect(bot["sideQuestionAskers"].size).toBe(0);
+		await collections.messageEvents.deleteMany({});
+	});
+
+	it("never admits more than the minute's quota when reservations race", async () => {
+		const { bot } = await startedThread();
+		const admitted = await Promise.all(
+			Array.from({ length: 8 }, () => bot["reserveSideQuestion"]("T123", "RACER"))
+		);
+		const count = admitted.filter(Boolean).length;
+		expect(count).toBeLessThanOrEqual(5);
+		expect(await collections.messageEvents.countDocuments({ userId: "slack-btw:T123:RACER" })).toBe(
+			count
+		);
+		for (let n = count; n < 5; n++) {
+			expect(await bot["reserveSideQuestion"]("T123", "RACER")).toBe(true);
+		}
+		expect(await bot["reserveSideQuestion"]("T123", "RACER")).toBe(false);
+		await collections.messageEvents.deleteMany({});
+	});
+
 	it("caps btw questions per asker per minute", async () => {
 		const { bot } = await startedThread();
 		mocks.sideQuestion.mockImplementation(async function* () {
