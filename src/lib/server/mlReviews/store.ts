@@ -32,6 +32,7 @@ export async function createReview(params: {
 		_id: new ObjectId(),
 		...params,
 		drafts: {},
+		draftRevision: 0,
 		status: "open",
 		createdAt: now,
 		updatedAt: now,
@@ -62,20 +63,25 @@ export async function saveDraft(
 	// a detached review stays open for drafting, only its submission changes shape
 	const updated = await collections.mlReviews.updateOne(
 		{ _id, conversationId, status: { $in: ["open", "detached"] } },
-		{ $set: { [`drafts.${index}`]: draft, updatedAt: now } }
+		{ $set: { [`drafts.${index}`]: draft, updatedAt: now }, $inc: { draftRevision: 1 } }
 	);
 	return updated.matchedCount === 1;
 }
 
-/** from open only, so a submit that lost a race to a detach or an expiry changes nothing */
+/** from the status and draft revision the result was built on, so a race changes nothing */
 export async function submitReview(
-	review: Pick<MlReview, "_id" | "conversationId">,
+	review: Pick<MlReview, "_id" | "conversationId" | "draftRevision">,
 	submission: { verdict: ReviewVerdict; summary?: string; result: NonNullable<MlReview["result"]> },
 	from: MlReview["status"] = "open"
 ): Promise<boolean> {
 	const now = new Date();
 	const updated = await collections.mlReviews.updateOne(
-		{ _id: review._id, conversationId: review.conversationId, status: from },
+		{
+			_id: review._id,
+			conversationId: review.conversationId,
+			status: from,
+			draftRevision: review.draftRevision,
+		},
 		{
 			$set: {
 				status: "submitted",
@@ -88,6 +94,52 @@ export async function submitReview(
 		}
 	);
 	return updated.matchedCount === 1;
+}
+
+/** answers the parked call from a stored submission, false once anything else closed it */
+export async function resolveSubmittedReview(
+	review: Pick<MlReview, "conversationId" | "elicitationId">,
+	resolvedAt = new Date()
+): Promise<boolean> {
+	const updated = await collections.mcpElicitations.updateOne(
+		{
+			elicitationId: review.elicitationId,
+			conversationId: review.conversationId,
+			status: "pending",
+			"pending.kind": "review",
+		},
+		{
+			$set: {
+				status: "resolved",
+				action: "accept",
+				resolution: "user",
+				resolvedAt,
+				updatedAt: new Date(),
+			},
+		}
+	);
+	return updated.matchedCount === 1;
+}
+
+/** resolves pending rows of submitted reviews, a submit can die between its two writes */
+export async function finishStoredSubmissions(conversationId?: ObjectId): Promise<void> {
+	const rows = await collections.mcpElicitations
+		.find(
+			{
+				...(conversationId ? { conversationId } : {}),
+				status: "pending",
+				"pending.kind": "review",
+			},
+			{ projection: { conversationId: 1, pending: 1 } }
+		)
+		.limit(50)
+		.toArray();
+	for (const row of rows) {
+		if (row.pending?.kind !== "review") continue;
+		const review = await readReview(row.conversationId, row.pending.reviewId);
+		if (review?.status !== "submitted") continue;
+		await resolveSubmittedReview(review, review.submittedAt);
+	}
 }
 
 /** the user wrote instead, the review stays answerable and its submission becomes a message */

@@ -989,6 +989,53 @@ describe("a submitted review", () => {
 	});
 });
 
+describe("a submit that died between storing the result and answering the row", () => {
+	async function storeOnly(conv: Conversation) {
+		const review = await collections.mlReviews.findOne({ conversationId: conv._id });
+		if (!review) throw new Error("no review");
+		const submission = { verdict: "approve" as const };
+		const result = await buildReviewResult(review, submission);
+		expect(await submitReview(review, { ...submission, result })).toBe(true);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{ $set: { submittedAt: new Date(Date.now() - 60_000) } }
+		);
+	}
+
+	it("is continued by the sweep", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Thanks, carrying on." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await labelAll(conv, locals, reviewId);
+		await storeOnly(conv);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, parked.id, "done");
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(toolResultsIn(outgoing(1))[0]).toContain('Review "Triage batch 1" submitted');
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resolution: "user",
+			resume: { status: "resumed" },
+		});
+	});
+
+	it("is settled as the answer, not detached, when the user sends a message", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Carrying on." }]);
+		const { reviewId } = await parkOnReview(conv, locals);
+		await labelAll(conv, locals, reviewId);
+		await storeOnly(conv);
+
+		await sendMessage(conv, locals, "Did that go through?");
+
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain('Review "Triage batch 1" submitted');
+		expect(result).not.toContain("still open");
+	});
+});
+
 describe("a review the user wrote past", () => {
 	it("is closed as still open, detached, and never resumed by a later submit", async () => {
 		const { conv, locals } = await newConversation();

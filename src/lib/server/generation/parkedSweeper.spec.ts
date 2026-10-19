@@ -633,6 +633,7 @@ describe("resuming a parked wait", () => {
 			source: { kind: "inline" },
 			records: [{ id: "a", values: {} }],
 			drafts: {},
+			draftRevision: 0,
 			status: "open",
 			createdAt: now,
 			updatedAt: now,

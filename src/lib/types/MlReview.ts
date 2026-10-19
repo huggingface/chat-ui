@@ -118,6 +118,8 @@ export interface MlReview {
 	records: ReviewRecord[];
 	/** keyed by position, a model chosen id can hold dots or dollar signs that break $set */
 	drafts: Record<string, ReviewDraft>;
+	/** bumped by every draft save, a submit built from an older read must not land */
+	draftRevision: number;
 	status: ReviewStatus;
 	verdict?: ReviewVerdict;
 	summary?: string;

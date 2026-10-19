@@ -20,6 +20,9 @@ vi.mock("$lib/server/logger", () => ({
 
 const { GET, PATCH } =
 	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/+server");
+const { submitReviewRequest } = await import("$lib/server/mlReviews/api");
+const { buildReviewResult } = await import("$lib/server/mlReviews/result");
+const { submitReview } = await import("$lib/server/mlReviews/store");
 const { POST: SUBMIT } =
 	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/submit/+server");
 
@@ -326,6 +329,65 @@ describe.sequential("saving a draft", () => {
 });
 
 describe.sequential("submitting", () => {
+	const labelBoth = async (locals: App.Locals, conv: Conversation, review: MlReview) => {
+		for (const [index, kind] of ["bug", "feature"].entries()) {
+			await PATCH(
+				event(locals, conv._id.toString(), review._id.toString(), {
+					index,
+					draft: draft({ kind }),
+				})
+			);
+		}
+	};
+
+	it("refuses a submit built from drafts that changed after it read them", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		await labelBoth(locals, conv, review);
+		const read = await collections.mlReviews.findOne({ _id: review._id });
+		if (!read) throw new Error("review vanished");
+		await PATCH(
+			event(locals, conv._id.toString(), review._id.toString(), {
+				index: 1,
+				draft: draft({ kind: "bug" }),
+			})
+		);
+
+		await expect(submitReviewRequest(read, { verdict: "approve" })).rejects.toMatchObject({
+			status: 409,
+			body: {
+				message: "This review changed while it was being submitted, reload it and submit again.",
+			},
+		});
+		const stored = await collections.mlReviews.findOne({ _id: review._id });
+		expect(stored).toMatchObject({ status: "open", drafts: { "1": { answers: { kind: "bug" } } } });
+	});
+
+	it("lets a retry finish a submit whose process died before answering the row", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		await labelBoth(locals, conv, review);
+		const read = await collections.mlReviews.findOne({ _id: review._id });
+		if (!read) throw new Error("review vanished");
+		const result = await buildReviewResult(read, { verdict: "approve" });
+		expect(await submitReview(read, { verdict: "approve", result })).toBe(true);
+
+		const res = await SUBMIT(
+			event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+		);
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({ ok: true, files: result.files });
+		expect(
+			await collections.mcpElicitations.findOne({ elicitationId: review.elicitationId })
+		).toMatchObject({ status: "resolved", action: "accept", resolution: "user" });
+		expect(
+			await errorOf(
+				SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }))
+			)
+		).toEqual({ status: 409, message: "This review was already submitted." });
+	});
+
 	it("answers 400 with the blockers while a required question is open", async () => {
 		const { locals } = await createTestUser();
 		const { conv, review } = await seed(locals);

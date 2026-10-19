@@ -19,6 +19,7 @@ import {
 	releaseElicitationResume,
 } from "$lib/server/mcp/elicitation";
 import { resumeParkedToolCall } from "$lib/server/mcp/resumeElicitation";
+import { finishStoredSubmissions } from "$lib/server/mlReviews/store";
 import {
 	MessageElicitationUpdateType,
 	MessageToolUpdateType,
@@ -496,6 +497,7 @@ async function storeAnswerOnly(
 export async function settleAnsweredAsks(
 	conv: Pick<Conversation, "_id" | "messages">
 ): Promise<() => Promise<void>> {
+	await finishStoredSubmissions(conv._id);
 	const now = Date.now();
 	const rows: McpElicitation[] = [];
 	// one equality match per kind, so each query uses its own partial index
@@ -552,6 +554,9 @@ export async function settleAnsweredAsks(
 
 /** Answers whose process died before it could continue them. */
 export async function sweepAnsweredAsks(): Promise<void> {
+	await finishStoredSubmissions().catch((err) =>
+		logger.error({ err }, "[review] could not finish stored submissions")
+	);
 	for (const kind of SERVER_RESUMED_KINDS) await sweepAnswered(kind);
 }
 

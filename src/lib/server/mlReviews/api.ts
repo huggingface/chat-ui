@@ -9,7 +9,7 @@ import type { MlReview, ReviewDraft } from "$lib/types/MlReview";
 import { blockers, validateAnswer, type ReviewBlocker } from "$lib/utils/review/answers";
 import { REVIEW_LIMITS } from "$lib/utils/review/schema";
 import { buildReviewResult } from "./result";
-import { readReview, saveDraft, submitReview } from "./store";
+import { readReview, resolveSubmittedReview, saveDraft, submitReview } from "./store";
 
 export const REVIEW_MAX_COMMENTS_PER_RECORD = 20;
 export const REVIEW_MAX_COMMENT_CHARS = 2_000;
@@ -214,12 +214,20 @@ export type SubmitOutcome =
 	| { blockers: ReviewBlocker[] };
 
 export async function submitReviewRequest(review: MlReview, body: unknown): Promise<SubmitOutcome> {
-	if (review.status === "submitted") error(409, "This review was already submitted.");
 	if (review.status === "expired") error(409, "This review expired.");
 	const parsed = submitBodySchema.safeParse(body);
 	if (!parsed.success) error(400, "Invalid review submission");
 	const { verdict, selection } = parsed.data;
 	const summary = parsed.data.summary || undefined;
+
+	if (review.status === "submitted") {
+		// a submit whose process died before resolving the row is finished by the retry
+		if (review.result && (await resolveSubmittedReview(review))) {
+			await resume(review, selection);
+			return { ok: true, files: review.result.files };
+		}
+		error(409, "This review was already submitted.");
+	}
 
 	const found = blockers(review.schema, review.drafts, review.records.length);
 	if (found.length > 0) return { blockers: found };
@@ -227,31 +235,18 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 	const result = await buildReviewResult(review, { verdict, summary });
 	const from = review.status;
 	if (!(await submitReview(review, { verdict, summary, result }, from))) {
-		error(409, "This review changed while it was being submitted; reload it.");
+		error(409, "This review changed while it was being submitted, reload it and submit again.");
 	}
 	// the turn already moved on, so the submission becomes the next user message
 	if (from === "detached") return { deliverAsMessage: true, text: result.text };
-
-	const now = new Date();
-	const resolved = await collections.mcpElicitations.updateOne(
-		{
-			elicitationId: review.elicitationId,
-			conversationId: review.conversationId,
-			status: "pending",
-		},
-		{
-			$set: {
-				status: "resolved",
-				action: "accept",
-				resolution: "user",
-				resolvedAt: now,
-				updatedAt: now,
-			},
-		}
-	);
 	// lost to a message the user sent meanwhile, which closed the parked call as still open
-	if (resolved.matchedCount === 0) return { deliverAsMessage: true, text: result.text };
+	if (!(await resolveSubmittedReview(review))) return { deliverAsMessage: true, text: result.text };
 
+	await resume(review, selection);
+	return { ok: true, files: result.files };
+}
+
+async function resume(review: MlReview, selection: z.infer<typeof selectionSchema>) {
 	const outcome = await kickAnsweredAsk(
 		review.conversationId,
 		review.elicitationId,
@@ -259,7 +254,6 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 		"review"
 	);
 	if (outcome === "failed") {
-		logger.warn({ reviewId: review._id.toString() }, "[review] resume failed; the sweep retries");
+		logger.warn({ reviewId: review._id.toString() }, "[review] resume failed, the sweep retries");
 	}
-	return { ok: true, files: result.files };
 }
