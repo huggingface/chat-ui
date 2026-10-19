@@ -1,4 +1,4 @@
-import { ObjectId } from "mongodb";
+import { ObjectId, type Filter } from "mongodb";
 import { collections } from "$lib/server/database";
 import type {
 	MlReview,
@@ -55,23 +55,39 @@ export async function saveDraft(
 	conversationId: ObjectId,
 	reviewId: string,
 	index: number,
-	draft: ReviewDraft
-): Promise<boolean> {
+	draft: ReviewDraft,
+	/** the record revision the draft was edited from, absent saves over whatever is there */
+	baseRevision?: number
+): Promise<"saved" | "closed" | "conflict"> {
 	const _id = reviewObjectId(reviewId);
-	if (!_id || !Number.isInteger(index) || index < 0) return false;
+	if (!_id || !Number.isInteger(index) || index < 0) return "closed";
+	const path = `drafts.${index}`;
 	const now = new Date();
 	// a detached review stays open for drafting, only its submission changes shape
+	const open: Filter<MlReview> = {
+		_id,
+		conversationId,
+		status: { $in: ["open", "detached"] },
+	};
 	const updated = await collections.mlReviews.updateOne(
-		{ _id, conversationId, status: { $in: ["open", "detached"] } },
-		{ $set: { [`drafts.${index}`]: draft, updatedAt: now }, $inc: { draftRevision: 1 } }
+		{
+			...open,
+			...(baseRevision === undefined
+				? {}
+				: baseRevision === 0
+					? { [`${path}.revision`]: { $exists: false } }
+					: { [`${path}.revision`]: baseRevision }),
+		},
+		{ $set: { [path]: draft, updatedAt: now }, $inc: { draftRevision: 1 } }
 	);
-	return updated.matchedCount === 1;
+	if (updated.matchedCount === 1) return "saved";
+	return (await collections.mlReviews.countDocuments(open)) > 0 ? "conflict" : "closed";
 }
 
-/** from the status and draft revision the result was built on, so a race changes nothing */
+/** claims the submission from the status and draft revision it read, so a race changes nothing */
 export async function submitReview(
 	review: Pick<MlReview, "_id" | "conversationId" | "draftRevision">,
-	submission: { verdict: ReviewVerdict; summary?: string; result: NonNullable<MlReview["result"]> },
+	submission: { verdict: ReviewVerdict; summary?: string },
 	from: MlReview["status"] = "open"
 ): Promise<boolean> {
 	const now = new Date();
@@ -87,13 +103,29 @@ export async function submitReview(
 				status: "submitted",
 				verdict: submission.verdict,
 				...(submission.summary ? { summary: submission.summary } : {}),
-				result: submission.result,
+				...(from === "open" ? { unresolved: true as const } : {}),
 				submittedAt: now,
 				updatedAt: now,
 			},
 		}
 	);
 	return updated.matchedCount === 1;
+}
+
+/** first writer wins, a second builder of the same submission reads the stored one back */
+export async function storeReviewResult(
+	review: Pick<MlReview, "_id">,
+	result: NonNullable<MlReview["result"]>
+): Promise<NonNullable<MlReview["result"]>> {
+	await collections.mlReviews.updateOne(
+		{ _id: review._id, status: "submitted", result: { $exists: false } },
+		{ $set: { result, updatedAt: new Date() } }
+	);
+	const stored = await collections.mlReviews.findOne(
+		{ _id: review._id },
+		{ projection: { result: 1 } }
+	);
+	return stored?.result ?? result;
 }
 
 /** answers the parked call from a stored submission, false once anything else closed it */
@@ -121,25 +153,20 @@ export async function resolveSubmittedReview(
 	return updated.matchedCount === 1;
 }
 
-/** resolves pending rows of submitted reviews, a submit can die between its two writes */
-export async function finishStoredSubmissions(conversationId?: ObjectId): Promise<void> {
-	const rows = await collections.mcpElicitations
-		.find(
-			{
-				...(conversationId ? { conversationId } : {}),
-				status: "pending",
-				"pending.kind": "review",
-			},
-			{ projection: { conversationId: 1, pending: 1 } }
-		)
-		.limit(50)
+export async function clearUnresolved(review: Pick<MlReview, "_id">): Promise<void> {
+	await collections.mlReviews.updateOne({ _id: review._id }, { $unset: { unresolved: "" } });
+}
+
+/** claimed submissions a process left unresolved, oldest first, so none can starve the rest */
+export async function unresolvedSubmissions(
+	conversationId?: ObjectId,
+	limit = 50
+): Promise<MlReview[]> {
+	return collections.mlReviews
+		.find({ ...(conversationId ? { conversationId } : {}), unresolved: true })
+		.sort({ submittedAt: 1 })
+		.limit(limit)
 		.toArray();
-	for (const row of rows) {
-		if (row.pending?.kind !== "review") continue;
-		const review = await readReview(row.conversationId, row.pending.reviewId);
-		if (review?.status !== "submitted") continue;
-		await resolveSubmittedReview(review, review.submittedAt);
-	}
 }
 
 /** the user wrote instead, the review stays answerable and its submission becomes a message */

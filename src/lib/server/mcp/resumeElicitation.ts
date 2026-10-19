@@ -9,7 +9,7 @@ import {
 	MessageToolUpdateType,
 	MessageUpdateType,
 } from "$lib/types/MessageUpdate";
-import { reviewResolvedUpdate } from "$lib/server/mlReviews/result";
+import { ensureReviewResult, reviewResolvedUpdate } from "$lib/server/mlReviews/result";
 import { readReview } from "$lib/server/mlReviews/store";
 import { REQUEST_REVIEW_TOOL_NAME } from "$lib/server/textGeneration/builtinTools/requestReviewDefinition";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
@@ -105,7 +105,10 @@ export async function resumeParkedToolCall({
 
 	if (pending.kind === "review") {
 		const review = await readReview(conversationId, pending.reviewId);
-		const submitted = review?.status === "submitted" && review.result ? review : undefined;
+		const submitted =
+			review?.status === "submitted"
+				? { ...review, result: await ensureReviewResult(review) }
+				: undefined;
 		const result: MessageUpdate = {
 			type: MessageUpdateType.Tool,
 			subtype: MessageToolUpdateType.Result,

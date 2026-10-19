@@ -8,8 +8,8 @@ import { kickAnsweredAsk, type AskResumeSelection } from "$lib/server/generation
 import type { MlReview, ReviewDraft } from "$lib/types/MlReview";
 import { blockers, validateAnswer, type ReviewBlocker } from "$lib/utils/review/answers";
 import { REVIEW_LIMITS } from "$lib/utils/review/schema";
-import { buildReviewResult } from "./result";
-import { readReview, resolveSubmittedReview, saveDraft, submitReview } from "./store";
+import { readReview, saveDraft, submitReview } from "./store";
+import { completeSubmission } from "./submission";
 
 export const REVIEW_MAX_COMMENTS_PER_RECORD = 20;
 export const REVIEW_MAX_COMMENT_CHARS = 2_000;
@@ -81,6 +81,7 @@ const comment = z.object({
 
 export const draftBodySchema = z.object({
 	index: z.number().int().nonnegative(),
+	baseRevision: z.number().int().nonnegative().optional(),
 	draft: z.object({
 		status: z.enum(["pending", "answered", "skipped", "discarded"]),
 		answers: z.record(z.string(), answerValue).default({}),
@@ -103,7 +104,7 @@ export interface DraftProblem {
 export async function patchDraft(
 	review: MlReview,
 	body: unknown
-): Promise<{ problems: DraftProblem[] }> {
+): Promise<{ problems: DraftProblem[]; revision: number } | { conflict: ReviewDraft | undefined }> {
 	if (review.status === "submitted") error(409, "This review was already submitted.");
 	if (review.status === "expired") error(409, "This review expired.");
 	const parsed = draftBodySchema.safeParse(body);
@@ -111,7 +112,7 @@ export async function patchDraft(
 		const issue = parsed.error.issues[0];
 		error(400, `${issue?.path.join(".") ?? "body"}: ${issue?.message ?? "invalid"}`);
 	}
-	const { index, draft } = parsed.data;
+	const { index, draft, baseRevision } = parsed.data;
 	if (index >= review.records.length)
 		error(400, `index: the review has ${review.records.length} records`);
 
@@ -143,6 +144,7 @@ export async function patchDraft(
 			body: c.body,
 			createdAt: c.createdAt ?? now,
 		})),
+		revision: (baseRevision ?? review.drafts[String(index)]?.revision ?? 0) + 1,
 		updatedAt: now,
 	};
 	const draftBytes = Object.entries(review.drafts)
@@ -154,8 +156,18 @@ export async function patchDraft(
 			`This review's answers have reached the ${REVIEW_MAX_DRAFT_BYTES / 1024 / 1024} MB limit. Shorten long answers, or submit this batch and review the rest in another.`
 		);
 	}
-	const saved = await saveDraft(review.conversationId, review._id.toString(), index, stored);
-	if (!saved) error(409, "This review is closed.");
+	const saved = await saveDraft(
+		review.conversationId,
+		review._id.toString(),
+		index,
+		stored,
+		baseRevision
+	);
+	if (saved === "closed") error(409, "This review is closed.");
+	if (saved === "conflict") {
+		const current = await readReview(review.conversationId, review._id.toString());
+		return { conflict: current?.drafts[String(index)] };
+	}
 
 	const problems: DraftProblem[] = [];
 	for (const [name, value] of Object.entries(draft.answers)) {
@@ -163,7 +175,7 @@ export async function patchDraft(
 		const reason = question ? validateAnswer(question, value) : undefined;
 		if (reason) problems.push({ question: name, reason });
 	}
-	return { problems };
+	return { problems, revision: stored.revision ?? 1 };
 }
 
 const selectionSchema = z
@@ -221,26 +233,32 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 	const summary = parsed.data.summary || undefined;
 
 	if (review.status === "submitted") {
-		// a submit whose process died before resolving the row is finished by the retry
-		if (review.result && (await resolveSubmittedReview(review))) {
-			await resume(review, selection);
-			return { ok: true, files: review.result.files };
-		}
-		error(409, "This review was already submitted.");
+		// a submit whose process died before answering the parked call is finished by the retry
+		if (!review.unresolved) error(409, "This review was already submitted.");
+		const { result, resolved } = await completeSubmission(review);
+		if (!resolved) return { deliverAsMessage: true, text: result.text };
+		await resume(review, selection);
+		return { ok: true, files: result.files };
 	}
 
 	const found = blockers(review.schema, review.drafts, review.records.length);
 	if (found.length > 0) return { blockers: found };
 
-	const result = await buildReviewResult(review, { verdict, summary });
 	const from = review.status;
-	if (!(await submitReview(review, { verdict, summary, result }, from))) {
+	if (!(await submitReview(review, { verdict, summary }, from))) {
 		error(409, "This review changed while it was being submitted, reload it and submit again.");
 	}
-	// the turn already moved on, so the submission becomes the next user message
-	if (from === "detached") return { deliverAsMessage: true, text: result.text };
-	// lost to a message the user sent meanwhile, which closed the parked call as still open
-	if (!(await resolveSubmittedReview(review))) return { deliverAsMessage: true, text: result.text };
+	const claimed: MlReview = {
+		...review,
+		status: "submitted",
+		verdict,
+		...(summary ? { summary } : {}),
+		...(from === "open" ? { unresolved: true as const } : {}),
+		submittedAt: new Date(),
+	};
+	const { result, resolved } = await completeSubmission(claimed);
+	// a detached turn moved on, or a message sent meanwhile closed the call, so send it as one
+	if (!resolved) return { deliverAsMessage: true, text: result.text };
 
 	await resume(review, selection);
 	return { ok: true, files: result.files };

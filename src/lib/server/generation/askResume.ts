@@ -19,7 +19,7 @@ import {
 	releaseElicitationResume,
 } from "$lib/server/mcp/elicitation";
 import { resumeParkedToolCall } from "$lib/server/mcp/resumeElicitation";
-import { finishStoredSubmissions } from "$lib/server/mlReviews/store";
+import { finishStoredSubmissions } from "$lib/server/mlReviews/submission";
 import {
 	MessageElicitationUpdateType,
 	MessageToolUpdateType,

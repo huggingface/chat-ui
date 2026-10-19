@@ -1,5 +1,6 @@
 import type { ReviewSchema } from "$lib/types/MlReview";
 import { SUGGESTIONS_KEY } from "$lib/utils/review/schema";
+import { REVIEW_MAX_RECORDS } from "$lib/server/textGeneration/builtinTools/requestReviewDefinition";
 
 export type TabularFormat = "csv" | "tsv";
 
@@ -16,26 +17,69 @@ export interface TabularRows {
 	rows: Record<string, string>[];
 }
 
+/** declared fields cap at 30, so a wider header can only fail and is refused while it is read */
+export const TABULAR_MAX_COLUMNS = 64;
+
 /** rfc 4180, quoted cells may hold the delimiter, doubled quotes and newlines */
 export function parseDelimited(
 	text: string,
 	format: TabularFormat,
-	location: string
+	location: string,
+	maxRows = REVIEW_MAX_RECORDS
 ): TabularRows | { error: string } {
 	const delimiter = format === "csv" ? "," : "\t";
-	const lines: { cells: string[]; line: number }[] = [];
+	const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+	let columns: string[] | undefined;
+	const rows: Record<string, string>[] = [];
 	let cells: string[] = [];
 	let cell = "";
 	let quoted = false;
 	let line = 1;
 	let startLine = 1;
-	const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 
-	const endRow = () => {
+	const tooWide = (): string | undefined => {
+		if (!columns && cells.length > TABULAR_MAX_COLUMNS) {
+			return `${location} header has more than ${TABULAR_MAX_COLUMNS} columns`;
+		}
+		if (columns && cells.length > columns.length) {
+			return `${location} line ${startLine} has more cells than the header's ${columns.length}`;
+		}
+		return undefined;
+	};
+
+	const endRow = (): string | undefined => {
 		cells.push(cell);
-		if (!(cells.length === 1 && cells[0] === "")) lines.push({ cells, line: startLine });
+		const values = cells;
 		cells = [];
 		cell = "";
+		if (values.length === 1 && values[0] === "") return undefined;
+		if (!columns) {
+			if (values.length > TABULAR_MAX_COLUMNS) {
+				return `${location} header has more than ${TABULAR_MAX_COLUMNS} columns`;
+			}
+			const names = values.map((name) => name.trim());
+			const seen = new Set<string>();
+			for (const [i, name] of names.entries()) {
+				if (!name) return `${location} header column ${i + 1} has no name`;
+				if (seen.has(name)) return `${location} header names "${name}" twice`;
+				seen.add(name);
+			}
+			columns = names;
+			return undefined;
+		}
+		if (values.length !== columns.length) {
+			return `${location} line ${startLine} has ${values.length} cells, the header has ${columns.length}`;
+		}
+		if (rows.length >= maxRows) {
+			return `${location} has more than ${maxRows} records; a review holds at most ${maxRows}. Split it into batches on the same schema`;
+		}
+		const row: Record<string, string> = {};
+		const header = columns;
+		values.forEach((value, i) => {
+			if (value !== "") row[header[i]] = value;
+		});
+		rows.push(row);
+		return undefined;
 	};
 
 	for (let i = 0; i < source.length; i += 1) {
@@ -59,40 +103,26 @@ export function parseDelimited(
 		} else if (char === delimiter) {
 			cells.push(cell);
 			cell = "";
+			const wide = tooWide();
+			if (wide) return { error: wide };
 		} else if (char === "\n" || char === "\r") {
 			if (char === "\r" && source[i + 1] === "\n") i += 1;
-			endRow();
+			const problem = endRow();
+			if (problem) return { error: problem };
 			line += 1;
 			startLine = line;
 		} else {
 			cell += char;
 		}
 	}
-	if (quoted)
+	if (quoted) {
 		return { error: `${location} has a quoted cell opened on line ${startLine} that never closes` };
-	if (cell !== "" || cells.length > 0) endRow();
-
-	const [header, ...data] = lines;
-	if (!header) return { error: `${location} is empty` };
-	const columns = header.cells.map((name) => name.trim());
-	const blank = columns.findIndex((name) => !name);
-	if (blank !== -1) return { error: `${location} header column ${blank + 1} has no name` };
-	const repeated = columns.find((name, i) => columns.indexOf(name) !== i);
-	if (repeated) return { error: `${location} header names "${repeated}" twice` };
-
-	const rows: Record<string, string>[] = [];
-	for (const { cells: values, line: at } of data) {
-		if (values.length !== columns.length) {
-			return {
-				error: `${location} line ${at} has ${values.length} cells, the header has ${columns.length}`,
-			};
-		}
-		const row: Record<string, string> = {};
-		values.forEach((value, i) => {
-			if (value !== "") row[columns[i]] = value;
-		});
-		rows.push(row);
 	}
+	if (cell !== "" || cells.length > 0) {
+		const problem = endRow();
+		if (problem) return { error: problem };
+	}
+	if (!columns) return { error: `${location} is empty` };
 	return { columns, rows };
 }
 

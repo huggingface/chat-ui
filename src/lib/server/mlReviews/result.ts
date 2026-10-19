@@ -1,4 +1,6 @@
+import { collections } from "$lib/server/database";
 import { ML_FILE_MAX_BYTES, writeMlFileVersion } from "$lib/server/mlFiles";
+import { storeReviewResult } from "./store";
 import { formatVirtualFileRef } from "$lib/server/mlFiles/refs";
 import type { MlFileRef } from "$lib/types/MlFile";
 import type {
@@ -241,24 +243,40 @@ export function reviewResultText(
 	return lines.join("\n");
 }
 
-export async function buildReviewResult(
-	review: MlReview,
-	submission: { verdict: ReviewVerdict; summary?: string }
+/** tags the files a submission wrote, so a rebuild after a crash reuses them */
+export const reviewFileSource = (review: Pick<MlReview, "_id">) =>
+	`review:${review._id.toString()}`;
+
+/** the result of a claimed submission, built once and safe to repeat after a crash */
+export async function ensureReviewResult(
+	review: MlReview
 ): Promise<NonNullable<MlReview["result"]>> {
+	if (review.result) return review.result;
+	const submission = { verdict: review.verdict ?? "comment", summary: review.summary };
 	const parts = responseParts(responseLines(review));
 	const base = `reviews/${reviewSlug(review.schema.title)}.responses`;
+	const source = reviewFileSource(review);
 	const files: MlFileRef[] = [];
 	for (const [index, content] of parts.entries()) {
 		const name = parts.length === 1 ? `${base}.jsonl` : `${base}.part-${index + 1}.jsonl`;
+		const existing = await collections.mlFiles.findOne(
+			{ conversationId: review.conversationId, name, source },
+			{ projection: { version: 1 } }
+		);
+		if (existing) {
+			files.push({ name, version: existing.version });
+			continue;
+		}
 		const written = await writeMlFileVersion({
 			conversationId: review.conversationId,
 			name,
 			content,
 			origin: "review",
+			source,
 			summary: `answers to review "${review.schema.title}" (schema ${review.schemaHash})`,
 			attribution: { messageId: review.messageId, toolUuid: review.toolUuid },
 		});
 		files.push({ name: written.name, version: written.version });
 	}
-	return { text: reviewResultText(review, submission, files), files };
+	return storeReviewResult(review, { text: reviewResultText(review, submission, files), files });
 }

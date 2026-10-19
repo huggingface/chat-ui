@@ -21,7 +21,8 @@ vi.mock("$lib/server/logger", () => ({
 const { GET, PATCH } =
 	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/+server");
 const { submitReviewRequest } = await import("$lib/server/mlReviews/api");
-const { buildReviewResult } = await import("$lib/server/mlReviews/result");
+const { ensureReviewResult } = await import("$lib/server/mlReviews/result");
+const { finishStoredSubmissions } = await import("$lib/server/mlReviews/submission");
 const { submitReview } = await import("$lib/server/mlReviews/store");
 const { POST: SUBMIT } =
 	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/submit/+server");
@@ -207,6 +208,7 @@ describe.sequential("saving a draft", () => {
 		expect(await res.json()).toEqual({
 			ok: true,
 			problems: [{ question: "kind", reason: '"nope" is not an option (bug, feature)' }],
+			revision: 1,
 		});
 		const stored = await collections.mlReviews.findOne({ _id: review._id });
 		expect(stored?.drafts["1"]).toMatchObject({
@@ -303,6 +305,45 @@ describe.sequential("saving a draft", () => {
 		expect((await patch(fits, { note_a: "short" })).status).toBe(200);
 	});
 
+	it("refuses a save from a tab that missed another tab's save of the same record", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		const save = (
+			baseRevision: number,
+			answers: Record<string, string>,
+			comments: unknown[] = []
+		) =>
+			PATCH(
+				event(locals, conv._id.toString(), review._id.toString(), {
+					index: 0,
+					baseRevision,
+					draft: draft(answers, comments),
+				})
+			);
+
+		const first = await save(0, { kind: "bug" });
+		expect(await first.json()).toEqual({ ok: true, problems: [], revision: 1 });
+		const stale = await save(0, {}, [{ id: "c1", body: "dupe of #4" }]);
+
+		expect(stale.status).toBe(409);
+		const body = superjson.parse<{ message: string; draft: Record<string, unknown> }>(
+			await stale.text()
+		);
+		expect(body.message).toBe("This record was changed elsewhere, its current draft is attached.");
+		expect(body.draft).toMatchObject({ answers: { kind: "bug" }, revision: 1 });
+		expect((await collections.mlReviews.findOne({ _id: review._id }))?.drafts["0"]).toMatchObject({
+			answers: { kind: "bug" },
+			comments: [],
+		});
+		expect(
+			await (await save(1, { kind: "bug" }, [{ id: "c1", body: "dupe of #4" }])).json()
+		).toEqual({
+			ok: true,
+			problems: [],
+			revision: 2,
+		});
+	});
+
 	it("refuses keys that would become Mongo keys without being declared", async () => {
 		const { locals } = await createTestUser();
 		const { conv, review } = await seed(locals);
@@ -361,6 +402,7 @@ describe.sequential("submitting", () => {
 		});
 		const stored = await collections.mlReviews.findOne({ _id: review._id });
 		expect(stored).toMatchObject({ status: "open", drafts: { "1": { answers: { kind: "bug" } } } });
+		expect(await collections.mlFiles.countDocuments({ conversationId: conv._id })).toBe(0);
 	});
 
 	it("lets a retry finish a submit whose process died before answering the row", async () => {
@@ -369,15 +411,17 @@ describe.sequential("submitting", () => {
 		await labelBoth(locals, conv, review);
 		const read = await collections.mlReviews.findOne({ _id: review._id });
 		if (!read) throw new Error("review vanished");
-		const result = await buildReviewResult(read, { verdict: "approve" });
-		expect(await submitReview(read, { verdict: "approve", result })).toBe(true);
+		expect(await submitReview(read, { verdict: "approve" })).toBe(true);
 
 		const res = await SUBMIT(
 			event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
 		);
 
 		expect(res.status).toBe(200);
-		expect(await res.json()).toEqual({ ok: true, files: result.files });
+		expect(await res.json()).toEqual({
+			ok: true,
+			files: [{ name: "reviews/triage-batch-1.responses.jsonl", version: 1 }],
+		});
 		expect(
 			await collections.mcpElicitations.findOne({ elicitationId: review.elicitationId })
 		).toMatchObject({ status: "resolved", action: "accept", resolution: "user" });
@@ -386,6 +430,49 @@ describe.sequential("submitting", () => {
 				SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }))
 			)
 		).toEqual({ status: 409, message: "This review was already submitted." });
+	});
+
+	it("rebuilds a lost result from the files its first attempt wrote", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		await labelBoth(locals, conv, review);
+		const read = await collections.mlReviews.findOne({ _id: review._id });
+		if (!read) throw new Error("review vanished");
+		expect(await submitReview(read, { verdict: "approve" })).toBe(true);
+		const claimed = await collections.mlReviews.findOne({ _id: review._id });
+		if (!claimed) throw new Error("review vanished");
+		const first = await ensureReviewResult(claimed);
+		await collections.mlReviews.updateOne({ _id: review._id }, { $unset: { result: "" } });
+
+		const again = await ensureReviewResult({ ...claimed, result: undefined });
+
+		expect(again.files).toEqual(first.files);
+		expect(await collections.mlFiles.countDocuments({ conversationId: conv._id })).toBe(1);
+	});
+
+	it("recovers a claimed submission behind more than fifty open reviews", async () => {
+		const { locals } = await createTestUser();
+		for (let i = 0; i < 55; i += 1) await seed(locals);
+		const { conv, review } = await seed(locals);
+		await labelBoth(locals, conv, review);
+		const read = await collections.mlReviews.findOne({ _id: review._id });
+		if (!read) throw new Error("review vanished");
+		expect(await submitReview(read, { verdict: "approve" })).toBe(true);
+
+		await finishStoredSubmissions();
+
+		expect(
+			await collections.mcpElicitations.findOne({ elicitationId: review.elicitationId })
+		).toMatchObject({ status: "resolved", resolution: "user" });
+		const stored = await collections.mlReviews.findOne({ _id: review._id });
+		expect(stored?.unresolved).toBeUndefined();
+		expect(stored?.result?.files).toHaveLength(1);
+		expect(
+			await collections.mcpElicitations.countDocuments({
+				status: "pending",
+				"pending.kind": "review",
+			})
+		).toBe(55);
 	});
 
 	it("answers 400 with the blockers while a required question is open", async () => {

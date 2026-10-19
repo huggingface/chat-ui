@@ -68,6 +68,29 @@ describe("parseDelimited", () => {
 	});
 });
 
+describe("parseDelimited bounds", () => {
+	it("refuses a header wider than any declaration while reading it, not after", () => {
+		const header = Array.from({ length: 200_000 }, (_, i) => `column_${i}`).join(",");
+		expect(header.length).toBeGreaterThan(1_400_000);
+		const started = performance.now();
+		expect(parseDelimited(`${header}\nrow`, "csv", "wide.csv")).toEqual({
+			error: "wide.csv header has more than 64 columns",
+		});
+		expect(performance.now() - started).toBeLessThan(500);
+	});
+
+	it("stops at the first over-wide data row and at the record cap", () => {
+		expect(parseDelimited(`id,body\na,${"x,".repeat(100_000)}x\n`, "csv", "a.csv")).toEqual({
+			error: "a.csv line 2 has more cells than the header's 2",
+		});
+		const rows = Array.from({ length: 6 }, (_, i) => `r${i},x`).join("\n");
+		expect(parseDelimited(`id,body\n${rows}`, "csv", "a.csv", 5)).toEqual({
+			error:
+				"a.csv has more than 5 records; a review holds at most 5. Split it into batches on the same schema",
+		});
+	});
+});
+
 describe("recordsFromTabular", () => {
 	const schema: Pick<ReviewSchema, "idField" | "fields"> = {
 		idField: "id",

@@ -451,6 +451,9 @@ export class Database {
 		mlReviews
 			.createIndex({ conversationId: 1, status: 1 })
 			.catch((e) => logger.error(e, "Error creating index for mlReviews by conversationId"));
+		mlReviews
+			.createIndex({ submittedAt: 1 }, { partialFilterExpression: { unresolved: true } })
+			.catch((e) => logger.error(e, "Error creating index for mlReviews by unresolved submit"));
 		mlSessionLabels
 			.createIndex({ reconcileAt: 1 })
 			.catch((e) => logger.error(e, "Error creating index for mlSessionLabels by due time"));

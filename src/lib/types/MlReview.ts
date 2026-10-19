@@ -92,6 +92,8 @@ export interface ReviewDraft {
 	status: ReviewDraftStatus;
 	answers: Record<string, ReviewAnswer>;
 	comments: ReviewComment[];
+	/** bumped by every save of this record, a save from an older copy is refused */
+	revision?: number;
 	updatedAt: Date;
 }
 
@@ -123,7 +125,10 @@ export interface MlReview {
 	status: ReviewStatus;
 	verdict?: ReviewVerdict;
 	summary?: string;
+	/** built after the claim, so a losing submit never writes a responses file */
 	result?: { text: string; files: MlFileRef[] };
+	/** claimed while the parked call still waited, cleared once its row is answered or closed */
+	unresolved?: true;
 	createdAt: Date;
 	updatedAt: Date;
 	submittedAt?: Date;

@@ -778,7 +778,7 @@ const { POST: SUBMIT_REVIEW } =
 	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/submit/+server");
 const { PATCH: PATCH_REVIEW } =
 	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/+server");
-const { buildReviewResult } = await import("$lib/server/mlReviews/result");
+const { completeSubmission } = await import("$lib/server/mlReviews/submission");
 const { submitReview } = await import("$lib/server/mlReviews/store");
 
 const REVIEW: Round = {
@@ -873,13 +873,13 @@ async function submitAndDie(conv: Conversation, reviewId: string, elicitationId:
 	const review = await collections.mlReviews.findOne({ conversationId: conv._id });
 	if (!review) throw new Error("no review");
 	const submission = { verdict: "request_changes" as const, summary: "Fix the scraper first." };
-	const result = await buildReviewResult(review, submission);
-	expect(await submitReview(review, { ...submission, result })).toBe(true);
-	const now = new Date();
-	await collections.mcpElicitations.updateOne(
-		{ elicitationId, status: "pending" },
-		{ $set: { status: "resolved", action: "accept", resolution: "user", resolvedAt: now } }
-	);
+	expect(await submitReview(review, submission)).toBe(true);
+	const claimed = await collections.mlReviews.findOne({ _id: review._id });
+	if (!claimed) throw new Error("no review");
+	expect((await completeSubmission(claimed)).resolved).toBe(true);
+	expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+		status: "resolved",
+	});
 	expect(reviewId).toBe(review._id.toString());
 }
 
@@ -989,13 +989,11 @@ describe("a submitted review", () => {
 	});
 });
 
-describe("a submit that died between storing the result and answering the row", () => {
+describe("a submit that died right after claiming the submission", () => {
 	async function storeOnly(conv: Conversation) {
 		const review = await collections.mlReviews.findOne({ conversationId: conv._id });
 		if (!review) throw new Error("no review");
-		const submission = { verdict: "approve" as const };
-		const result = await buildReviewResult(review, submission);
-		expect(await submitReview(review, { ...submission, result })).toBe(true);
+		expect(await submitReview(review, { verdict: "approve" })).toBe(true);
 		await collections.mlReviews.updateOne(
 			{ _id: review._id },
 			{ $set: { submittedAt: new Date(Date.now() - 60_000) } }
