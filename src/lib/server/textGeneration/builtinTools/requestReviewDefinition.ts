@@ -34,6 +34,8 @@ export const requestReviewDefinition: OpenAiTool = {
 			"answers (inline too when there are 20 records or fewer). " +
 			`Records come from source: inline \`records\` for ${REVIEW_MAX_INLINE_RECORDS} or fewer, ` +
 			"otherwise a virtual file, a sandbox path or an hf:// file holding a JSON array or JSONL, " +
+			"or a .csv or .tsv passed as it is (its header row names the fields, cells are converted " +
+			"to the declared types), " +
 			`at most ${REVIEW_MAX_RECORDS} records and 4 MB. Each record is an object with the ` +
 			"id_field, one key per field, and optionally `suggestions`: " +
 			'{"<question>": {"value": ..., "score": 0.7, "rationale": "..."}}, your own guess, kept ' +
@@ -63,7 +65,7 @@ export const requestReviewDefinition: OpenAiTool = {
 						file: {
 							type: "string",
 							description:
-								"A virtual file name, e.g. triage/batch-1.jsonl, or name@v2 to pin a version.",
+								"A virtual file name, e.g. triage/batch-1.jsonl or sample.csv, or name@v2 to pin a version.",
 						},
 						sandbox: {
 							type: "object",

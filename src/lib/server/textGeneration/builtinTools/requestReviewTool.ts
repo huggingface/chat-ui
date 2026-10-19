@@ -8,7 +8,9 @@ import { readMlFile } from "$lib/server/mlFiles";
 import { turnAwaitingInput } from "$lib/server/generation/turnState";
 import { createReview } from "$lib/server/mlReviews/store";
 import { loadRecords, parseFileSource, parseRecordsInput } from "$lib/server/mlReviews/source";
+import { recordsFromTabular } from "$lib/server/mlReviews/tabular";
 import type { ElicitationRequestPayload } from "$lib/types/McpElicitation";
+import type { ReviewSource } from "$lib/types/MlReview";
 import { MessageReviewUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { parseReviewSchema } from "$lib/utils/review/schema";
 import { compileRecordValidator } from "$lib/utils/review/records";
@@ -26,6 +28,15 @@ export { REQUEST_REVIEW_TOOL_NAME };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
+
+const describeSource = (source: ReviewSource): string =>
+	source.kind === "file"
+		? `${source.name} v${source.version}`
+		: source.kind === "sandbox"
+			? `${source.handle}:${source.path}`
+			: source.kind === "hub"
+				? source.uri
+				: "source.records";
 
 const refuse = (problem: string): BuiltinToolResult => ({
 	error: `${REQUEST_REVIEW_TOOL_NAME} was not shown: ${problem}`,
@@ -100,7 +111,11 @@ async function requestReview(
 		signal: ctx.abortSignal,
 	});
 	if (!loaded.ok) return refuse(loaded.error);
-	const validated = compileRecordValidator(schema.schema)(loaded.records);
+	const tabular = loaded.table
+		? recordsFromTabular(schema.schema, loaded.table, describeSource(loaded.source))
+		: undefined;
+	if (tabular && "error" in tabular) return refuse(tabular.error);
+	const validated = compileRecordValidator(schema.schema)(tabular?.records ?? loaded.records);
 	if (!validated.ok) {
 		return refuse(
 			`the records do not match the declared fields. Fix these and call again:\n${validated.errors.join("\n")}`

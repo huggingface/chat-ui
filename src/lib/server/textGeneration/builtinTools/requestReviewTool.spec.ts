@@ -288,6 +288,97 @@ describe("request_review sources", () => {
 	});
 });
 
+describe("request_review csv and tsv sources", () => {
+	const TABLE_FIELDS = [
+		{ name: "title", type: "text" },
+		{ name: "body", type: "markdown" },
+		{ name: "score", type: "number" },
+	];
+
+	it("reads a csv virtual file, quoted multi-line bodies included, with typed cells", async () => {
+		const { conv, run } = setup();
+		await writeMlFileVersion({
+			conversationId: conv._id,
+			name: "triage/batch.csv",
+			content:
+				"id,title,body,score\n" +
+				'gh-1,"Crash, on start","Steps:\n1. open\n2. click ""Run""",0.9\n' +
+				"gh-2,Dark mode,,\n",
+			origin: "write",
+		});
+
+		expect(
+			await run({ title: "CSV", source: { file: "triage/batch.csv" }, fields: TABLE_FIELDS })
+		).toEqual({ awaitingInput: true });
+
+		const review = await collections.mlReviews.findOne({ conversationId: conv._id });
+		expect(review?.records).toEqual([
+			{
+				id: "gh-1",
+				values: { title: "Crash, on start", body: 'Steps:\n1. open\n2. click "Run"', score: 0.9 },
+			},
+			{ id: "gh-2", values: { title: "Dark mode" } },
+		]);
+	});
+
+	it("reads a tsv from a sandbox path", async () => {
+		const { conv, run } = setup();
+		vi.mocked(readSandboxPage).mockResolvedValueOnce(
+			page('id\ttitle\tscore\nr1\tsays "hi", then leaves\t3\n')
+		);
+
+		expect(
+			await run({
+				title: "TSV",
+				source: { sandbox: { handle: HANDLE, path: "/work/sample.tsv" } },
+				fields: TABLE_FIELDS,
+			})
+		).toEqual({ awaitingInput: true });
+
+		const review = await collections.mlReviews.findOne({ conversationId: conv._id });
+		expect(review?.records).toEqual([
+			{ id: "r1", values: { title: 'says "hi", then leaves', score: 3 } },
+		]);
+	});
+
+	it("names a cell that does not convert to its declared number", async () => {
+		const { run } = setup();
+		vi.mocked(readHubPage).mockResolvedValueOnce(page("id,score\nr1,4\nr2,high\n"));
+		const outcome = await run({
+			title: "Hub CSV",
+			source: { hub: "hf://datasets/org/repo/rows.csv" },
+			fields: TABLE_FIELDS,
+		});
+		expect(errorOf(outcome)).toContain("record 2: score must be a number");
+	});
+
+	it("refuses a header that does not match the declared fields", async () => {
+		const { conv, run } = setup();
+		await writeMlFileVersion({
+			conversationId: conv._id,
+			name: "rows.csv",
+			content: "id,title,label\nr1,a,bug\n",
+			origin: "write",
+		});
+		const outcome = await run({ title: "T", source: { file: "rows.csv" }, fields: TABLE_FIELDS });
+		expect(errorOf(outcome)).toContain(
+			'rows.csv v1 header column "label" matches no declared field (fields: title, body, score); declare it or drop the column'
+		);
+	});
+
+	it("keeps json parsing for every other extension", async () => {
+		const { conv, run } = setup();
+		await writeMlFileVersion({
+			conversationId: conv._id,
+			name: "rows.txt",
+			content: "id,title\nr1,a\n",
+			origin: "write",
+		});
+		const outcome = await run({ title: "T", source: { file: "rows.txt" }, fields: TABLE_FIELDS });
+		expect(errorOf(outcome)).toContain("rows.txt v1 line 1 is not valid JSON");
+	});
+});
+
 describe("request_review errors the model can fix", () => {
 	it("names the record and the field", async () => {
 		const { run } = setup();

@@ -10,6 +10,7 @@ import {
 	readWhole,
 } from "$lib/server/mlFiles/remoteRead";
 import type { ReviewSource } from "$lib/types/MlReview";
+import { parseDelimited, tabularFormat, type TabularRows } from "./tabular";
 import {
 	REVIEW_MAX_BYTES,
 	REVIEW_MAX_INLINE_CHARS,
@@ -29,7 +30,14 @@ export type RecordsInput =
 	| { hub: string };
 
 export type LoadedRecords =
-	{ ok: true; records: unknown[]; source: ReviewSource } | { ok: false; error: string };
+	| {
+			ok: true;
+			records: unknown[];
+			source: ReviewSource;
+			/** set for a csv or tsv file, whose string cells still need the declared types */
+			table?: TabularRows;
+	  }
+	| { ok: false; error: string };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
@@ -213,6 +221,21 @@ export async function loadRecords(
 		text = read.content;
 	}
 
+	const format = tabularFormat(
+		source.kind === "file" ? source.name : source.kind === "sandbox" ? source.path : location
+	);
+	if (format) {
+		const table = parseDelimited(text, format, location);
+		if ("error" in table) return { ok: false, error: table.error };
+		return (
+			capped(table.rows, Buffer.byteLength(text, "utf8"), location) ?? {
+				ok: true,
+				records: table.rows,
+				source,
+				table,
+			}
+		);
+	}
 	const parsed = parseRecordsText(text, location);
 	if ("error" in parsed) return { ok: false, error: parsed.error };
 	return (
