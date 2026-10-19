@@ -448,6 +448,26 @@ describe.sequential("starting the next turn from the queue", async () => {
 		expect(rows.every((row) => row.status === "started")).toBe(true);
 	});
 
+	it("clears a stop marker the ended turn left so it cannot abort the new one", async () => {
+		const conversationId = conversation();
+		await seedConversation(conversationId);
+		await queue(conversationId, "after send now");
+		await collections.abortedGenerations.insertOne({
+			_id: new ObjectId(),
+			conversationId,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		} as never);
+		let markerAtStart: unknown = "unset";
+		generate.mockImplementation(async () => {
+			markerAtStart = await collections.abortedGenerations.findOne({ conversationId });
+			return streamingResponse();
+		});
+
+		expect(await startQueuedTurn(conversationId)).toBe("started");
+		expect(markerAtStart).toBeNull();
+	});
+
 	it("leaves the queue to a turn that is still running", async () => {
 		const conversationId = conversation();
 		await seedConversation(conversationId);

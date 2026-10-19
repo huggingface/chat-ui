@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { ObjectId } from "mongodb";
+import { ObjectId } from "mongodb";
 
 import { collections, ready } from "$lib/server/database";
 import {
@@ -14,6 +14,8 @@ vi.mock("$lib/server/queuedInputs/drain", () => ({ kickQueuedTurn: kick }));
 
 const { GET, POST, DELETE } = await import("../../../routes/conversation/[id]/queue/+server");
 const { POST: STOP } = await import("../../../routes/conversation/[id]/stop-generating/+server");
+const { POST: INTERRUPT } =
+	await import("../../../routes/conversation/[id]/queue/interrupt/+server");
 
 beforeAll(async () => {
 	await ready;
@@ -28,21 +30,23 @@ async function createTestUser() {
 }
 
 const call = (
-	handler: typeof POST,
+	handler: (event: never) => Response | Promise<Response>,
 	id: string,
 	locals: App.Locals,
 	method: string,
 	body?: unknown
 ) =>
-	handler({
-		params: { id },
-		locals,
-		request: new Request("http://localhost/queue", {
-			method,
-			headers: { "Content-Type": "application/json" },
-			...(body === undefined ? {} : { body: JSON.stringify(body) }),
-		}),
-	} as never);
+	Promise.resolve().then(() =>
+		handler({
+			params: { id },
+			locals,
+			request: new Request("http://localhost/queue", {
+				method,
+				headers: { "Content-Type": "application/json" },
+				...(body === undefined ? {} : { body: JSON.stringify(body) }),
+			}),
+		} as never)
+	);
 
 describe.sequential("/conversation/[id]/queue", () => {
 	afterEach(async () => {
@@ -132,5 +136,52 @@ describe.sequential("/conversation/[id]/queue", () => {
 		const response = await STOP({ params: { id }, locals } as never);
 		expect(await response.json()).toEqual({ cancelledQueuedInputs: [left.id] });
 		expect(taken.id).not.toBe(left.id);
+	});
+
+	it("send now stops a running step and keeps the queue for the next turn", async () => {
+		const { locals, id, conversationId } = await mlConversation();
+		await expect(call(INTERRUPT, id, locals, "POST")).rejects.toMatchObject({ status: 409 });
+
+		await call(POST, id, locals, "POST", { text: "do this instead" });
+		const messageId = crypto.randomUUID();
+		await collections.conversations.updateOne({ _id: conversationId }, {
+			$push: {
+				messages: {
+					id: messageId,
+					from: "assistant",
+					content: "",
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
+			},
+		} as never);
+		await collections.generations.insertOne({
+			_id: new ObjectId(),
+			generationId: "g",
+			conversationId,
+			messageId,
+			status: "running",
+			startedAt: new Date(),
+			lastHeartbeatAt: new Date(),
+		} as never);
+		kick.mockClear();
+
+		expect((await call(INTERRUPT, id, locals, "POST")).status).toBe(200);
+
+		expect(await collections.abortedGenerations.findOne({ conversationId })).not.toBeNull();
+		expect(await collections.queuedInputs.findOne({ conversationId })).toMatchObject({
+			status: "queued",
+		});
+		expect(kick).not.toHaveBeenCalled();
+		await collections.generations.deleteMany({ conversationId });
+	});
+
+	it("send now with no turn running starts the queue straight away", async () => {
+		const { locals, id } = await mlConversation();
+		await call(POST, id, locals, "POST", { text: "go" });
+		kick.mockClear();
+
+		expect((await call(INTERRUPT, id, locals, "POST")).status).toBe(200);
+		expect(kick).toHaveBeenCalledTimes(1);
 	});
 });

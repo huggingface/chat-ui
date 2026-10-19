@@ -865,7 +865,7 @@ export async function generateConversationResponse({
 			});
 			clearInterval(abortMarkerWatcher);
 			abortRegistry.unregister(conversationKey, ctrl);
-			if (endedUpdate && !abortedByUser && isMlAssistantConversation(conv)) {
+			if (endedUpdate && isMlAssistantConversation(conv)) {
 				const { kickQueuedTurn } = await import("$lib/server/queuedInputs/drain");
 				kickQueuedTurn(convId);
 			}

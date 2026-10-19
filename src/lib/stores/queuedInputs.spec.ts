@@ -234,6 +234,20 @@ describe("QueuedInputsStore", () => {
 		expect(returned).toEqual([{ text: "text q1", error: "rate limited" }]);
 	});
 
+	it("asks the server to send the queue now", async () => {
+		const fetchFn = vi.fn(async (url: unknown, init?: RequestInit) =>
+			init?.method === "POST" ? json({ ok: true }) : json({ inputs: [view("q1")] })
+		);
+		const store = new QueuedInputsStore(fetchFn as unknown as typeof fetch);
+		store.watch("c1", { busy: true, onStarted: () => {} });
+
+		expect(await store.sendNow()).toBe(true);
+		expect(fetchFn).toHaveBeenCalledWith(
+			"/conversation/c1/queue/interrupt",
+			expect.objectContaining({ method: "POST" })
+		);
+	});
+
 	it("forgets the last conversation's queue on navigation", async () => {
 		const fetchFn = vi.fn(async (url: unknown) =>
 			json({ inputs: String(url).includes("c1") ? [view("q1")] : [] })

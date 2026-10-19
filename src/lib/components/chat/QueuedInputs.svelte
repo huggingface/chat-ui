@@ -8,17 +8,42 @@
 		busy: boolean;
 		onremove: (id: string) => void;
 		onedit: (id: string) => void;
+		onsendnow: () => Promise<void>;
 	}
 
-	let { items, busy, onremove, onedit }: Props = $props();
+	let { items, busy, onremove, onedit, onsendnow }: Props = $props();
+
+	let sending = $state(false);
+
+	async function sendNow() {
+		sending = true;
+		try {
+			await onsendnow();
+		} finally {
+			sending = false;
+		}
+	}
 </script>
 
 {#if items.length}
 	<div class="queued-inputs mb-2 flex w-full max-w-4xl flex-col gap-1.5" aria-live="polite">
-		<div class="px-1 text-xs text-gray-400 dark:text-gray-500">
-			{busy
-				? "Queued: ML Intern reads these at its next step"
-				: "Queued: starting the next turn with these"}
+		<div class="flex items-center gap-2 px-1 text-xs text-gray-400 dark:text-gray-500">
+			<span class="flex-1">
+				{busy
+					? "Queued: ML Intern reads these at its next step"
+					: "Queued: starting the next turn with these"}
+			</span>
+			{#if busy && items.some((item) => !item.sending)}
+				<button
+					type="button"
+					class="rounded-md px-1.5 py-0.5 font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+					title="Stop the current step and send these now"
+					disabled={sending}
+					onclick={sendNow}
+				>
+					Send now
+				</button>
+			{/if}
 		</div>
 		{#each items as item (item.id)}
 			<div

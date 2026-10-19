@@ -1,7 +1,5 @@
 import type { RequestHandler } from "./$types";
-import { authCondition } from "$lib/server/auth";
-import { collections } from "$lib/server/database";
-import { isMlAssistantConversation } from "$lib/server/mlAssistant";
+import { ownedMlConversation } from "$lib/server/queuedInputs/access";
 import { wakeParkForQueuedInput } from "$lib/server/queuedInputs/deliver";
 import { kickQueuedTurn } from "$lib/server/queuedInputs/drain";
 import {
@@ -15,18 +13,6 @@ import {
 import { error, json } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-
-async function ownedMlConversation(params: { id: string }, locals: App.Locals) {
-	if (!locals.user && !locals.sessionId) error(401, "Unauthorized");
-	if (!ObjectId.isValid(params.id)) error(404, "Conversation not found");
-	const conversation = await collections.conversations.findOne(
-		{ _id: new ObjectId(params.id), ...authCondition(locals) },
-		{ projection: { _id: 1, mlAssistant: 1 } }
-	);
-	if (!conversation) error(404, "Conversation not found");
-	if (!isMlAssistantConversation(conversation)) error(400, "Only ML Intern conversations queue");
-	return conversation._id;
-}
 
 export const GET: RequestHandler = async ({ params, locals }) => {
 	const conversationId = await ownedMlConversation(params, locals);

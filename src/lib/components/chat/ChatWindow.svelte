@@ -607,6 +607,12 @@
 		else if (outcome === "error") $error = "Could not edit the queued message. Try again.";
 	}
 
+	async function sendQueuedNow() {
+		if (!(await queuedInputs.sendNow())) {
+			$error = "Could not send the queued messages now. Try again.";
+		}
+	}
+
 	async function removeQueued(id: string) {
 		if ((await queuedInputs.remove(id)) === "error") {
 			$error = "Could not remove the queued message. Try again.";
@@ -1286,6 +1292,7 @@
 						busy={loading || turnWaiting}
 						onremove={removeQueued}
 						onedit={editQueued}
+						onsendnow={sendQueuedNow}
 					/>
 				{/if}
 				<form

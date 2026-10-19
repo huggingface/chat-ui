@@ -103,6 +103,8 @@ export async function startQueuedTurn(conversationId: ObjectId): Promise<QueuedT
 			);
 			return "failed";
 		}
+		// no turn is alive, so a marker left by a send now or a stop can only abort the new one
+		await collections.abortedGenerations.deleteMany({ conversationId });
 		const data = new FormData();
 		data.set(
 			"data",

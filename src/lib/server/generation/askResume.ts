@@ -453,7 +453,7 @@ export async function resumeAnsweredAsk({
 					.deleteOne({ conversationId })
 					.catch((err) => logger.warn({ err }, "[ask] failed to consume stop marker"));
 			}
-			if (turnClosed && !aborted && isMlAssistantConversation(conv)) {
+			if (turnClosed && isMlAssistantConversation(conv)) {
 				const { kickQueuedTurn } = await import("$lib/server/queuedInputs/drain");
 				kickQueuedTurn(conversationId);
 			}

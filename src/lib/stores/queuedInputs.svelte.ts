@@ -160,6 +160,20 @@ export class QueuedInputsStore {
 		]);
 	}
 
+	/** stops the running step so the queue goes now, false when the server refused */
+	async sendNow(): Promise<boolean> {
+		const conversationId = this.conversationId;
+		if (!conversationId) return false;
+		try {
+			const response = await this.#fetch(`${this.#url(conversationId)}/interrupt`, {
+				method: "POST",
+			});
+			return response.ok;
+		} catch {
+			return false;
+		}
+	}
+
 	/** sent when the turn read it first, the chip goes either way */
 	async remove(id: string): Promise<"cancelled" | "sent" | "error"> {
 		const conversationId = this.conversationId;
