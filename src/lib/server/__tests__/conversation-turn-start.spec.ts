@@ -107,16 +107,34 @@ describe.sequential("a normal send into a busy ML Intern conversation", () => {
 		await expect(send(locals, conversationId)).rejects.toMatchObject({ status: 409 });
 		const stored = await collections.conversations.findOne({ _id: conversationId });
 		expect(stored?.messages).toHaveLength(3);
-		const free = await claimTurnStart(conversationId, undefined, "alive");
+		await collections.generations.deleteMany({ conversationId });
+		const free = await claimTurnStart(conversationId, "alive");
 		expect(free).toBeDefined();
-		await free?.();
+		await free?.release();
+	});
+
+	it("lets go of the turn start when saving the new messages fails", async () => {
+		const { locals, conversationId } = await busyConversation();
+		const updateOne = collections.conversations.updateOne.bind(collections.conversations);
+		const spy = vi
+			.spyOn(collections.conversations, "updateOne")
+			.mockImplementation(((filter: never, update: { $set?: Record<string, unknown> }) =>
+				update.$set && "messages" in update.$set
+					? Promise.reject(new Error("write failed"))
+					: updateOne(filter, update as never)) as never);
+
+		await expect(send(locals, conversationId)).rejects.toThrow("write failed");
+		spy.mockRestore();
+		const next = await claimTurnStart(conversationId, "alive");
+		expect(next).toBeDefined();
+		await next?.release();
 	});
 
 	it("is refused while a start from the queue holds the conversation", async () => {
 		const { locals, conversationId } = await busyConversation();
-		const release = await claimTurnStart(conversationId, undefined, "alive");
+		const release = await claimTurnStart(conversationId, "alive");
 
 		await expect(send(locals, conversationId)).rejects.toMatchObject({ status: 409 });
-		await release?.();
+		await release?.release();
 	});
 });

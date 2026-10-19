@@ -12,8 +12,10 @@ import {
 	cancelQueuedInput,
 	claimQueuedInputs,
 	enqueueInput,
+	failQueuedInputs,
 	listQueuedInputs,
 	queuedInputCharLimit,
+	recoverStaleClaims,
 	releaseQueuedInputs,
 } from "./store";
 import { takeQueuedInputs, wakeParkForQueuedInput } from "./deliver";
@@ -58,6 +60,7 @@ afterEach(async () => {
 		collections.parkedCalls.deleteMany(filter),
 		collections.generations.deleteMany(filter),
 		collections.turnStates.deleteMany(filter),
+		collections.generationEvents.deleteMany(filter),
 		collections.conversations.deleteMany({ _id: { $in: conversationIds } }),
 		collections.semaphores.deleteMany({
 			key: { $in: conversationIds.map((id) => `queue.drain:${id.toString()}`) },
@@ -162,6 +165,110 @@ describe.sequential("queued inputs", () => {
 		expect(await listQueuedInputs(conversationId)).toMatchObject([
 			{ status: "failed", error: "rate limited", text: "retry me" },
 		]);
+	});
+
+	it("puts back what it already took when a later lookup fails", async () => {
+		const conversationId = conversation();
+		await queue(conversationId, "first");
+		await queue(conversationId, "second");
+		const findOne = collections.queuedInputs.findOne.bind(collections.queuedInputs);
+		let lookups = 0;
+		const spy = vi.spyOn(collections.queuedInputs, "findOne").mockImplementation(((
+			...args: Parameters<typeof findOne>
+		) => {
+			lookups += 1;
+			return lookups === 2 ? Promise.reject(new Error("db down")) : findOne(...args);
+		}) as never);
+
+		await expect(claimQueuedInputs(conversationId, { status: "started" })).rejects.toThrow(
+			"db down"
+		);
+		spy.mockRestore();
+		const rows = await collections.queuedInputs.find({ conversationId }).toArray();
+		expect(rows.map((row) => row.status)).toEqual(["queued", "queued"]);
+	});
+
+	it("requeues a lapsed claim the conversation never received", async () => {
+		const conversationId = conversation();
+		const row = await queue(conversationId, "lost with the pod");
+		await claimQueuedInputs(conversationId, { status: "delivered", messageId: "a1" });
+		await collections.queuedInputs.updateOne(
+			{ _id: row._id },
+			{ $set: { takenAt: new Date(Date.now() - 10 * 60_000) } }
+		);
+
+		expect(await recoverStaleClaims()).toBe(1);
+		expect(await collections.queuedInputs.findOne({ _id: row._id })).toMatchObject({
+			status: "queued",
+		});
+	});
+
+	it("acknowledges a lapsed claim the turn log shows arrived, instead of sending it twice", async () => {
+		const conversationId = conversation();
+		const row = await queue(conversationId, "made it");
+		await claimQueuedInputs(conversationId, { status: "delivered", messageId: "a1" });
+		await collections.queuedInputs.updateOne(
+			{ _id: row._id },
+			{ $set: { takenAt: new Date(Date.now() - 10 * 60_000) } }
+		);
+		await collections.generationEvents.insertOne({
+			_id: new ObjectId(),
+			generationId: "g",
+			conversationId,
+			messageId: "a1",
+			seq: 7,
+			event: {
+				type: MessageUpdateType.QueuedInput,
+				inputs: [{ id: row._id.toString(), text: "made it", at: 0 }],
+				text: "made it",
+				afterToolUuid: "t",
+			},
+			createdAt: new Date(),
+		});
+
+		expect(await recoverStaleClaims()).toBe(0);
+		const stored = await collections.queuedInputs.findOne({ _id: row._id });
+		expect(stored?.status).toBe("delivered");
+		expect(stored?.ackedAt).toBeInstanceOf(Date);
+	});
+
+	it("acknowledges a lapsed start whose user message was saved", async () => {
+		const conversationId = conversation();
+		const row = await queue(conversationId, "start me");
+		const takenAt = new Date(Date.now() - 10 * 60_000);
+		await claimQueuedInputs(conversationId, { status: "started" });
+		await collections.queuedInputs.updateOne({ _id: row._id }, { $set: { takenAt } });
+		await collections.conversations.insertOne({
+			_id: conversationId,
+			sessionId: "s",
+			model: "m",
+			title: "t",
+			messages: [
+				{
+					id: "u9",
+					from: "user",
+					content: "start me",
+					createdAt: new Date(takenAt.getTime() + 100),
+					updatedAt: new Date(),
+				},
+			],
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		} as never);
+
+		expect(await recoverStaleClaims()).toBe(0);
+		expect((await collections.queuedInputs.findOne({ _id: row._id }))?.ackedAt).toBeInstanceOf(
+			Date
+		);
+	});
+
+	it("lets one caller acknowledge a failed row", async () => {
+		const conversationId = conversation();
+		const row = await queue(conversationId, "could not start");
+		await failQueuedInputs({ _id: row._id }, "rate limited");
+
+		expect(await cancelQueuedInput(conversationId, row._id)).toBe(true);
+		expect(await cancelQueuedInput(conversationId, row._id)).toBe(false);
 	});
 
 	it("reports only the rows a stop cancelled", async () => {
@@ -414,25 +521,43 @@ describe.sequential("starting the next turn from the queue", async () => {
 	it("refuses a normal send while a queued start holds the conversation", async () => {
 		const conversationId = conversation();
 		await seedConversation(conversationId);
-		const release = await claimTurnStart(conversationId, undefined, "alive");
+		const release = await claimTurnStart(conversationId, "alive");
 		expect(release).toBeDefined();
 
-		expect(await claimTurnStart(conversationId, undefined, "working")).toBeUndefined();
-		await release?.();
-		const again = await claimTurnStart(conversationId, undefined, "working");
+		expect(await claimTurnStart(conversationId, "working")).toBeUndefined();
+		await release?.release();
+		const again = await claimTurnStart(conversationId, "working");
 		expect(again).toBeDefined();
-		await again?.();
+		await again?.release();
+	});
+
+	it("refuses a start built on a message that stopped being the latest", async () => {
+		const conversationId = conversation();
+		await seedConversation(conversationId);
+		const first = await claimTurnStart(conversationId, "working", "a1");
+		expect(first?.latest?.id).toBe("a1");
+		const now = new Date();
+		await collections.conversations.updateOne({ _id: conversationId }, {
+			$push: {
+				messages: { id: "a2", from: "assistant", content: "", createdAt: now, updatedAt: now },
+			},
+		} as never);
+		await first?.release();
+
+		expect(await claimTurnStart(conversationId, "working", "a1")).toBeUndefined();
+		const fresh = await claimTurnStart(conversationId, "working", "a2");
+		expect(fresh?.latest?.id).toBe("a2");
+		await fresh?.release();
 	});
 
 	it("lets a normal send through during a question but not during a running turn", async () => {
 		const conversationId = conversation();
 		await seedConversation(conversationId);
 		await awaitingInput(conversationId);
-		const latest = { id: "a1", from: "assistant" as const };
 
-		const duringQuestion = await claimTurnStart(conversationId, latest, "working");
+		const duringQuestion = await claimTurnStart(conversationId, "working");
 		expect(duringQuestion).toBeDefined();
-		await duringQuestion?.();
+		await duringQuestion?.release();
 
 		await collections.generations.insertOne({
 			_id: new ObjectId(),
@@ -443,7 +568,7 @@ describe.sequential("starting the next turn from the queue", async () => {
 			startedAt: new Date(),
 			lastHeartbeatAt: new Date(),
 		} as never);
-		expect(await claimTurnStart(conversationId, latest, "working")).toBeUndefined();
+		expect(await claimTurnStart(conversationId, "working")).toBeUndefined();
 	});
 
 	it("rotates the orphan sweep so conversations stuck on a question cannot starve the rest", async () => {

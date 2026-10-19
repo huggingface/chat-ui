@@ -27,6 +27,7 @@ export class QueuedInputsStore {
 	#takenBack = 0;
 	#sending = new Set<Promise<unknown>>();
 	#withdrawal: Withdrawal | undefined;
+	#acknowledging = new Set<string>();
 	#fetch: FetchFn;
 
 	constructor(fetchFn?: FetchFn) {
@@ -87,11 +88,7 @@ export class QueuedInputsStore {
 		const byId = new Map(inputs.map((input) => [input.id, input]));
 		const known = new Set(this.items.map((item) => item.id));
 		const started = this.items.some((item) => byId.get(item.id)?.status === "started");
-		const failed = this.items.flatMap((item) => {
-			const input = byId.get(item.id);
-			return input?.status === "failed" ? [{ text: item.text, error: input.error }] : [];
-		});
-		if (failed.length) this.#giveBack(...failed);
+		for (const input of inputs) if (input.status === "failed") this.#acknowledgeFailure(input);
 		this.items = [
 			...this.items.filter((item) => item.sending || byId.get(item.id)?.status === "queued"),
 			...inputs.filter((input) => input.status === "queued" && !known.has(input.id)),
@@ -219,6 +216,16 @@ export class QueuedInputsStore {
 		const returned = this.returned;
 		this.returned = [];
 		return returned;
+	}
+
+	/** another tab or a reload may see the same failure, only the one whose cancel wins gives it back */
+	#acknowledgeFailure(input: QueuedInputView) {
+		if (this.#acknowledging.has(input.id)) return;
+		this.#acknowledging.add(input.id);
+		void this.remove(input.id).then((outcome) => {
+			this.#acknowledging.delete(input.id);
+			if (outcome === "cancelled") this.#giveBack({ text: input.text, error: input.error });
+		});
 	}
 
 	#giveBack(...inputs: ReturnedInput[]) {

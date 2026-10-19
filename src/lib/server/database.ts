@@ -478,6 +478,9 @@ export class Database {
 			.createIndex({ status: 1, checkedAt: 1, createdAt: 1 })
 			.catch((e) => logger.error(e, "Error creating index for queuedInputs by status"));
 		queuedInputs
+			.createIndex({ status: 1, takenAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for queuedInputs by claim"));
+		queuedInputs
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for queuedInputs by createdAt"));
 

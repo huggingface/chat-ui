@@ -52,10 +52,10 @@ export async function enqueueInput(input: {
 	return row;
 }
 
-/** false when a turn already took it */
+/** false when a turn already took it, a failed row is acknowledged by whoever cancels it first */
 export async function cancelQueuedInput(conversationId: ObjectId, id: ObjectId): Promise<boolean> {
 	const result = await collections.queuedInputs.updateOne(
-		{ _id: id, conversationId, status: "queued" },
+		{ _id: id, conversationId, status: { $in: ["queued", "failed"] } },
 		{ $set: { status: "cancelled", updatedAt: new Date() } }
 	);
 	return result.matchedCount > 0;
@@ -94,33 +94,132 @@ export async function claimQueuedInputs(
 	const budget = queuedInputCharLimit();
 	const claimed: QueuedInput[] = [];
 	let chars = 0;
-	for (let i = 0; i < MAX_QUEUED_INPUTS * 2; i += 1) {
-		const next = await collections.queuedInputs.findOne(
-			{ conversationId, status: "queued" },
-			{ sort: { createdAt: 1 }, projection: { _id: 1, text: 1 } }
-		);
-		if (!next) break;
-		const joined = chars + (claimed.length > 0 ? JOIN.length : 0) + next.text.length;
-		if (claimed.length > 0 && joined > budget) break;
-		const now = new Date();
-		const result = await collections.queuedInputs.findOneAndUpdate(
-			{ _id: next._id, status: "queued" },
-			{
-				$set: {
-					status: as.status,
-					claimToken,
-					takenAt: now,
-					updatedAt: now,
-					...(as.status === "delivered" ? { messageId: as.messageId } : {}),
-				},
-			},
-			{ returnDocument: "after" }
-		);
-		if (!result.value) continue;
-		claimed.push(result.value);
-		chars = joined;
+	try {
+		await claimInto(claimed);
+	} catch (err) {
+		await requeue(claimed).catch(() => {});
+		throw err;
 	}
 	return claimed;
+
+	async function claimInto(rows: QueuedInput[]) {
+		for (let i = 0; i < MAX_QUEUED_INPUTS * 2; i += 1) {
+			const next = await collections.queuedInputs.findOne(
+				{ conversationId, status: "queued" },
+				{ sort: { createdAt: 1 }, projection: { _id: 1, text: 1 } }
+			);
+			if (!next) return;
+			const joined = chars + (rows.length > 0 ? JOIN.length : 0) + next.text.length;
+			if (rows.length > 0 && joined > budget) return;
+			const now = new Date();
+			const result = await collections.queuedInputs.findOneAndUpdate(
+				{ _id: next._id, status: "queued" },
+				{
+					$set: {
+						status: as.status,
+						claimToken,
+						takenAt: now,
+						updatedAt: now,
+						...(as.status === "delivered" ? { messageId: as.messageId } : {}),
+					},
+				},
+				{ returnDocument: "after" }
+			);
+			if (!result.value) continue;
+			rows.push(result.value);
+			chars = joined;
+		}
+	}
+}
+
+async function requeue(rows: QueuedInput[]): Promise<void> {
+	if (rows.length === 0) return;
+	await collections.queuedInputs.updateMany(
+		{ _id: { $in: rows.map((row) => row._id) }, claimToken: rows[0].claimToken },
+		{
+			$set: { status: "queued", updatedAt: new Date() },
+			$unset: { claimToken: "", takenAt: "", messageId: "" },
+		}
+	);
+}
+
+/** a started turn is running, its rows no longer need the recovery sweep */
+export async function ackQueuedInputs(rows: QueuedInput[]): Promise<void> {
+	if (rows.length === 0) return;
+	await collections.queuedInputs.updateMany(
+		{ _id: { $in: rows.map((row) => row._id) } },
+		{ $set: { ackedAt: new Date() } }
+	);
+}
+
+const CLAIM_LEASE_MS = 2 * 60_000;
+
+/** requeues a claim not acknowledged within the lease unless the conversation shows it arrived */
+export async function recoverStaleClaims(now = new Date()): Promise<number> {
+	const stale = await collections.queuedInputs
+		.find({
+			status: { $in: ["delivered", "started"] },
+			ackedAt: { $exists: false },
+			takenAt: { $lt: new Date(now.getTime() - CLAIM_LEASE_MS) },
+		})
+		.limit(50)
+		.toArray();
+	let requeued = 0;
+	for (const row of stale) {
+		if (await arrived(row)) {
+			await collections.queuedInputs.updateOne({ _id: row._id }, { $set: { ackedAt: now } });
+			continue;
+		}
+		const result = await collections.queuedInputs.updateOne(
+			{ _id: row._id, claimToken: row.claimToken, ackedAt: { $exists: false } },
+			{
+				$set: { status: "queued", updatedAt: now },
+				$unset: { claimToken: "", takenAt: "", messageId: "" },
+			}
+		);
+		requeued += result.modifiedCount;
+	}
+	return requeued;
+}
+
+async function arrived(row: QueuedInput): Promise<boolean> {
+	const id = row._id.toString();
+	if (row.status === "delivered") {
+		const logged = await collections.generationEvents.findOne(
+			{
+				conversationId: row.conversationId,
+				messageId: row.messageId,
+				"event.type": "queuedInput",
+				"event.inputs.id": id,
+			},
+			{ projection: { _id: 1 } }
+		);
+		if (logged) return true;
+		const stored = await collections.conversations.findOne(
+			{
+				_id: row.conversationId,
+				messages: { $elemMatch: { id: row.messageId, "updates.inputs.id": id } },
+			},
+			{ projection: { _id: 1 } }
+		);
+		return stored !== null;
+	}
+	const conversation = await collections.conversations.findOne(
+		{ _id: row.conversationId },
+		{
+			projection: {
+				messages: {
+					$filter: {
+						input: "$messages",
+						cond: {
+							$and: [{ $eq: ["$$this.from", "user"] }, { $gte: ["$$this.createdAt", row.takenAt] }],
+						},
+					},
+				},
+			},
+		}
+	);
+	return (conversation?.messages ?? []).some((message) => message.content.includes(row.text));
 }
 
 export function joinQueuedInputs(rows: Pick<QueuedInput, "text">[]): string {
@@ -172,8 +271,13 @@ export async function listQueuedInputs(conversationId: ObjectId): Promise<Queued
 		collections.queuedInputs
 			.find({
 				conversationId,
-				status: { $in: ["delivered", "started", "failed"] },
-				takenAt: { $gte: new Date(Date.now() - RECENT_MS) },
+				$or: [
+					{ status: "failed" },
+					{
+						status: { $in: ["delivered", "started"] },
+						takenAt: { $gte: new Date(Date.now() - RECENT_MS) },
+					},
+				],
 			})
 			.sort({ takenAt: -1 })
 			.limit(MAX_QUEUED_INPUTS * 2)

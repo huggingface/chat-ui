@@ -10,11 +10,13 @@ import { isTurnAlive } from "$lib/server/generation/turnLog";
 import type { Message } from "$lib/types/Message";
 import type { QueuedInput } from "$lib/types/QueuedInput";
 import {
+	ackQueuedInputs,
 	cancelAllQueuedInputs,
 	claimQueuedInputs,
 	failQueuedInputs,
 	hasQueuedInputs,
 	joinQueuedInputs,
+	recoverStaleClaims,
 	releaseQueuedInputs,
 } from "./store";
 
@@ -23,26 +25,46 @@ export type QueuedTurnStart = "started" | "busy" | "empty" | "failed";
 export const TURN_BUSY_MESSAGE =
 	"ML Intern is still working on this conversation. Your message can be queued for its next step.";
 
-/** held until the new run has a generation row, working lets a pending question through and alive does not */
+export interface TurnStartClaim {
+	release: () => Promise<void>;
+	/** read under the lock, the message the new turn builds on */
+	latest: Pick<Message, "id" | "from"> | undefined;
+}
+
+/** held until the new run has a generation row, refused if the latest message moved on or is busy */
 export async function claimTurnStart(
 	conversationId: ObjectId,
-	latest: Pick<Message, "id" | "from"> | undefined,
-	refuse: "working" | "alive"
-): Promise<(() => Promise<void>) | undefined> {
+	refuse: "working" | "alive",
+	builtOn?: string
+): Promise<TurnStartClaim | undefined> {
 	const key = `queue.drain:${conversationId.toString()}`;
 	const lock = await acquireLock(key);
 	if (!lock) return undefined;
 	const release = () => releaseLock(key, lock).catch(() => {});
-	if (latest?.from === "assistant") {
-		const turn = await isTurnAlive(conversationId, latest.id);
-		const busy =
-			refuse === "alive" ? turn.alive : turn.status === "running" || turn.status === "parked";
-		if (busy) {
+	try {
+		const fresh = await collections.conversations.findOne(
+			{ _id: conversationId },
+			{ projection: { messages: { $slice: -1 } } }
+		);
+		const latest = fresh?.messages.at(-1);
+		if (builtOn !== undefined && latest?.id !== builtOn) {
 			await release();
 			return undefined;
 		}
+		if (latest?.from === "assistant") {
+			const turn = await isTurnAlive(conversationId, latest.id);
+			const busy =
+				refuse === "alive" ? turn.alive : turn.status === "running" || turn.status === "parked";
+			if (busy) {
+				await release();
+				return undefined;
+			}
+		}
+		return { release, latest };
+	} catch (err) {
+		await release();
+		throw err;
 	}
-	return release;
 }
 
 export async function startQueuedTurn(conversationId: ObjectId): Promise<QueuedTurnStart> {
@@ -55,9 +77,9 @@ export async function startQueuedTurn(conversationId: ObjectId): Promise<QueuedT
 		await cancelAllQueuedInputs(conversationId);
 		return "empty";
 	}
-	const latest = conv.messages.at(-1);
-	const release = await claimTurnStart(conversationId, latest, "alive");
-	if (!release) return "busy";
+	const claim = await claimTurnStart(conversationId, "alive");
+	if (!claim) return "busy";
+	const { release, latest } = claim;
 
 	let rows: QueuedInput[] = [];
 	let reader: ReadableStreamDefaultReader<unknown> | undefined;
@@ -102,6 +124,8 @@ export async function startQueuedTurn(conversationId: ObjectId): Promise<QueuedT
 		if (!response.ok || !response.body) throw new Error(`refused with ${response.status}`);
 		reader = response.body.getReader();
 		await reader.read();
+		// the route saved the new user message before answering, the text is durable now
+		await ackQueuedInputs(rows);
 		logger.info(
 			{ conversationId: conversationId.toString(), count: rows.length },
 			"[queuedInputs] started the next turn from the queue"
@@ -160,6 +184,7 @@ const SWEEP_BATCH = 20;
 
 /** least recently looked at first, so conversations parked on a question cannot starve the rest */
 export async function sweepQueuedInputs(now = new Date()): Promise<void> {
+	await recoverStaleClaims(now);
 	const rows = await collections.queuedInputs
 		.find(
 			{

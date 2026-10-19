@@ -213,6 +213,27 @@ describe("QueuedInputsStore", () => {
 		expect(store.takeReturned()).toEqual([{ text: "text q1", error: "rate limited" }]);
 	});
 
+	it("gives back a failure it never showed, once, after a reload", async () => {
+		const failed = { ...view("q1", "failed"), error: "rate limited" };
+		const deletes: string[] = [];
+		const fetchFn = vi.fn(async (_url: unknown, init?: RequestInit) => {
+			if (init?.method !== "DELETE") return json({ inputs: [failed] });
+			const { id } = JSON.parse(String(init.body));
+			const first = !deletes.includes(id);
+			deletes.push(id);
+			return first ? json({ cancelled: true }) : json({ cancelled: false }, 409);
+		});
+		const reloaded = new QueuedInputsStore(fetchFn as unknown as typeof fetch);
+		const otherTab = new QueuedInputsStore(fetchFn as unknown as typeof fetch);
+
+		reloaded.watch("c1", { busy: false, onStarted: () => {} });
+		otherTab.watch("c1", { busy: false, onStarted: () => {} });
+
+		await vi.waitFor(() => expect(deletes).toHaveLength(2));
+		const returned = [...reloaded.takeReturned(), ...otherTab.takeReturned()];
+		expect(returned).toEqual([{ text: "text q1", error: "rate limited" }]);
+	});
+
 	it("forgets the last conversation's queue on navigation", async () => {
 		const fetchFn = vi.fn(async (url: unknown) =>
 			json({ inputs: String(url).includes("c1") ? [view("q1")] : [] })

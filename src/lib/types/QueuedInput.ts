@@ -21,6 +21,8 @@ export interface QueuedInput extends Timestamps {
 	attempts?: number;
 	/** why no turn could start from it, shown when the text goes back to the composer */
 	error?: string;
+	/** set once the turn that took it is known to have it, until then a lapsed claim is requeued */
+	ackedAt?: Date;
 	/** when the orphan sweep last looked, so it rotates through every waiting conversation */
 	checkedAt?: Date;
 }
