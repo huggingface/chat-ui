@@ -923,7 +923,7 @@ describe("Slack btw side questions", () => {
 		const event = {
 			channel: "C123",
 			user: "OTHER",
-			text: "<@UBOT> BTW: which job is running?",
+			text: "<@UBOT> /BTW which job is running?",
 			ts: "101.0",
 			thread_ts: "100.0",
 		};
@@ -946,12 +946,29 @@ describe("Slack btw side questions", () => {
 		expect(mocks.ephemeral).not.toHaveBeenCalled();
 	});
 
-	it("treats btw outside a task thread as a request and hints at a bare btw", async () => {
+	it("sends plain btw messages in a task thread to the agent as requests", async () => {
+		const { bot } = await startedThread();
+		await bot.receive(
+			{
+				channel: "C123",
+				user: "OWNER",
+				text: "<@UBOT> btw, also push the model to the hub",
+				ts: "101.0",
+				thread_ts: "100.0",
+			},
+			"T123",
+			"PLAIN"
+		);
+		expect(mocks.sideQuestion).not.toHaveBeenCalled();
+		expect(await collections.slackInputs.countDocuments({ text: /push the model/ })).toBe(1);
+	});
+
+	it("treats /btw outside a task thread as a request and hints at a bare /btw", async () => {
 		const { user } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);
 		bot["botUserId"] = "UBOT";
 		await bot.receive(
-			{ channel: "C123", user: "OTHER", text: "<@UBOT> btw can you fine-tune bert?", ts: "300.0" },
+			{ channel: "C123", user: "OTHER", text: "<@UBOT> /btw can you fine-tune bert?", ts: "300.0" },
 			"T123",
 			"NOTASK"
 		);
@@ -960,7 +977,7 @@ describe("Slack btw side questions", () => {
 
 		const { bot: threaded } = await startedThread();
 		await threaded.receive(
-			{ channel: "C123", user: "OTHER", text: "<@UBOT> btw", ts: "101.0", thread_ts: "100.0" },
+			{ channel: "C123", user: "OTHER", text: "<@UBOT> /btw", ts: "101.0", thread_ts: "100.0" },
 			"T123",
 			"BARE"
 		);
@@ -968,7 +985,7 @@ describe("Slack btw side questions", () => {
 		expect(mocks.ephemeral).toHaveBeenLastCalledWith(
 			expect.objectContaining({ user: "OTHER", text: expect.stringContaining("Add your question") })
 		);
-		expect(await collections.slackInputs.countDocuments({ text: "<@UBOT> btw" })).toBe(0);
+		expect(await collections.slackInputs.countDocuments({ text: "<@UBOT> /btw" })).toBe(0);
 	});
 
 	it("reports a failed answer privately and leaves the run alone", async () => {
@@ -978,7 +995,7 @@ describe("Slack btw side questions", () => {
 			throw new Error("upstream 500");
 		});
 		await bot.receive(
-			{ channel: "C123", user: "OTHER", text: "btw status?", ts: "101.0", thread_ts: "100.0" },
+			{ channel: "C123", user: "OTHER", text: " /btw status?", ts: "101.0", thread_ts: "100.0" },
 			"T123",
 			"BTWFAIL"
 		);
@@ -1001,7 +1018,7 @@ describe("Slack btw side questions", () => {
 		});
 		const ask = (eventId: string, ts: string) =>
 			bot.receive(
-				{ channel: "C123", user: "OTHER", text: "btw status?", ts, thread_ts: "100.0" },
+				{ channel: "C123", user: "OTHER", text: "/btw status?", ts, thread_ts: "100.0" },
 				"T123",
 				eventId
 			);
@@ -1030,7 +1047,7 @@ describe("Slack btw side questions", () => {
 		});
 		const ask = (eventId: string, ts: string) =>
 			bot.receive(
-				{ channel: "C123", user: "OTHER", text: "btw status?", ts, thread_ts: "100.0" },
+				{ channel: "C123", user: "OTHER", text: "/btw status?", ts, thread_ts: "100.0" },
 				"T123",
 				eventId
 			);
@@ -1072,7 +1089,13 @@ describe("Slack btw side questions", () => {
 		});
 		for (const n of [1, 2, 3, 4, 5, 6]) {
 			await bot.receive(
-				{ channel: "C123", user: "OTHER", text: "btw status?", ts: `10${n}.0`, thread_ts: "100.0" },
+				{
+					channel: "C123",
+					user: "OTHER",
+					text: "/btw status?",
+					ts: `10${n}.0`,
+					thread_ts: "100.0",
+				},
 				"T123",
 				`RATE${n}`
 			);
@@ -1093,7 +1116,7 @@ describe("Slack btw side questions", () => {
 			{
 				channel: "C123",
 				user: "OTHER",
-				text: "<@UBOT> btw what is the eval loss?",
+				text: "<@UBOT> /btw what is the eval loss?",
 				ts: "101.0",
 				thread_ts: "100.0",
 			},
@@ -1104,7 +1127,7 @@ describe("Slack btw side questions", () => {
 		if (!thread) throw new Error("No thread");
 		mocks.replies.mockResolvedValue({
 			messages: [
-				{ user: "OTHER", ts: "101.0", text: "<@UBOT> btw what is the eval loss?" },
+				{ user: "OTHER", ts: "101.0", text: "<@UBOT> /btw what is the eval loss?" },
 				{ user: "UBOT", bot_id: "B1", ts: "101.5", text: "btw answer: the loss is 0.3" },
 				{ user: "OTHER", ts: "102.0", text: "use the bigger dataset" },
 				{ user: "ALICE", ts: "102.5", text: "btw the dataset moved to org/x" },

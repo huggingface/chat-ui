@@ -61,7 +61,7 @@ describe("side question panel", () => {
 	it("answers a bare /btw with a hint instead of asking anything", async () => {
 		const { component, baseElement } = mount();
 
-		expect(component.intercept("  /btw  ")).toBe(true);
+		expect(component.intercept("/btw  ")).toBe(true);
 		expect(sent).toHaveLength(0);
 		await expect.poll(() => cards(baseElement)).toHaveLength(1);
 		expect(cards(baseElement)[0].textContent).toContain("Type your question after /btw");

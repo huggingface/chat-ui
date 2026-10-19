@@ -25,6 +25,7 @@
 	import AskQuestion from "./AskQuestion.svelte";
 	import SideQuestionPanel from "./SideQuestionPanel.svelte";
 	import { isWebSideQuestion } from "$lib/utils/sideQuestion";
+	import { BTW_COMMAND } from "$lib/utils/slashCommands";
 	import { firstQuestionFor } from "$lib/stores/pendingQuestion";
 	import { shouldShowPendingPlaceholder } from "$lib/utils/pendingPlaceholder";
 	import VoiceRecorder from "./VoiceRecorder.svelte";
@@ -1287,6 +1288,7 @@
 										{modelIsMultimodal}
 										{modelSupportsTools}
 										showMlPill={mlPillVisible}
+										slashCommands={sideQuestionPanel ? [BTW_COMMAND] : []}
 										bind:focused
 									/>
 								{/if}

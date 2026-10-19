@@ -563,7 +563,7 @@ export class MlSlackBot {
 
 		const refuse = (text: string) =>
 			this.tell(event.channel, event.user, text, thread.threadTs).then(() => true);
-		if (!question) return refuse("Add your question after btw, e.g. `btw which job is running?`");
+		if (!question) return refuse("Add your question after /btw, e.g. `/btw which job is running?`");
 		if (question.length > SIDE_QUESTION_MAX_CHARS)
 			return refuse(`Keep btw questions under ${SIDE_QUESTION_MAX_CHARS} characters.`);
 		if (
