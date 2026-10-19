@@ -1,9 +1,10 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ObjectId } from "mongodb";
+import { BSON, ObjectId } from "mongodb";
 import superjson from "superjson";
 import { collections, ready } from "$lib/server/database";
 import { ML_FILE_VERSION_INDEX } from "$lib/server/mlFiles/indexes";
 import { createReview } from "$lib/server/mlReviews/store";
+import { REVIEW_MAX_DRAFT_BYTES } from "$lib/server/mlReviews/api";
 import type { MlReview, ReviewSchema } from "$lib/types/MlReview";
 import type { Conversation } from "$lib/types/Conversation";
 import {
@@ -237,6 +238,66 @@ describe.sequential("saving a draft", () => {
 			message: "a review holds at most 200 comments",
 		});
 		expect((await patch(9, draft({}, comments(20, "again-")))).status).toBe(200);
+	});
+
+	it("answers 413 once the drafts would outgrow their share of the row, never a 500", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { mlAssistant: true });
+		const notes = ["a", "b", "c", "d", "e"].map((n) => `note_${n}`);
+		const review = await createReview({
+			conversationId: conv._id,
+			messageId: "m",
+			toolCallId: "c",
+			toolUuid: "u",
+			elicitationId: crypto.randomUUID(),
+			schema: {
+				...SCHEMA,
+				questions: notes.map((name) => ({
+					name,
+					type: "text" as const,
+					required: false,
+					maxLength: 4_000,
+				})),
+			},
+			schemaHash: "abcd1234",
+			source: { kind: "inline" },
+			records: Array.from({ length: 500 }, (_, i) => ({ id: `r${i}`, values: {} })),
+		});
+		const full = {
+			status: "answered" as const,
+			answers: Object.fromEntries(notes.map((name) => [name, "n".repeat(4_000)])),
+			comments: [],
+			updatedAt: new Date(),
+		};
+		const fits = Math.floor((REVIEW_MAX_DRAFT_BYTES - 5_000) / BSON.calculateObjectSize(full));
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{
+				$set: {
+					drafts: Object.fromEntries(Array.from({ length: fits }, (_, i) => [String(i), full])),
+				},
+			}
+		);
+		const patch = (index: number, answers: Record<string, string>) =>
+			errorOf(
+				PATCH(
+					event(locals, conv._id.toString(), review._id.toString(), {
+						index,
+						draft: draft(answers),
+					})
+				)
+			);
+
+		expect(await patch(fits, full.answers)).toEqual({
+			status: 413,
+			message:
+				"This review's answers have reached the 8 MB limit. Shorten long answers, or submit this batch and review the rest in another.",
+		});
+		expect(
+			Object.keys((await collections.mlReviews.findOne({ _id: review._id }))?.drafts ?? {})
+		).toHaveLength(fits);
+		expect((await patch(0, { note_a: "shorter" })).status).toBe(200);
+		expect((await patch(fits, { note_a: "short" })).status).toBe(200);
 	});
 
 	it("refuses keys that would become Mongo keys without being declared", async () => {

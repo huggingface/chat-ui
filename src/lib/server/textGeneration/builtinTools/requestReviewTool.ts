@@ -8,7 +8,6 @@ import { readMlFile } from "$lib/server/mlFiles";
 import { turnAwaitingInput } from "$lib/server/generation/turnState";
 import { createReview } from "$lib/server/mlReviews/store";
 import { loadRecords, parseFileSource, parseRecordsInput } from "$lib/server/mlReviews/source";
-import { ASK_USER_QUESTION_TOOL_NAME } from "$lib/server/askUserQuestion";
 import type { ElicitationRequestPayload } from "$lib/types/McpElicitation";
 import { MessageReviewUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { parseReviewSchema } from "$lib/utils/review/schema";
@@ -20,6 +19,7 @@ import {
 	requestReviewDefinition,
 } from "./requestReviewDefinition";
 import type { NestedAgentBuiltinTool, NestedAgentDeps } from "./nestedAgent";
+import { reviewParkRefusal } from "./parkRefusal";
 import type { BuiltinToolContext, BuiltinToolResult } from "./types";
 
 export { REQUEST_REVIEW_TOOL_NAME };
@@ -186,9 +186,7 @@ export function createRequestReviewTool(conv: Pick<Conversation, "_id">): Nested
 		preprompt: REQUEST_REVIEW_PREPROMPT,
 		exemptFromToolRestraint: true,
 		mayPark: true,
-		parkRefusalMessage:
-			`Only one of ${REQUEST_REVIEW_TOOL_NAME} and ${ASK_USER_QUESTION_TOOL_NAME} can wait on the user per turn. ` +
-			"Make the other call after this one is answered.",
+		parkRefusalMessage: reviewParkRefusal,
 		bind(next: NestedAgentDeps) {
 			deps = next;
 		},

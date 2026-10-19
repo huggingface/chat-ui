@@ -1,5 +1,5 @@
 import { error } from "@sveltejs/kit";
-import { ObjectId } from "mongodb";
+import { BSON, ObjectId } from "mongodb";
 import { z } from "zod";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
@@ -14,6 +14,8 @@ import { readReview, saveDraft, submitReview } from "./store";
 export const REVIEW_MAX_COMMENTS_PER_RECORD = 20;
 export const REVIEW_MAX_COMMENT_CHARS = 2_000;
 export const REVIEW_MAX_COMMENTS = 200;
+/** records cap at 4 MB, so 8 MiB of drafts keeps the row under the 16 MiB mongo limit */
+export const REVIEW_MAX_DRAFT_BYTES = 8 * 1024 * 1024;
 const QUOTE_EXACT_CHARS = 2_000;
 const QUOTE_CONTEXT_CHARS = 64;
 const SUMMARY_CHARS = 4_000;
@@ -143,6 +145,15 @@ export async function patchDraft(
 		})),
 		updatedAt: now,
 	};
+	const draftBytes = Object.entries(review.drafts)
+		.filter(([key, d]) => key !== String(index) && d)
+		.reduce((sum, [, d]) => sum + BSON.calculateObjectSize(d as ReviewDraft), 0);
+	if (draftBytes + BSON.calculateObjectSize(stored) > REVIEW_MAX_DRAFT_BYTES) {
+		error(
+			413,
+			`This review's answers have reached the ${REVIEW_MAX_DRAFT_BYTES / 1024 / 1024} MB limit. Shorten long answers, or submit this batch and review the rest in another.`
+		);
+	}
 	const saved = await saveDraft(review.conversationId, review._id.toString(), index, stored);
 	if (!saved) error(409, "This review is closed.");
 
