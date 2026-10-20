@@ -24,7 +24,8 @@ export type MessageUpdate =
 	| MessageBudgetUpdate
 	| MessageTurnStateUpdate
 	| MessageHarnessEventUpdate
-	| MessageNoticeUpdate;
+	| MessageNoticeUpdate
+	| MessageQueuedInputUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -41,6 +42,7 @@ export enum MessageUpdateType {
 	TurnState = "turnState",
 	HarnessEvent = "harnessEvent",
 	Notice = "notice",
+	QueuedInput = "queuedInput",
 }
 
 /**
@@ -289,6 +291,14 @@ export interface HarnessServiceEvent {
 export interface MessageHarnessEventUpdate {
 	type: MessageUpdateType.HarnessEvent;
 	events: HarnessServiceEvent[];
+	text: string;
+	afterToolUuid: string;
+}
+
+/** sent while the turn was busy, replayed after the result of afterToolUuid like a harness event */
+export interface MessageQueuedInputUpdate {
+	type: MessageUpdateType.QueuedInput;
+	inputs: { id: string; text: string; at: number }[];
 	text: string;
 	afterToolUuid: string;
 }

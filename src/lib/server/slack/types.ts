@@ -28,6 +28,8 @@ export interface SlackThread {
 	watching: boolean;
 	pollAt?: Date;
 	contextThroughTs?: string;
+	/** btw questions answered in the thread, left out of the next turn's context */
+	sideQuestionTs?: string[];
 	renderFailures?: number;
 	nextRenderAt?: Date;
 	conversationId: ObjectId;

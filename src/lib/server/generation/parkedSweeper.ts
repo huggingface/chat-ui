@@ -34,6 +34,7 @@ import { applyUpdateToMessage } from "./applyUpdate";
 import { turnAbandoned, turnEnded, turnRunning, turnUnsaved } from "./turnState";
 import { compressUpdatesForStorage, messageForStorage } from "./compressUpdates";
 import { offloadStoredToolImages } from "$lib/server/files/toolImages";
+import { takeQueuedInputs } from "$lib/server/queuedInputs/deliver";
 import { restoreRunningShape } from "$lib/utils/messageShape";
 
 const SWEEP_BATCH = 5;
@@ -331,6 +332,10 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 	if (!message || message.from !== "assistant") {
 		return abandon(park, "no parked assistant message to resume");
 	}
+	// resuming here would write the old branch over the newer one, each run saves every message
+	if ((message.children?.length ?? 0) > 0) {
+		return abandon(park, "the conversation moved on while it waited");
+	}
 
 	const model = models.find((m) => m.id === conv.model);
 	if (!model) return abandon(park, `model ${conv.model} is no longer available`);
@@ -414,6 +419,7 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 	};
 
 	let hasError = false;
+	let turnClosed = false;
 	try {
 		apply(await turnRunning(turnKey));
 		if (parseLinkedSessionId(park.sessionId) && tokenExpired) {
@@ -436,6 +442,9 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 				"[parked] wait result already delivered; continuing the stored turn"
 			);
 		} else {
+			const queued = isMlAssistantConversation(conv)
+				? await takeQueuedInputs(conv._id, message.id, park.toolUuid)
+				: undefined;
 			// The result the parked call has been missing. Replay pairs it with the call
 			// by uuid, which is what puts it in the model's history for the next round.
 			apply({
@@ -458,6 +467,7 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 					display: true,
 				},
 			});
+			if (queued) apply(queued);
 		}
 
 		const ctx: TextGenerationContext = {
@@ -493,6 +503,7 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 		// CAS: misses when the resumed run parked again, and that state stands.
 		const endedUpdate = await turnEnded(turnKey, { failed: false });
 		if (endedUpdate) apply(endedUpdate);
+		turnClosed = Boolean(endedUpdate);
 	} catch (err) {
 		hasError = true;
 		logger.error({ err, parkedCallId: park.parkedCallId }, "[parked] resumed turn failed");
@@ -504,6 +515,7 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 		});
 		const failedUpdate = await turnEnded(turnKey, { failed: true, error: errorMessage });
 		if (failedUpdate) apply(failedUpdate);
+		turnClosed = Boolean(failedUpdate);
 	}
 
 	// Settled before the save: the run is over, so a re-claim could only repeat
@@ -568,6 +580,10 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 		}
 	} finally {
 		await writer.finish({ status: hasError ? "error" : "completed" });
+	}
+	if (turnClosed && isMlAssistantConversation(conv)) {
+		const { kickQueuedTurn } = await import("$lib/server/queuedInputs/drain");
+		kickQueuedTurn(conv._id);
 	}
 }
 

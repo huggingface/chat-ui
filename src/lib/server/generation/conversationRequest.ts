@@ -59,11 +59,14 @@ export async function generateConversationResponse({
 	locals,
 	params,
 	getClientAddress,
+	queuedStart = false,
 }: {
 	request: Request;
 	locals: App.Locals;
 	params: { id: string };
 	getClientAddress: () => string;
+	/** the queue drain already holds the turn start */
+	queuedStart?: boolean;
 }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
@@ -304,6 +307,12 @@ export async function generateConversationResponse({
 	);
 	const dashboardViews = acceptTrackioViews(rawDashboardViews, conv.messages);
 
+	// a racing send and a queued start would each save the whole messages array over the other
+	const guardTurnStart =
+		isMlAssistantConversation(conv) && !resumeElicitationId && !isRetry && !queuedStart;
+	const builtOn = conv.messages.at(-1)?.id;
+	let releaseTurnStart: (() => Promise<void>) | undefined;
+
 	// we will append tokens to the content of this message
 	let messageToWriteToId: Message["id"] | undefined = undefined;
 	// used for building the prompt, subtree of the conversation that goes from the latest message to the root
@@ -438,15 +447,27 @@ export async function generateConversationResponse({
 	messageToWriteTo.generationId = effectiveGenerationId;
 	stampMlHarness(messageToWriteTo, conv, model);
 
-	// A conversation stored with inline tool images can be too big to take this write.
-	await offloadStoredToolImages(convId, conv.messages);
+	if (guardTurnStart) {
+		const { claimTurnStart, TURN_BUSY_MESSAGE } = await import("$lib/server/queuedInputs/drain");
+		const claim = await claimTurnStart(convId, "working", builtOn);
+		if (!claim) error(409, TURN_BUSY_MESSAGE);
+		releaseTurnStart = claim.release;
+	}
 
-	// update the conversation with the new messages
-	await collections.conversations.updateOne(
-		{ _id: convId },
-		{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
-	);
-	await answeredAsksSaved?.();
+	try {
+		// A conversation stored with inline tool images can be too big to take this write.
+		await offloadStoredToolImages(convId, conv.messages);
+
+		// update the conversation with the new messages
+		await collections.conversations.updateOne(
+			{ _id: convId },
+			{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
+		);
+		await answeredAsksSaved?.();
+	} catch (err) {
+		await releaseTurnStart?.();
+		throw err;
+	}
 
 	let doneStreaming = false;
 	let clientDetached = false;
@@ -525,7 +546,7 @@ export async function generateConversationResponse({
 					routerMetadata: messageToWriteTo.routerMetadata,
 					updates: compressUpdatesForStorage(messageToWriteTo.updates),
 				}),
-			});
+			}).finally(() => releaseTurnStart?.());
 			generationWriter = writer;
 
 			let finalAnswerReceived = false;
@@ -844,6 +865,10 @@ export async function generateConversationResponse({
 			});
 			clearInterval(abortMarkerWatcher);
 			abortRegistry.unregister(conversationKey, ctrl);
+			if (endedUpdate && isMlAssistantConversation(conv)) {
+				const { kickQueuedTurn } = await import("$lib/server/queuedInputs/drain");
+				kickQueuedTurn(convId);
+			}
 
 			// Consume the stop marker once the stop has been honored and the
 			// interrupted state persisted. Markers are conversation-scoped, so a

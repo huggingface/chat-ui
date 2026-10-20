@@ -12,6 +12,7 @@ import {
 	type MessageElicitationResolvedUpdate,
 	type MessagePlanUpdate,
 	type MessageHarnessEventUpdate,
+	type MessageQueuedInputUpdate,
 	type MessageNoticeUpdate,
 	MessageUpdateType,
 	MessageUpdateStatus,
@@ -412,6 +413,10 @@ export const isMessagePlanUpdate = (update: MessageUpdate): update is MessagePla
 export const isMessageHarnessEventUpdate = (
 	update: MessageUpdate
 ): update is MessageHarnessEventUpdate => update.type === MessageUpdateType.HarnessEvent;
+
+export const isMessageQueuedInputUpdate = (
+	update: MessageUpdate
+): update is MessageQueuedInputUpdate => update.type === MessageUpdateType.QueuedInput;
 
 export const isMessageNoticeUpdate = (update: MessageUpdate): update is MessageNoticeUpdate =>
 	update.type === MessageUpdateType.Notice;

@@ -52,6 +52,9 @@ const mocks = vi.hoisted(() => ({
 		async () => undefined
 	),
 	markHarnessEventDelivered: vi.fn(async () => undefined),
+	takeQueuedInputs: vi.fn<
+		(conversationId: unknown, messageId: string, afterToolUuid: string) => Promise<unknown>
+	>(async () => undefined),
 	prepareHistory: vi.fn(),
 }));
 
@@ -140,6 +143,9 @@ vi.mock("$lib/server/mlRegistry/store", async (importOriginal) => ({
 vi.mock("$lib/server/mlRegistry/midTurn", () => ({
 	pendingHarnessEvent: mocks.pendingHarnessEvent,
 	markHarnessEventDelivered: mocks.markHarnessEventDelivered,
+}));
+vi.mock("$lib/server/queuedInputs/deliver", () => ({
+	takeQueuedInputs: mocks.takeQueuedInputs,
 }));
 vi.mock("$lib/server/mlFiles/store", async (importOriginal) => ({
 	...(await importOriginal<typeof import("$lib/server/mlFiles/store")>()),
@@ -299,6 +305,8 @@ beforeEach(() => {
 	mocks.pendingHarnessEvent.mockResolvedValue(undefined);
 	mocks.markHarnessEventDelivered.mockReset();
 	mocks.markHarnessEventDelivered.mockResolvedValue(undefined);
+	mocks.takeQueuedInputs.mockReset();
+	mocks.takeQueuedInputs.mockResolvedValue(undefined);
 	mocks.prepareHistory.mockReset();
 	mocks.prepareHistory.mockImplementation(plainHistory);
 	scriptToolResults();
@@ -1219,6 +1227,88 @@ describe("runMcpFlow mid-turn service events", () => {
 			expect(mocks.pendingHarnessEvent).not.toHaveBeenCalled();
 		}
 	);
+});
+
+describe("runMcpFlow queued user messages", () => {
+	const inMode = () =>
+		({
+			conv: { _id: new ObjectId(), mlAssistant: true },
+			messageId: "a1",
+		}) as unknown as Partial<Parameters<typeof runMcpFlow>[0]>;
+	const QUEUED_TEXT =
+		"[The user sent this while you were working.]\n<user_message>\nuse lr 1e-4\n</user_message>";
+	const queuedUpdate = (afterToolUuid: string) => ({
+		type: MessageUpdateType.QueuedInput,
+		inputs: [{ id: "q1", text: "use lr 1e-4", at: 0 }],
+		text: QUEUED_TEXT,
+		afterToolUuid,
+	});
+	const queuedUpdates = (updates: MessageUpdate[]) =>
+		updates.filter((u) => u.type === MessageUpdateType.QueuedInput);
+
+	it("reads a queued message into the round's last tool result before the next request", async () => {
+		mocks.takeQueuedInputs.mockImplementationOnce(async (_id, _messageId, uuid) =>
+			queuedUpdate(uuid)
+		);
+		scriptRounds([
+			{
+				toolCalls: [
+					{ id: "call_1", name: "do_thing", arguments: "{}" },
+					{ id: "call_2", name: "do_thing", arguments: "{}" },
+				],
+			},
+			{ content: "switching to 1e-4" },
+		]);
+
+		const { updates, result } = await runFlow(inMode());
+
+		expect(result).toBe("completed");
+		expect(mocks.takeQueuedInputs.mock.calls[0].slice(1)).toEqual(["a1", "call_2"]);
+		expect(queuedUpdates(updates)).toEqual([queuedUpdate("call_2")]);
+		expect(requestMessages(1).at(-1)).toEqual({
+			role: "tool",
+			tool_call_id: "call_2",
+			content: `tool ok\n\n${QUEUED_TEXT}`,
+		});
+	});
+
+	it("puts the message after a harness event of the same round", async () => {
+		mocks.pendingHarnessEvent.mockImplementationOnce(async (_id, uuid) => ({
+			update: {
+				type: MessageUpdateType.HarnessEvent,
+				events: [],
+				text: "[Harness event]",
+				afterToolUuid: uuid,
+			},
+			services: [],
+		}));
+		mocks.takeQueuedInputs.mockImplementationOnce(async (_id, _messageId, uuid) =>
+			queuedUpdate(uuid)
+		);
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+
+		await runFlow(inMode());
+
+		expect(requestMessages(1).at(-1)?.content).toBe(`tool ok\n\n[Harness event]\n\n${QUEUED_TEXT}`);
+	});
+
+	it("leaves the queue to the next turn when the model answers without a tool", async () => {
+		scriptRounds([{ content: "the answer" }]);
+		await runFlow(inMode());
+		expect(mocks.takeQueuedInputs).not.toHaveBeenCalled();
+	});
+
+	it("takes nothing outside the mode", async () => {
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+		await runFlow({ messageId: "a1" } as Partial<Parameters<typeof runMcpFlow>[0]>);
+		expect(mocks.takeQueuedInputs).not.toHaveBeenCalled();
+	});
 });
 
 describe("runMcpFlow job labels", () => {

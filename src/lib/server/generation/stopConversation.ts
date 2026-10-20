@@ -1,6 +1,7 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { AbortRegistry } from "$lib/server/abortRegistry";
+import { cancelAllQueuedInputs } from "$lib/server/queuedInputs/store";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
@@ -47,6 +48,17 @@ export async function stopConversation({
 		stopPoint = undefined;
 	}
 
+	// cancelled before the abort since an ending turn starts whatever is still queued
+	const cancelledQueuedInputs = await cancelAllQueuedInputs(conversationId);
+	await abortRunningTurn(conversationId, stopPoint);
+
+	return Response.json({ cancelledQueuedInputs });
+}
+
+export async function abortRunningTurn(
+	conversationId: ObjectId,
+	stopPoint?: z.infer<typeof stopPointSchema>
+): Promise<void> {
 	// Write the marker before aborting the in-process registry so a finalize
 	// triggered by a same-pod abort always finds the stop point on it.
 	await collections.abortedGenerations.updateOne(
@@ -59,6 +71,4 @@ export async function stopConversation({
 	);
 
 	AbortRegistry.getInstance().abort(conversationId.toString());
-
-	return new Response();
 }

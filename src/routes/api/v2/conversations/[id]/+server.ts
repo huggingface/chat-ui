@@ -29,12 +29,14 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 	const lastAssistant = [...conversation.messages]
 		.reverse()
 		.find((message) => message.from === "assistant");
-	// Share views resolve with a string id; ObjectId accepts both forms.
-	const turnStateDoc = lastAssistant
-		? await collections.turnStates
-				.findOne({ conversationId: new ObjectId(conversation._id), messageId: lastAssistant.id })
-				.catch(() => null)
-		: null;
+	// Share snapshots are keyed by a 7-char string id, which `new ObjectId` rejects
+	// synchronously, and they carry no turn state of their own.
+	const turnStateDoc =
+		lastAssistant && typeof conversation._id !== "string"
+			? await collections.turnStates
+					.findOne({ conversationId: conversation._id, messageId: lastAssistant.id })
+					.catch(() => null)
+			: null;
 	const turnState: TurnStateSnapshot | undefined = turnStateDoc
 		? {
 				messageId: turnStateDoc.messageId,

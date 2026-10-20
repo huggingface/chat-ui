@@ -88,6 +88,7 @@ import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
 import { PARENT_READER } from "$lib/types/MlSource";
 import { mlJobLabelsEnabled, mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
 import { markHarnessEventDelivered, pendingHarnessEvent } from "$lib/server/mlRegistry/midTurn";
+import { takeQueuedInputs } from "$lib/server/queuedInputs/deliver";
 import {
 	buildSessionStateBlock,
 	injectSessionState,
@@ -1402,6 +1403,20 @@ export async function* runMcpFlow({
 						yield pending.update;
 						messagesOpenAI = withHarnessEventOnLastTool(messagesOpenAI, pending.update.text);
 						await markHarnessEventDelivered(conv._id, pending.services);
+					}
+				}
+				// what is left when the last round runs out starts the next turn instead
+				if (
+					mlAssistant &&
+					messageId &&
+					lastCallUuid &&
+					toolMsgCount > 0 &&
+					loop + 1 < maxToolRounds
+				) {
+					const queued = await takeQueuedInputs(conv._id, messageId, lastCallUuid);
+					if (queued) {
+						yield queued;
+						messagesOpenAI = withHarnessEventOnLastTool(messagesOpenAI, queued.text);
 					}
 				}
 				// Continue loop: next iteration will use tool messages to get the final content
