@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import ServerCard from "./ServerCard.svelte";
@@ -15,6 +15,7 @@
 		setServerOAuth,
 		toggleServer,
 		reconcileOAuthConnections,
+		isSameServerUrl,
 	} from "$lib/stores/mcpServers";
 	import type { KeyValuePair, MCPOAuthState } from "$lib/types/Tool";
 	import type { DiscoveryResponse, OAuthCallbackPayload } from "$lib/utils/mcpOAuth";
@@ -28,12 +29,17 @@
 
 	interface Props {
 		onclose: () => void;
+		/** A server a deep link asked to add: opens straight on the add form, filled in. */
+		linkServer?: { name: string; url: string };
 	}
 
-	let { onclose }: Props = $props();
+	let { onclose, linkServer }: Props = $props();
+
+	// True while the add form still holds the link's server; any submit or cancel ends it.
+	let linkPending = $state(untrack(() => Boolean(linkServer)));
 
 	type View = "list" | "add" | "authorize";
-	let currentView = $state<View>("list");
+	let currentView = $state<View>(untrack(() => (linkServer ? "add" : "list")));
 	let isRefreshing = $state(false);
 	let pendingAuth = $state<{
 		serverId: string;
@@ -57,6 +63,15 @@
 		headers?: KeyValuePair[];
 		discovery?: DiscoveryResponse;
 	}) {
+		const fromLink = linkPending;
+		linkPending = false;
+		// A link to a server the user already has turns that one on instead of adding a copy.
+		const existing = fromLink && $allMcpServers.find((s) => isSameServerUrl(s.url, serverData.url));
+		if (existing) {
+			if (!$selectedServerIds.has(existing.id)) toggleServer(existing.id);
+			currentView = "list";
+			return;
+		}
 		const oauth: MCPOAuthState | undefined =
 			serverData.discovery?.requiresAuth && serverData.discovery.connection
 				? serverData.discovery.connection
@@ -80,6 +95,8 @@
 			currentView = "list";
 			$error = `${serverData.url} requires authorization but its OAuth metadata could not be loaded. Try Health Check or contact the server admin.`;
 		} else {
+			// The user added it from a link to use it now, so it starts enabled.
+			if (fromLink) toggleServer(id);
 			currentView = "list";
 		}
 	}
@@ -103,6 +120,8 @@
 	}
 
 	function handleCancel() {
+		// Declining a link's server closes the dialog: the user never asked to manage servers.
+		if (linkPending) return onclose();
 		currentView = "list";
 	}
 
@@ -147,6 +166,8 @@
 					MCP Servers
 				{:else if currentView === "authorize"}
 					Authorize MCP server
+				{:else if linkPending}
+					Add MCP server from link
 				{:else}
 					Add MCP server
 				{/if}
@@ -157,6 +178,9 @@
 				{:else if currentView === "authorize"}
 					Sign in to {pendingAuth?.serverUrl} so {publicConfig.PUBLIC_APP_NAME} can call its tools on
 					your behalf.
+				{:else if linkPending}
+					A link asked to add this server to {publicConfig.PUBLIC_APP_NAME}. Add it only if you
+					trust whoever shared the link.
 				{:else}
 					Add a custom MCP server to {publicConfig.PUBLIC_APP_NAME}.
 				{/if}
@@ -274,7 +298,16 @@
 				</div>
 			</div>
 		{:else if currentView === "add"}
-			<AddServerForm onsubmit={handleAddServer} oncancel={handleCancel} />
+			{#if linkServer && linkPending}
+				<AddServerForm
+					onsubmit={handleAddServer}
+					oncancel={handleCancel}
+					initialName={linkServer.name}
+					initialUrl={linkServer.url}
+				/>
+			{:else}
+				<AddServerForm onsubmit={handleAddServer} oncancel={handleCancel} />
+			{/if}
 		{:else if currentView === "authorize" && pendingAuth}
 			<AuthorizeStep
 				discovery={pendingAuth.discovery}
