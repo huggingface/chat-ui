@@ -17,6 +17,7 @@ vi.mock("@huggingface/hub", async (importOriginal) => ({
 	commit: vi.fn(),
 	createRepo: vi.fn(async () => ({ repoUrl: "" })),
 	fileExists: vi.fn(async () => false),
+	datasetInfo: vi.fn(async () => ({ sha: "head1" })),
 }));
 
 const hub = await import("@huggingface/hub");
@@ -117,6 +118,8 @@ beforeEach(() => {
 	vi.mocked(hub.fileExists).mockReset();
 	vi.mocked(hub.fileExists).mockResolvedValue(false);
 	vi.mocked(hub.createRepo).mockClear();
+	vi.mocked(hub.datasetInfo).mockReset();
+	vi.mocked(hub.datasetInfo).mockResolvedValue({ sha: "head1" } as never);
 });
 
 afterEach(async () => {
@@ -211,6 +214,7 @@ describe("review destinations", () => {
 			repo: { type: "dataset", name: "pngwn/gold" },
 			accessToken: "hf_owner",
 			operations: [{ operation: "addOrUpdate", path: "data/batch-1.parquet" }],
+			parentCommit: "head1",
 		});
 		expect(call).not.toHaveProperty("isPullRequest");
 
@@ -248,6 +252,49 @@ describe("review destinations", () => {
 		expect(hub.createRepo).toHaveBeenCalledWith(
 			expect.objectContaining({ repo: { type: "dataset", name: "pngwn/gold" }, private: true })
 		);
+	});
+
+	it("never lets two reviews write one path: a commit made meanwhile sends it beside", async () => {
+		vi.mocked(hub.datasetInfo)
+			.mockResolvedValueOnce({ sha: "head1" } as never)
+			.mockResolvedValueOnce({ sha: "head2" } as never);
+		vi.mocked(hub.fileExists).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+		vi.mocked(hub.commit).mockRejectedValueOnce(denied(412)).mockResolvedValueOnce(commitOutput());
+		const review = await seed();
+		const push = await pushReviewLabels(review, "hf_owner");
+		const beside = besidePath("data/batch-1.parquet", review._id.toString());
+		expect(push).toMatchObject({ status: "pushed", path: beside });
+		expect(vi.mocked(hub.fileExists).mock.calls.map((c) => c[0].revision)).toEqual([
+			"head1",
+			"head2",
+		]);
+		expect(
+			vi.mocked(hub.commit).mock.calls.map((c) => [c[0].parentCommit, c[0].operations[0].path])
+		).toEqual([
+			["head1", "data/batch-1.parquet"],
+			["head2", beside],
+		]);
+	});
+
+	it("waits out a commit still running on the repo, then checks the path again", async () => {
+		vi.mocked(hub.commit).mockRejectedValueOnce(denied(409)).mockResolvedValueOnce(commitOutput());
+		const push = await pushReviewLabels(await seed(), "hf_owner");
+		expect(push).toMatchObject({ status: "pushed", path: "data/batch-1.parquet" });
+		expect(hub.datasetInfo).toHaveBeenCalledTimes(2);
+		expect(hub.commit).toHaveBeenCalledTimes(2);
+	});
+
+	it("gives a bucket file a review specific path, a bucket write cannot be conditional", async () => {
+		vi.mocked(hub.commit).mockResolvedValue(commitOutput());
+		const review = await seed({
+			destination: { repo: "org/bucket", type: "bucket", path: "labels.parquet", pr: false },
+		});
+		const push = await pushReviewLabels(review, "hf_owner");
+		expect(push).toMatchObject({
+			status: "pushed",
+			path: besidePath("labels.parquet", review._id.toString()),
+		});
+		expect(hub.fileExists).not.toHaveBeenCalled();
 	});
 
 	it("waits for a repo it just created to accept writes", async () => {

@@ -1,6 +1,7 @@
 import {
 	commit,
 	createRepo,
+	datasetInfo,
 	fileExists,
 	HubApiError,
 	type RepoDesignation,
@@ -201,6 +202,10 @@ async function reviewerName(conversationId: ObjectId): Promise<string> {
 const statusOf = (err: unknown) => (err instanceof HubApiError ? err.statusCode : undefined);
 
 const CREATE_SETTLE_MS = [1_000, 2_000, 4_000];
+/** a 409 means another commit to the repo is still running, the probe saw one take 30 s */
+const COMMIT_RACE_WAITS_MS = [2_000, 4_000, 8_000, 16_000];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** a bucket created a moment ago still 404s its xet write token */
 async function afterCreate<T>(write: () => Promise<T>): Promise<T> {
@@ -209,7 +214,7 @@ async function afterCreate<T>(write: () => Promise<T>): Promise<T> {
 			return await write();
 		} catch (err) {
 			if (statusOf(err) !== 404) throw err;
-			await new Promise((resolve) => setTimeout(resolve, wait));
+			await sleep(wait);
 		}
 	}
 	return write();
@@ -275,19 +280,13 @@ export async function pushReviewLabels(
 		return fail("the labels could not be written as Parquet");
 	}
 
-	let path = destination.path;
-	try {
-		if (await fileExists({ repo, path, accessToken }))
-			path = besidePath(path, review._id.toString());
-	} catch (err) {
-		if (statusOf(err) !== 401 && statusOf(err) !== 403 && statusOf(err) !== 404) {
-			return fail(`could not check ${destination.repo}: ${String(err)}`);
-		}
-	}
-
+	const reviewId = review._id.toString();
 	const title = `Add review labels: ${review.schema.title}`.slice(0, 200);
 	const description = `${review.records.length} rows reviewed in HuggingChat, schema ${review.schemaHash}.`;
-	const write = (isPullRequest: boolean) =>
+	// a bucket has no commit to make the write conditional on, so its file is always review specific
+	let path =
+		destination.type === "bucket" ? besidePath(destination.path, reviewId) : destination.path;
+	const commitTo = (isPullRequest: boolean, parentCommit?: string) =>
 		commit({
 			repo,
 			accessToken,
@@ -295,7 +294,40 @@ export async function pushReviewLabels(
 			description,
 			operations: [{ operation: "addOrUpdate", path, content }],
 			...(isPullRequest ? { isPullRequest: true } : {}),
+			...(parentCommit ? { parentCommit } : {}),
 		});
+	const pathAt = async (revision?: string) =>
+		(await fileExists({
+			repo,
+			path: destination.path,
+			accessToken,
+			...(revision ? { revision } : {}),
+		}))
+			? besidePath(destination.path, reviewId)
+			: destination.path;
+	// checked and committed against one head, so a review that landed meanwhile 412s this one
+	const direct = async () => {
+		for (let attempt = 0; ; attempt += 1) {
+			const { sha } = await datasetInfo({
+				name: destination.repo,
+				accessToken,
+				additionalFields: ["sha"],
+			});
+			path = await pathAt(sha);
+			try {
+				return await commitTo(false, sha);
+			} catch (err) {
+				const status = statusOf(err);
+				if ((status !== 409 && status !== 412) || attempt >= COMMIT_RACE_WAITS_MS.length) throw err;
+				if (status === 409) await sleep(COMMIT_RACE_WAITS_MS[attempt]);
+			}
+		}
+	};
+	const write = async (isPullRequest: boolean) => {
+		if (destination.type === "dataset" && !isPullRequest) return direct();
+		if (destination.type === "dataset") path = await pathAt();
+		return commitTo(isPullRequest);
+	};
 
 	let pr = destination.pr;
 	try {

@@ -26,6 +26,7 @@ vi.mock("@huggingface/hub", async (importOriginal) => ({
 		hookOutput: "",
 	})),
 	fileExists: vi.fn(async () => false),
+	datasetInfo: vi.fn(async () => ({ sha: "head1" })),
 }));
 vi.mock("$lib/server/logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), trace: vi.fn() },
