@@ -3,7 +3,13 @@ import { messageBlocks, type MessageBlock } from "./messageBlocks";
 import { restoreRunningShape } from "./messageShape";
 import { convertingTurns } from "$lib/server/generation/__tests__/turnFixtures";
 import { messageForStorage } from "$lib/server/generation/compressUpdates";
-import { MessageUpdateType } from "$lib/types/MessageUpdate";
+import {
+	MessageElicitationUpdateType,
+	MessageReviewUpdateType,
+	MessageToolUpdateType,
+	MessageUpdateType,
+	type MessageUpdate,
+} from "$lib/types/MessageUpdate";
 
 function shown(blocks: MessageBlock[]) {
 	return blocks.map((block) => {
@@ -78,4 +84,80 @@ it("keeps a question, a plan card and a harness event where the legacy form had 
 		"think",
 		"text",
 	]);
+});
+
+describe("a review card", () => {
+	const call = (uuid: string): MessageUpdate => ({
+		type: MessageUpdateType.Tool,
+		subtype: MessageToolUpdateType.Call,
+		uuid,
+		call: { name: "request_review", parameters: {} },
+	});
+	const request: MessageUpdate = {
+		type: MessageUpdateType.Review,
+		subtype: MessageReviewUpdateType.Request,
+		reviewId: "r1",
+		toolUuid: "u1",
+		title: "triage batch 1",
+		records: 30,
+		questions: 2,
+		mode: "label",
+	};
+
+	it("stands for its call, the result that resumes the turn included", () => {
+		const blocks = messageBlocks({
+			content: "",
+			updates: [
+				call("u1"),
+				request,
+				{
+					type: MessageUpdateType.Review,
+					subtype: MessageReviewUpdateType.Resolved,
+					reviewId: "r1",
+					verdict: "approve",
+					answered: 30,
+					skipped: 0,
+					comments: 2,
+					files: [{ name: "reviews/triage.responses.jsonl", version: 1 }],
+				},
+				{
+					type: MessageUpdateType.Elicitation,
+					subtype: MessageElicitationUpdateType.Resolved,
+					elicitationId: "e1",
+					action: "accept",
+					resolution: "user",
+				},
+				{
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Result,
+					uuid: "u1",
+					result: {
+						status: "success",
+						call: { name: "request_review", parameters: {} },
+						outputs: [],
+					},
+				} as MessageUpdate,
+				{ type: MessageUpdateType.Stream, token: "Thanks." },
+			],
+		});
+		expect(blocks.map((block) => block.type)).toEqual(["review", "text"]);
+		const review = blocks[0];
+		expect(review.type === "review" && review.resolved?.answered).toBe(30);
+	});
+
+	it("leaves a refused call its tool card", () => {
+		const blocks = messageBlocks({
+			content: "",
+			updates: [
+				call("u2"),
+				{
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid: "u2",
+					message: "request_review was not shown: record 14: body must be a string",
+				},
+			],
+		});
+		expect(blocks.map((block) => block.type)).toEqual(["tool"]);
+	});
 });

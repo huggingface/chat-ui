@@ -5,6 +5,7 @@
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import TrackioPane from "./TrackioPane.svelte";
 	import MlRegistryPane from "./MlRegistryPane.svelte";
+	import MlReviewPane from "./MlReviewPane.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
 	import { collectTrackioDashboards } from "$lib/utils/trackio";
@@ -82,6 +83,7 @@
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 	import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
+	import { mlReviews } from "$lib/stores/mlReview.svelte";
 	import MlInternSpotlight from "./MlInternSpotlight.svelte";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { MediaQuery } from "svelte/reactivity";
@@ -784,6 +786,15 @@
 			return;
 		}
 		return mlRegistry.watch(conversationId, { live: loading });
+	});
+
+	$effect(() => {
+		const conversationId = ML_ASSISTANT_MODE && !shared ? page.params?.id : undefined;
+		untrack(() => mlReviews.bind(conversationId));
+	});
+
+	$effect(() => {
+		if (!loading) untrack(() => mlReviews.refreshOpen());
 	});
 
 	const budgetClient = useAPIClient();
@@ -1593,6 +1604,9 @@
 	<TrackioPane items={paneItems} />
 	{#if ML_ASSISTANT_MODE}
 		<MlRegistryPane />
+		{#if !shared}
+			<MlReviewPane />
+		{/if}
 	{/if}
 </div>
 

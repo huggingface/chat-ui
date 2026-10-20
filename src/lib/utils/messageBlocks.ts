@@ -5,6 +5,9 @@ import {
 	type MessageHarnessEventUpdate,
 	type MessageQueuedInputUpdate,
 	type MessagePlanUpdate,
+	type MessageReviewRequestUpdate,
+	type MessageReviewResolvedUpdate,
+	MessageReviewUpdateType,
 	type MessageToolUpdate,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
@@ -16,6 +19,7 @@ import {
 	isMessageNoticeUpdate,
 	isMessageQueuedInputUpdate,
 	isMessagePlanUpdate,
+	isMessageReviewUpdate,
 	isMessageToolUpdate,
 } from "./messageUpdates";
 import { splitArtifactSegments, type ArtifactOperation } from "./artifacts";
@@ -31,6 +35,12 @@ export type ElicitationBlock = {
 	resolved?: MessageElicitationResolvedUpdate;
 };
 
+export type ReviewBlock = {
+	type: "review";
+	request: MessageReviewRequestUpdate;
+	resolved?: MessageReviewResolvedUpdate;
+};
+
 export type MessageBlock =
 	| { type: "text"; content: string }
 	| { type: "think"; content: string; closed: boolean }
@@ -38,6 +48,7 @@ export type MessageBlock =
 	| { type: "artifact"; op: ArtifactOperation; opIndex: number }
 	| ElicitationBlock
 	| { type: "plan"; update: MessagePlanUpdate }
+	| ReviewBlock
 	| { type: "harnessEvent"; update: MessageHarnessEventUpdate }
 	| { type: "queuedInput"; update: MessageQueuedInputUpdate }
 	| { type: "notice"; text: string };
@@ -119,6 +130,8 @@ function collapseConsecutiveArtifactOps(input: MessageBlock[]): MessageBlock[] {
 /** the updates that render the same in both shapes */
 function applyCardUpdate(res: MessageBlock[], update: MessageUpdate): void {
 	if (isMessageToolUpdate(update)) {
+		// the review card stands for its call, the result that resumes it included
+		if (res.some((b) => b.type === "review" && b.request.toolUuid === update.uuid)) return;
 		const existingBlock = res.find(
 			(b): b is ToolBlock => b.type === "tool" && b.uuid === update.uuid
 		);
@@ -150,6 +163,18 @@ function applyCardUpdate(res: MessageBlock[], update: MessageUpdate): void {
 		const planIdx = res.findIndex((b) => b.type === "plan");
 		if (planIdx !== -1) res.splice(planIdx, 1);
 		res.push({ type: "plan", update });
+	} else if (isMessageReviewUpdate(update)) {
+		if (update.subtype === MessageReviewUpdateType.Request) {
+			// takes the place of the generic tool card, a refused call emits no request and keeps it
+			const toolIdx = res.findIndex((b) => b.type === "tool" && b.uuid === update.toolUuid);
+			if (toolIdx !== -1) res.splice(toolIdx, 1, { type: "review", request: update });
+			else res.push({ type: "review", request: update });
+		} else {
+			const target = res.find(
+				(b): b is ReviewBlock => b.type === "review" && b.request.reviewId === update.reviewId
+			);
+			if (target) target.resolved = update;
+		}
 	} else if (isMessageHarnessEventUpdate(update)) {
 		res.push({ type: "harnessEvent", update });
 	} else if (isMessageQueuedInputUpdate(update)) {
