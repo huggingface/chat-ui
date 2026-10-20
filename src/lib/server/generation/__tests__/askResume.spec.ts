@@ -904,9 +904,21 @@ describe("a submitted review", () => {
 		]);
 		await turnIs(conv, parked.id, "done");
 
-		expect([first.status, second.status].sort()).toEqual([200, 409]);
-		expect([first.body, second.body].find(Boolean)).toMatchObject({ ok: true });
+		// a second submit that reads the review mid claim finishes the same submission instead
+		expect([
+			[200, 200],
+			[200, 409],
+		]).toContainEqual([first.status, second.status].sort());
+		const accepted = [first, second].filter((r) => r.status === 200).map((r) => r.body);
+		for (const body of accepted) {
+			expect(body).toEqual(accepted[0]);
+			expect(body).toMatchObject({ ok: true });
+			expect(body).not.toHaveProperty("delivery");
+		}
 		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(
+			(await collections.mlReviews.findOne({ _id: new ObjectId(reviewId) }))?.delivery
+		).toBeUndefined();
 		const [result] = toolResultsIn(outgoing(1));
 		expect(result).toContain('Review "Triage batch 1" submitted');
 		expect(result).toContain('Verdict: request changes. "Fix the scraper first."');
