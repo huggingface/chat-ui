@@ -199,7 +199,10 @@ export class MlSlackBot {
 			await this.receive(event, body.team_id, body.event_id);
 		});
 		this.app.event("message", async ({ event, body }) => {
-			if ("channel_type" in event && event.channel_type === "im")
+			if (
+				("channel_type" in event && event.channel_type === "im") ||
+				(await this.isOwnerFollowUp(event, body.team_id))
+			)
 				await this.receive(event, body.team_id, body.event_id);
 		});
 
@@ -540,6 +543,22 @@ export class MlSlackBot {
 		this.app.error(async () => {
 			logger.error("[slack] Could not handle a Slack event; no credentials or payload logged.");
 		});
+	}
+
+	/**
+	 * the owner's unmentioned replies in a bot thread act like chat messages: they steer a running
+	 * turn or start the next one. Mentions are left to app_mention so a message is handled once.
+	 */
+	private async isOwnerFollowUp(raw: unknown, teamId: string): Promise<boolean> {
+		const parsed = mention.safeParse(raw);
+		if (!parsed.success || teamId !== this.settings.teamId || !this.botUserId) return false;
+		const { channel, user, text, ts, thread_ts } = parsed.data;
+		if (!thread_ts || thread_ts === ts || text.includes(`<@${this.botUserId}>`)) return false;
+		const thread = await collections.slackThreads.findOne(
+			{ _id: threadKey(teamId, channel, thread_ts) },
+			{ projection: { owner: 1, deletedAt: 1 } }
+		);
+		return !!thread && !thread.deletedAt && thread.owner === user;
 	}
 
 	async receive(raw: unknown, teamId: string, eventId: string): Promise<void> {
@@ -1090,7 +1109,7 @@ export class MlSlackBot {
 		const status = question
 			? "⏳ Waiting for your answer"
 			: live.alive
-				? `${["🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛"][Math.floor(elapsed / (this.statusIntervalMs / 1000)) % 12]} ${state.status === "waiting" ? "Running" : "Working"} for ${duration}`
+				? `⏳ _working..._ · ${duration}`
 				: message.interrupted
 					? "⏹️ Stopped"
 					: state.status === "failed"

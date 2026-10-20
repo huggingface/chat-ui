@@ -73,7 +73,9 @@ vi.mock("@slack/bolt", () => ({
 			conversations: { info: mocks.channels, replies: mocks.replies, open: mocks.open },
 			chat: { postMessage: mocks.post, postEphemeral: mocks.ephemeral, update: mocks.update },
 		};
-		event() {}
+		event(name: string, handler: Handler) {
+			mocks.handlers.set(`event:${name}`, handler);
+		}
 		action(id: string, handler: Handler) {
 			mocks.handlers.set(id, handler);
 		}
@@ -632,6 +634,112 @@ describe("Slack transport authorization", () => {
 		expect(after?.contextThroughTs).toBe("102.0");
 		await collections.queuedInputs.deleteMany({ conversationId: thread.conversationId });
 		await collections.generations.deleteMany({ conversationId: thread.conversationId });
+	});
+
+	it("steers a running turn with the owner's unmentioned thread replies and shows working status", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		bot["botUserId"] = "UBOT";
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "<@UBOT> Start", ts: "100.0" },
+			"T123",
+			"start"
+		);
+		await collections.slackInputs.updateMany({}, { $set: { status: "done" } });
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		const messageId = crypto.randomUUID();
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			messages: [{ id: messageId, from: "assistant", content: "Working" }],
+		});
+		await collections.generations.insertOne({
+			_id: new ObjectId(),
+			generationId: crypto.randomUUID(),
+			conversationId: thread.conversationId,
+			messageId,
+			status: "running",
+			startedAt: new Date(),
+			lastHeartbeatAt: new Date(),
+		} as never);
+		await collections.turnStates.insertOne({
+			_id: new ObjectId(),
+			conversationId: thread.conversationId,
+			messageId,
+			producerId: crypto.randomUUID(),
+			status: "running",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+		const onMessage = mocks.handlers.get("event:message");
+		if (!onMessage) throw Error("No message handler");
+		const message = (event: Record<string, string>, id: string) =>
+			onMessage({
+				event: { channel: "C123", channel_type: "channel", ...event },
+				body: { team_id: "T123", event_id: id },
+			});
+
+		// Ignored: another participant, a top-level message, another thread, and a mention
+		// (app_mention delivers that one).
+		await message({ user: "OTHER", text: "Me too", ts: "101.0", thread_ts: "100.0" }, "e1");
+		await message({ user: "OWNER", text: "Unrelated", ts: "102.0" }, "e2");
+		await message({ user: "OWNER", text: "Elsewhere", ts: "103.0", thread_ts: "90.0" }, "e3");
+		await message(
+			{ user: "OWNER", text: "<@UBOT> mentioned", ts: "104.0", thread_ts: "100.0" },
+			"e4"
+		);
+		expect(await collections.slackInputs.countDocuments({ status: "queued" })).toBe(0);
+
+		await message(
+			{ user: "OWNER", text: "Use the 7B model", ts: "105.0", thread_ts: "100.0" },
+			"e5"
+		);
+		await bot["dispatch"](thread);
+		expect(mocks.run).not.toHaveBeenCalled();
+		const queued = await collections.queuedInputs
+			.find({ conversationId: thread.conversationId })
+			.toArray();
+		expect(queued).toHaveLength(1);
+		expect(queued[0].text).toContain("Use the 7B model");
+		expect(mocks.kickQueuedTurn).toHaveBeenCalledWith(thread.conversationId);
+
+		mocks.post.mockClear();
+		await bot["publish"](thread);
+		const card = mocks.post.mock.calls.find(([v]) => v.text.includes("Session status"));
+		expect(JSON.stringify(card?.[0].blocks)).toMatch(/⏳ _working\.\.\._ · \d+s/);
+		await collections.queuedInputs.deleteMany({ conversationId: thread.conversationId });
+		await collections.generations.deleteMany({ conversationId: thread.conversationId });
+		await collections.turnStates.deleteMany({ conversationId: thread.conversationId });
+	});
+
+	it("starts the next turn from the owner's unmentioned reply once the run is idle", async () => {
+		const { user } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		bot["botUserId"] = "UBOT";
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "<@UBOT> Start", ts: "100.0" },
+			"T123",
+			"start"
+		);
+		await collections.slackInputs.updateMany({}, { $set: { status: "done" } });
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		const onMessage = mocks.handlers.get("event:message");
+		if (!onMessage) throw Error("No message handler");
+		await onMessage({
+			event: {
+				channel: "C123",
+				channel_type: "channel",
+				user: "OWNER",
+				text: "Now evaluate it",
+				ts: "101.0",
+				thread_ts: "100.0",
+			},
+			body: { team_id: "T123", event_id: "idle" },
+		});
+		await bot["dispatch"](thread);
+		expect(mocks.run).toHaveBeenCalledTimes(1);
+		expect(mocks.run.mock.lastCall?.[2].text).toContain("Now evaluate it");
 	});
 
 	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {
