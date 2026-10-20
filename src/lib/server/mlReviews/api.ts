@@ -15,6 +15,7 @@ import { deliverReview, type DeliveryState } from "./delivery";
 export const REVIEW_MAX_COMMENTS_PER_RECORD = 20;
 export const REVIEW_MAX_COMMENT_CHARS = 2_000;
 export const REVIEW_MAX_COMMENTS = 200;
+export const NOTHING_DECIDED = "Approve, reject or answer at least one record before submitting.";
 /** records cap at 4 MB, so 8 MiB of drafts keeps the row under the 16 MiB mongo limit */
 export const REVIEW_MAX_DRAFT_BYTES = 8 * 1024 * 1024;
 const QUOTE_EXACT_CHARS = 2_000;
@@ -303,6 +304,10 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 
 	const found = blockers(review.schema, review.drafts, review.records.length);
 	if (found.length > 0) return { blockers: found };
+	const decided = Object.values(review.drafts).some(
+		(d) => d?.status === "answered" || d?.status === "discarded"
+	);
+	if (!decided) error(400, NOTHING_DECIDED);
 
 	const from = review.status;
 	if (!(await submitReview(review, { verdict, summary }, from))) {

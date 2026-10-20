@@ -213,8 +213,21 @@ export function reviewResultText(
 		`Verdict: ${VERDICT_TEXT[submission.verdict]}.${
 			submission.summary ? ` "${submission.summary}"` : ""
 		}`,
-		`Records: ${counts.answered} answered, ${counts.skipped} skipped, ${counts.discarded} discarded, ${counts.pending} not reviewed (of ${counts.total}).`,
+		review.schema.questions.length > 0
+			? `Records: ${counts.answered} answered, ${counts.skipped} skipped, ${counts.discarded} discarded, ${counts.pending} not reviewed (of ${counts.total}).`
+			: `Records: ${counts.answered} approved, ${counts.discarded} rejected, ${counts.skipped} skipped, ${counts.pending} not reviewed (of ${counts.total}).`,
 	];
+	// with no questions the status is the whole answer, a pane stores approve as answered
+	if (review.schema.questions.length === 0 && review.records.length <= REVIEW_INLINE_ANSWERS) {
+		const idsWith = (status: ReviewDraft["status"]) =>
+			review.records
+				.filter((_, index) => draftAt(review, index)?.status === status)
+				.map((r) => r.id);
+		const approved = idsWith("answered");
+		const rejected = idsWith("discarded");
+		if (approved.length) lines.push(`Approved: ${approved.join(", ")}`);
+		if (rejected.length) lines.push(`Rejected: ${rejected.join(", ")}`);
+	}
 
 	for (const question of review.schema.questions) {
 		const answers: ReviewAnswer[] = [];

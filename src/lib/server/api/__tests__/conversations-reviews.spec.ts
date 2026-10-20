@@ -554,6 +554,83 @@ describe.sequential("submitting", () => {
 		).toBe(55);
 	});
 
+	it("refuses a submit with no record approved, rejected or answered", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { mlAssistant: true });
+		const review = await createReview({
+			conversationId: conv._id,
+			messageId: "m",
+			toolCallId: "c",
+			toolUuid: "u",
+			elicitationId: crypto.randomUUID(),
+			schema: { ...SCHEMA, questions: [] },
+			schemaHash: "abcd1234",
+			source: { kind: "inline" },
+			records: [
+				{ id: "a", values: {} },
+				{ id: "b", values: {} },
+			],
+		});
+		const submit = () =>
+			errorOf(
+				SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }))
+			);
+		const nothing = {
+			status: 400,
+			message: "Approve, reject or answer at least one record before submitting.",
+		};
+
+		expect(await submit()).toEqual(nothing);
+		await PATCH(
+			event(locals, conv._id.toString(), review._id.toString(), {
+				index: 0,
+				draft: { status: "skipped", answers: {}, comments: [] },
+			})
+		);
+		expect(await submit()).toEqual(nothing);
+		expect((await collections.mlReviews.findOne({ _id: review._id }))?.status).toBe("open");
+		expect(await collections.mlFiles.countDocuments({ conversationId: conv._id })).toBe(0);
+	});
+
+	it("words a review with no questions as approved and rejected, listing the ids", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { mlAssistant: true });
+		const review = await createReview({
+			conversationId: conv._id,
+			messageId: "m",
+			toolCallId: "c",
+			toolUuid: "u",
+			elicitationId: crypto.randomUUID(),
+			schema: { ...SCHEMA, questions: [] },
+			schemaHash: "abcd1234",
+			source: { kind: "inline" },
+			records: ["a", "b", "c", "d"].map((id) => ({ id, values: {} })),
+		});
+		await collections.mlReviews.updateOne({ _id: review._id }, { $set: { status: "detached" } });
+		for (const [index, status] of ["answered", "discarded", "answered", "skipped"].entries()) {
+			await PATCH(
+				event(locals, conv._id.toString(), review._id.toString(), {
+					index,
+					draft: { status, answers: {}, comments: [] },
+				})
+			);
+		}
+
+		await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }));
+
+		const text = (await collections.mlReviews.findOne({ _id: review._id }))?.result?.text ?? "";
+		expect(text).toContain("Records: 2 approved, 1 rejected, 1 skipped, 0 not reviewed (of 4).");
+		expect(text).toContain("Approved: a, c\nRejected: b\n");
+		expect(text).not.toContain("Answers:");
+		const file = await collections.mlFiles.findOne({ conversationId: conv._id });
+		expect(
+			file?.content
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line).status)
+		).toEqual(["answered", "discarded", "answered", "skipped"]);
+	});
+
 	it("answers 400 with the blockers while a required question is open", async () => {
 		const { locals } = await createTestUser();
 		const { conv, review } = await seed(locals);
