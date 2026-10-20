@@ -21,6 +21,8 @@ export type Message = Partial<Timestamps> & {
 	 * generation events existed, which is how a reader tells the two apart.
 	 */
 	generationId?: string;
+	/** Original assistant turn continued by server-drained steering, not a fresh request. */
+	queuedContinuationOf?: string;
 	/**
 	 * Highest `generationEvents.seq` already folded into `content`/`reasoning`.
 	 * A reader resumes from here. Written in the same $set as the content it

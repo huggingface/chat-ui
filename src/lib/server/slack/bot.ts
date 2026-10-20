@@ -1115,11 +1115,20 @@ export class MlSlackBot {
 				actions.push({ id: RESUME_ACTION, label: "Retry", value: turnValue });
 			actions.push({ id: "ml_intern_trace", label: "Download trace", value: thread._id });
 		}
+		const original = message.queuedContinuationOf
+			? await collections.conversations.findOne(
+					{ _id: conv._id },
+					{
+						projection: { messages: { $elemMatch: { id: message.queuedContinuationOf } } },
+					}
+				)
+			: undefined;
+		const startedAt = original?.messages[0]?.createdAt ?? message.createdAt ?? state.createdAt;
 		const elapsed = Math.max(
 			0,
 			Math.floor(
 				((live.alive ? Date.now() : new Date(state.updatedAt).getTime()) -
-					new Date(message.createdAt ?? state.createdAt).getTime()) /
+					new Date(startedAt).getTime()) /
 					this.statusIntervalMs
 			) *
 				(this.statusIntervalMs / 1000)
@@ -1295,12 +1304,19 @@ export class MlSlackBot {
 	): Promise<void> {
 		const conv = await collections.conversations.findOne(
 			{ _id: thread.conversationId },
-			{ projection: { "messages.id": 1, "messages.from": 1, mlBudget: 1 } }
+			{
+				projection: {
+					"messages.id": 1,
+					"messages.from": 1,
+					"messages.queuedContinuationOf": 1,
+					mlBudget: 1,
+				},
+			}
 		);
 		const message = conv?.messages.at(-1);
 		if (message?.from !== "assistant") return;
-		// A fresh invocation gets a new assistant message; question continuations keep its ID.
-		const _id = `${thread._id}:status:${message.id}`;
+		// Steering may drain into a new assistant turn, but still belongs to the original card.
+		const _id = `${thread._id}:status:${message.queuedContinuationOf ?? message.id}`;
 		const delivery = await collections.slackDeliveries.findOne({ _id });
 		const budget = conv?.mlBudget;
 		const text = `**Session status**\n\n${status}\n💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;

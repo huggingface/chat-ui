@@ -1509,3 +1509,63 @@ describe("Slack btw side questions", () => {
 		expect(context.text).not.toContain("0.3");
 	});
 });
+
+it("reuses the original status card for queued continuations but not idle follow-ups", async () => {
+	const { user, locals } = await createTestUser();
+	const bot = new MlSlackBot(settings, user);
+	await bot.receive(
+		{ channel: "C123", user: "OWNER", text: "Start", ts: "100.0" },
+		"T123",
+		"STATUS"
+	);
+	const thread = await collections.slackThreads.findOne({});
+	if (!thread) throw Error("Missing thread");
+	const originalId = crypto.randomUUID();
+	const continuationId = crypto.randomUUID();
+	await createTestConversation(locals, {
+		_id: thread.conversationId,
+		messages: [{ id: originalId, from: "assistant", content: "Researching" }],
+	});
+	await bot["publishSessionStatus"](thread, "working", [
+		{ id: STOP_ACTION, label: "Stop assistant", value: originalId },
+	]);
+	const originalCard = mocks.post.mock.results[0];
+	const { ts } = await originalCard.value;
+	await collections.conversations.updateOne(
+		{ _id: thread.conversationId },
+		{
+			$push: {
+				messages: {
+					id: continuationId,
+					from: "assistant",
+					content: "Corrected",
+					queuedContinuationOf: originalId,
+				},
+			},
+		}
+	);
+	// A new bot instance proves the relationship survives process restarts.
+	const restarted = new MlSlackBot(settings, user);
+	await restarted["publishSessionStatus"](thread, "working", [
+		{ id: STOP_ACTION, label: "Stop assistant", value: continuationId },
+	]);
+	expect(mocks.post).toHaveBeenCalledTimes(1);
+	expect(mocks.update).toHaveBeenLastCalledWith(expect.objectContaining({ ts }));
+	expect(JSON.stringify(mocks.update.mock.lastCall?.[0].blocks)).toContain(continuationId);
+	await restarted["publishSessionStatus"](thread, "Finished", []);
+	expect(JSON.stringify(mocks.update.mock.lastCall?.[0].blocks)).not.toContain(STOP_ACTION);
+	await collections.conversations.updateOne(
+		{ _id: thread.conversationId },
+		{
+			$push: {
+				messages: {
+					id: crypto.randomUUID(),
+					from: "assistant",
+					content: "Fresh idle request",
+				},
+			},
+		}
+	);
+	await restarted["publishSessionStatus"](thread, "working", []);
+	expect(mocks.post).toHaveBeenCalledTimes(2);
+});

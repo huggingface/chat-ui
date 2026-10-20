@@ -437,6 +437,12 @@ export async function generateConversationResponse({
 	if (!messageToWriteTo) {
 		error(500, "Failed to create message");
 	}
+	if (queuedStart && messageId) {
+		const parent = conv.messages.find((message) => message.id === messageId);
+		if (parent?.from === "assistant") {
+			messageToWriteTo.queuedContinuationOf = parent.queuedContinuationOf ?? parent.id;
+		}
+	}
 	restoreRunningShape(messageToWriteTo);
 	if (messagesForPrompt.length === 0) {
 		error(500, "Failed to create prompt");
