@@ -33,6 +33,45 @@ export function draftStatus(
 	return done ? "answered" : "pending";
 }
 
+export type DraftCore = Pick<ReviewDraft, "status" | "answers" | "comments">;
+
+const sameValue = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/** this tab's changes since `base`, set or cleared answers, added or deleted comments, over theirs */
+export function mergeDraft(
+	schema: Pick<ReviewSchema, "questions">,
+	base: DraftCore | undefined,
+	ours: DraftCore,
+	theirs: DraftCore
+): DraftCore {
+	const was: DraftCore = base ?? { status: "pending", answers: {}, comments: [] };
+	const answers = { ...theirs.answers };
+	let answering = false;
+	for (const name of new Set([...Object.keys(ours.answers), ...Object.keys(was.answers)])) {
+		const mine = ours.answers[name];
+		if (sameValue(mine, was.answers[name])) continue;
+		answering = true;
+		if (mine === undefined) delete answers[name];
+		else answers[name] = mine;
+	}
+	const before = new Set(was.comments.map((comment) => comment.id));
+	const kept = new Set(ours.comments.map((comment) => comment.id));
+	const known = new Set(theirs.comments.map((comment) => comment.id));
+	const comments = [
+		...theirs.comments.filter((comment) => !before.has(comment.id) || kept.has(comment.id)),
+		...ours.comments.filter((comment) => !before.has(comment.id) && !known.has(comment.id)),
+	];
+	const moved = ours.status !== was.status;
+	const settled = ours.status === "skipped" || ours.status === "discarded";
+	const status =
+		moved && (settled || schema.questions.length === 0)
+			? ours.status
+			: schema.questions.length === 0
+				? theirs.status
+				: draftStatus(schema, answers, theirs.status, { answering });
+	return { status, answers, comments };
+}
+
 export function suggestionVisible(mode: ReviewSuggestionsMode, value: unknown): boolean {
 	if (mode === "none") return false;
 	if (mode === "after_answer") return isAnswered(value);

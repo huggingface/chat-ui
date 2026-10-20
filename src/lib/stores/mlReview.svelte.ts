@@ -15,7 +15,7 @@ import type {
 	ReviewVerdict,
 } from "$lib/types/MlReview";
 import { blockers, type ReviewBlocker } from "$lib/utils/review/answers";
-import { draftStatus } from "$lib/utils/review/view";
+import { draftStatus, mergeDraft } from "$lib/utils/review/view";
 import {
 	isDecided,
 	passFailQuestion,
@@ -160,6 +160,8 @@ export class ReviewSession {
 	/** by record position, the server revision the local copy builds on, 0 before the first save */
 	#revisions = new Map<number, number>();
 	#conflicts = new Map<number, number>();
+	/** the server copy each record's revision names, a conflict merges only what changed since */
+	#base = new Map<number, Pick<ReviewDraft, "status" | "answers" | "comments">>();
 	readonly #owner: MlReviewsStore;
 	readonly #epoch: number;
 
@@ -198,9 +200,15 @@ export class ReviewSession {
 			const payload = superjson.parse<ReviewPayload>(await res.text());
 			if (!this.#alive) return;
 			const drafts: Record<string, ReviewDraft> = { ...payload.drafts };
-			const dirty = new Set([...this.#timers.keys(), ...this.#inflight.keys()]);
+			const dirty = new Set([
+				...this.#timers.keys(),
+				...this.#inflight.keys(),
+				...this.saveErrors.keys(),
+			]);
 			for (const [key, draft] of Object.entries(payload.drafts)) {
-				if (!dirty.has(Number(key))) this.#revisions.set(Number(key), draft.revision ?? 0);
+				if (dirty.has(Number(key))) continue;
+				this.#revisions.set(Number(key), draft.revision ?? 0);
+				this.#base.set(Number(key), draft);
 			}
 			// an edit still waiting to be saved is newer than what the server holds
 			for (const index of dirty) {
@@ -333,13 +341,14 @@ export class ReviewSession {
 	async #send(index: number, keepalive: boolean): Promise<void> {
 		const draft = this.draft(index);
 		if (!draft) return;
+		const sent = {
+			status: draft.status,
+			answers: $state.snapshot(draft.answers),
+			comments: $state.snapshot(draft.comments),
+		};
 		const body = JSON.stringify({
 			index,
-			draft: {
-				status: draft.status,
-				answers: $state.snapshot(draft.answers),
-				comments: $state.snapshot(draft.comments),
-			},
+			draft: sent,
 			baseRevision: this.#revisions.get(index) ?? 0,
 		});
 		this.saving += 1;
@@ -350,10 +359,11 @@ export class ReviewSession {
 				body,
 				keepalive,
 			});
-			if (!this.#alive) return;
+			// a save still running after a conversation switch keeps its revision and retries
 			if (res.ok) {
 				const saved = await res.json().catch(() => null);
 				if (typeof saved?.revision === "number") this.#revisions.set(index, saved.revision);
+				this.#base.set(index, sent);
 				this.#conflicts.delete(index);
 				this.saveErrors.delete(index);
 				return;
@@ -363,6 +373,7 @@ export class ReviewSession {
 				this.#adoptConflict(index, parsed.draft as ReviewDraft | undefined, parsed);
 				return;
 			}
+			if (!this.#alive) return;
 			this.saveErrors.set(index, messageOf(parsed, "This draft did not save."));
 			// submitted from another tab or expired, show what the server holds
 			if (res.status === 409) void this.refresh();
@@ -374,34 +385,27 @@ export class ReviewSession {
 	}
 
 	/**
-	 * another tab saved this record first, both edits are kept, this tab winning a clash on the
-	 * same answer, then the merge is saved again on top of the other tab's revision
+	 * another tab saved this record first, only what this tab changed since its base copy lands on
+	 * top of theirs, then the merge is saved again on their revision
 	 */
 	#adoptConflict(index: number, theirs: ReviewDraft | undefined, body: unknown) {
 		const tries = (this.#conflicts.get(index) ?? 0) + 1;
 		this.#conflicts.set(index, tries);
 		if (tries > MAX_CONFLICT_RETRIES) {
-			this.saveErrors.set(index, messageOf(body, "This record keeps changing in another tab."));
+			if (this.#alive) {
+				this.saveErrors.set(index, messageOf(body, "This record keeps changing in another tab."));
+			}
 			return;
 		}
 		this.#revisions.set(index, theirs?.revision ?? 0);
 		const ours = this.draft(index);
 		if (theirs && ours && this.schema) {
-			const answers = { ...theirs.answers, ...ours.answers };
-			const known = new Set(theirs.comments.map((comment) => comment.id));
-			const settled = ours.status === "skipped" || ours.status === "discarded";
 			this.drafts[String(index)] = {
-				status: settled
-					? ours.status
-					: draftStatus(this.schema, answers, theirs.status, { answering: true }),
-				answers,
-				comments: [
-					...theirs.comments,
-					...ours.comments.filter((comment) => !known.has(comment.id)),
-				],
+				...mergeDraft(this.schema, this.#base.get(index), ours, theirs),
 				updatedAt: new Date(),
 			};
 		}
+		if (theirs) this.#base.set(index, theirs);
 		this.#again.add(index);
 	}
 

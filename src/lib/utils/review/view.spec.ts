@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewSchema } from "$lib/types/MlReview";
-import { draftStatus, findQuote, imageUrl, pick, quoteAt, suggestionVisible } from "./view";
+import {
+	draftStatus,
+	findQuote,
+	imageUrl,
+	mergeDraft,
+	pick,
+	quoteAt,
+	suggestionVisible,
+} from "./view";
 
 const schema = (required: boolean): Pick<ReviewSchema, "questions"> => ({
 	questions: [
@@ -79,4 +87,53 @@ it("turns hf:// images into public resolve URLs", () => {
 	);
 	expect(imageUrl("https://example.com/a.png")).toBe("https://example.com/a.png");
 	expect(imageUrl("hf://buckets/org")).toBeUndefined();
+});
+
+describe("mergeDraft", () => {
+	const schema = {
+		questions: [
+			{ name: "a", type: "boolean" as const, required: false },
+			{ name: "b", type: "boolean" as const, required: false },
+		],
+	};
+	const comment = (id: string) => ({ id, body: id, createdAt: new Date(0) });
+	const base = {
+		status: "answered" as const,
+		answers: { a: true, b: true },
+		comments: [comment("x")],
+	};
+
+	it("keeps the other tab's change to an answer this tab left alone", () => {
+		const ours = { ...base, answers: { a: true, b: false } };
+		const theirs = { ...base, answers: { a: false, b: true } };
+		expect(mergeDraft(schema, base, ours, theirs).answers).toEqual({ a: false, b: false });
+	});
+
+	it("clears an answer this tab cleared", () => {
+		const ours = { ...base, answers: { a: true } };
+		const theirs = { ...base, answers: { a: true, b: true } };
+		expect(mergeDraft(schema, base, ours, theirs).answers).toEqual({ a: true });
+	});
+
+	it("drops a comment this tab deleted and keeps both tabs' new ones", () => {
+		const ours = { ...base, comments: [comment("mine")] };
+		const theirs = { ...base, comments: [comment("x"), comment("theirs")] };
+		expect(mergeDraft(schema, base, ours, theirs).comments.map((c) => c.id)).toEqual([
+			"theirs",
+			"mine",
+		]);
+	});
+
+	it("keeps a status this tab set on a review with no questions", () => {
+		const none = { questions: [] };
+		const was = { status: "pending" as const, answers: {}, comments: [] };
+		const merged = mergeDraft(
+			none,
+			was,
+			{ ...was, status: "discarded" },
+			{ ...was, comments: [comment("t")] }
+		);
+		expect(merged.status).toBe("discarded");
+		expect(merged.comments).toHaveLength(1);
+	});
 });

@@ -454,6 +454,39 @@ describe("MlReviewPane", () => {
 			expect(server.patches[1].draft.answers).toEqual({ kind: "question" });
 		});
 
+		it("keeps a draft that failed to save when the review is refreshed", async () => {
+			const review = payload();
+			const { session, server } = await mount(review);
+			const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+				(init?.method ?? "GET") === "PATCH"
+					? new Response("{}", { status: 500 })
+					: new Response(superjson.stringify(review))
+			);
+			vi.stubGlobal("fetch", fetch);
+			await press("1");
+			await vi.waitFor(() => expect(session()?.saveErrors.size).toBe(1));
+			await session()?.refresh();
+			expect(session()?.draft(0)?.answers.kind).toBe("bug");
+			expect(server.patches).toHaveLength(0);
+		});
+
+		it("finishes a queued save on the right revision after a conversation switch", async () => {
+			const { container, server } = await mount(payload());
+			const kind = question(container, "kind") as HTMLElement;
+			server.hold();
+			button(kind, "bug").click();
+			await vi.waitFor(() => expect(server.patches).toHaveLength(1));
+			button(kind, "feature").click();
+			await tick();
+			mlReviews.reset();
+			server.release();
+			await vi.waitFor(() => expect(server.patches).toHaveLength(2));
+			expect(server.patches[1]).toMatchObject({
+				baseRevision: 1,
+				draft: { answers: { kind: "feature" } },
+			});
+		});
+
 		it("says why a draft did not save in the header, and retries", async () => {
 			const { container } = await mount(payload());
 			const limit = "This review's answers have reached the 8 MB limit.";
