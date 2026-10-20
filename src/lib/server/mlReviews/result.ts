@@ -8,7 +8,10 @@ import type {
 	ReviewAnswer,
 	ReviewComment,
 	ReviewDraft,
+	ReviewDatasetVia,
+	ReviewPush,
 	ReviewQuestion,
+	ReviewSource,
 } from "$lib/types/MlReview";
 import {
 	MessageReviewUpdateType,
@@ -16,6 +19,7 @@ import {
 	type MessageReviewResolvedUpdate,
 } from "$lib/types/MessageUpdate";
 import { isAnswered, recordStatus } from "$lib/utils/review/answers";
+import { destinationUrl, pushReviewLabels } from "./destination";
 
 /** the submit carries no verdict, so the model reads the annotations and the user decides */
 export const REVIEW_NEXT_STEPS =
@@ -71,6 +75,9 @@ export function reviewResolvedUpdate(
 		skipped: counts.skipped,
 		comments: counts.comments,
 		files: review.result?.files ?? [],
+		...(review.result?.pushed
+			? { pushed: { url: review.result.pushed.url, pr: review.result.pushed.pr } }
+			: {}),
 	};
 }
 
@@ -202,14 +209,79 @@ export function responseParts(lines: string[], maxBytes = ML_FILE_MAX_BYTES): st
 	return parts;
 }
 
+const count = (n: number) => n.toLocaleString("en-US");
+
+const READ_FROM: Record<ReviewDatasetVia, string> = {
+	viewer: "through the dataset viewer",
+	parquet: "from its Parquet files",
+	converted: "from the viewer's Parquet conversion",
+	jsonl: "from its JSONL files by range reads",
+	csv: "from its CSV files by range reads",
+	tsv: "from its TSV files by range reads",
+};
+
+/** names the path and revision read, so a next batch can match it */
+export function sourceLine(source: ReviewSource): string | undefined {
+	if (source.kind !== "dataset" && source.kind !== "parquet") return undefined;
+	const { sample } = source;
+	const at = source.revision
+		? ` at ${/^[0-9a-f]{40}$/.test(source.revision) ? source.revision.slice(0, 8) : source.revision}`
+		: "";
+	const from =
+		source.kind === "dataset"
+			? `${source.repo} ${source.config}/${source.split}, read ${READ_FROM[source.via]}${at}${source.partial ? " (it covers only the first part of this split)" : ""}`
+			: `${source.uri}${source.files.length > 1 ? ` (${source.files.length} files)` : ""}${at}`;
+	const of =
+		sample.total !== undefined
+			? `${count(sample.rows)} of ${count(sample.total)} rows`
+			: `${count(sample.rows)} rows${sample.bytes !== undefined ? ` of ${(sample.bytes / 1024 / 1024).toFixed(1)} MB` : ""}`;
+	const drawn =
+		sample.method === "head"
+			? `rows ${count(sample.offset ?? 0)}-${count((sample.offset ?? 0) + sample.rows - 1)}`
+			: sample.approximate
+				? `an approximate random sample, seed ${sample.seed}, lines picked at random byte offsets (biased toward lines after long ones)`
+				: sample.groups !== undefined
+					? `a random sample grouped inside ${sample.groups} random row group${sample.groups === 1 ? "" : "s"}, seed ${sample.seed}`
+					: `a random sample, seed ${sample.seed}, in ${sample.windows} window${sample.windows === 1 ? "" : "s"}`;
+	const filter = sample.where
+		? ` where ${sample.where}`
+		: sample.query
+			? ` matching "${sample.query}"`
+			: "";
+	const fellBack =
+		source.kind === "dataset" && source.viewerError
+			? ` The dataset viewer was not used: ${source.viewerError}.`
+			: "";
+	return `Source: ${of} of ${from}${filter}, ${drawn}.${fellBack}`;
+}
+
+export function pushLine(
+	destination: NonNullable<MlReview["destination"]>,
+	push: ReviewPush | undefined
+): string {
+	const where = `${destination.repo} (${push?.path ?? destination.path})`;
+	if (push?.status === "pushed") {
+		return push.pr
+			? `Labels pushed as a pull request on ${where}: ${push.url}`
+			: `Labels pushed to ${where}: ${push.url}`;
+	}
+	if (push?.status === "failed") {
+		return `Labels were NOT pushed to ${where}: ${push.error}. The answers are in the file below.`;
+	}
+	return `Labels are still being pushed to ${where}; check ${destinationUrl(destination)}.`;
+}
+
 export function reviewResultText(
 	review: MlReview,
 	submission: { note?: string },
-	files: MlFileRef[]
+	files: MlFileRef[],
+	push?: ReviewPush
 ): string {
 	const counts = reviewCounts(review);
+	const source = sourceLine(review.source);
 	const lines: string[] = [
 		`Review "${review.schema.title}" submitted (schema ${review.schemaHash}).`,
+		...(source ? [source] : []),
 		...(submission.note ? [`Note from the user: "${submission.note}"`] : []),
 		review.schema.questions.length > 0
 			? `Records: ${counts.answered} answered, ${counts.skipped} skipped, ${counts.discarded} discarded, ${counts.pending} not finished (of ${counts.total}).`
@@ -314,6 +386,7 @@ export function reviewResultText(
 		}
 	}
 
+	if (review.destination) lines.push(pushLine(review.destination, push));
 	lines.push(
 		files.length === 1
 			? `All answers: ${formatVirtualFileRef(files[0].name)} (version ${files[0].version})`
@@ -329,12 +402,9 @@ export function reviewResultText(
 export const reviewFileSource = (review: Pick<MlReview, "_id">) =>
 	`review:${review._id.toString()}`;
 
-/** the result of a claimed submission, built once and safe to repeat after a crash */
-export async function ensureReviewResult(
-	review: MlReview
-): Promise<NonNullable<MlReview["result"]>> {
-	if (review.result) return review.result;
-	const submission = { note: review.note ?? review.summary };
+/** found again by their source tag on a repeat */
+export async function ensureReviewFiles(review: MlReview): Promise<MlFileRef[]> {
+	if (review.result) return review.result.files;
 	const parts = responseParts(responseLines(review));
 	const base = `reviews/${reviewSlug(review.schema.title)}.responses`;
 	const source = reviewFileSource(review);
@@ -360,5 +430,24 @@ export async function ensureReviewResult(
 		});
 		files.push({ name: written.name, version: written.version });
 	}
-	return storeReviewResult(review, { text: reviewResultText(review, submission, files), files });
+	return files;
+}
+
+/** with a destination it pushes first, so it runs in the resume or the delivery and never the submit */
+export async function ensureReviewResult(
+	review: MlReview,
+	/** absent reads the owner last session, a resume or sweep has no request */
+	token?: string
+): Promise<NonNullable<MlReview["result"]>> {
+	if (review.result) return review.result;
+	const submission = { note: review.note ?? review.summary };
+	const files = await ensureReviewFiles(review);
+	const push = await pushReviewLabels(review, token);
+	return storeReviewResult(review, {
+		text: reviewResultText(review, submission, files, push),
+		files,
+		...(push?.status === "pushed" && push.url && push.path
+			? { pushed: { url: push.url, pr: push.pr === true, path: push.path } }
+			: {}),
+	});
 }

@@ -51,7 +51,7 @@ export function getEnabledBuiltinTools(params: {
 	return [
 		askUserQuestionBuiltin,
 		// its records and answers are virtual files, so it goes wherever they go
-		...(virtualFiles ? [createRequestReviewTool(params.conv)] : []),
+		...(virtualFiles ? [createRequestReviewTool(params.conv, () => params.hfToken)] : []),
 		createPlanTool(params.conv),
 		createWaitTool({ serviceEvents: mlServiceEventsEnabled() }),
 		...githubGroundingBuiltins(params.conv._id),

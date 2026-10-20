@@ -340,4 +340,6 @@ export interface MessageReviewResolvedUpdate {
 	skipped: number;
 	comments: number;
 	files: MlFileRef[];
+	/** set when the labels were written back to the hub */
+	pushed?: { url: string; pr: boolean };
 }

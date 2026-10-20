@@ -2,6 +2,7 @@ import { ObjectId, type Filter } from "mongodb";
 import { collections } from "$lib/server/database";
 import type {
 	MlReview,
+	ReviewDestination,
 	ReviewDraft,
 	ReviewRecord,
 	ReviewSchema,
@@ -25,6 +26,7 @@ export async function createReview(params: {
 	schemaHash: string;
 	source: ReviewSource;
 	records: ReviewRecord[];
+	destination?: ReviewDestination;
 }): Promise<MlReview> {
 	const now = new Date();
 	const review: MlReview = {
@@ -119,6 +121,8 @@ export async function submitReview(
 		note?: string;
 		/** drafts written in the same update as the claim, keyed by record position */
 		drafts?: Record<string, ReviewDraft>;
+		/** null drops the destination, absent keeps it */
+		destination?: ReviewDestination | null;
 	},
 	from: MlReview["status"] = "open"
 ): Promise<boolean> {
@@ -134,7 +138,9 @@ export async function submitReview(
 			draftRevision: review.draftRevision,
 		},
 		{
+			...(submission.destination === null ? { $unset: { destination: "" } } : {}),
 			$set: {
+				...(submission.destination ? { destination: submission.destination } : {}),
 				status: "submitted",
 				...(submission.note ? { note: submission.note } : {}),
 				...(from === "open"

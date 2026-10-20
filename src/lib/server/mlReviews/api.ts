@@ -5,7 +5,7 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { logger } from "$lib/server/logger";
 import { kickAnsweredAsk, type AskResumeSelection } from "$lib/server/generation/askResume";
-import type { MlReview, ReviewDraft } from "$lib/types/MlReview";
+import type { MlReview, ReviewDestination, ReviewDraft } from "$lib/types/MlReview";
 import {
 	invalidAnswers,
 	isAnswered,
@@ -17,6 +17,8 @@ import { readReview, saveDraft, saveDraftsGuarded, submitReview } from "./store"
 import { completeSubmission } from "./submission";
 import { deliverReview, type DeliveryState } from "./delivery";
 import { REVIEW_MAX_RECORDS } from "$lib/server/textGeneration/builtinTools/requestReviewDefinition";
+import { parseDestination } from "./destination";
+import { reviewSlug } from "./result";
 
 export const REVIEW_MAX_COMMENTS_PER_RECORD = REVIEW_LIMITS.commentsPerRecord;
 export const REVIEW_MAX_COMMENT_CHARS = REVIEW_LIMITS.commentChars;
@@ -56,6 +58,18 @@ export function reviewPayload(review: MlReview) {
 		...((review.note ?? review.summary) ? { note: review.note ?? review.summary } : {}),
 		...(review.result ? { result: review.result } : {}),
 		...(review.submitFailure?.gaveUp ? { submitFailed: review.submitFailure.error } : {}),
+		...(review.destination ? { destination: review.destination } : {}),
+		...(review.push
+			? {
+					push: {
+						status: review.push.status,
+						...(review.push.url ? { url: review.push.url } : {}),
+						...(review.push.path ? { path: review.push.path } : {}),
+						...(review.push.pr !== undefined ? { pr: review.push.pr } : {}),
+						...(review.push.error ? { error: review.push.error } : {}),
+					},
+				}
+			: {}),
 		...(review.delivery
 			? {
 					delivery: {
@@ -416,6 +430,8 @@ export const submitBodySchema = z.object({
 	selection: selectionSchema,
 	/** marks every record still undecided ok, so marking all is one request at 500 records */
 	approveRest: z.boolean().optional(),
+	/** null pushes nothing, absent keeps the destination the model gave */
+	destination: z.unknown().optional(),
 });
 
 /** mirrors the pane, a record is answered once its required questions are, or any when none is */
@@ -495,18 +511,30 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 		return finish(review, selection);
 	}
 
+	let destination: ReviewDestination | null | undefined;
+	if (parsed.data.destination === null) destination = null;
+	else if (parsed.data.destination !== undefined) {
+		const given = parseDestination(
+			parsed.data.destination,
+			review.destination?.path ?? `data/${reviewSlug(review.schema.title)}.parquet`
+		);
+		if ("error" in given) error(400, given.error);
+		destination = given;
+	}
+
 	const approved = parsed.data.approveRest ? approvalsForRest(review) : {};
 	const drafts = { ...review.drafts, ...approved };
 	const found = invalidAnswers(review.schema, drafts, review.records.length);
 	if (found.length > 0) return { blockers: found };
 
 	const from = review.status;
-	if (!(await submitReview(review, { note, drafts: approved }, from))) {
+	if (!(await submitReview(review, { note, drafts: approved, destination }, from))) {
 		error(409, "This review changed while it was being submitted, reload it and submit again.");
 	}
 	const claimed: MlReview = {
 		...review,
 		drafts,
+		destination: destination === null ? undefined : (destination ?? review.destination),
 		status: "submitted",
 		...(note ? { note } : {}),
 		...(from === "open" ? { unresolved: true as const } : {}),
@@ -519,15 +547,22 @@ async function finish(
 	review: MlReview,
 	selection: z.infer<typeof selectionSchema>
 ): Promise<SubmitOutcome> {
-	const { result, resolved } = await completeSubmission(review);
+	const { files, resolved } = await completeSubmission(review);
 	if (resolved) {
 		await resume(review, selection);
-		return { ok: true, files: result.files };
+		return { ok: true, files };
 	}
 	// a detached turn moved on, or a message sent meanwhile closed the call, so post it as one
+	if (review.destination) {
+		// its message carries the push link and a commit can take a minute
+		deliverReview(review._id, toResumeSelection(selection)).catch((err) =>
+			logger.error({ err, reviewId: review._id.toString() }, "[review] delivery failed")
+		);
+		return { ok: true, files, delivery: "queued" };
+	}
 	return {
 		ok: true,
-		files: result.files,
+		files,
 		delivery: await deliverReview(review._id, toResumeSelection(selection)),
 	};
 }

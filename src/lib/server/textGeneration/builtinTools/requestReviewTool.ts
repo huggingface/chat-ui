@@ -8,9 +8,12 @@ import { readMlFile } from "$lib/server/mlFiles";
 import { turnAwaitingInput } from "$lib/server/generation/turnState";
 import { createReview } from "$lib/server/mlReviews/store";
 import { loadRecords, parseFileSource, parseRecordsInput } from "$lib/server/mlReviews/source";
+import { loadTable, type TableInput } from "$lib/server/mlReviews/tableSource";
+import { parseDestination } from "$lib/server/mlReviews/destination";
+import { reviewSlug } from "$lib/server/mlReviews/result";
 import { recordsFromTabular } from "$lib/server/mlReviews/tabular";
 import type { ElicitationRequestPayload } from "$lib/types/McpElicitation";
-import type { ReviewSource } from "$lib/types/MlReview";
+import type { ReviewDestination, ReviewRecord, ReviewSource } from "$lib/types/MlReview";
 import { MessageReviewUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { parseReviewSchema } from "$lib/utils/review/schema";
 import { compileRecordValidator } from "$lib/utils/review/records";
@@ -35,9 +38,14 @@ const describeSource = (source: ReviewSource): string =>
 		? `${source.name} v${source.version}`
 		: source.kind === "sandbox"
 			? `${source.handle}:${source.path}`
-			: source.kind === "hub"
+			: source.kind === "hub" || source.kind === "parquet"
 				? source.uri
-				: "source.records";
+				: source.kind === "dataset"
+					? source.repo
+					: "source.records";
+
+const isTableInput = (input: object): input is TableInput =>
+	"dataset" in input || "parquet" in input;
 
 const refuse = (problem: string): BuiltinToolResult => ({
 	error: `${REQUEST_REVIEW_TOOL_NAME} was not shown: ${problem}`,
@@ -93,7 +101,8 @@ async function requestReview(
 	conv: Pick<Conversation, "_id">,
 	args: Record<string, unknown>,
 	ctx: BuiltinToolContext,
-	deps: NestedAgentDeps | undefined
+	deps: NestedAgentDeps | undefined,
+	token: () => string | undefined
 ): Promise<BuiltinToolResult> {
 	// the sink, not messageId, a sub agent run has a messageId and no pane
 	const sink = ctx.elicitationSink;
@@ -101,30 +110,72 @@ async function requestReview(
 
 	const declared = await declaration(conv._id, args);
 	if ("error" in declared) return refuse(declared.error);
-	const schema = parseReviewSchema(declared.value);
-	if (!schema.ok) return refuse(schema.error);
-
 	const input = parseRecordsInput(args.source);
 	if ("error" in input) return refuse(input.error);
-	const loaded = await loadRecords(input, {
-		conversationId: conv._id,
-		hubServer: deps?.servers.find((server) => isHfMcpServer(server.url)),
-		signal: ctx.abortSignal,
-	});
-	if (!loaded.ok) return refuse(loaded.error);
-	const tabular = loaded.table
-		? recordsFromTabular(schema.schema, loaded.table, describeSource(loaded.source))
-		: undefined;
-	if (tabular && "error" in tabular) return refuse(tabular.error);
-	const validated = compileRecordValidator(schema.schema)(tabular?.records ?? loaded.records);
-	if (!validated.ok) {
-		return refuse(
-			`the records do not match the declared fields. Fix these and call again:\n${validated.errors.join("\n")}`
-		);
+	const table = isTableInput(input) ? input : undefined;
+
+	let destination: ReviewDestination | undefined;
+	if (args.destination !== undefined && args.destination !== null) {
+		const title = typeof declared.value.title === "string" ? declared.value.title : "review";
+		const parsed = parseDestination(args.destination, `data/${reviewSlug(title)}.parquet`);
+		if ("error" in parsed) return refuse(parsed.error);
+		destination = parsed;
+	}
+
+	// a table source may leave the fields to the dataset column types
+	let schema =
+		!table || declared.value.fields !== undefined ? parseReviewSchema(declared.value) : undefined;
+	if (schema && !schema.ok) return refuse(schema.error);
+
+	let records: ReviewRecord[];
+	let source: ReviewSource;
+	if (table) {
+		const idField = declared.value.id_field;
+		const loaded = await loadTable(table, {
+			...(schema?.ok ? { fields: schema.schema.fields } : {}),
+			...(typeof idField === "string" && idField.trim() ? { idField: idField.trim() } : {}),
+			access: { token: token(), signal: ctx.abortSignal },
+		});
+		if (!loaded.ok) return refuse(ctx.abortSignal?.aborted ? "Aborted by user" : loaded.error);
+		if (!schema) schema = parseReviewSchema({ ...declared.value, fields: loaded.fields });
+		if (!schema.ok) return refuse(schema.error);
+		const validated = compileRecordValidator(schema.schema)(loaded.records);
+		if (!validated.ok) {
+			return refuse(
+				`the rows do not match the declared fields. Fix these and call again:\n${validated.errors.join("\n")}`
+			);
+		}
+		records = validated.records.map((record, i) => ({
+			...record,
+			origin: loaded.origins[i],
+			...(loaded.media.length ? { media: loaded.media } : {}),
+		}));
+		source = loaded.source;
+	} else {
+		if (!schema?.ok) return refuse("the fields could not be read");
+		if (isTableInput(input)) return refuse("the source could not be read");
+		const loaded = await loadRecords(input, {
+			conversationId: conv._id,
+			hubServer: deps?.servers.find((server) => isHfMcpServer(server.url)),
+			signal: ctx.abortSignal,
+		});
+		if (!loaded.ok) return refuse(loaded.error);
+		const tabular = loaded.table
+			? recordsFromTabular(schema.schema, loaded.table, describeSource(loaded.source))
+			: undefined;
+		if (tabular && "error" in tabular) return refuse(tabular.error);
+		const validated = compileRecordValidator(schema.schema)(tabular?.records ?? loaded.records);
+		if (!validated.ok) {
+			return refuse(
+				`the records do not match the declared fields. Fix these and call again:\n${validated.errors.join("\n")}`
+			);
+		}
+		records = validated.records;
+		source = loaded.source;
 	}
 
 	// the row also holds up to 8 MiB of drafts, so the records are measured as stored, not as read
-	const storedBytes = BSON.calculateObjectSize({ records: validated.records });
+	const storedBytes = BSON.calculateObjectSize({ records });
 	if (storedBytes > REVIEW_MAX_BYTES) {
 		return refuse(
 			`the records take ${(storedBytes / 1024 / 1024).toFixed(1)} MB once stored; a review holds at most ${
@@ -142,8 +193,9 @@ async function requestReview(
 		elicitationId,
 		schema: schema.schema,
 		schemaHash: await reviewSchemaHash(schema.schema),
-		source: loaded.source,
-		records: validated.records,
+		source,
+		records,
+		...(destination ? { destination } : {}),
 	});
 	const reviewId = review._id.toString();
 
@@ -186,7 +238,7 @@ async function requestReview(
 		reviewId,
 		toolUuid: ctx.uuid,
 		title: schema.schema.title,
-		records: validated.records.length,
+		records: records.length,
 		questions: schema.schema.questions.length,
 		mode: schema.schema.questions.some((question) => question.required) ? "label" : "review",
 	});
@@ -204,7 +256,11 @@ async function requestReview(
 }
 
 /** bound like import_file, the hub server that reads a sandbox or hf:// source is per turn */
-export function createRequestReviewTool(conv: Pick<Conversation, "_id">): NestedAgentBuiltinTool {
+export function createRequestReviewTool(
+	conv: Pick<Conversation, "_id">,
+	/** the user hub token, a dataset or parquet source is read with it */
+	token: () => string | undefined = () => undefined
+): NestedAgentBuiltinTool {
 	let deps: NestedAgentDeps | undefined;
 	return {
 		name: REQUEST_REVIEW_TOOL_NAME,
@@ -216,6 +272,6 @@ export function createRequestReviewTool(conv: Pick<Conversation, "_id">): Nested
 		bind(next: NestedAgentDeps) {
 			deps = next;
 		},
-		execute: (args, ctx) => requestReview(conv, args, ctx, deps),
+		execute: (args, ctx) => requestReview(conv, args, ctx, deps, token),
 	};
 }

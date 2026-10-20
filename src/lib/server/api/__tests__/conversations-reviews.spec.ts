@@ -19,6 +19,14 @@ vi.mock("$lib/server/mlReviews/delivery", () => ({
 	deliverReview,
 	sweepReviewDeliveries: vi.fn(),
 }));
+vi.mock("@huggingface/hub", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@huggingface/hub")>()),
+	commit: vi.fn(async () => ({
+		commit: { oid: "abc123", url: "https://huggingface.co/datasets/pngwn/gold/commit/abc123" },
+		hookOutput: "",
+	})),
+	fileExists: vi.fn(async () => false),
+}));
 vi.mock("$lib/server/logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
@@ -31,6 +39,10 @@ const { finishStoredSubmissions } = await import("$lib/server/mlReviews/submissi
 const { submitReview } = await import("$lib/server/mlReviews/store");
 const { POST: SUBMIT } =
 	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/submit/+server");
+const { GET: MEDIA } =
+	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/media/[index]/[field]/+server");
+const hub = await import("@huggingface/hub");
+const { resumeParkedToolCall } = await import("$lib/server/mcp/resumeElicitation");
 
 const SCHEMA: ReviewSchema = {
 	title: "Triage batch 1",
@@ -1293,5 +1305,155 @@ describe.sequential("submitting", () => {
 		expect(files.flatMap((f) => f.content.trim().split("\n"))).toHaveLength(100);
 		expect(body.text).toContain("All answers, in 2 parts:");
 		expect(body.text).not.toContain("Answers:");
+	});
+});
+
+describe.sequential("writing labels back", () => {
+	const answerBoth = async (locals: App.Locals, conv: Conversation, review: MlReview) => {
+		for (const index of [0, 1]) {
+			await PATCH(
+				event(locals, conv._id.toString(), review._id.toString(), {
+					index,
+					draft: draft({ kind: "bug" }),
+				})
+			);
+		}
+	};
+
+	it("answers the submit before the push, which the resume makes with the owner's sign in", async () => {
+		vi.mocked(hub.commit).mockClear();
+		const { locals, user } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{
+				$set: {
+					destination: { repo: "pngwn/gold", type: "dataset", path: "data/a.parquet", pr: false },
+				},
+			}
+		);
+		await answerBoth(locals, conv, review);
+
+		const res = await SUBMIT(
+			event(locals, conv._id.toString(), review._id.toString(), {
+				verdict: "approve",
+				destination: { repo: "pngwn/gold", path: "data/b.parquet" },
+			})
+		);
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({
+			ok: true,
+			files: [{ name: "reviews/triage-batch-1.responses.jsonl", version: 1 }],
+		});
+		expect(hub.commit).not.toHaveBeenCalled();
+		const submitted = await collections.mlReviews.findOne({ _id: review._id });
+		expect(submitted?.destination?.path).toBe("data/b.parquet");
+		expect(submitted?.result).toBeUndefined();
+		expect(submitted?.push).toBeUndefined();
+
+		await collections.sessions.updateOne(
+			{ userId: user._id },
+			{ $set: { oauth: { token: { value: "hf_owner" } } } as never }
+		);
+		const { updates } = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: review.elicitationId,
+		});
+		expect(vi.mocked(hub.commit).mock.calls[0][0]).toMatchObject({
+			accessToken: "hf_owner",
+			operations: [{ path: "data/b.parquet" }],
+		});
+		expect(JSON.stringify(updates)).toContain("Labels pushed to pngwn/gold (data/b.parquet)");
+		expect(updates).toContainEqual(
+			expect.objectContaining({
+				reviewId: review._id.toString(),
+				pushed: {
+					url: "https://huggingface.co/datasets/pngwn/gold/commit/abc123",
+					pr: false,
+				},
+			})
+		);
+
+		const payload = superjson.parse<Record<string, unknown>>(
+			await (await GET(event(locals, conv._id.toString(), review._id.toString()))).text()
+		);
+		expect(payload).toMatchObject({
+			destination: { repo: "pngwn/gold", path: "data/b.parquet" },
+			push: { status: "pushed", path: "data/b.parquet", pr: false },
+		});
+	});
+
+	it("leaves a detached review's push to its delivery, in the background", async () => {
+		vi.mocked(hub.commit).mockClear();
+		deliverReview.mockClear();
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{
+				$set: {
+					status: "detached",
+					destination: { repo: "pngwn/gold", type: "dataset", path: "data/a.parquet", pr: false },
+				},
+			}
+		);
+		await answerBoth(locals, conv, review);
+		const res = await SUBMIT(
+			event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+		);
+		expect(await res.json()).toMatchObject({ ok: true, delivery: "queued" });
+		expect(deliverReview).toHaveBeenCalledWith(review._id, expect.anything());
+		expect(hub.commit).not.toHaveBeenCalled();
+	});
+
+	it("pushes nothing when the user clears the destination, and refuses a bad one", async () => {
+		vi.mocked(hub.commit).mockClear();
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{
+				$set: {
+					destination: { repo: "pngwn/gold", type: "dataset", path: "data/a.parquet", pr: false },
+				},
+			}
+		);
+		await answerBoth(locals, conv, review);
+		expect(
+			await errorOf(
+				SUBMIT(
+					event(locals, conv._id.toString(), review._id.toString(), {
+						verdict: "approve",
+						destination: { repo: "pngwn/gold", path: "/etc/x.parquet" },
+					})
+				)
+			)
+		).toMatchObject({ status: 400, message: expect.stringContaining("destination.path") });
+
+		await SUBMIT(
+			event(locals, conv._id.toString(), review._id.toString(), {
+				verdict: "approve",
+				destination: null,
+			})
+		);
+		const stored = await collections.mlReviews.findOne({ _id: review._id });
+		expect(stored?.destination).toBeUndefined();
+		expect(stored?.push).toBeUndefined();
+		expect(hub.commit).not.toHaveBeenCalled();
+	});
+
+	it("serves media to the owner only", async () => {
+		const { locals: owner } = await createTestUser();
+		const { locals: other } = await createTestUser();
+		const { conv, review } = await seed(owner);
+		const media = (locals: App.Locals, index: string, field: string) =>
+			MEDIA({
+				locals,
+				params: { id: conv._id.toString(), reviewId: review._id.toString(), index, field },
+				request: new Request("http://localhost/media"),
+			} as never);
+		expect(await statusOf(media(other, "0", "body"))).toBe(404);
+		expect(await statusOf(media(owner, "0", "body"))).toBe(404);
+		expect(await statusOf(media(owner, "9", "body"))).toBe(404);
 	});
 });

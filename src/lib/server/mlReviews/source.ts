@@ -11,6 +11,7 @@ import {
 } from "$lib/server/mlFiles/remoteRead";
 import type { ReviewSource } from "$lib/types/MlReview";
 import { parseDelimited, tabularFormat, type TabularRows } from "./tabular";
+import { parseTableInput, type TableInput } from "./tableSource";
 import {
 	REVIEW_MAX_BYTES,
 	REVIEW_MAX_INLINE_CHARS,
@@ -29,6 +30,9 @@ export type RecordsInput =
 	| { sandbox: { handle: string; path: string } }
 	| { hub: string };
 
+const SOURCE_KEYS = ["records", "file", "sandbox", "hub", "dataset", "parquet"] as const;
+const SOURCE_KEY_LIST = "records, file, sandbox, hub, dataset or parquet";
+
 export type LoadedRecords =
 	| {
 			ok: true;
@@ -42,14 +46,14 @@ export type LoadedRecords =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 
-export function parseRecordsInput(source: unknown): RecordsInput | { error: string } {
+export function parseRecordsInput(source: unknown): RecordsInput | TableInput | { error: string } {
 	if (!isRecord(source)) {
-		return { error: "source must be an object with one of records, file, sandbox or hub" };
+		return { error: `source must be an object with one of ${SOURCE_KEY_LIST}` };
 	}
-	const given = ["records", "file", "sandbox", "hub"].filter((key) => source[key] !== undefined);
+	const given = SOURCE_KEYS.filter((key) => source[key] !== undefined);
 	if (given.length !== 1) {
 		return {
-			error: `source must have exactly one of records, file, sandbox or hub, got ${
+			error: `source must have exactly one of ${SOURCE_KEY_LIST}, got ${
 				given.length === 0 ? "none" : given.join(", ")
 			}`,
 		};
@@ -57,6 +61,9 @@ export function parseRecordsInput(source: unknown): RecordsInput | { error: stri
 	const [key] = given;
 	const value = source[key];
 	switch (key) {
+		case "dataset":
+		case "parquet":
+			return parseTableInput(key, value);
 		case "records":
 			return Array.isArray(value) ? { records: value } : { error: "source.records must be a list" };
 		case "file":
@@ -71,7 +78,7 @@ export function parseRecordsInput(source: unknown): RecordsInput | { error: stri
 				value.path.trim()
 				? { sandbox: { handle: value.handle.trim(), path: value.path.trim() } }
 				: { error: 'source.sandbox must be {"handle", "path"}' };
-		default:
+		case "hub":
 			return typeof value === "string" && /^hf:\/\/\S+$/.test(value.trim())
 				? { hub: value.trim() }
 				: { error: "source.hub must be an hf:// file URI" };
