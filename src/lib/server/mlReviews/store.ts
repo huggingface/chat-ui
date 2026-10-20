@@ -103,7 +103,9 @@ export async function submitReview(
 				status: "submitted",
 				verdict: submission.verdict,
 				...(submission.summary ? { summary: submission.summary } : {}),
-				...(from === "open" ? { unresolved: true as const } : {}),
+				...(from === "open"
+					? { unresolved: true as const }
+					: { delivery: { status: "pending" as const, attempts: 0 } }),
 				submittedAt: now,
 				updatedAt: now,
 			},
@@ -151,6 +153,14 @@ export async function resolveSubmittedReview(
 		}
 	);
 	return updated.matchedCount === 1;
+}
+
+/** a claimed submission whose parked call was closed meanwhile goes out as a message instead */
+export async function queueDelivery(review: Pick<MlReview, "_id">): Promise<void> {
+	await collections.mlReviews.updateOne(
+		{ _id: review._id, status: "submitted", delivery: { $exists: false } },
+		{ $set: { delivery: { status: "pending", attempts: 0 }, updatedAt: new Date() } }
+	);
 }
 
 export async function clearUnresolved(review: Pick<MlReview, "_id">): Promise<void> {

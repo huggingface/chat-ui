@@ -454,6 +454,12 @@ export class Database {
 		mlReviews
 			.createIndex({ submittedAt: 1 }, { partialFilterExpression: { unresolved: true } })
 			.catch((e) => logger.error(e, "Error creating index for mlReviews by unresolved submit"));
+		mlReviews
+			.createIndex(
+				{ "delivery.status": 1, "delivery.takenAt": 1 },
+				{ partialFilterExpression: { "delivery.status": { $in: ["pending", "sending"] } } }
+			)
+			.catch((e) => logger.error(e, "Error creating index for mlReviews by delivery"));
 		mlSessionLabels
 			.createIndex({ reconcileAt: 1 })
 			.catch((e) => logger.error(e, "Error creating index for mlSessionLabels by due time"));

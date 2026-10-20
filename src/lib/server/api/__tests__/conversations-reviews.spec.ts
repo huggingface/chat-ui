@@ -14,6 +14,11 @@ import {
 	createTestUser,
 } from "./testHelpers";
 
+const deliverReview = vi.hoisted(() => vi.fn(async () => "sent" as const));
+vi.mock("$lib/server/mlReviews/delivery", () => ({
+	deliverReview,
+	sweepReviewDeliveries: vi.fn(),
+}));
 vi.mock("$lib/server/logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
@@ -497,7 +502,7 @@ describe.sequential("submitting", () => {
 		expect((await collections.mlReviews.findOne({ _id: review._id }))?.status).toBe("open");
 	});
 
-	it("hands a detached review back as a message to send, resolving nothing", async () => {
+	it("posts a detached review through the server delivery, resolving nothing", async () => {
 		const { locals } = await createTestUser();
 		const { conv, review } = await seed(locals);
 		await collections.mcpElicitations.updateOne(
@@ -522,8 +527,12 @@ describe.sequential("submitting", () => {
 		);
 
 		expect(res.status).toBe(200);
-		const body = await res.json();
-		expect(body.deliverAsMessage).toBe(true);
+		const outcome = await res.json();
+		expect(outcome).toMatchObject({ ok: true, delivery: "sent" });
+		expect(deliverReview).toHaveBeenCalledWith(review._id, {});
+		const body = {
+			text: (await collections.mlReviews.findOne({ _id: review._id }))?.result?.text ?? "",
+		};
 		expect(body.text).toContain('Review "Triage batch 1" submitted (schema 3f2a91c0).');
 		expect(body.text).toContain('Verdict: comment. "Mostly fine."');
 		expect(body.text).toContain(
@@ -640,11 +649,10 @@ describe.sequential("submitting", () => {
 			}
 		);
 
-		const body = await (
-			await SUBMIT(
-				event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
-			)
-		).json();
+		await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }));
+		const body = {
+			text: (await collections.mlReviews.findOne({ _id: review._id }))?.result?.text ?? "",
+		};
 
 		const files = await collections.mlFiles.find({ conversationId: conv._id }).toArray();
 		expect(files.map((f) => f.name).sort()).toEqual([

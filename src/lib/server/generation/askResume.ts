@@ -20,6 +20,7 @@ import {
 } from "$lib/server/mcp/elicitation";
 import { resumeParkedToolCall } from "$lib/server/mcp/resumeElicitation";
 import { finishStoredSubmissions } from "$lib/server/mlReviews/submission";
+import { sweepReviewDeliveries } from "$lib/server/mlReviews/delivery";
 import {
 	MessageElicitationUpdateType,
 	MessageToolUpdateType,
@@ -556,6 +557,9 @@ export async function settleAnsweredAsks(
 export async function sweepAnsweredAsks(): Promise<void> {
 	await finishStoredSubmissions().catch((err) =>
 		logger.error({ err }, "[review] could not finish stored submissions")
+	);
+	await sweepReviewDeliveries().catch((err) =>
+		logger.error({ err }, "[review] could not sweep review deliveries")
 	);
 	for (const kind of SERVER_RESUMED_KINDS) await sweepAnswered(kind);
 }

@@ -10,6 +10,7 @@ import { blockers, validateAnswer, type ReviewBlocker } from "$lib/utils/review/
 import { REVIEW_LIMITS } from "$lib/utils/review/schema";
 import { readReview, saveDraft, submitReview } from "./store";
 import { completeSubmission } from "./submission";
+import { deliverReview, type DeliveryState } from "./delivery";
 
 export const REVIEW_MAX_COMMENTS_PER_RECORD = 20;
 export const REVIEW_MAX_COMMENT_CHARS = 2_000;
@@ -49,6 +50,14 @@ export function reviewPayload(review: MlReview) {
 		...(review.verdict ? { verdict: review.verdict } : {}),
 		...(review.summary ? { summary: review.summary } : {}),
 		...(review.result ? { result: review.result } : {}),
+		...(review.delivery
+			? {
+					delivery: {
+						status: review.delivery.status,
+						...(review.delivery.messageId ? { messageId: review.delivery.messageId } : {}),
+					},
+				}
+			: {}),
 		createdAt: review.createdAt,
 		updatedAt: review.updatedAt,
 	};
@@ -221,8 +230,12 @@ function toResumeSelection(selection: z.infer<typeof selectionSchema>): AskResum
 }
 
 export type SubmitOutcome =
-	| { ok: true; files: NonNullable<MlReview["result"]>["files"] }
-	| { deliverAsMessage: true; text: string }
+	| {
+			ok: true;
+			files: NonNullable<MlReview["result"]>["files"];
+			/** set when the turn had moved on and the submission goes out as the next user message */
+			delivery?: DeliveryState;
+	  }
 	| { blockers: ReviewBlocker[] };
 
 export async function submitReviewRequest(review: MlReview, body: unknown): Promise<SubmitOutcome> {
@@ -233,12 +246,9 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 	const summary = parsed.data.summary || undefined;
 
 	if (review.status === "submitted") {
-		// a submit whose process died before answering the parked call is finished by the retry
-		if (!review.unresolved) error(409, "This review was already submitted.");
-		const { result, resolved } = await completeSubmission(review);
-		if (!resolved) return { deliverAsMessage: true, text: result.text };
-		await resume(review, selection);
-		return { ok: true, files: result.files };
+		// a retry finishes what a dead process left and answers with the same outcome
+		if (!review.unresolved && !review.delivery) error(409, "This review was already submitted.");
+		return finish(review, selection);
 	}
 
 	const found = blockers(review.schema, review.drafts, review.records.length);
@@ -256,12 +266,24 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 		...(from === "open" ? { unresolved: true as const } : {}),
 		submittedAt: new Date(),
 	};
-	const { result, resolved } = await completeSubmission(claimed);
-	// a detached turn moved on, or a message sent meanwhile closed the call, so send it as one
-	if (!resolved) return { deliverAsMessage: true, text: result.text };
+	return finish(claimed, selection);
+}
 
-	await resume(review, selection);
-	return { ok: true, files: result.files };
+async function finish(
+	review: MlReview,
+	selection: z.infer<typeof selectionSchema>
+): Promise<SubmitOutcome> {
+	const { result, resolved } = await completeSubmission(review);
+	if (resolved) {
+		await resume(review, selection);
+		return { ok: true, files: result.files };
+	}
+	// a detached turn moved on, or a message sent meanwhile closed the call, so post it as one
+	return {
+		ok: true,
+		files: result.files,
+		delivery: await deliverReview(review._id, toResumeSelection(selection)),
+	};
 }
 
 async function resume(review: MlReview, selection: z.infer<typeof selectionSchema>) {

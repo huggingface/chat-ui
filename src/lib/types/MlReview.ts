@@ -105,6 +105,15 @@ export type ReviewSource =
 	| { kind: "sandbox"; handle: string; path: string }
 	| { kind: "hub"; uri: string };
 
+/** a submission the turn had moved past, posted by the server as the user's next message */
+export interface ReviewDelivery {
+	status: "pending" | "sending" | "sent" | "failed";
+	attempts: number;
+	takenAt?: Date;
+	messageId?: string;
+	error?: string;
+}
+
 export type ReviewStatus = "open" | "submitted" | "detached" | "expired";
 
 export interface MlReview {
@@ -129,6 +138,7 @@ export interface MlReview {
 	result?: { text: string; files: MlFileRef[] };
 	/** claimed while the parked call still waited, cleared once its row is answered or closed */
 	unresolved?: true;
+	delivery?: ReviewDelivery;
 	createdAt: Date;
 	updatedAt: Date;
 	submittedAt?: Date;
