@@ -17,6 +17,7 @@ import {
 	toolRound,
 } from "$lib/server/generation/__tests__/turnFixtures";
 import type { Message } from "$lib/types/Message";
+import type { TurnStateSnapshot } from "$lib/types/TurnState";
 import {
 	listMlArtefacts,
 	listMlServices,
@@ -30,6 +31,19 @@ async function parseResponse<T = unknown>(res: Response): Promise<T> {
 
 function mockUrl(): URL {
 	return new URL("http://localhost:5173/api/v2/conversations/some-id");
+}
+
+async function seedTurnState(conversationId: ObjectId, messageId: string) {
+	await collections.turnStates.insertOne({
+		_id: new ObjectId(),
+		conversationId,
+		messageId,
+		status: "failed",
+		error: "owner-only error text",
+		producerId: "producer",
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	});
 }
 
 // `collections` is undefined until the database IIFE resolves.
@@ -94,9 +108,11 @@ describe.sequential("GET /api/v2/conversations/[id]", () => {
 		expect(JSON.stringify(returned).length).toBeLessThan(JSON.stringify(legacy).length);
 	});
 
-	it("returns a shared conversation by its share id", async () => {
+	it("returns a shared conversation by its share id, without the owner's turn state", async () => {
 		const { locals } = await createTestUser();
 		const reply: Message = { id: "reply", from: "assistant", content: "Hi.", children: [] };
+		const source = await createTestConversation(locals, { messages: [reply] });
+		await seedTurnState(source._id, reply.id);
 		await collections.sharedConversations.insertOne({
 			_id: "Z7ytzER",
 			hash: "shared-hash",
@@ -114,9 +130,34 @@ describe.sequential("GET /api/v2/conversations/[id]", () => {
 		} as never);
 
 		expect(res.status).toBe(200);
-		const data = await parseResponse<{ title: string; shared: boolean }>(res);
+		const data = await parseResponse<{
+			title: string;
+			shared: boolean;
+			turnState?: TurnStateSnapshot;
+		}>(res);
 		expect(data.title).toBe("Shared");
 		expect(data.shared).toBe(true);
+		expect(data.turnState).toBeUndefined();
+	});
+
+	it("keeps an imported share's own turn state", async () => {
+		const { locals } = await createTestUser();
+		const reply: Message = { id: "reply", from: "assistant", content: "Hi.", children: [] };
+		const imported = await createTestConversation(locals, {
+			messages: [reply],
+			meta: { fromShareId: "Z7ytzER" },
+		});
+		await seedTurnState(imported._id, reply.id);
+
+		const res = await GET({
+			locals,
+			params: { id: imported._id.toString() },
+			url: new URL("http://localhost:5173/api/v2/conversations/some-id?fromShare=Z7ytzER"),
+		} as never);
+
+		const data = await parseResponse<{ shared: boolean; turnState?: TurnStateSnapshot }>(res);
+		expect(data.shared).toBe(true);
+		expect(data.turnState).toMatchObject({ messageId: reply.id, status: "failed" });
 	});
 
 	it("throws 404 for non-existent conversation", async () => {

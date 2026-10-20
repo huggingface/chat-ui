@@ -29,12 +29,11 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 	const lastAssistant = [...conversation.messages]
 		.reverse()
 		.find((message) => message.from === "assistant");
-	// Share snapshots are keyed by a 7-char string id, which `new ObjectId` rejects
-	// synchronously, and they carry no turn state of their own.
+	// share readers must not see the source conversation turn state
 	const turnStateDoc =
-		lastAssistant && typeof conversation._id !== "string"
+		lastAssistant && conversation.kind === "owned"
 			? await collections.turnStates
-					.findOne({ conversationId: conversation._id, messageId: lastAssistant.id })
+					.findOne({ conversationId: conversation.objectId, messageId: lastAssistant.id })
 					.catch(() => null)
 			: null;
 	const turnState: TurnStateSnapshot | undefined = turnStateDoc
@@ -54,7 +53,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 		model: conversation.model,
 		preprompt: conversation.preprompt,
 		rootMessageId: conversation.rootMessageId,
-		id: conversation._id.toString(),
+		id: conversation.id,
 		updatedAt: conversation.updatedAt,
 		modelId: conversation.model,
 		shared: conversation.shared,
