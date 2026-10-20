@@ -16,6 +16,7 @@
 	import MCPServerManager from "$lib/components/mcp/MCPServerManager.svelte";
 	import IconMCP from "$lib/components/icons/IconMCP.svelte";
 	import HfHubMentionAutocomplete from "./HfHubMentionAutocomplete.svelte";
+	import SlashCommandAutocomplete from "./SlashCommandAutocomplete.svelte";
 	import MlInternPill from "./MlInternPill.svelte";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
@@ -38,6 +39,12 @@
 		mentionToken,
 		stripOrphanMentionMarks,
 	} from "$lib/utils/mentionTokens";
+	import {
+		leadingSlashCommand,
+		matchingSlashCommands,
+		slashCommandQuery,
+		type SlashCommand,
+	} from "$lib/utils/slashCommands";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { page } from "$app/state";
 
@@ -54,6 +61,7 @@
 		modelSupportsTools?: boolean;
 		// Offers the ML Intern mode switch beside the MCP pill (empty conversations only)
 		showMlPill?: boolean;
+		slashCommands?: SlashCommand[];
 		children?: import("svelte").Snippet;
 		onPaste?: (e: ClipboardEvent) => void;
 		focused?: boolean;
@@ -71,6 +79,7 @@
 		modelIsMultimodal = false,
 		modelSupportsTools = true,
 		showMlPill = false,
+		slashCommands = [],
 		children,
 		onPaste,
 		focused = $bindable(false),
@@ -91,17 +100,21 @@
 
 	// Tokens are drawn by a layer behind the textarea while its glyphs go
 	// transparent, so paste, IME and undo stay native.
-	type InlineToken = { start: number; end: number; kind: "view" | "mention" };
-	let inlineTokens = $derived<InlineToken[]>(
-		[
+	type InlineToken = { start: number; end: number; kind: "view" | "mention" | "command" };
+	let inlineTokens = $derived.by<InlineToken[]>(() => {
+		const command = leadingSlashCommand(value, slashCommands);
+		return [
+			...(command ? [{ start: command.start, end: command.end, kind: "command" as const }] : []),
 			...findViewTokens(value).map((t) => ({ start: t.start, end: t.end, kind: "view" as const })),
 			...findMentionTokens(value).map((t) => ({
 				start: t.start,
 				end: t.end,
 				kind: "mention" as const,
 			})),
-		].sort((a, b) => a.start - b.start)
-	);
+		].sort((a, b) => a.start - b.start);
+	});
+	// a command stays plain text the caret can enter and edit
+	let atomicTokens = $derived(inlineTokens.filter((t) => t.kind !== "command"));
 	let mirrorElement: HTMLDivElement | undefined = $state();
 	// Drawn from the raw token, padding and marks included, so every glyph is
 	// the textarea's own.
@@ -132,11 +145,11 @@
 	}
 
 	function handleTokenKeys(event: KeyboardEvent): boolean {
-		if (!textareaElement || !inlineTokens.length || isCompositionOn) return false;
+		if (!textareaElement || !atomicTokens.length || isCompositionOn) return false;
 		if (event.key !== "Backspace" && event.key !== "Delete") return false;
 		const { selectionStart: s, selectionEnd: e } = textareaElement;
 		if (s !== e) return false;
-		const token = inlineTokens.find((t) =>
+		const token = atomicTokens.find((t) =>
 			event.key === "Backspace" ? t.end === s : t.start === s
 		);
 		if (!token) return false;
@@ -146,11 +159,11 @@
 	}
 
 	function snapSelectionToTokens() {
-		if (!textareaElement || !inlineTokens.length) return;
+		if (!textareaElement || !atomicTokens.length) return;
 		const { selectionStart: s, selectionEnd: e, selectionDirection } = textareaElement;
 		let ns = s;
 		let ne = e;
-		for (const t of inlineTokens) {
+		for (const t of atomicTokens) {
 			if (s === e && s > t.start && s < t.end) {
 				ns = ne = s - t.start < t.end - s ? t.start : t.end;
 				break;
@@ -175,23 +188,66 @@
 
 	/** Panel anchor: the `@` of the mention being edited, in composer space. */
 	let hubAnchor = $state({ left: 0, bottom: 0 });
-	/** Panel width, kept in step with the `w-72` on the listbox. */
+	/** panel width, kept in step with w-72 on both listboxes */
 	const HUB_PANEL_WIDTH = 288;
-	function updateHubAnchor() {
-		const mention = hub.mention;
-		if (!textareaElement || !mention) return;
-		const caret = getCaretCoordinates(textareaElement, mention.start);
-		const parent =
-			textareaElement.offsetParent instanceof HTMLElement ? textareaElement.offsetParent : null;
+	function anchorAt(textarea: HTMLTextAreaElement, index: number) {
+		const caret = getCaretCoordinates(textarea, index);
+		const parent = textarea.offsetParent instanceof HTMLElement ? textarea.offsetParent : null;
 		// Clamped so a mention typed near the right edge of a wide composer does
 		// not push the panel off it.
 		const maxLeft = Math.max(0, (parent?.clientWidth ?? 0) - HUB_PANEL_WIDTH);
-		hubAnchor = {
-			left: Math.min(Math.max(0, textareaElement.offsetLeft + caret.left), maxLeft),
+		return {
+			left: Math.min(Math.max(0, textarea.offsetLeft + caret.left), maxLeft),
 			// Measured from the composer's bottom edge so the panel sits just above
 			// the line the mention is on, clearing its glyphs.
-			bottom: parent ? parent.clientHeight - (textareaElement.offsetTop + caret.top) + 4 : 0,
+			bottom: parent ? parent.clientHeight - (textarea.offsetTop + caret.top) + 4 : 0,
 		};
+	}
+	function updateHubAnchor() {
+		const mention = hub.mention;
+		if (!textareaElement || !mention) return;
+		hubAnchor = anchorAt(textareaElement, mention.start);
+	}
+
+	// the value is kept with the caret, so a programmatic write the textarea never reports closes it
+	let slashCaret = $state<{ value: string; caret: number } | null>(null);
+	let slashDismissed = $state<string | null>(null);
+	let slashActiveIndex = $state(0);
+	let slashAnchor = $state({ left: 0, bottom: 0 });
+	const slashQuery = $derived(
+		slashCommands.length && slashCaret && slashCaret.value === value
+			? slashCommandQuery(value, slashCaret.caret)
+			: undefined
+	);
+	const slashMatches = $derived(
+		slashQuery === undefined ? [] : matchingSlashCommands(slashQuery, slashCommands)
+	);
+	const isSlashCommandOpen = $derived(
+		!isHubMentionOpen && slashMatches.length > 0 && slashQuery !== slashDismissed
+	);
+	const slashIndex = $derived(Math.min(slashActiveIndex, slashMatches.length - 1));
+
+	function syncSlashCommand(text: string, caret: number) {
+		const query = slashCommandQuery(text, caret);
+		if (query !== slashQuery) slashActiveIndex = 0;
+		if (query !== slashDismissed) slashDismissed = null;
+		slashCaret = { value: text, caret };
+		if (query !== undefined && textareaElement) slashAnchor = anchorAt(textareaElement, 0);
+	}
+
+	function acceptSlashCommand(command: SlashCommand) {
+		if (!textareaElement || !slashCaret) return;
+		const { caret } = slashCaret;
+		let end = caret + (value.slice(caret).match(/^[a-z]*/i)?.[0].length ?? 0);
+		if (value[end] === " ") end += 1;
+		const text = `/${command.name} `;
+		textareaElement.focus();
+		textareaElement.setSelectionRange(0, end);
+		if (!document.execCommand("insertText", false, text)) {
+			value = text + value.slice(end);
+			void tick().then(() => textareaElement?.setSelectionRange(text.length, text.length));
+		}
+		adjustTextareaHeight();
 	}
 
 	let fileInputEl: HTMLInputElement | undefined = $state();
@@ -311,6 +367,7 @@
 		if (!textareaElement) return;
 		hub.update(textareaElement.value, textareaElement.selectionStart);
 		updateHubAnchor();
+		syncSlashCommand(textareaElement.value, textareaElement.selectionStart);
 	}
 
 	function handleInput(event: Event) {
@@ -330,6 +387,7 @@
 		}
 		hub.update(target.value, target.selectionStart);
 		updateHubAnchor();
+		syncSlashCommand(target.value, target.selectionStart);
 	}
 
 	// The textarea reports its own edits; a programmatic write (ChatWindow
@@ -361,6 +419,25 @@
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (handleTokenKeys(event)) return;
+		if (isSlashCommandOpen && !isCompositionOn) {
+			if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+				event.preventDefault();
+				const step = event.key === "ArrowDown" ? 1 : -1;
+				slashActiveIndex = (slashIndex + step + slashMatches.length) % slashMatches.length;
+				return;
+			}
+			// enter accepts too, a bare partial command is never worth sending
+			if ((event.key === "Tab" || event.key === "Enter") && !event.shiftKey) {
+				event.preventDefault();
+				acceptSlashCommand(slashMatches[slashIndex]);
+				return;
+			}
+			if (event.key === "Escape") {
+				event.preventDefault();
+				slashDismissed = slashQuery ?? null;
+				return;
+			}
+		}
 		if (isHubMentionOpen && !isCompositionOn) {
 			if (event.key === "ArrowDown" && hub.results.length > 0) {
 				event.preventDefault();
@@ -428,6 +505,7 @@
 		hubBlurTimeout = setTimeout(() => {
 			hubBlurTimeout = null;
 			hub.reset();
+			slashCaret = null;
 		}, 100);
 
 		if (!isVirtualKeyboard()) {
@@ -460,7 +538,15 @@
 	     typed on / travels into this page's history entry across the SPA
 	     navigation, and the restore bypasses the Svelte binding). -->
 	<div class="relative">
-		{#if isHubMentionOpen}
+		{#if isSlashCommandOpen}
+			<SlashCommandAutocomplete
+				commands={slashMatches}
+				activeIndex={slashIndex}
+				caretAnchor={slashAnchor}
+				onselect={acceptSlashCommand}
+				onactivechange={(index) => (slashActiveIndex = index)}
+			/>
+		{:else if isHubMentionOpen}
 			<HfHubMentionAutocomplete
 				results={hub.results}
 				status={hub.status ?? "loading"}
@@ -483,6 +569,7 @@
 				{#each mirrorSegments as segment, i (i)}{#if segment.kind === "view"}<span
 							class="view-token">{segment.text}</span
 						>{:else if segment.kind === "mention"}<span class="mention-token">{segment.text}</span
+						>{:else if segment.kind === "command"}<span class="command-token">{segment.text}</span
 						>{:else}{segment.text}{/if}{/each}{"\u200b"}
 			</div>
 		{/if}
@@ -493,11 +580,17 @@
 			autocomplete="off"
 			role="combobox"
 			aria-autocomplete="list"
-			aria-expanded={isHubMentionOpen}
-			aria-controls={isHubMentionOpen ? "hf-hub-mention-listbox" : undefined}
-			aria-activedescendant={isHubMentionOpen && hub.activeIndex >= 0
-				? `hf-hub-mention-option-${hub.activeIndex}`
-				: undefined}
+			aria-expanded={isSlashCommandOpen || isHubMentionOpen}
+			aria-controls={isSlashCommandOpen
+				? "slash-command-listbox"
+				: isHubMentionOpen
+					? "hf-hub-mention-listbox"
+					: undefined}
+			aria-activedescendant={isSlashCommandOpen
+				? `slash-command-option-${slashIndex}`
+				: isHubMentionOpen && hub.activeIndex >= 0
+					? `hf-hub-mention-option-${hub.activeIndex}`
+					: undefined}
 			class="relative scrollbar-custom max-h-[4lh] w-full resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent px-2.5 py-2.5 outline-hidden focus:ring-0 focus-visible:ring-0 sm:px-3 md:max-h-[8lh]"
 			class:text-gray-400={disabled}
 			class:has-view-tokens={inlineTokens.length > 0}
@@ -830,6 +923,17 @@
 		border-radius: 4px;
 		background: rgb(37 99 235 / 0.08);
 		box-shadow: 0 0 0 1px rgb(37 99 235 / 0.08);
+	}
+	.command-token {
+		color: #7c3aed;
+		border-radius: 4px;
+		background: rgb(124 58 237 / 0.08);
+		box-shadow: 0 0 0 1px rgb(124 58 237 / 0.08);
+	}
+	:global(.dark) .command-token {
+		color: #a78bfa;
+		background: rgb(167 139 250 / 0.12);
+		box-shadow: 0 0 0 1px rgb(167 139 250 / 0.12);
 	}
 	:global(.dark) .mention-token {
 		color: #60a5fa;

@@ -23,6 +23,9 @@
 
 	import ChatInput from "./ChatInput.svelte";
 	import AskQuestion from "./AskQuestion.svelte";
+	import SideQuestionPanel from "./SideQuestionPanel.svelte";
+	import { isWebSideQuestion } from "$lib/utils/sideQuestion";
+	import { BTW_COMMAND } from "$lib/utils/slashCommands";
 	import { firstQuestionFor } from "$lib/stores/pendingQuestion";
 	import { shouldShowPendingPlaceholder } from "$lib/utils/pendingPlaceholder";
 	import VoiceRecorder from "./VoiceRecorder.svelte";
@@ -213,7 +216,14 @@
 	);
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
 
+	let sideQuestionPanel: ReturnType<typeof SideQuestionPanel> | undefined = $state();
+	let draftIsSideQuestion = $derived(Boolean(sideQuestionPanel) && isWebSideQuestion(draft));
+
 	const handleSubmit = () => {
+		if (sideQuestionPanel?.intercept(draft)) {
+			draft = "";
+			return;
+		}
 		if (requireAuthUser() || loading || !draft) return;
 		tap();
 		chatScroll.notifySend();
@@ -1200,6 +1210,11 @@
 						/>
 					{/if}
 				</div>
+				{#if mlTaskRunning && !shared && page.params?.id}
+					{#key page.params.id}
+						<SideQuestionPanel bind:this={sideQuestionPanel} conversationId={page.params.id} />
+					{/key}
+				{/if}
 				<form
 					bind:this={composerForm}
 					tabindex="-1"
@@ -1273,11 +1288,12 @@
 										{modelIsMultimodal}
 										{modelSupportsTools}
 										showMlPill={mlPillVisible}
+										slashCommands={sideQuestionPanel ? [BTW_COMMAND] : []}
 										bind:focused
 									/>
 								{/if}
 
-								{#if loading}
+								{#if loading && !draftIsSideQuestion}
 									<StopGeneratingBtn
 										onClick={() => {
 											hapticError();
