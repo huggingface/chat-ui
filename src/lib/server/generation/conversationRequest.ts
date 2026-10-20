@@ -324,13 +324,26 @@ export async function generateConversationResponse({
 	/** marks the reviews detachOpenReviews closed, once the same save has landed */
 	let reviewsDetached: (() => Promise<void>) | undefined;
 
+	// before the settle, a refused start must not have withdrawn a review it never saves as detached
+	if (guardTurnStart) {
+		const { claimTurnStart, TURN_BUSY_MESSAGE } = await import("$lib/server/queuedInputs/drain");
+		const claim = await claimTurnStart(convId, "working", builtOn);
+		if (!claim) error(409, TURN_BUSY_MESSAGE);
+		releaseTurnStart = claim.release;
+	}
+
 	// Asks exist only in ML Assistant conversations, so nothing else pays for the lookup.
 	if (!resumeElicitationId && isMlAssistantConversation(conv)) {
-		const { settleAnsweredAsks } = await import("$lib/server/generation/askResume");
-		answeredAsksSaved = await settleAnsweredAsks(conv);
-		// after the settle, so a submit that just landed is answered, not detached
-		const { detachOpenReviews } = await import("$lib/server/mlReviews/detach");
-		reviewsDetached = await detachOpenReviews(conv);
+		try {
+			const { settleAnsweredAsks } = await import("$lib/server/generation/askResume");
+			answeredAsksSaved = await settleAnsweredAsks(conv);
+			// after the settle, so a submit that just landed is answered, not detached
+			const { detachOpenReviews } = await import("$lib/server/mlReviews/detach");
+			reviewsDetached = await detachOpenReviews(conv);
+		} catch (err) {
+			await releaseTurnStart?.();
+			throw err;
+		}
 	}
 
 	if (resumeElicitationId) {
@@ -440,6 +453,7 @@ export async function generateConversationResponse({
 
 	const messageToWriteTo = conv.messages.find((message) => message.id === messageToWriteToId);
 	if (!messageToWriteTo) {
+		await releaseTurnStart?.();
 		error(500, "Failed to create message");
 	}
 	if (queuedStart && messageId) {
@@ -450,6 +464,7 @@ export async function generateConversationResponse({
 	}
 	restoreRunningShape(messageToWriteTo);
 	if (messagesForPrompt.length === 0) {
+		await releaseTurnStart?.();
 		error(500, "Failed to create prompt");
 	}
 
@@ -457,13 +472,6 @@ export async function generateConversationResponse({
 	const effectiveGenerationId = generationId ?? randomUUID();
 	messageToWriteTo.generationId = effectiveGenerationId;
 	stampMlHarness(messageToWriteTo, conv, model);
-
-	if (guardTurnStart) {
-		const { claimTurnStart, TURN_BUSY_MESSAGE } = await import("$lib/server/queuedInputs/drain");
-		const claim = await claimTurnStart(convId, "working", builtOn);
-		if (!claim) error(409, TURN_BUSY_MESSAGE);
-		releaseTurnStart = claim.release;
-	}
 
 	try {
 		// A conversation stored with inline tool images can be too big to take this write.

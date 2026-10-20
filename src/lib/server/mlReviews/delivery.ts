@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { isHttpError } from "@sveltejs/kit";
 import type { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
@@ -216,6 +217,8 @@ export async function deliverReview(
 		const message = saved?.messages.findLast((m) => m.from === "user" && m.content === text);
 		return markSent(review, message?.id);
 	} catch (err) {
+		// the turn start is held or the conversation moved on, a later sweep posts it
+		if (isHttpError(err) && err.status === 409) return release(review, { counted: false });
 		logger.warn({ err, reviewId: review._id.toString() }, "[review] delivery attempt failed");
 		return release(review, { error: reasonOf(err), counted: true });
 	} finally {

@@ -780,7 +780,7 @@ const { PATCH: PATCH_REVIEW } =
 	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/+server");
 const { completeSubmission } = await import("$lib/server/mlReviews/submission");
 const { submitReview } = await import("$lib/server/mlReviews/store");
-const { acquireLock, releaseLock } = await import("$lib/migrations/lock");
+const { acquireLock, isDBLocked, releaseLock } = await import("$lib/migrations/lock");
 
 const REVIEW: Round = {
 	toolCalls: [
@@ -1185,6 +1185,53 @@ describe("a review the user wrote past", () => {
 		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
 		expect(mocks.create).toHaveBeenCalledTimes(3);
 		expect(postedResults(await reload(conv))).toHaveLength(1);
+	});
+
+	it("defers, uncounted, while the queue holds the turn start, then posts", async () => {
+		const { conv, locals, reviewId } = await writePast([{ content: "Thanks." }]);
+		await labelAll(conv, locals, reviewId);
+		const key = `queue.drain:${conv._id.toString()}`;
+		const lock = await acquireLock(key);
+		if (!lock) throw new Error("lock not taken");
+
+		expect((await submitOverHttp(conv, locals, reviewId)).body).toMatchObject({
+			ok: true,
+			delivery: "queued",
+		});
+		expect(
+			(await collections.mlReviews.findOne({ conversationId: conv._id }))?.delivery
+		).toMatchObject({ status: "pending", attempts: 0 });
+		expect(postedResults(await reload(conv))).toHaveLength(0);
+
+		await releaseLock(key, lock);
+		await sweepAnsweredAsks();
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		expect(postedResults(await reload(conv))).toHaveLength(1);
+	});
+
+	it("leaves a parked review alone when a send is refused its turn start", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Waiting for your review." }]);
+		const { elicitationId } = await parkOnReview(conv, locals);
+		const key = `queue.drain:${conv._id.toString()}`;
+		const lock = await acquireLock(key);
+		if (!lock) throw new Error("lock not taken");
+
+		await expect(sendMessage(conv, locals, "Hold on.")).rejects.toMatchObject({ status: 409 });
+
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			status: "pending",
+		});
+		expect((await collections.mlReviews.findOne({ conversationId: conv._id }))?.status).toBe(
+			"open"
+		);
+		await releaseLock(key, lock);
+
+		await sendMessage(conv, locals, "Hold on.");
+		expect((await collections.mlReviews.findOne({ conversationId: conv._id }))?.status).toBe(
+			"detached"
+		);
+		expect(await isDBLocked(key)).toBe(false);
 	});
 
 	it("reruns a posted message whose run never started, without posting it again", async () => {
