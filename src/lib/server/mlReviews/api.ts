@@ -70,9 +70,31 @@ const answerValue = z.union([
 	z.array(z.string().max(REVIEW_LIMITS.optionChars)).max(REVIEW_LIMITS.maxOptions),
 ]);
 
+/** a day is far past any clip a review shows, and keeps a typo from reading as a time */
+const MAX_SECONDS = 24 * 60 * 60;
+const FLOAT_SLACK = 1e-9;
+const fraction = z.number().finite().min(0).max(1);
+const seconds = z.number().finite().min(0).max(MAX_SECONDS);
+
+const area = z
+	.object({ x: fraction, y: fraction, w: fraction.gt(0), h: fraction.gt(0) })
+	.refine((a) => a.x + a.w <= 1 + FLOAT_SLACK, { message: "x + w must not exceed 1", path: ["w"] })
+	.refine((a) => a.y + a.h <= 1 + FLOAT_SLACK, { message: "y + h must not exceed 1", path: ["h"] });
+
+const time = z
+	.object({ start: seconds, end: seconds.optional() })
+	.refine((t) => t.end === undefined || t.end > t.start, {
+		message: "end must be after start",
+		path: ["end"],
+	});
+
+const round4 = (value: number) => Math.round(value * 10_000) / 10_000;
+
 const comment = z.object({
 	id: z.string().min(1).max(64),
 	field: z.string().optional(),
+	area: area.optional(),
+	time: time.optional(),
 	quote: z
 		.object({
 			exact: z.string().min(1).max(QUOTE_EXACT_CHARS),
@@ -131,9 +153,26 @@ export async function patchDraft(
 		if (!questions.has(name)) error(400, `answers.${name}: no such question`);
 	}
 	const fields = new Set(review.schema.fields.map((f) => f.name));
-	for (const c of draft.comments) {
+	const fieldTypes = new Map(review.schema.fields.map((f) => [f.name, f.type]));
+	for (const [i, c] of draft.comments.entries()) {
+		const at = `draft.comments.${i}`;
 		if (c.field !== undefined && !fields.has(c.field))
 			error(400, `comments: no field "${c.field}"`);
+		const type = c.field === undefined ? undefined : fieldTypes.get(c.field);
+		if (c.quote && (c.area || c.time))
+			error(400, `${at}: a quote cannot also carry an area or a time`);
+		if (c.quote && type !== "text" && type !== "markdown" && type !== "code") {
+			error(400, `${at}.quote: a quote is only on a text, markdown or code field`);
+		}
+		if (c.time && type !== "audio" && type !== "video") {
+			error(400, `${at}.time: a time is only on an audio or video field`);
+		}
+		if (c.area && type !== "image" && type !== "video") {
+			error(400, `${at}.area: an area is only on an image or video field`);
+		}
+		if (c.area && type === "video" && !c.time) {
+			error(400, `${at}.time: a box on a video needs the frame time in time.start`);
+		}
 	}
 	const elsewhere = Object.entries(review.drafts)
 		.filter(([key]) => key !== String(index))
@@ -150,6 +189,17 @@ export async function patchDraft(
 			id: c.id,
 			...(c.field !== undefined ? { field: c.field } : {}),
 			...(c.quote ? { quote: c.quote } : {}),
+			...(c.area
+				? {
+						area: {
+							x: round4(c.area.x),
+							y: round4(c.area.y),
+							w: round4(c.area.w),
+							h: round4(c.area.h),
+						},
+					}
+				: {}),
+			...(c.time ? { time: c.time } : {}),
 			body: c.body,
 			createdAt: c.createdAt ?? now,
 		})),

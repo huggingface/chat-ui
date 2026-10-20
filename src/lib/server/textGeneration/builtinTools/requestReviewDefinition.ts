@@ -98,7 +98,8 @@ export const requestReviewDefinition: OpenAiTool = {
 								enum: [...REVIEW_FIELD_TYPES],
 								description:
 									"text, markdown, code, json, chat (a list of {role, content}), image " +
-									"(an https or hf:// URL), number or category (shown as chips).",
+									"(an https or hf:// URL), audio or video (an https or hf:// URL, the user can comment on " +
+									"a moment, a range or a box on a frame), number or category (shown as chips).",
 							},
 							title: { type: "string" },
 							language: { type: "string", description: "For code fields." },

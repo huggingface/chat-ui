@@ -6,6 +6,7 @@ import type { MlFileRef } from "$lib/types/MlFile";
 import type {
 	MlReview,
 	ReviewAnswer,
+	ReviewComment,
 	ReviewDraft,
 	ReviewQuestion,
 	ReviewVerdict,
@@ -119,6 +120,32 @@ const clip = (text: string, max: number) =>
 
 const flat = (text: string) => text.replace(/\s+/g, " ").trim();
 
+/** m:ss under an hour, h:mm:ss past it */
+export function clockText(seconds: number): string {
+	const whole = Math.floor(seconds);
+	const s = String(whole % 60).padStart(2, "0");
+	const m = Math.floor(whole / 60) % 60;
+	const h = Math.floor(whole / 3600);
+	return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
+
+const percent = (value: number) => `${Math.round(value * 100)}%`;
+
+/** how a comment points into its field, the pane prints the same */
+export function anchorText(comment: Pick<ReviewComment, "quote" | "area" | "time">): string {
+	if (comment.quote) return ` "${clip(flat(comment.quote.exact), QUOTE_CHARS)}"`;
+	const parts: string[] = [];
+	if (comment.time) {
+		const { start, end } = comment.time;
+		parts.push(end === undefined ? clockText(start) : `${clockText(start)}-${clockText(end)}`);
+	}
+	if (comment.area) {
+		const { x, y, w, h } = comment.area;
+		parts.push(`area ${percent(x)},${percent(y)} ${percent(w)}x${percent(h)}`);
+	}
+	return parts.length ? ` [${parts.join(" ")}]` : "";
+}
+
 export function reviewSlug(title: string): string {
 	const slug = title
 		.toLowerCase()
@@ -145,6 +172,8 @@ export function responseLines(review: MlReview): string[] {
 			comments: (draft?.comments ?? []).map((comment) => ({
 				...(comment.field ? { field: comment.field } : {}),
 				...(comment.quote ? { quote: comment.quote.exact } : {}),
+				...(comment.area ? { area: comment.area } : {}),
+				...(comment.time ? { time: comment.time } : {}),
 				body: comment.body,
 			})),
 			schema: review.schemaHash,
@@ -209,8 +238,7 @@ export function reviewResultText(
 	review.records.forEach((record, index) => {
 		for (const comment of draftAt(review, index)?.comments ?? []) {
 			const where = comment.field ?? "record";
-			const quote = comment.quote ? ` "${clip(flat(comment.quote.exact), QUOTE_CHARS)}"` : "";
-			comments.push(`- ${record.id} ${where}${quote}: ${comment.body}`);
+			comments.push(`- ${record.id} ${where}${anchorText(comment)}: ${comment.body}`);
 		}
 	});
 	lines.push(`Comments (${comments.length}):`, ...(comments.length ? comments : ["(none)"]));

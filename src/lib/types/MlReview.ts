@@ -4,7 +4,16 @@ import type { Message } from "./Message";
 import type { MlFileRef } from "./MlFile";
 
 export type ReviewFieldType =
-	"text" | "markdown" | "code" | "json" | "chat" | "image" | "number" | "category";
+	| "text"
+	| "markdown"
+	| "code"
+	| "json"
+	| "chat"
+	| "image"
+	| "audio"
+	| "video"
+	| "number"
+	| "category";
 
 interface ReviewFieldBase {
 	name: string;
@@ -79,11 +88,27 @@ export interface ReviewQuote {
 	suffix: string;
 }
 
+/** fractions of the image or video frame, so the box survives any display size */
+export interface ReviewArea {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+}
+
+/** seconds into the audio or video, a moment when end is absent */
+export interface ReviewTime {
+	start: number;
+	end?: number;
+}
+
 export interface ReviewComment {
 	id: string;
 	/** absent means the comment is on the whole record */
 	field?: string;
 	quote?: ReviewQuote;
+	area?: ReviewArea;
+	time?: ReviewTime;
 	body: string;
 	createdAt: Date;
 }

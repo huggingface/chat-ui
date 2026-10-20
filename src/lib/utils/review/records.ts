@@ -34,6 +34,8 @@ function checkFor(field: ReviewField): FieldCheck {
 		case "json":
 			return () => undefined;
 		case "image":
+		case "audio":
+		case "video":
 			return (value) =>
 				typeof value === "string" && /^(https:\/\/|hf:\/\/)\S+$/.test(value)
 					? undefined

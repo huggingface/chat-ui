@@ -24,6 +24,8 @@ export const REVIEW_FIELD_TYPES = [
 	"json",
 	"chat",
 	"image",
+	"audio",
+	"video",
 	"number",
 	"category",
 ] as const;

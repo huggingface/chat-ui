@@ -349,6 +349,80 @@ describe.sequential("saving a draft", () => {
 		});
 	});
 
+	it("stores box and time anchors only on the media they fit, boxes rounded", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { mlAssistant: true });
+		const review = await createReview({
+			conversationId: conv._id,
+			messageId: "m",
+			toolCallId: "c",
+			toolUuid: "u",
+			elicitationId: crypto.randomUUID(),
+			schema: {
+				...SCHEMA,
+				fields: [
+					{ name: "body", type: "text" },
+					{ name: "photo", type: "image" },
+					{ name: "voice", type: "audio" },
+					{ name: "clip", type: "video" },
+				],
+				questions: [],
+			},
+			schemaHash: "abcd1234",
+			source: { kind: "inline" },
+			records: [{ id: "r1", values: {} }],
+		});
+		const save = (comment: Record<string, unknown>) =>
+			errorOf(
+				PATCH(
+					event(locals, conv._id.toString(), review._id.toString(), {
+						index: 0,
+						draft: draft({}, [{ id: "c", body: "note", ...comment }]),
+					})
+				)
+			);
+
+		expect(
+			(await save({ field: "photo", area: { x: 0.123456, y: 0.2, w: 0.3, h: 0.4 } })).status
+		).toBe(200);
+		expect(
+			(await collections.mlReviews.findOne({ _id: review._id }))?.drafts["0"].comments[0].area
+		).toEqual({ x: 0.1235, y: 0.2, w: 0.3, h: 0.4 });
+		expect((await save({ field: "voice", time: { start: 12, end: 18 } })).status).toBe(200);
+		expect(
+			(await save({ field: "clip", time: { start: 3 }, area: { x: 0, y: 0, w: 1, h: 1 } })).status
+		).toBe(200);
+		expect(
+			(await save({ field: "body", quote: { exact: "x", prefix: "", suffix: "" } })).status
+		).toBe(200);
+
+		expect(await save({ field: "clip", area: { x: 0, y: 0, w: 0.5, h: 0.5 } })).toEqual({
+			status: 400,
+			message: "draft.comments.0.time: a box on a video needs the frame time in time.start",
+		});
+		expect(await save({ field: "photo", time: { start: 1 } })).toEqual({
+			status: 400,
+			message: "draft.comments.0.time: a time is only on an audio or video field",
+		});
+		expect(await save({ field: "voice", area: { x: 0, y: 0, w: 0.5, h: 0.5 } })).toEqual({
+			status: 400,
+			message: "draft.comments.0.area: an area is only on an image or video field",
+		});
+		expect(await save({ field: "photo", quote: { exact: "x", prefix: "", suffix: "" } })).toEqual({
+			status: 400,
+			message: "draft.comments.0.quote: a quote is only on a text, markdown or code field",
+		});
+		expect(await save({ field: "photo", area: { x: 0.8, y: 0, w: 0.3, h: 0.5 } })).toEqual({
+			status: 400,
+			message: "draft.comments.0.area.w: x + w must not exceed 1",
+		});
+		expect(await save({ field: "voice", time: { start: 18, end: 12 } })).toEqual({
+			status: 400,
+			message: "draft.comments.0.time.end: end must be after start",
+		});
+		expect((await save({ field: "voice", time: { start: 90_000 } })).status).toBe(400);
+	});
+
 	it("refuses keys that would become Mongo keys without being declared", async () => {
 		const { locals } = await createTestUser();
 		const { conv, review } = await seed(locals);

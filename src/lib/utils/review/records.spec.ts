@@ -9,6 +9,8 @@ const schema: Pick<ReviewSchema, "idField" | "fields" | "questions"> = {
 		{ name: "meta", type: "json" },
 		{ name: "turns", type: "chat" },
 		{ name: "img", type: "image" },
+		{ name: "voice", type: "audio" },
+		{ name: "clip", type: "video" },
 		{ name: "score", type: "number" },
 	],
 	questions: [
@@ -73,6 +75,15 @@ describe("compileRecordValidator", () => {
 				"record 4: body must be a string; declare the field as json to show a list or an object",
 			],
 		});
+	});
+
+	it("takes audio and video as https or hf urls", () => {
+		expect(
+			validate([
+				{ id: "a", voice: "hf://datasets/o/r/a.wav", clip: "https://x.test/c.mp4" },
+				{ id: "b", voice: "file:///a.wav" },
+			])
+		).toEqual({ ok: false, errors: ["record 2: voice must be an https:// or hf:// URL"] });
 	});
 
 	it("needs present, unique ids", () => {
