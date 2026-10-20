@@ -511,6 +511,33 @@ describe.sequential("submitting", () => {
 		).toEqual({ status: 409, message: "This review was already submitted." });
 	});
 
+	it("treats a retry whose row is already answered as done, not as a message to post", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		await labelBoth(locals, conv, review);
+		const read = await collections.mlReviews.findOne({ _id: review._id });
+		if (!read) throw new Error("review vanished");
+		expect(await submitReview(read, { verdict: "approve" })).toBe(true);
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId: review.elicitationId },
+			{ $set: { status: "resolved", action: "accept", resolution: "user", resolvedAt: new Date() } }
+		);
+		deliverReview.mockClear();
+
+		const res = await SUBMIT(
+			event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+		);
+
+		expect(await res.json()).toEqual({
+			ok: true,
+			files: [{ name: "reviews/triage-batch-1.responses.jsonl", version: 1 }],
+		});
+		expect(deliverReview).not.toHaveBeenCalled();
+		const stored = await collections.mlReviews.findOne({ _id: review._id });
+		expect(stored?.delivery).toBeUndefined();
+		expect(stored?.unresolved).toBeUndefined();
+	});
+
 	it("rebuilds a lost result from the files its first attempt wrote", async () => {
 		const { locals } = await createTestUser();
 		const { conv, review } = await seed(locals);

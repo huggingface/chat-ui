@@ -780,6 +780,7 @@ const { PATCH: PATCH_REVIEW } =
 	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/+server");
 const { completeSubmission } = await import("$lib/server/mlReviews/submission");
 const { submitReview } = await import("$lib/server/mlReviews/store");
+const { acquireLock, releaseLock } = await import("$lib/migrations/lock");
 
 const REVIEW: Round = {
 	toolCalls: [
@@ -1163,5 +1164,63 @@ describe("a review the user wrote past", () => {
 		expect(
 			(await collections.mlReviews.findOne({ conversationId: conv._id }))?.delivery
 		).toMatchObject({ status: "sent", messageId: posted.id });
+	});
+
+	it("waits for another delivery holding the conversation", async () => {
+		const { conv, locals, reviewId } = await writePast([{ content: "Thanks." }]);
+		await labelAll(conv, locals, reviewId);
+		const key = `review.delivery:${conv._id.toString()}`;
+		const lock = await acquireLock(key);
+		if (!lock) throw new Error("lock not taken");
+
+		expect((await submitOverHttp(conv, locals, reviewId)).body).toMatchObject({
+			ok: true,
+			delivery: "queued",
+		});
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(postedResults(await reload(conv))).toHaveLength(0);
+
+		await releaseLock(key, lock);
+		await sweepAnsweredAsks();
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		expect(mocks.create).toHaveBeenCalledTimes(3);
+		expect(postedResults(await reload(conv))).toHaveLength(1);
+	});
+
+	it("reruns a posted message whose run never started, without posting it again", async () => {
+		const { conv, locals, reviewId } = await writePast([
+			{ content: "Thanks." },
+			{ content: "Thanks, second try." },
+		]);
+		await labelAll(conv, locals, reviewId);
+		await submitOverHttp(conv, locals, reviewId);
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		const posted = postedResults(await reload(conv))[0];
+		await collections.generations.deleteMany({
+			conversationId: conv._id,
+			messageId: { $in: posted.children ?? [] },
+		});
+		await collections.mlReviews.updateOne(
+			{ conversationId: conv._id },
+			{
+				$set: {
+					"delivery.status": "sending",
+					"delivery.takenAt": new Date(Date.now() - 10 * 60_000),
+				},
+			}
+		);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+
+		expect(mocks.create).toHaveBeenCalledTimes(4);
+		const fresh = await reload(conv);
+		expect(postedResults(fresh)).toHaveLength(1);
+		expect(lastAssistant(fresh).content).toContain("Thanks, second try.");
+		const delivery = (await collections.mlReviews.findOne({ conversationId: conv._id }))?.delivery;
+		expect(delivery).toMatchObject({ status: "sent", messageId: posted.id });
+		expect(
+			await collections.generations.countDocuments({ generationId: delivery?.generationId })
+		).toBe(1);
 	});
 });

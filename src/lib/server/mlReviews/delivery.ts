@@ -5,6 +5,8 @@ import { logger } from "$lib/server/logger";
 import { rebuildIdentity } from "$lib/server/generation/parkedSweeper";
 import type { AskResumeSelection } from "$lib/server/generation/askResume";
 import type { MlReview } from "$lib/types/MlReview";
+import type { Message } from "$lib/types/Message";
+import { acquireLock, releaseLock } from "$lib/migrations/lock";
 
 /** a live attempt posts in seconds, so this only expires under a process that died */
 const DELIVERY_LEASE_MS = 5 * 60_000;
@@ -98,7 +100,36 @@ const reasonOf = (err: unknown): string => {
 	return err instanceof Error ? err.message : String(err);
 };
 
-/** posts a detached submission as the next user message once, deferring while a turn runs */
+/** the route registers its generation inside its stream, a few database writes after it answers */
+const REGISTER_WAIT_MS = 10_000;
+const REGISTER_POLL_MS = 100;
+
+async function registered(generationId: string): Promise<boolean> {
+	const deadline = Date.now() + REGISTER_WAIT_MS;
+	for (;;) {
+		if (await collections.generations.countDocuments({ generationId })) return true;
+		if (Date.now() >= deadline) return false;
+		await new Promise((resolve) => setTimeout(resolve, REGISTER_POLL_MS));
+	}
+}
+
+/** a run posted by an earlier attempt exists, so the review is in the conversation for good */
+async function ranFrom(
+	conversationId: ObjectId,
+	posted: Message,
+	generationId: string | undefined
+): Promise<boolean> {
+	const runs = await collections.generations.countDocuments({
+		conversationId,
+		$or: [
+			...(generationId ? [{ generationId }] : []),
+			{ messageId: { $in: posted.children ?? [] } },
+		],
+	});
+	return runs > 0;
+}
+
+/** posts a detached submission once per conversation lock, and reruns a post whose run never began */
 export async function deliverReview(
 	reviewId: ObjectId,
 	selection?: AskResumeSelection
@@ -108,17 +139,34 @@ export async function deliverReview(
 	const text = review.result?.text;
 	if (!text) return release(review, { error: "the submission has no result yet", counted: true });
 
-	const conv = await collections.conversations.findOne({ _id: review.conversationId });
-	if (!conv) return release(review, { error: "the conversation is gone", counted: true });
-	const posted = conv.messages.findLast((m) => m.from === "user" && m.content === text);
-	if (posted) return markSent(review, posted.id);
-	const running = await collections.generations.countDocuments({
-		conversationId: conv._id,
-		status: "running",
-	});
-	if (running > 0) return release(review, { counted: false });
-
+	// the route rewrites the whole message array, so two posts at once would drop one
+	const lockKey = `review.delivery:${review.conversationId.toString()}`;
+	const lock = await acquireLock(lockKey);
+	if (!lock) return release(review, { counted: false });
 	try {
+		const conv = await collections.conversations.findOne({ _id: review.conversationId });
+		if (!conv) return release(review, { error: "the conversation is gone", counted: true });
+		const running = await collections.generations.countDocuments({
+			conversationId: conv._id,
+			status: "running",
+		});
+		if (running > 0) return release(review, { counted: false });
+
+		const posted = conv.messages.findLast((m) => m.from === "user" && m.content === text);
+		if (posted && (await ranFrom(conv._id, posted, review.delivery?.generationId))) {
+			return markSent(review, posted.id);
+		}
+		const reply = posted
+			? conv.messages.find((m) => m.from === "assistant" && posted.children?.includes(m.id))
+			: undefined;
+		if (posted && !reply) {
+			return release(review, { error: "the posted message has no reply to run", counted: true });
+		}
+
+		const generationId = randomUUID();
+		await collections.mlReviews.updateOne(held(review), {
+			$set: { "delivery.generationId": generationId },
+		});
 		const { locals } = await rebuildIdentity({
 			...(conv.userId ? { userId: conv.userId } : {}),
 			...(conv.sessionId ? { sessionId: conv.sessionId } : {}),
@@ -135,11 +183,15 @@ export async function deliverReview(
 		const data = new FormData();
 		data.set(
 			"data",
-			JSON.stringify({
-				inputs: text,
-				id: conv.messages.at(-1)?.id ?? conv.rootMessageId,
-				generationId: randomUUID(),
-			})
+			JSON.stringify(
+				reply
+					? { id: reply.id, is_retry: true, generationId }
+					: {
+							inputs: text,
+							id: conv.messages.at(-1)?.id ?? conv.rootMessageId,
+							generationId,
+						}
+			)
 		);
 		const { generateConversationResponse } =
 			await import("$lib/server/generation/conversationRequest");
@@ -150,20 +202,24 @@ export async function deliverReview(
 			getClientAddress: () => "review-delivery",
 		});
 		if (!response.ok) throw new Error(`the conversation route answered ${response.status}`);
-		// the route saved the message before it answered, so this finds it
+		drain(response).catch((err) =>
+			logger.error({ err, reviewId: review._id.toString() }, "[review] delivered turn failed")
+		);
+		// sent only once the run exists, a crash before that leaves the lease to lapse into a rerun
+		if (!(await registered(generationId))) {
+			return release(review, { error: "the run was not registered in time", counted: true });
+		}
 		const saved = await collections.conversations.findOne(
 			{ _id: conv._id },
 			{ projection: { messages: 1 } }
 		);
 		const message = saved?.messages.findLast((m) => m.from === "user" && m.content === text);
-		const state = await markSent(review, message?.id);
-		drain(response).catch((err) =>
-			logger.error({ err, reviewId: review._id.toString() }, "[review] delivered turn failed")
-		);
-		return state;
+		return markSent(review, message?.id);
 	} catch (err) {
 		logger.warn({ err, reviewId: review._id.toString() }, "[review] delivery attempt failed");
 		return release(review, { error: reasonOf(err), counted: true });
+	} finally {
+		await releaseLock(lockKey, lock).catch(() => undefined);
 	}
 }
 
