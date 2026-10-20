@@ -288,6 +288,8 @@ function approvalsForRest(review: MlReview): Record<string, ReviewDraft> {
 	for (let index = 0; index < review.records.length; index += 1) {
 		const draft = review.drafts[String(index)];
 		if (draft && draft.status !== "pending") continue;
+		// a no the user already gave stands, approving the rest never flips it
+		if (yesNo && isAnswered(draft?.answers?.[yesNo.name])) continue;
 		const answers = { ...(draft?.answers ?? {}), ...(yesNo ? { [yesNo.name]: true } : {}) };
 		approved[String(index)] = {
 			status: yesNo ? answeredStatus(review.schema, answers) : "answered",

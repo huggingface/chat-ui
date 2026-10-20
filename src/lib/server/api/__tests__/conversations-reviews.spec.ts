@@ -691,6 +691,7 @@ describe.sequential("submitting", () => {
 			]);
 			await patch(0, "pending", { note: "half done" });
 			await patch(1, "answered", { ok: false });
+			await patch(2, "pending", { ok: false });
 
 			expect((await submit({ verdict: "approve", approveRest: true })).status).toBe(200);
 
@@ -701,6 +702,7 @@ describe.sequential("submitting", () => {
 			});
 			expect(drafts["1"]).toMatchObject({ status: "answered", answers: { ok: false } });
 			expect(drafts["3"]).toMatchObject({ status: "answered", answers: { ok: true } });
+			expect(drafts["2"]).toMatchObject({ status: "pending", answers: { ok: false } });
 			expect(drafts["3"].answers.also).toBeUndefined();
 		});
 
