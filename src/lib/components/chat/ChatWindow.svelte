@@ -47,7 +47,9 @@
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
 	import { browser } from "$app/environment";
 	import { createChatScroll } from "$lib/utils/scroll/chatScroll.svelte";
-	import { isAssistantGenerationTerminal } from "$lib/utils/generationState";
+	import { isAssistantGenerationTerminal, turnStateOf } from "$lib/utils/generationState";
+	import { queuedInputs } from "$lib/stores/queuedInputs.svelte";
+	import QueuedInputs from "./QueuedInputs.svelte";
 	import { NAV_EDGE_SWIPE_ZONE_PX } from "$lib/constants/gestures";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ShareConversationModal from "../ShareConversationModal.svelte";
@@ -111,6 +113,7 @@
 		isMessageToolErrorUpdate,
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
+	import { MessageUpdateType } from "$lib/types/MessageUpdate";
 	import type { ToolFront } from "$lib/types/Tool";
 
 	interface Props {
@@ -129,6 +132,8 @@
 		onstop?: () => void;
 		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
 		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
+		/** the server started a turn from the queue */
+		onqueuedturn?: () => void;
 		draft?: string;
 	}
 
@@ -149,6 +154,7 @@
 		onstop,
 		onretry,
 		onshowAlternateMsg,
+		onqueuedturn,
 	}: Props = $props();
 
 	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
@@ -222,6 +228,10 @@
 	const handleSubmit = () => {
 		if (sideQuestionPanel?.intercept(draft)) {
 			draft = "";
+			return;
+		}
+		if (queueing && draft.trim()) {
+			queueDraft();
 			return;
 		}
 		if (requireAuthUser() || loading || !draft) return;
@@ -573,6 +583,82 @@
 
 	let mlModeOn = $derived(ML_ASSISTANT_MODE && mlAssistant.enabled);
 	let mlTaskRunning = $derived(ML_ASSISTANT_MODE && mlAssistant.taskStarted);
+
+	// a message sent during a question still goes the usual way
+	let turnWaiting = $derived(turnStateOf(messages.at(-1))?.state === "waiting");
+	// a normal send could race the turn the server starts from the queue
+	let queueing = $derived(
+		mlTaskRunning &&
+			!shared &&
+			!isReadOnly &&
+			(loading || turnWaiting || queuedInputs.items.length > 0)
+	);
+
+	function queueDraft() {
+		if (files.length > 0) {
+			$error = "Attachments can be sent once ML Intern finishes this turn.";
+			return;
+		}
+		const text = draft.trim();
+		draft = "";
+		tap();
+		void queuedInputs.enqueue(text).then((outcome) => {
+			if (outcome !== "failed") return;
+			draft = draft ? `${text}\n\n${draft}` : text;
+			$error = "Could not queue the message. Try again.";
+		});
+	}
+
+	async function editQueued(id: string) {
+		const item = queuedInputs.items.find((queued) => queued.id === id);
+		if (!item) return;
+		const outcome = await queuedInputs.remove(id);
+		if (outcome === "cancelled") draft = draft ? `${item.text}\n\n${draft}` : item.text;
+		else if (outcome === "error") $error = "Could not edit the queued message. Try again.";
+	}
+
+	async function sendQueuedNow() {
+		if (!(await queuedInputs.sendNow())) {
+			$error = "Could not send the queued messages now. Try again.";
+		}
+	}
+
+	async function removeQueued(id: string) {
+		if ((await queuedInputs.remove(id)) === "error") {
+			$error = "Could not remove the queued message. Try again.";
+		}
+	}
+
+	$effect(() => {
+		const conversationId = page.params?.id;
+		if (!mlTaskRunning || shared || !conversationId) {
+			queuedInputs.reset();
+			return;
+		}
+		return queuedInputs.watch(conversationId, {
+			busy: loading || turnWaiting,
+			onStarted: () => onqueuedturn?.(),
+		});
+	});
+
+	$effect(() => {
+		if (queuedInputs.returned.length === 0) return;
+		untrack(() => {
+			const returned = queuedInputs.takeReturned();
+			draft = [...returned.map((input) => input.text), draft].filter(Boolean).join("\n\n");
+			const reason = returned.find((input) => input.error)?.error;
+			if (reason) $error = reason;
+		});
+	});
+
+	$effect(() => {
+		const delivered = new Set<string>();
+		for (const update of messages.at(-1)?.updates ?? []) {
+			if (update.type !== MessageUpdateType.QueuedInput) continue;
+			for (const input of update.inputs) delivered.add(input.id);
+		}
+		untrack(() => queuedInputs.delivered(delivered));
+	});
 	// Resume beats Retry for a failed agentic turn: retry re-runs the whole turn
 	// (duplicating jobs and repos already created), resume continues past the
 	// preserved transcript. ML mode only — elsewhere turns rarely carry work
@@ -1210,6 +1296,15 @@
 						/>
 					{/if}
 				</div>
+				{#if mlTaskRunning}
+					<QueuedInputs
+						items={queuedInputs.items}
+						busy={loading || turnWaiting}
+						onremove={removeQueued}
+						onedit={editQueued}
+						onsendnow={sendQueuedNow}
+					/>
+				{/if}
 				{#if mlTaskRunning && !shared && page.params?.id}
 					{#key page.params.id}
 						<SideQuestionPanel bind:this={sideQuestionPanel} conversationId={page.params.id} />
@@ -1231,7 +1326,10 @@
 						"opacity-30": isReadOnly,
 						"max-sm:mb-4": focused && isVirtualKeyboard(),
 					}}
-					style:--composer-actions-width={transcriptionEnabled && !loading ? "84px" : "44px"}
+					style:--composer-actions-width={(transcriptionEnabled && !loading) ||
+					(loading && queueing && draft.trim() && !draftIsSideQuestion)
+						? "84px"
+						: "44px"}
 				>
 					{#if ML_ASSISTANT_MODE}
 						<MlAssistantStrip
@@ -1275,9 +1373,11 @@
 									<ChatInput
 										placeholder={isReadOnly
 											? "This conversation is read-only."
-											: mlModeOn
-												? ML_ASSISTANT_PLACEHOLDER
-												: "Ask anything"}
+											: queueing
+												? "Add to the run, read at its next step"
+												: mlModeOn
+													? ML_ASSISTANT_PLACEHOLDER
+													: "Ask anything"}
 										{loading}
 										bind:value={draft}
 										bind:files
@@ -1293,6 +1393,17 @@
 									/>
 								{/if}
 
+								{#if loading && queueing && draft.trim() && !draftIsSideQuestion}
+									<button
+										class="absolute right-11 bottom-2 btn size-8 self-end rounded-full border bg-black! text-white! shadow transition-none sm:right-10 sm:size-7 dark:border-transparent dark:bg-white! dark:text-black!"
+										type="submit"
+										aria-label="Queue message"
+										title="Queue: read at the next step"
+										name="submit"
+									>
+										<IconArrowUp />
+									</button>
+								{/if}
 								{#if loading && !draftIsSideQuestion}
 									<StopGeneratingBtn
 										onClick={() => {

@@ -274,7 +274,10 @@ function replayAssistantTurn(
 			);
 		} else if (isToolErrorUpdate(update)) {
 			outputsByUuid.set(update.uuid, `Error: ${update.message}`);
-		} else if (update.type === MessageUpdateType.HarnessEvent) {
+		} else if (
+			update.type === MessageUpdateType.HarnessEvent ||
+			update.type === MessageUpdateType.QueuedInput
+		) {
 			const texts = eventsByUuid.get(update.afterToolUuid) ?? [];
 			eventsByUuid.set(update.afterToolUuid, [...texts, update.text]);
 		}

@@ -385,6 +385,7 @@ export async function resumeAnsweredAsk({
 		AbortRegistry.getInstance().register(conversationKey, abortController);
 		const stopWatching = watchStopMarker(conversationId, abortController);
 		let failure: string | undefined;
+		let turnClosed = false;
 		try {
 			try {
 				const ctx: TextGenerationContext = {
@@ -436,6 +437,7 @@ export async function resumeAnsweredAsk({
 				failure === undefined ? { failed: false } : { failed: true, error: failure }
 			);
 			if (endedUpdate) apply(endedUpdate);
+			turnClosed = Boolean(endedUpdate);
 		} finally {
 			const aborted = abortController.signal.aborted;
 			stopWatching();
@@ -450,6 +452,10 @@ export async function resumeAnsweredAsk({
 				await collections.abortedGenerations
 					.deleteOne({ conversationId })
 					.catch((err) => logger.warn({ err }, "[ask] failed to consume stop marker"));
+			}
+			if (turnClosed && isMlAssistantConversation(conv)) {
+				const { kickQueuedTurn } = await import("$lib/server/queuedInputs/drain");
+				kickQueuedTurn(conversationId);
 			}
 		}
 	})();

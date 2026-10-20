@@ -51,6 +51,7 @@
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import SharePreviewTags from "$lib/components/SharePreviewTags.svelte";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { queuedInputs } from "$lib/stores/queuedInputs.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 	import { planStepsToMlSteps } from "$lib/utils/planProgress";
 
@@ -698,6 +699,7 @@
 				: undefined;
 
 		stopRequestedFor = convId;
+		queuedInputs.takeBack();
 		$isAborted = true;
 		$loading = false;
 		messageUpdatesAbortController.abort();
@@ -723,6 +725,10 @@
 			if (!response.ok) {
 				throw new Error(`Stop request failed: ${response.status}`);
 			}
+			const body = (await response.json().catch(() => ({}))) as {
+				cancelledQueuedInputs?: string[];
+			};
+			queuedInputs.stopped(body.cancelledQueuedInputs ?? []);
 		};
 
 		// Store the promise so writeMessage's finally block can await it
@@ -731,6 +737,7 @@
 		// generation watchers act on), so retry with backoff instead of giving
 		// up after a single transient failure.
 		stopRequestPromise = (async () => {
+			await queuedInputs.settled();
 			const delays = [0, 300, 1000, 3000];
 			for (const [attempt, delay] of delays.entries()) {
 				if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
@@ -941,6 +948,7 @@
 	onretry={onRetry}
 	onshowAlternateMsg={onShowAlternateMsg}
 	onstop={stopGeneration}
+	onqueuedturn={() => resyncTurn()}
 	models={data.models}
 	currentModel={findCurrentModel(data.models, data.oldModels, data.model)}
 />

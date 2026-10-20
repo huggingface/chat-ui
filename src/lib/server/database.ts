@@ -13,6 +13,7 @@ import type { Generation, GenerationEvent } from "$lib/types/Generation";
 import type { TurnState } from "$lib/types/TurnState";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { ParkedCall } from "$lib/types/ParkedCall";
+import type { QueuedInput } from "$lib/types/QueuedInput";
 import type { NestedAgentCall } from "$lib/types/NestedAgentCall";
 import type { MlFile } from "$lib/types/MlFile";
 import { ML_FILE_VERSION_INDEX } from "$lib/server/mlFiles/indexes";
@@ -158,6 +159,7 @@ export class Database {
 		const turnStates = db.collection<TurnState>("turnStates");
 		const mcpElicitations = db.collection<McpElicitation>("mcpElicitations");
 		const parkedCalls = db.collection<ParkedCall>("parkedCalls");
+		const queuedInputs = db.collection<QueuedInput>("queuedInputs");
 		const nestedAgentCalls = db.collection<NestedAgentCall>("nestedAgentCalls");
 		const mlFiles = db.collection<MlFile>("mlFiles");
 		const mlServices = db.collection<MlService>("mlServices");
@@ -203,6 +205,7 @@ export class Database {
 			turnStates,
 			mcpElicitations,
 			parkedCalls,
+			queuedInputs,
 			nestedAgentCalls,
 			mlFiles,
 			mlServices,
@@ -241,6 +244,7 @@ export class Database {
 			turnStates,
 			mcpElicitations,
 			parkedCalls,
+			queuedInputs,
 			nestedAgentCalls,
 			mlFiles,
 			mlServices,
@@ -466,6 +470,19 @@ export class Database {
 		parkedCalls
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 })
 			.catch((e) => logger.error(e, "Error creating TTL index for parkedCalls by createdAt"));
+
+		queuedInputs
+			.createIndex({ conversationId: 1, status: 1, createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for queuedInputs by conversation"));
+		queuedInputs
+			.createIndex({ status: 1, checkedAt: 1, createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for queuedInputs by status"));
+		queuedInputs
+			.createIndex({ status: 1, takenAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for queuedInputs by claim"));
+		queuedInputs
+			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 })
+			.catch((e) => logger.error(e, "Error creating TTL index for queuedInputs by createdAt"));
 
 		mcpElicitations
 			.createIndex({ elicitationId: 1 }, { unique: true })

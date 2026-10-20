@@ -8,6 +8,8 @@ import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { GenerationReaper } from "$lib/server/generation/reaper";
 import { ParkedCallSweeper } from "$lib/server/generation/parkedSweeper";
 import { AnsweredAskSweeper } from "$lib/server/generation/askResume";
+import { QueuedInputSweeper } from "$lib/server/queuedInputs/drain";
+import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 import { MlServicePoller } from "$lib/server/mlRegistry/poller";
 import { mlServicePollerEnabled } from "$lib/server/mlRegistry/enabled";
 import { adminTokenManager } from "$lib/server/adminToken";
@@ -51,6 +53,7 @@ export async function initServer(): Promise<void> {
 	GenerationReaper.getInstance();
 	ParkedCallSweeper.getInstance();
 	AnsweredAskSweeper.getInstance();
+	if (ML_ASSISTANT_MODE) QueuedInputSweeper.getInstance();
 	if (mlServicePollerEnabled()) MlServicePoller.getInstance();
 
 	// Warm up the share-thumbnail renderer: the first satori render in a fresh

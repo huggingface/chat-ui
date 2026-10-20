@@ -68,6 +68,8 @@ export interface ParkedCall extends Timestamps {
 	serviceEvents?: ServiceEvent[];
 	/** set when an event moved resumeAt, worded apart from wokeEarlyAt since the user did not ask */
 	wokeByHarnessAt?: Date;
+	/** set when a message the user sent while it waited moved resumeAt */
+	wokeByUserMessageAt?: Date;
 
 	/** Set when a sweeper claims the row, so two pods cannot resume the same turn. */
 	takenAt?: Date;
