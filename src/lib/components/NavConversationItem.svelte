@@ -144,11 +144,7 @@
 				}
 			}}
 		>
-			<span
-				>{conv.managedBy?.kind === "slack" && !conv.title.startsWith("Slack · ")
-					? "Slack · "
-					: ""}{conv.title}</span
-			>
+			<span>{conv.title}</span>
 		</a>
 
 		{#if !readOnly || allowDelete}
