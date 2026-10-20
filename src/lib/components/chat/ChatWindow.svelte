@@ -23,6 +23,9 @@
 
 	import ChatInput from "./ChatInput.svelte";
 	import AskQuestion from "./AskQuestion.svelte";
+	import SideQuestionPanel from "./SideQuestionPanel.svelte";
+	import { isWebSideQuestion } from "$lib/utils/sideQuestion";
+	import { BTW_COMMAND } from "$lib/utils/slashCommands";
 	import { firstQuestionFor } from "$lib/stores/pendingQuestion";
 	import { shouldShowPendingPlaceholder } from "$lib/utils/pendingPlaceholder";
 	import VoiceRecorder from "./VoiceRecorder.svelte";
@@ -219,7 +222,14 @@
 	);
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
 
+	let sideQuestionPanel: ReturnType<typeof SideQuestionPanel> | undefined = $state();
+	let draftIsSideQuestion = $derived(Boolean(sideQuestionPanel) && isWebSideQuestion(draft));
+
 	const handleSubmit = () => {
+		if (sideQuestionPanel?.intercept(draft)) {
+			draft = "";
+			return;
+		}
 		if (queueing && draft.trim()) {
 			queueDraft();
 			return;
@@ -1295,6 +1305,11 @@
 						onsendnow={sendQueuedNow}
 					/>
 				{/if}
+				{#if mlTaskRunning && !shared && page.params?.id}
+					{#key page.params.id}
+						<SideQuestionPanel bind:this={sideQuestionPanel} conversationId={page.params.id} />
+					{/key}
+				{/if}
 				<form
 					bind:this={composerForm}
 					tabindex="-1"
@@ -1373,11 +1388,12 @@
 										{modelIsMultimodal}
 										{modelSupportsTools}
 										showMlPill={mlPillVisible}
+										slashCommands={sideQuestionPanel ? [BTW_COMMAND] : []}
 										bind:focused
 									/>
 								{/if}
 
-								{#if loading && queueing && draft.trim()}
+								{#if loading && queueing && draft.trim() && !draftIsSideQuestion}
 									<button
 										class="absolute right-11 bottom-2 btn size-8 self-end rounded-full border bg-black! text-white! shadow transition-none sm:right-10 sm:size-7 dark:border-transparent dark:bg-white! dark:text-black!"
 										type="submit"
@@ -1388,7 +1404,7 @@
 										<IconArrowUp />
 									</button>
 								{/if}
-								{#if loading}
+								{#if loading && !draftIsSideQuestion}
 									<StopGeneratingBtn
 										onClick={() => {
 											hapticError();
