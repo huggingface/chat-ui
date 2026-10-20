@@ -843,15 +843,19 @@ export class MlSlackBot {
 		}
 	}
 
-	private async dispatch(thread: SlackThread): Promise<void> {
+	private async dispatch(thread: SlackThread, queueOnly = false): Promise<void> {
 		const claim = await collections.slackInputs.findOneAndUpdate(
-			{ threadId: thread._id, status: "queued" },
+			{
+				threadId: thread._id,
+				status: "queued",
+				...(queueOnly ? { retry: { $ne: true }, resumeElicitationId: { $exists: false } } : {}),
+			},
 			{ $set: { status: "running", updatedAt: new Date() } },
 			{ sort: { ts: 1 }, returnDocument: "after" }
 		);
 		const input = claim.value;
 		if (!input) return;
-		this.runningConversations.set(thread._id, thread.conversationId.toHexString());
+		if (!queueOnly) this.runningConversations.set(thread._id, thread.conversationId.toHexString());
 		try {
 			if (thread.hfUserId && input.user !== thread.owner)
 				throw new Error("Only the personal session owner may submit requests.");
@@ -885,10 +889,25 @@ export class MlSlackBot {
 						latest?.generationId !== input.expectedGenerationId)
 				)
 					throw new Error("This resume refers to an older turn.");
-				const busy =
-					latest?.from === "assistant" &&
-					(await isTurnAlive(thread.conversationId, latest.id)).alive;
+				const live =
+					latest?.from === "assistant"
+						? await isTurnAlive(thread.conversationId, latest.id)
+						: undefined;
+				const busy = live?.alive;
+				// The existing dispatch owns turn startup and question continuation. A concurrent
+				// intake may only queue text, never start a second generation or skip its ask.
+				if (queueOnly && (!busy || live?.status === "awaiting_input")) {
+					await collections.slackInputs.updateOne(
+						{ _id: input._id },
+						{
+							$set: { status: "queued", updatedAt: new Date() },
+						}
+					);
+					return;
+				}
 				const skipped =
+					!queueOnly &&
+					latest &&
 					busy &&
 					!input.retry &&
 					input.user === thread.owner &&
@@ -949,7 +968,7 @@ export class MlSlackBot {
 				}
 			);
 		} finally {
-			this.runningConversations.delete(thread._id);
+			if (!queueOnly) this.runningConversations.delete(thread._id);
 		}
 	}
 
@@ -1541,6 +1560,8 @@ export class MlSlackBot {
 						await this.deliveryFailure(thread);
 					}
 				} else deliveryFailed = true;
+				// Intake stays serialized by tick, independently of the long-lived run.
+				if (this.active.has(thread._id)) await this.dispatch(thread, true);
 				if (
 					!this.active.has(thread._id) &&
 					this.active.size < 4 &&

@@ -694,7 +694,9 @@ describe("Slack transport authorization", () => {
 			{ user: "OWNER", text: "Use the 7B model", ts: "105.0", thread_ts: "100.0" },
 			"e5"
 		);
-		await bot["dispatch"](thread);
+		bot["active"].set(thread._id, new Promise<void>(() => {}));
+		await bot.tick();
+		bot["active"].delete(thread._id);
 		expect(mocks.run).not.toHaveBeenCalled();
 		const queued = await collections.queuedInputs
 			.find({ conversationId: thread.conversationId })
@@ -703,8 +705,6 @@ describe("Slack transport authorization", () => {
 		expect(queued[0].text).toContain("Use the 7B model");
 		expect(mocks.kickQueuedTurn).toHaveBeenCalledWith(thread.conversationId);
 
-		mocks.post.mockClear();
-		await bot["publish"](thread);
 		const card = mocks.post.mock.calls.find(([v]) => v.text.includes("Session status"));
 		expect(JSON.stringify(card?.[0].blocks)).toMatch(/⏳ _working\.\.\._ · \d+s/);
 		await collections.queuedInputs.deleteMany({ conversationId: thread.conversationId });
@@ -737,6 +737,12 @@ describe("Slack transport authorization", () => {
 			},
 			body: { team_id: "T123", event_id: "idle" },
 		});
+		// A finishing/starting stream must retain ownership even without a live turn row.
+		bot["active"].set(thread._id, new Promise<void>(() => {}));
+		await bot.tick();
+		expect(mocks.run).not.toHaveBeenCalled();
+		expect(await collections.slackInputs.countDocuments({ status: "queued" })).toBe(1);
+		bot["active"].delete(thread._id);
 		await bot["dispatch"](thread);
 		expect(mocks.run).toHaveBeenCalledTimes(1);
 		expect(mocks.run.mock.lastCall?.[2].text).toContain("Now evaluate it");
