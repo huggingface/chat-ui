@@ -87,10 +87,18 @@ export async function saveDraft(
 /** claims the submission from the status and draft revision it read, so a race changes nothing */
 export async function submitReview(
 	review: Pick<MlReview, "_id" | "conversationId" | "draftRevision">,
-	submission: { verdict: ReviewVerdict; summary?: string },
+	submission: {
+		verdict: ReviewVerdict;
+		summary?: string;
+		/** drafts written in the same update as the claim, keyed by record position */
+		drafts?: Record<string, ReviewDraft>;
+	},
 	from: MlReview["status"] = "open"
 ): Promise<boolean> {
 	const now = new Date();
+	const drafts = Object.fromEntries(
+		Object.entries(submission.drafts ?? {}).map(([index, draft]) => [`drafts.${index}`, draft])
+	);
 	const updated = await collections.mlReviews.updateOne(
 		{
 			_id: review._id,
@@ -106,6 +114,7 @@ export async function submitReview(
 				...(from === "open"
 					? { unresolved: true as const }
 					: { delivery: { status: "pending" as const, attempts: 0 } }),
+				...drafts,
 				submittedAt: now,
 				updatedAt: now,
 			},

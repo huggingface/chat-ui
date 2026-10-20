@@ -631,6 +631,109 @@ describe.sequential("submitting", () => {
 		).toEqual(["answered", "discarded", "answered", "skipped"]);
 	});
 
+	describe("approveRest", () => {
+		const reviewWith = async (locals: App.Locals, questions: ReviewSchema["questions"]) => {
+			const conv = await createTestConversation(locals, { mlAssistant: true });
+			const review = await createReview({
+				conversationId: conv._id,
+				messageId: "m",
+				toolCallId: "c",
+				toolUuid: "u",
+				elicitationId: crypto.randomUUID(),
+				schema: { ...SCHEMA, questions },
+				schemaHash: "abcd1234",
+				source: { kind: "inline" },
+				records: ["a", "b", "c", "d"].map((id) => ({ id, values: {} })),
+			});
+			await collections.mlReviews.updateOne({ _id: review._id }, { $set: { status: "detached" } });
+			const patch = (index: number, status: string, answers: Record<string, unknown> = {}) =>
+				PATCH(
+					event(locals, conv._id.toString(), review._id.toString(), {
+						index,
+						draft: { status, answers, comments: [] },
+					})
+				);
+			const submit = (body: Record<string, unknown>) =>
+				errorOf(SUBMIT(event(locals, conv._id.toString(), review._id.toString(), body)));
+			const stored = async () => {
+				const row = await collections.mlReviews.findOne({ _id: review._id });
+				if (!row) throw new Error("review vanished");
+				return row;
+			};
+			return { conv, review, patch, submit, stored };
+		};
+
+		it("approves every undecided record in the claim, leaving decided ones alone", async () => {
+			const { locals } = await createTestUser();
+			const { patch, submit, stored } = await reviewWith(locals, []);
+			await patch(1, "skipped");
+			await patch(2, "discarded");
+
+			expect((await submit({ verdict: "approve", approveRest: true })).status).toBe(200);
+
+			const review = await stored();
+			expect([0, 1, 2, 3].map((i) => review.drafts[String(i)]?.status)).toEqual([
+				"answered",
+				"skipped",
+				"discarded",
+				"answered",
+			]);
+			expect(review.status).toBe("submitted");
+			expect(review.result?.text).toContain("Approved: a, d\nRejected: c\n");
+		});
+
+		it("sets the first yes or no question and keeps answers already given", async () => {
+			const { locals } = await createTestUser();
+			const { patch, submit, stored } = await reviewWith(locals, [
+				{ name: "ok", type: "boolean", required: true },
+				{ name: "also", type: "boolean", required: false },
+				{ name: "note", type: "text", required: false, maxLength: 100 },
+			]);
+			await patch(0, "pending", { note: "half done" });
+			await patch(1, "answered", { ok: false });
+
+			expect((await submit({ verdict: "approve", approveRest: true })).status).toBe(200);
+
+			const drafts = (await stored()).drafts;
+			expect(drafts["0"]).toMatchObject({
+				status: "answered",
+				answers: { note: "half done", ok: true },
+			});
+			expect(drafts["1"]).toMatchObject({ status: "answered", answers: { ok: false } });
+			expect(drafts["3"]).toMatchObject({ status: "answered", answers: { ok: true } });
+			expect(drafts["3"].answers.also).toBeUndefined();
+		});
+
+		it("cannot answer a required label for the user, so the blockers still stand", async () => {
+			const { locals } = await createTestUser();
+			const { submit, stored } = await reviewWith(locals, SCHEMA.questions);
+			const res = await SUBMIT(
+				event(locals, (await stored()).conversationId.toString(), (await stored())._id.toString(), {
+					verdict: "approve",
+					approveRest: true,
+				})
+			);
+			expect(res.status).toBe(400);
+			expect((await res.json()).blockers).toHaveLength(4);
+			expect(await stored()).toMatchObject({ status: "detached", drafts: {} });
+			expect((await submit({ verdict: "approve" })).status).toBe(400);
+		});
+
+		it("lets approve all pass the empty-submit guard, and writes nothing when the claim loses", async () => {
+			const { locals } = await createTestUser();
+			const { review, submit, stored } = await reviewWith(locals, []);
+			const read = await stored();
+			await collections.mlReviews.updateOne({ _id: review._id }, { $inc: { draftRevision: 1 } });
+
+			await expect(
+				submitReviewRequest(read, { verdict: "approve", approveRest: true })
+			).rejects.toMatchObject({ status: 409 });
+			expect((await stored()).drafts).toEqual({});
+
+			expect((await submit({ verdict: "approve", approveRest: true })).status).toBe(200);
+		});
+	});
+
 	it("answers 400 with the blockers while a required question is open", async () => {
 		const { locals } = await createTestUser();
 		const { conv, review } = await seed(locals);

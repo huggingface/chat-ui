@@ -6,7 +6,12 @@ import { authCondition } from "$lib/server/auth";
 import { logger } from "$lib/server/logger";
 import { kickAnsweredAsk, type AskResumeSelection } from "$lib/server/generation/askResume";
 import type { MlReview, ReviewDraft } from "$lib/types/MlReview";
-import { blockers, validateAnswer, type ReviewBlocker } from "$lib/utils/review/answers";
+import {
+	blockers,
+	isAnswered,
+	validateAnswer,
+	type ReviewBlocker,
+} from "$lib/utils/review/answers";
 import { REVIEW_LIMITS } from "$lib/utils/review/schema";
 import { readReview, saveDraft, submitReview } from "./store";
 import { completeSubmission } from "./submission";
@@ -258,7 +263,42 @@ export const submitBodySchema = z.object({
 	verdict: z.enum(["approve", "request_changes", "comment"]),
 	summary: z.string().trim().max(SUMMARY_CHARS).optional(),
 	selection: selectionSchema,
+	/** approves every record still undecided, so approve all is one request at 500 records */
+	approveRest: z.boolean().optional(),
 });
+
+/** mirrors the pane, a record is answered once its required questions are, or any when none is */
+function answeredStatus(
+	schema: MlReview["schema"],
+	answers: ReviewDraft["answers"]
+): ReviewDraft["status"] {
+	const required = schema.questions.filter((question) => question.required);
+	const done =
+		required.length > 0
+			? required.every((question) => isAnswered(answers[question.name]))
+			: schema.questions.some((question) => isAnswered(answers[question.name]));
+	return done ? "answered" : "pending";
+}
+
+/** approval sets the first yes or no question, or with none just marks the record answered */
+function approvalsForRest(review: MlReview): Record<string, ReviewDraft> {
+	const yesNo = review.schema.questions.find((question) => question.type === "boolean");
+	const now = new Date();
+	const approved: Record<string, ReviewDraft> = {};
+	for (let index = 0; index < review.records.length; index += 1) {
+		const draft = review.drafts[String(index)];
+		if (draft && draft.status !== "pending") continue;
+		const answers = { ...(draft?.answers ?? {}), ...(yesNo ? { [yesNo.name]: true } : {}) };
+		approved[String(index)] = {
+			status: yesNo ? answeredStatus(review.schema, answers) : "answered",
+			answers,
+			comments: draft?.comments ?? [],
+			revision: (draft?.revision ?? 0) + 1,
+			updatedAt: now,
+		};
+	}
+	return approved;
+}
 
 function toResumeSelection(selection: z.infer<typeof selectionSchema>): AskResumeSelection {
 	return {
@@ -302,19 +342,22 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 		return finish(review, selection);
 	}
 
-	const found = blockers(review.schema, review.drafts, review.records.length);
+	const approved = parsed.data.approveRest ? approvalsForRest(review) : {};
+	const drafts = { ...review.drafts, ...approved };
+	const found = blockers(review.schema, drafts, review.records.length);
 	if (found.length > 0) return { blockers: found };
-	const decided = Object.values(review.drafts).some(
+	const decided = Object.values(drafts).some(
 		(d) => d?.status === "answered" || d?.status === "discarded"
 	);
 	if (!decided) error(400, NOTHING_DECIDED);
 
 	const from = review.status;
-	if (!(await submitReview(review, { verdict, summary }, from))) {
+	if (!(await submitReview(review, { verdict, summary, drafts: approved }, from))) {
 		error(409, "This review changed while it was being submitted, reload it and submit again.");
 	}
 	const claimed: MlReview = {
 		...review,
+		drafts,
 		status: "submitted",
 		verdict,
 		...(summary ? { summary } : {}),
