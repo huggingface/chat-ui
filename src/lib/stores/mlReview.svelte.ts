@@ -157,6 +157,8 @@ export class ReviewSession {
 	#timers = new Map<number, ReturnType<typeof setTimeout>>();
 	#inflight = new Map<number, Promise<void>>();
 	#again = new Set<number>();
+	/** a queued resave keeps the keepalive of any call that asked for it, a hiding tab must not lose it */
+	#againKeepalive = new Set<number>();
 	/** by record position, the server revision the local copy builds on, 0 before the first save */
 	#revisions = new Map<number, number>();
 	#conflicts = new Map<number, number>();
@@ -323,6 +325,7 @@ export class ReviewSession {
 		const running = this.#inflight.get(index);
 		if (running) {
 			this.#again.add(index);
+			if (keepalive) this.#againKeepalive.add(index);
 			return running;
 		}
 		const request = (async () => {
@@ -332,7 +335,10 @@ export class ReviewSession {
 				this.#inflight.delete(index);
 			}
 			// the edit made while the last one was in flight, sent even after a conversation switch
-			if (this.#again.delete(index)) await this.#save(index, keepalive);
+			if (this.#again.delete(index)) {
+				const queuedKeepalive = this.#againKeepalive.delete(index);
+				await this.#save(index, keepalive || queuedKeepalive);
+			}
 		})();
 		this.#inflight.set(index, request);
 		return request;
