@@ -1327,7 +1327,7 @@
 						"max-sm:mb-4": focused && isVirtualKeyboard(),
 					}}
 					style:--composer-actions-width={(transcriptionEnabled && !loading) ||
-					(loading && queueing && draft.trim())
+					(loading && queueing && draft.trim() && !draftIsSideQuestion)
 						? "84px"
 						: "44px"}
 				>
