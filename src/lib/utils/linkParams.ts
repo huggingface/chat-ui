@@ -21,10 +21,6 @@ export interface LinkPromptRequest {
 
 export const LINK_PARAM_NAMES = ["q", "prompt", "attachments"] as const;
 
-/**
- * An MCP server a deep link asked to add, e.g. a Gradio app launched with
- * `share=True`. Nothing is contacted until the user confirms in the add form.
- */
 export interface LinkMcpServerRequest {
 	name: string;
 	url: URL;
@@ -34,10 +30,6 @@ export const MCP_LINK_PARAM_NAMES = ["mcp", "mcp_name"] as const;
 
 const MAX_MCP_NAME_LENGTH = 100;
 
-/**
- * `null` unless `mcp` holds an absolute http(s) URL without credentials.
- * `mcp_name` is optional; the host name stands in for it.
- */
 export function readLinkMcpServerRequest(params: URLSearchParams): LinkMcpServerRequest | null {
 	const raw = sanitizeUrlParam(params.get("mcp"));
 	const url = raw ? parseExternalUrl(raw) : undefined;

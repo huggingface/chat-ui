@@ -44,7 +44,6 @@
 	let draft = $state("");
 	/** A deep link waiting on the user's say-so; see LinkPromptModal. */
 	let linkRequest = $state<LinkPromptRequest | null>(null);
-	/** An MCP server a deep link asked to add, waiting on the add form's confirmation. */
 	let linkMcpServer = $state<LinkMcpServerRequest | null>(null);
 
 	const settings = useSettingsStore();
@@ -167,8 +166,6 @@
 				replaceState(url, page.state);
 			});
 
-			// The add form is the confirmation: nothing is contacted until the user
-			// submits it. A server that is already on needs no dialog at all.
 			const alreadyEnabled =
 				mcpRequest &&
 				$allMcpServers.some(

@@ -29,16 +29,12 @@
 
 	interface Props {
 		onclose: () => void;
-		/** A server a deep link asked to add: opens straight on the add form, filled in. */
 		linkServer?: { name: string; url: string };
 	}
 
 	let { onclose, linkServer }: Props = $props();
 
-	// True while the add form still holds the link's server; any submit or cancel ends it.
 	let linkPending = $state(untrack(() => Boolean(linkServer)));
-	// A link to a server the user already has offers to turn that one on. It is not probed again:
-	// discovery would open a second OAuth connection for a server that already has one.
 	const linkExisting = $derived.by(() => {
 		const url = linkServer?.url;
 		return url ? $allMcpServers.find((s) => isSameServerUrl(s.url, url)) : undefined;
@@ -79,7 +75,6 @@
 		headers?: KeyValuePair[];
 		discovery?: DiscoveryResponse;
 	}) {
-		// Discovery can finish after the user cancels or leaves the page.
 		if (closed) return;
 		const fromLink = linkPending;
 		linkPending = false;
@@ -106,7 +101,6 @@
 			currentView = "list";
 			$error = `${serverData.url} requires authorization but its OAuth metadata could not be loaded. Try Health Check or contact the server admin.`;
 		} else {
-			// The user added it from a link to use it now, so it starts enabled.
 			if (fromLink) toggleServer(id);
 			currentView = "list";
 		}
@@ -115,7 +109,6 @@
 	function handleEnableExisting(server: MCPServer) {
 		linkPending = false;
 		if (server.oauth && server.oauth.status !== "authorized") {
-			// Enabled once authorization completes, in handleAuthorized.
 			handleReauthorizeFromCard({
 				serverId: server.id,
 				serverUrl: server.url,
@@ -146,7 +139,6 @@
 	}
 
 	function handleCancel() {
-		// Declining a link's server closes the dialog: the user never asked to manage servers.
 		if (linkPending) return handleClose();
 		currentView = "list";
 	}
