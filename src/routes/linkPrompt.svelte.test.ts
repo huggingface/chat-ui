@@ -14,17 +14,15 @@ vi.mock("$lib/components/chat/ChatWindow.svelte", async () => ({
 vi.mock("$lib/utils/loadAttachmentsFromUrls", () => ({ loadAttachmentsFromUrls: vi.fn() }));
 
 const mcp = vi.hoisted(() => ({
-	servers: [] as { id: string; url: string }[],
+	servers: [] as { id: string; name?: string; url: string }[],
 	selected: new Set<string>(),
 }));
 vi.mock("$lib/stores/mcpServers", async () => {
 	const { readable, writable } = await import("svelte/store");
-	const sameUrl = (a: string, b: string) => new URL(a).href === new URL(b).href;
 	return {
 		allMcpServers: writable(mcp.servers),
 		selectedServerIds: writable(mcp.selected),
 		enabledServersCount: readable(0),
-		isSameServerUrl: sameUrl,
 		addCustomServer: vi.fn(() => "added"),
 		refreshMcpServers: vi.fn(async () => undefined),
 		healthCheckServer: vi.fn(async () => undefined),
@@ -151,6 +149,15 @@ describe("mcp link on the home route", () => {
 		expect(document.querySelector<HTMLInputElement>("#server-url")?.value).toBe(MCP_URL);
 		const [url] = (appNavigation().replaceState.mock.lastCall ?? []) as unknown[];
 		expect(new URL(String(url)).search).toBe("");
+	});
+
+	it("offers to enable a server the user already has, without the add form", async () => {
+		mcp.servers.push({ id: "existing", name: "Mine", url: `${MCP_URL}#tools` });
+		mountOnLink(HomePage as Component, mcpLink);
+		await settle();
+
+		expect(document.body.textContent).toContain("Enable Server");
+		expect(document.querySelector("#server-url")).toBeNull();
 	});
 
 	it("shows nothing for a server that is already enabled", async () => {

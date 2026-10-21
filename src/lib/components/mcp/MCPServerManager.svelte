@@ -15,9 +15,9 @@
 		setServerOAuth,
 		toggleServer,
 		reconcileOAuthConnections,
-		isSameServerUrl,
 	} from "$lib/stores/mcpServers";
-	import type { KeyValuePair, MCPOAuthState } from "$lib/types/Tool";
+	import { isSameServerUrl } from "$lib/utils/mcpValidation";
+	import type { KeyValuePair, MCPOAuthState, MCPServer } from "$lib/types/Tool";
 	import type { DiscoveryResponse, OAuthCallbackPayload } from "$lib/utils/mcpOAuth";
 	import { error } from "$lib/stores/errors";
 	import IconAddLarge from "~icons/carbon/add-large";
@@ -37,6 +37,12 @@
 
 	// True while the add form still holds the link's server; any submit or cancel ends it.
 	let linkPending = $state(untrack(() => Boolean(linkServer)));
+	// A link to a server the user already has offers to turn that one on. It is not probed again:
+	// discovery would open a second OAuth connection for a server that already has one.
+	const linkExisting = untrack(() => {
+		const url = linkServer?.url;
+		return url ? $allMcpServers.find((s) => isSameServerUrl(s.url, url)) : undefined;
+	});
 
 	type View = "list" | "add" | "authorize";
 	let currentView = $state<View>(untrack(() => (linkServer ? "add" : "list")));
@@ -65,13 +71,6 @@
 	}) {
 		const fromLink = linkPending;
 		linkPending = false;
-		// A link to a server the user already has turns that one on instead of adding a copy.
-		const existing = fromLink && $allMcpServers.find((s) => isSameServerUrl(s.url, serverData.url));
-		if (existing) {
-			if (!$selectedServerIds.has(existing.id)) toggleServer(existing.id);
-			currentView = "list";
-			return;
-		}
 		const oauth: MCPOAuthState | undefined =
 			serverData.discovery?.requiresAuth && serverData.discovery.connection
 				? serverData.discovery.connection
@@ -99,6 +98,21 @@
 			if (fromLink) toggleServer(id);
 			currentView = "list";
 		}
+	}
+
+	function handleEnableExisting(server: MCPServer) {
+		linkPending = false;
+		if (server.oauth && server.oauth.status !== "authorized") {
+			// Enabled once authorization completes, in handleAuthorized.
+			handleReauthorizeFromCard({
+				serverId: server.id,
+				serverUrl: server.url,
+				oauth: server.oauth,
+			});
+			return;
+		}
+		if (!$selectedServerIds.has(server.id)) toggleServer(server.id);
+		currentView = "list";
 	}
 
 	function handleAuthorized(payload: OAuthCallbackPayload) {
@@ -178,6 +192,8 @@
 				{:else if currentView === "authorize"}
 					Sign in to {pendingAuth?.serverUrl} so {publicConfig.PUBLIC_APP_NAME} can call its tools on
 					your behalf.
+				{:else if linkPending && linkExisting}
+					A link asked to turn on a server you already added to {publicConfig.PUBLIC_APP_NAME}.
 				{:else if linkPending}
 					A link asked to add this server to {publicConfig.PUBLIC_APP_NAME}. Add it only if you
 					trust whoever shared the link.
@@ -298,7 +314,31 @@
 				</div>
 			</div>
 		{:else if currentView === "add"}
-			{#if linkServer && linkPending}
+			{#if linkPending && linkExisting}
+				{@const existing = linkExisting}
+				<div class="space-y-4">
+					<div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+						<p class="text-sm font-medium text-gray-900 dark:text-gray-100">{existing.name}</p>
+						<p class="mt-1 text-xs break-all text-gray-600 dark:text-gray-400">{existing.url}</p>
+					</div>
+					<div class="flex justify-end gap-2">
+						<button
+							type="button"
+							onclick={handleCancel}
+							class="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onclick={() => handleEnableExisting(existing)}
+							class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+						>
+							Enable Server
+						</button>
+					</div>
+				</div>
+			{:else if linkServer && linkPending}
 				<AddServerForm
 					onsubmit={handleAddServer}
 					oncancel={handleCancel}

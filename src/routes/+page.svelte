@@ -29,7 +29,8 @@
 	} from "$lib/utils/linkParams";
 	import LinkPromptModal from "$lib/components/LinkPromptModal.svelte";
 	import MCPServerManager from "$lib/components/mcp/MCPServerManager.svelte";
-	import { allMcpServers, isSameServerUrl, selectedServerIds } from "$lib/stores/mcpServers";
+	import { allMcpServers, selectedServerIds } from "$lib/stores/mcpServers";
+	import { isSameServerUrl } from "$lib/utils/mcpValidation";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";

@@ -341,15 +341,6 @@ export function disableAllServers() {
 	selectedServerIds.set(new Set());
 }
 
-/** Whether two server URLs point at the same endpoint, ignoring how they were spelled. */
-export function isSameServerUrl(a: string, b: string): boolean {
-	try {
-		return new URL(a).href === new URL(b).href;
-	} catch {
-		return false;
-	}
-}
-
 /**
  * Add a custom MCP server
  */
