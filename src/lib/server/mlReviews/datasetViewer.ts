@@ -60,7 +60,8 @@ async function viewerGet(
 	});
 	const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 	if (res.ok) return body;
-	const reason = typeof body.error === "string" ? body.error : `HTTP ${res.status}`;
+	const reason =
+		typeof body.error === "string" ? body.error : `the dataset viewer answered HTTP ${res.status}`;
 	const dataset = String(params.dataset);
 	if (res.status === 401 || res.status === 403 || res.status === 404) {
 		if (/split|config/i.test(reason) && !/dataset does not exist/i.test(reason)) {
