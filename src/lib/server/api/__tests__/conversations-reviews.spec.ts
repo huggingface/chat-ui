@@ -1503,6 +1503,39 @@ describe.sequential("writing labels back", () => {
 		}
 	});
 
+	it("never runs the ask answer path for a publish card, a budget grant included", async () => {
+		vi.mocked(hub.commit).mockClear();
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals);
+		await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }));
+		await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: review.elicitationId,
+			generationId: "gen-resume",
+			mayPark: true,
+		});
+		const row = await publishRow(conv._id);
+		if (!row) throw new Error("no publish card");
+		await collections.mcpElicitations.updateOne(
+			{ _id: row._id },
+			{ $set: { "request.fields.0.options.2.setBudgetUsd": 50 } }
+		);
+		const before = (await collections.conversations.findOne({ _id: conv._id }))?.mlBudget;
+
+		expect(await answer(conv._id, row.elicitationId, "skip")).toMatchObject({ ok: true });
+		expect((await collections.conversations.findOne({ _id: conv._id }))?.mlBudget).toEqual(before);
+
+		const { updates } = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: row.elicitationId,
+		});
+		const text = JSON.stringify(updates);
+		expect(text).toContain('Review \\"Triage batch 1\\" submitted');
+		expect(text).not.toContain("The user answered");
+		expect(text).not.toContain("compute budget");
+	});
+
 	it("offers no direct push to a repo the owner cannot write to", async () => {
 		owner = "someone-else";
 		const { locals, user } = await createTestUser();

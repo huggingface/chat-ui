@@ -8,6 +8,7 @@ import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } fr
 import { questionModal, readAnswers } from "./presentation";
 import { submitElicitationAnswer } from "$lib/server/mcp/elicitation";
 import { kickAnsweredAsk } from "$lib/server/generation/askResume";
+import { submitReviewRequest } from "$lib/server/mlReviews/api";
 import { PUBLISH_FIELD, publishOptions } from "$lib/server/mlReviews/publish";
 import { rebuildIdentity } from "$lib/server/generation/parkedSweeper";
 
@@ -68,6 +69,15 @@ vi.mock("$lib/server/mcp/clientPool", () => ({ getClient: async () => ({}) }));
 vi.mock("$lib/server/mcp/httpClient", () => ({
 	callMcpTool: vi.fn(),
 	getMcpToolTimeoutMs: () => 2000,
+}));
+vi.mock("@huggingface/hub", async (original) => ({
+	...(await original<typeof import("@huggingface/hub")>()),
+	commit: vi.fn(async () => ({
+		commit: { oid: "abc123", url: "https://huggingface.co/datasets/pngwn/gold/commit/abc123" },
+		hookOutput: "",
+	})),
+	fileExists: vi.fn(async () => false),
+	datasetInfo: vi.fn(async () => ({ sha: "head1" })),
 }));
 vi.mock("$lib/server/logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), trace: vi.fn() },
@@ -251,6 +261,95 @@ describe("Slack ML Intern persistence", () => {
 				q0: { answer: { type: "static_select", selected_option: { value: "1" } } },
 			} as never)
 		).toEqual({ content: { publish: "pr" }, errors: {} });
+	});
+
+	it("resumes a publish card answered from the modal into the push, not a plain ask", async () => {
+		const { commit } = await import("@huggingface/hub");
+		vi.mocked(commit).mockClear();
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: string | URL) => {
+				const url = String(input);
+				if (url.endsWith("/api/datasets/pngwn/gold")) return Response.json({ private: false });
+				if (url.endsWith("/api/whoami-v2")) {
+					return Response.json({
+						name: "pngwn",
+						orgs: [],
+						auth: { accessToken: { role: "write" } },
+					});
+				}
+				return new Response("not stubbed", { status: 500 });
+			})
+		);
+		try {
+			const { thread, user } = await setup();
+			rounds(
+				{
+					toolCalls: [
+						{
+							id: "review",
+							name: "request_review",
+							arguments: JSON.stringify({
+								title: "Slack batch",
+								source: { records: [{ id: "a", body: "first" }] },
+								fields: [{ name: "body", type: "text" }],
+								destination: { repo: "pngwn/gold", path: "data/slack.parquet" },
+							}),
+						},
+					],
+				},
+				{ content: "Pushed from Slack." }
+			);
+			await runSlackTurn(thread, user, { text: "Review this" });
+			const review = await collections.mlReviews.findOne({ conversationId: thread.conversationId });
+			if (!review) throw new Error("no review was opened");
+			await submitReviewRequest(review, { verdict: "approve", approveRest: true });
+			await vi.waitFor(
+				async () =>
+					expect(
+						await collections.mcpElicitations.findOne({
+							"pending.publish.reviewId": review._id.toString(),
+						})
+					).toBeTruthy(),
+				{ timeout: 10_000, interval: 25 }
+			);
+			const card = await collections.mcpElicitations.findOne({
+				"pending.publish.reviewId": review._id.toString(),
+			});
+			if (!card) throw new Error("no publish card");
+			const pushIndex = String(
+				card.request.fields?.[0]?.kind === "select"
+					? card.request.fields[0].options.findIndex((o) => o.value === "push")
+					: -1
+			);
+			const answer = readAnswers(card.request, {
+				q0: { answer: { type: "static_select", selected_option: { value: pushIndex } } },
+			} as never);
+			expect(answer.content).toEqual({ publish: "push" });
+			expect(
+				await submitElicitationAnswer({
+					conversationId: thread.conversationId,
+					elicitationId: card.elicitationId,
+					action: "accept",
+					content: answer.content,
+				})
+			).toMatchObject({ ok: true, resume: true });
+
+			await kickAnsweredAsk(thread.conversationId, card.elicitationId);
+			await vi.waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2), {
+				timeout: 10_000,
+				interval: 25,
+			});
+			expect(commit).toHaveBeenCalledTimes(1);
+			expect(vi.mocked(commit).mock.calls[0][0]).toMatchObject({ accessToken: "hf-test-token" });
+			const tool = JSON.stringify(
+				mocks.create.mock.calls[1][0].messages.filter((m: { role: string }) => m.role === "tool")
+			);
+			expect(tool).toContain("Labels pushed to pngwn/gold (data/slack.parquet)");
+			expect(tool).not.toContain("The user answered");
+		} finally {
+			vi.unstubAllGlobals();
+		}
 	});
 
 	it("skips a pending budget question without granting spend and accepts a fresh turn", async () => {

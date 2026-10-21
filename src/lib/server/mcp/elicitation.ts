@@ -480,7 +480,8 @@ export async function submitElicitationAnswer({
 	// residual race — grant applied, then the resolve CAS lost to a concurrent
 	// different answer — needs two competing submissions of one prompt in the
 	// same instant; the phantom-grant failure it replaces needed only a DB blip.
-	if (action === "accept" && doc.pending?.kind === "ask" && validated) {
+	// a publish card is server authored and grants nothing, whatever its options say
+	if (action === "accept" && doc.pending?.kind === "ask" && !doc.pending.publish && validated) {
 		const grantedUsd = chosenBudgetUsd(doc.request, validated);
 		if (grantedUsd !== undefined) {
 			try {
