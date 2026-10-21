@@ -65,7 +65,7 @@ async function busyConversation() {
 	return { locals, conversationId: conversation._id };
 }
 
-function send(locals: App.Locals, conversationId: ObjectId) {
+function send(locals: App.Locals, conversationId: ObjectId, queuedStart = false) {
 	const data = new FormData();
 	data.set(
 		"data",
@@ -76,6 +76,7 @@ function send(locals: App.Locals, conversationId: ObjectId) {
 		locals,
 		params: { id: conversationId.toString() },
 		getClientAddress: () => "127.0.0.1",
+		queuedStart,
 	});
 }
 
@@ -91,6 +92,39 @@ describe.sequential("a normal send into a busy ML Intern conversation", () => {
 		created.length = 0;
 		users.length = 0;
 	});
+
+	it.each([true, false])(
+		"keeps the original status group only for queued starts (%s)",
+		async (queuedStart) => {
+			const { locals, conversationId } = await busyConversation();
+			await collections.conversations.updateOne(
+				{ _id: conversationId, "messages.id": A1 },
+				{
+					$set: { "messages.$.queuedContinuationOf": "original-turn" },
+				}
+			);
+			let messages: Array<{ queuedContinuationOf?: string }> = [];
+			const original = collections.conversations.updateOne.bind(collections.conversations);
+			const spy = vi.spyOn(collections.conversations, "updateOne").mockImplementation(((
+				filter: never,
+				update: { $set?: { messages?: typeof messages } }
+			) => {
+				if (update.$set?.messages) {
+					messages = update.$set.messages;
+					throw new Error("captured save");
+				}
+				return original(filter, update as never);
+			}) as never);
+			try {
+				await expect(send(locals, conversationId, queuedStart)).rejects.toThrow("captured save");
+				expect(messages.at(-1)?.queuedContinuationOf).toBe(
+					queuedStart ? "original-turn" : undefined
+				);
+			} finally {
+				spy.mockRestore();
+			}
+		}
+	);
 
 	it("is refused while the latest turn runs, and leaves the messages alone", async () => {
 		const { locals, conversationId } = await busyConversation();

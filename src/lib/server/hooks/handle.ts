@@ -15,6 +15,8 @@ import { adminTokenManager } from "$lib/server/adminToken";
 import { isHostLocalhost } from "$lib/server/isURLLocal";
 import { runWithRequestContext, updateRequestContext } from "$lib/server/requestContext";
 import { config, ready } from "$lib/server/config";
+import { isSlackConversationMutation } from "$lib/server/slack/readOnly";
+import { parseRequestOrigin } from "./origin";
 
 type HandleInput = Parameters<Handle>[0];
 
@@ -37,6 +39,26 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				config.checkForUpdates();
 			});
 
+			// Slack viewer routes have their own OIDC identity and per-thread authorization.
+			// Do not turn a Slack browser session into a HuggingChat user session.
+			if (event.url.pathname.startsWith(`${base}/slack/view/`)) {
+				const resolved = await resolve(event);
+				const response = new Response(resolved.body, {
+					status: resolved.status,
+					statusText: resolved.statusText,
+					headers: resolved.headers,
+				});
+				response.headers.set("Cache-Control", "private, no-store");
+				response.headers.set("Referrer-Policy", "no-referrer");
+				response.headers.set("X-Content-Type-Options", "nosniff");
+				response.headers.set("X-Frame-Options", "DENY");
+				response.headers.set(
+					"Content-Security-Policy",
+					"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+				);
+				return response;
+			}
+
 			logger.debug(
 				{
 					locals: event.locals,
@@ -51,7 +73,7 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				const sendJson =
 					event.request.headers.get("accept")?.includes("application/json") ||
 					event.request.headers.get("content-type")?.includes("application/json");
-				return new Response(sendJson ? JSON.stringify({ error: message }) : message, {
+				return new Response(sendJson ? JSON.stringify({ error: message, message }) : message, {
 					status,
 					headers: {
 						"content-type": sendJson ? "application/json" : "text/plain",
@@ -154,7 +176,8 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 						...(config.PUBLIC_ORIGIN ? [new URL(config.PUBLIC_ORIGIN).host] : []),
 					];
 
-					if (!validOrigins.includes(new URL(origin).host)) {
+					const parsedOrigin = parseRequestOrigin(origin);
+					if (!parsedOrigin || !validOrigins.includes(parsedOrigin.host)) {
 						return errorResponse(403, "Invalid referer for POST request");
 					}
 				}
@@ -185,6 +208,21 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				return errorResponse(401, ERROR_MESSAGES.authOnly);
 			}
 
+			// Slack's trusted runner calls generation directly; browser/API callers are view-only.
+			if (
+				await isSlackConversationMutation(
+					event.request.method,
+					event.route.id,
+					event.params.id,
+					event.locals
+				)
+			) {
+				return errorResponse(
+					403,
+					"This session is managed in Slack. Continue in its Slack thread."
+				);
+			}
+
 			let replaced = false;
 
 			const response = await resolve(event, {
@@ -195,7 +233,10 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 					}
 					replaced = true;
 
-					return chunk.html.replace("%gaId%", config.PUBLIC_GOOGLE_ANALYTICS_ID);
+					return chunk.html.replace(
+						"%gaId%",
+						event.url.pathname.startsWith(`${base}/slack/`) ? "" : config.PUBLIC_GOOGLE_ANALYTICS_ID
+					);
 				},
 				filterSerializedResponseHeaders: (header) => {
 					return header.includes("content-type");
@@ -224,6 +265,7 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 			if (event.url.pathname.startsWith(`${base}/api/`)) {
 				// get origin from the request
 				const requestOrigin = event.request.headers.get("origin");
+				const parsedRequestOrigin = parseRequestOrigin(requestOrigin);
 
 				// get origin from the config if its defined
 				let allowedOrigin = config.PUBLIC_ORIGIN ? new URL(config.PUBLIC_ORIGIN).origin : undefined;
@@ -231,7 +273,7 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				if (
 					dev || // if we're in dev mode
 					!requestOrigin || // or the origin is null (SSR)
-					isHostLocalhost(new URL(requestOrigin).hostname) // or the origin is localhost
+					(parsedRequestOrigin !== undefined && isHostLocalhost(parsedRequestOrigin.hostname)) // or the origin is localhost
 				) {
 					allowedOrigin = "*"; // allow all origins
 				} else if (allowedOrigin === requestOrigin) {

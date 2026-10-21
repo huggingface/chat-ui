@@ -8,6 +8,13 @@ import { setTimeout as delay } from "node:timers/promises";
 import { MongoClient } from "mongodb";
 import { snapshot, restore, readBackup, writeBackup, removeBackup } from "./state.mjs";
 config({ path: "/app/.env", quiet: true });
+// Spaces supplies its built-in OAuth application under OAUTH_* names.
+// Explicit Chat UI credentials still take precedence for custom installations.
+if (!process.env.OPENID_CLIENT_ID && process.env.OAUTH_CLIENT_ID) {
+	process.env.OPENID_CLIENT_ID = process.env.OAUTH_CLIENT_ID;
+	process.env.OPENID_CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET || "";
+	process.env.OPENID_SCOPES = process.env.OAUTH_SCOPES || "openid profile";
+}
 const bucket = process.env.SLACK_ML_STATE_BUCKET;
 const token = process.env.SLACK_ML_STATE_TOKEN;
 if (token && token === process.env.SLACK_ML_HF_TOKEN)

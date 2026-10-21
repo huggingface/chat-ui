@@ -16,6 +16,7 @@ export interface ConversationData {
 	updatedAt: Date;
 	modelId: string;
 	shared: boolean;
+	slackThreadUrl?: string;
 	deployedSpaces?: Record<string, DeployedSpace>;
 	mlAssistant?: boolean;
 	mlBudget?: MlBudget;

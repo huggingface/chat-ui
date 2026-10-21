@@ -1,11 +1,30 @@
 import type { ObjectId } from "mongodb";
 
+export interface SlackConnection {
+	/** Only set after verified Slack OIDC identity matches the connection ticket. */
+	verifiedSlackIdentity?: boolean;
+	_id: string;
+	teamId: string;
+	slackUserId: string;
+	userId: ObjectId;
+	sessionId: string;
+	updatedAt: Date;
+}
+export interface SlackLink {
+	_id: string;
+	teamId: string;
+	slackUserId: string;
+	expiresAt: Date;
+}
 export interface SlackThread {
+	deletedAt?: Date;
 	_id: string;
 	teamId: string;
 	channel: string;
 	threadTs: string;
 	owner: string;
+	/** Absent on legacy shared-token threads. Never changed after creation. */
+	hfUserId?: ObjectId;
 	watching: boolean;
 	pollAt?: Date;
 	contextThroughTs?: string;

@@ -159,7 +159,13 @@
 					{titles[group]}
 				</h4>
 				{#each convs as conv (String(conv.id))}
-					<NavConversationItem {conv} {oneditConversationTitle} {ondeleteConversation} />
+					<NavConversationItem
+						readOnly={conv.managedBy?.kind === "slack" ? true : undefined}
+						allowDelete={conv.managedBy?.kind === "slack"}
+						{conv}
+						{oneditConversationTitle}
+						{ondeleteConversation}
+					/>
 				{/each}
 			{/if}
 		{/each}

@@ -38,11 +38,18 @@
 	interface Props {
 		conv: ConvSidebar;
 		readOnly?: true;
+		allowDelete?: boolean;
 		ondeleteConversation?: (id: string) => void;
 		oneditConversationTitle?: (payload: { id: string; title: string }) => void;
 	}
 
-	let { conv, readOnly, ondeleteConversation, oneditConversationTitle }: Props = $props();
+	let {
+		conv,
+		readOnly,
+		allowDelete = false,
+		ondeleteConversation,
+		oneditConversationTitle,
+	}: Props = $props();
 
 	let deleteOpen = $state(false);
 	let renameOpen = $state(false);
@@ -140,7 +147,7 @@
 			<span>{conv.title}</span>
 		</a>
 
-		{#if !readOnly}
+		{#if !readOnly || allowDelete}
 			<DropdownMenu.Root
 				bind:open={isMenuOpen}
 				onOpenChange={(open) => {
@@ -168,13 +175,14 @@
 						onCloseAutoFocus={(e) => e.preventDefault()}
 						interactOutsideBehavior="defer-otherwise-close"
 					>
-						<DropdownMenu.Item
-							class="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-gray-700 select-none focus-visible:outline-hidden data-highlighted:bg-gray-100 sm:h-8 dark:text-gray-200 dark:data-highlighted:bg-white/10"
-							onSelect={() => (renameOpen = true)}
-						>
-							<CarbonEdit class="size-4 opacity-90 dark:opacity-80" />
-							Rename
-						</DropdownMenu.Item>
+						{#if !readOnly}
+							<DropdownMenu.Item
+								class="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-gray-700 select-none focus-visible:outline-hidden data-highlighted:bg-gray-100 sm:h-8 dark:text-gray-200 dark:data-highlighted:bg-white/10"
+								onSelect={() => (renameOpen = true)}
+							>
+								<CarbonEdit class="size-4 opacity-90 dark:opacity-80" />
+								Rename
+							</DropdownMenu.Item>{/if}
 						<DropdownMenu.Item
 							class="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-red-500 select-none focus-visible:outline-hidden data-highlighted:bg-red-50 data-highlighted:text-red-600 sm:h-8 dark:text-red-400 dark:data-highlighted:bg-red-500/10 dark:data-highlighted:text-red-400"
 							onSelect={() => (deleteOpen = true)}

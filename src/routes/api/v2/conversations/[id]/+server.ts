@@ -48,7 +48,13 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 			}
 		: undefined;
 
+	const slackThread = !conversation.shared
+		? await collections.slackThreads.findOne({ conversationId: new ObjectId(conversation._id) })
+		: null;
 	return superjsonResponse({
+		slackThreadUrl: slackThread
+			? `https://app.slack.com/client/${encodeURIComponent(slackThread.teamId)}/${encodeURIComponent(slackThread.channel)}/thread/${encodeURIComponent(slackThread.channel)}-${encodeURIComponent(slackThread.threadTs)}`
+			: undefined,
 		messages: conversation.messages,
 		title: conversation.title,
 		model: conversation.model,

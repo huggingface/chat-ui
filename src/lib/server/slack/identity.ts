@@ -1,3 +1,4 @@
+import { connectedLocals } from "./ownerIdentity";
 import { createHash } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
@@ -52,4 +53,17 @@ export function slackLocals(user: User): App.Locals {
 		billingOrganization: settings.billingOrganization,
 		billingResourceGroup: settings.billingResourceGroup,
 	};
+}
+
+/** Legacy threads retain the shared identity; linked threads resolve only their pinned HF owner. */
+export async function threadLocals(
+	thread: import("./types").SlackThread,
+	legacyUser?: User
+): Promise<App.Locals> {
+	if (thread.hfUserId) {
+		return connectedLocals(thread);
+	}
+	if (!legacyUser)
+		throw new Error("This legacy thread needs its original shared-token installation.");
+	return slackLocals(legacyUser);
 }

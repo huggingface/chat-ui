@@ -476,7 +476,8 @@
 		sessionDeployments[cid] = { ...(sessionDeployments[cid] ?? {}), [id]: deployment };
 	}
 	let canDeploy = $derived(
-		publicConfig.isHuggingChat &&
+		!page.data.slackThreadUrl &&
+			publicConfig.isHuggingChat &&
 			!!conversationId &&
 			!!version &&
 			version.complete &&

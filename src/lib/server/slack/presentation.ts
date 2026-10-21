@@ -20,11 +20,51 @@ export const STOP_ACTION = "ml_intern_stop";
 export const RESUME_ACTION = "ml_intern_resume";
 
 const plain = (text: string) => ({ type: "plain_text" as const, text, emoji: false });
+/** Slack mrkdwn has no Markdown table syntax. Preserve each row as labeled fields. */
+function readableTables(text: string): string {
+	return Lexer.lex(text, { gfm: true })
+		.map((token) => {
+			if (token.type !== "table") return token.raw;
+			// Models sometimes mix Slack links into Markdown tables. Protect the link's
+			// pipe before parsing columns; leave fenced code and non-table text alone.
+			const normalized = token.raw.replace(
+				/<(https?:\/\/[^>|]+)\|([^>]+)>/g,
+				(_match: string, url: string, label: string) => `[${label.replace(/\|/g, "\\|")}](${url})`
+			);
+			const table = Lexer.lex(normalized, { gfm: true })[0];
+			if (table.type !== "table") return token.raw;
+			return (
+				table.rows
+					.map((row: Array<{ text: string }>) =>
+						row.map((cell, i) => `**${table.header[i].text}:** ${cell.text}`).join("\n")
+					)
+					.join("\n\n") + "\n\n"
+			);
+		})
+		.join("");
+}
+
 export function chunks(text: string, size = 2800): string[] {
-	// Split on code points, never between the halves of an emoji.
-	const chars = Array.from(text || "No response text.");
+	if (!Number.isInteger(size) || size < 1) throw new Error("Invalid chunk size");
+	let remaining = readableTables(text || "No response text.");
 	const parts: string[] = [];
-	for (let i = 0; i < chars.length; i += size) parts.push(chars.slice(i, i + size).join(""));
+	while (Array.from(remaining).length > size) {
+		const window = Array.from(remaining).slice(0, size).join("");
+		// Prefer complete paragraphs, then sentences, lines and finally words.
+		let cut = 0;
+		for (const pattern of [/\n\s*\n/g, /[.!?][”"')\]]*\s+/g, /\n/g, /\s+/g]) {
+			const matches = [...window.matchAll(pattern)];
+			const match = matches.at(-1);
+			if (match) {
+				cut = (match.index ?? 0) + match[0].length;
+				break;
+			}
+		}
+		if (!cut) cut = window.length;
+		parts.push(remaining.slice(0, cut));
+		remaining = remaining.slice(cut);
+	}
+	if (remaining) parts.push(remaining);
 	return parts;
 }
 
@@ -111,7 +151,7 @@ export function slackMarkdown(text: string): string {
 				}
 			})
 			.join("");
-	return render(Lexer.lex(text, { gfm: true })).trim();
+	return render(Lexer.lex(readableTables(text), { gfm: true })).trim();
 }
 
 export function messageBlocks(
@@ -136,6 +176,7 @@ export function messageBlocks(
 							action_id: a.id,
 							text: plain(a.label),
 							value: a.value,
+							...(a.id === STOP_ACTION ? { style: "danger" as const } : {}),
 							...(a.id === RESUME_ACTION
 								? {
 										confirm: {

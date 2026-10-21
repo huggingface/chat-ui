@@ -100,6 +100,8 @@ export async function cleanupTestData() {
 	await Promise.all([
 		collections.conversations.deleteMany({}),
 		collections.slackThreads.deleteMany({}),
+		collections.slackConnections.deleteMany({}),
+		collections.slackLinks.deleteMany({}),
 		collections.slackInputs.deleteMany({}),
 		collections.slackDeliveries.deleteMany({}),
 		collections.slackLeases.deleteMany({}),

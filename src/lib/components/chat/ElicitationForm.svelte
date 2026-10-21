@@ -15,6 +15,7 @@
 	import { forDateInput } from "$lib/utils/elicitationDate";
 
 	interface Props {
+		readOnly?: boolean;
 		conversationId: string;
 		request: ElicitationRequestPayload;
 		/** Epoch ms; absent for a 2026-era prompt, which nothing is waiting on. */
@@ -22,7 +23,7 @@
 		resolved?: MessageElicitationResolvedUpdate;
 	}
 
-	let { conversationId, request, expiresAt, resolved }: Props = $props();
+	let { conversationId, request, expiresAt, resolved, readOnly = false }: Props = $props();
 
 	const fields = $derived(request.fields ?? []);
 
@@ -267,7 +268,11 @@
 		"focus:ring-2 focus:ring-gray-300 focus:outline-hidden dark:focus:ring-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white";
 </script>
 
-{#if liftedToComposer}
+{#if readOnly && !resolved}
+	<BlockWrapper
+		><p class="text-sm text-gray-500">{request.message} — Answer in Slack.</p></BlockWrapper
+	>
+{:else if liftedToComposer}
 	<!-- shown over the composer -->
 {:else if !open}
 	<BlockWrapper>

@@ -8,4 +8,5 @@ export interface ConvSidebar {
 	avatarUrl?: string | Promise<string | undefined>;
 	/** Started in ML Intern mode — the sidebar marks these and shows their turn status. */
 	mlAssistant?: boolean;
+	managedBy?: { kind: "slack"; continueUrl: string };
 }
