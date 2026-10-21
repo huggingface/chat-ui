@@ -60,6 +60,9 @@ export function parseDestination(
 	return { repo, type, path: path ?? fallbackPath, pr };
 }
 
+export const sameDestination = (a: ReviewDestination, b: ReviewDestination) =>
+	a.repo === b.repo && a.type === b.type && a.path === b.path && a.pr === b.pr;
+
 export const destinationUrl = (d: Pick<ReviewDestination, "repo" | "type">) =>
 	`https://huggingface.co/${d.type === "bucket" ? "buckets" : "datasets"}/${d.repo}`;
 

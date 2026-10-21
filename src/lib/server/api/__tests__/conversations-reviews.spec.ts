@@ -1338,7 +1338,12 @@ describe.sequential("writing labels back", () => {
 		const res = await SUBMIT(
 			event(locals, conv._id.toString(), review._id.toString(), {
 				verdict: "approve",
-				destination: { repo: "pngwn/gold", path: "data/b.parquet" },
+				destination: {
+					repo: "pngwn/gold",
+					type: "dataset",
+					path: "data/a.parquet",
+					pr: false,
+				},
 			})
 		);
 		expect(res.status).toBe(200);
@@ -1348,7 +1353,7 @@ describe.sequential("writing labels back", () => {
 		});
 		expect(hub.commit).not.toHaveBeenCalled();
 		const submitted = await collections.mlReviews.findOne({ _id: review._id });
-		expect(submitted?.destination?.path).toBe("data/b.parquet");
+		expect(submitted?.destination?.path).toBe("data/a.parquet");
 		expect(submitted?.result).toBeUndefined();
 		expect(submitted?.push).toBeUndefined();
 
@@ -1362,9 +1367,9 @@ describe.sequential("writing labels back", () => {
 		});
 		expect(vi.mocked(hub.commit).mock.calls[0][0]).toMatchObject({
 			accessToken: "hf_owner",
-			operations: [{ path: "data/b.parquet" }],
+			operations: [{ path: "data/a.parquet" }],
 		});
-		expect(JSON.stringify(updates)).toContain("Labels pushed to pngwn/gold (data/b.parquet)");
+		expect(JSON.stringify(updates)).toContain("Labels pushed to pngwn/gold (data/a.parquet)");
 		expect(updates).toContainEqual(
 			expect.objectContaining({
 				reviewId: review._id.toString(),
@@ -1379,8 +1384,8 @@ describe.sequential("writing labels back", () => {
 			await (await GET(event(locals, conv._id.toString(), review._id.toString()))).text()
 		);
 		expect(payload).toMatchObject({
-			destination: { repo: "pngwn/gold", path: "data/b.parquet" },
-			push: { status: "pushed", path: "data/b.parquet", pr: false },
+			destination: { repo: "pngwn/gold", path: "data/a.parquet" },
+			push: { status: "pushed", path: "data/a.parquet", pr: false },
 		});
 	});
 
@@ -1400,10 +1405,50 @@ describe.sequential("writing labels back", () => {
 		);
 		await answerBoth(locals, conv, review);
 		const res = await SUBMIT(
-			event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+			event(locals, conv._id.toString(), review._id.toString(), {
+				verdict: "approve",
+				destination: { repo: "pngwn/gold", type: "dataset", path: "data/a.parquet", pr: false },
+			})
 		);
 		expect(await res.json()).toMatchObject({ ok: true, delivery: "queued" });
 		expect(deliverReview).toHaveBeenCalledWith(review._id, expect.anything());
+		expect(hub.commit).not.toHaveBeenCalled();
+	});
+
+	it("publishes only a destination the submit sends back, and says so when it did not", async () => {
+		vi.mocked(hub.commit).mockClear();
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		const destination = {
+			repo: "pngwn/gold",
+			type: "dataset" as const,
+			path: "data/a.parquet",
+			pr: false,
+		};
+		await collections.mlReviews.updateOne({ _id: review._id }, { $set: { destination } });
+		await answerBoth(locals, conv, review);
+
+		expect(
+			await errorOf(
+				SUBMIT(
+					event(locals, conv._id.toString(), review._id.toString(), {
+						verdict: "approve",
+						destination: { ...destination, repo: "someone/else" },
+					})
+				)
+			)
+		).toMatchObject({ status: 400, message: expect.stringContaining("does not match") });
+
+		const res = await SUBMIT(
+			event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+		);
+		expect(res.status).toBe(200);
+		const stored = await collections.mlReviews.findOne({ _id: review._id });
+		expect(stored?.destination).toBeUndefined();
+		expect(stored?.declinedDestination).toEqual(destination);
+		expect(stored?.result?.text).toContain(
+			"Labels were NOT pushed to pngwn/gold (data/a.parquet): the user submitted without confirming the push."
+		);
 		expect(hub.commit).not.toHaveBeenCalled();
 	});
 

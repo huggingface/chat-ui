@@ -17,7 +17,7 @@ import { readReview, saveDraft, saveDraftsGuarded, submitReview } from "./store"
 import { completeSubmission } from "./submission";
 import { deliverReview, type DeliveryState } from "./delivery";
 import { REVIEW_MAX_RECORDS } from "$lib/server/textGeneration/builtinTools/requestReviewDefinition";
-import { parseDestination } from "./destination";
+import { parseDestination, sameDestination } from "./destination";
 import { reviewSlug } from "./result";
 
 export const REVIEW_MAX_COMMENTS_PER_RECORD = REVIEW_LIMITS.commentsPerRecord;
@@ -59,6 +59,7 @@ export function reviewPayload(review: MlReview) {
 		...(review.result ? { result: review.result } : {}),
 		...(review.submitFailure?.gaveUp ? { submitFailed: review.submitFailure.error } : {}),
 		...(review.destination ? { destination: review.destination } : {}),
+		...(review.declinedDestination ? { declinedDestination: review.declinedDestination } : {}),
 		...(review.push
 			? {
 					push: {
@@ -430,7 +431,7 @@ export const submitBodySchema = z.object({
 	selection: selectionSchema,
 	/** marks every record still undecided ok, so marking all is one request at 500 records */
 	approveRest: z.boolean().optional(),
-	/** null pushes nothing, absent keeps the destination the model gave */
+	/** the review destination sent back to confirm the push, null or absent pushes nothing */
 	destination: z.unknown().optional(),
 });
 
@@ -511,16 +512,20 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 		return finish(review, selection);
 	}
 
-	let destination: ReviewDestination | null | undefined;
-	if (parsed.data.destination === null) destination = null;
-	else if (parsed.data.destination !== undefined) {
+	// only a destination the user saw and sent back publishes, a submit without one pushes nothing
+	let confirmed: ReviewDestination | undefined;
+	if (parsed.data.destination !== undefined && parsed.data.destination !== null) {
 		const given = parseDestination(
 			parsed.data.destination,
 			review.destination?.path ?? `data/${reviewSlug(review.schema.title)}.parquet`
 		);
 		if ("error" in given) error(400, given.error);
-		destination = given;
+		if (!review.destination || !sameDestination(given, review.destination)) {
+			error(400, "The destination does not match this review's, reload it and confirm again.");
+		}
+		confirmed = review.destination;
 	}
+	const declined = confirmed ? undefined : review.destination;
 
 	const approved = parsed.data.approveRest ? approvalsForRest(review) : {};
 	const drafts = { ...review.drafts, ...approved };
@@ -528,13 +533,16 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 	if (found.length > 0) return { blockers: found };
 
 	const from = review.status;
-	if (!(await submitReview(review, { note, drafts: approved, destination }, from))) {
+	if (
+		!(await submitReview(review, { note, drafts: approved, confirmed, declined }, from))
+	) {
 		error(409, "This review changed while it was being submitted, reload it and submit again.");
 	}
 	const claimed: MlReview = {
 		...review,
 		drafts,
-		destination: destination === null ? undefined : (destination ?? review.destination),
+		destination: confirmed,
+		...(declined ? { declinedDestination: declined } : {}),
 		status: "submitted",
 		...(note ? { note } : {}),
 		...(from === "open" ? { unresolved: true as const } : {}),

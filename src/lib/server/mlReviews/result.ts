@@ -387,6 +387,12 @@ export function reviewResultText(
 	}
 
 	if (review.destination) lines.push(pushLine(review.destination, push));
+	else if (review.declinedDestination) {
+		const { repo, path } = review.declinedDestination;
+		lines.push(
+			`Labels were NOT pushed to ${repo} (${path}): the user submitted without confirming the push. Do not push them unless the user asks.`
+		);
+	}
 	lines.push(
 		files.length === 1
 			? `All answers: ${formatVirtualFileRef(files[0].name)} (version ${files[0].version})`

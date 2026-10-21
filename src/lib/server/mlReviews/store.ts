@@ -121,8 +121,10 @@ export async function submitReview(
 		note?: string;
 		/** drafts written in the same update as the claim, keyed by record position */
 		drafts?: Record<string, ReviewDraft>;
-		/** null drops the destination, absent keeps it */
-		destination?: ReviewDestination | null;
+		/** the destination the user sent back, the only one that is pushed */
+		confirmed?: ReviewDestination;
+		/** the model destination the submit did not confirm, kept so the result can say so */
+		declined?: ReviewDestination;
 	},
 	from: MlReview["status"] = "open"
 ): Promise<boolean> {
@@ -138,9 +140,9 @@ export async function submitReview(
 			draftRevision: review.draftRevision,
 		},
 		{
-			...(submission.destination === null ? { $unset: { destination: "" } } : {}),
+			...(submission.declined ? { $unset: { destination: "" } } : {}),
 			$set: {
-				...(submission.destination ? { destination: submission.destination } : {}),
+				...(submission.declined ? { declinedDestination: submission.declined } : {}),
 				status: "submitted",
 				...(submission.note ? { note: submission.note } : {}),
 				...(from === "open"

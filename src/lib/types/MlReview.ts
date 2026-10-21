@@ -270,6 +270,8 @@ export interface MlReview {
 	submitFailure?: { attempts: number; error: string; retryAt?: Date; gaveUp?: true };
 	delivery?: ReviewDelivery;
 	destination?: ReviewDestination;
+	/** the model destination a submit did not confirm, nothing was pushed */
+	declinedDestination?: ReviewDestination;
 	push?: ReviewPush;
 	createdAt: Date;
 	updatedAt: Date;
