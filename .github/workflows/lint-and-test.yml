@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
           cache: "npm"
       - run: npm  ci
       - name: "Checking lint/format errors"
@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
       - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
           cache: "npm"
 
       # The server workspace spawns a MongoMemoryServer per test file. On a cold runner
@@ -96,10 +96,7 @@ jobs:
       - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
       - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
         with:
-          # Newer than the other jobs on purpose: the e2e servers under tests/ are
-          # TypeScript run directly by node via --experimental-strip-types, which
-          # needs Node >= 22.6.
-          node-version: "22"
+          node-version-file: .nvmrc
           cache: "npm"
 
       # The harness starts its own MongoMemoryServer (see startTestDatabase in
