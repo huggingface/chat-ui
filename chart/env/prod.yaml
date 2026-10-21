@@ -53,6 +53,14 @@ envVars:
   MCP_FORWARD_HF_USER_TOKEN: "true"
   AUTOMATIC_LOGIN: "false"
 
+  # Main ML Intern Slack app. Supply tokens and viewer secrets through Infisical.
+  # Pause the old Space worker before deploying with this enabled.
+  SLACK_ML_ENABLED: "true"
+  SLACK_ML_ACCOUNT_MODE: "user"
+  SLACK_ML_TEAM_ID: "T1RCG4490"
+  SLACK_ML_VIEWER_ORIGIN: "https://huggingface.co"
+  SLACK_ML_VIEWER_CLIENT_ID: "59424140306.12287993699043"
+
   ADDRESS_HEADER: "X-Forwarded-For"
   APP_BASE: "/chat"
   ALLOW_IFRAME: "false"
