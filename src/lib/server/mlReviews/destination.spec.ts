@@ -84,6 +84,7 @@ async function seed(overrides: Partial<MlReview> = {}): Promise<MlReview> {
 		...review,
 		status: "submitted",
 		verdict: "approve",
+		publish: { decision: "push" },
 		submittedAt: new Date("2026-10-20T12:00:00Z"),
 		drafts: {
 			"0": {
@@ -224,6 +225,20 @@ describe("review destinations", () => {
 		});
 		expect(await pushReviewLabels(review, "hf_owner")).toMatchObject({ status: "pushed" });
 		expect(hub.commit).toHaveBeenCalledTimes(1);
+	});
+
+	it("pushes only on the user's decision, a pull request when they chose one", async () => {
+		vi.mocked(hub.commit).mockResolvedValue(
+			commitOutput("https://huggingface.co/datasets/pngwn/gold/discussions/4")
+		);
+		expect(await pushReviewLabels(await seed({ publish: {} }), "hf_owner")).toBeUndefined();
+		expect(
+			await pushReviewLabels(await seed({ publish: { decision: "skip" } }), "hf_owner")
+		).toBeUndefined();
+		expect(hub.commit).not.toHaveBeenCalled();
+		const push = await pushReviewLabels(await seed({ publish: { decision: "pr" } }), "hf_owner");
+		expect(push).toMatchObject({ status: "pushed", pr: true });
+		expect(vi.mocked(hub.commit).mock.calls[0][0]).toMatchObject({ isPullRequest: true });
 	});
 
 	it("opens a pull request when the user cannot write to the repo", async () => {

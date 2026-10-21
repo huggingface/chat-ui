@@ -139,9 +139,9 @@ export const requestReviewDefinition: OpenAiTool = {
 				destination: {
 					type: "object",
 					description:
-						"Where to write the reviewed rows and their answers as a Parquet file when the user " +
-						"submits; the user sees and can change it first. Gets a pull request when they " +
-						"cannot write to the repo. A later batch to the same path lands beside it.",
+						"Where to write the reviewed rows and their answers as a Parquet file. After the " +
+						"user submits, a card asks them to push, open a pull request or not push, showing who " +
+						"will see it; the result says which. A later batch to the same path lands beside it.",
 					properties: {
 						repo: { type: "string", description: '"owner/name".' },
 						type: { type: "string", enum: ["dataset", "bucket"] },

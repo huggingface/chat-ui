@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { BSON, ObjectId } from "mongodb";
 import superjson from "superjson";
 import { collections, ready } from "$lib/server/database";
@@ -44,6 +44,8 @@ const { GET: MEDIA } =
 	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/media/[index]/[field]/+server");
 const hub = await import("@huggingface/hub");
 const { resumeParkedToolCall } = await import("$lib/server/mcp/resumeElicitation");
+const { submitElicitationAnswer } = await import("$lib/server/mcp/elicitation");
+const { detachOpenReviews } = await import("$lib/server/mlReviews/detach");
 
 const SCHEMA: ReviewSchema = {
 	title: "Triage batch 1",
@@ -1310,6 +1312,36 @@ describe.sequential("submitting", () => {
 });
 
 describe.sequential("writing labels back", () => {
+	const AUDIENCE = {
+		label: "existing public dataset pngwn/gold",
+		exists: true,
+		private: false,
+		canWrite: true,
+	};
+	let owner = "pngwn";
+	beforeEach(() => {
+		owner = "pngwn";
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: string | URL) => {
+				const url = String(input);
+				if (url.endsWith("/api/datasets/pngwn/gold")) return Response.json({ private: false });
+				if (url.endsWith("/api/whoami-v2")) {
+					return Response.json({ name: owner, orgs: [], auth: { accessToken: { role: "write" } } });
+				}
+				return new Response("not stubbed", { status: 500 });
+			})
+		);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+	const DESTINATION = {
+		repo: "pngwn/gold",
+		type: "dataset" as const,
+		path: "data/a.parquet",
+		pr: false,
+	};
 	const answerBoth = async (locals: App.Locals, conv: Conversation, review: MlReview) => {
 		for (const index of [0, 1]) {
 			await PATCH(
@@ -1320,172 +1352,242 @@ describe.sequential("writing labels back", () => {
 			);
 		}
 	};
-
-	it("answers the submit before the push, which the resume makes with the owner's sign in", async () => {
-		vi.mocked(hub.commit).mockClear();
-		const { locals, user } = await createTestUser();
+	const withDestination = async (locals: App.Locals, status?: "detached") => {
 		const { conv, review } = await seed(locals);
 		await collections.mlReviews.updateOne(
 			{ _id: review._id },
-			{
-				$set: {
-					destination: { repo: "pngwn/gold", type: "dataset", path: "data/a.parquet", pr: false },
-				},
-			}
+			{ $set: { destination: DESTINATION, ...(status ? { status } : {}) } }
 		);
 		await answerBoth(locals, conv, review);
+		return { conv, review };
+	};
+	const signIn = (userId: ObjectId) =>
+		collections.sessions.updateOne(
+			{ userId },
+			{ $set: { oauth: { token: { value: "hf_owner" } } } as never }
+		);
+	const publishRow = (conversationId: ObjectId) =>
+		collections.mcpElicitations.findOne({
+			conversationId,
+			"pending.kind": "ask",
+			"pending.publish": { $exists: true },
+		});
+	const answer = (conversationId: ObjectId, elicitationId: string, choice?: string) =>
+		submitElicitationAnswer({
+			elicitationId,
+			conversationId,
+			action: choice ? "accept" : "cancel",
+			...(choice ? { content: { publish: choice } } : {}),
+		});
+
+	it("submits without pushing, then parks the resumed turn on a publish card", async () => {
+		vi.mocked(hub.commit).mockClear();
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals);
 
 		const res = await SUBMIT(
 			event(locals, conv._id.toString(), review._id.toString(), {
 				verdict: "approve",
-				destination: {
-					repo: "pngwn/gold",
-					type: "dataset",
-					path: "data/a.parquet",
-					pr: false,
-				},
+				destination: { ...DESTINATION, repo: "ignored/now" },
 			})
 		);
 		expect(res.status).toBe(200);
-		expect(await res.json()).toEqual({
-			ok: true,
-			files: [{ name: "reviews/triage-batch-1.responses.jsonl", version: 1 }],
-		});
 		expect(hub.commit).not.toHaveBeenCalled();
-		const submitted = await collections.mlReviews.findOne({ _id: review._id });
-		expect(submitted?.destination?.path).toBe("data/a.parquet");
-		expect(submitted?.result).toBeUndefined();
-		expect(submitted?.push).toBeUndefined();
 
-		await collections.sessions.updateOne(
-			{ userId: user._id },
-			{ $set: { oauth: { token: { value: "hf_owner" } } } as never }
-		);
-		const { updates } = await resumeParkedToolCall({
+		const parked = await resumeParkedToolCall({
 			conversationId: conv._id,
 			elicitationId: review.elicitationId,
+			generationId: "gen-resume",
+			mayPark: true,
 		});
-		expect(vi.mocked(hub.commit).mock.calls[0][0]).toMatchObject({
-			accessToken: "hf_owner",
-			operations: [{ path: "data/a.parquet" }],
+		expect(parked.parkedAgain).toBe(true);
+		const row = await publishRow(conv._id);
+		expect(row).toMatchObject({
+			status: "pending",
+			generationId: "gen-resume",
+			request: { source: "assistant", mode: "form" },
+			pending: {
+				kind: "ask",
+				messageId: "msg-1",
+				toolUuid: "uuid-1",
+				publish: { reviewId: review._id.toString(), destination: DESTINATION, audience: AUDIENCE },
+			},
 		});
-		expect(JSON.stringify(updates)).toContain("Labels pushed to pngwn/gold (data/a.parquet)");
-		expect(updates).toContainEqual(
-			expect.objectContaining({
-				reviewId: review._id.toString(),
-				pushed: {
-					url: "https://huggingface.co/datasets/pngwn/gold/commit/abc123",
-					pr: false,
-				},
-			})
-		);
+		const field = row?.request.fields?.[0];
+		expect(field?.kind === "select" && field.options.map((o) => o.value)).toEqual([
+			"push",
+			"pr",
+			"skip",
+		]);
+		expect(parked.updates.map((u) => [u.type, "subtype" in u ? u.subtype : undefined])).toEqual([
+			["review", "resolved"],
+			["elicitation", "resolved"],
+			["elicitation", "request"],
+			["turnState", undefined],
+		]);
+		expect(await collections.turnStates.findOne({ messageId: "msg-1" })).toMatchObject({
+			status: "awaiting_input",
+		});
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			destination: DESTINATION,
+			publish: { promptId: row?.elicitationId, audience: AUDIENCE },
+		});
+		expect((await collections.mlReviews.findOne({ _id: review._id }))?.result).toBeUndefined();
 
-		const payload = superjson.parse<Record<string, unknown>>(
-			await (await GET(event(locals, conv._id.toString(), review._id.toString()))).text()
-		);
-		expect(payload).toMatchObject({
-			destination: { repo: "pngwn/gold", path: "data/a.parquet" },
-			push: { status: "pushed", path: "data/a.parquet", pr: false },
+		const again = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: review.elicitationId,
+			generationId: "gen-repeat",
+			mayPark: true,
 		});
+		expect(again.parkedAgain).toBe(true);
+		expect(
+			await collections.mcpElicitations.countDocuments({ "pending.publish": { $exists: true } })
+		).toBe(1);
 	});
 
-	it("leaves a detached review's push to its delivery, in the background", async () => {
-		vi.mocked(hub.commit).mockClear();
-		deliverReview.mockClear();
-		const { locals } = await createTestUser();
-		const { conv, review } = await seed(locals);
-		await collections.mlReviews.updateOne(
-			{ _id: review._id },
-			{
-				$set: {
-					status: "detached",
-					destination: { repo: "pngwn/gold", type: "dataset", path: "data/a.parquet", pr: false },
-				},
+	it("pushes, opens a PR, or skips on the card's answer, then hands the model the result", async () => {
+		for (const [choice, expected] of [
+			["push", "Labels pushed to pngwn/gold (data/a.parquet)"],
+			["pr", "Labels pushed as a pull request on pngwn/gold (data/a.parquet)"],
+			[
+				"skip",
+				"Labels were NOT pushed to pngwn/gold (data/a.parquet): the user chose not to push.",
+			],
+		] as const) {
+			vi.mocked(hub.commit).mockClear();
+			vi.mocked(hub.commit).mockResolvedValue({
+				commit: { oid: "abc123", url: "https://huggingface.co/datasets/pngwn/gold/commit/abc123" },
+				hookOutput: "",
+				...(choice === "pr"
+					? { pullRequestUrl: "https://huggingface.co/datasets/pngwn/gold/discussions/2" }
+					: {}),
+			});
+			const { locals, user } = await createTestUser();
+			await signIn(user._id);
+			const { conv, review } = await withDestination(locals);
+			await SUBMIT(
+				event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+			);
+			await resumeParkedToolCall({
+				conversationId: conv._id,
+				elicitationId: review.elicitationId,
+				generationId: "gen-resume",
+				mayPark: true,
+			});
+			const row = await publishRow(conv._id);
+			if (!row) throw new Error("no publish card");
+			expect(await answer(conv._id, row.elicitationId, choice)).toMatchObject({ ok: true });
+
+			const { updates } = await resumeParkedToolCall({
+				conversationId: conv._id,
+				elicitationId: row.elicitationId,
+			});
+			const text = JSON.stringify(updates);
+			expect(text).toContain(expected);
+			expect(updates.at(-1)).toMatchObject({ type: "tool", subtype: "result", uuid: "uuid-1" });
+			if (choice === "skip") {
+				expect(hub.commit).not.toHaveBeenCalled();
+				expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+					declinedDestination: DESTINATION,
+					publish: { decision: "skip" },
+				});
+			} else {
+				expect(vi.mocked(hub.commit).mock.calls[0][0]).toMatchObject({
+					accessToken: "hf_owner",
+					...(choice === "pr" ? { isPullRequest: true } : { parentCommit: "head1" }),
+				});
 			}
+			await collections.mcpElicitations.deleteMany({});
+		}
+	});
+
+	it("offers no direct push to a repo the owner cannot write to", async () => {
+		owner = "someone-else";
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals);
+		await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }));
+		await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: review.elicitationId,
+			generationId: "gen-resume",
+			mayPark: true,
+		});
+		const field = (await publishRow(conv._id))?.request.fields?.[0];
+		expect(field?.kind === "select" && field.options.map((o) => o.value)).toEqual(["pr", "skip"]);
+	});
+
+	it("closes an open card as not pushed when the user writes instead", async () => {
+		vi.mocked(hub.commit).mockClear();
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals);
+		await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }));
+		await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: review.elicitationId,
+			generationId: "gen-resume",
+			mayPark: true,
+		});
+		const fresh = await collections.conversations.findOne({ _id: conv._id });
+		if (!fresh) throw new Error("no conversation");
+		fresh.messages.push({ id: "msg-1", from: "assistant", content: "", updates: [] } as never);
+
+		await detachOpenReviews(fresh);
+
+		expect(await publishRow(conv._id)).toMatchObject({
+			status: "resolved",
+			resolution: "withdrawn",
+			resume: { status: "abandoned" },
+		});
+		const message = fresh.messages.find((m) => m.id === "msg-1");
+		expect(JSON.stringify(message?.updates)).toContain(
+			"the user wrote instead of answering the publish card"
 		);
-		await answerBoth(locals, conv, review);
-		const res = await SUBMIT(
-			event(locals, conv._id.toString(), review._id.toString(), {
-				verdict: "approve",
-				destination: { repo: "pngwn/gold", type: "dataset", path: "data/a.parquet", pr: false },
-			})
-		);
-		expect(await res.json()).toMatchObject({ ok: true, delivery: "queued" });
-		expect(deliverReview).toHaveBeenCalledWith(review._id, expect.anything());
 		expect(hub.commit).not.toHaveBeenCalled();
 	});
 
-	it("publishes only a destination the submit sends back, and says so when it did not", async () => {
+	it("holds a detached review's message until its card is answered", async () => {
 		vi.mocked(hub.commit).mockClear();
-		const { locals } = await createTestUser();
-		const { conv, review } = await seed(locals);
-		const destination = {
-			repo: "pngwn/gold",
-			type: "dataset" as const,
-			path: "data/a.parquet",
-			pr: false,
-		};
-		await collections.mlReviews.updateOne({ _id: review._id }, { $set: { destination } });
-		await answerBoth(locals, conv, review);
-
-		expect(
-			await errorOf(
-				SUBMIT(
-					event(locals, conv._id.toString(), review._id.toString(), {
-						verdict: "approve",
-						destination: { ...destination, repo: "someone/else" },
-					})
-				)
-			)
-		).toMatchObject({ status: 400, message: expect.stringContaining("does not match") });
+		vi.mocked(hub.commit).mockResolvedValue({
+			commit: { oid: "abc123", url: "https://huggingface.co/datasets/pngwn/gold/commit/abc123" },
+			hookOutput: "",
+		});
+		deliverReview.mockClear();
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals, "detached");
 
 		const res = await SUBMIT(
 			event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
 		);
-		expect(res.status).toBe(200);
-		const stored = await collections.mlReviews.findOne({ _id: review._id });
-		expect(stored?.destination).toBeUndefined();
-		expect(stored?.declinedDestination).toEqual(destination);
-		expect(stored?.result?.text).toContain(
-			"Labels were NOT pushed to pngwn/gold (data/a.parquet): the user submitted without confirming the push."
-		);
-		expect(hub.commit).not.toHaveBeenCalled();
-	});
+		const body = await res.json();
+		const row = await publishRow(conv._id);
+		expect(body).toMatchObject({
+			ok: true,
+			delivery: "queued",
+			publishPromptId: row?.elicitationId,
+		});
+		expect(row?.pending).toMatchObject({ publish: { deliver: true } });
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			delivery: { status: "held" },
+		});
+		expect(deliverReview).not.toHaveBeenCalled();
 
-	it("pushes nothing when the user clears the destination, and refuses a bad one", async () => {
-		vi.mocked(hub.commit).mockClear();
-		const { locals } = await createTestUser();
-		const { conv, review } = await seed(locals);
-		await collections.mlReviews.updateOne(
-			{ _id: review._id },
-			{
-				$set: {
-					destination: { repo: "pngwn/gold", type: "dataset", path: "data/a.parquet", pr: false },
-				},
-			}
-		);
-		await answerBoth(locals, conv, review);
-		expect(
-			await errorOf(
-				SUBMIT(
-					event(locals, conv._id.toString(), review._id.toString(), {
-						verdict: "approve",
-						destination: { repo: "pngwn/gold", path: "/etc/x.parquet" },
-					})
-				)
-			)
-		).toMatchObject({ status: 400, message: expect.stringContaining("destination.path") });
-
-		await SUBMIT(
-			event(locals, conv._id.toString(), review._id.toString(), {
-				verdict: "approve",
-				destination: null,
-			})
-		);
-		const stored = await collections.mlReviews.findOne({ _id: review._id });
-		expect(stored?.destination).toBeUndefined();
-		expect(stored?.push).toBeUndefined();
-		expect(hub.commit).not.toHaveBeenCalled();
+		if (!row) throw new Error("no publish card");
+		await answer(conv._id, row.elicitationId, "push");
+		const { updates } = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: row.elicitationId,
+		});
+		expect(updates.some((u) => u.type === "tool")).toBe(false);
+		expect(hub.commit).toHaveBeenCalledTimes(1);
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			delivery: { status: "pending" },
+		});
+		expect(deliverReview).toHaveBeenCalledWith(review._id);
 	});
 
 	it("serves media to the owner only", async () => {

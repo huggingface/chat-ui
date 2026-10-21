@@ -5,7 +5,7 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { logger } from "$lib/server/logger";
 import { kickAnsweredAsk, type AskResumeSelection } from "$lib/server/generation/askResume";
-import type { MlReview, ReviewDestination, ReviewDraft } from "$lib/types/MlReview";
+import type { MlReview, ReviewDraft } from "$lib/types/MlReview";
 import {
 	invalidAnswers,
 	isAnswered,
@@ -17,8 +17,7 @@ import { readReview, saveDraft, saveDraftsGuarded, submitReview } from "./store"
 import { completeSubmission } from "./submission";
 import { deliverReview, type DeliveryState } from "./delivery";
 import { REVIEW_MAX_RECORDS } from "$lib/server/textGeneration/builtinTools/requestReviewDefinition";
-import { parseDestination, sameDestination } from "./destination";
-import { reviewSlug } from "./result";
+import { openDetachedPublish } from "./resume";
 
 export const REVIEW_MAX_COMMENTS_PER_RECORD = REVIEW_LIMITS.commentsPerRecord;
 export const REVIEW_MAX_COMMENT_CHARS = REVIEW_LIMITS.commentChars;
@@ -60,6 +59,7 @@ export function reviewPayload(review: MlReview) {
 		...(review.submitFailure?.gaveUp ? { submitFailed: review.submitFailure.error } : {}),
 		...(review.destination ? { destination: review.destination } : {}),
 		...(review.declinedDestination ? { declinedDestination: review.declinedDestination } : {}),
+		...(review.publish ? { publish: review.publish } : {}),
 		...(review.push
 			? {
 					push: {
@@ -431,7 +431,7 @@ export const submitBodySchema = z.object({
 	selection: selectionSchema,
 	/** marks every record still undecided ok, so marking all is one request at 500 records */
 	approveRest: z.boolean().optional(),
-	/** the review destination sent back to confirm the push, null or absent pushes nothing */
+	/** ignored, the publish card after the submit is where a push is confirmed */
 	destination: z.unknown().optional(),
 });
 
@@ -496,6 +496,8 @@ export type SubmitOutcome =
 			files: NonNullable<MlReview["result"]>["files"];
 			/** set when the turn had moved on and the submission goes out as the next user message */
 			delivery?: DeliveryState;
+			/** a detached review waits on this publish card before its message posts */
+			publishPromptId?: string;
 	  }
 	| { blockers: ReviewBlocker[] };
 
@@ -512,37 +514,18 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 		return finish(review, selection);
 	}
 
-	// only a destination the user saw and sent back publishes, a submit without one pushes nothing
-	let confirmed: ReviewDestination | undefined;
-	if (parsed.data.destination !== undefined && parsed.data.destination !== null) {
-		const given = parseDestination(
-			parsed.data.destination,
-			review.destination?.path ?? `data/${reviewSlug(review.schema.title)}.parquet`
-		);
-		if ("error" in given) error(400, given.error);
-		if (!review.destination || !sameDestination(given, review.destination)) {
-			error(400, "The destination does not match this review's, reload it and confirm again.");
-		}
-		confirmed = review.destination;
-	}
-	const declined = confirmed ? undefined : review.destination;
-
 	const approved = parsed.data.approveRest ? approvalsForRest(review) : {};
 	const drafts = { ...review.drafts, ...approved };
 	const found = invalidAnswers(review.schema, drafts, review.records.length);
 	if (found.length > 0) return { blockers: found };
 
 	const from = review.status;
-	if (
-		!(await submitReview(review, { note, drafts: approved, confirmed, declined }, from))
-	) {
+	if (!(await submitReview(review, { note, drafts: approved }, from))) {
 		error(409, "This review changed while it was being submitted, reload it and submit again.");
 	}
 	const claimed: MlReview = {
 		...review,
 		drafts,
-		destination: confirmed,
-		...(declined ? { declinedDestination: declined } : {}),
 		status: "submitted",
 		...(note ? { note } : {}),
 		...(from === "open" ? { unresolved: true as const } : {}),
@@ -562,11 +545,9 @@ async function finish(
 	}
 	// a detached turn moved on, or a message sent meanwhile closed the call, so post it as one
 	if (review.destination) {
-		// its message carries the push link and a commit can take a minute
-		deliverReview(review._id, toResumeSelection(selection)).catch((err) =>
-			logger.error({ err, reviewId: review._id.toString() }, "[review] delivery failed")
-		);
-		return { ok: true, files, delivery: "queued" };
+		// held until the publish card is answered, so the posted message carries the outcome
+		const publishPromptId = await openDetachedPublish(review, toResumeSelection(selection));
+		return { ok: true, files, delivery: "queued", ...(publishPromptId ? { publishPromptId } : {}) };
 	}
 	return {
 		ok: true,

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { collections, ready } from "$lib/server/database";
+import { ObjectId } from "mongodb";
 import { createTestUser, cleanupTestData } from "$lib/server/api/__tests__/testHelpers";
 import { streamFor, type Round } from "$lib/server/textGeneration/__tests__/replayHarness";
 import { getOrCreateThread, enqueueInput, inputKey, SlackLeader } from "./store";
@@ -7,6 +8,7 @@ import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } fr
 import { questionModal, readAnswers } from "./presentation";
 import { submitElicitationAnswer } from "$lib/server/mcp/elicitation";
 import { kickAnsweredAsk } from "$lib/server/generation/askResume";
+import { PUBLISH_FIELD, publishOptions } from "$lib/server/mlReviews/publish";
 import { rebuildIdentity } from "$lib/server/generation/parkedSweeper";
 
 const mocks = vi.hoisted(() => ({
@@ -183,6 +185,72 @@ describe("Slack ML Intern persistence", () => {
 		expect(await second.acquire()).toBe(false);
 		await first.release();
 		expect(await second.acquire()).toBe(true);
+	});
+
+	it("leaves a publish card for the new turn to close, and answers it from the modal", async () => {
+		const { thread, user } = await setup();
+		const destination = {
+			repo: "pngwn/gold",
+			type: "dataset" as const,
+			path: "a.parquet",
+			pr: false,
+		};
+		const audience = {
+			label: "existing public dataset pngwn/gold",
+			exists: true,
+			private: false,
+			canWrite: true,
+		};
+		const request = {
+			elicitationId: "publish-1",
+			source: "assistant" as const,
+			server: "",
+			mode: "form" as const,
+			message: 'Push the labels of review "t" to existing public dataset pngwn/gold?',
+			fields: [
+				{
+					kind: "select" as const,
+					name: PUBLISH_FIELD,
+					title: "Labels",
+					required: true,
+					multiple: false,
+					options: publishOptions(destination, audience),
+				},
+			],
+		};
+		const now = new Date();
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			elicitationId: "publish-1",
+			conversationId: thread.conversationId,
+			status: "pending",
+			request,
+			pending: {
+				kind: "ask",
+				messageId: "msg-review",
+				toolCallId: "call-review",
+				toolUuid: "uuid-review",
+				publish: { reviewId: new ObjectId().toString(), destination, audience },
+			},
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		expect(await skipSlackQuestion(thread, user, "msg-review", "new-input")).toBe(true);
+		expect(await collections.mcpElicitations.findOne({ elicitationId: "publish-1" })).toMatchObject(
+			{
+				status: "pending",
+			}
+		);
+
+		const modal = JSON.stringify(questionModal(request, thread._id));
+		expect(modal).toContain("Push to existing public dataset pngwn/gold");
+		expect(modal).toContain("Open a pull request on pngwn/gold");
+		expect(
+			readAnswers(request, {
+				q0: { answer: { type: "static_select", selected_option: { value: "1" } } },
+			} as never)
+		).toEqual({ content: { publish: "pr" }, errors: {} });
 	});
 
 	it("skips a pending budget question without granting spend and accepts a fresh turn", async () => {

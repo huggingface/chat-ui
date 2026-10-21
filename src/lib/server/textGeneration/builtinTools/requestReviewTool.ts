@@ -10,6 +10,7 @@ import { createReview } from "$lib/server/mlReviews/store";
 import { loadRecords, parseFileSource, parseRecordsInput } from "$lib/server/mlReviews/source";
 import { loadTable, type TableInput } from "$lib/server/mlReviews/tableSource";
 import { parseDestination } from "$lib/server/mlReviews/destination";
+import { resolveAudience } from "$lib/server/mlReviews/publish";
 import { reviewSlug } from "$lib/server/mlReviews/result";
 import { recordsFromTabular } from "$lib/server/mlReviews/tabular";
 import type { ElicitationRequestPayload } from "$lib/types/McpElicitation";
@@ -195,7 +196,13 @@ async function requestReview(
 		schemaHash: await reviewSchemaHash(schema.schema),
 		source,
 		records,
-		...(destination ? { destination } : {}),
+		...(destination
+			? {
+					destination,
+					// shown on the finish step, the publish card looks it up again when it opens
+					publish: { audience: await resolveAudience(destination, { token: token() }) },
+				}
+			: {}),
 	});
 	const reviewId = review._id.toString();
 

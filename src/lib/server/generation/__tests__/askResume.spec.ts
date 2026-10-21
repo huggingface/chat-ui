@@ -59,6 +59,15 @@ vi.mock("$lib/server/mcp/httpClient", () => ({
 	getMcpToolTimeoutMs: () => 2_000,
 }));
 vi.mock("$lib/server/mcp/clientPool", () => ({ getClient: async () => ({}) }));
+vi.mock("@huggingface/hub", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@huggingface/hub")>()),
+	commit: vi.fn(async () => ({
+		commit: { oid: "abc123", url: "https://huggingface.co/datasets/pngwn/gold/commit/abc123" },
+		hookOutput: "",
+	})),
+	fileExists: vi.fn(async () => false),
+	datasetInfo: vi.fn(async () => ({ sha: "head1" })),
+}));
 vi.mock("$lib/server/logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
@@ -1280,5 +1289,110 @@ describe("a review the user wrote past", () => {
 		expect(
 			await collections.generations.countDocuments({ generationId: delivery?.generationId })
 		).toBe(1);
+	});
+});
+
+describe("a submitted review with a destination", () => {
+	const REVIEW_TO_HUB: Round = {
+		toolCalls: (REVIEW.toolCalls ?? []).map((call) => ({
+			...call,
+			arguments: JSON.stringify({
+				...JSON.parse(call.arguments),
+				destination: { repo: "pngwn/gold", path: "data/batch-1.parquet" },
+			}),
+		})),
+	};
+
+	beforeEach(() => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: string | URL) => {
+				const url = String(input);
+				if (url.endsWith("/api/datasets/pngwn/gold")) return Response.json({ private: false });
+				if (url.endsWith("/api/whoami-v2")) {
+					return Response.json({
+						name: "pngwn",
+						orgs: [],
+						auth: { accessToken: { role: "write" } },
+					});
+				}
+				return new Response("not stubbed", { status: 500 });
+			})
+		);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	async function parkOnPublish() {
+		const { conv, locals } = await newConversation();
+		await collections.sessions.updateOne(
+			{ userId: conv.userId },
+			{ $set: { oauth: { token: { value: "hf_owner" } } } as never }
+		);
+		scriptRounds([REVIEW_TO_HUB, { content: "Labels are on the Hub." }]);
+		const { reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await labelAll(conv, locals, reviewId);
+		expect((await submitOverHttp(conv, locals, reviewId)).status).toBe(200);
+		await turnIs(conv, parked.id, "awaiting_input");
+		const card = await collections.mcpElicitations.findOne({
+			conversationId: conv._id,
+			"pending.publish": { $exists: true },
+		});
+		if (!card) throw new Error("the resumed turn did not park on a publish card");
+		return { conv, locals, parked, card };
+	}
+
+	it("parks on the publish card, then the answer pushes and the model runs", async () => {
+		const { commit } = await import("@huggingface/hub");
+		vi.mocked(commit).mockClear();
+		const { conv, locals, parked, card } = await parkOnPublish();
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(commit).not.toHaveBeenCalled();
+		const message = lastAssistant(await reload(conv));
+		expect(
+			message.updates?.some(
+				(u) =>
+					u.type === MessageUpdateType.Elicitation &&
+					u.subtype === MessageElicitationUpdateType.Request &&
+					u.request.elicitationId === card.elicitationId
+			)
+		).toBe(true);
+
+		const answered = await answerOverHttp(conv, locals, card.elicitationId, {
+			action: "accept",
+			content: { publish: "push" },
+		});
+		expect(answered.status).toBe(200);
+		await turnIs(conv, parked.id, "done");
+
+		expect(commit).toHaveBeenCalledTimes(1);
+		expect(vi.mocked(commit).mock.calls[0][0]).toMatchObject({ accessToken: "hf_owner" });
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain("Labels pushed to pngwn/gold (data/batch-1.parquet)");
+	});
+
+	it("is pushed by the sweep when the answer's process died", async () => {
+		const { commit } = await import("@huggingface/hub");
+		vi.mocked(commit).mockClear();
+		const { conv, parked, card } = await parkOnPublish();
+		await submitElicitationAnswer({
+			elicitationId: card.elicitationId,
+			conversationId: conv._id,
+			action: "accept",
+			content: { publish: "skip" },
+		});
+		await backdate(card.elicitationId, 60_000);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, parked.id, "done");
+
+		expect(commit).not.toHaveBeenCalled();
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain(
+			"Labels were NOT pushed to pngwn/gold (data/batch-1.parquet): the user chose not to push."
+		);
 	});
 });

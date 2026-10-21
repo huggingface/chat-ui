@@ -20,6 +20,7 @@ import {
 } from "$lib/types/MessageUpdate";
 import { isAnswered, recordStatus } from "$lib/utils/review/answers";
 import { destinationUrl, pushReviewLabels } from "./destination";
+import { decidePublish } from "./publish";
 
 /** the submit carries no verdict, so the model reads the annotations and the user decides */
 export const REVIEW_NEXT_STEPS =
@@ -390,7 +391,7 @@ export function reviewResultText(
 	else if (review.declinedDestination) {
 		const { repo, path } = review.declinedDestination;
 		lines.push(
-			`Labels were NOT pushed to ${repo} (${path}): the user submitted without confirming the push. Do not push them unless the user asks.`
+			`Labels were NOT pushed to ${repo} (${path}): ${review.publish?.reason ?? "the user chose not to push"}. Do not push them unless the user asks.`
 		);
 	}
 	lines.push(
@@ -446,6 +447,13 @@ export async function ensureReviewResult(
 	token?: string
 ): Promise<NonNullable<MlReview["result"]>> {
 	if (review.result) return review.result;
+	if (review.destination && !review.publish?.decision) {
+		review = await decidePublish(
+			review,
+			"skip",
+			"the push was never confirmed on the publish card"
+		);
+	}
 	const submission = { note: review.note ?? review.summary };
 	const files = await ensureReviewFiles(review);
 	const push = await pushReviewLabels(review, token);

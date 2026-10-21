@@ -183,6 +183,8 @@ export async function skipSlackQuestion(
 		{
 			conversationId: thread.conversationId,
 			"pending.kind": "ask",
+			// a publish card is closed by the new turn, which also writes the review result
+			"pending.publish": { $exists: false },
 			"pending.messageId": messageId,
 			$or: [
 				{ status: "pending", slackSubmitting: { $ne: true } },
@@ -211,7 +213,10 @@ export async function skipSlackQuestion(
 		// let it through, the new turn detaches the review, a stop would resolve it as aborted
 		const review = await collections.mcpElicitations.findOne({
 			conversationId: thread.conversationId,
-			"pending.kind": "review",
+			$or: [
+				{ "pending.kind": "review" },
+				{ "pending.kind": "ask", "pending.publish": { $exists: true } },
+			],
 			"pending.messageId": messageId,
 			status: "pending",
 		});

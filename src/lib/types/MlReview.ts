@@ -199,13 +199,34 @@ export type ReviewSource =
 
 export type ReviewDestinationType = "dataset" | "bucket";
 
-/** where the reviewed rows and labels are written, the submit confirms it */
+/** where the reviewed rows and labels are written, the publish card confirms it */
 export interface ReviewDestination {
 	repo: string;
 	type: ReviewDestinationType;
 	path: string;
 	/** a pull request instead of a commit to main, forced when the user cannot write */
 	pr: boolean;
+}
+
+/** who would see the pushed labels, shown on the publish card and the finish step */
+export interface PublishAudience {
+	label: string;
+	exists: boolean;
+	private?: boolean;
+	/** false offers only a pull request or no push */
+	canWrite: boolean;
+}
+
+export type PublishDecision = "push" | "pr" | "skip";
+
+/** the publish card the resumed turn parks on, and what the user chose there */
+export interface ReviewPublish {
+	audience?: PublishAudience;
+	promptId?: string;
+	decision?: PublishDecision;
+	/** why nothing was pushed, said in the tool result */
+	reason?: string;
+	decidedAt?: Date;
 }
 
 export interface ReviewPush {
@@ -223,7 +244,8 @@ export interface ReviewPush {
 
 /** a submission the turn had moved past, posted by the server as the user's next message */
 export interface ReviewDelivery {
-	status: "pending" | "sending" | "sent" | "failed";
+	/** held waits for the publish card, the sweep only takes pending */
+	status: "held" | "pending" | "sending" | "sent" | "failed";
 	attempts: number;
 	takenAt?: Date;
 	/** a rate limited attempt waits until then */
@@ -270,8 +292,9 @@ export interface MlReview {
 	submitFailure?: { attempts: number; error: string; retryAt?: Date; gaveUp?: true };
 	delivery?: ReviewDelivery;
 	destination?: ReviewDestination;
-	/** the model destination a submit did not confirm, nothing was pushed */
+	/** the model destination the user chose not to push to, nothing was pushed */
 	declinedDestination?: ReviewDestination;
+	publish?: ReviewPublish;
 	push?: ReviewPush;
 	createdAt: Date;
 	updatedAt: Date;

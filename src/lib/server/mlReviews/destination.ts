@@ -179,7 +179,7 @@ export function labelsParquet(review: MlReview, reviewedBy: string): ArrayBuffer
 }
 
 /** the owner as last signed in, a resume or sweep has no request to read */
-async function ownerToken(conversationId: ObjectId): Promise<string | undefined> {
+export async function ownerToken(conversationId: ObjectId): Promise<string | undefined> {
 	const conv = await collections.conversations.findOne(
 		{ _id: conversationId },
 		{ projection: { userId: 1, sessionId: 1 } }
@@ -241,7 +241,9 @@ export async function pushReviewLabels(
 	token?: string
 ): Promise<ReviewPush | undefined> {
 	const destination = review.destination;
-	if (!destination) return undefined;
+	const decision = review.publish?.decision;
+	// only the user choice on the publish card pushes
+	if (!destination || (decision !== "push" && decision !== "pr")) return undefined;
 	if (review.push && review.push.status !== "pushing") return review.push;
 
 	const takenAt = new Date();
@@ -332,7 +334,7 @@ export async function pushReviewLabels(
 		return commitTo(isPullRequest);
 	};
 
-	let pr = destination.pr;
+	let pr = destination.pr || decision === "pr";
 	try {
 		let output;
 		try {
