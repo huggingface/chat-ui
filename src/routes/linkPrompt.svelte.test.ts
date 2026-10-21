@@ -13,6 +13,29 @@ vi.mock("$lib/components/chat/ChatWindow.svelte", async () => ({
 }));
 vi.mock("$lib/utils/loadAttachmentsFromUrls", () => ({ loadAttachmentsFromUrls: vi.fn() }));
 
+const mcp = vi.hoisted(() => ({
+	servers: [] as { id: string; url: string }[],
+	selected: new Set<string>(),
+}));
+vi.mock("$lib/stores/mcpServers", async () => {
+	const { readable, writable } = await import("svelte/store");
+	const sameUrl = (a: string, b: string) => new URL(a).href === new URL(b).href;
+	return {
+		allMcpServers: writable(mcp.servers),
+		selectedServerIds: writable(mcp.selected),
+		enabledServersCount: readable(0),
+		isSameServerUrl: sameUrl,
+		addCustomServer: vi.fn(() => "added"),
+		refreshMcpServers: vi.fn(async () => undefined),
+		healthCheckServer: vi.fn(async () => undefined),
+		setServerOAuth: vi.fn(),
+		toggleServer: vi.fn(),
+		reconcileOAuthConnections: vi.fn(async () => undefined),
+		deleteCustomServer: vi.fn(),
+		disconnectServerOAuth: vi.fn(async () => undefined),
+	};
+});
+
 afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
@@ -107,5 +130,35 @@ describe.each([
 			"/conversation/created",
 			expect.objectContaining({ state: expect.objectContaining({ pendingMessage: "hello" }) })
 		);
+	});
+});
+
+describe("mcp link on the home route", () => {
+	const MCP_URL = "https://abc123.gradio.live/gradio_api/mcp/";
+	const mcpLink = `/?mcp=${encodeURIComponent(MCP_URL)}&mcp_name=My%20App`;
+
+	afterEach(() => {
+		mcp.servers.length = 0;
+		mcp.selected.clear();
+	});
+
+	it("opens the add form filled in, and strips the params from the URL", async () => {
+		mountOnLink(HomePage as Component, mcpLink);
+		await settle();
+
+		expect(document.body.textContent).toContain("Add MCP server from link");
+		expect(document.querySelector<HTMLInputElement>("#server-name")?.value).toBe("My App");
+		expect(document.querySelector<HTMLInputElement>("#server-url")?.value).toBe(MCP_URL);
+		const [url] = (appNavigation().replaceState.mock.lastCall ?? []) as unknown[];
+		expect(new URL(String(url)).search).toBe("");
+	});
+
+	it("shows nothing for a server that is already enabled", async () => {
+		mcp.servers.push({ id: "existing", url: MCP_URL });
+		mcp.selected.add("existing");
+		mountOnLink(HomePage as Component, mcpLink);
+		await settle();
+
+		expect(document.body.textContent).not.toContain("Add MCP server from link");
 	});
 });
