@@ -1,7 +1,9 @@
 <script lang="ts">
 	import MarkdownRenderer from "$lib/components/chat/MarkdownRenderer.svelte";
 	import type { ReviewQuote } from "$lib/types/MlReview";
+	import { jsonSummary, parseJsonText, unpackJson } from "$lib/utils/review/json";
 	import { quoteAt } from "$lib/utils/review/view";
+	import JsonView from "./JsonView.svelte";
 	import {
 		offerSelectionComment,
 		offsetsWithin,
@@ -29,6 +31,11 @@
 		onanchors = () => {},
 		oncomment,
 	}: Props = $props();
+
+	/** a text cell holding JSON renders as structure, the raw toggle shows it as stored */
+	let parsed = $derived(markdown ? undefined : parseJsonText(value));
+	let structured = $derived(parsed === undefined ? undefined : unpackJson(parsed));
+	let raw = $state(false);
 
 	/** room the popup needs above the selection before it flips below */
 	const POPUP_ROOM = 36;
@@ -88,6 +95,17 @@
 <svelte:document onselectionchange={dropStaleSelection} />
 
 <div bind:this={wrapper} class="relative min-w-0">
+	{#if structured !== undefined && !clamp}
+		<button
+			type="button"
+			class="mb-1 rounded-md px-1.5 py-0.5 font-mono text-[11px] text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+			aria-pressed={raw}
+			data-json-raw-toggle
+			onclick={() => (raw = !raw)}
+		>
+			{raw ? "Formatted" : "Raw"}
+		</button>
+	{/if}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		bind:this={element}
@@ -105,6 +123,10 @@
 	>
 		{#if markdown}
 			<MarkdownRenderer content={value} />
+		{:else if structured !== undefined && clamp}
+			{jsonSummary(structured)}
+		{:else if structured !== undefined && !raw}
+			<JsonView value={structured} />
 		{:else}
 			{value}
 		{/if}

@@ -1177,6 +1177,109 @@ describe("MlReviewPane", () => {
 		});
 	});
 
+	describe("JSON in records", () => {
+		const criteria = JSON.stringify({
+			false: "No annotated span has this type.",
+			true: "At least one annotated span has this type.",
+		});
+		const jsonReview = (
+			values: Record<string, unknown>,
+			fields: ReviewSchema["fields"],
+			drafts: ReviewPayload["drafts"] = {}
+		) =>
+			payload({
+				schema: {
+					title: "spans",
+					idField: "id",
+					fields: [{ name: "title", type: "text" }, ...fields],
+					questions: [{ name: "ok", type: "boolean", required: true }],
+					suggestions: "none",
+				},
+				records: [{ id: "s1", values: { title: "Span check", ...values } }],
+				drafts,
+			});
+
+		it("opens a json field that holds a JSON string, as a key and value list", async () => {
+			const { container } = await mount(
+				jsonReview({ criteria_json: criteria }, [{ name: "criteria_json", type: "json" }])
+			);
+			const field = container.querySelector("[data-json-field]") as HTMLElement;
+			expect(field.querySelector("[data-json-flat]")).not.toBeNull();
+			expect(field.textContent).toContain("No annotated span has this type.");
+			expect(field.textContent).not.toContain('\\"');
+		});
+
+		it("opens JSON nested inside a JSON string", async () => {
+			const state = JSON.stringify({ step: 3, criteria });
+			const { container } = await mount(
+				jsonReview({ state_preview: state }, [{ name: "state_preview", type: "json" }])
+			);
+			const field = container.querySelector("[data-json-field]") as HTMLElement;
+			expect(field.querySelectorAll("[data-json-flat]")).toHaveLength(1);
+			expect(field.textContent).toContain("At least one annotated span has this type.");
+		});
+
+		it("formats a text field holding JSON, with a raw toggle", async () => {
+			const { container } = await mount(
+				jsonReview({ notes: criteria }, [{ name: "notes", type: "text" }])
+			);
+			const field = container.querySelector("[data-field='notes']") as HTMLElement;
+			expect(field.querySelector("[data-json-flat]")).not.toBeNull();
+			(field.querySelector("[data-json-raw-toggle]") as HTMLButtonElement).click();
+			await tick();
+			expect(field.querySelector("[data-json-flat]")).toBeNull();
+			expect(field.querySelector("[data-review-quotable]")?.textContent).toContain(criteria);
+		});
+
+		it("folds a long string and wraps it", async () => {
+			const long = "word ".repeat(200).trim();
+			const { container } = await mount(
+				jsonReview({ blob: JSON.stringify({ text: long, more: [1, 2] }) }, [
+					{ name: "blob", type: "json" },
+				])
+			);
+			const string = container.querySelector("[data-json-string]") as HTMLElement;
+			expect(string.className).toContain("whitespace-pre-wrap");
+			expect(string.textContent?.length).toBeLessThan(long.length);
+			button(container.querySelector("[data-json-field]") as HTMLElement, "Show more").click();
+			await tick();
+			expect(container.querySelector("[data-json-string]")?.textContent).toBe(long);
+		});
+
+		it("keeps an invalid JSON string as plain text", async () => {
+			const { container } = await mount(
+				jsonReview({ notes: '{"broken": ' }, [{ name: "notes", type: "text" }])
+			);
+			const field = container.querySelector("[data-field='notes']") as HTMLElement;
+			expect(field.querySelector("[data-json-raw-toggle]")).toBeNull();
+			expect(field.textContent).toContain('{"broken": ');
+		});
+
+		it("anchors quotes to the formatted text, or says the anchor is lost", async () => {
+			const comment = (id: string, exact: string) => ({
+				id,
+				field: "notes",
+				quote: { exact, prefix: "", suffix: "" },
+				body: id,
+				createdAt: new Date(),
+			});
+			const { container } = await mount(
+				jsonReview({ notes: criteria }, [{ name: "notes", type: "text" }], {
+					"0": {
+						status: "pending",
+						answers: {},
+						comments: [comment("kept", "At least one"), comment("gone", '"true":')],
+						updatedAt: new Date(),
+					},
+				})
+			);
+			await vi.waitFor(() =>
+				expect(container.querySelector("[data-comment='gone'] [data-anchor-lost]")).not.toBeNull()
+			);
+			expect(container.querySelector("[data-comment='kept'] [data-anchor-lost]")).toBeNull();
+		});
+	});
+
 	describe("image grid", () => {
 		it("adds one comment to each selected image", async () => {
 			const { container, session } = await mount(
