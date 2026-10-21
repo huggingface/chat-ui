@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { tick } from "svelte";
 import { writable } from "svelte/store";
 import type { Component } from "svelte";
+import type { MCPServer } from "$lib/types/Tool";
 import { appNavigation, renderWithApp } from "$lib/components/__tests__/renderWithApp";
 import { setPage } from "$lib/components/__tests__/appMocks";
 import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
@@ -14,7 +15,7 @@ vi.mock("$lib/components/chat/ChatWindow.svelte", async () => ({
 vi.mock("$lib/utils/loadAttachmentsFromUrls", () => ({ loadAttachmentsFromUrls: vi.fn() }));
 
 const mcp = vi.hoisted(() => ({
-	servers: [] as { id: string; name?: string; url: string }[],
+	servers: [] as MCPServer[],
 	selected: new Set<string>(),
 }));
 vi.mock("$lib/stores/mcpServers", async () => {
@@ -152,7 +153,7 @@ describe("mcp link on the home route", () => {
 	});
 
 	it("offers to enable a server the user already has, without the add form", async () => {
-		mcp.servers.push({ id: "existing", name: "Mine", url: `${MCP_URL}#tools` });
+		mcp.servers.push({ id: "existing", type: "custom", name: "Mine", url: `${MCP_URL}#tools` });
 		mountOnLink(HomePage as Component, mcpLink);
 		await settle();
 
@@ -161,11 +162,91 @@ describe("mcp link on the home route", () => {
 	});
 
 	it("shows nothing for a server that is already enabled", async () => {
-		mcp.servers.push({ id: "existing", url: MCP_URL });
+		mcp.servers.push({ id: "existing", type: "custom", name: "Mine", url: MCP_URL });
 		mcp.selected.add("existing");
 		mountOnLink(HomePage as Component, mcpLink);
 		await settle();
 
 		expect(document.body.textContent).not.toContain("Add MCP server from link");
+	});
+});
+
+describe("adversarial link interactions", () => {
+	afterEach(async () => {
+		mcp.servers.length = 0;
+		mcp.selected.clear();
+		const stores = await import("$lib/stores/mcpServers");
+		stores.allMcpServers.set(mcp.servers);
+	});
+	it("uses reconciled OAuth state when enabling an existing server", async () => {
+		const stores = await import("$lib/stores/mcpServers");
+		const oauth = {
+			connectionId: "connection",
+			issuer: "https://issuer.example",
+			status: "authorized" as const,
+		};
+		const existing = {
+			id: "existing",
+			name: "Mine",
+			url: "https://server.example/mcp",
+			type: "custom" as const,
+			status: "disconnected" as const,
+			oauth,
+		};
+		mcp.servers.push(existing);
+		vi.mocked(stores.reconcileOAuthConnections).mockImplementationOnce(async () => {
+			stores.allMcpServers.set([
+				{ ...existing, oauth: { ...oauth, status: "authorization_required" } },
+			]);
+		});
+		mountOnLink(HomePage as Component, "/?mcp=https://server.example/mcp");
+		await settle();
+		[...document.querySelectorAll("button")]
+			.find((b) => b.textContent?.trim() === "Enable Server")
+			?.click();
+		await settle();
+		expect(document.body.textContent).toContain("Authorize MCP server");
+	});
+	it.each(["cancel", "escape", "unmount"])("ignores discovery after %s", async (action) => {
+		const stores = await import("$lib/stores/mcpServers");
+		stores.allMcpServers.set(mcp.servers);
+		vi.mocked(stores.toggleServer).mockClear();
+		vi.mocked(stores.addCustomServer).mockClear();
+		const { screen, fetchSpy } = mountOnLink(
+			HomePage as Component,
+			"/?mcp=https://server.example/mcp"
+		);
+		let resolveDiscovery: (response: Response) => void = () => {};
+		fetchSpy.mockImplementationOnce(
+			() =>
+				new Promise<Response>((resolve) => {
+					resolveDiscovery = resolve;
+				})
+		);
+		await settle();
+		[...document.querySelectorAll("button")]
+			.find((b) => b.textContent?.trim() === "Add Server")
+			?.click();
+		await settle();
+		expect(fetchSpy).toHaveBeenCalledWith(
+			"/api/mcp/oauth/discover",
+			expect.objectContaining({ method: "POST" })
+		);
+		if (action === "cancel") {
+			[...document.querySelectorAll("button")]
+				.find((b) => b.textContent?.trim() === "Cancel")
+				?.click();
+		} else if (action === "escape") {
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+		} else {
+			await screen.unmount();
+		}
+		await vi.waitFor(() =>
+			expect(document.body.textContent).not.toContain("Add MCP server from link")
+		);
+		resolveDiscovery(new Response(JSON.stringify({ requiresAuth: false }), { status: 200 }));
+		await settle();
+		expect.soft(stores.addCustomServer).not.toHaveBeenCalled();
+		expect(stores.toggleServer).not.toHaveBeenCalled();
 	});
 });

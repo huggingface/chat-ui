@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, untrack } from "svelte";
+	import { onDestroy, onMount, untrack } from "svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import ServerCard from "./ServerCard.svelte";
@@ -39,10 +39,20 @@
 	let linkPending = $state(untrack(() => Boolean(linkServer)));
 	// A link to a server the user already has offers to turn that one on. It is not probed again:
 	// discovery would open a second OAuth connection for a server that already has one.
-	const linkExisting = untrack(() => {
+	const linkExisting = $derived.by(() => {
 		const url = linkServer?.url;
 		return url ? $allMcpServers.find((s) => isSameServerUrl(s.url, url)) : undefined;
 	});
+
+	let closed = false;
+	onDestroy(() => {
+		closed = true;
+	});
+
+	function handleClose() {
+		closed = true;
+		onclose();
+	}
 
 	type View = "list" | "add" | "authorize";
 	let currentView = $state<View>(untrack(() => (linkServer ? "add" : "list")));
@@ -69,6 +79,8 @@
 		headers?: KeyValuePair[];
 		discovery?: DiscoveryResponse;
 	}) {
+		// Discovery can finish after the user cancels or leaves the page.
+		if (closed) return;
 		const fromLink = linkPending;
 		linkPending = false;
 		const oauth: MCPOAuthState | undefined =
@@ -135,7 +147,7 @@
 
 	function handleCancel() {
 		// Declining a link's server closes the dialog: the user never asked to manage servers.
-		if (linkPending) return onclose();
+		if (linkPending) return handleClose();
 		currentView = "list";
 	}
 
@@ -171,7 +183,7 @@
 	}
 </script>
 
-<Modal width={currentView === "list" ? "w-[800px]" : "w-[600px]"} {onclose} closeButton>
+<Modal width={currentView === "list" ? "w-[800px]" : "w-[600px]"} onclose={handleClose} closeButton>
 	<div class="p-6">
 		<!-- Header -->
 		<div class="mb-6">
