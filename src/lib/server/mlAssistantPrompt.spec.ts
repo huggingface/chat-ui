@@ -544,8 +544,9 @@ describe("ML Assistant system message size", () => {
 	it("keeps the review guidance short, the rest lives in the tool description", () => {
 		expect(REQUEST_REVIEW_PREPROMPT.length).toBeLessThanOrEqual(600);
 		expect(REQUEST_REVIEW_PREPROMPT).toContain('"after_answer"');
-		expect(REQUEST_REVIEW_PREPROMPT).toContain("More than 20 records go in a file");
-		expect(REQUEST_REVIEW_PREPROMPT).toContain("before you train on it or push it");
+		expect(REQUEST_REVIEW_PREPROMPT).toContain("Over 20 records go in a file");
+		expect(REQUEST_REVIEW_PREPROMPT).toContain("when the user asks to see data");
+		expect(REQUEST_REVIEW_PREPROMPT).toContain("before you train or push");
 		expect(REQUEST_REVIEW_PREPROMPT).toContain("One review per round");
 	});
 });

@@ -15,9 +15,9 @@ export const REVIEW_MAX_INLINE_CHARS = 16_000;
 
 /** re-sent every round while offered, held to 600 characters by the prompt spec */
 export const REQUEST_REVIEW_PREPROMPT =
-	`REVIEWING DATA: show data to the user with ${REQUEST_REVIEW_TOOL_NAME} before you train on it or push it. ` +
+	`SHOWING DATA: when the user asks to see data, show it with ${REQUEST_REVIEW_TOOL_NAME}, and before you train or push. ` +
 	`Golden and eval sets use suggestions "after_answer". ` +
-	`More than ${REVIEW_MAX_INLINE_RECORDS} records go in a file, never inline. One review per round.`;
+	`Over ${REVIEW_MAX_INLINE_RECORDS} records go in a file. One review per round.`;
 
 /** kept apart from the tool so the prompt specs can measure it without a database */
 export const requestReviewDefinition: OpenAiTool = {
@@ -25,9 +25,11 @@ export const requestReviewDefinition: OpenAiTool = {
 	function: {
 		name: REQUEST_REVIEW_TOOL_NAME,
 		description:
-			"Show the user a batch of records in a review pane and wait for their submission. " +
-			"Use it to have data looked at before you train on it or push it, and to have a golden " +
-			"or eval set labelled. Declare the record shape in `fields` and, to collect labels, the " +
+			"Show records to the user in a rich, browsable view. Use it whenever the user asks to see, " +
+			"look at, sample or browse data, rather than describing rows in prose; also to have data " +
+			"checked before you train on it or push it, or a golden or eval set labelled. The turn " +
+			"waits until the user sends the view back. Declare the record shape in `fields` and, to " +
+			"collect labels, the " +
 			"`questions`; with no questions the user marks records OK or rejects them. The user can " +
 			"comment on any record, field or quoted span, and submits everything at once. You get " +
 			"back what they did: counts, tallies, every comment, their note, and a file of per-record " +
