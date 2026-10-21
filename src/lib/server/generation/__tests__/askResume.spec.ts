@@ -1374,6 +1374,31 @@ describe("a submitted review with a destination", () => {
 		expect(result).toContain("Labels pushed to pngwn/gold (data/batch-1.parquet)");
 	});
 
+	it("takes no ask path when the HTTP endpoint answers a card carrying a budget option", async () => {
+		const { commit } = await import("@huggingface/hub");
+		vi.mocked(commit).mockClear();
+		const { conv, locals, parked, card } = await parkOnPublish();
+		await collections.mcpElicitations.updateOne(
+			{ _id: card._id },
+			{ $set: { "request.fields.0.options.0.setBudgetUsd": 50 } }
+		);
+		const before = (await reload(conv)).mlBudget;
+
+		const answered = await answerOverHttp(conv, locals, card.elicitationId, {
+			action: "accept",
+			content: { publish: "push" },
+		});
+		expect(answered.status).toBe(200);
+		await turnIs(conv, parked.id, "done");
+
+		expect((await reload(conv)).mlBudget).toEqual(before);
+		expect(commit).toHaveBeenCalledTimes(1);
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain("Labels pushed to pngwn/gold (data/batch-1.parquet)");
+		expect(result).not.toContain("The user answered");
+		expect(result).not.toContain("compute budget");
+	});
+
 	it("is pushed by the sweep when the answer's process died", async () => {
 		const { commit } = await import("@huggingface/hub");
 		vi.mocked(commit).mockClear();

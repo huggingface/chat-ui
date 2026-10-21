@@ -216,18 +216,21 @@ export async function openPublishPrompt({
 		return { decided: current ?? review };
 	}
 
+	const question = `Push the labels of review "${review.schema.title}" to ${audience.label}?`;
 	const request: ElicitationRequestPayload = {
 		elicitationId,
 		source: "assistant",
 		server: "",
 		mode: "form",
 		reviewId: review._id.toString(),
-		message: `Push the labels of review "${review.schema.title}" to ${audience.label}?`,
+		message: question,
 		fields: [
 			{
 				kind: "select",
 				name: PUBLISH_FIELD,
 				title: "Labels",
+				// the ask panel shows a field description as the question, never the message
+				description: question,
 				required: true,
 				multiple: false,
 				options,

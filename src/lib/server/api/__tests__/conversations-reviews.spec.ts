@@ -1420,6 +1420,10 @@ describe.sequential("writing labels back", () => {
 			"pr",
 			"skip",
 		]);
+		expect(field?.description).toBe(
+			'Push the labels of review "Triage batch 1" to existing public dataset pngwn/gold?'
+		);
+		expect(row?.request.message).toBe(field?.description);
 		expect(parked.updates.map((u) => [u.type, "subtype" in u ? u.subtype : undefined])).toEqual([
 			["review", "resolved"],
 			["elicitation", "resolved"],
@@ -1534,6 +1538,39 @@ describe.sequential("writing labels back", () => {
 		expect(text).toContain('Review \\"Triage batch 1\\" submitted');
 		expect(text).not.toContain("The user answered");
 		expect(text).not.toContain("compute budget");
+	});
+
+	it("pushes only to the destination the card showed, never to one changed after it", async () => {
+		vi.mocked(hub.commit).mockClear();
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals);
+		await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }));
+		await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: review.elicitationId,
+			generationId: "gen-resume",
+			mayPark: true,
+		});
+		const row = await publishRow(conv._id);
+		if (!row) throw new Error("no publish card");
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{ $set: { destination: { ...DESTINATION, repo: "someone/else" } } }
+		);
+
+		await answer(conv._id, row.elicitationId, "push");
+		const { updates } = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: row.elicitationId,
+		});
+		expect(hub.commit).not.toHaveBeenCalled();
+		expect(JSON.stringify(updates)).toContain(
+			"the destination changed after the publish card was shown"
+		);
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			publish: { decision: "skip" },
+		});
 	});
 
 	it("offers no direct push to a repo the owner cannot write to", async () => {
