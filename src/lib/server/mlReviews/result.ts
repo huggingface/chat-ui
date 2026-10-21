@@ -250,7 +250,7 @@ export function sourceLine(source: ReviewSource): string | undefined {
 			: "";
 	const fellBack =
 		source.kind === "dataset" && source.viewerError
-			? ` The dataset viewer was not used: ${source.viewerError}.`
+			? ` The dataset viewer was not used (${source.viewerError}), its files were read directly instead, so there is nothing to wait for.`
 			: "";
 	return `Source: ${of} of ${from}${filter}, ${drawn}.${fellBack}`;
 }

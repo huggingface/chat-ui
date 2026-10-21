@@ -66,6 +66,8 @@ const MAX_FILTER_CHARS = 2_000;
 /** short, a slow viewer falls back to the files rather than holding the turn */
 const VIEWER_TIMEOUT_MS = 8_000;
 const VIEWER_FILTER_TIMEOUT_MS = 5_000;
+/** the whole viewer attempt, every call together, so a slow viewer never holds a read */
+const VIEWER_BUDGET_MS = 10_000;
 /** a random parquet sample reads at most this many row groups */
 const PARQUET_RANDOM_GROUPS = 5;
 const PARQUET_MAX_LINE_FILES = 100;
@@ -332,8 +334,10 @@ async function loadFromViewer(
 ): Promise<Loaded | { fallback: string }> {
 	const { repo } = input.dataset;
 	const filtered = input.sample.where !== undefined || input.sample.query !== undefined;
+	const budget = AbortSignal.timeout(VIEWER_BUDGET_MS);
 	const viewer = {
 		...access,
+		signal: access.signal ? AbortSignal.any([access.signal, budget]) : budget,
 		timeoutMs: filtered ? VIEWER_FILTER_TIMEOUT_MS : VIEWER_TIMEOUT_MS,
 	};
 	// filter and search have nothing else to run on, everything else can fall back to the files
@@ -343,7 +347,7 @@ async function loadFromViewer(
 		return filtered
 			? {
 					ok: false,
-					error: `the dataset viewer could not ${input.sample.where !== undefined ? "filter" : "search"} ${repo}: ${reason}. where and query need the viewer; sample without them (that reads the dataset's files), or filter in a sandbox and pass source.sandbox`,
+					error: `the dataset viewer could not ${input.sample.where !== undefined ? "filter" : "search"} ${repo}: ${reason}. where and query need the viewer; sample without them (that reads the dataset's files), or filter in a job or sandbox that writes the rows to a file and pass source.sandbox or source.hub`,
 				}
 			: { fallback: reason };
 	};
@@ -586,7 +590,7 @@ async function loadFromParquet({
 		if (mediaRefusal && fields.media.length > 0) {
 			return {
 				ok: false,
-				error: `${where} has ${fields.media.join(", ")} media, which the pane loads only through the dataset viewer, and ${mediaRefusal}. Declare fields without the media, try again later, or sample in a sandbox and pass source.sandbox`,
+				error: `${where} has ${fields.media.join(", ")} media, which the pane loads only through the dataset viewer, and ${mediaRefusal}. Declare fields without the media, or sample it in a job or sandbox that writes the rows and media links to a file and pass source.sandbox or source.hub; do not wait for the viewer`,
 			};
 		}
 		resolved = fields;
@@ -851,7 +855,7 @@ async function loadFromFiles(
 
 	return {
 		ok: false,
-		error: `${repo} could not be read without a job: ${viewerError}, and at ${revision} it has no Parquet, JSONL or CSV files${split ? ` for split ${split}` : ""} and no ${CONVERTED_REVISION} conversion. Sample it in a sandbox and pass source.sandbox`,
+		error: `${repo} could not be read without a job: ${viewerError}, and at ${revision} it has no Parquet, JSONL or CSV files${split ? ` for split ${split}` : ""} and no ${CONVERTED_REVISION} conversion. Sample it in a job or sandbox that writes the rows to a file and pass source.sandbox or source.hub; do not wait for the viewer`,
 	};
 }
 

@@ -457,6 +457,7 @@ describe("source.dataset without the viewer", () => {
 				access: { fetch: viewer.fetch },
 			});
 			expect(loaded.ok ? loaded.source : loaded.error).toMatchObject({ via: "parquet" });
+			expect(viewer.calls).toHaveLength(1);
 		}
 		served({ "v1.0": { "data/train-0.parquet": textParquet(100, 50) } });
 		const viewer = fakeViewer();

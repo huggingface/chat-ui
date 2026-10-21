@@ -218,7 +218,7 @@ describe("the source line", () => {
 				sample: { method: "random", rows: 50, total: 2_207_027, seed: 3, groups: 5 },
 			})
 		).toBe(
-			"Source: 50 of 2,207,027 rows of allenai/c4 en/train, read from the viewer's Parquet conversion at refs/convert/parquet (it covers only the first part of this split), a random sample grouped inside 5 random row groups, seed 3. The dataset viewer was not used: the dataset viewer did not answer in time."
+			"Source: 50 of 2,207,027 rows of allenai/c4 en/train, read from the viewer's Parquet conversion at refs/convert/parquet (it covers only the first part of this split), a random sample grouped inside 5 random row groups, seed 3. The dataset viewer was not used (the dataset viewer did not answer in time), its files were read directly instead, so there is nothing to wait for."
 		);
 		expect(
 			sourceLine({

@@ -18,7 +18,9 @@ export const REQUEST_REVIEW_PREPROMPT =
 	`SHOWING DATA: when the user asks to see data, show it with ${REQUEST_REVIEW_TOOL_NAME}, and before you train or push. ` +
 	`Golden and eval sets use suggestions "after_answer". ` +
 	`Over ${REVIEW_MAX_INLINE_RECORDS} records go in a file. One review per round. ` +
-	"Sample a Hub dataset with source.dataset, not a job, unless the rows need preprocessing.";
+	"Sample a Hub dataset with source.dataset, not a job, unless the rows need preprocessing. " +
+	`Never wait for the dataset viewer, ${REQUEST_REVIEW_TOOL_NAME} falls back on its own. ` +
+	`After revising data for review comments, call ${REQUEST_REVIEW_TOOL_NAME} again.`;
 
 const SAMPLE_PROPERTIES = {
 	sample: {
@@ -105,7 +107,7 @@ export const requestReviewDefinition: OpenAiTool = {
 								"A Hub dataset read through the dataset viewer, a few seconds for any size. " +
 								"When the viewer is down or has not processed it, reads the repo's Parquet files, then " +
 								"the viewer's refs/convert/parquet branch, then JSONL or CSV; where, query and image or " +
-								"audio columns need the viewer.",
+								"audio columns need the viewer. Never wait for the viewer, the tool falls back at once.",
 							properties: {
 								repo: { type: "string", description: 'e.g. "stanfordnlp/imdb".' },
 								config: { type: "string", description: "Defaults to the first config." },
