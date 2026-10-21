@@ -774,6 +774,8 @@ async function loadFromFiles(
 		return { ok: false, error: hubError(err, repo) };
 	}
 
+	// a path that fails hands on to the next, the refusal names why each one did not serve
+	const tried: string[] = [`dataset viewer: ${viewerError}`];
 	const parquet = filesForSplit(
 		listed.filter((p) => p.endsWith(".parquet")),
 		config,
@@ -791,34 +793,42 @@ async function loadFromFiles(
 			access,
 			mediaRefusal,
 		});
-		if (!loaded.ok) return loaded;
-		const { sample, files, ...rest } = loaded;
-		return { ...rest, source: { ...dataset("parquet", (await sha) ?? revision), files, sample } };
+		if (loaded.ok) {
+			const { sample, files, ...rest } = loaded;
+			return { ...rest, source: { ...dataset("parquet", (await sha) ?? revision), files, sample } };
+		}
+		tried.push(`Parquet files at ${revision}: ${loaded.error}`);
+	} else {
+		tried.push(`Parquet files at ${revision}: none${split ? ` for split ${split}` : ""}`);
 	}
 
 	// the conversion follows main, so it may hold other rows than a pinned revision
 	const pinned = revision !== "main";
 	const converted = pinned ? undefined : await findConverted(designation, config, split, access);
-	if (converted) {
-		let paths: string[];
+	if (pinned) tried.push(`${CONVERTED_REVISION}: not used for pinned revision ${revision}`);
+	else if (!converted) tried.push(`${CONVERTED_REVISION}: no conversion for this split`);
+	else {
+		let paths: string[] = [];
+		let listing: string | undefined;
 		try {
 			paths = await listDataFiles(designation, converted.folder, CONVERTED_REVISION, access);
 		} catch (err) {
-			return { ok: false, error: hubError(err, repo) };
+			listing = hubError(err, repo);
 		}
-		if (paths.length > 0) {
-			const loaded = await loadFromParquet({
-				repo: designation,
-				paths,
-				revision: CONVERTED_REVISION,
-				sample: input.sample,
-				declared,
-				idField,
-				where: `${repo} (${CONVERTED_REVISION} ${converted.folder})`,
-				access,
-				mediaRefusal,
-			});
-			if (!loaded.ok) return loaded;
+		const loaded = paths.length
+			? await loadFromParquet({
+					repo: designation,
+					paths,
+					revision: CONVERTED_REVISION,
+					sample: input.sample,
+					declared,
+					idField,
+					where: `${repo} (${CONVERTED_REVISION} ${converted.folder})`,
+					access,
+					mediaRefusal,
+				})
+			: undefined;
+		if (loaded?.ok) {
 			const { sample, files, ...rest } = loaded;
 			return {
 				...rest,
@@ -831,6 +841,9 @@ async function loadFromFiles(
 				},
 			};
 		}
+		tried.push(
+			`${CONVERTED_REVISION}: ${loaded ? loaded.error : (listing ?? `no files in ${converted.folder}`)}`
+		);
 	}
 
 	const lines = filesForSplit(
@@ -840,7 +853,7 @@ async function loadFromFiles(
 	);
 	const format = lines[0] ? lineFormat(lines[0]) : undefined;
 	if (format) {
-		return loadFromLines(
+		const loaded = await loadFromLines(
 			designation,
 			lines.filter((p) => lineFormat(p) === format),
 			format,
@@ -851,11 +864,15 @@ async function loadFromFiles(
 			access,
 			(sample, files) => ({ ...dataset(format, revision), files, sample })
 		);
+		if (loaded.ok) return loaded;
+		tried.push(`${format.toUpperCase()} files at ${revision}: ${loaded.error}`);
+	} else {
+		tried.push(`JSONL or CSV files at ${revision}: none`);
 	}
 
 	return {
 		ok: false,
-		error: `${repo} could not be read without a job: ${viewerError}, and at ${revision} it has no Parquet, JSONL or CSV files${split ? ` for split ${split}` : ""} and no ${CONVERTED_REVISION} conversion. Sample it in a job or sandbox that writes the rows to a file and pass source.sandbox or source.hub; do not wait for the viewer`,
+		error: `${repo} could not be read without a job. Tried, in order:\n${tried.map((t) => `- ${t}`).join("\n")}\nSample it in a job or sandbox that writes the rows to a file and pass source.sandbox or source.hub; do not wait for the viewer`,
 	};
 }
 

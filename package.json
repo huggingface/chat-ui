@@ -95,6 +95,7 @@
 		"highlight.js": "^11.7.0",
 		"htmlparser2": "^10.0.0",
 		"hyparquet": "1.31.1",
+		"hyparquet-compressors": "1.1.2",
 		"hyparquet-writer": "0.16.10",
 		"ip-address": "^9.0.5",
 		"isomorphic-dompurify": "^3.8.0",

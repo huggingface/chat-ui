@@ -118,6 +118,30 @@ describe("source.dataset through the dataset viewer", () => {
 		});
 	});
 
+	it("fetches random windows in parallel, so twenty fit the viewer budget", async () => {
+		const viewer = fakeViewer();
+		let inFlight = 0;
+		let most = 0;
+		const slow = (async (url: string | URL, init?: RequestInit) => {
+			if (!new URL(String(url)).pathname.startsWith("/rows")) return viewer.fetch(url, init);
+			inFlight += 1;
+			most = Math.max(most, inFlight);
+			await new Promise((resolve) => setTimeout(resolve, 300));
+			inFlight -= 1;
+			return viewer.fetch(url, init);
+		}) as typeof fetch;
+		const started = performance.now();
+		const loaded = await loadTable(
+			input({ repo: "org/set", sample: "random", rows: 20, seed: 4 }),
+			{ access: { fetch: slow } }
+		);
+		if (!loaded.ok) throw new Error(loaded.error);
+		expect(loaded.records).toHaveLength(20);
+		expect(loaded.source).toMatchObject({ via: "viewer", sample: { windows: 20 } });
+		expect(most).toBeGreaterThanOrEqual(6);
+		expect(performance.now() - started).toBeLessThan(2_500);
+	});
+
 	it("sends the user's token on every viewer call", async () => {
 		const seen: (string | null)[] = [];
 		const viewer = fakeViewer();
@@ -414,6 +438,18 @@ describe("source.parquet through range reads", () => {
 	});
 });
 
+/** four rows written with zstd, the codec hyparquet alone cannot read; zlib on node 20 cannot write it */
+const ZSTD_PARQUET =
+	"UEFSMRUGFSwVPlwVCBUAFQgVABUEFQAAAAMPKLUv/SAUoQAAAQAAAGEBAAAAYgEAAABjAQAAAGQVBhWIARWaAVwVCBUAFQgVABUEFQAAAAMPKLUv/SBCEQIAEAAAAFRoZSBza3kgaXMgZ3JlZW4MAAAAV2F0ZXIgaXMgd2V0DAAAAEZpcmUgaXMgY29sZAoAAABJY2UgaXMgaG90FQQZPEgEcm9vdBUEABUMJQIYAmlkJQAAFQwlAhgFY2xhaW0lAAAWCBkcGSwmCBwVDBkVABkYAmlkFQwWCBZoFmgmCDw2ACgBZBgBYQAZHBUGFQAVAgAAACZwHBUMGRUAGRgFY2xhaW0VDBYIFsgBFsgBJnA8NgAoDFdhdGVyIGlzIHdldBgMRmlyZSBpcyBjb2xkABkcFQYVABUCAAAAFrACFggAKAloeXBhcnF1ZXQAsQAAAFBBUjE=";
+
+/** a codec nothing here can decode, written with a pass-through so the file is otherwise valid */
+const lzoParquet = () =>
+	parquetWriteBuffer({
+		columnData: [{ name: "text", data: ["a", "b"], type: "STRING" }],
+		codec: "LZO",
+		compressors: { LZO: (bytes: Uint8Array) => bytes },
+	});
+
 const jsonl = (n: number) =>
 	Array.from({ length: n }, (_, i) =>
 		JSON.stringify({ id: `r${i}`, prompt: `Prompt ${i} ${noise(i)}`, score: i / 10 })
@@ -541,6 +577,47 @@ describe("source.dataset without the viewer", () => {
 		expect(loaded.source).toMatchObject({ via: "csv" });
 	});
 
+	it("reads a ZSTD Parquet file, as most dataset files are", async () => {
+		served({ "data/train-0.parquet": Uint8Array.from(Buffer.from(ZSTD_PARQUET, "base64")).buffer });
+		const loaded = await loadTable(input({ repo: "org/zstd", rows: 10 }), {
+			access: { fetch: down },
+		});
+		if (!loaded.ok) throw new Error(loaded.error);
+		expect(loaded.records.map((r) => r.claim)).toEqual([
+			"The sky is green",
+			"Water is wet",
+			"Fire is cold",
+			"Ice is hot",
+		]);
+	});
+
+	it("falls past a file it cannot decode to the next path", async () => {
+		served({
+			main: { "data/train-0.parquet": lzoParquet() },
+			"refs/convert/parquet": { "default/train/0000.parquet": textParquet(30, 10) },
+		});
+		const loaded = await loadTable(input({ repo: "org/odd", rows: 3 }), {
+			access: { fetch: down },
+		});
+		if (!loaded.ok) throw new Error(loaded.error);
+		expect(loaded.source).toMatchObject({ via: "converted", revision: "refs/convert/parquet" });
+	});
+
+	it("names why each path did not serve when none can", async () => {
+		served({ main: { "data/train-0.parquet": lzoParquet() }, "refs/convert/parquet": {} });
+		const loaded = await loadTable(input({ repo: "org/odd", rows: 3 }), {
+			access: { fetch: down },
+		});
+		expect(loaded.ok).toBe(false);
+		const error = loaded.ok ? "" : loaded.error;
+		expect(error).toContain("Tried, in order:");
+		expect(error).toContain("- dataset viewer: the dataset viewer could not be reached");
+		expect(error).toMatch(/- Parquet files at main: .*unsupported compression codec: LZO/);
+		expect(error).toContain("- refs/convert/parquet: no conversion for this split");
+		expect(error).toContain("- JSONL or CSV files at main: none");
+		expect(error).toContain("pass source.sandbox or source.hub; do not wait for the viewer");
+	});
+
 	it("keeps a url column declared as an image, which is not stored media", async () => {
 		served({
 			"train.jsonl": `${JSON.stringify({ id: "a", photo: "https://example.com/a.png" })}\n`,
@@ -587,7 +664,9 @@ describe("source.dataset without the viewer", () => {
 		const media = await loadTable(input({ repo: "org/img", rows: 2 }), { access: { fetch: down } });
 		expect(media).toMatchObject({
 			ok: false,
-			error: expect.stringMatching(/image media.*only through the dataset viewer.*source\.sandbox/),
+			error: expect.stringMatching(
+				/could not be read without a job[\s\S]*image media, which the pane loads only through the dataset viewer[\s\S]*source\.sandbox/
+			),
 		});
 		expect(vi.mocked(hub.downloadFile)).toHaveBeenCalledTimes(1);
 
@@ -596,7 +675,7 @@ describe("source.dataset without the viewer", () => {
 		expect(tars).toMatchObject({
 			ok: false,
 			error: expect.stringMatching(
-				/no Parquet, JSONL or CSV files.*refs\/convert\/parquet.*source\.sandbox/
+				/Parquet files at main: none[\s\S]*refs\/convert\/parquet: no conversion[\s\S]*JSONL or CSV files at main: none[\s\S]*source\.sandbox/
 			),
 		});
 	});

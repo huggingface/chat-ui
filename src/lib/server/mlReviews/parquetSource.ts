@@ -7,6 +7,8 @@ import {
 	type AsyncBuffer,
 	type FileMetaData,
 } from "hyparquet";
+// hyparquet itself decodes only snappy, most dataset files are zstd
+import { compressors } from "hyparquet-compressors";
 import { accessSignal, type HubAccess } from "./datasetViewer";
 import type { DatasetColumn } from "./features";
 import type { RowWindow } from "./sampling";
@@ -275,6 +277,7 @@ export async function readSegment(
 		columns,
 		useOffsetIndex: true,
 		utf8: false,
+		compressors,
 	});
 }
 
@@ -340,6 +343,7 @@ export async function readMediaCell(
 			columns: [column],
 			useOffsetIndex: true,
 			utf8: false,
+			compressors,
 		});
 	if (hasOffsetIndex(opened.metadata, group.index)) {
 		return (await read(fileRow, fileRow + 1))[0]?.[column];
