@@ -68,7 +68,7 @@
 			? [
 					["all", "All"],
 					["todo", "To review"],
-					["approved", "Approved"],
+					["approved", "OK"],
 					["rejected", "Rejected"],
 					["commented", "Commented"],
 				]
@@ -265,7 +265,7 @@
 					class="flex w-full flex-col gap-1.5 border-0 bg-transparent p-0 text-left select-none"
 					aria-label="Image {index + 1}{caption
 						? `, ${plainText(record.values[caption.name])}`
-						: ''}{decision ? `, ${decision}` : ''}"
+						: ''}{decision ? `, ${decision === 'approved' ? 'OK' : 'rejected'}` : ''}"
 					aria-pressed={editable ? on : undefined}
 					data-tile={index}
 					data-decision={decision}
@@ -320,7 +320,7 @@
 										: "bg-red-700 dark:bg-red-500",
 								]}
 							>
-								{#if decision === "approved"}<CarbonCheckmark class="text-[11px]" />Approved
+								{#if decision === "approved"}<CarbonCheckmark class="text-[11px]" />OK
 								{:else}<CarbonClose class="text-[11px]" />Rejected{/if}
 							</span>
 						{/if}
@@ -393,7 +393,7 @@
 						onclick={() => decide("approved")}
 					>
 						<CarbonCheckmark class="text-sm text-green-600 dark:text-green-500" />
-						Approve {selected.size}
+						Mark {selected.size} OK
 					</button>
 					<button
 						type="button"

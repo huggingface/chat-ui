@@ -713,7 +713,7 @@ describe("MlReviewPane", () => {
 			expect(container.querySelector("[data-send-reason]")?.textContent).toContain(
 				"Answer #2 and #3 to send."
 			);
-			expect(button(container, "Send review").disabled).toBe(true);
+			expect(button(container, "Send").disabled).toBe(true);
 
 			button(blocked[1], "Go").click();
 			await tick();
@@ -721,13 +721,12 @@ describe("MlReviewPane", () => {
 			expect(position(container)).toBe("3 of 3");
 		});
 
-		it("sends with the chosen verdict and a note, then follows the message the server posted", async () => {
+		it("sends a note, then follows the message the server posted", async () => {
 			const review = payload({ status: "detached" });
 			const { container, server } = await mount(review);
 			server.answerSubmit({ ok: true, files: [], delivery: "sent" });
 			server.whenSubmitted(() => {
 				review.status = "submitted";
-				review.verdict = "request_changes";
 				review.delivery = { status: "sent", messageId: "m-1" };
 			});
 			for (let i = 0; i < RECORDS.length; i += 1) {
@@ -736,12 +735,11 @@ describe("MlReviewPane", () => {
 			}
 			button(container, "Finish").click();
 			await tick();
-			(container.querySelector("input[value='request_changes']") as HTMLInputElement).click();
 			const note = container.querySelector("[data-finish-step] textarea") as HTMLTextAreaElement;
 			note.value = "Check the dark mode one.";
 			note.dispatchEvent(new Event("input", { bubbles: true }));
 			await tick();
-			button(container, "Send review").click();
+			button(container, "Send").click();
 
 			await vi.waitFor(
 				() => expect(navigation.invalidate).toHaveBeenCalledWith("conversation:id"),
@@ -749,8 +747,7 @@ describe("MlReviewPane", () => {
 			);
 			expect(server.patches.map((patch) => patch.index).sort()).toEqual([0, 1, 2]);
 			expect(server.submits[0]).toMatchObject({
-				verdict: "request_changes",
-				summary: "Check the dark mode one.",
+				note: "Check the dark mode one.",
 			});
 			await vi.waitFor(() =>
 				expect(container.querySelector("[data-delivery='sent']")?.textContent).toContain(
@@ -765,7 +762,6 @@ describe("MlReviewPane", () => {
 			server.answerSubmit({ ok: true, files: [], delivery: "queued" });
 			server.whenSubmitted(() => {
 				review.status = "submitted";
-				review.verdict = "approve";
 				review.delivery = { status: "pending" };
 			});
 			for (let i = 0; i < RECORDS.length; i += 1) {
@@ -774,7 +770,7 @@ describe("MlReviewPane", () => {
 			}
 			button(container, "Finish").click();
 			await tick();
-			button(container, "Send review").click();
+			button(container, "Send").click();
 			await vi.waitFor(
 				() => expect(container.querySelector("[data-delivery='pending']")).not.toBeNull(),
 				{ timeout: 5_000 }
@@ -856,7 +852,7 @@ describe("MlReviewPane", () => {
 				],
 			});
 
-		it("opens a short review as a list, and an untouched one only approves all", async () => {
+		it("opens a short review as a list, and marks all OK in one send", async () => {
 			const { container, server } = await mount(review());
 			expect(container.querySelector("[data-list-view]")).not.toBeNull();
 			expect(container.querySelector("[data-instructions-strip]")?.textContent).toContain(
@@ -867,23 +863,20 @@ describe("MlReviewPane", () => {
 			);
 
 			const footer = container.querySelector("[data-review-footer]") as HTMLElement;
-			expect(() => button(footer, "Send now…")).toThrow();
-			button(footer, "Approve all 2…").click();
+			button(footer, "Mark all OK…").click();
 			await tick();
 			expect(footer.textContent?.replace(/\s+/g, " ")).toContain(
-				"Approve all 2 examples and send? This ends the review."
+				"Mark the 2 remaining examples OK and send? This ends the review."
 			);
 			expect(server.submits).toHaveLength(0);
-			button(footer, "Approve and send").click();
-			await vi.waitFor(() =>
-				expect(server.submits[0]).toMatchObject({ verdict: "approve", approveRest: true })
-			);
+			button(footer, "Mark OK and send").click();
+			await vi.waitFor(() => expect(server.submits[0]).toMatchObject({ approveRest: true }));
 		});
 
-		it("approves and rejects rows one by one", async () => {
+		it("marks rows OK or rejects them one by one", async () => {
 			const { container, session } = await mount(review());
 			(
-				container.querySelector("[data-row='0'] button[aria-label='Approve']") as HTMLButtonElement
+				container.querySelector("[data-row='0'] button[aria-label='Mark OK']") as HTMLButtonElement
 			).click();
 			(
 				container.querySelector("[data-row='1'] button[aria-label='Reject']") as HTMLButtonElement
@@ -892,8 +885,8 @@ describe("MlReviewPane", () => {
 			expect(session()?.draft(0)?.status).toBe("answered");
 			expect(session()?.draft(1)?.status).toBe("discarded");
 			const footer = container.querySelector("[data-review-footer]") as HTMLElement;
-			expect(footer.textContent).toContain("1 approved · 1 rejected · 0 to review");
-			expect(button(footer, "Send review").className).toContain("bg-gray-900");
+			expect(footer.textContent).toContain("1 OK · 1 rejected · 0 to review");
+			expect(button(footer, "Send").className).toContain("bg-gray-900");
 
 			(
 				container.querySelector("[data-row='1'] button[aria-label='Reject']") as HTMLButtonElement
@@ -902,24 +895,40 @@ describe("MlReviewPane", () => {
 			expect(session()?.draft(1)?.status).toBe("pending");
 		});
 
-		it("sends a review with a rejection as a request for changes", async () => {
+		it("sends a decided review straight away, with no verdict", async () => {
 			const { container, session, server } = await mount(review());
 			session()?.decide([0], "approved");
 			session()?.decide([1], "rejected");
 			await tick();
 			const footer = container.querySelector("[data-review-footer]") as HTMLElement;
-			button(footer, "Send review").click();
-			await vi.waitFor(() =>
-				expect(server.submits[0]).toMatchObject({ verdict: "request_changes" })
-			);
+			button(footer, "Send").click();
+			await vi.waitFor(() => expect(server.submits).toHaveLength(1));
+			expect(server.submits[0]).not.toHaveProperty("verdict");
 			expect(server.submits[0]).not.toHaveProperty("approveRest");
 		});
 
-		it("never sends a review with nothing decided", async () => {
-			const { session, server } = await mount(review());
-			expect(await session()?.submit("request_changes")).toBe(false);
-			expect(session()?.submitError).toContain("at least one record");
-			expect(server.submits).toHaveLength(0);
+		it("asks once before an empty send, then sends it", async () => {
+			const { container, server } = await mount(review());
+			const footer = container.querySelector("[data-review-footer]") as HTMLElement;
+			button(footer, "Send…").click();
+			await tick();
+			expect(footer.textContent).toContain("Send without any notes?");
+			button(footer, "Send").click();
+			await vi.waitFor(() => expect(server.submits).toHaveLength(1));
+			expect(server.submits[0]).not.toHaveProperty("note");
+			expect(server.submits[0]).not.toHaveProperty("verdict");
+		});
+
+		it("sends the note with the submission", async () => {
+			const { container, session, server } = await mount(review());
+			session()?.decide([0, 1], "approved");
+			const open = session();
+			if (open) open.note = "Retrain on these two.";
+			await tick();
+			button(container.querySelector("[data-review-footer]") as HTMLElement, "Send").click();
+			await vi.waitFor(() =>
+				expect(server.submits[0]).toMatchObject({ note: "Retrain on these two." })
+			);
 		});
 
 		it("approves the open record with 1 in the one-at-a-time view", async () => {
@@ -933,26 +942,24 @@ describe("MlReviewPane", () => {
 			expect(session()?.draft(1)?.status).toBe("answered");
 		});
 
-		it("offers to approve the remaining records, and says a send ends the review", async () => {
+		it("offers to mark the rest OK, and says a send ends the review", async () => {
 			const { container, session, server } = await mount(review());
 			session()?.decide([1], "approved");
 			session()?.addComment(0, { body: "Too short." });
 			await tick();
 			const footer = container.querySelector("[data-review-footer]") as HTMLElement;
 			expect(footer.textContent).toContain("1 comment");
-			button(footer, "Send now…").click();
+			button(footer, "Send…").click();
 			await tick();
 			expect(footer.textContent?.replace(/\s+/g, " ")).toContain(
 				"Send with 1 example not reviewed? This ends the review."
 			);
 			button(footer, "Cancel").click();
 			await tick();
-			button(footer, "Approve remaining 1…").click();
+			button(footer, "Mark the rest OK…").click();
 			await tick();
-			button(footer, "Approve and send").click();
-			await vi.waitFor(() =>
-				expect(server.submits[0]).toMatchObject({ verdict: "comment", approveRest: true })
-			);
+			button(footer, "Mark OK and send").click();
+			await vi.waitFor(() => expect(server.submits[0]).toMatchObject({ approveRest: true }));
 		});
 	});
 
@@ -1256,13 +1263,13 @@ describe("MlReviewPane", () => {
 			expect(selectedTiles(container)).toEqual([]);
 		});
 
-		it("approves or rejects only the selected images, the footer waits", async () => {
+		it("marks OK or rejects only the selected images, the footer waits", async () => {
 			const { container, session, server } = await mount(rocks());
 			tileClick(container, 0);
 			tileClick(container, 2, { ctrlKey: true });
 			await tick();
 			expect(container.querySelector("[data-review-footer]")).toBeNull();
-			button(container, "Approve 2").click();
+			button(container, "Mark 2 OK").click();
 			await tick();
 			expect(session()?.draft(0)?.status).toBe("answered");
 			expect(session()?.draft(1)).toBeUndefined();
@@ -1278,7 +1285,7 @@ describe("MlReviewPane", () => {
 			await tick();
 			expect(session()?.draft(4)?.status).toBe("discarded");
 			const footer = container.querySelector("[data-review-footer]") as HTMLElement;
-			expect(footer.textContent).toContain("2 approved · 1 rejected · 2 to review");
+			expect(footer.textContent).toContain("2 OK · 1 rejected · 2 to review");
 		});
 
 		it("sets the yes/no question when the review has one", async () => {
@@ -1366,7 +1373,7 @@ describe("MlReviewCard", () => {
 		expect(mlReviews.conversationId).toBeUndefined();
 	});
 
-	it("asks before approving a whole review unopened", async () => {
+	it("asks before marking a whole review OK unopened", async () => {
 		const { container, server } = await card(
 			payload({
 				schema: reviewSchema,
@@ -1374,13 +1381,11 @@ describe("MlReviewCard", () => {
 			}),
 			cardRequest({ mode: "review", records: 1, questions: 0 })
 		);
-		button(container, "Approve all 1").click();
+		button(container, "Mark all 1 OK").click();
 		await tick();
-		expect(container.textContent).toContain("Approve all 1 without opening any?");
+		expect(container.textContent).toContain("Mark all 1 OK without opening any?");
 		expect(server.submits).toHaveLength(0);
-		button(container, "Approve").click();
-		await vi.waitFor(() =>
-			expect(server.submits[0]).toMatchObject({ verdict: "approve", approveRest: true })
-		);
+		button(container, "Mark OK and send").click();
+		await vi.waitFor(() => expect(server.submits[0]).toMatchObject({ approveRest: true }));
 	});
 });

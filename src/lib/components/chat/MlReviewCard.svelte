@@ -6,15 +6,12 @@
 		MessageReviewRequestUpdate,
 		MessageReviewResolvedUpdate,
 	} from "$lib/types/MessageUpdate";
-	import type { ReviewVerdict } from "$lib/types/MlReview";
 	import { formatFileRef } from "$lib/utils/mlRegistry";
 	import { deliveryLabel } from "$lib/utils/review/view";
 
 	import CarbonArrowRight from "~icons/carbon/arrow-right";
-	import CarbonChat from "~icons/carbon/chat";
 	import CarbonCheckmarkOutline from "~icons/carbon/checkmark-outline";
 	import CarbonDocument from "~icons/carbon/document";
-	import CarbonEdit from "~icons/carbon/edit";
 	import CarbonInformation from "~icons/carbon/information";
 	import CarbonTaskComplete from "~icons/carbon/task-complete";
 	import CarbonTime from "~icons/carbon/time";
@@ -30,12 +27,6 @@
 	}
 
 	let { request, resolved, conversationId, interactive }: Props = $props();
-
-	const VERDICT_LABEL: Record<ReviewVerdict, string> = {
-		approve: "Approved",
-		request_changes: "Changes requested",
-		comment: "Commented",
-	};
 
 	$effect(() => {
 		if (interactive && conversationId && !resolved) {
@@ -55,7 +46,6 @@
 	let frozen = $derived.by(() => {
 		if (resolved) {
 			return {
-				verdict: resolved.verdict,
 				answered: resolved.answered,
 				skipped: resolved.skipped,
 				comments: resolved.comments,
@@ -64,7 +54,6 @@
 		}
 		if (payload?.status !== "submitted" || !session) return undefined;
 		return {
-			verdict: payload.verdict ?? "comment",
 			answered: session.counts.answered,
 			skipped: session.counts.skipped,
 			comments: session.counts.comments,
@@ -111,9 +100,9 @@
 		session?.openRecord(index);
 	}
 
-	async function approveAll() {
+	async function markAllOk() {
 		confirming = false;
-		await session?.submit("approve", { approveRest: true });
+		await session?.submit({ approveRest: true });
 	}
 
 	const card =
@@ -172,36 +161,21 @@
 			</div>
 			<div class="min-w-0 flex-1 text-[13px] text-gray-500 dark:text-gray-400">
 				<span class="font-medium text-gray-700 dark:text-gray-300">{request.title}</span>
-				· {VERDICT_LABEL[frozen.verdict].toLowerCase()} · {frozen.comments} comment{frozen.comments ===
-				1
-					? ""
-					: "s"}
+				· sent · {frozen.comments} comment{frozen.comments === 1 ? "" : "s"}
 			</div>
 		</div>
 	{:else}
 		<div class={card} data-exclude-from-copy role="group" aria-label="Review: {request.title}">
 			<div class="flex items-center gap-2.5">
-				{#if frozen.verdict === "approve"}
-					<div class="{tile} bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400">
-						<CarbonCheckmarkOutline class="text-base" />
-					</div>
-				{:else if frozen.verdict === "request_changes"}
-					<div class="{tile} bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-400">
-						<CarbonEdit class="text-base" />
-					</div>
-				{:else}
-					<div class={tile}><CarbonChat class="text-base" /></div>
-				{/if}
+				<div class="{tile} bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400">
+					<CarbonCheckmarkOutline class="text-base" />
+				</div>
 				<div class="flex-1 text-[13px] text-gray-500 dark:text-gray-400">{kind} · submitted</div>
 				<span
-					class="{pill} {frozen.verdict === 'approve'
-						? 'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400'
-						: frozen.verdict === 'request_changes'
-							? 'bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-400'
-							: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}"
+					class="{pill} bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400"
 					data-card-pill
 				>
-					{VERDICT_LABEL[frozen.verdict]}
+					Sent
 				</span>
 			</div>
 			<div class="flex flex-col gap-1">
@@ -212,17 +186,19 @@
 							? ` · ${frozen.skipped} skipped`
 							: ""} · {frozen.comments} comment{frozen.comments === 1 ? "" : "s"}
 					{:else}
-						{frozen.comments} comment{frozen.comments === 1 ? "" : "s"}{commentedRecords
-							? ` on ${commentedRecords} of ${request.records}`
+						{frozen.answered} of {request.records} marked OK{frozen.skipped
+							? ` · ${frozen.skipped} rejected or skipped`
+							: ""} · {frozen.comments} comment{frozen.comments === 1 ? "" : "s"}{commentedRecords
+							? ` on ${commentedRecords}`
 							: ""}
 					{/if}
 				</div>
 			</div>
-			{#if payload?.summary}
+			{#if payload?.note}
 				<div
 					class="rounded-[10px] bg-gray-50 px-3 py-2.5 text-[13px] leading-normal text-gray-700 dark:bg-gray-800/60 dark:text-gray-300"
 				>
-					“{payload.summary}”
+					“{payload.note}”
 				</div>
 			{/if}
 			{#if payload?.delivery}
@@ -365,7 +341,7 @@
 				class="flex items-center gap-2 rounded-[10px] bg-gray-50 py-2.5 pr-2.5 pl-3.5 dark:bg-gray-800/60"
 			>
 				<div class="flex-1 text-[13px] leading-snug text-gray-700 dark:text-gray-300">
-					Approve all {request.records} without opening any?
+					Mark all {request.records} OK without opening any? This sends the review.
 				</div>
 				<button
 					type="button"
@@ -378,9 +354,9 @@
 					type="button"
 					class="{primary} h-8"
 					disabled={session.submitting}
-					onclick={approveAll}
+					onclick={markAllOk}
 				>
-					Approve
+					Mark OK and send
 				</button>
 			</div>
 		{:else}
@@ -405,7 +381,7 @@
 					<button type="button" class={primary} onclick={() => open()}>Open review</button>
 					{#if session.editable}
 						<button type="button" class={plain} onclick={() => (confirming = true)}>
-							Approve all {request.records}
+							Mark all {request.records} OK
 						</button>
 					{/if}
 				{/if}

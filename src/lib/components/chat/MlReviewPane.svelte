@@ -3,7 +3,7 @@
 	import { page } from "$app/state";
 	import { mlReviews, type ReviewView } from "$lib/stores/mlReview.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
-	import type { ReviewQuestion, ReviewVerdict } from "$lib/types/MlReview";
+	import type { ReviewQuestion } from "$lib/types/MlReview";
 	import { useIsDesktop } from "$lib/utils/isDesktop.svelte";
 	import { formatFileRef } from "$lib/utils/mlRegistry";
 	import { isAnswered } from "$lib/utils/review/answers";
@@ -50,11 +50,6 @@
 	import CarbonTime from "~icons/carbon/time";
 	import CarbonWarning from "~icons/carbon/warning-alt";
 
-	const VERDICT_LABEL: Record<ReviewVerdict, string> = {
-		approve: "Approved",
-		request_changes: "Changes requested",
-		comment: "Commented",
-	};
 	const VIEW_LABEL: Record<ReviewView, string> = {
 		list: "List",
 		table: "Table",
@@ -129,7 +124,7 @@
 		const types = new Set(schema?.fields.map((field) => field.type));
 		return [
 			...(schema?.questions.length === 0
-				? ([["Approve / reject", "1 2"]] as [string, string][])
+				? ([["Mark OK / reject", "1 2"]] as [string, string][])
 				: []),
 			...KEYS,
 			...(types.has("audio") || types.has("video") ? PLAYER_KEYS : []),
@@ -426,7 +421,7 @@
 			>
 				<kbd class="font-mono text-[10px] opacity-60">1</kbd>
 				<CarbonCheckmark class="text-sm" />
-				Approve
+				Mark OK
 			</button>
 			<button
 				type="button"
@@ -531,12 +526,15 @@
 		>
 			<CarbonCheckmarkFilled class="flex-none text-green-700 dark:text-green-400" />
 			<div class="min-w-0 flex-1 text-[13px] text-gray-700 dark:text-gray-300">
-				<b class="font-semibold text-green-700 dark:text-green-400">
-					{VERDICT_LABEL[session.payload.verdict ?? "comment"]}
-				</b>
+				<b class="font-semibold text-green-700 dark:text-green-400"> Sent </b>
 				· {session.counts.answered} answered, {session.counts.skipped} skipped, {session.counts
 					.comments}
 				comments
+				{#if session.payload.note}
+					<span class="block truncate text-xs text-gray-500 dark:text-gray-400" data-note>
+						“{session.payload.note}”
+					</span>
+				{/if}
 				{#if session.payload.delivery}
 					<span
 						class={[

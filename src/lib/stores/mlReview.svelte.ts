@@ -12,7 +12,6 @@ import type {
 	ReviewRecord,
 	ReviewSchema,
 	ReviewStatus,
-	ReviewVerdict,
 } from "$lib/types/MlReview";
 import { blockers, type ReviewBlocker } from "$lib/utils/review/answers";
 import { draftStatus, mergeDraft } from "$lib/utils/review/view";
@@ -41,8 +40,8 @@ export interface ReviewPayload {
 	records: ReviewRecord[];
 	drafts: Record<string, ReviewDraft>;
 	status: ReviewStatus;
-	verdict?: ReviewVerdict;
-	summary?: string;
+	/** the user's free text sent with the submission */
+	note?: string;
 	result?: { text: string; files: MlFileRef[] };
 	/** the server posts a submission the turn had moved past as the user's next message */
 	delivery?: { status: "pending" | "sending" | "sent" | "failed"; messageId?: string };
@@ -69,7 +68,6 @@ export interface CommentInput {
 }
 
 const UNREACHABLE = "Could not reach the server. Try again.";
-export const NOTHING_DECIDED = "Approve, reject or answer at least one record before sending.";
 /** saves that keep losing to another tab stop retrying and show the conflict */
 const MAX_CONFLICT_RETRIES = 3;
 
@@ -106,8 +104,7 @@ export class ReviewSession {
 	/** by record position, why its last save failed */
 	saveErrors = new SvelteMap<number, string>();
 	saving = $state(0);
-	verdict = $state<ReviewVerdict | undefined>(undefined);
-	summary = $state("");
+	note = $state("");
 	submitting = $state(false);
 	submitError = $state<string | undefined>(undefined);
 	/** the blockers a refused submit answered with */
@@ -149,9 +146,6 @@ export class ReviewSession {
 	/** label mode, some question is required on every record */
 	labelling = $derived(
 		this.payload?.schema.questions.some((question) => question.required) ?? false
-	);
-	chosenVerdict = $derived<ReviewVerdict>(
-		this.verdict ?? (this.labelling || this.counts.comments === 0 ? "approve" : "comment")
 	);
 
 	#timers = new Map<number, ReturnType<typeof setTimeout>>();
@@ -219,8 +213,7 @@ export class ReviewSession {
 			}
 			this.drafts = drafts;
 			this.payload = payload;
-			if (payload.verdict) this.verdict = payload.verdict;
-			if (payload.summary !== undefined) this.summary = payload.summary;
+			if (payload.note !== undefined) this.note = payload.note;
 			this.load = "ready";
 		} catch {
 			if (this.#alive && !this.payload) this.load = "error";
@@ -428,16 +421,9 @@ export class ReviewSession {
 		}, REVIEW_DELIVERY_POLL_MS);
 	}
 
-	/** `approveRest` has the server approve every undecided record, one write instead of one per record */
-	async submit(
-		verdict: ReviewVerdict,
-		{ approveRest = false }: { approveRest?: boolean } = {}
-	): Promise<boolean> {
+	/** `approveRest` has the server mark every undecided record OK, one write instead of one per record */
+	async submit({ approveRest = false }: { approveRest?: boolean } = {}): Promise<boolean> {
 		if (this.submitting || !this.editable) return false;
-		if (!approveRest && this.decided === 0) {
-			this.submitError = NOTHING_DECIDED;
-			return false;
-		}
 		this.submitting = true;
 		this.submitError = undefined;
 		this.serverBlockers = [];
@@ -449,13 +435,12 @@ export class ReviewSession {
 				return false;
 			}
 			const selection = await mcpSelection();
-			const summary = this.summary.trim();
+			const note = this.note.trim();
 			const res = await this.#owner.fetcher(`${this.#url}/submit`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json", Accept: "application/json" },
 				body: JSON.stringify({
-					verdict,
-					...(summary ? { summary } : {}),
+					...(note ? { note } : {}),
 					...(approveRest ? { approveRest: true } : {}),
 					selection,
 				}),
@@ -469,7 +454,6 @@ export class ReviewSession {
 				if (res.status === 409) void this.refresh();
 				return false;
 			}
-			this.verdict = verdict;
 			await this.refresh();
 			if (body?.delivery === "sent") void this.#owner.followConversation();
 			else if (body?.delivery === "queued") this.#followDelivery();

@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { NOTHING_DECIDED, type ReviewSession } from "$lib/stores/mlReview.svelte";
-	import type { ReviewVerdict } from "$lib/types/MlReview";
+	import type { ReviewSession } from "$lib/stores/mlReview.svelte";
 	import { anchorLabel } from "$lib/utils/review/anchors";
 	import { headingField, plainText } from "$lib/utils/review/progress";
 
@@ -29,32 +28,6 @@
 		return title || record?.id || "";
 	};
 
-	let verdicts = $derived<{ value: ReviewVerdict; label: string; hint: string }[]>(
-		labelling
-			? [
-					{ value: "approve", label: "Approve", hint: "The answers are ready to use." },
-					{
-						value: "request_changes",
-						label: "Request changes",
-						hint: "Something in the set or the schema needs redoing first.",
-					},
-					{
-						value: "comment",
-						label: "Comment",
-						hint: "Send the answers and notes without a decision.",
-					},
-				]
-			: [
-					{ value: "approve", label: "Approve", hint: "The data is good to use." },
-					{
-						value: "request_changes",
-						label: "Request changes",
-						hint: "Fix what the comments say.",
-					},
-					{ value: "comment", label: "Comment", hint: "Send the notes without a decision." },
-				]
-	);
-
 	/** by record, the questions still missing an answer */
 	let blocked = $derived.by(() => {
 		const byRecord = new Map<number, string[]>();
@@ -80,15 +53,16 @@
 		return field?.title ?? name;
 	};
 
-	/** nothing decided yet, an approve then approves every record and anything else is refused */
-	let untouched = $derived(session.decided === 0);
-	let approveAll = $derived(untouched && session.chosenVerdict === "approve");
+	/** nothing answered, marked or commented and no note, worth one question before it goes */
+	let empty = $derived(
+		session.decided === 0 && session.counts.comments === 0 && !session.note.trim()
+	);
+	let confirmEmpty = $state(false);
 
 	let reason = $derived.by(() => {
-		if (blocked.length === 0 && approveAll) {
-			return `Nothing is approved yet, so this approves all ${session.records.length}. You can't edit after sending.`;
+		if (blocked.length === 0 && confirmEmpty && empty) {
+			return "Send without any notes? You can't edit after sending.";
 		}
-		if (blocked.length === 0 && untouched) return NOTHING_DECIDED;
 		if (blocked.length === 0) return "You can't edit after sending.";
 		const named = blocked.slice(0, 3).map((entry) => `#${entry.record + 1}`);
 		const more = blocked.length > 3 ? ` and ${blocked.length - 3} more` : "";
@@ -98,7 +72,11 @@
 	});
 
 	async function send() {
-		if (await session.submit(session.chosenVerdict, { approveRest: approveAll })) onsubmitted();
+		if (empty && !confirmEmpty) {
+			confirmEmpty = true;
+			return;
+		}
+		if (await session.submit()) onsubmitted();
 	}
 
 	const tile = "rounded-xl bg-gray-50 px-3.5 py-3 dark:bg-gray-800/60";
@@ -259,36 +237,6 @@
 			{/if}
 		</section>
 
-		<div class="flex flex-col gap-2.5" role="radiogroup" aria-label="Verdict">
-			<div class={heading}>Verdict</div>
-			{#each verdicts as verdict (verdict.value)}
-				{@const on = session.chosenVerdict === verdict.value}
-				<label
-					class={[
-						"flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3",
-						on
-							? "border-gray-900 shadow-[0_0_0_1px] shadow-gray-900 dark:border-gray-100 dark:shadow-gray-100"
-							: "border-gray-200 dark:border-gray-800",
-					]}
-				>
-					<input
-						type="radio"
-						class="mt-0.5 accent-gray-900 dark:accent-gray-100"
-						name="review-verdict-{uid}"
-						value={verdict.value}
-						checked={on}
-						onchange={() => (session.verdict = verdict.value)}
-					/>
-					<div>
-						<div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-							{verdict.label}
-						</div>
-						<div class="text-[13px] text-gray-500 dark:text-gray-400">{verdict.hint}</div>
-					</div>
-				</label>
-			{/each}
-		</div>
-
 		<section class="flex flex-col gap-2">
 			<label for="review-note-{uid}" class={heading}>
 				Note to the agent <span class="font-medium text-gray-500 dark:text-gray-400">optional</span>
@@ -296,9 +244,9 @@
 			<textarea
 				id="review-note-{uid}"
 				rows="3"
-				bind:value={session.summary}
+				bind:value={session.note}
 				maxlength={4000}
-				placeholder="Anything the agent should know about these answers"
+				placeholder="Anything the agent should know, or what to do next"
 				class="scrollbar-custom resize-y rounded-[10px] border border-gray-200 bg-white px-3 py-2.5 text-sm leading-normal text-gray-900 outline-none focus:border-blue-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
 			></textarea>
 		</section>
@@ -330,17 +278,10 @@
 	<button
 		type="button"
 		class="h-9 rounded-lg bg-gray-900 px-4 text-[13px] font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
-		disabled={blocked.length > 0 ||
-			(untouched && !approveAll) ||
-			session.submitting ||
-			!session.editable}
+		disabled={blocked.length > 0 || session.submitting || !session.editable}
 		aria-busy={session.submitting}
 		onclick={send}
 	>
-		{session.submitting
-			? "Sending…"
-			: approveAll
-				? `Approve all ${session.records.length} and send`
-				: "Send review"}
+		{session.submitting ? "Sending…" : confirmEmpty && empty ? "Send anyway" : "Send"}
 	</button>
 </footer>

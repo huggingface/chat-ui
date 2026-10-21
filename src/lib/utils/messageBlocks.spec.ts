@@ -114,7 +114,6 @@ describe("a review card", () => {
 					type: MessageUpdateType.Review,
 					subtype: MessageReviewUpdateType.Resolved,
 					reviewId: "r1",
-					verdict: "approve",
 					answered: 30,
 					skipped: 0,
 					comments: 2,

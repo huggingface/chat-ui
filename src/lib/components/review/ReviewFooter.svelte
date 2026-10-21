@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { ReviewSession } from "$lib/stores/mlReview.svelte";
-	import type { ReviewVerdict } from "$lib/types/MlReview";
 	import { canDecide, recordDecision } from "$lib/utils/review/progress";
 
 	interface Props {
@@ -14,7 +13,7 @@
 
 	let noteOpen = $state(false);
 	/** every send ends the review, so each one says what it does before it goes */
-	let confirming = $state<"approveRest" | "asIs" | undefined>(undefined);
+	let confirming = $state<"rest" | "send" | undefined>(undefined);
 	let schema = $derived(session.schema);
 	let total = $derived(session.records.length);
 	let decidable = $derived(!!schema && canDecide(schema));
@@ -29,19 +28,14 @@
 	});
 	let comments = $derived(session.counts.comments);
 	let blocked = $derived(session.blockers.length > 0);
-	/** nothing approved, rejected or answered, so the only send is an approve of everything */
-	let untouched = $derived(session.decided === 0);
 	let left = $derived(session.states.filter((state) => state === "todo").length);
-	/** a rejection asks the agent for changes, comments alone are notes on an approval */
-	let verdict = $derived<ReviewVerdict>(
-		tally.rejected > 0 ? "request_changes" : comments > 0 ? "comment" : "approve"
-	);
+	let empty = $derived(session.decided === 0 && comments === 0 && !session.note.trim());
 
 	const one = (n: number, word: string) => (n === 1 ? word.replace(/s$/, "") : word);
 
 	async function send(approveRest: boolean) {
 		confirming = undefined;
-		await session.submit(verdict, { approveRest });
+		await session.submit({ approveRest });
 	}
 
 	const plain =
@@ -57,10 +51,10 @@
 		<div class="flex-none border-t border-gray-200 px-4 pt-3 dark:border-gray-800">
 			<textarea
 				rows="2"
-				bind:value={session.summary}
+				bind:value={session.note}
 				maxlength={4000}
 				aria-label="Note to the agent"
-				placeholder="A note for the agent, sent with your verdict"
+				placeholder="Anything the agent should know, or what to do next"
 				class="scrollbar-custom w-full resize-y rounded-[10px] border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
 			></textarea>
 		</div>
@@ -76,14 +70,13 @@
 	>
 		{#if confirming}
 			<div class="min-w-0 flex-1 text-[13px] text-gray-700 dark:text-gray-300" data-footer-status>
-				{#if confirming === "asIs"}
+				{#if confirming === "rest"}
+					Mark the {left} remaining {one(left, noun)} OK and send? This ends the review.
+				{:else if empty}
+					Send without any notes? This ends the review.
+				{:else}
 					Send with {left}
 					{one(left, noun)} not reviewed? This ends the review.
-				{:else if untouched}
-					Approve all {total}
-					{one(total, noun)} and send? This ends the review.
-				{:else}
-					Approve the {left} remaining {one(left, noun)} and send? This ends the review.
 				{/if}
 			</div>
 			<button type="button" class={ghost} onclick={() => (confirming = undefined)}>Cancel</button>
@@ -91,9 +84,9 @@
 				type="button"
 				class={primary}
 				disabled={session.submitting}
-				onclick={() => send(confirming === "approveRest")}
+				onclick={() => send(confirming === "rest")}
 			>
-				{confirming === "asIs" ? "Send" : "Approve and send"}
+				{confirming === "rest" ? "Mark OK and send" : "Send"}
 			</button>
 		{:else}
 			<div
@@ -101,7 +94,7 @@
 				data-footer-status
 			>
 				{#if decidable}
-					<b class="font-semibold text-gray-900 dark:text-gray-100">{tally.approved} approved</b>
+					<b class="font-semibold text-gray-900 dark:text-gray-100">{tally.approved} OK</b>
 					· {tally.rejected} rejected · {left} to review
 				{:else}
 					<b class="font-semibold text-gray-900 dark:text-gray-100">{session.decided} answered</b>
@@ -122,42 +115,24 @@
 				>
 					{noteOpen ? "Hide note" : "Add a note"}
 				</button>
-				{#if untouched}
-					<button
-						type="button"
-						class={primary}
-						disabled={session.submitting}
-						onclick={() => (confirming = "approveRest")}
-					>
-						Approve all {total}…
-					</button>
-				{:else if left > 0}
+				{#if left > 0}
 					<button
 						type="button"
 						class={plain}
 						disabled={session.submitting}
-						onclick={() => (confirming = "asIs")}
+						onclick={() => (confirming = "rest")}
 					>
-						Send now…
-					</button>
-					<button
-						type="button"
-						class={primary}
-						disabled={session.submitting}
-						onclick={() => (confirming = "approveRest")}
-					>
-						Approve remaining {left}…
-					</button>
-				{:else}
-					<button
-						type="button"
-						class={primary}
-						disabled={session.submitting}
-						onclick={() => send(false)}
-					>
-						Send review
+						{left === total ? "Mark all OK…" : "Mark the rest OK…"}
 					</button>
 				{/if}
+				<button
+					type="button"
+					class={primary}
+					disabled={session.submitting}
+					onclick={() => (left > 0 || empty ? (confirming = "send") : send(false))}
+				>
+					Send{left > 0 || empty ? "…" : ""}
+				</button>
 			{/if}
 		{/if}
 	</footer>

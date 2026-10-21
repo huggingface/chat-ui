@@ -12,7 +12,7 @@
 		ondecide: (decision: RecordDecision | undefined) => void;
 	}
 
-	let { decision, disabled = false, labels = ["Approve", "Reject"], ondecide }: Props = $props();
+	let { decision, disabled = false, labels = ["Mark OK", "Reject"], ondecide }: Props = $props();
 
 	const press = (e: MouseEvent, value: RecordDecision) => {
 		e.stopPropagation();
