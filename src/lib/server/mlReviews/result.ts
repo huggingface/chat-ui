@@ -17,6 +17,10 @@ import {
 } from "$lib/types/MessageUpdate";
 import { isAnswered } from "$lib/utils/review/answers";
 
+/** the submit carries no verdict, so the model reads the annotations and the user decides */
+export const REVIEW_NEXT_STEPS =
+	"Next: summarise for the user what these annotations mean, propose next steps, and ask before anything that costs compute or publishes.";
+
 /** at or under this many records the answers go in the tool message too */
 export const REVIEW_INLINE_ANSWERS = 20;
 const QUOTE_CHARS = 80;
@@ -205,17 +209,23 @@ export function reviewResultText(
 		...(submission.note ? [`Note from the user: "${submission.note}"`] : []),
 		review.schema.questions.length > 0
 			? `Records: ${counts.answered} answered, ${counts.skipped} skipped, ${counts.discarded} discarded, ${counts.pending} not reviewed (of ${counts.total}).`
-			: `Records: ${counts.answered} approved, ${counts.discarded} rejected, ${counts.skipped} skipped, ${counts.pending} not reviewed (of ${counts.total}).`,
+			: `Records: ${counts.answered} marked OK, ${counts.discarded} rejected, ${counts.skipped} skipped, ${counts.pending} not reviewed (of ${counts.total}).`,
 	];
-	// with no questions the status is the whole answer, a pane stores approve as answered
+	const answeredAny = Object.values(review.drafts).some((draft) =>
+		Object.values(draft?.answers ?? {}).some(isAnswered)
+	);
+	const annotated =
+		counts.answered + counts.discarded + counts.comments > 0 || answeredAny || submission.note;
+	if (!annotated) lines.push("The user looked at the records and left no annotations.");
+	// with no questions the status is the whole answer, a pane stores ok as answered
 	if (review.schema.questions.length === 0 && review.records.length <= REVIEW_INLINE_ANSWERS) {
 		const idsWith = (status: ReviewDraft["status"]) =>
 			review.records
 				.filter((_, index) => draftAt(review, index)?.status === status)
 				.map((r) => r.id);
-		const approved = idsWith("answered");
+		const marked = idsWith("answered");
 		const rejected = idsWith("discarded");
-		if (approved.length) lines.push(`Approved: ${approved.join(", ")}`);
+		if (marked.length) lines.push(`Marked OK: ${marked.join(", ")}`);
 		if (rejected.length) lines.push(`Rejected: ${rejected.join(", ")}`);
 	}
 
@@ -271,6 +281,7 @@ export function reviewResultText(
 					.map((file) => `${formatVirtualFileRef(file.name)} (version ${file.version})`)
 					.join(", ")}`
 	);
+	lines.push(REVIEW_NEXT_STEPS);
 	return lines.join("\n");
 }
 

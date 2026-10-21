@@ -28,9 +28,9 @@ export const requestReviewDefinition: OpenAiTool = {
 			"Show the user a batch of records in a review pane and wait for their submission. " +
 			"Use it to have data looked at before you train on it or push it, and to have a golden " +
 			"or eval set labelled. Declare the record shape in `fields` and, to collect labels, the " +
-			"`questions`; with no questions the user approves or comments. The user can comment on " +
-			"any record, field or quoted span, and submits everything at once with a verdict. You get " +
-			"back the verdict, counts, tallies, every comment, and a virtual file of the per-record " +
+			"`questions`; with no questions the user marks records OK or rejects them. The user can " +
+			"comment on any record, field or quoted span, and submits everything at once. You get " +
+			"back what they did: counts, tallies, every comment, their note, and a file of per-record " +
 			"answers (inline too when there are 20 records or fewer). " +
 			`Records come from source: inline \`records\` for ${REVIEW_MAX_INLINE_RECORDS} or fewer, ` +
 			"otherwise a virtual file, a sandbox path or an hf:// file holding a JSON array or JSONL, " +

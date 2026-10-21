@@ -613,6 +613,46 @@ describe.sequential("submitting", () => {
 		expect(stored).not.toHaveProperty("verdict");
 		expect(stored).not.toHaveProperty("note");
 		expect(stored?.result?.text).not.toMatch(/verdict|request changes|an older pane/i);
+		expect(stored?.result?.text).toContain(
+			"Records: 0 marked OK, 0 rejected, 0 skipped, 2 not reviewed (of 2).\nThe user looked at the records and left no annotations.\n"
+		);
+		expect(stored?.result?.text?.split("\n").at(-1)).toBe(
+			"Next: summarise for the user what these annotations mean, propose next steps, and ask before anything that costs compute or publishes."
+		);
+	});
+
+	it("passes the user's note on, and a note alone counts as an annotation", async () => {
+		const { locals } = await createTestUser();
+		const conv = await createTestConversation(locals, { mlAssistant: true });
+		const review = await createReview({
+			conversationId: conv._id,
+			messageId: "m",
+			toolCallId: "c",
+			toolUuid: "u",
+			elicitationId: crypto.randomUUID(),
+			schema: { ...SCHEMA, questions: [] },
+			schemaHash: "abcd1234",
+			source: { kind: "inline" },
+			records: [{ id: "a", values: {} }],
+		});
+		await collections.mlReviews.updateOne({ _id: review._id }, { $set: { status: "detached" } });
+
+		await SUBMIT(
+			event(locals, conv._id.toString(), review._id.toString(), {
+				note: "  Looks like the scraper truncates long bodies.  ",
+			})
+		);
+
+		const text = (await collections.mlReviews.findOne({ _id: review._id }))?.result?.text ?? "";
+		expect(text).toContain('Note from the user: "Looks like the scraper truncates long bodies."');
+		expect(text).not.toContain("left no annotations");
+		expect(
+			await errorOf(
+				SUBMIT(
+					event(locals, conv._id.toString(), review._id.toString(), { note: "x".repeat(4_001) })
+				)
+			)
+		).toMatchObject({ status: 400 });
 	});
 
 	it("loads a review stored with a verdict, showing its summary as the note", async () => {
@@ -632,7 +672,7 @@ describe.sequential("submitting", () => {
 		expect(payload).not.toHaveProperty("summary");
 	});
 
-	it("words a review with no questions as approved and rejected, listing the ids", async () => {
+	it("words a review with no questions as marked ok and rejected, listing the ids", async () => {
 		const { locals } = await createTestUser();
 		const conv = await createTestConversation(locals, { mlAssistant: true });
 		const review = await createReview({
@@ -659,8 +699,9 @@ describe.sequential("submitting", () => {
 		await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }));
 
 		const text = (await collections.mlReviews.findOne({ _id: review._id }))?.result?.text ?? "";
-		expect(text).toContain("Records: 2 approved, 1 rejected, 1 skipped, 0 not reviewed (of 4).");
-		expect(text).toContain("Approved: a, c\nRejected: b\n");
+		expect(text).toContain("Records: 2 marked OK, 1 rejected, 1 skipped, 0 not reviewed (of 4).");
+		expect(text).toContain("Marked OK: a, c\nRejected: b\n");
+		expect(text).not.toContain("left no annotations");
 		expect(text).not.toContain("Answers:");
 		const file = await collections.mlFiles.findOne({ conversationId: conv._id });
 		expect(
@@ -719,7 +760,7 @@ describe.sequential("submitting", () => {
 				"answered",
 			]);
 			expect(review.status).toBe("submitted");
-			expect(review.result?.text).toContain("Approved: a, d\nRejected: c\n");
+			expect(review.result?.text).toContain("Marked OK: a, d\nRejected: c\n");
 		});
 
 		it("sets the first yes or no question and keeps answers already given", async () => {
