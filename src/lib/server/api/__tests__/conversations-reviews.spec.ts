@@ -1406,7 +1406,7 @@ describe.sequential("writing labels back", () => {
 		expect(row).toMatchObject({
 			status: "pending",
 			generationId: "gen-resume",
-			request: { source: "assistant", mode: "form" },
+			request: { source: "assistant", mode: "form", reviewId: review._id.toString() },
 			pending: {
 				kind: "ask",
 				messageId: "msg-1",

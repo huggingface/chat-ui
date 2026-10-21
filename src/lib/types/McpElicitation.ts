@@ -97,6 +97,8 @@ export interface ElicitationRequestPayload {
 	message: string;
 	fields?: ElicitationField[];
 	url?: string;
+	/** a review publish card, so the pane can show it beside its review */
+	reviewId?: string;
 }
 
 /** In the database because the pod serving the answer need not be the one waiting on it. */

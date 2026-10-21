@@ -221,6 +221,7 @@ export async function openPublishPrompt({
 		source: "assistant",
 		server: "",
 		mode: "form",
+		reviewId: review._id.toString(),
 		message: `Push the labels of review "${review.schema.title}" to ${audience.label}?`,
 		fields: [
 			{
