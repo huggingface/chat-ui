@@ -490,7 +490,7 @@ describe.sequential("submitting", () => {
 		await labelBoth(locals, conv, review);
 		const read = await collections.mlReviews.findOne({ _id: review._id });
 		if (!read) throw new Error("review vanished");
-		expect(await submitReview(read, { verdict: "approve" })).toBe(true);
+		expect(await submitReview(read, {})).toBe(true);
 
 		const res = await SUBMIT(
 			event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
@@ -517,7 +517,7 @@ describe.sequential("submitting", () => {
 		await labelBoth(locals, conv, review);
 		const read = await collections.mlReviews.findOne({ _id: review._id });
 		if (!read) throw new Error("review vanished");
-		expect(await submitReview(read, { verdict: "approve" })).toBe(true);
+		expect(await submitReview(read, {})).toBe(true);
 		await collections.mcpElicitations.updateOne(
 			{ elicitationId: review.elicitationId },
 			{ $set: { status: "resolved", action: "accept", resolution: "user", resolvedAt: new Date() } }
@@ -544,7 +544,7 @@ describe.sequential("submitting", () => {
 		await labelBoth(locals, conv, review);
 		const read = await collections.mlReviews.findOne({ _id: review._id });
 		if (!read) throw new Error("review vanished");
-		expect(await submitReview(read, { verdict: "approve" })).toBe(true);
+		expect(await submitReview(read, {})).toBe(true);
 		const claimed = await collections.mlReviews.findOne({ _id: review._id });
 		if (!claimed) throw new Error("review vanished");
 		const first = await ensureReviewResult(claimed);
@@ -563,7 +563,7 @@ describe.sequential("submitting", () => {
 		await labelBoth(locals, conv, review);
 		const read = await collections.mlReviews.findOne({ _id: review._id });
 		if (!read) throw new Error("review vanished");
-		expect(await submitReview(read, { verdict: "approve" })).toBe(true);
+		expect(await submitReview(read, {})).toBe(true);
 
 		await finishStoredSubmissions();
 
@@ -581,7 +581,7 @@ describe.sequential("submitting", () => {
 		).toBe(55);
 	});
 
-	it("refuses a submit with no record approved, rejected or answered", async () => {
+	it("accepts a submit with nothing marked, and ignores an old verdict body", async () => {
 		const { locals } = await createTestUser();
 		const conv = await createTestConversation(locals, { mlAssistant: true });
 		const review = await createReview({
@@ -598,25 +598,38 @@ describe.sequential("submitting", () => {
 				{ id: "b", values: {} },
 			],
 		});
-		const submit = () =>
-			errorOf(
-				SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }))
-			);
-		const nothing = {
-			status: 400,
-			message: "Approve, reject or answer at least one record before submitting.",
-		};
+		await collections.mlReviews.updateOne({ _id: review._id }, { $set: { status: "detached" } });
 
-		expect(await submit()).toEqual(nothing);
-		await PATCH(
+		const res = await SUBMIT(
 			event(locals, conv._id.toString(), review._id.toString(), {
-				index: 0,
-				draft: { status: "skipped", answers: {}, comments: [] },
+				verdict: "request_changes",
+				summary: "an older pane sent this",
 			})
 		);
-		expect(await submit()).toEqual(nothing);
-		expect((await collections.mlReviews.findOne({ _id: review._id }))?.status).toBe("open");
-		expect(await collections.mlFiles.countDocuments({ conversationId: conv._id })).toBe(0);
+
+		expect(res.status).toBe(200);
+		const stored = await collections.mlReviews.findOne({ _id: review._id });
+		expect(stored?.status).toBe("submitted");
+		expect(stored).not.toHaveProperty("verdict");
+		expect(stored).not.toHaveProperty("note");
+		expect(stored?.result?.text).not.toMatch(/verdict|request changes|an older pane/i);
+	});
+
+	it("loads a review stored with a verdict, showing its summary as the note", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{ $set: { verdict: "request_changes", summary: "older note" } }
+		);
+
+		const payload = superjson.parse<Record<string, unknown>>(
+			await (await GET(event(locals, conv._id.toString(), review._id.toString()))).text()
+		);
+
+		expect(payload.note).toBe("older note");
+		expect(payload).not.toHaveProperty("verdict");
+		expect(payload).not.toHaveProperty("summary");
 	});
 
 	it("words a review with no questions as approved and rejected, listing the ids", async () => {
@@ -804,8 +817,7 @@ describe.sequential("submitting", () => {
 
 		const res = await SUBMIT(
 			event(locals, conv._id.toString(), review._id.toString(), {
-				verdict: "comment",
-				summary: "Mostly fine.",
+				note: "Mostly fine.",
 			})
 		);
 
@@ -817,7 +829,7 @@ describe.sequential("submitting", () => {
 			text: (await collections.mlReviews.findOne({ _id: review._id }))?.result?.text ?? "",
 		};
 		expect(body.text).toContain('Review "Triage batch 1" submitted (schema 3f2a91c0).');
-		expect(body.text).toContain('Verdict: comment. "Mostly fine."');
+		expect(body.text).toContain('Note from the user: "Mostly fine."');
 		expect(body.text).toContain(
 			"Records: 2 answered, 0 skipped, 0 discarded, 0 not reviewed (of 2)."
 		);
@@ -830,8 +842,7 @@ describe.sequential("submitting", () => {
 		const stored = await collections.mlReviews.findOne({ _id: review._id });
 		expect(stored).toMatchObject({
 			status: "submitted",
-			verdict: "comment",
-			summary: "Mostly fine.",
+			note: "Mostly fine.",
 		});
 		expect(
 			await collections.mcpElicitations.findOne({ elicitationId: review.elicitationId })

@@ -864,8 +864,7 @@ const submitOverHttp = (conv: Conversation, locals: App.Locals, reviewId: string
 	reviewRoute<Record<string, unknown>>(() =>
 		SUBMIT_REVIEW(
 			routeArgs(conv, locals, reviewId, {
-				verdict: "request_changes",
-				summary: "Fix the scraper first.",
+				note: "Fix the scraper first.",
 			}) as never
 		)
 	);
@@ -873,7 +872,7 @@ const submitOverHttp = (conv: Conversation, locals: App.Locals, reviewId: string
 async function submitAndDie(conv: Conversation, reviewId: string, elicitationId: string) {
 	const review = await collections.mlReviews.findOne({ conversationId: conv._id });
 	if (!review) throw new Error("no review");
-	const submission = { verdict: "request_changes" as const, summary: "Fix the scraper first." };
+	const submission = { note: "Fix the scraper first." };
 	expect(await submitReview(review, submission)).toBe(true);
 	const claimed = await collections.mlReviews.findOne({ _id: review._id });
 	if (!claimed) throw new Error("no review");
@@ -921,7 +920,7 @@ describe("a submitted review", () => {
 		).toBeUndefined();
 		const [result] = toolResultsIn(outgoing(1));
 		expect(result).toContain('Review "Triage batch 1" submitted');
-		expect(result).toContain('Verdict: request changes. "Fix the scraper first."');
+		expect(result).toContain('Note from the user: "Fix the scraper first."');
 		expect(result).toContain("kind: bug 1, feature 1.");
 		expect(result).toContain("- gh-1 body: repro needs a stack trace");
 		expect(result).toContain("v-file://reviews/triage-batch-1.responses.jsonl");
@@ -1006,7 +1005,7 @@ describe("a submit that died right after claiming the submission", () => {
 	async function storeOnly(conv: Conversation) {
 		const review = await collections.mlReviews.findOne({ conversationId: conv._id });
 		if (!review) throw new Error("no review");
-		expect(await submitReview(review, { verdict: "approve" })).toBe(true);
+		expect(await submitReview(review, {})).toBe(true);
 		await collections.mlReviews.updateOne(
 			{ _id: review._id },
 			{ $set: { submittedAt: new Date(Date.now() - 60_000) } }

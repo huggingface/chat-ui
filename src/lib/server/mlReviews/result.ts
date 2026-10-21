@@ -9,7 +9,6 @@ import type {
 	ReviewComment,
 	ReviewDraft,
 	ReviewQuestion,
-	ReviewVerdict,
 } from "$lib/types/MlReview";
 import {
 	MessageReviewUpdateType,
@@ -21,12 +20,6 @@ import { isAnswered } from "$lib/utils/review/answers";
 /** at or under this many records the answers go in the tool message too */
 export const REVIEW_INLINE_ANSWERS = 20;
 const QUOTE_CHARS = 80;
-
-export const VERDICT_TEXT: Record<ReviewVerdict, string> = {
-	approve: "approve",
-	request_changes: "request changes",
-	comment: "comment",
-};
 
 export interface ReviewCounts {
 	total: number;
@@ -59,14 +52,13 @@ export function reviewCounts(review: Pick<MlReview, "drafts" | "records">): Revi
 }
 
 export function reviewResolvedUpdate(
-	review: Pick<MlReview, "_id" | "drafts" | "records" | "verdict" | "result">
+	review: Pick<MlReview, "_id" | "drafts" | "records" | "result">
 ): MessageReviewResolvedUpdate {
 	const counts = reviewCounts(review);
 	return {
 		type: MessageUpdateType.Review,
 		subtype: MessageReviewUpdateType.Resolved,
 		reviewId: review._id.toString(),
-		verdict: review.verdict ?? "comment",
 		answered: counts.answered,
 		skipped: counts.skipped,
 		comments: counts.comments,
@@ -204,15 +196,13 @@ export function responseParts(lines: string[], maxBytes = ML_FILE_MAX_BYTES): st
 
 export function reviewResultText(
 	review: MlReview,
-	submission: { verdict: ReviewVerdict; summary?: string },
+	submission: { note?: string },
 	files: MlFileRef[]
 ): string {
 	const counts = reviewCounts(review);
 	const lines: string[] = [
 		`Review "${review.schema.title}" submitted (schema ${review.schemaHash}).`,
-		`Verdict: ${VERDICT_TEXT[submission.verdict]}.${
-			submission.summary ? ` "${submission.summary}"` : ""
-		}`,
+		...(submission.note ? [`Note from the user: "${submission.note}"`] : []),
 		review.schema.questions.length > 0
 			? `Records: ${counts.answered} answered, ${counts.skipped} skipped, ${counts.discarded} discarded, ${counts.pending} not reviewed (of ${counts.total}).`
 			: `Records: ${counts.answered} approved, ${counts.discarded} rejected, ${counts.skipped} skipped, ${counts.pending} not reviewed (of ${counts.total}).`,
@@ -293,7 +283,7 @@ export async function ensureReviewResult(
 	review: MlReview
 ): Promise<NonNullable<MlReview["result"]>> {
 	if (review.result) return review.result;
-	const submission = { verdict: review.verdict ?? "comment", summary: review.summary };
+	const submission = { note: review.note ?? review.summary };
 	const parts = responseParts(responseLines(review));
 	const base = `reviews/${reviewSlug(review.schema.title)}.responses`;
 	const source = reviewFileSource(review);

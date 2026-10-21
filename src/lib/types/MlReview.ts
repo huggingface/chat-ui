@@ -122,6 +122,7 @@ export interface ReviewDraft {
 	updatedAt: Date;
 }
 
+/** written by reviews submitted before the single submit, read by nothing */
 export type ReviewVerdict = "approve" | "request_changes" | "comment";
 
 export type ReviewSource =
@@ -160,6 +161,9 @@ export interface MlReview {
 	draftRevision: number;
 	status: ReviewStatus;
 	verdict?: ReviewVerdict;
+	/** the user's free text with the submission */
+	note?: string;
+	/** what older submissions stored as their note */
 	summary?: string;
 	/** built after the claim, so a losing submit never writes a responses file */
 	result?: { text: string; files: MlFileRef[] };

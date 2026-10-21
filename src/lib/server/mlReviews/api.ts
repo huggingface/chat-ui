@@ -20,7 +20,6 @@ import { deliverReview, type DeliveryState } from "./delivery";
 export const REVIEW_MAX_COMMENTS_PER_RECORD = 20;
 export const REVIEW_MAX_COMMENT_CHARS = 2_000;
 export const REVIEW_MAX_COMMENTS = 200;
-export const NOTHING_DECIDED = "Approve, reject or answer at least one record before submitting.";
 /** records cap at 4 MB, so 8 MiB of drafts keeps the row under the 16 MiB mongo limit */
 export const REVIEW_MAX_DRAFT_BYTES = 8 * 1024 * 1024;
 const QUOTE_EXACT_CHARS = 2_000;
@@ -53,8 +52,7 @@ export function reviewPayload(review: MlReview) {
 		records: review.records,
 		drafts: review.drafts,
 		status: review.status,
-		...(review.verdict ? { verdict: review.verdict } : {}),
-		...(review.summary ? { summary: review.summary } : {}),
+		...((review.note ?? review.summary) ? { note: review.note ?? review.summary } : {}),
 		...(review.result ? { result: review.result } : {}),
 		...(review.delivery
 			? {
@@ -260,10 +258,10 @@ const selectionSchema = z
 	.optional();
 
 export const submitBodySchema = z.object({
-	verdict: z.enum(["approve", "request_changes", "comment"]),
-	summary: z.string().trim().max(SUMMARY_CHARS).optional(),
+	// an older pane still sends a verdict and summary, both are ignored
+	note: z.string().trim().max(SUMMARY_CHARS).optional(),
 	selection: selectionSchema,
-	/** approves every record still undecided, so approve all is one request at 500 records */
+	/** marks every record still undecided ok, so marking all is one request at 500 records */
 	approveRest: z.boolean().optional(),
 });
 
@@ -335,8 +333,8 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 	if (review.status === "expired") error(409, "This review expired.");
 	const parsed = submitBodySchema.safeParse(body);
 	if (!parsed.success) error(400, "Invalid review submission");
-	const { verdict, selection } = parsed.data;
-	const summary = parsed.data.summary || undefined;
+	const { selection } = parsed.data;
+	const note = parsed.data.note || undefined;
 
 	if (review.status === "submitted") {
 		// a retry finishes what a dead process left and answers with the same outcome
@@ -348,21 +346,16 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 	const drafts = { ...review.drafts, ...approved };
 	const found = blockers(review.schema, drafts, review.records.length);
 	if (found.length > 0) return { blockers: found };
-	const decided = Object.values(drafts).some(
-		(d) => d?.status === "answered" || d?.status === "discarded"
-	);
-	if (!decided) error(400, NOTHING_DECIDED);
 
 	const from = review.status;
-	if (!(await submitReview(review, { verdict, summary, drafts: approved }, from))) {
+	if (!(await submitReview(review, { note, drafts: approved }, from))) {
 		error(409, "This review changed while it was being submitted, reload it and submit again.");
 	}
 	const claimed: MlReview = {
 		...review,
 		drafts,
 		status: "submitted",
-		verdict,
-		...(summary ? { summary } : {}),
+		...(note ? { note } : {}),
 		...(from === "open" ? { unresolved: true as const } : {}),
 		submittedAt: new Date(),
 	};

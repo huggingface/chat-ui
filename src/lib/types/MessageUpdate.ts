@@ -10,7 +10,6 @@ import type {
 	ElicitationValue,
 } from "$lib/types/McpElicitation";
 import type { MlFileRef } from "$lib/types/MlFile";
-import type { ReviewVerdict } from "$lib/types/MlReview";
 
 export type MessageUpdate =
 	| MessageStatusUpdate
@@ -337,7 +336,6 @@ export interface MessageReviewResolvedUpdate {
 	type: MessageUpdateType.Review;
 	subtype: MessageReviewUpdateType.Resolved;
 	reviewId: string;
-	verdict: ReviewVerdict;
 	answered: number;
 	skipped: number;
 	comments: number;

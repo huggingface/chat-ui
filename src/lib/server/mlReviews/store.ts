@@ -6,7 +6,6 @@ import type {
 	ReviewRecord,
 	ReviewSchema,
 	ReviewSource,
-	ReviewVerdict,
 } from "$lib/types/MlReview";
 
 /** records are snapshotted here, never into the conversation document */
@@ -88,8 +87,7 @@ export async function saveDraft(
 export async function submitReview(
 	review: Pick<MlReview, "_id" | "conversationId" | "draftRevision">,
 	submission: {
-		verdict: ReviewVerdict;
-		summary?: string;
+		note?: string;
 		/** drafts written in the same update as the claim, keyed by record position */
 		drafts?: Record<string, ReviewDraft>;
 	},
@@ -109,8 +107,7 @@ export async function submitReview(
 		{
 			$set: {
 				status: "submitted",
-				verdict: submission.verdict,
-				...(submission.summary ? { summary: submission.summary } : {}),
+				...(submission.note ? { note: submission.note } : {}),
 				...(from === "open"
 					? { unresolved: true as const }
 					: { delivery: { status: "pending" as const, attempts: 0 } }),
