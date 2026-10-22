@@ -64,7 +64,13 @@
 	let counts = $derived(session?.counts ?? { answered: 0, skipped: 0, comments: 0 });
 	let firstTodo = $derived(Math.max(0, session?.states.indexOf("todo") ?? 0));
 	let started = $derived(counts.answered + counts.skipped + counts.comments > 0);
-	let ready = $derived(label && !!session && session.blockers.length === 0 && counts.answered > 0);
+	let ready = $derived(
+		label &&
+			!!session &&
+			session.unfinished === 0 &&
+			session.invalidBlockers.length === 0 &&
+			counts.answered > 0
+	);
 	let commentedRecords = $derived(
 		Object.values(session?.drafts ?? {}).filter((draft) => draft.comments.length > 0).length
 	);

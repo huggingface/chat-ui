@@ -28,17 +28,20 @@
 		return title || record?.id || "";
 	};
 
-	/** by record, the questions still missing an answer */
+	/** by record, the questions still missing an answer or holding one that is not valid */
 	let blocked = $derived.by(() => {
-		const byRecord = new Map<number, string[]>();
+		const byRecord = new Map<number, { questions: string[]; invalid: boolean }>();
 		for (const blocker of session.blockers) {
 			const question = schema?.questions.find((candidate) => candidate.name === blocker.question);
-			const names = byRecord.get(blocker.record) ?? [];
-			names.push(question?.title ?? blocker.question);
-			byRecord.set(blocker.record, names);
+			const entry = byRecord.get(blocker.record) ?? { questions: [], invalid: false };
+			entry.questions.push(question?.title ?? blocker.question);
+			if (blocker.reason !== "required") entry.invalid = true;
+			byRecord.set(blocker.record, entry);
 		}
-		return [...byRecord.entries()].map(([record, questions]) => ({ record, questions }));
+		return [...byRecord.entries()].map(([record, entry]) => ({ record, ...entry }));
 	});
+	let invalid = $derived(blocked.filter((entry) => entry.invalid));
+	let confirmPartial = $state(false);
 
 	let comments = $derived(
 		Object.entries(session.drafts)
@@ -60,20 +63,27 @@
 	let confirmEmpty = $state(false);
 
 	let reason = $derived.by(() => {
-		if (blocked.length === 0 && confirmEmpty && empty) {
-			return "Send without any notes? You can't edit after sending.";
+		if (invalid.length > 0) {
+			const named = invalid.slice(0, 3).map((entry) => `#${entry.record + 1}`);
+			const more = invalid.length > 3 ? ` and ${invalid.length - 3} more` : "";
+			const list =
+				named.length > 1 ? `${named.slice(0, -1).join(", ")} and ${named.at(-1)}` : named[0];
+			return `Fix the answers on ${list}${more} to send.`;
 		}
-		if (blocked.length === 0) return "You can't edit after sending.";
-		const named = blocked.slice(0, 3).map((entry) => `#${entry.record + 1}`);
-		const more = blocked.length > 3 ? ` and ${blocked.length - 3} more` : "";
-		const list =
-			named.length > 1 ? `${named.slice(0, -1).join(", ")} and ${named.at(-1)}` : named[0];
-		return `Answer ${list}${more} to send. You can't edit after sending.`;
+		if (confirmEmpty && empty) return "Send without any notes? You can't edit after sending.";
+		if (confirmPartial && session.unfinished > 0) {
+			return `${session.unfinished} of ${records.length} records aren't finished. Send anyway? They go to the agent as not reviewed.`;
+		}
+		return "You can't edit after sending.";
 	});
 
 	async function send() {
 		if (empty && !confirmEmpty) {
 			confirmEmpty = true;
+			return;
+		}
+		if (session.unfinished > 0 && !confirmPartial) {
+			confirmPartial = true;
 			return;
 		}
 		if (await session.submit()) onsubmitted();
@@ -106,11 +116,16 @@
 						<div class={tileLabel}>skipped</div>
 					</div>
 					{#if blocked.length > 0}
-						<div class="rounded-xl bg-red-50 px-3.5 py-3 dark:bg-red-400/10" data-tile="blocked">
-							<div class="text-[22px] font-semibold text-red-600 tabular-nums dark:text-red-400">
+						<div
+							class="rounded-xl bg-amber-50 px-3.5 py-3 dark:bg-amber-400/10"
+							data-tile="unfinished"
+						>
+							<div
+								class="text-[22px] font-semibold text-amber-700 tabular-nums dark:text-amber-400"
+							>
 								{blocked.length}
 							</div>
-							<div class="text-[13px] text-red-600 dark:text-red-400">need an answer</div>
+							<div class="text-[13px] text-amber-700 dark:text-amber-400">not finished</div>
 						</div>
 					{:else}
 						<div class={tile}>
@@ -136,12 +151,15 @@
 		</div>
 
 		{#if blocked.length > 0}
-			<section class="flex flex-col gap-2.5" aria-label="Needs an answer">
+			<section class="flex flex-col gap-2.5" aria-label="Not finished">
 				<div class={heading}>
-					Needs an answer <span class="font-medium text-gray-500 dark:text-gray-400"
+					Not finished <span class="font-medium text-gray-500 dark:text-gray-400"
 						>{blocked.length}</span
 					>
 				</div>
+				<p class="m-0 text-[13px] text-gray-500 dark:text-gray-400">
+					You can still send. These go to the agent as not reviewed.
+				</p>
 				<div
 					class="flex flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800"
 				>
@@ -156,8 +174,15 @@
 							<span class="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-300">
 								{titleOf(entry.record)}
 							</span>
-							<span class="text-xs whitespace-nowrap text-red-600 dark:text-red-400">
-								{entry.questions.join(", ")}
+							<span
+								class={[
+									"text-xs whitespace-nowrap",
+									entry.invalid
+										? "text-red-600 dark:text-red-400"
+										: "text-amber-700 dark:text-amber-400",
+								]}
+							>
+								{entry.invalid ? "fix " : ""}{entry.questions.join(", ")}
 							</span>
 							<button
 								type="button"
@@ -278,10 +303,14 @@
 	<button
 		type="button"
 		class="h-9 rounded-lg bg-gray-900 px-4 text-[13px] font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
-		disabled={blocked.length > 0 || session.submitting || !session.editable}
+		disabled={invalid.length > 0 || session.submitting || !session.editable}
 		aria-busy={session.submitting}
 		onclick={send}
 	>
-		{session.submitting ? "Sending…" : confirmEmpty && empty ? "Send anyway" : "Send"}
+		{session.submitting
+			? "Sending…"
+			: (confirmEmpty && empty) || (confirmPartial && session.unfinished > 0)
+				? "Send anyway"
+				: "Send"}
 	</button>
 </footer>

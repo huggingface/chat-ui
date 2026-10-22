@@ -13,7 +13,7 @@ import type {
 	ReviewSchema,
 	ReviewStatus,
 } from "$lib/types/MlReview";
-import { blockers, type ReviewBlocker } from "$lib/utils/review/answers";
+import { blockers, recordStatus, type ReviewBlocker } from "$lib/utils/review/answers";
 import { draftStatus, mergeDraft } from "$lib/utils/review/view";
 import { REVIEW_LIMITS } from "$lib/utils/review/schema";
 import {
@@ -127,8 +127,13 @@ export class ReviewSession {
 	instructionsOpen = $state<boolean | undefined>(undefined);
 
 	schema = $derived(this.payload?.schema);
+	/** a record answered but short of a required answer is still to do, as the server counts it */
 	states = $derived<RecordState[]>(
-		(this.payload?.records ?? []).map((_, index) => recordState(this.drafts[String(index)]))
+		(this.payload?.records ?? []).map((_, index) => {
+			const draft = this.drafts[String(index)];
+			const schema = this.payload?.schema;
+			return recordState(schema && draft ? { status: recordStatus(schema, draft) } : draft);
+		})
 	);
 	records = $derived(this.payload?.records ?? []);
 	editable = $derived(
@@ -138,6 +143,10 @@ export class ReviewSession {
 	blockers = $derived(
 		this.payload ? blockers(this.payload.schema, this.drafts, this.payload.records.length) : []
 	);
+	/** an answer given but not valid, the only thing that still stops a send */
+	invalidBlockers = $derived(this.blockers.filter((blocker) => blocker.reason !== "required"));
+	/** records the agent gets as not reviewed, sending them is allowed after a confirm */
+	unfinished = $derived(this.states.filter((state) => state === "todo").length);
 	counts = $derived.by((): ReviewCounts => {
 		const counts = { answered: 0, skipped: 0, comments: 0 };
 		for (const draft of Object.values(this.drafts)) {

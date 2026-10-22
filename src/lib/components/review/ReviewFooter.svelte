@@ -27,7 +27,7 @@
 		return counts;
 	});
 	let comments = $derived(session.counts.comments);
-	let blocked = $derived(session.blockers.length > 0);
+	let blocked = $derived(session.invalidBlockers.length > 0);
 	let left = $derived(session.states.filter((state) => state === "todo").length);
 	let empty = $derived(session.decided === 0 && comments === 0 && !session.note.trim());
 
@@ -75,8 +75,8 @@
 				{:else if empty}
 					Send without any notes? This ends the review.
 				{:else}
-					Send with {left}
-					{one(left, noun)} not reviewed? This ends the review.
+					{left} of {total}
+					{one(total, noun)} aren't finished. Send anyway? They go to the agent as not reviewed.
 				{/if}
 			</div>
 			<button type="button" class={ghost} onclick={() => (confirming = undefined)}>Cancel</button>

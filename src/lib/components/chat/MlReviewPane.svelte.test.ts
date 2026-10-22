@@ -725,7 +725,7 @@ describe("MlReviewPane", () => {
 	});
 
 	describe("finish step", () => {
-		it("lists what needs an answer, jumps to it, and holds Send until it is answered", async () => {
+		it("lists unfinished records as a warning, jumps to them, and sends after a confirm", async () => {
 			const { container } = await mount(payload());
 			await press("1");
 			button(container, "Finish").click();
@@ -734,15 +734,41 @@ describe("MlReviewPane", () => {
 			const blocked = [...finish.querySelectorAll<HTMLElement>("[data-blocker]")];
 			expect(blocked.map((row) => row.dataset.blocker)).toEqual(["1", "2"]);
 			expect(blocked[1].textContent).toContain("How to export?");
+			expect(finish.textContent).toContain("You can still send.");
+			expect(button(container, "Send").disabled).toBe(false);
+			button(container, "Send").click();
+			await tick();
 			expect(container.querySelector("[data-send-reason]")?.textContent).toContain(
-				"Answer #2 and #3 to send."
+				"2 of 3 records aren't finished. Send anyway?"
 			);
-			expect(button(container, "Send").disabled).toBe(true);
+			expect(button(container, "Send anyway")).toBeDefined();
 
 			button(blocked[1], "Go").click();
 			await tick();
 			expect(container.querySelector("[data-finish-step]")).toBeNull();
 			expect(position(container)).toBe("3 of 3");
+		});
+
+		it("sends unfinished records once confirmed, and marks a short answer unfinished", async () => {
+			const review = payload({
+				drafts: {
+					"0": {
+						status: "answered",
+						answers: {},
+						comments: [],
+						updatedAt: new Date(),
+					},
+				},
+			});
+			const { container, session, server } = await mount(review, { work: false });
+			expect(session()?.states[0]).toBe("todo");
+			const open = session();
+			if (open) open.screen = "finish";
+			await tick();
+			button(container, "Send").click();
+			await tick();
+			button(container, "Send anyway").click();
+			await vi.waitFor(() => expect(server.submits).toHaveLength(1));
 		});
 
 		it("sends a note, then follows the message the server posted", async () => {
@@ -1003,7 +1029,7 @@ describe("MlReviewPane", () => {
 			button(footer, "Send…").click();
 			await tick();
 			expect(footer.textContent?.replace(/\s+/g, " ")).toContain(
-				"Send with 1 example not reviewed? This ends the review."
+				"1 of 2 examples aren't finished. Send anyway? They go to the agent as not reviewed."
 			);
 			button(footer, "Cancel").click();
 			await tick();
