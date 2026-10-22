@@ -8,12 +8,15 @@ import type {
 	PublishAudience,
 	PublishDecision,
 	ReviewDestination,
+	ReviewSource,
+	SourceAudience,
 } from "$lib/types/MlReview";
 import {
 	MessageElicitationUpdateType,
 	MessageUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
+import { parseHfUri } from "$lib/server/mlRegistry/hubUri";
 import { ownerToken } from "./destination";
 import { readReview } from "./store";
 
@@ -85,6 +88,61 @@ export async function resolveAudience(
 	};
 }
 
+function sourceRepo(source: ReviewSource): { kind: string; repo: string } | undefined {
+	if (source.kind === "dataset") return { kind: "dataset", repo: source.repo };
+	if (source.kind !== "parquet" && source.kind !== "hub") return undefined;
+	const uri = parseHfUri(source.uri);
+	return uri ? { kind: uri.kind, repo: `${uri.owner}/${uri.name}` } : undefined;
+}
+
+/** a source the owner's token cannot see, or that cannot be looked up, counts as private */
+export async function resolveSourceAudience(
+	source: ReviewSource,
+	lookup: Lookup
+): Promise<SourceAudience> {
+	const hub = sourceRepo(source);
+	if (!hub) {
+		const where =
+			source.kind === "file"
+				? `chat file ${source.name}`
+				: source.kind === "sandbox"
+					? `sandbox file ${source.path}`
+					: source.kind === "inline"
+						? "this chat"
+						: "uri" in source
+							? source.uri
+							: source.repo;
+		return { visibility: "unknown", label: `rows from ${where}, not known to be public` };
+	}
+	const { kind, repo } = hub;
+	try {
+		const info = await getJson(`${HUB_URL}/api/${kind}s/${repo}`, lookup);
+		if (info.status === 200) {
+			const visibility =
+				info.body.private === true || info.body.visibility === "private"
+					? "private"
+					: info.body.gated
+						? "gated"
+						: "public";
+			return { visibility, label: `rows from a ${visibility} ${kind} ${repo}` };
+		}
+		if (info.status === 401 || info.status === 403 || info.status === 404) {
+			return { visibility: "private", label: `rows from a private ${kind} ${repo}` };
+		}
+	} catch (err) {
+		logger.warn({ err, repo }, "[review] could not look up the source");
+	}
+	return {
+		visibility: "unknown",
+		label: `rows from ${kind} ${repo}, whose visibility could not be checked`,
+	};
+}
+
+/** a pull request on a public repo is public too */
+export function exposesSource(audience: PublishAudience, source: SourceAudience): boolean {
+	return source.visibility !== "public" && audience.private === false;
+}
+
 function audienceLabel(
 	destination: ReviewDestination,
 	{ exists, isPrivate, canWrite }: { exists: boolean; isPrivate?: boolean; canWrite: boolean }
@@ -105,10 +163,17 @@ function audienceLabel(
 
 export function publishOptions(
 	destination: ReviewDestination,
-	audience: PublishAudience
+	audience: PublishAudience,
+	{ skipFirst = false }: { skipFirst?: boolean } = {}
 ): Extract<ElicitationField, { kind: "select" }>["options"] {
 	const where = `${destination.path}, ${audience.label}`;
+	const skip = {
+		value: "skip",
+		label: "Don't push",
+		description: "Keep the labels in this chat only",
+	};
 	return [
+		...(skipFirst ? [skip] : []),
 		...(audience.canWrite && !destination.pr
 			? [{ value: "push", label: `Push to ${audience.label}`, description: destination.path }]
 			: []),
@@ -121,7 +186,7 @@ export function publishOptions(
 					},
 				]
 			: []),
-		{ value: "skip", label: "Don't push", description: "Keep the labels in this chat only" },
+		...(skipFirst ? [] : [skip]),
 	];
 }
 
@@ -178,8 +243,12 @@ export async function openPublishPrompt({
 	const destination = review.destination;
 	if (!destination) return { decided: review };
 	const token = lookup?.token ?? (await ownerToken(review.conversationId));
-	const audience = await resolveAudience(destination, { ...lookup, token });
-	const options = publishOptions(destination, audience);
+	const [audience, source] = await Promise.all([
+		resolveAudience(destination, { ...lookup, token }),
+		review.publish?.source ?? resolveSourceAudience(review.source, { ...lookup, token }),
+	]);
+	const exposes = exposesSource(audience, source);
+	const options = publishOptions(destination, audience, { skipFirst: exposes });
 	if (options.length === 1) {
 		return {
 			decided: await decidePublish(
@@ -194,7 +263,14 @@ export async function openPublishPrompt({
 	const now = new Date();
 	const taken = await collections.mlReviews.updateOne(
 		{ _id: review._id, "publish.promptId": { $exists: false } },
-		{ $set: { "publish.promptId": elicitationId, "publish.audience": audience, updatedAt: now } }
+		{
+			$set: {
+				"publish.promptId": elicitationId,
+				"publish.audience": audience,
+				"publish.source": source,
+				updatedAt: now,
+			},
+		}
 	);
 	if (taken.matchedCount === 0) {
 		const current = await readReview(review.conversationId, review._id.toString());
@@ -215,7 +291,7 @@ export async function openPublishPrompt({
 		return { decided: current ?? review };
 	}
 
-	const question = `Push the labels of review "${review.schema.title}" to ${audience.label}?`;
+	const question = `Push the labels of review "${review.schema.title}" (${source.label}) to ${audience.label}? The reviewed source rows are written along with the labels.`;
 	const request: ElicitationRequestPayload = {
 		elicitationId,
 		source: "assistant",
@@ -233,6 +309,7 @@ export async function openPublishPrompt({
 				required: true,
 				multiple: false,
 				options,
+				...(exposes ? { default: "skip" } : {}),
 			},
 		],
 	};

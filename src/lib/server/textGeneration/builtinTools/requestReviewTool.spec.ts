@@ -539,6 +539,10 @@ describe("request_review samples a Hub dataset with no job", () => {
 			path: "data/yelp-sample.parquet",
 			pr: false,
 		});
+		expect(review?.publish?.source).toEqual({
+			visibility: "public",
+			label: "rows from a public dataset org/yelp",
+		});
 		expect(auth.every((h) => h === "Bearer hf_user")).toBe(true);
 	});
 

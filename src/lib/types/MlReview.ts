@@ -217,11 +217,19 @@ export interface PublishAudience {
 	canWrite: boolean;
 }
 
+/** unknown is treated as private: the card defaults to no push when it would go public */
+export interface SourceAudience {
+	visibility: "public" | "private" | "gated" | "unknown";
+	label: string;
+}
+
 export type PublishDecision = "push" | "pr" | "skip";
 
 /** the publish card the resumed turn parks on, and what the user chose there */
 export interface ReviewPublish {
 	audience?: PublishAudience;
+	/** who could already see the reviewed rows, looked up when the review was requested */
+	source?: SourceAudience;
 	promptId?: string;
 	decision?: PublishDecision;
 	/** why nothing was pushed, said in the tool result */

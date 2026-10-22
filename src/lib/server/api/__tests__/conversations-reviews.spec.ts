@@ -1322,13 +1322,20 @@ describe.sequential("writing labels back", () => {
 		canWrite: true,
 	};
 	let owner = "pngwn";
+	let sourceRepo: number | Record<string, unknown> = { private: false };
 	beforeEach(() => {
 		owner = "pngwn";
+		sourceRepo = { private: false };
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async (input: string | URL) => {
 				const url = String(input);
 				if (url.endsWith("/api/datasets/pngwn/gold")) return Response.json({ private: false });
+				if (url.endsWith("/api/datasets/org/raw")) {
+					return typeof sourceRepo === "number"
+						? new Response(null, { status: sourceRepo })
+						: Response.json(sourceRepo);
+				}
 				if (url.endsWith("/api/whoami-v2")) {
 					return Response.json({ name: owner, orgs: [], auth: { accessToken: { role: "write" } } });
 				}
@@ -1355,11 +1362,22 @@ describe.sequential("writing labels back", () => {
 			);
 		}
 	};
-	const withDestination = async (locals: App.Locals, status?: "detached") => {
+	const withDestination = async (
+		locals: App.Locals,
+		status?: "detached",
+		source: MlReview["source"] = {
+			kind: "dataset",
+			repo: "org/raw",
+			config: "default",
+			split: "train",
+			via: "viewer",
+			sample: { method: "head", rows: 2, total: 2 },
+		}
+	) => {
 		const { conv, review } = await seed(locals);
 		await collections.mlReviews.updateOne(
 			{ _id: review._id },
-			{ $set: { destination: DESTINATION, ...(status ? { status } : {}) } }
+			{ $set: { destination: DESTINATION, source, ...(status ? { status } : {}) } }
 		);
 		await answerBoth(locals, conv, review);
 		return { conv, review };
@@ -1382,6 +1400,60 @@ describe.sequential("writing labels back", () => {
 			action: choice ? "accept" : "cancel",
 			...(choice ? { content: { publish: choice } } : {}),
 		});
+
+	it("defaults to no push when a private, gated or unchecked source would go public", async () => {
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const card = async (source?: MlReview["source"]) => {
+			const { conv, review } = await withDestination(locals, undefined, source);
+			await SUBMIT(
+				event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+			);
+			await resumeParkedToolCall({
+				conversationId: conv._id,
+				elicitationId: review.elicitationId,
+				generationId: "gen-resume",
+				mayPark: true,
+			});
+			const field = (await publishRow(conv._id))?.request.fields?.[0];
+			if (field?.kind !== "select") throw new Error("no publish card");
+			return {
+				values: field.options.map((o) => o.value),
+				default: field.default,
+				question: field.description,
+				stored: (await collections.mlReviews.findOne({ _id: review._id }))?.publish?.source,
+			};
+		};
+
+		sourceRepo = { private: true };
+		expect(await card()).toEqual({
+			values: ["skip", "push", "pr"],
+			default: "skip",
+			question:
+				'Push the labels of review "Triage batch 1" (rows from a private dataset org/raw) to existing public dataset pngwn/gold? The reviewed source rows are written along with the labels.',
+			stored: { visibility: "private", label: "rows from a private dataset org/raw" },
+		});
+		sourceRepo = { private: false, gated: "manual" };
+		expect(await card()).toMatchObject({ values: ["skip", "push", "pr"], default: "skip" });
+		sourceRepo = 404;
+		expect((await card()).stored).toEqual({
+			visibility: "private",
+			label: "rows from a private dataset org/raw",
+		});
+		sourceRepo = 500;
+		expect(await card()).toMatchObject({
+			default: "skip",
+			stored: {
+				visibility: "unknown",
+				label: "rows from dataset org/raw, whose visibility could not be checked",
+			},
+		});
+		expect(await card({ kind: "inline" })).toMatchObject({
+			values: ["skip", "push", "pr"],
+			default: "skip",
+			question: expect.stringContaining("(rows from this chat, not known to be public)"),
+		});
+	});
 
 	it("submits without pushing, then parks the resumed turn on a publish card", async () => {
 		vi.mocked(hub.commit).mockClear();
@@ -1424,8 +1496,9 @@ describe.sequential("writing labels back", () => {
 			"skip",
 		]);
 		expect(field?.description).toBe(
-			'Push the labels of review "Triage batch 1" to existing public dataset pngwn/gold?'
+			'Push the labels of review "Triage batch 1" (rows from a public dataset org/raw) to existing public dataset pngwn/gold? The reviewed source rows are written along with the labels.'
 		);
+		expect(field?.kind === "select" && field.default).toBeUndefined();
 		expect(row?.request.message).toBe(field?.description);
 		expect(parked.updates.map((u) => [u.type, "subtype" in u ? u.subtype : undefined])).toEqual([
 			["review", "resolved"],

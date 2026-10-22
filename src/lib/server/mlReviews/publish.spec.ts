@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewDestination } from "$lib/types/MlReview";
-import { chosenDecision, publishOptions, resolveAudience } from "./publish";
+import {
+	chosenDecision,
+	exposesSource,
+	publishOptions,
+	resolveAudience,
+	resolveSourceAudience,
+} from "./publish";
 
 const dataset: ReviewDestination = {
 	repo: "pngwn/gold",
@@ -101,6 +107,73 @@ describe("the publish card", () => {
 		expect(values({ ...dataset, pr: true }, true)).toEqual(["pr", "skip"]);
 		expect(values({ ...dataset, type: "bucket" }, true)).toEqual(["push", "skip"]);
 		expect(values({ ...dataset, type: "bucket" }, false)).toEqual(["skip"]);
+	});
+
+	it("names who could already see the reviewed rows, and reads unknown as private", async () => {
+		const seen = async (
+			source: Parameters<typeof resolveSourceAudience>[0],
+			repo: Parameters<typeof hub>[0]["repo"]
+		) => resolveSourceAudience(source, { token: "hf_x", fetch: hub({ repo }) });
+		const dataset = {
+			kind: "dataset" as const,
+			repo: "org/raw",
+			config: "default",
+			split: "train",
+			via: "viewer" as const,
+			sample: { method: "head" as const, rows: 1 },
+		};
+		expect(await seen(dataset, { private: false })).toEqual({
+			visibility: "public",
+			label: "rows from a public dataset org/raw",
+		});
+		expect((await seen(dataset, { private: false, gated: "auto" })).visibility).toBe("gated");
+		expect((await seen(dataset, 401)).visibility).toBe("private");
+		expect((await seen(dataset, 500)).visibility).toBe("unknown");
+		const bucket = {
+			kind: "parquet" as const,
+			uri: "hf://buckets/org/raw/data",
+			files: [],
+			sample: { method: "head" as const, rows: 1 },
+		};
+		expect(await seen(bucket, { private: true })).toEqual({
+			visibility: "private",
+			label: "rows from a private bucket org/raw",
+		});
+		expect(
+			await seen({ kind: "file", name: "rows.jsonl", version: 2 }, { private: false })
+		).toEqual({
+			visibility: "unknown",
+			label: "rows from chat file rows.jsonl, not known to be public",
+		});
+		expect(
+			(await seen({ kind: "sandbox", handle: "s", path: "/out/rows.csv" }, { private: false }))
+				.label
+		).toBe("rows from sandbox file /out/rows.csv, not known to be public");
+	});
+
+	it("flags only a source that is not public going to a public repo or pull request", () => {
+		const to = (isPrivate?: boolean) => ({
+			label: "x",
+			exists: isPrivate !== undefined,
+			...(isPrivate !== undefined ? { private: isPrivate } : {}),
+			canWrite: true,
+		});
+		const from = (visibility: "public" | "private" | "gated" | "unknown") => ({
+			visibility,
+			label: "x",
+		});
+		expect(exposesSource(to(false), from("private"))).toBe(true);
+		expect(exposesSource(to(false), from("gated"))).toBe(true);
+		expect(exposesSource(to(false), from("unknown"))).toBe(true);
+		expect(exposesSource(to(false), from("public"))).toBe(false);
+		expect(exposesSource(to(true), from("private"))).toBe(false);
+		// a repo that does not exist yet is created private
+		expect(exposesSource(to(), from("private"))).toBe(false);
+		expect(publishOptions(dataset, to(false), { skipFirst: true }).map((o) => o.value)).toEqual([
+			"skip",
+			"push",
+			"pr",
+		]);
 	});
 
 	it("reads anything but an accepted push or pull request as a skip", () => {

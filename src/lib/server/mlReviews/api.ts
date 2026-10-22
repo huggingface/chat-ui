@@ -16,8 +16,8 @@ import { REVIEW_LIMITS } from "$lib/utils/review/schema";
 import { readReview, reviewObjectId, saveDraft, saveDraftsGuarded, submitReview } from "./store";
 import { completeSubmission } from "./submission";
 import { deliverReview, type DeliveryState } from "./delivery";
-import { REVIEW_MAX_RECORDS } from "$lib/server/textGeneration/builtinTools/requestReviewDefinition";
 import { openDetachedPublish } from "./resume";
+import { REVIEW_MAX_RECORDS } from "$lib/server/textGeneration/builtinTools/requestReviewDefinition";
 
 export const REVIEW_MAX_COMMENTS_PER_RECORD = REVIEW_LIMITS.commentsPerRecord;
 export const REVIEW_MAX_COMMENT_CHARS = REVIEW_LIMITS.commentChars;
@@ -136,11 +136,11 @@ export function reviewPayload(review: MlReview) {
 		status: review.status,
 		...((review.note ?? review.summary) ? { note: review.note ?? review.summary } : {}),
 		...(review.result ? { result: review.result } : {}),
-		...(review.submitFailure?.gaveUp ? { submitFailed: review.submitFailure.error } : {}),
 		...(review.destination ? { destination: review.destination } : {}),
 		...(review.declinedDestination ? { declinedDestination: review.declinedDestination } : {}),
 		...(review.publish ? { publish: review.publish } : {}),
 		...(review.push ? { push: pushPayload(review.push) } : {}),
+		...(review.submitFailure?.gaveUp ? { submitFailed: review.submitFailure.error } : {}),
 		...(review.delivery ? { delivery: deliveryPayload(review.delivery) } : {}),
 		createdAt: review.createdAt,
 		updatedAt: review.updatedAt,
