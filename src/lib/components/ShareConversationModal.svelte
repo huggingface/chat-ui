@@ -153,7 +153,7 @@
 						}}
 						onCopyError={() => {
 							justCopied = false;
-							errorMsg = "Couldn't copy the link. Select it above and copy it manually.";
+							errorMsg = "Couldn't copy the link. Select it below and copy it manually.";
 						}}
 					>
 						{#snippet children()}
