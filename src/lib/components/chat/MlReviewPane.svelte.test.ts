@@ -122,6 +122,7 @@ function fakeServer(review: ReviewPayload) {
 	const patches: Patch[] = [];
 	const submits: unknown[] = [];
 	let reads = 0;
+	let statusReads = 0;
 	let gate: Promise<void> | undefined;
 	let release: (() => void) | undefined;
 	let submitAnswer: unknown = { ok: true, files: [] };
@@ -131,6 +132,10 @@ function fakeServer(review: ReviewPayload) {
 	const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = String(input);
 		const method = init?.method ?? "GET";
+		if (method === "GET" && url.endsWith(`/reviews/${REVIEW}/status`)) {
+			statusReads += 1;
+			return new Response(superjson.stringify(review));
+		}
 		if (method === "GET" && url.endsWith(`/conversations/${CONVERSATION}/reviews/${REVIEW}`)) {
 			reads += 1;
 			return new Response(superjson.stringify(review));
@@ -172,6 +177,7 @@ function fakeServer(review: ReviewPayload) {
 		patches,
 		submits,
 		reads: () => reads,
+		statusReads: () => statusReads,
 		hold() {
 			gate = new Promise((resolve) => (release = resolve));
 		},
@@ -1016,6 +1022,40 @@ describe("MlReviewPane", () => {
 			} finally {
 				delete (document as { visibilityState?: unknown }).visibilityState;
 			}
+		});
+
+		it("reads only the status while it follows a push", async () => {
+			const review = payload({
+				status: "submitted",
+				destination,
+				push: { status: "pushing" },
+			});
+			const { container, server } = await mount(review, { work: false });
+			review.push = { status: "pushed", url: "https://huggingface.co/x/commit/2", pr: false };
+			await vi.waitFor(
+				() => expect(container.querySelector("[data-push='pushed']")).not.toBeNull(),
+				{ timeout: 5_000 }
+			);
+			expect(server.statusReads()).toBeGreaterThan(0);
+		});
+
+		it("says the publish question comes after the reply, then shows it once it is on the message", async () => {
+			const review = payload({
+				status: "submitted",
+				destination,
+				delivery: { status: "held" },
+				publish: { audience, promptId: "p1" },
+			});
+			const { container } = await mount(review, { work: false });
+			expect(
+				container.querySelector("[data-push='card-waiting']")?.textContent?.replace(/\s+/g, " ")
+			).toContain("appears in the chat when the current reply ends");
+			review.publish = { audience, promptId: "p1", attached: true };
+			mlReviews.refreshOpen();
+			await vi.waitFor(() =>
+				expect(container.querySelector("[data-push='asking']")).not.toBeNull()
+			);
+			expect(navigation.invalidate).toHaveBeenCalledWith("conversation:id");
 		});
 
 		it("says when the push failed", async () => {

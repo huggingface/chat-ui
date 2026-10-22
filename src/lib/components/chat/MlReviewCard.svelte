@@ -225,6 +225,7 @@
 				destination={payload?.destination}
 				push={payload?.push}
 				stale={session?.pushStale}
+				detached={!!payload?.delivery}
 				publish={payload?.publish}
 				pushed={resolved?.pushed}
 				failed={resolved?.pushFailed}

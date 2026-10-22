@@ -22,6 +22,8 @@
 		planned?: boolean;
 		/** the push stayed running past the polling budget, its replica likely died */
 		stale?: boolean;
+		/** sent after the turn moved on, its publish card waits for the running reply to end */
+		detached?: boolean;
 	}
 
 	let {
@@ -34,6 +36,7 @@
 		declined,
 		planned = false,
 		stale = false,
+		detached = false,
 	}: Props = $props();
 
 	let where = $derived(
@@ -43,6 +46,8 @@
 	let pr = $derived(push?.pr ?? pushed?.pr ?? destination?.pr ?? false);
 	let label = $derived(publish?.audience?.label ?? audience?.label);
 	let asking = $derived(!!publish?.promptId && !publish.decision);
+	/** a detached review's card is put on its message once the running reply ends */
+	let waiting = $derived(asking && !!detached && !publish?.attached);
 </script>
 
 {#if link}
@@ -84,7 +89,13 @@
 {:else if destination}
 	<span
 		class="flex min-w-0 items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400"
-		data-push={planned ? "planned" : asking ? "asking" : (push?.status ?? "waiting")}
+		data-push={planned
+			? "planned"
+			: waiting
+				? "card-waiting"
+				: asking
+					? "asking"
+					: (push?.status ?? "waiting")}
 	>
 		<CarbonCloudUpload class="flex-none" />
 		<span class="min-w-0 truncate">
@@ -93,6 +104,9 @@
 					class="font-medium text-gray-700 dark:text-gray-300">{label ?? destination.repo}</b
 				>
 				· {destination.path}
+			{:else if waiting}
+				The question about pushing labels to {label ?? where} appears in the chat when the current reply
+				ends
 			{:else if asking}
 				Answer the question in the chat to push labels to {label ?? where}
 			{:else if push?.status === "pushing" && stale}

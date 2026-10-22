@@ -555,11 +555,12 @@
 						publish={session.payload.publish}
 						push={session.payload.push}
 						stale={session.pushStale}
+						detached={!!session.payload.delivery}
 						declined={session.payload.declinedDestination}
 					/>
 				</span>
 			</div>
-			{#if phone && session.payload.publish?.promptId && !session.payload.publish.decision}
+			{#if phone && session.payload.publish?.promptId && !session.payload.publish.decision && !session.publishWaiting}
 				<button
 					type="button"
 					class="{plainButton} h-7"
