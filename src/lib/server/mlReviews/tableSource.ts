@@ -33,6 +33,7 @@ import {
 } from "./features";
 import { lineFormat, sampleLines, type LineFormat } from "./lineSource";
 import {
+	DecodeBudget,
 	groupsOf,
 	listDataFiles,
 	listFolders,
@@ -650,8 +651,9 @@ async function loadFromParquet({
 
 	let read: Record<string, unknown>[][];
 	try {
+		const decode = new DecodeBudget();
 		read = await mapPool(segments, PARQUET_CONCURRENCY, (segment) =>
-			readSegment(segment, [...dataColumns])
+			readSegment(segment, [...dataColumns], decode)
 		);
 	} catch (err) {
 		if (err instanceof ParquetReadError) return { ok: false, error: err.message };

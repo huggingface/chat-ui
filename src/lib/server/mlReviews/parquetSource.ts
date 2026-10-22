@@ -1,10 +1,12 @@
 import { downloadFile, listFiles, type RepoDesignation } from "@huggingface/hub";
+import { decompress as decompressZstd } from "fzstd";
 import {
 	cachedAsyncBuffer,
 	parquetMetadataAsync,
 	parquetReadObjects,
 	parquetSchema,
 	type AsyncBuffer,
+	type Compressors,
 	type FileMetaData,
 } from "hyparquet";
 // hyparquet itself decodes only snappy, most dataset files are zstd
@@ -34,6 +36,51 @@ export class ReadBudget {
 	}
 }
 
+/** a page header can claim any size, the decoder allocates what it claims */
+export const PARQUET_MAX_PAGE_BYTES = 64 * 1024 * 1024;
+export const PARQUET_MAX_DECODED_BYTES = 128 * 1024 * 1024;
+
+const mb = (bytes: number) => Math.ceil(bytes / 1024 / 1024);
+
+/** decoded bytes, checked against each header before the decoder allocates them */
+export class DecodeBudget {
+	bytes = 0;
+	constructor(
+		readonly limit = PARQUET_MAX_DECODED_BYTES,
+		readonly pageLimit = PARQUET_MAX_PAGE_BYTES
+	) {}
+	take(bytes: number, what = "a page") {
+		if (bytes > this.pageLimit && what === "a page") {
+			throw new ParquetReadError(
+				`a Parquet page claims ${mb(bytes)} MB decoded, past the ${mb(this.pageLimit)} MB one page may take`
+			);
+		}
+		this.bytes += bytes;
+		if (this.bytes > this.limit) {
+			throw new ParquetReadError(
+				`${what === "a page" ? "decoding this sample" : what} would pass ${mb(this.limit)} MB of decoded Parquet; sample fewer rows or declare fewer fields`
+			);
+		}
+	}
+}
+
+/** every codec behind the budget, zstd into a buffer of the claimed size so a frame cannot outgrow it */
+export function guardedCompressors(budget: DecodeBudget): Compressors {
+	const guarded: Compressors = {};
+	for (const [codec, decode] of Object.entries(compressors) as [
+		keyof Compressors,
+		NonNullable<Compressors[keyof Compressors]>,
+	][]) {
+		guarded[codec] = (input, length) => {
+			budget.take(length);
+			return codec === "ZSTD"
+				? decompressZstd(input, new Uint8Array(length))
+				: decode(input, length);
+		};
+	}
+	return guarded;
+}
+
 export interface ParquetTarget {
 	repo: RepoDesignation;
 	path: string;
@@ -43,6 +90,7 @@ export interface ParquetTarget {
 export interface OpenParquet {
 	path: string;
 	file: AsyncBuffer;
+	blob: Blob;
 	metadata: FileMetaData;
 	rows: number;
 	/** first row of this file counted across the source files */
@@ -84,7 +132,7 @@ export async function openParquet(
 		if (err instanceof ParquetReadError) throw err;
 		throw new ParquetReadError(`${target.path} is not a readable Parquet file`);
 	}
-	return { path: target.path, file, metadata, rows: Number(metadata.num_rows) };
+	return { path: target.path, file, blob, metadata, rows: Number(metadata.num_rows) };
 }
 
 /** a large repo tree is not walked to the end for a few files */
@@ -264,11 +312,50 @@ export function planBytes(segments: Segment[], data: Set<string>, media: Set<str
 	return Math.ceil(bytes);
 }
 
+function decodedBytes(metadata: FileMetaData, group: number, columns: Set<string>): number {
+	return metadata.row_groups[group].columns.reduce((sum, chunk) => {
+		const top = chunk.meta_data?.path_in_schema[0];
+		return top !== undefined && columns.has(top)
+			? sum + Number(chunk.meta_data?.total_uncompressed_size ?? 0)
+			: sum;
+	}, 0);
+}
+
+/** the chunks a read touches, decoded, before any of it is fetched */
+function checkDecoded(
+	metadata: FileMetaData,
+	from: number,
+	to: number,
+	columns: Set<string>,
+	decode: DecodeBudget,
+	where: string
+) {
+	let bytes = 0;
+	for (const group of groupsOf(metadata)) {
+		if (group.start >= to || group.start + group.rows <= from) continue;
+		bytes += decodedBytes(metadata, group.index, columns);
+	}
+	if (bytes > decode.limit - decode.bytes) {
+		throw new ParquetReadError(
+			`${where} would decode ${mb(bytes)} MB, past the ${mb(decode.limit)} MB a read may decode; sample fewer rows or declare fewer fields`
+		);
+	}
+}
+
 export async function readSegment(
 	segment: Segment,
-	columns: string[]
+	columns: string[],
+	decode = new DecodeBudget()
 ): Promise<Record<string, unknown>[]> {
 	if (columns.length === 0) return Array.from({ length: segment.to - segment.from }, () => ({}));
+	checkDecoded(
+		segment.file.metadata,
+		segment.from,
+		segment.to,
+		new Set(columns),
+		decode,
+		segment.file.path
+	);
 	return parquetReadObjects({
 		file: segment.file.file,
 		metadata: segment.file.metadata,
@@ -277,14 +364,67 @@ export async function readSegment(
 		columns,
 		useOffsetIndex: true,
 		utf8: false,
-		compressors,
+		compressors: guardedCompressors(decode),
 	});
 }
 
-const CELL_CACHE_BYTES = 128 * 1024 * 1024;
-const CELL_CACHE_MS = 15 * 60 * 1000;
-const cellCache = new Map<string, { cells: unknown[]; bytes: number; at: number }>();
-let cachedBytes = 0;
+/** per replica and shared by every user on it, so each cache is held to a byte budget and a short ttl */
+const MEDIA_CACHE_MS = 5 * 60 * 1000;
+const MEDIA_FILES = 32;
+const RANGE_CACHE_BYTES = 64 * 1024 * 1024;
+const CELL_CACHE_BYTES = 64 * 1024 * 1024;
+
+/** least recently used first, a hit moves to the back */
+class ByteCache<T> {
+	#entries = new Map<string, { value: T; bytes: number; at: number }>();
+	#bytes = 0;
+	constructor(
+		readonly limit: number,
+		readonly ttl = MEDIA_CACHE_MS
+	) {}
+	get(key: string): T | undefined {
+		const hit = this.#entries.get(key);
+		if (!hit) return undefined;
+		this.#entries.delete(key);
+		if (Date.now() - hit.at >= this.ttl) {
+			this.#bytes -= hit.bytes;
+			return undefined;
+		}
+		this.#entries.set(key, hit);
+		return hit.value;
+	}
+	set(key: string, value: T, bytes: number) {
+		if (bytes > this.limit) return;
+		const old = this.#entries.get(key);
+		if (old) {
+			this.#entries.delete(key);
+			this.#bytes -= old.bytes;
+		}
+		this.#entries.set(key, { value, bytes, at: Date.now() });
+		this.#bytes += bytes;
+		for (const [oldest, entry] of this.#entries) {
+			if (this.#bytes <= this.limit && Date.now() - entry.at < this.ttl) break;
+			this.#entries.delete(oldest);
+			this.#bytes -= entry.bytes;
+		}
+	}
+	delete(key: string) {
+		const hit = this.#entries.get(key);
+		if (!hit) return;
+		this.#entries.delete(key);
+		this.#bytes -= hit.bytes;
+	}
+	get size() {
+		return this.#entries.size;
+	}
+	get bytes() {
+		return this.#bytes;
+	}
+}
+
+const rangeCache = new ByteCache<ArrayBuffer>(RANGE_CACHE_BYTES);
+const cellCache = new ByteCache<unknown[]>(CELL_CACHE_BYTES);
+const openFiles = new ByteCache<Promise<Pick<OpenParquet, "blob" | "metadata">>>(MEDIA_FILES);
 
 const cellBytes = (cells: unknown[]) =>
 	cells.reduce<number>((sum, cell) => {
@@ -292,32 +432,34 @@ const cellBytes = (cells: unknown[]) =>
 		return sum + (bytes instanceof Uint8Array ? bytes.byteLength : 64);
 	}, 0);
 
-function remember(key: string, cells: unknown[]) {
-	const bytes = cellBytes(cells);
-	if (bytes > CELL_CACHE_BYTES) return;
-	cellCache.set(key, { cells, bytes, at: Date.now() });
-	cachedBytes += bytes;
-	for (const [old, entry] of cellCache) {
-		if (cachedBytes <= CELL_CACHE_BYTES && Date.now() - entry.at < CELL_CACHE_MS) break;
-		cellCache.delete(old);
-		cachedBytes -= entry.bytes;
-	}
-}
-
-const openFiles = new Map<string, { value: Promise<Omit<OpenParquet, "start">>; at: number }>();
-
-/** the footer once per file a while, not once per image */
+/** the footer once per file a while, not once per image, a file counts one toward the cap */
 function openForMedia(target: ParquetTarget, access: HubAccess, key: string) {
 	const hit = openFiles.get(key);
-	if (hit && Date.now() - hit.at < CELL_CACHE_MS) return hit.value;
-	const value = openParquet(target, access, new ReadBudget(Number.POSITIVE_INFINITY));
+	if (hit) return hit;
+	const value = openParquet(target, access, new ReadBudget()).then(({ blob, metadata }) => ({
+		blob,
+		metadata,
+	}));
 	value.catch(() => openFiles.delete(key));
-	openFiles.set(key, { value, at: Date.now() });
-	for (const [old, entry] of openFiles) {
-		if (openFiles.size <= 200 && Date.now() - entry.at < CELL_CACHE_MS) break;
-		openFiles.delete(old);
-	}
+	openFiles.set(key, value, 1);
 	return value;
+}
+
+/** the reads of one request, under its own budget, through the shared range cache */
+function mediaBuffer(blob: Blob, key: string, budget: ReadBudget): AsyncBuffer {
+	return {
+		byteLength: blob.size,
+		async slice(start, end) {
+			const stop = end ?? blob.size;
+			const rangeKey = `${key}#${start}-${stop}`;
+			const hit = rangeCache.get(rangeKey);
+			if (hit) return hit;
+			budget.take(stop - start);
+			const bytes = await blob.slice(start, stop).arrayBuffer();
+			rangeCache.set(rangeKey, bytes, bytes.byteLength);
+			return bytes;
+		},
+	};
 }
 
 /** without an offset index a grid asks for every row of a group, so its column is read once and kept */
@@ -325,7 +467,8 @@ export async function readMediaCell(
 	target: ParquetTarget,
 	fileRow: number,
 	column: string,
-	access: HubAccess
+	access: HubAccess,
+	limits: { read?: ReadBudget; decode?: DecodeBudget } = {}
 ): Promise<unknown> {
 	// the token is part of the key, a cached read never serves someone who could not make it
 	const fileKey = JSON.stringify([target, access.token ?? ""]);
@@ -334,30 +477,41 @@ export async function readMediaCell(
 		(g) => g.start <= fileRow && fileRow < g.start + g.rows
 	);
 	if (!group) throw new ParquetReadError(`row ${fileRow} is past the end of ${target.path}`);
-	const read = (rowStart: number, rowEnd: number) =>
-		parquetReadObjects({
-			file: opened.file,
+	const decode = limits.decode ?? new DecodeBudget();
+	const file = mediaBuffer(opened.blob, fileKey, limits.read ?? new ReadBudget());
+	const read = (rowStart: number, rowEnd: number) => {
+		checkDecoded(opened.metadata, rowStart, rowEnd, new Set([column]), decode, target.path);
+		return parquetReadObjects({
+			file,
 			metadata: opened.metadata,
 			rowStart,
 			rowEnd,
 			columns: [column],
 			useOffsetIndex: true,
 			utf8: false,
-			compressors,
+			compressors: guardedCompressors(decode),
 		});
+	};
 	if (hasOffsetIndex(opened.metadata, group.index)) {
 		return (await read(fileRow, fileRow + 1))[0]?.[column];
 	}
 	const key = `${fileKey}#${group.index}#${column}`;
 	const hit = cellCache.get(key);
-	if (hit && Date.now() - hit.at < CELL_CACHE_MS) return hit.cells[fileRow - group.start];
+	if (hit) return hit[fileRow - group.start];
 	const bytes = chunkBytes(opened.metadata, group.index, new Set([column]));
 	if (bytes > PARQUET_MAX_READ_BYTES) {
 		throw new ParquetReadError(
-			`${target.path} keeps ${Math.ceil(bytes / 1024 / 1024)} MB of ${column} in one row group with no offset index, past the ${PARQUET_MAX_READ_BYTES / 1024 / 1024} MB one read may take`
+			`${target.path} keeps ${mb(bytes)} MB of ${column} in one row group with no offset index, past the ${mb(PARQUET_MAX_READ_BYTES)} MB one read may take`
 		);
 	}
 	const cells = (await read(group.start, group.start + group.rows)).map((row) => row[column]);
-	remember(key, cells);
+	cellCache.set(key, cells, cellBytes(cells));
 	return cells[fileRow - group.start];
 }
+
+/** for specs, what the media caches hold right now */
+export const mediaCacheSizes = () => ({
+	files: openFiles.size,
+	rangeBytes: rangeCache.bytes,
+	cellBytes: cellCache.bytes,
+});
