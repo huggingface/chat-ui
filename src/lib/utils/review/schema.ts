@@ -13,6 +13,9 @@ export const REVIEW_LIMITS = {
 	optionChars: 200,
 	descriptionChars: 1_000,
 	idFieldChars: 64,
+	comments: 200,
+	commentsPerRecord: 20,
+	commentChars: 2_000,
 } as const;
 
 export const REVIEW_NAME_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;

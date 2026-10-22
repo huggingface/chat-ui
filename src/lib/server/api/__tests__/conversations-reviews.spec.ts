@@ -137,6 +137,26 @@ const draft = (answers: Record<string, unknown>, comments: unknown[] = []) => ({
 const comments = (n: number, prefix = "c") =>
 	Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, body: `note ${i}` }));
 
+/** drafts as stored, record i holding counts[i] comments */
+const storedDrafts = (counts: number[]): MlReview["drafts"] =>
+	Object.fromEntries(
+		counts.map((n, i) => [
+			String(i),
+			{
+				status: "answered" as const,
+				answers: {},
+				comments: comments(n, `s${i}-`).map((c) => ({ ...c, createdAt: new Date() })),
+				updatedAt: new Date(),
+			},
+		])
+	);
+
+const commentCount = async (reviewId: ObjectId) =>
+	Object.values((await collections.mlReviews.findOne({ _id: reviewId }))?.drafts ?? {}).reduce(
+		(sum, d) => sum + (d?.comments?.length ?? 0),
+		0
+	);
+
 beforeAll(async () => {
 	await ready;
 	await collections.mlFiles.createIndex(ML_FILE_VERSION_INDEX.keys, ML_FILE_VERSION_INDEX.options);
@@ -445,6 +465,184 @@ describe.sequential("saving a draft", () => {
 				)
 			)
 		).toMatchObject({ status: 400, message: "index: the review has 2 records" });
+	});
+
+	it("parallel saves that each add a comment never take the review past 200", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals, 30);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{ $set: { drafts: storedDrafts([19, 19, 19, 19, 19, 19, 19, 19, 19, 19]) } }
+		);
+
+		const statuses = await Promise.all(
+			Array.from({ length: 20 }, (_, i) =>
+				statusOf(
+					PATCH(
+						event(locals, conv._id.toString(), review._id.toString(), {
+							index: 10 + i,
+							draft: draft({}, comments(1, `p${i}-`)),
+						})
+					)
+				)
+			)
+		);
+
+		const total = await commentCount(review._id);
+		expect(total).toBeLessThanOrEqual(200);
+		expect(total).toBe(190 + statuses.filter((s) => s === 200).length);
+		expect(statuses).toContain(200);
+		expect(statuses.every((s) => [200, 400, 409].includes(s))).toBe(true);
+	});
+});
+
+describe.sequential("bulk draft writes", () => {
+	const bulk = (locals: App.Locals, conv: Conversation, review: MlReview, body: unknown) =>
+		PATCH(event(locals, conv._id.toString(), review._id.toString(), { bulk: body }));
+
+	it("applies one change to every listed record in one write and returns their revisions", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals, 4);
+		await PATCH(
+			event(locals, conv._id.toString(), review._id.toString(), {
+				index: 1,
+				draft: {
+					status: "pending",
+					answers: { kind: "bug" },
+					comments: [{ id: "old", body: "seen" }],
+				},
+			})
+		);
+		const before = await collections.mlReviews.findOne({ _id: review._id });
+
+		const res = await bulk(locals, conv, review, {
+			indexes: [0, 1, 2],
+			status: "discarded",
+			addComment: { id: "dup", field: "body", body: "duplicate" },
+		});
+
+		expect(await res.json()).toEqual({ ok: true, revisions: { "0": 1, "1": 2, "2": 1 } });
+		const stored = await collections.mlReviews.findOne({ _id: review._id });
+		expect(stored?.draftRevision).toBe((before?.draftRevision ?? 0) + 1);
+		expect(stored?.drafts["1"]).toMatchObject({
+			status: "discarded",
+			answers: { kind: "bug" },
+			comments: [
+				{ id: "old", body: "seen" },
+				{ id: "dup-1", field: "body", body: "duplicate" },
+			],
+			revision: 2,
+		});
+		expect(stored?.drafts["0"]?.comments).toEqual([
+			expect.objectContaining({ id: "dup-0", field: "body", body: "duplicate" }),
+		]);
+		expect(stored?.drafts["3"]).toBeUndefined();
+	});
+
+	it("merges answers, deletes on null and recomputes the status when none is given", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals, 3);
+
+		const set = await bulk(locals, conv, review, { indexes: [0, 1], answers: { kind: "feature" } });
+		expect(await set.json()).toEqual({ ok: true, revisions: { "0": 1, "1": 1 } });
+		let stored = await collections.mlReviews.findOne({ _id: review._id });
+		expect(stored?.drafts["0"]).toMatchObject({ status: "answered", answers: { kind: "feature" } });
+
+		const cleared = await bulk(locals, conv, review, { indexes: [1], answers: { kind: null } });
+		expect(await cleared.json()).toEqual({ ok: true, revisions: { "1": 2 } });
+		stored = await collections.mlReviews.findOne({ _id: review._id });
+		expect(stored?.drafts["1"]).toMatchObject({ status: "pending", answers: {} });
+		expect(stored?.drafts["0"]).toMatchObject({ answers: { kind: "feature" }, revision: 1 });
+	});
+
+	it("validates like a single save and writes nothing when any part fails", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals, 3);
+		const refused = (body: unknown) => errorOf(bulk(locals, conv, review, body));
+
+		expect(await refused({ indexes: [0, 3], status: "answered" })).toEqual({
+			status: 400,
+			message: "bulk.indexes: the review has 3 records, 3 is past them",
+		});
+		expect(await refused({ indexes: [0, 0], status: "answered" })).toEqual({
+			status: 400,
+			message: "bulk.indexes: repeats an index",
+		});
+		expect(
+			(await refused({ indexes: Array.from({ length: 501 }, (_, i) => i), status: "answered" }))
+				.status
+		).toBe(400);
+		expect((await refused({ indexes: [0] })).status).toBe(400);
+		expect(await refused({ indexes: [0], answers: { $where: "x" } })).toEqual({
+			status: 400,
+			message: "bulk.answers.$where: no such question",
+		});
+		expect(await refused({ indexes: [0], answers: { kind: "nope" } })).toEqual({
+			status: 400,
+			message: 'bulk.answers.kind: "nope" is not an option (bug, feature)',
+		});
+		expect(
+			await refused({ indexes: [0], addComment: { id: "q", field: "nope", body: "x" } })
+		).toEqual({ status: 400, message: 'comments: no field "nope"' });
+		expect((await collections.mlReviews.findOne({ _id: review._id }))?.drafts).toEqual({});
+	});
+
+	it("holds the comment caps, naming how many the review has left", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals, 30);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{ $set: { drafts: storedDrafts([20, 20, 20, 20, 20, 20, 20, 20, 20, 8]) } }
+		);
+		const add = (indexes: number[]) =>
+			errorOf(bulk(locals, conv, review, { indexes, addComment: { id: "c", body: "same" } }));
+
+		expect(await add(Array.from({ length: 13 }, (_, i) => 10 + i))).toEqual({
+			status: 400,
+			message: "a review holds at most 200 comments, 12 left",
+		});
+		expect(await add([0, 10])).toEqual({
+			status: 400,
+			message: "record 0 already has 20 comments, the most one record holds",
+		});
+		expect((await add(Array.from({ length: 12 }, (_, i) => 10 + i))).status).toBe(200);
+		expect(await add([22])).toEqual({
+			status: 400,
+			message: "a review holds at most 200 comments, 0 left",
+		});
+	});
+
+	it("lets one of two racing bulk comments through when each would fit alone", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals, 130);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{ $set: { drafts: storedDrafts([20, 20, 20, 20, 20]) } }
+		);
+		const add = (from: number) =>
+			errorOf(
+				bulk(locals, conv, review, {
+					indexes: Array.from({ length: 60 }, (_, i) => from + i),
+					addComment: { id: `c${from}`, body: "same" },
+				})
+			);
+
+		const results = await Promise.all([add(10), add(70)]);
+
+		expect(results.map((r) => r.status).sort()).toEqual([200, 400]);
+		expect(results.find((r) => r.status === 400)?.message).toBe(
+			"a review holds at most 200 comments, 40 left"
+		);
+		expect(await commentCount(review._id)).toBe(160);
+	});
+
+	it("is 409 once the review is submitted", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals, 2);
+		await collections.mlReviews.updateOne({ _id: review._id }, { $set: { status: "submitted" } });
+		expect(await statusOf(bulk(locals, conv, review, { indexes: [0], status: "answered" }))).toBe(
+			409
+		);
 	});
 });
 

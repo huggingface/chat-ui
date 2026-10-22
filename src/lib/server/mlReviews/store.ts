@@ -83,6 +83,35 @@ export async function saveDraft(
 	return (await collections.mlReviews.countDocuments(open)) > 0 ? "conflict" : "closed";
 }
 
+/**
+ * writes several drafts in one update, only if no draft changed since the review was read, so
+ * caps computed from that read hold however many saves race
+ */
+export async function saveDraftsGuarded(
+	review: Pick<MlReview, "_id" | "conversationId" | "draftRevision">,
+	drafts: Record<string, ReviewDraft>
+): Promise<"saved" | "moved" | "closed"> {
+	const open: Filter<MlReview> = {
+		_id: review._id,
+		conversationId: review.conversationId,
+		status: { $in: ["open", "detached"] },
+	};
+	const updated = await collections.mlReviews.updateOne(
+		{ ...open, draftRevision: review.draftRevision },
+		{
+			$set: {
+				...Object.fromEntries(
+					Object.entries(drafts).map(([index, draft]) => [`drafts.${index}`, draft])
+				),
+				updatedAt: new Date(),
+			},
+			$inc: { draftRevision: 1 },
+		}
+	);
+	if (updated.matchedCount === 1) return "saved";
+	return (await collections.mlReviews.countDocuments(open)) > 0 ? "moved" : "closed";
+}
+
 /** claims the submission from the status and draft revision it read, so a race changes nothing */
 export async function submitReview(
 	review: Pick<MlReview, "_id" | "conversationId" | "draftRevision">,
