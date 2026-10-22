@@ -115,6 +115,7 @@ interface Patch {
 function fakeServer(review: ReviewPayload) {
 	const patches: Patch[] = [];
 	const submits: unknown[] = [];
+	let reads = 0;
 	let gate: Promise<void> | undefined;
 	let release: (() => void) | undefined;
 	let submitAnswer: unknown = { ok: true, files: [] };
@@ -124,6 +125,7 @@ function fakeServer(review: ReviewPayload) {
 		const url = String(input);
 		const method = init?.method ?? "GET";
 		if (method === "GET" && url.endsWith(`/conversations/${CONVERSATION}/reviews/${REVIEW}`)) {
+			reads += 1;
 			return new Response(superjson.stringify(review));
 		}
 		if (method === "PATCH") {
@@ -151,6 +153,7 @@ function fakeServer(review: ReviewPayload) {
 	return {
 		patches,
 		submits,
+		reads: () => reads,
 		hold() {
 			gate = new Promise((resolve) => (release = resolve));
 		},
@@ -754,6 +757,33 @@ describe("MlReviewPane", () => {
 					"Posted as your message"
 				)
 			);
+		});
+
+		it("does not poll a queued submission while the tab is hidden", async () => {
+			const review = payload({ status: "detached" });
+			const { container, server } = await mount(review);
+			server.answerSubmit({ ok: true, files: [], delivery: "queued" });
+			server.whenSubmitted(() => {
+				review.status = "submitted";
+				review.delivery = { status: "pending" };
+			});
+			for (let i = 0; i < RECORDS.length; i += 1) {
+				await press("1");
+				await press("j");
+			}
+			button(container, "Finish").click();
+			await tick();
+			Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+			try {
+				button(container, "Send").click();
+				await vi.waitFor(() => expect(server.submits).toHaveLength(1));
+				await sleep(100);
+				const before = server.reads();
+				await sleep(2_500);
+				expect(server.reads()).toBe(before);
+			} finally {
+				delete (document as { visibilityState?: unknown }).visibilityState;
+			}
 		});
 
 		it("waits for a queued submission to be posted before following it", async () => {

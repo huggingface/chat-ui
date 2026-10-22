@@ -29,7 +29,12 @@ import { UrlDependency } from "$lib/types/UrlDependency";
 export const REVIEW_SAVE_DEBOUNCE_MS = 250;
 /** a queued submission is posted within about 10 s of the running turn ending */
 export const REVIEW_DELIVERY_POLL_MS = 2_000;
+/** fast for the first half minute, then slower, each poll reads the whole review */
+const DELIVERY_FAST_POLLS = 15;
+const DELIVERY_SLOW_POLL_MS = 10_000;
 const DELIVERY_POLL_LIMIT = 90;
+
+const tabHidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
 
 type FetchFn = typeof globalThis.fetch;
 
@@ -410,15 +415,18 @@ export class ReviewSession {
 
 	/** the posted message and its run reach the page once the conversation reloads */
 	#followDelivery(attempt = 0) {
+		const wait = attempt < DELIVERY_FAST_POLLS ? REVIEW_DELIVERY_POLL_MS : DELIVERY_SLOW_POLL_MS;
 		setTimeout(async () => {
 			if (!this.#alive) return;
+			// a hidden tab waits without fetching, the posted message reaches it once it is shown
+			if (tabHidden()) return this.#followDelivery(attempt);
 			await this.refresh();
 			const status = this.payload?.delivery?.status;
 			if (status === "sent") void this.#owner.followConversation();
 			else if (status !== "failed" && attempt + 1 < DELIVERY_POLL_LIMIT) {
 				this.#followDelivery(attempt + 1);
 			}
-		}, REVIEW_DELIVERY_POLL_MS);
+		}, wait);
 	}
 
 	/** `approveRest` has the server mark every undecided record OK, one write instead of one per record */
