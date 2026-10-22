@@ -169,8 +169,38 @@ export async function queueDelivery(review: Pick<MlReview, "_id">): Promise<void
 	);
 }
 
+const SUBMIT_RETRY_BASE_MS = 30_000;
+const SUBMIT_RETRY_MAX_MS = 30 * 60_000;
+const SUBMIT_MAX_ATTEMPTS = 6;
+
+/** backs a failing recovery off so it cannot hold up its conversation or the sweep, then gives up */
+export async function recordSubmitFailure(
+	review: Pick<MlReview, "_id" | "submitFailure">,
+	error: string
+): Promise<void> {
+	const attempts = (review.submitFailure?.attempts ?? 0) + 1;
+	const gaveUp = attempts >= SUBMIT_MAX_ATTEMPTS;
+	const wait = Math.min(SUBMIT_RETRY_BASE_MS * 2 ** (attempts - 1), SUBMIT_RETRY_MAX_MS);
+	await collections.mlReviews.updateOne(
+		{ _id: review._id },
+		{
+			$set: {
+				submitFailure: {
+					attempts,
+					error: error.slice(0, 500),
+					...(gaveUp ? { gaveUp: true as const } : { retryAt: new Date(Date.now() + wait) }),
+				},
+				updatedAt: new Date(),
+			},
+		}
+	);
+}
+
 export async function clearUnresolved(review: Pick<MlReview, "_id">): Promise<void> {
-	await collections.mlReviews.updateOne({ _id: review._id }, { $unset: { unresolved: "" } });
+	await collections.mlReviews.updateOne(
+		{ _id: review._id },
+		{ $unset: { unresolved: "", submitFailure: "" } }
+	);
 }
 
 /** claimed submissions a process left unresolved, oldest first, so none can starve the rest */
@@ -179,7 +209,14 @@ export async function unresolvedSubmissions(
 	limit = 50
 ): Promise<MlReview[]> {
 	return collections.mlReviews
-		.find({ ...(conversationId ? { conversationId } : {}), unresolved: true })
+		.find({
+			...(conversationId ? { conversationId } : {}),
+			unresolved: true,
+			$or: [
+				{ submitFailure: { $exists: false } },
+				{ "submitFailure.retryAt": { $lte: new Date() } },
+			],
+		})
 		.sort({ submittedAt: 1 })
 		.limit(limit)
 		.toArray();

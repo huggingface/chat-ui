@@ -2,9 +2,11 @@ import type { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import type { MlReview } from "$lib/types/MlReview";
 import { ensureReviewResult } from "./result";
+import { logger } from "$lib/server/logger";
 import {
 	clearUnresolved,
 	queueDelivery,
+	recordSubmitFailure,
 	resolveSubmittedReview,
 	unresolvedSubmissions,
 } from "./store";
@@ -35,6 +37,13 @@ export async function completeSubmission(
 /** submissions a process claimed and died on, finished for the settle and the sweep */
 export async function finishStoredSubmissions(conversationId?: ObjectId): Promise<void> {
 	for (const review of await unresolvedSubmissions(conversationId)) {
-		await completeSubmission(review);
+		try {
+			await completeSubmission(review);
+		} catch (err) {
+			logger.error({ err, reviewId: review._id.toString() }, "[review] recovery failed");
+			await recordSubmitFailure(review, err instanceof Error ? err.message : String(err)).catch(
+				() => undefined
+			);
+		}
 	}
 }

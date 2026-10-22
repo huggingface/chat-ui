@@ -171,6 +171,8 @@ export interface MlReview {
 	result?: { text: string; files: MlFileRef[] };
 	/** claimed while the parked call still waited, cleared once its row is answered or closed */
 	unresolved?: true;
+	/** recovery of an unresolved submission that threw, retried with backoff until it gives up */
+	submitFailure?: { attempts: number; error: string; retryAt?: Date; gaveUp?: true };
 	delivery?: ReviewDelivery;
 	createdAt: Date;
 	updatedAt: Date;

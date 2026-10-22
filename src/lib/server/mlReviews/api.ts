@@ -54,6 +54,7 @@ export function reviewPayload(review: MlReview) {
 		status: review.status,
 		...((review.note ?? review.summary) ? { note: review.note ?? review.summary } : {}),
 		...(review.result ? { result: review.result } : {}),
+		...(review.submitFailure?.gaveUp ? { submitFailed: review.submitFailure.error } : {}),
 		...(review.delivery
 			? {
 					delivery: {

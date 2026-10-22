@@ -498,7 +498,10 @@ async function storeAnswerOnly(
 export async function settleAnsweredAsks(
 	conv: Pick<Conversation, "_id" | "messages">
 ): Promise<() => Promise<void>> {
-	await finishStoredSubmissions(conv._id);
+	// a review that fails to finish must not fail the new turn
+	await finishStoredSubmissions(conv._id).catch((err) =>
+		logger.error({ err }, "[review] could not finish stored submissions")
+	);
 	const now = Date.now();
 	const rows: McpElicitation[] = [];
 	// one equality match per kind, so each query uses its own partial index

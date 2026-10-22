@@ -817,6 +817,67 @@ describe.sequential("submitting", () => {
 		});
 	});
 
+	it("keeps recovering the others when one stored submission keeps throwing", async () => {
+		const { locals } = await createTestUser();
+		const healthy = await seed(locals);
+		const broken = await seed(locals);
+		for (const { conv, review } of [healthy, broken]) {
+			await labelBoth(locals, conv, review);
+			const read = await collections.mlReviews.findOne({ _id: review._id });
+			if (!read) throw new Error("review vanished");
+			expect(await submitReview(read, {})).toBe(true);
+		}
+		// any throw inside the result build stands in for a document that cannot take the write
+		await collections.mlReviews.updateOne({ _id: broken.review._id }, {
+			$set: { records: null },
+		} as never);
+		const { settleAnsweredAsks } = await import("$lib/server/generation/askResume");
+
+		await expect(settleAnsweredAsks({ _id: broken.conv._id, messages: [] })).resolves.toBeTypeOf(
+			"function"
+		);
+		await finishStoredSubmissions();
+
+		expect(
+			await collections.mcpElicitations.findOne({ elicitationId: healthy.review.elicitationId })
+		).toMatchObject({ status: "resolved", resolution: "user" });
+		const failing = await collections.mlReviews.findOne({ _id: broken.review._id });
+		expect(failing?.unresolved).toBe(true);
+		expect(failing?.submitFailure).toMatchObject({ attempts: 1 });
+		expect(failing?.submitFailure?.retryAt?.getTime()).toBeGreaterThan(Date.now());
+
+		await finishStoredSubmissions();
+		expect(
+			(await collections.mlReviews.findOne({ _id: broken.review._id }))?.submitFailure
+		).toMatchObject({
+			attempts: 1,
+		});
+
+		for (let i = 0; i < 5; i += 1) {
+			await collections.mlReviews.updateOne(
+				{ _id: broken.review._id },
+				{ $set: { "submitFailure.retryAt": new Date(Date.now() - 1_000) } }
+			);
+			await finishStoredSubmissions();
+		}
+		expect(
+			(await collections.mlReviews.findOne({ _id: broken.review._id }))?.submitFailure
+		).toMatchObject({
+			attempts: 6,
+			gaveUp: true,
+		});
+		await finishStoredSubmissions();
+		expect(
+			(await collections.mlReviews.findOne({ _id: broken.review._id }))?.submitFailure?.attempts
+		).toBe(6);
+		const payload = superjson.parse<Record<string, unknown>>(
+			await (
+				await GET(event(locals, broken.conv._id.toString(), broken.review._id.toString()))
+			).text()
+		);
+		expect(typeof payload.submitFailed).toBe("string");
+	});
+
 	it("answers 400 with the blockers while a required question is open", async () => {
 		const { locals } = await createTestUser();
 		const { conv, review } = await seed(locals);
