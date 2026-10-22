@@ -75,6 +75,24 @@ describe("the publish card", () => {
 		).toBe(false);
 	});
 
+	it("reads a whoami that fails or errors as unable to write", async () => {
+		for (const who of [500, 401]) {
+			const audience = await resolveAudience(dataset, {
+				token: "hf_x",
+				fetch: hub({ repo: { private: false }, who }),
+			});
+			expect(audience).toMatchObject({
+				canWrite: false,
+				label: "pull request on public dataset pngwn/gold",
+			});
+		}
+		const broken = (async (input: string | URL) => {
+			if (String(input).endsWith("/api/whoami-v2")) throw new TypeError("fetch failed");
+			return Response.json({ private: false });
+		}) as typeof fetch;
+		expect((await resolveAudience(dataset, { token: "hf_x", fetch: broken })).canWrite).toBe(false);
+	});
+
 	it("offers push only where the owner can write, and no pull request on a bucket", () => {
 		const values = (d: ReviewDestination, canWrite: boolean) =>
 			publishOptions(d, { label: "x", exists: true, canWrite }).map((o) => o.value);

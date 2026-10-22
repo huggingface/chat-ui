@@ -19,7 +19,7 @@ import {
 	type MessageReviewResolvedUpdate,
 } from "$lib/types/MessageUpdate";
 import { isAnswered, recordStatus } from "$lib/utils/review/answers";
-import { destinationUrl, pushReviewLabels } from "./destination";
+import { destinationUrl, settledPush } from "./destination";
 import { decidePublish } from "./publish";
 
 /** the submit carries no verdict, so the model reads the annotations and the user decides */
@@ -456,7 +456,7 @@ export async function ensureReviewResult(
 	}
 	const submission = { note: review.note ?? review.summary };
 	const files = await ensureReviewFiles(review);
-	const push = await pushReviewLabels(review, token);
+	const push = await settledPush(review, token);
 	return storeReviewResult(review, {
 		text: reviewResultText(review, submission, files, push),
 		files,

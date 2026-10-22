@@ -23,7 +23,8 @@ import { isAnswered } from "$lib/utils/review/answers";
 import { columnOf, isMediaType } from "./features";
 
 /** a push quiet this long is reported failed, never retried, as its commit may have landed */
-const PUSH_LEASE_MS = 5 * 60 * 1000;
+export const PUSH_LEASE_MS = 5 * 60 * 1000;
+const PUSH_POLL_MS = 2_000;
 
 export const destinationSchema = z.object({
 	repo: z
@@ -116,6 +117,15 @@ function answerColumn(question: ReviewQuestion, name: string, values: unknown[])
 	}
 }
 
+export const REVIEW_COLUMNS = [
+	"review_status",
+	"review_comments",
+	"source_ref",
+	"schema_hash",
+	"reviewed_by",
+	"reviewed_at",
+] as const;
+
 export function labelsParquet(review: MlReview, reviewedBy: string): ArrayBuffer {
 	const records = review.records;
 	const draft = (i: number) => review.drafts[String(i)];
@@ -126,12 +136,17 @@ export function labelsParquet(review: MlReview, reviewedBy: string): ArrayBuffer
 		columns.push(column);
 	};
 
+	// a file pushed by an earlier review carries these, the answers of this one replace them
+	const replaced = new Set<string>([
+		...REVIEW_COLUMNS,
+		...review.schema.questions.flatMap((q) => [q.name, `${q.name}_label`]),
+	]);
 	add({ name: review.schema.idField, data: records.map((r) => r.id), type: "STRING" });
 	for (const field of review.schema.fields) {
 		// media stays where it is, source_ref joins back to it
 		if (isMediaType(field.type) && records.some((r) => r.media?.includes(field.name))) continue;
 		const name = columnOf(field);
-		if (taken.has(name)) continue;
+		if (taken.has(name) || replaced.has(name)) continue;
 		const values = records.map((r) => r.values[field.name] ?? null);
 		const type =
 			field.type === "number"
@@ -262,7 +277,7 @@ export async function pushReviewLabels(
 		const lost: ReviewPush = {
 			...push,
 			status: "failed",
-			error: `an earlier push was interrupted and may or may not have landed; check ${destinationUrl(destination)}`,
+			error: interrupted(destination),
 			finishedAt: new Date(),
 		};
 		return finishPush(review, lost);
@@ -377,4 +392,58 @@ export async function pushReviewLabels(
 					: String(err)
 		);
 	}
+}
+
+const interrupted = (destination: Pick<ReviewDestination, "repo" | "type"> | undefined) =>
+	`an earlier push was interrupted and may or may not have landed; check ${destination ? destinationUrl(destination) : "the destination"}`;
+
+/** waits out a push another process holds until it settles or its lease lapses, a result never sees pushing */
+export async function settledPush(
+	review: MlReview,
+	token?: string
+): Promise<ReviewPush | undefined> {
+	let push = await pushReviewLabels(review, token);
+	const deadline = Date.now() + PUSH_LEASE_MS + PUSH_POLL_MS * 5;
+	while (push?.status === "pushing" && Date.now() < deadline) {
+		await new Promise((resolve) => setTimeout(resolve, PUSH_POLL_MS));
+		push = await pushReviewLabels(
+			(await collections.mlReviews.findOne({ _id: review._id })) ?? review,
+			token
+		);
+	}
+	if (push?.status === "pushing") {
+		throw new Error(`the push for review ${review._id.toString()} did not settle`);
+	}
+	return push;
+}
+
+/** for the sweep, a push whose holder went quiet past its lease is failed, never left pushing */
+export async function expireStalePushes(now = Date.now()): Promise<number> {
+	const stale = await collections.mlReviews
+		.find(
+			{
+				"push.status": "pushing",
+				"push.takenAt": { $lt: new Date(now - PUSH_LEASE_MS) },
+			},
+			{ projection: { push: 1, destination: 1 } }
+		)
+		.limit(50)
+		.toArray();
+	let expired = 0;
+	for (const review of stale) {
+		if (!review.push) continue;
+		const updated = await collections.mlReviews.updateOne(
+			{ _id: review._id, "push.status": "pushing", "push.takenAt": review.push.takenAt },
+			{
+				$set: {
+					"push.status": "failed",
+					"push.error": interrupted(review.destination),
+					"push.finishedAt": new Date(now),
+					updatedAt: new Date(now),
+				},
+			}
+		);
+		expired += updated.modifiedCount;
+	}
+	return expired;
 }

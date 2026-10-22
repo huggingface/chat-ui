@@ -22,8 +22,14 @@ vi.mock("@huggingface/hub", async (importOriginal) => ({
 
 const hub = await import("@huggingface/hub");
 const { HubApiError } = hub;
-const { besidePath, labelsParquet, parseDestination, pushReviewLabels, sourceRef } =
-	await import("./destination");
+const {
+	besidePath,
+	expireStalePushes,
+	labelsParquet,
+	parseDestination,
+	pushReviewLabels,
+	sourceRef,
+} = await import("./destination");
 const { ensureReviewResult, reviewResolvedUpdate } = await import("./result");
 const { createReview } = await import("./store");
 const { deliverReview } = await import("./delivery");
@@ -183,6 +189,47 @@ describe("review destinations", () => {
 		expect(new Date(rows[0].reviewed_at as Date).toISOString()).toBe("2026-10-20T12:00:00.000Z");
 	});
 
+	it("replaces the review columns when the reviewed file is one it pushed before", async () => {
+		const first = await seed();
+		const pushed = await parquetReadObjects({ file: labelsParquet(first, "pngwn") });
+		const columns = Object.keys(pushed[0]).filter((c) => c !== "id");
+		const again: MlReview = {
+			...first,
+			schema: {
+				...first.schema,
+				fields: columns.map((name) => ({ name: name.toLowerCase(), type: "json", column: name })),
+				questions: first.schema.questions.filter((q) => q.name === "sentiment"),
+			},
+			records: pushed.map((row, i) => ({
+				id: String(row.id),
+				values: Object.fromEntries(columns.map((c) => [c.toLowerCase(), row[c]])),
+				origin: { row: i },
+			})),
+			drafts: {
+				"0": {
+					status: "answered",
+					answers: { sentiment: "neg" },
+					comments: [],
+					updatedAt: new Date(),
+				},
+				"1": { status: "discarded", answers: {}, comments: [], updatedAt: new Date() },
+			},
+			submittedAt: new Date("2026-10-22T09:00:00Z"),
+		};
+		const rows = await parquetReadObjects({ file: labelsParquet(again, "abidlabs") });
+		const names = Object.keys(rows[0]);
+		expect(new Set(names).size).toBe(names.length);
+		expect(names.filter((n) => n === "review_status")).toHaveLength(1);
+		expect(names).not.toContain("sentiment_label");
+		expect(rows[0]).toMatchObject({
+			sentiment: "neg",
+			review_status: "answered",
+			reviewed_by: "abidlabs",
+			tags: ["a", "b"],
+		});
+		expect(rows[1]).toMatchObject({ sentiment: null, review_status: "discarded" });
+	});
+
 	it("points Parquet rows at their file and row", () => {
 		const ref = sourceRef(
 			{
@@ -338,6 +385,48 @@ describe("review destinations", () => {
 			error: expect.stringContaining("may or may not have landed"),
 		});
 		expect(hub.commit).not.toHaveBeenCalled();
+	});
+
+	it("builds no result while another process still holds the push, then uses its outcome", async () => {
+		const review = await seed({ push: { status: "pushing", takenAt: new Date() } });
+		setTimeout(() => {
+			void collections.mlReviews.updateOne(
+				{ _id: review._id },
+				{
+					$set: {
+						push: {
+							status: "pushed",
+							takenAt: new Date(),
+							path: "data/batch-1.parquet",
+							pr: false,
+							url: "https://huggingface.co/datasets/pngwn/gold/commit/elsewhere",
+						},
+					},
+				}
+			);
+		}, 300);
+		const result = await ensureReviewResult(review, "hf_owner");
+		expect(result.pushed).toEqual({
+			url: "https://huggingface.co/datasets/pngwn/gold/commit/elsewhere",
+			pr: false,
+			path: "data/batch-1.parquet",
+		});
+		expect(hub.commit).not.toHaveBeenCalled();
+	});
+
+	it("has the sweep fail a push whose holder went quiet past its lease", async () => {
+		const review = await seed({
+			push: { status: "pushing", takenAt: new Date(Date.now() - 6 * 60_000) },
+		});
+		expect(await expireStalePushes()).toBe(1);
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			push: { status: "failed", error: expect.stringContaining("may or may not have landed") },
+		});
+		const stored = await collections.mlReviews.findOne({ _id: review._id });
+		const result = await ensureReviewResult(stored as MlReview, "hf_owner");
+		expect(result.text).toContain("Labels were NOT pushed to pngwn/gold");
+		expect(hub.commit).not.toHaveBeenCalled();
+		expect(await expireStalePushes()).toBe(0);
 	});
 
 	it("fails without a sign in rather than pushing as anyone else", async () => {

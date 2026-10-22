@@ -40,7 +40,7 @@ async function getJson(url: string, { token, fetch: f = fetch }: Lookup) {
 	};
 }
 
-/** a lookup that fails reads as writable, the push still falls back to a pull request on a 403 */
+/** only a whoami that names the owner or a writing org role reads as writable, a failed one offers a pull request */
 export async function resolveAudience(
 	destination: ReviewDestination,
 	lookup: Lookup
@@ -48,7 +48,7 @@ export async function resolveAudience(
 	const kind = destination.type === "bucket" ? "buckets" : "datasets";
 	let exists = false;
 	let isPrivate: boolean | undefined;
-	let canWrite = Boolean(lookup.token);
+	let canWrite = false;
 	try {
 		const repo = await getJson(`${HUB_URL}/api/${kind}/${destination.repo}`, lookup);
 		if (repo.status === 200) {
@@ -69,10 +69,9 @@ export async function resolveAudience(
 				?.role;
 			const namespace = destination.repo.split("/")[0];
 			const orgs = Array.isArray(who.body.orgs) ? (who.body.orgs as Record<string, unknown>[]) : [];
-			if (who.status !== 200 || role === "read") canWrite = false;
-			else if (namespace !== name) {
+			if (who.status === 200 && name && role !== "read") {
 				const org = orgs.find((o) => o.name === namespace);
-				canWrite = !!org && WRITE_ROLES.has(String(org.roleInOrg));
+				canWrite = namespace === name || (!!org && WRITE_ROLES.has(String(org.roleInOrg)));
 			}
 		} catch (err) {
 			logger.warn({ err }, "[review] could not look up the signed in user");
