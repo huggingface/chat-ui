@@ -145,10 +145,15 @@
 						classNames="inline-flex items-center rounded-xl -mr-1 border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm enabled:hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:enabled:hover:bg-gray-600"
 						showTooltip={false}
 						value={withLeafId(createdUrl) ?? createdUrl}
-						onClick={() => {
+						onCopied={() => {
+							errorMsg = null;
 							justCopied = true;
 							oncopied?.();
 							setTimeout(() => (justCopied = false), 1200);
+						}}
+						onCopyError={() => {
+							justCopied = false;
+							errorMsg = "Couldn't copy the link. Select it above and copy it manually.";
 						}}
 					>
 						{#snippet children()}
