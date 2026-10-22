@@ -77,3 +77,32 @@ it("validates the request origin before looking up Slack ownership", async () =>
 	expect(response.status).toBe(403);
 	expect(collections.conversations.findOne).not.toHaveBeenCalled();
 });
+
+it("omits oversized HTML preload headers while retaining the HTML preload tags", async () => {
+	const html = '<html><head><link rel="modulepreload" href="/app.js"></head></html>';
+	const response = await handleRequest({
+		event: event("GET", "https://chat.example"),
+		resolve: async () =>
+			new Response(html, {
+				headers: {
+					"content-type": "text/html; charset=utf-8",
+					link: Array.from({ length: 80 }, (_, i) => `</chunk-${i}.js>; rel="modulepreload"`).join(
+						", "
+					),
+				},
+			}),
+	});
+	expect(response.headers.has("link")).toBe(false);
+	expect(await response.text()).toBe(html);
+});
+
+it.each([
+	["text/html", '</app.js>; rel="modulepreload"'],
+	["application/json", "x".repeat(4096)],
+])("preserves small HTML hints and non-HTML Link headers (%s)", async (contentType, link) => {
+	const response = await handleRequest({
+		event: event("GET", "https://chat.example"),
+		resolve: async () => new Response("ok", { headers: { "content-type": contentType, link } }),
+	});
+	expect(response.headers.get("link")).toBe(link);
+});

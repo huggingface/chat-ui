@@ -246,6 +246,17 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 			// Update request context with status code
 			updateRequestContext({ statusCode: response.status });
 
+			// SvelteKit also emits these preload hints as tags in the HTML. Large
+			// dependency graphs can make the duplicate Link header exceed a reverse
+			// proxy's response-header buffer, turning otherwise valid pages into 502s.
+			// Leave headroom for cookies and other headers; preserve non-HTML links.
+			if (
+				response.headers.get("content-type")?.includes("text/html") &&
+				Buffer.byteLength(response.headers.get("link") ?? "", "utf8") > 2048
+			) {
+				response.headers.delete("link");
+			}
+
 			// Add CSP header to control iframe embedding
 			// Always allow huggingface.co; when ALLOW_IFRAME=true, allow all domains
 			if (config.ALLOW_IFRAME !== "true") {
