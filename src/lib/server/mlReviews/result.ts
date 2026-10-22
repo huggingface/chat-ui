@@ -258,18 +258,24 @@ export function sourceLine(source: ReviewSource): string | undefined {
 
 export function pushLine(
 	destination: NonNullable<MlReview["destination"]>,
-	push: ReviewPush | undefined
+	push: ReviewPush | undefined,
+	counts?: Pick<ReviewCounts, "pending" | "total">
 ): string {
 	const where = `${destination.repo} (${push?.path ?? destination.path})`;
+	const unlabelled = counts?.pending
+		? `${counts.pending} of ${counts.total} rows went out unfinished, with review_status "pending": filter them out before treating the file as labelled.`
+		: "";
+	const after = (line: string) =>
+		unlabelled ? `${line.endsWith(".") ? line : `${line}.`} ${unlabelled}` : line;
 	if (push?.status === "pushed") {
 		return push.pr
-			? `Labels pushed as a pull request on ${where}: ${push.url}`
-			: `Labels pushed to ${where}: ${push.url}`;
+			? after(`Labels pushed as a pull request on ${where}: ${push.url}`)
+			: after(`Labels pushed to ${where}: ${push.url}`);
 	}
 	if (push?.status === "failed") {
 		return `Labels were NOT pushed to ${where}: ${push.error}. The answers are in the file below.`;
 	}
-	return `Labels are still being pushed to ${where}; check ${destinationUrl(destination)}.`;
+	return after(`Labels are still being pushed to ${where}; check ${destinationUrl(destination)}.`);
 }
 
 export function reviewResultText(
@@ -387,7 +393,7 @@ export function reviewResultText(
 		}
 	}
 
-	if (review.destination) lines.push(pushLine(review.destination, push));
+	if (review.destination) lines.push(pushLine(review.destination, push, counts));
 	else if (review.declinedDestination) {
 		const { repo, path } = review.declinedDestination;
 		lines.push(

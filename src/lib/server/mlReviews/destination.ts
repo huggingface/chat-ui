@@ -19,7 +19,7 @@ import type {
 	ReviewQuestion,
 	ReviewRecord,
 } from "$lib/types/MlReview";
-import { isAnswered } from "$lib/utils/review/answers";
+import { isAnswered, recordStatus } from "$lib/utils/review/answers";
 import { columnOf, isMediaType } from "./features";
 
 /** a push quiet this long is reported failed, never retried, as its commit may have landed */
@@ -169,7 +169,7 @@ export function labelsParquet(review: MlReview, reviewedBy: string): ArrayBuffer
 	const reviewedAt = review.submittedAt ?? new Date();
 	add({
 		name: "review_status",
-		data: records.map((_, i) => draft(i)?.status ?? "pending"),
+		data: records.map((_, i) => recordStatus(review.schema, draft(i))),
 		type: "STRING",
 	});
 	add({

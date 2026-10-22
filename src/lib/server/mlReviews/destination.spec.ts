@@ -458,6 +458,35 @@ describe("review destinations", () => {
 		});
 	});
 
+	it("pushes a partly reviewed batch with its unfinished rows marked pending", async () => {
+		vi.mocked(hub.commit).mockResolvedValue(commitOutput());
+		const now = new Date();
+		const review = await seed({
+			records: [
+				{ id: "17", values: { text: "good" }, origin: { row: 17 } },
+				{ id: "803", values: { text: "bad" }, origin: { row: 803 } },
+				{ id: "905", values: { text: "meh" }, origin: { row: 905 } },
+			],
+			drafts: {
+				"0": { status: "answered", answers: { sentiment: "pos" }, comments: [], updatedAt: now },
+				// answered on the optional questions only, so the required label is still missing
+				"1": { status: "answered", answers: { quality: 2 }, comments: [], updatedAt: now },
+			},
+		});
+		const rows = await parquetReadObjects({ file: labelsParquet(review, "pngwn") });
+		expect(rows.map((r) => [r.id, r.review_status, r.sentiment])).toEqual([
+			["17", "answered", "pos"],
+			["803", "pending", null],
+			["905", "pending", null],
+		]);
+		expect(rows[1].quality).toBe(2);
+
+		const result = await ensureReviewResult(review, "hf_owner");
+		expect(result.text).toContain(
+			'Labels pushed to pngwn/gold (data/batch-1.parquet): https://huggingface.co/datasets/pngwn/gold/commit/abc123. 2 of 3 rows went out unfinished, with review_status "pending": filter them out before treating the file as labelled.'
+		);
+	});
+
 	it("builds a detached review's result, push included, before its delivery posts it", async () => {
 		vi.mocked(hub.commit).mockResolvedValue(commitOutput());
 		const review = await seed({ delivery: { status: "pending", attempts: 0 } });
