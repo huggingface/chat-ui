@@ -15,6 +15,7 @@ import type {
 } from "$lib/types/MlReview";
 import { blockers, type ReviewBlocker } from "$lib/utils/review/answers";
 import { draftStatus, mergeDraft } from "$lib/utils/review/view";
+import { REVIEW_LIMITS } from "$lib/utils/review/schema";
 import {
 	isDecided,
 	passFailQuestion,
@@ -277,6 +278,134 @@ export class ReviewSession {
 		};
 		this.#update(index, { ...current, comments: [...current.comments, comment] });
 		return comment;
+	}
+
+	/** comments the whole review and each record can still take */
+	commentRoom(indices: Iterable<number>): string | undefined {
+		const list = [...indices];
+		const left = REVIEW_LIMITS.comments - this.counts.comments;
+		if (list.length > left) {
+			return `A review holds at most ${REVIEW_LIMITS.comments} comments, ${Math.max(left, 0)} left. Select fewer.`;
+		}
+		const full = list.find(
+			(index) => (this.draft(index)?.comments.length ?? 0) >= REVIEW_LIMITS.commentsPerRecord
+		);
+		return full === undefined
+			? undefined
+			: `#${full + 1} already has ${REVIEW_LIMITS.commentsPerRecord} comments, the most one record holds.`;
+	}
+
+	/**
+	 * one write for a grid selection, a decision or the same comment on every record, the
+	 * server applies it all or nothing, so the local copy rolls back when it refuses
+	 */
+	async bulk(
+		indices: Iterable<number>,
+		change: { decision: RecordDecision } | { comment: CommentInput }
+	): Promise<string | undefined> {
+		const schema = this.schema;
+		const list = [...new Set(indices)].sort((a, b) => a - b);
+		if (!schema || !this.editable || list.length === 0) return undefined;
+		if ("comment" in change) {
+			const room = this.commentRoom(list);
+			if (room) return room;
+		}
+		await this.flush();
+		if (!this.#alive) return undefined;
+
+		const question = schema.questions.length > 0 ? passFailQuestion(schema) : undefined;
+		const id = globalThis.crypto.randomUUID();
+		const before = new Map(list.map((index) => [index, this.draft(index)]));
+		let body: Record<string, unknown>;
+		if ("decision" in change) {
+			const ok = change.decision === "approved";
+			body = question
+				? { answers: { [question.name]: ok } }
+				: { status: ok ? "answered" : "discarded" };
+		} else {
+			const { field, area, time } = change.comment;
+			body = {
+				addComment: {
+					id,
+					...(field !== undefined ? { field } : {}),
+					...(area ? { area } : {}),
+					...(time ? { time } : {}),
+					body: change.comment.body.trim(),
+				},
+			};
+		}
+
+		for (const index of list) {
+			const current = this.draft(index) ?? emptyDraft();
+			let next: ReviewDraft;
+			if ("decision" in change && question) {
+				const answers = { ...current.answers, [question.name]: change.decision === "approved" };
+				next = {
+					...current,
+					answers,
+					status: draftStatus(schema, answers, current.status, { answering: true }),
+				};
+			} else if ("decision" in change) {
+				next = { ...current, status: change.decision === "approved" ? "answered" : "discarded" };
+			} else {
+				const { field, area, time } = change.comment;
+				next = {
+					...current,
+					comments: [
+						...current.comments,
+						{
+							id: `${id}-${index}`,
+							...(field !== undefined ? { field } : {}),
+							...(area ? { area } : {}),
+							...(time ? { time } : {}),
+							body: change.comment.body.trim(),
+							createdAt: new Date(),
+						},
+					],
+				};
+			}
+			this.drafts[String(index)] = { ...next, updatedAt: new Date() };
+		}
+
+		const rollback = () => {
+			for (const [index, draft] of before) {
+				if (draft) this.drafts[String(index)] = draft;
+				else delete this.drafts[String(index)];
+			}
+		};
+		this.saving += 1;
+		try {
+			const res = await this.#owner.fetcher(this.#url, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json", Accept: "application/json" },
+				body: JSON.stringify({ bulk: { indexes: list, ...body } }),
+			});
+			const parsed = parseBody(await res.text().catch(() => ""));
+			if (!this.#alive) return undefined;
+			if (!res.ok) {
+				rollback();
+				if (res.status === 409) void this.refresh();
+				return messageOf(parsed, "Could not save the selection.");
+			}
+			const revisions =
+				parsed && typeof parsed === "object" && "revisions" in parsed
+					? (parsed.revisions as Record<string, number>)
+					: {};
+			for (const index of list) {
+				const revision = revisions[String(index)];
+				if (typeof revision === "number") this.#revisions.set(index, revision);
+				const draft = this.draft(index);
+				if (draft) this.#base.set(index, draft);
+				this.saveErrors.delete(index);
+			}
+			return undefined;
+		} catch {
+			if (!this.#alive) return undefined;
+			rollback();
+			return UNREACHABLE;
+		} finally {
+			this.saving -= 1;
+		}
 	}
 
 	removeComment(index: number, id: string): void {

@@ -44,6 +44,7 @@
 	);
 
 	const selected = new SvelteSet<number>();
+	let bulkError = $state<string | undefined>(undefined);
 	let anchor = $state<number | undefined>(undefined);
 	let filter = $state<Filter>("all");
 	let small = $state(false);
@@ -95,6 +96,7 @@
 	function clear() {
 		selected.clear();
 		composing = false;
+		bulkError = undefined;
 	}
 
 	/** click picks one, cmd or ctrl click adds or drops, shift click adds the run from the last pick */
@@ -128,9 +130,10 @@
 		for (const { index } of shown) selected.add(index);
 	}
 
-	function decide(decision: RecordDecision) {
-		session.decide(selected, decision);
-		clear();
+	/** a selection saves in one request, a refusal keeps the selection so it can be tried again */
+	async function decide(decision: RecordDecision) {
+		bulkError = await session.bulk(selected, { decision });
+		if (!bulkError) clear();
 	}
 
 	async function compose() {
@@ -140,13 +143,16 @@
 	}
 
 	/** one comment per selected record, the server keeps comments per record */
-	function commentOnSelected() {
+	async function commentOnSelected() {
 		const body = text.trim();
 		if (!body) return;
-		for (const index of selected) session.addComment(index, { body, field: image?.name });
+		bulkError = await session.bulk(selected, { comment: { body, field: image?.name } });
+		if (bulkError) return;
 		text = "";
 		clear();
 	}
+
+	let room = $derived(selected.size > 0 ? session.commentRoom(selected) : undefined);
 
 	const isTyping = (target: EventTarget | null) =>
 		target instanceof HTMLElement &&
@@ -353,6 +359,15 @@
 		class="mx-4 mb-3 flex flex-none flex-col gap-2 rounded-xl bg-gray-900 py-2 pr-2 pl-3.5 text-white shadow-[0_6px_20px_rgba(0,0,0,0.18)] dark:bg-gray-100 dark:text-gray-900"
 		data-selection-bar
 	>
+		{#if bulkError || (composing && room)}
+			<p
+				class="m-0 mt-1 mr-1.5 text-[13px] text-red-300 dark:text-red-700"
+				role="alert"
+				data-bulk-error
+			>
+				{bulkError ?? room}
+			</p>
+		{/if}
 		{#if composing}
 			<textarea
 				bind:this={textEl}
@@ -380,7 +395,7 @@
 				<button
 					type="button"
 					class="flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-[13px] font-semibold text-gray-900 disabled:opacity-50 dark:bg-gray-900 dark:text-gray-100"
-					disabled={!text.trim()}
+					disabled={!text.trim() || !!room || session.saving > 0}
 					onclick={commentOnSelected}
 				>
 					Add to {selected.size === 1 ? "image" : many(selected.size)}

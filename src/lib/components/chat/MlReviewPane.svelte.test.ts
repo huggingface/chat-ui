@@ -106,6 +106,12 @@ const payload = (overrides: Partial<ReviewPayload> = {}): ReviewPayload => ({
 });
 
 interface Patch {
+	bulk?: {
+		indexes: number[];
+		status?: string;
+		answers?: Record<string, unknown>;
+		addComment?: { id: string; body: string; field?: string };
+	};
 	index: number;
 	draft: Pick<ReviewDraft, "status" | "answers" | "comments">;
 	baseRevision?: number;
@@ -120,6 +126,7 @@ function fakeServer(review: ReviewPayload) {
 	let release: (() => void) | undefined;
 	let submitAnswer: unknown = { ok: true, files: [] };
 	let conflict: ReviewDraft | undefined;
+	let refusal: { status: number; message: string } | undefined;
 	let onSubmit: (() => void) | undefined;
 	const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = String(input);
@@ -131,6 +138,17 @@ function fakeServer(review: ReviewPayload) {
 		if (method === "PATCH") {
 			const patch: Patch = { ...JSON.parse(String(init?.body)), keepalive: init?.keepalive };
 			patches.push(patch);
+			if (refusal) {
+				const { status, message } = refusal;
+				refusal = undefined;
+				return Response.json({ message }, { status });
+			}
+			if (patch.bulk) {
+				return Response.json({
+					ok: true,
+					revisions: Object.fromEntries(patch.bulk.indexes.map((index) => [String(index), 1])),
+				});
+			}
 			if (gate) await gate;
 			if (conflict) {
 				const draft = conflict;
@@ -169,6 +187,9 @@ function fakeServer(review: ReviewPayload) {
 		},
 		conflictOnce(draft: ReviewDraft) {
 			conflict = draft;
+		},
+		refuseNext(status: number, message: string) {
+			refusal = { status, message };
 		},
 	};
 }
@@ -1311,8 +1332,8 @@ describe("MlReviewPane", () => {
 	});
 
 	describe("image grid", () => {
-		it("adds one comment to each selected image", async () => {
-			const { container, session } = await mount(
+		it("adds one comment to each selected image in one request", async () => {
+			const { container, session, server } = await mount(
 				payload({
 					schema: {
 						title: "photos",
@@ -1341,10 +1362,19 @@ describe("MlReviewPane", () => {
 			box.dispatchEvent(new Event("input", { bubbles: true }));
 			await tick();
 			button(container, "Add to both").click();
-			await tick();
-			expect(session()?.draft(0)?.comments[0]).toMatchObject({ body: "Not food.", field: "image" });
+			await vi.waitFor(() =>
+				expect(session()?.draft(0)?.comments[0]).toMatchObject({
+					body: "Not food.",
+					field: "image",
+				})
+			);
 			expect(session()?.draft(1)).toBeUndefined();
 			expect(session()?.draft(2)?.comments[0]).toMatchObject({ body: "Not food." });
+			expect(server.patches).toHaveLength(1);
+			expect(server.patches[0].bulk).toMatchObject({
+				indexes: [0, 2],
+				addComment: { body: "Not food.", field: "image" },
+			});
 		});
 
 		const tileClick = (root: HTMLElement, index: number, init: MouseEventInit = {}) =>
@@ -1403,8 +1433,9 @@ describe("MlReviewPane", () => {
 			await tick();
 			expect(container.querySelector("[data-review-footer]")).toBeNull();
 			button(container, "Mark 2 OK").click();
-			await tick();
-			expect(session()?.draft(0)?.status).toBe("answered");
+			await vi.waitFor(() => expect(session()?.draft(0)?.status).toBe("answered"));
+			expect(server.patches).toHaveLength(1);
+			expect(server.patches[0].bulk).toEqual({ indexes: [0, 2], status: "answered" });
 			expect(session()?.draft(1)).toBeUndefined();
 			expect(session()?.draft(2)?.status).toBe("answered");
 			expect(server.submits).toHaveLength(0);
@@ -1415,8 +1446,7 @@ describe("MlReviewPane", () => {
 			tileClick(container, 4);
 			await tick();
 			button(container, "Reject 1").click();
-			await tick();
-			expect(session()?.draft(4)?.status).toBe("discarded");
+			await vi.waitFor(() => expect(session()?.draft(4)?.status).toBe("discarded"));
 			const footer = container.querySelector("[data-review-footer]") as HTMLElement;
 			expect(footer.textContent).toContain("2 OK · 1 rejected · 2 to review");
 		});
@@ -1428,8 +1458,50 @@ describe("MlReviewPane", () => {
 			tileClick(container, 1);
 			await tick();
 			button(container, "Reject 1").click();
+			await vi.waitFor(() => expect(session()?.draft(1)?.answers.ok).toBe(false));
+		});
+
+		it("refuses a comment past the review's cap before sending", async () => {
+			const full = rocks();
+			full.drafts = Object.fromEntries(
+				[0, 1, 2, 3].map((index) => [
+					String(index),
+					{
+						status: "pending",
+						answers: {},
+						comments: Array.from({ length: index < 3 ? 50 : 49 }, (_, n) => ({
+							id: `c${index}-${n}`,
+							body: "x",
+							createdAt: new Date(),
+						})),
+						updatedAt: new Date(),
+					},
+				])
+			);
+			const { container, server } = await mount(full);
+			tileClick(container, 3);
+			tileClick(container, 4, { ctrlKey: true });
 			await tick();
-			expect(session()?.draft(1)?.answers.ok).toBe(false);
+			button(container, "Comment").click();
+			await tick();
+			expect(container.querySelector("[data-bulk-error]")?.textContent).toContain(
+				"at most 200 comments, 1 left"
+			);
+			expect(button(container, "Add to both").disabled).toBe(true);
+			expect(server.patches).toHaveLength(0);
+		});
+
+		it("rolls back and keeps the selection when the server refuses", async () => {
+			const { container, session, server } = await mount(rocks());
+			server.refuseNext(400, "a review holds at most 200 comments, 0 left");
+			tileClick(container, 1);
+			await tick();
+			button(container, "Mark 1 OK").click();
+			await vi.waitFor(() =>
+				expect(container.querySelector("[data-bulk-error]")?.textContent).toContain("0 left")
+			);
+			expect(session()?.draft(1)).toBeUndefined();
+			expect(container.querySelector("[data-tile='1']")?.getAttribute("aria-pressed")).toBe("true");
 		});
 
 		const photos = () =>
