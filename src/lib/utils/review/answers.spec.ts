@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewDraft, ReviewQuestion } from "$lib/types/MlReview";
-import { blockers, validateAnswer } from "./answers";
+import { blockers, invalidAnswers, recordStatus, validateAnswer } from "./answers";
 
 const label: ReviewQuestion = {
 	name: "kind",
@@ -87,5 +87,24 @@ describe("blockers", () => {
 
 	it("lets a review with no required question through untouched", () => {
 		expect(blockers({ questions: [rating] }, {}, 50)).toEqual([]);
+	});
+});
+
+describe("partial submits", () => {
+	const schema = { questions: [label, rating] };
+
+	it("keeps only answers that are there and wrong", () => {
+		expect(
+			invalidAnswers(schema, { "0": draft({ kind: "bug", sev: 9 }), "1": draft({}) }, 3)
+		).toEqual([{ record: 0, question: "sev", reason: "must be between 1 and 5" }]);
+	});
+
+	it("counts an answered record missing a required answer as pending", () => {
+		expect(recordStatus(schema, draft({ kind: "bug" }))).toBe("answered");
+		expect(recordStatus(schema, draft({ sev: 3 }))).toBe("pending");
+		expect(recordStatus(schema, draft({}, "skipped"))).toBe("skipped");
+		expect(recordStatus(schema, draft({}, "discarded"))).toBe("discarded");
+		expect(recordStatus(schema, undefined)).toBe("pending");
+		expect(recordStatus({ questions: [] }, draft({}))).toBe("answered");
 	});
 });

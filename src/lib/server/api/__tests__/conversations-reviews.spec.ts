@@ -812,7 +812,7 @@ describe.sequential("submitting", () => {
 		expect(stored).not.toHaveProperty("note");
 		expect(stored?.result?.text).not.toMatch(/verdict|request changes|an older pane/i);
 		expect(stored?.result?.text).toContain(
-			"Records: 0 marked OK, 0 rejected, 0 skipped, 2 not reviewed (of 2).\nThe user looked at the records and left no annotations.\n"
+			"Records: 0 marked OK, 0 rejected, 0 skipped, 2 not finished (of 2).\nThe user looked at the records and left no annotations.\n"
 		);
 		expect(stored?.result?.text?.split("\n").at(-1)).toBe(
 			"Next: summarise for the user what these annotations mean, propose next steps, and ask before anything that costs compute or publishes."
@@ -897,7 +897,7 @@ describe.sequential("submitting", () => {
 		await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }));
 
 		const text = (await collections.mlReviews.findOne({ _id: review._id }))?.result?.text ?? "";
-		expect(text).toContain("Records: 2 marked OK, 1 rejected, 1 skipped, 0 not reviewed (of 4).");
+		expect(text).toContain("Records: 2 marked OK, 1 rejected, 1 skipped, 0 not finished (of 4).");
 		expect(text).toContain("Marked OK: a, c\nRejected: b\n");
 		expect(text).not.toContain("left no annotations");
 		expect(text).not.toContain("Answers:");
@@ -985,19 +985,18 @@ describe.sequential("submitting", () => {
 			expect(drafts["3"].answers.also).toBeUndefined();
 		});
 
-		it("cannot answer a required label for the user, so the blockers still stand", async () => {
+		it("cannot answer a required label for the user, so those records go as not finished", async () => {
 			const { locals } = await createTestUser();
 			const { submit, stored } = await reviewWith(locals, SCHEMA.questions);
-			const res = await SUBMIT(
-				event(locals, (await stored()).conversationId.toString(), (await stored())._id.toString(), {
-					verdict: "approve",
-					approveRest: true,
-				})
+
+			expect((await submit({ approveRest: true })).status).toBe(200);
+
+			const row = await stored();
+			expect(row.status).toBe("submitted");
+			expect(row.result?.text).toContain(
+				"0 answered, 0 skipped, 0 discarded, 4 not finished (of 4)."
 			);
-			expect(res.status).toBe(400);
-			expect((await res.json()).blockers).toHaveLength(4);
-			expect(await stored()).toMatchObject({ status: "detached", drafts: {} });
-			expect((await submit({ verdict: "approve" })).status).toBe(400);
+			expect(row.result?.text).toContain("4 of 4 records not finished: a, b, c, d");
 		});
 
 		it("lets approve all pass the empty-submit guard, and writes nothing when the claim loses", async () => {
@@ -1076,24 +1075,61 @@ describe.sequential("submitting", () => {
 		expect(typeof payload.submitFailed).toBe("string");
 	});
 
-	it("answers 400 with the blockers while a required question is open", async () => {
+	it("submits with a required question open, naming the unfinished records", async () => {
 		const { locals } = await createTestUser();
-		const { conv, review } = await seed(locals);
+		const { conv, review } = await seed(locals, 3);
 		await PATCH(
 			event(locals, conv._id.toString(), review._id.toString(), {
 				index: 0,
 				draft: draft({ kind: "bug" }),
 			})
 		);
-
-		const res = await SUBMIT(
-			event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+		await PATCH(
+			event(locals, conv._id.toString(), review._id.toString(), {
+				index: 1,
+				draft: draft({}, [{ id: "c", body: "unsure" }]),
+			})
 		);
+
+		const res = await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), {}));
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toMatchObject({ ok: true, files: [expect.any(Object)] });
+		const stored = await collections.mlReviews.findOne({ _id: review._id });
+		expect(stored?.status).toBe("submitted");
+		expect(stored?.result?.text).toContain(
+			"Records: 1 answered, 0 skipped, 0 discarded, 2 not finished (of 3)."
+		);
+		expect(stored?.result?.text).toContain("2 of 3 records not finished: gh-2, gh-3");
+		expect(stored?.result?.text).toContain("Those records are missing labels.");
+		const file = await collections.mlFiles.findOne({
+			conversationId: conv._id,
+			name: "reviews/triage-batch-1.responses.jsonl",
+		});
+		expect(
+			file?.content
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line).status)
+		).toEqual(["answered", "pending", "pending"]);
+	});
+
+	it("still refuses an answer that is there but not valid", async () => {
+		const { locals } = await createTestUser();
+		const { conv, review } = await seed(locals);
+		await PATCH(
+			event(locals, conv._id.toString(), review._id.toString(), {
+				index: 0,
+				draft: draft({ kind: "nope" }),
+			})
+		);
+
+		const res = await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), {}));
 
 		expect(res.status).toBe(400);
 		expect(await res.json()).toEqual({
-			message: "Some records still need answers.",
-			blockers: [{ record: 1, question: "kind", reason: "required" }],
+			message: "Some answers are not valid.",
+			blockers: [{ record: 0, question: "kind", reason: '"nope" is not an option (bug, feature)' }],
 		});
 		expect((await collections.mlReviews.findOne({ _id: review._id }))?.status).toBe("open");
 	});
@@ -1131,7 +1167,7 @@ describe.sequential("submitting", () => {
 		expect(body.text).toContain('Review "Triage batch 1" submitted (schema 3f2a91c0).');
 		expect(body.text).toContain('Note from the user: "Mostly fine."');
 		expect(body.text).toContain(
-			"Records: 2 answered, 0 skipped, 0 discarded, 0 not reviewed (of 2)."
+			"Records: 2 answered, 0 skipped, 0 discarded, 0 not finished (of 2)."
 		);
 		expect(body.text).toContain("kind: bug 1, feature 1. Your suggestion matched on 1 of 1.");
 		expect(body.text).toContain("- gh-1 record: dupe of #4");

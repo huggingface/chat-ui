@@ -38,6 +38,7 @@ describe("responseLines", () => {
 		const review = {
 			_id: new ObjectId(),
 			records: [{ id: "clip-12", values: {} }],
+			schema: { questions: [] },
 			schemaHash: "abcd1234",
 			drafts: {
 				"0": {
@@ -125,5 +126,76 @@ describe("reviewResultText size", () => {
 		expect(text).toMatch(/- \d+ more comments are in the responses file/);
 		expect(text).toContain("Answers: too long to repeat here, they are in the responses file");
 		expect(text).toContain("All answers: v-file://reviews/big.responses.jsonl (version 1)");
+	});
+});
+
+describe("reviewResultText unfinished records", () => {
+	const reviewOf = (ids: string[], drafts: Record<string, unknown>) =>
+		({
+			_id: new ObjectId(),
+			schema: {
+				title: "Golden",
+				idField: "id",
+				fields: [],
+				questions: [
+					{
+						name: "kind",
+						type: "label",
+						required: true,
+						options: [{ value: "a" }, { value: "b" }],
+					},
+				],
+				suggestions: "after_answer",
+			},
+			schemaHash: "abcd1234",
+			records: ids.map((id) => ({ id, values: {} })),
+			drafts,
+		}) as unknown as MlReview;
+	const files = [{ name: "reviews/golden.responses.jsonl", version: 1 }];
+	const now = new Date();
+
+	it("names the unfinished records and warns they carry no labels", () => {
+		const review = reviewOf(["r1", "r2", "r3", "r4"], {
+			"0": { status: "answered", answers: { kind: "a" }, comments: [], updatedAt: now },
+			"1": { status: "answered", answers: {}, comments: [], updatedAt: now },
+			"2": { status: "discarded", answers: {}, comments: [], updatedAt: now },
+		});
+
+		const text = reviewResultText(review, {}, files);
+
+		expect(text).toContain("Records: 1 answered, 0 skipped, 1 discarded, 2 not finished (of 4).");
+		expect(text).toContain(
+			"2 of 4 records not finished: r2, r4\nThose records are missing labels. Do not treat them as labelled, for example in a golden or eval set or a training split."
+		);
+		expect(responseLines(review).map((line) => JSON.parse(line).status)).toEqual([
+			"answered",
+			"pending",
+			"discarded",
+			"pending",
+		]);
+	});
+
+	it("points at the responses file when the ids outgrow the budget", () => {
+		const ids = Array.from({ length: 500 }, (_, i) => `${"x".repeat(100)}-${i}`);
+
+		const text = reviewResultText(reviewOf(ids, {}), {}, files);
+
+		expect(text).toContain(
+			'500 of 500 records not finished, their ids are the rows with status "pending" in the responses file'
+		);
+		expect(text).not.toContain(ids[0]);
+		expect(text.length).toBeLessThan(REVIEW_RESULT_BUDGET_CHARS);
+	});
+
+	it("says nothing about unfinished records when every record is settled", () => {
+		const text = reviewResultText(
+			reviewOf(["r1"], {
+				"0": { status: "skipped", answers: {}, comments: [], updatedAt: now },
+			}),
+			{},
+			files
+		);
+		expect(text).not.toContain("not finished:");
+		expect(text).not.toContain("missing labels");
 	});
 });

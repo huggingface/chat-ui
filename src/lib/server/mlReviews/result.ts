@@ -15,7 +15,7 @@ import {
 	MessageUpdateType,
 	type MessageReviewResolvedUpdate,
 } from "$lib/types/MessageUpdate";
-import { isAnswered } from "$lib/utils/review/answers";
+import { isAnswered, recordStatus } from "$lib/utils/review/answers";
 
 /** the submit carries no verdict, so the model reads the annotations and the user decides */
 export const REVIEW_NEXT_STEPS =
@@ -40,7 +40,9 @@ export interface ReviewCounts {
 const draftAt = (review: Pick<MlReview, "drafts">, index: number): ReviewDraft | undefined =>
 	review.drafts[String(index)];
 
-export function reviewCounts(review: Pick<MlReview, "drafts" | "records">): ReviewCounts {
+export function reviewCounts(
+	review: Pick<MlReview, "drafts" | "records" | "schema">
+): ReviewCounts {
 	const counts: ReviewCounts = {
 		total: review.records.length,
 		answered: 0,
@@ -51,15 +53,14 @@ export function reviewCounts(review: Pick<MlReview, "drafts" | "records">): Revi
 	};
 	for (let index = 0; index < review.records.length; index += 1) {
 		const draft = draftAt(review, index);
-		const status = draft?.status ?? "pending";
-		counts[status] += 1;
+		counts[recordStatus(review.schema, draft)] += 1;
 		counts.comments += draft?.comments?.length ?? 0;
 	}
 	return counts;
 }
 
 export function reviewResolvedUpdate(
-	review: Pick<MlReview, "_id" | "drafts" | "records" | "result">
+	review: Pick<MlReview, "_id" | "drafts" | "records" | "result" | "schema">
 ): MessageReviewResolvedUpdate {
 	const counts = reviewCounts(review);
 	return {
@@ -163,7 +164,7 @@ export function responseLines(review: MlReview): string[] {
 		);
 		return JSON.stringify({
 			id: record.id,
-			status: draft?.status ?? "pending",
+			status: recordStatus(review.schema, draft),
 			answers: Object.fromEntries(
 				Object.entries(draft?.answers ?? {}).filter(([, value]) => isAnswered(value))
 			),
@@ -211,8 +212,8 @@ export function reviewResultText(
 		`Review "${review.schema.title}" submitted (schema ${review.schemaHash}).`,
 		...(submission.note ? [`Note from the user: "${submission.note}"`] : []),
 		review.schema.questions.length > 0
-			? `Records: ${counts.answered} answered, ${counts.skipped} skipped, ${counts.discarded} discarded, ${counts.pending} not reviewed (of ${counts.total}).`
-			: `Records: ${counts.answered} marked OK, ${counts.discarded} rejected, ${counts.skipped} skipped, ${counts.pending} not reviewed (of ${counts.total}).`,
+			? `Records: ${counts.answered} answered, ${counts.skipped} skipped, ${counts.discarded} discarded, ${counts.pending} not finished (of ${counts.total}).`
+			: `Records: ${counts.answered} marked OK, ${counts.discarded} rejected, ${counts.skipped} skipped, ${counts.pending} not finished (of ${counts.total}).`,
 	];
 	const answeredAny = Object.values(review.drafts).some((draft) =>
 		Object.values(draft?.answers ?? {}).some(isAnswered)
@@ -224,7 +225,7 @@ export function reviewResultText(
 	if (review.schema.questions.length === 0 && review.records.length <= REVIEW_INLINE_ANSWERS) {
 		const idsWith = (status: ReviewDraft["status"]) =>
 			review.records
-				.filter((_, index) => draftAt(review, index)?.status === status)
+				.filter((_, index) => recordStatus(review.schema, draftAt(review, index)) === status)
 				.map((r) => r.id);
 		const marked = idsWith("answered");
 		const rejected = idsWith("discarded");
@@ -271,18 +272,31 @@ export function reviewResultText(
 				})
 				.filter(Boolean);
 			answers.push(
-				`- ${record.id} (${draft?.status ?? "pending"})${given.length ? `: ${given.join("; ")}` : ""}`
+				`- ${record.id} (${recordStatus(review.schema, draft)})${given.length ? `: ${given.join("; ")}` : ""}`
 			);
 		});
 	}
 
-	// comments are the feedback so they come first, whatever is cut stays in the responses file
 	let budget = REVIEW_RESULT_BUDGET_CHARS;
 	const fits = (line: string) => {
 		if (line.length + 1 > budget) return false;
 		budget -= line.length + 1;
 		return true;
 	};
+	if (counts.pending > 0) {
+		const ids = review.records
+			.filter((_, index) => recordStatus(review.schema, draftAt(review, index)) === "pending")
+			.map((record) => record.id);
+		const listed = `${counts.pending} of ${counts.total} records not finished: ${ids.join(", ")}`;
+		lines.push(
+			fits(listed)
+				? listed
+				: `${counts.pending} of ${counts.total} records not finished, their ids are the rows with status "pending" in the responses file`,
+			"Those records are missing labels. Do not treat them as labelled, for example in a golden or eval set or a training split."
+		);
+	}
+
+	// comments are the feedback so they come before inline answers, whatever is cut stays in the responses file
 	const shown: string[] = [];
 	for (const line of comments) {
 		if (!fits(line)) break;

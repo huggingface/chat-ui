@@ -1,4 +1,9 @@
-import type { ReviewDraft, ReviewQuestion, ReviewSchema } from "$lib/types/MlReview";
+import type {
+	ReviewDraft,
+	ReviewDraftStatus,
+	ReviewQuestion,
+	ReviewSchema,
+} from "$lib/types/MlReview";
 
 const optionValues = (question: { options: { value: string }[] }) =>
 	question.options.map((option) => option.value);
@@ -78,4 +83,21 @@ export function blockers(
 		}
 	}
 	return found;
+}
+
+/** a submit may leave records unfinished, so only an answer that is there and wrong refuses it */
+export const invalidAnswers = (...args: Parameters<typeof blockers>): ReviewBlocker[] =>
+	blockers(...args).filter((found) => found.reason !== "required");
+
+/** an answered record missing a required answer is not finished, whatever status was stored */
+export function recordStatus(
+	schema: Pick<ReviewSchema, "questions">,
+	draft: ReviewDraft | undefined
+): ReviewDraftStatus {
+	const status = draft?.status ?? "pending";
+	if (status !== "answered") return status;
+	const missing = schema.questions.some(
+		(question) => question.required && !isAnswered(draft?.answers?.[question.name])
+	);
+	return missing ? "pending" : status;
 }

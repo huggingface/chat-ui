@@ -6,7 +6,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 	const outcome = await submitReviewRequest(review, await request.json().catch(() => null));
 	if ("blockers" in outcome) {
 		return json(
-			{ message: "Some records still need answers.", blockers: outcome.blockers },
+			{ message: "Some answers are not valid.", blockers: outcome.blockers },
 			{ status: 400 }
 		);
 	}

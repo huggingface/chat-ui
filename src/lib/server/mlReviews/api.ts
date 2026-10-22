@@ -7,7 +7,7 @@ import { logger } from "$lib/server/logger";
 import { kickAnsweredAsk, type AskResumeSelection } from "$lib/server/generation/askResume";
 import type { MlReview, ReviewDraft } from "$lib/types/MlReview";
 import {
-	blockers,
+	invalidAnswers,
 	isAnswered,
 	validateAnswer,
 	type ReviewBlocker,
@@ -497,7 +497,7 @@ export async function submitReviewRequest(review: MlReview, body: unknown): Prom
 
 	const approved = parsed.data.approveRest ? approvalsForRest(review) : {};
 	const drafts = { ...review.drafts, ...approved };
-	const found = blockers(review.schema, drafts, review.records.length);
+	const found = invalidAnswers(review.schema, drafts, review.records.length);
 	if (found.length > 0) return { blockers: found };
 
 	const from = review.status;
