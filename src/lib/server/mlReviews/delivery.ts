@@ -12,6 +12,8 @@ import { acquireLock, releaseLock } from "$lib/migrations/lock";
 /** a live attempt posts in seconds, so this only expires under a process that died */
 const DELIVERY_LEASE_MS = 5 * 60_000;
 const MAX_ATTEMPTS = 5;
+/** the route limits messages per minute, so a refused attempt waits out the window */
+const RATE_LIMIT_BACKOFF_MS = 60_000;
 const SWEEP_BATCH = 5;
 
 export type DeliveryState = "sent" | "queued" | "failed";
@@ -30,7 +32,13 @@ async function claim(reviewId: ObjectId): Promise<MlReview | null> {
 			_id: reviewId,
 			status: "submitted",
 			$or: [
-				{ "delivery.status": "pending" },
+				{
+					"delivery.status": "pending",
+					$or: [
+						{ "delivery.notBefore": { $exists: false } },
+						{ "delivery.notBefore": { $lte: now } },
+					],
+				},
 				{
 					"delivery.status": "sending",
 					"delivery.takenAt": { $lt: new Date(now.getTime() - DELIVERY_LEASE_MS) },
@@ -39,6 +47,7 @@ async function claim(reviewId: ObjectId): Promise<MlReview | null> {
 		},
 		{
 			$set: { "delivery.status": "sending", "delivery.takenAt": now, updatedAt: now },
+			$unset: { "delivery.notBefore": "" },
 			$inc: { "delivery.attempts": 1 },
 		},
 		{ returnDocument: "after" }
@@ -67,7 +76,7 @@ async function markSent(review: MlReview, messageId?: string): Promise<DeliveryS
 
 async function release(
 	review: MlReview,
-	{ error, counted }: { error?: string; counted: boolean }
+	{ error, counted, retryAfterMs }: { error?: string; counted: boolean; retryAfterMs?: number }
 ): Promise<DeliveryState> {
 	const attempts = review.delivery?.attempts ?? 1;
 	const failed = counted && attempts >= MAX_ATTEMPTS;
@@ -75,6 +84,7 @@ async function release(
 		$set: {
 			"delivery.status": failed ? "failed" : "pending",
 			...(error ? { "delivery.error": error } : {}),
+			...(retryAfterMs ? { "delivery.notBefore": new Date(Date.now() + retryAfterMs) } : {}),
 			updatedAt: new Date(),
 		},
 		...(counted ? {} : { $inc: { "delivery.attempts": -1 } }),
@@ -200,7 +210,9 @@ export async function deliverReview(
 			request: new Request("http://review.internal/conversation", { method: "POST", body: data }),
 			locals,
 			params: { id: conv._id.toString() },
-			getClientAddress: () => "review-delivery",
+			// a shared constant would put every user in one ip rate limit bucket
+			getClientAddress: () =>
+				`review:${conv.userId?.toString() ?? conv.sessionId ?? conv._id.toString()}`,
 		});
 		if (!response.ok) throw new Error(`the conversation route answered ${response.status}`);
 		drain(response).catch((err) =>
@@ -219,6 +231,13 @@ export async function deliverReview(
 	} catch (err) {
 		// the turn start is held or the conversation moved on, a later sweep posts it
 		if (isHttpError(err) && err.status === 409) return release(review, { counted: false });
+		if (isHttpError(err) && err.status === 429) {
+			return release(review, {
+				counted: false,
+				error: "rate limited",
+				retryAfterMs: RATE_LIMIT_BACKOFF_MS,
+			});
+		}
 		logger.warn({ err, reviewId: review._id.toString() }, "[review] delivery attempt failed");
 		return release(review, { error: reasonOf(err), counted: true });
 	} finally {
@@ -233,7 +252,13 @@ export async function sweepReviewDeliveries(): Promise<void> {
 		.find(
 			{
 				$or: [
-					{ "delivery.status": "pending" },
+					{
+						"delivery.status": "pending",
+						$or: [
+							{ "delivery.notBefore": { $exists: false } },
+							{ "delivery.notBefore": { $lte: new Date(now) } },
+						],
+					},
 					{
 						"delivery.status": "sending",
 						"delivery.takenAt": { $lt: new Date(now - DELIVERY_LEASE_MS) },

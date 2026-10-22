@@ -136,6 +136,8 @@ export interface ReviewDelivery {
 	status: "pending" | "sending" | "sent" | "failed";
 	attempts: number;
 	takenAt?: Date;
+	/** a rate limited attempt waits until then */
+	notBefore?: Date;
 	/** the run the current attempt asked for, sent only once it exists */
 	generationId?: string;
 	messageId?: string;
