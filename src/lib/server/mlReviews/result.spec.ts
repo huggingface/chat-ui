@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
 import type { MlReview } from "$lib/types/MlReview";
-import { anchorText, clockText, responseLines } from "./result";
+import {
+	REVIEW_RESULT_BUDGET_CHARS,
+	anchorText,
+	clockText,
+	responseLines,
+	reviewResultText,
+} from "./result";
 
 describe("anchorText", () => {
 	it("prints times as m:ss under an hour and h:mm:ss past it", () => {
@@ -68,5 +74,56 @@ describe("responseLines", () => {
 				body: "Logo cut off",
 			},
 		]);
+	});
+});
+
+describe("reviewResultText size", () => {
+	it("keeps comments and inline answers within budget, pointing at the responses file", () => {
+		const now = new Date();
+		const long = "x".repeat(2_000);
+		const review = {
+			_id: new ObjectId(),
+			schema: {
+				title: "Big",
+				idField: "id",
+				fields: [{ name: "body", type: "text" }],
+				questions: Array.from({ length: 20 }, (_, i) => ({
+					name: `q${i}`,
+					type: "text",
+					required: false,
+					maxLength: 4_000,
+				})),
+				suggestions: "shown",
+			},
+			schemaHash: "abcd1234",
+			records: Array.from({ length: 20 }, (_, i) => ({ id: `r${i}`, values: {} })),
+			drafts: Object.fromEntries(
+				Array.from({ length: 20 }, (_, i) => [
+					String(i),
+					{
+						status: "answered",
+						answers: Object.fromEntries(
+							Array.from({ length: 20 }, (_, q) => [`q${q}`, "y".repeat(4_000)])
+						),
+						comments: Array.from({ length: 10 }, (_, c) => ({
+							id: `c${c}`,
+							body: long,
+							createdAt: now,
+						})),
+						updatedAt: now,
+					},
+				])
+			),
+		} as unknown as MlReview;
+
+		const text = reviewResultText(review, {}, [
+			{ name: "reviews/big.responses.jsonl", version: 1 },
+		]);
+
+		expect(text.length).toBeLessThan(REVIEW_RESULT_BUDGET_CHARS + 10_000);
+		expect(text).toContain("Comments (200):");
+		expect(text).toMatch(/- \d+ more comments are in the responses file/);
+		expect(text).toContain("Answers: too long to repeat here, they are in the responses file");
+		expect(text).toContain("All answers: v-file://reviews/big.responses.jsonl (version 1)");
 	});
 });

@@ -21,6 +21,9 @@ import { isAnswered } from "$lib/utils/review/answers";
 export const REVIEW_NEXT_STEPS =
 	"Next: summarise for the user what these annotations mean, propose next steps, and ask before anything that costs compute or publishes.";
 
+/** what comments and inline answers may add to the tool message, which a review row also stores */
+export const REVIEW_RESULT_BUDGET_CHARS = 48_000;
+
 /** at or under this many records the answers go in the tool message too */
 export const REVIEW_INLINE_ANSWERS = 20;
 const QUOTE_CHARS = 80;
@@ -254,10 +257,9 @@ export function reviewResultText(
 			comments.push(`- ${record.id} ${where}${anchorText(comment)}: ${comment.body}`);
 		}
 	});
-	lines.push(`Comments (${comments.length}):`, ...(comments.length ? comments : ["(none)"]));
 
+	const answers: string[] = [];
 	if (review.records.length <= REVIEW_INLINE_ANSWERS && review.schema.questions.length > 0) {
-		lines.push("Answers:");
 		review.records.forEach((record, index) => {
 			const draft = draftAt(review, index);
 			const given = review.schema.questions
@@ -268,10 +270,34 @@ export function reviewResultText(
 						: undefined;
 				})
 				.filter(Boolean);
-			lines.push(
+			answers.push(
 				`- ${record.id} (${draft?.status ?? "pending"})${given.length ? `: ${given.join("; ")}` : ""}`
 			);
 		});
+	}
+
+	// comments are the feedback so they come first, whatever is cut stays in the responses file
+	let budget = REVIEW_RESULT_BUDGET_CHARS;
+	const fits = (line: string) => {
+		if (line.length + 1 > budget) return false;
+		budget -= line.length + 1;
+		return true;
+	};
+	const shown: string[] = [];
+	for (const line of comments) {
+		if (!fits(line)) break;
+		shown.push(line);
+	}
+	lines.push(`Comments (${comments.length}):`, ...(comments.length ? shown : ["(none)"]));
+	if (shown.length < comments.length) {
+		lines.push(`- ${comments.length - shown.length} more comments are in the responses file`);
+	}
+	if (answers.length) {
+		if (answers.reduce((sum, line) => sum + line.length + 1, 0) <= budget) {
+			lines.push("Answers:", ...answers);
+		} else {
+			lines.push("Answers: too long to repeat here, they are in the responses file");
+		}
 	}
 
 	lines.push(

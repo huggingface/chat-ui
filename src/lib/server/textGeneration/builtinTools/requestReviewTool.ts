@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { ObjectId } from "mongodb";
+import { BSON, ObjectId } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
@@ -17,6 +17,7 @@ import { compileRecordValidator } from "$lib/utils/review/records";
 import { reviewSchemaHash } from "$lib/utils/review/hash";
 import {
 	REQUEST_REVIEW_PREPROMPT,
+	REVIEW_MAX_BYTES,
 	REQUEST_REVIEW_TOOL_NAME,
 	requestReviewDefinition,
 } from "./requestReviewDefinition";
@@ -119,6 +120,16 @@ async function requestReview(
 	if (!validated.ok) {
 		return refuse(
 			`the records do not match the declared fields. Fix these and call again:\n${validated.errors.join("\n")}`
+		);
+	}
+
+	// the row also holds up to 8 MiB of drafts, so the records are measured as stored, not as read
+	const storedBytes = BSON.calculateObjectSize({ records: validated.records });
+	if (storedBytes > REVIEW_MAX_BYTES) {
+		return refuse(
+			`the records take ${(storedBytes / 1024 / 1024).toFixed(1)} MB once stored; a review holds at most ${
+				REVIEW_MAX_BYTES / 1024 / 1024
+			} MB. Split them into batches on the same schema`
 		);
 	}
 

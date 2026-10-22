@@ -432,6 +432,23 @@ describe("request_review errors the model can fix", () => {
 		).toContain("pass schema or inline fields and questions, not both");
 	});
 
+	it("measures records as stored, where small json numbers grow several times", async () => {
+		const { run } = setup();
+		const zeros = JSON.stringify({ id: "a", meta: Array.from({ length: 400_000 }, () => 0) });
+		expect(zeros.length).toBeLessThan(1_000_000);
+		vi.mocked(readHubPage).mockResolvedValueOnce(page(zeros));
+
+		const outcome = await run({
+			title: "Wide",
+			source: { hub: "hf://datasets/org/repo/wide.jsonl" },
+			fields: [{ name: "meta", type: "json" }],
+		});
+
+		expect(errorOf(outcome)).toMatch(
+			/the records take \d+\.\d MB once stored; a review holds at most 4 MB/
+		);
+	});
+
 	it("needs exactly one source", async () => {
 		const { run } = setup();
 		expect(
