@@ -1,3 +1,5 @@
+import { WebClient } from "@slack/web-api";
+import { eligibleParticipant } from "./access";
 import { createHash, randomBytes } from "node:crypto";
 import { OIDConfig } from "$lib/server/auth";
 import { base } from "$app/paths";
@@ -36,7 +38,11 @@ export function chatLink(thread: SlackThread): string | undefined {
 	}
 }
 /** Sent ephemerally to the Slack user, never placed in a shared thread or log. */
-export async function createConnectionLink(teamId: string, slackUserId: string): Promise<string> {
+export async function createConnectionLink(
+	teamId: string,
+	slackUserId: string,
+	source?: { userTeamId: string; channel: string }
+): Promise<string> {
 	const token = randomBytes(32).toString("base64url");
 	// Keep outstanding links valid while bounding live tickets per account.
 	await collections.slackLinks.deleteMany({ teamId, slackUserId, expiresAt: { $lte: new Date() } });
@@ -46,6 +52,7 @@ export async function createConnectionLink(teamId: string, slackUserId: string):
 		);
 	await collections.slackLinks.insertOne({
 		_id: hash(token),
+		...source,
 		teamId,
 		slackUserId,
 		expiresAt: new Date(Date.now() + 10 * 60_000),
@@ -78,12 +85,24 @@ export async function connectAccount(
 	if (
 		!slackIdentity ||
 		slackIdentity.expires <= Date.now() ||
-		slackIdentity.team !== ticket.teamId ||
+		slackIdentity.team !== (ticket.userTeamId ?? ticket.teamId) ||
 		slackIdentity.user !== ticket.slackUserId
 	)
 		throw new ConnectionError(
 			"Sign in with the Slack account that requested this connection link."
 		);
+	if (ticket.userTeamId && ticket.userTeamId !== ticket.teamId) {
+		const settings = slackConfig();
+		if (!settings || !ticket.channel) throw new ConnectionError("Shared channel unavailable.");
+		const participant = await eligibleParticipant(
+			new WebClient(settings.botToken),
+			settings,
+			ticket.slackUserId,
+			ticket.channel
+		);
+		if (participant?.team_id !== ticket.userTeamId)
+			throw new ConnectionError("You are no longer a member of this shared channel.");
+	}
 	const session = await collections.sessions.findOne({
 		sessionId,
 		userId: user._id,
@@ -102,6 +121,7 @@ export async function connectAccount(
 		{
 			$set: {
 				verifiedSlackIdentity: true,
+				userTeamId: ticket.userTeamId ?? ticket.teamId,
 				teamId: ticket.teamId,
 				slackUserId: ticket.slackUserId,
 				userId: user._id,

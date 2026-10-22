@@ -1,6 +1,8 @@
 import type { ObjectId } from "mongodb";
 
 export interface SlackConnection {
+	/** Home workspace of the authenticated user; teamId remains the installation. */
+	userTeamId?: string;
 	/** Only set after verified Slack OIDC identity matches the connection ticket. */
 	verifiedSlackIdentity?: boolean;
 	_id: string;
@@ -11,6 +13,8 @@ export interface SlackConnection {
 	updatedAt: Date;
 }
 export interface SlackLink {
+	userTeamId?: string;
+	channel?: string;
 	_id: string;
 	teamId: string;
 	slackUserId: string;

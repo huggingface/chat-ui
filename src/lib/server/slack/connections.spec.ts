@@ -25,7 +25,24 @@ vi.mock("$lib/server/config", async (original) => {
 		}),
 	};
 });
-vi.mock("./config", () => ({ slackConfig: () => ({ teamId: "T123", accountMode: "user" }) }));
+const slackMembership = vi.hoisted(() => ({ members: vi.fn() }));
+vi.mock("@slack/web-api", () => ({
+	WebClient: class {
+		users = { info: async () => ({ user: { id: "UEXT", team_id: "TREMOTE" } }) };
+		conversations = {
+			info: async () => ({ channel: { is_ext_shared: true } }),
+			members: slackMembership.members,
+		};
+	},
+}));
+vi.mock("./config", () => ({
+	slackConfig: () => ({
+		teamId: "T123",
+		accountMode: "user",
+		botToken: "xoxb-test",
+		allowedChannels: [],
+	}),
+}));
 beforeEach(async () => {
 	await ready;
 });
@@ -220,4 +237,35 @@ it("extends active owner sessions and exposes expired continuations without cred
 	const resumed = await rebuildIdentity({ userId: a.user._id, sessionId: linkedSessionId(thread) });
 	expect(resumed.tokenExpired).toBe(true);
 	expect(resumed.locals.token).toBeUndefined();
+});
+
+it("links an external identity to its own HF session only while it belongs to the shared channel", async () => {
+	const a = await account("UEXT");
+	const url = await createConnectionLink("T123", "UEXT", {
+		userTeamId: "TREMOTE",
+		channel: "CSHARED",
+	});
+	const ticket = new URL(url).searchParams.get("ticket") ?? "";
+	const identity = { user: "UEXT", team: "TREMOTE", expires: Date.now() + 60000 };
+	await expect(
+		connectAccount(ticket, a.user, a.session.sessionId, { ...identity, team: "T123" })
+	).rejects.toThrow("Sign in");
+	slackMembership.members.mockResolvedValue({ members: [] });
+	await expect(connectAccount(ticket, a.user, a.session.sessionId, identity)).rejects.toThrow(
+		"no longer a member"
+	);
+	expect(await readConnectionLink(ticket)).not.toBeNull();
+	slackMembership.members.mockResolvedValue({ members: ["UEXT"] });
+	await connectAccount(ticket, a.user, a.session.sessionId, identity);
+	expect(await collections.slackConnections.findOne({ _id: "T123:UEXT" })).toMatchObject({
+		teamId: "T123",
+		userTeamId: "TREMOTE",
+		slackUserId: "UEXT",
+		userId: a.user._id,
+		sessionId: a.session.sessionId,
+		verifiedSlackIdentity: true,
+	});
+	await expect(connectAccount(ticket, a.user, a.session.sessionId, identity)).rejects.toThrow(
+		"expired"
+	);
 });

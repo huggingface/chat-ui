@@ -21,8 +21,8 @@
 	{:else if data.ticket}
 		<p>
 			Connect this account to Slack user {data.slackNames?.displayName} ({data.slackUser}) in
-			workspace {data.slackNames?.workspaceName} ({data.slackTeam}). Only continue if you requested
-			it yourself.
+			workspace {data.slackNames?.workspaceName} ({data.slackTeam}). Your Slack account belongs to
+			workspace {data.slackUserTeam}. Only continue if you requested it yourself.
 		</p>
 		<p>
 			New sessions you start will appear in your HuggingChat history and use your HF permissions and
@@ -32,8 +32,10 @@
 		<p>
 			Only you can issue requests in your personal Slack sessions. Your full HF permissions and
 			inference billing apply, not just the Jobs budget. Your private HuggingChat conversation is
-			accessible only to you unless you share it. Its contents are available read-only in the
-			browser. Continue the session and approve budgets in Slack.
+			accessible only to you unless you share it. The bot can read other participants’ messages and
+			attachments as context. Its public replies and results are visible to everyone in the Slack
+			channel, including external organizations in Slack Connect. Its contents are available
+			read-only in the browser. Continue the session and approve budgets in Slack.
 		</p>
 		<p>
 			The connection uses your current HuggingChat login. If it expires or is revoked, reconnect
