@@ -226,6 +226,8 @@ export interface ReviewPublish {
 	decision?: PublishDecision;
 	/** why nothing was pushed, said in the tool result */
 	reason?: string;
+	/** a detached card written onto its message, which waits for no turn to be saving it */
+	attached?: true;
 	decidedAt?: Date;
 }
 

@@ -46,6 +46,9 @@ const hub = await import("@huggingface/hub");
 const { resumeParkedToolCall } = await import("$lib/server/mcp/resumeElicitation");
 const { submitElicitationAnswer } = await import("$lib/server/mcp/elicitation");
 const { detachOpenReviews } = await import("$lib/server/mlReviews/detach");
+const { sweepHeldPublishCards } = await import("$lib/server/mlReviews/resume");
+const { GET: STATUS } =
+	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/status/+server");
 
 const SCHEMA: ReviewSchema = {
 	title: "Triage batch 1",
@@ -1617,6 +1620,123 @@ describe.sequential("writing labels back", () => {
 			"the user wrote instead of answering the publish card"
 		);
 		expect(hub.commit).not.toHaveBeenCalled();
+	});
+
+	it("keeps a detached card through a running turn's save, and posts after a day unanswered", async () => {
+		deliverReview.mockClear();
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals, "detached");
+		const now = new Date();
+		const message = (id: string, from: "assistant" | "user") =>
+			({
+				id,
+				from,
+				content: "",
+				updates: [],
+				ancestors: [],
+				children: [],
+				createdAt: now,
+				updatedAt: now,
+			}) as never;
+		const snapshot = [
+			message("msg-1", "assistant"),
+			message("msg-2", "user"),
+			message("msg-3", "assistant"),
+		];
+		await collections.conversations.updateOne({ _id: conv._id }, { $set: { messages: snapshot } });
+		await collections.generations.insertOne({
+			_id: new ObjectId(),
+			conversationId: conv._id,
+			messageId: "msg-3",
+			status: "running",
+			startedAt: now,
+		} as never);
+
+		const body = await (
+			await SUBMIT(
+				event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+			)
+		).json();
+		expect(body.publishPromptId).toBeTruthy();
+		// the running turn saves the whole array it loaded before the card existed
+		await collections.conversations.updateOne({ _id: conv._id }, { $set: { messages: snapshot } });
+		const cardOn = async () =>
+			(await collections.conversations.findOne({ _id: conv._id }))?.messages
+				.find((m) => m.id === "msg-1")
+				?.updates?.some(
+					(u) =>
+						u.type === "elicitation" &&
+						"request" in u &&
+						u.request.elicitationId === body.publishPromptId
+				);
+		expect(await cardOn()).toBe(false);
+		expect(
+			(await collections.mlReviews.findOne({ _id: review._id }))?.publish?.attached
+		).toBeUndefined();
+
+		await collections.generations.updateMany(
+			{ conversationId: conv._id },
+			{ $set: { status: "completed" } }
+		);
+		await sweepHeldPublishCards();
+		expect(await cardOn()).toBe(true);
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			publish: { attached: true },
+			delivery: { status: "held" },
+		});
+
+		const fresh = await collections.conversations.findOne({ _id: conv._id });
+		if (!fresh) throw new Error("no conversation");
+		await detachOpenReviews(fresh);
+		expect(await publishRow(conv._id)).toMatchObject({ status: "pending" });
+		expect(deliverReview).not.toHaveBeenCalled();
+
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{ $set: { submittedAt: new Date(Date.now() - 25 * 60 * 60 * 1000) } }
+		);
+		await sweepHeldPublishCards();
+		expect(await publishRow(conv._id)).toMatchObject({ status: "resolved", resolution: "expired" });
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			publish: { decision: "skip", reason: "the publish card was not answered within a day" },
+			delivery: { status: "pending" },
+		});
+		expect(deliverReview).toHaveBeenCalledWith(review._id);
+	});
+
+	it("serves the push and delivery state without records or drafts", async () => {
+		const { locals: owner } = await createTestUser();
+		const { locals: other } = await createTestUser();
+		const { conv, review } = await seed(owner);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{
+				$set: {
+					status: "submitted",
+					push: { status: "pushing", takenAt: new Date() },
+					delivery: { status: "held", attempts: 0 },
+					result: { text: "x".repeat(10_000), files: [{ name: "a.jsonl", version: 1 }] },
+				},
+			}
+		);
+		const payload = superjson.parse<Record<string, unknown>>(
+			await (await STATUS(event(owner, conv._id.toString(), review._id.toString()))).text()
+		);
+		expect(payload).toMatchObject({
+			id: review._id.toString(),
+			status: "submitted",
+			push: { status: "pushing" },
+			delivery: { status: "held" },
+			result: { files: [{ name: "a.jsonl", version: 1 }] },
+		});
+		expect(payload).not.toHaveProperty("records");
+		expect(payload).not.toHaveProperty("drafts");
+		expect(payload).not.toHaveProperty("schema");
+		expect(payload.result).not.toHaveProperty("text");
+		expect(await statusOf(STATUS(event(other, conv._id.toString(), review._id.toString())))).toBe(
+			404
+		);
 	});
 
 	it("holds a detached review's message until its card is answered", async () => {

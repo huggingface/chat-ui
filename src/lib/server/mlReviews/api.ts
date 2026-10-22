@@ -13,7 +13,7 @@ import {
 	type ReviewBlocker,
 } from "$lib/utils/review/answers";
 import { REVIEW_LIMITS } from "$lib/utils/review/schema";
-import { readReview, saveDraft, saveDraftsGuarded, submitReview } from "./store";
+import { readReview, reviewObjectId, saveDraft, saveDraftsGuarded, submitReview } from "./store";
 import { completeSubmission } from "./submission";
 import { deliverReview, type DeliveryState } from "./delivery";
 import { REVIEW_MAX_RECORDS } from "$lib/server/textGeneration/builtinTools/requestReviewDefinition";
@@ -34,6 +34,12 @@ export async function ownedReview(
 	id: string,
 	reviewId: string
 ): Promise<MlReview> {
+	const review = await readReview(await ownedConversation(locals, id), reviewId);
+	if (!review) error(404, "Review not found");
+	return review;
+}
+
+const ownedConversation = async (locals: App.Locals, id: string) => {
 	if (!locals.user?._id && !locals.sessionId) error(401, "Must have a valid session or user");
 	if (id.length === 7 || !ObjectId.isValid(id)) error(404, "Review not found");
 	const conversation = await collections.conversations.findOne(
@@ -41,9 +47,83 @@ export async function ownedReview(
 		{ projection: { _id: 1 } }
 	);
 	if (!conversation) error(404, "Review not found");
-	const review = await readReview(conversation._id, reviewId);
+	return conversation._id;
+};
+
+/** what a poll needs, never the records, drafts or result text a full read carries */
+const STATUS_PROJECTION = {
+	status: 1,
+	"result.files": 1,
+	"result.pushed": 1,
+	destination: 1,
+	declinedDestination: 1,
+	publish: 1,
+	push: 1,
+	delivery: 1,
+	updatedAt: 1,
+} as const;
+
+export type ReviewStatusRow = Pick<
+	MlReview,
+	| "_id"
+	| "status"
+	| "destination"
+	| "declinedDestination"
+	| "publish"
+	| "push"
+	| "delivery"
+	| "updatedAt"
+> & { result?: Pick<NonNullable<MlReview["result"]>, "files" | "pushed"> };
+
+export async function ownedReviewStatus(
+	locals: App.Locals,
+	id: string,
+	reviewId: string
+): Promise<ReviewStatusRow> {
+	const conversationId = await ownedConversation(locals, id);
+	const _id = reviewObjectId(reviewId);
+	const review = _id
+		? await collections.mlReviews.findOne<ReviewStatusRow>(
+				{ _id, conversationId },
+				{ projection: STATUS_PROJECTION }
+			)
+		: null;
 	if (!review) error(404, "Review not found");
 	return review;
+}
+
+const pushPayload = (push: NonNullable<MlReview["push"]>) => ({
+	status: push.status,
+	...(push.url ? { url: push.url } : {}),
+	...(push.path ? { path: push.path } : {}),
+	...(push.pr !== undefined ? { pr: push.pr } : {}),
+	...(push.error ? { error: push.error } : {}),
+});
+
+const deliveryPayload = (delivery: NonNullable<MlReview["delivery"]>) => ({
+	status: delivery.status,
+	...(delivery.messageId ? { messageId: delivery.messageId } : {}),
+});
+
+export function reviewStatusPayload(review: ReviewStatusRow) {
+	return {
+		id: review._id.toString(),
+		status: review.status,
+		...(review.result
+			? {
+					result: {
+						files: review.result.files,
+						...(review.result.pushed ? { pushed: review.result.pushed } : {}),
+					},
+				}
+			: {}),
+		...(review.destination ? { destination: review.destination } : {}),
+		...(review.declinedDestination ? { declinedDestination: review.declinedDestination } : {}),
+		...(review.publish ? { publish: review.publish } : {}),
+		...(review.push ? { push: pushPayload(review.push) } : {}),
+		...(review.delivery ? { delivery: deliveryPayload(review.delivery) } : {}),
+		updatedAt: review.updatedAt,
+	};
 }
 
 export function reviewPayload(review: MlReview) {
@@ -60,25 +140,8 @@ export function reviewPayload(review: MlReview) {
 		...(review.destination ? { destination: review.destination } : {}),
 		...(review.declinedDestination ? { declinedDestination: review.declinedDestination } : {}),
 		...(review.publish ? { publish: review.publish } : {}),
-		...(review.push
-			? {
-					push: {
-						status: review.push.status,
-						...(review.push.url ? { url: review.push.url } : {}),
-						...(review.push.path ? { path: review.push.path } : {}),
-						...(review.push.pr !== undefined ? { pr: review.push.pr } : {}),
-						...(review.push.error ? { error: review.push.error } : {}),
-					},
-				}
-			: {}),
-		...(review.delivery
-			? {
-					delivery: {
-						status: review.delivery.status,
-						...(review.delivery.messageId ? { messageId: review.delivery.messageId } : {}),
-					},
-				}
-			: {}),
+		...(review.push ? { push: pushPayload(review.push) } : {}),
+		...(review.delivery ? { delivery: deliveryPayload(review.delivery) } : {}),
 		createdAt: review.createdAt,
 		updatedAt: review.updatedAt,
 	};

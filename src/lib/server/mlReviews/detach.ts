@@ -125,7 +125,8 @@ async function closePublishPrompts(conv: Pick<Conversation, "_id" | "messages">)
 		.toArray();
 	for (const row of rows) {
 		const pending = row.pending;
-		if (pending?.kind !== "ask" || !pending.publish) continue;
+		// a detached review card sits on an old message and outlives the chat, the sweep closes it
+		if (pending?.kind !== "ask" || !pending.publish || pending.publish.deliver) continue;
 		const now = new Date();
 		const closed = await collections.mcpElicitations.updateOne(
 			{ _id: row._id, status: "pending" },

@@ -19,6 +19,8 @@ import {
 	releaseElicitationResume,
 } from "$lib/server/mcp/elicitation";
 import { resumeParkedToolCall } from "$lib/server/mcp/resumeElicitation";
+import { expireStalePushes } from "$lib/server/mlReviews/destination";
+import { sweepHeldPublishCards } from "$lib/server/mlReviews/resume";
 import { finishStoredSubmissions } from "$lib/server/mlReviews/submission";
 import { sweepReviewDeliveries } from "$lib/server/mlReviews/delivery";
 import {
@@ -590,6 +592,12 @@ export async function settleAnsweredAsks(
 export async function sweepAnsweredAsks(): Promise<void> {
 	await finishStoredSubmissions().catch((err) =>
 		logger.error({ err }, "[review] could not finish stored submissions")
+	);
+	await expireStalePushes().catch((err) =>
+		logger.error({ err }, "[review] could not expire stale label pushes")
+	);
+	await sweepHeldPublishCards().catch((err) =>
+		logger.error({ err }, "[review] could not sweep held publish cards")
 	);
 	await sweepReviewDeliveries().catch((err) =>
 		logger.error({ err }, "[review] could not sweep review deliveries")
