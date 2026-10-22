@@ -64,7 +64,20 @@
 	let needsNext = $derived(
 		!isLast && select !== undefined && (select.multiple || showOther[select.name] === true)
 	);
-	const chosen = (name: string) => picks[name] ?? [];
+	/** a field's default, kept only where it names one of its options, starts out picked */
+	let defaults = $derived(
+		Object.fromEntries(
+			fields.flatMap((f) => {
+				if (f.kind !== "select" || f.default === undefined) return [];
+				const values = new Set(f.options.map((option) => option.value));
+				const picked = (Array.isArray(f.default) ? f.default : [f.default]).filter((value) =>
+					values.has(value)
+				);
+				return picked.length > 0 ? [[f.name, f.multiple ? picked : picked.slice(0, 1)]] : [];
+			})
+		) as Record<string, string[]>
+	);
+	const chosen = (name: string) => picks[name] ?? defaults[name] ?? [];
 
 	function toggle(f: ElicitationField, value: string) {
 		const multiple = f.kind === "select" && f.multiple;
