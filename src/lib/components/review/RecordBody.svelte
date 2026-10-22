@@ -239,6 +239,7 @@
 	<ReviewFieldValue
 		{field}
 		value={record?.values[field.name]}
+		src={field.type === "image" ? session.mediaSrc(index, field.name) : undefined}
 		quotes={quotable(field) ? anchorsFor(field.name) : undefined}
 		onanchors={(ids) => reportAnchors(field.name, ids)}
 		oncomment={quotable(field) && editable
@@ -272,6 +273,7 @@
 			<div class="-mx-8 -mt-7 flex flex-col gap-3" data-field={imageName}>
 				<ImageStage
 					value={record.values[imageName]}
+					src={session.mediaSrc(index, imageName)}
 					comments={imageComments}
 					pending={composer?.field === imageName ? composer.area : undefined}
 					keys={mediaKeys}
@@ -323,6 +325,7 @@
 					<MediaStage
 						kind={field.type}
 						value={record.values[field.name]}
+						src={session.mediaSrc(index, field.name)}
 						comments={fieldComments}
 						pending={composer?.field === field.name ? composer.area : undefined}
 						{editable}

@@ -3,12 +3,13 @@
 
 	interface Props {
 		value: string;
+		src?: string;
 		clamp?: boolean;
 	}
 
-	let { value, clamp = false }: Props = $props();
+	let { value, src: given, clamp = false }: Props = $props();
 
-	let src = $derived(imageUrl(value));
+	let src = $derived(given ?? imageUrl(value));
 	let failed = $state(false);
 </script>
 

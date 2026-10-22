@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ReviewSession } from "$lib/stores/mlReview.svelte";
 	import { canDecide, recordDecision } from "$lib/utils/review/progress";
+	import PushStatus from "./PushStatus.svelte";
 
 	interface Props {
 		session: ReviewSession;
@@ -59,13 +60,25 @@
 			></textarea>
 		</div>
 	{/if}
+	{#if session.payload?.destination}
+		<div class="flex-none border-t border-gray-200 px-4 pt-2.5 dark:border-gray-800">
+			<PushStatus
+				destination={session.payload.destination}
+				audience={session.payload.publish?.audience}
+				planned
+			/>
+		</div>
+	{/if}
 	{#if session.submitError}
 		<p class="m-0 flex-none px-4 pt-2 text-[13px] text-red-600 dark:text-red-400" role="alert">
 			{session.submitError}
 		</p>
 	{/if}
 	<footer
-		class="flex flex-none items-center gap-2 border-t border-gray-200 px-4 py-3 dark:border-gray-800"
+		class={[
+			"flex flex-none items-center gap-2 px-4 py-3",
+			!session.payload?.destination && "border-t border-gray-200 dark:border-gray-800",
+		]}
 		data-review-footer
 	>
 		{#if confirming}
@@ -102,6 +115,11 @@
 				{/if}
 				{#if comments > 0}
 					· {comments} comment{comments === 1 ? "" : "s"}
+				{/if}
+				{#if session.decided === 0 && comments > 0 && decidable}
+					<span class="block truncate text-xs" data-footer-hint>
+						Comments go to the agent when you send. Reject the {noun} that need changing.
+					</span>
 				{/if}
 			</div>
 			{#if blocked}

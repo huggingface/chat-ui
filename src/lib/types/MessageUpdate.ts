@@ -342,4 +342,6 @@ export interface MessageReviewResolvedUpdate {
 	files: MlFileRef[];
 	/** set when the labels were written back to the hub */
 	pushed?: { url: string; pr: boolean };
+	/** set when they were not, `where` is the repo and path they were meant for */
+	pushFailed?: { error: string; where: string };
 }

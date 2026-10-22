@@ -882,6 +882,174 @@ describe("MlReviewPane", () => {
 		});
 	});
 
+	describe("labels pushed to the Hub", () => {
+		const destination = {
+			repo: "pngwn/rocks-labels",
+			type: "dataset" as const,
+			path: "data/rocks.parquet",
+			pr: false,
+		};
+
+		it("refetches a submitted review when the turn ends and links where the labels went", async () => {
+			const review = payload({
+				status: "submitted",
+				destination,
+				drafts: {
+					"0": {
+						status: "answered",
+						answers: { kind: "bug" },
+						comments: [],
+						updatedAt: new Date(),
+					},
+				},
+			});
+			const { container } = await mount(review, { work: false });
+			expect(container.querySelector("[data-push='waiting']")?.textContent).toContain(
+				"pngwn/rocks-labels/data/rocks.parquet"
+			);
+			review.push = {
+				status: "pushed",
+				url: "https://huggingface.co/datasets/pngwn/rocks-labels/commit/abc123",
+				path: "data/rocks.parquet",
+				pr: false,
+			};
+			mlReviews.refreshOpen();
+			await vi.waitFor(() =>
+				expect(container.querySelector("[data-push='pushed'] a")?.getAttribute("href")).toBe(
+					"https://huggingface.co/datasets/pngwn/rocks-labels/commit/abc123"
+				)
+			);
+		});
+
+		it("keeps reading a review whose push is running until it lands", async () => {
+			const review = payload({
+				status: "submitted",
+				destination,
+				push: { status: "pushing" },
+			});
+			const { container } = await mount(review, { work: false });
+			expect(container.querySelector("[data-push='pushing']")).not.toBeNull();
+			review.push = { status: "pushed", url: "https://huggingface.co/x/commit/1", pr: false };
+			await vi.waitFor(
+				() => expect(container.querySelector("[data-push='pushed']")).not.toBeNull(),
+				{ timeout: 5_000 }
+			);
+		});
+
+		it("says the labels were not pushed when the user declined", async () => {
+			const { container } = await mount(
+				payload({ status: "submitted", declinedDestination: destination }),
+				{ work: false }
+			);
+			expect(container.querySelector("[data-push='declined']")?.textContent).toContain(
+				"Labels not pushed to pngwn/rocks-labels/data/rocks.parquet"
+			);
+		});
+
+		const audience = {
+			label: "new private dataset pngwn/rocks-labels",
+			exists: false,
+			canWrite: true,
+		};
+
+		it("shows where the labels could go before sending, and sends no destination", async () => {
+			const { container, session, server } = await mount(
+				payload({ schema: reviewSchema, destination, publish: { audience } })
+			);
+			expect(container.querySelector("[data-push='planned']")?.textContent).toContain(
+				"new private dataset pngwn/rocks-labels"
+			);
+			session()?.decide([0, 1, 2], "approved");
+			await tick();
+			const footer = container.querySelector("[data-review-footer]") as HTMLElement;
+			expect(footer.textContent).not.toContain("without pushing");
+			button(footer, "Send").click();
+			await vi.waitFor(() => expect(server.submits).toHaveLength(1));
+			expect(server.submits[0]).not.toHaveProperty("destination");
+		});
+
+		it("points at the publish question while it waits for an answer", async () => {
+			desktop(false);
+			const { container } = await mount(
+				payload({
+					status: "submitted",
+					destination,
+					publish: { audience, promptId: "p1" },
+				}),
+				{ work: false }
+			);
+			expect(container.querySelector("[data-push='asking']")?.textContent).toContain(
+				"Answer the question in the chat to push labels to new private dataset pngwn/rocks-labels"
+			);
+			(container.querySelector("[data-answer-publish]") as HTMLButtonElement).click();
+			await tick();
+			expect(sidePane.open).toBe(false);
+		});
+
+		it("says why the labels were not pushed after a skip", async () => {
+			const { container } = await mount(
+				payload({
+					status: "submitted",
+					declinedDestination: destination,
+					publish: { audience, promptId: "p1", decision: "skip", reason: "you chose not to push" },
+				}),
+				{ work: false }
+			);
+			expect(container.querySelector("[data-push='declined']")?.textContent).toContain(
+				"Labels not pushed to pngwn/rocks-labels/data/rocks.parquet, you chose not to push"
+			);
+		});
+
+		it("does not read a pushing review while the tab is hidden", async () => {
+			const review = payload({
+				status: "submitted",
+				destination,
+				push: { status: "pushing" },
+			});
+			const { server } = await mount(review, { work: false });
+			const reads = () => server.reads();
+			const before = reads();
+			Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+			try {
+				await sleep(3_500);
+				expect(reads()).toBe(before);
+			} finally {
+				delete (document as { visibilityState?: unknown }).visibilityState;
+			}
+		});
+
+		it("says when the push failed", async () => {
+			const { container } = await mount(
+				payload({
+					status: "submitted",
+					destination,
+					push: { status: "failed", error: "403 from the Hub" },
+				}),
+				{ work: false }
+			);
+			expect(container.querySelector("[data-push='failed']")?.textContent).toContain(
+				"403 from the Hub"
+			);
+		});
+
+		it("loads a media field the server does not store through the media route", async () => {
+			const { container } = await mount(
+				payload({
+					schema: {
+						title: "rocks",
+						idField: "id",
+						fields: [{ name: "image", type: "image" }],
+						questions: [],
+						suggestions: "none",
+					},
+					records: [{ id: "r0", values: {}, media: ["image"], origin: { row: 803 } }],
+				})
+			);
+			const src = container.querySelector("[data-tile='0'] img")?.getAttribute("src");
+			expect(src).toBe(`/api/v2/conversations/${CONVERSATION}/reviews/${REVIEW}/media/0/image`);
+		});
+	});
+
 	describe("pane states", () => {
 		it("shows a review as detached once a turn ends and the server moved it on", async () => {
 			const review = payload();
@@ -1477,6 +1645,25 @@ describe("MlReviewPane", () => {
 			expect(footer.textContent).toContain("2 OK · 1 rejected · 2 to review");
 		});
 
+		it("shows the comments of the selected images", async () => {
+			const { container, session } = await mount(rocks());
+			session()?.addComment(1, { body: "Not a rock, a brick.", field: "image" });
+			await tick();
+			expect(container.querySelector("[data-tile='1'] [title]")?.getAttribute("title")).toBe(
+				"Not a rock, a brick."
+			);
+			tileClick(container, 1);
+			await tick();
+			expect(container.querySelector("[data-selected-comments]")?.textContent).toContain(
+				"Not a rock, a brick."
+			);
+			const footer = () => container.querySelector("[data-review-footer]");
+			await press("Escape");
+			expect(footer()?.querySelector("[data-footer-hint]")?.textContent).toContain(
+				"Reject the images that need changing"
+			);
+		});
+
 		it("sets the yes/no question when the review has one", async () => {
 			const { container, session } = await mount(
 				rocks([{ name: "ok", title: "Label right?", type: "boolean", required: false }])
@@ -1602,6 +1789,57 @@ describe("MlReviewCard", () => {
 		await tick();
 		expect(mlReviews.get(REVIEW)).toBeUndefined();
 		expect(mlReviews.conversationId).toBeUndefined();
+	});
+
+	it("links the pushed labels from a resolved card", async () => {
+		fakeServer(payload());
+		setPage({ params: { id: CONVERSATION } });
+		const { container } = render(MlReviewCard, {
+			request: cardRequest(),
+			conversationId: CONVERSATION,
+			interactive: true,
+			resolved: {
+				type: MessageUpdateType.Review,
+				subtype: MessageReviewUpdateType.Resolved,
+				reviewId: REVIEW,
+				answered: 3,
+				skipped: 0,
+				comments: 0,
+				files: [],
+				pushed: {
+					url: "https://huggingface.co/datasets/pngwn/rocks-labels/discussions/4",
+					pr: true,
+				},
+			},
+		});
+		await tick();
+		const line = container.querySelector("[data-push='pushed']");
+		expect(line?.querySelector("a")?.getAttribute("href")).toContain("/discussions/4");
+		expect(line?.textContent).toContain("as a pull request");
+	});
+
+	it("still says a push failed after the conversation reloads", async () => {
+		fakeServer(payload());
+		setPage({ params: { id: CONVERSATION } });
+		const { container } = render(MlReviewCard, {
+			request: cardRequest(),
+			conversationId: CONVERSATION,
+			interactive: true,
+			resolved: {
+				type: MessageUpdateType.Review,
+				subtype: MessageReviewUpdateType.Resolved,
+				reviewId: REVIEW,
+				answered: 3,
+				skipped: 0,
+				comments: 0,
+				files: [],
+				pushFailed: { error: "403 from the Hub", where: "pngwn/rocks/data/rocks.parquet" },
+			},
+		});
+		await tick();
+		expect(container.querySelector("[data-push='failed']")?.textContent).toContain(
+			"pngwn/rocks/data/rocks.parquet: 403 from the Hub"
+		);
 	});
 
 	it("asks before marking a whole review OK unopened", async () => {

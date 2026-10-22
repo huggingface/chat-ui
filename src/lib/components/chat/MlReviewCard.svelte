@@ -8,6 +8,7 @@
 	} from "$lib/types/MessageUpdate";
 	import { formatFileRef } from "$lib/utils/mlRegistry";
 	import { deliveryLabel } from "$lib/utils/review/view";
+	import PushStatus from "../review/PushStatus.svelte";
 
 	import CarbonArrowRight from "~icons/carbon/arrow-right";
 	import CarbonCheckmarkOutline from "~icons/carbon/checkmark-outline";
@@ -220,6 +221,15 @@
 					{deliveryLabel(payload.delivery.status)}
 				</p>
 			{/if}
+			<PushStatus
+				destination={payload?.destination}
+				push={payload?.push}
+				stale={session?.pushStale}
+				publish={payload?.publish}
+				pushed={resolved?.pushed}
+				failed={resolved?.pushFailed}
+				declined={payload?.declinedDestination}
+			/>
 			<div class="flex flex-wrap items-center gap-2">
 				{#each frozen.files as file (`${file.name}@${file.version}`)}
 					<button
@@ -344,10 +354,18 @@
 
 		{#if confirming}
 			<div
-				class="flex items-center gap-2 rounded-[10px] bg-gray-50 py-2.5 pr-2.5 pl-3.5 dark:bg-gray-800/60"
+				class="flex flex-wrap items-center gap-2 rounded-[10px] bg-gray-50 py-2.5 pr-2.5 pl-3.5 dark:bg-gray-800/60"
+				data-approve-all-confirm
 			>
-				<div class="flex-1 text-[13px] leading-snug text-gray-700 dark:text-gray-300">
+				<div
+					class="flex min-w-0 flex-1 flex-col gap-1 text-[13px] leading-snug text-gray-700 dark:text-gray-300"
+				>
 					Mark all {request.records} OK without opening any? This sends the review.
+					<PushStatus
+						destination={payload?.destination}
+						audience={payload?.publish?.audience}
+						planned
+					/>
 				</div>
 				<button
 					type="button"

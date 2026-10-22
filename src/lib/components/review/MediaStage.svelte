@@ -24,6 +24,8 @@
 	interface Props {
 		kind: MediaFieldType;
 		value: unknown;
+		/** the media route for a value the server does not store */
+		src?: string;
 		comments: ReviewComment[];
 		pending?: ReviewArea;
 		editable: boolean;
@@ -36,6 +38,7 @@
 	let {
 		kind,
 		value,
+		src: given,
 		comments,
 		pending,
 		editable,
@@ -50,7 +53,7 @@
 	const DRAG_PX = 4;
 	const SPEEDS = [0.75, 1, 1.5];
 
-	let src = $derived(typeof value === "string" ? imageUrl(value) : undefined);
+	let src = $derived(given ?? (typeof value === "string" ? imageUrl(value) : undefined));
 
 	let media: HTMLMediaElement | undefined = $state();
 	let frame: HTMLElement | undefined = $state();

@@ -518,5 +518,9 @@ describe("review destinations", () => {
 			"Labels were NOT pushed to org/bucket (labels.parquet): the signed in user cannot write to org/bucket."
 		);
 		expect(result.pushed).toBeUndefined();
+		expect(reviewResolvedUpdate({ ...review, result }).pushFailed).toEqual({
+			error: "the signed in user cannot write to org/bucket",
+			where: "org/bucket/labels.parquet",
+		});
 	});
 });

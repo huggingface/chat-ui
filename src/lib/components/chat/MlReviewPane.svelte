@@ -27,6 +27,7 @@
 	import GridView from "../review/GridView.svelte";
 	import ListView from "../review/ListView.svelte";
 	import ProgressBar, { type BarState } from "../review/ProgressBar.svelte";
+	import PushStatus from "../review/PushStatus.svelte";
 	import QuestionPanel from "../review/QuestionPanel.svelte";
 	import RecordBody from "../review/RecordBody.svelte";
 	import RecordNavigator from "../review/RecordNavigator.svelte";
@@ -548,7 +549,26 @@
 						{deliveryLabel(session.payload.delivery.status)}
 					</span>
 				{/if}
+				<span class="mt-0.5 block">
+					<PushStatus
+						destination={session.payload.destination}
+						publish={session.payload.publish}
+						push={session.payload.push}
+						stale={session.pushStale}
+						declined={session.payload.declinedDestination}
+					/>
+				</span>
 			</div>
+			{#if phone && session.payload.publish?.promptId && !session.payload.publish.decision}
+				<button
+					type="button"
+					class="{plainButton} h-7"
+					data-answer-publish
+					onclick={() => sidePane.close()}
+				>
+					Answer
+				</button>
+			{/if}
 			{#each session.payload.result?.files ?? [] as file (`${file.name}@${file.version}`)}
 				<button
 					type="button"
