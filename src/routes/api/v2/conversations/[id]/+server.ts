@@ -49,7 +49,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 		: undefined;
 
 	const slackThread = !conversation.shared
-		? await collections.slackThreads.findOne({ conversationId: new ObjectId(conversation._id) })
+		? await collections.slackThreads.findOne({ conversationId: conversation.objectId })
 		: null;
 	return superjsonResponse({
 		slackThreadUrl: slackThread
