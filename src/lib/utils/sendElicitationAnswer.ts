@@ -15,7 +15,7 @@ import type {
  * store reads public env at load, and this module is reached from components that render
  * without one.
  */
-async function mcpSelection() {
+export async function mcpSelection() {
 	try {
 		const { enabledServers, mcpServersLoaded } = await import("$lib/stores/mcpServers");
 		if (!get(mcpServersLoaded)) return {};
