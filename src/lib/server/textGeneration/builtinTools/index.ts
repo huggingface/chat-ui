@@ -11,6 +11,7 @@ import { createSandboxTool } from "./sandboxTool";
 import { createJobCheckTool } from "./jobCheckTool";
 import { createTrackioTool } from "./createTrackioTool";
 import { createReadTrackioTool } from "./readTrackioTool";
+import { createWorkflowTool } from "./createWorkflowTool";
 import { createFileTools } from "./fileTools";
 import { createImportFileTool } from "./importFileTool";
 import { createRequestReviewTool } from "./requestReviewTool";
@@ -23,6 +24,7 @@ export { SANDBOX_TOOL_NAME, isSandboxTool } from "./sandboxTool";
 export { JOB_CHECK_TOOL_NAME, isJobCheckTool } from "./jobCheckTool";
 export { CREATE_TRACKIO_TOOL_NAME } from "./createTrackioTool";
 export { READ_TRACKIO_TOOL_NAME } from "./readTrackioTool";
+export { CREATE_WORKFLOW_TOOL_NAME } from "./createWorkflowTool";
 export { WRITE_FILE_TOOL_NAME, EDIT_FILE_TOOL_NAME, READ_FILE_TOOL_NAME } from "./fileTools";
 export { IMPORT_FILE_TOOL_NAME } from "./importFileTool";
 export { REQUEST_REVIEW_TOOL_NAME } from "./requestReviewDefinition";
@@ -61,6 +63,10 @@ export function getEnabledBuiltinTools(params: {
 		createTrackioTool(() => params.namespace),
 		createReadTrackioTool(
 			() => params.conv.messages ?? [],
+			() => params.hfToken
+		),
+		createWorkflowTool(
+			() => params.namespace,
 			() => params.hfToken
 		),
 		...(virtualFiles ? [...createFileTools(params.conv), createImportFileTool(params.conv)] : []),
