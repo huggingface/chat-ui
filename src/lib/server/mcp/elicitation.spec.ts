@@ -747,6 +747,87 @@ describe("submitElicitationAnswer", () => {
 	});
 });
 
+describe("a review row at the generic answer endpoint", () => {
+	const conversationId = new ObjectId();
+
+	const reviewRow = async (closed?: "withdrawn") => {
+		const elicitationId = crypto.randomUUID();
+		const now = new Date();
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			elicitationId,
+			conversationId,
+			...(closed
+				? {
+						status: "resolved",
+						action: "cancel",
+						resolution: "withdrawn",
+						resolvedAt: now,
+						resume: {
+							status: "abandoned",
+							takenAt: now,
+							attempts: 0,
+							abandonedReason: "user wrote instead",
+						},
+					}
+				: { status: "pending" }),
+			request: { elicitationId, source: "assistant", server: "", mode: "form", message: "Batch" },
+			pending: {
+				kind: "review",
+				reviewId: new ObjectId().toString(),
+				messageId: crypto.randomUUID(),
+				toolCallId: "call-1",
+				toolUuid: "tool-1",
+			},
+			createdAt: now,
+			updatedAt: now,
+		});
+		return elicitationId;
+	};
+
+	beforeEach(async () => {
+		await collections.mcpElicitations.deleteMany({ conversationId });
+	});
+
+	it("refuses it, where {} would validate against its empty form", async () => {
+		const elicitationId = await reviewRow();
+
+		const result = await submitElicitationAnswer({
+			elicitationId,
+			conversationId,
+			action: "accept",
+			content: {},
+		});
+
+		expect(result).toEqual({
+			ok: false,
+			status: 409,
+			error: "This is a review; submit it from the review pane.",
+			pendingKind: "review",
+		});
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			status: "pending",
+		});
+	});
+
+	it("cannot answer a withdrawn review back to life", async () => {
+		const elicitationId = await reviewRow("withdrawn");
+		const before = await collections.mcpElicitations.findOne({ elicitationId });
+
+		const result = await submitElicitationAnswer({
+			elicitationId,
+			conversationId,
+			action: "accept",
+			content: {},
+		});
+
+		expect(result).toMatchObject({ ok: false, status: 409 });
+		expect("answered" in result && result.answered).toBeFalsy();
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toEqual(before);
+		expect(await claimElicitationResume(conversationId, elicitationId, "review")).toBeNull();
+	});
+});
+
 describe("claiming an answered prompt's continuation", () => {
 	const conversationId = new ObjectId();
 
@@ -926,6 +1007,21 @@ describe("claiming an answered prompt's continuation", () => {
 
 		expect(await claimElicitationResume(conversationId, mcp, "ask")).toBeNull();
 		expect(await claimElicitationResume(conversationId, mcp)).not.toBeNull();
+	});
+
+	it("can be restricted to reviews", async () => {
+		const review = await answeredRow({
+			pending: {
+				kind: "review",
+				reviewId: new ObjectId().toString(),
+				messageId: "m1",
+				toolCallId: "c1",
+				toolUuid: "u1",
+			},
+		});
+
+		expect(await claimElicitationResume(conversationId, review, "ask")).toBeNull();
+		expect(await claimElicitationResume(conversationId, review, "review")).not.toBeNull();
 	});
 });
 

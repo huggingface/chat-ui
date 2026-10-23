@@ -11,14 +11,13 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 	requireAuth(locals);
 
 	const id = params.id ?? "";
-	// a share snapshot has no runs of its own, and its reader is not the owner
-	if (id.length === 7) error(404, "Conversation not found");
-
 	const conversation = await resolveConversation(id, locals);
+	// a share snapshot has no runs of its own, and its reader is not the owner
+	if (conversation.kind === "share") error(404, "Conversation not found");
 	const runId = params.runId ?? "";
 	if (!ObjectId.isValid(runId) || runId.length !== 24) error(404, "Run not found");
 
-	const run = await readMlAgentRun(new ObjectId(conversation._id), new ObjectId(runId));
+	const run = await readMlAgentRun(conversation.objectId, new ObjectId(runId));
 	if (!run) error(404, "Run not found");
 	return superjsonResponse(toDetail(run));
 };

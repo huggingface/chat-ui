@@ -13,6 +13,7 @@ import { createTrackioTool } from "./createTrackioTool";
 import { createReadTrackioTool } from "./readTrackioTool";
 import { createFileTools } from "./fileTools";
 import { createImportFileTool } from "./importFileTool";
+import { createRequestReviewTool } from "./requestReviewTool";
 import type { BuiltinTool } from "./types";
 
 export type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
@@ -24,6 +25,7 @@ export { CREATE_TRACKIO_TOOL_NAME } from "./createTrackioTool";
 export { READ_TRACKIO_TOOL_NAME } from "./readTrackioTool";
 export { WRITE_FILE_TOOL_NAME, EDIT_FILE_TOOL_NAME, READ_FILE_TOOL_NAME } from "./fileTools";
 export { IMPORT_FILE_TOOL_NAME } from "./importFileTool";
+export { REQUEST_REVIEW_TOOL_NAME } from "./requestReviewDefinition";
 export { isNestedAgentTool } from "./nestedAgent";
 
 /**
@@ -48,6 +50,8 @@ export function getEnabledBuiltinTools(params: {
 	const virtualFiles = mlVirtualFilesEnabled(params.conv);
 	return [
 		askUserQuestionBuiltin,
+		// its records and answers are virtual files, so it goes wherever they go
+		...(virtualFiles ? [createRequestReviewTool(params.conv, () => params.hfToken)] : []),
 		createPlanTool(params.conv),
 		createWaitTool({ serviceEvents: mlServiceEventsEnabled() }),
 		...githubGroundingBuiltins(params.conv._id),

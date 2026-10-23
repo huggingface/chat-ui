@@ -10,6 +10,7 @@ import { MlSlackBot } from "./bot";
 import { connectionKey } from "./connections";
 import { skipSlackQuestion } from "./engine";
 import {
+	ANSWER_ACTION,
 	ANSWER_VIEW,
 	RESUME_ACTION,
 	STOP_ACTION,
@@ -34,6 +35,7 @@ const mocks = vi.hoisted(() => ({
 	open: vi.fn(),
 	kickQueuedTurn: vi.fn(),
 	sideQuestion: vi.fn(),
+	views: vi.fn(),
 }));
 vi.mock("$lib/server/mlSideQuestion", () => ({
 	answerSideQuestion: mocks.sideQuestion,
@@ -78,6 +80,7 @@ vi.mock("@slack/bolt", () => ({
 				open: mocks.open,
 			},
 			chat: { postMessage: mocks.post, postEphemeral: mocks.ephemeral, update: mocks.update },
+			views: { open: mocks.views },
 		};
 		event(name: string, handler: Handler) {
 			mocks.handlers.set(`event:${name}`, handler);
@@ -539,6 +542,77 @@ describe("Slack transport authorization", () => {
 		expect(mocks.update).toHaveBeenCalledTimes(1);
 		expect(mocks.update.mock.calls[0][0].ts).toBe("201.0");
 		expect(await collections.slackDeliveries.countDocuments({ threadId: thread._id })).toBe(2);
+	});
+
+	it("shows an open review as a link to the web, never the question modal", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Sample it", ts: "100.0" },
+			"T123",
+			"REVIEW"
+		);
+		await collections.slackInputs.updateMany({}, { $set: { status: "done" } });
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		const messageId = crypto.randomUUID(),
+			generationId = crypto.randomUUID(),
+			elicitationId = crypto.randomUUID();
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			messages: [
+				{ id: messageId, generationId, from: "assistant", content: "", createdAt: new Date() },
+			],
+		});
+		await collections.turnStates.insertOne({
+			_id: new ObjectId(),
+			conversationId: thread.conversationId,
+			messageId,
+			producerId: generationId,
+			status: "awaiting_input",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			conversationId: thread.conversationId,
+			generationId,
+			elicitationId,
+			status: "pending",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			pending: {
+				kind: "review",
+				reviewId: new ObjectId().toString(),
+				messageId,
+				toolCallId: "c",
+				toolUuid: "u",
+			},
+			request: { elicitationId, source: "assistant", server: "", mode: "form", message: "Rows" },
+		});
+
+		await bot["render"](thread);
+
+		const posted = JSON.stringify(mocks.post.mock.calls);
+		expect(posted).toMatch(
+			new RegExp(`Review waiting, open it on the web: \\S*/conversation/${thread.conversationId}`)
+		);
+		expect(posted).toContain("Waiting for your review");
+		expect(posted).not.toContain(ANSWER_ACTION);
+		expect(posted).not.toContain("Answer questions");
+
+		const handler = mocks.handlers.get(ANSWER_ACTION);
+		if (!handler) throw Error("No answer handler");
+		await handler({
+			ack: vi.fn(),
+			body: { user: { id: "OWNER" }, team: { id: "T123" }, trigger_id: "trigger" },
+			action: { value: JSON.stringify({ threadId: thread._id, elicitationId }) },
+		});
+		expect(mocks.views).not.toHaveBeenCalled();
+		expect(mocks.ephemeral.mock.lastCall?.[0].text).toContain("Reviews are submitted on the web");
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			status: "pending",
+		});
 	});
 
 	it("only lets the owner replace a pending question with a new request", async () => {

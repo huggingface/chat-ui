@@ -9,6 +9,7 @@ import { VIRTUAL_FILES_TOOL_PREPROMPT } from "$lib/server/mlFiles/prompt";
 import { buildToolPreprompt } from "./textGeneration/utils/toolPrompt";
 import { ARTIFACTS_SYSTEM_PROMPT } from "./textGeneration/artifacts";
 import { askUserQuestionBuiltin } from "./textGeneration/builtinTools/askUserQuestion";
+import { REQUEST_REVIEW_PREPROMPT } from "./textGeneration/builtinTools/requestReviewDefinition";
 import type { OpenAiTool } from "$lib/server/mcp/tools";
 
 const tool = (name: string): OpenAiTool =>
@@ -503,6 +504,11 @@ describe("ML Assistant system message size", () => {
 		// 36k to 39k for establishing what the result is for, argued by finished classifiers that
 		// passed their eval and failed in use because they trained on truncated inputs nobody asked
 		// for, hours of compute each, it landed at 38,332
+		//
+		// 39k to 39,500 for request_review, argued by data trained on or pushed before anyone looked
+		// at it and golden sets labelled with the model guesses in view, most of its guidance lives
+		// in the tool description and the preprompt is held to 600 characters below, but main had
+		// already reached 38,983 so even the short form needed the raise, it landed at 39,216
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -512,6 +518,7 @@ describe("ML Assistant system message size", () => {
 					...HF_TOOLS,
 					tool("hf_fs_write"),
 					tool("ask_user_question"),
+					tool("request_review"),
 					tool("update_plan"),
 					tool("github_find_examples"),
 					tool("web_search_exa"),
@@ -519,7 +526,11 @@ describe("ML Assistant system message size", () => {
 					tool("write_file"),
 				],
 				undefined,
-				[askUserQuestionBuiltin, { name: "write_file", preprompt: VIRTUAL_FILES_TOOL_PREPROMPT }],
+				[
+					askUserQuestionBuiltin,
+					{ name: "request_review", preprompt: REQUEST_REVIEW_PREPROMPT },
+					{ name: "write_file", preprompt: VIRTUAL_FILES_TOOL_PREPROMPT },
+				],
 				{ mlAssistant: true }
 			),
 			ML_ASSISTANT_PREPROMPT,
@@ -527,7 +538,16 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(39_000);
+		expect(composed.length).toBeLessThan(39_500);
+	});
+
+	it("keeps the review guidance short, the rest lives in the tool description", () => {
+		expect(REQUEST_REVIEW_PREPROMPT.length).toBeLessThanOrEqual(600);
+		expect(REQUEST_REVIEW_PREPROMPT).toContain('"after_answer"');
+		expect(REQUEST_REVIEW_PREPROMPT).toContain("Over 20 records go in a file");
+		expect(REQUEST_REVIEW_PREPROMPT).toContain("when the user asks to see data");
+		expect(REQUEST_REVIEW_PREPROMPT).toContain("before you train or push");
+		expect(REQUEST_REVIEW_PREPROMPT).toContain("One review per round");
 	});
 });
 

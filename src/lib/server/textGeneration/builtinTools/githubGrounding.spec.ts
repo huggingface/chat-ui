@@ -115,6 +115,7 @@ describe("registration", () => {
 			)
 		).toEqual([
 			"ask_user_question",
+			"request_review",
 			"update_plan",
 			"wait",
 			"github_list_repos",
@@ -144,6 +145,7 @@ describe("registration", () => {
 			)
 		).toEqual([
 			"ask_user_question",
+			"request_review",
 			"update_plan",
 			"wait",
 			"research",

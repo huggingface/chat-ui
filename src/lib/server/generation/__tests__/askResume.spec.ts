@@ -59,6 +59,15 @@ vi.mock("$lib/server/mcp/httpClient", () => ({
 	getMcpToolTimeoutMs: () => 2_000,
 }));
 vi.mock("$lib/server/mcp/clientPool", () => ({ getClient: async () => ({}) }));
+vi.mock("@huggingface/hub", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@huggingface/hub")>()),
+	commit: vi.fn(async () => ({
+		commit: { oid: "abc123", url: "https://huggingface.co/datasets/pngwn/gold/commit/abc123" },
+		hookOutput: "",
+	})),
+	fileExists: vi.fn(async () => false),
+	datasetInfo: vi.fn(async () => ({ sha: "head1" })),
+}));
 vi.mock("$lib/server/logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
@@ -771,5 +780,644 @@ describe("a new message after an answer nothing continued", () => {
 		expect(settlements(settled, elicitationId)).toHaveLength(1);
 		expect(toolResults(settled)).toHaveLength(1);
 		expect(await turnStatus(conv, parked.id)).toBe("done");
+	});
+});
+
+const { POST: SUBMIT_REVIEW } =
+	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/submit/+server");
+const { PATCH: PATCH_REVIEW } =
+	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/+server");
+const { completeSubmission } = await import("$lib/server/mlReviews/submission");
+const { submitReview } = await import("$lib/server/mlReviews/store");
+const { acquireLock, isDBLocked, releaseLock } = await import("$lib/migrations/lock");
+
+const REVIEW: Round = {
+	toolCalls: [
+		{
+			id: "call_review",
+			name: "request_review",
+			arguments: JSON.stringify({
+				title: "Triage batch 1",
+				source: {
+					records: [
+						{ id: "gh-1", body: "Crash on empty prompt" },
+						{ id: "gh-2", body: "Add dark mode" },
+					],
+				},
+				fields: [{ name: "body", type: "text" }],
+				questions: [
+					{
+						name: "kind",
+						type: "label",
+						required: true,
+						options: [{ value: "bug" }, { value: "feature" }],
+					},
+				],
+				suggestions: "after_answer",
+			}),
+		},
+	],
+};
+
+async function parkOnReview(conv: Conversation, locals: App.Locals) {
+	await sendMessage(conv, locals, "Show me the issues to label.");
+	const row = await collections.mcpElicitations.findOne({ conversationId: conv._id });
+	if (row?.pending?.kind !== "review") throw new Error("the turn did not park on a review");
+	expect(row.status).toBe("pending");
+	return { elicitationId: row.elicitationId, reviewId: row.pending.reviewId };
+}
+
+const reviewRoute = async <T>(
+	run: () => Response | Promise<Response>
+): Promise<{ status: number; body: T }> => {
+	try {
+		const response = await run();
+		return { status: response.status, body: (await response.json()) as T };
+	} catch (err) {
+		const status = (err as { status?: unknown } | null)?.status;
+		if (typeof status !== "number") throw err;
+		return { status, body: undefined as T };
+	}
+};
+
+const routeArgs = (conv: Conversation, locals: App.Locals, reviewId: string, body: unknown) => ({
+	request: new Request("http://localhost/review", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(body),
+	}),
+	locals,
+	params: { id: conv._id.toString(), reviewId },
+});
+
+async function labelAll(conv: Conversation, locals: App.Locals, reviewId: string) {
+	for (const [index, kind] of ["bug", "feature"].entries()) {
+		const patched = await reviewRoute(() =>
+			PATCH_REVIEW(
+				routeArgs(conv, locals, reviewId, {
+					index,
+					draft: {
+						status: "answered",
+						answers: { kind },
+						comments:
+							index === 0 ? [{ id: "c1", field: "body", body: "repro needs a stack trace" }] : [],
+					},
+				}) as never
+			)
+		);
+		expect(patched.status).toBe(200);
+	}
+}
+
+const submitOverHttp = (conv: Conversation, locals: App.Locals, reviewId: string) =>
+	reviewRoute<Record<string, unknown>>(() =>
+		SUBMIT_REVIEW(
+			routeArgs(conv, locals, reviewId, {
+				note: "Fix the scraper first.",
+			}) as never
+		)
+	);
+
+async function submitAndDie(conv: Conversation, reviewId: string, elicitationId: string) {
+	const review = await collections.mlReviews.findOne({ conversationId: conv._id });
+	if (!review) throw new Error("no review");
+	const submission = { note: "Fix the scraper first." };
+	expect(await submitReview(review, submission)).toBe(true);
+	const claimed = await collections.mlReviews.findOne({ _id: review._id });
+	if (!claimed) throw new Error("no review");
+	expect((await completeSubmission(claimed)).resolved).toBe(true);
+	expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+		status: "resolved",
+	});
+	expect(reviewId).toBe(review._id.toString());
+}
+
+const reviewResolutions = (message: Message) =>
+	(message.updates ?? []).filter(
+		(u) => u.type === MessageUpdateType.Review && u.subtype === "resolved"
+	);
+
+describe("a submitted review", () => {
+	it("is continued by the server with the result as the tool message, once for two submits", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "On it: fixing the scraper." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		expect(await turnStatus(conv, parked.id)).toBe("awaiting_input");
+		await labelAll(conv, locals, reviewId);
+
+		const [first, second] = await Promise.all([
+			submitOverHttp(conv, locals, reviewId),
+			submitOverHttp(conv, locals, reviewId),
+		]);
+		await turnIs(conv, parked.id, "done");
+
+		// a second submit that reads the review mid claim finishes the same submission instead
+		expect([
+			[200, 200],
+			[200, 409],
+		]).toContainEqual([first.status, second.status].sort());
+		const accepted = [first, second].filter((r) => r.status === 200).map((r) => r.body);
+		for (const body of accepted) {
+			expect(body).toEqual(accepted[0]);
+			expect(body).toMatchObject({ ok: true });
+			expect(body).not.toHaveProperty("delivery");
+		}
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(
+			(await collections.mlReviews.findOne({ _id: new ObjectId(reviewId) }))?.delivery
+		).toBeUndefined();
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain('Review "Triage batch 1" submitted');
+		expect(result).toContain('Note from the user: "Fix the scraper first."');
+		expect(result).toContain("kind: bug 1, feature 1.");
+		expect(result).toContain("- gh-1 body: repro needs a stack trace");
+		expect(result).toContain("v-file://reviews/triage-batch-1.responses.jsonl");
+
+		const message = lastAssistant(await reload(conv));
+		expect(message.id).toBe(parked.id);
+		expect(settlements(message, elicitationId)).toHaveLength(1);
+		expect(toolResults(message)).toHaveLength(1);
+		expect(reviewResolutions(message)).toHaveLength(1);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "resumed", attempts: 1 },
+		});
+	});
+
+	it("is run by the sweep after a holder persisted its resume updates and died", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "On it." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await labelAll(conv, locals, reviewId);
+		await submitAndDie(conv, reviewId, elicitationId);
+		await backdate(elicitationId, 10 * 60_000);
+		const row = await collections.mcpElicitations.findOne({ elicitationId });
+		if (!row) throw new Error("row vanished");
+		const { resumeParkedToolCall } = await import("$lib/server/mcp/resumeElicitation");
+		const delivered = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId,
+			claimed: row,
+		});
+		expect(delivered.updates.map((u) => [u.type, "subtype" in u ? u.subtype : ""])).toEqual([
+			[MessageUpdateType.Review, "resolved"],
+			[MessageUpdateType.Elicitation, MessageElicitationUpdateType.Resolved],
+			[MessageUpdateType.Tool, MessageToolUpdateType.Result],
+		]);
+		await collections.conversations.updateOne({ _id: conv._id, "messages.id": parked.id }, {
+			$push: { "messages.$.updates": { $each: delivered.updates } },
+		} as never);
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId },
+			{
+				$set: {
+					resume: {
+						status: "resuming",
+						attempts: 1,
+						takenAt: new Date(Date.now() - RESUME_LEASE_MS - 1_000),
+					},
+				},
+			}
+		);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, parked.id, "done");
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const message = lastAssistant(await reload(conv));
+		expect(settlements(message, elicitationId)).toHaveLength(1);
+		expect(toolResults(message)).toHaveLength(1);
+		expect(reviewResolutions(message)).toHaveLength(1);
+		expect(message.content).toContain("On it.");
+	});
+
+	it("is settled as the answer when the user sends a message after a submit nothing continued", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Fixing the scraper." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		await labelAll(conv, locals, reviewId);
+		await submitAndDie(conv, reviewId, elicitationId);
+
+		await sendMessage(conv, locals, "Did you see my review?");
+
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain('Review "Triage batch 1" submitted');
+		expect(result).not.toContain("still open");
+		expect((await collections.mlReviews.findOne({ conversationId: conv._id }))?.status).toBe(
+			"submitted"
+		);
+	});
+});
+
+describe("a submit that died right after claiming the submission", () => {
+	async function storeOnly(conv: Conversation) {
+		const review = await collections.mlReviews.findOne({ conversationId: conv._id });
+		if (!review) throw new Error("no review");
+		expect(await submitReview(review, {})).toBe(true);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{ $set: { submittedAt: new Date(Date.now() - 60_000) } }
+		);
+	}
+
+	it("is continued by the sweep", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Thanks, carrying on." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await labelAll(conv, locals, reviewId);
+		await storeOnly(conv);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, parked.id, "done");
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(toolResultsIn(outgoing(1))[0]).toContain('Review "Triage batch 1" submitted');
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resolution: "user",
+			resume: { status: "resumed" },
+		});
+	});
+
+	it("is settled as the answer, not detached, when the user sends a message", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Carrying on." }]);
+		const { reviewId } = await parkOnReview(conv, locals);
+		await labelAll(conv, locals, reviewId);
+		await storeOnly(conv);
+
+		await sendMessage(conv, locals, "Did that go through?");
+
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain('Review "Triage batch 1" submitted');
+		expect(result).not.toContain("still open");
+	});
+});
+
+describe("a review the user wrote past", () => {
+	async function writePast(rounds: Round[]) {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Waiting for your review." }, ...rounds]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await sendMessage(conv, locals, "Hold on, first tell me where the issues came from.");
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		return { conv, locals, elicitationId, reviewId, parked };
+	}
+
+	const postedResults = (conv: Conversation) =>
+		conv.messages.filter(
+			(m) => m.from === "user" && m.content.startsWith('Review "Triage batch 1" submitted')
+		);
+
+	it("is closed as still open and detached, never resumed in place", async () => {
+		const { conv, elicitationId, parked } = await writePast([]);
+
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toBe(
+			'Review "Triage batch 1" is still open: 0 of 2 answered, 0 comments. The user wrote instead; the review stays open and its submission will arrive as a user message.'
+		);
+		expect(await turnStatus(conv, parked.id)).toBe("done");
+		expect((await collections.mlReviews.findOne({ conversationId: conv._id }))?.status).toBe(
+			"detached"
+		);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			status: "resolved",
+			resolution: "withdrawn",
+			resume: { status: "abandoned", abandonedReason: "user wrote instead" },
+		});
+	});
+
+	it("is posted by the server as the user's next message and run, once however often it is submitted", async () => {
+		const { conv, locals, elicitationId, reviewId, parked } = await writePast([
+			{ content: "Thanks, fixing the scraper." },
+		]);
+		await labelAll(conv, locals, reviewId);
+
+		const submitted = await submitOverHttp(conv, locals, reviewId);
+
+		expect(submitted.status).toBe(200);
+		expect(submitted.body).toMatchObject({ ok: true, delivery: "sent" });
+		const after = await reload(conv);
+		await turnIs(conv, lastAssistant(after).id, "done");
+		expect(mocks.create).toHaveBeenCalledTimes(3);
+		const sent = outgoing(2).at(-1);
+		expect(sent?.role).toBe("user");
+		expect(String(sent?.content)).toContain('Review "Triage batch 1" submitted');
+		const fresh = await reload(conv);
+		expect(postedResults(fresh)).toHaveLength(1);
+		expect(lastAssistant(fresh).content).toContain("Thanks, fixing the scraper.");
+		expect(await collections.mlReviews.findOne({ conversationId: conv._id })).toMatchObject({
+			status: "submitted",
+			delivery: { status: "sent", messageId: postedResults(fresh)[0].id },
+		});
+
+		const again = await submitOverHttp(conv, locals, reviewId);
+		expect(again.body).toMatchObject({ ok: true, delivery: "sent" });
+		await backdate(elicitationId, 60_000);
+		await sweepAnsweredAsks();
+		expect(
+			await resumeAnsweredAsk({ conversationId: conv._id, elicitationId, kind: "review" })
+		).toEqual({ outcome: "not_claimed" });
+		expect(mocks.create).toHaveBeenCalledTimes(3);
+		expect(postedResults(await reload(conv))).toHaveLength(1);
+		const settled = (await reload(conv)).messages.find((m) => m.id === parked.id);
+		expect(settled && reviewResolutions(settled)).toHaveLength(0);
+	});
+
+	it("waits while another turn runs, then the sweep posts it", async () => {
+		const { conv, locals, reviewId } = await writePast([{ content: "Thanks." }]);
+		await labelAll(conv, locals, reviewId);
+		const busy = new ObjectId();
+		const now = new Date();
+		await collections.generations.insertOne({
+			_id: busy,
+			generationId: crypto.randomUUID(),
+			conversationId: conv._id,
+			messageId: "other",
+			status: "running",
+			seq: 0,
+			lastHeartbeatAt: now,
+			startedAt: now,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		expect((await submitOverHttp(conv, locals, reviewId)).body).toMatchObject({
+			ok: true,
+			delivery: "queued",
+		});
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(
+			(await collections.mlReviews.findOne({ conversationId: conv._id }))?.delivery
+		).toMatchObject({ status: "pending", attempts: 0 });
+
+		await collections.generations.deleteOne({ _id: busy });
+		await sweepAnsweredAsks();
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		expect(mocks.create).toHaveBeenCalledTimes(3);
+		expect(postedResults(await reload(conv))).toHaveLength(1);
+	});
+
+	it("adopts the message a dead attempt already posted instead of posting it twice", async () => {
+		const { conv, locals, reviewId } = await writePast([{ content: "Thanks." }]);
+		await labelAll(conv, locals, reviewId);
+		await submitOverHttp(conv, locals, reviewId);
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		const posted = postedResults(await reload(conv))[0];
+		await collections.mlReviews.updateOne(
+			{ conversationId: conv._id },
+			{
+				$set: {
+					"delivery.status": "sending",
+					"delivery.takenAt": new Date(Date.now() - 10 * 60_000),
+				},
+				$unset: { "delivery.messageId": "" },
+			}
+		);
+
+		await sweepAnsweredAsks();
+
+		expect(mocks.create).toHaveBeenCalledTimes(3);
+		expect(postedResults(await reload(conv))).toHaveLength(1);
+		expect(
+			(await collections.mlReviews.findOne({ conversationId: conv._id }))?.delivery
+		).toMatchObject({ status: "sent", messageId: posted.id });
+	});
+
+	it("waits for another delivery holding the conversation", async () => {
+		const { conv, locals, reviewId } = await writePast([{ content: "Thanks." }]);
+		await labelAll(conv, locals, reviewId);
+		const key = `review.delivery:${conv._id.toString()}`;
+		const lock = await acquireLock(key);
+		if (!lock) throw new Error("lock not taken");
+
+		expect((await submitOverHttp(conv, locals, reviewId)).body).toMatchObject({
+			ok: true,
+			delivery: "queued",
+		});
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(postedResults(await reload(conv))).toHaveLength(0);
+
+		await releaseLock(key, lock);
+		await sweepAnsweredAsks();
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		expect(mocks.create).toHaveBeenCalledTimes(3);
+		expect(postedResults(await reload(conv))).toHaveLength(1);
+	});
+
+	it("defers, uncounted, while the queue holds the turn start, then posts", async () => {
+		const { conv, locals, reviewId } = await writePast([{ content: "Thanks." }]);
+		await labelAll(conv, locals, reviewId);
+		const key = `queue.drain:${conv._id.toString()}`;
+		const lock = await acquireLock(key);
+		if (!lock) throw new Error("lock not taken");
+
+		expect((await submitOverHttp(conv, locals, reviewId)).body).toMatchObject({
+			ok: true,
+			delivery: "queued",
+		});
+		expect(
+			(await collections.mlReviews.findOne({ conversationId: conv._id }))?.delivery
+		).toMatchObject({ status: "pending", attempts: 0 });
+		expect(postedResults(await reload(conv))).toHaveLength(0);
+
+		await releaseLock(key, lock);
+		await sweepAnsweredAsks();
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		expect(postedResults(await reload(conv))).toHaveLength(1);
+	});
+
+	it("leaves a parked review alone when a send is refused its turn start", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Waiting for your review." }]);
+		const { elicitationId } = await parkOnReview(conv, locals);
+		const key = `queue.drain:${conv._id.toString()}`;
+		const lock = await acquireLock(key);
+		if (!lock) throw new Error("lock not taken");
+
+		await expect(sendMessage(conv, locals, "Hold on.")).rejects.toMatchObject({ status: 409 });
+
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			status: "pending",
+		});
+		expect((await collections.mlReviews.findOne({ conversationId: conv._id }))?.status).toBe(
+			"open"
+		);
+		await releaseLock(key, lock);
+
+		await sendMessage(conv, locals, "Hold on.");
+		expect((await collections.mlReviews.findOne({ conversationId: conv._id }))?.status).toBe(
+			"detached"
+		);
+		expect(await isDBLocked(key)).toBe(false);
+	});
+
+	it("reruns a posted message whose run never started, without posting it again", async () => {
+		const { conv, locals, reviewId } = await writePast([
+			{ content: "Thanks." },
+			{ content: "Thanks, second try." },
+		]);
+		await labelAll(conv, locals, reviewId);
+		await submitOverHttp(conv, locals, reviewId);
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		const posted = postedResults(await reload(conv))[0];
+		await collections.generations.deleteMany({
+			conversationId: conv._id,
+			messageId: { $in: posted.children ?? [] },
+		});
+		await collections.mlReviews.updateOne(
+			{ conversationId: conv._id },
+			{
+				$set: {
+					"delivery.status": "sending",
+					"delivery.takenAt": new Date(Date.now() - 10 * 60_000),
+				},
+			}
+		);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+
+		expect(mocks.create).toHaveBeenCalledTimes(4);
+		const fresh = await reload(conv);
+		expect(postedResults(fresh)).toHaveLength(1);
+		expect(lastAssistant(fresh).content).toContain("Thanks, second try.");
+		const delivery = (await collections.mlReviews.findOne({ conversationId: conv._id }))?.delivery;
+		expect(delivery).toMatchObject({ status: "sent", messageId: posted.id });
+		expect(
+			await collections.generations.countDocuments({ generationId: delivery?.generationId })
+		).toBe(1);
+	});
+});
+
+describe("a submitted review with a destination", () => {
+	const REVIEW_TO_HUB: Round = {
+		toolCalls: (REVIEW.toolCalls ?? []).map((call) => ({
+			...call,
+			arguments: JSON.stringify({
+				...JSON.parse(call.arguments),
+				destination: { repo: "pngwn/gold", path: "data/batch-1.parquet" },
+			}),
+		})),
+	};
+
+	beforeEach(() => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: string | URL) => {
+				const url = String(input);
+				if (url.endsWith("/api/datasets/pngwn/gold")) return Response.json({ private: false });
+				if (url.endsWith("/api/whoami-v2")) {
+					return Response.json({
+						name: "pngwn",
+						orgs: [],
+						auth: { accessToken: { role: "write" } },
+					});
+				}
+				return new Response("not stubbed", { status: 500 });
+			})
+		);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	async function parkOnPublish() {
+		const { conv, locals } = await newConversation();
+		await collections.sessions.updateOne(
+			{ userId: conv.userId },
+			{ $set: { oauth: { token: { value: "hf_owner" } } } as never }
+		);
+		scriptRounds([REVIEW_TO_HUB, { content: "Labels are on the Hub." }]);
+		const { reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await labelAll(conv, locals, reviewId);
+		expect((await submitOverHttp(conv, locals, reviewId)).status).toBe(200);
+		await turnIs(conv, parked.id, "awaiting_input");
+		const card = await collections.mcpElicitations.findOne({
+			conversationId: conv._id,
+			"pending.publish": { $exists: true },
+		});
+		if (!card) throw new Error("the resumed turn did not park on a publish card");
+		return { conv, locals, parked, card };
+	}
+
+	it("parks on the publish card, then the answer pushes and the model runs", async () => {
+		const { commit } = await import("@huggingface/hub");
+		vi.mocked(commit).mockClear();
+		const { conv, locals, parked, card } = await parkOnPublish();
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(commit).not.toHaveBeenCalled();
+		const message = lastAssistant(await reload(conv));
+		expect(
+			message.updates?.some(
+				(u) =>
+					u.type === MessageUpdateType.Elicitation &&
+					u.subtype === MessageElicitationUpdateType.Request &&
+					u.request.elicitationId === card.elicitationId
+			)
+		).toBe(true);
+
+		const answered = await answerOverHttp(conv, locals, card.elicitationId, {
+			action: "accept",
+			content: { publish: "push" },
+		});
+		expect(answered.status).toBe(200);
+		await turnIs(conv, parked.id, "done");
+
+		expect(commit).toHaveBeenCalledTimes(1);
+		expect(vi.mocked(commit).mock.calls[0][0]).toMatchObject({ accessToken: "hf_owner" });
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain("Labels pushed to pngwn/gold (data/batch-1.parquet)");
+	});
+
+	it("takes no ask path when the HTTP endpoint answers a card carrying a budget option", async () => {
+		const { commit } = await import("@huggingface/hub");
+		vi.mocked(commit).mockClear();
+		const { conv, locals, parked, card } = await parkOnPublish();
+		await collections.mcpElicitations.updateOne(
+			{ _id: card._id },
+			{ $set: { "request.fields.0.options.0.setBudgetUsd": 50 } }
+		);
+		const before = (await reload(conv)).mlBudget;
+
+		const answered = await answerOverHttp(conv, locals, card.elicitationId, {
+			action: "accept",
+			content: { publish: "push" },
+		});
+		expect(answered.status).toBe(200);
+		await turnIs(conv, parked.id, "done");
+
+		expect((await reload(conv)).mlBudget).toEqual(before);
+		expect(commit).toHaveBeenCalledTimes(1);
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain("Labels pushed to pngwn/gold (data/batch-1.parquet)");
+		expect(result).not.toContain("The user answered");
+		expect(result).not.toContain("compute budget");
+	});
+
+	it("is pushed by the sweep when the answer's process died", async () => {
+		const { commit } = await import("@huggingface/hub");
+		vi.mocked(commit).mockClear();
+		const { conv, parked, card } = await parkOnPublish();
+		await submitElicitationAnswer({
+			elicitationId: card.elicitationId,
+			conversationId: conv._id,
+			action: "accept",
+			content: { publish: "skip" },
+		});
+		await backdate(card.elicitationId, 60_000);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, parked.id, "done");
+
+		expect(commit).not.toHaveBeenCalled();
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain(
+			"Labels were NOT pushed to pngwn/gold (data/batch-1.parquet): the user chose not to push."
+		);
 	});
 });
