@@ -10,7 +10,7 @@ export const SIDE_PANE_MAX_WIDTH = 2400;
 export const SIDE_PANE_DEFAULT_FRACTION = "60%";
 
 /** Which view owns the pane. One slot, so the views are mutually exclusive. */
-export type SidePaneView = "artifact" | "trackio" | "registry";
+export type SidePaneView = "artifact" | "trackio" | "registry" | "review";
 
 /**
  * UI state for the side pane. Its content is always derived from the
@@ -29,6 +29,7 @@ class SidePaneStore {
 	trackio = $state<{ url: string; label: string; viewUrl?: string } | null>(null);
 	/** the file version the registry view scrolls to and opens */
 	registryFocus = $state<MlFileRef | null>(null);
+	reviewId = $state<string | null>(null);
 	identifier = $state<string | null>(null);
 	/** 1-based version to display; null follows the latest version (including streaming growth) */
 	version = $state<number | null>(null);
@@ -113,6 +114,13 @@ class SidePaneStore {
 		this.revealNonce += 1;
 	}
 
+	openReview(reviewId: string) {
+		this.view = "review";
+		this.reviewId = reviewId;
+		this.open = true;
+		this.revealNonce += 1;
+	}
+
 	selectTab(tab: "preview" | "code") {
 		this.tab = tab;
 		this.userPinnedTab = true;
@@ -145,6 +153,7 @@ class SidePaneStore {
 				view: this.view,
 				trackio: this.trackio,
 				registryFocus: this.registryFocus,
+				reviewId: this.reviewId,
 				identifier: this.identifier,
 				version: this.version,
 				tab: this.tab,
@@ -166,6 +175,7 @@ class SidePaneStore {
 		this.view = next.view;
 		this.trackio = next.trackio;
 		this.registryFocus = next.registryFocus;
+		this.reviewId = next.reviewId;
 		this.identifier = next.identifier;
 		this.version = next.version;
 		this.tab = next.tab;
@@ -181,6 +191,7 @@ class SidePaneStore {
 		this.view = "artifact";
 		this.trackio = null;
 		this.registryFocus = null;
+		this.reviewId = null;
 		this.identifier = null;
 		this.version = null;
 		this.tab = "preview";
@@ -196,6 +207,7 @@ interface SavedPaneState {
 	view: SidePaneView;
 	trackio: SidePaneStore["trackio"];
 	registryFocus: SidePaneStore["registryFocus"];
+	reviewId: string | null;
 	identifier: string | null;
 	version: number | null;
 	tab: "preview" | "code";

@@ -110,6 +110,22 @@ describe("a question from the assistant", () => {
 		expect(sent[0]).toMatchObject({ action: "accept", content: { q1: "Postgres", q2: "Mongo" } });
 	});
 
+	it("starts with the field's default picked, and Send sends it", async () => {
+		const { baseElement } = mount([ask("q1", "Which database?", { default: "Mongo" })]);
+		expect(rowFor(baseElement, "Mongo")?.getAttribute("aria-pressed")).toBe("true");
+		expect(rowFor(baseElement, "Postgres")?.getAttribute("aria-pressed")).toBe("false");
+		button(baseElement, "Send")?.click();
+		await vi.waitFor(() => expect(sent).toHaveLength(1));
+		expect(sent[0]).toMatchObject({ action: "accept", content: { q1: "Mongo" } });
+	});
+
+	it("ignores a default that names no option", () => {
+		const { baseElement } = mount([ask("q1", "Which database?", { default: "Oracle" })]);
+		expect(
+			rows(baseElement).filter((row) => row.getAttribute("aria-pressed") === "true")
+		).toHaveLength(0);
+	});
+
 	it("sends the browser's tool selection with the answer", async () => {
 		// The server continues the turn from this request, so this is the only place the
 		// selection can reach it; custom servers and their headers exist only in the browser.

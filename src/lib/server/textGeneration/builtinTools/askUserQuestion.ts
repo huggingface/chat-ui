@@ -4,6 +4,7 @@ import {
 	openAskPrompt,
 } from "$lib/server/askUserQuestion";
 import { turnAwaitingInput } from "$lib/server/generation/turnState";
+import { askParkRefusal } from "./parkRefusal";
 import type { BuiltinTool } from "./types";
 
 export const askUserQuestionBuiltin: BuiltinTool = {
@@ -18,10 +19,7 @@ export const askUserQuestionBuiltin: BuiltinTool = {
 		`Ask once, then get on with the work using what you are told. ` +
 		`Do not use it for something you can look up, for a choice with an obvious default, or when the user has already said what they want.`,
 	mayPark: true,
-	// One call carries several questions, so say that instead of asking twice.
-	parkRefusalMessage:
-		"Only one ask_user_question call can be answered per turn. " +
-		"Put every question in a single call's `questions` array.",
+	parkRefusalMessage: askParkRefusal,
 	async execute(args, ctx) {
 		const opened = ctx.elicitationSink
 			? await openAskPrompt({

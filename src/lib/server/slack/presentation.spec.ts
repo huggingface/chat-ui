@@ -182,6 +182,19 @@ describe("Inline Slack questions", () => {
 		const sections = blocks.filter((b) => b.type === "section");
 		expect(sections.length).toBeGreaterThanOrEqual(4);
 	});
+	it("pre-selects a field default in the modal and marks its button", () => {
+		const field = question.fields?.[0];
+		if (field?.kind !== "select") throw Error("Bad fixture");
+		const withDefault = { ...question, fields: [{ ...field, allowOther: false, default: "No" }] };
+		const input = questionModal(withDefault, "T:C:1").blocks.find((b) => b.type === "input");
+		expect(input).toMatchObject({ element: { initial_option: { value: "1" } } });
+		const buttons = questionBlocks(withDefault, "T:C:1").filter((b) => b.type === "actions");
+		expect(buttons.at(-1)).toMatchObject({
+			elements: [{ text: { text: "A. Set budget to $5.00" } }, { style: "primary" }],
+		});
+		expect(JSON.stringify(buttons.at(-1)).match(/"style"/g)).toHaveLength(1);
+		expect(JSON.stringify(questionModal(question, "T:C:1"))).not.toContain("initial_option");
+	});
 	it("keeps multi-question and multi-select forms in the modal", () => {
 		expect(
 			inlineField({ ...question, fields: [...(question.fields ?? []), ...(question.fields ?? [])] })

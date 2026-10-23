@@ -8,6 +8,7 @@ import { slackLocals } from "$lib/server/slack/identity";
 import { randomUUID } from "crypto";
 import { MongoInvalidArgumentError, MongoServerError } from "mongodb";
 import { collections } from "$lib/server/database";
+import { expireReview } from "$lib/server/mlReviews/store";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import { onExit } from "$lib/server/exitHandler";
@@ -106,16 +107,18 @@ async function expireUnsavedPrompts(
 					"pending.messageId": park.messageId,
 					status: "pending",
 				},
-				{ projection: { elicitationId: 1 } }
+				{ projection: { elicitationId: 1, pending: 1 } }
 			)
 			.toArray();
-		for (const { _id, elicitationId } of open) {
+		for (const { _id, elicitationId, pending } of open) {
 			const now = new Date();
 			const result = await collections.mcpElicitations.updateOne(
 				{ _id, status: "pending" },
 				{ $set: { expiresAt: now, updatedAt: now } }
 			);
 			if (result.matchedCount === 0) continue;
+			// otherwise the pane gets 409 on submit, then 404 once the ttl removes the row
+			if (pending?.kind === "review") await expireReview(park.conversationId, pending.reviewId);
 			closed.push({
 				type: MessageUpdateType.Elicitation,
 				subtype: MessageElicitationUpdateType.Resolved,

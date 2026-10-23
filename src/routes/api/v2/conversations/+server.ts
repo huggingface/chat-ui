@@ -7,6 +7,7 @@ import { collections } from "$lib/server/database";
 import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
 import { deleteStoredFilesOf } from "$lib/server/files/toolImages";
 import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
+import { deleteMlReviewsOf } from "$lib/server/mlReviews/store";
 import { authCondition } from "$lib/server/auth";
 import type { Conversation } from "$lib/types/Conversation";
 import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
@@ -60,6 +61,7 @@ export const DELETE: RequestHandler = async ({ locals }) => {
 	);
 	const res = await collections.conversations.deleteMany({ _id: { $in: ids } });
 	await deleteMlRegistry(ids);
+	await deleteMlReviewsOf(ids);
 	await deleteMlFilesOf(ids);
 	await deleteStoredFilesOf(ids);
 

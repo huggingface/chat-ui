@@ -3,6 +3,7 @@ import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
 import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
+import { deleteMlReviewsOf } from "$lib/server/mlReviews/store";
 import { validModelIdSchema } from "$lib/server/models";
 import { applyConversationSettings } from "$lib/server/conversationSettings";
 import { ObjectId } from "mongodb";
@@ -26,6 +27,7 @@ export async function DELETE({ locals, params }) {
 	await deleteMlFilesOf([conv._id]);
 	await deleteStoredFilesOf([conv._id]);
 	await deleteMlRegistry([conv._id]);
+	await deleteMlReviewsOf([conv._id]);
 
 	return new Response();
 }
