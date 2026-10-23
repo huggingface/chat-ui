@@ -321,6 +321,55 @@ describe("Slack ML Intern persistence", () => {
 		).toBe(0);
 	});
 
+	it("lets the owner's next message past an open review, which the new turn detaches", async () => {
+		const { thread, user } = await setup();
+		rounds(
+			{
+				toolCalls: [
+					{
+						id: "review",
+						name: "request_review",
+						arguments: JSON.stringify({
+							title: "Sampled rows",
+							source: { records: [{ id: "r1", text: "hello" }] },
+							fields: [{ name: "text", type: "text" }],
+						}),
+					},
+				],
+			},
+			{ content: "Answering the new request." }
+		);
+		await runSlackTurn(thread, user, { text: "Sample the dataset" });
+		const row = await collections.mcpElicitations.findOne({
+			conversationId: thread.conversationId,
+			status: "pending",
+		});
+		if (row?.pending?.kind !== "review") throw new Error("No review");
+
+		expect(await skipSlackQuestion(thread, user, row.pending.messageId, "next")).toBe(true);
+		expect(await collections.mcpElicitations.findOne({ _id: row._id })).toMatchObject({
+			status: "pending",
+		});
+		expect(
+			(await collections.turnStates.findOne({ messageId: row.pending.messageId }))?.status
+		).toBe("awaiting_input");
+
+		await runSlackTurn(thread, user, { text: "Where do these rows come from?" });
+
+		expect(await collections.mcpElicitations.findOne({ _id: row._id })).toMatchObject({
+			resolution: "withdrawn",
+			resume: { status: "abandoned" },
+		});
+		expect(
+			(await collections.mlReviews.findOne({ conversationId: thread.conversationId }))?.status
+		).toBe("detached");
+		expect(JSON.stringify(mocks.create.mock.calls[1][0].messages)).toContain(
+			'Review \\"Sampled rows\\" is still open'
+		);
+		const conv = await collections.conversations.findOne({ _id: thread.conversationId });
+		expect(conv?.messages.at(-1)?.content).toContain("Answering the new request.");
+	});
+
 	it("stops a parked question without starting a continuation", async () => {
 		const { thread, user } = await setup();
 		rounds({

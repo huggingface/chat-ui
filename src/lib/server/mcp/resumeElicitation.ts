@@ -9,6 +9,9 @@ import {
 	MessageToolUpdateType,
 	MessageUpdateType,
 } from "$lib/types/MessageUpdate";
+import { ensureReviewResult, reviewResolvedUpdate } from "$lib/server/mlReviews/result";
+import { readReview } from "$lib/server/mlReviews/store";
+import { REQUEST_REVIEW_TOOL_NAME } from "$lib/server/textGeneration/builtinTools/requestReviewDefinition";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { McpServerConfig } from "./httpClient";
@@ -97,6 +100,36 @@ export async function resumeParkedToolCall({
 					},
 				},
 			],
+		};
+	}
+
+	if (pending.kind === "review") {
+		const review = await readReview(conversationId, pending.reviewId);
+		const submitted =
+			review?.status === "submitted"
+				? { ...review, result: await ensureReviewResult(review) }
+				: undefined;
+		const result: MessageUpdate = {
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Result,
+			uuid: pending.toolUuid,
+			result: {
+				status: ToolResultStatus.Success,
+				call: { name: REQUEST_REVIEW_TOOL_NAME, parameters: {} },
+				outputs: [
+					{
+						text:
+							submitted?.result?.text ??
+							"The review's submission could not be found. Ask the user what they decided.",
+					},
+				] as unknown as Record<string, unknown>[],
+				display: true,
+			},
+		};
+		// ahead of the marker, ranPastAnswer reads anything after it but this result as a past run
+		return {
+			resumed: true,
+			updates: [...(submitted ? [reviewResolvedUpdate(submitted)] : []), settled, result],
 		};
 	}
 

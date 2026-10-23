@@ -207,7 +207,16 @@ export async function skipSlackQuestion(
 		},
 		{ returnDocument: "after" }
 	);
-	if (!result.value) return false;
+	if (!result.value) {
+		// let it through, the new turn detaches the review, a stop would resolve it as aborted
+		const review = await collections.mcpElicitations.findOne({
+			conversationId: thread.conversationId,
+			"pending.kind": "review",
+			"pending.messageId": messageId,
+			status: "pending",
+		});
+		return review !== null;
+	}
 	await stopSlackTurn(thread, user);
 	return true;
 }

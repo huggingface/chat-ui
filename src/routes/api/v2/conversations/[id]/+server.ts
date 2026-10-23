@@ -6,6 +6,7 @@ import { collections } from "$lib/server/database";
 import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
 import { deleteStoredFilesOf } from "$lib/server/files/toolImages";
 import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
+import { deleteMlReviewsOf } from "$lib/server/mlReviews/store";
 import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
 import { validModelIdSchema } from "$lib/server/models";
@@ -90,6 +91,7 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 	await deleteMlFilesOf([new ObjectId(id)]);
 	await deleteStoredFilesOf([new ObjectId(id)]);
 	await deleteMlRegistry([new ObjectId(id)]);
+	await deleteMlReviewsOf([new ObjectId(id)]);
 
 	return superjsonResponse({ success: true });
 };

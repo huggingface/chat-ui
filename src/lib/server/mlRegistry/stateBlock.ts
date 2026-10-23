@@ -6,6 +6,8 @@ import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
 import { VIRTUAL_FILE_SCHEME } from "$lib/server/mlFiles/refs";
 import { listMlFiles } from "$lib/server/mlFiles/store";
+import { listOpenReviews } from "$lib/server/mlReviews/store";
+import { reviewCounts } from "$lib/server/mlReviews/result";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MlArtefact } from "$lib/types/MlArtefact";
 import type { MlFileListing } from "$lib/types/MlFile";
@@ -35,10 +37,19 @@ export function mlStateBlockEnabled(conv: Pick<Conversation, "mlAssistant">): bo
 	return isMlAssistantConversation(conv) && config.ML_ASSISTANT_STATE_BLOCK !== "false";
 }
 
+export interface SessionReview {
+	title: string;
+	answered: number;
+	total: number;
+	/** the user wrote instead, so a later submission arrives as a user message */
+	detached: boolean;
+}
+
 export interface SessionState {
 	services: readonly MlService[];
 	artefacts: readonly MlArtefact[];
 	files: readonly MlFileListing[];
+	reviews?: readonly SessionReview[];
 	now: Date;
 }
 
@@ -185,10 +196,16 @@ function fitSections(
 }
 
 /** pure because the pinned head of the history cap is meant to reuse it */
+const reviewLine = (review: SessionReview) =>
+	`- review "${truncate(review.title, NAME_MAX_CHARS)}": ${review.answered}/${review.total} answered, open${
+		review.detached ? ", its submission will arrive as a user message" : ""
+	}`;
+
 export function renderSessionStateBlock({
 	services,
 	artefacts,
 	files,
+	reviews = [],
 	now,
 }: SessionState): SessionStateBlock | undefined {
 	const open = services
@@ -204,6 +221,7 @@ export function renderSessionStateBlock({
 	};
 	const sections = [
 		{ title: "Running and queued:", rows: open.map((s) => serviceLine(s, now)) },
+		{ title: "Reviews:", rows: reviews.map(reviewLine) },
 		endedSection,
 		{ title: "Created on the Hub:", rows: artefactRows(artefacts) },
 		{
@@ -237,13 +255,27 @@ export async function buildSessionStateBlock(
 	now = new Date()
 ): Promise<SessionStateBlock | undefined> {
 	try {
-		const [services, artefacts, files] = await Promise.all([
+		const virtualFiles = mlVirtualFilesEnabled(conv);
+		const [services, artefacts, files, reviews] = await Promise.all([
 			listMlServices(conv._id),
 			listMlArtefacts(conv._id),
 			// a reference nothing expands would reach the hub as a literal
-			mlVirtualFilesEnabled(conv) ? listMlFiles(conv._id) : [],
+			virtualFiles ? listMlFiles(conv._id) : [],
+			// offered only with virtual files, see getEnabledBuiltinTools
+			virtualFiles ? listOpenReviews(conv._id) : [],
 		]);
-		return renderSessionStateBlock({ services, artefacts, files, now });
+		return renderSessionStateBlock({
+			services,
+			artefacts,
+			files,
+			reviews: reviews.map((review) => ({
+				title: review.schema.title,
+				answered: reviewCounts(review).answered,
+				total: review.records.length,
+				detached: review.status === "detached",
+			})),
+			now,
+		});
 	} catch (err) {
 		logger.warn(
 			{ err: String(err), conversationId: conv._id.toString() },

@@ -79,6 +79,26 @@ describe("renderSessionStateBlock", () => {
 		expect(render({})).toBeUndefined();
 	});
 
+	it("lists open reviews so a resumed turn knows one is still waiting", () => {
+		expect(
+			linesOf(
+				render({
+					reviews: [
+						{ title: "triage batch 1", answered: 12, total: 50, detached: false },
+						{ title: "eval spot check", answered: 3, total: 10, detached: true },
+					],
+					files: [file()],
+				})
+			).slice(1)
+		).toEqual([
+			"Reviews:",
+			'- review "triage batch 1": 12/50 answered, open',
+			'- review "eval spot check": 3/10 answered, open, its submission will arrive as a user message',
+			"Virtual files:",
+			"- v-file://train.py v5 · 3.2 KB",
+		]);
+	});
+
 	it("renders every section with full ids and handles", () => {
 		const block = render({
 			services: [
