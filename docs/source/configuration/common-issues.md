@@ -14,11 +14,31 @@ COOKIE_SECURE=false
 
 This automatically sets `COOKIE_SAMESITE` to `lax`, which is the correct value for HTTP deployments.
 
-Also ensure `PUBLIC_ORIGIN` matches your actual URL:
+Also ensure `PUBLIC_ORIGIN` matches your actual URL (**no trailing slash**):
 
 ```ini
 PUBLIC_ORIGIN=http://localhost:5173
 ```
+
+
+## Favicons / logos use https:// over plain HTTP (Docker)
+
+SvelteKit's **adapter-node** forces `page.url.origin` to `https://` in production unless you set its own `ORIGIN` (or `PROTOCOL_HEADER` / `HOST_HEADER`) env var. `PUBLIC_ORIGIN` alone does **not** change that, so favicons and logos can break when you serve Chat UI over plain HTTP in Docker.
+
+For HTTP Docker deployments, set both (no trailing slash on either):
+
+```ini
+PUBLIC_ORIGIN=http://localhost:3000
+ORIGIN=http://localhost:3000
+COOKIE_SECURE=false
+```
+
+Notes:
+
+- Do **not** leave `ORIGIN=` empty — adapter-node rejects `Invalid ORIGIN: ''`.
+- Prefer setting `ORIGIN` explicitly rather than copying it from `PUBLIC_ORIGIN` automatically: a forced `ORIGIN` also scopes CSRF checks to that host.
+- Alternatively, behind a reverse proxy that injects `X-Forwarded-Proto` / `X-Forwarded-Host`, you can use `PROTOCOL_HEADER` and `HOST_HEADER` as documented by [@sveltejs/adapter-node](https://github.com/sveltejs/kit/tree/main/packages/adapter-node#environment-variables).
+- A trailing slash on `PUBLIC_ORIGIN` (e.g. `http://host:3000/`) produces broken asset URLs like `//chatui/favicon.svg`. Chat UI strips a trailing slash when the config loads.
 
 ## Models not loading
 
