@@ -10,7 +10,6 @@
 		shownFields,
 		type RecordDecision,
 	} from "$lib/utils/review/progress";
-	import { imageUrl } from "$lib/utils/review/view";
 
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonChat from "~icons/carbon/chat";
@@ -18,6 +17,7 @@
 	import CarbonGrid from "~icons/carbon/grid";
 	import CarbonMaximize from "~icons/carbon/maximize";
 	import CarbonSquareOutline from "~icons/carbon/square-outline";
+	import CarbonTrashCan from "~icons/carbon/trash-can";
 
 	interface Props {
 		session: ReviewSession;
@@ -53,6 +53,13 @@
 	let textEl: HTMLTextAreaElement | undefined = $state();
 
 	const commentCount = (index: number) => session.draft(index)?.comments.length ?? 0;
+	let selectedComments = $derived(
+		[...selected]
+			.sort((a, b) => a - b)
+			.flatMap((index) =>
+				(session.draft(index)?.comments ?? []).map((comment) => ({ index, comment }))
+			)
+	);
 	const decisionOf = (index: number): RecordDecision | undefined =>
 		schema ? recordDecision(schema, session.draft(index)) : undefined;
 
@@ -253,15 +260,14 @@
 			Click to select, <kbd class="font-mono">⌘</kbd>/<kbd class="font-mono">Ctrl</kbd> click to
 			add,
 			<kbd class="font-mono">Shift</kbd> click for a range, double-click or
-			<kbd class="font-mono">↵</kbd> to open.
+			<kbd class="font-mono">↵</kbd> to open.{tally.commented > 0
+				? " Select an image to read its comments."
+				: ""}
 		</p>
 	{/if}
 	<div class={["grid gap-x-3.5 gap-y-[18px]", small ? "grid-cols-6" : "grid-cols-4"]}>
 		{#each shown as { record, index } (index)}
-			{@const src =
-				image && typeof record.values[image.name] === "string"
-					? imageUrl(record.values[image.name] as string)
-					: undefined}
+			{@const src = image ? session.mediaSrc(index, image.name) : undefined}
 			{@const on = selected.has(index)}
 			{@const notes = commentCount(index)}
 			{@const decision = decisions[index]}
@@ -313,6 +319,10 @@
 						{#if notes > 0}
 							<span
 								class="absolute top-1.5 right-1.5 flex h-5 items-center gap-[3px] rounded-full bg-amber-200 px-1.5 text-[11px] font-bold text-gray-900"
+								title={session
+									.draft(index)
+									?.comments.map((comment) => comment.body)
+									.join("\n")}
 							>
 								<CarbonChat class="text-[10px]" />{notes}
 							</span>
@@ -359,6 +369,28 @@
 		class="mx-4 mb-3 flex flex-none flex-col gap-2 rounded-xl bg-gray-900 py-2 pr-2 pl-3.5 text-white shadow-[0_6px_20px_rgba(0,0,0,0.18)] dark:bg-gray-100 dark:text-gray-900"
 		data-selection-bar
 	>
+		{#if selectedComments.length > 0}
+			<ul
+				class="m-0 mt-1 mr-1.5 scrollbar-custom flex max-h-32 list-none flex-col gap-1 overflow-y-auto p-0 text-[13px]"
+				aria-label="Comments on the selected images"
+				data-selected-comments
+			>
+				{#each selectedComments as { index, comment } (comment.id)}
+					<li class="group/comment flex items-start gap-2">
+						<span class="flex-none font-mono text-[11px] leading-5 opacity-60">#{index + 1}</span>
+						<span class="min-w-0 flex-1 break-words whitespace-pre-wrap">{comment.body}</span>
+						<button
+							type="button"
+							class="flex-none rounded-sm p-0.5 opacity-0 group-hover/comment:opacity-60 hover:opacity-100 focus:opacity-100"
+							aria-label="Delete comment"
+							onclick={() => session.removeComment(index, comment.id)}
+						>
+							<CarbonTrashCan class="text-xs" />
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
 		{#if bulkError || (composing && room)}
 			<p
 				class="m-0 mt-1 mr-1.5 text-[13px] text-red-300 dark:text-red-700"

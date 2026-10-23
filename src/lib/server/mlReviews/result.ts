@@ -65,7 +65,7 @@ export function reviewCounts(
 }
 
 export function reviewResolvedUpdate(
-	review: Pick<MlReview, "_id" | "drafts" | "records" | "result" | "schema">
+	review: Pick<MlReview, "_id" | "drafts" | "records" | "result" | "schema" | "destination">
 ): MessageReviewResolvedUpdate {
 	const counts = reviewCounts(review);
 	return {
@@ -78,6 +78,14 @@ export function reviewResolvedUpdate(
 		files: review.result?.files ?? [],
 		...(review.result?.pushed
 			? { pushed: { url: review.result.pushed.url, pr: review.result.pushed.pr } }
+			: {}),
+		...(review.result?.pushFailed && review.destination
+			? {
+					pushFailed: {
+						error: review.result.pushFailed.error,
+						where: `${review.destination.repo}/${review.destination.path}`,
+					},
+				}
 			: {}),
 	};
 }
@@ -468,6 +476,9 @@ export async function ensureReviewResult(
 		files,
 		...(push?.status === "pushed" && push.url && push.path
 			? { pushed: { url: push.url, pr: push.pr === true, path: push.path } }
+			: {}),
+		...(push?.status === "failed"
+			? { pushFailed: { error: push.error ?? "the push failed" } }
 			: {}),
 	});
 }

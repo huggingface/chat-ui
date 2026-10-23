@@ -12,6 +12,8 @@
 
 	interface Props {
 		value: unknown;
+		/** the media route for a value the server does not store */
+		src?: string;
 		comments?: ReviewComment[];
 		pending?: ReviewArea;
 		/** absent on a read only review, the stage then offers no area marking */
@@ -20,12 +22,12 @@
 		keys?: boolean;
 	}
 
-	let { value, comments = [], pending, onmark, keys = false }: Props = $props();
+	let { value, src: given, comments = [], pending, onmark, keys = false }: Props = $props();
 
 	const ZOOMS = [1, 1.5, 2, 3];
 	const STAGE_IMAGE_PX = 380;
 
-	let src = $derived(typeof value === "string" ? imageUrl(value) : undefined);
+	let src = $derived(given ?? (typeof value === "string" ? imageUrl(value) : undefined));
 	let zoom = $state(0);
 	let size = $state<{ w: number; h: number } | undefined>(undefined);
 	let failed = $state(false);

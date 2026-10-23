@@ -177,9 +177,10 @@ export function imageUrl(uri: string): string | undefined {
 	)}/${path}`;
 }
 
-export type DeliveryStatus = "pending" | "sending" | "sent" | "failed";
+export type DeliveryStatus = "held" | "pending" | "sending" | "sent" | "failed";
 
 const DELIVERY_LABEL: Record<DeliveryStatus, string> = {
+	held: "Posts as your message once you answer the publish question",
 	pending: "Posts as your message once the current turn ends",
 	sending: "Posting as your message",
 	sent: "Posted as your message",

@@ -295,6 +295,8 @@ export interface MlReview {
 		files: MlFileRef[];
 		/** the commit, pull request or bucket file the labels went to */
 		pushed?: { url: string; pr: boolean; path: string };
+		/** kept on the result so a resolved card can still say the push failed */
+		pushFailed?: { error: string };
 	};
 	/** claimed while the parked call still waited, cleared once its row is answered or closed */
 	unresolved?: true;

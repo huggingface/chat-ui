@@ -6,7 +6,9 @@ import type {
 	ReviewAnswer,
 	ReviewArea,
 	ReviewComment,
+	ReviewDestination,
 	ReviewDraft,
+	ReviewPublish,
 	ReviewQuote,
 	ReviewTime,
 	ReviewRecord,
@@ -14,7 +16,7 @@ import type {
 	ReviewStatus,
 } from "$lib/types/MlReview";
 import { blockers, recordStatus, type ReviewBlocker } from "$lib/utils/review/answers";
-import { draftStatus, mergeDraft } from "$lib/utils/review/view";
+import { draftStatus, imageUrl, mergeDraft, type DeliveryStatus } from "$lib/utils/review/view";
 import { REVIEW_LIMITS } from "$lib/utils/review/schema";
 import {
 	isDecided,
@@ -34,6 +36,12 @@ export const REVIEW_DELIVERY_POLL_MS = 2_000;
 const DELIVERY_FAST_POLLS = 15;
 const DELIVERY_SLOW_POLL_MS = 10_000;
 const DELIVERY_POLL_LIMIT = 90;
+/** a running push polls fast for its first minute, then slowly, each poll reads the whole review */
+const PUSH_POLL_MS = 3_000;
+const PUSH_FAST_POLLS = 20;
+const PUSH_WAIT_POLL_MS = 15_000;
+/** about half an hour, a push still running then has lost its replica and nothing will end it */
+const PUSH_POLL_LIMIT = 130;
 
 const tabHidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
 
@@ -50,9 +58,37 @@ export interface ReviewPayload {
 	note?: string;
 	result?: { text: string; files: MlFileRef[] };
 	/** the server posts a submission the turn had moved past as the user's next message */
-	delivery?: { status: "pending" | "sending" | "sent" | "failed"; messageId?: string };
+	delivery?: { status: DeliveryStatus; messageId?: string };
+	/** where the labels go, pushed after the submit by the resume or the delivery */
+	destination?: ReviewDestination;
+	/** the destination the user chose not to push to, kept after the submit */
+	declinedDestination?: ReviewDestination;
+	/** the publish card that confirms the push after a submit, and its answer */
+	publish?: ReviewPublish;
+	push?: ReviewPushState;
 	createdAt: Date;
 	updatedAt: Date;
+}
+
+/** what the status endpoint answers, everything a poll needs and no records or drafts */
+interface ReviewStatusPayload {
+	id: string;
+	status: ReviewStatus;
+	result?: { files: MlFileRef[]; pushed?: { url: string; pr: boolean; path: string } };
+	destination?: ReviewDestination;
+	declinedDestination?: ReviewDestination;
+	publish?: ReviewPublish;
+	push?: ReviewPushState;
+	delivery?: ReviewPayload["delivery"];
+	updatedAt: Date;
+}
+
+export interface ReviewPushState {
+	status: "pushing" | "pushed" | "failed";
+	url?: string;
+	path?: string;
+	pr?: boolean;
+	error?: string;
 }
 
 export type ReviewLoad = "loading" | "ready" | "missing" | "error";
@@ -196,6 +232,36 @@ export class ReviewSession {
 		return this.drafts[String(index)];
 	}
 
+	/** a detached review's publish card goes onto its message only once no turn is saving it */
+	get publishWaiting(): boolean {
+		const publish = this.payload?.publish;
+		return (
+			!!this.payload?.delivery && !!publish?.promptId && !publish.decision && !publish.attached
+		);
+	}
+
+	/** a turn end brings the push result */
+	get pushPending(): boolean {
+		const payload = this.payload;
+		return (
+			payload?.status === "submitted" &&
+			!!payload.destination &&
+			payload.push?.status !== "pushed" &&
+			payload.push?.status !== "failed"
+		);
+	}
+
+	/** a field with no stored value streams through the media route, which re-signs viewer links */
+	mediaSrc(index: number, field: string): string | undefined {
+		const record = this.payload?.records[index];
+		if (!record) return undefined;
+		if (record.media?.includes(field)) {
+			return `${this.#url}/media/${index}/${encodeURIComponent(field)}`;
+		}
+		const value = record.values[field];
+		return typeof value === "string" ? imageUrl(value) : undefined;
+	}
+
 	async refresh(): Promise<void> {
 		try {
 			const res = await this.#owner.fetcher(this.#url, { headers: { Accept: "application/json" } });
@@ -230,8 +296,42 @@ export class ReviewSession {
 			this.payload = payload;
 			if (payload.note !== undefined) this.note = payload.note;
 			this.load = "ready";
+			this.#watchPush();
 		} catch {
 			if (this.#alive && !this.payload) this.load = "error";
+		}
+	}
+
+	/** the push and delivery state only, a submitted review's records and drafts no longer change */
+	async refreshStatus(): Promise<void> {
+		const current = this.payload;
+		if (!current) return this.refresh();
+		try {
+			const res = await this.#owner.fetcher(`${this.#url}/status`, {
+				headers: { Accept: "application/json" },
+			});
+			if (!this.#alive || !res.ok) return;
+			const next = superjson.parse<ReviewStatusPayload>(await res.text());
+			if (!this.#alive) return;
+			const { destination, declinedDestination, publish, push, delivery } = next;
+			const attachedNow = !!publish?.attached && !current.publish?.attached;
+			this.payload = {
+				...current,
+				status: next.status,
+				destination,
+				declinedDestination,
+				publish,
+				push,
+				delivery,
+				result: next.result
+					? { text: current.result?.text ?? "", ...current.result, ...next.result }
+					: current.result,
+			};
+			// the card renders from the conversation, so it shows once that is read again
+			if (attachedNow) void this.#owner.followConversation();
+			this.#watchPush();
+		} catch {
+			// a missed poll is retried by the next one
 		}
 	}
 
@@ -551,6 +651,48 @@ export class ReviewSession {
 		this.#again.add(index);
 	}
 
+	#pushTimer: ReturnType<typeof setTimeout> | undefined;
+	#pushPolls = 0;
+	/** polling gave up on a push still marked running, the pane says it could not confirm it */
+	pushStale = $state(false);
+
+	/** any load of a review whose push has not landed keeps reading it until the push ends */
+	#watchPush(): void {
+		if (!this.pushPending) {
+			this.#pushPolls = 0;
+			this.pushStale = false;
+		}
+		if (!this.#alive || !this.pushPending || this.#pushTimer) return;
+		// the publish card waits on the user, the answer resumes the turn and its end refreshes this,
+		// one not yet on its message is read slowly until the sweep puts it there
+		const publish = this.payload?.publish;
+		if (publish?.promptId && !publish.decision && !this.publishWaiting) return;
+		const running = this.payload?.push?.status === "pushing";
+		if (this.#pushPolls >= PUSH_POLL_LIMIT) {
+			this.pushStale = running;
+			return;
+		}
+		const wait = running && this.#pushPolls < PUSH_FAST_POLLS ? PUSH_POLL_MS : PUSH_WAIT_POLL_MS;
+		this.#pushTimer = setTimeout(() => {
+			this.#pushTimer = undefined;
+			if (!this.#alive) return;
+			// a hidden tab waits without fetching, and reads it again once it is shown
+			if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+				this.#watchPush();
+				return;
+			}
+			this.#pushPolls += 1;
+			void this.refreshStatus();
+		}, wait);
+	}
+
+	/** a turn end may have started the push, so the poll budget starts over */
+	rewatchPush(): void {
+		this.#pushPolls = 0;
+		this.pushStale = false;
+		void this.refreshStatus();
+	}
+
 	/** the posted message and its run reach the page once the conversation reloads */
 	#followDelivery(attempt = 0) {
 		const wait = attempt < DELIVERY_FAST_POLLS ? REVIEW_DELIVERY_POLL_MS : DELIVERY_SLOW_POLL_MS;
@@ -558,7 +700,7 @@ export class ReviewSession {
 			if (!this.#alive) return;
 			// a hidden tab waits without fetching, the posted message reaches it once it is shown
 			if (tabHidden()) return this.#followDelivery(attempt);
-			await this.refresh();
+			await this.refreshStatus();
 			const status = this.payload?.delivery?.status;
 			if (status === "sent") void this.#owner.followConversation();
 			else if (status !== "failed" && attempt + 1 < DELIVERY_POLL_LIMIT) {
@@ -658,10 +800,11 @@ export class MlReviewsStore {
 		this.conversationId = conversationId;
 	}
 
-	/** a turn that ended may have detached or expired a review this tab still shows as open */
+	/** a turn end can detach or expire an open review or push a submitted one */
 	refreshOpen(): void {
 		for (const session of this.#sessions.values()) {
 			if (session.payload?.status === "open") void session.refresh();
+			else if (session.pushPending) session.rewatchPush();
 		}
 	}
 

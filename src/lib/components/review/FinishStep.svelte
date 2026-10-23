@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ReviewSession } from "$lib/stores/mlReview.svelte";
 	import { anchorLabel } from "$lib/utils/review/anchors";
+	import PushStatus from "./PushStatus.svelte";
 	import { headingField, plainText } from "$lib/utils/review/progress";
 
 	import CarbonWarning from "~icons/carbon/warning-alt";
@@ -299,7 +300,14 @@
 <footer
 	class="flex flex-none items-center gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-800"
 >
-	<div class="flex-1 text-[13px] text-gray-500 dark:text-gray-400" data-send-reason>{reason}</div>
+	<div class="flex min-w-0 flex-1 flex-col gap-1">
+		<div class="text-[13px] text-gray-500 dark:text-gray-400" data-send-reason>{reason}</div>
+		<PushStatus
+			destination={session.payload?.destination}
+			audience={session.payload?.publish?.audience}
+			planned
+		/>
+	</div>
 	<button
 		type="button"
 		class="h-9 rounded-lg bg-gray-900 px-4 text-[13px] font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
