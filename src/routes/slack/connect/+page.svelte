@@ -27,7 +27,8 @@
 		<p>
 			New sessions you start will appear in your HuggingChat history and use your HF permissions and
 			current billing settings. Inference may incur charges; compute jobs still require an explicit
-			session budget.
+			session budget. Your enabled HuggingChat MCP servers are also available to ML Intern;
+			information returned by those tools may be posted in the Slack thread.
 		</p>
 		<p>
 			Only you can issue requests in your personal Slack sessions. Your full HF permissions and

@@ -10,6 +10,7 @@
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { setHapticsEnabled } from "$lib/utils/haptics";
+	import { syncMcpSelection } from "$lib/stores/mcpSelectionSync";
 	import { initWithServers } from "$lib/stores/mcpServers";
 
 	import Toast from "$lib/components/Toast.svelte";
@@ -135,6 +136,10 @@
 	});
 
 	const settings = createSettingsStore(data.settings);
+
+	$effect(() => {
+		if (browser && data.user?.id) return syncMcpSelection(data.user.id);
+	});
 
 	$effect(() => {
 		setHapticsEnabled($settings.hapticsEnabled);
