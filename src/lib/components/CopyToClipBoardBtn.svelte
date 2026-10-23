@@ -11,6 +11,8 @@
 		value: string;
 		children?: import("svelte").Snippet;
 		onClick?: () => void;
+		onCopied?: () => void;
+		onCopyError?: (err: unknown) => void;
 		showTooltip?: boolean;
 	}
 
@@ -20,6 +22,8 @@
 		value,
 		children,
 		onClick,
+		onCopied,
+		onCopyError,
 		showTooltip = true,
 	}: Props = $props();
 
@@ -37,10 +41,10 @@
 		document.body.appendChild(textArea);
 		textArea.focus({ preventScroll: true });
 		textArea.select();
-		document.execCommand("copy");
+		const copied = document.execCommand("copy");
 		document.body.removeChild(textArea);
 
-		return Promise.resolve();
+		return copied ? Promise.resolve() : Promise.reject(new Error("execCommand copy failed"));
 	};
 
 	const copy = async (text: string) => {
@@ -54,6 +58,7 @@
 		try {
 			await copy(value);
 			hapticConfirm();
+			onCopied?.();
 
 			isSuccess = true;
 			if (timeout) {
@@ -64,6 +69,7 @@
 			}, 1000);
 		} catch (err) {
 			console.error(err);
+			onCopyError?.(err);
 		}
 	};
 
