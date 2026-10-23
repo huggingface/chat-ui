@@ -239,8 +239,8 @@ function parse(args: Record<string, unknown>, sessionNamespace?: string): Plan |
 	const slug = title
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.slice(0, 80);
+		.slice(0, 80)
+		.replace(/^-+|-+$/g, "");
 	return {
 		shape: args.shape,
 		steps,

@@ -180,6 +180,12 @@ describe("create_workflow", () => {
 		expect(hub.uploadFiles).toHaveBeenCalledOnce();
 	});
 
+	it("never leaves a `--` where a long name is cut", async () => {
+		await tool().execute({ ...compare, name: `${"a".repeat(79)} b` }, ctx);
+
+		expect(hub.createRepo.mock.calls[0][0].repo.name).toBe(`pngwn/${"a".repeat(79)}-workflow`);
+	});
+
 	it.each([
 		[{ ...compare, models: ["krea/Krea-2-Turbo"] }, "gr.Interface"],
 		[{ ...compare, models: ["krea/Krea-2-Turbo", "nobody/missing"] }, "does not resolve"],

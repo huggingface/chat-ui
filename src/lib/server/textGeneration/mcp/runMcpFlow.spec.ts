@@ -745,6 +745,7 @@ describe("runMcpFlow offering the question tool", () => {
 			"check_job",
 			"create_trackio",
 			"read_trackio",
+			"create_workflow",
 			"write_file",
 			"edit_file",
 			"read_file",
