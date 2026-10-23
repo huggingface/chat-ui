@@ -10,7 +10,8 @@ import type { User } from "$lib/types/User";
 import type { ViewerIdentity } from "./viewer/auth";
 import { slackConfig } from "./config";
 
-export const connectionKey = (team: string, user: string) => `${team}:${user}`;
+export const connectionKey = (team: string, user: string, homeTeam = team) =>
+	homeTeam === team ? `${team}:${user}` : `${team}:${homeTeam}:${user}`;
 
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 export function chatOrigin(): string {
@@ -95,7 +96,7 @@ export async function connectAccount(
 		const settings = slackConfig();
 		if (!settings || !ticket.channel) throw new ConnectionError("Shared channel unavailable.");
 		const participant = await eligibleParticipant(
-			new WebClient(settings.botToken),
+			new WebClient(settings.botToken, { retryConfig: { retries: 0 }, timeout: 10000 }),
 			settings,
 			ticket.slackUserId,
 			ticket.channel
@@ -117,7 +118,7 @@ export async function connectAccount(
 	});
 	if (!consumed.deletedCount) throw new ConnectionError("This connection link was already used.");
 	await collections.slackConnections.updateOne(
-		{ _id: connectionKey(ticket.teamId, ticket.slackUserId) },
+		{ _id: connectionKey(ticket.teamId, ticket.slackUserId, ticket.userTeamId) },
 		{
 			$set: {
 				verifiedSlackIdentity: true,

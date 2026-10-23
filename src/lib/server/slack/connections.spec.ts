@@ -28,7 +28,11 @@ vi.mock("$lib/server/config", async (original) => {
 const slackMembership = vi.hoisted(() => ({ members: vi.fn() }));
 vi.mock("@slack/web-api", () => ({
 	WebClient: class {
-		users = { info: async () => ({ user: { id: "UEXT", team_id: "TREMOTE" } }) };
+		users = {
+			info: async () => ({
+				user: { id: "UEXT", team_id: "TREMOTE", is_restricted: false, is_ultra_restricted: false },
+			}),
+		};
 		conversations = {
 			info: async () => ({ channel: { is_ext_shared: true } }),
 			members: slackMembership.members,
@@ -241,6 +245,12 @@ it("extends active owner sessions and exposes expired continuations without cred
 
 it("links an external identity to its own HF session only while it belongs to the shared channel", async () => {
 	const a = await account("UEXT");
+	const internal = await account("UEXT");
+	await connectAccount(internal.ticket, internal.user, internal.session.sessionId, {
+		user: "UEXT",
+		team: "T123",
+		expires: Date.now() + 60000,
+	});
 	const url = await createConnectionLink("T123", "UEXT", {
 		userTeamId: "TREMOTE",
 		channel: "CSHARED",
@@ -257,7 +267,7 @@ it("links an external identity to its own HF session only while it belongs to th
 	expect(await readConnectionLink(ticket)).not.toBeNull();
 	slackMembership.members.mockResolvedValue({ members: ["UEXT"] });
 	await connectAccount(ticket, a.user, a.session.sessionId, identity);
-	expect(await collections.slackConnections.findOne({ _id: "T123:UEXT" })).toMatchObject({
+	expect(await collections.slackConnections.findOne({ _id: "T123:TREMOTE:UEXT" })).toMatchObject({
 		teamId: "T123",
 		userTeamId: "TREMOTE",
 		slackUserId: "UEXT",
@@ -265,6 +275,9 @@ it("links an external identity to its own HF session only while it belongs to th
 		sessionId: a.session.sessionId,
 		verifiedSlackIdentity: true,
 	});
+	expect((await collections.slackConnections.findOne({ _id: "T123:UEXT" }))?.userId).toEqual(
+		internal.user._id
+	);
 	await expect(connectAccount(ticket, a.user, a.session.sessionId, identity)).rejects.toThrow(
 		"expired"
 	);

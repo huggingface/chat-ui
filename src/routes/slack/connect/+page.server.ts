@@ -55,7 +55,12 @@ export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies })
 	const namedConnections = await Promise.all(
 		connections.map(async (connection) => ({
 			...connection,
-			...(await describe(connection.teamId, connection.slackUserId, connection.userTeamId)),
+			...(await describe(connection.teamId, connection.slackUserId, connection.userTeamId).catch(
+				() => ({
+					workspaceName: connection.teamId,
+					displayName: connection.slackUserId,
+				})
+			)),
 		}))
 	);
 	return {

@@ -16,7 +16,8 @@ export async function downloadAttachments(
 	messages: ThreadMessage[],
 	throughTs: string,
 	botUser: string,
-	token: string
+	token: string,
+	signal?: AbortSignal
 ): Promise<File[]> {
 	const selected = new Map<string, SlackFile>();
 	for (const message of messages) {
@@ -61,7 +62,7 @@ export async function downloadAttachments(
 			response = await fetch(url, {
 				headers: url.hostname === "files.slack.com" ? { Authorization: `Bearer ${token}` } : {},
 				redirect: "manual",
-				signal: AbortSignal.timeout(20000),
+				signal: signal ?? AbortSignal.timeout(20000),
 			});
 			if (![301, 302, 303, 307, 308].includes(response.status)) break;
 			const location = response.headers.get("location");
@@ -100,4 +101,60 @@ export async function downloadAttachments(
 		);
 	}
 	return files;
+}
+
+/** Owner files remain required; other participants cannot poison a turn with bad files. */
+export async function downloadThreadAttachments(
+	messages: ThreadMessage[],
+	throughTs: string,
+	botUser: string,
+	token: string,
+	owner: string
+): Promise<{ files: File[]; referencesOmitted: boolean }> {
+	const own = messages.filter((m) => m.user === owner);
+	const files = await downloadAttachments(own, throughTs, botUser, token);
+	const key = (file: SlackFile) => file.id ?? file.url_private_download ?? file.url_private;
+	const seen = new Set(own.flatMap((m) => (m.files ?? []).map(key)));
+	let total = files.reduce((sum, file) => sum + file.size, 0);
+	let attempts = 0;
+	let referencesOmitted = false;
+	const signal = AbortSignal.timeout(5000);
+	for (const message of messages) {
+		if (
+			message.user === owner ||
+			message.bot_id ||
+			message.user === botUser ||
+			!message.ts ||
+			Number(message.ts) > Number(throughTs)
+		)
+			continue;
+		for (const file of message.files ?? []) {
+			const id = key(file);
+			if (id && seen.has(id)) continue;
+			if (id) seen.add(id);
+			if (++attempts > 10 || files.length >= 10 || total >= MAX_TOTAL || signal.aborted) {
+				referencesOmitted = true;
+				continue;
+			}
+			try {
+				const downloaded = await downloadAttachments(
+					[{ ...message, files: [file] }],
+					throughTs,
+					botUser,
+					token,
+					signal
+				);
+				const size = downloaded.reduce((sum, f) => sum + f.size, 0);
+				if (!downloaded.length || total + size > MAX_TOTAL) {
+					referencesOmitted = true;
+					continue;
+				}
+				total += size;
+				files.push(...downloaded);
+			} catch {
+				referencesOmitted = true;
+			}
+		}
+	}
+	return { files, referencesOmitted };
 }

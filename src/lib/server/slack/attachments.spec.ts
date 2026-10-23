@@ -72,3 +72,44 @@ it("rejects oversized files and reports inaccessible attachments instead of igno
 		downloadAttachments([{ ts: "1.0", files: [file] }], "1.0", "BOT", "secret")
 	).rejects.toThrow("files:read");
 });
+
+it("keeps owner files and skips poisoned reference files on successive turns", async () => {
+	const { downloadThreadAttachments } = await import("./attachments");
+	const fetcher = vi.fn(async (url: URL) =>
+		url.pathname.includes("bad")
+			? new Response("denied", { status: 403 })
+			: new Response("owner data")
+	);
+	vi.stubGlobal("fetch", fetcher);
+	const messages = [
+		{
+			ts: "1",
+			user: "OTHER",
+			files: [
+				{ id: "missing" },
+				{ ...file, id: "bad", url_private: "https://files.slack.com/bad" },
+				{ ...file, id: "large", size: 11 * 1024 * 1024 },
+				...Array.from({ length: 20 }, (_, i) => ({ ...file, id: `ref-${i}` })),
+			],
+		},
+		{ ts: "2", user: "OWNER", files: [file] },
+	];
+	for (const ts of ["2", "3"]) {
+		const result = await downloadThreadAttachments(messages, ts, "BOT", "secret", "OWNER");
+		expect(result.referencesOmitted).toBe(true);
+		expect(await result.files[0].text()).toBe("owner data");
+		expect(result.files.length).toBeLessThanOrEqual(10);
+	}
+});
+it("still reports failures for files the owner explicitly provides", async () => {
+	const { downloadThreadAttachments } = await import("./attachments");
+	await expect(
+		downloadThreadAttachments(
+			[{ ts: "1", user: "OWNER", files: [{ id: "missing" }] }],
+			"1",
+			"BOT",
+			"secret",
+			"OWNER"
+		)
+	).rejects.toThrow("download URL");
+});

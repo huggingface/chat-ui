@@ -10,7 +10,7 @@ import {
 } from "./connections";
 import { viewerLink, viewerConfig } from "./viewer/auth";
 import { isHttpError } from "@sveltejs/kit";
-import { downloadAttachments } from "./attachments";
+import { downloadThreadAttachments } from "./attachments";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createHash } from "node:crypto";
 import { ObjectId } from "mongodb";
@@ -84,6 +84,7 @@ const turnAction = z.object({
 const mention = z.object({
 	channel: z.string(),
 	user: z.string(),
+	user_team: z.string().optional(),
 	text: z.string().max(40_000),
 	ts: z.string().regex(/^\d+\.\d+$/),
 	thread_ts: z
@@ -109,6 +110,11 @@ export class MlSlackBot {
 	private botUserId = "";
 	private active = new Map<string, Promise<void>>();
 	private runningConversations = new Map<string, string>();
+	private eventMembership = new Map<
+		string,
+		{ user: NonNullable<Awaited<ReturnType<typeof eligibleParticipant>>>; until: number }
+	>();
+	private eventRates = new Map<string, { count: number; until: number }>();
 	private linkPrompts = new Map<string, number>();
 	private sideQuestionEvents = new Map<string, number>();
 	private sideQuestionAskers = new Set<string>();
@@ -146,12 +152,19 @@ export class MlSlackBot {
 	}
 
 	private async participant(thread: SlackThread, userId: string) {
-		return eligibleParticipant(
+		const participant = await eligibleParticipant(
 			this.app.client,
 			{ ...this.settings, accountMode: thread.hfUserId ? this.settings.accountMode : "shared" },
 			userId,
 			thread.channel
 		);
+		if (
+			thread.hfUserId &&
+			userId === thread.owner &&
+			participant?.team_id !== (thread.ownerTeamId ?? thread.teamId)
+		)
+			return;
+		return participant;
 	}
 
 	private async reconnectionLink(thread: SlackThread) {
@@ -532,6 +545,7 @@ export class MlSlackBot {
 				teamId: this.settings.teamId,
 			});
 			if (!thread || !("channel" in body) || body.channel?.id !== thread.channel) return;
+			if (thread.hfUserId && thread.owner !== body.user.id) return;
 			const participant = await this.participant(thread, body.user.id);
 			if (
 				!participant ||
@@ -615,28 +629,20 @@ export class MlSlackBot {
 			!this.settings.allowedChannels.includes(event.channel)
 		)
 			return;
-		const participant = await eligibleParticipant(
-			this.app.client,
-			this.settings,
-			event.user,
-			event.channel
-		);
-		if (!participant) return;
+		// Bound mention traffic before any Slack API lookup. Local owner checks also
+		// keep non-owners from consuming paginated membership checks on existing sessions.
+		const now = Date.now();
+		for (const [key, value] of this.eventRates) if (value.until <= now) this.eventRates.delete(key);
+		const rate = this.eventRates.get(event.user) ?? { count: 0, until: now + 60_000 };
+		if (rate.count >= 10 || (!this.eventRates.has(event.user) && this.eventRates.size >= 5000))
+			return;
+		rate.count++;
+		this.eventRates.set(event.user, rate);
 		const existing = await collections.slackThreads.findOne({
 			teamId,
 			channel: event.channel,
 			threadTs: event.thread_ts ?? event.ts,
 		});
-		if (existing && !(await this.participant(existing, event.user))) return;
-		if (existing?.deletedAt) {
-			await this.tell(
-				event.channel,
-				event.user,
-				"This conversation was deleted by its owner. Start a new Slack thread.",
-				event.thread_ts
-			);
-			return;
-		}
 		if (existing?.hfUserId && existing.owner !== event.user) {
 			await this.tell(
 				event.channel,
@@ -646,6 +652,39 @@ export class MlSlackBot {
 			);
 			return;
 		}
+		for (const [key, value] of this.eventMembership)
+			if (value.until <= now) this.eventMembership.delete(key);
+		const mode = existing && !existing.hfUserId ? "shared" : this.settings.accountMode;
+		const cacheKey = `${mode}:${event.channel}:${event.user}`;
+		let participant = this.eventMembership.get(cacheKey)?.user;
+		if (!participant) {
+			participant = await eligibleParticipant(
+				this.app.client,
+				{ ...this.settings, accountMode: mode },
+				event.user,
+				event.channel
+			);
+			if (participant && this.eventMembership.size < 5000)
+				this.eventMembership.set(cacheKey, { user: participant, until: now + 60_000 });
+		}
+		if (
+			!participant ||
+			(event.user_team && event.user_team !== participant.team_id) ||
+			(existing?.hfUserId && participant.team_id !== (existing.ownerTeamId ?? existing.teamId))
+		)
+			return;
+		// Dispatch and controls recheck membership without this event-only cache.
+
+		if (existing?.deletedAt) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"This conversation was deleted by its owner. Start a new Slack thread.",
+				event.thread_ts
+			);
+			return;
+		}
+
 		if (existing && !existing.hfUserId && !this.user) {
 			await this.tell(
 				event.channel,
@@ -661,9 +700,12 @@ export class MlSlackBot {
 		let hfUserId = existing?.hfUserId;
 		if (this.settings.accountMode === "user" && !existing) {
 			const connection = await collections.slackConnections.findOne({
-				_id: connectionKey(teamId, event.user),
+				_id: connectionKey(teamId, event.user, participant.team_id),
 			});
-			if (!connection) {
+			if (
+				!connection ||
+				(connection.userTeamId ?? connection.teamId) !== (participant.team_id ?? teamId)
+			) {
 				const now = Date.now();
 				for (const [user, until] of this.linkPrompts)
 					if (until <= now) this.linkPrompts.delete(user);
@@ -689,7 +731,8 @@ export class MlSlackBot {
 			event.channel,
 			event.thread_ts ?? event.ts,
 			event.user,
-			hfUserId
+			hfUserId,
+			participant.team_id ?? teamId
 		);
 		const inserted = await enqueueInput({
 			_id: inputKey(teamId, eventId),
@@ -850,7 +893,10 @@ export class MlSlackBot {
 				)
 			);
 			if (messages.length > 200) {
-				messages.splice(0, messages.length - 200);
+				while (messages.length > 200) {
+					const reference = messages.findIndex((m) => m.user !== thread.owner);
+					messages.splice(reference < 0 ? 0 : reference, 1);
+				}
 				omitted = true;
 			}
 			cursor = page.response_metadata?.next_cursor || undefined;
@@ -864,13 +910,21 @@ export class MlSlackBot {
 			!!thread.hfUserId
 		);
 		try {
-			const files = await downloadAttachments(
+			const { files, referencesOmitted } = await downloadThreadAttachments(
 				messages,
 				input.ts,
 				this.botUserId,
-				this.settings.botToken
+				this.settings.botToken,
+				input.user
 			);
-			return { text, files };
+			return {
+				text:
+					text +
+					(referencesOmitted
+						? "\nSome reference attachments from other participants were omitted because they were unavailable or exceeded limits. Ask the owner for any needed file; do not assume its contents."
+						: ""),
+				files,
+			};
 		} catch (error) {
 			await this.tell(
 				thread.channel,

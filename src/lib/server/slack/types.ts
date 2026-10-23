@@ -27,6 +27,8 @@ export interface SlackThread {
 	channel: string;
 	threadTs: string;
 	owner: string;
+	/** Home workspace of the owner; absent legacy values mean the installation workspace. */
+	ownerTeamId?: string;
 	/** Absent on legacy shared-token threads. Never changed after creation. */
 	hfUserId?: ObjectId;
 	watching: boolean;

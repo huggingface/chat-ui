@@ -16,7 +16,7 @@ beforeEach(() => {
 	client = new WebClient();
 	vi.spyOn(client.users, "info").mockResolvedValue({
 		ok: true,
-		user: { id: "UEXT", team_id: "TREMOTE" },
+		user: { id: "UEXT", team_id: "TREMOTE", is_restricted: false, is_ultra_restricted: false },
 	});
 	vi.spyOn(client.conversations, "info").mockResolvedValue({
 		ok: true,
@@ -47,7 +47,13 @@ it.each([
 ])("rejects ineligible external users %j", async (flags) => {
 	vi.mocked(client.users.info).mockResolvedValue({
 		ok: true,
-		user: { id: "UEXT", team_id: "TREMOTE", ...flags },
+		user: {
+			id: "UEXT",
+			team_id: "TREMOTE",
+			is_restricted: false,
+			is_ultra_restricted: false,
+			...flags,
+		},
 	});
 	expect(await eligibleParticipant(client, settings, "UEXT", "CSHARED")).toBeUndefined();
 });
@@ -81,4 +87,22 @@ it("fails closed when Slack membership cannot be checked", async () => {
 	await expect(eligibleParticipant(client, settings, "UEXT", "CSHARED")).rejects.toThrow(
 		"Slack unavailable"
 	);
+});
+
+it.each([{ is_im: true }, { is_mpim: true }])(
+	"rejects shared direct conversations %j",
+	async (flags) => {
+		vi.mocked(client.conversations.info).mockResolvedValue({
+			ok: true,
+			channel: { is_ext_shared: true, ...flags },
+		});
+		expect(await eligibleParticipant(client, settings, "UEXT", "G123")).toBeUndefined();
+	}
+);
+it("fails closed when the external user's guest status is unavailable", async () => {
+	vi.mocked(client.users.info).mockResolvedValue({
+		ok: true,
+		user: { id: "UEXT", team_id: "TREMOTE" },
+	});
+	expect(await eligibleParticipant(client, settings, "UEXT", "C123")).toBeUndefined();
 });

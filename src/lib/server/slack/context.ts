@@ -26,7 +26,10 @@ export function threadPrompt(
 		}));
 	let context = JSON.stringify(history);
 	if (context.length > 24_000) {
-		while (history.length && JSON.stringify(history).length > 24_000) history.shift();
+		while (history.length && JSON.stringify(history).length > 24_000) {
+			const reference = history.findIndex((m) => m.user !== owner);
+			history.splice(reference < 0 ? 0 : reference, 1);
+		}
 		context = JSON.stringify(history);
 		truncated = true;
 	}

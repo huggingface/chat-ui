@@ -21,11 +21,15 @@ export async function eligibleParticipant(
 		settings.accountMode !== "user" ||
 		!channel.is_ext_shared ||
 		channelId.startsWith("D") ||
+		channel.is_im ||
+		channel.is_mpim ||
 		!user.team_id ||
 		user.is_bot ||
 		user.deleted ||
 		user.is_restricted ||
 		user.is_ultra_restricted ||
+		(user.team_id !== settings.teamId &&
+			(user.is_restricted !== false || user.is_ultra_restricted !== false)) ||
 		user.is_stranger
 	)
 		return;

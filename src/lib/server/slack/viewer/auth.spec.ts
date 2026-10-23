@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ObjectId } from "mongodb";
 import { WebClient } from "@slack/web-api";
-import { canView, sign, verify } from "./auth";
+import { canView, sign, verify, identitySchema } from "./auth";
 import type { SlackThread } from "../types";
 const secret = "a".repeat(48);
 const thread: SlackThread = {
@@ -93,4 +93,8 @@ describe("Slack viewer access", () => {
 
 it("does not expose personal HuggingChat conversations through Slack-only viewer auth", async () => {
 	expect(await canView({ ...thread, hfUserId: new ObjectId() }, viewer, client())).toBe(false);
+});
+
+it("accepts Enterprise Grid user IDs in verified identities", () => {
+	expect(identitySchema.safeParse({ ...viewer, user: "W123" }).success).toBe(true);
 });

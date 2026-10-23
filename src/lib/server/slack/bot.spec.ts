@@ -1668,7 +1668,7 @@ it("reuses the original status card for queued continuations but not idle follow
 it("binds external connection tickets to the home workspace and keeps personal thread ownership", async () => {
 	mocks.channels.mockResolvedValue({ channel: { is_ext_shared: true } });
 	mocks.users.mockImplementation(async ({ user }: { user: string }) => ({
-		user: { id: user, team_id: "TREMOTE" },
+		user: { id: user, team_id: "TREMOTE", is_restricted: false, is_ultra_restricted: false },
 	}));
 	mocks.members.mockResolvedValue({ members: ["UEXT", "UOTHER"] });
 	const bot = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
@@ -1682,7 +1682,7 @@ it("binds external connection tickets to the home workspace and keeps personal t
 	expect(await collections.slackInputs.countDocuments({})).toBe(0);
 	const { user } = await createTestUser();
 	await collections.slackConnections.insertOne({
-		_id: connectionKey("T123", "UEXT"),
+		_id: connectionKey("T123", "UEXT", "TREMOTE"),
 		teamId: "T123",
 		userTeamId: "TREMOTE",
 		slackUserId: "UEXT",
@@ -1729,4 +1729,16 @@ it("rejects legacy shared-account threads even when personal mode permits the sh
 		"legacy-shared"
 	);
 	expect(await collections.slackInputs.countDocuments({})).toBe(0);
+});
+
+it("bounds mention lookups and reuses eligibility only for event admission", async () => {
+	const bot = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
+	for (let i = 0; i < 40; i++)
+		await bot.receive(
+			{ user: "U123", channel: "C123", text: "hello", ts: `${100 + i}.0` },
+			"T123",
+			`flood-${i}`
+		);
+	expect(mocks.users).toHaveBeenCalledTimes(1);
+	expect(mocks.channels).toHaveBeenCalledTimes(1);
 });
