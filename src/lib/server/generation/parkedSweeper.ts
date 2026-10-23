@@ -1,3 +1,4 @@
+import { loadMcpSelection } from "$lib/server/mcp/savedSelection";
 import {
 	parseLinkedSessionId,
 	connectedLocals,
@@ -267,6 +268,20 @@ export async function rebuildIdentity(park: Pick<ParkedCall, "userId" | "session
 			if (!user) throw error;
 			locals = { user, sessionId: linkedSessionId(thread), isAdmin: false };
 			tokenExpired = true;
+		}
+		if (!tokenExpired) {
+			const selection = await loadMcpSelection(thread.hfUserId);
+			if (selection) {
+				(locals as unknown as Record<string, unknown>).mcp = {
+					selectedServerNames: selection.selectedMcpServerNames,
+					selectedServers: selection.selectedMcpServers.map((server) => ({
+						...server,
+						headers: server.headers
+							? Object.fromEntries(server.headers.map(({ key, value }) => [key, value]))
+							: undefined,
+					})),
+				};
+			}
 		}
 		const settings = await collections.settings.findOne({ userId: thread.hfUserId });
 		return { locals, settings, tokenExpired };
