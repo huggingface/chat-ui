@@ -333,3 +333,23 @@ it("preserves columns when table cells contain Slack-style links", () => {
 	expect(rendered).toContain("*Link:* <https://huggingface.co|huggingface.co>");
 	expect(rendered).toContain("*Notes:* *Fast* demo");
 });
+
+it("keeps owner context when reference messages exhaust the character limit", () => {
+	const prompt = threadPrompt(
+		[
+			{ user: "OWNER", ts: "1.0", text: "Keep my original requirements" },
+			...Array.from({ length: 20 }, (_, i) => ({
+				user: "OTHER",
+				ts: `${i + 2}.0`,
+				text: "x".repeat(2000),
+			})),
+		],
+		{ user: "OWNER", ts: "99.0", text: "Continue" },
+		"BOT",
+		false,
+		"OWNER",
+		true
+	);
+	expect(prompt).toContain("Keep my original requirements");
+	expect(prompt).toContain("Some thread context was omitted");
+});

@@ -1,6 +1,8 @@
 import type { ObjectId } from "mongodb";
 
 export interface SlackConnection {
+	/** Home workspace of the authenticated user; teamId remains the installation. */
+	userTeamId?: string;
 	/** Only set after verified Slack OIDC identity matches the connection ticket. */
 	verifiedSlackIdentity?: boolean;
 	_id: string;
@@ -11,6 +13,8 @@ export interface SlackConnection {
 	updatedAt: Date;
 }
 export interface SlackLink {
+	userTeamId?: string;
+	channel?: string;
 	_id: string;
 	teamId: string;
 	slackUserId: string;
@@ -23,6 +27,8 @@ export interface SlackThread {
 	channel: string;
 	threadTs: string;
 	owner: string;
+	/** Home workspace of the owner; absent legacy values mean the installation workspace. */
+	ownerTeamId?: string;
 	/** Absent on legacy shared-token threads. Never changed after creation. */
 	hfUserId?: ObjectId;
 	watching: boolean;
