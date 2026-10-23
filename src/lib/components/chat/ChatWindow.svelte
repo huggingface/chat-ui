@@ -1141,6 +1141,7 @@
 										alternatives={messagesAlternatives.find((a) => a.includes(message.id)) ?? []}
 										isAuthor={!shared}
 										readOnly={isReadOnly}
+										slackManaged={!!slackThreadUrl}
 										isLast={turnIdx === turns.length - 1 && msgIdx === turn.messages.length - 1}
 										bind:editMsdgId
 										onretry={(payload) => {
@@ -1298,7 +1299,9 @@
 							registry={mlRegistry.summary}
 						/>
 					{/if}
-					<div class="rounded-xl border p-4 text-sm">
+					<div
+						class="rounded-xl border bg-gray-100 p-4 text-sm dark:border-gray-700 dark:bg-gray-800"
+					>
 						<p>This session is managed in Slack. This view is read-only.</p>
 						<a class="font-medium underline" href={slackThreadUrl} target="_blank" rel="noreferrer"
 							>Continue in Slack</a
