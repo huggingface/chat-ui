@@ -27,6 +27,7 @@ export async function createReview(params: {
 	schemaHash: string;
 	source: ReviewSource;
 	records: ReviewRecord[];
+	mediaLinks?: Record<string, string>[];
 	destination?: ReviewDestination;
 	publish?: ReviewPublish;
 }): Promise<MlReview> {
@@ -42,6 +43,13 @@ export async function createReview(params: {
 	};
 	await collections.mlReviews.insertOne(review);
 	return review;
+}
+
+export async function keepMediaLinks(
+	reviewId: ObjectId,
+	links: Record<string, string>[]
+): Promise<void> {
+	await collections.mlReviews.updateOne({ _id: reviewId }, { $set: { mediaLinks: links } });
 }
 
 export async function readReview(

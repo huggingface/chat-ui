@@ -1,12 +1,14 @@
 import type { RepoDesignation } from "@huggingface/hub";
-import type { MlReview, ReviewFieldType } from "$lib/types/MlReview";
+import type { MlReview, ReviewField, ReviewFieldType } from "$lib/types/MlReview";
 import { parseHfUri } from "$lib/server/mlRegistry/hubUri";
 import { viewerWindow, ViewerError, type HubAccess } from "./datasetViewer";
 import { columnOf } from "./features";
 import { ParquetReadError, readMediaCell, type ParquetTarget } from "./parquetSource";
+import { mapPool, splitWindows, type RowWindow } from "./sampling";
 
 export type MediaOutcome =
-	| { redirect: string }
+	/** set when every link was signed again, for the caller to keep */
+	| { redirect: string; links?: Record<string, string>[] }
 	| { bytes: Uint8Array; contentType: string }
 	| { status: number; message: string };
 
@@ -35,6 +37,78 @@ export function isViewerAssetUrl(src: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+/** longer than the 10 minutes a browser keeps the redirect, a link without Expires is always signed again */
+const LINK_MARGIN_MS = 15 * 60 * 1000;
+const RESIGN_CONCURRENCY = 4;
+const RESIGN_REUSE_MS = 60_000;
+
+function linkExpiresAt(src: string): number | undefined {
+	try {
+		const expires = Number(new URL(src).searchParams.get("Expires"));
+		return Number.isFinite(expires) && expires > 0 ? expires * 1000 : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+const usableLink = (src: string | undefined, now: number): src is string =>
+	!!src && isViewerAssetUrl(src) && (linkExpiresAt(src) ?? 0) - now > LINK_MARGIN_MS;
+
+export function viewerMediaLinks(
+	row: Record<string, unknown>,
+	fields: ReviewField[]
+): Record<string, string> {
+	const links: Record<string, string> = {};
+	for (const field of fields) {
+		const src = viewerMediaSrc(row[columnOf(field)]);
+		if (src && isViewerAssetUrl(src)) links[field.name] = src;
+	}
+	return links;
+}
+
+function rowRuns(rows: number[]): RowWindow[] {
+	const runs: RowWindow[] = [];
+	for (const row of [...new Set(rows)].sort((a, b) => a - b)) {
+		const last = runs.at(-1);
+		if (last && last.offset + last.length === row) last.length += 1;
+		else runs.push({ offset: row, length: 1 });
+	}
+	return splitWindows(runs);
+}
+
+const resigning = new Map<string, Promise<Record<string, string>[]>>();
+
+/** the viewer rate limits by ip, so a review is signed again in as few reads as its sample took */
+function resignLinks(review: MlReview, access: HubAccess): Promise<Record<string, string>[]> {
+	const key = String(review._id);
+	const running = resigning.get(key);
+	if (running) return running;
+	const source = review.source;
+	if (source.kind !== "dataset") return Promise.resolve([]);
+	const target = { dataset: source.repo, config: source.config, split: source.split };
+	const fields = review.schema.fields;
+	const rows = review.records.flatMap((r) =>
+		r.media?.length && r.origin?.row !== undefined ? [r.origin.row] : []
+	);
+	const work = mapPool(rowRuns(rows), RESIGN_CONCURRENCY, (w) =>
+		viewerWindow(target, w, access)
+	).then((pages) => {
+		const byRow = new Map(pages.flatMap((p) => p.rows).map((r) => [r.row_idx, r.row]));
+		return review.records.map((record) => {
+			const row = record.origin?.row !== undefined ? byRow.get(record.origin.row) : undefined;
+			const media = fields.filter((f) => record.media?.includes(f.name));
+			return row ? viewerMediaLinks(row, media) : {};
+		});
+	});
+	// requests that read the review before the new links were kept still join this one
+	work.then(
+		() => setTimeout(() => resigning.delete(key), RESIGN_REUSE_MS).unref?.(),
+		() => resigning.delete(key)
+	);
+	resigning.set(key, work);
+	return work;
 }
 
 const SIGNATURES: { type: string; kind: ReviewFieldType; test: (b: Uint8Array) => boolean }[] = [
@@ -126,15 +200,15 @@ export async function reviewMedia(
 	try {
 		if (source.kind === "dataset" && source.via === "viewer") {
 			if (record.origin.row === undefined) return missing("No row to read from.");
-			const page = await viewerWindow(
-				{ dataset: source.repo, config: source.config, split: source.split },
-				{ offset: record.origin.row, length: 1 },
-				access
-			);
-			const src = viewerMediaSrc(page.rows[0]?.row[column]);
-			if (!src) return missing("The dataset row has no media in this field.");
-			if (!isViewerAssetUrl(src)) return { status: 502, message: "Unexpected media link." };
-			return { redirect: src };
+			const kept = review.mediaLinks?.[index]?.[field.name];
+			if (usableLink(kept, Date.now())) return { redirect: kept };
+			const links = await resignLinks(review, access);
+			const src = links[index]?.[field.name];
+			if (!src)
+				return missing(
+					"The dataset row has no media in this field, or the viewer sent an unexpected link."
+				);
+			return { redirect: src, links };
 		}
 		const file = record.origin.file;
 		const target = file ? parquetTarget(review, file) : undefined;

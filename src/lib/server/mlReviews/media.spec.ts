@@ -41,7 +41,13 @@ describe("review media", () => {
 		expect(viewerMediaSrc(null)).toBeUndefined();
 	});
 
-	const viewerReview = {
+	let reviews = 0;
+	const viewerReview = () =>
+		({
+			_id: `review-${(reviews += 1)}`,
+			...viewerBase,
+		}) as unknown as MlReview;
+	const viewerBase = {
 		schema: { fields: [{ name: "picture", type: "image", column: "image" }] },
 		records: [{ id: "5", values: {}, origin: { row: 5 }, media: ["picture"] }],
 		source: {
@@ -52,7 +58,7 @@ describe("review media", () => {
 			via: "viewer",
 			sample: { method: "head", rows: 1, total: 10 },
 		},
-	} as unknown as MlReview;
+	};
 
 	it("re-reads the row for a fresh link, with the user's token", async () => {
 		const calls: { url: URL; auth: string | null }[] = [];
@@ -75,9 +81,10 @@ describe("review media", () => {
 				],
 			});
 		}) as typeof globalThis.fetch;
-		const outcome = await reviewMedia(viewerReview, 0, "picture", { fetch, token: "hf_owner" });
+		const outcome = await reviewMedia(viewerReview(), 0, "picture", { fetch, token: "hf_owner" });
 		expect(outcome).toEqual({
 			redirect: "https://datasets-server.huggingface.co/cached-assets/fresh.jpg?sig=1",
+			links: [{ picture: "https://datasets-server.huggingface.co/cached-assets/fresh.jpg?sig=1" }],
 		});
 		expect(calls[0].url.pathname).toBe("/rows");
 		expect(calls[0].url.searchParams.get("offset")).toBe("5");
@@ -90,9 +97,66 @@ describe("review media", () => {
 			Response.json({
 				rows: [{ row_idx: 5, row: { image: { src: "https://evil.example/x.jpg" } } }],
 			})) as typeof globalThis.fetch;
-		expect(await reviewMedia(viewerReview, 0, "picture", { fetch })).toMatchObject({ status: 502 });
-		expect(await reviewMedia(viewerReview, 0, "other", { fetch })).toMatchObject({ status: 404 });
-		expect(await reviewMedia(viewerReview, 3, "picture", { fetch })).toMatchObject({ status: 404 });
+		expect(await reviewMedia(viewerReview(), 0, "picture", { fetch })).toMatchObject({
+			status: 404,
+		});
+		expect(await reviewMedia(viewerReview(), 0, "other", { fetch })).toMatchObject({ status: 404 });
+		expect(await reviewMedia(viewerReview(), 3, "picture", { fetch })).toMatchObject({
+			status: 404,
+		});
+	});
+
+	const now = Math.floor(Date.now() / 1000);
+	const signed = (row: number, seconds: number) =>
+		`https://datasets-server.huggingface.co/cached-assets/${row}.jpg?Expires=${now + seconds}&Signature=s`;
+
+	it("redirects to a kept link without reading the viewer", async () => {
+		const fetch = vi.fn() as unknown as typeof globalThis.fetch;
+		const review = { ...viewerReview(), mediaLinks: [{ picture: signed(5, 3600) }] } as MlReview;
+		expect(await reviewMedia(review, 0, "picture", { fetch })).toEqual({
+			redirect: signed(5, 3600),
+		});
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
+	it("signs a whole review again in one read per run of rows once its links go stale", async () => {
+		const rows = [5, 6, 7, 20];
+		const urls: URL[] = [];
+		const fetch = (async (input: string | URL) => {
+			const url = new URL(String(input));
+			urls.push(url);
+			const offset = Number(url.searchParams.get("offset"));
+			const length = Number(url.searchParams.get("length"));
+			return Response.json({
+				rows: Array.from({ length }, (_, i) => ({
+					row_idx: offset + i,
+					row: { image: { src: signed(offset + i, 3600) } },
+				})),
+			});
+		}) as typeof globalThis.fetch;
+		const review = {
+			...viewerReview(),
+			records: rows.map((row) => ({
+				id: String(row),
+				values: {},
+				origin: { row },
+				media: ["picture"],
+			})),
+			mediaLinks: rows.map((row) => ({ picture: signed(row, 60) })),
+		} as MlReview;
+		const outcomes = await Promise.all(
+			rows.map((_, index) => reviewMedia(review, index, "picture", { fetch }))
+		);
+		expect(outcomes.map((o) => ("redirect" in o ? o.redirect : o))).toEqual(
+			rows.map((row) => signed(row, 3600))
+		);
+		expect(urls.map((u) => [u.searchParams.get("offset"), u.searchParams.get("length")])).toEqual([
+			["5", "3"],
+			["20", "1"],
+		]);
+		expect(outcomes[0]).toMatchObject({
+			links: rows.map((row) => ({ picture: signed(row, 3600) })),
+		});
 	});
 
 	it("serves Parquet media bytes, reading the row group once for the whole grid", async () => {
