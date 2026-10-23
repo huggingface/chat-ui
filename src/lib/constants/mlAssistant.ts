@@ -58,6 +58,6 @@ export const mlAssistantExamples: RouterExample[] = [
 	{
 		title: "Review a dataset",
 		prompt:
-			"Show me 20 rows from a plant image classification dataset and let me mark whether each label is correct.",
+			"Show me 20 rows from the @ML-Intern-lab/imagenet_1k dataset and let me mark whether each label is correct.",
 	},
 ];
