@@ -105,6 +105,10 @@ describe("source.dataset through the dataset viewer", () => {
 		expect(first.id).toBe(String(row));
 		expect(first.label).toBe(row % 2 ? "pos" : "neg");
 		expect(first).not.toHaveProperty("image");
+		expect(loaded.mediaLinks?.[0]).toEqual({
+			image: `https://datasets-server.huggingface.co/cached-assets/x/${row}.jpg`,
+		});
+		expect(loaded.mediaLinks).toHaveLength(50);
 		const rows = loaded.origins.map((o) => o.row ?? -1);
 		expect(Math.max(...rows)).toBeGreaterThan(900_000);
 		expect(loaded.source).toMatchObject({

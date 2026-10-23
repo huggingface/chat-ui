@@ -32,6 +32,7 @@ import {
 	type DatasetColumn,
 } from "./features";
 import { lineFormat, sampleLines, type LineFormat } from "./lineSource";
+import { viewerMediaLinks } from "./media";
 import {
 	DecodeBudget,
 	groupsOf,
@@ -192,6 +193,7 @@ export interface LoadedTable {
 	origins: ReviewRecordOrigin[];
 	/** no stored value, the media route serves them */
 	media: string[];
+	mediaLinks?: Record<string, string>[];
 	source: ReviewSource;
 }
 
@@ -417,6 +419,7 @@ async function loadFromViewer(
 
 	const rows = pages.flat();
 	if (rows.length === 0) return { ok: false, error: `${where} returned no rows at those offsets` };
+	const mediaFields = resolved.fields.filter((f) => resolved.media.includes(f.name));
 	const shown = new Set(
 		resolved.fields.filter((f) => !resolved.media.includes(f.name)).map(columnOf)
 	);
@@ -465,6 +468,9 @@ async function loadFromViewer(
 		idField: resolved.idField,
 		media: resolved.media,
 		...built,
+		...(mediaFields.length
+			? { mediaLinks: rows.map((r) => viewerMediaLinks(r.row, mediaFields)) }
+			: {}),
 		source: {
 			kind: "dataset",
 			repo,

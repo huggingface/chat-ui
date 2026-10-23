@@ -130,6 +130,7 @@ async function requestReview(
 
 	let records: ReviewRecord[];
 	let source: ReviewSource;
+	let mediaLinks: Record<string, string>[] | undefined;
 	if (table) {
 		const idField = declared.value.id_field;
 		const loaded = await loadTable(table, {
@@ -152,6 +153,7 @@ async function requestReview(
 			...(loaded.media.length ? { media: loaded.media } : {}),
 		}));
 		source = loaded.source;
+		mediaLinks = loaded.mediaLinks;
 	} else {
 		if (!schema?.ok) return refuse("the fields could not be read");
 		if (isTableInput(input)) return refuse("the source could not be read");
@@ -196,6 +198,7 @@ async function requestReview(
 		schemaHash: await reviewSchemaHash(schema.schema),
 		source,
 		records,
+		...(mediaLinks ? { mediaLinks } : {}),
 		...(destination
 			? {
 					destination,

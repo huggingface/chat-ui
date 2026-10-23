@@ -1,6 +1,8 @@
 import { error, type RequestHandler } from "@sveltejs/kit";
 import { ownedReview } from "$lib/server/mlReviews/api";
+import { logger } from "$lib/server/logger";
 import { reviewMedia } from "$lib/server/mlReviews/media";
+import { keepMediaLinks } from "$lib/server/mlReviews/store";
 
 /** the bytes come from a dataset row, nothing in them may run or be sniffed into something that does */
 const SAFE_HEADERS = {
@@ -23,6 +25,11 @@ export const GET: RequestHandler = async ({ locals, params, request }) => {
 	const outcome = await reviewMedia(review, index, params.field ?? "", { token: locals.token });
 	if ("status" in outcome) error(outcome.status, outcome.message);
 	if ("redirect" in outcome) {
+		if (outcome.links) {
+			await keepMediaLinks(review._id, outcome.links).catch((err) =>
+				logger.warn({ err, reviewId: review._id.toString() }, "[review] could not keep media links")
+			);
+		}
 		// the viewer signs its links for about an hour, so this answer must not be kept longer
 		return new Response(null, {
 			status: 302,

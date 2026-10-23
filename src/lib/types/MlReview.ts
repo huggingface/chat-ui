@@ -279,6 +279,8 @@ export interface MlReview {
 	schemaHash: string;
 	source: ReviewSource;
 	records: ReviewRecord[];
+	/** never in a payload, the signed links open private dataset media to anyone holding them */
+	mediaLinks?: Record<string, string>[];
 	/** keyed by position, a model chosen id can hold dots or dollar signs that break $set */
 	drafts: Record<string, ReviewDraft>;
 	/** bumped by every draft save, a submit built from an older read must not land */
