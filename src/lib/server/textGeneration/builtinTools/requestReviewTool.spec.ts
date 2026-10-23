@@ -49,10 +49,10 @@ const jsonl = (n: number) =>
 		.map((r) => JSON.stringify(r))
 		.join("\n");
 
-function setup({ sink = true }: { sink?: boolean } = {}) {
+function setup({ sink = true, token }: { sink?: boolean; token?: string } = {}) {
 	const conv = { _id: new ObjectId() };
 	const emitted: MessageUpdate[] = [];
-	const tool = createRequestReviewTool(conv);
+	const tool = createRequestReviewTool(conv, () => token);
 	tool.bind({
 		openai: {} as never,
 		completionBase: { model: "m", stream: true },
@@ -453,6 +453,120 @@ describe("request_review errors the model can fix", () => {
 		const { run } = setup();
 		expect(
 			errorOf(await run({ title: "T", source: { records: [], hub: "hf://x/y" }, fields: FIELDS }))
-		).toContain("exactly one of records, file, sandbox or hub, got records, hub");
+		).toContain("exactly one of records, file, sandbox, hub, dataset or parquet, got records, hub");
+	});
+});
+
+describe("request_review samples a Hub dataset with no job", () => {
+	const auth: (string | null)[] = [];
+	const viewer = vi.fn(async (input: string | URL, init?: RequestInit) => {
+		const url = new URL(String(input));
+		auth.push(new Headers(init?.headers).get("authorization"));
+		if (url.hostname === "huggingface.co") return Response.json({ sha: "c0ffee" });
+		if (url.pathname === "/splits") {
+			return Response.json({ splits: [{ config: "default", split: "train" }] });
+		}
+		if (url.pathname === "/size") {
+			return Response.json({ size: { splits: [{ split: "train", num_rows: 500_000 }] } });
+		}
+		const offset = Number(url.searchParams.get("offset"));
+		const length = Number(url.searchParams.get("length"));
+		return Response.json({
+			features: [
+				{ feature_idx: 0, name: "review", type: { _type: "Value", dtype: "string" } },
+				{
+					feature_idx: 1,
+					name: "stars",
+					type: { _type: "ClassLabel", names: ["1", "2", "3", "4", "5"] },
+				},
+				{ feature_idx: 2, name: "photo", type: { _type: "Image" } },
+			],
+			rows: Array.from({ length }, (_, i) => ({
+				row_idx: offset + i,
+				row: {
+					review: `Review ${offset + i}`,
+					stars: (offset + i) % 5,
+					photo: { src: "https://datasets-server.huggingface.co/x.jpg" },
+				},
+				truncated_cells: [],
+			})),
+			num_rows_total: 500_000,
+		});
+	});
+
+	beforeEach(() => {
+		auth.length = 0;
+		viewer.mockClear();
+		vi.stubGlobal("fetch", viewer);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("shows every column by its dataset type, keeping each row's origin", async () => {
+		const { conv, run } = setup({ token: "hf_user" });
+		const outcome = await run({
+			title: "Yelp sample",
+			source: { dataset: { repo: "org/yelp", sample: "random", rows: 30, seed: 11 } },
+			questions: [{ name: "useful", type: "boolean" }],
+			destination: { repo: "pngwn/yelp-gold" },
+		});
+		expect(outcome).toEqual({ awaitingInput: true });
+
+		const review = await collections.mlReviews.findOne({ conversationId: conv._id });
+		expect(review?.schema.fields).toEqual([
+			{ name: "review", type: "text" },
+			{ name: "stars", type: "category" },
+			{ name: "photo", type: "image" },
+		]);
+		expect(review?.records).toHaveLength(30);
+		const first = review?.records[0];
+		expect(first?.id).toBe(String(first?.origin?.row));
+		expect(first?.values).toEqual({
+			review: `Review ${first?.origin?.row}`,
+			stars: String(((first?.origin?.row ?? 0) % 5) + 1),
+		});
+		expect(first?.media).toEqual(["photo"]);
+		expect(review?.source).toMatchObject({
+			kind: "dataset",
+			repo: "org/yelp",
+			revision: "c0ffee",
+			sample: { method: "random", seed: 11, total: 500_000 },
+		});
+		expect(review?.destination).toEqual({
+			repo: "pngwn/yelp-gold",
+			type: "dataset",
+			path: "data/yelp-sample.parquet",
+			pr: false,
+		});
+		expect(review?.publish?.source).toEqual({
+			visibility: "public",
+			label: "rows from a public dataset org/yelp",
+		});
+		expect(auth.every((h) => h === "Bearer hf_user")).toBe(true);
+	});
+
+	it("checks declared fields against the columns and refuses a bad destination first", async () => {
+		const { run } = setup();
+		expect(
+			errorOf(
+				await run({
+					title: "t",
+					source: { dataset: { repo: "org/yelp" } },
+					fields: [{ name: "text", type: "text" }],
+				})
+			)
+		).toContain('field text reads column "text"');
+		viewer.mockClear();
+		expect(
+			errorOf(
+				await run({
+					title: "t",
+					source: { dataset: { repo: "org/yelp" } },
+					destination: { repo: "pngwn/x", path: "../x.parquet" },
+				})
+			)
+		).toContain("destination.path");
+		expect(viewer).not.toHaveBeenCalled();
 	});
 });

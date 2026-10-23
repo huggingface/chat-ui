@@ -7,6 +7,7 @@ import {
 	clockText,
 	responseLines,
 	reviewResultText,
+	sourceLine,
 } from "./result";
 
 describe("anchorText", () => {
@@ -78,6 +79,47 @@ describe("responseLines", () => {
 	});
 });
 
+describe("the source line", () => {
+	it("names the path and revision a dataset sample was read through", () => {
+		expect(
+			sourceLine({
+				kind: "dataset",
+				repo: "allenai/c4",
+				config: "en",
+				split: "train",
+				revision: "refs/convert/parquet",
+				via: "converted",
+				partial: true,
+				viewerError: "the dataset viewer did not answer in time",
+				sample: { method: "random", rows: 50, total: 2_207_027, seed: 3, groups: 5 },
+			})
+		).toBe(
+			"Source: 50 of 2,207,027 rows of allenai/c4 en/train, read from the viewer's Parquet conversion at refs/convert/parquet (it covers only the first part of this split), a random sample grouped inside 5 random row groups, seed 3. The dataset viewer was not used (the dataset viewer did not answer in time), its files were read directly instead, so there is nothing to wait for."
+		);
+		expect(
+			sourceLine({
+				kind: "dataset",
+				repo: "org/lines",
+				config: "default",
+				split: "train",
+				revision: "main",
+				via: "jsonl",
+				sample: {
+					method: "random",
+					rows: 40,
+					bytes: 13 * 1024 * 1024,
+					seed: 9,
+					windows: 20,
+					approximate: true,
+				},
+			})
+		).toBe(
+			"Source: 40 rows of 13.0 MB of org/lines default/train, read from its JSONL files by range reads at main, an approximate random sample, seed 9, lines picked at random byte offsets (biased toward lines after long ones)."
+		);
+		expect(sourceLine({ kind: "inline" })).toBeUndefined();
+	});
+});
+
 describe("reviewResultText size", () => {
 	it("keeps comments and inline answers within budget, pointing at the responses file", () => {
 		const now = new Date();
@@ -97,6 +139,7 @@ describe("reviewResultText size", () => {
 				suggestions: "shown",
 			},
 			schemaHash: "abcd1234",
+			source: { kind: "inline" },
 			records: Array.from({ length: 20 }, (_, i) => ({ id: `r${i}`, values: {} })),
 			drafts: Object.fromEntries(
 				Array.from({ length: 20 }, (_, i) => [
@@ -148,6 +191,7 @@ describe("reviewResultText unfinished records", () => {
 				suggestions: "after_answer",
 			},
 			schemaHash: "abcd1234",
+			source: { kind: "inline" },
 			records: ids.map((id) => ({ id, values: {} })),
 			drafts,
 		}) as unknown as MlReview;

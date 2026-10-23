@@ -9,8 +9,11 @@ import {
 	MessageUpdateType,
 } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
-import { reviewCounts } from "./result";
-import { detachReview, readReview } from "./store";
+import { deliverReview } from "./delivery";
+import { decidePublish } from "./publish";
+import { ensureReviewResult, reviewCounts, reviewResolvedUpdate } from "./result";
+import { reviewToolResult } from "./resume";
+import { detachReview, readReview, releaseHeldDelivery } from "./store";
 
 export const USER_WROTE_INSTEAD = "user wrote instead";
 
@@ -99,6 +102,8 @@ export async function detachOpenReviews(
 		message.updatedAt = new Date();
 	}
 
+	await closePublishPrompts(conv);
+
 	return async () => {
 		for (const reviewId of withdrawn) {
 			await detachReview(conv._id, reviewId).catch((err) =>
@@ -106,4 +111,74 @@ export async function detachOpenReviews(
 			);
 		}
 	};
+}
+
+/** a publish card the user wrote past is not pushed, a detached review posts its held message */
+async function closePublishPrompts(conv: Pick<Conversation, "_id" | "messages">): Promise<void> {
+	const rows = await collections.mcpElicitations
+		.find({
+			conversationId: conv._id,
+			status: "pending",
+			"pending.kind": "ask",
+			"pending.publish": { $exists: true },
+		})
+		.toArray();
+	for (const row of rows) {
+		const pending = row.pending;
+		// a detached review card sits on an old message and outlives the chat, the sweep closes it
+		if (pending?.kind !== "ask" || !pending.publish || pending.publish.deliver) continue;
+		const now = new Date();
+		const closed = await collections.mcpElicitations.updateOne(
+			{ _id: row._id, status: "pending" },
+			{
+				$set: {
+					status: "resolved",
+					action: "cancel",
+					resolution: "withdrawn",
+					resolvedAt: now,
+					updatedAt: now,
+					resume: {
+						status: "abandoned",
+						takenAt: now,
+						attempts: 0,
+						abandonedReason: USER_WROTE_INSTEAD,
+					},
+				},
+			}
+		);
+		if (closed.matchedCount === 0) continue;
+		const review = await readReview(conv._id, pending.publish.reviewId);
+		if (!review) continue;
+		const decided = await decidePublish(
+			review,
+			"skip",
+			"the user wrote instead of answering the publish card"
+		);
+		const result = await ensureReviewResult(decided);
+		if (pending.publish.deliver) {
+			await releaseHeldDelivery(review);
+			deliverReview(review._id).catch((err) =>
+				logger.error({ err, reviewId: pending.publish?.reviewId }, "[review] delivery failed")
+			);
+			continue;
+		}
+		const message = conv.messages.find((m) => m.id === pending.messageId);
+		if (!message || message.from !== "assistant") continue;
+		if (hasResult(message.updates, pending.toolUuid)) continue;
+		const ended = await turnAnsweredWithoutRun(conv._id, message.id);
+		message.updates = [
+			...(message.updates ?? []),
+			reviewResolvedUpdate({ ...decided, result }),
+			{
+				type: MessageUpdateType.Elicitation,
+				subtype: MessageElicitationUpdateType.Resolved,
+				elicitationId: row.elicitationId,
+				action: "cancel",
+				resolution: "withdrawn",
+			},
+			reviewToolResult(pending.toolUuid, result.text),
+			...(ended ? [ended] : []),
+		];
+		message.updatedAt = new Date();
+	}
 }

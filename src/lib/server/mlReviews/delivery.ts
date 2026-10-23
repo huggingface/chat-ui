@@ -4,6 +4,7 @@ import type { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
 import { rebuildIdentity } from "$lib/server/generation/parkedSweeper";
+import { ensureReviewResult } from "./result";
 import type { AskResumeSelection } from "$lib/server/generation/askResume";
 import type { MlReview } from "$lib/types/MlReview";
 import type { Message } from "$lib/types/Message";
@@ -147,7 +148,15 @@ export async function deliverReview(
 ): Promise<DeliveryState> {
 	const review = await claim(reviewId);
 	if (!review) return stateOf(await collections.mlReviews.findOne({ _id: reviewId }));
-	const text = review.result?.text;
+	let text = review.result?.text;
+	if (!text && review.status === "submitted") {
+		try {
+			// with a destination the result waits for the push, so it is built here
+			text = (await ensureReviewResult(review)).text;
+		} catch (err) {
+			logger.warn({ err, reviewId: review._id.toString() }, "[review] building the result failed");
+		}
+	}
 	if (!text) return release(review, { error: "the submission has no result yet", counted: true });
 
 	// the route rewrites the whole message array, so two posts at once would drop one

@@ -2,7 +2,9 @@ import { ObjectId, type Filter } from "mongodb";
 import { collections } from "$lib/server/database";
 import type {
 	MlReview,
+	ReviewDestination,
 	ReviewDraft,
+	ReviewPublish,
 	ReviewRecord,
 	ReviewSchema,
 	ReviewSource,
@@ -25,6 +27,8 @@ export async function createReview(params: {
 	schemaHash: string;
 	source: ReviewSource;
 	records: ReviewRecord[];
+	destination?: ReviewDestination;
+	publish?: ReviewPublish;
 }): Promise<MlReview> {
 	const now = new Date();
 	const review: MlReview = {
@@ -114,7 +118,7 @@ export async function saveDraftsGuarded(
 
 /** claims the submission from the status and draft revision it read, so a race changes nothing */
 export async function submitReview(
-	review: Pick<MlReview, "_id" | "conversationId" | "draftRevision">,
+	review: Pick<MlReview, "_id" | "conversationId" | "draftRevision" | "destination">,
 	submission: {
 		note?: string;
 		/** drafts written in the same update as the claim, keyed by record position */
@@ -139,7 +143,7 @@ export async function submitReview(
 				...(submission.note ? { note: submission.note } : {}),
 				...(from === "open"
 					? { unresolved: true as const }
-					: { delivery: { status: "pending" as const, attempts: 0 } }),
+					: { delivery: { status: deliveryStart(review), attempts: 0 } }),
 				...drafts,
 				submittedAt: now,
 				updatedAt: now,
@@ -147,6 +151,18 @@ export async function submitReview(
 		}
 	);
 	return updated.matchedCount === 1;
+}
+
+/** a review with a destination posts only once the publish card is answered */
+const deliveryStart = (review: Pick<MlReview, "destination">) =>
+	review.destination ? ("held" as const) : ("pending" as const);
+
+/** the publish card was answered or closed, so the held submission may post */
+export async function releaseHeldDelivery(review: Pick<MlReview, "_id">): Promise<void> {
+	await collections.mlReviews.updateOne(
+		{ _id: review._id, "delivery.status": "held" },
+		{ $set: { "delivery.status": "pending", updatedAt: new Date() } }
+	);
 }
 
 /** first writer wins, a second builder of the same submission reads the stored one back */
@@ -191,10 +207,10 @@ export async function resolveSubmittedReview(
 }
 
 /** a claimed submission whose parked call was closed meanwhile goes out as a message instead */
-export async function queueDelivery(review: Pick<MlReview, "_id">): Promise<void> {
+export async function queueDelivery(review: Pick<MlReview, "_id" | "destination">): Promise<void> {
 	await collections.mlReviews.updateOne(
 		{ _id: review._id, status: "submitted", delivery: { $exists: false } },
-		{ $set: { delivery: { status: "pending", attempts: 0 }, updatedAt: new Date() } }
+		{ $set: { delivery: { status: deliveryStart(review), attempts: 0 }, updatedAt: new Date() } }
 	);
 }
 

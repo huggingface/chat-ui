@@ -55,6 +55,7 @@ const field = z.object({
 	type: z.enum(REVIEW_FIELD_TYPES),
 	title: shortText(REVIEW_LIMITS.titleChars).optional(),
 	language: z.string().trim().max(40).optional(),
+	column: z.string().trim().min(1).max(200).optional(),
 });
 
 const option = z.object({
@@ -244,6 +245,7 @@ export function parseReviewSchema(input: unknown): ParsedReviewSchema {
 				type: f.type,
 				...(f.title ? { title: f.title } : {}),
 				...(f.type === "code" && f.language ? { language: f.language } : {}),
+				...(f.column && f.column !== f.name ? { column: f.column } : {}),
 			})) as ReviewSchema["fields"],
 			questions,
 			suggestions: declared.suggestions ?? "shown",

@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { BSON, ObjectId } from "mongodb";
 import superjson from "superjson";
 import { collections, ready } from "$lib/server/database";
@@ -19,6 +19,15 @@ vi.mock("$lib/server/mlReviews/delivery", () => ({
 	deliverReview,
 	sweepReviewDeliveries: vi.fn(),
 }));
+vi.mock("@huggingface/hub", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@huggingface/hub")>()),
+	commit: vi.fn(async () => ({
+		commit: { oid: "abc123", url: "https://huggingface.co/datasets/pngwn/gold/commit/abc123" },
+		hookOutput: "",
+	})),
+	fileExists: vi.fn(async () => false),
+	datasetInfo: vi.fn(async () => ({ sha: "head1" })),
+}));
 vi.mock("$lib/server/logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
@@ -31,6 +40,15 @@ const { finishStoredSubmissions } = await import("$lib/server/mlReviews/submissi
 const { submitReview } = await import("$lib/server/mlReviews/store");
 const { POST: SUBMIT } =
 	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/submit/+server");
+const { GET: MEDIA } =
+	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/media/[index]/[field]/+server");
+const hub = await import("@huggingface/hub");
+const { resumeParkedToolCall } = await import("$lib/server/mcp/resumeElicitation");
+const { submitElicitationAnswer } = await import("$lib/server/mcp/elicitation");
+const { detachOpenReviews } = await import("$lib/server/mlReviews/detach");
+const { sweepHeldPublishCards } = await import("$lib/server/mlReviews/resume");
+const { GET: STATUS } =
+	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/status/+server");
 
 const SCHEMA: ReviewSchema = {
 	title: "Triage batch 1",
@@ -1293,5 +1311,560 @@ describe.sequential("submitting", () => {
 		expect(files.flatMap((f) => f.content.trim().split("\n"))).toHaveLength(100);
 		expect(body.text).toContain("All answers, in 2 parts:");
 		expect(body.text).not.toContain("Answers:");
+	});
+});
+
+describe.sequential("writing labels back", () => {
+	const AUDIENCE = {
+		label: "existing public dataset pngwn/gold",
+		exists: true,
+		private: false,
+		canWrite: true,
+	};
+	let owner = "pngwn";
+	let sourceRepo: number | Record<string, unknown> = { private: false };
+	beforeEach(() => {
+		owner = "pngwn";
+		sourceRepo = { private: false };
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: string | URL) => {
+				const url = String(input);
+				if (url.endsWith("/api/datasets/pngwn/gold")) return Response.json({ private: false });
+				if (url.endsWith("/api/datasets/org/raw")) {
+					return typeof sourceRepo === "number"
+						? new Response(null, { status: sourceRepo })
+						: Response.json(sourceRepo);
+				}
+				if (url.endsWith("/api/whoami-v2")) {
+					return Response.json({ name: owner, orgs: [], auth: { accessToken: { role: "write" } } });
+				}
+				return new Response("not stubbed", { status: 500 });
+			})
+		);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+	const DESTINATION = {
+		repo: "pngwn/gold",
+		type: "dataset" as const,
+		path: "data/a.parquet",
+		pr: false,
+	};
+	const answerBoth = async (locals: App.Locals, conv: Conversation, review: MlReview) => {
+		for (const index of [0, 1]) {
+			await PATCH(
+				event(locals, conv._id.toString(), review._id.toString(), {
+					index,
+					draft: draft({ kind: "bug" }),
+				})
+			);
+		}
+	};
+	const withDestination = async (
+		locals: App.Locals,
+		status?: "detached",
+		source: MlReview["source"] = {
+			kind: "dataset",
+			repo: "org/raw",
+			config: "default",
+			split: "train",
+			via: "viewer",
+			sample: { method: "head", rows: 2, total: 2 },
+		}
+	) => {
+		const { conv, review } = await seed(locals);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{ $set: { destination: DESTINATION, source, ...(status ? { status } : {}) } }
+		);
+		await answerBoth(locals, conv, review);
+		return { conv, review };
+	};
+	const signIn = (userId: ObjectId) =>
+		collections.sessions.updateOne(
+			{ userId },
+			{ $set: { oauth: { token: { value: "hf_owner" } } } as never }
+		);
+	const publishRow = (conversationId: ObjectId) =>
+		collections.mcpElicitations.findOne({
+			conversationId,
+			"pending.kind": "ask",
+			"pending.publish": { $exists: true },
+		});
+	const answer = (conversationId: ObjectId, elicitationId: string, choice?: string) =>
+		submitElicitationAnswer({
+			elicitationId,
+			conversationId,
+			action: choice ? "accept" : "cancel",
+			...(choice ? { content: { publish: choice } } : {}),
+		});
+
+	it("defaults to no push when a private, gated or unchecked source would go public", async () => {
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const card = async (source?: MlReview["source"]) => {
+			const { conv, review } = await withDestination(locals, undefined, source);
+			await SUBMIT(
+				event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+			);
+			await resumeParkedToolCall({
+				conversationId: conv._id,
+				elicitationId: review.elicitationId,
+				generationId: "gen-resume",
+				mayPark: true,
+			});
+			const field = (await publishRow(conv._id))?.request.fields?.[0];
+			if (field?.kind !== "select") throw new Error("no publish card");
+			return {
+				values: field.options.map((o) => o.value),
+				default: field.default,
+				question: field.description,
+				stored: (await collections.mlReviews.findOne({ _id: review._id }))?.publish?.source,
+			};
+		};
+
+		sourceRepo = { private: true };
+		expect(await card()).toEqual({
+			values: ["skip", "push", "pr"],
+			default: "skip",
+			question:
+				'Push the labels of review "Triage batch 1" (rows from a private dataset org/raw) to existing public dataset pngwn/gold? The reviewed source rows are written along with the labels.',
+			stored: { visibility: "private", label: "rows from a private dataset org/raw" },
+		});
+		sourceRepo = { private: false, gated: "manual" };
+		expect(await card()).toMatchObject({ values: ["skip", "push", "pr"], default: "skip" });
+		sourceRepo = 404;
+		expect((await card()).stored).toEqual({
+			visibility: "private",
+			label: "rows from a private dataset org/raw",
+		});
+		sourceRepo = 500;
+		expect(await card()).toMatchObject({
+			default: "skip",
+			stored: {
+				visibility: "unknown",
+				label: "rows from dataset org/raw, whose visibility could not be checked",
+			},
+		});
+		expect(await card({ kind: "inline" })).toMatchObject({
+			values: ["skip", "push", "pr"],
+			default: "skip",
+			question: expect.stringContaining("(rows from this chat, not known to be public)"),
+		});
+	});
+
+	it("submits without pushing, then parks the resumed turn on a publish card", async () => {
+		vi.mocked(hub.commit).mockClear();
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals);
+
+		const res = await SUBMIT(
+			event(locals, conv._id.toString(), review._id.toString(), {
+				verdict: "approve",
+				destination: { ...DESTINATION, repo: "ignored/now" },
+			})
+		);
+		expect(res.status).toBe(200);
+		expect(hub.commit).not.toHaveBeenCalled();
+
+		const parked = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: review.elicitationId,
+			generationId: "gen-resume",
+			mayPark: true,
+		});
+		expect(parked.parkedAgain).toBe(true);
+		const row = await publishRow(conv._id);
+		expect(row).toMatchObject({
+			status: "pending",
+			generationId: "gen-resume",
+			request: { source: "assistant", mode: "form", reviewId: review._id.toString() },
+			pending: {
+				kind: "ask",
+				messageId: "msg-1",
+				toolUuid: "uuid-1",
+				publish: { reviewId: review._id.toString(), destination: DESTINATION, audience: AUDIENCE },
+			},
+		});
+		const field = row?.request.fields?.[0];
+		expect(field?.kind === "select" && field.options.map((o) => o.value)).toEqual([
+			"push",
+			"pr",
+			"skip",
+		]);
+		expect(field?.description).toBe(
+			'Push the labels of review "Triage batch 1" (rows from a public dataset org/raw) to existing public dataset pngwn/gold? The reviewed source rows are written along with the labels.'
+		);
+		expect(field?.kind === "select" && field.default).toBeUndefined();
+		expect(row?.request.message).toBe(field?.description);
+		expect(parked.updates.map((u) => [u.type, "subtype" in u ? u.subtype : undefined])).toEqual([
+			["review", "resolved"],
+			["elicitation", "resolved"],
+			["elicitation", "request"],
+			["turnState", undefined],
+		]);
+		expect(await collections.turnStates.findOne({ messageId: "msg-1" })).toMatchObject({
+			status: "awaiting_input",
+		});
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			destination: DESTINATION,
+			publish: { promptId: row?.elicitationId, audience: AUDIENCE },
+		});
+		expect((await collections.mlReviews.findOne({ _id: review._id }))?.result).toBeUndefined();
+
+		const again = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: review.elicitationId,
+			generationId: "gen-repeat",
+			mayPark: true,
+		});
+		expect(again.parkedAgain).toBe(true);
+		expect(
+			await collections.mcpElicitations.countDocuments({ "pending.publish": { $exists: true } })
+		).toBe(1);
+	});
+
+	it("pushes, opens a PR, or skips on the card's answer, then hands the model the result", async () => {
+		for (const [choice, expected] of [
+			["push", "Labels pushed to pngwn/gold (data/a.parquet)"],
+			["pr", "Labels pushed as a pull request on pngwn/gold (data/a.parquet)"],
+			[
+				"skip",
+				"Labels were NOT pushed to pngwn/gold (data/a.parquet): the user chose not to push.",
+			],
+		] as const) {
+			vi.mocked(hub.commit).mockClear();
+			vi.mocked(hub.commit).mockResolvedValue({
+				commit: { oid: "abc123", url: "https://huggingface.co/datasets/pngwn/gold/commit/abc123" },
+				hookOutput: "",
+				...(choice === "pr"
+					? { pullRequestUrl: "https://huggingface.co/datasets/pngwn/gold/discussions/2" }
+					: {}),
+			});
+			const { locals, user } = await createTestUser();
+			await signIn(user._id);
+			const { conv, review } = await withDestination(locals);
+			await SUBMIT(
+				event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+			);
+			await resumeParkedToolCall({
+				conversationId: conv._id,
+				elicitationId: review.elicitationId,
+				generationId: "gen-resume",
+				mayPark: true,
+			});
+			const row = await publishRow(conv._id);
+			if (!row) throw new Error("no publish card");
+			expect(await answer(conv._id, row.elicitationId, choice)).toMatchObject({ ok: true });
+
+			const { updates } = await resumeParkedToolCall({
+				conversationId: conv._id,
+				elicitationId: row.elicitationId,
+			});
+			const text = JSON.stringify(updates);
+			expect(text).toContain(expected);
+			expect(updates.at(-1)).toMatchObject({ type: "tool", subtype: "result", uuid: "uuid-1" });
+			if (choice === "skip") {
+				expect(hub.commit).not.toHaveBeenCalled();
+				expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+					declinedDestination: DESTINATION,
+					publish: { decision: "skip" },
+				});
+			} else {
+				expect(vi.mocked(hub.commit).mock.calls[0][0]).toMatchObject({
+					accessToken: "hf_owner",
+					...(choice === "pr" ? { isPullRequest: true } : { parentCommit: "head1" }),
+				});
+			}
+			await collections.mcpElicitations.deleteMany({});
+		}
+	});
+
+	it("never runs the ask answer path for a publish card, a budget grant included", async () => {
+		vi.mocked(hub.commit).mockClear();
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals);
+		await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }));
+		await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: review.elicitationId,
+			generationId: "gen-resume",
+			mayPark: true,
+		});
+		const row = await publishRow(conv._id);
+		if (!row) throw new Error("no publish card");
+		await collections.mcpElicitations.updateOne(
+			{ _id: row._id },
+			{ $set: { "request.fields.0.options.2.setBudgetUsd": 50 } }
+		);
+		const before = (await collections.conversations.findOne({ _id: conv._id }))?.mlBudget;
+
+		expect(await answer(conv._id, row.elicitationId, "skip")).toMatchObject({ ok: true });
+		expect((await collections.conversations.findOne({ _id: conv._id }))?.mlBudget).toEqual(before);
+
+		const { updates } = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: row.elicitationId,
+		});
+		const text = JSON.stringify(updates);
+		expect(text).toContain('Review \\"Triage batch 1\\" submitted');
+		expect(text).not.toContain("The user answered");
+		expect(text).not.toContain("compute budget");
+	});
+
+	it("pushes only to the destination the card showed, never to one changed after it", async () => {
+		vi.mocked(hub.commit).mockClear();
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals);
+		await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }));
+		await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: review.elicitationId,
+			generationId: "gen-resume",
+			mayPark: true,
+		});
+		const row = await publishRow(conv._id);
+		if (!row) throw new Error("no publish card");
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{ $set: { destination: { ...DESTINATION, repo: "someone/else" } } }
+		);
+
+		await answer(conv._id, row.elicitationId, "push");
+		const { updates } = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: row.elicitationId,
+		});
+		expect(hub.commit).not.toHaveBeenCalled();
+		expect(JSON.stringify(updates)).toContain(
+			"the destination changed after the publish card was shown"
+		);
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			publish: { decision: "skip" },
+		});
+	});
+
+	it("offers no direct push to a repo the owner cannot write to", async () => {
+		owner = "someone-else";
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals);
+		await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }));
+		await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: review.elicitationId,
+			generationId: "gen-resume",
+			mayPark: true,
+		});
+		const field = (await publishRow(conv._id))?.request.fields?.[0];
+		expect(field?.kind === "select" && field.options.map((o) => o.value)).toEqual(["pr", "skip"]);
+	});
+
+	it("closes an open card as not pushed when the user writes instead", async () => {
+		vi.mocked(hub.commit).mockClear();
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals);
+		await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" }));
+		await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: review.elicitationId,
+			generationId: "gen-resume",
+			mayPark: true,
+		});
+		const fresh = await collections.conversations.findOne({ _id: conv._id });
+		if (!fresh) throw new Error("no conversation");
+		fresh.messages.push({ id: "msg-1", from: "assistant", content: "", updates: [] } as never);
+
+		await detachOpenReviews(fresh);
+
+		expect(await publishRow(conv._id)).toMatchObject({
+			status: "resolved",
+			resolution: "withdrawn",
+			resume: { status: "abandoned" },
+		});
+		const message = fresh.messages.find((m) => m.id === "msg-1");
+		expect(JSON.stringify(message?.updates)).toContain(
+			"the user wrote instead of answering the publish card"
+		);
+		expect(hub.commit).not.toHaveBeenCalled();
+	});
+
+	it("keeps a detached card through a running turn's save, and posts after a day unanswered", async () => {
+		deliverReview.mockClear();
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals, "detached");
+		const now = new Date();
+		const message = (id: string, from: "assistant" | "user") =>
+			({
+				id,
+				from,
+				content: "",
+				updates: [],
+				ancestors: [],
+				children: [],
+				createdAt: now,
+				updatedAt: now,
+			}) as never;
+		const snapshot = [
+			message("msg-1", "assistant"),
+			message("msg-2", "user"),
+			message("msg-3", "assistant"),
+		];
+		await collections.conversations.updateOne({ _id: conv._id }, { $set: { messages: snapshot } });
+		await collections.generations.insertOne({
+			_id: new ObjectId(),
+			conversationId: conv._id,
+			messageId: "msg-3",
+			status: "running",
+			startedAt: now,
+		} as never);
+
+		const body = await (
+			await SUBMIT(
+				event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+			)
+		).json();
+		expect(body.publishPromptId).toBeTruthy();
+		// the running turn saves the whole array it loaded before the card existed
+		await collections.conversations.updateOne({ _id: conv._id }, { $set: { messages: snapshot } });
+		const cardOn = async () =>
+			(await collections.conversations.findOne({ _id: conv._id }))?.messages
+				.find((m) => m.id === "msg-1")
+				?.updates?.some(
+					(u) =>
+						u.type === "elicitation" &&
+						"request" in u &&
+						u.request.elicitationId === body.publishPromptId
+				);
+		expect(await cardOn()).toBe(false);
+		expect(
+			(await collections.mlReviews.findOne({ _id: review._id }))?.publish?.attached
+		).toBeUndefined();
+
+		await collections.generations.updateMany(
+			{ conversationId: conv._id },
+			{ $set: { status: "completed" } }
+		);
+		await sweepHeldPublishCards();
+		expect(await cardOn()).toBe(true);
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			publish: { attached: true },
+			delivery: { status: "held" },
+		});
+
+		const fresh = await collections.conversations.findOne({ _id: conv._id });
+		if (!fresh) throw new Error("no conversation");
+		await detachOpenReviews(fresh);
+		expect(await publishRow(conv._id)).toMatchObject({ status: "pending" });
+		expect(deliverReview).not.toHaveBeenCalled();
+
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{ $set: { submittedAt: new Date(Date.now() - 25 * 60 * 60 * 1000) } }
+		);
+		await sweepHeldPublishCards();
+		expect(await publishRow(conv._id)).toMatchObject({ status: "resolved", resolution: "expired" });
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			publish: { decision: "skip", reason: "the publish card was not answered within a day" },
+			delivery: { status: "pending" },
+		});
+		expect(deliverReview).toHaveBeenCalledWith(review._id);
+	});
+
+	it("serves the push and delivery state without records or drafts", async () => {
+		const { locals: owner } = await createTestUser();
+		const { locals: other } = await createTestUser();
+		const { conv, review } = await seed(owner);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{
+				$set: {
+					status: "submitted",
+					push: { status: "pushing", takenAt: new Date() },
+					delivery: { status: "held", attempts: 0 },
+					result: { text: "x".repeat(10_000), files: [{ name: "a.jsonl", version: 1 }] },
+				},
+			}
+		);
+		const payload = superjson.parse<Record<string, unknown>>(
+			await (await STATUS(event(owner, conv._id.toString(), review._id.toString()))).text()
+		);
+		expect(payload).toMatchObject({
+			id: review._id.toString(),
+			status: "submitted",
+			push: { status: "pushing" },
+			delivery: { status: "held" },
+			result: { files: [{ name: "a.jsonl", version: 1 }] },
+		});
+		expect(payload).not.toHaveProperty("records");
+		expect(payload).not.toHaveProperty("drafts");
+		expect(payload).not.toHaveProperty("schema");
+		expect(payload.result).not.toHaveProperty("text");
+		expect(await statusOf(STATUS(event(other, conv._id.toString(), review._id.toString())))).toBe(
+			404
+		);
+	});
+
+	it("holds a detached review's message until its card is answered", async () => {
+		vi.mocked(hub.commit).mockClear();
+		vi.mocked(hub.commit).mockResolvedValue({
+			commit: { oid: "abc123", url: "https://huggingface.co/datasets/pngwn/gold/commit/abc123" },
+			hookOutput: "",
+		});
+		deliverReview.mockClear();
+		const { locals, user } = await createTestUser();
+		await signIn(user._id);
+		const { conv, review } = await withDestination(locals, "detached");
+
+		const res = await SUBMIT(
+			event(locals, conv._id.toString(), review._id.toString(), { verdict: "approve" })
+		);
+		const body = await res.json();
+		const row = await publishRow(conv._id);
+		expect(body).toMatchObject({
+			ok: true,
+			delivery: "queued",
+			publishPromptId: row?.elicitationId,
+		});
+		expect(row?.pending).toMatchObject({ publish: { deliver: true } });
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			delivery: { status: "held" },
+		});
+		expect(deliverReview).not.toHaveBeenCalled();
+
+		if (!row) throw new Error("no publish card");
+		await answer(conv._id, row.elicitationId, "push");
+		const { updates } = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId: row.elicitationId,
+		});
+		expect(updates.some((u) => u.type === "tool")).toBe(false);
+		expect(hub.commit).toHaveBeenCalledTimes(1);
+		expect(await collections.mlReviews.findOne({ _id: review._id })).toMatchObject({
+			delivery: { status: "pending" },
+		});
+		expect(deliverReview).toHaveBeenCalledWith(review._id);
+	});
+
+	it("serves media to the owner only", async () => {
+		const { locals: owner } = await createTestUser();
+		const { locals: other } = await createTestUser();
+		const { conv, review } = await seed(owner);
+		const media = (locals: App.Locals, index: string, field: string) =>
+			MEDIA({
+				locals,
+				params: { id: conv._id.toString(), reviewId: review._id.toString(), index, field },
+				request: new Request("http://localhost/media"),
+			} as never);
+		expect(await statusOf(media(other, "0", "body"))).toBe(404);
+		expect(await statusOf(media(owner, "0", "body"))).toBe(404);
+		expect(await statusOf(media(owner, "9", "body"))).toBe(404);
 	});
 });

@@ -19,6 +19,8 @@ import {
 	releaseElicitationResume,
 } from "$lib/server/mcp/elicitation";
 import { resumeParkedToolCall } from "$lib/server/mcp/resumeElicitation";
+import { expireStalePushes } from "$lib/server/mlReviews/destination";
+import { sweepHeldPublishCards } from "$lib/server/mlReviews/resume";
 import { finishStoredSubmissions } from "$lib/server/mlReviews/submission";
 import { sweepReviewDeliveries } from "$lib/server/mlReviews/delivery";
 import {
@@ -124,6 +126,21 @@ async function answerUpdates(row: McpElicitation): Promise<MessageUpdate[]> {
 	return outcome.updates;
 }
 
+/** the same for a run that goes on, which a review may park again on its publish card */
+async function liveAnswerUpdates(
+	row: McpElicitation,
+	generationId: string
+): Promise<{ updates: MessageUpdate[]; parkedAgain: boolean }> {
+	const outcome = await resumeParkedToolCall({
+		conversationId: row.conversationId,
+		elicitationId: row.elicitationId,
+		claimed: row,
+		generationId,
+		mayPark: true,
+	});
+	return { updates: outcome.updates, parkedAgain: outcome.parkedAgain === true };
+}
+
 async function abandon(row: McpElicitation, reason: string): Promise<void> {
 	logger.warn(
 		{ elicitationId: row.elicitationId, reason },
@@ -176,7 +193,9 @@ export type AskResumeOutcome =
 	/** The result was stored; the turn was not run because the conversation has moved on. */
 	| "answered"
 	/** The result was stored and the turn is running. */
-	| "resumed";
+	| "resumed"
+	/** the answer was stored and the turn parked again on a further prompt */
+	| "parked";
 
 /**
  * Continue the turn an answered `ask_user_question` parked, with no request behind it.
@@ -367,11 +386,14 @@ export async function resumeAnsweredAsk({
 	// Answer first, stored before the model is called and before the claim is consumed: a
 	// process that dies past this point leaves an ordinary interrupted turn whose history
 	// holds the answer, and one that dies before it leaves a claim the sweep takes over.
+	let parkedAgain = false;
 	try {
 		apply(await turnRunning(turnKey));
 		// A claim taken over from a dead process may find the answer already in place.
 		if (!alreadySettled(message, elicitationId)) {
-			for (const update of await answerUpdates(row)) apply(update);
+			const answered = await liveAnswerUpdates(row, generationId);
+			for (const update of answered.updates) apply(update);
+			parkedAgain = answered.parkedAgain;
 		}
 		await persist();
 	} catch (err) {
@@ -387,6 +409,16 @@ export async function resumeAnsweredAsk({
 	await finishElicitationResume(row).catch((err) =>
 		logger.error({ err, elicitationId }, "[ask] failed to consume the claim")
 	);
+
+	// a review parked again on its publish card, the model has no round to answer until then
+	if (parkedAgain) {
+		apply({ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished });
+		await persist().catch((err) =>
+			logger.error({ err, elicitationId }, "[ask] failed to save the parked turn")
+		);
+		await writer.finish({ status: "completed" });
+		return { outcome: "parked" };
+	}
 
 	const run = (async () => {
 		AbortRegistry.getInstance().register(conversationKey, abortController);
@@ -560,6 +592,12 @@ export async function settleAnsweredAsks(
 export async function sweepAnsweredAsks(): Promise<void> {
 	await finishStoredSubmissions().catch((err) =>
 		logger.error({ err }, "[review] could not finish stored submissions")
+	);
+	await expireStalePushes().catch((err) =>
+		logger.error({ err }, "[review] could not expire stale label pushes")
+	);
+	await sweepHeldPublishCards().catch((err) =>
+		logger.error({ err }, "[review] could not sweep held publish cards")
 	);
 	await sweepReviewDeliveries().catch((err) =>
 		logger.error({ err }, "[review] could not sweep review deliveries")

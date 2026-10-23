@@ -13,9 +13,10 @@ import {
 	type ReviewBlocker,
 } from "$lib/utils/review/answers";
 import { REVIEW_LIMITS } from "$lib/utils/review/schema";
-import { readReview, saveDraft, saveDraftsGuarded, submitReview } from "./store";
+import { readReview, reviewObjectId, saveDraft, saveDraftsGuarded, submitReview } from "./store";
 import { completeSubmission } from "./submission";
 import { deliverReview, type DeliveryState } from "./delivery";
+import { openDetachedPublish } from "./resume";
 import { REVIEW_MAX_RECORDS } from "$lib/server/textGeneration/builtinTools/requestReviewDefinition";
 
 export const REVIEW_MAX_COMMENTS_PER_RECORD = REVIEW_LIMITS.commentsPerRecord;
@@ -33,6 +34,12 @@ export async function ownedReview(
 	id: string,
 	reviewId: string
 ): Promise<MlReview> {
+	const review = await readReview(await ownedConversation(locals, id), reviewId);
+	if (!review) error(404, "Review not found");
+	return review;
+}
+
+const ownedConversation = async (locals: App.Locals, id: string) => {
 	if (!locals.user?._id && !locals.sessionId) error(401, "Must have a valid session or user");
 	if (id.length === 7 || !ObjectId.isValid(id)) error(404, "Review not found");
 	const conversation = await collections.conversations.findOne(
@@ -40,9 +47,83 @@ export async function ownedReview(
 		{ projection: { _id: 1 } }
 	);
 	if (!conversation) error(404, "Review not found");
-	const review = await readReview(conversation._id, reviewId);
+	return conversation._id;
+};
+
+/** what a poll needs, never the records, drafts or result text a full read carries */
+const STATUS_PROJECTION = {
+	status: 1,
+	"result.files": 1,
+	"result.pushed": 1,
+	destination: 1,
+	declinedDestination: 1,
+	publish: 1,
+	push: 1,
+	delivery: 1,
+	updatedAt: 1,
+} as const;
+
+export type ReviewStatusRow = Pick<
+	MlReview,
+	| "_id"
+	| "status"
+	| "destination"
+	| "declinedDestination"
+	| "publish"
+	| "push"
+	| "delivery"
+	| "updatedAt"
+> & { result?: Pick<NonNullable<MlReview["result"]>, "files" | "pushed"> };
+
+export async function ownedReviewStatus(
+	locals: App.Locals,
+	id: string,
+	reviewId: string
+): Promise<ReviewStatusRow> {
+	const conversationId = await ownedConversation(locals, id);
+	const _id = reviewObjectId(reviewId);
+	const review = _id
+		? await collections.mlReviews.findOne<ReviewStatusRow>(
+				{ _id, conversationId },
+				{ projection: STATUS_PROJECTION }
+			)
+		: null;
 	if (!review) error(404, "Review not found");
 	return review;
+}
+
+const pushPayload = (push: NonNullable<MlReview["push"]>) => ({
+	status: push.status,
+	...(push.url ? { url: push.url } : {}),
+	...(push.path ? { path: push.path } : {}),
+	...(push.pr !== undefined ? { pr: push.pr } : {}),
+	...(push.error ? { error: push.error } : {}),
+});
+
+const deliveryPayload = (delivery: NonNullable<MlReview["delivery"]>) => ({
+	status: delivery.status,
+	...(delivery.messageId ? { messageId: delivery.messageId } : {}),
+});
+
+export function reviewStatusPayload(review: ReviewStatusRow) {
+	return {
+		id: review._id.toString(),
+		status: review.status,
+		...(review.result
+			? {
+					result: {
+						files: review.result.files,
+						...(review.result.pushed ? { pushed: review.result.pushed } : {}),
+					},
+				}
+			: {}),
+		...(review.destination ? { destination: review.destination } : {}),
+		...(review.declinedDestination ? { declinedDestination: review.declinedDestination } : {}),
+		...(review.publish ? { publish: review.publish } : {}),
+		...(review.push ? { push: pushPayload(review.push) } : {}),
+		...(review.delivery ? { delivery: deliveryPayload(review.delivery) } : {}),
+		updatedAt: review.updatedAt,
+	};
 }
 
 export function reviewPayload(review: MlReview) {
@@ -55,15 +136,12 @@ export function reviewPayload(review: MlReview) {
 		status: review.status,
 		...((review.note ?? review.summary) ? { note: review.note ?? review.summary } : {}),
 		...(review.result ? { result: review.result } : {}),
+		...(review.destination ? { destination: review.destination } : {}),
+		...(review.declinedDestination ? { declinedDestination: review.declinedDestination } : {}),
+		...(review.publish ? { publish: review.publish } : {}),
+		...(review.push ? { push: pushPayload(review.push) } : {}),
 		...(review.submitFailure?.gaveUp ? { submitFailed: review.submitFailure.error } : {}),
-		...(review.delivery
-			? {
-					delivery: {
-						status: review.delivery.status,
-						...(review.delivery.messageId ? { messageId: review.delivery.messageId } : {}),
-					},
-				}
-			: {}),
+		...(review.delivery ? { delivery: deliveryPayload(review.delivery) } : {}),
 		createdAt: review.createdAt,
 		updatedAt: review.updatedAt,
 	};
@@ -416,6 +494,8 @@ export const submitBodySchema = z.object({
 	selection: selectionSchema,
 	/** marks every record still undecided ok, so marking all is one request at 500 records */
 	approveRest: z.boolean().optional(),
+	/** ignored, the publish card after the submit is where a push is confirmed */
+	destination: z.unknown().optional(),
 });
 
 /** mirrors the pane, a record is answered once its required questions are, or any when none is */
@@ -479,6 +559,8 @@ export type SubmitOutcome =
 			files: NonNullable<MlReview["result"]>["files"];
 			/** set when the turn had moved on and the submission goes out as the next user message */
 			delivery?: DeliveryState;
+			/** a detached review waits on this publish card before its message posts */
+			publishPromptId?: string;
 	  }
 	| { blockers: ReviewBlocker[] };
 
@@ -519,15 +601,20 @@ async function finish(
 	review: MlReview,
 	selection: z.infer<typeof selectionSchema>
 ): Promise<SubmitOutcome> {
-	const { result, resolved } = await completeSubmission(review);
+	const { files, resolved } = await completeSubmission(review);
 	if (resolved) {
 		await resume(review, selection);
-		return { ok: true, files: result.files };
+		return { ok: true, files };
 	}
 	// a detached turn moved on, or a message sent meanwhile closed the call, so post it as one
+	if (review.destination) {
+		// held until the publish card is answered, so the posted message carries the outcome
+		const publishPromptId = await openDetachedPublish(review, toResumeSelection(selection));
+		return { ok: true, files, delivery: "queued", ...(publishPromptId ? { publishPromptId } : {}) };
+	}
 	return {
 		ok: true,
-		files: result.files,
+		files,
 		delivery: await deliverReview(review._id, toResumeSelection(selection)),
 	};
 }

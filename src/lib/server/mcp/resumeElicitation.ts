@@ -9,9 +9,6 @@ import {
 	MessageToolUpdateType,
 	MessageUpdateType,
 } from "$lib/types/MessageUpdate";
-import { ensureReviewResult, reviewResolvedUpdate } from "$lib/server/mlReviews/result";
-import { readReview } from "$lib/server/mlReviews/store";
-import { REQUEST_REVIEW_TOOL_NAME } from "$lib/server/textGeneration/builtinTools/requestReviewDefinition";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import type { McpElicitation } from "$lib/types/McpElicitation";
 import type { McpServerConfig } from "./httpClient";
@@ -35,6 +32,7 @@ export async function resumeParkedToolCall({
 	generationId,
 	extraServers = [],
 	signal,
+	mayPark = false,
 }: {
 	conversationId: ObjectId;
 	elicitationId: string;
@@ -47,6 +45,8 @@ export async function resumeParkedToolCall({
 	generationId?: string;
 	extraServers?: McpServerConfig[];
 	signal?: AbortSignal;
+	/** a live run that can park again, a settle with no run to park closes instead */
+	mayPark?: boolean;
 }): Promise<{
 	resumed: boolean;
 	reason?: string;
@@ -73,6 +73,17 @@ export async function resumeParkedToolCall({
 		resolution: "user",
 		...(taken.row.content ? { content: taken.row.content } : {}),
 	};
+
+	if (pending.kind === "ask" && pending.publish) {
+		const { publishAnswerUpdates } = await import("$lib/server/mlReviews/resume");
+		const { updates } = await publishAnswerUpdates({
+			conversationId,
+			row: taken.row,
+			pending: { ...pending, publish: pending.publish },
+			settled,
+		});
+		return { resumed: true, updates };
+	}
 
 	// The model's own question: the answer is the result, so there is nothing to re-issue.
 	if (pending.kind === "ask") {
@@ -104,33 +115,15 @@ export async function resumeParkedToolCall({
 	}
 
 	if (pending.kind === "review") {
-		const review = await readReview(conversationId, pending.reviewId);
-		const submitted =
-			review?.status === "submitted"
-				? { ...review, result: await ensureReviewResult(review) }
-				: undefined;
-		const result: MessageUpdate = {
-			type: MessageUpdateType.Tool,
-			subtype: MessageToolUpdateType.Result,
-			uuid: pending.toolUuid,
-			result: {
-				status: ToolResultStatus.Success,
-				call: { name: REQUEST_REVIEW_TOOL_NAME, parameters: {} },
-				outputs: [
-					{
-						text:
-							submitted?.result?.text ??
-							"The review's submission could not be found. Ask the user what they decided.",
-					},
-				] as unknown as Record<string, unknown>[],
-				display: true,
-			},
-		};
-		// ahead of the marker, ranPastAnswer reads anything after it but this result as a past run
-		return {
-			resumed: true,
-			updates: [...(submitted ? [reviewResolvedUpdate(submitted)] : []), settled, result],
-		};
+		const { reviewResumeUpdates } = await import("$lib/server/mlReviews/resume");
+		const outcome = await reviewResumeUpdates({
+			conversationId,
+			pending,
+			settled,
+			...(generationId ? { generationId } : {}),
+			mayPark,
+		});
+		return { resumed: true, ...outcome };
 	}
 
 	const server = [...getMcpServers(), ...extraServers].find((s) => s.name === pending.server);

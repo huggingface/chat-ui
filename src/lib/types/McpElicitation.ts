@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 import type { Conversation } from "./Conversation";
 import type { Timestamps } from "./Timestamps";
+import type { PublishAudience, ReviewDestination } from "./MlReview";
 
 export const MAX_OTHER_CHARS = 200;
 
@@ -96,6 +97,8 @@ export interface ElicitationRequestPayload {
 	message: string;
 	fields?: ElicitationField[];
 	url?: string;
+	/** a review publish card, so the pane can show it beside its review */
+	reviewId?: string;
 }
 
 /** In the database because the pod serving the answer need not be the one waiting on it. */
@@ -177,6 +180,16 @@ export interface PendingMcpCall extends PendingCallBase {
 /** Nothing to re-issue: the answer itself is the tool result. */
 export interface PendingAskCall extends PendingCallBase {
 	kind: "ask";
+	/** a review publish card, its answer runs the push and the tool result is the review result */
+	publish?: PendingPublish;
+}
+
+export interface PendingPublish {
+	reviewId: string;
+	destination: ReviewDestination;
+	audience: PublishAudience;
+	/** a detached review, the answer releases its held delivery instead of resuming a turn */
+	deliver?: true;
 }
 
 /** a review pane batch, its request stub is never shown and the result comes from mlReviews */

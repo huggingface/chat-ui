@@ -734,6 +734,7 @@ export async function generateConversationResponse({
 						extraServers: (locals as unknown as { mcp?: { selectedServers?: McpServerConfig[] } })
 							?.mcp?.selectedServers,
 						signal: ctrl.signal,
+						mayPark: true,
 					});
 					logger.info(
 						{

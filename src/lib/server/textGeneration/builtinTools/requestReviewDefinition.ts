@@ -17,7 +17,24 @@ export const REVIEW_MAX_INLINE_CHARS = 16_000;
 export const REQUEST_REVIEW_PREPROMPT =
 	`SHOWING DATA: when the user asks to see data, show it with ${REQUEST_REVIEW_TOOL_NAME}, and before you train or push. ` +
 	`Golden and eval sets use suggestions "after_answer". ` +
-	`Over ${REVIEW_MAX_INLINE_RECORDS} records go in a file. One review per round.`;
+	`Over ${REVIEW_MAX_INLINE_RECORDS} records go in a file. One review per round. ` +
+	"Sample a Hub dataset with source.dataset, not a job, unless the rows need preprocessing. " +
+	`Never wait for the dataset viewer, ${REQUEST_REVIEW_TOOL_NAME} falls back on its own. ` +
+	`After revising data for review comments, call ${REQUEST_REVIEW_TOOL_NAME} again.`;
+
+const SAMPLE_PROPERTIES = {
+	sample: {
+		type: "string",
+		enum: ["head", "random"],
+		description: '"head" (default) takes rows in order, "random" a seeded sample across all rows.',
+	},
+	rows: {
+		type: "integer",
+		description: `How many rows, default 50, at most ${REVIEW_MAX_RECORDS}.`,
+	},
+	offset: { type: "integer", description: "head: the first row." },
+	seed: { type: "integer", description: "random: repeat a sample, the result gives its seed." },
+} as const;
 
 /** kept apart from the tool so the prompt specs can measure it without a database */
 export const requestReviewDefinition: OpenAiTool = {
@@ -37,7 +54,10 @@ export const requestReviewDefinition: OpenAiTool = {
 			`Records come from source: inline \`records\` for ${REVIEW_MAX_INLINE_RECORDS} or fewer, ` +
 			"otherwise a virtual file, a sandbox path or an hf:// file holding a JSON array or JSONL, " +
 			"or a .csv or .tsv passed as it is (its header row names the fields, cells are converted " +
-			"to the declared types), " +
+			"to the declared types), a Hub `dataset` sampled through the dataset viewer, or a `parquet` " +
+			"file or folder in a dataset repo or bucket, both read with no job; for those two, omit " +
+			"`fields` to show every column by its dataset type, or declare fields to pick columns " +
+			"(`column` names the source column when it differs). " +
 			`at most ${REVIEW_MAX_RECORDS} records and 4 MB. Each record is an object with the ` +
 			"id_field, one key per field, and optionally `suggestions`: " +
 			'{"<question>": {"value": ..., "score": 0.7, "rationale": "..."}}, your own guess, kept ' +
@@ -81,7 +101,54 @@ export const requestReviewDefinition: OpenAiTool = {
 							type: "string",
 							description: "An hf:// file URI, e.g. hf://datasets/org/repo/sample.jsonl.",
 						},
+						dataset: {
+							type: "object",
+							description:
+								"A Hub dataset read through the dataset viewer, a few seconds for any size. " +
+								"When the viewer is down or has not processed it, reads the repo's Parquet files, then " +
+								"the viewer's refs/convert/parquet branch, then JSONL or CSV; where, query and image or " +
+								"audio columns need the viewer. Never wait for the viewer, the tool falls back at once.",
+							properties: {
+								repo: { type: "string", description: 'e.g. "stanfordnlp/imdb".' },
+								config: { type: "string", description: "Defaults to the first config." },
+								split: { type: "string", description: 'Defaults to "train".' },
+								revision: {
+									type: "string",
+									description: "A branch, tag or commit; the viewer serves only the latest.",
+								},
+								...SAMPLE_PROPERTIES,
+								where: {
+									type: "string",
+									description: `A SQL WHERE clause, column names double quoted: "label" = 1 AND "lang" = 'en'.`,
+								},
+								query: { type: "string", description: "Full text search over the text columns." },
+							},
+							required: ["repo"],
+						},
+						parquet: {
+							type: "object",
+							description:
+								"A Parquet file or folder, hf://datasets/org/repo/data/train-0.parquet or " +
+								"hf://buckets/org/bucket/path/. Only the row groups and columns needed are read, " +
+								"at most 64 MB.",
+							properties: { uri: { type: "string" }, ...SAMPLE_PROPERTIES },
+							required: ["uri"],
+						},
 					},
+				},
+				destination: {
+					type: "object",
+					description:
+						"Where to write the reviewed rows and their answers as a Parquet file. After the " +
+						"user submits, a card asks them to push, open a pull request or not push, showing who " +
+						"will see it; the result says which. A later batch to the same path lands beside it.",
+					properties: {
+						repo: { type: "string", description: '"owner/name".' },
+						type: { type: "string", enum: ["dataset", "bucket"] },
+						path: { type: "string", description: 'e.g. "data/batch-1.parquet".' },
+						pr: { type: "boolean", description: "Open a pull request instead of committing." },
+					},
+					required: ["repo"],
 				},
 				id_field: {
 					type: "string",
@@ -105,6 +172,10 @@ export const requestReviewDefinition: OpenAiTool = {
 							},
 							title: { type: "string" },
 							language: { type: "string", description: "For code fields." },
+							column: {
+								type: "string",
+								description: "dataset and parquet sources: the column to read, when not the name.",
+							},
 						},
 						required: ["name", "type"],
 					},

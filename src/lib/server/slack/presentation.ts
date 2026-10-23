@@ -222,16 +222,28 @@ export function questionModal(request: ElicitationRequestPayload, threadId: stri
 				value: String(i),
 			}));
 			if (field.allowOther) options.push({ text: plain("Other (write below)"), value: "other" });
+			const defaults = [field.default ?? []]
+				.flat()
+				.map((value) => options[field.options.findIndex((option) => option.value === value)])
+				.filter((option) => option !== undefined);
 			blocks.push({
 				type: "input",
 				block_id: key,
 				label,
 				optional: !field.required,
-				element: {
-					type: field.multiple ? "multi_static_select" : "static_select",
-					action_id: "answer",
-					options,
-				},
+				element: field.multiple
+					? {
+							type: "multi_static_select",
+							action_id: "answer",
+							options,
+							...(defaults.length ? { initial_options: defaults } : {}),
+						}
+					: {
+							type: "static_select",
+							action_id: "answer",
+							options,
+							...(defaults[0] ? { initial_option: defaults[0] } : {}),
+						},
 			});
 			if (field.allowOther)
 				blocks.push({
@@ -482,6 +494,7 @@ export function questionBlocks(
 				type: "button",
 				action_id: `${PICK_ACTION}${i}`,
 				text: plain(`${choiceLetter(i)}. ${optionLabel(option)}`.slice(0, 75)),
+				...(field.default === option.value ? { style: "primary" as const } : {}),
 				value: JSON.stringify({ threadId, elicitationId: request.elicitationId, optionIndex: i }),
 				confirm: {
 					title: plain(
