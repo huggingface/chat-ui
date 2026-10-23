@@ -5,6 +5,7 @@
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	const publicConfig = usePublicConfig();
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
+	import { splitSlackRequest } from "$lib/utils/slackRequest";
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
 	// import CarbonDownload from "~icons/carbon/download";
@@ -58,6 +59,8 @@
 		loading?: boolean;
 		isAuthor?: boolean;
 		readOnly?: boolean;
+		/** Conversation is driven from Slack; its user turns carry harness framing. */
+		slackManaged?: boolean;
 		isTapped?: boolean;
 		alternatives?: Message["id"][];
 		editMsdgId?: Message["id"] | null;
@@ -71,6 +74,7 @@
 		loading = false,
 		isAuthor = true,
 		readOnly = false,
+		slackManaged = false,
 		isTapped = $bindable(false),
 		alternatives = [],
 		editMsdgId = $bindable(null),
@@ -292,12 +296,17 @@
 
 	let editMode = $derived(editMsdgId === message.id);
 
+	// Slack turns keep their framing for the model; show the request and fold the rest away.
+	let slackParts = $derived(
+		message.from === "user" && slackManaged ? splitSlackRequest(message.content) : undefined
+	);
+	let displayContent = $derived(slackParts?.request ?? message.content);
 	let contentSegments = $derived(
-		segmentViewText(message.content.trim(), message.dashboardViews ?? [])
+		segmentViewText(displayContent.trim(), message.dashboardViews ?? [])
 	);
 	let unplacedViews = $derived.by(() => {
 		const views = message.dashboardViews ?? [];
-		const placed = viewsInText(message.content, views);
+		const placed = viewsInText(displayContent, views);
 		return views.filter((v) => !placed.includes(v));
 	});
 	$effect(() => {
@@ -618,6 +627,19 @@
 				</div>
 			{/if}
 
+			{#if slackParts?.context}
+				<details class="px-5 text-sm text-gray-400 dark:text-gray-500" data-exclude-from-copy>
+					<summary
+						class="w-fit cursor-pointer select-none hover:text-gray-500 dark:hover:text-gray-400"
+						>Slack context</summary
+					>
+					<p
+						class="mt-2 scrollbar-custom max-h-80 overflow-y-auto rounded-lg border border-gray-100 p-3 text-xs wrap-break-word whitespace-pre-wrap dark:border-gray-800"
+					>
+						{slackParts.context}
+					</p>
+				</details>
+			{/if}
 			<div class="flex w-full flex-row flex-nowrap">
 				{#if !editMode}
 					<p
@@ -714,10 +736,10 @@
 						onclick={async () => {
 							try {
 								if (window.isSecureContext && navigator.clipboard) {
-									await navigator.clipboard.writeText(message.content);
+									await navigator.clipboard.writeText(displayContent);
 								} else {
 									const textArea = document.createElement("textarea");
-									textArea.value = message.content;
+									textArea.value = displayContent;
 									// Off-screen + preventScroll so the legacy copy path
 									// (insecure contexts) can't scroll-jump or shift layout.
 									textArea.style.cssText = "position: fixed; opacity: 0;";

@@ -321,3 +321,35 @@ describe("a notice on an assistant turn", () => {
 		expect(spinners(container)).toBe(1);
 	});
 });
+
+describe("a user turn sent from Slack", () => {
+	const content = `The invoking Slack user is U1. Reply to them in this thread.\n\n<slack_thread_context>\n[]\n</slack_thread_context>\n\nInvoking user's request:\nWhat is the best upscaler?`;
+	const mountUser = (slackManaged: boolean) =>
+		render(ChatMessage, {
+			message: { id: "u1", from: "user", content, children: [] },
+			readOnly: slackManaged,
+			slackManaged,
+		} as never);
+
+	it("shows the request and keeps the Slack framing collapsed until opened", async () => {
+		const { container } = mountUser(true);
+		const details = container.querySelector("details");
+		if (!details) throw new Error("No Slack context");
+		expect(details.open).toBe(false);
+		expect(details.querySelector("summary")?.textContent).toBe("Slack context");
+		const request = [...container.querySelectorAll("p")].find(
+			(p) => !details.contains(p) && p.textContent?.includes("upscaler")
+		);
+		expect(request?.textContent?.trim()).toBe("What is the best upscaler?");
+		expect(details.textContent).toContain("The invoking Slack user is U1.");
+		expect(details.textContent).not.toContain("Invoking user's request");
+		details.querySelector("summary")?.click();
+		await vi.waitFor(() => expect(details.open).toBe(true));
+	});
+
+	it("leaves the text alone outside Slack-managed conversations", () => {
+		const { container } = mountUser(false);
+		expect(container.querySelector("details")).toBeNull();
+		expect(container.textContent).toContain("Invoking user's request");
+	});
+});
