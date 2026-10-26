@@ -18,3 +18,8 @@ it("separates requests, including joined follow-ups, from their Slack framing", 
 	expect(context).toContain("Use the 4x model we discussed");
 	expect(splitSlackRequest("Plain message").context).toBeUndefined();
 });
+
+it("keeps the request's own whitespace", () => {
+	const code = "fix:\n```\ndef f():\n    return 1\n```";
+	expect(splitSlackRequest(prompt(`<@UBOT> ${code}`)).request).toBe(code);
+});
