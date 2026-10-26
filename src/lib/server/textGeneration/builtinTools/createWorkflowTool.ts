@@ -1,10 +1,13 @@
 import { createRepo, uploadFiles } from "@huggingface/hub";
+import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import type { OpenAiTool } from "$lib/server/mcp/tools";
 import { knownArtefactUris, recordArtefact } from "$lib/server/mlRegistry/store";
 import type { BuiltinTool, BuiltinToolContext } from "./types";
 
 export const CREATE_WORKFLOW_TOOL_NAME = "create_workflow";
+
+export const workflowsEnabled = (): boolean => config.ML_ASSISTANT_WORKFLOWS !== "false";
 
 /** The gradio release the generated graph is written against, pinned in the Space's README. */
 export const GRADIO_VERSION = "6.30.0";

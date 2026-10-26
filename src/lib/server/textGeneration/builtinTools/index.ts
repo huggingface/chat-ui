@@ -11,7 +11,7 @@ import { createSandboxTool } from "./sandboxTool";
 import { createJobCheckTool } from "./jobCheckTool";
 import { createTrackioTool } from "./createTrackioTool";
 import { createReadTrackioTool } from "./readTrackioTool";
-import { createWorkflowTool } from "./createWorkflowTool";
+import { createWorkflowTool, workflowsEnabled } from "./createWorkflowTool";
 import { createFileTools } from "./fileTools";
 import { createImportFileTool } from "./importFileTool";
 import type { BuiltinTool } from "./types";
@@ -61,10 +61,14 @@ export function getEnabledBuiltinTools(params: {
 			() => params.conv.messages ?? [],
 			() => params.hfToken
 		),
-		createWorkflowTool(
-			() => params.namespace,
-			() => params.hfToken
-		),
+		...(workflowsEnabled()
+			? [
+					createWorkflowTool(
+						() => params.namespace,
+						() => params.hfToken
+					),
+				]
+			: []),
 		...(virtualFiles ? [...createFileTools(params.conv), createImportFileTool(params.conv)] : []),
 	];
 }

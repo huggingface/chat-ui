@@ -105,6 +105,7 @@ Several parts of ML Intern have kill switches. Each is on unless set to `false`,
 | `ML_ASSISTANT_SERVICE_EVENTS`           | Waking a waiting turn when a Job or sandbox ends (needs the poller)                                                    |
 | `ML_ASSISTANT_PUSH_CHECKS`              | Checking which repos a finished Job pushed to (needs the poller)                                                       |
 | `ML_ASSISTANT_JOB_LABELS`               | Naming and labelling ML Intern Jobs, and recovering submissions whose reply was lost                                   |
+| `ML_ASSISTANT_WORKFLOWS`                | The `create_workflow` tool, which deploys public gr.Workflow Spaces under the user's account                           |
 
 ## Where the code lives
 
