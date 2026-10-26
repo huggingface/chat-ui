@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
-import { listMlArtefacts } from "$lib/server/mlRegistry/store";
+import { listMlArtefacts, recordArtefact } from "$lib/server/mlRegistry/store";
 import type { BuiltinToolContext } from "./types";
 
 const hub = vi.hoisted(() => ({ createRepo: vi.fn(), uploadFiles: vi.fn() }));
@@ -104,11 +104,8 @@ describe("create_workflow", () => {
 			"FLUX.1-dev",
 		]);
 		const readme = await uploaded("README.md");
-		// gradio warns at launch without both: inference-api runs nodes on the visitor's quota,
-		// write-repos lets the owner save the canvas.
-		expect(readme).toContain(
-			"hf_oauth: true\nhf_oauth_scopes:\n  - inference-api\n  - write-repos"
-		);
+		expect(readme).toContain("hf_oauth: true\nhf_oauth_scopes:\n  - inference-api\n");
+		expect(readme).not.toContain("write-repos");
 		expect(readme).toContain(`sdk_version: ${GRADIO_VERSION}`);
 		expect(readme).toContain("built-with-ml-intern");
 	});
@@ -174,10 +171,15 @@ describe("create_workflow", () => {
 		expect(hub.uploadFiles).not.toHaveBeenCalled();
 	});
 
-	it("updates the same Space on a rerun", async () => {
+	it("updates the same Space on a rerun, but not one made elsewhere", async () => {
+		const conversationId = new ObjectId();
+		conversationIds.push(conversationId);
 		hub.createRepo.mockRejectedValue(Object.assign(new Error("exists"), { statusCode: 409 }));
-		expect(await tool().execute(compare, ctx)).toHaveProperty("resultText");
-		expect(hub.uploadFiles).toHaveBeenCalledOnce();
+		expect(await tool().execute(compare, { ...ctx, conversationId })).toHaveProperty("error");
+
+		const uri = "hf://spaces/pngwn/product-shots-workflow";
+		await recordArtefact({ conversationId, kind: "space", uri, url: "" });
+		expect(await tool().execute(compare, { ...ctx, conversationId })).toHaveProperty("resultText");
 	});
 
 	it("never leaves a `--` where a long name is cut", async () => {

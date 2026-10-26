@@ -1,7 +1,7 @@
 import { createRepo, uploadFiles } from "@huggingface/hub";
 import { logger } from "$lib/server/logger";
 import type { OpenAiTool } from "$lib/server/mcp/tools";
-import { recordArtefact } from "$lib/server/mlRegistry/store";
+import { knownArtefactUris, recordArtefact } from "$lib/server/mlRegistry/store";
 import type { BuiltinTool, BuiltinToolContext } from "./types";
 
 export const CREATE_WORKFLOW_TOOL_NAME = "create_workflow";
@@ -48,7 +48,7 @@ const definition: OpenAiTool = {
 					description:
 						"What the workflow is for, in a few words — the Space is named from it, e.g. " +
 						"'product-shot-t2i-comparison'. Reuse a name only to update that workflow; " +
-						"otherwise pick a new one, since a reused name overwrites edits saved on its canvas.",
+						"otherwise pick a new one.",
 				},
 				namespace: {
 					type: "string",
@@ -69,7 +69,8 @@ const definition: OpenAiTool = {
  * reaching the providers, a model nobody serves 404s on Run. So the graph is
  * generated from the endpoint schemas below and every model is checked here,
  * before anything exists. workflow.json is the source of truth from then on:
- * app.py only loads it, and the canvas saves back to it.
+ * app.py only loads it. The canvas cannot save back to it: that would need
+ * write-repos, which every visitor who signs in would have to grant.
  *
  * Nothing it creates spends the conversation's budget: a gradio Space runs on
  * free CPU, and every inference call bills the visitor who presses Run.
@@ -116,8 +117,15 @@ export function createWorkflowTool(
 					sdk: "gradio",
 				});
 			} catch (err) {
-				// 409 → a rerun of the same workflow: update the Space it made last time.
 				if (statusCodeOf(err) !== 409) return { error: hubError("create", plan.spaceId, err) };
+				const uri = `hf://spaces/${plan.spaceId}`;
+				const ours =
+					ctx.conversationId && (await knownArtefactUris(ctx.conversationId, [uri])).has(uri);
+				if (!ours) {
+					return {
+						error: `${plan.spaceId} already exists and was not made in this conversation — call this again with a different name.`,
+					};
+				}
 			}
 			try {
 				await uploadFiles({
@@ -514,7 +522,6 @@ app_file: app.py
 hf_oauth: true
 hf_oauth_scopes:
   - inference-api
-  - write-repos
 tags:
   - ml-intern
   - gradio-workflow
@@ -522,7 +529,7 @@ tags:
 
 [![Built with ML Intern](https://huggingface.co/datasets/huggingface/badges/resolve/main/built-with-ml-intern-sm.svg)](https://hf.co/chat?mode=ml-intern)
 
-A [gr.Workflow](https://www.gradio.app/guides/workflows): sign in and press Run to try it on your own input, or swap a model on the canvas and save your own copy.
+A [gr.Workflow](https://www.gradio.app/guides/workflows): sign in and press Run to try it on your own input.
 `;
 }
 

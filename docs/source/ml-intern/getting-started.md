@@ -76,7 +76,7 @@ While ML Intern works, you can:
   - the scripts it wrote, with every version and the Jobs that ran each one
   - the images its tools returned, such as sample grids and plots
 - **Watch training live.** When a training run logs to [Trackio](https://huggingface.co/docs/trackio), a live metrics dashboard opens in a side panel.
-- **Compare models side by side.** Asked to choose between models, or to feed one model's output into another, ML Intern deploys a public [gr.Workflow](https://www.gradio.app/guides/workflows) Space that runs them on the same input. You can rerun it on your own inputs, or swap models on its canvas and save your own copy. Runs bill the inference quota of whoever presses Run, not the conversation's compute budget.
+- **Compare models side by side.** Asked to choose between models, or to feed one model's output into another, ML Intern deploys a public [gr.Workflow](https://www.gradio.app/guides/workflows) Space that runs them on the same input. You can rerun it on your own inputs. Runs bill the inference quota of whoever presses Run, not the conversation's compute budget.
 - **Answer its questions.** ML Intern sometimes asks you to choose between options or confirm a step before it continues.
 - **Resume after a failure.** If a turn fails partway, use **Resume** to continue from where it stopped rather than starting the whole turn again.
 
