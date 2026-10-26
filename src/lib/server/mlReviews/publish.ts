@@ -212,9 +212,7 @@ export async function decidePublish(
 		},
 		{ returnDocument: "after" }
 	);
-	return (
-		updated.value ?? (await readReview(review.conversationId, review._id.toString())) ?? review
-	);
+	return updated ?? (await readReview(review.conversationId, review._id.toString())) ?? review;
 }
 
 export type OpenedPublish =
