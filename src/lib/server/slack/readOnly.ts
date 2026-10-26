@@ -23,6 +23,7 @@ export async function isSlackConversationMutation(
 		return false;
 	const route = routeId?.replace(/\/\([^/]+\)/g, "");
 	if (!route || !/^\/(?:api\/(?:v2\/)?)?conversations?\/\[id\](?:\/|$)/.test(route)) return false;
+	if (route === "/conversation/[id]/share") return false;
 	const conv = await collections.conversations.findOne(
 		{ _id: new ObjectId(id), ...authCondition(locals) },
 		{ projection: { managedBy: 1, sessionId: 1 } }
