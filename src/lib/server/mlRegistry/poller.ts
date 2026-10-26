@@ -54,7 +54,7 @@ export async function claimDueService(now: Date): Promise<MlService | null> {
 		{ $set: { nextPollAt: new Date(now.getTime() + CLAIM_LEASE_MS) } },
 		{ sort: { nextPollAt: 1 }, returnDocument: "after" }
 	);
-	return claimed?.value ?? null;
+	return claimed;
 }
 
 type TokenCache = Map<string, Promise<string | undefined>>;

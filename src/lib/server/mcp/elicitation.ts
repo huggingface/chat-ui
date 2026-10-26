@@ -331,8 +331,7 @@ export async function claimElicitationResume(
 		},
 		{ returnDocument: "after" }
 	);
-	// Driver v5: findOneAndUpdate returns ModifyResult unless told otherwise.
-	return claimed?.value ?? null;
+	return claimed;
 }
 
 /** takenAt as well, a pod on older code claims without replacing claimId */
