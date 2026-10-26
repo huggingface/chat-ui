@@ -59,7 +59,6 @@
 		loading?: boolean;
 		isAuthor?: boolean;
 		readOnly?: boolean;
-		/** Conversation is driven from Slack; its user turns carry harness framing. */
 		slackManaged?: boolean;
 		isTapped?: boolean;
 		alternatives?: Message["id"][];
@@ -296,7 +295,6 @@
 
 	let editMode = $derived(editMsdgId === message.id);
 
-	// Slack turns keep their framing for the model; show the request and fold the rest away.
 	let slackParts = $derived(
 		message.from === "user" && slackManaged ? splitSlackRequest(message.content) : undefined
 	);

@@ -33,7 +33,6 @@ export function threadPrompt(
 		context = JSON.stringify(history);
 		truncated = true;
 	}
-	// Removing the mention must not leave a double space mid-sentence.
 	const instruction = invocation.text
 		.split(`<@${botUserId}>`)
 		.join("")
