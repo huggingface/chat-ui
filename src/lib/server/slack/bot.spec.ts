@@ -249,7 +249,7 @@ describe("Slack transport authorization", () => {
 			v.text.startsWith("Questions answered")
 		);
 		expect(summaries).toHaveLength(1);
-		expect(JSON.stringify(summaries[0][0].blocks)).toContain("Set budget to $5.00* ✅");
+		expect(JSON.stringify(summaries[0][0].blocks)).toContain("✅ Set budget to $5.00");
 	});
 
 	it("collects owner-only choices without spending, rejects stale submissions, and submits together", async () => {
@@ -501,8 +501,8 @@ describe("Slack transport authorization", () => {
 			mocks.update.mock.calls.some(([v]) => v.ts === "100.0" && v.text.includes("Finished"))
 		).toBe(true);
 		const frozen = mocks.update.mock.calls.find(([v]) => v.text.startsWith("Questions answered"));
-		expect(JSON.stringify(frozen?.[0].blocks)).toContain("*Beta* ✅");
-		expect(JSON.stringify(frozen?.[0].blocks)).toContain("*Alpha* ✅");
+		expect(JSON.stringify(frozen?.[0].blocks)).toContain("✅ Beta");
+		expect(JSON.stringify(frozen?.[0].blocks)).toContain("✅ Alpha");
 		expect(frozen?.[0].blocks.at(-1)).toEqual({ type: "divider" });
 		expect(frozen?.[0].blocks.some((b: { type: string }) => b.type === "actions")).toBe(false);
 		await collections.slackThreads.updateOne({ _id: thread._id }, { $set: { watching: true } });
@@ -820,6 +820,53 @@ describe("Slack transport authorization", () => {
 		await bot["dispatch"](thread);
 		expect(mocks.run).toHaveBeenCalledTimes(1);
 		expect(mocks.run.mock.lastCall?.[2].text).toContain("Now evaluate it");
+	});
+
+	it("tells the owner privately instead of sending a reply that opens by tagging someone else", async () => {
+		const { user } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		bot["botUserId"] = "UBOT";
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "<@UBOT> Start", ts: "100.0" },
+			"T123",
+			"start"
+		);
+		const onMessage = mocks.handlers.get("event:message");
+		if (!onMessage) throw Error("No message handler");
+		const reply = (text: string, ts: string) =>
+			onMessage({
+				event: {
+					channel: "C123",
+					channel_type: "channel",
+					user: "OWNER",
+					text,
+					ts,
+					thread_ts: "100.0",
+				},
+				body: { team_id: "T123", event_id: ts },
+			});
+		await reply("<@UALICE> what do you think?", "101.0");
+		expect(await collections.slackInputs.countDocuments({})).toBe(1);
+		expect(mocks.ephemeral).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				user: "OWNER",
+				thread_ts: "100.0",
+				text: "Tagging a user at the beginning of a message means your message will not be sent to ML Intern.",
+			})
+		);
+		await bot.receive(
+			{
+				channel: "C123",
+				user: "OWNER",
+				text: "<@UALICE> <@UBOT> compare",
+				ts: "102.0",
+				thread_ts: "100.0",
+			},
+			"T123",
+			"both"
+		);
+		await reply("Ask <@UALICE> later", "103.0");
+		expect(await collections.slackInputs.countDocuments({})).toBe(3);
 	});
 
 	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {

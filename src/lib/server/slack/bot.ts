@@ -40,7 +40,13 @@ import { provisionSlackIdentity, threadLocals } from "./identity";
 import { answerSideQuestion, SIDE_QUESTION_MAX_CHARS } from "$lib/server/mlSideQuestion";
 import { slackSideQuestion } from "$lib/utils/sideQuestion";
 import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } from "./engine";
-import { isWorkspaceMember, threadKey, threadPrompt, type ThreadMessage } from "./context";
+import {
+	addressedToOther,
+	isWorkspaceMember,
+	threadKey,
+	threadPrompt,
+	type ThreadMessage,
+} from "./context";
 import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store";
 import type { SlackThread } from "./types";
 import {
@@ -589,6 +595,15 @@ export class MlSlackBot {
 		)
 			return;
 		if (!(await this.member(event.user))) return;
+		if (this.botUserId && addressedToOther(event.text, this.botUserId)) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"Tagging a user at the beginning of a message means your message will not be sent to ML Intern.",
+				event.thread_ts
+			);
+			return;
+		}
 		const channel = await this.app.client.conversations.info({ channel: event.channel });
 		if (channel.channel?.is_ext_shared) {
 			await this.tell(
