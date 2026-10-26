@@ -102,10 +102,11 @@ export function createWorkflowTool(
 				return { error: "No Hugging Face token for this conversation; the user needs to sign in." };
 			}
 
-			for (const { model, task } of plan.steps) {
-				const problem = await checkModel(model, task, accessToken, ctx.abortSignal);
-				if (problem) return { error: problem };
-			}
+			const problems = await Promise.all(
+				plan.steps.map(({ model, task }) => checkModel(model, task, accessToken, ctx.abortSignal))
+			);
+			const problem = problems.find(Boolean);
+			if (problem) return { error: problem };
 
 			const graph = workflowJson(plan);
 			const files = [
@@ -136,6 +137,7 @@ export function createWorkflowTool(
 					accessToken,
 					files,
 					commitTitle: "Workflow from ML Intern",
+					abortSignal: ctx.abortSignal,
 				});
 			} catch (err) {
 				return { error: hubError("write to", plan.spaceId, err) };
@@ -269,7 +271,7 @@ async function checkModel(
 ): Promise<string | undefined> {
 	let info: {
 		pipeline_tag?: string;
-		inferenceProviderMapping?: Record<string, { status?: string }>;
+		inferenceProviderMapping?: Record<string, { status?: string; task?: string }>;
 	};
 	try {
 		const response = await fetch(
@@ -284,11 +286,14 @@ async function checkModel(
 	if (info.pipeline_tag !== task) {
 		return `${model} is a ${info.pipeline_tag ?? "untagged"} model, not ${task}.`;
 	}
-	const live = Object.values(info.inferenceProviderMapping ?? {}).some((p) => p.status === "live");
+	const tasks = providerTasks(PIPELINE_TAG_TO_ENDPOINT[task]);
+	const live = Object.values(info.inferenceProviderMapping ?? {}).some(
+		(p) => p.status === "live" && tasks.includes(p.task ?? "")
+	);
 	if (!live) {
 		return (
-			`${model} is not served by any inference provider, so a workflow cannot call it — ` +
-			`pick another, or deploy it in a Space of its own first.`
+			`${model} is not served by any inference provider for ${tasks.join(" or ")}, so a ` +
+			`workflow cannot call it — pick another, or deploy it in a Space of its own first.`
 		);
 	}
 	return undefined;
@@ -401,6 +406,12 @@ const PIPELINE_TAG_TO_ENDPOINT: Record<string, string> = {
 };
 
 const endpointOf = (task: string): Endpoint => ENDPOINTS[PIPELINE_TAG_TO_ENDPOINT[task]];
+
+function providerTasks(endpoint: string): string[] {
+	if (endpoint === "chat_completion") return ["conversational"];
+	if (endpoint === "text_generation") return ["text-generation", "conversational"];
+	return [endpoint.replaceAll("_", "-")];
+}
 
 /** Mirrors `ports_compatible` in gradio's workflow-types.ts: markdown is text to a port. */
 function portsConnect(from: string, to: string): boolean {
@@ -546,8 +557,11 @@ function statusCodeOf(err: unknown): number | undefined {
 
 function hubError(action: string, spaceId: string, err: unknown): string {
 	const status = statusCodeOf(err);
-	if (status === 401 || status === 403) {
-		return `Not allowed to ${action} ${spaceId}: the user's sign-in needs permission to create Spaces.`;
+	if (status === 401) {
+		return `Not allowed to ${action} ${spaceId}: the user needs to sign in again.`;
+	}
+	if (status === 403) {
+		return `${spaceId} already exists and this app cannot write to it — call this again with a different name.`;
 	}
 	return `Could not ${action} ${spaceId}: ${String(err)}`;
 }

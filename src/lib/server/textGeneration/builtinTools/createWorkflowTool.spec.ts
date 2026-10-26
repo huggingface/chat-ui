@@ -18,7 +18,7 @@ const tool = (namespace: string | undefined = "pngwn") =>
 	);
 
 /** Hub model records, keyed by id; anything absent 404s. */
-let models: Record<string, { pipeline_tag?: string; providers?: string[] }>;
+let models: Record<string, { pipeline_tag?: string; providers?: string[]; providerTask?: string }>;
 
 const t2i = { pipeline_tag: "text-to-image", providers: ["live"] };
 const compare = {
@@ -43,7 +43,10 @@ beforeEach(() => {
 			const model = models[id];
 			if (!model) return new Response("", { status: 404 });
 			const inferenceProviderMapping = Object.fromEntries(
-				(model.providers ?? []).map((status, i) => [`p${i}`, { status }])
+				(model.providers ?? []).map((status, i) => [
+					`p${i}`,
+					{ status, task: model.providerTask ?? model.pipeline_tag },
+				])
 			);
 			return Response.json({ pipeline_tag: model.pipeline_tag, inferenceProviderMapping });
 		})
@@ -212,6 +215,22 @@ describe("create_workflow", () => {
 
 		if (!("error" in result)) throw new Error("expected an error");
 		expect(result.error).toContain("not served by any inference provider");
+	});
+
+	it("refuses a model served live only for another task", async () => {
+		models["krea/Krea-2-Turbo"] = { ...t2i, providerTask: "image-to-image" };
+		const result = await tool().execute(compare, ctx);
+
+		if (!("error" in result)) throw new Error("expected an error");
+		expect(result.error).toContain("not served by any inference provider for text-to-image");
+	});
+
+	it("asks for a different name, not more permissions, on a 403", async () => {
+		hub.uploadFiles.mockRejectedValue(Object.assign(new Error("no"), { statusCode: 403 }));
+		const result = await tool().execute(compare, ctx);
+
+		if (!("error" in result)) throw new Error("expected an error");
+		expect(result.error).toContain("different name");
 	});
 
 	it("refuses rather than guessing when there is no namespace", async () => {
