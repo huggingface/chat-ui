@@ -19,12 +19,18 @@
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
 	import {
 		LINK_PARAM_NAMES,
+		MCP_LINK_PARAM_NAMES,
 		linkPromptNeedsConfirmation,
+		readLinkMcpServerRequest,
 		readLinkMode,
 		readLinkPromptRequest,
+		type LinkMcpServerRequest,
 		type LinkPromptRequest,
 	} from "$lib/utils/linkParams";
 	import LinkPromptModal from "$lib/components/LinkPromptModal.svelte";
+	import MCPServerManager from "$lib/components/mcp/MCPServerManager.svelte";
+	import { allMcpServers, selectedServerIds } from "$lib/stores/mcpServers";
+	import { isSameServerUrl } from "$lib/utils/mcpValidation";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
 	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
@@ -38,6 +44,7 @@
 	let draft = $state("");
 	/** A deep link waiting on the user's say-so; see LinkPromptModal. */
 	let linkRequest = $state<LinkPromptRequest | null>(null);
+	let linkMcpServer = $state<LinkMcpServerRequest | null>(null);
 
 	const settings = useSettingsStore();
 
@@ -144,17 +151,29 @@
 	onMount(() => {
 		try {
 			const request = readLinkPromptRequest(page.url.searchParams);
-			if (!request) return;
+			const mcpRequest = readLinkMcpServerRequest(page.url.searchParams);
+			if (!request && !mcpRequest) return;
 			// Redirects to login and comes back to this URL, params included.
 			if (requireAuthUser()) return;
 
 			// The request lives in memory from here on. Strip it from the URL so a
 			// reload or Back/Forward cannot replay it.
 			const url = new URL(page.url);
-			for (const name of LINK_PARAM_NAMES) url.searchParams.delete(name);
+			for (const name of [...LINK_PARAM_NAMES, ...MCP_LINK_PARAM_NAMES]) {
+				url.searchParams.delete(name);
+			}
 			tick().then(() => {
 				replaceState(url, page.state);
 			});
+
+			const alreadyEnabled =
+				mcpRequest &&
+				$allMcpServers.some(
+					(s) => $selectedServerIds.has(s.id) && isSameServerUrl(s.url, mcpRequest.url.href)
+				);
+			if (mcpRequest && !alreadyEnabled) linkMcpServer = mcpRequest;
+
+			if (!request) return;
 
 			// A link that sends, or one that brings in content we do not publish
 			// ourselves, is shown to the user first. Nothing is fetched before then.
@@ -232,7 +251,12 @@
 	<!-- A first visit also opens the layout's welcome modal, and a first switch into
 	     ML Intern its onboarding. One dialog at a time: the request waits in memory
 	     until those are dismissed. -->
-	{#if linkRequest && $settings.welcomeModalSeen && !mlAssistant.onboardingOpen}
+	{#if linkMcpServer && $settings.welcomeModalSeen && !mlAssistant.onboardingOpen}
+		<MCPServerManager
+			linkServer={{ name: linkMcpServer.name, url: linkMcpServer.url.href }}
+			onclose={() => (linkMcpServer = null)}
+		/>
+	{:else if linkRequest && $settings.welcomeModalSeen && !mlAssistant.onboardingOpen}
 		{@const request = linkRequest}
 		<LinkPromptModal
 			{request}
