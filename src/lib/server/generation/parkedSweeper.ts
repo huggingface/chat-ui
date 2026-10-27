@@ -169,8 +169,7 @@ async function claimDueCall(now: Date): Promise<ParkedCall | null> {
 		{ $set: { status: "resuming", takenAt: now, updatedAt: now }, $inc: { attempts: 1 } },
 		{ sort: { resumeAt: 1 }, returnDocument: "after" }
 	);
-	// Driver v5: findOneAndUpdate returns ModifyResult unless told otherwise.
-	return claimed?.value ?? null;
+	return claimed;
 }
 
 /**

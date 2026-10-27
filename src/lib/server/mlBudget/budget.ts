@@ -207,8 +207,7 @@ export async function setMlBudgetLeft({
 		],
 		{ returnDocument: "after", projection: { mlBudget: 1 } }
 	);
-	// Driver v5: findOneAndUpdate returns ModifyResult unless told otherwise.
-	const budget = res?.value?.mlBudget;
+	const budget = res?.mlBudget;
 	if (budget) return { outcome: "set", budget };
 	// Tell the ceiling apart from a missing (or not-yours) conversation.
 	const exists = await collections.conversations.countDocuments(

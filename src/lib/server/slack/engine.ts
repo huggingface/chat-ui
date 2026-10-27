@@ -162,13 +162,13 @@ export async function stopSlackTurn(thread: SlackThread, user: User): Promise<vo
 		{ $set: { status: "failed", error: "Stopped from Slack", endedAt: now, updatedAt: now } },
 		{ returnDocument: "after" }
 	);
-	if (parked.value) {
+	if (parked) {
 		await collections.abortedGenerations.deleteOne({
 			conversationId: thread.conversationId,
 			updatedAt: { $lte: now },
 		});
 		await collections.conversations.updateOne(
-			{ _id: thread.conversationId, "messages.id": parked.value.messageId },
+			{ _id: thread.conversationId, "messages.id": parked.messageId },
 			{ $set: { "messages.$.interrupted": true, updatedAt: now } }
 		);
 	}
@@ -216,7 +216,7 @@ export async function skipSlackQuestion(
 		},
 		{ returnDocument: "after" }
 	);
-	if (!result.value) {
+	if (!result) {
 		// let it through, the new turn detaches the review, a stop would resolve it as aborted
 		const review = await collections.mcpElicitations.findOne({
 			conversationId: thread.conversationId,
