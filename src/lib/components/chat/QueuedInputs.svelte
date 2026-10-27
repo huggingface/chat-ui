@@ -1,17 +1,19 @@
 <script lang="ts">
 	import type { QueuedChip } from "$lib/stores/queuedInputs.svelte";
+	import { splitSlackRequest } from "$lib/utils/slackRequest";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonEdit from "~icons/carbon/edit";
 
 	interface Props {
 		items: QueuedChip[];
 		busy: boolean;
+		slackManaged?: boolean;
 		onremove: (id: string) => void;
 		onedit: (id: string) => void;
 		onsendnow: () => Promise<void>;
 	}
 
-	let { items, busy, onremove, onedit, onsendnow }: Props = $props();
+	let { items, busy, slackManaged = false, onremove, onedit, onsendnow }: Props = $props();
 
 	let sending = $state(false);
 
@@ -51,7 +53,7 @@
 				class:opacity-60={item.sending}
 			>
 				<p class="line-clamp-3 min-w-0 flex-1 wrap-break-word whitespace-break-spaces">
-					{item.text}
+					{slackManaged ? splitSlackRequest(item.text).request : item.text}
 				</p>
 				{#if !item.sending}
 					<button

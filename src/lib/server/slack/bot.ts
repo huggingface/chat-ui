@@ -41,7 +41,13 @@ import { answerSideQuestion, SIDE_QUESTION_MAX_CHARS } from "$lib/server/mlSideQ
 import { slackSideQuestion } from "$lib/utils/sideQuestion";
 import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } from "./engine";
 import { MCP_RESYNC_NOTE } from "$lib/server/mcp/savedSelection";
-import { isWorkspaceMember, threadKey, threadPrompt, type ThreadMessage } from "./context";
+import {
+	addressedToOther,
+	isWorkspaceMember,
+	threadKey,
+	threadPrompt,
+	type ThreadMessage,
+} from "./context";
 import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store";
 import type { SlackThread } from "./types";
 import {
@@ -92,6 +98,7 @@ const mention = z.object({
 		.optional(),
 	bot_id: z.string().optional(),
 	subtype: z.string().optional(),
+	channel_type: z.string().optional(),
 });
 
 /** shared slack credentials pay for these, so they are capped per asker and per workspace */
@@ -590,6 +597,20 @@ export class MlSlackBot {
 		)
 			return;
 		if (!(await this.member(event.user))) return;
+		// In a DM every message is for the bot, even one that opens by tagging a colleague.
+		if (
+			event.channel_type !== "im" &&
+			this.botUserId &&
+			addressedToOther(event.text, this.botUserId)
+		) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"Tagging a person or group at the beginning of a message means your message will not be sent to ML Intern.",
+				event.thread_ts
+			);
+			return;
+		}
 		const channel = await this.app.client.conversations.info({ channel: event.channel });
 		if (channel.channel?.is_ext_shared) {
 			await this.tell(
@@ -1481,7 +1502,7 @@ export class MlSlackBot {
 			const text = "Question skipped — continued with a new message.";
 			const blocks = [
 				{ type: "section" as const, text: { type: "plain_text" as const, text } },
-				...confirmedQuestionBlocks(question.request, {}),
+				...confirmedQuestionBlocks(question.request),
 			];
 			for (const ts of card.parts)
 				await this.app.client.chat.update({

@@ -30,8 +30,11 @@ it.each([
 	expect(await isSlackConversationMutation(method, route, id, locals)).toBe(true);
 	expect(mocks.findOne.mock.calls[0][0]).toEqual({ _id: new ObjectId(id), userId: "owner" });
 });
-it("allows inspection without a database lookup", async () => {
+it("allows inspection and sharing without a database lookup", async () => {
 	expect(await isSlackConversationMutation("GET", "/conversation/[id]/stream", id, locals)).toBe(
+		false
+	);
+	expect(await isSlackConversationMutation("POST", "/conversation/[id]/share", id, locals)).toBe(
 		false
 	);
 	expect(mocks.findOne).not.toHaveBeenCalled();
