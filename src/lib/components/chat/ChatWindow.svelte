@@ -1337,6 +1337,7 @@
 						<QueuedInputs
 							items={queuedInputs.items}
 							busy={loading || turnWaiting}
+							slackManaged={!!slackThreadUrl}
 							onremove={removeQueued}
 							onedit={editQueued}
 							onsendnow={sendQueuedNow}

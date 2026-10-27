@@ -23,3 +23,10 @@ it("keeps the request's own whitespace", () => {
 	const code = "fix:\n```\ndef f():\n    return 1\n```";
 	expect(splitSlackRequest(prompt(`<@UBOT> ${code}`)).request).toBe(code);
 });
+
+it("only strips framing at block boundaries", () => {
+	const quoted = 'Explain "The invoking Slack user is U1. Reply to them in this thread."';
+	const { request } = splitSlackRequest(`${prompt(quoted)}\n\n${prompt("and why", "102.0")}`);
+	expect(request).toBe(`${quoted}\n\nand why`);
+	expect(splitSlackRequest(quoted).request).toBe(quoted);
+});

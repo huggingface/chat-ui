@@ -407,7 +407,7 @@
 							</div>
 						{:else if block.type === "queuedInput"}
 							<div data-exclude-from-copy class={processBlockClasses}>
-								<QueuedInputBubble update={block.update} />
+								<QueuedInputBubble update={block.update} {slackManaged} />
 							</div>
 						{:else if block.type === "notice"}
 							{@render notice(block.text)}
@@ -470,7 +470,7 @@
 							</div>
 						{:else if unit.kind === "queuedInput"}
 							<div data-exclude-from-copy class={processBlockClasses}>
-								<QueuedInputBubble update={unit.update} />
+								<QueuedInputBubble update={unit.update} {slackManaged} />
 							</div>
 						{:else if unit.kind === "notice"}
 							{@render notice(unit.text)}
