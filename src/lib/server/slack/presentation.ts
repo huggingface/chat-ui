@@ -434,15 +434,17 @@ function answerLabel(field: ElicitationField, value: ElicitationValue): string {
 /** answered or skipped: each question with only what was chosen, the unpicked options dropped */
 export function confirmedQuestionBlocks(
 	request: ElicitationRequestPayload,
-	content: Record<string, ElicitationValue>
+	/** omitted when the question was skipped */
+	content?: Record<string, ElicitationValue>
 ): KnownBlock[] {
 	return [
 		...(request.fields ?? []).flatMap((field, index) => {
-			const answer = content[field.name];
+			const answer = content?.[field.name];
 			const answers = answer === undefined ? [] : Array.isArray(answer) ? answer : [answer];
 			const text = [
 				`${index + 1}. ${field.description || field.title || field.name}`,
 				...answers.map((value) => `✅ ${answerLabel(field, value)}`),
+				...(content && !answers.length ? ["_No answer_"] : []),
 			].join("\n");
 			return chunks(text).map((part) => ({ type: "section" as const, text: questionText(part) }));
 		}),

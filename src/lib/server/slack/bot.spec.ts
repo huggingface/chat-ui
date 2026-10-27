@@ -851,9 +851,12 @@ describe("Slack transport authorization", () => {
 			expect.objectContaining({
 				user: "OWNER",
 				thread_ts: "100.0",
-				text: "Tagging a user at the beginning of a message means your message will not be sent to ML Intern.",
+				text: "Tagging a person or group at the beginning of a message means your message will not be sent to ML Intern.",
 			})
 		);
+		await reply("<!subteam^S123|@ml-team> thoughts on this loss curve?", "101.1");
+		await reply("<!here> anyone around?", "101.2");
+		expect(await collections.slackInputs.countDocuments({})).toBe(1);
 		await bot.receive(
 			{
 				channel: "C123",
@@ -867,6 +870,26 @@ describe("Slack transport authorization", () => {
 		);
 		await reply("Ask <@UALICE> later", "103.0");
 		expect(await collections.slackInputs.countDocuments({})).toBe(3);
+	});
+
+	it("sends a DM that opens by tagging someone else, since only the bot reads it", async () => {
+		const { user } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		bot["botUserId"] = "UBOT";
+		const onMessage = mocks.handlers.get("event:message");
+		if (!onMessage) throw Error("No message handler");
+		await onMessage({
+			event: {
+				channel: "D123",
+				channel_type: "im",
+				user: "OWNER",
+				text: "<@UALICE>'s run OOMed, retry it with batch size 8",
+				ts: "100.0",
+			},
+			body: { team_id: "T123", event_id: "dm" },
+		});
+		expect(mocks.ephemeral).not.toHaveBeenCalled();
+		expect(await collections.slackInputs.countDocuments({})).toBe(1);
 	});
 
 	it("acknowledges a received request before generation and deduplicates Slack retries", async () => {

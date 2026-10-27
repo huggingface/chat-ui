@@ -301,6 +301,21 @@ it("shows only accepted values, including custom answers, under each question", 
 	]);
 });
 
+it("marks a blank optional answer instead of showing a bare question", () => {
+	const request: ElicitationRequestPayload = {
+		...question,
+		fields: [{ kind: "string", name: "split", title: "Which dataset split?", required: false }],
+	};
+	expect(confirmedQuestionBlocks(request, {})[0]).toEqual({
+		type: "section",
+		text: { type: "mrkdwn", text: "1. Which dataset split?\n_No answer_" },
+	});
+	expect(confirmedQuestionBlocks(request)[0]).toEqual({
+		type: "section",
+		text: { type: "mrkdwn", text: "1. Which dataset split?" },
+	});
+});
+
 describe("Slack long replies and tables", () => {
 	it("renders table rows as labeled fields with clickable links", () => {
 		const table =
