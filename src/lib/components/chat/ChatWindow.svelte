@@ -8,6 +8,7 @@
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
 	import { collectTrackioDashboards } from "$lib/utils/trackio";
+	import { collectWorkflowSpaces } from "$lib/utils/workflowSpace";
 	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
 	import { collectPaneItems } from "$lib/utils/paneItems";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
@@ -196,10 +197,19 @@
 	// reopening the conversation finds the same dashboards.
 	let trackioDashboards = $derived(collectTrackioDashboards(messages));
 
+	let paneSpaces = $derived.by(() => {
+		const at = new Map(messages.map((message, index) => [message.id, index]));
+		const position = (id?: Message["id"]) =>
+			id === undefined ? Infinity : (at.get(id) ?? Infinity);
+		return [...trackioDashboards, ...collectWorkflowSpaces(messages)].sort(
+			(a, b) => position(a.messageId) - position(b.messageId)
+		);
+	});
+
 	// One ordered list of everything the pane can show, so its next/previous walks
 	// artifacts and dashboards together instead of each view navigating only its
 	// own kind.
-	let paneItems = $derived(collectPaneItems(messages, artifactRegistry, trackioDashboards));
+	let paneItems = $derived(collectPaneItems(messages, artifactRegistry, paneSpaces));
 
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
@@ -1226,7 +1236,7 @@
 							complete={mlAssistant.complete}
 							budget={mlAssistant.budget}
 							onbudgetchange={page.params?.id ? changeMlBudget : undefined}
-							dashboard={trackioDashboards.at(-1)}
+							dashboard={paneSpaces.at(-1)}
 							registry={mlRegistry.summary}
 						/>
 					{/if}

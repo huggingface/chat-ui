@@ -69,6 +69,9 @@
 			sidePane.trackio?.url === dashboard.url
 	);
 
+	let noun = $derived(dashboard?.kind === "workflow" ? "workflow" : "training dashboard");
+	let Noun = $derived(noun[0].toUpperCase() + noun.slice(1));
+
 	function toggleDashboard() {
 		if (!dashboard || !dashboardLive) return;
 		if (dashboardShowing) sidePane.close();
@@ -250,15 +253,15 @@
 						: "cursor-default opacity-60",
 				]}
 				title={dashboardShowing
-					? `Close the training dashboard: ${dashboard.label}`
+					? `Close the ${noun}: ${dashboard.label}`
 					: dashboardLive
-						? `Open the training dashboard: ${dashboard.label}`
+						? `Open the ${noun}: ${dashboard.label}`
 						: dashboardStatus === "failed"
-							? "The training dashboard never came up"
-							: "The training dashboard starts with the run"}
-				aria-label={dashboardLive
-					? `Training dashboard: ${dashboard.label}`
-					: "Training dashboard, still starting"}
+							? `The ${noun} never came up`
+							: dashboard.kind === "workflow"
+								? "The workflow is still building"
+								: "The training dashboard starts with the run"}
+				aria-label={dashboardLive ? `${Noun}: ${dashboard.label}` : `${Noun}, still starting`}
 				aria-pressed={dashboardLive ? dashboardShowing : undefined}
 				onclick={toggleDashboard}
 			>
@@ -267,7 +270,9 @@
 				/>
 				<!-- The one thing this design collapses: below a comfortable width the
 				     label goes and the icon keeps a round hit target. -->
-				<span class="hidden @min-[480px]:inline">Metrics</span>
+				<span class="hidden @min-[480px]:inline"
+					>{dashboard.kind === "workflow" ? "Workflow" : "Metrics"}</span
+				>
 			</button>
 		{/if}
 

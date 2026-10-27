@@ -19,7 +19,7 @@ import type { TrackioDashboard } from "./trackio";
 
 export type PaneItem =
 	| { kind: "artifact"; identifier: string; label: string }
-	| { kind: "trackio"; url: string; label: string };
+	| { kind: "trackio"; url: string; label: string; workflow?: boolean };
 
 /** The pane's current selection, as the store holds it. */
 export interface PaneSelection {
@@ -55,7 +55,12 @@ export function collectPaneItems(
 
 	for (const dashboard of dashboards) {
 		entries.push({
-			item: { kind: "trackio", url: dashboard.url, label: dashboard.label },
+			item: {
+				kind: "trackio",
+				url: dashboard.url,
+				label: dashboard.label,
+				...(dashboard.kind === "workflow" ? { workflow: true } : {}),
+			},
 			message: at(dashboard.messageId),
 			withinMessage: 0,
 		});
