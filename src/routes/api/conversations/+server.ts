@@ -1,7 +1,9 @@
+import { retireSlackConversations } from "$lib/server/slack/readOnly";
 import { collections } from "$lib/server/database";
 import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
 import { deleteStoredFilesOf } from "$lib/server/files/toolImages";
 import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
+import { deleteMlReviewsOf } from "$lib/server/mlReviews/store";
 import type { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
 import type { Conversation } from "$lib/types/Conversation";
@@ -43,13 +45,16 @@ export async function GET({ locals, url }) {
 
 export async function DELETE({ locals }) {
 	if (locals.user?._id || locals.sessionId) {
-		const ids = await collections.conversations
-			.find(authCondition(locals))
-			.project<{ _id: ObjectId }>({ _id: 1 })
-			.map((conv) => conv._id)
-			.toArray();
+		const ids = await retireSlackConversations(
+			await collections.conversations
+				.find(authCondition(locals))
+				.project<{ _id: ObjectId }>({ _id: 1 })
+				.map((conv) => conv._id)
+				.toArray()
+		);
 		await collections.conversations.deleteMany({ _id: { $in: ids } });
 		await deleteMlRegistry(ids);
+		await deleteMlReviewsOf(ids);
 		await deleteMlFilesOf(ids);
 		await deleteStoredFilesOf(ids);
 	}

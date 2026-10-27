@@ -15,7 +15,7 @@ export async function claimDueReconcile(now: Date): Promise<MlSessionLabel | nul
 		{ $set: { reconcileAt: new Date(now.getTime() + RECONCILE_DELAY_MS) } },
 		{ sort: { reconcileAt: 1 }, returnDocument: "after" }
 	);
-	return claimed?.value ?? null;
+	return claimed;
 }
 
 /** returns rows added, a failed listing or missing token leaves the claim due time as the retry */

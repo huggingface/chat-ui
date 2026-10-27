@@ -55,4 +55,9 @@ export const mlAssistantExamples: RouterExample[] = [
 		title: "Run an eval",
 		prompt: "Evaluate @baidu/Unlimited-OCR on @allenai/olmOCR-bench and score it.",
 	},
+	{
+		title: "Review a dataset",
+		prompt:
+			"Show me 20 rows from the @ML-Intern-lab/imagenet_1k dataset and let me mark whether each label is correct.",
+	},
 ];

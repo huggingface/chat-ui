@@ -1625,3 +1625,46 @@ describe("tool images before the next user message", () => {
 		expect(JSON.stringify(prepared[3])).toContain("data:image/png;base64,AAAA");
 	});
 });
+
+describe("queued user messages in replay", () => {
+	const QUEUED_TEXT =
+		"[The user sent this while you were working.]\n<user_message>\nuse Lyon too\n</user_message>";
+
+	it("appends what the user sent mid-turn to the result it followed, after any event", async () => {
+		const history: HistoryMessage[] = [
+			user("u0", "weather?"),
+			{
+				id: "a0",
+				from: "assistant",
+				content: "Both are sunny.",
+				contentShape: 2,
+				updates: [
+					callUpdate("w1", "get_weather", { city: "Paris" }),
+					resultUpdate("w1", "get_weather", "18°C, sunny"),
+					{
+						type: MessageUpdateType.QueuedInput,
+						inputs: [{ id: "q1", text: "use Lyon too", at: 0 }],
+						text: QUEUED_TEXT,
+						afterToolUuid: "w1",
+					},
+					callUpdate("w2", "get_weather", { city: "Lyon" }),
+					resultUpdate("w2", "get_weather", "20°C, sunny"),
+				],
+			},
+		];
+		const replayed = await prepareMessagesWithFiles(history, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+
+		expect(replayed.map((m) => m.role)).toEqual([
+			"user",
+			"assistant",
+			"tool",
+			"assistant",
+			"tool",
+			"assistant",
+		]);
+		expect(textOf(replayed[2])).toBe(`18°C, sunny\n\n${QUEUED_TEXT}`);
+		expect(textOf(replayed[4])).toBe("20°C, sunny");
+	});
+});

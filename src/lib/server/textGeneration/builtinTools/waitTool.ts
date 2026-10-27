@@ -4,7 +4,10 @@ import { collections } from "$lib/server/database";
 import { turnWaiting } from "$lib/server/generation/turnState";
 import { logger } from "$lib/server/logger";
 import { claimServiceEvents } from "$lib/server/mlRegistry/events";
+import { hasQueuedInputs } from "$lib/server/queuedInputs/store";
+import { wakeParkForQueuedInput } from "$lib/server/queuedInputs/deliver";
 import type { ServiceEvent, ServicePush } from "$lib/types/MlService";
+import { waitParkRefusal } from "./parkRefusal";
 import type { BuiltinTool } from "./types";
 
 export const WAIT_TOOL_NAME = "wait";
@@ -80,8 +83,7 @@ export function createWaitTool({ serviceEvents }: { serviceEvents: boolean }): B
 			},
 		},
 		mayPark: true,
-		parkRefusalMessage:
-			"Only one call can park per round. Wait for one thing at a time, then check the rest when you wake.",
+		parkRefusalMessage: waitParkRefusal,
 		preprompt: serviceEvents
 			? `${WAITING_PREPROMPT} The harness watches every job and sandbox you launched and wakes you the ` +
 				`moment one ends or fails, so ask for a delay that matches the time the work has left rather ` +
@@ -109,6 +111,15 @@ export function createWaitTool({ serviceEvents }: { serviceEvents: boolean }): B
 			if (serviceEvents) {
 				const ended = await claimServiceEvents(ctx.conversationId);
 				if (ended.length > 0) return { resultText: waitSkippedResultText(ended) };
+			}
+
+			// the round boundary right after this call reads it
+			if (await hasQueuedInputs(ctx.conversationId)) {
+				return {
+					resultText:
+						"Did not wait: the user sent you a message. If it follows this result, read it " +
+						"first; wait again if nothing changes what you are waiting for.",
+				};
 			}
 
 			const clamped = Math.min(Math.max(seconds, MIN_WAIT_SECONDS), MAX_WAIT_SECONDS);
@@ -164,6 +175,11 @@ export function createWaitTool({ serviceEvents }: { serviceEvents: boolean }): B
 				{ until: new Date(now.getTime() + clamped * 1000), reason }
 			);
 			ctx.elicitationSink?.emit(stateUpdate);
+
+			// a message queued between the check above and the insert found no wait to wake
+			if (await hasQueuedInputs(ctx.conversationId)) {
+				await wakeParkForQueuedInput(ctx.conversationId);
+			}
 
 			return { awaitingInput: true };
 		},
@@ -284,6 +300,7 @@ export function waitResumeResultText(park: {
 	plannedResumeAt?: Date;
 	serviceEvents?: ServiceEvent[];
 	wokeByHarnessAt?: Date;
+	wokeByUserMessageAt?: Date;
 }): string {
 	const waited = Math.round((park.resumeAt.getTime() - park.createdAt.getTime()) / 1000);
 	const planned = park.plannedResumeAt
@@ -301,7 +318,10 @@ export function waitResumeResultText(park: {
 		: park.wokeByHarnessAt && events.length > 0
 			? `You were woken early${planned ? `, cutting short a ${planned}s wait,` : ""} because ` +
 				`${whatChanged(events)} changed state; the short gap says nothing else about the work. `
-			: "";
+			: park.wokeByUserMessageAt
+				? `You were woken early${planned ? `, cutting short a ${planned}s wait,` : ""} because ` +
+					"the user sent a message; the short gap says nothing about the work. "
+				: "";
 	if (events.length === 0) {
 		return (
 			`Waited ${waited}s for: ${park.reason}. ${early}You are now resumed. ` +

@@ -9,7 +9,7 @@ import { AbortRegistry } from "$lib/server/abortRegistry";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree";
 import { textGeneration } from "$lib/server/textGeneration";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
-import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
+import { requestProvider } from "$lib/server/requestProvider";
 import { stampMlHarness } from "$lib/server/mlAssistantHarness";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import {
@@ -19,6 +19,10 @@ import {
 	releaseElicitationResume,
 } from "$lib/server/mcp/elicitation";
 import { resumeParkedToolCall } from "$lib/server/mcp/resumeElicitation";
+import { expireStalePushes } from "$lib/server/mlReviews/destination";
+import { sweepHeldPublishCards } from "$lib/server/mlReviews/resume";
+import { finishStoredSubmissions } from "$lib/server/mlReviews/submission";
+import { sweepReviewDeliveries } from "$lib/server/mlReviews/delivery";
 import {
 	MessageElicitationUpdateType,
 	MessageToolUpdateType,
@@ -27,7 +31,11 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import type { Conversation } from "$lib/types/Conversation";
-import type { McpElicitation } from "$lib/types/McpElicitation";
+import {
+	SERVER_RESUMED_KINDS,
+	type McpElicitation,
+	type ServerResumedKind,
+} from "$lib/types/McpElicitation";
 import type { Message } from "$lib/types/Message";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
@@ -118,6 +126,21 @@ async function answerUpdates(row: McpElicitation): Promise<MessageUpdate[]> {
 	return outcome.updates;
 }
 
+/** the same for a run that goes on, which a review may park again on its publish card */
+async function liveAnswerUpdates(
+	row: McpElicitation,
+	generationId: string
+): Promise<{ updates: MessageUpdate[]; parkedAgain: boolean }> {
+	const outcome = await resumeParkedToolCall({
+		conversationId: row.conversationId,
+		elicitationId: row.elicitationId,
+		claimed: row,
+		generationId,
+		mayPark: true,
+	});
+	return { updates: outcome.updates, parkedAgain: outcome.parkedAgain === true };
+}
+
 async function abandon(row: McpElicitation, reason: string): Promise<void> {
 	logger.warn(
 		{ elicitationId: row.elicitationId, reason },
@@ -170,7 +193,9 @@ export type AskResumeOutcome =
 	/** The result was stored; the turn was not run because the conversation has moved on. */
 	| "answered"
 	/** The result was stored and the turn is running. */
-	| "resumed";
+	| "resumed"
+	/** the answer was stored and the turn parked again on a further prompt */
+	| "parked";
 
 /**
  * Continue the turn an answered `ask_user_question` parked, with no request behind it.
@@ -183,14 +208,15 @@ export async function resumeAnsweredAsk({
 	conversationId,
 	elicitationId,
 	selection,
+	kind = "ask",
 }: {
 	conversationId: ObjectId;
 	elicitationId: string;
 	selection?: AskResumeSelection;
+	kind?: ServerResumedKind;
 }): Promise<{ outcome: AskResumeOutcome; run?: Promise<void> }> {
-	// Asks only: a parked MCP call is re-issued against a server that may exist only in the
-	// browser's configuration, so its continuation still starts from the route.
-	const row = await claimElicitationResume(conversationId, elicitationId, "ask");
+	// never an mcp call, its server may live only in the browser, so the route resumes it
+	const row = await claimElicitationResume(conversationId, elicitationId, kind);
 	const pending = row?.pending;
 	if (!row || !pending) return { outcome: "not_claimed" };
 
@@ -360,11 +386,14 @@ export async function resumeAnsweredAsk({
 	// Answer first, stored before the model is called and before the claim is consumed: a
 	// process that dies past this point leaves an ordinary interrupted turn whose history
 	// holds the answer, and one that dies before it leaves a claim the sweep takes over.
+	let parkedAgain = false;
 	try {
 		apply(await turnRunning(turnKey));
 		// A claim taken over from a dead process may find the answer already in place.
 		if (!alreadySettled(message, elicitationId)) {
-			for (const update of await answerUpdates(row)) apply(update);
+			const answered = await liveAnswerUpdates(row, generationId);
+			for (const update of answered.updates) apply(update);
+			parkedAgain = answered.parkedAgain;
 		}
 		await persist();
 	} catch (err) {
@@ -381,10 +410,21 @@ export async function resumeAnsweredAsk({
 		logger.error({ err, elicitationId }, "[ask] failed to consume the claim")
 	);
 
+	// a review parked again on its publish card, the model has no round to answer until then
+	if (parkedAgain) {
+		apply({ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished });
+		await persist().catch((err) =>
+			logger.error({ err, elicitationId }, "[ask] failed to save the parked turn")
+		);
+		await writer.finish({ status: "completed" });
+		return { outcome: "parked" };
+	}
+
 	const run = (async () => {
 		AbortRegistry.getInstance().register(conversationKey, abortController);
 		const stopWatching = watchStopMarker(conversationId, abortController);
 		let failure: string | undefined;
+		let turnClosed = false;
 		try {
 			try {
 				const ctx: TextGenerationContext = {
@@ -395,12 +435,7 @@ export async function resumeAnsweredAsk({
 					promptedAt,
 					ip: "ask-resume",
 					username: locals.user?.username,
-					provider:
-						config.isHuggingChat && !model.isRouter
-							? isMlAssistantConversation(conv)
-								? mlAssistantProviderFor(model.id, settings?.providerOverrides?.[model.id])
-								: settings?.providerOverrides?.[model.id]
-							: undefined,
+					provider: requestProvider(model, conv, settings?.providerOverrides),
 					reasoningEffort: isMlAssistantConversation(conv)
 						? ML_ASSISTANT_EFFORT
 						: settings?.reasoningEffortOverrides?.[model.id],
@@ -441,6 +476,7 @@ export async function resumeAnsweredAsk({
 				failure === undefined ? { failed: false } : { failed: true, error: failure }
 			);
 			if (endedUpdate) apply(endedUpdate);
+			turnClosed = Boolean(endedUpdate);
 		} finally {
 			const aborted = abortController.signal.aborted;
 			stopWatching();
@@ -455,6 +491,10 @@ export async function resumeAnsweredAsk({
 				await collections.abortedGenerations
 					.deleteOne({ conversationId })
 					.catch((err) => logger.warn({ err }, "[ask] failed to consume stop marker"));
+			}
+			if (turnClosed && isMlAssistantConversation(conv)) {
+				const { kickQueuedTurn } = await import("$lib/server/queuedInputs/drain");
+				kickQueuedTurn(conversationId);
 			}
 		}
 	})();
@@ -490,21 +530,31 @@ async function storeAnswerOnly(
 export async function settleAnsweredAsks(
 	conv: Pick<Conversation, "_id" | "messages">
 ): Promise<() => Promise<void>> {
+	// a review that fails to finish must not fail the new turn
+	await finishStoredSubmissions(conv._id).catch((err) =>
+		logger.error({ err }, "[review] could not finish stored submissions")
+	);
 	const now = Date.now();
-	const rows = await collections.mcpElicitations
-		.find({
-			conversationId: conv._id,
-			status: "resolved",
-			"pending.kind": "ask",
-			$or: [
-				{ resume: { $exists: false } },
-				{
-					"resume.status": "resuming",
-					"resume.takenAt": { $lt: new Date(now - RESUME_LEASE_MS) },
-				},
-			],
-		})
-		.toArray();
+	const rows: McpElicitation[] = [];
+	// one equality match per kind, so each query uses its own partial index
+	for (const kind of SERVER_RESUMED_KINDS) {
+		rows.push(
+			...(await collections.mcpElicitations
+				.find({
+					conversationId: conv._id,
+					status: "resolved",
+					"pending.kind": kind,
+					$or: [
+						{ resume: { $exists: false } },
+						{
+							"resume.status": "resuming",
+							"resume.takenAt": { $lt: new Date(now - RESUME_LEASE_MS) },
+						},
+					],
+				})
+				.toArray())
+		);
+	}
 
 	const claimed: McpElicitation[] = [];
 	for (const candidate of rows) {
@@ -540,12 +590,28 @@ export async function settleAnsweredAsks(
 
 /** Answers whose process died before it could continue them. */
 export async function sweepAnsweredAsks(): Promise<void> {
+	await finishStoredSubmissions().catch((err) =>
+		logger.error({ err }, "[review] could not finish stored submissions")
+	);
+	await expireStalePushes().catch((err) =>
+		logger.error({ err }, "[review] could not expire stale label pushes")
+	);
+	await sweepHeldPublishCards().catch((err) =>
+		logger.error({ err }, "[review] could not sweep held publish cards")
+	);
+	await sweepReviewDeliveries().catch((err) =>
+		logger.error({ err }, "[review] could not sweep review deliveries")
+	);
+	for (const kind of SERVER_RESUMED_KINDS) await sweepAnswered(kind);
+}
+
+async function sweepAnswered(kind: ServerResumedKind): Promise<void> {
 	const now = Date.now();
 	const rows = await collections.mcpElicitations
 		.find(
 			{
 				status: "resolved",
-				"pending.kind": "ask",
+				"pending.kind": kind,
 				resolution: "user",
 				resolvedAt: {
 					$gte: new Date(now - SWEEP_MAX_AGE_MS),
@@ -566,8 +632,8 @@ export async function sweepAnsweredAsks(): Promise<void> {
 		.toArray();
 
 	for (const { conversationId, elicitationId } of rows) {
-		logger.info({ elicitationId }, "[ask] resuming an answered question nothing continued");
-		await kickAnsweredAsk(conversationId, elicitationId);
+		logger.info({ elicitationId, kind }, "[ask] resuming an answer nothing continued");
+		await kickAnsweredAsk(conversationId, elicitationId, undefined, kind);
 	}
 }
 
@@ -575,12 +641,14 @@ export async function sweepAnsweredAsks(): Promise<void> {
 export async function kickAnsweredAsk(
 	conversationId: ObjectId,
 	elicitationId: string,
-	selection?: AskResumeSelection
+	selection?: AskResumeSelection,
+	kind: ServerResumedKind = "ask"
 ): Promise<AskResumeOutcome | "failed"> {
 	try {
 		const { outcome, run } = await resumeAnsweredAsk({
 			conversationId,
 			elicitationId,
+			kind,
 			...(selection ? { selection } : {}),
 		});
 		run?.catch((err) => logger.error({ err, elicitationId }, "[ask] resumed turn crashed"));

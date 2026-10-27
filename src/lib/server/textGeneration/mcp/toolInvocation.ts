@@ -402,7 +402,8 @@ export async function* executeToolCalls({
 			// never get a result — which providers reject on the next turn.
 			if (builtin.mayPark && parkingCalls.indexOf(p) > 0) {
 				const message =
-					builtin.parkRefusalMessage ?? "Only one call that waits on the user can run per turn.";
+					builtin.parkRefusalMessage?.(parkingCalls[0].call.name) ??
+					"Only one call that waits on the user can run per turn.";
 				results.push({ index, error: message, uuid: p.uuid, paramsClean: p.paramsClean });
 				updatesQueue.push({
 					type: MessageUpdateType.Tool,

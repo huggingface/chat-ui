@@ -23,6 +23,8 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 
+vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
+
 /**
  * The model is stubbed: what is under test is what the sweeper does around a
  * run (delivery, settling the row, the save), not what a run produces.
@@ -92,11 +94,16 @@ const waitResult = (row: ParkedCall): MessageUpdate => ({
  */
 async function seedParkedTurn(
 	row: ParkedCall,
-	{ updates = [waitCall(row)], padBytes = 0 }: { updates?: MessageUpdate[]; padBytes?: number } = {}
+	{
+		updates = [waitCall(row)],
+		padBytes = 0,
+		mlAssistant = false,
+	}: { updates?: MessageUpdate[]; padBytes?: number; mlAssistant?: boolean } = {}
 ) {
 	await collections.conversations.insertOne({
 		_id: row.conversationId,
 		sessionId: "s",
+		...(mlAssistant ? { mlAssistant: true } : {}),
 		model: "test-org/test-model",
 		title: RESUMED_TITLE,
 		rootMessageId: "u1",
@@ -193,6 +200,7 @@ afterEach(async () => {
 	await collections.generations.deleteMany({});
 	await collections.generationEvents.deleteMany({});
 	await collections.mcpElicitations.deleteMany({});
+	await collections.queuedInputs.deleteMany({});
 	await collections.conversations.deleteMany({ title: { $in: ["abandoned turn", RESUMED_TITLE] } });
 });
 
@@ -362,6 +370,55 @@ describe("resuming a parked wait", () => {
 		expect(text).toContain("because a job you started changed state");
 		expect(text).toContain("Job sft-smoke (a10g-small, id 0123456789abcdef01234567) failed: ERROR");
 		expect(text).not.toContain("The user asked you to check early");
+	});
+
+	it("reads what the user queued while it waited right after the wait result", async () => {
+		const row = park({
+			plannedResumeAt: new Date(Date.now() + 20 * 60_000),
+			wokeByUserMessageAt: new Date(),
+		});
+		await seedParkedTurn(row, { mlAssistant: true });
+		const { enqueueInput } = await import("$lib/server/queuedInputs/store");
+		const queued = await enqueueInput({
+			conversationId: row.conversationId,
+			text: "stop after this epoch",
+			source: "web",
+			sessionId: "s",
+		});
+
+		await sweepParkedCalls();
+
+		const updates = (await storedAssistant(row))?.updates ?? [];
+		const resultAt = updates.findIndex(
+			(u) => u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Result
+		);
+		expect(updates[resultAt + 1]).toMatchObject({
+			type: MessageUpdateType.QueuedInput,
+			afterToolUuid: row.toolUuid,
+			inputs: [{ id: queued._id.toString(), text: "stop after this epoch" }],
+		});
+		expect(await storedWaitResult(row)).toContain("because the user sent a message");
+		expect(await collections.queuedInputs.findOne({ _id: queued._id })).toMatchObject({
+			status: "delivered",
+			messageId: row.messageId,
+		});
+	});
+
+	it("abandons a wait whose conversation moved on instead of writing the old branch", async () => {
+		const row = park();
+		await seedParkedTurn(row);
+		await collections.conversations.updateOne(
+			{ _id: row.conversationId, "messages.id": row.messageId },
+			{ $set: { "messages.$.children": ["u2"] } }
+		);
+
+		await sweepParkedCalls();
+
+		expect(generation.runs).toHaveLength(0);
+		expect(await collections.parkedCalls.findOne({ _id: row._id })).toMatchObject({
+			status: "abandoned",
+			abandonedReason: "the conversation moved on while it waited",
+		});
 	});
 
 	it("a wait the user woke keeps the user's wording", async () => {
@@ -557,6 +614,61 @@ describe("resuming a parked wait", () => {
 				resolution: "expired",
 			})
 		);
+	});
+
+	it("a too-large save expires the review the resumed run opened, so the pane shows it closed", async () => {
+		const row = park();
+		await seedParkedTurn(row, { padBytes: NEAR_LIMIT_PAD });
+		const reviewId = new ObjectId();
+		const now = new Date();
+		await collections.mlReviews.insertOne({
+			_id: reviewId,
+			conversationId: row.conversationId,
+			messageId: row.messageId,
+			toolCallId: "call-2",
+			toolUuid: "uuid-2",
+			elicitationId: "r-mine",
+			schema: { title: "Batch", idField: "id", fields: [], questions: [], suggestions: "shown" },
+			schemaHash: "00000000",
+			source: { kind: "inline" },
+			records: [{ id: "a", values: {} }],
+			drafts: {},
+			draftRevision: 0,
+			status: "open",
+			createdAt: now,
+			updatedAt: now,
+		});
+		generation.run = async function* (ctx) {
+			yield { type: MessageUpdateType.Stream, token: BIG_ANSWER };
+			await collections.mcpElicitations.insertOne({
+				_id: new ObjectId(),
+				elicitationId: "r-mine",
+				conversationId: row.conversationId,
+				generationId: ctx.generationId ?? "",
+				status: "pending",
+				request: { elicitationId: "r-mine", server: "", mode: "form", message: "Batch" },
+				pending: {
+					kind: "review",
+					reviewId: reviewId.toString(),
+					messageId: row.messageId,
+					toolCallId: "call-2",
+					toolUuid: "uuid-2",
+				},
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			});
+		};
+
+		await sweepParkedCalls();
+
+		expect(await collections.mlReviews.findOne({ _id: reviewId })).toMatchObject({
+			status: "expired",
+			expiredAt: expect.any(Date),
+		});
+		expect(
+			(await collections.mcpElicitations.findOne({ elicitationId: "r-mine" }))?.expiresAt
+		).toBeInstanceOf(Date);
+		await collections.mlReviews.deleteMany({ conversationId: row.conversationId });
 	});
 });
 

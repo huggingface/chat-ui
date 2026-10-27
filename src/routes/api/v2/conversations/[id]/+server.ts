@@ -6,6 +6,7 @@ import { collections } from "$lib/server/database";
 import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
 import { deleteStoredFilesOf } from "$lib/server/files/toolImages";
 import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
+import { deleteMlReviewsOf } from "$lib/server/mlReviews/store";
 import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
 import { validModelIdSchema } from "$lib/server/models";
@@ -29,12 +30,13 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 	const lastAssistant = [...conversation.messages]
 		.reverse()
 		.find((message) => message.from === "assistant");
-	// Share views resolve with a string id; ObjectId accepts both forms.
-	const turnStateDoc = lastAssistant
-		? await collections.turnStates
-				.findOne({ conversationId: new ObjectId(conversation._id), messageId: lastAssistant.id })
-				.catch(() => null)
-		: null;
+	// share readers must not see the source conversation turn state
+	const turnStateDoc =
+		lastAssistant && conversation.kind === "owned"
+			? await collections.turnStates
+					.findOne({ conversationId: conversation.objectId, messageId: lastAssistant.id })
+					.catch(() => null)
+			: null;
 	const turnState: TurnStateSnapshot | undefined = turnStateDoc
 		? {
 				messageId: turnStateDoc.messageId,
@@ -46,13 +48,19 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 			}
 		: undefined;
 
+	const slackThread = !conversation.shared
+		? await collections.slackThreads.findOne({ conversationId: conversation.objectId })
+		: null;
 	return superjsonResponse({
+		slackThreadUrl: slackThread
+			? `https://app.slack.com/client/${encodeURIComponent(slackThread.teamId)}/${encodeURIComponent(slackThread.channel)}/thread/${encodeURIComponent(slackThread.channel)}-${encodeURIComponent(slackThread.threadTs)}`
+			: undefined,
 		messages: conversation.messages,
 		title: conversation.title,
 		model: conversation.model,
 		preprompt: conversation.preprompt,
 		rootMessageId: conversation.rootMessageId,
-		id: conversation._id.toString(),
+		id: conversation.id,
 		updatedAt: conversation.updatedAt,
 		modelId: conversation.model,
 		shared: conversation.shared,
@@ -82,6 +90,7 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 	await deleteMlFilesOf([new ObjectId(id)]);
 	await deleteStoredFilesOf([new ObjectId(id)]);
 	await deleteMlRegistry([new ObjectId(id)]);
+	await deleteMlReviewsOf([new ObjectId(id)]);
 
 	return superjsonResponse({ success: true });
 };

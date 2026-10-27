@@ -135,6 +135,10 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		error(404, "Conversation not found");
 	}
 
+	if (await collections.slackThreads.findOne({ conversationId: conversation._id })) {
+		error(403, "This session is managed in Slack. Continue in its Slack thread.");
+	}
+
 	// README emoji/colors are seeded per artifact so they stay identical across
 	// re-deploys; index.html + README are uploaded on every deploy (create and
 	// update), so a Space recovered from a failed first upload still gets its

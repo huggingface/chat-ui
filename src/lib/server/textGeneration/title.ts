@@ -14,16 +14,30 @@ export async function* generateTitleForConversation(
 ): AsyncGenerator<MessageUpdate, undefined, undefined> {
 	try {
 		const userMessage = conv.messages.find((m) => m.from === "user");
-		// HACK: detect if the conversation is new
-		if (conv.title !== "New Chat" || !userMessage) return;
+		const isSlack = conv.managedBy?.kind === "slack";
+		// Also replace the channel/timestamp placeholders created by older Slack versions.
+		const needsTitle =
+			conv.title === "New Chat" ||
+			(isSlack &&
+				(conv.title === "[Slack] New Chat" ||
+					/^Slack · [A-Z0-9]+ · \d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(conv.title)));
+		if (!needsTitle || !userMessage) return;
 
-		const prompt = plainViewText(plainMentions(userMessage.content));
+		let content = userMessage.content;
+		if (isSlack) {
+			// threadPrompt escapes '<' in quoted history, so this boundary cannot
+			// accidentally match a reference message instead of the actual request.
+			const boundary = "</slack_thread_context>\n\nInvoking user's request:\n";
+			const requestStart = content.indexOf(boundary);
+			if (requestStart !== -1) content = content.slice(requestStart + boundary.length);
+		}
+		const prompt = plainViewText(plainMentions(content));
 		const modelForTitle = config.TASK_MODEL?.trim() ? config.TASK_MODEL : conv.model;
 		const title = (await generateTitle(prompt, modelForTitle, locals)) ?? "New Chat";
 
 		yield {
 			type: MessageUpdateType.Title,
-			title,
+			title: isSlack ? `[Slack] ${title}` : title,
 		};
 	} catch (cause) {
 		logger.error(cause, "Failed while generating title for conversation");

@@ -2,6 +2,8 @@ import { createMcpClient } from "./client";
 import { StreamableHTTPClientTransport, SSEClientTransport } from "@modelcontextprotocol/client";
 import type { McpServerConfig } from "./httpClient";
 import { logger } from "$lib/server/logger";
+import { config } from "$lib/server/config";
+import { redactSecret } from "./hf";
 import { mcpFetchForServer } from "./fetch";
 // use console.* for lightweight diagnostics in production logs
 
@@ -216,7 +218,7 @@ async function listServerTools(
 			logger.debug(
 				{
 					server: server.name,
-					url: server.url,
+					url: redactSecret(server.url, config.EXA_API_KEY),
 					count: tools.length,
 					toolNames: tools.map((t) => t?.name).filter(Boolean),
 				},
@@ -280,7 +282,11 @@ export async function getOpenAiToolsForMcp(
 				return tools;
 			} catch (err) {
 				logger.debug(
-					{ server: server.name, url: server.url, err: String(err) },
+					{
+						server: server.name,
+						url: redactSecret(server.url, config.EXA_API_KEY),
+						err: redactSecret(String(err), config.EXA_API_KEY),
+					},
 					"[mcp] failed to list tools for server"
 				);
 				return [];

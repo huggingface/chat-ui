@@ -71,7 +71,7 @@ import {
 	resolveOAuthAccessToken,
 } from "$lib/server/mcp/oauth/connections";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
-import { withoutContentLength } from "$lib/server/undiciCompat";
+import { fetchWithProviderFallback } from "$lib/server/endpoints/openai/providerFallback";
 import {
 	isMlAssistantConversation,
 	mlAssistantPayerTarget,
@@ -88,6 +88,7 @@ import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
 import { PARENT_READER } from "$lib/types/MlSource";
 import { mlJobLabelsEnabled, mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
 import { markHarnessEventDelivered, pendingHarnessEvent } from "$lib/server/mlRegistry/midTurn";
+import { takeQueuedInputs } from "$lib/server/queuedInputs/deliver";
 import {
 	buildSessionStateBlock,
 	injectSessionState,
@@ -211,7 +212,7 @@ export async function* runMcpFlow({
 	};
 	const builtinTools = getEnabledBuiltinTools({
 		conv,
-		namespace: (locals as unknown as { user?: { username?: string } })?.user?.username,
+		namespace: locals?.publishNamespace ?? locals?.user?.username,
 		hfToken:
 			(locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
 			getUserHubToken(locals),
@@ -618,7 +619,7 @@ export async function* runMcpFlow({
 			input: RequestInfo | URL,
 			init?: RequestInit
 		): Promise<Response> => {
-			const res = await fetch(input, withoutContentLength(init));
+			const res = await fetchWithProviderFallback(input, init);
 			const p = res.headers.get("x-inference-provider");
 			if (p && !providerHeader) providerHeader = p;
 			return res;
@@ -1402,6 +1403,20 @@ export async function* runMcpFlow({
 						yield pending.update;
 						messagesOpenAI = withHarnessEventOnLastTool(messagesOpenAI, pending.update.text);
 						await markHarnessEventDelivered(conv._id, pending.services);
+					}
+				}
+				// what is left when the last round runs out starts the next turn instead
+				if (
+					mlAssistant &&
+					messageId &&
+					lastCallUuid &&
+					toolMsgCount > 0 &&
+					loop + 1 < maxToolRounds
+				) {
+					const queued = await takeQueuedInputs(conv._id, messageId, lastCallUuid);
+					if (queued) {
+						yield queued;
+						messagesOpenAI = withHarnessEventOnLastTool(messagesOpenAI, queued.text);
 					}
 				}
 				// Continue loop: next iteration will use tool messages to get the final content

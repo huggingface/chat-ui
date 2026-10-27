@@ -1,3 +1,4 @@
+import { retireSlackConversations } from "$lib/server/slack/readOnly";
 import type { RequestHandler } from "@sveltejs/kit";
 import type { ObjectId } from "mongodb";
 import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
@@ -6,6 +7,7 @@ import { collections } from "$lib/server/database";
 import { deleteMlFilesOf } from "$lib/server/mlFiles/store";
 import { deleteStoredFilesOf } from "$lib/server/files/toolImages";
 import { deleteMlRegistry } from "$lib/server/mlRegistry/store";
+import { deleteMlReviewsOf } from "$lib/server/mlReviews/store";
 import { authCondition } from "$lib/server/auth";
 import type { Conversation } from "$lib/types/Conversation";
 import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
@@ -18,11 +20,14 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 
 	const convs = await collections.conversations
 		.find(authCondition(locals))
-		.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "mlAssistant">>({
+		.project<
+			Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "mlAssistant" | "managedBy">
+		>({
 			title: 1,
 			updatedAt: 1,
 			model: 1,
 			mlAssistant: 1,
+			managedBy: 1,
 		})
 		.sort({ updatedAt: -1 })
 		.skip(p * pageSize)
@@ -34,6 +39,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		_id: conv._id,
 		id: conv._id, // legacy param iOS
 		title: conv.title,
+		managedBy: conv.managedBy,
 		updatedAt: conv.updatedAt,
 		model: conv.model,
 		modelId: conv.model, // legacy param iOS
@@ -46,13 +52,16 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 export const DELETE: RequestHandler = async ({ locals }) => {
 	requireAuth(locals);
 
-	const ids = await collections.conversations
-		.find(authCondition(locals))
-		.project<{ _id: ObjectId }>({ _id: 1 })
-		.map((conv) => conv._id)
-		.toArray();
+	const ids = await retireSlackConversations(
+		await collections.conversations
+			.find(authCondition(locals))
+			.project<{ _id: ObjectId }>({ _id: 1 })
+			.map((conv) => conv._id)
+			.toArray()
+	);
 	const res = await collections.conversations.deleteMany({ _id: { $in: ids } });
 	await deleteMlRegistry(ids);
+	await deleteMlReviewsOf(ids);
 	await deleteMlFilesOf(ids);
 	await deleteStoredFilesOf(ids);
 

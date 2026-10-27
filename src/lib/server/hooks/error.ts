@@ -19,10 +19,9 @@ export async function handleServerError({
 	const errorId = crypto.randomUUID();
 
 	logger.error({
-		locals: event.locals,
-		url: event.request.url,
-		params: event.params,
-		request: event.request,
+		// Locals and request URLs can contain OAuth tokens and account-link tickets.
+		url: event.url.pathname,
+		method: event.request.method,
 		message,
 		error,
 		errorId,
