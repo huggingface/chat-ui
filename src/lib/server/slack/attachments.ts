@@ -103,13 +103,17 @@ export async function downloadAttachments(
 	return files;
 }
 
-/** Owner files remain required; other participants cannot poison a turn with bad files. */
+/**
+ * Owner files remain required; other participants cannot poison a turn with bad files.
+ * With `references: false` other participants' files are left out entirely.
+ */
 export async function downloadThreadAttachments(
 	messages: ThreadMessage[],
 	throughTs: string,
 	botUser: string,
 	token: string,
-	owner: string
+	owner: string,
+	{ references = true }: { references?: boolean } = {}
 ): Promise<{ files: File[]; referencesOmitted: boolean }> {
 	const own = messages.filter((m) => m.user === owner);
 	const files = await downloadAttachments(own, throughTs, botUser, token);
@@ -132,7 +136,13 @@ export async function downloadThreadAttachments(
 			const id = key(file);
 			if (id && seen.has(id)) continue;
 			if (id) seen.add(id);
-			if (++attempts > 10 || files.length >= 10 || total >= MAX_TOTAL || signal.aborted) {
+			if (
+				!references ||
+				++attempts > 10 ||
+				files.length >= 10 ||
+				total >= MAX_TOTAL ||
+				signal.aborted
+			) {
 				referencesOmitted = true;
 				continue;
 			}

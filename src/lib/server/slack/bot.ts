@@ -99,6 +99,8 @@ const mention = z.object({
 
 /** shared slack credentials pay for these, so they are capped per asker and per workspace */
 const MAX_SLACK_SIDE_QUESTIONS = 4;
+/** eligibility checks per request, so a crowded thread cannot burn Slack rate limits */
+const MAX_REFERENCE_AUTHORS = 20;
 const SLACK_SIDE_QUESTIONS_PER_MINUTE = 5;
 const SLACK_WORKSPACE_SIDE_QUESTIONS_PER_MINUTE = 20;
 const SLACK_SIDE_QUESTION_TIMEOUT_MS = 90_000;
@@ -116,7 +118,7 @@ export class MlSlackBot {
 		string,
 		{ user: NonNullable<Awaited<ReturnType<typeof eligibleParticipant>>>; until: number }
 	>();
-	private eventRates = new Map<string, { count: number; until: number }>();
+	private eventRates = new Map<string, { count: number; until: number; notified?: boolean }>();
 	private linkPrompts = new Map<string, number>();
 	private sideQuestionEvents = new Map<string, number>();
 	private sideQuestionAskers = new Set<string>();
@@ -166,6 +168,25 @@ export class MlSlackBot {
 			participant?.team_id !== (thread.ownerTeamId ?? thread.teamId)
 		)
 			return;
+		return participant;
+	}
+
+	/** event-path eligibility with a 60 s positive cache; dispatch and controls recheck uncached */
+	private async cachedParticipant(mode: SlackConfig["accountMode"], channel: string, user: string) {
+		const now = Date.now();
+		for (const [key, value] of this.eventMembership)
+			if (value.until <= now) this.eventMembership.delete(key);
+		const cacheKey = `${mode}:${channel}:${user}`;
+		const cached = this.eventMembership.get(cacheKey)?.user;
+		if (cached) return cached;
+		const participant = await eligibleParticipant(
+			this.app.client,
+			{ ...this.settings, accountMode: mode },
+			user,
+			channel
+		);
+		if (participant && this.eventMembership.size < 5000)
+			this.eventMembership.set(cacheKey, { user: participant, until: now + 60_000 });
 		return participant;
 	}
 
@@ -631,20 +652,34 @@ export class MlSlackBot {
 			!this.settings.allowedChannels.includes(event.channel)
 		)
 			return;
-		// Bound mention traffic before any Slack API lookup. Local owner checks also
-		// keep non-owners from consuming paginated membership checks on existing sessions.
-		const now = Date.now();
-		for (const [key, value] of this.eventRates) if (value.until <= now) this.eventRates.delete(key);
-		const rate = this.eventRates.get(event.user) ?? { count: 0, until: now + 60_000 };
-		if (rate.count >= 10 || (!this.eventRates.has(event.user) && this.eventRates.size >= 5000))
-			return;
-		rate.count++;
-		this.eventRates.set(event.user, rate);
 		const existing = await collections.slackThreads.findOne({
 			teamId,
 			channel: event.channel,
 			threadTs: event.thread_ts ?? event.ts,
 		});
+		// Bound traffic before any Slack API lookup. Local owner checks also keep non-owners
+		// from consuming paginated membership checks on existing sessions. The owner steering
+		// their own thread is exempt: dropping it would demote their instruction to quoted context.
+		const now = Date.now();
+		if (!existing || existing.deletedAt || existing.owner !== event.user) {
+			for (const [key, value] of this.eventRates)
+				if (value.until <= now) this.eventRates.delete(key);
+			const rate = this.eventRates.get(event.user) ?? { count: 0, until: now + 60_000 };
+			if (rate.count >= 10 || (!this.eventRates.has(event.user) && this.eventRates.size >= 5000)) {
+				if (rate.count >= 10 && !rate.notified) {
+					rate.notified = true;
+					await this.tell(
+						event.channel,
+						event.user,
+						"You're sending messages to ML Intern too quickly. Wait a minute, then send that again.",
+						event.thread_ts
+					).catch(() => {});
+				}
+				return;
+			}
+			rate.count++;
+			this.eventRates.set(event.user, rate);
+		}
 		if (existing?.hfUserId && existing.owner !== event.user) {
 			await this.tell(
 				event.channel,
@@ -654,21 +689,8 @@ export class MlSlackBot {
 			);
 			return;
 		}
-		for (const [key, value] of this.eventMembership)
-			if (value.until <= now) this.eventMembership.delete(key);
 		const mode = existing && !existing.hfUserId ? "shared" : this.settings.accountMode;
-		const cacheKey = `${mode}:${event.channel}:${event.user}`;
-		let participant = this.eventMembership.get(cacheKey)?.user;
-		if (!participant) {
-			participant = await eligibleParticipant(
-				this.app.client,
-				{ ...this.settings, accountMode: mode },
-				event.user,
-				event.channel
-			);
-			if (participant && this.eventMembership.size < 5000)
-				this.eventMembership.set(cacheKey, { user: participant, until: now + 60_000 });
-		}
+		const participant = await this.cachedParticipant(mode, event.channel, event.user);
 		if (
 			!participant ||
 			(event.user_team && event.user_team !== participant.team_id) ||
@@ -917,6 +939,26 @@ export class MlSlackBot {
 			}
 			cursor = page.response_metadata?.next_cursor || undefined;
 		} while (cursor);
+		// Personal sessions run on the owner's HF token, so other people's content is an injection
+		// path. Keep only authors who could use the bot here themselves, and in Slack Connect
+		// channels keep their files out: a file is the easiest place to hide instructions.
+		let references = true;
+		if (thread.hfUserId) {
+			const authors = [
+				...new Set(messages.map((m) => m.user).filter((u) => u && u !== thread.owner)),
+			] as string[];
+			const eligible = new Set([thread.owner]);
+			for (const user of authors.slice(0, MAX_REFERENCE_AUTHORS))
+				if (await this.cachedParticipant(this.settings.accountMode, thread.channel, user))
+					eligible.add(user);
+			const kept = messages.filter((m) => m.user && eligible.has(m.user));
+			if (kept.length < messages.length) omitted = true;
+			messages.splice(0, messages.length, ...kept);
+			if (kept.some((m) => m.user !== thread.owner && m.files?.length)) {
+				const { channel } = await this.app.client.conversations.info({ channel: thread.channel });
+				references = !channel?.is_ext_shared;
+			}
+		}
 		const text = threadPrompt(
 			messages,
 			input,
@@ -931,14 +973,17 @@ export class MlSlackBot {
 				input.ts,
 				this.botUserId,
 				this.settings.botToken,
-				input.user
+				input.user,
+				{ references }
 			);
 			return {
 				text:
 					text +
-					(referencesOmitted
-						? "\nSome reference attachments from other participants were omitted because they were unavailable or exceeded limits. Ask the owner for any needed file; do not assume its contents."
-						: ""),
+					(!referencesOmitted
+						? ""
+						: references
+							? "\nSome reference attachments from other participants were omitted because they were unavailable or exceeded limits. Ask the owner for any needed file; do not assume its contents."
+							: "\nAttachments from other participants are not included in Slack Connect channels. Ask the owner to share any needed file themselves; do not assume its contents."),
 				files,
 			};
 		} catch (error) {

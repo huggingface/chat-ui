@@ -9,6 +9,7 @@ import {
 import { MlSlackBot } from "./bot";
 import { connectionKey } from "./connections";
 import { skipSlackQuestion } from "./engine";
+import { getOrCreateThread } from "./store";
 import {
 	ANSWER_ACTION,
 	ANSWER_VIEW,
@@ -1382,6 +1383,46 @@ it("includes attributed non-owner messages as reference context in personal sess
 	expect(result.files).toHaveLength(1);
 	expect(await result.files[0].text()).toBe("reference");
 });
+it("drops ineligible authors and, in Slack Connect, other people's files from personal context", async () => {
+	const fetchMock = vi.fn(
+		async () => new Response("reference", { headers: { "content-type": "text/plain" } })
+	);
+	vi.stubGlobal("fetch", fetchMock);
+	const { user } = await createTestUser();
+	const bot = new MlSlackBot({ ...settings, accountMode: "user" }, user);
+	const thread = await getOrCreateThread("T123", "C123", "100.0", "OWNER", user._id);
+	mocks.users.mockImplementation(async ({ user: id }: { user: string }) => ({
+		user: { id, team_id: "T123", ...(id === "GUEST" ? { is_restricted: true } : {}) },
+	}));
+	const file = (id: string) => ({
+		id,
+		name: `${id}.txt`,
+		mimetype: "text/plain",
+		url_private: `https://files.slack.com/${id}.txt`,
+	});
+	mocks.replies.mockResolvedValue({
+		messages: [
+			{ user: "GUEST", ts: "101.0", text: "guest instruction", files: [file("FGUEST")] },
+			{ user: "OTHER", ts: "102.0", text: "colleague note", files: [file("FOTHER")] },
+			{ user: "OWNER", ts: "103.0", text: "my model" },
+		],
+	});
+	const input = { user: "OWNER", ts: "104.0", text: "inspect" };
+	const internal = await bot["context"](thread, input);
+	expect(internal.text).not.toContain("guest instruction");
+	expect(internal.text).toContain("colleague note");
+	expect(internal.text).toContain("Some thread context was omitted");
+	expect(internal.files.map((f) => f.name)).toEqual(["FOTHER.txt"]);
+
+	fetchMock.mockClear();
+	mocks.channels.mockResolvedValue({ channel: { is_ext_shared: true } });
+	mocks.members.mockResolvedValue({ members: ["OWNER", "OTHER", "GUEST"] });
+	const shared = await bot["context"](thread, input);
+	expect(shared.text).toContain("colleague note");
+	expect(shared.text).toContain("not included in Slack Connect channels");
+	expect(shared.files).toHaveLength(0);
+	expect(fetchMock).not.toHaveBeenCalled();
+});
 it("delivers personal raw traces only to the owner's DM", async () => {
 	const { user, locals } = await createTestUser();
 	const bot = new MlSlackBot(settings, user);
@@ -1799,6 +1840,35 @@ it("rejects legacy shared-account threads even when personal mode permits the sh
 		"legacy-shared"
 	);
 	expect(await collections.slackInputs.countDocuments({})).toBe(0);
+});
+
+it("never throttles the owner's own thread replies and tells others once when throttled", async () => {
+	const bot = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
+	for (let i = 0; i < 12; i++)
+		await bot.receive(
+			{ user: "U999", channel: "C123", text: "hello", ts: `${200 + i}.0` },
+			"T123",
+			`busy-${i}`
+		);
+	const throttled = mocks.ephemeral.mock.calls.filter(([args]) =>
+		String(args.text).includes("too quickly")
+	);
+	expect(throttled).toHaveLength(1);
+
+	const { user } = await createTestUser();
+	const owner = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
+	const thread = await getOrCreateThread("T123", "C123", "300.0", "OWNER", user._id);
+	mocks.ephemeral.mockClear();
+	for (let i = 0; i < 12; i++)
+		await owner.receive(
+			{ user: "OWNER", channel: "C123", text: "steer", ts: `${301 + i}.0`, thread_ts: "300.0" },
+			"T123",
+			`steer-${i}`
+		);
+	expect(await collections.slackInputs.countDocuments({ threadId: thread._id })).toBe(12);
+	expect(
+		mocks.ephemeral.mock.calls.some(([args]) => String(args.text).includes("too quickly"))
+	).toBe(false);
 });
 
 it("bounds mention lookups and reuses eligibility only for event admission", async () => {
