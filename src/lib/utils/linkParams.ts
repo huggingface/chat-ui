@@ -21,6 +21,23 @@ export interface LinkPromptRequest {
 
 export const LINK_PARAM_NAMES = ["q", "prompt", "attachments"] as const;
 
+export interface LinkMcpServerRequest {
+	name: string;
+	url: URL;
+}
+
+export const MCP_LINK_PARAM_NAMES = ["mcp", "mcp_name"] as const;
+
+const MAX_MCP_NAME_LENGTH = 100;
+
+export function readLinkMcpServerRequest(params: URLSearchParams): LinkMcpServerRequest | null {
+	const raw = sanitizeUrlParam(params.get("mcp"));
+	const url = raw ? parseExternalUrl(raw) : undefined;
+	if (!url) return null;
+	const name = sanitizeUrlParam(params.get("mcp_name"))?.slice(0, MAX_MCP_NAME_LENGTH);
+	return { name: name ?? url.hostname, url };
+}
+
 export type LinkMode = "ml-intern";
 
 export function readLinkMode(params: URLSearchParams): LinkMode | null {
