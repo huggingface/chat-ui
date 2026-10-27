@@ -70,8 +70,8 @@ export async function cancelAllQueuedInputs(conversationId: ObjectId): Promise<s
 			{ $set: { status: "cancelled", updatedAt: new Date() } },
 			{ sort: { createdAt: 1 } }
 		);
-		if (!result.value) break;
-		cancelled.push(result.value._id.toString());
+		if (!result) break;
+		cancelled.push(result._id.toString());
 	}
 	return cancelled;
 }
@@ -125,8 +125,8 @@ export async function claimQueuedInputs(
 				},
 				{ returnDocument: "after" }
 			);
-			if (!result.value) continue;
-			rows.push(result.value);
+			if (!result) continue;
+			rows.push(result);
 			chars = joined;
 		}
 	}

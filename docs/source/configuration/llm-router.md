@@ -38,20 +38,32 @@ Create a JSON array of routes. With heuristic routing, three route names are rec
 	{
 		"name": "default",
 		"description": "General purpose route for all conversations.",
-		"primary_model": "deepseek-ai/DeepSeek-V4.1-Flash",
-		"fallback_models": ["moonshotai/Kimi-K2.6", "zai-org/GLM-4.6"]
+		"primary_model": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+		"fallback_models": [
+			"deepseek-ai/DeepSeek-V4.1-Flash",
+			"moonshotai/Kimi-K2.6",
+			"zai-org/GLM-4.6"
+		]
 	},
 	{
 		"name": "multimodal",
 		"description": "Route for requests with image inputs.",
-		"primary_model": "deepseek-ai/DeepSeek-V4.1-Flash",
-		"fallback_models": ["moonshotai/Kimi-K2.6", "Qwen/Qwen3-VL-235B-A22B-Instruct"]
+		"primary_model": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+		"fallback_models": [
+			"deepseek-ai/DeepSeek-V4.1-Flash",
+			"moonshotai/Kimi-K2.6",
+			"Qwen/Qwen3-VL-235B-A22B-Instruct"
+		]
 	},
 	{
 		"name": "agentic",
 		"description": "Route for MCP server tool calling.",
-		"primary_model": "deepseek-ai/DeepSeek-V4.1-Flash",
-		"fallback_models": ["moonshotai/Kimi-K2.6", "zai-org/GLM-4.6"]
+		"primary_model": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+		"fallback_models": [
+			"deepseek-ai/DeepSeek-V4.1-Flash",
+			"moonshotai/Kimi-K2.6",
+			"zai-org/GLM-4.6"
+		]
 	}
 ]
 ```
@@ -62,7 +74,7 @@ When `LLM_ROUTER_ENABLE_MULTIMODAL=true` and an image is attached, the router by
 
 ```ini
 LLM_ROUTER_ENABLE_MULTIMODAL=true
-LLM_ROUTER_MULTIMODAL_MODEL=deepseek-ai/DeepSeek-V4.1-Flash
+LLM_ROUTER_MULTIMODAL_MODEL=deepseek-ai/DeepSeek-V4.1-Flash-1017
 ```
 
 If the flag is off, image inputs still flow through the heuristic and pick the `multimodal` route from the policy file.
@@ -73,7 +85,7 @@ When `LLM_ROUTER_ENABLE_TOOLS=true` and the user has at least one MCP server ena
 
 ```ini
 LLM_ROUTER_ENABLE_TOOLS=true
-LLM_ROUTER_TOOLS_MODEL=deepseek-ai/DeepSeek-V4.1-Flash
+LLM_ROUTER_TOOLS_MODEL=deepseek-ai/DeepSeek-V4.1-Flash-1017
 ```
 
 If the flag is off (or no tools-capable model is found), tool-active requests flow through the heuristic and pick the `agentic` route from the policy file.
