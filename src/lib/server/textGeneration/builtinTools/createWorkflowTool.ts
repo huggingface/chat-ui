@@ -90,9 +90,7 @@ export function createWorkflowTool(
 			`GRADIO WORKFLOWS: when the user is choosing between models, or wants one model's output ` +
 			`fed into another, call ${CREATE_WORKFLOW_TOOL_NAME} rather than recommending from memory ` +
 			`or writing a Space by hand: a comparison they can rerun on their own inputs is a receipt, ` +
-			`a paragraph is not. AN INTERFACE DRAWN AS A GRAPH — one model with many inputs is a ` +
-			`gr.Interface, not a workflow; a workflow earns its place only when the topology is the ` +
-			`point, models racing on one input or one feeding the next.`,
+			`a paragraph is not.`,
 		async execute(args: Record<string, unknown>, ctx: BuiltinToolContext) {
 			const plan = parse(args, namespace());
 			if ("error" in plan) return plan;

@@ -258,9 +258,8 @@ describe("create_workflow", () => {
 		});
 	});
 
-	it("is exempt from tool restraint and names the Interface failure mode", () => {
+	it("is exempt from tool restraint", () => {
 		expect(tool().exemptFromToolRestraint).toBe(true);
 		expect(tool().name).toBe(CREATE_WORKFLOW_TOOL_NAME);
-		expect(tool().preprompt).toContain("AN INTERFACE DRAWN AS A GRAPH");
 	});
 });
