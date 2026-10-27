@@ -196,34 +196,15 @@ export const ML_ASSISTANT_PREPROMPT = mlAssistantPreprompt({
 });
 
 /**
- * The session context line, stamped at the very end of the system prompt.
+ * The date and time in the user's zone, falling back to the server's.
  *
- * Not decoration: the identity section reads PublishTo (or User) back out of it to
- * decide which namespace to push to, and the absence of a username is what
- * triggers the ask-don't-guess rule. Dropping this line makes the model invent
- * Hub usernames.
+ * The zone comes from the request body and is validated only as a string, so
+ * it can be anything. Intl throws RangeError on one it does not know, and this
+ * runs before the generation's own try — an unusable zone would fail the turn
+ * outright rather than degrade it. Fall back to the server's zone, and stop
+ * claiming a zone we did not use.
  */
-export function mlAssistantSessionContext({
-	username,
-	publishNamespace,
-	timezone,
-	now = new Date(),
-	budget,
-	billTo,
-	billingResourceGroup,
-}: {
-	username?: string;
-	/** Default output namespace, independent of identity and compute billing. */
-	publishNamespace?: string;
-	timezone?: string;
-	now?: Date;
-	/** Formatted amounts, e.g. "$7.80" — the caller owns the money arithmetic. */
-	budget?: { remaining: string; total: string };
-	/** Organization namespace whose credits pay for compute; absent means the user's own. */
-	billTo?: string;
-	/** Resource group within BillTo used for cost attribution. */
-	billingResourceGroup?: string;
-}): string {
+function sessionClock(now: Date, timezone?: string): { date: string; time: string; zone?: string } {
 	const format = (zone?: string) =>
 		new Intl.DateTimeFormat("en-CA", {
 			year: "numeric",
@@ -234,12 +215,6 @@ export function mlAssistantSessionContext({
 			hour12: false,
 			...(zone ? { timeZone: zone } : {}),
 		}).formatToParts(now);
-
-	// The zone comes from the request body and is validated only as a string, so
-	// it can be anything. Intl throws RangeError on one it does not know, and this
-	// runs before the generation's own try — an unusable zone would fail the turn
-	// outright rather than degrade it. Fall back to the server's zone, and stop
-	// claiming a zone we did not use.
 	let zone = timezone;
 	let parts;
 	try {
@@ -249,8 +224,44 @@ export function mlAssistantSessionContext({
 		parts = format(undefined);
 	}
 	const at = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-	const date = `${at("year")}-${at("month")}-${at("day")}`;
-	const time = `${at("hour")}:${at("minute")}`;
+	return {
+		date: `${at("year")}-${at("month")}-${at("day")}`,
+		time: `${at("hour")}:${at("minute")}`,
+		zone,
+	};
+}
+
+/**
+ * The session context line, stamped at the very end of the system prompt.
+ *
+ * Not decoration: the identity section reads PublishTo (or User) back out of it to
+ * decide which namespace to push to, and the absence of a username is what
+ * triggers the ask-don't-guess rule. Dropping this line makes the model invent
+ * Hub usernames.
+ *
+ * Only what holds for the whole session goes here. The system prompt starts every
+ * request, so a value that changes between turns makes the provider prefill the
+ * whole conversation again; the time and the budget are in mlAssistantTurnContext.
+ */
+export function mlAssistantSessionContext({
+	username,
+	publishNamespace,
+	timezone,
+	now = new Date(),
+	billTo,
+	billingResourceGroup,
+}: {
+	username?: string;
+	/** Default output namespace, independent of identity and compute billing. */
+	publishNamespace?: string;
+	timezone?: string;
+	now?: Date;
+	/** Organization namespace whose credits pay for compute; absent means the user's own. */
+	billTo?: string;
+	/** Resource group within BillTo used for cost attribution. */
+	billingResourceGroup?: string;
+}): string {
+	const { date, zone } = sessionClock(now, timezone);
 	const user = username && username.trim().length > 0 ? username.trim() : "unknown";
 	const publishTo = publishNamespace?.trim() || undefined;
 	const paidBy = billTo && billTo.trim().length > 0 ? billTo.trim() : undefined;
@@ -258,11 +269,30 @@ export function mlAssistantSessionContext({
 		billingResourceGroup && billingResourceGroup.trim().length > 0
 			? billingResourceGroup.trim()
 			: undefined;
-	return `[Session context: Date=${date}, Time=${time}${
-		zone ? `, Timezone=${zone}` : ""
-	}, User=${user}${publishTo ? `, PublishTo=${publishTo}` : ""}${paidBy ? `, BillTo=${paidBy}` : ""}${
-		paidBy && group ? `, BillingResourceGroup=${group}` : ""
-	}${budget ? `, Budget=${budget.remaining} remaining of ${budget.total}` : ""}]`;
+	return `[Session context: Date=${date}${zone ? `, Timezone=${zone}` : ""}, User=${user}${
+		publishTo ? `, PublishTo=${publishTo}` : ""
+	}${paidBy ? `, BillTo=${paidBy}` : ""}${paidBy && group ? `, BillingResourceGroup=${group}` : ""}]`;
+}
+
+/**
+ * The time and the remaining budget, stamped at the end of the user's latest
+ * message rather than in the system prompt, so the prefix a provider caches
+ * survives the minute changing and a job settling.
+ */
+export function mlAssistantTurnContext({
+	timezone,
+	now = new Date(),
+	budget,
+}: {
+	timezone?: string;
+	now?: Date;
+	/** Formatted amounts, e.g. "$7.80" — the caller owns the money arithmetic. */
+	budget?: { remaining: string; total: string };
+}): string {
+	const { time } = sessionClock(now, timezone);
+	return `[Session context: Time=${time}${
+		budget ? `, Budget=${budget.remaining} remaining of ${budget.total}` : ""
+	}]`;
 }
 
 /**
@@ -273,7 +303,7 @@ export function mlAssistantSessionContext({
  */
 export const ML_ASSISTANT_BUDGET_RULES = `# Session budget
 
-This session has a hard compute budget, enforced by the server and shown as Budget in the session context line below. It covers hf_jobs submissions and sandboxes.
+This session has a hard compute budget, enforced by the server and shown as Budget in the session context at the end of the user's latest message. It covers hf_jobs submissions and sandboxes.
 
 The budget is granted by the user, never assumed. A session starts at $0.00 unless they granted one, and an autonomous stretch of work is not authorization to spend — the number in the session context is the whole grant. When the budget is $0.00 and a run is on the table, ask for a grant before sizing anything further.
 

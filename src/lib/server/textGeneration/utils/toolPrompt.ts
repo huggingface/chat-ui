@@ -32,25 +32,26 @@ export function buildToolPreprompt(
 		.filter((s) => s.length > 0);
 	if (names.length === 0) return "";
 	const now = new Date();
-	const dateTimeOptions: Intl.DateTimeFormatOptions = {
+	// The date only: this sentence opens the system prompt, and anything finer
+	// changes the prefix every minute, so the provider prefills the whole
+	// conversation again instead of reusing its cache.
+	const dateOptions: Intl.DateTimeFormatOptions = {
 		year: "numeric",
 		month: "long",
 		day: "numeric",
 		weekday: "long",
-		hour: "2-digit",
-		minute: "2-digit",
 		...(timezone ? { timeZone: timezone } : {}),
 	};
 	// Same exposure as the session-context stamp: the zone is client-supplied and
 	// validated only as a string, and Intl throws on one it does not know. Here the
 	// throw is caught upstream and degrades the turn to a tool-free answer, which
 	// is quieter than a failure and just as wrong.
-	let currentDateTime: string;
+	let currentDate: string;
 	try {
-		currentDateTime = now.toLocaleString("en-US", dateTimeOptions);
+		currentDate = now.toLocaleDateString("en-US", dateOptions);
 	} catch {
 		timezone = undefined;
-		currentDateTime = now.toLocaleString("en-US", { ...dateTimeOptions, timeZone: undefined });
+		currentDate = now.toLocaleDateString("en-US", { ...dateOptions, timeZone: undefined });
 	}
 	const isoDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 	const locationLine = timezone ? ` User's timezone: ${timezone}.` : "";
@@ -74,7 +75,7 @@ export function buildToolPreprompt(
 			}`;
 	const general = [
 		`You have access to these tools: ${names.join(", ")}.`,
-		`Current date and time: ${currentDateTime} (${isoDate}).${locationLine}`,
+		`Current date: ${currentDate} (${isoDate}).${locationLine}`,
 		restraint,
 		...builtinGuidance,
 		`PARALLEL TOOL CALLS: When multiple tool calls are needed and they are independent of each other (i.e., one does not need the result of another), call them all at once in a single response instead of one at a time. Only chain tool calls sequentially when a later call depends on an earlier call's output.`,

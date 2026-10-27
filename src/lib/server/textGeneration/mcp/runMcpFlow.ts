@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { config } from "$lib/server/config";
 import { getUserHubToken } from "$lib/server/apiToken";
 import {
@@ -16,6 +17,7 @@ import type {
 } from "openai/resources/chat/completions";
 import type { Stream } from "openai/streaming";
 import { buildToolPreprompt } from "../utils/toolPrompt";
+import { toToolCallId } from "../utils/toolCallId";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
 import {
@@ -187,11 +189,14 @@ export async function* runMcpFlow({
 	generationId,
 	messageId,
 	preprompt,
+	turnContext,
 	abortSignal,
 	abortController,
 	promptedAt,
 }: RunMcpFlowContext & {
 	preprompt?: string;
+	/** stamped at the end of the user's latest message, see resolveTurnContext */
+	turnContext?: string;
 	abortSignal?: AbortSignal;
 	abortController?: AbortController;
 	promptedAt?: Date;
@@ -761,8 +766,9 @@ export async function* runMcpFlow({
 			if (conv.plan && builtinTools.some((tool) => tool.name === PLAN_TOOL_NAME)) {
 				prompt = injectPlanState(prompt, conv.plan);
 			}
-			if (stateBlock) {
-				prompt = injectSessionState(prompt, stateBlock.text);
+			const tail = [turnContext, stateBlock?.text].filter((text): text is string => !!text);
+			if (tail.length > 0) {
+				prompt = injectSessionState(prompt, tail.join("\n\n"));
 			}
 
 			// Work around servers that reject `system` role
@@ -900,6 +906,8 @@ export async function* runMcpFlow({
 			);
 		}
 
+		// one set per turn, like the per-message set replay uses
+		const sentToolCallIds = new Set<string>();
 		for (let loop = 0; loop < maxToolRounds; loop += 1) {
 			// Check for abort at the start of each loop iteration
 			if (checkAborted()) {
@@ -1255,6 +1263,15 @@ export async function* runMcpFlow({
 						rewrite: rewriteArgs,
 					});
 				}
+
+				// The ids history replay derives from the same uuids on later turns,
+				// not the provider's: a round replayed with other ids stops matching
+				// the prefix the provider cached, and Mistral-family templates refuse
+				// ids that are not nine alphanumeric characters anyway.
+				calls = calls.map((call) => {
+					const uuid = randomUUID();
+					return { ...call, uuid, id: toToolCallId(uuid, sentToolCallIds), providerId: call.id };
+				});
 
 				// Include the assistant message with tool_calls so the next round
 				// sees both the calls and their outputs, matching MCP branch behavior.

@@ -4,6 +4,7 @@ import {
 	ML_ASSISTANT_PREPROMPT,
 	mlAssistantPreprompt,
 	mlAssistantSessionContext,
+	mlAssistantTurnContext,
 } from "./mlAssistantPrompt";
 import { VIRTUAL_FILES_TOOL_PREPROMPT } from "$lib/server/mlFiles/prompt";
 import { buildToolPreprompt } from "./textGeneration/utils/toolPrompt";
@@ -556,7 +557,7 @@ describe("ML Assistant session context", () => {
 
 	it("stamps the user so the namespace rule has something to read", () => {
 		expect(mlAssistantSessionContext({ username: "pngwn", timezone: "UTC", now })).toBe(
-			"[Session context: Date=2026-08-24, Time=09:07, Timezone=UTC, User=pngwn]"
+			"[Session context: Date=2026-08-24, Timezone=UTC, User=pngwn]"
 		);
 	});
 
@@ -581,9 +582,48 @@ describe("ML Assistant session context", () => {
 		expect(stamped).not.toContain("Timezone=");
 	});
 
-	it("stamps the time in the user's zone", () => {
-		expect(mlAssistantSessionContext({ timezone: "Europe/Berlin", now })).toContain("Time=11:07");
+	it("stamps the date in the user's zone", () => {
+		const late = new Date("2026-08-24T23:07:00Z");
+		expect(mlAssistantSessionContext({ timezone: "Europe/Berlin", now: late })).toContain(
+			"Date=2026-08-25"
+		);
 		expect(mlAssistantSessionContext({ now })).not.toContain("Timezone=");
+	});
+
+	it("keeps what changes between turns out of the system prompt", () => {
+		// The system prompt starts every request: a minute or a settled job changing
+		// it makes the provider prefill the whole conversation again.
+		const stamped = mlAssistantSessionContext({ username: "pngwn", timezone: "UTC", now });
+		expect(stamped).not.toContain("Time=");
+		expect(stamped).not.toContain("Budget=");
+		expect(
+			mlAssistantSessionContext({
+				username: "pngwn",
+				timezone: "UTC",
+				now: new Date("2026-08-24T09:58:00Z"),
+			})
+		).toBe(stamped);
+	});
+});
+
+describe("ML Assistant turn context", () => {
+	const now = new Date("2026-08-24T09:07:00Z");
+
+	it("stamps the time in the user's zone", () => {
+		expect(mlAssistantTurnContext({ timezone: "Europe/Berlin", now })).toBe(
+			"[Session context: Time=11:07]"
+		);
+		expect(mlAssistantTurnContext({ timezone: "Not/AZone", now })).toContain("Time=");
+	});
+
+	it("carries the budget", () => {
+		expect(
+			mlAssistantTurnContext({
+				timezone: "UTC",
+				now,
+				budget: { remaining: "$7.80", total: "$10.00" },
+			})
+		).toBe("[Session context: Time=09:07, Budget=$7.80 remaining of $10.00]");
 	});
 });
 
@@ -632,23 +672,13 @@ describe("ML Assistant billing", () => {
 	it("stamps who pays after the user, only when someone other than the user does", () => {
 		expect(
 			mlAssistantSessionContext({ username: "pngwn", timezone: "UTC", now, billTo: "acme" })
-		).toBe("[Session context: Date=2026-08-24, Time=09:07, Timezone=UTC, User=pngwn, BillTo=acme]");
+		).toBe("[Session context: Date=2026-08-24, Timezone=UTC, User=pngwn, BillTo=acme]");
 		expect(mlAssistantSessionContext({ username: "pngwn", timezone: "UTC", now })).not.toContain(
 			"BillTo="
 		);
 		expect(
 			mlAssistantSessionContext({ username: "pngwn", timezone: "UTC", now, billTo: "  " })
 		).not.toContain("BillTo=");
-	});
-
-	it("keeps the budget last, after the payer", () => {
-		const stamped = mlAssistantSessionContext({
-			username: "pngwn",
-			now,
-			billTo: "acme",
-			budget: { remaining: "$7.80", total: "$10.00" },
-		});
-		expect(stamped).toContain("User=pngwn, BillTo=acme, Budget=$7.80 remaining of $10.00]");
 	});
 
 	it("keeps BillTo a valid namespace and stamps the resource group separately", () => {

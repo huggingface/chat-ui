@@ -1179,6 +1179,81 @@ describe.sequential("history stored in either shape", () => {
 	});
 });
 
+describe.sequential("the prompt prefix a provider caches", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	/** a provider reuses its cache only as far as the bytes match from the start */
+	function sharedPrefix(a: ChatMessage[], b: ChatMessage[]): number {
+		let n = 0;
+		while (n < a.length && n < b.length && JSON.stringify(a[n]) === JSON.stringify(b[n])) n += 1;
+		return n;
+	}
+
+	it("extends the previous turn's last request byte for byte, a minute later", async () => {
+		vi.useFakeTimers({ toFake: ["Date"] });
+		vi.setSystemTime(new Date("2026-10-27T23:36:10Z"));
+		const { conv, locals } = await newConversation();
+		scriptRounds([
+			{
+				// the trailing newlines are what a trimming replay used to drop
+				content: "I'll search for that.\n\n",
+				toolCalls: [
+					{
+						id: "chatcmpl-tool-89a723c0929e54d3",
+						name: "get_weather",
+						arguments: '{"city":"Paris"}',
+					},
+				],
+			},
+			{ content: "Sunny." },
+			{ content: "Still sunny." },
+		]);
+
+		await sendMessage(conv, locals, "Weather in Paris?");
+		const turnOneLast = outgoing(1);
+		vi.setSystemTime(new Date("2026-10-27T23:37:10Z"));
+		await sendMessage(await reload(conv), locals, "And tomorrow?");
+		const turnTwo = outgoing(2);
+
+		expect(sharedPrefix(turnOneLast, turnTwo), describeMessages(turnTwo)).toBe(turnOneLast.length);
+		const round = turnOneLast.find((m) => m.tool_calls);
+		expect(round?.content).toBe("I'll search for that.\n\n");
+		// what the provider issued is kept, but never sent
+		expect(round?.tool_calls?.[0].id).toMatch(/^[a-zA-Z0-9]{9}$/);
+		const [turn] = assistantMessages(await reload(conv));
+		expect(callUpdatesOf(turn)[0].originalId).toBe("chatcmpl-tool-89a723c0929e54d3");
+	});
+
+	it("keeps the time and budget out of the ML Assistant system prompt", async () => {
+		vi.useFakeTimers({ toFake: ["Date"] });
+		vi.setSystemTime(new Date("2026-10-27T23:36:10Z"));
+		const { conv, locals } = await newConversation({ mlAssistant: true });
+		scriptRounds([
+			{ toolCalls: [{ id: "call_one11111", name: "get_weather", arguments: '{"city":"Paris"}' }] },
+			{ content: "Sunny." },
+			{ content: "Still sunny." },
+		]);
+
+		await sendMessage(conv, locals, "Weather in Paris?");
+		const turnOneLast = outgoing(1);
+		vi.setSystemTime(new Date("2026-10-27T23:37:10Z"));
+		await sendMessage(await reload(conv), locals, "And tomorrow?");
+		const turnTwo = outgoing(2);
+
+		expect(turnTwo[0]).toEqual(turnOneLast[0]);
+		expect(String(turnTwo[0].content)).not.toMatch(/Time=|Budget=/);
+		expect(String(turnTwo.at(-1)?.content)).toMatch(
+			/^And tomorrow\?\n\n\[Session context: Time=\d\d:37, Budget=\$0\.00 remaining of \$0\.00\]/
+		);
+		// the previous user message is replayed as written, so the prefix runs up to it
+		expect(sharedPrefix(turnOneLast, turnTwo)).toBe(
+			turnOneLast.findIndex((m) => m.role === "user")
+		);
+	});
+});
+
 describe.sequential("a job that ends while the turn is busy", () => {
 	const HEADER = "[Harness event, not part of this tool result]";
 
@@ -1211,19 +1286,12 @@ describe.sequential("a job that ends while the turn is busy", () => {
 		});
 	}
 
-	/** provider ids are replaced on replay, so pairs are compared by the order they appear in */
-	function withPositionalIds(messages: ChatMessage[]): ChatMessage[] {
-		const ids = new Map<string, string>();
-		const named = (id: string) => ids.get(id) ?? ids.set(id, `id${ids.size}`).get(id) ?? id;
-		return messages.map(
-			(m) =>
-				({
-					...m,
-					...(m.tool_calls
-						? { tool_calls: m.tool_calls.map((call) => ({ ...call, id: named(call.id) })) }
-						: {}),
-					...(m.tool_call_id ? { tool_call_id: named(m.tool_call_id) } : {}),
-				}) as ChatMessage
+	/** the turn context rides on the latest user message live, replay has what the user wrote */
+	function withoutTurnContext(messages: ChatMessage[]): ChatMessage[] {
+		return messages.map((m) =>
+			m.role === "user" && typeof m.content === "string"
+				? { ...m, content: m.content.replace(/\n\n\[Session context: Time=[^\]]*\]$/, "") }
+				: m
 		);
 	}
 
@@ -1262,10 +1330,9 @@ describe.sequential("a job that ends while the turn is busy", () => {
 
 		await sendMessage(converted, locals, "Thanks?");
 		const fromRounds = history(outgoing(2));
-		expect(
-			withPositionalIds(fromRounds.slice(0, live.length)),
-			describeMessages(fromRounds)
-		).toEqual(withPositionalIds(live));
+		expect(fromRounds.slice(0, live.length), describeMessages(fromRounds)).toEqual(
+			withoutTurnContext(live)
+		);
 
 		await collections.conversations.updateOne(
 			{ _id: conv._id, "messages.id": turn.id },

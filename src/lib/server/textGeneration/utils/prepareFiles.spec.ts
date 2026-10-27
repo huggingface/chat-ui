@@ -482,7 +482,8 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 	it("dedups a round preamble persisted with leading whitespace", async () => {
 		// The pre-tool stream often starts with newlines after a think block; a
 		// Call update persisted untrimmed must still match the trim-normalized
-		// visible text, or the preamble replays twice.
+		// visible text, or the preamble replays twice. The round itself replays the
+		// bytes the live loop sent, so the provider's cached prefix still matches.
 		const messages: EndpointMessage[] = [
 			{
 				from: "assistant",
@@ -502,7 +503,7 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		});
 		const roundMessage = prepared[0] as { content?: string };
 		const finalMessage = prepared.at(-1) as { content?: string };
-		expect(roundMessage.content).toBe("Let me check that.");
+		expect(roundMessage.content).toBe("\n\nLet me check that.");
 		expect(finalMessage.content).toContain("Here is the answer.");
 		expect(finalMessage.content).not.toContain("Let me check that.");
 	});

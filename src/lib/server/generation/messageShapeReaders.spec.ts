@@ -20,6 +20,15 @@ const user = (content: string): Message => ({
 	content,
 });
 
+/**
+ * a legacy Call update kept its preamble trimmed, the converted one has the bytes the live loop
+ * sent back from content, and replay sends those bytes so the provider's cached prefix matches
+ */
+const preamblesTrimmedInReplay = (messages: Awaited<ReturnType<typeof prepareMessagesWithFiles>>) =>
+	messages.map((m) =>
+		"tool_calls" in m && typeof m.content === "string" ? { ...m, content: m.content.trim() } : m
+	);
+
 const cases = Object.entries(convertingTurns()).map(([name, legacy]) => {
 	const result = convertMessageShape(legacy);
 	if (!("message" in result)) throw new Error(`${name} did not convert: ${result.skipped}`);
@@ -54,7 +63,7 @@ describe.each(cases)("$name", ({ legacy, rounds }) => {
 			false,
 			options
 		);
-		expect(fromRounds).toEqual(fromLegacy);
+		expect(preamblesTrimmedInReplay(fromRounds)).toEqual(preamblesTrimmedInReplay(fromLegacy));
 	});
 
 	it("collects the same artifacts", () => {
