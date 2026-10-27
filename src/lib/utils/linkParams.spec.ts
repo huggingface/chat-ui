@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	isTrustedAttachmentUrl,
 	linkPromptNeedsConfirmation,
+	readLinkMcpServerRequest,
 	readLinkMode,
 	readLinkPromptRequest,
 } from "./linkParams";
@@ -191,5 +192,35 @@ describe("readLinkMode", () => {
 
 	it("does not turn a mode-only link into a composer request", () => {
 		expect(readLinkPromptRequest(params("mode=ml-intern"))).toBeNull();
+	});
+});
+
+describe("readLinkMcpServerRequest", () => {
+	it("returns null without a usable mcp URL", () => {
+		expect(readLinkMcpServerRequest(params(""))).toBeNull();
+		expect(readLinkMcpServerRequest(params("mcp="))).toBeNull();
+		expect(readLinkMcpServerRequest(params("mcp=not-a-url"))).toBeNull();
+		expect(readLinkMcpServerRequest(params("mcp=javascript:alert(1)"))).toBeNull();
+		expect(readLinkMcpServerRequest(params("mcp=/relative/mcp"))).toBeNull();
+		expect(
+			readLinkMcpServerRequest(params(`mcp=${encodeURIComponent("https://a:b@evil.com/mcp")}`))
+		).toBeNull();
+	});
+
+	it("names the server after its host when mcp_name is missing", () => {
+		const request = readLinkMcpServerRequest(
+			params(`mcp=${encodeURIComponent("https://abc123.gradio.live/gradio_api/mcp/")}`)
+		);
+		expect(request?.url.href).toBe("https://abc123.gradio.live/gradio_api/mcp/");
+		expect(request?.name).toBe("abc123.gradio.live");
+	});
+
+	it("uses mcp_name, trimmed and capped", () => {
+		const mcp = encodeURIComponent("https://example.com/mcp");
+		expect(readLinkMcpServerRequest(params(`mcp=${mcp}&mcp_name=%20My%20App%20`))?.name).toBe(
+			"My App"
+		);
+		const long = "x".repeat(500);
+		expect(readLinkMcpServerRequest(params(`mcp=${mcp}&mcp_name=${long}`))?.name).toHaveLength(100);
 	});
 });

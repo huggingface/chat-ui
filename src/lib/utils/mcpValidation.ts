@@ -42,6 +42,16 @@ export function validateMcpServerUrl(urlString: string): string | null {
 	}
 }
 
+export function isSameServerUrl(a: string, b: string): boolean {
+	try {
+		const [x, y] = [new URL(a), new URL(b)];
+		x.hash = y.hash = "";
+		return x.href === y.href;
+	} catch {
+		return false;
+	}
+}
+
 /**
  * Check if hostname is localhost or a private IP
  */

@@ -26,13 +26,17 @@ const generate = vi.fn();
 vi.mock("$lib/server/generation/conversationRequest", () => ({
 	generateConversationResponse: (...args: unknown[]) => generate(...args),
 }));
-const identity = vi.hoisted(() => ({ tokenExpired: false }));
+const identity = vi.hoisted(() => ({
+	tokenExpired: false,
+	selection: undefined as unknown,
+}));
 vi.mock("$lib/server/generation/parkedSweeper", () => ({
 	rebuildIdentity: async () => ({
 		locals: { sessionId: "s" },
 		settings: null,
 		tokenExpired: identity.tokenExpired,
 	}),
+	savedSlackSelection: async () => identity.selection,
 }));
 const userToken = vi.hoisted(() => ({ value: "false" }));
 vi.mock("$lib/server/config", async (importOriginal) => {
@@ -446,6 +450,26 @@ describe.sequential("starting the next turn from the queue", async () => {
 		expect(body).toMatchObject({ inputs: "first\n\nsecond", id: "a1" });
 		const rows = await collections.queuedInputs.find({ conversationId }).toArray();
 		expect(rows.every((row) => row.status === "started")).toBe(true);
+	});
+
+	it("sends a Slack owner's saved MCP selection with the queued turn", async () => {
+		const conversationId = conversation();
+		await seedConversation(conversationId);
+		await queue(conversationId, "follow-up");
+		const selection = {
+			selectedMcpServerNames: ["Private"],
+			selectedMcpServers: [{ name: "Private", url: "https://example.com/mcp" }],
+		};
+		identity.selection = selection;
+		generate.mockResolvedValue(streamingResponse());
+		try {
+			expect(await startQueuedTurn(conversationId)).toBe("started");
+		} finally {
+			identity.selection = undefined;
+		}
+		const [{ request }] = generate.mock.calls.at(-1) as [{ request: Request }];
+		const body = JSON.parse(String((await request.formData()).get("data")));
+		expect(body).toMatchObject({ ...selection, inputs: "follow-up" });
 	});
 
 	it("clears a stop marker the ended turn left so it cannot abort the new one", async () => {

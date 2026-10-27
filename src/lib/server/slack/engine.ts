@@ -1,3 +1,4 @@
+import { loadMcpSelection } from "$lib/server/mcp/savedSelection";
 import { error } from "@sveltejs/kit";
 import { randomUUID } from "node:crypto";
 import { collections } from "$lib/server/database";
@@ -71,18 +72,28 @@ export async function runSlackTurn(
 	thread: SlackThread,
 	user: User,
 	input: { text?: string; files?: File[]; resumeElicitationId?: string; retry?: boolean },
-	resolvedLocals?: App.Locals
+	resolvedLocals?: App.Locals,
+	onMcpUnavailable?: () => Promise<void>
 ): Promise<void> {
 	const conv = await collections.conversations.findOne({
 		_id: thread.conversationId,
 		userId: user._id,
 	});
 	if (!conv) throw new Error("Slack conversation no longer exists.");
+	// Load afresh for every owner turn, including retries and answered questions.
+	// Legacy shared-account sessions never inherit a human's personal tools.
+	if (thread.hfUserId && !thread.hfUserId.equals(user._id))
+		throw new Error("Slack session owner does not match the connected user.");
+	const saved = thread.hfUserId ? await loadMcpSelection(user._id) : undefined;
+	const selection = saved?.status === "ok" ? saved.selection : undefined;
+	// Unreadable (e.g. after a key rotation): run with preset tools and say so.
+	if (saved?.status === "unavailable") await onMcpUnavailable?.().catch(() => {});
 	const latest = conv.messages[conv.messages.length - 1];
 	const data = new FormData();
 	data.set(
 		"data",
 		JSON.stringify({
+			...selection,
 			...(input.text ? { inputs: input.text } : {}),
 			...(input.resumeElicitationId ? { resumeElicitationId: input.resumeElicitationId } : {}),
 			...(input.retry ? { is_retry: true } : {}),

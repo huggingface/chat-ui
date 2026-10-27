@@ -1,11 +1,13 @@
 <script lang="ts">
 	import type { MessageQueuedInputUpdate } from "$lib/types/MessageUpdate";
+	import { splitSlackRequest } from "$lib/utils/slackRequest";
 
 	interface Props {
 		update: MessageQueuedInputUpdate;
+		slackManaged?: boolean;
 	}
 
-	let { update }: Props = $props();
+	let { update, slackManaged = false }: Props = $props();
 </script>
 
 <div class="queued-input flex flex-col gap-1.5">
@@ -15,7 +17,7 @@
 		>
 			<div class="mb-0.5 text-xs text-gray-400 dark:text-gray-500">You, while it worked</div>
 			<p class="text-sm wrap-break-word whitespace-break-spaces text-gray-600 dark:text-gray-300">
-				{input.text}
+				{slackManaged ? splitSlackRequest(input.text).request : input.text}
 			</p>
 		</div>
 	{/each}

@@ -26,6 +26,7 @@ import type { MlAgentRun } from "$lib/types/MlAgentRun";
 import type { MlSource } from "$lib/types/MlSource";
 import type { MlSessionLabel } from "$lib/types/MlSessionLabel";
 import type { Settings } from "$lib/types/Settings";
+import type { SavedMcpSelection } from "$lib/server/mcp/savedSelection";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
 import type { Session } from "$lib/types/Session";
@@ -154,6 +155,7 @@ export class Database {
 		);
 
 		// Collections with default readPreference (primary) - critical for read-after-write consistency
+		const mcpSelections = db.collection<SavedMcpSelection>("mcp.selections");
 		const slackConnections = db.collection<SlackConnection>("slack.connections");
 		const slackLinks = db.collection<SlackLink>("slack.links");
 		const slackThreads = db.collection<SlackThread>("slack.threads");
@@ -239,6 +241,7 @@ export class Database {
 			tokenCaches,
 			tools,
 			config: configCollection,
+			mcpSelections,
 			mcpOAuthConnections,
 		};
 	}
