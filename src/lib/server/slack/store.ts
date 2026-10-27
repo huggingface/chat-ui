@@ -98,7 +98,7 @@ export class SlackLeader {
 				{ $set: { owner: this.owner, until: new Date(now.getTime() + 60_000) } },
 				{ upsert: true, returnDocument: "after" }
 			);
-			const held = result.value?.owner === this.owner;
+			const held = result?.owner === this.owner;
 			this.validUntil = held ? now.getTime() + 50000 : 0;
 			return held;
 		} catch (err) {

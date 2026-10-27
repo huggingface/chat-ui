@@ -53,7 +53,7 @@ async function claim(reviewId: ObjectId): Promise<MlReview | null> {
 		},
 		{ returnDocument: "after" }
 	);
-	return claimed.value ?? null;
+	return claimed;
 }
 
 /** keyed on the claim taken, so a holder that stalled past its lease cannot undo its successor */

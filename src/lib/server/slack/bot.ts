@@ -865,7 +865,7 @@ export class MlSlackBot {
 			{ $set: { status: "running", updatedAt: new Date() } },
 			{ sort: { ts: 1 }, returnDocument: "after" }
 		);
-		const input = claim.value;
+		const input = claim;
 		if (!input) return;
 		if (!queueOnly) this.runningConversations.set(thread._id, thread.conversationId.toHexString());
 		try {
@@ -1560,7 +1560,7 @@ export class MlSlackBot {
 			{ $inc: { renderFailures: 1 } },
 			{ returnDocument: "after" }
 		);
-		const failures = row.value?.renderFailures ?? 1;
+		const failures = row?.renderFailures ?? 1;
 		await collections.slackThreads.updateOne(
 			{ _id: thread._id },
 			{

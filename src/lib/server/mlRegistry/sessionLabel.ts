@@ -26,9 +26,9 @@ export async function loadSessionJobLabels(conversationId: ObjectId): Promise<Se
 			)
 			.toArray(),
 	]);
-	if (!row.value) throw new Error("session label upsert returned no row");
+	if (!row) throw new Error("session label upsert returned no row");
 	return {
-		session: row.value.value,
+		session: row.value,
 		ownJobs: new Map(jobs.map((job) => [job.jobId, job.name])),
 	};
 }
