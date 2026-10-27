@@ -277,7 +277,7 @@ it("keeps multiple choices as drafts until all are selected and adds a final div
 	expect(selectedAnswers(req, { "0": 0, "1": 1 })).toEqual({ q1: "Set budget to $5.00", q2: "No" });
 });
 
-it("marks accepted values rather than drafts and retains custom answers safely", () => {
+it("shows only accepted values, including custom answers, under each question", () => {
 	const request: ElicitationRequestPayload = {
 		...question,
 		fields: [
@@ -295,12 +295,25 @@ it("marks accepted values rather than drafts and retains custom answers safely",
 		],
 	};
 	const blocks = confirmedQuestionBlocks(request, { q: ["two", "<custom>"] });
-	const text = JSON.stringify(blocks);
-	expect(text).toContain("Second* ✅");
-	expect(text).not.toContain("First* ✅");
-	expect(text).toContain("&lt;custom&gt; ✅");
-	expect(blocks.at(-1)).toEqual({ type: "divider" });
-	expect(blocks.some((b) => b.type === "actions")).toBe(false);
+	expect(blocks).toEqual([
+		{ type: "section", text: { type: "mrkdwn", text: "1. q\n✅ Second\n✅ &lt;custom&gt;" } },
+		{ type: "divider" },
+	]);
+});
+
+it("marks a blank optional answer instead of showing a bare question", () => {
+	const request: ElicitationRequestPayload = {
+		...question,
+		fields: [{ kind: "string", name: "split", title: "Which dataset split?", required: false }],
+	};
+	expect(confirmedQuestionBlocks(request, {})[0]).toEqual({
+		type: "section",
+		text: { type: "mrkdwn", text: "1. Which dataset split?\n_No answer_" },
+	});
+	expect(confirmedQuestionBlocks(request)[0]).toEqual({
+		type: "section",
+		text: { type: "mrkdwn", text: "1. Which dataset split?" },
+	});
 });
 
 describe("Slack long replies and tables", () => {

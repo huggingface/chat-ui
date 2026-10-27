@@ -46,4 +46,6 @@ export interface FeatureFlags {
 	taskModelId: string | null;
 	/** Models ML Intern conversations may use, in order; the first is the default. Empty when the mode is off. */
 	mlAssistantModels: string[];
+	/** Set when this user opted in to syncing MCP servers for personal Slack sessions. */
+	slackMcpSync: { saved: boolean } | null;
 }

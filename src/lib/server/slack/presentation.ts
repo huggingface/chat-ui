@@ -413,40 +413,43 @@ export function questionFormLabel(request: ElicitationRequestPayload): string | 
 			: undefined;
 	return field ? (field.allowOther ? "Other answer" : undefined) : "Answer questions";
 }
-function fieldBlocks(
-	field: ElicitationField,
-	index: number,
-	answer?: ElicitationValue
-): KnownBlock[] {
-	const answers = Array.isArray(answer) ? answer : [answer];
+function fieldBlocks(field: ElicitationField, index: number): KnownBlock[] {
 	const blocks: KnownBlock[] = [];
 	for (const part of chunks(`${index + 1}. ${field.description || field.title || field.name}`))
 		blocks.push({ type: "section", text: questionText(part) });
 	if (field.kind === "select")
 		for (const [i, option] of field.options.entries()) {
 			for (const part of chunks(
-				`${choiceLetter(i)}. *${optionLabel(option)}*${answers.includes(option.value) ? " ✅" : ""}${option.description ? `\n${option.description}` : ""}`
+				`${choiceLetter(i)}. *${optionLabel(option)}*${option.description ? `\n${option.description}` : ""}`
 			))
 				blocks.push({ type: "section", text: questionText(part) });
 		}
-	if (answer !== undefined) {
-		const custom = answers.filter(
-			(value) => field.kind !== "select" || !field.options.some((option) => option.value === value)
-		);
-		if (custom.length)
-			for (const part of chunks(`Answer: ${custom.join(", ")} ✅`))
-				blocks.push({ type: "section", text: questionText(part) });
-	}
 	return blocks;
 }
+function answerLabel(field: ElicitationField, value: ElicitationValue): string {
+	const option = field.kind === "select" && field.options.find((o) => o.value === value);
+	if (option) return optionLabel(option);
+	return typeof value === "boolean" ? (value ? "Yes" : "No") : String(value);
+}
+/** answered or skipped: each question with only what was chosen, the unpicked options dropped */
 export function confirmedQuestionBlocks(
 	request: ElicitationRequestPayload,
-	content: Record<string, ElicitationValue>
+	/** omitted when the question was skipped */
+	content?: Record<string, ElicitationValue>
 ): KnownBlock[] {
-	return (request.fields ?? []).flatMap((field, index) => [
-		...fieldBlocks(field, index, content[field.name]),
+	return [
+		...(request.fields ?? []).flatMap((field, index) => {
+			const answer = content?.[field.name];
+			const answers = answer === undefined ? [] : Array.isArray(answer) ? answer : [answer];
+			const text = [
+				`${index + 1}. ${field.description || field.title || field.name}`,
+				...answers.map((value) => `✅ ${answerLabel(field, value)}`),
+				...(content && !answers.length ? ["_No answer_"] : []),
+			].join("\n");
+			return chunks(text).map((part) => ({ type: "section" as const, text: questionText(part) }));
+		}),
 		{ type: "divider" as const },
-	]);
+	];
 }
 export function questionBlocks(
 	request: ElicitationRequestPayload,

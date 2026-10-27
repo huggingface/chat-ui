@@ -41,7 +41,8 @@ import { provisionSlackIdentity, threadLocals } from "./identity";
 import { answerSideQuestion, SIDE_QUESTION_MAX_CHARS } from "$lib/server/mlSideQuestion";
 import { slackSideQuestion } from "$lib/utils/sideQuestion";
 import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } from "./engine";
-import { threadKey, threadPrompt, type ThreadMessage } from "./context";
+import { MCP_RESYNC_NOTE } from "$lib/server/mcp/savedSelection";
+import { addressedToOther, threadKey, threadPrompt, type ThreadMessage } from "./context";
 import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store";
 import type { SlackThread } from "./types";
 import {
@@ -93,6 +94,7 @@ const mention = z.object({
 		.optional(),
 	bot_id: z.string().optional(),
 	subtype: z.string().optional(),
+	channel_type: z.string().optional(),
 });
 
 /** shared slack credentials pay for these, so they are capped per asker and per workspace */
@@ -674,6 +676,20 @@ export class MlSlackBot {
 		)
 			return;
 		// Dispatch and controls recheck membership without this event-only cache.
+		// In a DM every message is for the bot, even one that opens by tagging a colleague.
+		if (
+			event.channel_type !== "im" &&
+			this.botUserId &&
+			addressedToOther(event.text, this.botUserId)
+		) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"Tagging a person or group at the beginning of a message means your message will not be sent to ML Intern.",
+				event.thread_ts
+			);
+			return;
+		}
 
 		if (existing?.deletedAt) {
 			await this.tell(
@@ -946,7 +962,7 @@ export class MlSlackBot {
 			{ $set: { status: "running", updatedAt: new Date() } },
 			{ sort: { ts: 1 }, returnDocument: "after" }
 		);
-		const input = claim.value;
+		const input = claim;
 		if (!input) return;
 		if (!queueOnly) this.runningConversations.set(thread._id, thread.conversationId.toHexString());
 		try {
@@ -959,6 +975,8 @@ export class MlSlackBot {
 			const user = locals?.user ?? this.user;
 			if (!user) throw new Error("Slack session owner is unavailable.");
 			await ensureConversation(thread, user, this.settings);
+			const noteMcpUnavailable = () =>
+				this.tell(thread.channel, thread.owner, MCP_RESYNC_NOTE, thread.threadTs);
 			if (input.resumeElicitationId) {
 				const question = await collections.mcpElicitations.findOne({
 					conversationId: thread.conversationId,
@@ -971,7 +989,8 @@ export class MlSlackBot {
 						thread,
 						user,
 						{ resumeElicitationId: input.resumeElicitationId },
-						locals
+						locals,
+						noteMcpUnavailable
 					);
 			} else {
 				const conv = await collections.conversations.findOne({ _id: thread.conversationId });
@@ -1017,7 +1036,13 @@ export class MlSlackBot {
 				} else {
 					if (skipped) await this.render(thread);
 					const context = input.retry ? undefined : await this.context(thread, input);
-					await runSlackTurn(thread, user, { ...context, retry: input.retry }, locals);
+					await runSlackTurn(
+						thread,
+						user,
+						{ ...context, retry: input.retry },
+						locals,
+						noteMcpUnavailable
+					);
 					if (!input.retry)
 						await collections.slackThreads.updateOne(
 							{ _id: thread._id },
@@ -1552,7 +1577,7 @@ export class MlSlackBot {
 			const text = "Question skipped — continued with a new message.";
 			const blocks = [
 				{ type: "section" as const, text: { type: "plain_text" as const, text } },
-				...confirmedQuestionBlocks(question.request, {}),
+				...confirmedQuestionBlocks(question.request),
 			];
 			for (const ts of card.parts)
 				await this.app.client.chat.update({
@@ -1641,7 +1666,7 @@ export class MlSlackBot {
 			{ $inc: { renderFailures: 1 } },
 			{ returnDocument: "after" }
 		);
-		const failures = row.value?.renderFailures ?? 1;
+		const failures = row?.renderFailures ?? 1;
 		await collections.slackThreads.updateOne(
 			{ _id: thread._id },
 			{
