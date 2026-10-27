@@ -87,10 +87,11 @@ export async function startQueuedTurn(conversationId: ObjectId): Promise<QueuedT
 		rows = await claimQueuedInputs(conversationId, { status: "started" });
 		if (rows.length === 0) return "empty";
 
-		const [{ rebuildIdentity }, { generateConversationResponse }] = await Promise.all([
-			import("$lib/server/generation/parkedSweeper"),
-			import("$lib/server/generation/conversationRequest"),
-		]);
+		const [{ rebuildIdentity, savedSlackSelection }, { generateConversationResponse }] =
+			await Promise.all([
+				import("$lib/server/generation/parkedSweeper"),
+				import("$lib/server/generation/conversationRequest"),
+			]);
 		const { locals, tokenExpired } = await rebuildIdentity({
 			userId: rows[0].userId,
 			sessionId: rows[0].sessionId,
@@ -103,12 +104,15 @@ export async function startQueuedTurn(conversationId: ObjectId): Promise<QueuedT
 			);
 			return "failed";
 		}
+		// the request body sets the turn's MCP servers, so a Slack owner's saved ones go in it
+		const selection = await savedSlackSelection(rows[0], locals, tokenExpired);
 		// no turn is alive, so a marker left by a send now or a stop can only abort the new one
 		await collections.abortedGenerations.deleteMany({ conversationId });
 		const data = new FormData();
 		data.set(
 			"data",
 			JSON.stringify({
+				...selection,
 				inputs: joinQueuedInputs(rows),
 				id: latest?.id ?? conv.rootMessageId,
 				generationId: randomUUID(),

@@ -43,7 +43,8 @@ import { createGenerationWriter } from "./writer";
 import { isTurnAlive } from "./turnLog";
 import { clearStaleStopMarker, watchStopMarker } from "./stopMarker";
 import { applyUpdateToMessage } from "./applyUpdate";
-import { rebuildIdentity } from "./parkedSweeper";
+import { rebuildIdentity, savedSlackSelection } from "./parkedSweeper";
+import { selectionLocals } from "$lib/server/mcp/savedSelection";
 import {
 	turnAbandoned,
 	turnAnsweredWithoutRun,
@@ -266,7 +267,7 @@ export async function resumeAnsweredAsk({
 		return { outcome: "abandoned" };
 	}
 
-	const { locals, settings } = await rebuildIdentity({
+	const { locals, settings, tokenExpired } = await rebuildIdentity({
 		...(conv.userId ? { userId: conv.userId } : {}),
 		...(conv.sessionId ? { sessionId: conv.sessionId } : {}),
 	});
@@ -278,6 +279,10 @@ export async function resumeAnsweredAsk({
 			selectedServerNames: selection.selectedServerNames,
 			selectedServers: selection.selectedServers ?? [],
 		};
+	} else {
+		// answered from Slack: no browser selection, so use the owner's saved one
+		const saved = await savedSlackSelection(conv, locals, tokenExpired);
+		if (saved) (locals as unknown as Record<string, unknown>).mcp = selectionLocals(saved);
 	}
 	if (selection?.timezone) {
 		(locals as unknown as Record<string, unknown>).timezone = selection.timezone;

@@ -1,4 +1,4 @@
-import { loadMcpSelection } from "$lib/server/mcp/savedSelection";
+import { loadMcpSelection, selectionLocals } from "$lib/server/mcp/savedSelection";
 import {
 	parseLinkedSessionId,
 	connectedLocals,
@@ -242,6 +242,21 @@ async function abandon(park: ParkedCall, reason: string): Promise<void> {
 }
 
 /**
+ * The owner's saved MCP selection for a turn a personal Slack session starts without a
+ * request. Only turn-starting callers load it: token lookups and review delivery don't
+ * need tools, and an unreadable selection falls back to the preset servers.
+ */
+export async function savedSlackSelection(
+	park: Pick<ParkedCall, "sessionId">,
+	locals: App.Locals,
+	tokenExpired: boolean
+) {
+	if (tokenExpired || !locals.user || !parseLinkedSessionId(park.sessionId)) return undefined;
+	const saved = await loadMcpSelection(locals.user._id);
+	return saved.status === "ok" ? saved.selection : undefined;
+}
+
+/**
  * Rebuild the identity the parked turn ran as. There is no request to read one
  * from, so it comes from the row and the stored session — which also means a
  * resume can only ever act as the user who parked it.
@@ -267,20 +282,6 @@ export async function rebuildIdentity(park: Pick<ParkedCall, "userId" | "session
 			if (!user) throw error;
 			locals = { user, sessionId: linkedSessionId(thread), isAdmin: false };
 			tokenExpired = true;
-		}
-		if (!tokenExpired) {
-			const selection = await loadMcpSelection(thread.hfUserId);
-			if (selection) {
-				(locals as unknown as Record<string, unknown>).mcp = {
-					selectedServerNames: selection.selectedMcpServerNames,
-					selectedServers: selection.selectedMcpServers.map((server) => ({
-						...server,
-						headers: server.headers
-							? Object.fromEntries(server.headers.map(({ key, value }) => [key, value]))
-							: undefined,
-					})),
-				};
-			}
 		}
 		const settings = await collections.settings.findOne({ userId: thread.hfUserId });
 		return { locals, settings, tokenExpired };
@@ -358,6 +359,8 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 	if (!model) return abandon(park, `model ${conv.model} is no longer available`);
 
 	const { locals, settings, tokenExpired } = await rebuildIdentity(park);
+	const selection = await savedSlackSelection(park, locals, tokenExpired);
+	if (selection) (locals as unknown as Record<string, unknown>).mcp = selectionLocals(selection);
 
 	// persist rewrites every message, inline tool images must move out first
 	await offloadStoredToolImages(conv._id, conv.messages);

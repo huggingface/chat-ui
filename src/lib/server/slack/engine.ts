@@ -72,7 +72,8 @@ export async function runSlackTurn(
 	thread: SlackThread,
 	user: User,
 	input: { text?: string; files?: File[]; resumeElicitationId?: string; retry?: boolean },
-	resolvedLocals?: App.Locals
+	resolvedLocals?: App.Locals,
+	onMcpUnavailable?: () => Promise<void>
 ): Promise<void> {
 	const conv = await collections.conversations.findOne({
 		_id: thread.conversationId,
@@ -83,7 +84,10 @@ export async function runSlackTurn(
 	// Legacy shared-account sessions never inherit a human's personal tools.
 	if (thread.hfUserId && !thread.hfUserId.equals(user._id))
 		throw new Error("Slack session owner does not match the connected user.");
-	const selection = thread.hfUserId ? await loadMcpSelection(user._id) : undefined;
+	const saved = thread.hfUserId ? await loadMcpSelection(user._id) : undefined;
+	const selection = saved?.status === "ok" ? saved.selection : undefined;
+	// Unreadable (e.g. after a key rotation): run with preset tools and say so.
+	if (saved?.status === "unavailable") await onMcpUnavailable?.().catch(() => {});
 	const latest = conv.messages[conv.messages.length - 1];
 	const data = new FormData();
 	data.set(

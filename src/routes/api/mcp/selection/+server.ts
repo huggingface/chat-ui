@@ -1,8 +1,11 @@
-import { config } from "$lib/server/config";
 import { error } from "@sveltejs/kit";
 import { z } from "zod";
 import type { RequestHandler } from "./$types";
-import { mcpSelectionSchema, saveMcpSelection } from "$lib/server/mcp/savedSelection";
+import {
+	mcpSelectionSchema,
+	mcpSyncStatus,
+	saveMcpSelection,
+} from "$lib/server/mcp/savedSelection";
 
 const bodySchema = mcpSelectionSchema.extend({ userId: z.string() });
 
@@ -20,8 +23,8 @@ export const PUT: RequestHandler = async ({ request, locals, url }) => {
 	// A stale browser tab must not write its selection into a newly signed-in account.
 	if (input.userId !== locals.user._id.toHexString())
 		error(409, "Account changed. Reload HuggingChat.");
-	if (config.SLACK_ML_ENABLED !== "true" || config.SLACK_ML_ACCOUNT_MODE !== "user")
-		return new Response(null, { status: 204 });
+	// Headers stay in the browser unless the user connected Slack and opted in.
+	if (!(await mcpSyncStatus(locals.user._id))) return new Response(null, { status: 204 });
 	await saveMcpSelection(locals.user._id, input);
 	return new Response(null, { status: 204 });
 };

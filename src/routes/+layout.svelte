@@ -1,7 +1,7 @@
 <script lang="ts">
 	import "../styles/main.css";
 
-	import { onDestroy, onMount } from "svelte";
+	import { onDestroy, onMount, untrack } from "svelte";
 	import { browser } from "$app/environment";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
@@ -137,8 +137,13 @@
 
 	const settings = createSettingsStore(data.settings);
 
+	const slackMcpSync = $derived(Boolean(data.slackMcpSync));
 	$effect(() => {
-		if (browser && data.user?.id) return syncMcpSelection(data.user.id);
+		// `saved` is read once: a refreshed flag must not restart sync and drop a pending write
+		if (browser && data.user?.id && slackMcpSync)
+			return syncMcpSelection(data.user.id, {
+				saved: untrack(() => data.slackMcpSync?.saved) ?? false,
+			});
 	});
 
 	$effect(() => {

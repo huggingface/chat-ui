@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { PageData, ActionData } from "./$types";
 	let { data, form }: { data: PageData; form: ActionData } = $props();
+	const mcpSyncNote =
+		"Their settings, including API keys you added, are stored encrypted for Slack, and information those tools return may be posted in the Slack thread.";
 </script>
 
 <svelte:head
@@ -27,8 +29,7 @@
 		<p>
 			New sessions you start will appear in your HuggingChat history and use your HF permissions and
 			current billing settings. Inference may incur charges; compute jobs still require an explicit
-			session budget. Your enabled HuggingChat MCP servers are also available to ML Intern;
-			information returned by those tools may be posted in the Slack thread.
+			session budget.
 		</p>
 		<p>
 			Only you can issue requests in your personal Slack sessions. Your full HF permissions and
@@ -42,6 +43,10 @@
 		</p>
 		<form method="POST">
 			<input type="hidden" name="ticket" value={data.ticket} />
+			<label class="mb-4 flex items-start gap-2">
+				<input type="checkbox" name="useMcpServers" class="mt-1" checked={data.mcpSync} />
+				<span>Also use my enabled HuggingChat MCP servers in Slack. {mcpSyncNote}</span>
+			</label>
 			<button class="rounded bg-black px-4 py-2 text-white" type="submit"
 				>Connect Hugging Face</button
 			>
@@ -50,6 +55,20 @@
 		<p>
 			Your account is connected. Return to Slack and mention ML Intern again to start your request.
 		</p>
+		<form method="POST" class="space-y-2">
+			<input type="hidden" name="action" value="mcp" />
+			<input type="hidden" name="enabled" value={data.mcpSync ? "false" : "true"} />
+			<p>
+				{data.mcpSync
+					? "ML Intern uses your enabled HuggingChat MCP servers in your personal Slack sessions. Information returned by those tools may be posted in the Slack thread."
+					: `ML Intern uses only its built-in tools in Slack. You can let it use your enabled HuggingChat MCP servers too. ${mcpSyncNote}`}
+			</p>
+			<button class="rounded border px-4 py-2" type="submit"
+				>{data.mcpSync
+					? "Stop using my MCP servers in Slack"
+					: "Use my MCP servers in Slack"}</button
+			>
+		</form>
 		{#each data.connections as connection}
 			<p>
 				Slack user {connection.displayName} ({connection.slackUserId}) in workspace {connection.workspaceName}

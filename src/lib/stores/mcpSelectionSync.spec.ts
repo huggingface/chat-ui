@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 it("waits for hydration and sends only enabled servers with OAuth references", async () => {
-	stop = syncMcpSelection("owner");
+	stop = syncMcpSelection("owner", { saved: false });
 	await vi.advanceTimersByTimeAsync(500);
 	expect(fetchMock).not.toHaveBeenCalled();
 	allMcpServers.set([
@@ -60,7 +60,7 @@ it("serializes updates and cancels pending writes on account change", async () =
 			})
 	);
 	mcpServersLoaded.set(true);
-	stop = syncMcpSelection("owner");
+	stop = syncMcpSelection("owner", { saved: false });
 	await vi.advanceTimersByTimeAsync(500);
 	allMcpServers.set([
 		{ id: "one", type: "custom", name: "One", url: "https://one.test/mcp", isLocked: false },
@@ -77,8 +77,27 @@ it("serializes updates and cancels pending writes on account change", async () =
 it("reports a failed sync without exposing headers", async () => {
 	fetchMock.mockResolvedValue(new Response("private-token", { status: 500 }));
 	mcpServersLoaded.set(true);
-	stop = syncMcpSelection("owner");
+	stop = syncMcpSelection("owner", { saved: false });
 	await vi.advanceTimersByTimeAsync(500);
 	expect(get(error)).toContain("Could not sync MCP servers");
 	expect(get(error)).not.toContain("private-token");
+});
+
+it("does not let a page load replace an existing saved selection", async () => {
+	allMcpServers.set([
+		{ id: "base", type: "base", name: "Base", url: "https://base.test/mcp", isLocked: false },
+		{ id: "one", type: "custom", name: "One", url: "https://one.test/mcp", isLocked: false },
+	]);
+	selectedServerIds.set(new Set(["base"]));
+	mcpServersLoaded.set(true);
+	stop = syncMcpSelection("owner", { saved: true });
+	await vi.advanceTimersByTimeAsync(500);
+	expect(fetchMock).not.toHaveBeenCalled();
+	selectedServerIds.set(new Set(["base", "one"]));
+	await vi.advanceTimersByTimeAsync(500);
+	expect(fetchMock).toHaveBeenCalledTimes(1);
+	expect(JSON.parse(fetchMock.mock.calls[0][1].body).selectedMcpServerNames).toEqual([
+		"Base",
+		"One",
+	]);
 });

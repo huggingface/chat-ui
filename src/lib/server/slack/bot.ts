@@ -40,6 +40,7 @@ import { provisionSlackIdentity, threadLocals } from "./identity";
 import { answerSideQuestion, SIDE_QUESTION_MAX_CHARS } from "$lib/server/mlSideQuestion";
 import { slackSideQuestion } from "$lib/utils/sideQuestion";
 import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } from "./engine";
+import { MCP_RESYNC_NOTE } from "$lib/server/mcp/savedSelection";
 import { isWorkspaceMember, threadKey, threadPrompt, type ThreadMessage } from "./context";
 import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store";
 import type { SlackThread } from "./types";
@@ -878,6 +879,8 @@ export class MlSlackBot {
 			const user = locals?.user ?? this.user;
 			if (!user) throw new Error("Slack session owner is unavailable.");
 			await ensureConversation(thread, user, this.settings);
+			const noteMcpUnavailable = () =>
+				this.tell(thread.channel, thread.owner, MCP_RESYNC_NOTE, thread.threadTs);
 			if (input.resumeElicitationId) {
 				const question = await collections.mcpElicitations.findOne({
 					conversationId: thread.conversationId,
@@ -890,7 +893,8 @@ export class MlSlackBot {
 						thread,
 						user,
 						{ resumeElicitationId: input.resumeElicitationId },
-						locals
+						locals,
+						noteMcpUnavailable
 					);
 			} else {
 				const conv = await collections.conversations.findOne({ _id: thread.conversationId });
@@ -936,7 +940,13 @@ export class MlSlackBot {
 				} else {
 					if (skipped) await this.render(thread);
 					const context = input.retry ? undefined : await this.context(thread, input);
-					await runSlackTurn(thread, user, { ...context, retry: input.retry }, locals);
+					await runSlackTurn(
+						thread,
+						user,
+						{ ...context, retry: input.retry },
+						locals,
+						noteMcpUnavailable
+					);
 					if (!input.retry)
 						await collections.slackThreads.updateOne(
 							{ _id: thread._id },

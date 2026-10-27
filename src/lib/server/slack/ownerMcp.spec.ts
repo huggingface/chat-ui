@@ -6,10 +6,15 @@ import {
 	createTestConversation,
 	cleanupTestData,
 } from "$lib/server/api/__tests__/testHelpers";
-import { saveMcpSelection, loadMcpSelection } from "$lib/server/mcp/savedSelection";
+import {
+	saveMcpSelection,
+	loadMcpSelection,
+	setMcpSyncEnabled,
+	mcpSyncStatus,
+} from "$lib/server/mcp/savedSelection";
 import { runSlackTurn } from "./engine";
 import { getOrCreateThread } from "./store";
-import { rebuildIdentity } from "$lib/server/generation/parkedSweeper";
+import { rebuildIdentity, savedSlackSelection } from "$lib/server/generation/parkedSweeper";
 import { linkedSessionId } from "./ownerIdentity";
 import { PUT } from "../../../routes/api/mcp/selection/+server";
 
@@ -59,6 +64,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
 	await collections.mcpSelections.deleteMany({});
+	await collections.slackConnections.deleteMany({});
 	await collections.slackThreads.deleteMany({});
 	await cleanupTestData();
 });
@@ -75,6 +81,20 @@ async function setup(personal = true) {
 	await createTestConversation(locals, { _id: thread.conversationId });
 	return { user, locals, thread };
 }
+async function optInAndSave(userId: ObjectId, input: unknown) {
+	await setMcpSyncEnabled(userId, true);
+	expect(await saveMcpSelection(userId, input)).toBe(true);
+}
+async function connectSlack(userId: ObjectId) {
+	await collections.slackConnections.insertOne({
+		_id: `T1:${userId.toHexString()}`,
+		teamId: "T1",
+		slackUserId: "U1",
+		userId,
+		sessionId: crypto.randomUUID(),
+		updatedAt: new Date(),
+	});
+}
 async function sentSelection() {
 	const { request } = mocks.generate.mock.calls.at(-1)?.[0] as { request: Request };
 	return JSON.parse(String((await request.formData()).get("data")));
@@ -84,16 +104,26 @@ describe("Slack owner's saved MCP selection", () => {
 	it("encrypts headers and isolates stored selections by account", async () => {
 		const owner = await createTestUser();
 		const other = await createTestUser();
-		await saveMcpSelection(owner.user._id, selection);
+		await optInAndSave(owner.user._id, selection);
 		const saved = await collections.mcpSelections.findOne({ _id: owner.user._id });
 		expect(saved?.encryptedSelection).toMatch(/^enc.v1:/);
 		expect(JSON.stringify(saved)).not.toContain("private-secret");
-		expect(await loadMcpSelection(owner.user._id)).toEqual(selection);
-		expect(await loadMcpSelection(other.user._id)).toBeUndefined();
+		expect(await loadMcpSelection(owner.user._id)).toEqual({ status: "ok", selection });
+		expect(await loadMcpSelection(other.user._id)).toEqual({ status: "none" });
+	});
+	it("stores nothing until the user opts in, and deletes the selection on opt-out", async () => {
+		const { user } = await createTestUser();
+		expect(await saveMcpSelection(user._id, selection)).toBe(false);
+		expect(await collections.mcpSelections.countDocuments()).toBe(0);
+		await optInAndSave(user._id, selection);
+		await setMcpSyncEnabled(user._id, false);
+		expect(await loadMcpSelection(user._id)).toEqual({ status: "none" });
+		expect(await saveMcpSelection(user._id, selection)).toBe(false);
+		expect(await collections.mcpSelections.countDocuments()).toBe(0);
 	});
 	it("passes the owner's selection and OAuth reference on turns and refreshes it on resume", async () => {
 		const { user, locals, thread } = await setup();
-		await saveMcpSelection(user._id, selection);
+		await optInAndSave(user._id, selection);
 		await runSlackTurn(thread, user, { text: "Use my tools" }, locals);
 		expect(await sentSelection()).toMatchObject(selection);
 		await saveMcpSelection(user._id, { selectedMcpServerNames: [], selectedMcpServers: [] });
@@ -105,55 +135,65 @@ describe("Slack owner's saved MCP selection", () => {
 	});
 	it("does not inherit another user's selection or apply one to shared-token sessions", async () => {
 		const other = await createTestUser();
-		await saveMcpSelection(other.user._id, selection);
+		await optInAndSave(other.user._id, selection);
 		const personal = await setup();
 		await runSlackTurn(personal.thread, personal.user, { text: "Hello" }, personal.locals);
 		expect(await sentSelection()).not.toHaveProperty("selectedMcpServers");
 		const shared = await setup(false);
-		await saveMcpSelection(shared.user._id, selection);
+		await optInAndSave(shared.user._id, selection);
 		await runSlackTurn(shared.thread, shared.user, { text: "Hello" }, shared.locals);
 		expect(await sentSelection()).not.toHaveProperty("selectedMcpServers");
 	});
-	it("fails closed for a mismatched owner or undecryptable saved selection", async () => {
+	it("refuses a mismatched owner and falls back to preset tools for an unreadable selection", async () => {
 		const { thread, user, locals } = await setup();
 		await expect(
 			runSlackTurn({ ...thread, hfUserId: new ObjectId() }, user, { text: "Hello" }, locals)
 		).rejects.toThrow("owner");
+		expect(mocks.generate).not.toHaveBeenCalled();
 		await collections.mcpSelections.insertOne({
 			_id: user._id,
 			encryptedSelection: "enc.v1:broken",
 			updatedAt: new Date(),
 		});
-		await expect(runSlackTurn(thread, user, { text: "Hello" }, locals)).rejects.toThrow();
-		expect(mocks.generate).not.toHaveBeenCalled();
+		const note = vi.fn().mockResolvedValue(undefined);
+		await runSlackTurn(thread, user, { text: "Hello" }, locals, note);
+		expect(note).toHaveBeenCalledOnce();
+		expect(await sentSelection()).not.toHaveProperty("selectedMcpServers");
 	});
-	it("restores the owner's MCP selection for durable background and answer continuations", async () => {
+	it("loads the owner's selection only for turns a personal session starts", async () => {
 		const { user, locals, thread } = await setup();
 		mocks.connected.mockResolvedValue({ ...locals });
-		await saveMcpSelection(user._id, selection);
-		const restored = await rebuildIdentity({
-			userId: user._id,
-			sessionId: linkedSessionId(thread),
-		});
-		expect(restored.locals).toMatchObject({
-			mcp: {
-				selectedServerNames: ["Private"],
-				selectedServers: [
-					{
-						...selection.selectedMcpServers[0],
-						headers: { Authorization: "Bearer private-secret" },
-					},
-				],
-			},
-		});
+		await optInAndSave(user._id, selection);
+		const park = { userId: user._id, sessionId: linkedSessionId(thread) };
+		const restored = await rebuildIdentity(park);
+		expect(restored.locals).not.toHaveProperty("mcp");
+		expect(await savedSlackSelection(park, restored.locals, false)).toEqual(selection);
+		// an expired token or a web session never picks up the Slack selection
+		expect(await savedSlackSelection(park, restored.locals, true)).toBeUndefined();
+		expect(await savedSlackSelection({ sessionId: "web" }, restored.locals, false)).toBeUndefined();
 		await expect(
 			rebuildIdentity({ userId: new ObjectId(), sessionId: linkedSessionId(thread) })
 		).rejects.toThrow("owner");
 	});
+	it("rebuilds identity for non-turn callers even when the selection is unreadable", async () => {
+		const { user, locals, thread } = await setup();
+		mocks.connected.mockResolvedValue({ ...locals });
+		await collections.mcpSelections.insertOne({
+			_id: user._id,
+			encryptedSelection: "enc.v1:broken",
+			updatedAt: new Date(),
+		});
+		const park = { userId: user._id, sessionId: linkedSessionId(thread) };
+		const restored = await rebuildIdentity(park);
+		expect(restored.locals.user?._id).toEqual(user._id);
+		expect(await savedSlackSelection(park, restored.locals, false)).toBeUndefined();
+	});
 	it("refuses plaintext persistence without an encryption key", async () => {
 		mocks.key = "";
-		await expect(saveMcpSelection(new ObjectId(), selection)).rejects.toThrow("ENCRYPTION_KEY");
-		expect(await collections.mcpSelections.countDocuments()).toBe(0);
+		const userId = new ObjectId();
+		await setMcpSyncEnabled(userId, true);
+		await expect(saveMcpSelection(userId, selection)).rejects.toThrow("ENCRYPTION_KEY");
+		expect(await loadMcpSelection(userId)).toEqual({ status: "none" });
 	});
 	it("requires same-origin authenticated writes for the current account", async () => {
 		const { user, locals } = await createTestUser();
@@ -176,7 +216,15 @@ describe("Slack owner's saved MCP selection", () => {
 		await expect(
 			send("https://chat.test", user._id.toHexString(), { ...locals, user: undefined })
 		).rejects.toMatchObject({ status: 401 });
+		// signed in, but not connected to Slack or not opted in: nothing leaves the browser
 		expect((await send("https://chat.test", user._id.toHexString())).status).toBe(204);
-		expect(await loadMcpSelection(user._id)).toEqual(selection);
+		await setMcpSyncEnabled(user._id, true);
+		expect((await send("https://chat.test", user._id.toHexString())).status).toBe(204);
+		expect(await loadMcpSelection(user._id)).toEqual({ status: "none" });
+		await connectSlack(user._id);
+		expect(await mcpSyncStatus(user._id)).toEqual({ saved: false });
+		expect((await send("https://chat.test", user._id.toHexString())).status).toBe(204);
+		expect(await loadMcpSelection(user._id)).toEqual({ status: "ok", selection });
+		expect(await mcpSyncStatus(user._id)).toEqual({ saved: true });
 	});
 });

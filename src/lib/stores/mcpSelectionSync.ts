@@ -3,11 +3,15 @@ import { base } from "$app/paths";
 import { enabledServers, mcpServersLoaded, effectiveServerHeaders } from "./mcpServers";
 import { error } from "./errors";
 
-/** Mirror the last-used browser selection for personal Slack turns. No tokens are returned. */
-export function syncMcpSelection(userId: string) {
+/**
+ * Mirror the last-used browser selection for personal Slack turns. No tokens are returned.
+ * With a selection already saved, loading the page is not a change: a new browser or private
+ * window would otherwise replace it with base servers only. Only later edits here are written.
+ */
+export function syncMcpSelection(userId: string, { saved }: { saved: boolean }) {
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let stopped = false;
-	let previous = "";
+	let previous: string | undefined = saved ? undefined : "";
 	let pending: Promise<void> = Promise.resolve();
 	let reported = false;
 	const unsubscribe = derived([enabledServers, mcpServersLoaded], (values) => values).subscribe(
@@ -23,6 +27,10 @@ export function syncMcpSelection(userId: string) {
 					oauthConnectionId: s.oauth?.connectionId,
 				})),
 			});
+			if (previous === undefined) {
+				previous = body;
+				return;
+			}
 			if (body === previous) return;
 			previous = body;
 			clearTimeout(timer);
