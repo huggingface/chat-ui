@@ -167,8 +167,7 @@
 
 	const publicConfig = usePublicConfig();
 	let canShare = $derived(
-		!slackThreadUrl &&
-			publicConfig.isHuggingChat &&
+		publicConfig.isHuggingChat &&
 			Boolean(page.params?.id) &&
 			page.route.id?.startsWith("/conversation/")
 	);
