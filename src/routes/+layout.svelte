@@ -1,7 +1,7 @@
 <script lang="ts">
 	import "../styles/main.css";
 
-	import { onDestroy, onMount } from "svelte";
+	import { onDestroy, onMount, untrack } from "svelte";
 	import { browser } from "$app/environment";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
@@ -10,6 +10,7 @@
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { setHapticsEnabled } from "$lib/utils/haptics";
+	import { syncMcpSelection } from "$lib/stores/mcpSelectionSync";
 	import { initWithServers } from "$lib/stores/mcpServers";
 
 	import Toast from "$lib/components/Toast.svelte";
@@ -135,6 +136,15 @@
 	});
 
 	const settings = createSettingsStore(data.settings);
+
+	const slackMcpSync = $derived(Boolean(data.slackMcpSync));
+	$effect(() => {
+		// `saved` is read once: a refreshed flag must not restart sync and drop a pending write
+		if (browser && data.user?.id && slackMcpSync)
+			return syncMcpSelection(data.user.id, {
+				saved: untrack(() => data.slackMcpSync?.saved) ?? false,
+			});
+	});
 
 	$effect(() => {
 		setHapticsEnabled($settings.hapticsEnabled);

@@ -5,6 +5,7 @@ import { base } from "$app/paths";
 import { collections } from "$lib/server/database";
 import { connectAccount, readConnectionLink, ConnectionError } from "$lib/server/slack/connections";
 import { identity } from "$lib/server/slack/viewer/auth";
+import { setMcpSyncEnabled } from "$lib/server/mcp/savedSelection";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies }) => {
@@ -32,6 +33,7 @@ export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies })
 			slackUserId: 1,
 		})
 		.toArray();
+	const mcpSync = Boolean(await collections.mcpSelections.findOne({ _id: locals.user._id }));
 	const settings = slackConfig();
 	if (!settings && (ticket || connections.length)) error(503, "Slack is unavailable.");
 	const client = new WebClient(settings?.botToken, { retryConfig: { retries: 0 }, timeout: 10000 });
@@ -63,6 +65,7 @@ export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies })
 		connected: connections.length > 0,
 		connections: namedConnections,
 		slackNames,
+		mcpSync,
 	};
 };
 export const actions: Actions = {
@@ -76,7 +79,14 @@ export const actions: Actions = {
 				userId: locals.user._id,
 				...(typeof connectionId === "string" ? { _id: connectionId } : {}),
 			});
+			// the saved MCP headers only exist for Slack, so they go with the last connection
+			if (!(await collections.slackConnections.findOne({ userId: locals.user._id })))
+				await setMcpSyncEnabled(locals.user._id, false);
 			return { disconnected: true };
+		}
+		if (form.get("action") === "mcp") {
+			await setMcpSyncEnabled(locals.user._id, form.get("enabled") === "true");
+			return { mcpUpdated: true };
 		}
 		try {
 			await connectAccount(
@@ -85,6 +95,7 @@ export const actions: Actions = {
 				locals.sessionId,
 				identity({ cookies })
 			);
+			if (form.get("useMcpServers") === "on") await setMcpSyncEnabled(locals.user._id, true);
 		} catch (e) {
 			return fail(400, {
 				error: e instanceof ConnectionError ? e.message : "Could not connect your account.",
