@@ -17,6 +17,8 @@ export async function eligibleParticipant(
 	if (!user || !channel) return;
 	if (channel.is_ext_shared && settings.accountMode !== "user") return;
 	if (isWorkspaceMember(user, settings.teamId) && !channel.is_ext_shared) return user;
+	// Slack omits guest flags for external members, so their own org's guests look like
+	// members here. Membership of this shared channel is still required below.
 	if (
 		settings.accountMode !== "user" ||
 		!channel.is_ext_shared ||
@@ -28,8 +30,6 @@ export async function eligibleParticipant(
 		user.deleted ||
 		user.is_restricted ||
 		user.is_ultra_restricted ||
-		(user.team_id !== settings.teamId &&
-			(user.is_restricted !== false || user.is_ultra_restricted !== false)) ||
 		user.is_stranger
 	)
 		return;

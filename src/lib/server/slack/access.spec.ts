@@ -99,10 +99,13 @@ it.each([{ is_im: true }, { is_mpim: true }])(
 		expect(await eligibleParticipant(client, settings, "UEXT", "G123")).toBeUndefined();
 	}
 );
-it("fails closed when the external user's guest status is unavailable", async () => {
+it("accepts an external member whose guest flags Slack omits, but only from the channel", async () => {
+	// users.info returns this shape for Slack Connect members of another workspace
 	vi.mocked(client.users.info).mockResolvedValue({
 		ok: true,
-		user: { id: "UEXT", team_id: "TREMOTE" },
+		user: { id: "UEXT", team_id: "TREMOTE", is_bot: false, is_stranger: false },
 	});
+	expect((await eligibleParticipant(client, settings, "UEXT", "C123"))?.team_id).toBe("TREMOTE");
+	vi.mocked(client.conversations.members).mockResolvedValue({ ok: true, members: ["UOTHER"] });
 	expect(await eligibleParticipant(client, settings, "UEXT", "C123")).toBeUndefined();
 });
