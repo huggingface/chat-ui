@@ -98,7 +98,7 @@ export default defineConfig({
 				test: {
 					name: "server",
 					environment: "node",
-					include: ["src/**/*.{test,spec}.{js,ts}"],
+					include: ["src/**/*.{test,spec}.{js,ts}", "evals/**/*.{test,spec}.ts"],
 					exclude: ["src/**/*.svelte.{test,spec}.{js,ts}", "src/**/*.ssr.{test,spec}.{js,ts}"],
 					setupFiles: ["./scripts/setups/vitest-setup-server.ts"],
 					testTimeout: 30000,
