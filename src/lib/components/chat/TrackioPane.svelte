@@ -42,9 +42,10 @@
 	let { items }: Props = $props();
 
 	let dashboard = $derived(sidePane.trackio);
-	let present = $derived(
-		!!dashboard && items.some((item) => item.kind === "trackio" && item.url === dashboard?.url)
-	);
+	let item = $derived(items.find((item) => item.kind === "trackio" && item.url === dashboard?.url));
+	let present = $derived(!!dashboard && !!item);
+	let workflow = $derived(item?.kind === "trackio" && !!item.workflow);
+	let title = $derived(workflow ? "Workflow" : "Training dashboard");
 
 	/**
 	 * Close the pane when its dashboard is no longer on the visible message path
@@ -191,7 +192,7 @@
 </script>
 
 {#if sidePane.open && sidePane.view === "trackio" && dashboard}
-	<SidePane label="Training dashboard">
+	<SidePane label={title}>
 		{#snippet children(resizing)}
 			<header
 				class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
@@ -199,7 +200,7 @@
 				<PaneItemNav {items} />
 				<div class="flex min-w-0 flex-1 items-baseline gap-2">
 					<h2 class="min-w-0 truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
-						Training dashboard
+						{title}
 					</h2>
 					<span
 						class="truncate font-mono text-xs text-gray-400 @max-[380px]:hidden dark:text-gray-500"
@@ -241,7 +242,9 @@
 						target="_blank"
 						rel="noopener noreferrer"
 						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-						title="Open dashboard in a new tab"
+						title={workflow
+							? "Open the workflow in a new tab to sign in and run it"
+							: "Open dashboard in a new tab"}
 					>
 						<CarbonLaunch />
 					</a>
@@ -279,18 +282,19 @@
 					</span>
 					<div class="flex flex-col gap-1">
 						<p class="text-sm font-medium text-gray-600 dark:text-gray-300">
-							Starting the dashboard
+							{workflow ? "Starting the workflow" : "Starting the dashboard"}
 						</p>
 						<p class="max-w-xs text-xs text-gray-400 dark:text-gray-500">
-							Trackio Spaces can take a minute to build on the first run. Metrics appear as soon as
-							it is up.
+							{workflow
+								? "The Space takes a minute or two to build. The canvas appears as soon as it is up."
+								: "Trackio Spaces can take a minute to build on the first run. Metrics appear as soon as it is up."}
 						</p>
 					</div>
 					<span class="font-mono text-xxs text-gray-300 dark:text-gray-600">{dashboard.label}</span>
 				</div>
 				{#key `${frameUrl}:${reloadNonce}`}
 					<iframe
-						title="Trackio dashboard"
+						{title}
 						class="relative h-full w-full {resizing ? 'pointer-events-none' : ''}"
 						src={frameUrl}
 						bind:this={frame}
