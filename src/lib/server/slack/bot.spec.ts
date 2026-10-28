@@ -1217,6 +1217,30 @@ it("dispatches despite render errors, advances polling, and pauses persistent de
 	expect((await collections.slackThreads.findOne({ _id: thread._id }))?.watching).toBe(false);
 });
 
+it("keeps watching a thread whose turn ends while a tick is rendering it", async () => {
+	const { user } = await createTestUser();
+	const bot = new MlSlackBot(settings, user);
+	let finishRun = () => {};
+	mocks.run.mockImplementation(() => new Promise<void>((resolve) => (finishRun = resolve)));
+	await bot.receive({ channel: "C123", user: "OWNER", text: "Build", ts: "100.0" }, "T123", "race");
+	const render = vi.fn().mockResolvedValue(undefined);
+	bot["render"] = render;
+	await bot.tick();
+	await vi.waitFor(() => expect(mocks.run).toHaveBeenCalled());
+	// the run finishes after this tick rendered "working" but before it decides to unwatch
+	let releaseRender = () => {};
+	render.mockImplementationOnce(() => new Promise<void>((resolve) => (releaseRender = resolve)));
+	const ticking = bot.tick();
+	await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(2));
+	finishRun();
+	await vi.waitFor(() => expect(bot["active"].size).toBe(0));
+	releaseRender();
+	await ticking;
+	expect((await collections.slackThreads.findOne({}))?.watching).toBe(true);
+	await bot.tick();
+	expect(render).toHaveBeenCalledTimes(3);
+});
+
 it("unwatches a failed initial dispatch after its failure notice is delivered", async () => {
 	const { user } = await createTestUser();
 	const bot = new MlSlackBot(settings, user);

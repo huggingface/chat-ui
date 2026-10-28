@@ -1131,7 +1131,14 @@ export class MlSlackBot {
 				}
 			);
 		} finally {
-			if (!queueOnly) this.runningConversations.delete(thread._id);
+			if (!queueOnly) {
+				this.runningConversations.delete(thread._id);
+				// A tick that rendered just before the turn ended would otherwise unwatch the thread
+				// and never post the result. The new updatedAt voids that tick's conditional unwatch.
+				await collections.slackThreads
+					.updateOne({ _id: thread._id }, { $set: { watching: true, updatedAt: new Date() } })
+					.catch(() => logger.warn("[slack] Could not rewatch a finished thread"));
+			}
 		}
 	}
 
