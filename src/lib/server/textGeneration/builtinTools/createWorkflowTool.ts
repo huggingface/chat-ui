@@ -100,11 +100,19 @@ export function createWorkflowTool(
 				return { error: "No Hugging Face token for this conversation; the user needs to sign in." };
 			}
 
-			const problems = await Promise.all(
+			const checks = await Promise.all(
 				plan.steps.map(({ model, task }) => checkModel(model, task, accessToken, ctx.abortSignal))
 			);
-			const problem = problems.find(Boolean);
+			const problem = checks.find((check) => typeof check === "string");
 			if (problem) return { error: problem };
+			// The router only uses providers the runner has enabled, which this
+			// tool can't see, so a model with a single provider can still fail.
+			const narrow = plan.steps.flatMap(({ model }, i) => {
+				const providers = checks[i];
+				return Array.isArray(providers) && providers.length === 1
+					? [`${model} (${providers[0]})`]
+					: [];
+			});
 
 			const graph = workflowJson(plan);
 			const files = [
@@ -161,12 +169,21 @@ export function createWorkflowTool(
 
 			return {
 				resultText: [
-					`Public workflow Space written: ${url} — tell the user it is public.`,
+					`Public workflow Space written: ${url} — tell the user it is public, and link it`,
+					"exactly as written: `?ui=canvas` opens it on the canvas.",
 					`It runs ${plan.steps.map((step) => step.model).join(plan.shape === "compare" ? " and " : " → ")}.`,
 					"",
 					"It builds in a minute or two — tell the user it is building, not that it is live.",
 					"Every run bills the inference quota of whoever presses Run — signed in through the",
 					"Space — not this conversation's budget.",
+					...(narrow.length
+						? [
+								"",
+								`Only one provider serves ${narrow.join(", ")}. Whoever presses Run needs it`,
+								"enabled in their Hugging Face inference provider settings, or that step fails —",
+								"tell the user, or offer a model more providers serve.",
+							]
+						: []),
 				].join("\n"),
 			};
 		},
@@ -260,13 +277,13 @@ function parse(args: Record<string, unknown>, sessionNamespace?: string): Plan |
 	};
 }
 
-/** A problem worth telling the model about, or undefined when the model is usable. */
+/** A problem worth telling the model about, or the live providers that serve it. */
 async function checkModel(
 	model: string,
 	task: string,
 	accessToken: string,
 	signal?: AbortSignal
-): Promise<string | undefined> {
+): Promise<string | string[]> {
 	let info: {
 		pipeline_tag?: string;
 		inferenceProviderMapping?: Record<string, { status?: string; task?: string }>;
@@ -285,16 +302,16 @@ async function checkModel(
 		return `${model} is a ${info.pipeline_tag ?? "untagged"} model, not ${task}.`;
 	}
 	const tasks = providerTasks(PIPELINE_TAG_TO_ENDPOINT[task]);
-	const live = Object.values(info.inferenceProviderMapping ?? {}).some(
-		(p) => p.status === "live" && tasks.includes(p.task ?? "")
-	);
-	if (!live) {
+	const providers = Object.entries(info.inferenceProviderMapping ?? {})
+		.filter(([, p]) => p.status === "live" && tasks.includes(p.task ?? ""))
+		.map(([name]) => name);
+	if (!providers.length) {
 		return (
 			`${model} is not served by any inference provider for ${tasks.join(" or ")}, so a ` +
 			`workflow cannot call it — pick another, or deploy it in a Space of its own first.`
 		);
 	}
-	return undefined;
+	return providers;
 }
 
 const APP_PY = `import gradio as gr
@@ -307,6 +324,9 @@ if __name__ == "__main__":
 
 type Port = { id: string; label: string; type: string; output_index?: number };
 type Endpoint = { inputs: Port[]; outputs: Port[] };
+
+/** Ports a model runs without, left unwired rather than shown as required inputs. */
+const OPTIONAL_PORTS = new Set(["src_lang", "tgt_lang"]);
 
 const text = (id: string, label: string): Port => ({ id, label, type: "text" });
 const media = (type: string, id = type): Port => ({
@@ -481,6 +501,7 @@ function workflowJson({ shape, steps, title }: Plan): string {
 
 	if (shape === "compare") {
 		for (const port of operators[0].inputs) {
+			if (OPTIONAL_PORTS.has(port.id)) continue;
 			references.push(tile(`ref_${port.id}`, port.label, "reference", port.type));
 			for (const op of operators) edge(`ref_${port.id}`, "out", op.id, port.id, port.type);
 		}
@@ -495,7 +516,7 @@ function workflowJson({ shape, steps, title }: Plan): string {
 	const read = new Set(edges.map((e) => `${e.from_node_id}:${e.from_port_id}`));
 	for (const op of operators) {
 		for (const port of op.inputs) {
-			if (fed.has(`${op.id}:${port.id}`)) continue;
+			if (fed.has(`${op.id}:${port.id}`) || OPTIONAL_PORTS.has(port.id)) continue;
 			const id = `ref_${op.id}_${port.id}`;
 			references.push(tile(id, port.label, "reference", port.type));
 			edge(id, "out", op.id, port.id, port.type);

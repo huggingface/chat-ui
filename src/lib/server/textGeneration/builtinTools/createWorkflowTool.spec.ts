@@ -152,6 +152,29 @@ describe("create_workflow", () => {
 		}
 	});
 
+	it("leaves a translation's optional language ports unasked", async () => {
+		models = {
+			"facebook/bart-large-cnn": { pipeline_tag: "summarization", providers: ["live"] },
+			"Helsinki-NLP/opus-mt-en-fr": { pipeline_tag: "translation", providers: ["live"] },
+		};
+		await tool().execute(
+			{
+				shape: "chain",
+				name: "Summarize in French",
+				steps: [
+					{ model: "facebook/bart-large-cnn", task: "summarization" },
+					{ model: "Helsinki-NLP/opus-mt-en-fr", task: "translation" },
+				],
+			},
+			ctx
+		);
+
+		const graph = JSON.parse(await uploaded("workflow.json"));
+		expect(graph.references.map((ref: { id: string }) => ref.id)).toEqual([
+			"ref_op_bart_large_cnn_text",
+		]);
+	});
+
 	it("refuses a chain whose steps do not connect", async () => {
 		models = {
 			"krea/Krea-2-Turbo": t2i,
@@ -223,6 +246,15 @@ describe("create_workflow", () => {
 
 		if (!("error" in result)) throw new Error("expected an error");
 		expect(result.error).toContain("not served by any inference provider for text-to-image");
+	});
+
+	it("warns when one provider is all that serves a model", async () => {
+		models["black-forest-labs/FLUX.1-dev"] = { ...t2i, providers: ["live", "live"] };
+		const result = await tool().execute(compare, ctx);
+
+		if (!("resultText" in result)) throw new Error(JSON.stringify(result));
+		expect(result.resultText).toContain("Only one provider serves krea/Krea-2-Turbo (p0).");
+		expect(result.resultText).not.toContain("FLUX.1-dev (");
 	});
 
 	it("asks for a different name, not more permissions, on a 403", async () => {
