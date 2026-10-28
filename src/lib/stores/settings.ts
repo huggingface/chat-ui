@@ -23,6 +23,7 @@ type SettingsStore = {
 	streamingMode: StreamingMode;
 	directPaste: boolean;
 	hapticsEnabled: boolean;
+	showGenerationStats: boolean;
 	billingOrganization?: string;
 	billingResourceGroup?: string;
 };

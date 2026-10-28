@@ -196,7 +196,12 @@ export async function* generate(
 				}
 			}
 
-			yield { type: MessageUpdateType.FinalAnswer, text: finalAnswer, interrupted };
+			yield {
+				type: MessageUpdateType.FinalAnswer,
+				text: finalAnswer,
+				interrupted,
+				...(output.generationStats ? { stats: output.generationStats } : {}),
+			};
 			continue;
 		}
 

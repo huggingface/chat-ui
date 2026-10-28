@@ -32,6 +32,32 @@ async function textFrom(deltas: Delta[]): Promise<string> {
 	return out;
 }
 
+describe("openAIChatToTextGenerationStream generation stats", () => {
+	it("attaches the provider's timings to the final output only", async () => {
+		const stream = (async function* () {
+			yield { choices: [{ index: 0, delta: { content: "hi" }, finish_reason: null }] };
+			yield {
+				choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+				timings: { prompt_n: 15, prompt_ms: 95, predicted_n: 11, predicted_ms: 148 },
+			};
+		})() as unknown as Stream<OpenAI.Chat.Completions.ChatCompletionChunk>;
+
+		const outputs = [];
+		for await (const output of openAIChatToTextGenerationStream(stream)) outputs.push(output);
+
+		expect(outputs[0]).not.toHaveProperty("generationStats");
+		expect(outputs.at(-1)).toMatchObject({
+			generationStats: {
+				rounds: 1,
+				promptTokens: 15,
+				prefillMs: 95,
+				outputTokens: 11,
+				decodeMs: 148,
+			},
+		});
+	});
+});
+
 describe("openAIChatToTextGenerationStream reasoning", () => {
 	it("wraps reasoning deltas in a single think block", async () => {
 		expect(

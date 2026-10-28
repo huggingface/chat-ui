@@ -25,6 +25,7 @@ export const settingsSchema = z
 		streamingMode: z.enum(["raw", "smooth"]).optional(),
 		directPaste: z.boolean().default(false),
 		hapticsEnabled: z.boolean().default(true),
+		showGenerationStats: z.boolean().default(false),
 		hidePromptExamples: z.record(z.boolean()).default({}),
 		billingOrganization: z.string().optional(),
 		billingResourceGroup: z

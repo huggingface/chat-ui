@@ -31,6 +31,7 @@ interface SettingsResponse {
 	streamingMode: "raw" | "smooth";
 	directPaste: boolean;
 	hapticsEnabled: boolean;
+	showGenerationStats: boolean;
 	customPrompts: Record<string, string>;
 	customPromptsEnabled: Record<string, boolean>;
 	multimodalOverrides: Record<string, boolean>;

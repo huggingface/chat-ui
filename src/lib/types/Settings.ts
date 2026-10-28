@@ -84,6 +84,9 @@ export interface Settings extends Timestamps {
 	 */
 	hapticsEnabled: boolean;
 
+	/** Show token counts and prefill/decode speed under each answer, when the provider reports them. */
+	showGenerationStats?: boolean;
+
 	/**
 	 * Organization to bill inference requests, and the Jobs and sandboxes ML Intern
 	 * launches, to (HuggingChat only). Nothing else on the Hub follows it: Spaces,
@@ -117,4 +120,5 @@ export const DEFAULT_SETTINGS = {
 	streamingMode: "smooth",
 	directPaste: false,
 	hapticsEnabled: true,
+	showGenerationStats: false,
 } satisfies SettingsEditable;

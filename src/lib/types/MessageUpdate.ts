@@ -10,6 +10,7 @@ import type {
 	ElicitationValue,
 } from "$lib/types/McpElicitation";
 import type { MlFileRef } from "$lib/types/MlFile";
+import type { GenerationStats } from "$lib/types/GenerationStats";
 
 export type MessageUpdate =
 	| MessageStatusUpdate
@@ -202,6 +203,8 @@ export interface MessageFinalAnswerUpdate {
 	interrupted: boolean;
 	/** length of the text, stored in its place when the rounds shape holds the answer in content */
 	len?: number;
+	/** Token counts and timings for the whole turn, when the provider reports them. */
+	stats?: GenerationStats;
 }
 export interface MessageRouterMetadataUpdate {
 	type: MessageUpdateType.RouterMetadata;

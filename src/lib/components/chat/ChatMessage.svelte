@@ -18,6 +18,8 @@
 	import TrackioViewChip from "./TrackioViewChip.svelte";
 	import { segmentViewText, viewsInText } from "$lib/utils/trackioView";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
+	import { useSettingsStore } from "$lib/stores/settings";
+	import GenerationStatsRow from "./GenerationStatsRow.svelte";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
@@ -39,8 +41,10 @@
 	import type {
 		MessageHarnessEventUpdate,
 		MessagePlanUpdate,
+		MessageFinalAnswerUpdate,
 		MessageQueuedInputUpdate,
 	} from "$lib/types/MessageUpdate";
+	import { MessageUpdateType } from "$lib/types/MessageUpdate";
 	import { page } from "$app/state";
 	import ImageLightbox from "./ImageLightbox.svelte";
 	import { stripArtifacts } from "$lib/utils/artifacts";
@@ -185,6 +189,18 @@
 	});
 
 	let blocks = $derived(messageBlocks(message));
+
+	const settings = useSettingsStore();
+	// The turn's final answer carries its stats; a turn that never finished has none.
+	let generationStats = $derived.by(() => {
+		if (!$settings.showGenerationStats || (isLast && loading)) return undefined;
+		const stats = message.updates?.findLast(
+			(update): update is MessageFinalAnswerUpdate => update.type === MessageUpdateType.FinalAnswer
+		)?.stats;
+		return stats && (stats.promptTokens !== undefined || stats.outputTokens !== undefined)
+			? stats
+			: undefined;
+	});
 
 	// a notice can arrive before the first token, so it must not hide the spinner
 	let awaitingFirstBlock = $derived(blocks.every((block) => block.type === "notice"));
@@ -493,6 +509,10 @@
 					{/each}
 				{/if}
 			</div>
+
+			{#if generationStats}
+				<GenerationStatsRow stats={generationStats} />
+			{/if}
 
 			{#if waitingState}
 				<TurnWaitBanner

@@ -372,6 +372,48 @@ describe("runMcpFlow", () => {
 	});
 });
 
+describe("runMcpFlow generation stats", () => {
+	it("puts the turn's summed timings on the final answer", async () => {
+		const timings = (prompt_n: number, predicted_n: number) => ({
+			prompt_n,
+			prompt_ms: 100,
+			predicted_n,
+			predicted_ms: 200,
+		});
+		mocks.create
+			.mockImplementationOnce(async () =>
+				(async function* () {
+					yield chunk({
+						delta: {
+							tool_calls: [
+								{ index: 0, id: "call_1", function: { name: "do_thing", arguments: "{}" } },
+							],
+						},
+					});
+					yield { ...chunk({ delta: {}, finish_reason: "tool_calls" }), timings: timings(50, 10) };
+				})()
+			)
+			.mockImplementationOnce(async () =>
+				(async function* () {
+					yield chunk({ delta: { content: "done" } });
+					yield { ...chunk({ delta: {}, finish_reason: "stop" }), timings: timings(70, 5) };
+				})()
+			);
+		scriptToolResults();
+
+		const { updates } = await runFlow();
+
+		const answer = updates.find((u) => u.type === MessageUpdateType.FinalAnswer);
+		expect(answer?.type === MessageUpdateType.FinalAnswer && answer.stats).toMatchObject({
+			rounds: 2,
+			promptTokens: 120,
+			prefillMs: 200,
+			outputTokens: 15,
+			decodeMs: 400,
+		});
+	});
+});
+
 describe("runMcpFlow think-tag balance across tool rounds", () => {
 	const toolCallDelta = {
 		tool_calls: [{ index: 0, id: "call_1", function: { name: "do_thing", arguments: "{}" } }],

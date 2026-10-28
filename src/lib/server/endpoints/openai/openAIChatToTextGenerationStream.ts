@@ -1,6 +1,8 @@
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type OpenAI from "openai";
 import type { Stream } from "openai/streaming";
+import type { GenerationStats } from "$lib/types/GenerationStats";
+import { createGenerationStats } from "$lib/server/textGeneration/utils/generationStats";
 
 /**
  * Transform a stream of OpenAI.Chat.ChatCompletion into a stream of TextGenerationStreamOutput
@@ -19,8 +21,10 @@ export async function* openAIChatToTextGenerationStream(
 	// blank chunk can't create an empty <think> on its own while the trace still
 	// stays byte-exact. Mirrors runMcpFlow, which does the same for the tool path.
 	let pendingReasoningWhitespace = "";
+	const stats = createGenerationStats();
 
 	for await (const completion of completionStream) {
+		stats.observe(completion);
 		const retyped = completion as {
 			"x-router-metadata"?: { route: string; model: string; provider?: string };
 		};
@@ -139,7 +143,13 @@ export async function* openAIChatToTextGenerationStream(
 
 		// Accumulate the combined token into the full text
 		generatedText += combined;
-		const output: TextGenerationStreamOutput = {
+		if (combined.length > 0) stats.firstToken();
+		let generationStats: GenerationStats | undefined;
+		if (last) {
+			stats.endRound();
+			generationStats = stats.snapshot();
+		}
+		const output: TextGenerationStreamOutput & { generationStats?: GenerationStats } = {
 			token: {
 				id: tokenId++,
 				text: combined,
@@ -148,6 +158,7 @@ export async function* openAIChatToTextGenerationStream(
 			},
 			generated_text: last ? generatedText : null,
 			details: null,
+			...(generationStats ? { generationStats } : {}),
 		};
 		yield output;
 

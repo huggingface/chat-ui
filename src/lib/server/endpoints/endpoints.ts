@@ -1,3 +1,4 @@
+import type { GenerationStats } from "$lib/types/GenerationStats";
 import type { Conversation, StoredHistoryWindow } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 import type {
@@ -41,6 +42,8 @@ export interface EndpointParameters {
 export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & {
 	token: TextGenerationStreamToken;
 	routerMetadata?: { route?: string; model?: string; provider?: InferenceProvider };
+	/** On the final output, when the provider reported token counts or timings. */
+	generationStats?: GenerationStats;
 };
 // type signature for the endpoint
 export type Endpoint = (

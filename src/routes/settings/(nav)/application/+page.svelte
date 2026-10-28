@@ -47,6 +47,12 @@
 	function setHapticsEnabled(v: boolean) {
 		settings.update((s) => ({ ...s, hapticsEnabled: v }));
 	}
+	function getShowGenerationStats() {
+		return $settings.showGenerationStats;
+	}
+	function setShowGenerationStats(v: boolean) {
+		settings.update((s) => ({ ...s, showGenerationStats: v }));
+	}
 
 	const client = useAPIClient();
 
@@ -292,6 +298,22 @@
 						<Switch name="hapticsEnabled" bind:checked={getHapticsEnabled, setHapticsEnabled} />
 					</div>
 				{/if}
+
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+							Generation stats
+						</div>
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
+							Show tokens and prefill/decode speed under each answer, when the model's server
+							reports them.
+						</p>
+					</div>
+					<Switch
+						name="showGenerationStats"
+						bind:checked={getShowGenerationStats, setShowGenerationStats}
+					/>
+				</div>
 
 				<!-- Theme selector -->
 				<div class="flex items-start justify-between py-3">

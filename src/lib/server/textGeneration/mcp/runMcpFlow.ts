@@ -30,6 +30,7 @@ import {
 	withParseableArguments,
 } from "./toolArgs";
 import type { TextGenerationContext } from "../types";
+import { createGenerationStats } from "../utils/generationStats";
 import {
 	hasAuthHeader,
 	isStrictHfMcpLogin,
@@ -196,6 +197,7 @@ export async function* runMcpFlow({
 	abortController?: AbortController;
 	promptedAt?: Date;
 }): AsyncGenerator<MessageUpdate, McpFlowResult, undefined> {
+	const generationStats = createGenerationStats(promptedAt?.getTime());
 	// Helper to check if generation should be aborted via DB polling
 	// Also triggers the abort controller to cancel active streams/requests
 	const checkAborted = (): boolean => {
@@ -1000,6 +1002,7 @@ export async function* runMcpFlow({
 			let tokenCount = 0;
 			let finishReason: string | null | undefined;
 			for await (const chunk of completionStream) {
+				generationStats.observe(chunk);
 				const choice = chunk.choices?.[0];
 				// Before the delta guard: the terminal chunk can carry only a finish_reason.
 				if (choice?.finish_reason) finishReason = choice.finish_reason;
@@ -1109,6 +1112,7 @@ export async function* runMcpFlow({
 						streamedContent = true;
 						producedOutput = true;
 						yield { type: MessageUpdateType.Stream, token: combined };
+						generationStats.firstToken();
 						tokenCount += combined.length;
 						clientThinkOpen = thinkOpen;
 					} else if (clientThinkOpen && !thinkOpen) {
@@ -1127,6 +1131,7 @@ export async function* runMcpFlow({
 					return "aborted";
 				}
 			}
+			generationStats.endRound();
 			logger.info(
 				{ sawToolCalls: Object.keys(toolCallState).length > 0, tokens: tokenCount, loop },
 				"[mcp] completion stream closed"
@@ -1514,6 +1519,7 @@ export async function* runMcpFlow({
 				type: MessageUpdateType.FinalAnswer,
 				text: lastAssistantContent,
 				interrupted: cutMidAnswer,
+				stats: generationStats.snapshot(),
 			};
 			logger.info(
 				{ length: lastAssistantContent.length, loop },
@@ -1531,7 +1537,12 @@ export async function* runMcpFlow({
 		if (!streamedContent) {
 			yield { type: MessageUpdateType.Stream, token: exhaustedText };
 		}
-		yield { type: MessageUpdateType.FinalAnswer, text: exhaustedText, interrupted: false };
+		yield {
+			type: MessageUpdateType.FinalAnswer,
+			text: exhaustedText,
+			interrupted: false,
+			stats: generationStats.snapshot(),
+		};
 		return "exhausted";
 	} catch (err) {
 		const msg = String(err ?? "");

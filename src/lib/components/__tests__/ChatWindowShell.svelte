@@ -32,6 +32,7 @@
 		streamingMode: "raw",
 		directPaste: false,
 		hapticsEnabled: false,
+		showGenerationStats: false,
 	});
 	createConversationsStore();
 </script>
