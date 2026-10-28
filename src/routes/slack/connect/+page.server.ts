@@ -5,7 +5,7 @@ import { base } from "$app/paths";
 import { collections } from "$lib/server/database";
 import { connectAccount, readConnectionLink, ConnectionError } from "$lib/server/slack/connections";
 import { identity } from "$lib/server/slack/viewer/auth";
-import { setMcpSyncEnabled } from "$lib/server/mcp/savedSelection";
+import { setMcpSyncEnabled, slackMcpSyncAvailable } from "$lib/server/mcp/savedSelection";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies }) => {
@@ -34,7 +34,9 @@ export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies })
 			userTeamId: 1,
 		})
 		.toArray();
-	const mcpSync = Boolean(await collections.mcpSelections.findOne({ _id: locals.user._id }));
+	const mcpSyncAvailable = slackMcpSyncAvailable();
+	const mcpSync =
+		mcpSyncAvailable && Boolean(await collections.mcpSelections.findOne({ _id: locals.user._id }));
 	const settings = slackConfig();
 	if (!settings && (ticket || connections.length)) error(503, "Slack is unavailable.");
 	const client = new WebClient(settings?.botToken, { retryConfig: { retries: 0 }, timeout: 10000 });
@@ -75,6 +77,7 @@ export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies })
 		connections: namedConnections,
 		slackNames,
 		mcpSync,
+		mcpSyncAvailable,
 	};
 };
 export const actions: Actions = {
