@@ -24,7 +24,7 @@ export interface FixtureRound {
 	reasoning?: string;
 	text?: string;
 	tools?: string[];
-	/** what the first call records when not what streamed, trimmed like toolInvocation stores it */
+	/** what the first call records when not what streamed, trimmed like toolInvocation stored it */
 	stored?: { reasoning?: string; content?: string };
 	/** record neither field, like calls stored before rounds kept their text */
 	storesNothing?: boolean;

@@ -17,6 +17,7 @@ import type { ObjectId } from "mongodb";
 import { isValidJsonObject } from "$lib/server/textGeneration/mcp/toolInvocation";
 import { ROUNDS_SHAPE, rebuildLegacyContent, toolRounds } from "$lib/utils/messageShape";
 import { withHarnessEvent } from "./harnessEvent";
+import { toToolCallId } from "./toolCallId";
 import {
 	answeredQuestion,
 	CHARS_PER_TOKEN,
@@ -70,23 +71,6 @@ function legacyBudgetChars(contextLengthTokens?: number, maxOutputTokens?: numbe
 	return Math.min(LEGACY_HISTORY_BUDGET_CHARS, usableTokens * CHARS_PER_TOKEN);
 }
 
-/**
- * Normalize a persisted update uuid into a provider-safe tool_call_id.
- * Mistral-family chat templates require exactly nine alphanumeric characters,
- * a shape every other provider also accepts; the persisted uuid is only a
- * correlation key, so the id just has to pair calls with results consistently.
- */
-function toToolCallId(uuid: string, used: Set<string>): string {
-	const alnum = uuid.replace(/[^a-zA-Z0-9]/g, "") || "toolcall0";
-	let candidate = (alnum + "0".repeat(9)).slice(0, 9);
-	for (let salt = 1; used.has(candidate); salt += 1) {
-		const suffix = String(salt);
-		candidate = (alnum + "0".repeat(9)).slice(0, 9 - suffix.length) + suffix;
-	}
-	used.add(candidate);
-	return candidate;
-}
-
 const isToolResultUpdate = (u: MessageUpdate): u is MessageToolResultUpdate =>
 	u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Result;
 const isToolErrorUpdate = (u: MessageUpdate): u is MessageToolErrorUpdate =>
@@ -138,7 +122,7 @@ interface TurnRound {
 	calls: MessageToolCallUpdate[];
 	/** byte exact, see splitReasoning */
 	reasoning: string;
-	/** visible text streamed before the calls, trimmed */
+	/** visible text streamed before the calls, byte exact like the live loop sent it */
 	content: string;
 }
 
@@ -153,7 +137,7 @@ function turnRounds(message: EndpointMessage): {
 	const rounds = toolRounds(message.updates ?? []).map(({ calls }) => ({
 		calls,
 		reasoning: calls.find((u) => u.reasoning?.trim())?.reasoning ?? "",
-		content: (calls.find((u) => u.content?.trim())?.content ?? "").trim(),
+		content: calls.find((u) => u.content?.trim())?.content ?? "",
 	}));
 	if (message.contentShape === ROUNDS_SHAPE) {
 		return {
@@ -201,10 +185,11 @@ function legacyFinalAnswer(
 		// that."): rounds are processed oldest-first, matching the
 		// chronological order text was concatenated into `message.content`, so
 		// removing a matched prefix keeps the remainder correctly ordered for
-		// the final message. Trimmed on both sides (persistence trims too)
-		// because `remainingVisible` comes from splitReasoning trim-normalized;
-		// visible text has no byte-exactness requirement, unlike reasoning.
-		if (round.content && remainingVisible.startsWith(round.content)) {
+		// the final message. Trimmed only to match, because `remainingVisible`
+		// comes from splitReasoning trim-normalized; the round itself still
+		// replays its preamble byte exact.
+		const preamble = round.content.trim();
+		if (preamble && remainingVisible.startsWith(preamble)) {
 			// Prefix-only, deliberately: rounds consume the visible text in
 			// chronological order, so a streamed preamble is always the next
 			// prefix. A persisted preamble that is NOT a prefix was never merged
@@ -213,7 +198,7 @@ function legacyFinalAnswer(
 			// indexOf match could only hit identical text belonging to the final
 			// answer — removing that would reorder the conversation. The failure
 			// mode of not matching is mild duplication, which is safer.
-			remainingVisible = remainingVisible.slice(round.content.length).trimStart();
+			remainingVisible = remainingVisible.slice(preamble.length).trimStart();
 		}
 	}
 	return { content: remainingVisible.trim(), reasoning: remainingParts.join("\n") };

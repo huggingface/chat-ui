@@ -158,6 +158,7 @@ vi.mock("$lib/server/mlReviews/store", async (importOriginal) => ({
 }));
 
 const { runMcpFlow } = await import("./runMcpFlow");
+const { toToolCallId } = await import("../utils/toolCallId");
 const { config } = await import("$lib/server/config");
 
 type ScriptedCall = { id?: string; name?: string; arguments: string };
@@ -226,7 +227,7 @@ function scriptToolResults(output = "tool ok") {
 	mocks.executeToolCalls.mockImplementation(async function* ({
 		calls,
 	}: {
-		calls: Array<{ id: string; name: string }>;
+		calls: Array<{ id: string; name: string; uuid?: string }>;
 	}) {
 		for (const call of calls) {
 			yield {
@@ -234,7 +235,7 @@ function scriptToolResults(output = "tool ok") {
 				update: {
 					type: MessageUpdateType.Tool,
 					subtype: MessageToolUpdateType.Call,
-					uuid: call.id,
+					uuid: call.uuid ?? call.id,
 					call: { name: call.name, parameters: {} },
 				},
 			};
@@ -272,6 +273,11 @@ async function runFlow(overrides: Partial<Parameters<typeof runMcpFlow>[0]> = {}
 		step = await generator.next();
 	}
 	return { updates, result: step.value as McpFlowResult };
+}
+
+/** The calls the flow handed to the tools on the nth dispatch, with the ids it sends. */
+function dispatched(n = 0): Array<{ id: string; uuid: string; providerId: string }> {
+	return mocks.executeToolCalls.mock.calls[n][0].calls;
 }
 
 /** The messages sent on the nth upstream request (0-indexed). */
@@ -350,9 +356,11 @@ describe("runMcpFlow", () => {
 		expect(result).toBe("completed");
 		expect(mocks.executeToolCalls).toHaveBeenCalledTimes(1);
 		// The call the model made has to reach the tool intact...
-		expect(mocks.executeToolCalls.mock.calls[0][0].calls).toEqual([
-			{ id: "call_1", name: "do_thing", arguments: '{"a":1}' },
-		]);
+		const [call] = dispatched();
+		expect(call).toMatchObject({ name: "do_thing", arguments: '{"a":1}', providerId: "call_1" });
+		// ...under the id replay derives from the same uuid on later turns, so the
+		// round is sent with the same bytes then and the provider's cache still holds.
+		expect(call.id).toBe(toToolCallId(call.uuid, new Set()));
 
 		// ...and the follow-up has to carry the assistant's tool_calls *and* the matching
 		// results. An assistant message without its tool_calls leaves the tool messages
@@ -361,12 +369,12 @@ describe("runMcpFlow", () => {
 		expect(followUp.at(-2)).toMatchObject({
 			role: "assistant",
 			tool_calls: [
-				{ id: "call_1", type: "function", function: { name: "do_thing", arguments: '{"a":1}' } },
+				{ id: call.id, type: "function", function: { name: "do_thing", arguments: '{"a":1}' } },
 			],
 		});
 		expect(followUp.at(-1)).toEqual({
 			role: "tool",
-			tool_call_id: "call_1",
+			tool_call_id: call.id,
 			content: "the tool output",
 		});
 	});
@@ -470,8 +478,8 @@ describe("runMcpFlow truncated tool calls", () => {
 
 		expect(result).toBe("completed");
 		expect(mocks.executeToolCalls).toHaveBeenCalledTimes(1);
-		expect(mocks.executeToolCalls.mock.calls[0][0].calls).toEqual([
-			{ id: "call_1", name: "do_thing", arguments: '{"a":1}' },
+		expect(dispatched()).toEqual([
+			expect.objectContaining({ name: "do_thing", arguments: '{"a":1}', providerId: "call_1" }),
 		]);
 	});
 
@@ -1118,13 +1126,14 @@ describe("runMcpFlow mid-turn service events", () => {
 
 		expect(result).toBe("completed");
 		expect(mocks.pendingHarnessEvent).toHaveBeenCalledTimes(1);
-		expect(mocks.pendingHarnessEvent.mock.calls[0][1]).toBe("call_2");
-		expect(harnessUpdates(updates)).toEqual([eventUpdate("call_2")]);
+		const [first, second] = dispatched();
+		expect(mocks.pendingHarnessEvent.mock.calls[0][1]).toBe(second.uuid);
+		expect(harnessUpdates(updates)).toEqual([eventUpdate(second.uuid)]);
 		const next = requestMessages(1);
-		expect(next.at(-2)).toEqual({ role: "tool", tool_call_id: "call_1", content: "tool ok" });
+		expect(next.at(-2)).toEqual({ role: "tool", tool_call_id: first.id, content: "tool ok" });
 		expect(next.at(-1)).toEqual({
 			role: "tool",
-			tool_call_id: "call_2",
+			tool_call_id: second.id,
 			content: `tool ok\n\n${EVENT_TEXT}`,
 		});
 		expect(mocks.markHarnessEventDelivered).toHaveBeenCalledWith(expect.anything(), services);
@@ -1274,11 +1283,12 @@ describe("runMcpFlow queued user messages", () => {
 		const { updates, result } = await runFlow(inMode());
 
 		expect(result).toBe("completed");
-		expect(mocks.takeQueuedInputs.mock.calls[0].slice(1)).toEqual(["a1", "call_2"]);
-		expect(queuedUpdates(updates)).toEqual([queuedUpdate("call_2")]);
+		const [, second] = dispatched();
+		expect(mocks.takeQueuedInputs.mock.calls[0].slice(1)).toEqual(["a1", second.uuid]);
+		expect(queuedUpdates(updates)).toEqual([queuedUpdate(second.uuid)]);
 		expect(requestMessages(1).at(-1)).toEqual({
 			role: "tool",
-			tool_call_id: "call_2",
+			tool_call_id: second.id,
 			content: `tool ok\n\n${QUEUED_TEXT}`,
 		});
 	});

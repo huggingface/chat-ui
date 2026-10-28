@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolvePreprompt } from "./preprompt";
+import { resolvePreprompt, resolveTurnContext } from "./preprompt";
 import { injectArtifactsPrompt } from "./artifacts";
 import {
 	ML_ASSISTANT_BUDGET_RULES,
@@ -118,11 +118,7 @@ describe("resolvePreprompt", () => {
 			})
 		).toBe(
 			`${injectArtifactsPrompt(ML_ASSISTANT_PREPROMPT)}\n\n${ML_ASSISTANT_BUDGET_RULES}\n\n${mlAssistantSessionContext(
-				{
-					timezone: "UTC",
-					now,
-					budget: { remaining: "$0.00", total: "$0.00" },
-				}
+				{ timezone: "UTC", now }
 			)}`
 		);
 	});
@@ -159,7 +155,7 @@ describe("resolvePreprompt", () => {
 		).toBe("You are a pirate.");
 	});
 
-	it("carries the live balance in the session context", () => {
+	it("carries the live balance in the turn context, not the system prompt", () => {
 		const budget = {
 			totalMicroUsd: 10_000_000,
 			spentMicroUsd: 1_500_000,
@@ -179,11 +175,13 @@ describe("resolvePreprompt", () => {
 			conversationPreprompt: undefined,
 			mlAssistant: true,
 			username: "pngwn",
-			budget,
 		});
 		expect(resolved).toContain("# Session budget");
+		expect(resolved).not.toContain("Budget=");
 		// total − spent − held = 10.00 − 1.50 − 1.00
-		expect(resolved).toContain("Budget=$7.50 remaining of $10.00");
+		expect(resolveTurnContext({ mlAssistant: true, budget })).toContain(
+			"Budget=$7.50 remaining of $10.00"
+		);
 	});
 
 	it("treats a conversation without a stored budget as a zero grant, not an ungated one", () => {
@@ -193,7 +191,8 @@ describe("resolvePreprompt", () => {
 			username: "pngwn",
 		});
 		expect(resolved).toContain("# Session budget");
-		expect(resolved).toContain("Budget=$0.00 remaining of $0.00");
+		expect(resolveTurnContext({ mlAssistant: true })).toContain("Budget=$0.00 remaining of $0.00");
+		expect(resolveTurnContext({ mlAssistant: false })).toBeUndefined();
 
 		const outsideMode = resolvePreprompt({
 			conversationPreprompt: "You are a pirate.",

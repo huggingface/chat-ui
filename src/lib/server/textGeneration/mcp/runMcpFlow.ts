@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { config } from "$lib/server/config";
 import { getUserHubToken } from "$lib/server/apiToken";
 import {
@@ -16,6 +17,7 @@ import type {
 } from "openai/resources/chat/completions";
 import type { Stream } from "openai/streaming";
 import { buildToolPreprompt } from "../utils/toolPrompt";
+import { toToolCallId } from "../utils/toolCallId";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
 import {
@@ -187,11 +189,14 @@ export async function* runMcpFlow({
 	generationId,
 	messageId,
 	preprompt,
+	turnContext,
 	abortSignal,
 	abortController,
 	promptedAt,
 }: RunMcpFlowContext & {
 	preprompt?: string;
+	/** stamped at the end of the user's latest message, see resolveTurnContext */
+	turnContext?: string;
 	abortSignal?: AbortSignal;
 	abortController?: AbortController;
 	promptedAt?: Date;
@@ -761,8 +766,9 @@ export async function* runMcpFlow({
 			if (conv.plan && builtinTools.some((tool) => tool.name === PLAN_TOOL_NAME)) {
 				prompt = injectPlanState(prompt, conv.plan);
 			}
-			if (stateBlock) {
-				prompt = injectSessionState(prompt, stateBlock.text);
+			const tail = [turnContext, stateBlock?.text].filter((text): text is string => !!text);
+			if (tail.length > 0) {
+				prompt = injectSessionState(prompt, tail.join("\n\n"));
 			}
 
 			// Work around servers that reject `system` role
@@ -900,6 +906,8 @@ export async function* runMcpFlow({
 			);
 		}
 
+		// one set per turn, like the per-message set replay uses
+		const sentToolCallIds = new Set<string>();
 		for (let loop = 0; loop < maxToolRounds; loop += 1) {
 			// Check for abort at the start of each loop iteration
 			if (checkAborted()) {
@@ -1195,56 +1203,15 @@ export async function* runMcpFlow({
 			}
 
 			if (!discardedTruncatedToolCalls && Object.keys(toolCallState).length > 0) {
-				// If any streamed call is missing id, perform a quick non-stream retry to recover full tool_calls with ids
-				const missingId = Object.values(toolCallState).some((c) => c?.name && !c?.id);
-				let calls: NormalizedToolCall[];
-				if (missingId) {
-					logger.debug(
-						{ loop },
-						"[mcp] missing tool_call id in stream; retrying non-stream to recover ids"
-					);
-					// Same absorption as the streaming call above: this recovery
-					// request is mid-round, where a surfaced failure costs the whole turn.
-					const nonStream = await withUpstreamRetry(
-						() =>
-							openai.chat.completions.create(
-								{ ...completionBase, messages: requestMessages, stream: false },
-								{
-									signal: abortSignal,
-									headers: {
-										"ChatUI-Conversation-ID": conv._id.toString(),
-										"X-use-cache": "false",
-										...(config.USE_USER_TOKEN === "true" && locals?.token
-											? { Authorization: `Bearer ${locals.token}` }
-											: {}),
-									},
-								}
-							),
-						{
-							signal: abortSignal,
-							onBackoff: (attempt, delayMs, err) =>
-								logger.warn(
-									{ loop, attempt, delayMs, err: String(err) },
-									"[mcp] upstream failure on id recovery; backing off in-loop"
-								),
-						}
-					);
-					const tc = nonStream.choices?.[0]?.message?.tool_calls ?? [];
-					calls = tc.map((t) => ({
-						id: t.id,
-						name: t.function?.name ?? "",
-						arguments: t.function?.arguments ?? "",
-					}));
-				} else {
-					calls = Object.values(toolCallState)
-						.map((c) => (c?.id && c?.name ? c : undefined))
-						.filter(Boolean)
-						.map((c) => ({
-							id: c?.id ?? "",
-							name: c?.name ?? "",
-							arguments: c?.arguments ?? "",
-						})) as NormalizedToolCall[];
-				}
+				// No recovery request for a call streamed without an id: the id the
+				// provider sees is derived below, its own is only kept as originalId.
+				let calls = Object.values(toolCallState)
+					.filter((c) => c?.name)
+					.map((c) => ({
+						id: c?.id ?? "",
+						name: c?.name ?? "",
+						arguments: c?.arguments ?? "",
+					})) as NormalizedToolCall[];
 
 				if (rewriteArgs) {
 					calls = withRewrittenArguments(calls, {
@@ -1255,6 +1222,15 @@ export async function* runMcpFlow({
 						rewrite: rewriteArgs,
 					});
 				}
+
+				// The ids history replay derives from the same uuids on later turns,
+				// not the provider's: a round replayed with other ids stops matching
+				// the prefix the provider cached, and Mistral-family templates refuse
+				// ids that are not nine alphanumeric characters anyway.
+				calls = calls.map((call) => {
+					const uuid = randomUUID();
+					return { ...call, uuid, id: toToolCallId(uuid, sentToolCallIds), providerId: call.id };
+				});
 
 				// Include the assistant message with tool_calls so the next round
 				// sees both the calls and their outputs, matching MCP branch behavior.

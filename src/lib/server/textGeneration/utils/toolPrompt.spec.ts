@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildToolPreprompt } from "./toolPrompt";
 import type { OpenAiTool } from "$lib/server/mcp/tools";
 
@@ -9,6 +9,10 @@ const tool = (name: string): OpenAiTool =>
 	}) as OpenAiTool;
 
 describe("buildToolPreprompt", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
 	it("returns empty string when no tools", () => {
 		expect(buildToolPreprompt([])).toBe("");
 	});
@@ -34,6 +38,15 @@ describe("buildToolPreprompt", () => {
 
 		expect(prompt).toContain("web_search_exa");
 		expect(prompt).not.toContain("Not/AZone");
+	});
+
+	it("gives the user's date in both forms, not the server's", () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-10-28T00:30:00Z"));
+		const prompt = buildToolPreprompt([tool("web_search_exa")], "America/Los_Angeles");
+
+		expect(prompt).toContain("Current date: Tuesday, October 27, 2026 (2026-10-27).");
+		expect(prompt).toContain("always use today's date (2026-10-27)");
 	});
 
 	it("only includes a builtin's guidance when that tool is on offer", () => {
