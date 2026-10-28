@@ -30,7 +30,7 @@ import {
 } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { toolRounds } from "$lib/utils/messageShape";
-import { isGpu, isJobSubmit, isSandboxWork, jobFlavor, label } from "./labels";
+import { isGpu, isJobSubmit, isSandboxWork, jobFlavor, label, scriptName } from "./labels";
 import { redact } from "./redact";
 import type { Action, ActionCall, DecisionCase, Family, Feedback } from "./types";
 
@@ -39,6 +39,7 @@ const MAX_PER_CONVERSATION = 3;
 /** a conversation someone reported is the one the evals answer to, so more of it is kept */
 const MAX_PER_SEED_CONVERSATION = 10;
 const MAX_STORED_ARG_CHARS = 4000;
+const AFTERMATH_ROUNDS = 3;
 
 /** tools whose output is a program's own output, so an error in it is the agent's code failing */
 const RUN_TOOLS = new Set(["check_job", "hf_jobs", "hf_sandbox_exec", "sandbox_task", "wait"]);
@@ -131,6 +132,20 @@ function truncateArgs(value: unknown): unknown {
 	return value;
 }
 
+function clip(text: string | undefined, limit: number): string {
+	if (!text) return "";
+	return text.length > limit ? `${text.slice(0, limit)}… [${text.length - limit} chars cut]` : text;
+}
+
+function isOutcomeOf(update: MessageUpdate, uuid: string): boolean {
+	return (
+		update.type === MessageUpdateType.Tool &&
+		update.uuid === uuid &&
+		(update.subtype === MessageToolUpdateType.Result ||
+			update.subtype === MessageToolUpdateType.Error)
+	);
+}
+
 function excerpt(text: string, match: RegExpMatchArray): string {
 	const at = match.index ?? 0;
 	return text.slice(Math.max(0, at - 800), at + match[0].length + 200);
@@ -145,6 +160,7 @@ interface Decision {
 	action: Action;
 	trigger?: { tool: string; excerpt: string };
 	context: DecisionCase["context"];
+	aftermath: DecisionCase["aftermath"];
 	dedupeKey: string;
 }
 
@@ -156,6 +172,8 @@ interface History {
 	/** file names sandbox calls mentioned, to tell whether a job's script was run in one first */
 	sandboxFiles: Set<string>;
 	failedJobs: Set<string>;
+	/** job id to the v-file script it ran, read off each submission's result */
+	jobScripts: Map<string, string>;
 }
 
 const FILE_NAME = /[\w.-]+\.(?:py|sh|ipynb|ya?ml|json|toml)\b/g;
@@ -165,6 +183,7 @@ function cloneHistory(history: History): History {
 		...history,
 		sandboxFiles: new Set(history.sandboxFiles),
 		failedJobs: new Set(history.failedJobs),
+		jobScripts: new Map(history.jobScripts),
 	};
 }
 
@@ -172,11 +191,6 @@ function cloneHistory(history: History): History {
 const JOB_FAILURE_SPAN = 3;
 
 const FAILED_STATUS = /^[\s*-]*Status:?\**:?\s*\**failed\b/im;
-
-function scriptName(call: ActionCall): string | undefined {
-	const script = JSON.stringify(call.args).match(/v-file:\/\/([\w.-]+?)(?:@v\d+)?"/);
-	return script?.[1];
-}
 
 /** walks one assistant turn, updating `history`, and returns the decisions in it when `emit` */
 function walkTurn(message: Message, history: History, emit: boolean): Decision[] {
@@ -214,13 +228,30 @@ function walkTurn(message: Message, history: History, emit: boolean): Decision[]
 		}
 		return { ...first, calls, rounds: spanned };
 	};
+	/** the rounds after the decision, so a reviewer sees how it turned out without the trace */
+	const aftermathFrom = (round: number): DecisionCase["aftermath"] =>
+		rounds.slice(round, round + AFTERMATH_ROUNDS).flatMap((r) =>
+			r.calls.map((call) => ({
+				name: call.call.name,
+				args: clip(call.argumentsRaw ?? JSON.stringify(call.call.parameters), 400),
+				result: clip(resultText(updates.find((u) => isOutcomeOf(u, call.uuid)) ?? call), 800),
+			}))
+		);
 	const push = (
-		decision: Omit<Decision, "round" | "cutIndex" | "action">,
+		decision: Omit<Decision, "round" | "cutIndex" | "action" | "aftermath">,
 		round: number,
 		span = 1
 	) => {
 		const action = emit ? actionUntilDecisive(round, span) : undefined;
-		if (action) decisions.push({ ...decision, round, cutIndex: cutAt(round), action });
+		if (!action) return;
+		const spanned = action.kind === "calls" ? (action.rounds ?? 1) : 0;
+		decisions.push({
+			...decision,
+			round,
+			cutIndex: cutAt(round),
+			action,
+			aftermath: aftermathFrom(round + spanned),
+		});
 	};
 
 	const calls = new Map<string, ActionCall>();
@@ -258,6 +289,11 @@ function walkTurn(message: Message, history: History, emit: boolean): Decision[]
 		}
 		const call = calls.get(update.uuid);
 		const text = resultText(update);
+		if (call && text !== undefined && isJobSubmit(call)) {
+			const id = text.match(/\b[0-9a-f]{24}\b/)?.[0];
+			const script = scriptName(call);
+			if (id && script) history.jobScripts.set(id, script);
+		}
 		if (!call || !RUN_TOOLS.has(call.name) || text === undefined) continue;
 		const nextRound = rounds.findIndex((r) => r.start > index);
 		const next = nextRound === -1 ? rounds.length : nextRound;
@@ -288,7 +324,10 @@ function walkTurn(message: Message, history: History, emit: boolean): Decision[]
 			{
 				family: "after-job-failure",
 				trigger: { tool: call.name, excerpt: text.slice(0, 1200) },
-				context: { failedJobsSoFar: history.failedJobs.size },
+				context: {
+					failedJobsSoFar: history.failedJobs.size,
+					failedScript: history.jobScripts.get(jobId),
+				},
 				dedupeKey: `after-job-failure/${jobId}`,
 			},
 			next,
@@ -322,6 +361,7 @@ function casesFor(
 				sandboxUsed: false,
 				sandboxFiles: new Set(),
 				failedJobs: new Set(),
+				jobScripts: new Map(),
 			};
 		let history = after.get(parent.id);
 		if (!history) {
@@ -372,6 +412,7 @@ function casesFor(
 				},
 				trigger: decision.trigger,
 				context: decision.context,
+				aftermath: decision.aftermath,
 				observed: {
 					action:
 						decision.action.kind === "calls"

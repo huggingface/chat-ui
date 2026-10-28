@@ -23,6 +23,7 @@
 		"probe-model": "vite-node --options.transformMode.ssr='/.*/' scripts/probe-model.ts --",
 		"eval:mine": "vite-node --options.transformMode.ssr='/.*/' evals/decisions/mine.ts --",
 		"eval:review": "vite-node --options.transformMode.ssr='/.*/' evals/decisions/review/server.ts --",
+		"eval:annotate": "vite-node --options.transformMode.ssr='/.*/' evals/decisions/annotate.ts --",
 		"prepare": "husky"
 	},
 	"devDependencies": {

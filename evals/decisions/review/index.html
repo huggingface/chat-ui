@@ -123,6 +123,11 @@
 				main {
 					grid-template-columns: 1fr;
 				}
+				.right {
+					order: -1;
+					position: static;
+					max-height: none;
+				}
 			}
 			.col {
 				display: flex;
@@ -374,6 +379,29 @@
 			.seed {
 				border-color: var(--accent);
 			}
+			.ai {
+				border-color: var(--accent);
+			}
+			.ai .why {
+				margin-top: 8px;
+				color: var(--muted);
+			}
+			.conf {
+				color: var(--muted);
+				font-size: 12px;
+				margin-left: 6px;
+			}
+			.differs {
+				font-size: 12px;
+				font-weight: 600;
+				color: var(--accent);
+				margin-left: 6px;
+			}
+			.warn {
+				margin-top: 8px;
+				color: var(--fail);
+				font-size: 13px;
+			}
 			.seed a {
 				color: var(--accent);
 			}
@@ -385,8 +413,8 @@
 			<nav id="tabs"></nav>
 			<div class="keys">
 				<kbd>A</kbd> agree · <kbd>D</kbd> wrong label, then <kbd>1</kbd>–<kbd>9</kbd> ·
-				<kbd>X</kbd> not a real case · <kbd>←</kbd><kbd>→</kbd> move · <kbd>U</kbd> next unreviewed
-				· <kbd>N</kbd> note
+				<kbd>L</kbd> use DeepSeek's label · <kbd>X</kbd> not a real case · <kbd>←</kbd
+				><kbd>→</kbd> move · <kbd>U</kbd> next unreviewed · <kbd>N</kbd> note
 			</div>
 		</header>
 		<div id="view"></div>
@@ -533,7 +561,7 @@
 						<details><summary>Whole answer</summary><div class="text">${esc(c.previousAnswer)}</div></details></section>`);
 				if (c.rounds.length)
 					left.push(
-						`<section><h2>Last ${c.rounds.length} rounds before the decision</h2>${c.rounds
+						`<section><details><summary>Last ${c.rounds.length} rounds before the decision</summary>${c.rounds
 							.map(
 								(r, i) => `<div class="round">
 							${r.reasoning ? `<details><summary>Reasoning</summary><div class="text">${esc(r.reasoning)}</div></details>` : ""}
@@ -546,10 +574,23 @@
 								)
 								.join("")}</div>`
 							)
-							.join("")}</section>`
+							.join("")}</details></section>`
 					);
 
 				const right = [];
+				const ai = c.annotation;
+				if (ai)
+					right.push(`<section class="ai">
+						<h2>DeepSeek's read</h2>
+						<div class="text">${esc(ai.summary)}</div>
+						<div style="margin-top:10px">${chip(ai.label, ai.pass)} <span class="conf">${esc(ai.confidence)} confidence</span>${
+							ai.label !== c.observed.label
+								? ` <span class="differs">differs from the miner</span>`
+								: ""
+						}</div>
+						<div class="text why">${esc(ai.rationale)}</div>
+						${ai.triggerValid === false ? `<div class="warn">DeepSeek thinks the trigger isn't what this family is about: consider <kbd>X</kbd>.</div>` : ""}
+					</section>`);
 				let did;
 				if (action.kind === "final") {
 					did = `<div class="text">${esc(action.text)}</div>`;
@@ -564,7 +605,17 @@
 							)
 							.join("")}`;
 				}
-				right.push(`<section><h2>What production did next</h2>${did}</section>`);
+				const after = c.aftermath.length
+					? `<details><summary>What happened after (${c.aftermath.length} calls)</summary>${c.aftermath
+							.map(
+								(a) =>
+									`<div class="call"><span class="tool">${esc(a.name)}</span><pre class="clampable">${esc(a.args)}</pre>${a.result ? `<pre>${highlight(a.result)}</pre>` : ""}</div>`
+							)
+							.join("")}</details>`
+					: "";
+				right.push(
+					`<section><details ${ai ? "" : "open"}><summary>What production did next</summary>${did}</details>${after}</section>`
+				);
 
 				const labels = Object.entries(f.labels);
 				right.push(`<section class="verdict">
@@ -573,6 +624,7 @@
 					<div class="buttons" style="margin-top:12px">
 						<button data-v="agree" class="${v?.verdict === "agree" ? "sel" : ""}"><kbd>A</kbd> Label is right</button>
 						<button data-v="disagree" class="${v?.verdict === "disagree" || picking ? "sel" : ""}"><kbd>D</kbd> Wrong label</button>
+						${ai && ai.label !== c.observed.label ? `<button data-ai><kbd>L</kbd> Use DeepSeek's: ${esc(ai.label)}</button>` : ""}
 						<button data-v="invalid" class="${v?.verdict === "invalid" ? "sel" : ""}"><kbd>X</kbd> Not a real case</button>
 					</div>
 					${
@@ -600,6 +652,7 @@
 
 				view.innerHTML = `<main><div class="col">${left.join("")}</div><div class="col right">${right.join("")}</div></main>`;
 				for (const b of view.querySelectorAll("[data-v]")) b.onclick = () => decide(b.dataset.v);
+				view.querySelector("[data-ai]")?.addEventListener("click", useAi);
 				for (const b of view.querySelectorAll("[data-label]"))
 					b.onclick = () => decide("disagree", b.dataset.label);
 				document.getElementById("prev").onclick = () => move(-1);
@@ -626,8 +679,21 @@
 					return renderCase();
 				}
 				picking = false;
-				await save(current.id, { verdict: kind, label, note });
+				await save(current.id, {
+					verdict: kind,
+					label,
+					note,
+					minerLabel: current.observed.label,
+					llmLabel: current.annotation?.label,
+				});
 				nextUnreviewed(true);
+			}
+
+			function useAi() {
+				const ai = current?.annotation;
+				if (!ai) return;
+				if (ai.label === current.observed.label) decide("agree");
+				else decide("disagree", ai.label);
 			}
 
 			function move(step) {
@@ -695,6 +761,20 @@
 
 			const pct = (x) => (x === null ? "–" : `${Math.round(x * 100)}%`);
 
+			/** of the reviewed cases DeepSeek labelled, how often its label is the one you settled on */
+			function aiMatch(f, done) {
+				const judged = done.filter(
+					(c) => data.verdicts[c.id].verdict !== "invalid" && data.annotations[c.id]
+				);
+				if (!judged.length) return "–";
+				const yours = (c) => {
+					const v = data.verdicts[c.id];
+					return v.verdict === "agree" ? c.label : v.label;
+				};
+				const hits = judged.filter((c) => data.annotations[c.id].label === yours(c)).length;
+				return `${pct(hits / judged.length)} <small>of ${judged.length}</small>`;
+			}
+
 			function renderSummary() {
 				const view = document.getElementById("view");
 				view.innerHTML = `<div class="summary">${data.families
@@ -722,7 +802,8 @@
 						return `<section><h2>${esc(f.family)}</h2>
 							<div class="stats">
 								<div><span>Reviewed</span><b class="big">${done.length}/${f.cases.length}</b></div>
-								<div><span>Label right</span><b class="big">${done.length ? pct(agree / done.length) : "–"}</b></div>
+								<div><span>Miner matches you</span><b class="big">${done.length ? pct(agree / done.length) : "–"}</b></div>
+								<div><span>DeepSeek matches you</span><b class="big">${aiMatch(f, done)}</b></div>
 								<div><span>Not real cases</span><b class="big">${invalid}</b></div>
 								<div><span>Right-call rate, miner</span><b class="big">${pct(e.auto)}</b></div>
 								<div><span>Right-call rate, corrected</span><b class="big">${done.length ? pct(e.corrected) : "–"}</b></div>
@@ -752,6 +833,7 @@
 				if (key === "a") decide("agree");
 				else if (key === "d") decide("disagree");
 				else if (key === "x") decide("invalid");
+				else if (key === "l") useAi();
 				else if (key === "arrowright" || key === "j") move(1);
 				else if (key === "arrowleft" || key === "k") move(-1);
 				else if (key === "u") nextUnreviewed(false);

@@ -56,7 +56,11 @@ export interface DecisionCase {
 		sandboxedScript?: boolean;
 		/** distinct jobs failed on this path, this one included */
 		failedJobsSoFar?: number;
+		/** the v-file script the failed job ran, to tell a resubmit from running something else */
+		failedScript?: string;
 	};
+	/** up to three rounds after the decision, clipped: how it turned out, for review only */
+	aftermath: Array<{ name: string; args: string; result: string }>;
 	/** what production did at the cut, and how the family's scorer labels it */
 	observed: { action: Action; label: string; pass: boolean | null };
 	/**

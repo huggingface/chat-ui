@@ -17,7 +17,7 @@ export function label(
 		case "first-gpu-job":
 			return labelFirstGpuJob(calls, context);
 		case "after-job-failure":
-			return labelAfterJobFailure(calls);
+			return labelAfterJobFailure(calls, context);
 		case "after-oom":
 			return labelAfterOom(calls, context.failedFlavor);
 		case "after-stale-api":
@@ -41,6 +41,7 @@ export const LABELS: Record<Family, Record<string, boolean | null>> = {
 		"fix-and-resubmit": false,
 		resubmit: false,
 		"fix-only": null,
+		"different-job": null,
 		investigate: null,
 		...SHARED,
 	},
@@ -76,9 +77,16 @@ function labelFirstGpuJob(
 	return { label: "job-without-sandbox", pass: false };
 }
 
-function labelAfterJobFailure(calls: ActionCall[]): { label: string; pass: boolean | null } {
+function labelAfterJobFailure(
+	calls: ActionCall[],
+	context: DecisionCase["context"]
+): { label: string; pass: boolean | null } {
 	if (calls.some(isSandboxWork)) return { label: "reproduce-in-sandbox", pass: true };
-	if (calls.some(isJobSubmit)) {
+	const job = calls.find(isJobSubmit);
+	if (job && context.failedScript && scriptName(job) && scriptName(job) !== context.failedScript) {
+		return { label: "different-job", pass: null };
+	}
+	if (job) {
 		return calls.some(isEdit)
 			? { label: "fix-and-resubmit", pass: false }
 			: { label: "resubmit", pass: false };
@@ -171,6 +179,10 @@ function isRerun(c: ActionCall): boolean {
 		(c.name === "hf_sandbox_exec" &&
 			/python3? |bash |uv run|accelerate launch|torchrun/.test(JSON.stringify(c.args)))
 	);
+}
+
+export function scriptName(call: ActionCall): string | undefined {
+	return JSON.stringify(call.args).match(/v-file:\/\/([\w.-]+?)(?:@v\d+)?"/)?.[1];
 }
 
 export function isJobSubmit(c: ActionCall): boolean {

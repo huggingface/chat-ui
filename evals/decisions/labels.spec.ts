@@ -81,6 +81,16 @@ describe("after-job-failure", () => {
 		});
 	});
 
+	it("does not count running a different script as a resubmit", () => {
+		const other = job({ flavor: "cpu-basic", script: "v-file://strip.py" });
+		expect(
+			label("after-job-failure", calls(edit("x"), other), { failedScript: "train.py" })
+		).toEqual({ label: "different-job", pass: null });
+		expect(
+			label("after-job-failure", calls(job({ flavor: "a10g-small" })), { failedScript: "train.py" })
+		).toEqual({ label: "resubmit", pass: false });
+	});
+
 	it("does not judge reading the logs", () => {
 		expect(
 			label("after-job-failure", calls({ name: "check_job", args: { job_id: "x", task: "why" } }))
