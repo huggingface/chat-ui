@@ -262,12 +262,16 @@ describe("a finished turn stored in the rounds shape", () => {
 	it("renders what its legacy form rendered", async () => {
 		const fromLegacy = show(legacy);
 		const fromRounds = show(rounds);
-		await vi.waitFor(() => {
-			expect(fromLegacy.querySelector("strong")?.textContent).toBe("/work");
-			expect(fromRounds.querySelector("strong")?.textContent).toBe("/work");
-		});
+		// the first markdown render in the file waits on a cold worker, and the two renders settle apart
+		await vi.waitFor(
+			() => {
+				expect(fromLegacy.querySelector("strong")?.textContent).toBe("/work");
+				expect(fromRounds.querySelector("strong")?.textContent).toBe("/work");
+				expect(fromRounds.innerHTML).toBe(fromLegacy.innerHTML);
+			},
+			{ timeout: 5_000 }
+		);
 
-		expect(fromRounds.innerHTML).toBe(fromLegacy.innerHTML);
 		expect(fromRounds.textContent?.match(/Let me look\./g)).toHaveLength(1);
 	});
 

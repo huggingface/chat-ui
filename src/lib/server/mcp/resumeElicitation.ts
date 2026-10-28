@@ -32,6 +32,7 @@ export async function resumeParkedToolCall({
 	generationId,
 	extraServers = [],
 	signal,
+	mayPark = false,
 }: {
 	conversationId: ObjectId;
 	elicitationId: string;
@@ -44,6 +45,8 @@ export async function resumeParkedToolCall({
 	generationId?: string;
 	extraServers?: McpServerConfig[];
 	signal?: AbortSignal;
+	/** a live run that can park again, a settle with no run to park closes instead */
+	mayPark?: boolean;
 }): Promise<{
 	resumed: boolean;
 	reason?: string;
@@ -70,6 +73,17 @@ export async function resumeParkedToolCall({
 		resolution: "user",
 		...(taken.row.content ? { content: taken.row.content } : {}),
 	};
+
+	if (pending.kind === "ask" && pending.publish) {
+		const { publishAnswerUpdates } = await import("$lib/server/mlReviews/resume");
+		const { updates } = await publishAnswerUpdates({
+			conversationId,
+			row: taken.row,
+			pending: { ...pending, publish: pending.publish },
+			settled,
+		});
+		return { resumed: true, updates };
+	}
 
 	// The model's own question: the answer is the result, so there is nothing to re-issue.
 	if (pending.kind === "ask") {
@@ -98,6 +112,18 @@ export async function resumeParkedToolCall({
 				},
 			],
 		};
+	}
+
+	if (pending.kind === "review") {
+		const { reviewResumeUpdates } = await import("$lib/server/mlReviews/resume");
+		const outcome = await reviewResumeUpdates({
+			conversationId,
+			pending,
+			settled,
+			...(generationId ? { generationId } : {}),
+			mayPark,
+		});
+		return { resumed: true, ...outcome };
 	}
 
 	const server = [...getMcpServers(), ...extraServers].find((s) => s.name === pending.server);

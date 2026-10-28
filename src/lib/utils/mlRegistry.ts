@@ -445,6 +445,7 @@ export const FILE_ORIGIN_LABEL: Record<MlFile["origin"], string> = {
 	write: "written",
 	edit: "edited",
 	import: "imported",
+	review: "from a review",
 };
 
 export function formatBytes(bytes: number): string {

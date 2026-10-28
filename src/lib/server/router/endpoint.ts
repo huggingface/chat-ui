@@ -8,6 +8,7 @@ import endpoints from "../endpoints/endpoints";
 import type { ProcessedModel } from "../models";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
+import { upstreamErrorCode } from "$lib/server/endpoints/openai/providerFallback";
 import { heuristicSelectRoute, MULTIMODAL_ROUTE, AGENTIC_ROUTE } from "./heuristics";
 import { getRoutes, resolveRouteModels } from "./policy";
 import { getApiToken } from "$lib/server/apiToken";
@@ -38,11 +39,18 @@ async function getModels(): Promise<ProcessedModel[]> {
 class HTTPError extends Error {
 	constructor(
 		message: string,
-		public statusCode?: number
+		public statusCode?: number,
+		public errorCode?: string
 	) {
 		super(message);
 		this.name = "HTTPError";
 	}
+}
+
+function upstreamHTTPError(err: unknown, message: string, statusCode?: number): Error {
+	return statusCode
+		? new HTTPError(message, statusCode, upstreamErrorCode(err))
+		: new Error(message);
 }
 
 /**
@@ -199,7 +207,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 					},
 					"[router] multimodal model failed"
 				);
-				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+				throw upstreamHTTPError(e, message, statusCode);
 			}
 		}
 
@@ -236,7 +244,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 					} else {
 						logger.error(logData, "[router] tools model failed");
 					}
-					throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+					throw upstreamHTTPError(e, message, statusCode);
 				}
 			}
 			// No tools-capable model found — continue with default routing
@@ -282,6 +290,6 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		// Exhausted all candidates — throw to signal upstream failure
 		// Forward the upstream error to the client
 		const { message, statusCode } = extractUpstreamError(lastErr);
-		throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+		throw upstreamHTTPError(lastErr, message, statusCode);
 	};
 }

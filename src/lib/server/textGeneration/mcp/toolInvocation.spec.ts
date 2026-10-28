@@ -7,6 +7,7 @@ import { ToolResultStatus } from "$lib/types/Tool";
 import { parseToolArguments } from "./toolArgs";
 import type { NormalizedToolCall, ToolArgsRewrite } from "./toolInvocation";
 import type { BuiltinTool } from "../builtinTools/types";
+import { askParkRefusal, reviewParkRefusal } from "../builtinTools/parkRefusal";
 import type { McpToolTextResponse } from "$lib/server/mcp/httpClient";
 import type { ChatCompletionToolMessageParam } from "openai/resources/chat/completions";
 
@@ -293,9 +294,7 @@ describe("builtin tool dispatch", () => {
 		name: "ask_user_question",
 		definition: { type: "function", function: { name: "ask_user_question" } },
 		mayPark: true,
-		parkRefusalMessage:
-			"Only one ask_user_question call can be answered per turn. " +
-			"Put every question in a single call's `questions` array.",
+		parkRefusalMessage: askParkRefusal,
 		execute,
 	};
 
@@ -345,6 +344,43 @@ describe("builtin tool dispatch", () => {
 		expect(errors[0]).toMatchObject({
 			message: expect.stringContaining("single call's `questions` array"),
 		});
+	});
+
+	it("names the call that parked first when a review and a question meet in one round", async () => {
+		const review: BuiltinTool = {
+			name: "request_review",
+			definition: { type: "function", function: { name: "request_review" } },
+			mayPark: true,
+			parkRefusalMessage: reviewParkRefusal,
+			execute,
+		};
+		const REVIEW: NormalizedToolCall = {
+			id: "call_review",
+			name: "request_review",
+			arguments: "{}",
+		};
+		const refusal = async (calls: NormalizedToolCall[]) => {
+			execute.mockClear();
+			const events = await drain(calls, CHAT, [parkingBuiltin, review]);
+			expect(execute).toHaveBeenCalledTimes(1);
+			expect(summaryOf(events).awaitingInput).toBe(true);
+			const errors = toolUpdatesOf(events).filter((u) => u.subtype === MessageToolUpdateType.Error);
+			expect(errors).toHaveLength(1);
+			return errors[0];
+		};
+
+		expect(await refusal([REVIEW, ASK])).toMatchObject({
+			uuid: expect.any(String),
+			message:
+				"This question was not shown: request_review already paused this turn, and only one call can. Ask it after the turn resumes, if it still matters.",
+		});
+		expect(await refusal([ASK, REVIEW])).toMatchObject({
+			message:
+				"This review was not shown: ask_user_question already paused this turn, and only one call can. Call request_review again after the turn resumes.",
+		});
+		expect((await refusal([REVIEW, { ...REVIEW, id: "call_review_2" }])).message).toContain(
+			"Only one request_review can wait on the user per turn"
+		);
 	});
 
 	it("hands the builtin no sink when there is no chat behind the call", async () => {

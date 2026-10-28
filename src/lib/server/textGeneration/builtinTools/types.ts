@@ -65,7 +65,7 @@ export interface BuiltinTool {
 	exemptFromToolRestraint?: boolean;
 	/** Whether execute may return `{awaitingInput: true}`. See BuiltinToolResult. */
 	mayPark?: boolean;
-	/** Refusal sent for a second parking-capable call in the same round. */
-	parkRefusalMessage?: string;
+	/** refusal for a second parking call in one round, given the call that parked first */
+	parkRefusalMessage?: (parkedBy: string) => string;
 	execute(args: Record<string, unknown>, ctx: BuiltinToolContext): Promise<BuiltinToolResult>;
 }

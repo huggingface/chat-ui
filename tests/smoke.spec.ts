@@ -58,7 +58,12 @@ test("renders a conversation seeded directly into Mongo", async ({ page, seedCon
 		],
 	});
 
-	await page.goto(`/conversation/${id.toString()}`);
+	const response = await page.goto(`/conversation/${id.toString()}`);
+	expect(response?.status()).toBe(200);
+	// nginx can reject the whole SSR response when preload hints overflow its
+	// response-header buffer. The hints remain in the HTML when the header is omitted.
+	expect(Buffer.byteLength(response?.headers()["link"] ?? "", "utf8")).toBeLessThanOrEqual(2048);
+	expect(await page.locator('link[rel="modulepreload"]').count()).toBeGreaterThan(0);
 
 	await expect(page.locator('[data-message-role="assistant"]').last()).toContainText(
 		"seeded answer"

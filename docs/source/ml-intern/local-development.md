@@ -28,9 +28,10 @@ MongoDB is optional. If `MONGODB_URL` isn't set, Chat UI starts an in-memory dat
    - `read-mcp`
    - `read-billing`
    - `jobs`
+   - `gated-repos`
    - `contribute-repos` (optional)
 
-   `jobs` is required: without it, every Job submission returns 403. `contribute-repos` lets ML Intern deploy to Spaces, and it can only update the Spaces it created. `read-billing` lists the organizations and resource groups a user can bill to.
+   `jobs` is required: without it, every Job submission returns 403. `contribute-repos` lets ML Intern deploy to Spaces, and it can only update the Spaces it created. `gated-repos` lets ML Intern download gated models and datasets the user has been granted access to. `read-billing` lists the organizations and resource groups a user can bill to.
 
 4. Note the app's client ID and secret.
 
@@ -46,7 +47,7 @@ OPENAI_API_KEY=hf_***
 # Sign in with Hugging Face (Step 1)
 OPENID_CLIENT_ID=<client id>
 OPENID_CLIENT_SECRET=<client secret>
-OPENID_SCOPES="openid profile inference-api read-mcp read-billing contribute-repos jobs"
+OPENID_SCOPES="openid profile inference-api read-mcp read-billing contribute-repos gated-repos jobs"
 # Send the signed-in user's token to the Hugging Face MCP server
 MCP_FORWARD_HF_USER_TOKEN=true
 
@@ -137,6 +138,7 @@ npx vitest run src/lib/server/textGeneration/builtinTools
 
 - **No ML Intern switch.** Check that `ML_ASSISTANT_MODE=true` and `ML_ASSISTANT_MODELS` is set, and restart the dev server. The switch only shows in an empty conversation.
 - **Jobs fail with 403.** The OAuth app or `OPENID_SCOPES` is missing `jobs`. Sign out and back in after adding it, so your token carries the new scope.
+- **Downloads from a gated repo fail with 403 after accepting the gate.** The OAuth app or `OPENID_SCOPES` is missing `gated-repos`. The Hub still serves the repo's metadata and README without it, so it looks like the gate wasn't accepted. Sign out and back in after adding it.
 - **ML Intern can't use Hub tools, or acts anonymously.** Make sure you're signed in and `MCP_FORWARD_HF_USER_TOKEN=true` is set. Also check which tools are enabled in your [Hugging Face MCP settings](https://huggingface.co/settings/mcp).
 - **Every launch is refused.** The conversation's compute budget is still $0. Set it from the status bar.
 - **Sign-in redirects fail.** The OAuth app's redirect URI must match `http://localhost:5173/login/callback` exactly, including the port.

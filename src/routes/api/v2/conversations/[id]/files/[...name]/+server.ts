@@ -1,5 +1,4 @@
 import { error, type RequestHandler } from "@sveltejs/kit";
-import { ObjectId } from "mongodb";
 import { superjsonResponse } from "$lib/server/api/utils/superjsonResponse";
 import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { resolveConversation } from "$lib/server/api/utils/resolveConversation";
@@ -12,11 +11,10 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 	requireAuth(locals);
 
 	const id = params.id ?? "";
-	// a share snapshot has no files of its own, and its reader is not the owner
-	if (id.length === 7) error(404, "Conversation not found");
-
 	const conversation = await resolveConversation(id, locals);
-	const conversationId = new ObjectId(conversation._id);
+	// a share snapshot has no files of its own, and its reader is not the owner
+	if (conversation.kind === "share") error(404, "Conversation not found");
+	const { objectId: conversationId } = conversation;
 	const name = params.name ?? "";
 
 	const version = url.searchParams.get("version");

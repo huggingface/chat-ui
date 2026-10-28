@@ -30,6 +30,8 @@
       title: Getting Started
     - local: ml-intern/local-development
       title: Running Locally
+    - local: ml-intern/slack-bot
+      title: Slack Bot
 - title: Developing
   sections:
     - local: developing/architecture

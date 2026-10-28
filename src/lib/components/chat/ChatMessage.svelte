@@ -31,9 +31,15 @@
 	import ArtifactCard from "./ArtifactCard.svelte";
 	import ElicitationForm from "./ElicitationForm.svelte";
 	import PlanCard from "./PlanCard.svelte";
+	import MlReviewCard from "./MlReviewCard.svelte";
 	import HarnessEventChip from "./HarnessEventChip.svelte";
+	import QueuedInputBubble from "./QueuedInputBubble.svelte";
 	import { isMessageToolResultUpdate, isMessageToolErrorUpdate } from "$lib/utils/messageUpdates";
-	import type { MessageHarnessEventUpdate, MessagePlanUpdate } from "$lib/types/MessageUpdate";
+	import type {
+		MessageHarnessEventUpdate,
+		MessagePlanUpdate,
+		MessageQueuedInputUpdate,
+	} from "$lib/types/MessageUpdate";
 	import { page } from "$app/state";
 	import ImageLightbox from "./ImageLightbox.svelte";
 	import { stripArtifacts } from "$lib/utils/artifacts";
@@ -42,6 +48,7 @@
 		messageBlocks,
 		THINK_BLOCK_REGEX,
 		type ElicitationBlock,
+		type ReviewBlock,
 		type MessageBlock,
 	} from "$lib/utils/messageBlocks";
 	import { rebuildLegacyContent } from "$lib/utils/messageShape";
@@ -160,7 +167,9 @@
 		| { kind: "artifact"; op: ArtifactOperation; opIndex: number }
 		| ({ kind: "elicitation" } & Omit<ElicitationBlock, "type">)
 		| { kind: "plan"; update: MessagePlanUpdate }
+		| ({ kind: "review" } & Omit<ReviewBlock, "type">)
 		| { kind: "harnessEvent"; update: MessageHarnessEventUpdate }
+		| { kind: "queuedInput"; update: MessageQueuedInputUpdate }
 		| { kind: "notice"; text: string };
 
 	// The live turn's park, rendered as a countdown from its ABSOLUTE deadline
@@ -208,9 +217,16 @@
 				// Never folded into the collapsible summary: the plan stays visible.
 				flush();
 				units.push({ kind: "plan", update: block.update });
+			} else if (block.type === "review") {
+				// never folded into the summary, the review waits on the user
+				flush();
+				units.push({ kind: "review", request: block.request, resolved: block.resolved });
 			} else if (block.type === "harnessEvent") {
 				flush();
 				units.push({ kind: "harnessEvent", update: block.update });
+			} else if (block.type === "queuedInput") {
+				flush();
+				units.push({ kind: "queuedInput", update: block.update });
 			} else if (block.type === "notice") {
 				flush();
 				units.push({ kind: "notice", text: block.text });
@@ -248,7 +264,8 @@
 				block.type === "think" ||
 				block.type === "tool" ||
 				block.type === "elicitation" ||
-				block.type === "plan"
+				block.type === "plan" ||
+				block.type === "review"
 		);
 	});
 
@@ -359,6 +376,7 @@
 						{:else if block.type === "elicitation"}
 							<div data-exclude-from-copy class={processBlockClasses}>
 								<ElicitationForm
+									{readOnly}
 									conversationId={page.params.id ?? ""}
 									request={block.request}
 									expiresAt={block.expiresAt}
@@ -369,9 +387,20 @@
 							<div data-exclude-from-copy>
 								<PlanCard update={block.update} />
 							</div>
+						{:else if block.type === "review"}
+							<MlReviewCard
+								request={block.request}
+								resolved={block.resolved}
+								conversationId={page.params.id ?? ""}
+								interactive={isAuthor}
+							/>
 						{:else if block.type === "harnessEvent"}
 							<div data-exclude-from-copy class={processBlockClasses}>
 								<HarnessEventChip update={block.update} />
+							</div>
+						{:else if block.type === "queuedInput"}
+							<div data-exclude-from-copy class={processBlockClasses}>
+								<QueuedInputBubble update={block.update} />
 							</div>
 						{:else if block.type === "notice"}
 							{@render notice(block.text)}
@@ -410,6 +439,7 @@
 						{:else if unit.kind === "elicitation"}
 							<div data-exclude-from-copy class={processBlockClasses}>
 								<ElicitationForm
+									{readOnly}
 									conversationId={page.params.id ?? ""}
 									request={unit.request}
 									expiresAt={unit.expiresAt}
@@ -420,9 +450,20 @@
 							<div data-exclude-from-copy>
 								<PlanCard update={unit.update} />
 							</div>
+						{:else if unit.kind === "review"}
+							<MlReviewCard
+								request={unit.request}
+								resolved={unit.resolved}
+								conversationId={page.params.id ?? ""}
+								interactive={isAuthor}
+							/>
 						{:else if unit.kind === "harnessEvent"}
 							<div data-exclude-from-copy class={processBlockClasses}>
 								<HarnessEventChip update={unit.update} />
+							</div>
+						{:else if unit.kind === "queuedInput"}
+							<div data-exclude-from-copy class={processBlockClasses}>
+								<QueuedInputBubble update={unit.update} />
 							</div>
 						{:else if unit.kind === "notice"}
 							{@render notice(unit.text)}
@@ -518,16 +559,18 @@
 						value={contentWithoutThink}
 						iconClassNames="text-xs"
 					/>
-					<button
-						class="btn rounded-xs p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
-						title="Retry"
-						type="button"
-						onclick={() => {
-							onretry?.({ id: message.id });
-						}}
-					>
-						<CarbonRotate360 />
-					</button>
+					{#if !readOnly}
+						<button
+							class="btn rounded-xs p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+							title="Retry"
+							type="button"
+							onclick={() => {
+								onretry?.({ id: message.id });
+							}}
+						>
+							<CarbonRotate360 />
+						</button>
+					{/if}
 					{#if alternatives.length > 1 && editMsdgId === null}
 						<Alternatives
 							{message}
@@ -644,20 +687,22 @@
 					/>
 				{/if}
 				{#if (alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode)}
-					<button
-						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:bg-gray-100 hover:text-gray-500 lg:-right-2 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300 {isTapped
-							? '[@media(hover:none)]:flex'
-							: ''}"
-						title="Edit"
-						type="button"
-						onclick={() => {
-							if (requireAuthUser()) return;
-							editMsdgId = message.id;
-						}}
-					>
-						<CarbonPen />
-						Edit
-					</button>
+					{#if !readOnly}
+						<button
+							class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:bg-gray-100 hover:text-gray-500 lg:-right-2 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300 {isTapped
+								? '[@media(hover:none)]:flex'
+								: ''}"
+							title="Edit"
+							type="button"
+							onclick={() => {
+								if (requireAuthUser()) return;
+								editMsdgId = message.id;
+							}}
+						>
+							<CarbonPen />
+							Edit
+						</button>
+					{/if}
 					<button
 						class="hidden h-5 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs group-hover:flex hover:flex hover:bg-gray-100 lg:-right-2 dark:hover:bg-gray-800 {isTapped
 							? '[@media(hover:none)]:flex'
