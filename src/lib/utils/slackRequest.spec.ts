@@ -4,7 +4,7 @@ import { splitSlackRequest } from "./slackRequest";
 
 const prompt = (text: string, ts = "101.0") =>
 	threadPrompt(
-		[{ user: "U2", ts: "100.0", text: "Use the 4x model we discussed" }],
+		[{ user: "U1", ts: "100.0", text: "Use the 4x model we discussed" }],
 		{ user: "U1", ts, text },
 		"UBOT"
 	);
