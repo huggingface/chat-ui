@@ -9,7 +9,15 @@ export interface ActionCall {
 }
 
 /** the next round after the cut: its calls, or the turn ending in text */
-export type Action = { kind: "calls"; calls: ActionCall[] } | { kind: "final"; text: string };
+export type Action =
+	| {
+			kind: "calls";
+			calls: ActionCall[];
+			/** what the model thought and said before the calls, for a reviewer, never scored */
+			reasoning?: string;
+			preamble?: string;
+	  }
+	| { kind: "final"; text: string };
 
 export interface DecisionCase {
 	/** `<family>/<conversationId>/<messageId>/r<round>` */

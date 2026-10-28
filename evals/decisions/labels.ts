@@ -23,6 +23,34 @@ export function label(
 	}
 }
 
+const SHARED = { "ended-turn": null, "asked-user": null, other: null };
+
+/** every label a family can give and its verdict, for a reviewer correcting one by hand */
+export const LABELS: Record<Family, Record<string, boolean | null>> = {
+	"first-gpu-job": {
+		"gpu-smoke-job": true,
+		"gpu-sandbox": true,
+		"gpu-full-job": false,
+		"cpu-sandbox": null,
+		...SHARED,
+	},
+	"after-oom": {
+		"fix-memory": true,
+		"fix-and-upsize": true,
+		"upsize-only": false,
+		resubmit: false,
+		investigate: null,
+		...SHARED,
+	},
+	"after-stale-api": {
+		lookup: true,
+		"blind-fix": false,
+		"blind-fix-and-resubmit": false,
+		resubmit: false,
+		...SHARED,
+	},
+};
+
 function labelFirstGpuJob(calls: ActionCall[]): { label: string; pass: boolean | null } {
 	const job = calls.find((c) => isJobSubmit(c) && isGpu(jobFlavor(c)));
 	if (job) {

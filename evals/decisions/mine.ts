@@ -146,8 +146,15 @@ function findDecisions(
 	const rounds = toolRounds(updates);
 	const decisions: Decision[] = [];
 	const actionAt = (round: number): Action | undefined => {
-		if (round < rounds.length)
-			return { kind: "calls", calls: rounds[round].calls.map(toActionCall) };
+		if (round < rounds.length) {
+			const first = rounds[round].calls[0];
+			return {
+				kind: "calls",
+				calls: rounds[round].calls.map(toActionCall),
+				reasoning: first.reasoning,
+				preamble: first.content,
+			};
+		}
 		const text = message.content.trim();
 		return text && !message.interrupted ? { kind: "final", text } : undefined;
 	};
@@ -272,7 +279,7 @@ function casesFor(conversation: ExportedConversation, exportFile: string): Decis
 					action:
 						decision.action.kind === "calls"
 							? {
-									kind: "calls",
+									...decision.action,
 									calls: decision.action.calls.map((c) => ({
 										name: c.name,
 										args: truncateArgs(c.args) as Record<string, unknown>,

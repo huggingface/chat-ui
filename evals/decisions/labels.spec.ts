@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { gpuMemoryGb, label } from "./labels";
+import { gpuMemoryGb, label as rawLabel, LABELS } from "./labels";
 import type { ActionCall } from "./types";
+
+/** every verdict a test sees must match the table a reviewer corrects from */
+const label: typeof rawLabel = (family, action, context) => {
+	const result = rawLabel(family, action, context);
+	expect(LABELS[family][result.label]).toBe(result.pass);
+	return result;
+};
 
 const job = (args: Record<string, unknown>): ActionCall => ({
 	name: "hf_jobs",
