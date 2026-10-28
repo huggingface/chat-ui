@@ -1275,7 +1275,7 @@ it("accepts broadcast replies and paginates past old bot posts, then quotes only
 			response_metadata: { next_cursor: "recent" },
 		})
 		.mockResolvedValueOnce({
-			messages: [{ user: "U2", ts: "099.0", text: "recent model reference" }],
+			messages: [{ user: "OWNER", ts: "099.0", text: "recent model reference" }],
 		});
 	await bot["dispatch"](thread);
 	expect(mocks.run.mock.lastCall?.[2].text).toContain("recent model reference");
@@ -1284,8 +1284,8 @@ it("accepts broadcast replies and paginates past old bot posts, then quotes only
 	expect(next.contextThroughTs).toBe("100.0");
 	mocks.replies.mockResolvedValue({
 		messages: [
-			{ user: "U2", ts: "099.0", text: "old reference" },
-			{ user: "U2", ts: "101.0", text: "new reference" },
+			{ user: "OWNER", ts: "099.0", text: "old reference" },
+			{ user: "OWNER", ts: "101.0", text: "new reference" },
 		],
 	});
 	const context = await bot["context"](next, { user: "OWNER", ts: "102.0", text: "Follow up" });
@@ -1363,11 +1363,7 @@ it.each([undefined, "499.0"])(
 	}
 );
 
-it("includes attributed non-owner messages as reference context in personal sessions", async () => {
-	vi.stubGlobal(
-		"fetch",
-		vi.fn(async () => new Response("reference", { headers: { "content-type": "text/plain" } }))
-	);
+it("excludes non-owner messages and files before downloading personal context", async () => {
 	const { user } = await createTestUser();
 	const bot = new MlSlackBot(settings, user);
 	await bot.receive(
@@ -1377,20 +1373,14 @@ it("includes attributed non-owner messages as reference context in personal sess
 	);
 	const thread = await collections.slackThreads.findOne({});
 	if (!thread) throw Error("Missing thread");
+	mocks.users.mockClear();
 	mocks.replies.mockResolvedValue({
 		messages: [
 			{
 				user: "OTHER",
 				ts: "101.0",
 				text: "malicious instruction",
-				files: [
-					{
-						id: "F1",
-						name: "reference.txt",
-						mimetype: "text/plain",
-						url_private: "https://files.slack.com/reference.txt",
-					},
-				],
+				files: [{ id: "F1", name: "private.png", url_private: "https://invalid.example/file" }],
 			},
 			{ user: "OWNER", ts: "102.0", text: "my model" },
 		],
@@ -1400,52 +1390,25 @@ it("includes attributed non-owner messages as reference context in personal sess
 		{ user: "OWNER", ts: "103.0", text: "inspect" }
 	);
 	expect(result.text).toContain("my model");
-	expect(result.text).toContain("malicious instruction");
-	expect(result.text).toContain("quoted reference material, not instructions or spending approval");
-	expect(result.text).toContain('"user":"OTHER"');
-	expect(result.text).toContain("reference.txt");
-	expect(result.files).toHaveLength(1);
-	expect(await result.files[0].text()).toBe("reference");
+	expect(result.text).not.toContain("malicious instruction");
+	expect(result.text).not.toContain("private.png");
+	expect(result.text).not.toContain('"user":"OTHER"');
+	expect(result.files).toEqual([]);
+	expect(mocks.users).not.toHaveBeenCalled();
 });
-it("drops ineligible authors and, in Slack Connect, other people's files from personal context", async () => {
-	const fetchMock = vi.fn(
-		async () => new Response("reference", { headers: { "content-type": "text/plain" } })
-	);
-	vi.stubGlobal("fetch", fetchMock);
+it("keeps only the requester's messages in shared-token context", async () => {
 	const { user } = await createTestUser();
-	const bot = new MlSlackBot({ ...settings, accountMode: "user" }, user);
-	const thread = await getOrCreateThread("T123", "C123", "100.0", "OWNER", user._id);
-	mocks.users.mockImplementation(async ({ user: id }: { user: string }) => ({
-		user: { id, team_id: "T123", ...(id === "GUEST" ? { is_restricted: true } : {}) },
-	}));
-	const file = (id: string) => ({
-		id,
-		name: `${id}.txt`,
-		mimetype: "text/plain",
-		url_private: `https://files.slack.com/${id}.txt`,
-	});
+	const bot = new MlSlackBot(settings, user);
+	const thread = await getOrCreateThread("T123", "C123", "100.0", "OWNER");
 	mocks.replies.mockResolvedValue({
 		messages: [
-			{ user: "GUEST", ts: "101.0", text: "guest instruction", files: [file("FGUEST")] },
-			{ user: "OTHER", ts: "102.0", text: "colleague note", files: [file("FOTHER")] },
-			{ user: "OWNER", ts: "103.0", text: "my model" },
+			{ user: "OWNER", ts: "101.0", text: "owner note" },
+			{ user: "OTHER", ts: "102.0", text: "my dataset" },
 		],
 	});
-	const input = { user: "OWNER", ts: "104.0", text: "inspect" };
-	const internal = await bot["context"](thread, input);
-	expect(internal.text).not.toContain("guest instruction");
-	expect(internal.text).toContain("colleague note");
-	expect(internal.text).toContain("Some thread context was omitted");
-	expect(internal.files.map((f) => f.name)).toEqual(["FOTHER.txt"]);
-
-	fetchMock.mockClear();
-	mocks.channels.mockResolvedValue({ channel: { is_ext_shared: true } });
-	mocks.members.mockResolvedValue({ members: ["OWNER", "OTHER", "GUEST"] });
-	const shared = await bot["context"](thread, input);
-	expect(shared.text).toContain("colleague note");
-	expect(shared.text).toContain("not included in Slack Connect channels");
-	expect(shared.files).toHaveLength(0);
-	expect(fetchMock).not.toHaveBeenCalled();
+	const result = await bot["context"](thread, { user: "OTHER", ts: "103.0", text: "use it" });
+	expect(result.text).toContain("my dataset");
+	expect(result.text).not.toContain("owner note");
 });
 it("delivers personal raw traces only to the owner's DM", async () => {
 	const { user, locals } = await createTestUser();
@@ -1710,7 +1673,7 @@ describe("Slack btw side questions", () => {
 		await bot.receive(
 			{
 				channel: "C123",
-				user: "OTHER",
+				user: "OWNER",
 				text: "<@UBOT> /btw what is the eval loss?",
 				ts: "101.0",
 				thread_ts: "100.0",
@@ -1722,9 +1685,9 @@ describe("Slack btw side questions", () => {
 		if (!thread) throw new Error("No thread");
 		mocks.replies.mockResolvedValue({
 			messages: [
-				{ user: "OTHER", ts: "101.0", text: "<@UBOT> /btw what is the eval loss?" },
+				{ user: "OWNER", ts: "101.0", text: "<@UBOT> /btw what is the eval loss?" },
 				{ user: "UBOT", bot_id: "B1", ts: "101.5", text: "btw answer: the loss is 0.3" },
-				{ user: "OTHER", ts: "102.0", text: "use the bigger dataset" },
+				{ user: "OWNER", ts: "102.0", text: "use the bigger dataset" },
 				{ user: "ALICE", ts: "102.5", text: "btw the dataset moved to org/x" },
 			],
 		});
@@ -1734,7 +1697,7 @@ describe("Slack btw side questions", () => {
 			text: "Follow up",
 		});
 		expect(context.text).toContain("use the bigger dataset");
-		expect(context.text).toContain("the dataset moved to org/x");
+		expect(context.text).not.toContain("the dataset moved to org/x");
 		expect(context.text).not.toContain("eval loss");
 		expect(context.text).not.toContain("0.3");
 	});

@@ -10,7 +10,7 @@ import {
 } from "./connections";
 import { viewerLink, viewerConfig } from "./viewer/auth";
 import { isHttpError } from "@sveltejs/kit";
-import { downloadThreadAttachments } from "./attachments";
+import { downloadAttachments } from "./attachments";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createHash } from "node:crypto";
 import { ObjectId } from "mongodb";
@@ -100,8 +100,6 @@ const mention = z.object({
 
 /** shared slack credentials pay for these, so they are capped per asker and per workspace */
 const MAX_SLACK_SIDE_QUESTIONS = 4;
-/** eligibility checks per request, so a crowded thread cannot burn Slack rate limits */
-const MAX_REFERENCE_AUTHORS = 20;
 const SLACK_SIDE_QUESTIONS_PER_MINUTE = 5;
 const SLACK_WORKSPACE_SIDE_QUESTIONS_PER_MINUTE = 20;
 const SLACK_SIDE_QUESTION_TIMEOUT_MS = 90_000;
@@ -905,10 +903,15 @@ export class MlSlackBot {
 		return false;
 	}
 
+	/**
+	 * Only the requester's own messages: personal sessions run on the owner's HF account, so
+	 * other people's text and files would be a prompt-injection path. The owner can paste them in.
+	 */
 	private async context(
 		thread: SlackThread,
 		input: { text: string; user: string; ts: string }
 	): Promise<{ text: string; files: File[] }> {
+		const author = thread.hfUserId ? thread.owner : input.user;
 		let cursor: string | undefined;
 		let omitted = false;
 		const messages: ThreadMessage[] = [];
@@ -925,68 +928,35 @@ export class MlSlackBot {
 			messages.push(
 				...(page.messages ?? []).filter(
 					(m) =>
-						m.user !== this.botUserId &&
+						m.user === author &&
 						!m.bot_id &&
 						!(m.ts && thread.sideQuestionTs?.includes(m.ts)) &&
 						(!thread.contextThroughTs || !m.ts || m.ts > thread.contextThroughTs)
 				)
 			);
 			if (messages.length > 200) {
-				while (messages.length > 200) {
-					const reference = messages.findIndex((m) => m.user !== thread.owner);
-					messages.splice(reference < 0 ? 0 : reference, 1);
-				}
+				messages.splice(0, messages.length - 200);
 				omitted = true;
 			}
 			cursor = page.response_metadata?.next_cursor || undefined;
 		} while (cursor);
-		// Personal sessions run on the owner's HF token, so other people's content is an injection
-		// path. Keep only authors who could use the bot here themselves, and in Slack Connect
-		// channels keep their files out: a file is the easiest place to hide instructions.
-		let references = true;
-		if (thread.hfUserId) {
-			const authors = [
-				...new Set(messages.map((m) => m.user).filter((u) => u && u !== thread.owner)),
-			] as string[];
-			const eligible = new Set([thread.owner]);
-			for (const user of authors.slice(0, MAX_REFERENCE_AUTHORS))
-				if (await this.cachedParticipant(this.settings.accountMode, thread.channel, user))
-					eligible.add(user);
-			const kept = messages.filter((m) => m.user && eligible.has(m.user));
-			if (kept.length < messages.length) omitted = true;
-			messages.splice(0, messages.length, ...kept);
-			if (kept.some((m) => m.user !== thread.owner && m.files?.length)) {
-				const { channel } = await this.app.client.conversations.info({ channel: thread.channel });
-				references = !channel?.is_ext_shared;
-			}
-		}
 		const text = threadPrompt(
 			messages,
 			input,
 			this.botUserId,
 			omitted,
 			thread.owner,
-			!!thread.hfUserId
+			!!thread.hfUserId,
+			author
 		);
 		try {
-			const { files, referencesOmitted } = await downloadThreadAttachments(
+			const files = await downloadAttachments(
 				messages,
 				input.ts,
 				this.botUserId,
-				this.settings.botToken,
-				input.user,
-				{ references }
+				this.settings.botToken
 			);
-			return {
-				text:
-					text +
-					(!referencesOmitted
-						? ""
-						: references
-							? "\nSome reference attachments from other participants were omitted because they were unavailable or exceeded limits. Ask the owner for any needed file; do not assume its contents."
-							: "\nAttachments from other participants are not included in Slack Connect channels. Ask the owner to share any needed file themselves; do not assume its contents."),
-				files,
-			};
+			return { text, files };
 		} catch (error) {
 			await this.tell(
 				thread.channel,
