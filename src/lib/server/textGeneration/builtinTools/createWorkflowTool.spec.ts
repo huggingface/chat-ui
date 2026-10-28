@@ -18,7 +18,10 @@ const tool = (namespace: string | undefined = "pngwn") =>
 	);
 
 /** Hub model records, keyed by id; anything absent 404s. */
-let models: Record<string, { pipeline_tag?: string; providers?: string[]; providerTask?: string }>;
+let models: Record<
+	string,
+	{ pipeline_tag?: string; providers?: string[]; names?: string[]; providerTask?: string }
+>;
 
 const t2i = { pipeline_tag: "text-to-image", providers: ["live"] };
 const compare = {
@@ -44,7 +47,7 @@ beforeEach(() => {
 			if (!model) return new Response("", { status: 404 });
 			const inferenceProviderMapping = Object.fromEntries(
 				(model.providers ?? []).map((status, i) => [
-					`p${i}`,
+					model.names?.[i] ?? `p${i}`,
 					{ status, task: model.providerTask ?? model.pipeline_tag },
 				])
 			);
@@ -248,13 +251,27 @@ describe("create_workflow", () => {
 		expect(result.error).toContain("not served by any inference provider for text-to-image");
 	});
 
-	it("warns when one provider is all that serves a model", async () => {
-		models["black-forest-labs/FLUX.1-dev"] = { ...t2i, providers: ["live", "live"] };
-		const result = await tool().execute(compare, ctx);
+	it("pins each model to a provider that serves it", async () => {
+		models["black-forest-labs/FLUX.1-dev"] = {
+			pipeline_tag: "text-to-image",
+			providers: ["error", "live"],
+		};
+		await tool().execute(compare, ctx);
 
-		if (!("resultText" in result)) throw new Error(JSON.stringify(result));
-		expect(result.resultText).toContain("Only one provider serves krea/Krea-2-Turbo (p0).");
-		expect(result.resultText).not.toContain("FLUX.1-dev (");
+		const graph = JSON.parse(await uploaded("workflow.json"));
+		expect(graph.operators.map((op: { provider: string }) => op.provider)).toEqual(["p0", "p1"]);
+	});
+
+	it("prefers hf-inference when it serves the model", async () => {
+		models["krea/Krea-2-Turbo"] = {
+			...t2i,
+			providers: ["live", "live"],
+			names: ["together", "hf-inference"],
+		};
+		await tool().execute(compare, ctx);
+
+		const graph = JSON.parse(await uploaded("workflow.json"));
+		expect(graph.operators[0].provider).toBe("hf-inference");
 	});
 
 	it("asks for a different name, not more permissions, on a 403", async () => {

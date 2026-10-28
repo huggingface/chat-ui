@@ -105,16 +105,13 @@ export function createWorkflowTool(
 			);
 			const problem = checks.find((check) => typeof check === "string");
 			if (problem) return { error: problem };
-			// The router only uses providers the runner has enabled, which this
-			// tool can't see, so a model with a single provider can still fail.
-			const narrow = plan.steps.flatMap(({ model }, i) => {
-				const providers = checks[i];
-				return Array.isArray(providers) && providers.length === 1
-					? [`${model} (${providers[0]})`]
-					: [];
-			});
 
-			const graph = workflowJson(plan);
+			// Pinned, because "auto" only routes to providers the runner has enabled,
+			// and a model served by one they haven't fails on Run.
+			const graph = workflowJson(
+				plan,
+				checks.map((providers) => providers[0])
+			);
 			const files = [
 				{ path: "app.py", content: new Blob([APP_PY], { type: "text/x-python" }) },
 				{ path: "workflow.json", content: new Blob([graph], { type: "application/json" }) },
@@ -176,14 +173,6 @@ export function createWorkflowTool(
 					"It builds in a minute or two — tell the user it is building, not that it is live.",
 					"Every run bills the inference quota of whoever presses Run — signed in through the",
 					"Space — not this conversation's budget.",
-					...(narrow.length
-						? [
-								"",
-								`Only one provider serves ${narrow.join(", ")}. Whoever presses Run needs it`,
-								"enabled in their Hugging Face inference provider settings, or that step fails —",
-								"tell the user, or offer a model more providers serve.",
-							]
-						: []),
 				].join("\n"),
 			};
 		},
@@ -304,7 +293,9 @@ async function checkModel(
 	const tasks = providerTasks(PIPELINE_TAG_TO_ENDPOINT[task]);
 	const providers = Object.entries(info.inferenceProviderMapping ?? {})
 		.filter(([, p]) => p.status === "live" && tasks.includes(p.task ?? ""))
-		.map(([name]) => name);
+		.map(([name]) => name)
+		// HF's own provider first when it serves the model; otherwise the Hub's order.
+		.sort((a, b) => Number(b === "hf-inference") - Number(a === "hf-inference"));
 	if (!providers.length) {
 		return (
 			`${model} is not served by any inference provider for ${tasks.join(" or ")}, so a ` +
@@ -457,7 +448,7 @@ function tile(id: string, label: string, role: "reference" | "subject", type: st
  * subject. Node ids are readable and stable (op_flux_1_dev), since they are what
  * a user points at on the canvas. No coordinates: the canvas lays it out.
  */
-function workflowJson({ shape, steps, title }: Plan): string {
+function workflowJson({ shape, steps, title }: Plan, providers: string[]): string {
 	const names = steps.map((step) => step.model.split("/")[1]);
 	const labels = new Set(names).size === names.length ? names : steps.map((step) => step.model);
 	const taken = new Set<string>();
@@ -480,6 +471,7 @@ function workflowJson({ shape, steps, title }: Plan): string {
 			model_id: model,
 			pipeline_tag: task,
 			endpoint: PIPELINE_TAG_TO_ENDPOINT[task],
+			provider: providers[i],
 			inputs: endpoint.inputs.map((port) => ({ ...port })),
 			outputs: endpoint.outputs.map((port) => ({ ...port })),
 			data: {},
