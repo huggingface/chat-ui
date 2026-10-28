@@ -17,13 +17,13 @@ import {
 } from "$lib/server/mlRegistry/enabled";
 import { mlStateBlockEnabled } from "$lib/server/mlRegistry/stateBlock";
 import { getEnabledBuiltinTools } from "$lib/server/textGeneration/builtinTools";
-import { resolvePreprompt } from "$lib/server/textGeneration/preprompt";
+import { resolvePreprompt, resolveTurnContext } from "$lib/server/textGeneration/preprompt";
 import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWindowFlag";
 import { attachmentBudgetEnabled } from "$lib/server/textGeneration/utils/attachmentBudgetFlag";
 
 type HarnessConversation = Pick<Conversation, "_id" | "plan" | "mlAssistant">;
 
-// fixed so the clock, user and budget in the session line never move the hash
+// fixed so the clock, user and budget in the session and turn context never move the hash
 const FIXED_CONTEXT = { timezone: "UTC", now: new Date(0) };
 
 /** all model facing text the harness owns, under the current switches */
@@ -39,6 +39,7 @@ function mlAssistantPromptText(conv: HarnessConversation): string {
 			attachmentBudget,
 			...FIXED_CONTEXT,
 		}),
+		resolveTurnContext({ mlAssistant: true, ...FIXED_CONTEXT }),
 		...Object.values(ML_ASSISTANT_TOOL_DOCTRINE),
 		...mlAssistantToolDoctrineBlocks(ML_ASSISTANT_DOCTRINE_TOOLS, {
 			serviceEvents: mlServiceEventsEnabled(),

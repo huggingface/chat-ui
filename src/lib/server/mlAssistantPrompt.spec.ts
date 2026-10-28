@@ -611,7 +611,7 @@ describe("ML Assistant turn context", () => {
 
 	it("stamps the time in the user's zone", () => {
 		expect(mlAssistantTurnContext({ timezone: "Europe/Berlin", now })).toBe(
-			"[Session context: Time=11:07]"
+			"[Turn context: Time=11:07]"
 		);
 		expect(mlAssistantTurnContext({ timezone: "Not/AZone", now })).toContain("Time=");
 	});
@@ -623,7 +623,7 @@ describe("ML Assistant turn context", () => {
 				now,
 				budget: { remaining: "$7.80", total: "$10.00" },
 			})
-		).toBe("[Session context: Time=09:07, Budget=$7.80 remaining of $10.00]");
+		).toBe("[Turn context: Time=09:07, Budget=$7.80 remaining of $10.00]");
 	});
 });
 

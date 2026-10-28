@@ -1245,7 +1245,7 @@ describe.sequential("the prompt prefix a provider caches", () => {
 		expect(turnTwo[0]).toEqual(turnOneLast[0]);
 		expect(String(turnTwo[0].content)).not.toMatch(/Time=|Budget=/);
 		expect(String(turnTwo.at(-1)?.content)).toMatch(
-			/^And tomorrow\?\n\n\[Session context: Time=\d\d:37, Budget=\$0\.00 remaining of \$0\.00\]/
+			/^And tomorrow\?\n\n\[Turn context: Time=\d\d:37, Budget=\$0\.00 remaining of \$0\.00\]/
 		);
 		// the previous user message is replayed as written, so the prefix runs up to it
 		expect(sharedPrefix(turnOneLast, turnTwo)).toBe(
@@ -1290,7 +1290,7 @@ describe.sequential("a job that ends while the turn is busy", () => {
 	function withoutTurnContext(messages: ChatMessage[]): ChatMessage[] {
 		return messages.map((m) =>
 			m.role === "user" && typeof m.content === "string"
-				? { ...m, content: m.content.replace(/\n\n\[Session context: Time=[^\]]*\]$/, "") }
+				? { ...m, content: m.content.replace(/\n\n\[Turn context: Time=[^\]]*\]$/, "") }
 				: m
 		);
 	}

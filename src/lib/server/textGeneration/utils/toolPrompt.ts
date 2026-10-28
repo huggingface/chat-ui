@@ -53,7 +53,13 @@ export function buildToolPreprompt(
 		timezone = undefined;
 		currentDate = now.toLocaleDateString("en-US", { ...dateOptions, timeZone: undefined });
 	}
-	const isoDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+	// the user's day like currentDate, not the server's, or the two disagree around midnight
+	const isoDate = now.toLocaleDateString("en-CA", {
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		...(timezone ? { timeZone: timezone } : {}),
+	});
 	const locationLine = timezone ? ` User's timezone: ${timezone}.` : "";
 	// Only builtins actually on offer this turn contribute guidance.
 	const offered = (builtins ?? []).filter((builtin) => names.includes(builtin.name));
@@ -82,7 +88,7 @@ export function buildToolPreprompt(
 		...(mlAssistant
 			? [ML_ASSISTANT_TOOL_DOCTRINE.grounding, ML_ASSISTANT_TOOL_DOCTRINE.largeResults]
 			: [
-					`SEARCH: Use 3-6 precise keywords. For historical events, include the year the event occurred. For recent or current topics, use today's year (${now.getFullYear()}). When a tool accepts date-range parameters (e.g., startPublishedDate, endPublishedDate), always use today's date (${isoDate}) as the end date unless the user specifies otherwise. For multi-part questions, search each part separately. If the results only partially cover the question, run a follow-up search or crawl the most relevant result URL instead of answering from memory.`,
+					`SEARCH: Use 3-6 precise keywords. For historical events, include the year the event occurred. For recent or current topics, use today's year (${isoDate.slice(0, 4)}). When a tool accepts date-range parameters (e.g., startPublishedDate, endPublishedDate), always use today's date (${isoDate}) as the end date unless the user specifies otherwise. For multi-part questions, search each part separately. If the results only partially cover the question, run a follow-up search or crawl the most relevant result URL instead of answering from memory.`,
 					`GROUNDING: When you answer from tool results, the results are your only source of facts. Do not supplement them with specifics from your own knowledge — details not present in the results are likely wrong, even when they sound plausible. If a fact is missing, search again or say you could not verify it. Attribute key facts to their sources with markdown links to the result URLs. If results conflict, say so. Never fabricate URLs, citations, or facts.`,
 					`INTERACTIVE APPS: When asked to build an interactive application, game, or visualization without a specific language/framework preference, create a single self-contained HTML file with embedded CSS and JavaScript.`,
 				]),

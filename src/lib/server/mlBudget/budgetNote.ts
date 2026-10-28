@@ -3,7 +3,7 @@ import type { MlBudget } from "$lib/types/Conversation";
 import { formatMicroUsd, remainingMicroUsd } from "$lib/utils/mlBudget";
 
 /**
- * The session context states the budget once, when the turn starts. The
+ * The turn context states the budget once, when the turn starts. The
  * user can change the total from the strip while the turn runs, and nothing
  * else would tell the model: it would go on asking for a grant it already has.
  * Only the total is watched — spend and holds move with the model's own
@@ -14,7 +14,7 @@ export function budgetChangeNote(seenTotalMicroUsd: number, budget: MlBudget | u
 	if (effective.totalMicroUsd === seenTotalMicroUsd) return undefined;
 	return `The user changed the session compute budget during this turn: it is now ${formatMicroUsd(
 		remainingMicroUsd(effective)
-	)} remaining of ${formatMicroUsd(effective.totalMicroUsd)}. This supersedes the Budget in the session context.`;
+	)} remaining of ${formatMicroUsd(effective.totalMicroUsd)}. This supersedes the Budget in the turn context.`;
 }
 
 /**

@@ -290,7 +290,7 @@ export function mlAssistantTurnContext({
 	budget?: { remaining: string; total: string };
 }): string {
 	const { time } = sessionClock(now, timezone);
-	return `[Session context: Time=${time}${
+	return `[Turn context: Time=${time}${
 		budget ? `, Budget=${budget.remaining} remaining of ${budget.total}` : ""
 	}]`;
 }
@@ -303,9 +303,9 @@ export function mlAssistantTurnContext({
  */
 export const ML_ASSISTANT_BUDGET_RULES = `# Session budget
 
-This session has a hard compute budget, enforced by the server and shown as Budget in the session context at the end of the user's latest message. It covers hf_jobs submissions and sandboxes.
+This session has a hard compute budget, enforced by the server and shown as Budget in the turn context at the end of the user's latest message. It covers hf_jobs submissions and sandboxes.
 
-The budget is granted by the user, never assumed. A session starts at $0.00 unless they granted one, and an autonomous stretch of work is not authorization to spend — the number in the session context is the whole grant. When the budget is $0.00 and a run is on the table, ask for a grant before sizing anything further.
+The budget is granted by the user, never assumed. A session starts at $0.00 unless they granted one, and an autonomous stretch of work is not authorization to spend — the number in the turn context is the whole grant. When the budget is $0.00 and a run is on the table, ask for a grant before sizing anything further.
 
 How enforcement works — the same arithmetic to do yourself before proposing a run:
 

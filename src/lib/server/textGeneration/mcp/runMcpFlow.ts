@@ -1203,56 +1203,15 @@ export async function* runMcpFlow({
 			}
 
 			if (!discardedTruncatedToolCalls && Object.keys(toolCallState).length > 0) {
-				// If any streamed call is missing id, perform a quick non-stream retry to recover full tool_calls with ids
-				const missingId = Object.values(toolCallState).some((c) => c?.name && !c?.id);
-				let calls: NormalizedToolCall[];
-				if (missingId) {
-					logger.debug(
-						{ loop },
-						"[mcp] missing tool_call id in stream; retrying non-stream to recover ids"
-					);
-					// Same absorption as the streaming call above: this recovery
-					// request is mid-round, where a surfaced failure costs the whole turn.
-					const nonStream = await withUpstreamRetry(
-						() =>
-							openai.chat.completions.create(
-								{ ...completionBase, messages: requestMessages, stream: false },
-								{
-									signal: abortSignal,
-									headers: {
-										"ChatUI-Conversation-ID": conv._id.toString(),
-										"X-use-cache": "false",
-										...(config.USE_USER_TOKEN === "true" && locals?.token
-											? { Authorization: `Bearer ${locals.token}` }
-											: {}),
-									},
-								}
-							),
-						{
-							signal: abortSignal,
-							onBackoff: (attempt, delayMs, err) =>
-								logger.warn(
-									{ loop, attempt, delayMs, err: String(err) },
-									"[mcp] upstream failure on id recovery; backing off in-loop"
-								),
-						}
-					);
-					const tc = nonStream.choices?.[0]?.message?.tool_calls ?? [];
-					calls = tc.map((t) => ({
-						id: t.id,
-						name: t.function?.name ?? "",
-						arguments: t.function?.arguments ?? "",
-					}));
-				} else {
-					calls = Object.values(toolCallState)
-						.map((c) => (c?.id && c?.name ? c : undefined))
-						.filter(Boolean)
-						.map((c) => ({
-							id: c?.id ?? "",
-							name: c?.name ?? "",
-							arguments: c?.arguments ?? "",
-						})) as NormalizedToolCall[];
-				}
+				// No recovery request for a call streamed without an id: the id the
+				// provider sees is derived below, its own is only kept as originalId.
+				let calls = Object.values(toolCallState)
+					.filter((c) => c?.name)
+					.map((c) => ({
+						id: c?.id ?? "",
+						name: c?.name ?? "",
+						arguments: c?.arguments ?? "",
+					})) as NormalizedToolCall[];
 
 				if (rewriteArgs) {
 					calls = withRewrittenArguments(calls, {
