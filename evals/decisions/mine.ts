@@ -23,6 +23,7 @@ import {
 import { ToolResultStatus } from "$lib/types/Tool";
 import { toolRounds } from "$lib/utils/messageShape";
 import { isGpu, isJobSubmit, jobFlavor, label } from "./labels";
+import { redact } from "./redact";
 import type { Action, ActionCall, DecisionCase, Family } from "./types";
 
 const FAMILIES: Family[] = ["first-gpu-job", "after-oom", "after-stale-api"];
@@ -43,9 +44,6 @@ const SIGNALS: Array<{ family: Family; pattern: RegExp }> = [
 			/[^\n]*(?:TypeError: [^\n]*unexpected keyword argument|ImportError: cannot import name|AttributeError: module '[^']+' has no attribute|AttributeError: '\w*(?:Config|Arguments|Trainer)' object has no attribute)[^\n]*/,
 	},
 ];
-
-const SECRETS =
-	/\b(?:hf_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})\b/g;
 
 interface ExportedConversation {
 	_id: { $oid: string };
@@ -323,10 +321,7 @@ async function main() {
 			if (!conversation.mlAssistant) continue;
 			scanned += 1;
 			for (const c of casesFor(conversation, names[index])) {
-				appendFileSync(
-					join(out, `${c.family}.jsonl`),
-					`${JSON.stringify(c).replace(SECRETS, "[REDACTED]")}\n`
-				);
+				appendFileSync(join(out, `${c.family}.jsonl`), `${redact(JSON.stringify(c))}\n`);
 				kept.push({
 					family: c.family,
 					conversationId: c.source.conversationId,
