@@ -18,6 +18,8 @@
 	import TrackioViewChip from "./TrackioViewChip.svelte";
 	import { segmentViewText, viewsInText } from "$lib/utils/trackioView";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
+	import { toolCallDraft } from "$lib/stores/toolCallDraft";
+	import { formatBytes } from "$lib/utils/mlRegistry";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
@@ -40,6 +42,7 @@
 		MessageHarnessEventUpdate,
 		MessagePlanUpdate,
 		MessageQueuedInputUpdate,
+		ToolCallDraft,
 	} from "$lib/types/MessageUpdate";
 	import { page } from "$app/state";
 	import ImageLightbox from "./ImageLightbox.svelte";
@@ -186,6 +189,8 @@
 
 	let blocks = $derived(messageBlocks(message));
 
+	let liveDraft = $derived(isLast && loading ? $toolCallDraft : null);
+
 	// a notice can arrive before the first token, so it must not hide the spinner
 	let awaitingFirstBlock = $derived(blocks.every((block) => block.type === "notice"));
 
@@ -323,6 +328,19 @@
 	});
 </script>
 
+{#snippet draftRow(draft: ToolCallDraft)}
+	<!-- Arguments of a large call can stream for minutes before the call itself appears. -->
+	<div
+		data-exclude-from-copy
+		class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 [.prose+&]:mt-2"
+	>
+		<IconLoading classNames="h-4!" />
+		<span>
+			Writing {draft.name ? `${draft.name} call` : "tool call"} · {formatBytes(draft.chars)}
+		</span>
+	</div>
+{/snippet}
+
 {#snippet notice(text: string)}
 	<div
 		data-exclude-from-copy
@@ -427,7 +445,9 @@
 							</div>
 						{/if}
 					{/each}
-					{#if !trailingBlockShowsProgress}
+					{#if liveDraft}
+						{@render draftRow(liveDraft)}
+					{:else if !trailingBlockShowsProgress}
 						<IconLoading classNames="loading mt-1 inline first:ml-0" />
 					{/if}
 				{:else}
@@ -491,6 +511,9 @@
 							</div>
 						{/if}
 					{/each}
+					{#if liveDraft}
+						{@render draftRow(liveDraft)}
+					{/if}
 				{/if}
 			</div>
 

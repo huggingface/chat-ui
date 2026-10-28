@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ObjectId } from "mongodb";
 import {
 	MessageToolUpdateType,
+	MessageUpdateStatus,
 	MessageUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
@@ -369,6 +370,46 @@ describe("runMcpFlow", () => {
 			tool_call_id: "call_1",
 			content: "the tool output",
 		});
+	});
+});
+
+describe("runMcpFlow tool-call drafts", () => {
+	it("reports a tool call while its arguments stream, before the call itself", async () => {
+		// Only the first delta of a call carries its id and name.
+		const piece = (args: string, head?: { id: string; name: string }) => ({
+			tool_calls: [{ index: 0, id: head?.id, function: { name: head?.name, arguments: args } }],
+		});
+		scriptRounds([
+			{
+				deltas: [
+					{ content: "Building it now." },
+					piece('{"rows":', { id: "call_1", name: "do_thing" }),
+					piece("[[1,2]"),
+					piece("]}"),
+				],
+				finishReason: "tool_calls",
+			},
+			{ content: "done" },
+		]);
+		scriptToolResults();
+
+		const { updates } = await runFlow();
+
+		const drafts = updates.flatMap((u) =>
+			u.type === MessageUpdateType.Status && u.toolCallDraft ? [u] : []
+		);
+		// The first delta is reported at once, named; later ones are throttled.
+		expect(drafts[0]).toEqual({
+			type: MessageUpdateType.Status,
+			status: MessageUpdateStatus.KeepAlive,
+			toolCallDraft: { name: "do_thing", chars: 8 },
+		});
+		const lastDraftAt = updates.findLastIndex(
+			(u) => u.type === MessageUpdateType.Status && u.toolCallDraft !== undefined
+		);
+		expect(lastDraftAt).toBeLessThan(updates.findIndex((u) => u.type === MessageUpdateType.Tool));
+		// Drafts never leak into the visible text.
+		expect(streamedText(updates)).toBe("Building it now.done");
 	});
 });
 

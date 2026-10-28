@@ -531,9 +531,9 @@ describe.sequential("replaying a turn that ended badly", () => {
 				})
 		);
 
-		// One more chunk than before the turnState events existed: the turn now
-		// opens with an in-band `running` transition ahead of the tool call.
-		await sendMessageAndDetach(conv, locals, "Weather?", 4);
+		// The turn opens with an in-band `running` transition, and the call's
+		// arguments are announced as a draft keepalive before the call itself.
+		await sendMessageAndDetach(conv, locals, "Weather?", 5);
 
 		const stored = await reload(conv);
 		const lastAssistant = assistantMessages(stored).at(-1);

@@ -6,6 +6,7 @@ import {
 	type MessageStatusUpdate,
 	type MessageTurnStateUpdate,
 	type MessageUpdate,
+	type ToolCallDraft,
 } from "$lib/types/MessageUpdate";
 import type { Message } from "$lib/types/Message";
 import type { StreamingMode } from "$lib/types/Settings";
@@ -27,6 +28,8 @@ export interface ConsumeContext {
 	onBudget?: (update: MessageBudgetUpdate) => void;
 	/** Fired on every turn lifecycle transition; the caller notes serverNow for clock skew. */
 	onTurnState?: (update: MessageTurnStateUpdate) => void;
+	/** A tool call's arguments are streaming (draft), or that stretch is over (null). */
+	onToolCallDraft?: (draft: ToolCallDraft | null) => void;
 }
 
 /**
@@ -49,6 +52,7 @@ export async function consumeMessageUpdates(
 	// buffer, not message.updates, or they see stale data between flushes.
 	let updatesBuffer: MessageUpdate[] = message.updates ?? [];
 	let updatesDirty = false;
+	let draftShown = false;
 
 	const flushBuffer = (currentTime: Date) => {
 		if (buffer.length === 0 && !updatesDirty) return;
@@ -82,6 +86,7 @@ export async function consumeMessageUpdates(
 			// Commit anything still buffered: the navigation-abort path skips the
 			// post-stream refresh, so a dropped buffer would be lost from the UI.
 			flushBuffer(new Date());
+			if (draftShown) ctx.onToolCallDraft?.(null);
 			ctx.onAbort();
 			return;
 		}
@@ -93,6 +98,15 @@ export async function consumeMessageUpdates(
 
 		const isKeepAlive =
 			update.type === MessageUpdateType.Status && update.status === MessageUpdateStatus.KeepAlive;
+
+		if (isKeepAlive && update.toolCallDraft) {
+			draftShown = true;
+			ctx.onToolCallDraft?.(update.toolCallDraft);
+		} else if (!isKeepAlive && draftShown) {
+			// Whatever follows the draft (the call itself, an error, the answer) replaces it.
+			draftShown = false;
+			ctx.onToolCallDraft?.(null);
+		}
 
 		if (!isKeepAlive) {
 			if (update.type === MessageUpdateType.Stream) {
@@ -169,5 +183,6 @@ export async function consumeMessageUpdates(
 		}
 	}
 
+	if (draftShown) ctx.onToolCallDraft?.(null);
 	flushBuffer(new Date());
 }
