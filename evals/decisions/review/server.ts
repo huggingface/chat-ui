@@ -30,6 +30,8 @@ interface Indexed {
 	conversationId: string;
 	label: string;
 	pass: boolean | null;
+	/** from a conversation someone reported, always reviewed */
+	seed: boolean;
 	offset: number;
 	length: number;
 }
@@ -78,6 +80,7 @@ function indexFamily(family: Family): Indexed[] {
 				conversationId: head.source.conversationId,
 				label: head.observed.label,
 				pass: head.observed.pass,
+				seed: Boolean(head.source.feedback),
 				offset: start,
 				length: end - start,
 			});
@@ -96,15 +99,20 @@ function seeded(seed: number): () => number {
 	};
 }
 
+const MAX_SEED_CASES = 3;
+
 /**
- * One case per conversation, then every label gets at least two slots so rare labels get checked
- * too. The summary weights the verdicts back by each label's share of the whole family.
+ * Cases from reported conversations first, then one case per conversation with every label given
+ * at least two slots so rare labels get checked too. The summary weights the verdicts back by each
+ * label's share of the whole family, seeds included, so seeds only add to what is checked.
  */
 function drawSample(rows: Indexed[], size: number, random: () => number): string[] {
-	const shuffled = [...rows].sort(() => random() - 0.5);
+	const seeds = rows.filter((r) => r.seed).slice(0, MAX_SEED_CASES);
+	const shuffled = [...rows].filter((r) => !r.seed).sort(() => random() - 0.5);
 	const pool = [...new Map(shuffled.map((r) => [r.conversationId, r])).values()];
 	const byLabel = new Map<string, Indexed[]>();
 	for (const row of pool) byLabel.set(row.label, [...(byLabel.get(row.label) ?? []), row]);
+	size -= seeds.length;
 	const quota = new Map(
 		[...byLabel].map(([label, list]) => [
 			label,
@@ -119,7 +127,9 @@ function drawSample(rows: Indexed[], size: number, random: () => number): string
 	}
 	const picked = [...byLabel].flatMap(([label, list]) => list.slice(0, quota.get(label)));
 	const rest = pool.filter((r) => !picked.includes(r));
-	return [...picked, ...rest.slice(0, Math.max(0, size - picked.length))].map((r) => r.id);
+	return [...seeds, ...picked, ...rest.slice(0, Math.max(0, size - picked.length))].map(
+		(r) => r.id
+	);
 }
 
 const index = new Map<Family, Indexed[]>();
@@ -238,6 +248,7 @@ function caseView(c: DecisionCase) {
 		date: target.createdAt,
 		conversationId: c.source.conversationId,
 		round: c.source.round,
+		feedback: c.source.feedback,
 		trigger: c.trigger,
 		context: c.context,
 		observed: c.observed,
@@ -271,7 +282,7 @@ function state() {
 				total: rows.length,
 				cases: (sample[family] ?? []).map((id) => {
 					const row = byId.get(id);
-					return { id, label: row?.label, pass: row?.pass };
+					return { id, label: row?.label, pass: row?.pass, seed: row?.seed };
 				}),
 			};
 		}),

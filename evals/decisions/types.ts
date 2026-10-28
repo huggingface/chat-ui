@@ -1,6 +1,13 @@
 import type { Message, MessageHarness } from "$lib/types/Message";
 
-export type Family = "first-gpu-job" | "after-oom" | "after-stale-api";
+export type Family = "first-gpu-job" | "after-job-failure" | "after-oom" | "after-stale-api";
+
+/** who reported a conversation, so its cases can be traced back to the feedback they answer */
+export interface Feedback {
+	by: string;
+	link: string;
+	note?: string;
+}
 
 /** one tool call reduced to what the scorers read, from a stored turn or a sampled completion */
 export interface ActionCall {
@@ -16,6 +23,8 @@ export type Action =
 			/** what the model thought and said before the calls, for a reviewer, never scored */
 			reasoning?: string;
 			preamble?: string;
+			/** how many rounds the calls span, more than one when the family scores until a decisive call */
+			rounds?: number;
 	  }
 	| { kind: "final"; text: string };
 
@@ -31,12 +40,23 @@ export interface DecisionCase {
 		/** export file the conversation was read from, the newest one holding it */
 		exportFile: string;
 		harness?: MessageHarness;
+		feedback?: Feedback;
 	};
 	model: { id: string; provider?: string };
 	/** the tool output that put the agent at this decision, absent for first-gpu-job */
 	trigger?: { tool: string; excerpt: string };
-	/** what the scorer needs from before the cut, e.g. the flavor the job ran out of memory on */
-	context: { failedFlavor?: string };
+	/** what the scorer needs from before the cut */
+	context: {
+		/** the flavor the job ran out of memory on */
+		failedFlavor?: string;
+		/** whether any sandbox work came before the first GPU job */
+		sandboxUsed?: boolean;
+		/** the job's v-file script, and whether a sandbox call before the cut named it */
+		script?: string;
+		sandboxedScript?: boolean;
+		/** distinct jobs failed on this path, this one included */
+		failedJobsSoFar?: number;
+	};
 	/** what production did at the cut, and how the family's scorer labels it */
 	observed: { action: Action; label: string; pass: boolean | null };
 	/**

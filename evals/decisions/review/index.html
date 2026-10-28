@@ -371,6 +371,12 @@
 			.empty {
 				color: var(--muted);
 			}
+			.seed {
+				border-color: var(--accent);
+			}
+			.seed a {
+				color: var(--accent);
+			}
 		</style>
 	</head>
 	<body>
@@ -484,6 +490,27 @@
 				const action = c.observed.action;
 
 				const left = [];
+				if (c.feedback)
+					left.push(
+						`<section class="seed"><b>Reported by ${esc(c.feedback.by)}</b>${c.feedback.note ? ` · ${esc(c.feedback.note)}` : ""} · <a href="${esc(c.feedback.link)}" target="_blank" rel="noopener">thread</a></section>`
+					);
+				const facts = [];
+				if (c.context?.failedFlavor)
+					facts.push(`ran out of memory on <b>${esc(c.context.failedFlavor)}</b>`);
+				if (c.context?.sandboxUsed !== undefined)
+					facts.push(
+						c.context.sandboxUsed
+							? "sandbox used before this"
+							: "<b>no sandbox used before this</b>"
+					);
+				if (c.context?.script)
+					facts.push(
+						`script <span class="mono">${esc(c.context.script)}</span> ${c.context.sandboxedScript ? "ran in a sandbox first" : "<b>never named in a sandbox</b>"}`
+					);
+				if (c.context?.failedJobsSoFar)
+					facts.push(
+						`<b>${c.context.failedJobsSoFar}</b> failed job${c.context.failedJobsSoFar > 1 ? "s" : ""} so far`
+					);
 				left.push(`<section><div class="meta">
 					<span><b>${esc(c.model.id)}</b>${c.model.provider ? ` @ ${esc(c.model.provider)}` : ""}</span>
 					<span>${esc(
@@ -493,8 +520,7 @@
 					)}</span>
 					<span>conversation <span class="mono">${esc(c.conversationId)}</span></span>
 					<span>round ${c.round}</span>
-					${c.context?.failedFlavor ? `<span>ran out of memory on <b>${esc(c.context.failedFlavor)}</b></span>` : ""}
-				</div></section>`);
+				</div>${facts.length ? `<div class="meta" style="margin-top:6px">${facts.map((f) => `<span>${f}</span>`).join("")}</div>` : ""}</section>`);
 				left.push(`<section><h2>The task</h2><div class="text clamp" id="task">${esc(c.firstUser)}</div>
 					<details><summary>Whole first message</summary><div class="text">${esc(c.firstUser)}</div></details>
 					${c.lastUser ? `<h2 style="margin-top:12px">Latest user message</h2><div class="text">${esc(c.lastUser)}</div>` : ""}</section>`);

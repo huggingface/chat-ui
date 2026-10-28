@@ -28,15 +28,63 @@ describe("gpuMemoryGb", () => {
 	});
 });
 
+const sandbox: ActionCall = {
+	name: "sandbox_task",
+	args: { task: "run v-file://train.py for two steps" },
+};
+
 describe("first-gpu-job", () => {
-	it("passes a smoke job and fails a full run", () => {
+	const gpuJob = calls(job({ flavor: "a10g-small" }));
+
+	it("passes going to a sandbox, or a job whose script already ran in one", () => {
+		expect(label("first-gpu-job", calls(sandbox))).toEqual({
+			label: "develop-in-sandbox",
+			pass: true,
+		});
 		expect(
-			label("first-gpu-job", calls(job({ flavor: "l4x1", labels: { name: "x-smoke" } })))
-		).toEqual({ label: "gpu-smoke-job", pass: true });
-		expect(label("first-gpu-job", calls(job({ flavor: "a100-large", timeout: "4h" })))).toEqual({
-			label: "gpu-full-job",
+			label("first-gpu-job", gpuJob, {
+				sandboxUsed: true,
+				script: "train.py",
+				sandboxedScript: true,
+			})
+		).toEqual({ label: "job-after-sandboxing-script", pass: true });
+	});
+
+	it("fails a job with no sandbox work before it, and leaves unrelated sandbox work to a reviewer", () => {
+		expect(label("first-gpu-job", gpuJob, { sandboxUsed: false })).toEqual({
+			label: "job-without-sandbox",
 			pass: false,
 		});
+		expect(
+			label("first-gpu-job", gpuJob, {
+				sandboxUsed: true,
+				script: "train.py",
+				sandboxedScript: false,
+			})
+		).toEqual({ label: "job-after-other-sandbox-work", pass: null });
+	});
+});
+
+describe("after-job-failure", () => {
+	it("passes reproducing in a sandbox and fails resubmitting", () => {
+		expect(label("after-job-failure", calls(sandbox))).toEqual({
+			label: "reproduce-in-sandbox",
+			pass: true,
+		});
+		expect(label("after-job-failure", calls(edit("fix"), job({ flavor: "a10g-small" })))).toEqual({
+			label: "fix-and-resubmit",
+			pass: false,
+		});
+		expect(label("after-job-failure", calls(job({ flavor: "a10g-small" })))).toEqual({
+			label: "resubmit",
+			pass: false,
+		});
+	});
+
+	it("does not judge reading the logs", () => {
+		expect(
+			label("after-job-failure", calls({ name: "check_job", args: { job_id: "x", task: "why" } }))
+		).toEqual({ label: "investigate", pass: null });
 	});
 });
 

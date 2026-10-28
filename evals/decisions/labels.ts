@@ -1,4 +1,4 @@
-import type { Action, ActionCall, Family } from "./types";
+import type { Action, ActionCall, DecisionCase, Family } from "./types";
 
 /**
  * Labels the action taken at a decision, for production's stored turn and for sampled completions
@@ -8,14 +8,16 @@ import type { Action, ActionCall, Family } from "./types";
 export function label(
 	family: Family,
 	action: Action,
-	context: { failedFlavor?: string } = {}
+	context: DecisionCase["context"] = {}
 ): { label: string; pass: boolean | null } {
 	if (action.kind === "final") return { label: "ended-turn", pass: null };
 	const calls = action.calls;
 	if (calls.some((c) => c.name === "ask_user_question")) return { label: "asked-user", pass: null };
 	switch (family) {
 		case "first-gpu-job":
-			return labelFirstGpuJob(calls);
+			return labelFirstGpuJob(calls, context);
+		case "after-job-failure":
+			return labelAfterJobFailure(calls);
 		case "after-oom":
 			return labelAfterOom(calls, context.failedFlavor);
 		case "after-stale-api":
@@ -28,10 +30,18 @@ const SHARED = { "ended-turn": null, "asked-user": null, other: null };
 /** every label a family can give and its verdict, for a reviewer correcting one by hand */
 export const LABELS: Record<Family, Record<string, boolean | null>> = {
 	"first-gpu-job": {
-		"gpu-smoke-job": true,
-		"gpu-sandbox": true,
-		"gpu-full-job": false,
-		"cpu-sandbox": null,
+		"develop-in-sandbox": true,
+		"job-after-sandboxing-script": true,
+		"job-after-other-sandbox-work": null,
+		"job-without-sandbox": false,
+		...SHARED,
+	},
+	"after-job-failure": {
+		"reproduce-in-sandbox": true,
+		"fix-and-resubmit": false,
+		resubmit: false,
+		"fix-only": null,
+		investigate: null,
 		...SHARED,
 	},
 	"after-oom": {
@@ -51,21 +61,36 @@ export const LABELS: Record<Family, Record<string, boolean | null>> = {
 	},
 };
 
-function labelFirstGpuJob(calls: ActionCall[]): { label: string; pass: boolean | null } {
-	const job = calls.find((c) => isJobSubmit(c) && isGpu(jobFlavor(c)));
-	if (job) {
-		return looksLikeSmoke(job)
-			? { label: "gpu-smoke-job", pass: true }
-			: { label: "gpu-full-job", pass: false };
+/**
+ * Lewis's ask (Slack, 2026-10-24): develop in a sandbox before submitting jobs. A job whose script
+ * a sandbox call named earlier passes; sandbox work on something else is left to a reviewer.
+ */
+function labelFirstGpuJob(
+	calls: ActionCall[],
+	context: DecisionCase["context"]
+): { label: string; pass: boolean | null } {
+	if (calls.some(isSandboxWork)) return { label: "develop-in-sandbox", pass: true };
+	if (!calls.some(isJobSubmit)) return { label: "other", pass: null };
+	if (context.sandboxedScript) return { label: "job-after-sandboxing-script", pass: true };
+	if (context.sandboxUsed) return { label: "job-after-other-sandbox-work", pass: null };
+	return { label: "job-without-sandbox", pass: false };
+}
+
+function labelAfterJobFailure(calls: ActionCall[]): { label: string; pass: boolean | null } {
+	if (calls.some(isSandboxWork)) return { label: "reproduce-in-sandbox", pass: true };
+	if (calls.some(isJobSubmit)) {
+		return calls.some(isEdit)
+			? { label: "fix-and-resubmit", pass: false }
+			: { label: "resubmit", pass: false };
 	}
-	const sandbox = calls.find((c) => c.name === "hf_sandbox" && sandboxCommand(c) === "create");
-	if (sandbox) {
-		return isGpu(stringArg(flagValue(sandbox, "--flavor")))
-			? { label: "gpu-sandbox", pass: true }
-			: { label: "cpu-sandbox", pass: null };
+	if (calls.some(isEdit)) return { label: "fix-only", pass: null };
+	if (calls.some((c) => isLookup(c) || INSPECT_TOOLS.has(c.name))) {
+		return { label: "investigate", pass: null };
 	}
 	return { label: "other", pass: null };
 }
+
+const INSPECT_TOOLS = new Set(["check_job", "hf_jobs", "read_file", "hf_fs"]);
 
 function labelAfterOom(
 	calls: ActionCall[],
@@ -132,6 +157,13 @@ function isEdit(c: ActionCall): boolean {
 	return false;
 }
 
+/** using a sandbox to run or write code, not managing one */
+export function isSandboxWork(c: ActionCall): boolean {
+	if (c.name === "sandbox_task" || c.name === "hf_sandbox_exec" || c.name === "hf_sandbox_fs")
+		return true;
+	return c.name === "hf_sandbox" && sandboxCommand(c) === "create";
+}
+
 /** running the script again in a sandbox is the same move as resubmitting the job */
 function isRerun(c: ActionCall): boolean {
 	return (
@@ -149,12 +181,6 @@ export function isJobSubmit(c: ActionCall): boolean {
 
 export function jobFlavor(c: ActionCall): string | undefined {
 	return stringArg(nested(c).flavor ?? c.args.flavor);
-}
-
-function looksLikeSmoke(c: ActionCall): boolean {
-	return /smoke|sanity|debug|dry.?run|probe|max_steps|max-steps|--steps|SMOKE/i.test(
-		JSON.stringify(c.args)
-	);
 }
 
 export function isGpu(flavor: string | undefined): boolean {
@@ -190,12 +216,6 @@ function sandboxCommand(c: ActionCall): string | undefined {
 	return (
 		stringArg(c.args.cmd) ?? (Array.isArray(c.args.args) ? stringArg(c.args.args[0]) : undefined)
 	);
-}
-
-function flagValue(c: ActionCall, flag: string): unknown {
-	const args = Array.isArray(c.args.args) ? c.args.args : [];
-	const at = args.indexOf(flag);
-	return at === -1 ? c.args[flag.replace(/^--/, "")] : args[at + 1];
 }
 
 function stringArg(value: unknown): string | undefined {
