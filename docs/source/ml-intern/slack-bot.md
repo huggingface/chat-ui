@@ -356,7 +356,10 @@ node integrations/slack/space/upload.mjs your-company-org/ml-intern-slackbot-ser
 The helper uploads tracked source files in batches, excludes local env files, and
 checks for configured credentials. It installs `integrations/slack/space/Dockerfile`
 and `integrations/slack/space/README.md` as the Space's root Dockerfile and README.
-The Dockerfile enables ML Intern at build time.
+The Dockerfile enables ML Intern at build time. If your Space's README has its own
+frontmatter, such as `hf_oauth` for HuggingChat login, pass `--keep-readme` to leave it
+in place: removing `hf_oauth`, even briefly, deletes the Space's OAuth app and signs
+everyone out. The helper refuses to upload a README that would drop it.
 
 After upload completes and any old worker has stopped, set `SLACK_ML_ENABLED=true`
 in Space settings and resume the Space. Check runtime logs for `[state] Restored`,

@@ -6,9 +6,24 @@ const { uploadFiles } = require("@huggingface/hub");
 const { parse } = require("dotenv");
 const env = parse(fs.readFileSync(".env.local"));
 if (!env.SLACK_ML_DEPLOY_TOKEN) throw new Error("Set SLACK_ML_DEPLOY_TOKEN in .env.local");
-if (!process.argv[2])
-	throw new Error("Usage: node integrations/slack/space/upload.mjs owner/space");
-const repo = { type: "space", name: process.argv[2] };
+const args = process.argv.slice(2);
+const keepReadme = args.includes("--keep-readme");
+const name = args.find((arg) => !arg.startsWith("--"));
+if (!name)
+	throw new Error("Usage: node integrations/slack/space/upload.mjs owner/space [--keep-readme]");
+const repo = { type: "space", name };
+const readme = fs.readFileSync("integrations/slack/space/README.md", "utf8");
+// Dropping hf_oauth, even for one commit, deletes the Space's OAuth app and every login token.
+if (!keepReadme) {
+	const res = await fetch(`https://huggingface.co/spaces/${name}/raw/main/README.md`, {
+		headers: { Authorization: `Bearer ${env.SLACK_ML_DEPLOY_TOKEN}` },
+	});
+	const oauth = /^hf_oauth:\s*true\s*$/m;
+	if (res.ok && oauth.test(await res.text()) && !oauth.test(readme))
+		throw new Error(
+			`${name} uses hf_oauth, which this README would remove. Rerun with --keep-readme.`
+		);
+}
 const paths = [
 	...new Set(
 		execFileSync("git", ["ls-files", "--cached", "-z"], {
@@ -37,7 +52,7 @@ files.push(
 		path: "Dockerfile",
 		content: new Blob([fs.readFileSync("integrations/slack/space/Dockerfile")]),
 	},
-	{ path: "README.md", content: new Blob([fs.readFileSync("integrations/slack/space/README.md")]) },
+	...(keepReadme ? [] : [{ path: "README.md", content: new Blob([readme]) }]),
 	{
 		path: "docs/source/ml-intern/slack-bot.md",
 		content: new Blob([fs.readFileSync("docs/source/ml-intern/slack-bot.md")]),
