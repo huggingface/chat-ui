@@ -37,6 +37,10 @@ export interface NormalizedToolCall {
 	id: string;
 	name: string;
 	arguments: string;
+	/** set by the live loop when `id` is derived from it, so replay derives the same id */
+	uuid?: string;
+	/** the provider-issued id when `id` was replaced, persisted as originalId */
+	providerId?: string;
 }
 
 /**
@@ -250,7 +254,7 @@ export async function* executeToolCalls({
 			call,
 			argsObj,
 			paramsClean,
-			uuid: randomUUID(),
+			uuid: call.uuid ?? randomUUID(),
 			...(fileRefs ? { fileRefs } : {}),
 			...(refusal ? { refusal } : {}),
 		});
@@ -264,18 +268,18 @@ export async function* executeToolCalls({
 				subtype: MessageToolUpdateType.Call,
 				uuid: p.uuid,
 				call: { name: p.call.name, parameters: p.paramsClean },
-				...(p.call.id?.trim() ? { originalId: p.call.id } : {}),
+				...((p.call.providerId ?? p.call.id)?.trim()
+					? { originalId: p.call.providerId ?? p.call.id }
+					: {}),
 				...(p.call.arguments?.trim() && isValidJsonObject(p.call.arguments)
 					? { argumentsRaw: p.call.arguments }
 					: {}),
 				...(p.fileRefs ? { fileRefs: p.fileRefs } : {}),
 				...(index === 0 && roundReasoning?.trim() ? { reasoning: roundReasoning } : {}),
-				// Preamble text is trimmed (unlike reasoning, which stays
-				// byte-exact): replay compares it against the trim-normalized
-				// visible text from splitReasoning, so persisting leading
-				// whitespace would break the dedup match and duplicate the
-				// preamble in replayed history.
-				...(index === 0 && roundContent?.trim() ? { content: roundContent.trim() } : {}),
+				// Byte exact like reasoning: replay sends it back as this round's
+				// content, and a trimmed copy no longer matches the prefix the
+				// provider cached when the live loop sent it.
+				...(index === 0 && roundContent?.trim() ? { content: roundContent } : {}),
 			},
 		};
 		yield {

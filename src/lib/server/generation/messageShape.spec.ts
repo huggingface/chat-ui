@@ -112,6 +112,18 @@ describe("convertMessageShape", () => {
 		expect(next.content).toBe("Done.");
 	});
 
+	it("skips a round whose stored preamble kept whitespace the stream never showed", () => {
+		const message = assistantMessage([
+			...toolRound({
+				reasoning: "Plan.",
+				text: "Let me check.",
+				stored: { reasoning: "Plan.", content: "Let me check.\n\n" },
+			}),
+			...finalAnswer(undefined, "Done."),
+		]);
+		expect(skipped(message)).toBe("round_text");
+	});
+
 	it("keeps a literal </think> a model wrote into its preamble as text", () => {
 		const message = assistantMessage([
 			...toolRound({ reasoning: "Plan.", text: "Closing the tag </think> for you." }),

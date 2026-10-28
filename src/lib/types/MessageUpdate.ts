@@ -133,7 +133,7 @@ export interface MessageToolCallUpdate extends MessageToolUpdateBase<MessageTool
 	 * uses argumentsRaw when present for byte-accurate arguments instead of
 	 * reserializing the sanitized primitive parameters; the emitted
 	 * tool_call_id is always the
-	 * normalized one regardless (see toToolCallId in prepareFiles.ts), so
+	 * normalized one regardless (see toToolCallId in toolCallId.ts), so
 	 * originalId is captured for future fidelity but not replayed as-is.
 	 * Absent on messages persisted before this field existed, or if the
 	 * provider's response omitted an id.

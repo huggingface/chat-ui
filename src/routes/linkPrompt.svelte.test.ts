@@ -8,6 +8,8 @@ import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
 import HomePage from "./+page.svelte";
 import ModelPage from "./models/[...model]/+page.svelte";
 
+vi.mock("$env/dynamic/public", () => ({ env: {} }));
+
 vi.mock("$lib/components/chat/ChatWindow.svelte", async () => ({
 	default: (await import("$lib/components/__tests__/ChatWindowStub.svelte")).default,
 }));

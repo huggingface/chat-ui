@@ -18,11 +18,12 @@ import {
 import { settleMlBudget } from "$lib/server/mlBudget/settle";
 import { reservedMicroUsd } from "$lib/utils/mlBudget";
 import { logger } from "$lib/server/logger";
-import { resolvePreprompt } from "./preprompt";
+import { resolvePreprompt, resolveTurnContext } from "./preprompt";
 import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
 import { mlStateBlockEnabled } from "$lib/server/mlRegistry/stateBlock";
 import { AttachmentOverflowError } from "./utils/attachmentBudget";
 import { attachmentBudgetEnabled } from "./utils/attachmentBudgetFlag";
+import type { EndpointMessage } from "../endpoints/endpoints";
 
 /** Updates that mean the user has already been shown something for this turn. */
 function isVisibleWork(update: MessageUpdate): boolean {
@@ -32,6 +33,13 @@ function isVisibleWork(update: MessageUpdate): boolean {
 		update.type === MessageUpdateType.Reasoning ||
 		update.type === MessageUpdateType.FinalAnswer
 	);
+}
+
+/** appends the turn context to the latest user message, where the tool flow puts it */
+function withTurnContext(messages: EndpointMessage[], text: string): EndpointMessage[] {
+	const index = messages.findLastIndex((m) => m.from === "user");
+	if (index === -1) return messages;
+	return messages.map((m, i) => (i === index ? { ...m, content: `${m.content}\n\n${text}` } : m));
 }
 
 async function* keepAlive(done: AbortSignal): AsyncGenerator<MessageUpdate, undefined, undefined> {
@@ -120,14 +128,23 @@ async function* textGenerationWithoutTitle(
 		username: ctx.username,
 		publishNamespace: ctx.locals?.publishNamespace,
 		timezone: (ctx.locals as unknown as { timezone?: string } | undefined)?.timezone,
-		budget: conv.mlBudget,
 		// The same target the dispatch rewrite uses. BillTo remains the valid Hub
 		// namespace; the resource group is a separate attribution field.
 		billTo: promptBillingTarget?.namespace,
 		billingResourceGroup: promptBillingTarget?.resourceGroupId,
 	});
 
+	const turnContext = resolveTurnContext({
+		mlAssistant,
+		timezone: (ctx.locals as unknown as { timezone?: string } | undefined)?.timezone,
+		budget: conv.mlBudget,
+	});
+
 	const processedMessages = await preprocessMessages(messages, convId);
+	// the tool-free fallback has no state block to ride with, so it gets the stamp here
+	const fallbackMessages = turnContext
+		? withTurnContext(processedMessages, turnContext)
+		: processedMessages;
 
 	let mcpProducedOutput = false;
 
@@ -145,6 +162,7 @@ async function* textGenerationWithoutTitle(
 			reasoningOverride: ctx.reasoningOverride,
 			locals: ctx.locals,
 			preprompt,
+			turnContext,
 			abortSignal: ctx.abortController.signal,
 			abortController: ctx.abortController,
 			promptedAt: ctx.promptedAt,
@@ -164,7 +182,7 @@ async function* textGenerationWithoutTitle(
 		// throw, and re-running would discard whatever the user has already been shown.
 		if (mcpResult === "not_applicable" && !mcpProducedOutput) {
 			// fallback to normal text generation
-			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
+			yield* generate({ ...ctx, messages: fallbackMessages }, preprompt);
 		}
 		// Every other result already emitted a final answer; falling back would replace it.
 	} catch (err) {
@@ -182,7 +200,7 @@ async function* textGenerationWithoutTitle(
 			throw err;
 		} else {
 			// Nothing was shown yet, so a clean tool-free retry is a real recovery.
-			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
+			yield* generate({ ...ctx, messages: fallbackMessages }, preprompt);
 		}
 	}
 	done.abort();

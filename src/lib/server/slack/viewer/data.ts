@@ -1,5 +1,6 @@
 import type { Conversation } from "$lib/types/Conversation";
 import { visibleText } from "../presentation";
+import { splitSlackRequest } from "$lib/utils/slackRequest";
 
 /** Render as text only. Omit private reasoning and strip credentials/inline binary payloads. */
 export function scrub(value: unknown, secrets: string[] = []): unknown {
@@ -52,11 +53,7 @@ export function conversationView(conv: Conversation, secrets: string[]) {
 				role: m.from,
 				createdAt: m.createdAt,
 				text: scrub(
-					visibleText(
-						m.from === "user"
-							? (m.content.split("Invoking user's request:\n").at(-1) ?? m.content)
-							: m.content
-					),
+					visibleText(m.from === "user" ? splitSlackRequest(m.content).request : m.content),
 					secrets
 				),
 				files: m.files?.map((f) => ({ name: f.name, mime: f.mime })),
