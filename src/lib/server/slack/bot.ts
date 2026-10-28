@@ -66,6 +66,7 @@ import {
 	questionModal,
 	readAnswers,
 	visibleText,
+	runFailureText,
 } from "./presentation";
 
 function parseMetadata(raw: string | undefined): unknown {
@@ -1282,7 +1283,7 @@ export class MlSlackBot {
 			text =
 				visibleText(phaseContent) ||
 				(state.status === "failed"
-					? "The run failed. You can resume it below."
+					? runFailureText(message.updates)
 					: "The run ended without a text response.");
 			if (message.interrupted || state.status === "failed")
 				actions.push({ id: RESUME_ACTION, label: "Retry", value: turnValue });

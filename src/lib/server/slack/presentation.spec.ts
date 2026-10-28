@@ -1,4 +1,8 @@
-import { MessageUpdateType, MessageToolUpdateType } from "$lib/types/MessageUpdate";
+import {
+	MessageUpdateType,
+	MessageUpdateStatus,
+	MessageToolUpdateType,
+} from "$lib/types/MessageUpdate";
 import { describe, expect, it } from "vitest";
 import {
 	questionBlocks,
@@ -10,6 +14,7 @@ import {
 	inlineField,
 	createdSpaceLinks,
 	chunks,
+	runFailureText,
 	questionModal,
 	readAnswers,
 	visibleText,
@@ -365,4 +370,27 @@ it("keeps owner context when reference messages exhaust the character limit", ()
 	);
 	expect(prompt).toContain("Keep my original requirements");
 	expect(prompt).toContain("Some thread context was omitted");
+});
+
+describe("runFailureText", () => {
+	const failed = (statusCode?: number, errorCode?: string) => [
+		{
+			type: MessageUpdateType.Status as const,
+			status: MessageUpdateStatus.Error,
+			message: "upstream detail that must not reach Slack",
+			statusCode,
+			errorCode,
+		},
+	];
+	it("names known causes in one line and keeps others generic", () => {
+		expect(runFailureText(failed(402))).toBe(
+			"The run failed. Your Hugging Face account is out of inference credits. Add credits, then retry."
+		);
+		expect(runFailureText(failed(402, "PaymentMethodRequired"))).toContain("payment method");
+		expect(runFailureText(failed(401))).toContain("Sign in to HuggingChat again");
+		expect(runFailureText(failed(429))).toContain("rate-limited");
+		expect(runFailureText(failed(500))).toBe("The run failed. You can resume it below.");
+		expect(runFailureText()).toBe("The run failed. You can resume it below.");
+		expect(runFailureText(failed(500))).not.toContain("upstream detail");
+	});
 });
