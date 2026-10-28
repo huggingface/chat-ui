@@ -91,7 +91,13 @@ export function convertMessageShape(message: Message): ShapeConversion {
 		) {
 			return { skipped: "round_text" };
 		}
-		if (text.visible !== (first.content ?? "")) {
+		const stored = first.content ?? "";
+		if (text.visible !== stored) {
+			// Only a trimmed preamble, stored before calls kept the bytes the live loop
+			// sent, takes the streamed slice. Any other mismatch is whitespace that
+			// arrived after the calls muted the stream: replay must send the stored
+			// bytes, and content cannot rebuild from them.
+			if (stored !== text.visible.trim()) return { skipped: "round_text" };
 			converted[round.start] = { ...first, content: text.visible };
 		}
 		start = end;
