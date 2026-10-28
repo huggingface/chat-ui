@@ -8,6 +8,7 @@
 	import PaneItemNav from "./PaneItemNav.svelte";
 
 	import CarbonChartLine from "~icons/carbon/chart-line";
+	import CarbonFlow from "~icons/carbon/flow";
 	import CarbonCloseLarge from "~icons/carbon/close-large";
 	import CarbonLaunch from "~icons/carbon/launch";
 	import CarbonRenew from "~icons/carbon/renew";
@@ -229,7 +230,7 @@
 					<button
 						type="button"
 						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-						title="Reload the dashboard"
+						title={workflow ? "Reload the workflow" : "Reload the dashboard"}
 						onclick={() => (reloadNonce += 1)}
 					>
 						<CarbonRenew />
@@ -278,7 +279,11 @@
 						class="trackio-pulse flex size-11 items-center justify-center rounded-xl
 						bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
 					>
-						<CarbonChartLine class="text-xl" />
+						{#if workflow}
+							<CarbonFlow class="text-xl" />
+						{:else}
+							<CarbonChartLine class="text-xl" />
+						{/if}
 					</span>
 					<div class="flex flex-col gap-1">
 						<p class="text-sm font-medium text-gray-600 dark:text-gray-300">
