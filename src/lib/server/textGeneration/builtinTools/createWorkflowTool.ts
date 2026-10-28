@@ -141,7 +141,7 @@ export function createWorkflowTool(
 				return { error: hubError("write to", plan.spaceId, err) };
 			}
 
-			const url = `https://huggingface.co/spaces/${plan.spaceId}`;
+			const url = `https://huggingface.co/spaces/${plan.spaceId}?ui=canvas`;
 			if (ctx.conversationId) {
 				void recordArtefact({
 					conversationId: ctx.conversationId,

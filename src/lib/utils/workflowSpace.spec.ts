@@ -27,7 +27,7 @@ describe("collectWorkflowSpaces", () => {
 
 		expect(found).toEqual([
 			{
-				url: "https://hmb-flux-vs-krea-workflow.hf.space",
+				url: "https://hmb-flux-vs-krea-workflow.hf.space/?ui=canvas",
 				label: "hmb/flux-vs-krea-workflow",
 				spaceId: "hmb/flux-vs-krea-workflow",
 				messageId: "m1",

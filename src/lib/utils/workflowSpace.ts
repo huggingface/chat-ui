@@ -25,8 +25,10 @@ export function collectWorkflowSpaces(
 				const text = output["text"];
 				const match = typeof text === "string" ? text.match(SPACE_PAGE_REGEX) : null;
 				if (!match) continue;
-				const url = spaceIdToEmbedOrigin(match[1], match[2]);
-				if (!url || found.has(url)) continue;
+				const origin = spaceIdToEmbedOrigin(match[1], match[2]);
+				if (!origin) continue;
+				const url = `${origin}/?ui=canvas`;
+				if (found.has(url)) continue;
 				const spaceId = `${match[1]}/${match[2]}`;
 				found.set(url, { url, label: spaceId, spaceId, messageId: message.id, kind: "workflow" });
 			}
