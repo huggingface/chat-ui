@@ -402,7 +402,7 @@ describe("budget questions must carry real grants", () => {
 		expect(answerToToolResult(payload, "accept", { q1: "Postgres" })).not.toContain("budget");
 	});
 
-	it("passes once at least one option carries the grant", () => {
+	it("allows a funded grant alongside a zero-dollar decline", () => {
 		const payload = ok({
 			questions: [
 				question({
@@ -417,6 +417,47 @@ describe("budget questions must carry real grants", () => {
 		const field = payload.fields?.[0];
 		if (field?.kind !== "select") throw new Error("expected a select");
 		expect(field.options[0].setBudgetUsd).toBe(1);
+	});
+
+	it.each(["Set budget to $10", "Raise to $ 0.50", "$1,000 for the full run"])(
+		"rejects an unfunded option (%s) even alongside a valid grant",
+		(label) => {
+			const result = normalizeAskUserQuestion({
+				questions: [
+					question({
+						question: "What compute budget should I reserve against?",
+						options: [
+							{ label: "Small run", description: "Minimal.", setBudgetUsd: 1 },
+							{ label, description: "Full run." },
+							{ label: "Cancel", description: "Do not run anything." },
+						],
+					}),
+				],
+			});
+			expect(result.ok).toBe(false);
+			if (!result.ok) expect(result.reason).toContain("setBudgetUsd");
+		}
+	);
+
+	it("keeps separately funded choices and a zero-dollar decline selectable", () => {
+		const payload = {
+			...ok({
+				questions: [
+					question({
+						question: "What compute budget should I reserve against?",
+						options: [
+							{ label: "Small run", description: "Minimal.", setBudgetUsd: 1 },
+							{ label: "Full run", description: "More retries.", setBudgetUsd: 10 },
+							{ label: "$0.00 — no raise", description: "Keep as is." },
+						],
+					}),
+				],
+			}),
+			elicitationId: "budget",
+		};
+		expect(chosenBudgetUsd(payload, { q1: "Set budget to $1.00" })).toBe(1);
+		expect(chosenBudgetUsd(payload, { q1: "Set budget to $10.00" })).toBe(10);
+		expect(chosenBudgetUsd(payload, { q1: "$0.00 — no raise" })).toBeUndefined();
 	});
 
 	it("leaves non-budget questions alone however much they talk prices", () => {

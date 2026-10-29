@@ -206,9 +206,9 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 		}
 		if (options.length > MAX_OPTIONS) options.length = MAX_OPTIONS;
 
-		// A budget question whose options wave dollar amounts around without a
-		// single setBudgetUsd is the observed failure mode: the user clicks "$5",
-		// nothing reaches the ledger, and the model proceeds as if authorized.
+		// Each option that offers a positive dollar amount must carry its own
+		// setBudgetUsd: another option's grant cannot fund a click on "$5".
+		// Zero-dollar declines carry no grant and remain valid.
 		// Bounce it back for correction instead of showing a grant that isn't one.
 		// Labels only: the label is what a click appears to grant. A description
 		// that states what a choice costs is information, and rejecting it sent
@@ -216,9 +216,10 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 		const mentionsBudget = /budget/i.test(
 			`${question} ${asText(q?.header, MAX_HEADER_CHARS) ?? ""}`
 		);
-		const hasDollarLabel = options.some((o) => /\$\s*\d/.test(o.label));
-		const hasGrantOption = options.some((o) => o.setBudgetUsd !== undefined);
-		if (mentionsBudget && hasDollarLabel && !hasGrantOption) {
+		const hasUnfundedDollarLabel = options.some(
+			(o) => o.setBudgetUsd === undefined && /\$\s*[\d,.]*[1-9]/.test(o.label)
+		);
+		if (mentionsBudget && hasUnfundedDollarLabel) {
 			return {
 				ok: false,
 				reason:
