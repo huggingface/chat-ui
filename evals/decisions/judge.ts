@@ -86,6 +86,12 @@ export interface Judgement {
 	version?: number;
 }
 
+/** EVAL_BILL_TO bills an org for the inference, as production's X-HF-Bill-To does */
+export function billingHeaders(token: string): Record<string, string> {
+	const billTo = process.env.EVAL_BILL_TO;
+	return { authorization: `Bearer ${token}`, ...(billTo ? { "X-HF-Bill-To": billTo } : {}) };
+}
+
 /** the head and tail of a long text: the plan usually comes at the end of the reasoning */
 function ends(text: string, head: number, tail: number): string {
 	return text.length <= head + tail
@@ -191,7 +197,7 @@ async function judgeOnce(
 ): Promise<Judgement> {
 	const res = await fetch("https://router.huggingface.co/v1/chat/completions", {
 		method: "POST",
-		headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+		headers: { ...billingHeaders(key), "content-type": "application/json" },
 		body: JSON.stringify({
 			model,
 			messages: [{ role: "user", content: text }],

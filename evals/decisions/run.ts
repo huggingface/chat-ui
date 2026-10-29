@@ -28,7 +28,7 @@ import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
 import { indexCases, readCaseAt } from "./caseFile";
 import { contextFor } from "./calls";
-import { hfToken } from "./judge";
+import { billingHeaders, hfToken } from "./judge";
 import { label, LABELS } from "./labels";
 import { readReferences, selectCases } from "./select";
 import type { Action, Family } from "./types";
@@ -109,7 +109,7 @@ interface Delta {
 async function sampleOnce(baseUrl: string, request: object, token: string) {
 	const res = await fetch(`${baseUrl}/chat/completions`, {
 		method: "POST",
-		headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+		headers: { ...billingHeaders(token), "content-type": "application/json" },
 		body: JSON.stringify({ ...request, stream_options: { include_usage: true } }),
 	});
 	if (!res.ok || !res.body) throw new Error(`${res.status} ${await res.text()}`);

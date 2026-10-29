@@ -2,8 +2,9 @@
  * Compares two eval arms (run dirs from eval:run) case by case.
  *
  * Run: npm run eval:compare -- --cases <dir> --a <run dir> --b <run dir> [--target <family>]
- *   [--judge <id:provider>] [--concurrency 8] [--out <file>]
+ *   [--judge <id:provider>] [--concurrency 8] [--out <file>] [--markdown <file>]
  * Ends with a verdict (verdict.ts) and exits 1 on a regression, for a scheduled run to alert on.
+ * --markdown writes the summary for a PR comment: totals only, never a case's content.
  * Every sample is judged by a model (judge.ts) that never learns which arm it came from, and also
  * labelled by labels.ts. The judge's verdict is the score; the rules are a free cross-check: if
  * they disagree with the judge more in one arm, the judge is reacting to something other than
@@ -51,6 +52,9 @@ function arg(flag: string, fallback?: string): string {
 	if (value === undefined) throw new Error(`missing ${flag}`);
 	return value;
 }
+
+/** finds this tool's PR comment again, so a rerun edits it */
+export const COMMENT_MARKER = "<!-- decision-evals -->";
 
 const key = (s: Pick<Sample, "caseId" | "sample">) => `${s.caseId}#${s.sample}`;
 
@@ -322,26 +326,41 @@ async function main() {
 	const out = arg("--out", join(b.dir, `compare-vs-${basename(a.dir)}.json`));
 	writeFileSync(out, `${JSON.stringify({ ...report, target, verdict }, null, 2)}\n`);
 
-	console.log(`A ${a.dir} (${(a.meta.git as { sha?: string })?.sha?.slice(0, 8)})`);
-	console.log(`B ${b.dir} (${(b.meta.git as { sha?: string })?.sha?.slice(0, 8)})`);
-	console.log(`same prompt and tools in ${report.samePromptCases} cases; judge ${model}\n`);
-	console.log(
-		"| family | A | B | B − A | p (Holm) | cases | no verdict A/B | rules B − A (p) | judge≈rules A/B |"
-	);
-	console.log("|---|---|---|---|---|---|---|---|---|");
-	for (const [family, r] of Object.entries(report.results)) {
-		console.log(
-			`| ${family} | ${interval(r.judge.a)} | ${interval(r.judge.b)} | ${interval(r.judge.diff, true)} | ${r.judge.p ?? "–"} (${r.judge.pHolm ?? "–"}) | ` +
+	const sha = (arm: Arm) => (arm.meta.git as { sha?: string })?.sha?.slice(0, 8) ?? "?";
+	const tokens = (side: "a" | "b") => (report.tokens[side] as { prompt: number }).prompt;
+	const ICON = { pass: "✅", regression: "❌", inconclusive: "⚠️", "no-change": "➖" } as const;
+	// totals only: the cases are private conversations and this goes on a public PR
+	const lines = [
+		COMMENT_MARKER,
+		`## ${ICON[verdict.verdict]} Decision evals: ${verdict.verdict}`,
+		"",
+		...verdict.reasons.map((reason) => `- ${reason}`),
+		...(verdict.improved === null ? [] : [`- target improved: ${verdict.improved ? "yes" : "no"}`]),
+		"",
+		`A \`${sha(a)}\` vs B \`${sha(b)}\`, ${report.model}:${report.provider}, judge ${model}. ` +
+			`Same prompt and tools in ${report.samePromptCases} cases.`,
+		"",
+		"| family | A | B | B − A | p (Holm) | cases | no verdict A/B | rules B − A (p) | judge≈rules A/B |",
+		"|---|---|---|---|---|---|---|---|---|",
+		...Object.entries(report.results).map(
+			([family, r]) =>
+				`| ${family} | ${interval(r.judge.a)} | ${interval(r.judge.b)} | ${interval(r.judge.diff, true)} | ${r.judge.p ?? "–"} (${r.judge.pHolm ?? "–"}) | ` +
 				`${r.judge.pairedCases} | ${pct(r.judge.unjudgedShare.a)}/${pct(r.judge.unjudgedShare.b)} | ` +
 				`${interval(r.rules.diff, true)} (${r.rules.p ?? "–"}) | ${pct(r.judgeRulesAgreement.a)}/${pct(r.judgeRulesAgreement.b)} |`
-		);
-	}
-	for (const [family, r] of Object.entries(report.results)) {
-		const { a: ia, b: ib } = r.intentShare;
-		if (ia || ib) console.log(`${family}: ${pct(ia)}/${pct(ib)} of verdicts from a stated plan`);
-	}
-	console.log(`\nverdict: ${verdict.verdict}`);
-	for (const reason of verdict.reasons) console.log(`- ${reason}`);
+		),
+		"",
+		...Object.entries(report.results)
+			.filter(([, r]) => r.intentShare.a || r.intentShare.b)
+			.map(
+				([family, r]) =>
+					`${family}: ${pct(r.intentShare.a)}/${pct(r.intentShare.b)} of verdicts from a stated plan.`
+			),
+		`Prompt tokens: A ${(tokens("a") / 1e6).toFixed(1)}M, B ${(tokens("b") / 1e6).toFixed(1)}M. ` +
+			"The pooled row is shown, not tested; see evals/decisions/README.md.",
+	];
+	console.log(lines.join("\n"));
+	if (process.argv.includes("--markdown"))
+		writeFileSync(arg("--markdown"), `${lines.join("\n")}\n`);
 	console.log(`\nreport: ${out}`);
 	if (verdict.verdict === "regression") process.exitCode = 1;
 }

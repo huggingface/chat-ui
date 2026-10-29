@@ -1,0 +1,198 @@
+# ML Intern decision evals (evals/decisions/README.md), on demand: add the `decision-evals`
+# label to a PR. The label is removed when the run ends, so adding it again reruns.
+#
+# Compares the PR's head against its merge-base on private cases, posts the totals as a PR
+# comment and pushes every sample and judgement to a private Hub dataset. A full run takes about
+# two hours and costs about $36 of inference; a base arm already in the results repo is reused.
+name: Decision evals
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions: {}
+
+concurrency:
+  group: decision-evals-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CASES_REPO: ml-intern-internal/ml-intern-decision-cases
+  RESULTS_REPO: ml-intern-internal/ml-intern-decision-eval-runs
+  MODEL: zai-org/GLM-5.3-Flash
+  PROVIDER: novita
+  PER_FAMILY: "20"
+  SAMPLES: "10"
+  SEED: decisions-v1
+
+jobs:
+  evals:
+    # a fork's PR gets no secrets, and its code must not run with them
+    if: >-
+      github.event.label.name == 'decision-evals' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      HF_TOKEN: ${{ secrets.DECISION_EVALS_HF_TOKEN }}
+      EXA_API_KEY: ${{ secrets.DECISION_EVALS_EXA_API_KEY }}
+      EVAL_BILL_TO: ${{ vars.DECISION_EVALS_BILL_TO }}
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      BASE_REF: ${{ github.event.pull_request.base.ref }}
+      PR_BODY: ${{ github.event.pull_request.body }}
+    steps:
+      - name: Check the token is set
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::error::DECISION_EVALS_HF_TOKEN is not set"
+            exit 1
+          fi
+
+      - name: Checkout the PR
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+          fetch-depth: 0
+
+      - name: Check out the merge-base
+        id: base
+        run: |
+          sha=$(git -C head merge-base "origin/$BASE_REF" HEAD)
+          git -C head worktree add ../base "$sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          # the request builder the runner calls must exist in both arms
+          if [ -f base/src/lib/server/textGeneration/mcp/requestPrompt.ts ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+          # both arms run the PR's eval code, so only the app code differs between them
+          rm -rf base/evals
+          cp -r head/evals base/evals
+
+      - name: Say the base predates the evals
+        if: steps.base.outputs.ready != 'true'
+        run: |
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "<!-- decision-evals -->
+          Decision evals skipped: the merge-base (\`${{ steps.base.outputs.sha }}\`) predates the eval harness, so there is nothing to compare against."
+
+      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
+        if: steps.base.outputs.ready == 'true'
+        with:
+          node-version-file: head/.nvmrc
+          cache: "npm"
+          cache-dependency-path: |
+            head/package-lock.json
+            base/package-lock.json
+
+      # the app starts an in-memory MongoDB at import; two arms fetching its binary at once race
+      - name: Cache mongodb-memory-server binaries
+        if: steps.base.outputs.ready == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
+      - name: Install
+        if: steps.base.outputs.ready == 'true'
+        run: |
+          npm ci --prefix head
+          npm ci --prefix base
+          pip install --quiet "huggingface_hub==1.28.0"
+          cd head && node -e "require('mongodb-memory-server').MongoMemoryServer.create({ binary: { version: '7.0.18' } }).then((s) => s.stop())"
+
+      - name: Download the cases and any cached base arm
+        id: data
+        if: steps.base.outputs.ready == 'true'
+        run: |
+          hf download "$CASES_REPO" --repo-type dataset --local-dir cases --quiet
+          rev=$(python3 -c "from huggingface_hub import HfApi; print(HfApi().dataset_info('$CASES_REPO').sha[:8])")
+          settings="${MODEL//\//_}-$PROVIDER-${PER_FAMILY}x$SAMPLES-$SEED-cases$rev"
+          base_key="${{ steps.base.outputs.sha }}-$settings"
+          echo "base_key=$base_key" >> "$GITHUB_OUTPUT"
+          echo "head_key=$HEAD_SHA-$settings" >> "$GITHUB_OUTPUT"
+          mkdir -p runs
+          if hf download "$RESULTS_REPO" --repo-type dataset --include "arms/$base_key/*" --local-dir cached --quiet \
+            && [ -f "cached/arms/$base_key/samples.jsonl" ]; then
+            mv "cached/arms/$base_key" runs/base
+            echo "cached=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "cached=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sample both arms
+        if: steps.base.outputs.ready == 'true'
+        run: |
+          arm() {
+            (cd "$1" && npx vite-node --mode test --options.transformMode.ssr='/.*/' evals/decisions/run.ts -- \
+              --cases ../cases --out "../runs/$2" --model "$MODEL" --provider "$PROVIDER" \
+              --per-family "$PER_FAMILY" --samples "$SAMPLES" --seed "$SEED" --concurrency 12)
+          }
+          arm head head &
+          head_pid=$!
+          base_status=0
+          if [ "${{ steps.data.outputs.cached }}" != "true" ]; then arm base base || base_status=$?; fi
+          wait "$head_pid"
+          exit "$base_status"
+
+      - name: Judge and compare
+        id: compare
+        if: steps.base.outputs.ready == 'true'
+        run: |
+          target=$(printf '%s\n' "$PR_BODY" | sed -n 's/^[[:space:]]*Decision eval target:[[:space:]]*\([a-z-]*\).*/\1/p' | head -1)
+          mkdir -p out
+          set +e
+          (cd head && npx vite-node --options.transformMode.ssr='/.*/' evals/decisions/compare.ts -- \
+            --cases ../cases --a ../runs/base --b ../runs/head --concurrency 16 \
+            ${target:+--target "$target"} --out ../out/report.json --markdown ../out/summary.md)
+          status=$?
+          set -e
+          echo "regression=$([ "$status" = 1 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          [ -f out/summary.md ] || exit "$status"
+
+      - name: Push the results
+        if: steps.base.outputs.ready == 'true'
+        run: |
+          # private: samples are the model's answers inside real users' conversations
+          hf upload "$RESULTS_REPO" runs/base "arms/${{ steps.data.outputs.base_key }}" --repo-type dataset --private --quiet
+          hf upload "$RESULTS_REPO" runs/head "arms/${{ steps.data.outputs.head_key }}" --repo-type dataset --private --quiet
+          hf upload "$RESULTS_REPO" out "prs/$PR/$HEAD_SHA" --repo-type dataset --private --quiet
+
+      - name: Comment on the PR
+        if: steps.base.outputs.ready == 'true'
+        run: |
+          {
+            echo
+            [ -n "$EXA_API_KEY" ] || echo "The Exa search tools were not offered: DECISION_EVALS_EXA_API_KEY is not set."
+            echo "Samples and judgements (private): https://huggingface.co/datasets/$RESULTS_REPO/tree/main/prs/$PR/$HEAD_SHA"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } >> out/summary.md
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.body | startswith("<!-- decision-evals -->")) | .id' | tail -1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@out/summary.md > /dev/null
+          else
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file out/summary.md
+          fi
+
+      - name: Report a failed run on the PR
+        if: failure()
+        run: |
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "Decision evals failed before a result: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+      - name: Remove the label
+        if: always()
+        continue-on-error: true
+        run: gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --remove-label decision-evals
+
+      - name: Fail on a regression
+        if: steps.compare.outputs.regression == 'true'
+        run: |
+          echo "::error::A decision family regressed; see the PR comment"
+          exit 1
