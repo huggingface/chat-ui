@@ -13,7 +13,14 @@ import { basename, join } from "node:path";
 import { indexCases, readCaseAt, type CaseRow } from "./caseFile";
 import { contextFor } from "./calls";
 import { DEFAULT_JUDGE, hfToken, JUDGE_VERSION, judge, type Judgement } from "./judge";
-import { groupBy, pairedBootstrap, permutationP, type Interval, type PairedCase } from "./stats";
+import {
+	groupBy,
+	holm,
+	pairedBootstrap,
+	permutationP,
+	type Interval,
+	type PairedCase,
+} from "./stats";
 import type { Action, Family } from "./types";
 
 interface Sample {
@@ -259,6 +266,9 @@ async function main() {
 			])
 		),
 	};
+	// the families are the tests; "all" mixes their baselines and is reported, not tested
+	const adjusted = holm(families.map((f) => report.results[f].judge.p));
+	families.forEach((f, i) => Object.assign(report.results[f].judge, { pHolm: adjusted[i] }));
 	const out = arg("--out", join(b.dir, `compare-vs-${basename(a.dir)}.json`));
 	writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
 
@@ -266,12 +276,12 @@ async function main() {
 	console.log(`B ${b.dir} (${(b.meta.git as { sha?: string })?.sha?.slice(0, 8)})`);
 	console.log(`same prompt and tools in ${report.samePromptCases} cases; judge ${model}\n`);
 	console.log(
-		"| family | A | B | B − A | p | cases | no verdict A/B | rules B − A (p) | judge≈rules A/B |"
+		"| family | A | B | B − A | p (Holm) | cases | no verdict A/B | rules B − A (p) | judge≈rules A/B |"
 	);
 	console.log("|---|---|---|---|---|---|---|---|---|");
 	for (const [family, r] of Object.entries(report.results)) {
 		console.log(
-			`| ${family} | ${interval(r.judge.a)} | ${interval(r.judge.b)} | ${interval(r.judge.diff, true)} | ${r.judge.p ?? "–"} | ` +
+			`| ${family} | ${interval(r.judge.a)} | ${interval(r.judge.b)} | ${interval(r.judge.diff, true)} | ${r.judge.p ?? "–"} (${(r.judge as { pHolm?: number | null }).pHolm ?? "–"}) | ` +
 				`${r.judge.pairedCases} | ${pct(r.judge.unjudgedShare.a)}/${pct(r.judge.unjudgedShare.b)} | ` +
 				`${interval(r.rules.diff, true)} (${r.rules.p ?? "–"}) | ${pct(r.judgeRulesAgreement.a)}/${pct(r.judgeRulesAgreement.b)} |`
 		);

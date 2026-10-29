@@ -112,3 +112,18 @@ export function permutationP(cases: PairedCase[], iterations = 5000): number | n
 	}
 	return Number(((extreme + 1) / (iterations + 1)).toFixed(4));
 }
+
+/** Holm–Bonferroni adjusted p-values, in the order given; nulls stay null and are not counted */
+export function holm(ps: Array<number | null>): Array<number | null> {
+	const ranked = ps
+		.map((p, index) => ({ p, index }))
+		.filter((x): x is { p: number; index: number } => x.p !== null)
+		.sort((x, y) => x.p - y.p);
+	const adjusted: Array<number | null> = ps.map(() => null);
+	let running = 0;
+	ranked.forEach(({ p, index }, rank) => {
+		running = Math.max(running, Math.min(1, p * (ranked.length - rank)));
+		adjusted[index] = Number(running.toFixed(4));
+	});
+	return adjusted;
+}
