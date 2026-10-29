@@ -43,12 +43,18 @@ export function sandboxedFiles(messages: Message[]): Set<string> {
 
 /** a re-sampled step can run another script than production did, so first-gpu-job's facts are redone for it */
 export function contextFor(c: DecisionCase, action: Action): DecisionCase["context"] {
-	if (c.family !== "first-gpu-job" || action.kind !== "calls") return c.context;
-	const job = action.calls.find((call) => isJobSubmit(call) && isGpu(jobFlavor(call)));
+	if (c.family !== "first-gpu-job") return c.context;
+	const job =
+		action.kind === "calls"
+			? action.calls.find((call) => isJobSubmit(call) && isGpu(jobFlavor(call)))
+			: undefined;
+	const sandboxed = sandboxedFiles(c.conversation.messages);
 	const script = job ? scriptName(job) : undefined;
 	return {
 		...c.context,
 		script,
-		sandboxedScript: script ? sandboxedFiles(c.conversation.messages).has(script) : undefined,
+		sandboxedScript: script ? sandboxed.has(script) : undefined,
+		// a step that only says which script it will submit is judged against these
+		sandboxedFiles: job ? undefined : [...sandboxed],
 	};
 }

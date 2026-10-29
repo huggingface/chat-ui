@@ -54,6 +54,8 @@ export interface DecisionCase {
 		/** the job's v-file script, and whether a sandbox call before the cut named it */
 		script?: string;
 		sandboxedScript?: boolean;
+		/** file names earlier sandbox calls mentioned, set on a sample that submits no job */
+		sandboxedFiles?: string[];
 		/** distinct jobs failed on this path, this one included */
 		failedJobsSoFar?: number;
 		/** the v-file script the failed job ran, to tell a resubmit from running something else */

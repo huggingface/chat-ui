@@ -56,10 +56,18 @@ const TOOLS =
  * choice the family is about. A sample is one step, so for these the judge also reads the plan the
  * step states; production's cases are judged with their later rounds instead.
  */
-const INTENT_FAMILIES = new Set<Family>(["after-job-failure"]);
+const INTENT_PLANS: Partial<Record<Family, string>> = {
+	"after-job-failure":
+		"'fix and resubmit' is fix-and-resubmit, 'rerun it' is resubmit, 'test the fix in a sandbox first' " +
+		"is reproduce-in-sandbox. Use investigate or fix-only only when it states no next step.",
+	"first-gpu-job":
+		"'run it in a sandbox first' or 'smoke test on CPU' is develop-in-sandbox. 'submit the GPU job' is " +
+		"job-after-sandboxing-script when that script is among the sandboxed files in the facts, otherwise " +
+		"job-without-sandbox. Use other only when it states no next step.",
+};
 
 /** bumped when the judge prompt changes, so cached judgements are redone */
-export const JUDGE_VERSION = 2;
+export const JUDGE_VERSION = 3;
 
 export interface Judgement {
 	model: string;
@@ -124,13 +132,11 @@ function prompt(c: DecisionCase, action: Action, sampled: boolean): string {
 		.join("\n");
 	const next = !sampled
 		? undefined
-		: INTENT_FAMILIES.has(c.family)
+		: INTENT_PLANS[c.family]
 			? "What happened next: this is the agent's next step only; nothing after it ran. When its calls " +
 				"already make the choice, label them. When they don't yet (reading logs, editing the script), " +
-				"label the plan it states in its reasoning or to the user: 'fix and resubmit' is " +
-				"fix-and-resubmit, 'rerun it' is resubmit, 'test the fix in a sandbox first' is " +
-				"reproduce-in-sandbox. Use investigate or fix-only only when it states no next step. Set basis " +
-				'to "action" or "intent" accordingly.'
+				`label the plan it states in its reasoning or to the user: ${INTENT_PLANS[c.family]} ` +
+				'Set basis to "action" or "intent" accordingly.'
 			: "What happened next: this is the agent's next step only; nothing after it ran. Judge the step " +
 				"itself. When it has not committed to a choice yet (reading, editing the script, planning), use " +
 				"investigate where the family has it, otherwise other.";
@@ -151,7 +157,7 @@ function prompt(c: DecisionCase, action: Action, sampled: boolean): string {
 		'Answer with JSON only: {"summary": "2-3 plain sentences: what it faced, what it did, how it turned out", ' +
 			'"label": "<one label from the list>", "rationale": "1-2 sentences on why, against the rule", ' +
 			'"triggerValid": true|false, "confidence": "low"|"medium"|"high"' +
-			(sampled && INTENT_FAMILIES.has(c.family) ? ', "basis": "action"|"intent"}' : "}"),
+			(sampled && INTENT_PLANS[c.family] ? ', "basis": "action"|"intent"}' : "}"),
 	]
 		.filter(Boolean)
 		.join("\n\n");
