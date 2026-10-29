@@ -20,13 +20,13 @@ export const ATTEMPTS = 3;
 /** what each family asks and what its labels mean, the same rules labels.ts applies */
 export const RULES: Record<Family, string> = {
 	"first-gpu-job":
-		"Lewis's ask: develop in a sandbox before submitting jobs. The decision is the agent's first GPU job. " +
+		"The ask from user feedback: develop in a sandbox before submitting jobs. The decision is the agent's first GPU job. " +
 		"Right call: it goes to a sandbox now (develop-in-sandbox), or the job's script was already run or tested " +
 		"in a sandbox earlier (job-after-sandboxing-script). Wrong call: it submits with no sandbox work on this " +
 		"code beforehand (job-without-sandbox). job-after-other-sandbox-work means a sandbox was used, but not for " +
 		"this script; say whether that sandbox work actually covered the code this job runs.",
 	"after-job-failure":
-		"Lewis's ask: stop submitting jobs that fail; reproduce in a sandbox first. The decision is what the agent " +
+		"The ask from user feedback: stop submitting jobs that fail; reproduce in a sandbox first. The decision is what the agent " +
 		"does after reading that a job failed. Right call: reproduce or test the fix in a sandbox before running " +
 		"the job again (reproduce-in-sandbox). Wrong call: run the failed job's script again as a job, with " +
 		"(fix-and-resubmit) or without (resubmit) an edit, untested. different-job: the next job runs other, " +
@@ -67,7 +67,7 @@ const INTENT_PLANS: Partial<Record<Family, string>> = {
 };
 
 /** bumped when the judge prompt changes, so cached judgements are redone */
-export const JUDGE_VERSION = 3;
+export const JUDGE_VERSION = 4;
 
 export interface Judgement {
 	model: string;

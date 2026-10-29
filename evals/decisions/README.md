@@ -16,7 +16,7 @@ A full comparison takes a couple of hours, so it runs on demand or on a schedule
 | `after-oom`         | the step after a CUDA OOM              | change memory use, not only the GPU   |
 | `after-stale-api`   | the step after a changed-library error | look up the real API before editing   |
 
-The first two come from Lewis's report (Slack, 2026-10-24) of the agent submitting lots of failing
+The first two come from user feedback (2026-10-24) about the agent submitting lots of failing
 jobs instead of first developing in a sandbox.
 
 ## Data

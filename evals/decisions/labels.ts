@@ -63,7 +63,7 @@ export const LABELS: Record<Family, Record<string, boolean | null>> = {
 };
 
 /**
- * Lewis's ask (Slack, 2026-10-24): develop in a sandbox before submitting jobs. A job whose script
+ * The ask from user feedback (2026-10-24): develop in a sandbox before submitting jobs. A job whose script
  * a sandbox call named earlier passes; sandbox work on something else is left to a reviewer.
  */
 function labelFirstGpuJob(
