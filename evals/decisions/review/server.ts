@@ -5,19 +5,11 @@
  * The sample and the verdicts are kept in <cases>/review/, so a restart picks up where you left.
  * Local only: the cases are real users' conversations.
  */
-import {
-	closeSync,
-	existsSync,
-	mkdirSync,
-	openSync,
-	readFileSync,
-	readSync,
-	renameSync,
-	writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { indexCases, readCaseAt } from "../caseFile";
 import { caseView } from "../digest";
 import { LABELS } from "../labels";
 import type { DecisionCase, Family } from "../types";
@@ -66,33 +58,16 @@ function annotations(): Record<string, unknown> {
 	return existsSync(annotationsPath) ? JSON.parse(readFileSync(annotationsPath, "utf8")) : {};
 }
 
-/** reads only each line's head, the conversation is last and can be megabytes */
 function indexFamily(family: Family): Indexed[] {
-	const path = join(casesDir, `${family}.jsonl`);
-	if (!existsSync(path)) return [];
-	const buffer = readFileSync(path);
-	const marker = Buffer.from(',"conversation":');
-	const rows: Indexed[] = [];
-	let start = 0;
-	while (start < buffer.length) {
-		let end = buffer.indexOf(10, start);
-		if (end === -1) end = buffer.length;
-		const cut = buffer.indexOf(marker, start);
-		if (cut !== -1 && cut < end) {
-			const head = JSON.parse(`${buffer.subarray(start, cut).toString("utf8")}}`) as DecisionCase;
-			rows.push({
-				id: head.id,
-				conversationId: head.source.conversationId,
-				label: head.observed.label,
-				pass: head.observed.pass,
-				seed: Boolean(head.source.feedback),
-				offset: start,
-				length: end - start,
-			});
-		}
-		start = end + 1;
-	}
-	return rows;
+	return indexCases(casesDir, family).map(({ head, offset, length }) => ({
+		id: head.id,
+		conversationId: head.source.conversationId,
+		label: head.observed.label,
+		pass: head.observed.pass,
+		seed: Boolean(head.source.feedback),
+		offset,
+		length,
+	}));
 }
 
 function seeded(seed: number): () => number {
@@ -170,15 +145,7 @@ function saveVerdicts() {
 function readCase(id: string): DecisionCase | undefined {
 	const family = id.split("/")[0] as Family;
 	const row = index.get(family)?.find((r) => r.id === id);
-	if (!row) return undefined;
-	const fd = openSync(join(casesDir, `${family}.jsonl`), "r");
-	try {
-		const buffer = Buffer.alloc(row.length);
-		readSync(fd, buffer, 0, row.length, row.offset);
-		return JSON.parse(buffer.toString("utf8")) as DecisionCase;
-	} finally {
-		closeSync(fd);
-	}
+	return row ? readCaseAt(casesDir, family, row) : undefined;
 }
 
 function state() {
