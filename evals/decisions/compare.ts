@@ -1,8 +1,9 @@
 /**
  * Compares two eval arms (run dirs from eval:run) case by case.
  *
- * Run: npm run eval:compare -- --cases <dir> --a <run dir> --b <run dir> [--judge <id:provider>]
- *   [--concurrency 8] [--out <file>]
+ * Run: npm run eval:compare -- --cases <dir> --a <run dir> --b <run dir> [--target <family>]
+ *   [--judge <id:provider>] [--concurrency 8] [--out <file>]
+ * Ends with a verdict (verdict.ts) and exits 1 on a regression, for a scheduled run to alert on.
  * Every sample is judged by a model (judge.ts) that never learns which arm it came from, and also
  * labelled by labels.ts. The judge's verdict is the score; the rules are a free cross-check: if
  * they disagree with the judge more in one arm, the judge is reacting to something other than
@@ -22,6 +23,7 @@ import {
 	type PairedCase,
 } from "./stats";
 import type { Action, Family } from "./types";
+import { shipVerdict } from "./verdict";
 
 interface Sample {
 	caseId: string;
@@ -159,6 +161,8 @@ interface Comparison {
 	diff: Interval;
 	/** two-sided, from reshuffling each case's samples between the arms */
 	p: number | null;
+	/** p adjusted over the families, set on family rows only */
+	pHolm?: number | null;
 	pairedCases: number;
 	unjudgedShare: { a: number | null; b: number | null };
 }
@@ -187,15 +191,22 @@ function compareArms(a: Arm, b: Arm, family: Family | "all", score: Scorer): Com
 }
 
 /** how often the judge and the rules give the same verdict, where both give one */
-function agreement(arm: Arm, family: Family | "all"): number | null {
-	const both = arm.samples
+function bothVerdicts(arm: Arm, family: Family | "all") {
+	return arm.samples
 		.filter((s) => family === "all" || s.family === family)
 		.map((s) => [byJudge(arm, s), byRules(arm, s)])
 		.filter(([j, r]) => typeof j === "boolean" && typeof r === "boolean");
+}
+
+function agreement(arm: Arm, family: Family | "all"): number | null {
+	const both = bothVerdicts(arm, family);
 	return both.length
 		? Number((both.filter(([j, r]) => j === r).length / both.length).toFixed(3))
 		: null;
 }
+
+const familySamples = (arm: Arm, family: Family) =>
+	arm.samples.filter((s) => s.family === family).length;
 
 /** share of the judge's verdicts that came from a step's stated plan rather than its calls */
 function intentShare(arm: Arm, family: Family | "all"): number | null {
@@ -262,15 +273,54 @@ async function main() {
 					rules: compareArms(a, b, family, byRules),
 					judgeRulesAgreement: { a: agreement(a, family), b: agreement(b, family) },
 					intentShare: { a: intentShare(a, family), b: intentShare(b, family) },
+					counts:
+						family === "all"
+							? undefined
+							: {
+									samples: { a: familySamples(a, family), b: familySamples(b, family) },
+									agreement: {
+										a: bothVerdicts(a, family).length,
+										b: bothVerdicts(b, family).length,
+									},
+								},
 				},
 			])
 		),
 	};
 	// the families are the tests; "all" mixes their baselines and is reported, not tested
 	const adjusted = holm(families.map((f) => report.results[f].judge.p));
-	families.forEach((f, i) => Object.assign(report.results[f].judge, { pHolm: adjusted[i] }));
+	families.forEach((f, i) => (report.results[f].judge.pHolm = adjusted[i]));
+	const target = process.argv.includes("--target") ? (arg("--target") as Family) : undefined;
+	const verdict = shipVerdict({
+		samePromptCases: samePrompt,
+		sharedCases: shared.length,
+		size: {
+			perFamily: Math.min(Number(a.meta.perFamily), Number(b.meta.perFamily)),
+			samples: Math.min(Number(a.meta.samples), Number(b.meta.samples)),
+		},
+		target,
+		families: Object.fromEntries(
+			families.map((f) => {
+				const r = report.results[f];
+				return [
+					f,
+					{
+						diff: r.judge.diff.value,
+						p: r.judge.p,
+						pHolm: r.judge.pHolm ?? null,
+						unjudgedShare: r.judge.unjudgedShare,
+						agreement: r.judgeRulesAgreement,
+						counts: r.counts ?? {
+							samples: { a: 0, b: 0 },
+							agreement: { a: 0, b: 0 },
+						},
+					},
+				];
+			})
+		),
+	});
 	const out = arg("--out", join(b.dir, `compare-vs-${basename(a.dir)}.json`));
-	writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
+	writeFileSync(out, `${JSON.stringify({ ...report, target, verdict }, null, 2)}\n`);
 
 	console.log(`A ${a.dir} (${(a.meta.git as { sha?: string })?.sha?.slice(0, 8)})`);
 	console.log(`B ${b.dir} (${(b.meta.git as { sha?: string })?.sha?.slice(0, 8)})`);
@@ -281,7 +331,7 @@ async function main() {
 	console.log("|---|---|---|---|---|---|---|---|---|");
 	for (const [family, r] of Object.entries(report.results)) {
 		console.log(
-			`| ${family} | ${interval(r.judge.a)} | ${interval(r.judge.b)} | ${interval(r.judge.diff, true)} | ${r.judge.p ?? "–"} (${(r.judge as { pHolm?: number | null }).pHolm ?? "–"}) | ` +
+			`| ${family} | ${interval(r.judge.a)} | ${interval(r.judge.b)} | ${interval(r.judge.diff, true)} | ${r.judge.p ?? "–"} (${r.judge.pHolm ?? "–"}) | ` +
 				`${r.judge.pairedCases} | ${pct(r.judge.unjudgedShare.a)}/${pct(r.judge.unjudgedShare.b)} | ` +
 				`${interval(r.rules.diff, true)} (${r.rules.p ?? "–"}) | ${pct(r.judgeRulesAgreement.a)}/${pct(r.judgeRulesAgreement.b)} |`
 		);
@@ -290,7 +340,10 @@ async function main() {
 		const { a: ia, b: ib } = r.intentShare;
 		if (ia || ib) console.log(`${family}: ${pct(ia)}/${pct(ib)} of verdicts from a stated plan`);
 	}
+	console.log(`\nverdict: ${verdict.verdict}`);
+	for (const reason of verdict.reasons) console.log(`- ${reason}`);
 	console.log(`\nreport: ${out}`);
+	if (verdict.verdict === "regression") process.exitCode = 1;
 }
 
 main().catch((error) => {
