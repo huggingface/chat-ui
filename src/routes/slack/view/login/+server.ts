@@ -1,3 +1,4 @@
+import { readConnectionLink } from "$lib/server/slack/links";
 import { randomBytes } from "node:crypto";
 import { error, redirect } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
@@ -17,6 +18,9 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	const target = url.searchParams.get("session");
 	if (connect ? !/^[\w-]{43}$/.test(connect) : !target || !/^[a-f0-9]{24}$/.test(target))
 		error(400, "Invalid session.");
+	const ticket = connect ? await readConnectionLink(connect) : null;
+	if (connect && !ticket) error(400, "Connection link expired. Mention the bot again.");
+	const loginTeam = ticket?.userTeamId ?? slack.teamId;
 	const state = randomBytes(32).toString("base64url"),
 		nonce = randomBytes(32).toString("base64url");
 	cookies.set(
@@ -26,6 +30,6 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	);
 	redirect(
 		302,
-		(await oidcClient()).authorizationUrl({ scope: "openid", state, nonce, team: slack.teamId })
+		(await oidcClient()).authorizationUrl({ scope: "openid", state, nonce, team: loginTeam })
 	);
 };

@@ -1,8 +1,10 @@
 import {
 	MessageUpdateType,
+	MessageUpdateStatus,
 	MessageToolUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
+import { paymentErrorNotice } from "$lib/utils/paymentErrors";
 import { Lexer, type Token } from "marked";
 import type { types, ViewStateValue } from "@slack/bolt";
 import type {
@@ -70,6 +72,25 @@ export function chunks(text: string, size = 2800): string[] {
 
 export function visibleText(text: string): string {
 	return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
+}
+
+/** One line for a failed run. Unknown errors stay generic: the thread may be shared. */
+export function runFailureText(updates: MessageUpdate[] = []): string {
+	const error = updates.findLast(
+		(update) =>
+			update.type === MessageUpdateType.Status && update.status === MessageUpdateStatus.Error
+	);
+	const status = error?.type === MessageUpdateType.Status ? error : undefined;
+	const reason =
+		status?.statusCode === 402
+			? (paymentErrorNotice(status.errorCode) ??
+				"Your Hugging Face account is out of inference credits. Add credits, then retry.")
+			: status?.statusCode === 401
+				? "Your Hugging Face login is no longer valid. Sign in to HuggingChat again, then mention me to reconnect."
+				: status?.statusCode === 429
+					? "Hugging Face rate-limited this request. Wait a minute, then retry."
+					: undefined;
+	return reason ? `The run failed. ${reason}` : "The run failed. You can resume it below.";
 }
 
 /** Render Markdown as Slack mrkdwn, without allowing model-authored Slack mentions. */

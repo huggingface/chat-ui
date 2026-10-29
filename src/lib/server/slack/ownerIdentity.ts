@@ -13,11 +13,12 @@ export async function connectedLocals(thread: SlackThread): Promise<App.Locals> 
 	if (settings?.accountMode !== "user" || settings.teamId !== thread.teamId)
 		throw new ConnectionError("This Slack account connection is disabled.");
 	const connection = await collections.slackConnections.findOne({
-		_id: connectionKey(thread.teamId, thread.owner),
+		_id: connectionKey(thread.teamId, thread.owner, thread.ownerTeamId),
 	});
 	if (
 		!thread.hfUserId ||
 		!connection?.verifiedSlackIdentity ||
+		(connection.userTeamId ?? connection.teamId) !== (thread.ownerTeamId ?? thread.teamId) ||
 		!connection.userId.equals(thread.hfUserId)
 	)
 		throw new ConnectionError(

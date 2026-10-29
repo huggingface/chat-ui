@@ -5,7 +5,7 @@ import { base } from "$app/paths";
 import { collections } from "$lib/server/database";
 import { connectAccount, readConnectionLink, ConnectionError } from "$lib/server/slack/connections";
 import { identity } from "$lib/server/slack/viewer/auth";
-import { setMcpSyncEnabled } from "$lib/server/mcp/savedSelection";
+import { setMcpSyncEnabled, slackMcpSyncAvailable } from "$lib/server/mcp/savedSelection";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies }) => {
@@ -19,7 +19,7 @@ export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies })
 	if (ticket) {
 		const slack = identity({ cookies });
 		if (!slack) redirect(303, `${base}/slack/view/login?connect=${token}`);
-		if (slack.team !== ticket.teamId || slack.user !== ticket.slackUserId)
+		if (slack.team !== (ticket.userTeamId ?? ticket.teamId) || slack.user !== ticket.slackUserId)
 			error(
 				403,
 				"This link belongs to a different Slack account. Mention the bot yourself for a new link."
@@ -27,22 +27,25 @@ export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies })
 	}
 	const connections = await collections.slackConnections
 		.find({ userId: locals.user._id })
-		.project<{ _id: string; teamId: string; slackUserId: string }>({
+		.project<{ _id: string; teamId: string; slackUserId: string; userTeamId?: string }>({
 			_id: 1,
 			teamId: 1,
 			slackUserId: 1,
+			userTeamId: 1,
 		})
 		.toArray();
-	const mcpSync = Boolean(await collections.mcpSelections.findOne({ _id: locals.user._id }));
+	const mcpSyncAvailable = slackMcpSyncAvailable();
+	const mcpSync =
+		mcpSyncAvailable && Boolean(await collections.mcpSelections.findOne({ _id: locals.user._id }));
 	const settings = slackConfig();
 	if (!settings && (ticket || connections.length)) error(503, "Slack is unavailable.");
 	const client = new WebClient(settings?.botToken, { retryConfig: { retries: 0 }, timeout: 10000 });
-	const describe = async (teamId: string, userId: string) => {
+	const describe = async (teamId: string, userId: string, userTeamId = teamId) => {
 		const [team, user] = await Promise.all([
 			client.auth.test(),
 			client.users.info({ user: userId }),
 		]);
-		if (!team.team || team.team_id !== teamId || !user.user || user.user.team_id !== teamId)
+		if (!team.team || team.team_id !== teamId || !user.user || user.user.team_id !== userTeamId)
 			error(503, "Could not verify Slack account details. Try again shortly.");
 		return {
 			workspaceName: team.team,
@@ -50,11 +53,18 @@ export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies })
 				user.user.profile?.display_name || user.user.real_name || user.user.name || userId,
 		};
 	};
-	const slackNames = ticket ? await describe(ticket.teamId, ticket.slackUserId) : undefined;
+	const slackNames = ticket
+		? await describe(ticket.teamId, ticket.slackUserId, ticket.userTeamId)
+		: undefined;
 	const namedConnections = await Promise.all(
 		connections.map(async (connection) => ({
 			...connection,
-			...(await describe(connection.teamId, connection.slackUserId)),
+			...(await describe(connection.teamId, connection.slackUserId, connection.userTeamId).catch(
+				() => ({
+					workspaceName: connection.teamId,
+					displayName: connection.slackUserId,
+				})
+			)),
 		}))
 	);
 	return {
@@ -62,10 +72,12 @@ export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies })
 		ticket: token,
 		slackUser: ticket?.slackUserId,
 		slackTeam: ticket?.teamId,
+		slackUserTeam: ticket?.userTeamId ?? ticket?.teamId,
 		connected: connections.length > 0,
 		connections: namedConnections,
 		slackNames,
 		mcpSync,
+		mcpSyncAvailable,
 	};
 };
 export const actions: Actions = {

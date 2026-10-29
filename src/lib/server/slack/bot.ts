@@ -1,3 +1,4 @@
+import { eligibleParticipant } from "./access";
 import { ConnectionError } from "./links";
 import {
 	chatLink,
@@ -41,13 +42,7 @@ import { answerSideQuestion, SIDE_QUESTION_MAX_CHARS } from "$lib/server/mlSideQ
 import { slackSideQuestion } from "$lib/utils/sideQuestion";
 import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } from "./engine";
 import { MCP_RESYNC_NOTE } from "$lib/server/mcp/savedSelection";
-import {
-	addressedToOther,
-	isWorkspaceMember,
-	threadKey,
-	threadPrompt,
-	type ThreadMessage,
-} from "./context";
+import { addressedToOther, threadKey, threadPrompt, type ThreadMessage } from "./context";
 import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store";
 import type { SlackThread } from "./types";
 import {
@@ -71,6 +66,7 @@ import {
 	questionModal,
 	readAnswers,
 	visibleText,
+	runFailureText,
 } from "./presentation";
 
 function parseMetadata(raw: string | undefined): unknown {
@@ -90,6 +86,7 @@ const turnAction = z.object({
 const mention = z.object({
 	channel: z.string(),
 	user: z.string(),
+	user_team: z.string().optional(),
 	text: z.string().max(40_000),
 	ts: z.string().regex(/^\d+\.\d+$/),
 	thread_ts: z
@@ -116,8 +113,12 @@ export class MlSlackBot {
 	private botUserId = "";
 	private active = new Map<string, Promise<void>>();
 	private runningConversations = new Map<string, string>();
+	private eventMembership = new Map<
+		string,
+		{ user: NonNullable<Awaited<ReturnType<typeof eligibleParticipant>>>; until: number }
+	>();
+	private eventRates = new Map<string, { count: number; until: number; notified?: boolean }>();
 	private linkPrompts = new Map<string, number>();
-	private members = new Map<string, { allowed: boolean; until: number }>();
 	private sideQuestionEvents = new Map<string, number>();
 	private sideQuestionAskers = new Set<string>();
 	private ticking = false;
@@ -153,13 +154,53 @@ export class MlSlackBot {
 		this.register();
 	}
 
-	private async member(userId: string): Promise<boolean> {
-		const cached = this.members.get(userId);
-		if (cached && cached.until > Date.now()) return cached.allowed;
-		const result = await this.app.client.users.info({ user: userId });
-		const allowed = !!result.user && isWorkspaceMember(result.user, this.settings.teamId);
-		this.members.set(userId, { allowed, until: Date.now() + 60_000 });
-		return allowed;
+	private async participant(thread: SlackThread, userId: string) {
+		const participant = await eligibleParticipant(
+			this.app.client,
+			{ ...this.settings, accountMode: thread.hfUserId ? this.settings.accountMode : "shared" },
+			userId,
+			thread.channel
+		);
+		if (
+			thread.hfUserId &&
+			userId === thread.owner &&
+			participant?.team_id !== (thread.ownerTeamId ?? thread.teamId)
+		)
+			return;
+		return participant;
+	}
+
+	/** event-path eligibility with a 60 s positive cache; dispatch and controls recheck uncached */
+	private async cachedParticipant(mode: SlackConfig["accountMode"], channel: string, user: string) {
+		const now = Date.now();
+		for (const [key, value] of this.eventMembership)
+			if (value.until <= now) this.eventMembership.delete(key);
+		const cacheKey = `${mode}:${channel}:${user}`;
+		const cached = this.eventMembership.get(cacheKey)?.user;
+		if (cached) return cached;
+		const participant = await eligibleParticipant(
+			this.app.client,
+			{ ...this.settings, accountMode: mode },
+			user,
+			channel
+		);
+		if (participant && this.eventMembership.size < 5000)
+			this.eventMembership.set(cacheKey, { user: participant, until: now + 60_000 });
+		return participant;
+	}
+
+	private async reconnectionLink(thread: SlackThread) {
+		const user = await eligibleParticipant(
+			this.app.client,
+			this.settings,
+			thread.owner,
+			thread.channel
+		);
+		if (!user?.team_id) return;
+		return createConnectionLink(thread.teamId, thread.owner, {
+			userTeamId: user.team_id,
+			channel: thread.channel,
+		});
 	}
 
 	private async owned(
@@ -168,8 +209,15 @@ export class MlSlackBot {
 		teamId: string | undefined,
 		requireConnection = true
 	): Promise<SlackThread | null> {
-		if (teamId !== this.settings.teamId || !(await this.member(userId))) return null;
-		const thread = await collections.slackThreads.findOne({ _id: threadId, teamId, owner: userId });
+		const thread = await collections.slackThreads.findOne({
+			_id: threadId,
+			teamId: this.settings.teamId,
+			owner: userId,
+		});
+		if (!thread) return null;
+		const participant = await this.participant(thread, userId);
+		if (!participant || (teamId !== this.settings.teamId && teamId !== participant.team_id))
+			return null;
 		if (thread?.deletedAt) return null;
 		if (thread?.hfUserId && requireConnection) {
 			try {
@@ -513,12 +561,19 @@ export class MlSlackBot {
 		this.app.action("ml_intern_trace", async ({ ack, body, action }) => {
 			await ack();
 			if (!("value" in action)) return;
-			if (body.team?.id !== this.settings.teamId || !(await this.member(body.user.id))) return;
+
 			const thread = await collections.slackThreads.findOne({
 				_id: action.value ?? "",
 				teamId: this.settings.teamId,
 			});
 			if (!thread || !("channel" in body) || body.channel?.id !== thread.channel) return;
+			if (thread.hfUserId && thread.owner !== body.user.id) return;
+			const participant = await this.participant(thread, body.user.id);
+			if (
+				!participant ||
+				(body.team?.id !== this.settings.teamId && body.team?.id !== participant.team_id)
+			)
+				return;
 			// Personal traces and DMs are owner-only; legacy channel traces remain shared.
 			if ((thread.hfUserId || thread.channel.startsWith("D")) && thread.owner !== body.user.id)
 				return;
@@ -528,7 +583,7 @@ export class MlSlackBot {
 			)
 				return;
 			const channel = await this.app.client.conversations.info({ channel: thread.channel });
-			if (channel.channel?.is_ext_shared) return;
+			if (channel.channel?.is_ext_shared && !thread.hfUserId) return;
 			const conv = await collections.conversations.findOne({ _id: thread.conversationId });
 			if (!conv) return;
 			try {
@@ -596,7 +651,52 @@ export class MlSlackBot {
 			!this.settings.allowedChannels.includes(event.channel)
 		)
 			return;
-		if (!(await this.member(event.user))) return;
+		const existing = await collections.slackThreads.findOne({
+			teamId,
+			channel: event.channel,
+			threadTs: event.thread_ts ?? event.ts,
+		});
+		// Bound traffic before any Slack API lookup. Local owner checks also keep non-owners
+		// from consuming paginated membership checks on existing sessions. The owner steering
+		// their own thread is exempt: dropping it would demote their instruction to quoted context.
+		const now = Date.now();
+		if (!existing || existing.deletedAt || existing.owner !== event.user) {
+			for (const [key, value] of this.eventRates)
+				if (value.until <= now) this.eventRates.delete(key);
+			const rate = this.eventRates.get(event.user) ?? { count: 0, until: now + 60_000 };
+			if (rate.count >= 10 || (!this.eventRates.has(event.user) && this.eventRates.size >= 5000)) {
+				if (rate.count >= 10 && !rate.notified) {
+					rate.notified = true;
+					await this.tell(
+						event.channel,
+						event.user,
+						"You're sending messages to ML Intern too quickly. Wait a minute, then send that again.",
+						event.thread_ts
+					).catch(() => {});
+				}
+				return;
+			}
+			rate.count++;
+			this.eventRates.set(event.user, rate);
+		}
+		if (existing?.hfUserId && existing.owner !== event.user) {
+			await this.tell(
+				event.channel,
+				event.user,
+				"Only the session owner can make requests using their personal Hugging Face account. Start your own thread to use yours.",
+				event.thread_ts
+			);
+			return;
+		}
+		const mode = existing && !existing.hfUserId ? "shared" : this.settings.accountMode;
+		const participant = await this.cachedParticipant(mode, event.channel, event.user);
+		if (
+			!participant ||
+			(event.user_team && event.user_team !== participant.team_id) ||
+			(existing?.hfUserId && participant.team_id !== (existing.ownerTeamId ?? existing.teamId))
+		)
+			return;
+		// Dispatch and controls recheck membership without this event-only cache.
 		// In a DM every message is for the bot, even one that opens by tagging a colleague.
 		if (
 			event.channel_type !== "im" &&
@@ -611,20 +711,7 @@ export class MlSlackBot {
 			);
 			return;
 		}
-		const channel = await this.app.client.conversations.info({ channel: event.channel });
-		if (channel.channel?.is_ext_shared) {
-			await this.tell(
-				event.channel,
-				event.user,
-				"ML Intern is available in internal workspace channels and DMs."
-			);
-			return;
-		}
-		const existing = await collections.slackThreads.findOne({
-			teamId,
-			channel: event.channel,
-			threadTs: event.thread_ts ?? event.ts,
-		});
+
 		if (existing?.deletedAt) {
 			await this.tell(
 				event.channel,
@@ -634,15 +721,7 @@ export class MlSlackBot {
 			);
 			return;
 		}
-		if (existing?.hfUserId && existing.owner !== event.user) {
-			await this.tell(
-				event.channel,
-				event.user,
-				"Only the session owner can make requests using their personal Hugging Face account. Start your own thread to use yours.",
-				event.thread_ts
-			);
-			return;
-		}
+
 		if (existing && !existing.hfUserId && !this.user) {
 			await this.tell(
 				event.channel,
@@ -658,15 +737,21 @@ export class MlSlackBot {
 		let hfUserId = existing?.hfUserId;
 		if (this.settings.accountMode === "user" && !existing) {
 			const connection = await collections.slackConnections.findOne({
-				_id: connectionKey(teamId, event.user),
+				_id: connectionKey(teamId, event.user, participant.team_id),
 			});
-			if (!connection) {
+			if (
+				!connection ||
+				(connection.userTeamId ?? connection.teamId) !== (participant.team_id ?? teamId)
+			) {
 				const now = Date.now();
 				for (const [user, until] of this.linkPrompts)
 					if (until <= now) this.linkPrompts.delete(user);
 				if (this.linkPrompts.has(event.user)) return;
 				this.linkPrompts.set(event.user, now + 30000);
-				const link = await createConnectionLink(teamId, event.user);
+				const link = await createConnectionLink(teamId, event.user, {
+					userTeamId: participant.team_id ?? teamId,
+					channel: event.channel,
+				});
 				await this.tell(
 					event.channel,
 					event.user,
@@ -683,7 +768,8 @@ export class MlSlackBot {
 			event.channel,
 			event.thread_ts ?? event.ts,
 			event.user,
-			hfUserId
+			hfUserId,
+			participant.team_id ?? teamId
 		);
 		const inserted = await enqueueInput({
 			_id: inputKey(teamId, eventId),
@@ -817,6 +903,10 @@ export class MlSlackBot {
 		return false;
 	}
 
+	/**
+	 * Personal sessions take only the owner's messages: they run on the owner's HF account, so
+	 * other people's text and files would be a prompt-injection path. The owner can paste them in.
+	 */
 	private async context(
 		thread: SlackThread,
 		input: { text: string; user: string; ts: string }
@@ -893,8 +983,8 @@ export class MlSlackBot {
 		try {
 			if (thread.hfUserId && input.user !== thread.owner)
 				throw new Error("Only the personal session owner may submit requests.");
-			if (!(await this.member(input.user)))
-				throw new Error("The invoking user is no longer a workspace member.");
+			if (!(await this.participant(thread, input.user)))
+				throw new Error("The invoking user is no longer eligible in this channel.");
 			if (this.stopped) throw new Error("Slack worker stopped.");
 			const locals = thread.hfUserId ? await connectedLocals(thread) : undefined;
 			const user = locals?.user ?? this.user;
@@ -981,7 +1071,7 @@ export class MlSlackBot {
 			);
 		} catch (error) {
 			if (error instanceof ConnectionError) {
-				const link = await createConnectionLink(thread.teamId, thread.owner).catch(() => undefined);
+				const link = await this.reconnectionLink(thread).catch(() => undefined);
 				await this.tell(
 					thread.channel,
 					thread.owner,
@@ -1011,7 +1101,14 @@ export class MlSlackBot {
 				}
 			);
 		} finally {
-			if (!queueOnly) this.runningConversations.delete(thread._id);
+			if (!queueOnly) {
+				this.runningConversations.delete(thread._id);
+				// A tick that rendered just before the turn ended would otherwise unwatch the thread
+				// and never post the result. The new updatedAt voids that tick's conditional unwatch.
+				await collections.slackThreads
+					.updateOne({ _id: thread._id }, { $set: { watching: true, updatedAt: new Date() } })
+					.catch(() => logger.warn("[slack] Could not rewatch a finished thread"));
+			}
 		}
 	}
 
@@ -1155,7 +1252,7 @@ export class MlSlackBot {
 			text =
 				visibleText(phaseContent) ||
 				(state.status === "failed"
-					? "The run failed. You can resume it below."
+					? runFailureText(message.updates)
 					: "The run ended without a text response.");
 			if (message.interrupted || state.status === "failed")
 				actions.push({ id: RESUME_ACTION, label: "Retry", value: turnValue });
