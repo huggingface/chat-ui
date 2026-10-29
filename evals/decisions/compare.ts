@@ -13,7 +13,7 @@ import { basename, join } from "node:path";
 import { indexCases, readCaseAt, type CaseRow } from "./caseFile";
 import { contextFor } from "./calls";
 import { DEFAULT_JUDGE, hfToken, judge, type Judgement } from "./judge";
-import { bootstrap, groupBy, mean, type Interval } from "./stats";
+import { groupBy, pairedBootstrap, permutationP, type Interval, type PairedCase } from "./stats";
 import type { Action, Family } from "./types";
 
 interface Sample {
@@ -117,8 +117,8 @@ const byRules: Scorer = (_arm, s) => s.rules?.pass;
 interface CaseScore {
 	caseId: string;
 	conversationId: string;
-	/** share of judged samples that made the right call, null when none was judged */
-	rate: number | null;
+	/** verdicts on the samples that got one */
+	verdicts: boolean[];
 	/** samples given no verdict (investigate, asked the user, ...) */
 	unjudged: number;
 	samples: number;
@@ -128,13 +128,14 @@ function caseScores(arm: Arm, family: Family | "all", score: Scorer): Map<string
 	const scores = new Map<string, CaseScore>();
 	const samples = arm.samples.filter((s) => family === "all" || s.family === family);
 	for (const list of groupBy(samples, (s) => s.caseId)) {
-		const verdicts = list.map((s) => score(arm, s));
-		const judged = verdicts.filter((v): v is boolean => v === true || v === false);
+		const verdicts = list
+			.map((s) => score(arm, s))
+			.filter((v): v is boolean => v === true || v === false);
 		scores.set(list[0].caseId, {
 			caseId: list[0].caseId,
 			conversationId: list[0].conversationId,
-			rate: judged.length ? judged.filter(Boolean).length / judged.length : null,
-			unjudged: verdicts.length - judged.length,
+			verdicts,
+			unjudged: list.length - verdicts.length,
 			samples: list.length,
 		});
 	}
@@ -144,8 +145,10 @@ function caseScores(arm: Arm, family: Family | "all", score: Scorer): Map<string
 interface Comparison {
 	a: Interval;
 	b: Interval;
-	/** b − a over the cases both arms judged */
+	/** b − a over the cases both arms gave a verdict on */
 	diff: Interval;
+	/** two-sided, from reshuffling each case's samples between the arms */
+	p: number | null;
 	pairedCases: number;
 	unjudgedShare: { a: number | null; b: number | null };
 }
@@ -153,19 +156,21 @@ interface Comparison {
 function compareArms(a: Arm, b: Arm, family: Family | "all", score: Scorer): Comparison {
 	const sa = caseScores(a, family, score);
 	const sb = caseScores(b, family, score);
-	const paired = [...sa.values()]
-		.filter((x) => x.rate !== null && sb.get(x.caseId)?.rate != null)
-		.map((x) => ({ ...x, a: x.rate as number, b: sb.get(x.caseId)?.rate as number }));
-	const groups = groupBy(paired, (p) => p.conversationId);
+	const paired: PairedCase[] = [...sa.values()]
+		.map((x) => ({
+			conversationId: x.conversationId,
+			a: x.verdicts,
+			b: sb.get(x.caseId)?.verdicts ?? [],
+		}))
+		.filter((x) => x.a.length > 0 && x.b.length > 0);
 	const unjudged = (scores: Map<string, CaseScore>) => {
 		const list = [...scores.values()];
 		const total = list.reduce((n, s) => n + s.samples, 0);
 		return total ? Number((list.reduce((n, s) => n + s.unjudged, 0) / total).toFixed(3)) : null;
 	};
 	return {
-		a: bootstrap(groups, (list) => mean(list.map((p) => p.a))),
-		b: bootstrap(groups, (list) => mean(list.map((p) => p.b))),
-		diff: bootstrap(groups, (list) => mean(list.map((p) => p.b - p.a))),
+		...pairedBootstrap(paired),
+		p: permutationP(paired),
 		pairedCases: paired.length,
 		unjudgedShare: { a: unjudged(sa), b: unjudged(sb) },
 	};
@@ -246,14 +251,14 @@ async function main() {
 	console.log(`B ${b.dir} (${(b.meta.git as { sha?: string })?.sha?.slice(0, 8)})`);
 	console.log(`same prompt and tools in ${report.samePromptCases} cases; judge ${model}\n`);
 	console.log(
-		"| family | A | B | B − A | cases | no verdict A/B | rules B − A | judge≈rules A/B |"
+		"| family | A | B | B − A | p | cases | no verdict A/B | rules B − A (p) | judge≈rules A/B |"
 	);
-	console.log("|---|---|---|---|---|---|---|---|");
+	console.log("|---|---|---|---|---|---|---|---|---|");
 	for (const [family, r] of Object.entries(report.results)) {
 		console.log(
-			`| ${family} | ${interval(r.judge.a)} | ${interval(r.judge.b)} | ${interval(r.judge.diff, true)} | ` +
+			`| ${family} | ${interval(r.judge.a)} | ${interval(r.judge.b)} | ${interval(r.judge.diff, true)} | ${r.judge.p ?? "–"} | ` +
 				`${r.judge.pairedCases} | ${pct(r.judge.unjudgedShare.a)}/${pct(r.judge.unjudgedShare.b)} | ` +
-				`${interval(r.rules.diff, true)} | ${pct(r.judgeRulesAgreement.a)}/${pct(r.judgeRulesAgreement.b)} |`
+				`${interval(r.rules.diff, true)} (${r.rules.p ?? "–"}) | ${pct(r.judgeRulesAgreement.a)}/${pct(r.judgeRulesAgreement.b)} |`
 		);
 	}
 	console.log(`\nreport: ${out}`);
