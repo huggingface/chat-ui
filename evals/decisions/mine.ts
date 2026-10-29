@@ -25,11 +25,11 @@ import type { Message } from "$lib/types/Message";
 import {
 	MessageToolUpdateType,
 	MessageUpdateType,
-	type MessageToolCallUpdate,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { toolRounds } from "$lib/utils/messageShape";
+import { FILE_NAME, toActionCall } from "./calls";
 import { isGpu, isJobSubmit, isSandboxWork, jobFlavor, label, scriptName } from "./labels";
 import { redact } from "./redact";
 import type { Action, ActionCall, DecisionCase, Family, Feedback } from "./types";
@@ -90,22 +90,6 @@ async function newestFileById(files: string[]): Promise<Map<string, number>> {
 		}
 	}
 	return newest;
-}
-
-function callArgs(update: MessageToolCallUpdate): Record<string, unknown> {
-	if (update.argumentsRaw) {
-		try {
-			const parsed: unknown = JSON.parse(update.argumentsRaw);
-			if (parsed && typeof parsed === "object") return parsed as Record<string, unknown>;
-		} catch {
-			// a cut stream leaves argumentsRaw unparseable, the stored parameters are all there is
-		}
-	}
-	return update.call.parameters;
-}
-
-function toActionCall(update: MessageToolCallUpdate): ActionCall {
-	return { name: update.call.name, args: callArgs(update) };
 }
 
 function resultText(update: MessageUpdate): string | undefined {
@@ -175,8 +159,6 @@ interface History {
 	/** job id to the v-file script it ran, read off each submission's result */
 	jobScripts: Map<string, string>;
 }
-
-const FILE_NAME = /[\w.-]+\.(?:py|sh|ipynb|ya?ml|json|toml)\b/g;
 
 function cloneHistory(history: History): History {
 	return {
