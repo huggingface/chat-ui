@@ -3,6 +3,7 @@ import { config } from "$lib/server/config";
 import { getUserHubToken } from "$lib/server/apiToken";
 import {
 	MessageToolUpdateType,
+	MessageUpdateStatus,
 	MessageUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
@@ -174,6 +175,9 @@ const MAX_LEAKED_TOOL_CALL_RETRIES = 1;
  */
 const LEAKED_CALL_MARKUP =
 	/<\/arg_key>\s*<arg_value>|<\/arg_value>\s*(?:<arg_key>|<\/(?:tool_call|function)>)|<\/function>\s*<\/tool_call>/;
+
+/** How often a streaming tool call's progress is reported to the client. */
+const TOOL_CALL_DRAFT_INTERVAL_MS = 500;
 
 export async function* runMcpFlow({
 	model,
@@ -1004,6 +1008,7 @@ export async function* runMcpFlow({
 
 			const toolCallState: Record<number, { id?: string; name?: string; arguments: string }> = {};
 			let firstToolDeltaLogged = false;
+			let lastDraftAt = 0;
 			let sawToolCall = false;
 			let tokenCount = 0;
 			let finishReason: string | null | undefined;
@@ -1029,6 +1034,23 @@ export async function* runMcpFlow({
 						if (toolCall.function?.name) current.name = toolCall.function.name;
 						if (toolCall.function?.arguments) current.arguments += toolCall.function.arguments;
 						toolCallState[index] = current;
+					}
+					// Nothing else reaches the client until the call is complete, so report
+					// the draft's growth on the out-of-band keepalive channel.
+					const now = Date.now();
+					if (now - lastDraftAt >= TOOL_CALL_DRAFT_INTERVAL_MS) {
+						lastDraftAt = now;
+						const calls = Object.entries(toolCallState)
+							.sort(([a], [b]) => Number(a) - Number(b))
+							.map(([, call]) => call);
+						yield {
+							type: MessageUpdateType.Status,
+							status: MessageUpdateStatus.KeepAlive,
+							toolCallDraft: {
+								name: calls.at(-1)?.name,
+								chars: calls.reduce((sum, call) => sum + call.arguments.length, 0),
+							},
+						};
 					}
 					if (!firstToolDeltaLogged) {
 						try {

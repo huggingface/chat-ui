@@ -20,6 +20,7 @@
 	import { fetchMessageUpdates, resolveStreamingMode } from "$lib/utils/messageUpdates";
 	import { elicitationToResume } from "$lib/stores/elicitationResume";
 	import { consumeMessageUpdates } from "$lib/utils/consumeMessageUpdates";
+	import { toolCallDraft } from "$lib/stores/toolCallDraft";
 	import { consumeReattachStream } from "$lib/utils/consumeReattachStream";
 	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
@@ -440,6 +441,7 @@
 				onTurnState: (update) => {
 					noteServerNow(update.serverNow);
 				},
+				onToolCallDraft: (draft) => toolCallDraft.set(draft),
 				onError: (update) => {
 					if (showPaymentError(update)) return;
 					if (
@@ -475,6 +477,7 @@
 			writeMessageInFlight = false;
 			activeGenerationId = undefined;
 			$loading = false;
+			toolCallDraft.set(null);
 			pending = false;
 			resuming = false;
 			// Wait for the stop request to complete before refreshing data,
