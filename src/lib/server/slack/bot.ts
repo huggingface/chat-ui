@@ -904,14 +904,13 @@ export class MlSlackBot {
 	}
 
 	/**
-	 * Only the requester's own messages: personal sessions run on the owner's HF account, so
+	 * Personal sessions take only the owner's messages: they run on the owner's HF account, so
 	 * other people's text and files would be a prompt-injection path. The owner can paste them in.
 	 */
 	private async context(
 		thread: SlackThread,
 		input: { text: string; user: string; ts: string }
 	): Promise<{ text: string; files: File[] }> {
-		const author = thread.hfUserId ? thread.owner : input.user;
 		let cursor: string | undefined;
 		let omitted = false;
 		const messages: ThreadMessage[] = [];
@@ -928,7 +927,8 @@ export class MlSlackBot {
 			messages.push(
 				...(page.messages ?? []).filter(
 					(m) =>
-						m.user === author &&
+						(!thread.hfUserId || m.user === thread.owner) &&
+						m.user !== this.botUserId &&
 						!m.bot_id &&
 						!(m.ts && thread.sideQuestionTs?.includes(m.ts)) &&
 						(!thread.contextThroughTs || !m.ts || m.ts > thread.contextThroughTs)
@@ -946,8 +946,7 @@ export class MlSlackBot {
 			this.botUserId,
 			omitted,
 			thread.owner,
-			!!thread.hfUserId,
-			author
+			!!thread.hfUserId
 		);
 		try {
 			const files = await downloadAttachments(

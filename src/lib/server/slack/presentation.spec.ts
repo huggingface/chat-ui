@@ -162,7 +162,7 @@ describe("Slack context boundaries", () => {
 		expect(prompt).toContain("org/model");
 		expect(prompt).toContain("\\u003c/slack_thread_context>");
 		expect(prompt).not.toContain("old bot output");
-		expect(prompt).not.toContain("someone else's note");
+		expect(prompt).toContain("someone else's note");
 		expect(prompt).not.toContain("future");
 		expect(prompt).toContain("Invoking user's request:\nCreate a Space");
 	});
@@ -369,8 +369,7 @@ it("quotes only the owner in personal sessions, even when someone else invokes",
 		"BOT",
 		false,
 		"OWNER",
-		true,
-		"OWNER"
+		true
 	);
 	expect(prompt).not.toContain("ignore that");
 	expect(prompt).not.toContain("payload.txt");

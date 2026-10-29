@@ -1396,7 +1396,7 @@ it("excludes non-owner messages and files before downloading personal context", 
 	expect(result.files).toEqual([]);
 	expect(mocks.users).not.toHaveBeenCalled();
 });
-it("keeps only the requester's messages in shared-token context", async () => {
+it("keeps other workspace members' messages in shared-token context", async () => {
 	const { user } = await createTestUser();
 	const bot = new MlSlackBot(settings, user);
 	const thread = await getOrCreateThread("T123", "C123", "100.0", "OWNER");
@@ -1408,7 +1408,7 @@ it("keeps only the requester's messages in shared-token context", async () => {
 	});
 	const result = await bot["context"](thread, { user: "OTHER", ts: "103.0", text: "use it" });
 	expect(result.text).toContain("my dataset");
-	expect(result.text).not.toContain("owner note");
+	expect(result.text).toContain("owner note");
 });
 it("delivers personal raw traces only to the owner's DM", async () => {
 	const { user, locals } = await createTestUser();
@@ -1697,7 +1697,7 @@ describe("Slack btw side questions", () => {
 			text: "Follow up",
 		});
 		expect(context.text).toContain("use the bigger dataset");
-		expect(context.text).not.toContain("the dataset moved to org/x");
+		expect(context.text).toContain("the dataset moved to org/x");
 		expect(context.text).not.toContain("eval loss");
 		expect(context.text).not.toContain("0.3");
 	});
