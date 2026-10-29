@@ -12,7 +12,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { indexCases, readCaseAt, type CaseRow } from "./caseFile";
 import { contextFor } from "./calls";
-import { DEFAULT_JUDGE, hfToken, judge, type Judgement } from "./judge";
+import { DEFAULT_JUDGE, hfToken, JUDGE_VERSION, judge, type Judgement } from "./judge";
 import { groupBy, pairedBootstrap, permutationP, type Interval, type PairedCase } from "./stats";
 import type { Action, Family } from "./types";
 
@@ -76,7 +76,10 @@ async function judgeAll(arms: Arm[], casesDir: string, model: string, concurrenc
 	const todo = arms
 		.flatMap((arm) =>
 			arm.samples
-				.filter((s) => arm.judgements[key(s)]?.model !== model)
+				.filter((s) => {
+					const cached = arm.judgements[key(s)];
+					return cached?.model !== model || cached.version !== JUDGE_VERSION;
+				})
 				.map((sample) => ({ arm, sample }))
 		)
 		.sort((a, b) => key(a.sample).localeCompare(key(b.sample)));
@@ -187,6 +190,17 @@ function agreement(arm: Arm, family: Family | "all"): number | null {
 		: null;
 }
 
+/** share of the judge's verdicts that came from a step's stated plan rather than its calls */
+function intentShare(arm: Arm, family: Family | "all"): number | null {
+	const judged = arm.samples
+		.filter((s) => family === "all" || s.family === family)
+		.map((s) => arm.judgements[key(s)])
+		.filter((j) => typeof j?.pass === "boolean");
+	return judged.length
+		? Number((judged.filter((j) => j.basis === "intent").length / judged.length).toFixed(3))
+		: null;
+}
+
 const pct = (x: number | null) => (x === null ? "–" : `${Math.round(x * 100)}%`);
 const interval = (i: Interval, signed = false) =>
 	i.value === null
@@ -240,6 +254,7 @@ async function main() {
 					judge: compareArms(a, b, family, byJudge),
 					rules: compareArms(a, b, family, byRules),
 					judgeRulesAgreement: { a: agreement(a, family), b: agreement(b, family) },
+					intentShare: { a: intentShare(a, family), b: intentShare(b, family) },
 				},
 			])
 		),
@@ -260,6 +275,10 @@ async function main() {
 				`${r.judge.pairedCases} | ${pct(r.judge.unjudgedShare.a)}/${pct(r.judge.unjudgedShare.b)} | ` +
 				`${interval(r.rules.diff, true)} (${r.rules.p ?? "–"}) | ${pct(r.judgeRulesAgreement.a)}/${pct(r.judgeRulesAgreement.b)} |`
 		);
+	}
+	for (const [family, r] of Object.entries(report.results)) {
+		const { a: ia, b: ib } = r.intentShare;
+		if (ia || ib) console.log(`${family}: ${pct(ia)}/${pct(ib)} of verdicts from a stated plan`);
 	}
 	console.log(`\nreport: ${out}`);
 }

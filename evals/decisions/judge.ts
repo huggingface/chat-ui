@@ -51,6 +51,16 @@ const TOOLS =
 	"job; check_job and wait read a job. write_file, edit_file and read_file only write, change or read the " +
 	"agent's stored script (v-file://); they run nothing, in a sandbox or anywhere else.";
 
+/**
+ * Families whose next step is often a setup move (read the logs, edit the script) before the
+ * choice the family is about. A sample is one step, so for these the judge also reads the plan the
+ * step states; production's cases are judged with their later rounds instead.
+ */
+const INTENT_FAMILIES = new Set<Family>(["after-job-failure"]);
+
+/** bumped when the judge prompt changes, so cached judgements are redone */
+export const JUDGE_VERSION = 2;
+
 export interface Judgement {
 	model: string;
 	at: string;
@@ -63,6 +73,16 @@ export interface Judgement {
 	/** false when the trigger is not what the family is about, e.g. a summary saying "not an OOM" */
 	triggerValid: boolean;
 	confidence: "low" | "medium" | "high";
+	/** whether a sample was labelled from its calls or from the plan it states */
+	basis?: "action" | "intent";
+	version?: number;
+}
+
+/** the head and tail of a long text: the plan usually comes at the end of the reasoning */
+function ends(text: string, head: number, tail: number): string {
+	return text.length <= head + tail
+		? text
+		: `${text.slice(0, head)}\n… [${text.length - head - tail} chars] …\n${text.slice(-tail)}`;
 }
 
 export function hfToken(): string {
@@ -90,7 +110,8 @@ function prompt(c: DecisionCase, action: Action, sampled: boolean): string {
 		action.kind === "final"
 			? `It ended the turn with this text:\n${action.text.slice(0, 1500)}`
 			: [
-					action.reasoning ? `Its reasoning:\n${action.reasoning.slice(0, 1500)}` : "",
+					action.reasoning ? `Its reasoning:\n${ends(action.reasoning, 600, 2000)}` : "",
+					action.preamble ? `What it told the user:\n${action.preamble.slice(0, 1000)}` : "",
 					`Its calls${action.rounds && action.rounds > 1 ? ` (over ${action.rounds} rounds)` : ""}:`,
 					...action.calls.map(
 						(call) => `- ${call.name} ${JSON.stringify(call.args).slice(0, 1200)}`
@@ -101,13 +122,21 @@ function prompt(c: DecisionCase, action: Action, sampled: boolean): string {
 	const after = view.aftermath
 		.map((a) => `- ${a.name} ${a.args.slice(0, 200)}\n  → ${a.result.slice(0, 500)}`)
 		.join("\n");
-	const next = sampled
-		? "What happened next: this is the agent's next step only; nothing after it ran. Judge the step " +
-			"itself. When it has not committed to a choice yet (reading, editing the script, planning), use " +
-			"investigate where the family has it, otherwise other."
-		: after
-			? `What happened next:\n${after}`
-			: "What happened next: nothing recorded.";
+	const next = !sampled
+		? undefined
+		: INTENT_FAMILIES.has(c.family)
+			? "What happened next: this is the agent's next step only; nothing after it ran. When its calls " +
+				"already make the choice, label them. When they don't yet (reading logs, editing the script), " +
+				"label the plan it states in its reasoning or to the user: 'fix and resubmit' is " +
+				"fix-and-resubmit, 'rerun it' is resubmit, 'test the fix in a sandbox first' is " +
+				"reproduce-in-sandbox. Use investigate or fix-only only when it states no next step. Set basis " +
+				'to "action" or "intent" accordingly.'
+			: "What happened next: this is the agent's next step only; nothing after it ran. Judge the step " +
+				"itself. When it has not committed to a choice yet (reading, editing the script, planning), use " +
+				"investigate where the family has it, otherwise other.";
+	const recorded = after
+		? `What happened next:\n${after}`
+		: "What happened next: nothing recorded.";
 	return [
 		"You are checking one decision made by ML Intern, an agent that runs ML work on Hugging Face Jobs and sandboxes.",
 		`Family: ${c.family}. ${RULES[c.family]}`,
@@ -118,10 +147,11 @@ function prompt(c: DecisionCase, action: Action, sampled: boolean): string {
 		c.trigger ? `What the agent was reacting to (${c.trigger.tool}):\n${c.trigger.excerpt}` : "",
 		rounds ? `The rounds just before:\n${rounds}` : "",
 		`The decision. ${decision}`,
-		next,
+		next ?? recorded,
 		'Answer with JSON only: {"summary": "2-3 plain sentences: what it faced, what it did, how it turned out", ' +
 			'"label": "<one label from the list>", "rationale": "1-2 sentences on why, against the rule", ' +
-			'"triggerValid": true|false, "confidence": "low"|"medium"|"high"}',
+			'"triggerValid": true|false, "confidence": "low"|"medium"|"high"' +
+			(sampled && INTENT_FAMILIES.has(c.family) ? ', "basis": "action"|"intent"}' : "}"),
 	]
 		.filter(Boolean)
 		.join("\n\n");
@@ -136,7 +166,10 @@ export async function judge(
 	let lastError: unknown;
 	for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
 		try {
-			return await judgeOnce(c.family, text, model, key);
+			return {
+				...(await judgeOnce(c.family, text, model, key)),
+				version: JUDGE_VERSION,
+			};
 		} catch (error) {
 			lastError = error;
 		}
