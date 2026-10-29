@@ -8,7 +8,7 @@ import {
 } from "$lib/server/api/__tests__/testHelpers";
 import { MlSlackBot } from "./bot";
 import { connectionKey } from "./connections";
-import { skipSlackQuestion } from "./engine";
+import { skipSlackQuestion, stopSlackTurn } from "./engine";
 import {
 	ANSWER_ACTION,
 	ANSWER_VIEW,
@@ -1027,6 +1027,86 @@ describe("Slack transport authorization", () => {
 			thread_ts: "100.0",
 			text: expect.stringContaining("Stopped the assistant."),
 		});
+	});
+
+	it("privately explains a non-owner's Stop click without stopping the session", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive({ channel: "C123", user: "OWNER", text: "Run", ts: "100.0" }, "T123", "STOP");
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		const messageId = crypto.randomUUID(),
+			generationId = crypto.randomUUID();
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			messages: [{ id: messageId, generationId, from: "assistant", content: "Working" }],
+		});
+		const handler = mocks.handlers.get(STOP_ACTION);
+		if (!handler) throw Error("No handler");
+		const args = {
+			ack: vi.fn(),
+			body: { user: { id: "OTHER" }, team: { id: "T123" } },
+			action: { value: JSON.stringify({ threadId: thread._id, messageId, generationId }) },
+		};
+		await handler(args);
+		expect(args.ack).toHaveBeenCalledOnce();
+		expect(stopSlackTurn).not.toHaveBeenCalled();
+		expect(mocks.ephemeral).toHaveBeenCalledWith({
+			channel: "C123",
+			user: "OTHER",
+			thread_ts: "100.0",
+			text: "Only <@OWNER> can use this session's controls.",
+		});
+		mocks.ephemeral.mockClear();
+		await handler({ ...args, body: { ...args.body, team: { id: "T999" } } });
+		await collections.slackThreads.updateOne(
+			{ _id: thread._id },
+			{ $set: { deletedAt: new Date() } }
+		);
+		await handler(args);
+		expect(mocks.ephemeral).not.toHaveBeenCalled();
+		expect(stopSlackTurn).not.toHaveBeenCalled();
+	});
+
+	it("identifies personal view buttons and explains their owner restriction privately", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive({ channel: "C123", user: "OWNER", text: "Run", ts: "100.0" }, "T123", "VIEW");
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		thread.hfUserId = user._id;
+		await collections.slackThreads.updateOne({ _id: thread._id }, { $set: { hfUserId: user._id } });
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			messages: [{ id: crypto.randomUUID(), from: "assistant", content: "Working" }],
+		});
+		await bot["publishSessionStatus"](thread, "working", []);
+		const blocks = mocks.post.mock.lastCall?.[0].blocks;
+		const button = blocks
+			.flatMap(
+				(block: { elements?: { action_id: string; value?: string }[] }) => block.elements ?? []
+			)
+			.find((element: { action_id: string }) => element.action_id === "ml_intern_view");
+		expect(button.value).toBe(thread._id);
+		const handler = mocks.handlers.get("ml_intern_view");
+		if (!handler) throw Error("No handler");
+		const args = {
+			ack: vi.fn(),
+			body: { user: { id: "OTHER" }, team: { id: "T123" } },
+			action: button,
+		};
+		await handler(args);
+		expect(mocks.ephemeral).toHaveBeenCalledWith({
+			channel: "C123",
+			user: "OTHER",
+			thread_ts: "100.0",
+			text: "Only <@OWNER> can use this session's controls.",
+		});
+		mocks.ephemeral.mockClear();
+		await handler({ ...args, body: { ...args.body, user: { id: "OWNER" } } });
+		// Older cards and shared-session links have no owner-only action value.
+		await handler({ ...args, action: { action_id: "ml_intern_view" } });
+		expect(mocks.ephemeral).not.toHaveBeenCalled();
 	});
 
 	it("refuses a stale Resume button rather than replaying a newer completed turn", async () => {
