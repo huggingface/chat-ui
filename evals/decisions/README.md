@@ -5,7 +5,8 @@ better or worse at moments where it often gets it wrong. Each case is a real con
 before one decision. The model is sampled again from that point under two versions of the code,
 and the two versions are compared on the same cases.
 
-A full comparison takes a couple of hours, so it runs on demand or on a schedule, not on every PR.
+A full comparison takes a couple of hours, so it runs on demand (a PR label, see below) or on a
+schedule, not on every PR.
 
 ## Families
 
@@ -50,6 +51,31 @@ npm run eval:compare -- --cases <cases> --a <runs>/<base> --b <runs>/<change> [-
 
 An arm is fixed by its commit, so the base's run can be reused for every change compared against
 that commit.
+
+### In CI
+
+Add the `decision-evals` label to a PR. `.github/workflows/decision-evals.yml` then:
+
+1. samples the PR's head and its merge-base at full size;
+2. posts the verdict and totals as a PR comment, edited in place on reruns;
+3. pushes every sample, judgement and report to the private dataset
+   `ml-intern-internal/ml-intern-decision-eval-runs`;
+4. removes the label, so adding it again reruns.
+
+The comment holds totals only, never a case's content. A regression fails the job.
+
+- **Naming a target:** put a line like `Decision eval target: after-job-failure` in the PR description.
+- **Caching:** arms are stored under `arms/<commit>-<settings>-cases<revision>`, so a base already
+  run is reused by every PR on it.
+- **Bases that can't be compared:** a merge-base older than this harness has nothing to compare
+  against, and the job says so.
+- **Fork PRs:** they get no secrets, so they don't run.
+
+| Repository setting                              | What it is                                              |
+| ----------------------------------------------- | ------------------------------------------------------- |
+| `DECISION_EVALS_HF_TOKEN` (secret)              | reads the cases, writes the results, pays for inference |
+| `DECISION_EVALS_EXA_API_KEY` (secret, optional) | offers the Exa tools, as production does                |
+| `DECISION_EVALS_BILL_TO` (variable, optional)   | org billed for inference (`X-HF-Bill-To`)               |
 
 ### What a comparison does
 
