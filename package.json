@@ -21,6 +21,11 @@
 		"populate": "vite-node --options.transformMode.ssr='/.*/' scripts/populate.ts",
 		"config": "vite-node --options.transformMode.ssr='/.*/' scripts/config.ts",
 		"probe-model": "vite-node --options.transformMode.ssr='/.*/' scripts/probe-model.ts --",
+		"eval:mine": "vite-node --options.transformMode.ssr='/.*/' evals/decisions/mine.ts --",
+		"eval:review": "vite-node --options.transformMode.ssr='/.*/' evals/decisions/review/server.ts --",
+		"eval:annotate": "vite-node --options.transformMode.ssr='/.*/' evals/decisions/annotate.ts --",
+		"eval:run": "vite-node --mode test --options.transformMode.ssr='/.*/' evals/decisions/run.ts --",
+		"eval:compare": "vite-node --options.transformMode.ssr='/.*/' evals/decisions/compare.ts --",
 		"prepare": "husky"
 	},
 	"devDependencies": {

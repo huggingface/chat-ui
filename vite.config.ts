@@ -43,6 +43,9 @@ export default defineConfig({
 		// See Vite server.allowedHosts: string[] | true
 		// Using leading dot matches subdomains per Vite's host check logic
 		allowedHosts: ["huggingface.ngrok.io"],
+		// vite-node loads scripts through this server, and Vite 6.4 refuses files outside the
+		// allow list, which SvelteKit sets to src/ and its own folders
+		fs: { allow: ["scripts", "evals"] },
 	},
 	optimizeDeps: {
 		include: ["uuid", "sharp", "clsx"],
@@ -98,7 +101,7 @@ export default defineConfig({
 				test: {
 					name: "server",
 					environment: "node",
-					include: ["src/**/*.{test,spec}.{js,ts}"],
+					include: ["src/**/*.{test,spec}.{js,ts}", "evals/**/*.{test,spec}.ts"],
 					exclude: ["src/**/*.svelte.{test,spec}.{js,ts}", "src/**/*.ssr.{test,spec}.{js,ts}"],
 					setupFiles: ["./scripts/setups/vitest-setup-server.ts"],
 					testTimeout: 30000,
