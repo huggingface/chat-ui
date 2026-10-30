@@ -93,8 +93,8 @@ export function runFailureText(updates: MessageUpdate[] = []): string {
 	return reason ? `The run failed. ${reason}` : "The run failed. You can resume it below.";
 }
 
-/** Render Markdown as Slack mrkdwn, without allowing model-authored Slack mentions. */
-export function slackMarkdown(text: string): string {
+/** Render Markdown as Slack mrkdwn. Model-authored Slack mentions stay escaped unless the user is listed. */
+export function slackMarkdown(text: string, mentions: readonly string[] = []): string {
 	const escape = (value: string) =>
 		value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 	// Marked escapes inline text; decode its entities once before Slack escaping.
@@ -106,6 +106,10 @@ export function slackMarkdown(text: string): string {
 					({ "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" })[entity] ??
 					entity
 			)
+		);
+	const mention = (value: string) =>
+		value.replace(/&lt;@([A-Z0-9]+)&gt;/g, (raw, id: string) =>
+			mentions.includes(id) ? `<@${id}>` : raw
 		);
 	const render = (tokens: Token[] = []): string =>
 		tokens
@@ -168,7 +172,7 @@ export function slackMarkdown(text: string): string {
 					default:
 						return "tokens" in token && token.tokens
 							? render(token.tokens)
-							: inlineText("text" in token ? token.text : token.raw);
+							: mention(inlineText("text" in token ? token.text : token.raw));
 				}
 			})
 			.join("");
@@ -177,9 +181,10 @@ export function slackMarkdown(text: string): string {
 
 export function messageBlocks(
 	text: string,
-	actions: Array<{ id: string; label: string; value: string }> = []
+	actions: Array<{ id: string; label: string; value: string }> = [],
+	mentions: readonly string[] = []
 ): KnownBlock[] {
-	const formatted = slackMarkdown(text);
+	const formatted = slackMarkdown(text, mentions);
 	return [
 		{
 			type: "section",

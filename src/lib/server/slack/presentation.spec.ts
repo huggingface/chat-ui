@@ -57,6 +57,11 @@ describe("Slack questions", () => {
 			"&lt;!channel&gt; &lt;@U123&gt; <https://huggingface.co/spaces/me/demo|Space>"
 		);
 	});
+	it("keeps mentions of listed users only, and never inside code", () => {
+		expect(slackMarkdown("Hi <@U1>, ask <@U2> `<@U1>` <!channel>", ["U1"])).toBe(
+			"Hi <@U1>, ask &lt;@U2&gt; `&lt;@U1&gt;` &lt;!channel&gt;"
+		);
+	});
 	it("links bare URLs and preserves existing Markdown links and punctuation", () => {
 		expect(
 			slackMarkdown(
@@ -327,7 +332,9 @@ describe("Slack long replies and tables", () => {
 	it("renders table rows as labeled fields with clickable links", () => {
 		const table =
 			"| Model | Details |\n|---|---|\n| [Demo](https://example.com/demo) | **Fast** & small |\n| Other | Multi-speaker |";
-		const rendered = chunks(table, 100).map(slackMarkdown).join("\n");
+		const rendered = chunks(table, 100)
+			.map((part) => slackMarkdown(part))
+			.join("\n");
 		expect(rendered).toContain("*Model:* <https://example.com/demo|Demo>");
 		expect(rendered).toContain("*Details:* *Fast* &amp; small");
 		expect(rendered).toContain("*Model:* Other");
@@ -349,7 +356,9 @@ describe("Slack long replies and tables", () => {
 it("preserves columns when table cells contain Slack-style links", () => {
 	const text =
 		"| Model | Link | Notes |\n|---|---|---|\n| Alpha | <https://huggingface.co|huggingface.co> | **Fast** demo |";
-	const rendered = chunks(text).map(slackMarkdown).join("\n");
+	const rendered = chunks(text)
+		.map((part) => slackMarkdown(part))
+		.join("\n");
 	expect(rendered).toContain("*Link:* <https://huggingface.co|huggingface.co>");
 	expect(rendered).toContain("*Notes:* *Fast* demo");
 });

@@ -927,17 +927,19 @@ export class MlSlackBot {
 				signal: AbortSignal.timeout(SLACK_SIDE_QUESTION_TIMEOUT_MS),
 			}))
 				answer += chunk;
+			const mentions = await this.mentionable(thread, answer);
 			for (const text of chunks(`_btw answer, ML Intern does not see this_\n\n${answer.trim()}`)) {
 				await client.chat.postMessage({
 					channel: thread.channel,
 					thread_ts: thread.threadTs,
 					text,
-					blocks: messageBlocks(text, []),
+					blocks: messageBlocks(text, [], mentions),
 					parse: "none",
 					unfurl_links: false,
 					unfurl_media: false,
 				});
 			}
+			await this.finishReaction(teamId, event.channel, event.ts);
 		} catch (error) {
 			const status = isHttpError(error) ? error.status : undefined;
 			logger.warn({ status: status ?? "internal" }, "[slack] Side question failed");
@@ -1369,6 +1371,8 @@ export class MlSlackBot {
 				? [{ id: STOP_ACTION, label: "Stop assistant", value: turnValue }]
 				: actions.filter((a) => a.id === RESUME_ACTION)
 		);
+		if (!live.alive && !question && !message.interrupted && state.status !== "failed")
+			await this.markInputsFinished(thread);
 		text = text.trim() || "Waiting for your answer.";
 		const digest = createHash("sha256")
 			.update(
@@ -1443,6 +1447,7 @@ export class MlSlackBot {
 				await collections.slackDeliveries.insertOne(delivery);
 			}
 			const parts = chunks(text);
+			const mentions = await this.mentionable(thread, text);
 			for (let index = 0; index < Math.max(parts.length, delivery.parts.length); index++) {
 				const part = parts[index] ?? "(continued above)";
 				const blocks =
@@ -1456,7 +1461,7 @@ export class MlSlackBot {
 								),
 								...messageBlocks(part, actions).filter((block) => block.type === "actions"),
 							]
-						: messageBlocks(part, index === parts.length - 1 ? actions : []);
+						: messageBlocks(part, index === parts.length - 1 ? actions : [], mentions);
 				const ts = delivery.parts[index];
 				if (ts)
 					await client.chat.update({
@@ -1516,6 +1521,43 @@ export class MlSlackBot {
 		}
 	}
 
+	/** swaps 👀 for ✅ on the requests a finished turn answered */
+	private async markInputsFinished(thread: SlackThread): Promise<void> {
+		const inputs = await collections.slackInputs
+			.find({
+				threadId: thread._id,
+				status: "done",
+				finishedReaction: { $ne: true },
+				// a retry or answered form points at the thread root, not a message the bot reacted to
+				retry: { $ne: true },
+				resumeElicitationId: { $exists: false },
+			})
+			.limit(20)
+			.toArray();
+		for (const input of inputs) {
+			const claimed = await collections.slackInputs.updateOne(
+				{ _id: input._id, finishedReaction: { $ne: true } },
+				{ $set: { finishedReaction: true } }
+			);
+			if (claimed.modifiedCount) await this.finishReaction(thread.teamId, thread.channel, input.ts);
+		}
+	}
+
+	private async finishReaction(teamId: string, channel: string, timestamp: string): Promise<void> {
+		const { client } = await this.slack(teamId);
+		await client.reactions.remove({ channel, timestamp, name: "eyes" }).catch(() => {});
+		await client.reactions
+			.add({ channel, timestamp, name: "white_check_mark" })
+			.catch(() => logger.warn("[slack] Could not mark a request finished."));
+	}
+
+	/** only people who asked the bot something in this thread can be tagged by its replies */
+	private async mentionable(thread: SlackThread, text: string): Promise<string[]> {
+		if (!text.includes("<@")) return [];
+		const users = await collections.slackInputs.distinct("user", { threadId: thread._id });
+		return [...new Set([thread.owner, ...users])];
+	}
+
 	private async publishSessionStatus(
 		thread: SlackThread,
 		status: string,
@@ -1539,7 +1581,7 @@ export class MlSlackBot {
 		const _id = `${thread._id}:status:${message.queuedContinuationOf ?? message.id}`;
 		const delivery = await collections.slackDeliveries.findOne({ _id });
 		const budget = conv?.mlBudget;
-		const text = `**Session status**\n\n${status}\n💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
+		const text = `${status}\n💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
 		const viewUrl = chatLink(thread) ?? viewerLink(thread.conversationId.toHexString());
 		const owner =
 			viewUrl && thread.hfUserId
@@ -1623,6 +1665,7 @@ export class MlSlackBot {
 			await collections.slackDeliveries.insertOne(delivery);
 		}
 		const parts = chunks(`**Run updates**\n\n${retained.text}`);
+		const mentions = await this.mentionable(thread, retained.text);
 		const previous = delivery.publicText ? chunks(`**Run updates**\n\n${delivery.publicText}`) : [];
 		for (let index = 0; index < parts.length; index++) {
 			const text = parts[index];
@@ -1630,7 +1673,7 @@ export class MlSlackBot {
 			const payload = {
 				channel: thread.channel,
 				text,
-				blocks: messageBlocks(text, []),
+				blocks: messageBlocks(text, [], mentions),
 				parse: "none" as const,
 			};
 			const ts = delivery.parts[index];

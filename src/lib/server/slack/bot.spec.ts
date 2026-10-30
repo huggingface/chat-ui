@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
 	ephemeral: vi.fn(),
 	run: vi.fn(),
 	react: vi.fn(),
+	unreact: vi.fn(),
 	upload: vi.fn(),
 	open: vi.fn(),
 	kickQueuedTurn: vi.fn(),
@@ -79,7 +80,7 @@ vi.mock("@slack/web-api", () => ({
 		bots = { info: async () => ({ bot: { app_id: "AAPP" } }) };
 		users = { info: mocks.users };
 		files = { uploadV2: mocks.upload };
-		reactions = { add: mocks.react };
+		reactions = { add: mocks.react, remove: mocks.unreact };
 		conversations = {
 			info: mocks.channels,
 			members: mocks.members,
@@ -129,6 +130,7 @@ beforeEach(async () => {
 	}));
 	mocks.ephemeral.mockResolvedValue({ ok: true });
 	mocks.react.mockResolvedValue({ ok: true });
+	mocks.unreact.mockResolvedValue({ ok: true });
 	mocks.post.mockImplementation(async () => ({ ts: crypto.randomUUID() }));
 	mocks.channels.mockResolvedValue({ channel: { is_ext_shared: false } });
 	mocks.replies.mockResolvedValue({ messages: [] });
@@ -463,7 +465,7 @@ describe("Slack transport authorization", () => {
 		await select(1);
 		expect(JSON.stringify(mocks.update.mock.calls.at(-1))).toContain("✓ B. Beta");
 		// Simulate the harness resolving and resuming in the same assistant message.
-		expect(mocks.post.mock.calls[0][0].text).toContain("Session status");
+		expect(mocks.post.mock.calls[0][0].text).toContain("💻 Jobs");
 		expect(mocks.post.mock.calls[1][0].text).toContain("Run updates");
 		expect(mocks.post.mock.calls[1][0].text).toContain("Questions");
 		expect(
@@ -512,7 +514,7 @@ describe("Slack transport authorization", () => {
 		).toBe(false);
 		expect(
 			mocks.update.mock.calls
-				.filter(([v]) => v.text.includes("Session status"))
+				.filter(([v]) => v.text.includes("💻 Jobs"))
 				.every(([v]) => v.ts === "100.0")
 		).toBe(true);
 		expect(
@@ -553,6 +555,63 @@ describe("Slack transport authorization", () => {
 		expect(mocks.update).toHaveBeenCalledTimes(1);
 		expect(mocks.update.mock.calls[0][0].ts).toBe("201.0");
 		expect(await collections.slackDeliveries.countDocuments({ threadId: thread._id })).toBe(2);
+	});
+
+	it("swaps 👀 for ✅ once the turn finishes and only tags people who asked the bot", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Train", ts: "100.0" },
+			"T123",
+			"FINISH"
+		);
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		const messageId = crypto.randomUUID(),
+			generationId = crypto.randomUUID();
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			messages: [
+				{
+					id: messageId,
+					generationId,
+					from: "assistant",
+					content: "Done, <@OWNER>! cc <@STRANGER>",
+					createdAt: new Date(),
+				},
+			],
+		});
+		await collections.turnStates.insertOne({
+			_id: new ObjectId(),
+			conversationId: thread.conversationId,
+			messageId,
+			producerId: generationId,
+			status: "done",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+
+		// the request is still being dispatched, so its 👀 stays
+		await bot["render"](thread);
+		expect(mocks.unreact).not.toHaveBeenCalled();
+		const result = JSON.stringify(mocks.post.mock.calls.at(-1)?.[0].blocks);
+		expect(result).toContain("Done, <@OWNER>!");
+		expect(result).toContain("cc &lt;@STRANGER&gt;");
+
+		await collections.slackInputs.updateMany({}, { $set: { status: "done" } });
+		await bot["render"](thread);
+		await bot["render"](thread);
+		expect(mocks.unreact).toHaveBeenCalledTimes(1);
+		expect(mocks.unreact).toHaveBeenCalledWith({
+			channel: "C123",
+			timestamp: "100.0",
+			name: "eyes",
+		});
+		expect(mocks.react).toHaveBeenLastCalledWith({
+			channel: "C123",
+			timestamp: "100.0",
+			name: "white_check_mark",
+		});
 	});
 
 	it("shows an open review as a link to the web, never the question modal", async () => {
@@ -796,7 +855,7 @@ describe("Slack transport authorization", () => {
 		expect(queued[0].text).toContain("Use the 7B model");
 		expect(mocks.kickQueuedTurn).toHaveBeenCalledWith(thread.conversationId);
 
-		const card = mocks.post.mock.calls.find(([v]) => v.text.includes("Session status"));
+		const card = mocks.post.mock.calls.find(([v]) => v.text.includes("💻 Jobs"));
 		expect(JSON.stringify(card?.[0].blocks)).toMatch(/⏳ _working\.\.\._ · \d+s/);
 		await collections.queuedInputs.deleteMany({ conversationId: thread.conversationId });
 		await collections.generations.deleteMany({ conversationId: thread.conversationId });
@@ -1505,6 +1564,16 @@ describe("Slack btw side questions", () => {
 			})
 		);
 		expect(await collections.slackInputs.countDocuments({})).toBe(1);
+		expect(mocks.unreact).toHaveBeenCalledWith({
+			channel: "C123",
+			timestamp: "101.0",
+			name: "eyes",
+		});
+		expect(mocks.react).toHaveBeenLastCalledWith({
+			channel: "C123",
+			timestamp: "101.0",
+			name: "white_check_mark",
+		});
 		expect(mocks.run).not.toHaveBeenCalled();
 		expect(mocks.ephemeral).not.toHaveBeenCalled();
 	});
@@ -1914,6 +1983,23 @@ describe("other workspaces", () => {
 		expect(await collections.slackLinks.findOne({})).toMatchObject({
 			teamId: "TACME",
 			userTeamId: "TACME",
+		});
+	});
+
+	it("marks a finished request using its installing workspace's token", async () => {
+		await install("TFINISHED");
+		const bot = new MlSlackBot(shared);
+		await bot["finishReaction"]("TFINISHED", "CFINISHED", "100.0");
+		expect(mocks.tokens).toEqual(["xoxb-TFINISHED"]);
+		expect(mocks.unreact).toHaveBeenCalledWith({
+			channel: "CFINISHED",
+			timestamp: "100.0",
+			name: "eyes",
+		});
+		expect(mocks.react).toHaveBeenCalledWith({
+			channel: "CFINISHED",
+			timestamp: "100.0",
+			name: "white_check_mark",
 		});
 	});
 

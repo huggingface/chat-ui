@@ -59,6 +59,8 @@ export interface SlackInput {
 	/** An interrupted dispatch is never automatically submitted a second time. */
 	error?: string;
 	failureNotified?: boolean;
+	/** the 👀 on the request was swapped for ✅ once its turn finished */
+	finishedReaction?: boolean;
 }
 
 export interface SlackDelivery {
