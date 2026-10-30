@@ -56,7 +56,7 @@ Personal sessions read only the owner's own messages and files from the thread. 
 
 The Slack app must permit Sign in with Slack for the external user's workspace. Workspace app-approval/distribution policies can prevent consent even when the bot is visible in a shared channel; verify this with an external test account before rollout. No additional bot scope is required beyond the manifest's existing channel-history, member-read and file permissions. Slack may withhold external file metadata or deny downloads; such failures are reported to the requester. Personal trace delivery remains private by DM; if Slack does not permit that DM, it reports failure and never uploads the trace to the shared channel. The owner can inspect the session in HuggingChat instead.
 
-Live rollout checks: use two workspaces in a shared channel, connect an external owner's HF account, start a zero-budget session, and check that another participant's messages and files are not in its context. Verify owner steering and controls, rejection of another participant's requests/controls, removal of channel membership, and private HuggingChat access. Verified live: the event envelope identifies the installing workspace, and `users.info` returns external members without guest flags. Keep the bot's installation in one workspace; this is not a multi-installation OAuth deployment.
+Live rollout checks: use two workspaces in a shared channel, connect an external owner's HF account, start a zero-budget session, and check that another participant's messages and files are not in its context. Verify owner steering and controls, rejection of another participant's requests/controls, removal of channel membership, and private HuggingChat access. Verified live: the event envelope identifies the installing workspace, and `users.info` returns external members without guest flags. To let other companies install the bot in their own workspaces, see [Other workspaces](#other-workspaces).
 
 ### Server configuration
 
@@ -218,14 +218,41 @@ private testing channel, invite the bot, and initially set
 for this workspace; do not share another company's deployment or credentials.
 
 Continue with [Deploy on Hugging Face Spaces](#deploy-on-hugging-face-spaces).
-The manual setup is supported today. A centrally hosted, self-service installation
-flow is described under [Other companies and phase two](#other-companies-and-phase-two).
+A personal-account deployment can instead let the company install the hosted app
+from a link; see [Other workspaces](#other-workspaces).
 
-## Other companies and phase two
+## Other workspaces
 
-This version supports **one workspace per deployment**. Another company can create the same app from the manifest, run its own instance, and supply its own Slack and HF tokens. Secrets are resolved from server configuration when a run resumes, rather than copied into conversation history or persisted as bot session tokens. Restart the server after rotating credentials.
+A personal-account deployment can let any Slack workspace install its app from one link: `<PUBLIC_ORIGIN><base>/slack/install` (for HuggingChat, `https://huggingface.co/chat/slack/install`). The link goes straight to Slack's consent screen. After **Allow**, the installer lands on a page naming the workspace, with an **Open Slack** button, and the bot sends them a welcome DM. Each person then mentions the bot and connects their own HF account through the usual private link, so other workspaces never use a shared HF token or a shared payer.
 
-A hosted, multi-workspace **Add to Slack** service is a separate deployment phase. It needs Slack OAuth installation storage, encrypted per-workspace HF credentials, tenant-scoped billing and model catalogs, and a web onboarding flow. The current configuration must not be reused as a multi-tenant credential store. Socket Mode apps also cannot currently be listed in Slack's public Marketplace; choose HTTP events if Marketplace distribution is required. Commercially distributed apps may have different thread-history rate limits than internal apps.
+`SLACK_ML_TEAM_ID` and its tokens remain the app's home workspace. Every other workspace's bot token comes from its install and is stored in `slack.installations`, encrypted with `MCP_OAUTH_ENCRYPTION_KEY`. One Socket Mode connection receives events for every workspace, and each thread acts through its own workspace's token. Turn it on with:
+
+```env
+SLACK_ML_PUBLIC_INSTALL=true
+SLACK_ML_CLIENT_ID=123.456
+SLACK_ML_CLIENT_SECRET=...
+MCP_OAUTH_ENCRYPTION_KEY=...
+```
+
+Startup refuses public installs in shared-token mode or without these values. The client ID and secret are on the Slack app's **Basic Information** page; they must belong to the same app as `SLACK_ML_APP_TOKEN`, and the install is rejected otherwise. In the Slack app settings:
+
+1. Under **OAuth & Permissions**, add the redirect URL `<PUBLIC_ORIGIN><base>/slack/install/callback`.
+2. Under **Event Subscriptions**, subscribe to the `app_uninstalled` and `tokens_revoked` bot events. Uninstalling the app deletes the workspace's token and stops its threads.
+3. Under **Manage Distribution**, activate public distribution. This does not list the app in the Slack Marketplace, which does not accept Socket Mode apps.
+4. Sign in with Slack must also work for other workspaces. If `SLACK_ML_VIEWER_CLIENT_ID` belongs to a separate Slack app, activate public distribution for that app too.
+
+Notes:
+
+- Workspaces that require app approval show **Request to install**. After an admin approves it, opening the link again (or Slack's own install button) completes the install.
+- Workspaces that allow only Marketplace apps cannot install a Socket Mode app.
+- Org-wide Enterprise Grid installs are rejected; install into individual workspaces instead.
+- An install must grant every bot scope in the manifest. After adding a scope, each workspace has to install again.
+- To stop serving a workspace, set `disabled: true` on its `slack.installations` record. Reinstalling does not clear it. Changes take effect within 30 seconds.
+- A channel shared by two workspaces that both installed the app stays one thread, whichever install Slack delivers an event through.
+- A worker runs at most eight requests at once, and at most four per workspace.
+- `SLACK_ML_ALLOWED_CHANNELS` applies to every workspace, so leave it empty for public installs.
+
+A standalone shared-token deployment still serves only its own workspace. Another company that wants a shared HF token creates the same app from the manifest and runs its own instance; see [Company Slack with a Hugging Face organization](#company-slack-with-a-hugging-face-organization).
 
 ## Verification
 

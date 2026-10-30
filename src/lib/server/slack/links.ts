@@ -1,4 +1,3 @@
-import { WebClient } from "@slack/web-api";
 import { eligibleParticipant } from "./access";
 import { createHash, randomBytes } from "node:crypto";
 import { OIDConfig } from "$lib/server/auth";
@@ -9,6 +8,7 @@ import type { SlackThread } from "./types";
 import type { User } from "$lib/types/User";
 import type { ViewerIdentity } from "./viewer/auth";
 import { slackConfig } from "./config";
+import { slackInstalled, workspaceClient } from "./installations";
 
 export const connectionKey = (team: string, user: string, homeTeam = team) =>
 	homeTeam === team ? `${team}:${user}` : `${team}:${homeTeam}:${user}`;
@@ -64,11 +64,11 @@ export async function readConnectionLink(token: string) {
 	if (!/^[\w-]{43}$/.test(token)) return null;
 	const settings = slackConfig();
 	if (settings?.accountMode !== "user") return null;
-	return collections.slackLinks.findOne({
+	const ticket = await collections.slackLinks.findOne({
 		_id: hash(token),
-		teamId: settings.teamId,
 		expiresAt: { $gt: new Date() },
 	});
+	return ticket && (await slackInstalled(ticket.teamId)) ? ticket : null;
 }
 export class ConnectionError extends Error {}
 
@@ -94,10 +94,12 @@ export async function connectAccount(
 		);
 	if (ticket.userTeamId && ticket.userTeamId !== ticket.teamId) {
 		const settings = slackConfig();
-		if (!settings || !ticket.channel) throw new ConnectionError("Shared channel unavailable.");
+		const client = await workspaceClient(ticket.teamId);
+		if (!settings || !client || !ticket.channel)
+			throw new ConnectionError("Shared channel unavailable.");
 		const participant = await eligibleParticipant(
-			new WebClient(settings.botToken, { retryConfig: { retries: 0 }, timeout: 10000 }),
-			settings,
+			client,
+			{ ...settings, teamId: ticket.teamId },
 			ticket.slackUserId,
 			ticket.channel
 		);

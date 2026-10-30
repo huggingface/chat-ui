@@ -29,7 +29,14 @@
 	},
 	"settings": {
 		"event_subscriptions": {
-			"bot_events": ["app_mention", "message.channels", "message.groups", "message.im"]
+			"bot_events": [
+				"app_mention",
+				"message.channels",
+				"message.groups",
+				"message.im",
+				"app_uninstalled",
+				"tokens_revoked"
+			]
 		},
 		"interactivity": { "is_enabled": true },
 		"org_deploy_enabled": false,

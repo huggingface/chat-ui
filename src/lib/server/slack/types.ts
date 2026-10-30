@@ -82,3 +82,20 @@ export interface SlackLease {
 	owner: string;
 	until: Date;
 }
+
+/** Another workspace's install of the app; the home workspace comes from SLACK_ML_BOT_TOKEN. */
+export interface SlackInstallation {
+	/** Slack workspace (team) ID */
+	_id: string;
+	teamName: string;
+	appId: string;
+	/** encrypted with MCP_OAUTH_ENCRYPTION_KEY */
+	botToken: string;
+	botUserId: string;
+	scopes: string[];
+	installedBy: string;
+	/** set by an operator to stop serving the workspace; reinstalling does not clear it */
+	disabled?: boolean;
+	installedAt: Date;
+	updatedAt: Date;
+}

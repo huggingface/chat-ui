@@ -113,7 +113,14 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 
 			event.locals.sessionId = auth.sessionId;
 
-			if (loginEnabled && !auth.user && !event.url.pathname.startsWith(`${base}/.well-known/`)) {
+			// Adding the Slack app needs only Slack's consent; each person connects HF later.
+			const slackInstall = /^\/slack\/install(ed|\/|$)/.test(event.url.pathname.slice(base.length));
+			if (
+				loginEnabled &&
+				!auth.user &&
+				!slackInstall &&
+				!event.url.pathname.startsWith(`${base}/.well-known/`)
+			) {
 				if (config.AUTOMATIC_LOGIN === "true") {
 					// AUTOMATIC_LOGIN: always redirect to OAuth flow (unless already on login or healthcheck pages)
 					if (
