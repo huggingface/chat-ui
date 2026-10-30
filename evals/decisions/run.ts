@@ -4,10 +4,11 @@
  *
  * Run: npm run eval:run -- --cases <dir> --out <run dir> [--model zai-org/GLM-5.3-Flash]
  *   [--provider novita] [--per-family 20] [--samples 10] [--families a,b] [--seed decisions-v1]
- *   [--budget-usd 25] [--concurrency 8] [--dump-requests]
+ *   [--budget-usd 25] [--concurrency 8] [--dump-requests] [--require-hub-tools]
  * Run it once per arm, from each arm's checkout, with the same arguments, then compare the run
  * dirs with eval:compare. Resumes: samples already in <run dir>/samples.jsonl are kept.
  * --dump-requests writes each case's request to <run dir>/requests/, to diff what two arms sent.
+ * --require-hub-tools stops before sampling when the token cannot see every tool production offers.
  *
  * The app reads its config once, at import, so this re-runs itself with production's settings
  * from chart/env/prod.yaml in the environment before loading any of it.
@@ -37,6 +38,18 @@ import type { Action, Family } from "./types";
 const SKIPPED_PROD_ENV =
 	/^(MONGODB_|APP_BASE$|PUBLIC_ORIGIN$|COOKIE_|OPENID_|ADDRESS_HEADER$|METRICS_|LLM_ROUTER_ROUTES_PATH$|USE_USER_TOKEN$|AUTOMATIC_LOGIN$)/;
 const ATTEMPTS = 3;
+/** the intern bouquet as production's token sees it; keep in step with hf-mcp-server */
+const INTERN_HUB_TOOLS = [
+	"hf_whoami",
+	"create_repo",
+	"hub_repo_details",
+	"hf_fs",
+	"hf_fs_write",
+	"hf_jobs",
+	"hf_sandbox",
+	"hf_sandbox_exec",
+	"hf_sandbox_fs",
+];
 
 function arg(flag: string, fallback?: string): string {
 	const at = process.argv.indexOf(flag);
@@ -77,7 +90,8 @@ async function inProdEnv(): Promise<boolean> {
 		},
 	});
 	const code = await new Promise<number>((resolve) => child.on("exit", (c) => resolve(c ?? 1)));
-	rmSync(storage, { recursive: true, force: true });
+	// a failed run can exit while mongod is still writing its files
+	rmSync(storage, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
 	process.exit(code);
 }
 
@@ -196,6 +210,14 @@ async function main() {
 
 	const { requestBuilder } = await import("./request");
 	const builder = await requestBuilder({ model, provider, budgetUsd }, token);
+	if (process.argv.includes("--require-hub-tools")) {
+		const missing = INTERN_HUB_TOOLS.filter((name) => !builder.tools.includes(name));
+		if (missing.length)
+			throw new Error(
+				`the token sees no ${missing.join(", ")}: the Hub MCP server only lists what a token may use, ` +
+					"so these requests would not be production's (evals/decisions/README.md lists its permissions)"
+			);
+	}
 	const selected = selectCases(readReferences(casesDir), { families, perFamily, seed });
 	console.error(`${selected.length} cases × ${samples} samples, ${model}:${provider}`);
 

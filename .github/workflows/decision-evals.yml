@@ -132,7 +132,8 @@ jobs:
           arm() {
             (cd "$1" && npx vite-node --mode test --options.transformMode.ssr='/.*/' evals/decisions/run.ts -- \
               --cases ../cases --out "../runs/$2" --model "$MODEL" --provider "$PROVIDER" \
-              --per-family "$PER_FAMILY" --samples "$SAMPLES" --seed "$SEED" --concurrency 12)
+              --per-family "$PER_FAMILY" --samples "$SAMPLES" --seed "$SEED" --concurrency 12 \
+              --require-hub-tools)
           }
           arm head head &
           head_pid=$!

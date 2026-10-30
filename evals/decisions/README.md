@@ -77,6 +77,26 @@ The comment holds totals only, never a case's content. A regression fails the jo
 | `DECISION_EVALS_EXA_API_KEY` (secret, optional) | offers the Exa tools, as production does                |
 | `DECISION_EVALS_BILL_TO` (variable, optional)   | org billed for inference (`X-HF-Bill-To`)               |
 
+#### The token
+
+The Hub MCP server lists only the tools a token may use, so the token has to be able to do
+everything production's users can. Each arm stops before sampling if any intern-bouquet tool is
+missing, and names the missing ones (`--require-hub-tools`).
+
+The eval only lists the tools and never calls them. Still, give the token to a dedicated bot
+account that is a member of `ml-intern-internal` and owns nothing else. It needs:
+
+- **For the bot's own namespace:**
+  - read and write repos, and create repos (`hf_fs`, `hf_fs_write`, `create_repo`,
+    `hub_repo_details`);
+  - start and manage jobs (`hf_jobs`), plus whatever the sandbox tools need; if a scope is
+    missing, the guard names the tools that went with it;
+  - make calls to Inference Providers (sampling and the judge).
+- **For repos in `ml-intern-internal`:**
+  - read `ml-intern-decision-cases`;
+  - write `ml-intern-decision-eval-runs`;
+  - with `DECISION_EVALS_BILL_TO` set to the org, make inference calls on its behalf.
+
 ### What a comparison does
 
 - **Builds the request** with the app's own code (`requestPrompt.ts`, shared with `runMcpFlow`), so
