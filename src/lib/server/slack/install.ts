@@ -90,7 +90,7 @@ export async function completeInstall(
 export function welcomeText(botUserId: string): string {
 	return [
 		"Thanks for adding ML Intern! To get started:",
-		`1. Mention <@${botUserId}> with a task in any channel. If I'm not in that channel yet, Slack offers to add me.`,
+		`1. Add <@${botUserId}> to a channel from its details → Agents & apps, then mention me with a task.`,
 		"2. The first time, I'll send you a private link to connect your Hugging Face account. I work with your account, so inference is billed to you, and compute jobs only run on a budget you approve.",
 		"You can also message me here directly. Everyone in your workspace connects their own account the same way.",
 	].join("\n");

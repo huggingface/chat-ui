@@ -10,8 +10,7 @@
 		<h1 class="text-2xl font-semibold">ML Intern is in {data.installed.teamName}</h1>
 		<ol class="list-decimal space-y-2 pl-5">
 			<li>
-				Mention @ML Intern with a task in any channel. If it isn't in that channel yet, Slack offers
-				to add it.
+				Add @ML Intern to a channel from its details → Agents & apps, then mention it with a task.
 			</li>
 			<li>
 				The first time, it sends you a private link to connect your Hugging Face account. It works
