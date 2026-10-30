@@ -75,6 +75,7 @@ export interface TrackioDashboard {
 	 * `$lib/utils/paneItems`.
 	 */
 	messageId?: Message["id"];
+	kind?: "workflow"; // unrelated to trackio - gr.workflow
 }
 
 /**

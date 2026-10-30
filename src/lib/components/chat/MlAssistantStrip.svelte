@@ -9,6 +9,7 @@
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 	import type { TrackioDashboard } from "$lib/utils/trackio";
 	import CarbonBox from "~icons/carbon/box";
+	import CarbonFlow from "~icons/carbon/flow";
 
 	interface Props {
 		/** Collapses the strip out of the composer when false, rather than unmounting it. */
@@ -61,13 +62,20 @@
 	);
 	// A failed status lookup (rate limit, Hub error) must not lock the user out
 	// of a dashboard that may be up.
-	let dashboardLive = $derived(dashboardStatus === "live" || dashboardStatus === "unknown");
+	let dashboardLive = $derived(
+		dashboardStatus === "live" ||
+			dashboardStatus === "unknown" ||
+			(dashboard?.kind === "workflow" && dashboardStatus === "building")
+	);
 	let dashboardShowing = $derived(
 		!!dashboard &&
 			sidePane.open &&
 			sidePane.view === "trackio" &&
 			sidePane.trackio?.url === dashboard.url
 	);
+
+	let noun = $derived(dashboard?.kind === "workflow" ? "workflow" : "training dashboard");
+	let Noun = $derived(noun[0].toUpperCase() + noun.slice(1));
 
 	function toggleDashboard() {
 		if (!dashboard || !dashboardLive) return;
@@ -250,24 +258,38 @@
 						: "cursor-default opacity-60",
 				]}
 				title={dashboardShowing
-					? `Close the training dashboard: ${dashboard.label}`
+					? `Close the ${noun}: ${dashboard.label}`
 					: dashboardLive
-						? `Open the training dashboard: ${dashboard.label}`
+						? `Open the ${noun}: ${dashboard.label}`
 						: dashboardStatus === "failed"
-							? "The training dashboard never came up"
-							: "The training dashboard starts with the run"}
-				aria-label={dashboardLive
-					? `Training dashboard: ${dashboard.label}`
-					: "Training dashboard, still starting"}
+							? `The ${noun} never came up`
+							: dashboard.kind === "workflow"
+								? "The workflow is still building"
+								: "The training dashboard starts with the run"}
+				aria-label={dashboardStatus === "building"
+					? `${Noun}, building: ${dashboard.label}`
+					: dashboardLive
+						? `${Noun}: ${dashboard.label}`
+						: `${Noun}, still starting`}
 				aria-pressed={dashboardLive ? dashboardShowing : undefined}
 				onclick={toggleDashboard}
 			>
-				<IconSparkline
-					classNames="size-[14px] shrink-0 {dashboardStatus === 'building' ? 'animate-pulse' : ''}"
-				/>
+				{#if dashboard.kind === "workflow"}
+					<CarbonFlow
+						class="size-[14px] shrink-0 {dashboardStatus === 'building' ? 'animate-pulse' : ''}"
+					/>
+				{:else}
+					<IconSparkline
+						classNames="size-[14px] shrink-0 {dashboardStatus === 'building'
+							? 'animate-pulse'
+							: ''}"
+					/>
+				{/if}
 				<!-- The one thing this design collapses: below a comfortable width the
 				     label goes and the icon keeps a round hit target. -->
-				<span class="hidden @min-[480px]:inline">Metrics</span>
+				<span class="hidden @min-[480px]:inline"
+					>{dashboard.kind === "workflow" ? "Workflow" : "Metrics"}</span
+				>
 			</button>
 		{/if}
 
