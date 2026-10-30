@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => ({
 	kickQueuedTurn: vi.fn(),
 	sideQuestion: vi.fn(),
 	views: vi.fn(),
+	tokens: [] as string[],
 }));
 vi.mock("$lib/server/mlSideQuestion", () => ({
 	answerSideQuestion: mocks.sideQuestion,
@@ -69,21 +70,29 @@ vi.mock("$lib/server/config", async (original) => {
 		}),
 	};
 });
+// Every workspace's client shares these stubs; the home bot is UBOT in T123.
+vi.mock("@slack/web-api", () => ({
+	WebClient: class {
+		constructor(token: string) {
+			mocks.tokens.push(token);
+		}
+		auth = { test: async () => ({ team_id: "T123", user_id: "UBOT", bot_id: "BBOT" }) };
+		bots = { info: async () => ({ bot: { app_id: "AAPP" } }) };
+		users = { info: mocks.users };
+		files = { uploadV2: mocks.upload };
+		reactions = { add: mocks.react, remove: mocks.unreact };
+		conversations = {
+			info: mocks.channels,
+			members: mocks.members,
+			replies: mocks.replies,
+			open: mocks.open,
+		};
+		chat = { postMessage: mocks.post, postEphemeral: mocks.ephemeral, update: mocks.update };
+		views = { open: mocks.views };
+	},
+}));
 vi.mock("@slack/bolt", () => ({
 	App: class {
-		client = {
-			users: { info: mocks.users },
-			files: { uploadV2: mocks.upload },
-			reactions: { add: mocks.react, remove: mocks.unreact },
-			conversations: {
-				info: mocks.channels,
-				members: mocks.members,
-				replies: mocks.replies,
-				open: mocks.open,
-			},
-			chat: { postMessage: mocks.post, postEphemeral: mocks.ephemeral, update: mocks.update },
-			views: { open: mocks.views },
-		};
 		event(name: string, handler: Handler) {
 			mocks.handlers.set(`event:${name}`, handler);
 		}
@@ -115,6 +124,7 @@ beforeEach(async () => {
 	await ready;
 	vi.clearAllMocks();
 	mocks.handlers.clear();
+	mocks.tokens.length = 0;
 	mocks.users.mockImplementation(async ({ user }: { user: string }) => ({
 		user: { id: user, team_id: "T123" },
 	}));
@@ -780,7 +790,6 @@ describe("Slack transport authorization", () => {
 	it("steers a running turn with the owner's unmentioned thread replies and shows working status", async () => {
 		const { user, locals } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);
-		bot["botUserId"] = "UBOT";
 		await bot.receive(
 			{ channel: "C123", user: "OWNER", text: "<@UBOT> Start", ts: "100.0" },
 			"T123",
@@ -856,7 +865,6 @@ describe("Slack transport authorization", () => {
 	it("starts the next turn from the owner's unmentioned reply once the run is idle", async () => {
 		const { user } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);
-		bot["botUserId"] = "UBOT";
 		await bot.receive(
 			{ channel: "C123", user: "OWNER", text: "<@UBOT> Start", ts: "100.0" },
 			"T123",
@@ -892,7 +900,6 @@ describe("Slack transport authorization", () => {
 	it("tells the owner privately instead of sending a reply that opens by tagging someone else", async () => {
 		const { user } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);
-		bot["botUserId"] = "UBOT";
 		await bot.receive(
 			{ channel: "C123", user: "OWNER", text: "<@UBOT> Start", ts: "100.0" },
 			"T123",
@@ -941,8 +948,7 @@ describe("Slack transport authorization", () => {
 
 	it("sends a DM that opens by tagging someone else, since only the bot reads it", async () => {
 		const { user } = await createTestUser();
-		const bot = new MlSlackBot(settings, user);
-		bot["botUserId"] = "UBOT";
+		new MlSlackBot(settings, user);
 		const onMessage = mocks.handlers.get("event:message");
 		if (!onMessage) throw Error("No message handler");
 		await onMessage({
@@ -1519,7 +1525,6 @@ describe("Slack btw side questions", () => {
 	async function startedThread() {
 		const { user, locals } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);
-		bot["botUserId"] = "UBOT";
 		await bot.receive(
 			{ channel: "C123", user: "OWNER", text: "Train a model", ts: "100.0" },
 			"T123",
@@ -1593,7 +1598,6 @@ describe("Slack btw side questions", () => {
 	it("treats /btw outside a task thread as a request and hints at a bare /btw", async () => {
 		const { user } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);
-		bot["botUserId"] = "UBOT";
 		await bot.receive(
 			{ channel: "C123", user: "OTHER", text: "<@UBOT> /btw can you fine-tune bert?", ts: "300.0" },
 			"T123",
@@ -1937,4 +1941,136 @@ it("bounds mention lookups and reuses eligibility only for event admission", asy
 		);
 	expect(mocks.users).toHaveBeenCalledTimes(1);
 	expect(mocks.channels).toHaveBeenCalledTimes(1);
+});
+
+describe("other workspaces", () => {
+	const shared = { ...settings, accountMode: "user" as const, hfToken: "", publicInstall: true };
+	const install = (teamId: string, extra: object = {}) =>
+		collections.slackInstallations.insertOne({
+			_id: teamId,
+			teamName: teamId,
+			appId: "AAPP",
+			botToken: `xoxb-${teamId}`,
+			botUserId: `UBOT${teamId}`,
+			scopes: [],
+			installedBy: "UADMIN",
+			installedAt: new Date(),
+			updatedAt: new Date(),
+			...extra,
+		});
+	beforeEach(() => {
+		mocks.users.mockImplementation(async ({ user }: { user: string }) => ({
+			user: { id: user, team_id: "TACME" },
+		}));
+	});
+
+	it("answers a mention from an installing workspace with that workspace's own bot", async () => {
+		await install("TACME");
+		const bot = new MlSlackBot(shared);
+		await bot.receive(
+			{ user: "UACME", channel: "CACME", ts: "100.0", text: "<@UBOTTACME> Train a model" },
+			"TACME",
+			"acme-event"
+		);
+		expect(mocks.ephemeral).toHaveBeenCalledWith(
+			expect.objectContaining({
+				user: "UACME",
+				channel: "CACME",
+				text: expect.stringContaining("Connect Hugging Face"),
+			})
+		);
+		expect(mocks.tokens).toEqual(["xoxb-TACME"]);
+		expect(await collections.slackLinks.findOne({})).toMatchObject({
+			teamId: "TACME",
+			userTeamId: "TACME",
+		});
+	});
+
+	it("marks a finished request using its installing workspace's token", async () => {
+		await install("TFINISHED");
+		const bot = new MlSlackBot(shared);
+		await bot["finishReaction"]("TFINISHED", "CFINISHED", "100.0");
+		expect(mocks.tokens).toEqual(["xoxb-TFINISHED"]);
+		expect(mocks.unreact).toHaveBeenCalledWith({
+			channel: "CFINISHED",
+			timestamp: "100.0",
+			name: "eyes",
+		});
+		expect(mocks.react).toHaveBeenCalledWith({
+			channel: "CFINISHED",
+			timestamp: "100.0",
+			name: "white_check_mark",
+		});
+	});
+
+	// Installs are cached for 30 s, so each case uses its own workspace.
+	it.each([
+		["not installed", "TNONE", undefined],
+		["disabled by an operator", "TOFF", { disabled: true }],
+	])("ignores a workspace that is %s", async (_, teamId, extra) => {
+		if (extra) await install(teamId, extra);
+		const bot = new MlSlackBot(shared);
+		await bot.receive(
+			{ user: "UACME", channel: "CACME", ts: "100.0", text: "Train a model" },
+			teamId,
+			"acme-event"
+		);
+		expect(mocks.users).not.toHaveBeenCalled();
+		expect(mocks.ephemeral).not.toHaveBeenCalled();
+		expect(await collections.slackLinks.countDocuments({})).toBe(0);
+	});
+
+	it("ignores other workspaces unless public installs are on", async () => {
+		await install("TACME");
+		const bot = new MlSlackBot({ ...shared, publicInstall: false });
+		await bot.receive(
+			{ user: "UACME", channel: "CACME", ts: "100.0", text: "Train a model" },
+			"TACME",
+			"acme-event"
+		);
+		expect(mocks.ephemeral).not.toHaveBeenCalled();
+	});
+
+	it("keeps one thread when a shared channel's event arrives through the other install", async () => {
+		await install("TACME");
+		const { user } = await createTestUser();
+		const thread = await getOrCreateThread("T123", "CSHARED", "100.0", "OWNER", user._id, "TACME");
+		mocks.channels.mockResolvedValue({ channel: { is_ext_shared: true } });
+		mocks.members.mockResolvedValue({ members: ["OWNER"] });
+		const bot = new MlSlackBot(shared);
+		await bot.receive(
+			{ user: "OWNER", channel: "CSHARED", ts: "101.0", thread_ts: "100.0", text: "steer" },
+			"TACME",
+			"shared-event"
+		);
+		expect(await collections.slackThreads.countDocuments({})).toBe(1);
+		expect(await collections.slackInputs.findOne({})).toMatchObject({ threadId: thread._id });
+		expect(mocks.tokens).toEqual(["xoxb-test"]);
+	});
+
+	it("stops polling an uninstalled workspace's threads", async () => {
+		const { user } = await createTestUser();
+		await getOrCreateThread("TGONE", "CGONE", "100.0", "OWNER", user._id);
+		const bot = new MlSlackBot(shared);
+		await bot.tick();
+		expect(await collections.slackThreads.findOne({ teamId: "TGONE" })).toMatchObject({
+			watching: false,
+		});
+		expect(mocks.post).not.toHaveBeenCalled();
+	});
+
+	it("forgets a workspace when Slack reports the app uninstalled", async () => {
+		await install("TACME");
+		const bot = new MlSlackBot(shared);
+		const handler = mocks.handlers.get("event:app_uninstalled");
+		if (!handler) throw new Error("Missing uninstall handler");
+		await handler({ body: { team_id: "TACME" } });
+		expect(await collections.slackInstallations.countDocuments({})).toBe(0);
+		await bot.receive(
+			{ user: "UACME", channel: "CACME", ts: "100.0", text: "Train a model" },
+			"TACME",
+			"acme-event"
+		);
+		expect(mocks.ephemeral).not.toHaveBeenCalled();
+	});
 });

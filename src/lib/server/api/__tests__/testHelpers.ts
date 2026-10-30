@@ -105,6 +105,7 @@ export async function cleanupTestData() {
 		collections.slackInputs.deleteMany({}),
 		collections.slackDeliveries.deleteMany({}),
 		collections.slackLeases.deleteMany({}),
+		collections.slackInstallations.deleteMany({}),
 		collections.mlFiles.deleteMany({}),
 		collections.mlReviews.deleteMany({}),
 		collections.conversationStats.deleteMany({}),

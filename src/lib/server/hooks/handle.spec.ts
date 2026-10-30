@@ -11,8 +11,11 @@ vi.mock("$lib/server/config", () => ({
 	config: { PUBLIC_ORIGIN: "https://chat.example", checkForUpdates: vi.fn() },
 	ready: Promise.resolve(),
 }));
+const auth = vi.hoisted(() => ({ loginEnabled: false }));
 vi.mock("$lib/server/auth", () => ({
-	loginEnabled: false,
+	get loginEnabled() {
+		return auth.loginEnabled;
+	},
 	authCondition: () => ({ sessionId: "test" }),
 	authenticateRequest: vi.fn(async () => ({ sessionId: "test" })),
 	refreshSessionCookie: vi.fn(),
@@ -23,7 +26,11 @@ vi.mock("$lib/server/logger", () => ({ logger: { debug: vi.fn(), info: vi.fn() }
 
 import { handleRequest } from "./handle";
 import { collections } from "$lib/server/database";
-beforeEach(() => vi.clearAllMocks());
+import { triggerOauthFlow } from "$lib/server/auth";
+beforeEach(() => {
+	vi.clearAllMocks();
+	auth.loginEnabled = false;
+});
 
 function event(method: string, origin: string) {
 	const url = new URL("https://chat.example/api/v2/user/settings");
@@ -105,4 +112,29 @@ it.each([
 		resolve: async () => new Response("ok", { headers: { "content-type": contentType, link } }),
 	});
 	expect(response.headers.get("link")).toBe(link);
+});
+
+it.each([
+	["/slack/install", false],
+	["/slack/install/callback", false],
+	["/slack/installed", false],
+	["/slack/connect", true],
+	["/slack/installer", true],
+])("signing in to HuggingChat before %s required: %s", async (path, required) => {
+	auth.loginEnabled = true;
+	const url = new URL(`https://chat.example${path}`);
+	const resolve = vi.fn(async () => new Response("ok"));
+	await handleRequest({
+		event: {
+			url,
+			route: { id: path },
+			locals: {},
+			params: {},
+			cookies: {},
+			request: new Request(url),
+		} as unknown as Parameters<typeof handleRequest>[0]["event"],
+		resolve,
+	});
+	expect(vi.mocked(triggerOauthFlow).mock.calls.length > 0).toBe(required);
+	expect(resolve.mock.calls.length > 0).toBe(!required);
 });

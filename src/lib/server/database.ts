@@ -55,6 +55,7 @@ import type {
 	SlackLease,
 	SlackConnection,
 	SlackLink,
+	SlackInstallation,
 } from "./slack/types";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
@@ -162,6 +163,7 @@ export class Database {
 		const slackInputs = db.collection<SlackInput>("slack.inputs");
 		const slackDeliveries = db.collection<SlackDelivery>("slack.deliveries");
 		const slackLeases = db.collection<SlackLease>("slack.leases");
+		const slackInstallations = db.collection<SlackInstallation>("slack.installations");
 		const conversations = db.collection<Conversation>("conversations");
 		const settings = db.collection<Settings>("settings");
 		const users = db.collection<User>("users");
@@ -211,6 +213,7 @@ export class Database {
 			slackInputs,
 			slackDeliveries,
 			slackLeases,
+			slackInstallations,
 			conversations,
 			conversationStats,
 			assistants,

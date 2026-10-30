@@ -15,6 +15,10 @@ const schema = z.object({
 	billingOrganization: z.string().optional(),
 	billingResourceGroup: z.string().optional(),
 	allowedChannels: z.array(z.string()).default([]),
+	/** Other workspaces may install the app through /slack/install; personal-account mode only. */
+	publicInstall: z.boolean().optional(),
+	clientId: z.string().optional(),
+	clientSecret: z.string().optional(),
 });
 export type SlackConfig = z.infer<typeof schema>;
 
@@ -34,6 +38,9 @@ export function slackConfig(): SlackConfig | undefined {
 			.split(",")
 			.map((s) => s.trim())
 			.filter(Boolean),
+		publicInstall: config.SLACK_ML_PUBLIC_INSTALL === "true",
+		clientId: config.SLACK_ML_CLIENT_ID || undefined,
+		clientSecret: config.SLACK_ML_CLIENT_SECRET || undefined,
 	});
 	// Never include Zod's input or a credential in errors/logs.
 	if (!parsed.success)
@@ -43,5 +50,16 @@ export function slackConfig(): SlackConfig | undefined {
 	if (parsed.data.billingResourceGroup && !parsed.data.billingOrganization) {
 		throw new Error("Slack ML billing resource group requires an organization.");
 	}
+	// Other workspaces' bot tokens are stored encrypted, and they never get a shared HF token.
+	if (
+		parsed.data.publicInstall &&
+		(parsed.data.accountMode !== "user" ||
+			!parsed.data.clientId ||
+			!parsed.data.clientSecret ||
+			!config.MCP_OAUTH_ENCRYPTION_KEY?.trim())
+	)
+		throw new Error(
+			"Public Slack installs require user account mode, SLACK_ML_CLIENT_ID, SLACK_ML_CLIENT_SECRET and MCP_OAUTH_ENCRYPTION_KEY."
+		);
 	return parsed.data;
 }
