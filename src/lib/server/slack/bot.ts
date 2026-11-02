@@ -212,13 +212,20 @@ export class MlSlackBot {
 		const thread = await collections.slackThreads.findOne({
 			_id: threadId,
 			teamId: this.settings.teamId,
-			owner: userId,
 		});
-		if (!thread) return null;
+		if (!thread || thread.deletedAt) return null;
 		const participant = await this.participant(thread, userId);
 		if (!participant || (teamId !== this.settings.teamId && teamId !== participant.team_id))
 			return null;
-		if (thread?.deletedAt) return null;
+		if (thread.owner !== userId) {
+			await this.tell(
+				thread.channel,
+				userId,
+				`Only <@${thread.owner}> can use this session's controls.`,
+				thread.threadTs
+			);
+			return null;
+		}
 		if (thread?.hfUserId && requireConnection) {
 			try {
 				await connectedLocals(thread);
@@ -252,8 +259,10 @@ export class MlSlackBot {
 	}
 
 	private register(): void {
-		this.app.action("ml_intern_view", async ({ ack }) => {
+		this.app.action("ml_intern_view", async ({ ack, body, action }) => {
 			await ack();
+			if (!("value" in action) || !action.value) return;
+			await this.owned(action.value, body.user.id, body.team?.id, false);
 		});
 		this.app.event("app_mention", async ({ event, body }) => {
 			await this.receive(event, body.team_id, body.event_id);
@@ -1520,6 +1529,7 @@ export class MlSlackBot {
 						{
 							type: "button" as const,
 							action_id: "ml_intern_view",
+							...(thread.hfUserId ? { value: thread._id } : {}),
 							text: {
 								type: "plain_text" as const,
 								text: thread.hfUserId
