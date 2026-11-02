@@ -39,6 +39,13 @@ it("allows inspection and sharing without a database lookup", async () => {
 	);
 	expect(mocks.findOne).not.toHaveBeenCalled();
 });
+it.each([
+	["PATCH", "/api/v2/conversations/[id]/reviews/[reviewId]"],
+	["POST", "/api/v2/conversations/[id]/reviews/[reviewId]/submit"],
+])("allows the web review Slack links to: %s %s", async (method, route) => {
+	expect(await isSlackConversationMutation(method, route, id, locals)).toBe(false);
+	expect(mocks.findOne).not.toHaveBeenCalled();
+});
 it("does not reveal unowned conversations or block ordinary conversations", async () => {
 	mocks.findOne.mockResolvedValue(null);
 	expect(await isSlackConversationMutation("POST", "/conversation/[id]", id, locals)).toBe(false);
