@@ -180,6 +180,7 @@ describe("withJobFailedNote", () => {
 		"- **Status: failed.** Job ran ~48 s, exit code 1",
 		"- **Status:** failed (exit 1)",
 		"- Status: **failed**",
+		"- **Status: failed.** OOM at batch size 16",
 	])("adds the note to a failed report: %s", (report) => {
 		expect(withJobFailedNote(JOB_CHECK_TOOL_NAME, report)).toBe(`${report}\n\n${JOB_FAILED_NOTE}`);
 	});
@@ -187,8 +188,6 @@ describe("withJobFailedNote", () => {
 	it.each([
 		"- Status: running.\n- Step 120, loss 1.9 and falling",
 		"- Status: finished.\n- No job has failed",
-		"- Status: failed.\n- If it failed: torch.OutOfMemoryError: CUDA out of memory",
-		"- **Status: failed.** OOM at batch size 16",
 	])("leaves other reports alone: %s", (report) => {
 		expect(withJobFailedNote(JOB_CHECK_TOOL_NAME, report)).toBe(report);
 	});

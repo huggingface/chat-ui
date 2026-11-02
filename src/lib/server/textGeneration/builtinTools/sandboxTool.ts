@@ -86,11 +86,12 @@ const definition: OpenAiTool = {
 			"Use it for:\n" +
 			"- Getting a script to import and run before you submit it as a job\n" +
 			"- Checking data shapes, columns, versions or environment inside the sandbox\n" +
-			"- Validating a trainer config resolves, up to but not including the first step\n" +
+			"- Validating a trainer config resolves\n" +
+			"- On the job's GPU flavor, running a few training steps to measure memory and step time\n" +
 			"- Debugging a failure whose fix is edit-and-rerun\n\n" +
-			"The sandbox is CPU-only, so do not send it training: a step there measures nothing " +
-			"about the GPU the real run uses and is slow enough to eat the whole delegation. That " +
-			"check is a smoke job on the real flavor. It also cannot create or terminate " +
+			"It works on whatever flavor you created the sandbox on. The full training run is a " +
+			"job, not a delegation, and on a CPU sandbox stop it before the first training step: " +
+			"a step there measures nothing about the GPU the real run uses. It cannot create or terminate " +
 			"sandboxes, submit jobs, or write to the Hub — do those yourself. A single command you " +
 			"want to look at is not worth delegating; a loop is.",
 		parameters: {

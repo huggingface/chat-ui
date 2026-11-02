@@ -78,6 +78,7 @@ import { loadSessionJobLabels } from "$lib/server/mlRegistry/sessionLabel";
 import { createMlBudgetGuard } from "$lib/server/mlBudget/guard";
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
 import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
+import { createSandboxFirstGuard } from "$lib/server/mlRegistry/sandboxFirstGuard";
 import { PARENT_READER } from "$lib/types/MlSource";
 import { mlJobLabelsEnabled, mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
 import { markHarnessEventDelivered, pendingHarnessEvent } from "$lib/server/mlRegistry/midTurn";
@@ -285,6 +286,9 @@ export async function* runMcpFlow({
 	// Built here so it spans the turn's rounds; chained below, once the tool
 	// mapping the schema check reads exists.
 	const repeatedCallGuard = createRepeatedCallGuard();
+	const sandboxFirstGuard = mlAssistant
+		? createSandboxFirstGuard({ conversationId: conv._id })
+		: undefined;
 
 	// Start from env-configured servers
 	let servers = getMcpServers();
@@ -585,6 +589,10 @@ export async function* runMcpFlow({
 		const guard = [
 			repeatedCallGuard,
 			createSchemaPreflightGuard(mapping),
+			// it asks for a sandbox, so it applies only where one can be created
+			...(sandboxFirstGuard && Object.values(mapping).some((m) => m.tool === "hf_sandbox")
+				? [sandboxFirstGuard]
+				: []),
 			...(recordingGuard ? [recordingGuard] : []),
 			...(sourcesGuardFor ? [sourcesGuardFor(PARENT_READER)] : []),
 			...(budgetGuard ? [budgetGuard] : []),
