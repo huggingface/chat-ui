@@ -10,7 +10,7 @@ vi.mock("$lib/server/mlAssistantModels", () => ({
 	mlAssistantProviderFor: (id: string, pref: string | undefined) => mocked.pins.get(id) ?? pref,
 }));
 
-import { requestProvider } from "./requestProvider";
+import { requestProvider, routedProvider } from "./requestProvider";
 
 const model = {
 	id: "zai-org/GLM-5.3-Flash",
@@ -48,5 +48,47 @@ describe("requestProvider", () => {
 		expect(
 			requestProvider({ ...model, isRouter: true }, chat, { [model.id]: "novita" })
 		).toBeUndefined();
+	});
+
+	describe("with a default provider", () => {
+		const pinned = { ...model, defaultProvider: "baseten" };
+
+		it("applies when the user has not picked a provider", () => {
+			expect(requestProvider(pinned, chat, {})).toBe("baseten");
+			expect(requestProvider(pinned, chat, { [model.id]: "auto" })).toBe("baseten");
+		});
+
+		it("gives way to the user's own pick", () => {
+			expect(requestProvider(pinned, chat, { [model.id]: "novita" })).toBe("novita");
+			expect(requestProvider(pinned, chat, { [model.id]: "fastest" })).toBe("fastest");
+		});
+
+		it("gives way to the ML Intern pin", () => {
+			mocked.pins.set(model.id, "novita");
+			expect(requestProvider(pinned, intern, {})).toBe("novita");
+			mocked.pins.clear();
+		});
+
+		it("is dropped when the router no longer lists it", () => {
+			expect(requestProvider({ ...model, defaultProvider: "together" }, chat, {})).toBeUndefined();
+		});
+	});
+});
+
+describe("routedProvider", () => {
+	it("uses the routed model's default provider", () => {
+		expect(routedProvider({ ...model, defaultProvider: "novita" })).toBe("novita");
+	});
+
+	it("names no provider when the model has no default", () => {
+		expect(routedProvider(model)).toBeUndefined();
+	});
+
+	it("drops a default the router no longer lists", () => {
+		expect(routedProvider({ ...model, defaultProvider: "together" })).toBeUndefined();
+	});
+
+	it("never names a provider for the router alias", () => {
+		expect(routedProvider({ ...model, isRouter: true, defaultProvider: "novita" })).toBeUndefined();
 	});
 });

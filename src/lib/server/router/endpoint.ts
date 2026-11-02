@@ -9,6 +9,7 @@ import type { ProcessedModel } from "../models";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import { upstreamErrorCode } from "$lib/server/endpoints/openai/providerFallback";
+import { routedProvider } from "$lib/server/requestProvider";
 import { heuristicSelectRoute, MULTIMODAL_ROUTE, AGENTIC_ROUTE } from "./heuristics";
 import { getRoutes, resolveRouteModels } from "./policy";
 import { getApiToken } from "$lib/server/apiToken";
@@ -148,7 +149,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 				} as ProcessedModel;
 			}
 
-			return endpoints.openai({
+			const ep = await endpoints.openai({
 				type: "openai",
 				baseURL: (config.OPENAI_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, ""),
 				apiKey: getApiToken(params.locals),
@@ -156,6 +157,8 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 				// Ensure streaming path is used
 				streamingSupported: true,
 			});
+			const provider = routedProvider(modelForCall);
+			return (callParams) => ep({ ...callParams, provider });
 		}
 
 		// Yield router metadata for immediate UI display, using the actual candidate

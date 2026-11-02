@@ -84,6 +84,7 @@ import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
 import { createJobLabelRewrite } from "$lib/server/mcp/jobLabels";
 import { loadSessionJobLabels } from "$lib/server/mlRegistry/sessionLabel";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
+import { routedProvider } from "$lib/server/requestProvider";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
 import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
@@ -796,10 +797,14 @@ export async function* runMcpFlow({
 					? (parameters.stop as string[])
 					: undefined;
 
-		// Build model ID with optional provider suffix (e.g., "model:fastest" or "model:together")
+		// Build model ID with optional provider suffix (e.g., "model:fastest" or "model:together").
+		// An Omni request arrives without one, so the routed model's default applies.
 		const baseModelId = targetModel.id ?? targetModel.name;
+		const requestedProvider = model.isRouter ? routedProvider(targetModel) : provider;
 		const modelIdWithProvider =
-			provider && provider !== "auto" ? `${baseModelId}:${provider}` : baseModelId;
+			requestedProvider && requestedProvider !== "auto"
+				? `${baseModelId}:${requestedProvider}`
+				: baseModelId;
 
 		const completionBase: Omit<ChatCompletionCreateParamsStreaming, "messages"> & {
 			reasoning_effort?: "low" | "medium" | "high";

@@ -9,6 +9,7 @@ const PROVIDER_POLICIES = new Set(["auto", "fastest", "cheapest", "preferred"]);
 interface RequestModel {
 	id: string;
 	isRouter?: boolean;
+	defaultProvider?: string;
 	providers?: Array<Record<string, unknown>>;
 }
 
@@ -19,10 +20,22 @@ export function requestProvider(
 	providerOverrides: Record<string, string> | undefined
 ): string | undefined {
 	if (!config.isHuggingChat || model.isRouter) return undefined;
-	const preference = providerOverrides?.[model.id];
+	// "auto" is what the settings page stores before the user picks anything
+	const saved = providerOverrides?.[model.id];
+	const preference = saved && saved !== "auto" ? saved : (model.defaultProvider ?? saved);
 	const provider = isMlAssistantConversation(conv)
 		? mlAssistantProviderFor(model.id, preference)
 		: preference;
+	return listedProvider(model, provider);
+}
+
+/** provider suffix for a model Omni routed to, the user picked Omni rather than a provider so only the model's default applies */
+export function routedProvider(model: RequestModel): string | undefined {
+	if (!config.isHuggingChat || model.isRouter) return undefined;
+	return listedProvider(model, model.defaultProvider);
+}
+
+function listedProvider(model: RequestModel, provider: string | undefined): string | undefined {
 	if (!provider || PROVIDER_POLICIES.has(provider)) return provider;
 	const listed = (model.providers ?? []).map((p) => p.provider);
 	if (listed.length === 0 || listed.includes(provider)) return provider;
