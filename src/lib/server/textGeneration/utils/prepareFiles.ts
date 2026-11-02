@@ -17,6 +17,7 @@ import type { ObjectId } from "mongodb";
 import { isValidJsonObject } from "$lib/server/textGeneration/mcp/toolInvocation";
 import { ROUNDS_SHAPE, rebuildLegacyContent, toolRounds } from "$lib/utils/messageShape";
 import { withHarnessEvent } from "./harnessEvent";
+import { withJobFailedNote } from "../builtinTools/jobCheckPrompt";
 import { toToolCallId } from "./toolCallId";
 import {
 	answeredQuestion,
@@ -339,7 +340,7 @@ function replayAssistantTurn(
 				// the note and the event go on after the cap, a long output never cuts them
 				content: (eventsByUuid.get(u.uuid) ?? []).reduce(
 					withHarnessEvent,
-					withImageNote(capped, notes.get(toolCallId))
+					withImageNote(withJobFailedNote(u.call.name, capped), notes.get(toolCallId))
 				),
 			});
 		}
