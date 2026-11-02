@@ -23,13 +23,13 @@ export type GETModelsResponse = Array<{
 	unlisted: boolean;
 	hasInferenceAPI: boolean;
 	isRouter: boolean;
+	/** provider HuggingChat uses when the user has not picked one, only while the router lists it */
+	defaultProvider?: string;
 }>;
 
 export type GETModelResponse = GETModelsResponse[number] & {
 	providers?: Array<{ provider: string } & Record<string, unknown>>;
 	parameters: BackendModel["parameters"];
-	/** provider HuggingChat uses when the user has not picked one */
-	defaultProvider?: string;
 };
 
 export type GETOldModelsResponse = Array<{

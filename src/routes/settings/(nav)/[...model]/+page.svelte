@@ -66,9 +66,15 @@
 	// option is never stored: picking it clears the entry instead.
 	const DEFAULT_PROVIDER_OPTION = "default";
 	function getProviderOverride() {
-		return (
-			$settings.providerOverrides?.[modelId] ?? (defaultProvider ? DEFAULT_PROVIDER_OPTION : "auto")
-		);
+		const saved = $settings.providerOverrides?.[modelId];
+		// a saved provider the router no longer lists is sent to the default, then auto
+		const dropped =
+			saved !== undefined &&
+			!["auto", "fastest", "cheapest", "preferred"].includes(saved) &&
+			providerList.length > 0 &&
+			!providerList.some((p) => p.provider === saved);
+		if (saved && !dropped) return saved;
+		return defaultProvider ? DEFAULT_PROVIDER_OPTION : "auto";
 	}
 	function setProviderOverride(v: string) {
 		settings.update((s) => {
@@ -132,16 +138,21 @@
 	);
 
 	let model = $derived(page.data.models.find((el: BackendModel) => el.id === modelId));
+	// on the models list, so the selection is right before the providers arrive
+	let defaultProvider = $derived(
+		(model as { defaultProvider?: string } | undefined)?.defaultProvider
+	);
+	let defaultHubOrg = $derived(
+		PROVIDERS_HUB_ORGS[defaultProvider as keyof typeof PROVIDERS_HUB_ORGS]
+	);
 
 	// Providers are excluded from the models list payload (they are ~60KB
 	// across all models and this page is their only reader); fetch them for
 	// the current model on demand from the per-model detail endpoint.
 	let providerList: RouterProvider[] = $state([]);
-	let defaultProvider: string | undefined = $state();
 	let providersLoading = $state(false);
 	$effect(() => {
 		providerList = [];
-		defaultProvider = undefined;
 		if (!publicConfig.isHuggingChat || !model || model.isRouter) {
 			providersLoading = false;
 			return;
@@ -152,10 +163,9 @@
 			.models({ id: requestedId })
 			.get()
 			.then(handleResponse)
-			.then((detail: { providers?: RouterProvider[]; defaultProvider?: string } | null) => {
+			.then((detail: { providers?: RouterProvider[] } | null) => {
 				if (requestedId !== modelId) return; // stale response for a previous model
 				providerList = detail?.providers ?? [];
-				defaultProvider = detail?.defaultProvider;
 			})
 			.catch(() => {
 				// No providers section is rendered on failure; the selection-mode
@@ -193,6 +203,12 @@
 		{ value: "cheapest", label: "Cheapest (lowest cost)" },
 	]);
 </script>
+
+{#snippet providerAvatar(hubOrg: string)}
+	<span class="flex size-5 flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5">
+		<img src="https://huggingface.co/api/avatars/{hubOrg}" alt="" class="size-full rounded-sm" />
+	</span>
+{/snippet}
 
 <!-- Key on modelId so the DOM is rebuilt when navigating between models:
      reused switches/textareas would otherwise animate to the new model's values -->
@@ -480,19 +496,9 @@
 							{@const currentValue = getProviderOverride()}
 							{@const currentPolicy = PROVIDER_POLICIES.find((p) => p.value === currentValue)}
 							{@const currentProvider = providerList.find((p) => p.provider === currentValue)}
-							{@const defaultHubOrg =
-								PROVIDERS_HUB_ORGS[defaultProvider as keyof typeof PROVIDERS_HUB_ORGS]}
 							<span class="flex items-center gap-2">
 								{#if currentValue === DEFAULT_PROVIDER_OPTION && defaultHubOrg}
-									<span
-										class="flex size-5 flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5"
-									>
-										<img
-											src="https://huggingface.co/api/avatars/{defaultHubOrg}"
-											alt=""
-											class="size-full rounded-sm"
-										/>
-									</span>
+									{@render providerAvatar(defaultHubOrg)}
 								{:else if currentValue === "auto"}
 									<span class="grid size-5 flex-none place-items-center rounded-md bg-gray-500/10">
 										<CarbonMagicWandFilled class="size-3 text-gray-700 dark:text-gray-300" />
@@ -513,15 +519,7 @@
 									{@const hubOrg =
 										PROVIDERS_HUB_ORGS[currentValue as keyof typeof PROVIDERS_HUB_ORGS]}
 									{#if hubOrg}
-										<span
-											class="flex size-5 flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5"
-										>
-											<img
-												src="https://huggingface.co/api/avatars/{hubOrg}"
-												alt=""
-												class="size-full rounded-sm"
-											/>
-										</span>
+										{@render providerAvatar(hubOrg)}
 									{/if}
 								{/if}
 								{currentPolicy?.label ?? currentProvider?.provider ?? currentValue}
@@ -545,18 +543,8 @@
 											class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-hidden select-none data-highlighted:bg-gray-100 dark:text-gray-200 dark:data-highlighted:bg-white/10"
 										>
 											{#if opt.value === DEFAULT_PROVIDER_OPTION}
-												{@const defaultHubOrg =
-													PROVIDERS_HUB_ORGS[defaultProvider as keyof typeof PROVIDERS_HUB_ORGS]}
 												{#if defaultHubOrg}
-													<span
-														class="flex size-5 flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5"
-													>
-														<img
-															src="https://huggingface.co/api/avatars/{defaultHubOrg}"
-															alt=""
-															class="size-full rounded-sm"
-														/>
-													</span>
+													{@render providerAvatar(defaultHubOrg)}
 												{/if}
 											{:else if opt.value === "auto"}
 												<span
@@ -599,15 +587,7 @@
 											class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-hidden select-none data-highlighted:bg-gray-100 dark:text-gray-200 dark:data-highlighted:bg-white/10"
 										>
 											{#if hubOrg}
-												<span
-													class="flex size-5 flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5"
-												>
-													<img
-														src="https://huggingface.co/api/avatars/{hubOrg}"
-														alt=""
-														class="size-full rounded-sm"
-													/>
-												</span>
+												{@render providerAvatar(hubOrg)}
 											{:else}
 												<span class="size-5"></span>
 											{/if}

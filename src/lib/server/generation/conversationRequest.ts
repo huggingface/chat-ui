@@ -773,7 +773,7 @@ export async function generateConversationResponse({
 					forceMultimodal:
 						!config.isHuggingChat && Boolean(userSettings?.multimodalOverrides?.[model.id]),
 					forceTools: !config.isHuggingChat && Boolean(userSettings?.toolsOverrides?.[model.id]),
-					provider: requestProvider(model, conv, userSettings?.providerOverrides),
+					...requestProvider(model, conv, userSettings?.providerOverrides),
 					// Thinking-effort override (only forwarded for reasoning-capable models;
 					// per-user override can force-enable on self-hosted). The ML Assistant
 					// preset pins its own effort here rather than writing the user's saved

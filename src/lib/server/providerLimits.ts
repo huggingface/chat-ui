@@ -1,7 +1,6 @@
-/** provider values that let the HF router pick, rather than naming one provider */
-export const PROVIDER_POLICIES = new Set(["auto", "fastest", "cheapest", "preferred"]);
+import { PROVIDER_POLICIES } from "$lib/server/requestProvider";
 
-interface CappedModel {
+export interface CappedModel {
 	providerMaxTokens?: Record<string, number>;
 }
 
@@ -15,13 +14,4 @@ export function providerMaxTokensCap(
 	if (provider && !PROVIDER_POLICIES.has(provider)) return caps[provider];
 	const values = Object.values(caps);
 	return values.length > 0 ? Math.min(...values) : undefined;
-}
-
-export function capMaxTokens(
-	model: CappedModel,
-	provider: string | undefined,
-	maxTokens: number | undefined
-): number | undefined {
-	const cap = providerMaxTokensCap(model, provider);
-	return maxTokens === undefined || cap === undefined ? maxTokens : Math.min(maxTokens, cap);
 }

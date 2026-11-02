@@ -76,7 +76,6 @@ import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
 import { createJobLabelRewrite } from "$lib/server/mcp/jobLabels";
 import { loadSessionJobLabels } from "$lib/server/mlRegistry/sessionLabel";
 import { routedProvider } from "$lib/server/requestProvider";
-import { providerMaxTokensCap } from "$lib/server/providerLimits";
 import { createMlBudgetGuard } from "$lib/server/mlBudget/guard";
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
 import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
@@ -114,6 +113,7 @@ export type RunMcpFlowContext = Pick<
 	| "forceMultimodal"
 	| "forceTools"
 	| "provider"
+	| "providerIsDefault"
 	| "reasoningEffort"
 	| "reasoningOverride"
 	| "locals"
@@ -179,6 +179,7 @@ export async function* runMcpFlow({
 	forceMultimodal,
 	forceTools,
 	provider,
+	providerIsDefault,
 	reasoningEffort,
 	reasoningOverride,
 	locals,
@@ -604,17 +605,20 @@ export async function* runMcpFlow({
 
 		const { OpenAI } = await import("openai");
 
+		// An Omni request arrives without a provider, so the routed model's default applies.
+		const requested = model.isRouter
+			? routedProvider(targetModel)
+			: { provider, providerIsDefault: providerIsDefault ?? false };
+
 		// Capture provider header (x-inference-provider) from the upstream OpenAI-compatible server.
 		let providerHeader: string | undefined;
 		const captureProviderFetch = async (
 			input: RequestInfo | URL,
 			init?: RequestInit
 		): Promise<Response> => {
-			const res = await fetchWithProviderFallback(
-				input,
-				init,
-				providerMaxTokensCap(targetModel, undefined)
-			);
+			const res = await fetchWithProviderFallback(input, init, targetModel, {
+				defaultPin: requested.providerIsDefault,
+			});
 			const p = res.headers.get("x-inference-provider");
 			if (p && !providerHeader) providerHeader = p;
 			return res;
@@ -662,8 +666,6 @@ export async function* runMcpFlow({
 
 		// Hoisted above the message prep so the history budget can reserve the
 		// reply allowance this request will actually ask for.
-		// An Omni request arrives without a provider, so the routed model's default applies.
-		const requestedProvider = model.isRouter ? routedProvider(targetModel) : provider;
 		const {
 			parameters,
 			maxTokens,
@@ -672,7 +674,6 @@ export async function* runMcpFlow({
 			targetModel: targetModel as typeof targetModel & { contextLength?: number },
 			mlAssistant,
 			generateSettings: assistant?.generateSettings as Record<string, unknown> | undefined,
-			provider: requestedProvider,
 		});
 
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
@@ -717,7 +718,7 @@ export async function* runMcpFlow({
 
 		const completionBase = completionRequestBase({
 			model: targetModel.id ?? targetModel.name,
-			provider: requestedProvider,
+			provider: requested.provider,
 			parameters,
 			maxTokens,
 			tools: oaTools,

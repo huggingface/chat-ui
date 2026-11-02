@@ -19,9 +19,10 @@ import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWi
 import { windowLimitChars } from "$lib/server/textGeneration/utils/historyWindow";
 import { prepareAttachments } from "$lib/server/textGeneration/utils/attachmentBudget";
 import { fetchWithProviderFallback } from "./providerFallback";
-import { capMaxTokens, providerMaxTokensCap } from "$lib/server/providerLimits";
 import { inferenceBillingHeaders } from "$lib/server/billing";
 // uuid import removed (no tool call ids)
+
+const DEFAULT_PIN_HEADER = "X-ChatUI-Default-Provider";
 
 export const endpointOAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -84,11 +85,14 @@ export async function endpointOai(
 
 	// Custom fetch wrapper to capture response headers for router metadata
 	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
-		const response = await fetchWithProviderFallback(
-			url,
-			init,
-			providerMaxTokensCap(model, undefined)
-		);
+		// the client is shared across calls, so whether this one's provider is a default rides on a
+		// header of our own, taken off before the request leaves
+		const headers = new Headers(init?.headers);
+		const defaultPin = headers.get(DEFAULT_PIN_HEADER) === "1";
+		headers.delete(DEFAULT_PIN_HEADER);
+		const response = await fetchWithProviderFallback(url, { ...init, headers }, model, {
+			defaultPin,
+		});
 
 		// Capture router headers if present (fallback for non-streaming)
 		const routeHeader = response.headers.get("X-Router-Route");
@@ -133,14 +137,11 @@ export async function endpointOai(
 			locals,
 			abortSignal,
 			provider,
+			providerIsDefault,
 			attachments,
 			onAttachments,
 		}) => {
-			const settings = { ...model.parameters, ...generateSettings };
-			const parameters = {
-				...settings,
-				max_tokens: capMaxTokens(model, provider, settings.max_tokens),
-			};
+			const parameters = { ...model.parameters, ...generateSettings };
 			// the prompt renders message content only, pasted text and files have to be in it
 			const { contentOf, report } = await prepareAttachments(messages, imageProcessor, false, {
 				limitChars: model.contextLength
@@ -177,6 +178,7 @@ export async function endpointOai(
 			const openAICompletion = await openai.completions.create(body, {
 				body: { ...body, ...extraBody },
 				headers: {
+					...(providerIsDefault ? { [DEFAULT_PIN_HEADER]: "1" } : {}),
 					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 					"X-use-cache": "false",
 					...(config.USE_USER_TOKEN === "true" && locals?.token
@@ -200,6 +202,7 @@ export async function endpointOai(
 			locals,
 			abortSignal,
 			provider,
+			providerIsDefault,
 			reasoningEffort,
 			reasoningOverride,
 			historyWindow,
@@ -208,11 +211,7 @@ export async function endpointOai(
 		}) => {
 			// Hoisted above the message prep so the history budget can reserve the
 			// reply allowance this request will actually ask for.
-			const settings = { ...model.parameters, ...generateSettings };
-			const parameters = {
-				...settings,
-				max_tokens: capMaxTokens(model, provider, settings.max_tokens),
-			};
+			const parameters = { ...model.parameters, ...generateSettings };
 
 			// Format messages for the chat API, handling multimodal content if supported.
 			// attachReasoning re-attaches persisted reasoning as reasoning_content on
@@ -290,6 +289,7 @@ export async function endpointOai(
 					{
 						body: { ...body, ...extraBody },
 						headers: {
+							...(providerIsDefault ? { [DEFAULT_PIN_HEADER]: "1" } : {}),
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
 							...(config.USE_USER_TOKEN === "true" && locals?.token
@@ -308,6 +308,7 @@ export async function endpointOai(
 					{
 						body: { ...body, ...extraBody },
 						headers: {
+							...(providerIsDefault ? { [DEFAULT_PIN_HEADER]: "1" } : {}),
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
 							...(config.USE_USER_TOKEN === "true" && locals?.token

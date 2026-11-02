@@ -65,27 +65,4 @@ describe("legacy completions", () => {
 			})
 		);
 	});
-
-	it("caps max_tokens to the provider's own limit", async () => {
-		const endpoint = await endpointOai({
-			type: "openai",
-			completion: "completions",
-			model: {
-				id: "m",
-				name: "m",
-				parameters: { max_tokens: 49152 },
-				providerMaxTokens: { scaleway: 32768 },
-				chatPromptRender: () => "",
-			},
-		});
-		const sentMaxTokens = async (provider: string | undefined) => {
-			mocks.create.mockClear();
-			await endpoint({ messages: [{ from: "user", content: "hi" }], locals: undefined, provider });
-			return (mocks.create.mock.calls[0] as unknown as [{ max_tokens?: number }])[0].max_tokens;
-		};
-
-		expect(await sentMaxTokens("novita")).toBe(49152);
-		expect(await sentMaxTokens("scaleway")).toBe(32768);
-		expect(await sentMaxTokens(undefined)).toBe(32768);
-	});
 });

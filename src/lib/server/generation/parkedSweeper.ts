@@ -498,7 +498,7 @@ async function resumeParkedCallInner(park: ParkedCall): Promise<void> {
 			promptedAt,
 			ip: "sweeper",
 			username: locals.user?.username,
-			provider: requestProvider(model, conv, settings?.providerOverrides),
+			...requestProvider(model, conv, settings?.providerOverrides),
 			reasoningEffort: isMlAssistantConversation(conv)
 				? ML_ASSISTANT_EFFORT
 				: settings?.reasoningEffortOverrides?.[model.id],

@@ -98,7 +98,6 @@ export async function requestBuilder(settings: RequestSettings, token: string) {
 	const { parameters, maxTokens, contextLength } = completionSettings({
 		targetModel,
 		mlAssistant: true,
-		provider: settings.provider,
 	});
 
 	const build = async (c: DecisionCase) => {

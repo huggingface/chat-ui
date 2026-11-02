@@ -157,8 +157,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 				// Ensure streaming path is used
 				streamingSupported: true,
 			});
-			const provider = routedProvider(modelForCall);
-			return (callParams) => ep({ ...callParams, provider });
+			return (callParams) => ep({ ...callParams, ...routedProvider(modelForCall) });
 		}
 
 		// Yield router metadata for immediate UI display, using the actual candidate

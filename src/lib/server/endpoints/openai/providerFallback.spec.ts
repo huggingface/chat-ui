@@ -60,23 +60,84 @@ describe("fetchWithProviderFallback", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 
-	it("caps max_tokens on the retry, since auto may pick a provider with a lower limit", async () => {
-		const fetchMock = respond(402, 200);
-		await fetchWithProviderFallback(
-			URL_,
-			{
+	describe("provider limits", () => {
+		const model = { providerMaxTokens: { scaleway: 32768 } };
+		const sentMaxTokens = (fetchMock: ReturnType<typeof respond>) =>
+			fetchMock.mock.calls.map(
+				(call) =>
+					JSON.parse((call as unknown as [string, RequestInit])[1].body as string).max_tokens
+			);
+		const send = (modelId: string) =>
+			fetchWithProviderFallback(
+				URL_,
+				{ method: "POST", body: JSON.stringify({ model: modelId, max_tokens: 49152 }) },
+				model
+			);
+
+		it("caps max_tokens to the provider the model suffix names", async () => {
+			const fetchMock = respond(200, 200, 200);
+			await send("deepseek-ai/DeepSeek-V4.1-Flash-1017:novita");
+			await send("deepseek-ai/DeepSeek-V4.1-Flash-1017:scaleway");
+			await send("deepseek-ai/DeepSeek-V4.1-Flash-1017:fastest");
+			expect(sentMaxTokens(fetchMock)).toEqual([49152, 32768, 32768]);
+		});
+
+		it("caps an unpinned request to the lowest limit, the router may pick any provider", async () => {
+			const fetchMock = respond(200);
+			await send("deepseek-ai/DeepSeek-V4.1-Flash-1017");
+			expect(sentMaxTokens(fetchMock)).toEqual([32768]);
+		});
+
+		it("caps the retry, since auto may pick a provider with a lower limit", async () => {
+			const fetchMock = respond(402, 200);
+			await send("deepseek-ai/DeepSeek-V4.1-Flash-1017:novita");
+			expect(sentMaxTokens(fetchMock)).toEqual([49152, 32768]);
+		});
+
+		it("leaves the body alone for a model without limits", async () => {
+			const fetchMock = respond(200);
+			const sentBody = JSON.stringify({ model: "a/b:scaleway", max_tokens: 49152 });
+			await fetchWithProviderFallback(URL_, { method: "POST", body: sentBody });
+			expect((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body).toBe(sentBody);
+		});
+	});
+
+	describe("a default pin", () => {
+		it.each([429, 502, 503, 504])("is retried on auto after a %i", async (status) => {
+			const fetchMock = respond(status, 200);
+			const res = await fetchWithProviderFallback(
+				URL_,
+				{ method: "POST", body: body("deepseek-ai/DeepSeek-V4.1-Flash-1017:novita") },
+				{},
+				{ defaultPin: true }
+			);
+			expect(res.status).toBe(200);
+			expect(sentModels(fetchMock)).toEqual([
+				"deepseek-ai/DeepSeek-V4.1-Flash-1017:novita",
+				"deepseek-ai/DeepSeek-V4.1-Flash-1017",
+			]);
+		});
+
+		it("is not retried after a 500, the model's own refusal repeats anywhere", async () => {
+			const fetchMock = respond(500);
+			await fetchWithProviderFallback(
+				URL_,
+				{ method: "POST", body: body("deepseek-ai/DeepSeek-V4.1-Flash-1017:novita") },
+				{},
+				{ defaultPin: true }
+			);
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+		});
+
+		it("is the only pin retried when throttled, a provider someone picked is kept", async () => {
+			const fetchMock = respond(429);
+			const res = await fetchWithProviderFallback(URL_, {
 				method: "POST",
-				body: JSON.stringify({
-					model: "deepseek-ai/DeepSeek-V4.1-Flash-1017:novita",
-					max_tokens: 49152,
-				}),
-			},
-			32768
-		);
-		const sent = fetchMock.mock.calls.map(
-			(call) => JSON.parse((call as unknown as [string, RequestInit])[1].body as string).max_tokens
-		);
-		expect(sent).toEqual([49152, 32768]);
+				body: body("deepseek-ai/DeepSeek-V4.1-Flash-1017:novita"),
+			});
+			expect(res.status).toBe(429);
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+		});
 	});
 
 	it("does not retry an unpinned 402", async () => {

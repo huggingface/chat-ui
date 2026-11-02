@@ -158,6 +158,7 @@ async function* textGenerationWithoutTitle(
 			forceMultimodal: ctx.forceMultimodal,
 			forceTools: mlAssistant || ctx.forceTools,
 			provider: ctx.provider,
+			providerIsDefault: ctx.providerIsDefault,
 			reasoningEffort: ctx.reasoningEffort,
 			reasoningOverride: ctx.reasoningOverride,
 			locals: ctx.locals,

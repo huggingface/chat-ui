@@ -14,7 +14,6 @@ import { withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { injectSessionState } from "$lib/server/mlRegistry/stateBlock";
 import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
-import { capMaxTokens } from "$lib/server/providerLimits";
 import type { StoredHistoryWindow } from "$lib/types/Conversation";
 import { prepareHistory } from "../utils/prepareFiles";
 import { buildToolPreprompt } from "../utils/toolPrompt";
@@ -69,18 +68,10 @@ export function completionSettings({
 	targetModel,
 	mlAssistant,
 	generateSettings,
-	provider,
 }: {
-	targetModel: {
-		id?: string;
-		name: string;
-		parameters?: unknown;
-		contextLength?: number;
-		providerMaxTokens?: Record<string, number>;
-	};
+	targetModel: { id?: string; name: string; parameters?: unknown; contextLength?: number };
 	mlAssistant: boolean;
 	generateSettings?: Record<string, unknown>;
-	provider?: string;
 }) {
 	const parameters = {
 		...(targetModel.parameters as Record<string, unknown> | undefined),
@@ -100,13 +91,7 @@ export function completionSettings({
 	const clampedFloor = contextLength
 		? Math.min(ML_ASSISTANT_MIN_COMPLETION_TOKENS, Math.floor(contextLength / 2))
 		: ML_ASSISTANT_MIN_COMPLETION_TOKENS;
-	// The provider's own limit comes last, over the floor too: a request above
-	// it is refused outright rather than answered shorter.
-	const maxTokens = capMaxTokens(
-		targetModel,
-		provider,
-		mlAssistant ? Math.max(catalogMaxTokens ?? 0, clampedFloor) : catalogMaxTokens
-	);
+	const maxTokens = mlAssistant ? Math.max(catalogMaxTokens ?? 0, clampedFloor) : catalogMaxTokens;
 	return { parameters, maxTokens, contextLength };
 }
 
