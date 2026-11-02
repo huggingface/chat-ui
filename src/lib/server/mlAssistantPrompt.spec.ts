@@ -510,6 +510,10 @@ describe("ML Assistant system message size", () => {
 		// at it and golden sets labelled with the model guesses in view, most of its guidance lives
 		// in the tool description and the preprompt is held to 600 characters below, but main had
 		// already reached 38,983 so even the short form needed the raise, it landed at 39,216
+		//
+		// 39,500 to 40,500 for the resubmit loop, argued by production: after a failed job the agent
+		// reproduced it in a sandbox before resubmitting in 11% of 600 mined cases (evals/decisions),
+		// and fixed-and-resubmitted untested in 79%, it landed at 39,987
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -539,7 +543,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(39_500);
+		expect(composed.length).toBeLessThan(40_500);
 	});
 
 	it("keeps the review guidance short, the rest lives in the tool description", () => {
