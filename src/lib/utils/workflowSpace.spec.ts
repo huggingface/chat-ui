@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { collectWorkflowSpaces } from "$lib/utils/workflowSpace";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { collectWorkflowSpaces, fetchInferenceToken } from "$lib/utils/workflowSpace";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
@@ -42,5 +42,25 @@ describe("collectWorkflowSpaces", () => {
 				{ id: "m1", from: "assistant", updates: [result("hf_jobs", WRITTEN)] },
 			])
 		).toEqual([]);
+	});
+});
+
+describe("fetchInferenceToken", () => {
+	afterEach(() => vi.unstubAllGlobals());
+
+	it("returns the Hub's short-lived inference token", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => Response.json({ accessToken: "hf_jwt_x", exp: 1793367730 }))
+		);
+		expect(await fetchInferenceToken()).toEqual({ token: "hf_jwt_x", exp: 1793367730 });
+	});
+
+	it("returns null without a Hub session", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response("", { status: 401 }))
+		);
+		expect(await fetchInferenceToken()).toBeNull();
 	});
 });

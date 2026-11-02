@@ -36,3 +36,21 @@ export function collectWorkflowSpaces(
 	}
 	return [...found.values()];
 }
+
+export const INFERENCE_JWT_REQUEST = "INFERENCE_JWT_REQUEST";
+export const INFERENCE_JWT_RESPONSE = "INFERENCE_JWT_RESPONSE";
+
+export async function fetchInferenceToken(): Promise<{ token: string; exp: number } | null> {
+	try {
+		const res = await fetch("https://huggingface.co/api/settings/jwt-inference-only", {
+			credentials: "include",
+		});
+		if (!res.ok) return null;
+		const body = await res.json();
+		return typeof body.accessToken === "string" && typeof body.exp === "number"
+			? { token: body.accessToken, exp: body.exp }
+			: null;
+	} catch {
+		return null;
+	}
+}

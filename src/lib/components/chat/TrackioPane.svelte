@@ -5,6 +5,11 @@
 
 	import type { PaneItem } from "$lib/utils/paneItems";
 	import { TRACKIO_FRAME_SANDBOX } from "$lib/utils/trackio";
+	import {
+		fetchInferenceToken,
+		INFERENCE_JWT_REQUEST,
+		INFERENCE_JWT_RESPONSE,
+	} from "$lib/utils/workflowSpace";
 	import PaneItemNav from "./PaneItemNav.svelte";
 
 	import CarbonChartLine from "~icons/carbon/chart-line";
@@ -144,6 +149,23 @@
 			if (!resolve) return;
 			waiting.delete(msg.id);
 			resolve(msg.type === "state" ? msg.state : null);
+		};
+		window.addEventListener("message", onMessage);
+		return () => window.removeEventListener("message", onMessage);
+	});
+
+	$effect(() => {
+		if (!workflow) return;
+		const onMessage = async (event: MessageEvent) => {
+			if (!frame || event.source !== frame.contentWindow || event.origin !== dashboardOrigin)
+				return;
+			if ((event.data as { type?: unknown })?.type !== INFERENCE_JWT_REQUEST) return;
+			const source = event.source as Window;
+			const jwt = await fetchInferenceToken();
+			source.postMessage(
+				{ type: INFERENCE_JWT_RESPONSE, token: jwt?.token ?? null, exp: jwt?.exp },
+				event.origin
+			);
 		};
 		window.addEventListener("message", onMessage);
 		return () => window.removeEventListener("message", onMessage);
