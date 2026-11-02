@@ -41,6 +41,7 @@ import {
 	type ResolvedToolImage,
 	type ToolImageReader,
 } from "./toolImages";
+import { unescapeThinkTags } from "$lib/utils/escapeThinkTags";
 
 type ChatMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -114,7 +115,9 @@ function splitReasoning(
 		thinkParts.push(inner);
 		return "";
 	});
-	const parts = [storedReasoning ?? "", ...thinkParts].filter((part) => part.trim().length > 0);
+	const parts = [storedReasoning ?? "", ...thinkParts]
+		.filter((part) => part.trim().length > 0)
+		.map(unescapeThinkTags);
 	return { visible: visible.trim(), parts };
 }
 

@@ -38,6 +38,7 @@ import {
 } from "$lib/server/mcp/hf";
 import { buildImageRefResolver } from "./fileRefs";
 import { createVirtualFileExpander } from "$lib/server/mlFiles/expand";
+import { createThinkTagEscaper, unescapeThinkTags } from "$lib/utils/escapeThinkTags";
 import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
 import {
 	AttachmentOverflowError,
@@ -789,6 +790,7 @@ export async function* runMcpFlow({
 		// one). Held here and flushed once a non-blank delta opens the block, so
 		// the persisted trace stays byte-exact instead of silently dropping them.
 		let pendingReasoningWhitespace = "";
+		const reasoningEscaper = createThinkTagEscaper();
 		let truncatedToolCallRetries = 0;
 		let cutAnswerRetries = 0;
 		let leakedToolCallRetries = 0;
@@ -994,9 +996,10 @@ export async function* runMcpFlow({
 				// delta arrives and flushed into the opening of the block.
 				if (deltaReasoning.length > 0) {
 					if (thinkOpen) {
-						combined += deltaReasoning;
+						combined += reasoningEscaper.push(deltaReasoning);
 					} else if (deltaReasoning.trim().length > 0) {
-						combined += "<think>" + pendingReasoningWhitespace + deltaReasoning;
+						combined +=
+							"<think>" + pendingReasoningWhitespace + reasoningEscaper.push(deltaReasoning);
 						pendingReasoningWhitespace = "";
 						thinkOpen = true;
 					} else {
@@ -1006,7 +1009,7 @@ export async function* runMcpFlow({
 
 				if (deltaContent && deltaContent.length > 0) {
 					if (thinkOpen) {
-						combined += "</think>" + deltaContent;
+						combined += reasoningEscaper.flush() + "</think>" + deltaContent;
 						thinkOpen = false;
 					} else {
 						combined += deltaContent;
@@ -1059,15 +1062,16 @@ export async function* runMcpFlow({
 			// regex matches `<think>` to end-of-string, so an unclosed block would
 			// hide everything that follows.
 			if (thinkOpen) {
+				const closer = reasoningEscaper.flush() + "</think>";
 				// Gate on what the client saw, not on streamedContent: a round can
 				// stream content early and open the think block only after tool-call
 				// deltas muted the stream — a bare closer then shows up as literal
 				// "</think>" text.
 				if (clientThinkOpen) {
-					yield { type: MessageUpdateType.Stream, token: "</think>" };
+					yield { type: MessageUpdateType.Stream, token: closer };
 					clientThinkOpen = false;
 				}
-				lastAssistantContent += "</think>";
+				lastAssistantContent += closer;
 				thinkOpen = false;
 			}
 
@@ -1150,7 +1154,7 @@ export async function* runMcpFlow({
 				const assistantContentForToolMsg = lastAssistantContent.replace(
 					/<think>([\s\S]*?)(?:<\/think>|$)/g,
 					(_match, inner: string) => {
-						thinkParts.push(inner);
+						thinkParts.push(unescapeThinkTags(inner));
 						return "";
 					}
 				);
