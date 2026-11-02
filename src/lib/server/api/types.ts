@@ -28,6 +28,8 @@ export type GETModelsResponse = Array<{
 export type GETModelResponse = GETModelsResponse[number] & {
 	providers?: Array<{ provider: string } & Record<string, unknown>>;
 	parameters: BackendModel["parameters"];
+	/** provider HuggingChat uses when the user has not picked one */
+	defaultProvider?: string;
 };
 
 export type GETOldModelsResponse = Array<{

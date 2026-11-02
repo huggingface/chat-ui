@@ -2,9 +2,8 @@ import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { mlAssistantProviderFor } from "$lib/server/mlAssistantModels";
+import { PROVIDER_POLICIES } from "$lib/server/providerLimits";
 import type { Conversation } from "$lib/types/Conversation";
-
-const PROVIDER_POLICIES = new Set(["auto", "fastest", "cheapest", "preferred"]);
 
 interface RequestModel {
 	id: string;
@@ -20,9 +19,8 @@ export function requestProvider(
 	providerOverrides: Record<string, string> | undefined
 ): string | undefined {
 	if (!config.isHuggingChat || model.isRouter) return undefined;
-	// "auto" is what the settings page stores before the user picks anything
-	const saved = providerOverrides?.[model.id];
-	const preference = saved && saved !== "auto" ? saved : (model.defaultProvider ?? saved);
+	// a saved "auto" is the user asking for their own Hub order, so only an unset one takes the default
+	const preference = providerOverrides?.[model.id] || model.defaultProvider;
 	const provider = isMlAssistantConversation(conv)
 		? mlAssistantProviderFor(model.id, preference)
 		: preference;

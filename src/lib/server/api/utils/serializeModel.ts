@@ -40,5 +40,6 @@ export function serializeModelDetail(model: ProcessedModel): GETModelResponse {
 		...serializeModelSummary(model),
 		providers: model.providers as unknown as Array<{ provider: string } & Record<string, unknown>>,
 		parameters: model.parameters,
+		defaultProvider: model.defaultProvider,
 	};
 }

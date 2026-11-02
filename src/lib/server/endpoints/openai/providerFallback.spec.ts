@@ -60,6 +60,25 @@ describe("fetchWithProviderFallback", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 
+	it("caps max_tokens on the retry, since auto may pick a provider with a lower limit", async () => {
+		const fetchMock = respond(402, 200);
+		await fetchWithProviderFallback(
+			URL_,
+			{
+				method: "POST",
+				body: JSON.stringify({
+					model: "deepseek-ai/DeepSeek-V4.1-Flash-1017:novita",
+					max_tokens: 49152,
+				}),
+			},
+			32768
+		);
+		const sent = fetchMock.mock.calls.map(
+			(call) => JSON.parse((call as unknown as [string, RequestInit])[1].body as string).max_tokens
+		);
+		expect(sent).toEqual([49152, 32768]);
+	});
+
 	it("does not retry an unpinned 402", async () => {
 		const fetchMock = respond(402);
 		const res = await fetchWithProviderFallback(URL_, {

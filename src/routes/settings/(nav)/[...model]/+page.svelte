@@ -62,14 +62,21 @@
 		}));
 	}
 
+	// No saved entry means the model's default provider when it has one, so that
+	// option is never stored: picking it clears the entry instead.
+	const DEFAULT_PROVIDER_OPTION = "default";
 	function getProviderOverride() {
-		return $settings.providerOverrides?.[modelId] ?? "auto";
+		return (
+			$settings.providerOverrides?.[modelId] ?? (defaultProvider ? DEFAULT_PROVIDER_OPTION : "auto")
+		);
 	}
 	function setProviderOverride(v: string) {
-		settings.update((s) => ({
-			...s,
-			providerOverrides: { ...s.providerOverrides, [modelId]: v },
-		}));
+		settings.update((s) => {
+			const providerOverrides = { ...s.providerOverrides };
+			if (v === DEFAULT_PROVIDER_OPTION) delete providerOverrides[modelId];
+			else providerOverrides[modelId] = v;
+			return { ...s, providerOverrides };
+		});
 	}
 
 	function getReasoningOverride() {
@@ -130,9 +137,11 @@
 	// across all models and this page is their only reader); fetch them for
 	// the current model on demand from the per-model detail endpoint.
 	let providerList: RouterProvider[] = $state([]);
+	let defaultProvider: string | undefined = $state();
 	let providersLoading = $state(false);
 	$effect(() => {
 		providerList = [];
+		defaultProvider = undefined;
 		if (!publicConfig.isHuggingChat || !model || model.isRouter) {
 			providersLoading = false;
 			return;
@@ -143,9 +152,10 @@
 			.models({ id: requestedId })
 			.get()
 			.then(handleResponse)
-			.then((detail: { providers?: RouterProvider[] } | null) => {
+			.then((detail: { providers?: RouterProvider[]; defaultProvider?: string } | null) => {
 				if (requestedId !== modelId) return; // stale response for a previous model
 				providerList = detail?.providers ?? [];
+				defaultProvider = detail?.defaultProvider;
 			})
 			.catch(() => {
 				// No providers section is rendered on failure; the selection-mode
@@ -169,17 +179,19 @@
 		settings.initValue("customPromptsEnabled", modelId, true);
 	});
 
-	// Initialize provider override for this model (default to "auto")
-	$effect(() => {
-		settings.initValue("providerOverrides", modelId, "auto");
-	});
+	// providerOverrides intentionally has no initValue: a saved "auto" is a choice
+	// of the user's own Hub order, and an unset entry falls back to the model's
+	// default provider.
 
 	// Provider selection policies for the dropdown
-	const PROVIDER_POLICIES = [
+	const PROVIDER_POLICIES = $derived([
+		...(defaultProvider
+			? [{ value: DEFAULT_PROVIDER_OPTION, label: `HuggingChat default (${defaultProvider})` }]
+			: []),
 		{ value: "auto", label: "Auto (your HF preference order)" },
 		{ value: "fastest", label: "Fastest (highest throughput)" },
 		{ value: "cheapest", label: "Cheapest (lowest cost)" },
-	] as const;
+	]);
 </script>
 
 <!-- Key on modelId so the DOM is rebuilt when navigating between models:
@@ -468,8 +480,20 @@
 							{@const currentValue = getProviderOverride()}
 							{@const currentPolicy = PROVIDER_POLICIES.find((p) => p.value === currentValue)}
 							{@const currentProvider = providerList.find((p) => p.provider === currentValue)}
+							{@const defaultHubOrg =
+								PROVIDERS_HUB_ORGS[defaultProvider as keyof typeof PROVIDERS_HUB_ORGS]}
 							<span class="flex items-center gap-2">
-								{#if currentValue === "auto"}
+								{#if currentValue === DEFAULT_PROVIDER_OPTION && defaultHubOrg}
+									<span
+										class="flex size-5 flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5"
+									>
+										<img
+											src="https://huggingface.co/api/avatars/{defaultHubOrg}"
+											alt=""
+											class="size-full rounded-sm"
+										/>
+									</span>
+								{:else if currentValue === "auto"}
 									<span class="grid size-5 flex-none place-items-center rounded-md bg-gray-500/10">
 										<CarbonMagicWandFilled class="size-3 text-gray-700 dark:text-gray-300" />
 									</span>
@@ -520,7 +544,21 @@
 											value={opt.value}
 											class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-hidden select-none data-highlighted:bg-gray-100 dark:text-gray-200 dark:data-highlighted:bg-white/10"
 										>
-											{#if opt.value === "auto"}
+											{#if opt.value === DEFAULT_PROVIDER_OPTION}
+												{@const defaultHubOrg =
+													PROVIDERS_HUB_ORGS[defaultProvider as keyof typeof PROVIDERS_HUB_ORGS]}
+												{#if defaultHubOrg}
+													<span
+														class="flex size-5 flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5"
+													>
+														<img
+															src="https://huggingface.co/api/avatars/{defaultHubOrg}"
+															alt=""
+															class="size-full rounded-sm"
+														/>
+													</span>
+												{/if}
+											{:else if opt.value === "auto"}
 												<span
 													class="grid size-5 flex-none place-items-center rounded-md bg-gray-500/10"
 												>

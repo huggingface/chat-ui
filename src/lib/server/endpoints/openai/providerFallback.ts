@@ -2,14 +2,15 @@ import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import { withoutContentLength } from "$lib/server/undiciCompat";
 
-/** retries a 402 on a pinned provider once on auto, the router 402s billing disabled providers even for users with credits, other backends use colons in model ids */
+/** retries a 402 on a pinned provider once on auto, the router 402s billing disabled providers even for users with credits, other backends use colons in model ids. autoMaxTokens caps the retry, since auto may land on a provider with a lower limit than the pinned one */
 export async function fetchWithProviderFallback(
 	input: RequestInfo | URL,
-	init?: RequestInit
+	init?: RequestInit,
+	autoMaxTokens?: number
 ): Promise<Response> {
 	const res = await fetch(input, withoutContentLength(init));
 	if (res.status !== 402 || !config.isHuggingChat || typeof init?.body !== "string") return res;
-	const retry = withoutProviderSuffix(init.body);
+	const retry = withoutProviderSuffix(init.body, autoMaxTokens);
 	if (!retry) return res;
 	logger.warn(
 		{
@@ -24,7 +25,8 @@ export async function fetchWithProviderFallback(
 }
 
 function withoutProviderSuffix(
-	body: string
+	body: string,
+	maxTokens: number | undefined
 ): { body: string; model: string; provider: string } | undefined {
 	let parsed: unknown;
 	try {
@@ -38,8 +40,15 @@ function withoutProviderSuffix(
 	const sep = model.lastIndexOf(":");
 	if (sep <= 0 || sep === model.length - 1) return undefined;
 	const bare = model.slice(0, sep);
+	const capped: Record<string, unknown> = { ...parsed, model: bare };
+	if (maxTokens !== undefined) {
+		for (const key of ["max_tokens", "max_completion_tokens"]) {
+			const value = capped[key];
+			if (typeof value === "number" && value > maxTokens) capped[key] = maxTokens;
+		}
+	}
 	return {
-		body: JSON.stringify({ ...parsed, model: bare }),
+		body: JSON.stringify(capped),
 		model: bare,
 		provider: model.slice(sep + 1),
 	};

@@ -55,10 +55,11 @@ describe("requestProvider", () => {
 
 		it("applies when the user has not picked a provider", () => {
 			expect(requestProvider(pinned, chat, {})).toBe("baseten");
-			expect(requestProvider(pinned, chat, { [model.id]: "auto" })).toBe("baseten");
+			expect(requestProvider(pinned, chat, undefined)).toBe("baseten");
 		});
 
 		it("gives way to the user's own pick", () => {
+			expect(requestProvider(pinned, chat, { [model.id]: "auto" })).toBe("auto");
 			expect(requestProvider(pinned, chat, { [model.id]: "novita" })).toBe("novita");
 			expect(requestProvider(pinned, chat, { [model.id]: "fastest" })).toBe("fastest");
 		});

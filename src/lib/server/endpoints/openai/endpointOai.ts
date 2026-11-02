@@ -19,6 +19,7 @@ import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWi
 import { windowLimitChars } from "$lib/server/textGeneration/utils/historyWindow";
 import { prepareAttachments } from "$lib/server/textGeneration/utils/attachmentBudget";
 import { fetchWithProviderFallback } from "./providerFallback";
+import { capMaxTokens, providerMaxTokensCap } from "$lib/server/providerLimits";
 import { inferenceBillingHeaders } from "$lib/server/billing";
 // uuid import removed (no tool call ids)
 
@@ -83,7 +84,11 @@ export async function endpointOai(
 
 	// Custom fetch wrapper to capture response headers for router metadata
 	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
-		const response = await fetchWithProviderFallback(url, init);
+		const response = await fetchWithProviderFallback(
+			url,
+			init,
+			providerMaxTokensCap(model, undefined)
+		);
 
 		// Capture router headers if present (fallback for non-streaming)
 		const routeHeader = response.headers.get("X-Router-Route");
@@ -131,7 +136,11 @@ export async function endpointOai(
 			attachments,
 			onAttachments,
 		}) => {
-			const parameters = { ...model.parameters, ...generateSettings };
+			const settings = { ...model.parameters, ...generateSettings };
+			const parameters = {
+				...settings,
+				max_tokens: capMaxTokens(model, provider, settings.max_tokens),
+			};
 			// the prompt renders message content only, pasted text and files have to be in it
 			const { contentOf, report } = await prepareAttachments(messages, imageProcessor, false, {
 				limitChars: model.contextLength
@@ -199,7 +208,11 @@ export async function endpointOai(
 		}) => {
 			// Hoisted above the message prep so the history budget can reserve the
 			// reply allowance this request will actually ask for.
-			const parameters = { ...model.parameters, ...generateSettings };
+			const settings = { ...model.parameters, ...generateSettings };
+			const parameters = {
+				...settings,
+				max_tokens: capMaxTokens(model, provider, settings.max_tokens),
+			};
 
 			// Format messages for the chat API, handling multimodal content if supported.
 			// attachReasoning re-attaches persisted reasoning as reasoning_content on

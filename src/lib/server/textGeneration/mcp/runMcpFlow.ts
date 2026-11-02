@@ -85,6 +85,7 @@ import { createJobLabelRewrite } from "$lib/server/mcp/jobLabels";
 import { loadSessionJobLabels } from "$lib/server/mlRegistry/sessionLabel";
 import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
 import { routedProvider } from "$lib/server/requestProvider";
+import { capMaxTokens, providerMaxTokensCap } from "$lib/server/providerLimits";
 import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
 import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
@@ -625,7 +626,11 @@ export async function* runMcpFlow({
 			input: RequestInfo | URL,
 			init?: RequestInit
 		): Promise<Response> => {
-			const res = await fetchWithProviderFallback(input, init);
+			const res = await fetchWithProviderFallback(
+				input,
+				init,
+				providerMaxTokensCap(targetModel, undefined)
+			);
 			const p = res.headers.get("x-inference-provider");
 			if (p && !providerHeader) providerHeader = p;
 			return res;
@@ -692,9 +697,15 @@ export async function* runMcpFlow({
 		const clampedFloor = targetContextLength
 			? Math.min(ML_ASSISTANT_MIN_COMPLETION_TOKENS, Math.floor(targetContextLength / 2))
 			: ML_ASSISTANT_MIN_COMPLETION_TOKENS;
-		const maxTokens = mlAssistant
-			? Math.max(catalogMaxTokens ?? 0, clampedFloor)
-			: catalogMaxTokens;
+		// An Omni request arrives without a provider, so the routed model's default applies.
+		const requestedProvider = model.isRouter ? routedProvider(targetModel) : provider;
+		// The provider's own limit comes last, over the floor too: a request above
+		// it is refused outright rather than answered shorter.
+		const maxTokens = capMaxTokens(
+			targetModel,
+			requestedProvider,
+			mlAssistant ? Math.max(catalogMaxTokens ?? 0, clampedFloor) : catalogMaxTokens
+		);
 
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
 		// In the mode the doctrine paragraphs are swapped, not appended to: the
@@ -798,9 +809,7 @@ export async function* runMcpFlow({
 					: undefined;
 
 		// Build model ID with optional provider suffix (e.g., "model:fastest" or "model:together").
-		// An Omni request arrives without one, so the routed model's default applies.
 		const baseModelId = targetModel.id ?? targetModel.name;
-		const requestedProvider = model.isRouter ? routedProvider(targetModel) : provider;
 		const modelIdWithProvider =
 			requestedProvider && requestedProvider !== "auto"
 				? `${baseModelId}:${requestedProvider}`
