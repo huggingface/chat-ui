@@ -235,7 +235,7 @@ SLACK_ML_CLIENT_ID=123.456
 SLACK_ML_CLIENT_SECRET=...
 ```
 
-Installs use the Slack app's client ID and secret, from its **Basic Information** page. When Sign in with Slack uses the bot's own app, the usual setup, `SLACK_ML_VIEWER_CLIENT_ID` and `SLACK_ML_VIEWER_CLIENT_SECRET` already hold them and nothing else is needed. The client must belong to the same app as `SLACK_ML_APP_TOKEN`, and installs are rejected otherwise. Startup refuses public installs in shared-token mode, without a client, or without `MCP_OAUTH_ENCRYPTION_KEY`. In the Slack app settings:
+Installs use the Slack app's client ID and secret, from its **Basic Information** page. When Sign in with Slack uses the bot's own app, the usual setup, `SLACK_ML_VIEWER_CLIENT_ID` and `SLACK_ML_VIEWER_CLIENT_SECRET` already hold them and nothing else is needed. The client must belong to the same app as `SLACK_ML_APP_TOKEN`, and installs are rejected otherwise. Public installs also need personal-account mode, a working Sign in with Slack setup and `MCP_OAUTH_ENCRYPTION_KEY`. If anything is missing, the bot logs an error and keeps serving its home workspace with installs turned off. In the Slack app settings:
 
 1. Under **OAuth & Permissions**, add the redirect URL `<PUBLIC_ORIGIN><base>/slack/install/callback`.
 2. Under **Event Subscriptions**, subscribe to the `app_uninstalled` and `tokens_revoked` bot events. Uninstalling the app deletes the workspace's token and stops its threads.
@@ -248,7 +248,7 @@ Notes:
 - Workspaces that allow only Marketplace apps cannot install a Socket Mode app.
 - Org-wide Enterprise Grid installs are rejected; install into individual workspaces instead.
 - An install must grant every bot scope in the manifest. After adding a scope, each workspace has to install again.
-- To stop serving a workspace, set `disabled: true` on its `slack.installations` record. Reinstalling does not clear it. Changes take effect within 30 seconds.
+- To stop serving a workspace, set `disabled: true` on its `slack.installations` record. Uninstalling or reinstalling does not clear it, and installs from that workspace are refused. Changes take effect within 30 seconds.
 - A channel shared by two workspaces that both installed the app stays one thread, whichever install Slack delivers an event through.
 - A worker runs at most eight requests at once, and at most four per workspace.
 - `SLACK_ML_ALLOWED_CHANNELS` applies to every workspace, so leave it empty for public installs.

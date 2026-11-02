@@ -14,14 +14,20 @@ export const load: PageServerLoad = async ({ url, cookies, setHeaders }) => {
 			expires: z.number(),
 		})
 		.safeParse(viewer && verify(cookies.get(installedCookie), viewer.secret));
-	if (!installed.success || installed.data.expires < Date.now())
-		return { cancelled: url.searchParams.has("cancelled"), installed: undefined };
-	const { teamId, teamName, appId } = installed.data;
-	return {
-		cancelled: false,
-		installed: {
-			teamName,
-			slackUrl: `https://slack.com/app_redirect?app=${appId}&team=${teamId}`,
-		},
-	};
+	if (installed.success && installed.data.expires >= Date.now()) {
+		const { teamId, teamName, appId } = installed.data;
+		return {
+			cancelled: false,
+			installed: {
+				title: `ML Intern is in ${teamName}`,
+				slackUrl: `https://slack.com/app_redirect?app=${appId}&team=${teamId}`,
+			},
+		};
+	}
+	if (url.searchParams.has("done"))
+		return {
+			cancelled: false,
+			installed: { title: "ML Intern is installed", slackUrl: "https://app.slack.com/client" },
+		};
+	return { cancelled: url.searchParams.has("cancelled"), installed: undefined };
 };

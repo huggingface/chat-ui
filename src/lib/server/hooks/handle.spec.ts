@@ -119,7 +119,10 @@ it.each([
 	["/slack/install/callback", false],
 	["/slack/installed", false],
 	["/slack/connect", true],
+	["/slack/installed/__data.json", false],
 	["/slack/installer", true],
+	["/slack/installedfoo", true],
+	["/slack/install/other", true],
 ])("signing in to HuggingChat before %s required: %s", async (path, required) => {
 	auth.loginEnabled = true;
 	const url = new URL(`https://chat.example${path}`);

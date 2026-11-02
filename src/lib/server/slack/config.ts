@@ -1,5 +1,7 @@
 import { config } from "$lib/server/config";
+import { logger } from "$lib/server/logger";
 import { z } from "zod";
+import { viewerConfig } from "./viewer/settings";
 
 const schema = z.object({
 	teamId: z.string().regex(/^T[A-Z0-9]+$/),
@@ -21,6 +23,8 @@ const schema = z.object({
 	clientSecret: z.string().optional(),
 });
 export type SlackConfig = z.infer<typeof schema>;
+
+let warnedInstall = false;
 
 export function slackConfig(): SlackConfig | undefined {
 	if (config.SLACK_ML_ENABLED !== "true") return undefined;
@@ -52,16 +56,23 @@ export function slackConfig(): SlackConfig | undefined {
 	if (parsed.data.billingResourceGroup && !parsed.data.billingOrganization) {
 		throw new Error("Slack ML billing resource group requires an organization.");
 	}
-	// Other workspaces' bot tokens are stored encrypted, and they never get a shared HF token.
+	// Other workspaces' bot tokens are stored encrypted, they never get a shared HF token, and the
+	// install callback signs its result with the viewer secret. Missing any of these turns installs
+	// off instead of taking the home workspace's bot down with them.
 	if (
 		parsed.data.publicInstall &&
 		(parsed.data.accountMode !== "user" ||
 			!parsed.data.clientId ||
 			!parsed.data.clientSecret ||
-			!config.MCP_OAUTH_ENCRYPTION_KEY?.trim())
-	)
-		throw new Error(
-			"Public Slack installs require user account mode, the Slack app's client ID and secret, and MCP_OAUTH_ENCRYPTION_KEY."
-		);
+			!config.MCP_OAUTH_ENCRYPTION_KEY?.trim() ||
+			!viewerConfig())
+	) {
+		if (!warnedInstall)
+			logger.error(
+				"[slack] Public installs are off: they need user account mode, Sign in with Slack, the Slack app's client ID and secret, and MCP_OAUTH_ENCRYPTION_KEY."
+			);
+		warnedInstall = true;
+		return { ...parsed.data, publicInstall: false };
+	}
 	return parsed.data;
 }

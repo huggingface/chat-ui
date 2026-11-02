@@ -6,6 +6,7 @@ import { cleanupTestData } from "$lib/server/api/__tests__/testHelpers";
 import { completeInstall, InstallError } from "./install";
 import {
 	removeInstallation,
+	servedTeams,
 	slackInstalled,
 	slackWorkspace,
 	SLACK_BOT_SCOPES,
@@ -128,6 +129,28 @@ describe("completeInstall", () => {
 		expect(mocks.post).not.toHaveBeenCalled();
 	});
 
+	it("refuses a workspace an operator disabled", async () => {
+		await collections.slackInstallations.insertOne({
+			_id: "TACME",
+			teamName: "Acme",
+			appId: "AAPP",
+			botToken: "",
+			botUserId: "UACMEBOT",
+			scopes: [],
+			installedBy: "UADMIN",
+			disabled: true,
+			installedAt: new Date(),
+			updatedAt: new Date(),
+		});
+		mocks.access.mockResolvedValue(granted);
+		await expect(completeInstall(settings, "code")).rejects.toBeInstanceOf(InstallError);
+		expect(await collections.slackInstallations.findOne({ _id: "TACME" })).toMatchObject({
+			disabled: true,
+			botToken: "",
+		});
+		expect(mocks.post).not.toHaveBeenCalled();
+	});
+
 	it("reports a rejected code as an install error", async () => {
 		mocks.access.mockRejectedValue(new Error("invalid_code"));
 		await expect(completeInstall(settings, "code")).rejects.toBeInstanceOf(InstallError);
@@ -165,6 +188,23 @@ describe("installations", () => {
 		expect(await slackInstalled("TOFF")).toBe(false);
 		expect(await slackInstalled("TNONE")).toBe(false);
 		expect(await slackInstalled("TONE", { ...settings, publicInstall: false })).toBe(false);
+	});
+
+	it("serves a workspace as soon as it is installed", async () => {
+		expect(await slackInstalled("TLATE")).toBe(false);
+		await install("TLATE");
+		expect(await slackInstalled("TLATE")).toBe(true);
+	});
+
+	it("keeps an operator's block when a disabled workspace uninstalls", async () => {
+		await install("TBLOCK", { disabled: true });
+		await removeInstallation("TBLOCK");
+		expect(await collections.slackInstallations.findOne({ _id: "TBLOCK" })).toMatchObject({
+			disabled: true,
+			botToken: "",
+		});
+		expect(await servedTeams(settings)).toEqual(["THOME"]);
+		expect(await servedTeams(settings, { disabled: true })).toEqual(["THOME", "TBLOCK"]);
 	});
 
 	it("forgets an uninstalled workspace and stops polling its threads", async () => {
@@ -239,25 +279,40 @@ describe("install routes", () => {
 		expect(mocks.access).not.toHaveBeenCalled();
 	});
 
-	it("completes installs Slack starts itself and shows the workspace", async () => {
+	const page = (url: string, cookies: ReturnType<typeof cookieJar>["cookies"]) =>
+		installed({
+			url: new URL(url),
+			cookies,
+			setHeaders: () => {},
+		} as unknown as Parameters<typeof installed>[0]);
+
+	it("names the workspace after an install this browser started", async () => {
+		mocks.access.mockResolvedValue(granted);
+		const { jar, cookies } = cookieJar();
+		jar.set("__Secure-ml-slack-install", "mine");
+		const url = new URL("https://huggingface.co/chat/slack/install/callback?code=c&state=mine");
+		const result = await run(() => callback({ url, cookies } as unknown as Event));
+		expect(result.status).toBe(303);
+		expect(await slackInstalled("TACME")).toBe(true);
+		expect(await page(`https://huggingface.co${result.location}`, cookies)).toMatchObject({
+			installed: {
+				title: "ML Intern is in Acme",
+				slackUrl: "https://slack.com/app_redirect?app=AAPP&team=TACME",
+			},
+		});
+	});
+
+	it("completes installs Slack starts itself without naming the workspace", async () => {
 		mocks.access.mockResolvedValue(granted);
 		const { jar, cookies } = cookieJar();
 		const url = new URL("https://huggingface.co/chat/slack/install/callback?code=c");
 		const result = await run(() => callback({ url, cookies } as unknown as Event));
 		expect(result.status).toBe(303);
 		expect(await slackInstalled("TACME")).toBe(true);
-		const page = await installed({
-			url: new URL("https://huggingface.co/chat/slack/installed"),
-			cookies,
-			setHeaders: () => {},
-		} as unknown as Parameters<typeof installed>[0]);
-		expect(page).toMatchObject({
-			installed: {
-				teamName: "Acme",
-				slackUrl: "https://slack.com/app_redirect?app=AAPP&team=TACME",
-			},
+		expect(jar.has("__Secure-ml-slack-installed")).toBe(false);
+		expect(await page(`https://huggingface.co${result.location}`, cookies)).toMatchObject({
+			installed: { title: "ML Intern is installed" },
 		});
-		expect(jar.has("__Secure-ml-slack-installed")).toBe(true);
 	});
 
 	it("shows a cancelled install without calling Slack", async () => {

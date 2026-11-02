@@ -10,6 +10,7 @@ import { MlSlackBot } from "./bot";
 import { connectionKey } from "./connections";
 import { skipSlackQuestion } from "./engine";
 import { getOrCreateThread } from "./store";
+import type { SlackThread } from "./types";
 import {
 	ANSWER_ACTION,
 	ANSWER_VIEW,
@@ -39,6 +40,9 @@ const mocks = vi.hoisted(() => ({
 	sideQuestion: vi.fn(),
 	views: vi.fn(),
 	tokens: [] as string[],
+	authorize: undefined as
+		| ((source: { teamId?: string }, body?: { type?: string }) => Promise<{ botToken?: string }>)
+		| undefined,
 }));
 vi.mock("$lib/server/mlSideQuestion", () => ({
 	answerSideQuestion: mocks.sideQuestion,
@@ -93,6 +97,11 @@ vi.mock("@slack/web-api", () => ({
 }));
 vi.mock("@slack/bolt", () => ({
 	App: class {
+		constructor(options: { authorize: typeof mocks.authorize }) {
+			mocks.authorize = options.authorize;
+		}
+		async start() {}
+		async stop() {}
 		event(name: string, handler: Handler) {
 			mocks.handlers.set(`event:${name}`, handler);
 		}
@@ -2048,15 +2057,142 @@ describe("other workspaces", () => {
 		expect(mocks.tokens).toEqual(["xoxb-test"]);
 	});
 
-	it("stops polling an uninstalled workspace's threads", async () => {
+	it("leaves threads of workspaces it does not serve to their own deployment", async () => {
 		const { user } = await createTestUser();
-		await getOrCreateThread("TGONE", "CGONE", "100.0", "OWNER", user._id);
+		const other = await getOrCreateThread("TOTHER", "COTHER", "100.0", "OWNER", user._id);
+		await collections.slackInputs.insertOne({
+			_id: "other-running",
+			threadId: other._id,
+			user: "OWNER",
+			text: "run",
+			ts: "101.0",
+			status: "running",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
 		const bot = new MlSlackBot(shared);
+		await bot.start();
 		await bot.tick();
-		expect(await collections.slackThreads.findOne({ teamId: "TGONE" })).toMatchObject({
-			watching: false,
+		await bot.stop();
+		expect(await collections.slackThreads.findOne({ _id: other._id })).toMatchObject({
+			watching: true,
+		});
+		expect(await collections.slackInputs.findOne({ _id: "other-running" })).toMatchObject({
+			status: "running",
 		});
 		expect(mocks.post).not.toHaveBeenCalled();
+	});
+
+	it("keeps one thread when two installs deliver a new thread's events at once", async () => {
+		const bot = new MlSlackBot(shared);
+		await bot.start();
+		await bot.stop();
+		const [a, b] = await Promise.all([
+			getOrCreateThread("TA", "CRACE", "100.0", "OWNER"),
+			getOrCreateThread("TB", "CRACE", "100.0", "OWNER"),
+		]);
+		expect(a._id).toBe(b._id);
+		expect(await collections.slackThreads.countDocuments({ channel: "CRACE" })).toBe(1);
+	});
+
+	it("takes a mention of the other install's bot in a shared thread", async () => {
+		await install("TMENTION");
+		const { user } = await createTestUser();
+		await getOrCreateThread("T123", "CSHARED", "100.0", "OWNER", user._id, "TMENTION");
+		mocks.users.mockResolvedValue({ user: { id: "OWNER", team_id: "TMENTION" } });
+		mocks.channels.mockResolvedValue({ channel: { is_ext_shared: true } });
+		mocks.members.mockResolvedValue({ members: ["OWNER"] });
+		const bot = new MlSlackBot(shared);
+		const followUp = {
+			user: "OWNER",
+			channel: "CSHARED",
+			ts: "101.0",
+			thread_ts: "100.0",
+			text: "<@UBOTTMENTION> continue",
+		};
+		// The mention goes through app_mention, so the plain message event leaves it alone.
+		expect(await bot["isOwnerFollowUp"](followUp, "TMENTION")).toBe(false);
+		await bot.receive(followUp, "TMENTION", "mention-event");
+		expect(mocks.ephemeral).not.toHaveBeenCalled();
+		expect(await collections.slackInputs.findOne({})).toMatchObject({ text: "<@UBOT> continue" });
+	});
+
+	it("queues a message once even when it arrives as two events", async () => {
+		await install("TTWICE");
+		const { user } = await createTestUser();
+		await getOrCreateThread("T123", "CSHARED", "100.0", "OWNER", user._id, "TTWICE");
+		mocks.users.mockResolvedValue({ user: { id: "OWNER", team_id: "TTWICE" } });
+		mocks.channels.mockResolvedValue({ channel: { is_ext_shared: true } });
+		mocks.members.mockResolvedValue({ members: ["OWNER"] });
+		const bot = new MlSlackBot(shared);
+		const message = {
+			user: "OWNER",
+			channel: "CSHARED",
+			ts: "101.0",
+			thread_ts: "100.0",
+			text: "go",
+		};
+		await bot.receive(message, "T123", "event-a");
+		await bot.receive(message, "TTWICE", "event-b");
+		expect(await collections.slackInputs.countDocuments({})).toBe(1);
+	});
+
+	it("keeps ticking other workspaces while one waits on Slack", async () => {
+		await install("TSLOW");
+		const { user } = await createTestUser();
+		const slow = await getOrCreateThread("TSLOW", "CSLOW", "100.0", "OWNER", user._id);
+		const fast = await getOrCreateThread("T123", "CFAST", "100.0", "OWNER", user._id);
+		// a running request keeps the fast thread watched between ticks
+		await collections.slackInputs.insertOne({
+			_id: "fast-running",
+			threadId: fast._id,
+			user: "OWNER",
+			text: "run",
+			ts: "101.0",
+			status: "running",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+		const bot = new MlSlackBot(shared);
+		let release = () => {};
+		const render = vi.spyOn(
+			bot as unknown as { render: (t: SlackThread) => Promise<void> },
+			"render"
+		);
+		render.mockImplementation(async (thread) => {
+			if (thread._id === slow._id) await new Promise<void>((resolve) => (release = resolve));
+		});
+		const first = bot.tick();
+		await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(2));
+		await bot.tick();
+		expect(render.mock.calls.filter(([t]) => t._id === fast._id).length).toBe(2);
+		expect(render.mock.calls.filter(([t]) => t._id === slow._id).length).toBe(1);
+		release();
+		await first;
+	});
+
+	describe("authorizing Slack requests", () => {
+		it("serves installs and falls back to the home bot for Slack Connect interactions", async () => {
+			await install("TAUTH");
+			new MlSlackBot(shared);
+			const authorize = mocks.authorize;
+			if (!authorize) throw new Error("Missing authorize");
+			expect(await authorize({ teamId: "TAUTH" }, { type: "event_callback" })).toMatchObject({
+				botToken: "xoxb-TAUTH",
+			});
+			expect(await authorize({ teamId: "TGUEST" }, { type: "block_actions" })).toMatchObject({
+				botToken: "xoxb-test",
+			});
+		});
+
+		it.each([
+			["an event from a workspace it does not serve", "TSTRANGER", false, "event_callback"],
+			["an interaction from a disabled workspace", "TBLOCKED", true, "block_actions"],
+		])("refuses %s", async (_, teamId, disabled, type) => {
+			if (disabled) await install(teamId, { disabled: true });
+			new MlSlackBot(shared);
+			await expect(mocks.authorize?.({ teamId }, { type })).rejects.toThrow();
+		});
 	});
 
 	it("forgets a workspace when Slack reports the app uninstalled", async () => {

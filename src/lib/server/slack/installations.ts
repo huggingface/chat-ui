@@ -61,7 +61,10 @@ export async function slackInstalled(teamId: string, settings = slackConfig()): 
 	return !!(await installedWorkspace(settings, teamId));
 }
 
-/** Bot credentials for a served workspace, cached for 30 s so a disable or uninstall lands soon. */
+/**
+ * Bot credentials for a served workspace, cached for 30 s so a disable or uninstall lands soon.
+ * "Not installed" is never cached: another pod may be saving the install right now.
+ */
 export async function slackWorkspace(
 	teamId: string,
 	settings = slackConfig()
@@ -87,9 +90,32 @@ function installedWorkspace(settings: SlackConfig, teamId: string) {
 			const botToken = row && decryptSecret(row.botToken);
 			return row && botToken ? { teamId, botToken, botUserId: row.botUserId } : undefined;
 		});
-	value.catch(() => cache.delete(teamId));
+	const forget = () => {
+		if (cache.get(teamId)?.value === value) cache.delete(teamId);
+	};
+	value.then((workspace) => workspace || forget(), forget);
 	cache.set(teamId, { until: now + 30_000, value });
 	return value;
+}
+
+/** An operator blocked this workspace; its installs are refused and never served. */
+export async function installationDisabled(teamId: string): Promise<boolean> {
+	return !!(await collections.slackInstallations.countDocuments(
+		{ _id: teamId, disabled: true },
+		{ limit: 1 }
+	));
+}
+
+/** the workspaces whose threads and inputs belong to this deployment */
+export async function servedTeams(
+	settings: SlackConfig,
+	{ disabled = false } = {}
+): Promise<string[]> {
+	if (!settings.publicInstall) return [settings.teamId];
+	const rows = await collections.slackInstallations
+		.find(disabled ? {} : { disabled: { $ne: true } }, { projection: { _id: 1 } })
+		.toArray();
+	return [settings.teamId, ...rows.map((row) => row._id)];
 }
 
 /** a client for routes that only call Slack, without resolving the bot's own identity */
@@ -122,7 +148,12 @@ export async function saveInstallation(
 
 /** Slack revoked the app: forget the token and stop polling that workspace's threads. */
 export async function removeInstallation(teamId: string): Promise<void> {
-	await collections.slackInstallations.deleteOne({ _id: teamId });
+	// A disabled workspace keeps its record, so uninstalling and installing again cannot lift the block.
+	const kept = await collections.slackInstallations.updateOne(
+		{ _id: teamId, disabled: true },
+		{ $set: { botToken: "", updatedAt: new Date() } }
+	);
+	if (!kept.matchedCount) await collections.slackInstallations.deleteOne({ _id: teamId });
 	await collections.slackThreads.updateMany(
 		{ teamId, watching: true },
 		{ $set: { watching: false } }

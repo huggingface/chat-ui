@@ -17,6 +17,8 @@ describe("public installs", () => {
 			SLACK_ML_ACCOUNT_MODE: "user",
 			SLACK_ML_PUBLIC_INSTALL: "true",
 			MCP_OAUTH_ENCRYPTION_KEY: "key",
+			SLACK_ML_VIEWER_ORIGIN: "https://chat.example",
+			SLACK_ML_VIEWER_SESSION_SECRET: "s".repeat(32),
 		});
 	});
 
@@ -38,10 +40,14 @@ describe("public installs", () => {
 		expect(slackConfig()).toMatchObject({ clientId: "1.bot", clientSecret: "bot-secret" });
 	});
 
-	it("refuses to start without a client or an encryption key", () => {
-		expect(() => slackConfig()).toThrow(/client ID and secret/);
+	it.each([
+		["a client", {}],
+		["an encryption key", { MCP_OAUTH_ENCRYPTION_KEY: undefined }],
+		["Sign in with Slack", { SLACK_ML_VIEWER_SESSION_SECRET: undefined }],
+	])("turns installs off but keeps the bot running without %s", (_, missing) => {
 		Object.assign(env, { SLACK_ML_CLIENT_ID: "1.bot", SLACK_ML_CLIENT_SECRET: "bot-secret" });
-		delete env.MCP_OAUTH_ENCRYPTION_KEY;
-		expect(() => slackConfig()).toThrow(/MCP_OAUTH_ENCRYPTION_KEY/);
+		if (_ === "a client") delete env.SLACK_ML_CLIENT_ID;
+		Object.assign(env, missing);
+		expect(slackConfig()).toMatchObject({ teamId: "T123", publicInstall: false });
 	});
 });

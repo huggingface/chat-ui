@@ -24,6 +24,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	if (url.searchParams.get("error")) redirect(303, `${base}/slack/installed?cancelled=1`);
 	// Installs Slack starts itself, such as after an admin approves a request, carry no state.
 	// Nothing here signs anyone in: the code only installs the workspace that approved it.
+	// Anyone can send a stateless callback link, though, so only a checked one names the workspace.
 	const state = url.searchParams.get("state");
 	const code = url.searchParams.get("code");
 	if (!code || (state && state !== expected))
@@ -37,6 +38,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 			e instanceof InstallError ? e.message : "Slack install failed. Try again."
 		);
 	}
+	if (!state) redirect(303, `${base}/slack/installed?done=1`);
 	cookies.set(
 		installedCookie,
 		sign({ ...installed, expires: Date.now() + 600_000 }, viewer.secret),

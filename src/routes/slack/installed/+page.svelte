@@ -7,7 +7,7 @@
 <svelte:head><title>ML Intern for Slack</title></svelte:head>
 <div class="mx-auto max-w-xl space-y-5 p-8">
 	{#if data.installed}
-		<h1 class="text-2xl font-semibold">ML Intern is in {data.installed.teamName}</h1>
+		<h1 class="text-2xl font-semibold">{data.installed.title}</h1>
 		<ol class="list-decimal space-y-2 pl-5">
 			<li>
 				Add @ML Intern to a channel from its details → Agents & apps, then mention it with a task.

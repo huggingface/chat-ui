@@ -91,12 +91,12 @@ export interface SlackInstallation {
 	_id: string;
 	teamName: string;
 	appId: string;
-	/** encrypted with MCP_OAUTH_ENCRYPTION_KEY */
+	/** encrypted with MCP_OAUTH_ENCRYPTION_KEY; empty once a disabled workspace uninstalls */
 	botToken: string;
 	botUserId: string;
 	scopes: string[];
 	installedBy: string;
-	/** set by an operator to stop serving the workspace; reinstalling does not clear it */
+	/** set by an operator to stop serving the workspace; uninstalling or reinstalling does not clear it */
 	disabled?: boolean;
 	installedAt: Date;
 	updatedAt: Date;

@@ -3,7 +3,12 @@ import { base } from "$app/paths";
 import { logger } from "$lib/server/logger";
 import type { SlackConfig } from "./config";
 import { chatOrigin } from "./links";
-import { homeIdentity, saveInstallation, SLACK_BOT_SCOPES } from "./installations";
+import {
+	homeIdentity,
+	installationDisabled,
+	saveInstallation,
+	SLACK_BOT_SCOPES,
+} from "./installations";
 
 export const installCookie = "__Secure-ml-slack-install";
 export const installedCookie = "__Secure-ml-slack-installed";
@@ -65,6 +70,8 @@ export async function completeInstall(
 			"Slack granted fewer permissions than ML Intern needs. Ask a workspace admin to approve all of them, then install again."
 		);
 	const teamName = access.team?.name || teamId;
+	if (teamId !== settings.teamId && (await installationDisabled(teamId)))
+		throw new InstallError("ML Intern is not available for this Slack workspace.");
 	// The home workspace keeps using the deployment's own token.
 	if (teamId !== settings.teamId)
 		await saveInstallation({

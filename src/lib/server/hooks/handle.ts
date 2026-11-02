@@ -114,7 +114,12 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 			event.locals.sessionId = auth.sessionId;
 
 			// Adding the Slack app needs only Slack's consent; each person connects HF later.
-			const slackInstall = /^\/slack\/install(ed|\/|$)/.test(event.url.pathname.slice(base.length));
+			const slackInstall = [
+				"/slack/install",
+				"/slack/install/callback",
+				"/slack/installed",
+				"/slack/installed/__data.json",
+			].includes(event.url.pathname.slice(base.length));
 			if (
 				loginEnabled &&
 				!auth.user &&
