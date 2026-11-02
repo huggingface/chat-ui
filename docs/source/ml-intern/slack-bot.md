@@ -229,12 +229,13 @@ A personal-account deployment can let any Slack workspace install its app from o
 
 ```env
 SLACK_ML_PUBLIC_INSTALL=true
+MCP_OAUTH_ENCRYPTION_KEY=...
+# Only when Sign in with Slack uses a different app than the bot:
 SLACK_ML_CLIENT_ID=123.456
 SLACK_ML_CLIENT_SECRET=...
-MCP_OAUTH_ENCRYPTION_KEY=...
 ```
 
-Startup refuses public installs in shared-token mode or without these values. The client ID and secret are on the Slack app's **Basic Information** page; they must belong to the same app as `SLACK_ML_APP_TOKEN`, and the install is rejected otherwise. In the Slack app settings:
+Installs use the Slack app's client ID and secret, from its **Basic Information** page. When Sign in with Slack uses the bot's own app, the usual setup, `SLACK_ML_VIEWER_CLIENT_ID` and `SLACK_ML_VIEWER_CLIENT_SECRET` already hold them and nothing else is needed. The client must belong to the same app as `SLACK_ML_APP_TOKEN`, and installs are rejected otherwise. Startup refuses public installs in shared-token mode, without a client, or without `MCP_OAUTH_ENCRYPTION_KEY`. In the Slack app settings:
 
 1. Under **OAuth & Permissions**, add the redirect URL `<PUBLIC_ORIGIN><base>/slack/install/callback`.
 2. Under **Event Subscriptions**, subscribe to the `app_uninstalled` and `tokens_revoked` bot events. Uninstalling the app deletes the workspace's token and stops its threads.

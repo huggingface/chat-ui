@@ -39,8 +39,10 @@ export function slackConfig(): SlackConfig | undefined {
 			.map((s) => s.trim())
 			.filter(Boolean),
 		publicInstall: config.SLACK_ML_PUBLIC_INSTALL === "true",
-		clientId: config.SLACK_ML_CLIENT_ID || undefined,
-		clientSecret: config.SLACK_ML_CLIENT_SECRET || undefined,
+		// Sign in with Slack usually uses the bot's own app, so its client works for installs too.
+		clientId: config.SLACK_ML_CLIENT_ID || config.SLACK_ML_VIEWER_CLIENT_ID || undefined,
+		clientSecret:
+			config.SLACK_ML_CLIENT_SECRET || config.SLACK_ML_VIEWER_CLIENT_SECRET || undefined,
 	});
 	// Never include Zod's input or a credential in errors/logs.
 	if (!parsed.success)
@@ -59,7 +61,7 @@ export function slackConfig(): SlackConfig | undefined {
 			!config.MCP_OAUTH_ENCRYPTION_KEY?.trim())
 	)
 		throw new Error(
-			"Public Slack installs require user account mode, SLACK_ML_CLIENT_ID, SLACK_ML_CLIENT_SECRET and MCP_OAUTH_ENCRYPTION_KEY."
+			"Public Slack installs require user account mode, the Slack app's client ID and secret, and MCP_OAUTH_ENCRYPTION_KEY."
 		);
 	return parsed.data;
 }
