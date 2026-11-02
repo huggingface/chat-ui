@@ -27,6 +27,8 @@ export interface EndpointParameters {
 	abortSignal?: AbortSignal;
 	/** Inference provider preference: "auto", "fastest", "cheapest", or a specific provider name */
 	provider?: string;
+	/** provider is the model's default rather than anyone's pick, so it may be routed around when down */
+	providerIsDefault?: boolean;
 	/** Optional thinking-effort, forwarded as OpenAI `reasoning_effort` when set */
 	reasoningEffort?: "low" | "medium" | "high";
 	/** Per-model user override for reasoning; wins over the model's supportsReasoning flag in both directions */

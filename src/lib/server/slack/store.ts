@@ -13,7 +13,8 @@ export async function getOrCreateThread(
 	channel: string,
 	threadTs: string,
 	owner: string,
-	hfUserId?: ObjectId
+	hfUserId?: ObjectId,
+	ownerTeamId?: string
 ): Promise<SlackThread> {
 	const _id = threadKey(teamId, channel, threadTs);
 	const now = new Date();
@@ -23,7 +24,7 @@ export async function getOrCreateThread(
 		channel,
 		threadTs,
 		owner,
-		...(hfUserId ? { hfUserId } : {}),
+		...(hfUserId ? { hfUserId, ownerTeamId: ownerTeamId ?? teamId } : {}),
 		conversationId: new ObjectId(),
 		watching: true,
 		createdAt: now,

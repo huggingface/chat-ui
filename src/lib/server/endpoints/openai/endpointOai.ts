@@ -22,6 +22,8 @@ import { fetchWithProviderFallback } from "./providerFallback";
 import { inferenceBillingHeaders } from "$lib/server/billing";
 // uuid import removed (no tool call ids)
 
+const DEFAULT_PIN_HEADER = "X-ChatUI-Default-Provider";
+
 export const endpointOAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
@@ -83,7 +85,14 @@ export async function endpointOai(
 
 	// Custom fetch wrapper to capture response headers for router metadata
 	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
-		const response = await fetchWithProviderFallback(url, init);
+		// the client is shared across calls, so whether this one's provider is a default rides on a
+		// header of our own, taken off before the request leaves
+		const headers = new Headers(init?.headers);
+		const defaultPin = headers.get(DEFAULT_PIN_HEADER) === "1";
+		headers.delete(DEFAULT_PIN_HEADER);
+		const response = await fetchWithProviderFallback(url, { ...init, headers }, model, {
+			defaultPin,
+		});
 
 		// Capture router headers if present (fallback for non-streaming)
 		const routeHeader = response.headers.get("X-Router-Route");
@@ -128,6 +137,7 @@ export async function endpointOai(
 			locals,
 			abortSignal,
 			provider,
+			providerIsDefault,
 			attachments,
 			onAttachments,
 		}) => {
@@ -168,6 +178,7 @@ export async function endpointOai(
 			const openAICompletion = await openai.completions.create(body, {
 				body: { ...body, ...extraBody },
 				headers: {
+					...(providerIsDefault ? { [DEFAULT_PIN_HEADER]: "1" } : {}),
 					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 					"X-use-cache": "false",
 					...(config.USE_USER_TOKEN === "true" && locals?.token
@@ -191,6 +202,7 @@ export async function endpointOai(
 			locals,
 			abortSignal,
 			provider,
+			providerIsDefault,
 			reasoningEffort,
 			reasoningOverride,
 			historyWindow,
@@ -277,6 +289,7 @@ export async function endpointOai(
 					{
 						body: { ...body, ...extraBody },
 						headers: {
+							...(providerIsDefault ? { [DEFAULT_PIN_HEADER]: "1" } : {}),
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
 							...(config.USE_USER_TOKEN === "true" && locals?.token
@@ -295,6 +308,7 @@ export async function endpointOai(
 					{
 						body: { ...body, ...extraBody },
 						headers: {
+							...(providerIsDefault ? { [DEFAULT_PIN_HEADER]: "1" } : {}),
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
 							...(config.USE_USER_TOKEN === "true" && locals?.token

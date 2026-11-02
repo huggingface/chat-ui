@@ -69,7 +69,7 @@ export function verify(value: string | undefined, secret: string): unknown {
 }
 export const identitySchema = z.object({
 	team: z.string().regex(/^T[A-Z0-9]+$/),
-	user: z.string().regex(/^U[A-Z0-9]+$/),
+	user: z.string().regex(/^[UW][A-Z0-9]+$/),
 	expires: z.number().gt(0),
 });
 export type ViewerIdentity = z.infer<typeof identitySchema>;

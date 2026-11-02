@@ -54,6 +54,19 @@ const modelConfig = z.object({
 		)
 		.optional(),
 	/**
+	 * Inference provider HuggingChat sends this model's requests to when the user
+	 * has not picked one, and always when Omni routes to it. Keeps a provider
+	 * that rejects the model's parameters out of the router's per-user order.
+	 */
+	defaultProvider: z.string().trim().min(1).optional(),
+	/**
+	 * Per-provider max_tokens ceilings, for providers that reject the model's
+	 * own `max_tokens`. A request pinned to one of them is capped at its value;
+	 * one the router picks a provider for is capped at the lowest, since any of
+	 * them may serve it.
+	 */
+	providerMaxTokens: z.record(z.number().int().positive()).optional(),
+	/**
 	 * Context window in tokens, aggregated across providers. Used to bound how
 	 * much conversation history is sent; absent when no provider reports one.
 	 */

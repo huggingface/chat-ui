@@ -38,8 +38,13 @@ export interface SavedMcpSelection {
 export type LoadedMcpSelection =
 	{ status: "none" } | { status: "ok"; selection: McpSelection } | { status: "unavailable" };
 
+/** Without an encryption key the selection's headers cannot be stored, so the opt-in is hidden. */
 export function slackMcpSyncAvailable() {
-	return config.SLACK_ML_ENABLED === "true" && config.SLACK_ML_ACCOUNT_MODE === "user";
+	return (
+		config.SLACK_ML_ENABLED === "true" &&
+		config.SLACK_ML_ACCOUNT_MODE === "user" &&
+		Boolean(config.MCP_OAUTH_ENCRYPTION_KEY?.trim())
+	);
 }
 
 /** Sync only for users who connected Slack and opted in, so nobody else's headers leave the browser. */
@@ -54,7 +59,7 @@ export async function mcpSyncStatus(userId: ObjectId) {
 }
 
 export async function setMcpSyncEnabled(userId: ObjectId, enabled: boolean) {
-	if (!enabled) {
+	if (!enabled || !slackMcpSyncAvailable()) {
 		await collections.mcpSelections.deleteOne({ _id: userId });
 		return;
 	}
