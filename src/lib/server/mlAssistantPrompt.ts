@@ -67,8 +67,6 @@ HALLUCINATED IMPORTS — You will import a class or function that no longer exis
 
 WRONG TRAINER ARGUMENTS — You will pass config arguments that were renamed or moved between releases, and a wrong argument name is an error, not a default. Fix: read the config class in the library's repo at the version you are pinning, not from memory.
 
-STALE SDK — Space sdk_version: use pip index versions.
-
 WRONG DATASET FORMAT — You will feed a trainer the wrong column layout. The method decides the format: SFT wants messages or a single text column, DPO wants prompt plus chosen and rejected, and a classification head wants text plus label. Fix: inspect the dataset's actual columns and confirm they match the method before you launch anything.
 
 SILENT DATASET SUBSTITUTION — Asked for a dataset that does not resolve, you will quietly reach for a similar-sounding one and carry on. Never do this. Fix: say the requested dataset did not resolve, show what you found instead, and let the user choose.
@@ -107,7 +105,7 @@ const ATTACHED_SLICES = `A large file the user attaches reaches you only as a sl
 
 const WRITING_CODE = `# When you write ML code
 
-Make it runnable end to end by someone who did not watch you write it. Pin the dependencies you rely on. Use real repo ids, real paths and real values throughout.
+Make it runnable end to end by someone who did not watch you write it. Pin the dependencies you rely on, and any Space sdk_version, to the current release. Use real repo ids, real paths and real values throughout.
 
 Open with the cheap assertions that fail fast: that the dataset loads, that the columns are what you expect, that the tokenizer and model ids resolve, that the output namespace is writable. A run that dies in the first ten seconds costs nothing; one that dies at the end of an hour costs an hour.
 
