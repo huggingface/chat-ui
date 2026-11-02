@@ -206,9 +206,9 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 		}
 		if (options.length > MAX_OPTIONS) options.length = MAX_OPTIONS;
 
-		// Each option that offers a positive dollar amount must carry its own
+		// Each option that offers a dollar amount must carry its own
 		// setBudgetUsd: another option's grant cannot fund a click on "$5".
-		// Zero-dollar declines carry no grant and remain valid.
+		// Explicit zero-dollar declines carry no grant and remain valid.
 		// Bounce it back for correction instead of showing a grant that isn't one.
 		// Labels only: the label is what a click appears to grant. A description
 		// that states what a choice costs is information, and rejecting it sent
@@ -217,7 +217,10 @@ export function normalizeAskUserQuestion(args: unknown): NormalizedAsk {
 			`${question} ${asText(q?.header, MAX_HEADER_CHARS) ?? ""}`
 		);
 		const hasUnfundedDollarLabel = options.some(
-			(o) => o.setBudgetUsd === undefined && /\$\s*[\d,.]*[1-9]/.test(o.label)
+			(o) =>
+				o.setBudgetUsd === undefined &&
+				/\$\s*[\d,.]*\d/.test(o.label) &&
+				!/^\$\s*0+(?:\.0+)?\s*[-–—]\s*no (?:raise|increase)$/i.test(o.label)
 		);
 		if (mentionsBudget && hasUnfundedDollarLabel) {
 			return {

@@ -419,25 +419,31 @@ describe("budget questions must carry real grants", () => {
 		expect(field.options[0].setBudgetUsd).toBe(1);
 	});
 
-	it.each(["Set budget to $10", "Raise to $ 0.50", "$1,000 for the full run"])(
-		"rejects an unfunded option (%s) even alongside a valid grant",
-		(label) => {
-			const result = normalizeAskUserQuestion({
-				questions: [
-					question({
-						question: "What compute budget should I reserve against?",
-						options: [
-							{ label: "Small run", description: "Minimal.", setBudgetUsd: 1 },
-							{ label, description: "Full run." },
-							{ label: "Cancel", description: "Do not run anything." },
-						],
-					}),
-				],
-			});
-			expect(result.ok).toBe(false);
-			if (!result.ok) expect(result.reason).toContain("setBudgetUsd");
-		}
-	);
+	it.each([
+		"Set budget to $10",
+		"Raise to $ 0.50",
+		"Raise to $.50",
+		"$1,000 for the full run",
+		"Set budget to $0",
+		"Set budget to $0.00",
+		"$0",
+		"$0 — no raise; set budget to $0",
+	])("rejects an unfunded option (%s) even alongside a valid grant", (label) => {
+		const result = normalizeAskUserQuestion({
+			questions: [
+				question({
+					question: "What compute budget should I reserve against?",
+					options: [
+						{ label: "Small run", description: "Minimal.", setBudgetUsd: 1 },
+						{ label, description: "Full run." },
+						{ label: "Cancel", description: "Do not run anything." },
+					],
+				}),
+			],
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.reason).toContain("setBudgetUsd");
+	});
 
 	it("keeps separately funded choices and a zero-dollar decline selectable", () => {
 		const payload = {
