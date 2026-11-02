@@ -12,6 +12,7 @@
 	import IconFast from "$lib/components/icons/IconFast.svelte";
 	import IconCheap from "$lib/components/icons/IconCheap.svelte";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import { shownProvider } from "$lib/utils/shownProvider";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { goto } from "$app/navigation";
 	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
@@ -168,8 +169,8 @@
 
 						<!-- Icons and badges -->
 						<div class="flex flex-shrink-0 items-center gap-1.5">
-							{#if publicConfig.isHuggingChat && !model.isRouter && $settings.providerOverrides?.[model.id] && $settings.providerOverrides[model.id] !== "auto"}
-								{@const providerOverride = $settings.providerOverrides[model.id]}
+							{#if publicConfig.isHuggingChat && shownProvider(model, $settings.providerOverrides)}
+								{@const providerOverride = shownProvider(model, $settings.providerOverrides) ?? ""}
 								{@const hubOrg =
 									PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
 								{#if providerOverride === "fastest"}

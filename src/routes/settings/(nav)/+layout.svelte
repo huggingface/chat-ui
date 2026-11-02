@@ -15,6 +15,7 @@
 	import LucideHammer from "~icons/lucide/hammer";
 	import IconGear from "~icons/bi/gear-fill";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import { shownProvider } from "$lib/utils/shownProvider";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	const publicConfig = usePublicConfig();
@@ -214,8 +215,8 @@
 						<span class="truncate">{model.displayName}</span>
 					</div>
 
-					{#if publicConfig.isHuggingChat && !model.isRouter && $settings.providerOverrides?.[model.id] && $settings.providerOverrides[model.id] !== "auto"}
-						{@const providerOverride = $settings.providerOverrides[model.id]}
+					{#if publicConfig.isHuggingChat && shownProvider(model, $settings.providerOverrides)}
+						{@const providerOverride = shownProvider(model, $settings.providerOverrides) ?? ""}
 						{@const hubOrg =
 							PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
 						{#if providerOverride === "fastest"}
