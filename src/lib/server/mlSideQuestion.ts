@@ -185,7 +185,7 @@ export async function* answerSideQuestion(opts: {
 		isMultimodal: false,
 		locals: opts.locals,
 		abortSignal: opts.signal,
-		provider: requestProvider(model, conv, opts.settings?.providerOverrides),
+		...requestProvider(model, conv, opts.settings?.providerOverrides),
 		reasoningEffort: (reasoningOverride ?? model.supportsReasoning) ? "low" : undefined,
 		reasoningOverride,
 	});

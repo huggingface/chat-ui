@@ -62,14 +62,27 @@
 		}));
 	}
 
+	// No saved entry means the model's default provider when it has one, so that
+	// option is never stored: picking it clears the entry instead.
+	const DEFAULT_PROVIDER_OPTION = "default";
 	function getProviderOverride() {
-		return $settings.providerOverrides?.[modelId] ?? "auto";
+		const saved = $settings.providerOverrides?.[modelId];
+		// a saved provider the router no longer lists is sent to the default, then auto
+		const dropped =
+			saved !== undefined &&
+			!["auto", "fastest", "cheapest", "preferred"].includes(saved) &&
+			providerList.length > 0 &&
+			!providerList.some((p) => p.provider === saved);
+		if (saved && !dropped) return saved;
+		return defaultProvider ? DEFAULT_PROVIDER_OPTION : "auto";
 	}
 	function setProviderOverride(v: string) {
-		settings.update((s) => ({
-			...s,
-			providerOverrides: { ...s.providerOverrides, [modelId]: v },
-		}));
+		settings.update((s) => {
+			const providerOverrides = { ...s.providerOverrides };
+			if (v === DEFAULT_PROVIDER_OPTION) delete providerOverrides[modelId];
+			else providerOverrides[modelId] = v;
+			return { ...s, providerOverrides };
+		});
 	}
 
 	function getReasoningOverride() {
@@ -125,6 +138,13 @@
 	);
 
 	let model = $derived(page.data.models.find((el: BackendModel) => el.id === modelId));
+	// on the models list, so the selection is right before the providers arrive
+	let defaultProvider = $derived(
+		(model as { defaultProvider?: string } | undefined)?.defaultProvider
+	);
+	let defaultHubOrg = $derived(
+		PROVIDERS_HUB_ORGS[defaultProvider as keyof typeof PROVIDERS_HUB_ORGS]
+	);
 
 	// Providers are excluded from the models list payload (they are ~60KB
 	// across all models and this page is their only reader); fetch them for
@@ -169,18 +189,26 @@
 		settings.initValue("customPromptsEnabled", modelId, true);
 	});
 
-	// Initialize provider override for this model (default to "auto")
-	$effect(() => {
-		settings.initValue("providerOverrides", modelId, "auto");
-	});
+	// providerOverrides intentionally has no initValue: a saved "auto" is a choice
+	// of the user's own Hub order, and an unset entry falls back to the model's
+	// default provider.
 
 	// Provider selection policies for the dropdown
-	const PROVIDER_POLICIES = [
+	const PROVIDER_POLICIES = $derived([
+		...(defaultProvider
+			? [{ value: DEFAULT_PROVIDER_OPTION, label: `HuggingChat default (${defaultProvider})` }]
+			: []),
 		{ value: "auto", label: "Auto (your HF preference order)" },
 		{ value: "fastest", label: "Fastest (highest throughput)" },
 		{ value: "cheapest", label: "Cheapest (lowest cost)" },
-	] as const;
+	]);
 </script>
+
+{#snippet providerAvatar(hubOrg: string)}
+	<span class="flex size-5 flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5">
+		<img src="https://huggingface.co/api/avatars/{hubOrg}" alt="" class="size-full rounded-sm" />
+	</span>
+{/snippet}
 
 <!-- Key on modelId so the DOM is rebuilt when navigating between models:
      reused switches/textareas would otherwise animate to the new model's values -->
@@ -469,7 +497,9 @@
 							{@const currentPolicy = PROVIDER_POLICIES.find((p) => p.value === currentValue)}
 							{@const currentProvider = providerList.find((p) => p.provider === currentValue)}
 							<span class="flex items-center gap-2">
-								{#if currentValue === "auto"}
+								{#if currentValue === DEFAULT_PROVIDER_OPTION && defaultHubOrg}
+									{@render providerAvatar(defaultHubOrg)}
+								{:else if currentValue === "auto"}
 									<span class="grid size-5 flex-none place-items-center rounded-md bg-gray-500/10">
 										<CarbonMagicWandFilled class="size-3 text-gray-700 dark:text-gray-300" />
 									</span>
@@ -489,15 +519,7 @@
 									{@const hubOrg =
 										PROVIDERS_HUB_ORGS[currentValue as keyof typeof PROVIDERS_HUB_ORGS]}
 									{#if hubOrg}
-										<span
-											class="flex size-5 flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5"
-										>
-											<img
-												src="https://huggingface.co/api/avatars/{hubOrg}"
-												alt=""
-												class="size-full rounded-sm"
-											/>
-										</span>
+										{@render providerAvatar(hubOrg)}
 									{/if}
 								{/if}
 								{currentPolicy?.label ?? currentProvider?.provider ?? currentValue}
@@ -520,7 +542,11 @@
 											value={opt.value}
 											class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-hidden select-none data-highlighted:bg-gray-100 dark:text-gray-200 dark:data-highlighted:bg-white/10"
 										>
-											{#if opt.value === "auto"}
+											{#if opt.value === DEFAULT_PROVIDER_OPTION}
+												{#if defaultHubOrg}
+													{@render providerAvatar(defaultHubOrg)}
+												{/if}
+											{:else if opt.value === "auto"}
 												<span
 													class="grid size-5 flex-none place-items-center rounded-md bg-gray-500/10"
 												>
@@ -561,15 +587,7 @@
 											class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-hidden select-none data-highlighted:bg-gray-100 dark:text-gray-200 dark:data-highlighted:bg-white/10"
 										>
 											{#if hubOrg}
-												<span
-													class="flex size-5 flex-none items-center justify-center rounded-md bg-gray-500/10 p-0.5"
-												>
-													<img
-														src="https://huggingface.co/api/avatars/{hubOrg}"
-														alt=""
-														class="size-full rounded-sm"
-													/>
-												</span>
+												{@render providerAvatar(hubOrg)}
 											{:else}
 												<span class="size-5"></span>
 											{/if}
