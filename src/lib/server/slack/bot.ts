@@ -15,6 +15,7 @@ import { AbortRegistry } from "$lib/server/abortRegistry";
 import { createHash } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { App } from "@slack/bolt";
+import { WebClient } from "@slack/web-api";
 import { z } from "zod";
 import { collections } from "$lib/server/database";
 import { config } from "$lib/server/config";
@@ -44,6 +45,13 @@ import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } fr
 import { MCP_RESYNC_NOTE } from "$lib/server/mcp/savedSelection";
 import { addressedToOther, threadKey, threadPrompt, type ThreadMessage } from "./context";
 import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store";
+import {
+	homeIdentity,
+	installationDisabled,
+	removeInstallation,
+	servedTeams,
+	slackWorkspace,
+} from "./installations";
 import type { SlackThread } from "./types";
 import {
 	PICK_ACTION,
@@ -103,14 +111,37 @@ const MAX_SLACK_SIDE_QUESTIONS = 4;
 const SLACK_SIDE_QUESTIONS_PER_MINUTE = 5;
 const SLACK_WORKSPACE_SIDE_QUESTIONS_PER_MINUTE = 20;
 const SLACK_SIDE_QUESTION_TIMEOUT_MS = 90_000;
+/** concurrent runs per worker, and per Slack workspace */
+const MAX_RUNS = 8;
+const MAX_WORKSPACE_RUNS = 4;
 
 const conversationLink = (conversationId: ObjectId) =>
 	`${config.PUBLIC_ORIGIN}${base}/conversation/${conversationId.toString()}`;
 
+// Don't log Slack payloads, which can contain private thread text or answers.
+const slackLogger = {
+	debug() {},
+	info() {},
+	warn() {
+		logger.warn("[slack] SDK warning");
+	},
+	error() {
+		logger.error("[slack] SDK error");
+	},
+	setLevel() {},
+	getLevel() {
+		return "error" as import("@slack/bolt").LogLevel;
+	},
+	setName() {},
+};
+
 /** Transport and delivery only. ML Intern's existing engine owns tool execution and resume. */
 export class MlSlackBot {
 	readonly app: App;
-	private botUserId = "";
+	/** by workspace; replaced when its token changes, dropped on uninstall */
+	private clients = new Map<string, { token: string; client: WebClient }>();
+	/** each workspace's tick runs on its own, so one rate-limited workspace cannot stall the rest */
+	private workspaceTicks = new Map<string, Promise<void>>();
 	private active = new Map<string, Promise<void>>();
 	private runningConversations = new Map<string, string>();
 	private eventMembership = new Map<
@@ -131,33 +162,57 @@ export class MlSlackBot {
 		readonly user?: User
 	) {
 		this.app = new App({
-			token: settings.botToken,
 			appToken: settings.appToken,
 			socketMode: true,
-			// Don't log Slack payloads, which can contain private thread text or answers.
-			logger: {
-				debug() {},
-				info() {},
-				warn() {
-					logger.warn("[slack] SDK warning");
-				},
-				error() {
-					logger.error("[slack] SDK error");
-				},
-				setLevel() {},
-				getLevel() {
-					return "error" as import("@slack/bolt").LogLevel;
-				},
-				setName() {},
+			// Handlers act through the thread's own workspace client, never Bolt's. Events always name
+			// the install they came through. Interactions from a Slack Connect user name that user's
+			// workspace, so those fall back to the home token unless an operator disabled it.
+			authorize: async ({ teamId }, body) => {
+				const served = teamId ? await slackWorkspace(teamId, settings) : undefined;
+				if (!served && teamId && teamId !== settings.teamId) {
+					const event = (body as { type?: string } | undefined)?.type === "event_callback";
+					if (event || (await installationDisabled(teamId)))
+						throw new Error("Slack workspace is not served.");
+				}
+				const workspace = served ?? (await slackWorkspace(settings.teamId, settings));
+				if (!workspace) throw new Error("Slack workspace is not installed.");
+				const { botToken, botUserId, botId } = workspace;
+				return { botToken, botUserId, botId, teamId: workspace.teamId };
 			},
+			logger: slackLogger,
 		});
 		this.register();
 	}
 
+	/** the workspace's bot client and user, or undefined once this deployment no longer serves it */
+	private async workspace(teamId: string) {
+		const workspace = await slackWorkspace(teamId, this.settings);
+		if (!workspace) return;
+		let cached = this.clients.get(teamId);
+		if (cached?.token !== workspace.botToken) {
+			cached = {
+				token: workspace.botToken,
+				client: new WebClient(workspace.botToken, { logger: slackLogger }),
+			};
+			this.clients.set(teamId, cached);
+		}
+		return { client: cached.client, botUserId: workspace.botUserId, botToken: workspace.botToken };
+	}
+
+	private async slack(teamId: string) {
+		const workspace = await this.workspace(teamId);
+		if (!workspace) throw new Error("ML Intern is not installed in this Slack workspace.");
+		return workspace;
+	}
+
 	private async participant(thread: SlackThread, userId: string) {
 		const participant = await eligibleParticipant(
-			this.app.client,
-			{ ...this.settings, accountMode: thread.hfUserId ? this.settings.accountMode : "shared" },
+			(await this.slack(thread.teamId)).client,
+			{
+				...this.settings,
+				teamId: thread.teamId,
+				accountMode: thread.hfUserId ? this.settings.accountMode : "shared",
+			},
 			userId,
 			thread.channel
 		);
@@ -171,16 +226,22 @@ export class MlSlackBot {
 	}
 
 	/** event-path eligibility with a 60 s positive cache; dispatch and controls recheck uncached */
-	private async cachedParticipant(mode: SlackConfig["accountMode"], channel: string, user: string) {
+	private async cachedParticipant(
+		client: WebClient,
+		teamId: string,
+		mode: SlackConfig["accountMode"],
+		channel: string,
+		user: string
+	) {
 		const now = Date.now();
 		for (const [key, value] of this.eventMembership)
 			if (value.until <= now) this.eventMembership.delete(key);
-		const cacheKey = `${mode}:${channel}:${user}`;
+		const cacheKey = `${teamId}:${mode}:${channel}:${user}`;
 		const cached = this.eventMembership.get(cacheKey)?.user;
 		if (cached) return cached;
 		const participant = await eligibleParticipant(
-			this.app.client,
-			{ ...this.settings, accountMode: mode },
+			client,
+			{ ...this.settings, teamId, accountMode: mode },
 			user,
 			channel
 		);
@@ -191,8 +252,8 @@ export class MlSlackBot {
 
 	private async reconnectionLink(thread: SlackThread) {
 		const user = await eligibleParticipant(
-			this.app.client,
-			this.settings,
+			(await this.slack(thread.teamId)).client,
+			{ ...this.settings, teamId: thread.teamId },
 			thread.owner,
 			thread.channel
 		);
@@ -209,21 +270,17 @@ export class MlSlackBot {
 		teamId: string | undefined,
 		requireConnection = true
 	): Promise<SlackThread | null> {
-		const thread = await collections.slackThreads.findOne({
-			_id: threadId,
-			teamId: this.settings.teamId,
-			owner: userId,
-		});
-		if (!thread) return null;
+		const thread = await collections.slackThreads.findOne({ _id: threadId, owner: userId });
+		if (!thread || !(await this.workspace(thread.teamId))) return null;
 		const participant = await this.participant(thread, userId);
-		if (!participant || (teamId !== this.settings.teamId && teamId !== participant.team_id))
-			return null;
+		if (!participant || (teamId !== thread.teamId && teamId !== participant.team_id)) return null;
 		if (thread?.deletedAt) return null;
 		if (thread?.hfUserId && requireConnection) {
 			try {
 				await connectedLocals(thread);
 			} catch (error) {
 				await this.tell(
+					thread.teamId,
 					thread.channel,
 					userId,
 					error instanceof ConnectionError
@@ -238,12 +295,14 @@ export class MlSlackBot {
 	}
 
 	private async tell(
+		teamId: string,
 		channel: string,
 		user: string,
 		text: string,
 		threadTs?: string
 	): Promise<void> {
-		await this.app.client.chat.postEphemeral({
+		const { client } = await this.slack(teamId);
+		await client.chat.postEphemeral({
 			channel,
 			user,
 			text,
@@ -332,6 +391,7 @@ export class MlSlackBot {
 			);
 			if (!locked.modifiedCount) {
 				await this.tell(
+					thread.teamId,
 					thread.channel,
 					body.user.id,
 					"Your selections changed or were already submitted. Review the current choices and submit again."
@@ -347,7 +407,7 @@ export class MlSlackBot {
 				});
 				if (result.ok && result.resume)
 					await enqueueInput({
-						_id: inputKey(this.settings.teamId, `answer:${question.elicitationId}`),
+						_id: inputKey(thread.teamId, `answer:${question.elicitationId}`),
 						threadId: thread._id,
 						user: body.user.id,
 						text: "",
@@ -393,6 +453,7 @@ export class MlSlackBot {
 				});
 				if (!result.ok) {
 					await this.tell(
+						thread.teamId,
 						thread.channel,
 						body.user.id,
 						"This answer could not be applied, or the question was already answered. Please check the current question."
@@ -401,7 +462,7 @@ export class MlSlackBot {
 				}
 				if (result.resume)
 					await enqueueInput({
-						_id: inputKey(this.settings.teamId, `answer:${question.elicitationId}`),
+						_id: inputKey(thread.teamId, `answer:${question.elicitationId}`),
 						threadId: thread._id,
 						user: body.user.id,
 						text: "",
@@ -427,6 +488,7 @@ export class MlSlackBot {
 			});
 			if (question?.pending?.kind === "review") {
 				await this.tell(
+					thread.teamId,
 					thread.channel,
 					body.user.id,
 					`Reviews are submitted on the web: ${conversationLink(thread.conversationId)}`
@@ -435,13 +497,15 @@ export class MlSlackBot {
 			}
 			if (!question || question.request.mode !== "form") {
 				await this.tell(
+					thread.teamId,
 					thread.channel,
 					body.user.id,
 					"This question has already been answered or expired."
 				);
 				return;
 			}
-			await this.app.client.views.open({
+			const { client } = await this.slack(thread.teamId);
+			await client.views.open({
 				trigger_id: body.trigger_id,
 				view: questionModal(question.request, thread._id),
 			});
@@ -490,7 +554,7 @@ export class MlSlackBot {
 			const resumes = result.ok ? result.resume : result.answered?.resume;
 			if (resumes) {
 				await enqueueInput({
-					_id: inputKey(this.settings.teamId, `answer:${question.elicitationId}`),
+					_id: inputKey(thread.teamId, `answer:${question.elicitationId}`),
 					threadId: thread._id,
 					user: body.user.id,
 					text: "",
@@ -520,6 +584,7 @@ export class MlSlackBot {
 			if (!owner) return;
 			await stopSlackTurn(thread, owner);
 			await this.tell(
+				thread.teamId,
 				thread.channel,
 				body.user.id,
 				"Stopped the assistant. Jobs already running on Hugging Face keep running until cancelled or timed out.",
@@ -548,7 +613,7 @@ export class MlSlackBot {
 			});
 			if (!last.interrupted && state?.status !== "failed") return;
 			await enqueueInput({
-				_id: inputKey(this.settings.teamId, `retry:${thread._id}:${last.generationId}`),
+				_id: inputKey(thread.teamId, `retry:${thread._id}:${last.generationId}`),
 				threadId: thread._id,
 				user: body.user.id,
 				text: "",
@@ -562,16 +627,15 @@ export class MlSlackBot {
 			await ack();
 			if (!("value" in action)) return;
 
-			const thread = await collections.slackThreads.findOne({
-				_id: action.value ?? "",
-				teamId: this.settings.teamId,
-			});
+			const thread = await collections.slackThreads.findOne({ _id: action.value ?? "" });
 			if (!thread || !("channel" in body) || body.channel?.id !== thread.channel) return;
+			const workspace = await this.workspace(thread.teamId);
+			if (!workspace) return;
 			if (thread.hfUserId && thread.owner !== body.user.id) return;
 			const participant = await this.participant(thread, body.user.id);
 			if (
 				!participant ||
-				(body.team?.id !== this.settings.teamId && body.team?.id !== participant.team_id)
+				(body.team?.id !== thread.teamId && body.team?.id !== participant.team_id)
 			)
 				return;
 			// Personal traces and DMs are owner-only; legacy channel traces remain shared.
@@ -582,14 +646,14 @@ export class MlSlackBot {
 				!this.settings.allowedChannels.includes(thread.channel)
 			)
 				return;
-			const channel = await this.app.client.conversations.info({ channel: thread.channel });
+			const channel = await workspace.client.conversations.info({ channel: thread.channel });
 			if (channel.channel?.is_ext_shared && !thread.hfUserId) return;
 			const conv = await collections.conversations.findOne({ _id: thread.conversationId });
 			if (!conv) return;
 			try {
 				// Personal traces include private tool results: deliver only to the owner DM.
 				const destination = thread.hfUserId
-					? (await this.app.client.conversations.open({ users: thread.owner })).channel?.id
+					? (await workspace.client.conversations.open({ users: thread.owner })).channel?.id
 					: thread.channel;
 				if (!destination) return;
 				const upload = {
@@ -598,9 +662,9 @@ export class MlSlackBot {
 					title: "ML Intern conversation trace",
 				};
 				if (thread.hfUserId) {
-					await this.app.client.files.uploadV2({ ...upload, channel_id: destination });
+					await workspace.client.files.uploadV2({ ...upload, channel_id: destination });
 				} else {
-					await this.app.client.files.uploadV2({
+					await workspace.client.files.uploadV2({
 						...upload,
 						channel_id: destination,
 						thread_ts: thread.threadTs,
@@ -608,6 +672,7 @@ export class MlSlackBot {
 				}
 			} catch {
 				await this.tell(
+					thread.teamId,
 					thread.channel,
 					body.user.id,
 					"Could not deliver the trace. For personal traces, the Slack app needs im:write and files:write permissions; an administrator may need to reinstall it. Please try again after checking the installation.",
@@ -615,35 +680,73 @@ export class MlSlackBot {
 				);
 			}
 		});
+		this.app.event("app_uninstalled", async ({ body }) => {
+			await this.uninstalled(body.team_id);
+		});
+		this.app.event("tokens_revoked", async ({ event, body }) => {
+			if (event.tokens.bot?.length) await this.uninstalled(body.team_id);
+		});
 		this.app.error(async () => {
 			logger.error("[slack] Could not handle a Slack event; no credentials or payload logged.");
 		});
+	}
+
+	private async uninstalled(teamId: string): Promise<void> {
+		if (teamId === this.settings.teamId) {
+			logger.error("[slack] The app was removed from its home workspace; check SLACK_ML_BOT_TOKEN");
+			return;
+		}
+		await removeInstallation(teamId);
+		this.clients.delete(teamId);
+		logger.info("[slack] Uninstalled from a workspace");
 	}
 
 	/**
 	 * the owner's unmentioned replies in a bot thread act like chat messages: they steer a running
 	 * turn or start the next one. Mentions are left to app_mention so a message is handled once.
 	 */
-	private async isOwnerFollowUp(raw: unknown, teamId: string): Promise<boolean> {
+	private async isOwnerFollowUp(raw: unknown, eventTeam: string): Promise<boolean> {
 		const parsed = mention.safeParse(raw);
-		if (!parsed.success || teamId !== this.settings.teamId || !this.botUserId) return false;
+		if (!parsed.success) return false;
 		const { channel, user, text, ts, thread_ts } = parsed.data;
-		if (!thread_ts || thread_ts === ts || text.includes(`<@${this.botUserId}>`)) return false;
-		const thread = await collections.slackThreads.findOne(
-			{ _id: threadKey(teamId, channel, thread_ts) },
-			{ projection: { owner: 1, deletedAt: 1 } }
-		);
-		return !!thread && !thread.deletedAt && thread.owner === user;
+		if (!thread_ts || thread_ts === ts) return false;
+		const thread = await this.threadOf(channel, thread_ts);
+		if (!thread || thread.deletedAt || thread.owner !== user) return false;
+		const bots = await this.botUsers(thread.teamId, eventTeam);
+		return !!bots.length && !bots.some((bot) => text.includes(`<@${bot}>`));
 	}
 
-	async receive(raw: unknown, teamId: string, eventId: string): Promise<void> {
+	/**
+	 * the thread workspace's bot, then the bot of the install that delivered the event: in a channel
+	 * shared by two workspaces that both installed the app, either one is ML Intern
+	 */
+	private async botUsers(teamId: string, eventTeam: string): Promise<string[]> {
+		const thread = await slackWorkspace(teamId, this.settings);
+		if (!thread) return [];
+		const via =
+			eventTeam === teamId
+				? undefined
+				: await slackWorkspace(eventTeam, this.settings).catch(() => undefined);
+		return via && via.botUserId !== thread.botUserId
+			? [thread.botUserId, via.botUserId]
+			: [thread.botUserId];
+	}
+
+	/**
+	 * Channel IDs are unique across Slack, and a channel shared by two workspaces that both
+	 * installed the app is still one thread, whichever install Slack delivers the event through.
+	 */
+	private threadOf(channel: string, threadTs: string) {
+		return collections.slackThreads.findOne({ channel, threadTs });
+	}
+
+	async receive(raw: unknown, eventTeam: string, eventId: string): Promise<void> {
 		const parsed = mention.safeParse(raw);
-		if (!parsed.success || teamId !== this.settings.teamId) return;
+		if (!parsed.success) return;
 		const event = parsed.data;
 		if (
 			event.bot_id ||
-			(event.subtype && !["file_share", "thread_broadcast"].includes(event.subtype)) ||
-			event.user === this.botUserId
+			(event.subtype && !["file_share", "thread_broadcast"].includes(event.subtype))
 		)
 			return;
 		if (
@@ -651,11 +754,15 @@ export class MlSlackBot {
 			!this.settings.allowedChannels.includes(event.channel)
 		)
 			return;
-		const existing = await collections.slackThreads.findOne({
-			teamId,
-			channel: event.channel,
-			threadTs: event.thread_ts ?? event.ts,
-		});
+		const existing = await this.threadOf(event.channel, event.thread_ts ?? event.ts);
+		const teamId = existing?.teamId ?? eventTeam;
+		const workspace = await this.workspace(teamId);
+		const [botUserId, ...otherBots] = await this.botUsers(teamId, eventTeam);
+		if (!workspace || !botUserId || [botUserId, ...otherBots].includes(event.user)) return;
+		const { client } = workspace;
+		// Mentioning the other install's bot addresses this thread's bot.
+		for (const bot of otherBots)
+			event.text = event.text.replace(new RegExp(`<@${bot}(\\|[^>]*)?>`, "g"), `<@${botUserId}>`);
 		// Bound traffic before any Slack API lookup. Local owner checks also keep non-owners
 		// from consuming paginated membership checks on existing sessions. The owner steering
 		// their own thread is exempt: dropping it would demote their instruction to quoted context.
@@ -668,6 +775,7 @@ export class MlSlackBot {
 				if (rate.count >= 10 && !rate.notified) {
 					rate.notified = true;
 					await this.tell(
+						teamId,
 						event.channel,
 						event.user,
 						"You're sending messages to ML Intern too quickly. Wait a minute, then send that again.",
@@ -681,6 +789,7 @@ export class MlSlackBot {
 		}
 		if (existing?.hfUserId && existing.owner !== event.user) {
 			await this.tell(
+				teamId,
 				event.channel,
 				event.user,
 				"Only the session owner can make requests using their personal Hugging Face account. Start your own thread to use yours.",
@@ -689,7 +798,13 @@ export class MlSlackBot {
 			return;
 		}
 		const mode = existing && !existing.hfUserId ? "shared" : this.settings.accountMode;
-		const participant = await this.cachedParticipant(mode, event.channel, event.user);
+		const participant = await this.cachedParticipant(
+			client,
+			teamId,
+			mode,
+			event.channel,
+			event.user
+		);
 		if (
 			!participant ||
 			(event.user_team && event.user_team !== participant.team_id) ||
@@ -698,12 +813,9 @@ export class MlSlackBot {
 			return;
 		// Dispatch and controls recheck membership without this event-only cache.
 		// In a DM every message is for the bot, even one that opens by tagging a colleague.
-		if (
-			event.channel_type !== "im" &&
-			this.botUserId &&
-			addressedToOther(event.text, this.botUserId)
-		) {
+		if (event.channel_type !== "im" && addressedToOther(event.text, botUserId)) {
 			await this.tell(
+				teamId,
 				event.channel,
 				event.user,
 				"Tagging a person or group at the beginning of a message means your message will not be sent to ML Intern.",
@@ -714,6 +826,7 @@ export class MlSlackBot {
 
 		if (existing?.deletedAt) {
 			await this.tell(
+				teamId,
 				event.channel,
 				event.user,
 				"This conversation was deleted by its owner. Start a new Slack thread.",
@@ -724,6 +837,7 @@ export class MlSlackBot {
 
 		if (existing && !existing.hfUserId && !this.user) {
 			await this.tell(
+				teamId,
 				event.channel,
 				event.user,
 				"This legacy session needs the original shared HF token configured by the operator. Start a new thread to use your own account.",
@@ -731,7 +845,7 @@ export class MlSlackBot {
 			);
 			return;
 		}
-		const question = slackSideQuestion(event.text, this.botUserId);
+		const question = slackSideQuestion(event.text, botUserId);
 		if (question !== undefined && (await this.answerSideQuestion(event, teamId, eventId, question)))
 			return;
 		let hfUserId = existing?.hfUserId;
@@ -753,6 +867,7 @@ export class MlSlackBot {
 					channel: event.channel,
 				});
 				await this.tell(
+					teamId,
 					event.channel,
 					event.user,
 					`<${link}|Connect Hugging Face> to start sessions in your HuggingChat history using your own account. Then mention me again.`,
@@ -772,14 +887,15 @@ export class MlSlackBot {
 			participant.team_id ?? teamId
 		);
 		const inserted = await enqueueInput({
-			_id: inputKey(teamId, eventId),
+			// keyed by message, so one message delivered as two events or through two installs is one input
+			_id: inputKey(thread.teamId, `message:${event.channel}:${event.ts}`),
 			threadId: thread._id,
 			user: event.user,
 			text: event.text,
 			ts: event.ts,
 		});
 		if (inserted) {
-			await this.app.client.reactions
+			await client.reactions
 				.add({ channel: event.channel, timestamp: event.ts, name: "eyes" })
 				.catch(() =>
 					logger.warn(
@@ -822,7 +938,7 @@ export class MlSlackBot {
 		);
 
 		const refuse = (text: string) =>
-			this.tell(event.channel, event.user, text, thread.threadTs).then(() => true);
+			this.tell(teamId, event.channel, event.user, text, thread.threadTs).then(() => true);
 		if (!question) return refuse("Add your question after /btw, e.g. `/btw which job is running?`");
 		if (question.length > SIDE_QUESTION_MAX_CHARS)
 			return refuse(`Keep btw questions under ${SIDE_QUESTION_MAX_CHARS} characters.`);
@@ -838,7 +954,8 @@ export class MlSlackBot {
 		try {
 			if (!(await this.reserveSideQuestion(teamId, event.user)))
 				return await refuse("Too many btw questions in the last minute. Try again shortly.");
-			await this.app.client.reactions
+			const { client } = await this.slack(teamId);
+			await client.reactions
 				.add({ channel: event.channel, timestamp: event.ts, name: "eyes" })
 				.catch(() => {});
 			let answer = "";
@@ -851,7 +968,7 @@ export class MlSlackBot {
 				answer += chunk;
 			const mentions = await this.mentionable(thread, answer);
 			for (const text of chunks(`_btw answer, ML Intern does not see this_\n\n${answer.trim()}`)) {
-				await this.app.client.chat.postMessage({
+				await client.chat.postMessage({
 					channel: thread.channel,
 					thread_ts: thread.threadTs,
 					text,
@@ -861,11 +978,12 @@ export class MlSlackBot {
 					unfurl_media: false,
 				});
 			}
-			await this.finishReaction(event.channel, event.ts);
+			await this.finishReaction(teamId, event.channel, event.ts);
 		} catch (error) {
 			const status = isHttpError(error) ? error.status : undefined;
 			logger.warn({ status: status ?? "internal" }, "[slack] Side question failed");
 			await this.tell(
+				teamId,
 				event.channel,
 				event.user,
 				"ML Intern could not answer that side question. The run is unaffected; try again shortly.",
@@ -916,8 +1034,9 @@ export class MlSlackBot {
 		let cursor: string | undefined;
 		let omitted = false;
 		const messages: ThreadMessage[] = [];
+		const { client, botUserId, botToken } = await this.slack(thread.teamId);
 		do {
-			const page = await this.app.client.conversations.replies({
+			const page = await client.conversations.replies({
 				channel: thread.channel,
 				ts: thread.threadTs,
 				latest: input.ts,
@@ -930,7 +1049,7 @@ export class MlSlackBot {
 				...(page.messages ?? []).filter(
 					(m) =>
 						(!thread.hfUserId || m.user === thread.owner) &&
-						m.user !== this.botUserId &&
+						m.user !== botUserId &&
 						!m.bot_id &&
 						!(m.ts && thread.sideQuestionTs?.includes(m.ts)) &&
 						(!thread.contextThroughTs || !m.ts || m.ts > thread.contextThroughTs)
@@ -942,24 +1061,13 @@ export class MlSlackBot {
 			}
 			cursor = page.response_metadata?.next_cursor || undefined;
 		} while (cursor);
-		const text = threadPrompt(
-			messages,
-			input,
-			this.botUserId,
-			omitted,
-			thread.owner,
-			!!thread.hfUserId
-		);
+		const text = threadPrompt(messages, input, botUserId, omitted, thread.owner, !!thread.hfUserId);
 		try {
-			const files = await downloadAttachments(
-				messages,
-				input.ts,
-				this.botUserId,
-				this.settings.botToken
-			);
+			const files = await downloadAttachments(messages, input.ts, botUserId, botToken);
 			return { text, files };
 		} catch (error) {
 			await this.tell(
+				thread.teamId,
 				thread.channel,
 				input.user,
 				error instanceof Error ? error.message : "Could not read Slack attachments.",
@@ -993,7 +1101,7 @@ export class MlSlackBot {
 			if (!user) throw new Error("Slack session owner is unavailable.");
 			await ensureConversation(thread, user, this.settings);
 			const noteMcpUnavailable = () =>
-				this.tell(thread.channel, thread.owner, MCP_RESYNC_NOTE, thread.threadTs);
+				this.tell(thread.teamId, thread.channel, thread.owner, MCP_RESYNC_NOTE, thread.threadTs);
 			if (input.resumeElicitationId) {
 				const question = await collections.mcpElicitations.findOne({
 					conversationId: thread.conversationId,
@@ -1045,6 +1153,7 @@ export class MlSlackBot {
 					await this.queueIntoTurn(thread, input, user);
 				} else if (busy && !skipped) {
 					await this.tell(
+						thread.teamId,
 						thread.channel,
 						input.user,
 						"ML Intern is still working or waiting for the task owner. The owner can answer its form, send a new request to skip a pending question, or stop the current run.",
@@ -1075,6 +1184,7 @@ export class MlSlackBot {
 			if (error instanceof ConnectionError) {
 				const link = await this.reconnectionLink(thread).catch(() => undefined);
 				await this.tell(
+					thread.teamId,
 					thread.channel,
 					thread.owner,
 					link
@@ -1133,6 +1243,7 @@ export class MlSlackBot {
 			if (!(error instanceof QueueFullError || error instanceof QueuedInputTooLongError))
 				throw error;
 			await this.tell(
+				thread.teamId,
 				thread.channel,
 				input.user,
 				error instanceof QueueFullError
@@ -1149,6 +1260,7 @@ export class MlSlackBot {
 		await wakeParkForQueuedInput(thread.conversationId);
 		kickQueuedTurn(thread.conversationId);
 		await this.tell(
+			thread.teamId,
 			thread.channel,
 			input.user,
 			files.length > 0
@@ -1176,6 +1288,7 @@ export class MlSlackBot {
 		}
 	}
 	private async publish(thread: SlackThread): Promise<void> {
+		const { client } = await this.slack(thread.teamId);
 		const conv = await collections.conversations.findOne(
 			{ _id: thread.conversationId },
 			{ projection: { messages: { $slice: -1 }, mlBudget: 1 } }
@@ -1390,7 +1503,7 @@ export class MlSlackBot {
 						: messageBlocks(part, index === parts.length - 1 ? actions : [], mentions);
 				const ts = delivery.parts[index];
 				if (ts)
-					await this.app.client.chat.update({
+					await client.chat.update({
 						channel: thread.channel,
 						ts,
 						text: part,
@@ -1398,7 +1511,7 @@ export class MlSlackBot {
 						parse: "none",
 					});
 				else {
-					const sent = await this.app.client.chat.postMessage({
+					const sent = await client.chat.postMessage({
 						channel: thread.channel,
 						thread_ts: thread.threadTs,
 						text: part,
@@ -1465,13 +1578,14 @@ export class MlSlackBot {
 				{ _id: input._id, finishedReaction: { $ne: true } },
 				{ $set: { finishedReaction: true } }
 			);
-			if (claimed.modifiedCount) await this.finishReaction(thread.channel, input.ts);
+			if (claimed.modifiedCount) await this.finishReaction(thread.teamId, thread.channel, input.ts);
 		}
 	}
 
-	private async finishReaction(channel: string, timestamp: string): Promise<void> {
-		await this.app.client.reactions.remove({ channel, timestamp, name: "eyes" }).catch(() => {});
-		await this.app.client.reactions
+	private async finishReaction(teamId: string, channel: string, timestamp: string): Promise<void> {
+		const { client } = await this.slack(teamId);
+		await client.reactions.remove({ channel, timestamp, name: "eyes" }).catch(() => {});
+		await client.reactions
 			.add({ channel, timestamp, name: "white_check_mark" })
 			.catch(() => logger.warn("[slack] Could not mark a request finished."));
 	}
@@ -1488,6 +1602,7 @@ export class MlSlackBot {
 		status: string,
 		actions: Array<{ id: string; label: string; value: string }>
 	): Promise<void> {
+		const { client } = await this.slack(thread.teamId);
 		const conv = await collections.conversations.findOne(
 			{ _id: thread.conversationId },
 			{
@@ -1544,9 +1659,9 @@ export class MlSlackBot {
 			parse: "none" as const,
 		};
 		let ts = delivery?.parts[0];
-		if (ts) await this.app.client.chat.update({ ...payload, ts });
+		if (ts) await client.chat.update({ ...payload, ts });
 		else {
-			const sent = await this.app.client.chat.postMessage({
+			const sent = await client.chat.postMessage({
 				...payload,
 				thread_ts: thread.threadTs,
 				unfurl_links: false,
@@ -1576,6 +1691,7 @@ export class MlSlackBot {
 		messageId: string,
 		content: string
 	): Promise<void> {
+		const { client } = await this.slack(thread.teamId);
 		let delivery = await collections.slackDeliveries.findOne({ _id });
 		const retained = retainPublicUpdates(
 			delivery?.publicText ?? "",
@@ -1600,9 +1716,9 @@ export class MlSlackBot {
 				parse: "none" as const,
 			};
 			const ts = delivery.parts[index];
-			if (ts) await this.app.client.chat.update({ ...payload, ts });
+			if (ts) await client.chat.update({ ...payload, ts });
 			else {
-				const sent = await this.app.client.chat.postMessage({
+				const sent = await client.chat.postMessage({
 					...payload,
 					thread_ts: thread.threadTs,
 					unfurl_links: false,
@@ -1629,6 +1745,7 @@ export class MlSlackBot {
 	}
 
 	private async publishSkippedQuestions(thread: SlackThread): Promise<void> {
+		const { client } = await this.slack(thread.teamId);
 		const questions = await collections.mcpElicitations
 			.find({ conversationId: thread.conversationId, slackSkippedByInputId: { $exists: true } })
 			.toArray();
@@ -1644,7 +1761,7 @@ export class MlSlackBot {
 				...confirmedQuestionBlocks(question.request),
 			];
 			for (const ts of card.parts)
-				await this.app.client.chat.update({
+				await client.chat.update({
 					channel: thread.channel,
 					ts,
 					text,
@@ -1659,6 +1776,7 @@ export class MlSlackBot {
 	}
 
 	private async publishAnswers(thread: SlackThread): Promise<void> {
+		const { client } = await this.slack(thread.teamId);
 		const questions = await collections.mcpElicitations
 			.find({
 				conversationId: thread.conversationId,
@@ -1694,9 +1812,9 @@ export class MlSlackBot {
 					blocks: blocks.slice(index * 45, (index + 1) * 45),
 					parse: "none" as const,
 				};
-				if (parts[index]) await this.app.client.chat.update({ ...payload, ts: parts[index] });
+				if (parts[index]) await client.chat.update({ ...payload, ts: parts[index] });
 				else {
-					const sent = await this.app.client.chat.postMessage({
+					const sent = await client.chat.postMessage({
 						...payload,
 						thread_ts: thread.threadTs,
 						unfurl_links: false,
@@ -1746,113 +1864,150 @@ export class MlSlackBot {
 	async tick(): Promise<void> {
 		if (this.ticking || this.stopped) return;
 		this.ticking = true;
+		const started: Promise<void>[] = [];
 		try {
+			// Only this deployment's workspaces: another deployment may share the database.
 			const threads = await collections.slackThreads
-				.find({ teamId: this.settings.teamId, watching: true })
+				.find({ teamId: { $in: await servedTeams(this.settings) }, watching: true })
 				.sort({ pollAt: 1 })
 				.limit(200)
 				.toArray();
 			this.statusIntervalMs = Math.max(10000, threads.length * 2000);
-			for (const thread of threads) {
-				let deliveryFailed = false;
-				if (!thread.nextRenderAt || thread.nextRenderAt <= new Date()) {
-					try {
-						await this.render(thread);
-					} catch {
-						deliveryFailed = true;
-						await this.deliveryFailure(thread);
-					}
-				} else deliveryFailed = true;
-				// Intake stays serialized by tick, independently of the long-lived run.
-				if (this.active.has(thread._id)) await this.dispatch(thread, true);
-				if (
-					!this.active.has(thread._id) &&
-					this.active.size < 4 &&
-					(await collections.slackInputs.countDocuments(
-						{ threadId: thread._id, status: "queued" },
-						{ limit: 1 }
-					))
-				) {
-					const run = this.dispatch(thread)
-						.catch(() => logger.error("[slack] Dispatch failed"))
-						.finally(() => this.active.delete(thread._id));
-					this.active.set(thread._id, run);
-				}
-				const failures = await collections.slackInputs
-					.find({ threadId: thread._id, status: "failed", failureNotified: { $ne: true } })
-					.limit(5)
-					.toArray();
-				for (const failure of failures) {
-					try {
-						await this.app.client.chat.postMessage({
-							channel: thread.channel,
-							thread_ts: thread.threadTs,
-							text:
-								failure.error ??
-								"The request was interrupted. Retry regenerates the request and may repeat compute; inspect existing jobs first.",
-						});
-						await collections.slackInputs.updateOne(
-							{ _id: failure._id },
-							{ $set: { failureNotified: true } }
-						);
-					} catch {
-						deliveryFailed = true;
-						await this.deliveryFailure(thread);
-					}
-				}
-				await collections.slackThreads.updateOne(
-					{ _id: thread._id },
-					{ $set: { pollAt: new Date(), ...(!deliveryFailed ? { renderFailures: 0 } : {}) } }
-				);
-				if (
-					!deliveryFailed &&
-					!this.active.has(thread._id) &&
-					!(await collections.slackInputs.countDocuments(
-						{
-							threadId: thread._id,
-							$or: [
-								{ status: { $in: ["queued", "running"] } },
-								{ status: "failed", failureNotified: { $ne: true } },
-							],
-						},
-						{ limit: 1 }
-					))
-				) {
-					const latest = await collections.conversations.findOne(
-						{ _id: thread.conversationId },
-						{ projection: { messages: { $slice: -1 } } }
-					);
-					const message = latest?.messages.at(-1);
-					if (
-						(!message || !(await isTurnAlive(thread.conversationId, message.id)).alive) &&
-						!(await hasQueuedInputs(thread.conversationId))
-					)
-						await collections.slackThreads.updateOne(
-							{ _id: thread._id, updatedAt: thread.updatedAt },
-							{ $set: { watching: false } }
-						);
-				}
+			const byTeam = new Map<string, SlackThread[]>();
+			for (const thread of threads)
+				byTeam.set(thread.teamId, [...(byTeam.get(thread.teamId) ?? []), thread]);
+			for (const [teamId, teamThreads] of byTeam) {
+				// A workspace still waiting out a Slack rate limit picks up again on a later tick.
+				if (this.workspaceTicks.has(teamId)) continue;
+				const run = this.tickWorkspace(teamId, teamThreads)
+					.catch(() => logger.error("[slack] Worker tick failed for a workspace"))
+					.finally(() => this.workspaceTicks.delete(teamId));
+				this.workspaceTicks.set(teamId, run);
+				started.push(run);
 			}
 		} finally {
 			this.ticking = false;
 		}
+		await Promise.all(started);
+	}
+
+	private async tickWorkspace(teamId: string, threads: SlackThread[]): Promise<void> {
+		// Uninstalling stops its threads; a disabled workspace's threads wait until it is enabled again.
+		const served = await this.workspace(teamId).catch(() => undefined);
+		if (!served) return;
+		for (const thread of threads) {
+			if (this.stopped) return;
+			let deliveryFailed = false;
+			if (!thread.nextRenderAt || thread.nextRenderAt <= new Date()) {
+				try {
+					await this.render(thread);
+				} catch {
+					deliveryFailed = true;
+					await this.deliveryFailure(thread);
+				}
+			} else deliveryFailed = true;
+			// Intake stays serialized by tick, independently of the long-lived run.
+			if (this.active.has(thread._id)) await this.dispatch(thread, true);
+			const queued =
+				!this.active.has(thread._id) &&
+				(await collections.slackInputs.countDocuments(
+					{ threadId: thread._id, status: "queued" },
+					{ limit: 1 }
+				));
+			// Checked after the await: other workspaces' ticks may have started runs meanwhile.
+			if (
+				queued &&
+				!this.active.has(thread._id) &&
+				this.active.size < MAX_RUNS &&
+				// one busy workspace cannot take every run
+				[...this.active.keys()].filter((id) => id.startsWith(`${teamId}:`)).length <
+					MAX_WORKSPACE_RUNS
+			) {
+				const run = this.dispatch(thread)
+					.catch(() => logger.error("[slack] Dispatch failed"))
+					.finally(() => this.active.delete(thread._id));
+				this.active.set(thread._id, run);
+			}
+			const failures = await collections.slackInputs
+				.find({ threadId: thread._id, status: "failed", failureNotified: { $ne: true } })
+				.limit(5)
+				.toArray();
+			for (const failure of failures) {
+				try {
+					await served.client.chat.postMessage({
+						channel: thread.channel,
+						thread_ts: thread.threadTs,
+						text:
+							failure.error ??
+							"The request was interrupted. Retry regenerates the request and may repeat compute; inspect existing jobs first.",
+					});
+					await collections.slackInputs.updateOne(
+						{ _id: failure._id },
+						{ $set: { failureNotified: true } }
+					);
+				} catch {
+					deliveryFailed = true;
+					await this.deliveryFailure(thread);
+				}
+			}
+			await collections.slackThreads.updateOne(
+				{ _id: thread._id },
+				{ $set: { pollAt: new Date(), ...(!deliveryFailed ? { renderFailures: 0 } : {}) } }
+			);
+			if (
+				!deliveryFailed &&
+				!this.active.has(thread._id) &&
+				!(await collections.slackInputs.countDocuments(
+					{
+						threadId: thread._id,
+						$or: [
+							{ status: { $in: ["queued", "running"] } },
+							{ status: "failed", failureNotified: { $ne: true } },
+						],
+					},
+					{ limit: 1 }
+				))
+			) {
+				const latest = await collections.conversations.findOne(
+					{ _id: thread.conversationId },
+					{ projection: { messages: { $slice: -1 } } }
+				);
+				const message = latest?.messages.at(-1);
+				if (
+					(!message || !(await isTurnAlive(thread.conversationId, message.id)).alive) &&
+					!(await hasQueuedInputs(thread.conversationId))
+				)
+					await collections.slackThreads.updateOne(
+						{ _id: thread._id, updatedAt: thread.updatedAt },
+						{ $set: { watching: false } }
+					);
+			}
+		}
 	}
 
 	async start(): Promise<void> {
-		const auth = await this.app.client.auth.test();
-		if (auth.team_id !== this.settings.teamId || !auth.user_id)
-			throw new Error("Slack bot token belongs to a different workspace.");
-		this.botUserId = auth.user_id;
+		await homeIdentity(this.settings);
 		await collections.slackInputs.createIndex({ threadId: 1, status: 1, ts: 1 });
-		await collections.slackThreads.createIndex({ teamId: 1, watching: 1, pollAt: 1 });
+		await collections.slackThreads.createIndex({ watching: 1, pollAt: 1 });
+		// One thread per Slack thread, whichever workspace's install delivered it first.
+		const uniqueThreads = () =>
+			collections.slackThreads.createIndex({ channel: 1, threadTs: 1 }, { unique: true });
+		await uniqueThreads()
+			.catch(async () => {
+				// replaces the non-unique index of earlier builds
+				await collections.slackThreads.dropIndex("channel_1_threadTs_1");
+				await uniqueThreads();
+			})
+			.catch(() => logger.error("[slack] Could not make Slack threads unique by channel and ts"));
 		await collections.slackDeliveries.createIndex({ threadId: 1, questionId: 1 });
 		// A previous worker may have submitted compute before it died. Never replay an uncertain dispatch.
+		// Another deployment may share the database, so only this one's workspaces are touched.
 		const threads = await collections.slackThreads
-			.find({ teamId: this.settings.teamId })
+			.find({ teamId: { $in: await servedTeams(this.settings, { disabled: true }) } })
 			.project<{ _id: string }>({ _id: 1 })
 			.toArray();
 		await collections.slackInputs.updateMany(
-			{ threadId: { $in: threads.map((t) => t._id) }, status: "running" },
+			{ threadId: { $in: threads.map((thread) => thread._id) }, status: "running" },
 			{
 				$set: {
 					status: "failed",

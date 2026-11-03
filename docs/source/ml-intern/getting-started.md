@@ -78,42 +78,6 @@ While ML Intern works, you can:
 - **Answer its questions.** ML Intern sometimes asks you to choose between options or confirm a step before it continues.
 - **Resume after a failure.** If a turn fails partway, use **Resume** to continue from where it stopped rather than starting the whole turn again.
 
-## Using your credits outside ML Intern
-
-The same credits and billing work when you use Hugging Face compute directly. For an organization's resource group, pass its namespace and resource group id.
-
-Run a Job from the [`hf` CLI](https://huggingface.co/docs/huggingface_hub/guides/cli):
-
-```bash
-hf jobs run --namespace <org-name> --resource-group-id <resource-group-id> python:3.12 python -c "print('Hello!')"
-```
-
-Or from Python:
-
-```python
-from huggingface_hub import run_job
-
-run_job(
-    image="python:3.12",
-    command=["python", "-c", "print('Hello!')"],
-    namespace="<org-name>",
-    resource_group_id="<resource-group-id>",
-)
-```
-
-Call [Inference Providers](https://huggingface.co/docs/inference-providers) billed to the same group with `bill_to`:
-
-```python
-from huggingface_hub import InferenceClient
-
-client = InferenceClient(bill_to="<resource-group-id>")
-completion = client.chat.completions.create(
-    model="deepseek-ai/DeepSeek-V3-0324",
-    messages=[{"role": "user", "content": "How many 'G's in 'huggingface'?"}],
-)
-print(completion.choices[0].message)
-```
-
 ## Running ML Intern yourself
 
 ML Intern is part of Chat UI, the open-source app behind HuggingChat. To run it locally or work on it, see [Running Chat UI with ML Intern locally](./local-development.md).
