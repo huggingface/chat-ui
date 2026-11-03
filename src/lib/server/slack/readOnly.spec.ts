@@ -26,6 +26,7 @@ it.each([
 	["PATCH", "/api/v2/conversations/[id]"],
 	["PATCH", "/(app)/conversation/[id]"],
 	["PUT", "/api/v2/conversations/[id]/files/[...name]"],
+	["POST", "/api/v2/conversations/[id]/reviews/[reviewId]/other"],
 ])("blocks owned Slack mutation %s %s", async (method, route) => {
 	expect(await isSlackConversationMutation(method, route, id, locals)).toBe(true);
 	expect(mocks.findOne.mock.calls[0][0]).toEqual({ _id: new ObjectId(id), userId: "owner" });

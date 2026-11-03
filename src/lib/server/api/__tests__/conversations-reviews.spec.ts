@@ -1152,6 +1152,57 @@ describe.sequential("submitting", () => {
 		expect((await collections.mlReviews.findOne({ _id: review._id }))?.status).toBe("open");
 	});
 
+	describe("in a Slack-managed conversation", () => {
+		const slackSeed = async (locals: App.Locals) => {
+			deliverReview.mockClear();
+			const seeded = await seed(locals);
+			await collections.conversations.updateOne(
+				{ _id: seeded.conv._id },
+				{ $set: { managedBy: { kind: "slack", continueUrl: "https://app.slack.com/client/T/C" } } }
+			);
+			await labelBoth(locals, seeded.conv, seeded.review);
+			return seeded;
+		};
+
+		it("submits while Slack still waits on the review", async () => {
+			const { locals } = await createTestUser();
+			const { conv, review } = await slackSeed(locals);
+
+			const res = await SUBMIT(event(locals, conv._id.toString(), review._id.toString(), {}));
+
+			expect(res.status).toBe(200);
+			expect(
+				(await collections.mcpElicitations.findOne({ elicitationId: review.elicitationId }))?.status
+			).toBe("resolved");
+			expect(deliverReview).not.toHaveBeenCalled();
+		});
+
+		it.each([
+			["a new Slack message detached it", "withdrawn", "detached"],
+			["Stop from Slack closed its question", "aborted", "open"],
+		] as const)(
+			"refuses once %s, posting no turn Slack would not show",
+			async (_, resolution, status) => {
+				const { locals } = await createTestUser();
+				const { conv, review } = await slackSeed(locals);
+				await collections.mcpElicitations.updateOne(
+					{ elicitationId: review.elicitationId },
+					{ $set: { status: "resolved", action: "cancel", resolution } }
+				);
+				await collections.mlReviews.updateOne({ _id: review._id }, { $set: { status } });
+
+				expect(
+					await errorOf(SUBMIT(event(locals, conv._id.toString(), review._id.toString(), {})))
+				).toEqual({
+					status: 409,
+					message: "This review is closed because the Slack thread moved on. Continue in Slack.",
+				});
+				expect(deliverReview).not.toHaveBeenCalled();
+				expect((await collections.mlReviews.findOne({ _id: review._id }))?.status).toBe(status);
+			}
+		);
+	});
+
 	it("posts a detached review through the server delivery, resolving nothing", async () => {
 		const { locals } = await createTestUser();
 		const { conv, review } = await seed(locals);
