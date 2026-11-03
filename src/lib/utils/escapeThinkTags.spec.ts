@@ -19,6 +19,11 @@ describe("escapeThinkTags", () => {
 	it("round-trips byte for byte", () => {
 		expect(unescapeThinkTags(escapeThinkTags(trace))).toBe(trace);
 	});
+
+	it("round-trips a tag the model already escaped itself", () => {
+		const selfEscaped = "render-safe <\u200Bthink> and <\u200B\u200B/think>";
+		expect(unescapeThinkTags(escapeThinkTags(selfEscaped))).toBe(selfEscaped);
+	});
 });
 
 describe("createThinkTagEscaper", () => {
@@ -28,6 +33,14 @@ describe("createThinkTagEscaper", () => {
 		const out = chunks.map((chunk) => escaper.push(chunk)).join("") + escaper.flush();
 		expect(out).toBe(escapeThinkTags(chunks.join("")));
 		expect(out).not.toMatch(/<\/?think>/);
+	});
+
+	it("holds a self-escaped tag split across deltas", () => {
+		const escaper = createThinkTagEscaper();
+		const chunks = ["a <\u200B", "think> b"];
+		const out = chunks.map((chunk) => escaper.push(chunk)).join("") + escaper.flush();
+		expect(out).toBe(escapeThinkTags(chunks.join("")));
+		expect(unescapeThinkTags(out)).toBe(chunks.join(""));
 	});
 
 	it("releases a held `<` once it can no longer be a tag", () => {

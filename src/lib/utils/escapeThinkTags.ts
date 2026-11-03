@@ -4,12 +4,14 @@
  * inside it (e.g. while reasoning about Qwen's `<think></think>` soft switch)
  * would close the block early and spill the rest of the trace into the answer.
  * A zero-width space after the `<` keeps it reading the same while no think
- * parser matches it; the escape is undone before reasoning is echoed back to a
- * provider, which may require the trace byte for byte.
+ * parser matches it. Stored reasoning always keeps the escaped form; the escape
+ * is undone only where reasoning is echoed back to a provider, which may
+ * require the trace byte for byte. A tag that already has zero-width spaces
+ * after its `<` gets one more, so unescaping restores it exactly.
  */
 const ZWSP = "\u200B";
-const TAG_REGEX = /<(\/?think>)/gi;
-const ESCAPED_TAG_REGEX = /<\u200B(\/?think>)/gi;
+const TAG_REGEX = /<(\u200B*\/?think>)/gi;
+const ESCAPED_TAG_REGEX = /<\u200B(\u200B*\/?think>)/gi;
 const TAGS = ["<think>", "</think>"];
 
 export function escapeThinkTags(text: string): string {
@@ -24,8 +26,13 @@ export function unescapeThinkTags(text: string): string {
 function partialTagLength(text: string): number {
 	const start = text.lastIndexOf("<");
 	if (start === -1) return 0;
-	const tail = text.slice(start).toLowerCase();
-	return TAGS.some((tag) => tag.length > tail.length && tag.startsWith(tail)) ? tail.length : 0;
+	const tail = text
+		.slice(start)
+		.toLowerCase()
+		.replace(/^<\u200B*/, "<");
+	return TAGS.some((tag) => tag.length > tail.length && tag.startsWith(tail))
+		? text.length - start
+		: 0;
 }
 
 /**

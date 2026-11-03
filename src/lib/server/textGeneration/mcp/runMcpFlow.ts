@@ -988,6 +988,8 @@ export async function* runMcpFlow({
 				// Merge reasoning + content into a single combined token stream, mirroring
 				// the OpenAI adapter so the UI can auto-detect <think> blocks.
 				let combined = "";
+				// what closes the think block in this delta, the held reasoning tail included
+				let closer = "";
 				// Whitespace-only deltas still count once a think block is open
 				// (paragraph breaks are part of the byte-exact trace); non-blank
 				// text is only required to OPEN a block, so stray leading
@@ -1009,7 +1011,8 @@ export async function* runMcpFlow({
 
 				if (deltaContent && deltaContent.length > 0) {
 					if (thinkOpen) {
-						combined += reasoningEscaper.flush() + "</think>" + deltaContent;
+						closer = reasoningEscaper.flush() + "</think>";
+						combined += closer + deltaContent;
 						thinkOpen = false;
 					} else {
 						combined += deltaContent;
@@ -1029,7 +1032,7 @@ export async function* runMcpFlow({
 						// stopped the content stream. The client saw the opener, so it
 						// must see the closer too, or it renders that reasoning block as
 						// still streaming for the rest of the turn.
-						yield { type: MessageUpdateType.Stream, token: "</think>" };
+						yield { type: MessageUpdateType.Stream, token: closer };
 						clientThinkOpen = false;
 					}
 				}
@@ -1154,7 +1157,7 @@ export async function* runMcpFlow({
 				const assistantContentForToolMsg = lastAssistantContent.replace(
 					/<think>([\s\S]*?)(?:<\/think>|$)/g,
 					(_match, inner: string) => {
-						thinkParts.push(unescapeThinkTags(inner));
+						thinkParts.push(inner);
 						return "";
 					}
 				);
@@ -1178,8 +1181,9 @@ export async function* runMcpFlow({
 					// Gated by mayEchoReasoning — see where it is defined. Still
 					// persisted below regardless of the gate: recording what the model
 					// thought is inert, and only sending it can break a request.
+					// Persisted escaped like content, so only the echo is unescaped.
 					...(mayEchoReasoning && reasoningForToolMsg.trim().length > 0
-						? { reasoning_content: reasoningForToolMsg }
+						? { reasoning_content: unescapeThinkTags(reasoningForToolMsg) }
 						: {}),
 				};
 

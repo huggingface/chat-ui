@@ -115,9 +115,7 @@ function splitReasoning(
 		thinkParts.push(inner);
 		return "";
 	});
-	const parts = [storedReasoning ?? "", ...thinkParts]
-		.filter((part) => part.trim().length > 0)
-		.map(unescapeThinkTags);
+	const parts = [storedReasoning ?? "", ...thinkParts].filter((part) => part.trim().length > 0);
 	return { visible: visible.trim(), parts };
 }
 
@@ -142,13 +140,15 @@ function turnRounds(message: EndpointMessage): {
 		reasoning: calls.find((u) => u.reasoning?.trim())?.reasoning ?? "",
 		content: calls.find((u) => u.content?.trim())?.content ?? "",
 	}));
-	if (message.contentShape === ROUNDS_SHAPE) {
-		return {
-			rounds,
-			final: { content: message.content.trim(), reasoning: message.reasoning ?? "" },
-		};
-	}
-	return { rounds, final: legacyFinalAnswer(message, rounds) };
+	const final =
+		message.contentShape === ROUNDS_SHAPE
+			? { content: message.content.trim(), reasoning: message.reasoning ?? "" }
+			: legacyFinalAnswer(message, rounds);
+	// stored reasoning keeps literal think tags escaped, the provider gets its own bytes back
+	return {
+		rounds: rounds.map((round) => ({ ...round, reasoning: unescapeThinkTags(round.reasoning) })),
+		final: { ...final, reasoning: unescapeThinkTags(final.reasoning) },
+	};
 }
 
 /** the original shape keeps every round think block and preamble in content too */
@@ -533,7 +533,7 @@ async function prepareEntries(
 				};
 			}
 			const { visible, parts } = splitReasoning(legacy.content, legacy.reasoning);
-			const reasoning = parts.join("\n");
+			const reasoning = unescapeThinkTags(parts.join("\n"));
 			if (!wantsReasoning || reasoning.length === 0) {
 				// Either nothing to attach, or attachment is disabled/gated:
 				// either way `visible` (think-stripped) is the correct shape,

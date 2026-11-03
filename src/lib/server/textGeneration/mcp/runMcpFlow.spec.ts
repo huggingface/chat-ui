@@ -10,6 +10,7 @@ import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { RETRY_BACKOFF_MS } from "$lib/server/textGeneration/utils/upstreamRetry";
 import { APIConnectionError, BadRequestError } from "openai";
 import type { McpFlowResult, RunMcpFlowContext } from "./runMcpFlow";
+import { escapeThinkTags, unescapeThinkTags } from "$lib/utils/escapeThinkTags";
 
 // ---------------------------------------------------------------------------
 // Harness
@@ -700,6 +701,36 @@ describe("runMcpFlow in-loop reasoning echo", () => {
 		await runFlow();
 
 		expect(toolCallMessage(1)?.reasoning_content).toBe("I need the tool.");
+	});
+
+	it("escapes literal think tags everywhere but the echo", async () => {
+		const reasoning = "Qwen3 skips thinking after <think></think>, so <";
+		scriptRounds([
+			{
+				deltas: [
+					{ reasoning: "Qwen3 skips thinking after <thi" },
+					{ reasoning: "nk></think>, so <" },
+					{ content: "Checking." },
+					{
+						tool_calls: [
+							{ index: 0, id: "call_1", function: { name: "do_thing", arguments: "{}" } },
+						],
+					},
+				],
+				finishReason: "tool_calls",
+			},
+			{ content: "done" },
+		]);
+
+		const { updates } = await runFlow();
+
+		const streamed = streamedText(updates);
+		expect(streamed.match(/<\/?think>/g)).toEqual(["<think>", "</think>"]);
+		expect(unescapeThinkTags(streamed)).toContain(`<think>${reasoning}</think>Checking.`);
+		// stored like content, so the turn still converts to the rounds shape
+		const stored = mocks.executeToolCalls.mock.calls[0][0].roundReasoning;
+		expect(stored).toBe(escapeThinkTags(reasoning));
+		expect(toolCallMessage(1)?.reasoning_content).toBe(reasoning);
 	});
 
 	it("omits reasoning_content for a blocklisted model", async () => {
