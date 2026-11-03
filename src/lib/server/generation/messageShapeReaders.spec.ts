@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { convertMessageShape } from "./messageShape";
-import { convertingTurns, preamblesTrimmed } from "./__tests__/turnFixtures";
+import { LITERAL_TAGS, convertingTurns, preamblesTrimmed } from "./__tests__/turnFixtures";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
 import { stripReasoningFromMessageForRouting } from "$lib/server/textGeneration/utils/routing";
 import { collectArtifacts } from "$lib/utils/artifacts";
@@ -92,4 +92,27 @@ it("finds an artifact that only a preamble holds", () => {
 	const { rounds } = cases.find((c) => c.name === "artifact in a preamble") ?? cases[0];
 	expect(rounds.content).not.toContain("<artifact");
 	expect(collectArtifacts([rounds]).artifacts.size).toBe(1);
+});
+
+describe("literal think tags in reasoning", () => {
+	const turn = cases.find((c) => c.name === "literal think tags in reasoning");
+
+	it.each([
+		["legacy", turn?.legacy],
+		["rounds", turn?.rounds],
+	])("replays the original bytes from the %s shape", async (_label, message) => {
+		if (!message) throw new Error("did not convert");
+		const replay = await prepareMessagesWithFiles(
+			[user("Weather?"), message, user("And now?")],
+			imageProcessor,
+			false,
+			{ replayToolHistory: true }
+		);
+		const reasoning = replay.flatMap((m) =>
+			"reasoning_content" in m && typeof m.reasoning_content === "string"
+				? [m.reasoning_content]
+				: []
+		);
+		expect(reasoning).toEqual([LITERAL_TAGS.round, LITERAL_TAGS.final]);
+	});
 });
