@@ -38,6 +38,7 @@ import {
 } from "$lib/server/mcp/hf";
 import { buildImageRefResolver } from "./fileRefs";
 import { createVirtualFileExpander } from "$lib/server/mlFiles/expand";
+import { createThinkTagEscaper, unescapeThinkTags } from "$lib/utils/escapeThinkTags";
 import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
 import {
 	AttachmentOverflowError,
@@ -789,6 +790,7 @@ export async function* runMcpFlow({
 		// one). Held here and flushed once a non-blank delta opens the block, so
 		// the persisted trace stays byte-exact instead of silently dropping them.
 		let pendingReasoningWhitespace = "";
+		const reasoningEscaper = createThinkTagEscaper();
 		let truncatedToolCallRetries = 0;
 		let cutAnswerRetries = 0;
 		let leakedToolCallRetries = 0;
@@ -986,6 +988,8 @@ export async function* runMcpFlow({
 				// Merge reasoning + content into a single combined token stream, mirroring
 				// the OpenAI adapter so the UI can auto-detect <think> blocks.
 				let combined = "";
+				// what closes the think block in this delta, the held reasoning tail included
+				let closer = "";
 				// Whitespace-only deltas still count once a think block is open
 				// (paragraph breaks are part of the byte-exact trace); non-blank
 				// text is only required to OPEN a block, so stray leading
@@ -994,9 +998,10 @@ export async function* runMcpFlow({
 				// delta arrives and flushed into the opening of the block.
 				if (deltaReasoning.length > 0) {
 					if (thinkOpen) {
-						combined += deltaReasoning;
+						combined += reasoningEscaper.push(deltaReasoning);
 					} else if (deltaReasoning.trim().length > 0) {
-						combined += "<think>" + pendingReasoningWhitespace + deltaReasoning;
+						combined +=
+							"<think>" + pendingReasoningWhitespace + reasoningEscaper.push(deltaReasoning);
 						pendingReasoningWhitespace = "";
 						thinkOpen = true;
 					} else {
@@ -1006,7 +1011,8 @@ export async function* runMcpFlow({
 
 				if (deltaContent && deltaContent.length > 0) {
 					if (thinkOpen) {
-						combined += "</think>" + deltaContent;
+						closer = reasoningEscaper.flush() + "</think>";
+						combined += closer + deltaContent;
 						thinkOpen = false;
 					} else {
 						combined += deltaContent;
@@ -1026,7 +1032,7 @@ export async function* runMcpFlow({
 						// stopped the content stream. The client saw the opener, so it
 						// must see the closer too, or it renders that reasoning block as
 						// still streaming for the rest of the turn.
-						yield { type: MessageUpdateType.Stream, token: "</think>" };
+						yield { type: MessageUpdateType.Stream, token: closer };
 						clientThinkOpen = false;
 					}
 				}
@@ -1059,15 +1065,16 @@ export async function* runMcpFlow({
 			// regex matches `<think>` to end-of-string, so an unclosed block would
 			// hide everything that follows.
 			if (thinkOpen) {
+				const closer = reasoningEscaper.flush() + "</think>";
 				// Gate on what the client saw, not on streamedContent: a round can
 				// stream content early and open the think block only after tool-call
 				// deltas muted the stream — a bare closer then shows up as literal
 				// "</think>" text.
 				if (clientThinkOpen) {
-					yield { type: MessageUpdateType.Stream, token: "</think>" };
+					yield { type: MessageUpdateType.Stream, token: closer };
 					clientThinkOpen = false;
 				}
-				lastAssistantContent += "</think>";
+				lastAssistantContent += closer;
 				thinkOpen = false;
 			}
 
@@ -1174,8 +1181,9 @@ export async function* runMcpFlow({
 					// Gated by mayEchoReasoning — see where it is defined. Still
 					// persisted below regardless of the gate: recording what the model
 					// thought is inert, and only sending it can break a request.
+					// Persisted escaped like content, so only the echo is unescaped.
 					...(mayEchoReasoning && reasoningForToolMsg.trim().length > 0
-						? { reasoning_content: reasoningForToolMsg }
+						? { reasoning_content: unescapeThinkTags(reasoningForToolMsg) }
 						: {}),
 				};
 
