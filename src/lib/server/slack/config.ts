@@ -1,5 +1,7 @@
 import { config } from "$lib/server/config";
+import { logger } from "$lib/server/logger";
 import { z } from "zod";
+import { viewerConfig } from "./viewer/settings";
 
 const schema = z.object({
 	teamId: z.string().regex(/^T[A-Z0-9]+$/),
@@ -15,8 +17,14 @@ const schema = z.object({
 	billingOrganization: z.string().optional(),
 	billingResourceGroup: z.string().optional(),
 	allowedChannels: z.array(z.string()).default([]),
+	/** Other workspaces may install the app through /slack/install; personal-account mode only. */
+	publicInstall: z.boolean().optional(),
+	clientId: z.string().optional(),
+	clientSecret: z.string().optional(),
 });
 export type SlackConfig = z.infer<typeof schema>;
+
+let warnedInstall = false;
 
 export function slackConfig(): SlackConfig | undefined {
 	if (config.SLACK_ML_ENABLED !== "true") return undefined;
@@ -34,6 +42,11 @@ export function slackConfig(): SlackConfig | undefined {
 			.split(",")
 			.map((s) => s.trim())
 			.filter(Boolean),
+		publicInstall: config.SLACK_ML_PUBLIC_INSTALL === "true",
+		// Sign in with Slack usually uses the bot's own app, so its client works for installs too.
+		clientId: config.SLACK_ML_CLIENT_ID || config.SLACK_ML_VIEWER_CLIENT_ID || undefined,
+		clientSecret:
+			config.SLACK_ML_CLIENT_SECRET || config.SLACK_ML_VIEWER_CLIENT_SECRET || undefined,
 	});
 	// Never include Zod's input or a credential in errors/logs.
 	if (!parsed.success)
@@ -42,6 +55,24 @@ export function slackConfig(): SlackConfig | undefined {
 		throw new Error("Shared Slack mode requires SLACK_ML_HF_TOKEN.");
 	if (parsed.data.billingResourceGroup && !parsed.data.billingOrganization) {
 		throw new Error("Slack ML billing resource group requires an organization.");
+	}
+	// Other workspaces' bot tokens are stored encrypted, they never get a shared HF token, and the
+	// install callback signs its result with the viewer secret. Missing any of these turns installs
+	// off instead of taking the home workspace's bot down with them.
+	if (
+		parsed.data.publicInstall &&
+		(parsed.data.accountMode !== "user" ||
+			!parsed.data.clientId ||
+			!parsed.data.clientSecret ||
+			!config.MCP_OAUTH_ENCRYPTION_KEY?.trim() ||
+			!viewerConfig())
+	) {
+		if (!warnedInstall)
+			logger.error(
+				"[slack] Public installs are off: they need user account mode, Sign in with Slack, the Slack app's client ID and secret, and MCP_OAUTH_ENCRYPTION_KEY."
+			);
+		warnedInstall = true;
+		return { ...parsed.data, publicInstall: false };
 	}
 	return parsed.data;
 }
