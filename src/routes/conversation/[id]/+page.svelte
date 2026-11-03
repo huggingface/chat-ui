@@ -426,7 +426,8 @@
 				},
 				onTitle: (title) => convsStore.update(convId, { title }),
 				onPlan: (update) => {
-					if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
+					if (ML_ASSISTANT_MODE)
+						mlAssistant.setPlan(planStepsToMlSteps(update.steps), update.version);
 				},
 				onBudget: (update) => {
 					if (ML_ASSISTANT_MODE) {
@@ -555,7 +556,8 @@
 				onStreamStart: () => {},
 				onTitle: (title) => convsStore.update(runConvId, { title }),
 				onPlan: (update) => {
-					if (ML_ASSISTANT_MODE) mlAssistant.setPlan(planStepsToMlSteps(update.steps));
+					if (ML_ASSISTANT_MODE)
+						mlAssistant.setPlan(planStepsToMlSteps(update.steps), update.version);
 				},
 				onBudget: (update) => {
 					if (ML_ASSISTANT_MODE) {

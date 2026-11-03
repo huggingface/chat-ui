@@ -4,6 +4,17 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { tick } from "svelte";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
 
+// the wait banner's early check acts on the conversation the route names
+vi.mock("$app/state", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("$app/state")>();
+	return {
+		...actual,
+		page: new Proxy(actual.page, {
+			get: (target, key) => (key === "params" ? { id: "c1" } : Reflect.get(target, key)),
+		}),
+	};
+});
+
 beforeEach(() => vi.stubGlobal("fetch", async () => new Response("{}", { status: 200 })));
 afterEach(() => vi.unstubAllGlobals());
 
@@ -319,5 +330,33 @@ describe("a notice on an assistant turn", () => {
 		const { container } = mount([notice]);
 		expect(noticeWrapper(container)).toBeTruthy();
 		expect(spinners(container)).toBe(1);
+	});
+});
+
+describe("a turn waiting on a timer", () => {
+	const waiting = {
+		type: MessageUpdateType.TurnState,
+		state: "waiting",
+		serverNow: Date.now(),
+		until: Date.now() + 20 * 60_000,
+		reason: "the eval batch",
+	};
+	const wakeButton = (readOnly: boolean, slackManaged: boolean) =>
+		render(ChatMessage, {
+			message: { id: "m1", from: "assistant", content: "", children: [], updates: [waiting] },
+			loading: true,
+			isLast: true,
+			isAuthor: true,
+			readOnly,
+			slackManaged,
+		} as never).container.querySelector('button[aria-label="Check now"]');
+
+	// One mount per test: they share a document, so a second would count the first's.
+	it("lets the owner of a Slack-managed run check early, read-only as it is", () => {
+		expect(wakeButton(true, true)).toBeTruthy();
+	});
+
+	it("offers no early check on any other read-only view", () => {
+		expect(wakeButton(true, false)).toBeNull();
 	});
 });

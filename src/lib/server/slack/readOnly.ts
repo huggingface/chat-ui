@@ -5,10 +5,12 @@ import { AbortRegistry } from "$lib/server/abortRegistry";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MlReview } from "$lib/types/MlReview";
 
-// Slack links reviews to the web, and submitting one resumes the run server-side
-const REVIEW_ROUTES = new Set([
+// Slack links reviews to the web, and submitting one resumes the run server-side; checking
+// a wait early only moves the parked turn's timer, so the sweep resumes it like any other
+const SERVER_RESUMED_ROUTES = new Set([
 	"/api/v2/conversations/[id]/reviews/[reviewId]",
 	"/api/v2/conversations/[id]/reviews/[reviewId]/submit",
+	"/conversation/[id]/wake",
 ]);
 
 const isSlackManaged = (conv: Pick<Conversation, "managedBy" | "sessionId">) =>
@@ -35,7 +37,7 @@ export async function isSlackConversationMutation(
 	const route = routeId?.replace(/\/\([^/]+\)/g, "");
 	if (!route || !/^\/(?:api\/(?:v2\/)?)?conversations?\/\[id\](?:\/|$)/.test(route)) return false;
 	if (route === "/conversation/[id]/share") return false;
-	if (REVIEW_ROUTES.has(route)) return false;
+	if (SERVER_RESUMED_ROUTES.has(route)) return false;
 	const conv = await collections.conversations.findOne(
 		{ _id: new ObjectId(id), ...authCondition(locals) },
 		{ projection: { managedBy: 1, sessionId: 1 } }

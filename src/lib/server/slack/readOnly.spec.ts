@@ -22,7 +22,6 @@ it.each([
 	["POST", "/conversation/[id]"],
 	["POST", "/conversation/[id]/elicitation"],
 	["POST", "/conversation/[id]/stop-generating"],
-	["POST", "/conversation/[id]/wake"],
 	["PATCH", "/api/v2/conversations/[id]"],
 	["PATCH", "/(app)/conversation/[id]"],
 	["PUT", "/api/v2/conversations/[id]/files/[...name]"],
@@ -43,7 +42,8 @@ it("allows inspection and sharing without a database lookup", async () => {
 it.each([
 	["PATCH", "/api/v2/conversations/[id]/reviews/[reviewId]"],
 	["POST", "/api/v2/conversations/[id]/reviews/[reviewId]/submit"],
-])("allows the web review Slack links to: %s %s", async (method, route) => {
+	["POST", "/conversation/[id]/wake"],
+])("allows actions the server resumes on its own: %s %s", async (method, route) => {
 	expect(await isSlackConversationMutation(method, route, id, locals)).toBe(false);
 	expect(mocks.findOne).not.toHaveBeenCalled();
 });
