@@ -186,7 +186,9 @@ describe("Slack ML Intern persistence", () => {
 		await Promise.all([enqueueInput(input), enqueueInput(input)]);
 		expect(await collections.slackInputs.countDocuments({})).toBe(1);
 		expect((await getOrCreateThread("T123", "C123", "100.0", "OTHER")).owner).toBe("U123");
-		expect((await getOrCreateThread("T999", "C123", "100.0", "U123")).conversationId).not.toEqual(
+		// Channel IDs are unique across Slack, so another workspace's install finds the same thread.
+		expect((await getOrCreateThread("T999", "C123", "100.0", "U123"))._id).toBe(thread._id);
+		expect((await getOrCreateThread("T123", "C123", "200.0", "U123")).conversationId).not.toEqual(
 			thread.conversationId
 		);
 		const first = new SlackLeader("T123");
