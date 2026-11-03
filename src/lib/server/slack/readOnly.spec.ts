@@ -22,10 +22,10 @@ it.each([
 	["POST", "/conversation/[id]"],
 	["POST", "/conversation/[id]/elicitation"],
 	["POST", "/conversation/[id]/stop-generating"],
-	["POST", "/conversation/[id]/wake"],
 	["PATCH", "/api/v2/conversations/[id]"],
 	["PATCH", "/(app)/conversation/[id]"],
 	["PUT", "/api/v2/conversations/[id]/files/[...name]"],
+	["POST", "/api/v2/conversations/[id]/reviews/[reviewId]/other"],
 ])("blocks owned Slack mutation %s %s", async (method, route) => {
 	expect(await isSlackConversationMutation(method, route, id, locals)).toBe(true);
 	expect(mocks.findOne.mock.calls[0][0]).toEqual({ _id: new ObjectId(id), userId: "owner" });
@@ -37,6 +37,14 @@ it("allows inspection and sharing without a database lookup", async () => {
 	expect(await isSlackConversationMutation("POST", "/conversation/[id]/share", id, locals)).toBe(
 		false
 	);
+	expect(mocks.findOne).not.toHaveBeenCalled();
+});
+it.each([
+	["PATCH", "/api/v2/conversations/[id]/reviews/[reviewId]"],
+	["POST", "/api/v2/conversations/[id]/reviews/[reviewId]/submit"],
+	["POST", "/conversation/[id]/wake"],
+])("allows actions the server resumes on its own: %s %s", async (method, route) => {
+	expect(await isSlackConversationMutation(method, route, id, locals)).toBe(false);
 	expect(mocks.findOne).not.toHaveBeenCalled();
 });
 it("does not reveal unowned conversations or block ordinary conversations", async () => {

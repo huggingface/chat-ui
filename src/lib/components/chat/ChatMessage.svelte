@@ -500,7 +500,7 @@
 					reason={waitingState.reason}
 					conversationId={page.params.id ?? ""}
 					messageId={message.id}
-					canWake={isAuthor && !readOnly}
+					canWake={isAuthor && (!readOnly || slackManaged)}
 				/>
 			{/if}
 		</div>

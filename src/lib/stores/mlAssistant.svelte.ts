@@ -23,6 +23,8 @@ class MlAssistantStore {
 
 	/** Conversation the state above belongs to, so a different one starts clean. */
 	#conversationKey: string | undefined;
+	/** Version of the plan in `steps`, so a stale snapshot cannot replace a newer one. */
+	#planVersion: number | undefined;
 
 	/** The switch stops being interactive once the mode is locked in. */
 	get locked() {
@@ -66,14 +68,19 @@ class MlAssistantStore {
 	abortTask() {
 		this.taskStarted = false;
 		this.steps = [];
+		this.#planVersion = undefined;
 	}
 
 	/**
 	 * Seam for the backend: replaces the plan wholesale. Steps arrive with their
-	 * own statuses so a resumed conversation renders mid-plan correctly.
+	 * own statuses so a resumed conversation renders mid-plan correctly. Both the
+	 * stream and reloaded snapshots report plans, so an older version is ignored.
 	 */
-	setPlan(steps: MlPlanStep[]) {
+	setPlan(steps: MlPlanStep[], version?: number) {
+		if (version !== undefined && this.#planVersion !== undefined && version < this.#planVersion)
+			return;
 		this.steps = steps;
+		if (version !== undefined) this.#planVersion = version;
 	}
 
 	/** Seam for the backend: advances a single step as its status streams in. */
@@ -92,6 +99,7 @@ class MlAssistantStore {
 		this.enabled = false;
 		this.taskStarted = false;
 		this.steps = [];
+		this.#planVersion = undefined;
 		this.budget = undefined;
 	}
 
