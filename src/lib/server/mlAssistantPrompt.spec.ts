@@ -334,7 +334,7 @@ describe("ML Assistant tool-keyed doctrine", () => {
 	});
 
 	it("pins a Space's sdk_version too, which is not a job dependency", () => {
-		expect(ML_ASSISTANT_PREPROMPT).toContain("any Space sdk_version, to the current versions");
+		expect(ML_ASSISTANT_PREPROMPT).toContain("any Space sdk_version, to current versions");
 	});
 
 	it("reserves the push destination with create_repo and names it literally in the script", () => {

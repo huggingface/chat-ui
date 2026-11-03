@@ -105,7 +105,7 @@ const ATTACHED_SLICES = `A large file the user attaches reaches you only as a sl
 
 const WRITING_CODE = `# When you write ML code
 
-Make it runnable end to end by someone who did not watch you write it. Pin the dependencies you rely on, and any Space sdk_version, to the current versions. Use real repo ids, real paths and real values throughout.
+Make it runnable end to end by someone who did not watch you write it. Pin the dependencies you rely on, and any Space sdk_version, to current versions. Use real repo ids, real paths and real values throughout.
 
 Open with the cheap assertions that fail fast: that the dataset loads, that the columns are what you expect, that the tokenizer and model ids resolve, that the output namespace is writable. A run that dies in the first ten seconds costs nothing; one that dies at the end of an hour costs an hour.
 
