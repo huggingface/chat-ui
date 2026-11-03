@@ -1408,7 +1408,8 @@ export class MlSlackBot {
 			status,
 			live.alive
 				? [{ id: STOP_ACTION, label: "Stop assistant", value: turnValue }]
-				: actions.filter((a) => a.id === RESUME_ACTION)
+				: actions.filter((a) => a.id === RESUME_ACTION),
+			live.alive
 		);
 		if (!live.alive && !question && !message.interrupted && state.status !== "failed")
 			await this.markInputsFinished(thread);
@@ -1600,7 +1601,8 @@ export class MlSlackBot {
 	private async publishSessionStatus(
 		thread: SlackThread,
 		status: string,
-		actions: Array<{ id: string; label: string; value: string }>
+		actions: Array<{ id: string; label: string; value: string }>,
+		working = false
 	): Promise<void> {
 		const { client } = await this.slack(thread.teamId);
 		const conv = await collections.conversations.findOne(
@@ -1610,17 +1612,29 @@ export class MlSlackBot {
 					"messages.id": 1,
 					"messages.from": 1,
 					"messages.queuedContinuationOf": 1,
+					"messages.createdAt": 1,
 					mlBudget: 1,
+					plan: 1,
 				},
 			}
 		);
 		const message = conv?.messages.at(-1);
 		if (message?.from !== "assistant") return;
 		// Steering may drain into a new assistant turn, but still belongs to the original card.
-		const _id = `${thread._id}:status:${message.queuedContinuationOf ?? message.id}`;
+		const cardMessageId = message.queuedContinuationOf ?? message.id;
+		const _id = `${thread._id}:status:${cardMessageId}`;
 		const delivery = await collections.slackDeliveries.findOne({ _id });
 		const budget = conv?.mlBudget;
-		const text = `${status}\n💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
+		// The plan outlives its turn; a follow-up shows none until it plans again.
+		const startedAt = conv?.messages.find((m) => m.id === cardMessageId)?.createdAt;
+		const plan = conv?.plan && (!startedAt || conv.plan.updatedAt >= startedAt) ? conv.plan : null;
+		const steps = plan?.steps
+			.map((s, i) => {
+				const step = s.step.replace(/\s+/g, " ").trim();
+				return `${i + 1}. ${s.status === "in_progress" && working ? `**${step}**` : s.status === "skipped" ? `~~${step}~~` : step}`;
+			})
+			.join("\n");
+		const text = `${status}${steps ? `\n\n${steps}\n\n` : "\n"}💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
 		const viewUrl = chatLink(thread) ?? viewerLink(thread.conversationId.toHexString());
 		const owner =
 			viewUrl && thread.hfUserId
