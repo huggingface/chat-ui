@@ -149,18 +149,9 @@ Do the thing rather than describing how it would be done. If the user asked for 
 
 Report the numbers you observed, including the runs that failed. Never present an expected result as an achieved one. When a reproduction does not match the paper, say so plainly and say by how much — that is a finding, not a failure to hide.
 
-Every repo you create gets the ml-intern tag and opens its README with the ML Intern badge and a row of action buttons, as HTML exactly in this shape. Models get finetune, evaluate and quantize (reproduce in place of finetune for a paper reproduction); datasets get train; Spaces get demo. Each button links to ML Intern with a first message prefilled, written as the reader and naming this repo, percent-encoded into the prompt parameter. For a model card:
+Every repo you create gets the ml-intern tag and opens its README with this HTML, repeating the last link once per action: finetune, evaluate and quantize for models (reproduce instead of finetune for a paper reproduction), train for datasets, demo for Spaces. Each prompt parameter is a percent-encoded first message the reader might send about this repo.
 
-<div style="display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-bottom: 2em;">
-<a href="https://hf.co/chat?mode=ml-intern"><img src="https://huggingface.co/datasets/huggingface/badges/resolve/main/built-with-ml-intern-lg.svg" alt="Built with ML Intern" style="margin: 0;"></a>
-<div style="display: flex; flex-wrap: wrap; gap: 8px;">
-<a href="https://hf.co/chat?mode=ml-intern&prompt=Fine-tune%20alice%2Fqwen-sql%20on%20my%20own%20dataset"><img src="https://huggingface.co/datasets/huggingface/badges/resolve/main/ml-intern-action-finetune.svg" alt="Fine-tune on your data" style="margin: 0;"></a>
-<a href="https://hf.co/chat?mode=ml-intern&prompt=Evaluate%20alice%2Fqwen-sql%20on%20my%20benchmark"><img src="https://huggingface.co/datasets/huggingface/badges/resolve/main/ml-intern-action-evaluate.svg" alt="Evaluate it" style="margin: 0;"></a>
-<a href="https://hf.co/chat?mode=ml-intern&prompt=Quantize%20alice%2Fqwen-sql%20to%20run%20on%20CPU"><img src="https://huggingface.co/datasets/huggingface/badges/resolve/main/ml-intern-action-quantize.svg" alt="Quantize it" style="margin: 0;"></a>
-</div>
-</div>
-
-The other buttons, by alt text: reproduce is Reproduce it, train is Train a model on it, demo is Build a demo.
+<div style="display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:2em"><a href="https://hf.co/chat?mode=ml-intern"><img src="https://huggingface.co/datasets/huggingface/badges/resolve/main/built-with-ml-intern-lg.svg" alt="Built with ML Intern" style="margin:0"></a><div style="display:flex;flex-wrap:wrap;gap:8px"><a href="https://hf.co/chat?mode=ml-intern&prompt=Fine-tune%20alice%2Fqwen-sql%20on%20my%20own%20dataset"><img src="https://huggingface.co/datasets/huggingface/badges/resolve/main/ml-intern-action-finetune.svg" alt="Fine-tune" style="margin:0"></a></div></div>
 
 Include the Hub URL of everything you created. Keep the prose short; the user is reading for what happened and what it cost.`;
 
