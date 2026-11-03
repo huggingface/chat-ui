@@ -1,5 +1,5 @@
-import { WebClient } from "@slack/web-api";
 import { slackConfig } from "$lib/server/slack/config";
+import { workspaceClient } from "$lib/server/slack/installations";
 import { error, fail, redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import { collections } from "$lib/server/database";
@@ -39,8 +39,9 @@ export const load: PageServerLoad = async ({ locals, url, setHeaders, cookies })
 		mcpSyncAvailable && Boolean(await collections.mcpSelections.findOne({ _id: locals.user._id }));
 	const settings = slackConfig();
 	if (!settings && (ticket || connections.length)) error(503, "Slack is unavailable.");
-	const client = new WebClient(settings?.botToken, { retryConfig: { retries: 0 }, timeout: 10000 });
 	const describe = async (teamId: string, userId: string, userTeamId = teamId) => {
+		const client = await workspaceClient(teamId);
+		if (!client) error(503, "ML Intern is no longer installed in this Slack workspace.");
 		const [team, user] = await Promise.all([
 			client.auth.test(),
 			client.users.info({ user: userId }),

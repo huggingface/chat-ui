@@ -35,7 +35,9 @@ export async function getOrCreateThread(
 	} catch (err) {
 		if (!duplicate(err)) throw err;
 	}
-	const stored = await collections.slackThreads.findOne({ _id });
+	// { channel, threadTs } is unique: a shared channel's thread may already exist under the other
+	// workspace that installed the app, created by a delivery that raced this one.
+	const stored = await collections.slackThreads.findOne({ channel, threadTs });
 	if (!stored) throw new Error("Could not create Slack thread.");
 	return stored;
 }
