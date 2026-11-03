@@ -333,6 +333,10 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(jobs).toContain("Unpinned is not the safe middle");
 	});
 
+	it("pins a Space's sdk_version too, which is not a job dependency", () => {
+		expect(ML_ASSISTANT_PREPROMPT).toContain("any Space sdk_version, to the current versions");
+	});
+
 	it("reserves the push destination with create_repo and names it literally in the script", () => {
 		// the push check reads the id out of the script, one built at runtime goes unchecked
 		const jobs = inMode([tool("hf_jobs")]);
