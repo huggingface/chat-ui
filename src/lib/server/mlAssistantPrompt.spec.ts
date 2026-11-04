@@ -513,7 +513,7 @@ describe("ML Assistant system message size", () => {
 		//
 		// 39,500 to 40,500 for the repo card buttons, argued by every repo ML Intern creates opening
 		// ML Intern with a prompt about that repo already written, the rule is held to one example
-		// button the model repeats, but main had already reached 39,490, it landed at 40,225
+		// button the model repeats, but main had already reached 39,490, it landed at 40,289
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
