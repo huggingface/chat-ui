@@ -510,10 +510,6 @@ describe("ML Assistant system message size", () => {
 		// at it and golden sets labelled with the model guesses in view, most of its guidance lives
 		// in the tool description and the preprompt is held to 600 characters below, but main had
 		// already reached 38,983 so even the short form needed the raise, it landed at 39,216
-		//
-		// 39,500 to 40,500 for the repo card buttons, argued by every repo ML Intern creates opening
-		// ML Intern with a prompt about that repo already written, the rule is held to one example
-		// button the model repeats, but main had already reached 39,490, it landed at 40,481
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
