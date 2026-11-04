@@ -142,6 +142,23 @@ describe("mlAssistant store", () => {
 		expect(mlAssistant.enabled).toBe(true);
 	});
 
+	it("keeps a newer streamed plan over an older snapshot, and takes a newer snapshot", () => {
+		mlAssistant.setPlan([step("Research", "done"), step("Train", "running")], 3);
+		mlAssistant.setPlan([step("Research", "running")], 2);
+		expect(mlAssistant.steps.map((s) => s.status)).toEqual(["done", "running"]);
+
+		mlAssistant.setPlan([step("Research", "done"), step("Train", "done")], 4);
+		expect(mlAssistant.complete).toBe(true);
+	});
+
+	it("forgets the plan version when the conversation changes", () => {
+		mlAssistant.syncConversation("a", true);
+		mlAssistant.setPlan([step("Research", "running")], 5);
+		mlAssistant.syncConversation("b", true);
+		mlAssistant.setPlan([step("Train", "running")], 1);
+		expect(mlAssistant.steps[0].label).toBe("Train");
+	});
+
 	it("ignores a status update for a step outside the plan", () => {
 		mlAssistant.setPlan([step("Research", "pending")]);
 		mlAssistant.setStepStatus(4, "done");

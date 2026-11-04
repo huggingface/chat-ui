@@ -24,7 +24,7 @@ account is required. Restores before startup and backs up every 30 seconds and o
 shutdown. An abrupt crash can lose updates since the last completed backup.
 Run one replica only; pause before deploying to avoid overlapping writers.
 Slack and Hugging Face tokens belong in Space secrets, never in this repository.
-See `docs/source/ml-intern/slack-bot.md`.
+See `integrations/slack/README.md`.
 
 ## Personal-account staging
 

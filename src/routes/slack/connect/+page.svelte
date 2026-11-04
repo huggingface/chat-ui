@@ -23,8 +23,8 @@
 	{:else if data.ticket}
 		<p>
 			Connect this account to Slack user {data.slackNames?.displayName} ({data.slackUser}) in
-			workspace {data.slackNames?.workspaceName} ({data.slackTeam}). Only continue if you requested
-			it yourself.
+			workspace {data.slackNames?.workspaceName} ({data.slackTeam}). Your Slack account belongs to
+			workspace {data.slackUserTeam}. Only continue if you requested it yourself.
 		</p>
 		<p>
 			New sessions you start will appear in your HuggingChat history and use your HF permissions and
@@ -34,8 +34,11 @@
 		<p>
 			Only you can issue requests in your personal Slack sessions. Your full HF permissions and
 			inference billing apply, not just the Jobs budget. Your private HuggingChat conversation is
-			accessible only to you unless you share it. Its contents are available read-only in the
-			browser. Continue the session and approve budgets in Slack.
+			accessible only to you unless you share it. The bot reads only your own messages and files in
+			a thread, never other participants’; paste in anything else it should see. Its public replies
+			and results are visible to everyone in the Slack channel, including external organizations in
+			Slack Connect. Its contents are available read-only in the browser. Continue the session and
+			approve budgets in Slack.
 		</p>
 		<p>
 			The connection uses your current HuggingChat login. If it expires or is revoked, reconnect
@@ -43,10 +46,12 @@
 		</p>
 		<form method="POST">
 			<input type="hidden" name="ticket" value={data.ticket} />
-			<label class="mb-4 flex items-start gap-2">
-				<input type="checkbox" name="useMcpServers" class="mt-1" checked={data.mcpSync} />
-				<span>Also use my enabled HuggingChat MCP servers in Slack. {mcpSyncNote}</span>
-			</label>
+			{#if data.mcpSyncAvailable}
+				<label class="mb-4 flex items-start gap-2">
+					<input type="checkbox" name="useMcpServers" class="mt-1" checked={data.mcpSync} />
+					<span>Also use my enabled HuggingChat MCP servers in Slack. {mcpSyncNote}</span>
+				</label>
+			{/if}
 			<button class="rounded bg-black px-4 py-2 text-white" type="submit"
 				>Connect Hugging Face</button
 			>
@@ -55,20 +60,27 @@
 		<p>
 			Your account is connected. Return to Slack and mention ML Intern again to start your request.
 		</p>
-		<form method="POST" class="space-y-2">
-			<input type="hidden" name="action" value="mcp" />
-			<input type="hidden" name="enabled" value={data.mcpSync ? "false" : "true"} />
+		{#if !data.mcpSyncAvailable}
 			<p>
-				{data.mcpSync
-					? "ML Intern uses your enabled HuggingChat MCP servers in your personal Slack sessions. Information returned by those tools may be posted in the Slack thread."
-					: `ML Intern uses only its built-in tools in Slack. You can let it use your enabled HuggingChat MCP servers too. ${mcpSyncNote}`}
+				ML Intern uses only its built-in tools in Slack. Using your HuggingChat MCP servers in Slack
+				is not enabled on this server.
 			</p>
-			<button class="rounded border px-4 py-2" type="submit"
-				>{data.mcpSync
-					? "Stop using my MCP servers in Slack"
-					: "Use my MCP servers in Slack"}</button
-			>
-		</form>
+		{:else}
+			<form method="POST" class="space-y-2">
+				<input type="hidden" name="action" value="mcp" />
+				<input type="hidden" name="enabled" value={data.mcpSync ? "false" : "true"} />
+				<p>
+					{data.mcpSync
+						? "ML Intern uses your enabled HuggingChat MCP servers in your personal Slack sessions. Information returned by those tools may be posted in the Slack thread."
+						: `ML Intern uses only its built-in tools in Slack. You can let it use your enabled HuggingChat MCP servers too. ${mcpSyncNote}`}
+				</p>
+				<button class="rounded border px-4 py-2" type="submit"
+					>{data.mcpSync
+						? "Stop using my MCP servers in Slack"
+						: "Use my MCP servers in Slack"}</button
+				>
+			</form>
+		{/if}
 		{#each data.connections as connection}
 			<p>
 				Slack user {connection.displayName} ({connection.slackUserId}) in workspace {connection.workspaceName}

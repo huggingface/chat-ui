@@ -1,6 +1,7 @@
 import { findUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { slackConfig } from "./config";
+import { slackInstalled } from "./installations";
 import type { SlackThread } from "./types";
 import { connectionKey, ConnectionError, chatOrigin } from "./links";
 export const linkedSessionId = (thread: SlackThread) => `slack-user:${thread._id}`;
@@ -10,14 +11,15 @@ export function parseLinkedSessionId(id?: string): string | undefined {
 /** Resolve the pinned owner, never the current contributor or the most recent browser session. */
 export async function connectedLocals(thread: SlackThread): Promise<App.Locals> {
 	const settings = slackConfig();
-	if (settings?.accountMode !== "user" || settings.teamId !== thread.teamId)
+	if (settings?.accountMode !== "user" || !(await slackInstalled(thread.teamId)))
 		throw new ConnectionError("This Slack account connection is disabled.");
 	const connection = await collections.slackConnections.findOne({
-		_id: connectionKey(thread.teamId, thread.owner),
+		_id: connectionKey(thread.teamId, thread.owner, thread.ownerTeamId),
 	});
 	if (
 		!thread.hfUserId ||
 		!connection?.verifiedSlackIdentity ||
+		(connection.userTeamId ?? connection.teamId) !== (thread.ownerTeamId ?? thread.teamId) ||
 		!connection.userId.equals(thread.hfUserId)
 	)
 		throw new ConnectionError(

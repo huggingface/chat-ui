@@ -188,10 +188,11 @@ describe("Slack owner's saved MCP selection", () => {
 		expect(restored.locals.user?._id).toEqual(user._id);
 		expect(await savedSlackSelection(park, restored.locals, false)).toBeUndefined();
 	});
-	it("refuses plaintext persistence without an encryption key", async () => {
+	it("hides the opt-in and refuses plaintext persistence without an encryption key", async () => {
 		mocks.key = "";
 		const userId = new ObjectId();
 		await setMcpSyncEnabled(userId, true);
+		expect(await collections.mcpSelections.findOne({ _id: userId })).toBeNull();
 		await expect(saveMcpSelection(userId, selection)).rejects.toThrow("ENCRYPTION_KEY");
 		expect(await loadMcpSelection(userId)).toEqual({ status: "none" });
 	});

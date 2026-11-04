@@ -23,6 +23,8 @@ export type GETModelsResponse = Array<{
 	unlisted: boolean;
 	hasInferenceAPI: boolean;
 	isRouter: boolean;
+	/** provider HuggingChat uses when the user has not picked one, only while the router lists it */
+	defaultProvider?: string;
 }>;
 
 export type GETModelResponse = GETModelsResponse[number] & {

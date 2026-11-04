@@ -440,7 +440,7 @@ export async function resumeAnsweredAsk({
 					promptedAt,
 					ip: "ask-resume",
 					username: locals.user?.username,
-					provider: requestProvider(model, conv, settings?.providerOverrides),
+					...requestProvider(model, conv, settings?.providerOverrides),
 					reasoningEffort: isMlAssistantConversation(conv)
 						? ML_ASSISTANT_EFFORT
 						: settings?.reasoningEffortOverrides?.[model.id],

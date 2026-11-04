@@ -11,6 +11,7 @@ import {
 } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
 import type { TurnStatus } from "$lib/types/TurnState";
+import { escapeThinkTags } from "$lib/utils/escapeThinkTags";
 
 export const stream = (token: string): MessageUpdate => ({ type: MessageUpdateType.Stream, token });
 
@@ -141,6 +142,11 @@ export function preamblesTrimmed(message: Message): Message {
 	};
 }
 
+export const LITERAL_TAGS = {
+	round: "Qwen3 skips thinking after <think></think>.",
+	final: "So close it with </think>.",
+};
+
 export const ARTIFACT = '<artifact identifier="page" type="html" title="Page"><p>hi</p></artifact>';
 
 const question = ([uuid]: string[]): MessageUpdate[] => [
@@ -235,6 +241,11 @@ export function convertingTurns(): Record<string, Message> {
 				text: "<think>Plan.</think>Let me check.<think>Again.</think>",
 				interrupted: true,
 			},
+		]),
+		// stored escaped, as the live loop writes reasoning that quotes the tags
+		"literal think tags in reasoning": assistantMessage([
+			...toolRound({ reasoning: escapeThinkTags(LITERAL_TAGS.round), text: "Checking." }),
+			...finalAnswer(escapeThinkTags(LITERAL_TAGS.final), "Done."),
 		]),
 		"artifact in a preamble": assistantMessage([
 			...toolRound({ reasoning: `Draft it: ${ARTIFACT}`, text: `Here it is. ${ARTIFACT}` }),

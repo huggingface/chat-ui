@@ -3,13 +3,15 @@ import { Issuer } from "openid-client";
 import { WebClient } from "@slack/web-api";
 import { z } from "zod";
 import { error, type RequestEvent } from "@sveltejs/kit";
-import { config } from "$lib/server/config";
 import { slackConfig } from "../config";
+import { viewerConfig } from "./settings";
 import { isWorkspaceMember } from "../context";
 import type { SlackThread } from "../types";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { base } from "$app/paths";
+
+export { viewerConfig };
 
 export const sessionCookie = "__Secure-ml-slack-identity-v2";
 export const flowCookie = "__Secure-ml-slack-login";
@@ -19,33 +21,6 @@ export const cookieOptions = {
 	secure: true,
 	sameSite: "lax" as const,
 };
-export function viewerConfig() {
-	const parsed = z
-		.object({
-			origin: z.string().url(),
-			clientId: z.string().min(1),
-			clientSecret: z.string().min(1),
-			secret: z.string().min(32),
-		})
-		.safeParse({
-			origin: config.SLACK_ML_VIEWER_ORIGIN,
-			clientId: config.SLACK_ML_VIEWER_CLIENT_ID,
-			clientSecret: config.SLACK_ML_VIEWER_CLIENT_SECRET,
-			secret: config.SLACK_ML_VIEWER_SESSION_SECRET,
-		});
-	if (!parsed.success) return;
-	const url = new URL(parsed.data.origin);
-	if (
-		url.protocol !== "https:" ||
-		url.username ||
-		url.password ||
-		url.pathname !== "/" ||
-		url.search ||
-		url.hash
-	)
-		return;
-	return { ...parsed.data, origin: url.origin };
-}
 export function viewerLink(id: string): string | undefined {
 	const settings = viewerConfig();
 	return settings ? `${settings.origin}${base}/slack/view/${id}` : undefined;
@@ -69,7 +44,7 @@ export function verify(value: string | undefined, secret: string): unknown {
 }
 export const identitySchema = z.object({
 	team: z.string().regex(/^T[A-Z0-9]+$/),
-	user: z.string().regex(/^U[A-Z0-9]+$/),
+	user: z.string().regex(/^[UW][A-Z0-9]+$/),
 	expires: z.number().gt(0),
 });
 export type ViewerIdentity = z.infer<typeof identitySchema>;

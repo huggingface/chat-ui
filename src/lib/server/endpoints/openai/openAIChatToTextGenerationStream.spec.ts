@@ -5,6 +5,7 @@ import {
 	openAIChatToTextGenerationSingle,
 	openAIChatToTextGenerationStream,
 } from "./openAIChatToTextGenerationStream";
+import { unescapeThinkTags } from "$lib/utils/escapeThinkTags";
 
 type Delta = {
 	content?: string;
@@ -97,5 +98,31 @@ describe("openAIChatToTextGenerationSingle reasoning", () => {
 		// Same rule as the streaming path above, so both produce the same stored
 		// shape for the same upstream response.
 		expect(await contentFrom({ content: "Answer.", reasoning: "  \n " })).toBe("Answer.");
+	});
+});
+
+describe("openAIChatToTextGenerationStream literal think tags in reasoning", () => {
+	it("keeps a literal tag split across reasoning deltas inside the block", async () => {
+		const text = await textFrom([
+			{ reasoning_content: "Qwen3 soft-switch: empty <thi" },
+			{ reasoning_content: "nk></think> disables thinking. <" },
+			{ content: "Answer." },
+		]);
+		expect(text.match(/<\/?think>/g)).toEqual(["<think>", "</think>"]);
+		expect(text.endsWith("</think>Answer.")).toBe(true);
+		expect(unescapeThinkTags(text)).toBe(
+			"<think>Qwen3 soft-switch: empty <think></think> disables thinking. <</think>Answer."
+		);
+	});
+
+	it("escapes literal tags in non-streaming reasoning", async () => {
+		const completion = {
+			choices: [{ message: { content: "A.", reasoning_content: "use <think></think>" } }],
+		} as unknown as OpenAI.Chat.Completions.ChatCompletion;
+		let text = "";
+		for await (const output of openAIChatToTextGenerationSingle(completion)) {
+			text += output.token.text;
+		}
+		expect(text.match(/<\/?think>/g)).toEqual(["<think>", "</think>"]);
 	});
 });

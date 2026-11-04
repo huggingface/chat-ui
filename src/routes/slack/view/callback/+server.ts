@@ -1,3 +1,4 @@
+import { readConnectionLink } from "$lib/server/slack/links";
 import { z } from "zod";
 import { error, redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
@@ -59,7 +60,12 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	} catch {
 		error(401, "Slack sign-in failed. Start again.");
 	}
-	if (team !== slack.teamId) error(403, "Sign in with the bot's Slack workspace.");
+	if (flow.data.connect) {
+		const ticket = await readConnectionLink(flow.data.connect);
+		if (!ticket) error(400, "Connection link expired. Mention the bot again.");
+		if (user !== ticket.slackUserId || team !== (ticket.userTeamId ?? ticket.teamId))
+			error(403, "Sign in with the Slack account that requested this connection.");
+	} else if (team !== slack.teamId) error(403, "Sign in with the bot's Slack workspace.");
 	cookies.set(sessionCookie, sign({ user, team, expires: Date.now() + 3600000 }, settings.secret), {
 		...cookieOptions,
 		maxAge: 3600,

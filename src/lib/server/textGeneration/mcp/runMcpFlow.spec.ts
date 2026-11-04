@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ObjectId } from "mongodb";
 import {
 	MessageToolUpdateType,
@@ -10,6 +10,7 @@ import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { RETRY_BACKOFF_MS } from "$lib/server/textGeneration/utils/upstreamRetry";
 import { APIConnectionError, BadRequestError } from "openai";
 import type { McpFlowResult, RunMcpFlowContext } from "./runMcpFlow";
+import { escapeThinkTags, unescapeThinkTags } from "$lib/utils/escapeThinkTags";
 
 // ---------------------------------------------------------------------------
 // Harness
@@ -57,6 +58,10 @@ const mocks = vi.hoisted(() => ({
 		(conversationId: unknown, messageId: string, afterToolUuid: string) => Promise<unknown>
 	>(async () => undefined),
 	prepareHistory: vi.fn(),
+	/** what the flow built its client with, its fetch included */
+	clientOptions: undefined as { fetch?: typeof fetch } | undefined,
+	/** the model Omni resolves to, when a test routes through it */
+	routedTarget: undefined as unknown,
 }));
 
 type HistoryOptionsArg = { attachments?: "budget" | "minimal" };
@@ -76,6 +81,9 @@ vi.mock("openai", async (importOriginal) => ({
 	...(await importOriginal<typeof import("openai")>()),
 	OpenAI: class {
 		chat = { completions: { create: mocks.create } };
+		constructor(options: { fetch?: typeof fetch }) {
+			mocks.clientOptions = options;
+		}
 	},
 }));
 
@@ -110,7 +118,7 @@ vi.mock("$lib/server/mcp/tools", () => ({
 vi.mock("./routerResolution", () => ({
 	resolveRouterTarget: async ({ model }: { model: unknown }) => ({
 		runMcp: true,
-		targetModel: model,
+		targetModel: mocks.routedTarget ?? model,
 	}),
 }));
 
@@ -693,6 +701,36 @@ describe("runMcpFlow in-loop reasoning echo", () => {
 		await runFlow();
 
 		expect(toolCallMessage(1)?.reasoning_content).toBe("I need the tool.");
+	});
+
+	it("escapes literal think tags everywhere but the echo", async () => {
+		const reasoning = "Qwen3 skips thinking after <think></think>, so <";
+		scriptRounds([
+			{
+				deltas: [
+					{ reasoning: "Qwen3 skips thinking after <thi" },
+					{ reasoning: "nk></think>, so <" },
+					{ content: "Checking." },
+					{
+						tool_calls: [
+							{ index: 0, id: "call_1", function: { name: "do_thing", arguments: "{}" } },
+						],
+					},
+				],
+				finishReason: "tool_calls",
+			},
+			{ content: "done" },
+		]);
+
+		const { updates } = await runFlow();
+
+		const streamed = streamedText(updates);
+		expect(streamed.match(/<\/?think>/g)).toEqual(["<think>", "</think>"]);
+		expect(unescapeThinkTags(streamed)).toContain(`<think>${reasoning}</think>Checking.`);
+		// stored like content, so the turn still converts to the rounds shape
+		const stored = mocks.executeToolCalls.mock.calls[0][0].roundReasoning;
+		expect(stored).toBe(escapeThinkTags(reasoning));
+		expect(toolCallMessage(1)?.reasoning_content).toBe(reasoning);
 	});
 
 	it("omits reasoning_content for a blocklisted model", async () => {
@@ -1675,5 +1713,77 @@ describe("attachments over the provider's limit", () => {
 		>);
 
 		expect(notices(updates)).toEqual([]);
+	});
+});
+
+describe("runMcpFlow under Omni", () => {
+	const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash-1017";
+	const omni = { id: "omni", name: "omni", isRouter: true, supportsTools: true, parameters: {} };
+	const hfConfig = config as unknown as { isHuggingChat: boolean };
+
+	beforeEach(() => {
+		hfConfig.isHuggingChat = true;
+		mocks.routedTarget = {
+			id: DEEPSEEK,
+			name: DEEPSEEK,
+			supportsTools: true,
+			parameters: { max_tokens: 49152 },
+			defaultProvider: "novita",
+			providerMaxTokens: { scaleway: 32768 },
+			providers: [{ provider: "novita" }, { provider: "scaleway" }],
+		};
+	});
+	afterEach(() => {
+		hfConfig.isHuggingChat = false;
+		mocks.routedTarget = undefined;
+		vi.unstubAllGlobals();
+	});
+
+	it("asks the routed model's default provider, with the model's own max_tokens", async () => {
+		scriptRounds([{ content: "ok" }]);
+		await runFlow({ model: omni } as never);
+		const body = mocks.create.mock.calls[0][0];
+		expect(body.model).toBe(`${DEEPSEEK}:novita`);
+		expect(body.max_tokens).toBe(49152);
+	});
+
+	it("routes around the default provider when it is down", async () => {
+		scriptRounds([{ content: "ok" }]);
+		await runFlow({ model: omni } as never);
+		const statuses = [503, 200];
+		const fetchMock = vi.fn(async () => new Response("{}", { status: statuses.shift() }));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await mocks.clientOptions?.fetch?.("https://router.test/v1/chat/completions", {
+			method: "POST",
+			body: JSON.stringify({ model: `${DEEPSEEK}:novita`, max_tokens: 49152 }),
+		});
+
+		const sent = fetchMock.mock.calls.map((call) =>
+			JSON.parse((call as unknown as [string, RequestInit])[1].body as string)
+		);
+		expect(sent).toEqual([
+			{ model: `${DEEPSEEK}:novita`, max_tokens: 49152 },
+			{ model: DEEPSEEK, max_tokens: 32768 },
+		]);
+	});
+
+	it("keeps a provider the user picked for the model they chose directly", async () => {
+		mocks.routedTarget = undefined;
+		scriptRounds([{ content: "ok" }]);
+		await runFlow({
+			model: { ...(omni as object), id: DEEPSEEK, name: DEEPSEEK, isRouter: false },
+			provider: "scaleway",
+		} as never);
+		const fetchMock = vi.fn(async () => new Response("{}", { status: 429 }));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await mocks.clientOptions?.fetch?.("https://router.test/v1/chat/completions", {
+			method: "POST",
+			body: JSON.stringify({ model: `${DEEPSEEK}:scaleway` }),
+		});
+
+		expect(mocks.create.mock.calls[0][0].model).toBe(`${DEEPSEEK}:scaleway`);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 });

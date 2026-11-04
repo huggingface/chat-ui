@@ -11,12 +11,10 @@ import { isValidUrl } from "$lib/server/urlSafety";
 import { getOpenAiToolsForMcp } from "$lib/server/mcp/tools";
 import type {
 	ChatCompletionChunk,
-	ChatCompletionCreateParamsStreaming,
 	ChatCompletionMessageParam,
 	ChatCompletionMessageToolCall,
 } from "openai/resources/chat/completions";
 import type { Stream } from "openai/streaming";
-import { buildToolPreprompt } from "../utils/toolPrompt";
 import { toToolCallId } from "../utils/toolCallId";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
@@ -40,8 +38,8 @@ import {
 } from "$lib/server/mcp/hf";
 import { buildImageRefResolver } from "./fileRefs";
 import { createVirtualFileExpander } from "$lib/server/mlFiles/expand";
+import { createThinkTagEscaper, unescapeThinkTags } from "$lib/utils/escapeThinkTags";
 import { mlVirtualFilesEnabled } from "$lib/server/mlFiles/enabled";
-import { prepareHistory } from "$lib/server/textGeneration/utils/prepareFiles";
 import {
 	AttachmentOverflowError,
 	budgetNotice,
@@ -53,11 +51,6 @@ import {
 	retryNotice,
 	type AttachmentMode,
 } from "$lib/server/textGeneration/utils/attachmentBudget";
-import {
-	createHistoryWindow,
-	historyCost,
-	windowLimitChars,
-} from "$lib/server/textGeneration/utils/historyWindow";
 import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWindowFlag";
 import { withHarnessEventOnLastTool } from "$lib/server/textGeneration/utils/harnessEvent";
 import { makeImageProcessor } from "$lib/server/endpoints/images";
@@ -83,8 +76,8 @@ import {
 import { createHubBillingRewrite } from "$lib/server/mcp/hubBilling";
 import { createJobLabelRewrite } from "$lib/server/mcp/jobLabels";
 import { loadSessionJobLabels } from "$lib/server/mlRegistry/sessionLabel";
-import { mlAssistantModelEntry } from "$lib/server/mlAssistantModels";
-import { createMlBudgetGuard, withRequiredDiscriminators } from "$lib/server/mlBudget/guard";
+import { routedProvider } from "$lib/server/requestProvider";
+import { createMlBudgetGuard } from "$lib/server/mlBudget/guard";
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
 import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
 import { PARENT_READER } from "$lib/types/MlSource";
@@ -93,7 +86,6 @@ import { markHarnessEventDelivered, pendingHarnessEvent } from "$lib/server/mlRe
 import { takeQueuedInputs } from "$lib/server/queuedInputs/deliver";
 import {
 	buildSessionStateBlock,
-	injectSessionState,
 	markSessionStateRead,
 	mlStateBlockEnabled,
 	type SessionStateBlock,
@@ -101,13 +93,17 @@ import {
 import { readMlBudget } from "$lib/server/mlBudget/budget";
 import { appendToLastToolMessage, budgetChangeNote } from "$lib/server/mlBudget/budgetNote";
 import { createRepeatedCallGuard } from "./repeatedCallGuard";
-import { withRepairedToolSchemas } from "$lib/server/mcp/schemaRepair";
 import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
 import { composeGuards } from "./toolGuard";
-import { ML_ASSISTANT_MIN_COMPLETION_TOKENS } from "$lib/constants/mlAssistant";
 import { withUpstreamRetry } from "../utils/upstreamRetry";
 import { getEnabledBuiltinTools, isNestedAgentTool, shouldSkipMcpFlow } from "../builtinTools";
-import { injectPlanState, PLAN_TOOL_NAME } from "../builtinTools/planTool";
+import {
+	assembleTools,
+	buildRequestPrompt,
+	completionRequestBase,
+	completionSettings,
+	mergePreprompt,
+} from "./requestPrompt";
 import { inferenceBillingHeaders } from "$lib/server/billing";
 
 export type RunMcpFlowContext = Pick<
@@ -118,6 +114,7 @@ export type RunMcpFlowContext = Pick<
 	| "forceMultimodal"
 	| "forceTools"
 	| "provider"
+	| "providerIsDefault"
 	| "reasoningEffort"
 	| "reasoningOverride"
 	| "locals"
@@ -183,6 +180,7 @@ export async function* runMcpFlow({
 	forceMultimodal,
 	forceTools,
 	provider,
+	providerIsDefault,
 	reasoningEffort,
 	reasoningOverride,
 	locals,
@@ -568,26 +566,20 @@ export async function* runMcpFlow({
 		const { tools: mcpTools, mapping } = await getOpenAiToolsForMcp(servers, {
 			signal: abortSignal,
 		});
-		// An MCP tool that collides with a builtin name is dropped: dispatch checks
-		// builtins first, so the MCP twin would be advertised but unreachable.
-		const builtinNames = new Set(builtinTools.map((tool) => tool.name));
-		const collisions = mcpTools.filter((tool) => builtinNames.has(tool.function.name));
+		const { oaTools, shapedMcpTools, collisions } = assembleTools({
+			builtinTools,
+			mcpTools,
+			mapping,
+			servers,
+			mlAssistant,
+			virtualFiles: expandVirtualFiles !== undefined,
+		});
 		if (collisions.length > 0) {
 			logger.warn(
 				{ dropped: collisions.map((tool) => tool.function.name) },
 				"[mcp] dropped MCP tools shadowed by builtin tools"
 			);
 		}
-		// In the mode, gated tools advertise their routing discriminator as
-		// required — the Hub's own schema doesn't, and calls without one can only
-		// bounce off the budget gate's fail-closed path.
-		const gatedMcpTools = mlAssistant ? withRequiredDiscriminators(mcpTools, mapping) : mcpTools;
-		// Applied to every conversation, mode or not: the Hub tools whose real
-		// interface is a grammar in prose misfire the same way whoever is calling
-		// them. See mcp/schemaRepair.ts for what the traces showed.
-		const shapedMcpTools = withRepairedToolSchemas(gatedMcpTools, mapping, servers, {
-			virtualFiles: expandVirtualFiles !== undefined,
-		});
 		// Cheapest first, and only the last link may book anything (see
 		// composeGuards): a repeat of a call that already failed the same way, then
 		// arguments that cannot satisfy the tool's own schema, then the budget.
@@ -601,10 +593,6 @@ export async function* runMcpFlow({
 			...(sourcesGuardFor ? [sourcesGuardFor(PARENT_READER)] : []),
 			...(budgetGuard ? [budgetGuard] : []),
 		].reduce(composeGuards);
-		const oaTools = [
-			...builtinTools.map((tool) => tool.definition),
-			...shapedMcpTools.filter((tool) => !builtinNames.has(tool.function.name)),
-		];
 		try {
 			logger.info(
 				{ toolCount: oaTools.length, toolNames: oaTools.map((t) => t.function.name) },
@@ -618,13 +606,20 @@ export async function* runMcpFlow({
 
 		const { OpenAI } = await import("openai");
 
+		// An Omni request arrives without a provider, so the routed model's default applies.
+		const requested = model.isRouter
+			? routedProvider(targetModel)
+			: { provider, providerIsDefault: providerIsDefault ?? false };
+
 		// Capture provider header (x-inference-provider) from the upstream OpenAI-compatible server.
 		let providerHeader: string | undefined;
 		const captureProviderFetch = async (
 			input: RequestInfo | URL,
 			init?: RequestInit
 		): Promise<Response> => {
-			const res = await fetchWithProviderFallback(input, init);
+			const res = await fetchWithProviderFallback(input, init, targetModel, {
+				defaultPin: requested.providerIsDefault,
+			});
 			const p = res.headers.get("x-inference-provider");
 			if (p && !providerHeader) providerHeader = p;
 			return res;
@@ -672,156 +667,64 @@ export async function* runMcpFlow({
 
 		// Hoisted above the message prep so the history budget can reserve the
 		// reply allowance this request will actually ask for.
-		const parameters = {
-			...targetModel.parameters,
-			...(mlAssistant ? mlAssistantModelEntry(targetModel.id || targetModel.name)?.parameters : {}),
-			...assistant?.generateSettings,
-		} as Record<string, unknown>;
-		const catalogMaxTokens =
-			(parameters?.max_tokens as number | undefined) ??
-			(parameters?.max_new_tokens as number | undefined) ??
-			(parameters?.max_completion_tokens as number | undefined);
-		const targetContextLength = (targetModel as unknown as { contextLength?: number })
-			.contextLength;
-		// The preset floors the reply allowance — see the constant for why. The
-		// floor never claims more than half the model's window: prompt plus reply
-		// must fit it, and a backend that enforces the sum would reject the very
-		// first request of a small-window model. A catalog value above the floor
-		// still wins. The research sub-agent inherits this through completionBase.
-		const clampedFloor = targetContextLength
-			? Math.min(ML_ASSISTANT_MIN_COMPLETION_TOKENS, Math.floor(targetContextLength / 2))
-			: ML_ASSISTANT_MIN_COMPLETION_TOKENS;
-		const maxTokens = mlAssistant
-			? Math.max(catalogMaxTokens ?? 0, clampedFloor)
-			: catalogMaxTokens;
+		const {
+			parameters,
+			maxTokens,
+			contextLength: targetContextLength,
+		} = completionSettings({
+			targetModel: targetModel as typeof targetModel & { contextLength?: number },
+			mlAssistant,
+			generateSettings: assistant?.generateSettings as Record<string, unknown> | undefined,
+		});
 
 		const userTimezone = (locals as unknown as { timezone?: string })?.timezone;
-		// In the mode the doctrine paragraphs are swapped, not appended to: the
-		// generic restraint rule tells the model not to reach for a tool unless it
-		// lacks a capability, and names writing code as a case to answer directly,
-		// which is the inverse of the preset's doctrine.
-		const toolPreprompt = buildToolPreprompt(oaTools, userTimezone, builtinTools, {
+		const mergedPreprompt = mergePreprompt({
+			oaTools,
+			builtinTools,
+			preprompt,
+			timezone: userTimezone,
 			mlAssistant,
 		});
-		const prepromptPieces: string[] = [];
-		if (toolPreprompt.trim().length > 0) {
-			prepromptPieces.push(toolPreprompt);
-		}
-		if (typeof preprompt === "string" && preprompt.trim().length > 0) {
-			prepromptPieces.push(preprompt);
-		}
-		const mergedPreprompt = prepromptPieces.join("\n\n");
 		const stateBlock = mlStateBlockEnabled(conv) ? await buildSessionStateBlock(conv) : undefined;
 		let unreadEnded: SessionStateBlock["ended"] = stateBlock?.ended ?? [];
 
 		// built again, attachments cut, when the provider refuses the request for its size
 		const readToolImage = makeToolImageReader(conv._id);
-		const buildPrompt = async (attachments: AttachmentMode) => {
-			const history = await prepareHistory(messages, imageProcessor, mmEnabled, {
-				replayToolHistory: true,
-				readToolImage,
-				attachReasoning: mayEchoReasoning,
-				// The model resolved for THIS turn. Under the "omni" router alias a
-				// prior turn in the same conversation can have been produced by a
-				// different model (per-message routing, no user action needed); this
-				// gates reasoning_content to only replay onto its own producer.
-				currentProducerModel: candidateModelId ?? targetModel.id ?? targetModel.name,
-				// The resolved target's window, not the router alias's: under "omni"
-				// the alias itself has none, and the candidate is what serves this
-				// request.
-				contextLengthTokens: targetContextLength,
-				maxOutputTokens: maxTokens,
-				slidingWindow: historyWindowEnabled(),
+		const buildPrompt = (attachments: AttachmentMode) =>
+			buildRequestPrompt({
+				messages,
 				attachments,
+				imageProcessor,
+				multimodal: mmEnabled,
+				readToolImage,
+				echoReasoning: mayEchoReasoning,
+				producerModel: candidateModelId ?? targetModel.id ?? targetModel.name,
+				contextLength: targetContextLength,
+				maxTokens,
+				slidingWindow: historyWindowEnabled(),
 				mlAssistant,
+				systemPrompt: mergedPreprompt,
+				oaTools,
+				builtinTools,
+				conv,
+				messageId,
+				turnContext,
+				stateBlock: stateBlock?.text,
 			});
-			let prompt: ChatCompletionMessageParam[] = history.messages;
-			const hasSystemMessage = prompt.length > 0 && prompt[0]?.role === "system";
-			if (hasSystemMessage) {
-				if (mergedPreprompt.length > 0) {
-					const existing = prompt[0].content ?? "";
-					const existingText = typeof existing === "string" ? existing : "";
-					prompt[0].content = mergedPreprompt + (existingText ? "\n\n" + existingText : "");
-				}
-			} else if (mergedPreprompt.length > 0) {
-				prompt = [{ role: "system", content: mergedPreprompt }, ...prompt];
-			}
-
-			const window =
-				history.units && targetContextLength
-					? createHistoryWindow({
-							conversationId: conv._id,
-							units: history.units,
-							offset: prompt.length - history.messages.length,
-							limitChars: windowLimitChars(targetContextLength, maxTokens),
-							fixedChars: historyCost(oaTools),
-							stored: conv.historyWindow,
-							liveMessageId: messageId,
-						})
-					: undefined;
-
-			// Tail-injected once per turn; within the turn, freshness travels in the tool
-			// results. Gated on the tool being offered so a stale plan can't tell the model
-			// to call a tool it doesn't have.
-			if (conv.plan && builtinTools.some((tool) => tool.name === PLAN_TOOL_NAME)) {
-				prompt = injectPlanState(prompt, conv.plan);
-			}
-			const tail = [turnContext, stateBlock?.text].filter((text): text is string => !!text);
-			if (tail.length > 0) {
-				prompt = injectSessionState(prompt, tail.join("\n\n"));
-			}
-
-			// Work around servers that reject `system` role
-			if (
-				typeof config.OPENAI_BASE_URL === "string" &&
-				config.OPENAI_BASE_URL.length > 0 &&
-				(config.OPENAI_BASE_URL.includes("hf.space") ||
-					config.OPENAI_BASE_URL.includes("gradio.app")) &&
-				prompt[0]?.role === "system"
-			) {
-				prompt[0] = { ...prompt[0], role: "user" };
-			}
-			return { prompt, window, attachments: history.attachments };
-		};
 		let built = await buildPrompt("budget");
 		let messagesOpenAI = built.prompt;
 		let historyWindow = built.window;
 		let attachmentsCut = false;
 		let pendingNotice = budgetNotice(built.attachments);
 
-		const stopSequences =
-			typeof parameters?.stop === "string"
-				? parameters.stop
-				: Array.isArray(parameters?.stop)
-					? (parameters.stop as string[])
-					: undefined;
-
-		// Build model ID with optional provider suffix (e.g., "model:fastest" or "model:together")
-		const baseModelId = targetModel.id ?? targetModel.name;
-		const modelIdWithProvider =
-			provider && provider !== "auto" ? `${baseModelId}:${provider}` : baseModelId;
-
-		const completionBase: Omit<ChatCompletionCreateParamsStreaming, "messages"> & {
-			reasoning_effort?: "low" | "medium" | "high";
-		} = {
-			model: modelIdWithProvider,
-			stream: true,
-			temperature: typeof parameters?.temperature === "number" ? parameters.temperature : undefined,
-			top_p: typeof parameters?.top_p === "number" ? parameters.top_p : undefined,
-			frequency_penalty:
-				typeof parameters?.frequency_penalty === "number"
-					? parameters.frequency_penalty
-					: typeof parameters?.repetition_penalty === "number"
-						? parameters.repetition_penalty
-						: undefined,
-			presence_penalty:
-				typeof parameters?.presence_penalty === "number" ? parameters.presence_penalty : undefined,
-			stop: stopSequences,
-			max_tokens: typeof maxTokens === "number" ? maxTokens : undefined,
+		const completionBase = completionRequestBase({
+			model: targetModel.id ?? targetModel.name,
+			provider: requested.provider,
+			parameters,
+			maxTokens,
 			tools: oaTools,
-			tool_choice: "auto",
-			...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
-		};
+			reasoningEffort,
+		});
 
 		// Sub-agent builtins run nested tool loops and need the request plumbing
 		// this turn resolved — client, sampling params, the listed MCP tools —
@@ -887,6 +790,7 @@ export async function* runMcpFlow({
 		// one). Held here and flushed once a non-blank delta opens the block, so
 		// the persisted trace stays byte-exact instead of silently dropping them.
 		let pendingReasoningWhitespace = "";
+		const reasoningEscaper = createThinkTagEscaper();
 		let truncatedToolCallRetries = 0;
 		let cutAnswerRetries = 0;
 		let leakedToolCallRetries = 0;
@@ -1084,6 +988,8 @@ export async function* runMcpFlow({
 				// Merge reasoning + content into a single combined token stream, mirroring
 				// the OpenAI adapter so the UI can auto-detect <think> blocks.
 				let combined = "";
+				// what closes the think block in this delta, the held reasoning tail included
+				let closer = "";
 				// Whitespace-only deltas still count once a think block is open
 				// (paragraph breaks are part of the byte-exact trace); non-blank
 				// text is only required to OPEN a block, so stray leading
@@ -1092,9 +998,10 @@ export async function* runMcpFlow({
 				// delta arrives and flushed into the opening of the block.
 				if (deltaReasoning.length > 0) {
 					if (thinkOpen) {
-						combined += deltaReasoning;
+						combined += reasoningEscaper.push(deltaReasoning);
 					} else if (deltaReasoning.trim().length > 0) {
-						combined += "<think>" + pendingReasoningWhitespace + deltaReasoning;
+						combined +=
+							"<think>" + pendingReasoningWhitespace + reasoningEscaper.push(deltaReasoning);
 						pendingReasoningWhitespace = "";
 						thinkOpen = true;
 					} else {
@@ -1104,7 +1011,8 @@ export async function* runMcpFlow({
 
 				if (deltaContent && deltaContent.length > 0) {
 					if (thinkOpen) {
-						combined += "</think>" + deltaContent;
+						closer = reasoningEscaper.flush() + "</think>";
+						combined += closer + deltaContent;
 						thinkOpen = false;
 					} else {
 						combined += deltaContent;
@@ -1124,7 +1032,7 @@ export async function* runMcpFlow({
 						// stopped the content stream. The client saw the opener, so it
 						// must see the closer too, or it renders that reasoning block as
 						// still streaming for the rest of the turn.
-						yield { type: MessageUpdateType.Stream, token: "</think>" };
+						yield { type: MessageUpdateType.Stream, token: closer };
 						clientThinkOpen = false;
 					}
 				}
@@ -1157,15 +1065,16 @@ export async function* runMcpFlow({
 			// regex matches `<think>` to end-of-string, so an unclosed block would
 			// hide everything that follows.
 			if (thinkOpen) {
+				const closer = reasoningEscaper.flush() + "</think>";
 				// Gate on what the client saw, not on streamedContent: a round can
 				// stream content early and open the think block only after tool-call
 				// deltas muted the stream — a bare closer then shows up as literal
 				// "</think>" text.
 				if (clientThinkOpen) {
-					yield { type: MessageUpdateType.Stream, token: "</think>" };
+					yield { type: MessageUpdateType.Stream, token: closer };
 					clientThinkOpen = false;
 				}
-				lastAssistantContent += "</think>";
+				lastAssistantContent += closer;
 				thinkOpen = false;
 			}
 
@@ -1272,8 +1181,9 @@ export async function* runMcpFlow({
 					// Gated by mayEchoReasoning — see where it is defined. Still
 					// persisted below regardless of the gate: recording what the model
 					// thought is inert, and only sending it can break a request.
+					// Persisted escaped like content, so only the echo is unescaped.
 					...(mayEchoReasoning && reasoningForToolMsg.trim().length > 0
-						? { reasoning_content: reasoningForToolMsg }
+						? { reasoning_content: unescapeThinkTags(reasoningForToolMsg) }
 						: {}),
 				};
 

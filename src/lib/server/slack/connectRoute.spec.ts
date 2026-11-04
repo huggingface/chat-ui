@@ -2,6 +2,19 @@ import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { collections, ready } from "$lib/server/database";
 import { createTestUser, cleanupTestData } from "$lib/server/api/__tests__/testHelpers";
 import { actions, load } from "../../../routes/slack/connect/+page.server";
+vi.mock("./config", () => ({
+	slackConfig: () => ({ teamId: "T123", botToken: "test", accountMode: "user" }),
+}));
+vi.mock("@slack/web-api", () => ({
+	WebClient: class {
+		auth = { test: async () => ({ team: "Workspace", team_id: "T123" }) };
+		users = {
+			info: async () => {
+				throw new Error("user_not_found");
+			},
+		};
+	},
+}));
 beforeEach(async () => {
 	await ready;
 });
@@ -72,5 +85,26 @@ it("preserves same-origin form submissions while hiding link tickets from other 
 	expect(setHeaders).toHaveBeenCalledWith({
 		"cache-control": "private, no-store",
 		"referrer-policy": "same-origin",
+	});
+});
+
+it("renders disconnect controls even when Slack cannot describe a stale connection", async () => {
+	const { user, locals, session } = await createTestUser();
+	await collections.slackConnections.insertOne({
+		_id: "T123:TREMOTE:UEXT",
+		teamId: "T123",
+		userTeamId: "TREMOTE",
+		slackUserId: "UEXT",
+		userId: user._id,
+		sessionId: session.sessionId,
+		updatedAt: new Date(),
+	});
+	const result = await load({
+		locals,
+		url: new URL("https://chat.example/slack/connect"),
+		setHeaders: vi.fn(),
+	} as unknown as Parameters<typeof load>[0]);
+	expect(result).toMatchObject({
+		connections: [{ _id: "T123:TREMOTE:UEXT", displayName: "UEXT", workspaceName: "T123" }],
 	});
 });

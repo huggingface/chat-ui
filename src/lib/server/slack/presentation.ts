@@ -1,8 +1,10 @@
 import {
 	MessageUpdateType,
+	MessageUpdateStatus,
 	MessageToolUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
+import { paymentErrorNotice } from "$lib/utils/paymentErrors";
 import { Lexer, type Token } from "marked";
 import type { types, ViewStateValue } from "@slack/bolt";
 import type {
@@ -72,8 +74,27 @@ export function visibleText(text: string): string {
 	return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
 }
 
-/** Render Markdown as Slack mrkdwn, without allowing model-authored Slack mentions. */
-export function slackMarkdown(text: string): string {
+/** One line for a failed run. Unknown errors stay generic: the thread may be shared. */
+export function runFailureText(updates: MessageUpdate[] = []): string {
+	const error = updates.findLast(
+		(update) =>
+			update.type === MessageUpdateType.Status && update.status === MessageUpdateStatus.Error
+	);
+	const status = error?.type === MessageUpdateType.Status ? error : undefined;
+	const reason =
+		status?.statusCode === 402
+			? (paymentErrorNotice(status.errorCode) ??
+				"Your Hugging Face account is out of inference credits. Add credits, then retry.")
+			: status?.statusCode === 401
+				? "Your Hugging Face login is no longer valid. Sign in to HuggingChat again, then mention me to reconnect."
+				: status?.statusCode === 429
+					? "Hugging Face rate-limited this request. Wait a minute, then retry."
+					: undefined;
+	return reason ? `The run failed. ${reason}` : "The run failed. You can resume it below.";
+}
+
+/** Render Markdown as Slack mrkdwn. Model-authored Slack mentions stay escaped unless the user is listed. */
+export function slackMarkdown(text: string, mentions: readonly string[] = []): string {
 	const escape = (value: string) =>
 		value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 	// Marked escapes inline text; decode its entities once before Slack escaping.
@@ -85,6 +106,10 @@ export function slackMarkdown(text: string): string {
 					({ "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" })[entity] ??
 					entity
 			)
+		);
+	const mention = (value: string) =>
+		value.replace(/&lt;@([A-Z0-9]+)&gt;/g, (raw, id: string) =>
+			mentions.includes(id) ? `<@${id}>` : raw
 		);
 	const render = (tokens: Token[] = []): string =>
 		tokens
@@ -147,7 +172,7 @@ export function slackMarkdown(text: string): string {
 					default:
 						return "tokens" in token && token.tokens
 							? render(token.tokens)
-							: inlineText("text" in token ? token.text : token.raw);
+							: mention(inlineText("text" in token ? token.text : token.raw));
 				}
 			})
 			.join("");
@@ -156,9 +181,10 @@ export function slackMarkdown(text: string): string {
 
 export function messageBlocks(
 	text: string,
-	actions: Array<{ id: string; label: string; value: string }> = []
+	actions: Array<{ id: string; label: string; value: string }> = [],
+	mentions: readonly string[] = []
 ): KnownBlock[] {
-	const formatted = slackMarkdown(text);
+	const formatted = slackMarkdown(text, mentions);
 	return [
 		{
 			type: "section",

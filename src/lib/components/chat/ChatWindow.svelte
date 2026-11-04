@@ -19,6 +19,7 @@
 	import IconFast from "$lib/components/icons/IconFast.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import { shownProvider } from "$lib/utils/shownProvider";
 	import CarbonDirectionRight from "~icons/carbon/direction-right-01";
 	import IconArrowUp from "~icons/lucide/arrow-up";
 	import IconMic from "~icons/lucide/mic";
@@ -577,10 +578,8 @@
 	);
 
 	// Get provider override for the current model (HuggingChat only)
-	let providerOverride = $derived($settings.providerOverrides?.[currentModel.id]);
-	let hasProviderOverride = $derived(
-		providerOverride && providerOverride !== "auto" && !currentModel.isRouter
-	);
+	let providerOverride = $derived(shownProvider(currentModel, $settings.providerOverrides));
+	let hasProviderOverride = $derived(providerOverride !== undefined);
 
 	// Always allow common text-like files; add images only when model is multimodal
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
@@ -774,10 +773,12 @@
 		};
 		untrack(() => {
 			const reset = mlAssistant.syncConversation(conversationId, Boolean(startedInMlMode));
-			// A reopened mode conversation renders mid-plan from the stored snapshot;
-			// a reset without one keeps the strip on its tool note.
-			if (reset && startedInMlMode && plan?.steps.length) {
-				mlAssistant.setPlan(planStepsToMlSteps(plan.steps));
+			// A reopened mode conversation renders mid-plan from the stored snapshot, and
+			// so does a reload: a turn started elsewhere (Slack, another tab) streams its
+			// plan to no one here, and the resubscribe starts past it. A snapshot without
+			// a plan keeps the strip on its tool note.
+			if (startedInMlMode && plan?.steps.length) {
+				mlAssistant.setPlan(planStepsToMlSteps(plan.steps), plan.version);
 			}
 			// Loaded state seeds the ledger; the stream's Budget updates take over
 			// from there. The empty-ledger condition covers adoption — the create
