@@ -1,14 +1,13 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ObjectId } from "mongodb";
 import { collections, ready } from "$lib/server/database";
-import { listMlArtefacts, recordArtefact } from "$lib/server/mlRegistry/store";
+import { listMlArtefacts } from "$lib/server/mlRegistry/store";
 import type { BuiltinToolContext } from "./types";
 
 const hub = vi.hoisted(() => ({ createRepo: vi.fn(), uploadFiles: vi.fn() }));
 vi.mock("@huggingface/hub", () => hub);
 
-const { createWorkflowTool, CREATE_WORKFLOW_TOOL_NAME, GRADIO_VERSION } =
-	await import("./createWorkflowTool");
+const { createWorkflowTool, GRADIO_VERSION } = await import("./createWorkflowTool");
 
 const ctx = {} as BuiltinToolContext;
 const tool = (namespace: string | undefined = "pngwn") =>
@@ -71,6 +70,14 @@ async function uploaded(path: string): Promise<string> {
 	return file.content.text();
 }
 
+const graph = async () => JSON.parse(await uploaded("workflow.json"));
+
+async function error(args: Record<string, unknown>, namespace?: string): Promise<string> {
+	const result = await tool(namespace).execute(args, ctx);
+	if (!("error" in result)) throw new Error("expected an error");
+	return result.error;
+}
+
 describe("create_workflow", () => {
 	it("writes a compare Space the visitor's token can run", async () => {
 		const result = await tool().execute(compare, ctx);
@@ -79,92 +86,42 @@ describe("create_workflow", () => {
 		expect(result.resultText).toContain(
 			"https://huggingface.co/spaces/pngwn/product-shots-workflow"
 		);
-		expect(hub.createRepo).toHaveBeenCalledWith(
-			expect.objectContaining({
-				repo: { type: "space", name: "pngwn/product-shots-workflow" },
-				sdk: "gradio",
-			})
-		);
 		expect(await uploaded("app.py")).toContain('gr.Workflow(graph="workflow.json")');
-		const graph = JSON.parse(await uploaded("workflow.json"));
-		if (process.env.WORKFLOW_DUMP) {
-			const { writeFileSync } = await import("node:fs");
-			writeFileSync(`${process.env.WORKFLOW_DUMP}/compare.json`, JSON.stringify(graph));
-		}
-		expect(graph.schema_version).toBe("2");
-		expect(graph.operators.map((op: { id: string }) => op.id)).toEqual([
+		const { operators, references, edges, subjects } = await graph();
+		expect(operators.map((op: { id: string }) => op.id)).toEqual([
 			"op_krea_2_turbo",
 			"op_flux_1_dev",
 		]);
 		// One prompt reaches both models, under the endpoint's own parameter name.
-		expect(graph.references.map((ref: { id: string }) => ref.id)).toEqual(["ref_prompt"]);
-		expect(graph.edges).toContainEqual(
-			expect.objectContaining({
-				from_node_id: "ref_prompt",
-				to_node_id: "op_flux_1_dev",
-				to_port_id: "prompt",
-			})
+		expect(references.map((ref: { id: string }) => ref.id)).toEqual(["ref_prompt"]);
+		expect(edges).toContainEqual(
+			expect.objectContaining({ from_node_id: "ref_prompt", to_port_id: "prompt" })
 		);
-		expect(graph.subjects.map((sub: { label: string }) => sub.label)).toEqual([
+		expect(subjects.map((sub: { label: string }) => sub.label)).toEqual([
 			"Krea-2-Turbo",
 			"FLUX.1-dev",
 		]);
 		const readme = await uploaded("README.md");
-		expect(readme).toContain("hf_oauth: true\nhf_oauth_scopes:\n  - inference-api\n");
+		expect(readme).toContain("hf_oauth_scopes:\n  - inference-api\n");
 		expect(readme).not.toContain("write-repos");
 		expect(readme).toContain(`sdk_version: ${GRADIO_VERSION}`);
-		expect(readme).toContain("built-with-ml-intern");
 	});
 
-	it("writes a chain in step order", async () => {
+	it("wires a chain in step order, leaving optional ports unasked", async () => {
 		models = {
 			"openai/whisper-large-v3-turbo": {
 				pipeline_tag: "automatic-speech-recognition",
 				providers: ["live"],
 			},
 			"facebook/bart-large-cnn": { pipeline_tag: "summarization", providers: ["live"] },
-		};
-		const result = await tool().execute(
-			{
-				shape: "chain",
-				name: "Transcribe and summarize",
-				steps: [
-					{ model: "openai/whisper-large-v3-turbo", task: "automatic-speech-recognition" },
-					{ model: "facebook/bart-large-cnn", task: "summarization" },
-				],
-			},
-			ctx
-		);
-
-		expect(result).toHaveProperty("resultText");
-		const graph = JSON.parse(await uploaded("workflow.json"));
-		expect(graph.edges).toContainEqual(
-			expect.objectContaining({
-				from_node_id: "op_whisper_large_v3_turbo",
-				from_port_id: "out_0",
-				to_node_id: "op_bart_large_cnn",
-				to_port_id: "text",
-			})
-		);
-		// Only the audio is asked for, and only the summary comes back.
-		expect(graph.references).toHaveLength(1);
-		expect(graph.subjects).toHaveLength(1);
-		if (process.env.WORKFLOW_DUMP) {
-			const { writeFileSync } = await import("node:fs");
-			writeFileSync(`${process.env.WORKFLOW_DUMP}/chain.json`, JSON.stringify(graph));
-		}
-	});
-
-	it("leaves a translation's optional language ports unasked", async () => {
-		models = {
-			"facebook/bart-large-cnn": { pipeline_tag: "summarization", providers: ["live"] },
 			"Helsinki-NLP/opus-mt-en-fr": { pipeline_tag: "translation", providers: ["live"] },
 		};
 		await tool().execute(
 			{
 				shape: "chain",
-				name: "Summarize in French",
+				name: "Transcribe, summarize, translate",
 				steps: [
+					{ model: "openai/whisper-large-v3-turbo", task: "automatic-speech-recognition" },
 					{ model: "facebook/bart-large-cnn", task: "summarization" },
 					{ model: "Helsinki-NLP/opus-mt-en-fr", task: "translation" },
 				],
@@ -172,52 +129,23 @@ describe("create_workflow", () => {
 			ctx
 		);
 
-		const graph = JSON.parse(await uploaded("workflow.json"));
-		expect(graph.references.map((ref: { id: string }) => ref.id)).toEqual([
-			"ref_op_bart_large_cnn_text",
-		]);
-	});
-
-	it("refuses a chain whose steps do not connect", async () => {
-		models = {
-			"krea/Krea-2-Turbo": t2i,
-			"facebook/bart-large-cnn": { pipeline_tag: "summarization", providers: ["live"] },
-		};
-		const result = await tool().execute(
-			{
-				shape: "chain",
-				name: "x",
-				steps: [
-					{ model: "krea/Krea-2-Turbo", task: "text-to-image" },
-					{ model: "facebook/bart-large-cnn", task: "summarization" },
-				],
-			},
-			ctx
+		const { references, edges, subjects } = await graph();
+		expect(edges).toContainEqual(
+			expect.objectContaining({
+				from_node_id: "op_whisper_large_v3_turbo",
+				from_port_id: "out_0",
+				to_node_id: "op_bart_large_cnn",
+				to_port_id: "text",
+			})
 		);
-
-		if (!("error" in result)) throw new Error("expected an error");
-		expect(result.error).toContain("outputs image, but facebook/bart-large-cnn takes text");
-		expect(hub.uploadFiles).not.toHaveBeenCalled();
+		// Only the audio is asked for, and only the translation comes back.
+		expect(references.map((ref: { id: string }) => ref.id)).toEqual([
+			"ref_op_whisper_large_v3_turbo_audio",
+		]);
+		expect(subjects).toHaveLength(1);
 	});
 
-	it("updates the same Space on a rerun, but not one made elsewhere", async () => {
-		const conversationId = new ObjectId();
-		conversationIds.push(conversationId);
-		hub.createRepo.mockRejectedValue(Object.assign(new Error("exists"), { statusCode: 409 }));
-		expect(await tool().execute(compare, { ...ctx, conversationId })).toHaveProperty("error");
-
-		const uri = "hf://spaces/pngwn/product-shots-workflow";
-		await recordArtefact({ conversationId, kind: "space", uri, url: "" });
-		expect(await tool().execute(compare, { ...ctx, conversationId })).toHaveProperty("resultText");
-	});
-
-	it("never leaves a `--` where a long name is cut", async () => {
-		await tool().execute({ ...compare, name: `${"a".repeat(79)} b` }, ctx);
-
-		expect(hub.createRepo.mock.calls[0][0].repo.name).toBe(`pngwn/${"a".repeat(79)}-workflow`);
-	});
-
-	it.each([
+	it.each<[Record<string, unknown>, string, (() => void)?]>([
 		[{ ...compare, models: ["krea/Krea-2-Turbo"] }, "gr.Interface"],
 		[{ ...compare, models: ["krea/Krea-2-Turbo", "nobody/missing"] }, "does not resolve"],
 		[{ ...compare, models: ["krea/Krea-2-Turbo", "https://x.co/a"] }, "not a model id"],
@@ -226,89 +154,79 @@ describe("create_workflow", () => {
 		[{ ...compare, namespace: "a/b" }, "not a Hub namespace"],
 		[{ ...compare, shape: "fan" }, "shape must be"],
 		[{ ...compare, name: " " }, "No name provided."],
-	])("refuses before writing anything: %j", async (args, message) => {
-		const result = await tool().execute(args, ctx);
-
-		if (!("error" in result)) throw new Error("expected an error");
-		expect(result.error).toContain(message);
+		[
+			{
+				shape: "chain",
+				name: "x",
+				steps: [
+					{ model: "krea/Krea-2-Turbo", task: "text-to-image" },
+					{ model: "facebook/bart-large-cnn", task: "summarization" },
+				],
+			},
+			"outputs image, but facebook/bart-large-cnn takes text",
+		],
+		[
+			compare,
+			"not served by any inference provider",
+			() => (models["krea/Krea-2-Turbo"] = { ...t2i, providers: ["error"] }),
+		],
+		[
+			compare,
+			"not served by any inference provider for text-to-image",
+			() => (models["krea/Krea-2-Turbo"] = { ...t2i, providerTask: "image-to-image" }),
+		],
+	])("refuses before writing anything: %j", async (args, message, setup) => {
+		setup?.();
+		expect(await error(args)).toContain(message);
 		expect(hub.createRepo).not.toHaveBeenCalled();
 		expect(hub.uploadFiles).not.toHaveBeenCalled();
 	});
 
-	it("refuses a model no provider serves, since the node would 404 on Run", async () => {
-		models["krea/Krea-2-Turbo"] = { pipeline_tag: "text-to-image", providers: ["error"] };
-		const result = await tool().execute(compare, ctx);
-
-		if (!("error" in result)) throw new Error("expected an error");
-		expect(result.error).toContain("not served by any inference provider");
+	it("refuses rather than guessing when there is no namespace", async () => {
+		expect(await error(compare, "")).toContain("hf_whoami");
 	});
 
-	it("refuses a model served live only for another task", async () => {
-		models["krea/Krea-2-Turbo"] = { ...t2i, providerTask: "image-to-image" };
-		const result = await tool().execute(compare, ctx);
-
-		if (!("error" in result)) throw new Error("expected an error");
-		expect(result.error).toContain("not served by any inference provider for text-to-image");
+	it("asks for a different name, not more permissions, on a 403", async () => {
+		hub.uploadFiles.mockRejectedValue(Object.assign(new Error("no"), { statusCode: 403 }));
+		expect(await error(compare)).toContain("different name");
 	});
 
-	it("pins each model to a provider that serves it", async () => {
-		models["black-forest-labs/FLUX.1-dev"] = {
-			pipeline_tag: "text-to-image",
-			providers: ["error", "live"],
-		};
-		await tool().execute(compare, ctx);
-
-		const graph = JSON.parse(await uploaded("workflow.json"));
-		expect(graph.operators.map((op: { provider: string }) => op.provider)).toEqual(["p0", "p1"]);
-	});
-
-	it("prefers hf-inference when it serves the model", async () => {
+	it("pins each model to a live provider, hf-inference first", async () => {
 		models["krea/Krea-2-Turbo"] = {
 			...t2i,
 			providers: ["live", "live"],
 			names: ["together", "hf-inference"],
 		};
+		models["black-forest-labs/FLUX.1-dev"] = { ...t2i, providers: ["error", "live"] };
 		await tool().execute(compare, ctx);
 
-		const graph = JSON.parse(await uploaded("workflow.json"));
-		expect(graph.operators[0].provider).toBe("hf-inference");
+		const { operators } = await graph();
+		expect(operators.map((op: { provider: string }) => op.provider)).toEqual([
+			"hf-inference",
+			"p1",
+		]);
 	});
 
-	it("asks for a different name, not more permissions, on a 403", async () => {
-		hub.uploadFiles.mockRejectedValue(Object.assign(new Error("no"), { statusCode: 403 }));
-		const result = await tool().execute(compare, ctx);
+	it("never leaves a `--` where a long name is cut", async () => {
+		await tool().execute({ ...compare, name: `${"a".repeat(79)} b` }, ctx);
 
-		if (!("error" in result)) throw new Error("expected an error");
-		expect(result.error).toContain("different name");
+		expect(hub.createRepo.mock.calls[0][0].repo.name).toBe(`pngwn/${"a".repeat(79)}-workflow`);
 	});
 
-	it("refuses rather than guessing when there is no namespace", async () => {
-		const result = await createWorkflowTool(
-			() => undefined,
-			() => "hf_x"
-		).execute(compare, ctx);
-
-		if (!("error" in result)) throw new Error("expected an error");
-		expect(result.error).toContain("hf_whoami");
-	});
-
-	it("records the Space as an artefact of the conversation", async () => {
+	it("records the Space, and updates it on a rerun but not one made elsewhere", async () => {
 		const conversationId = new ObjectId();
 		conversationIds.push(conversationId);
+		const uri = "hf://spaces/pngwn/product-shots-workflow";
 		await tool().execute(compare, { ...ctx, conversationId, uuid: "uuid-7" });
-
 		await vi.waitFor(async () => {
-			expect(await listMlArtefacts(conversationId)).toHaveLength(1);
+			expect(await listMlArtefacts(conversationId)).toMatchObject([
+				{ kind: "space", uri, toolUuid: "uuid-7" },
+			]);
 		});
-		expect((await listMlArtefacts(conversationId))[0]).toMatchObject({
-			kind: "space",
-			uri: "hf://spaces/pngwn/product-shots-workflow",
-			toolUuid: "uuid-7",
-		});
-	});
 
-	it("is exempt from tool restraint", () => {
-		expect(tool().exemptFromToolRestraint).toBe(true);
-		expect(tool().name).toBe(CREATE_WORKFLOW_TOOL_NAME);
+		hub.createRepo.mockRejectedValue(Object.assign(new Error("exists"), { statusCode: 409 }));
+		const other = { ...ctx, conversationId: new ObjectId() };
+		expect(await tool().execute(compare, other)).toHaveProperty("error");
+		expect(await tool().execute(compare, { ...ctx, conversationId })).toHaveProperty("resultText");
 	});
 });

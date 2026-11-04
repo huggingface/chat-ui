@@ -154,8 +154,8 @@ export function createWorkflowTool(
 					uri: `hf://spaces/${plan.spaceId}`,
 					url,
 					toolUuid: ctx.uuid,
-					...(ctx.messageId ? { messageId: ctx.messageId } : {}),
-					...(ctx.generationId ? { generationId: ctx.generationId } : {}),
+					messageId: ctx.messageId,
+					generationId: ctx.generationId,
 				}).catch((err) => {
 					logger.error(
 						{ err: String(err), spaceId: plan.spaceId },
@@ -558,13 +558,7 @@ A [gr.Workflow](https://www.gradio.app/guides/workflows): sign in and press Run 
 `;
 }
 
-function statusCodeOf(err: unknown): number | undefined {
-	if (err && typeof err === "object" && "statusCode" in err) {
-		const code = (err as { statusCode?: unknown }).statusCode;
-		return typeof code === "number" ? code : undefined;
-	}
-	return undefined;
-}
+const statusCodeOf = (err: unknown) => (err as { statusCode?: number } | null)?.statusCode;
 
 function hubError(action: string, spaceId: string, err: unknown): string {
 	const status = statusCodeOf(err);
