@@ -61,6 +61,14 @@ describe("pairedCases", () => {
 });
 
 describe("compareArms", () => {
+	it("counts a crashed run as a failed one", () => {
+		const a = arm("a", [run("t1", 0, 0, true)]);
+		const b = arm("b", [{ name: "t1", repeat: 0, passed: false }]);
+		expect(pairedCases(a, b, measure("passed"))).toEqual([
+			{ conversationId: "t1", a: [true], b: [false] },
+		]);
+	});
+
 	it("finds no direction between identical arms", () => {
 		const runs = tasks.flatMap((t) => [
 			run(t, 0, 2, true),

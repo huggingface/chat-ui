@@ -102,7 +102,7 @@ export const MEASURES: Measure[] = [
 		label: "every check passed",
 		better: "higher",
 		headline: false,
-		value: (r) => (r.outcome ? r.passed === true : undefined),
+		value: (r) => r.passed === true,
 	},
 	{
 		key: "minutes",
