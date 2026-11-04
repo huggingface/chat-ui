@@ -1,6 +1,6 @@
 """Upload an ML Intern eval run (result.json from run.ts) to a Trackio Space.
 
-One Trackio run per eval run, one step per scenario. Each step logs the full
+One Trackio run per eval run, one step per task run (a task and its repeat). Each step logs the full
 agent trace (messages + one span per tool call, viewable in the dashboard's
 Traces tab) plus the scalars the checks graded.
 
@@ -36,12 +36,15 @@ def main() -> None:
         config={"scenarios": [s["name"] for s in result["scenarios"]]},
     )
     for step, scenario in enumerate(result["scenarios"]):
-        name = scenario["name"]
+        name = f'{scenario["name"]}/r{scenario.get("repeat", 0)}'
         metrics = {f"{name}/passed": int(bool(scenario.get("passed")))}
         outcome = scenario.get("outcome") or {}
         for key in ("costUsd", "durationSec", "trackioAccuracy", "reportedAccuracy"):
             if isinstance(outcome.get(key), (int, float)):
                 metrics[f"{name}/{key}"] = outcome[key]
+        for key, value in (outcome.get("metrics") or {}).items():
+            if isinstance(value, (int, float)):
+                metrics[f"{name}/{key}"] = value
         trace = scenario.get("trace")
         if trace:
             metrics[f"{name}/trace"] = trackio.Trace(

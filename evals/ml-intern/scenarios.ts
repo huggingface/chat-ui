@@ -1,8 +1,6 @@
 /**
- * ML Intern eval scenarios. Each one is a prompt run end to end against the real
- * app, a real model and real HF Jobs, then graded on what actually happened.
- *
- * Keep scenarios cheap and short: every PR runs all of them.
+ * ml intern outcome eval tasks, every one but the control a trap the obvious first attempt falls into
+ * calibrate a new trap before relying on it, see README.md
  */
 
 export interface ScenarioModel {
@@ -10,6 +8,35 @@ export interface ScenarioModel {
 	id: string;
 	/** Inference provider, pinned so a run does not drift between providers. */
 	provider: string;
+}
+
+/** what the user should be able to open when the run ends */
+export type ArtifactKind = "model" | "tokenizer" | "space" | "trackio";
+
+/** the production measures from evals/metrics/metrics.py */
+export interface ConversationMetrics {
+	jobs: number;
+	gpu_jobs: number;
+	failed: number;
+	completed: number;
+	longest_failed_streak: number;
+	failed_before_first_success: number;
+	jobs_to_first_success: number | "";
+	sandbox_creates: number;
+	gpu_sandbox_creates: number;
+	sandbox_before_first_gpu_job: number | "";
+	sandbox_on_flavor_before_first_gpu_job: number | "";
+	after_failure_sandbox: number;
+	after_failure_resubmit: number;
+	after_failure_stopped: number;
+	sandbox_first_refusals: number;
+	minutes_to_first_artifact: number | "";
+}
+
+/** what hidden_checks.py printed, always pass plus the numbers it measured */
+export interface HiddenResult {
+	pass: boolean;
+	[key: string]: unknown;
 }
 
 /** What the runner measured, handed to each check. */
@@ -26,6 +53,12 @@ export interface ScenarioOutcome {
 	trackioAccuracy?: number;
 	/** Accuracy parsed from the final answer, normalized to 0-1. */
 	reportedAccuracy?: number;
+	/** minutes from the prompt until each required artifact was usable, null if never */
+	artifactMinutes: Partial<Record<ArtifactKind, number | null>>;
+	/** the agent stopped for the user before any GPU job */
+	askedFirst: boolean;
+	hidden?: HiddenResult;
+	metrics?: ConversationMetrics;
 	finalAnswer: string;
 	toolCalls: string[];
 	turnStatus: string;
@@ -40,6 +73,7 @@ export interface Check {
 
 export interface Scenario {
 	name: string;
+	/** {repo} and {space} become names unique to the run in the token user namespace */
 	prompt: string;
 	model: ScenarioModel;
 	/** Budget the conversation starts with. Hard cap: the guard refuses jobs past it. */
@@ -55,10 +89,28 @@ export interface Scenario {
 	answers?: Array<{ question: RegExp; choose: RegExp }>;
 	/** Sent once if the turn ends without launching anything (e.g. it asked in prose). */
 	nudge?: string;
+	artifacts: ArtifactKind[];
+	/** hidden_checks.py arguments with the prompt placeholders, run as a cpu job once the turn ends */
+	hidden?: string[];
 	checks: (outcome: ScenarioOutcome) => Check[];
 }
 
-const GLM_FLASH: ScenarioModel = { id: "zai-org/GLM-5.3-Flash", provider: "together" };
+const GLM_FLASH: ScenarioModel = { id: "zai-org/GLM-5.3-Flash", provider: "novita" };
+const GO_AHEAD = "Use your best judgment for anything unspecified and go ahead.";
+
+const usd = (value: number) => `$${value.toFixed(3)}`;
+
+const costUnder = (o: ScenarioOutcome, cap: number): Check => ({
+	name: `cost < $${cap}`,
+	pass: o.costUsd < cap,
+	actual: usd(o.costUsd),
+});
+
+const hiddenPassed = (o: ScenarioOutcome, name: string, actual: (h: HiddenResult) => string) => ({
+	name,
+	pass: o.hidden?.pass === true,
+	actual: o.hidden ? actual(o.hidden) : "not run",
+});
 
 export const SCENARIOS: Scenario[] = [
 	{
@@ -66,26 +118,17 @@ export const SCENARIOS: Scenario[] = [
 		prompt: "train an mnist model from scratch for 1 minute and report the final score",
 		model: GLM_FLASH,
 		budgetUsd: 2,
-		timeoutMinutes: 15,
+		timeoutMinutes: 20,
 		answers: [
 			{ question: /hardware|gpu|cpu|flavor|instance/i, choose: /cpu|t4|small|cheap/i },
 			{ question: /dashboard|track|log/i, choose: /trackio|yes/i },
 		],
-		nudge: "Use your best judgment for anything unspecified and go ahead.",
+		nudge: GO_AHEAD,
+		artifacts: ["trackio"],
 		checks: (o) => {
 			const accuracy = o.trackioAccuracy ?? o.reportedAccuracy;
 			return [
-				{ name: "cost < $1", pass: o.costUsd < 1, actual: `$${o.costUsd.toFixed(3)}` },
-				{
-					name: "time < 5 min",
-					pass: o.durationSec < 300,
-					actual: `${(o.durationSec / 60).toFixed(1)} min`,
-				},
-				{
-					name: "Trackio dashboard created",
-					pass: o.trackioSpaceExists,
-					actual: o.trackioSpaces.join(", ") || "none",
-				},
+				costUnder(o, 1),
 				{
 					name: "final accuracy > 0.8",
 					pass: accuracy !== undefined && accuracy > 0.8,
@@ -96,5 +139,139 @@ export const SCENARIOS: Scenario[] = [
 				},
 			];
 		},
+	},
+	{
+		// 2.03B parameters, bf16 weights and gradients plus fp32 AdamW state fill the 24 GB A10G
+		name: "full-finetune-oom",
+		prompt:
+			"Fine-tune Qwen/Qwen3-1.7B on trl-lib/Capybara for 300 steps on an a10g-small with a sequence length of 2048, and push the result to {repo}.",
+		model: GLM_FLASH,
+		budgetUsd: 5,
+		timeoutMinutes: 90,
+		answers: [{ question: /hardware|gpu|flavor|instance/i, choose: /a10g-small/i }],
+		nudge: GO_AHEAD,
+		artifacts: ["model"],
+		hidden: ["generates", "{repo}"],
+		checks: (o) => [
+			costUnder(o, 5),
+			hiddenPassed(o, "pushed model generates", (h) => String(h.sample ?? h.error ?? "")),
+		],
+	},
+	{
+		// trl 1 and transformers 5 dropped max_seq_length, evaluation_strategy and the Trainer tokenizer argument
+		name: "stale-trainer-args",
+		prompt:
+			"Fine-tune Qwen/Qwen3-0.6B with SFT on trl-lib/Capybara for 200 steps at a max sequence length of 1024, evaluating every 50 steps, on an l4x1. Report the final eval loss and push the model to {repo}.",
+		model: GLM_FLASH,
+		budgetUsd: 5,
+		timeoutMinutes: 75,
+		answers: [{ question: /hardware|gpu|flavor|instance/i, choose: /l4/i }],
+		nudge: GO_AHEAD,
+		artifacts: ["model"],
+		hidden: ["generates", "{repo}"],
+		checks: (o) => [
+			costUnder(o, 5),
+			hiddenPassed(o, "pushed model generates", (h) => String(h.sample ?? h.error ?? "")),
+		],
+	},
+	{
+		// the en config is hundreds of GB unless streamed, and none of it needs a GPU
+		name: "c4-tokenizer",
+		prompt:
+			"Train a byte-level BPE tokenizer with a 32,000-token vocabulary on 1 million English documents from allenai/c4, and push it to {repo}.",
+		model: GLM_FLASH,
+		budgetUsd: 2,
+		timeoutMinutes: 60,
+		answers: [{ question: /hardware|gpu|cpu|flavor|instance/i, choose: /cpu/i }],
+		nudge: GO_AHEAD,
+		artifacts: ["tokenizer"],
+		hidden: ["tokenizer", "{repo}", "32000"],
+		checks: (o) => [
+			costUnder(o, 1),
+			{
+				name: "no GPU used",
+				pass: (o.metrics?.gpu_jobs ?? 0) === 0 && (o.metrics?.gpu_sandbox_creates ?? 0) === 0,
+				actual: `${o.metrics?.gpu_jobs ?? "?"} GPU jobs, ${o.metrics?.gpu_sandbox_creates ?? "?"} GPU sandboxes`,
+			},
+			hiddenPassed(o, "tokenizer loads, 32k vocab, round-trips", (h) =>
+				h.vocab === undefined
+					? String(h.error ?? "")
+					: `vocab ${h.vocab}, round-trip ${h.roundTrip}`
+			),
+		],
+	},
+	{
+		// whole papers, far past a 512-token encoder, and the prompt never says how long inputs are
+		name: "arxiv-long-docs",
+		prompt:
+			"Train a model that predicts a paper's arXiv subject from its full text, using ccdv/arxiv-classification, and push it to {repo}.",
+		model: GLM_FLASH,
+		budgetUsd: 5,
+		timeoutMinutes: 90,
+		answers: [
+			{ question: /length|long|token|truncat|context/i, choose: /full|whole|entire|long/i },
+			{ question: /hardware|gpu|flavor|instance/i, choose: /a10g|l4/i },
+		],
+		nudge: GO_AHEAD,
+		artifacts: ["model"],
+		hidden: ["classifier", "{repo}", "ccdv/arxiv-classification", "test", "100"],
+		checks: (o) => [
+			costUnder(o, 5),
+			hiddenPassed(o, "test accuracy >= 0.5 on held-out papers", (h) =>
+				h.accuracy === undefined
+					? String(h.error ?? "")
+					: `${Number(h.accuracy).toFixed(3)}${o.reportedAccuracy === undefined ? "" : ` (reported ${o.reportedAccuracy.toFixed(3)})`}`
+			),
+		],
+	},
+	{
+		name: "imdb-three-artifacts",
+		prompt:
+			"Train a sentiment classifier on stanfordnlp/imdb, log the training to a Trackio dashboard, push the model to {repo}, and make a Gradio Space at {space} where I can try it.",
+		model: GLM_FLASH,
+		budgetUsd: 5,
+		timeoutMinutes: 75,
+		answers: [{ question: /hardware|gpu|flavor|instance/i, choose: /t4|l4|a10g-small|small/i }],
+		nudge: GO_AHEAD,
+		artifacts: ["model", "trackio", "space"],
+		hidden: ["space-sentiment", "{space}", "10"],
+		checks: (o) => [
+			costUnder(o, 5),
+			{
+				name: "all three artifacts exist",
+				pass: (["model", "trackio", "space"] as const).every((k) => o.artifactMinutes[k] != null),
+				actual: Object.entries(o.artifactMinutes)
+					.map(([k, v]) => `${k} ${v == null ? "missing" : `${v} min`}`)
+					.join(", "),
+			},
+			hiddenPassed(o, "Space labels 8 of 10 held-out reviews", (h) =>
+				h.correct === undefined ? String(h.error ?? "") : `${h.correct}/${h.total}`
+			),
+		],
+	},
+	{
+		// about 4.2e19 FLOPs or 5 days on one A100 against a 3 dollar budget
+		name: "pretrain-too-big",
+		prompt:
+			"Pretrain a 350M-parameter GPT-style language model from scratch on 20B tokens of HuggingFaceFW/fineweb-edu.",
+		model: GLM_FLASH,
+		budgetUsd: 3,
+		timeoutMinutes: 40,
+		answers: [
+			{
+				question: /hardware|gpu|flavor|budget|time|scale|size/i,
+				choose: /small|cheap|scale|less|fewer/i,
+			},
+		],
+		nudge: GO_AHEAD,
+		artifacts: [],
+		checks: (o) => [
+			costUnder(o, 3),
+			{
+				name: "asked before any GPU job",
+				pass: o.askedFirst,
+				actual: o.askedFirst ? "asked" : "launched first",
+			},
+		],
 	},
 ];

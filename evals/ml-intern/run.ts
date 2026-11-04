@@ -1,42 +1,50 @@
 /**
- * End-to-end ML Intern eval: real app, real model, real HF Jobs.
+ * ml intern outcome eval, see README.md
  *
- * For each scenario in ./scenarios.ts the runner creates an ML Intern
- * conversation, sends the prompt, answers any ask_user_question the agent
- * raises, waits for the turn to end, then grades what actually happened:
- * cost from the Jobs API, wall time, whether the Trackio Space exists, and
- * the accuracy logged to it.
+ * env
+ *   HF_TOKEN               required, its account pays for the jobs
+ *   OPENAI_API_KEY         inference key for OPENAI_BASE_URL, defaults to HF_TOKEN
+ *   OPENAI_BASE_URL        defaults to the hf router
+ *   ML_EVAL_SCENARIO       comma separated task names, default all
+ *   ML_EVAL_REPEATS        runs per task, default 1
+ *   ML_EVAL_OUT            output directory, default eval-output/ml-intern/<timestamp>
+ *   ML_EVAL_PORT           app port, default 5210, so two arms can run side by side
+ *   ML_EVAL_SKIP_BUILD     1 reuses ./build, which must be built with ML_ASSISTANT_MODE true
+ *   ML_EVAL_BUILD_ONLY     1 builds the app with the eval env and exits
+ *   ML_EVAL_TRACES_SPACE   trackio space for the traces, a bare name goes under the token user
+ *   ML_EVAL_RUN_NAME       trackio run name, defaults to a timestamp
  *
- * It owns the whole stack so it runs the same locally and in CI: an in-memory
- * Mongo, a user + session seeded from HF_TOKEN (no browser login), and a
- * production build of the app served by `node server.js` with the ML Intern
- * env set explicitly, so nothing in .env.local leaks in.
- *
- * Run:
- *   HF_TOKEN=hf_... npm run eval:ml-intern
- *
- * Env:
- *   HF_TOKEN               required. Runs the jobs, so it needs job permissions and billing.
- *   OPENAI_API_KEY         inference key for OPENAI_BASE_URL (defaults to HF_TOKEN).
- *   OPENAI_BASE_URL        defaults to the HF router.
- *   ML_EVAL_SCENARIO       run only the scenario with this name.
- *   ML_EVAL_SKIP_BUILD=1   reuse ./build (it must have been built with ML_ASSISTANT_MODE=true).
- *   ML_EVAL_TRACES_SPACE   when set, uploads the traces to this Trackio Space (see log_traces.py).
- *                          A bare name goes under the HF_TOKEN user's namespace.
- *   ML_EVAL_RUN_NAME       Trackio run name for the upload (defaults to a timestamp).
- *
- * Writes eval-output/ml-intern/<timestamp>/{result.json,server.log} and exits 1
- * if any check fails.
+ * a failed check is a result, it exits 0 once result.json is written
  */
 import { spawn, execFile, type ChildProcess } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { appendFileSync, createWriteStream, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, createWriteStream, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { MongoClient, ObjectId } from "mongodb";
+import { gzipSync } from "node:zlib";
+import yaml from "js-yaml";
+import { BSON, MongoClient, ObjectId } from "mongodb";
 import superjson from "superjson";
-import { SCENARIOS, type Check, type Scenario, type ScenarioOutcome } from "./scenarios.ts";
+import {
+	artifactReady,
+	artifactRepo,
+	askedFirst,
+	fill,
+	parseHiddenResult,
+	runNames,
+	type RepoInfo,
+	type RunNames,
+} from "./outcome.ts";
+import {
+	SCENARIOS,
+	type ArtifactKind,
+	type Check,
+	type ConversationMetrics,
+	type HiddenResult,
+	type Scenario,
+	type ScenarioOutcome,
+} from "./scenarios.ts";
 
 const execFileAsync = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -50,6 +58,10 @@ const APP_URL = `http://127.0.0.1:${PORT}`;
 const COOKIE_NAME = "hf-chat";
 const DB_NAME = "chat-ui-ml-eval";
 const HUB = "https://huggingface.co";
+const ARTIFACT_POLL_MS = 60_000;
+/** cluster auth and database settings the eval sets itself */
+const SKIPPED_PROD_ENV =
+	/^(MONGODB_|APP_BASE$|PUBLIC_ORIGIN$|COOKIE_|OPENID_|ADDRESS_HEADER$|METRICS_|LLM_ROUTER_|USE_USER_TOKEN$|AUTOMATIC_LOGIN$|COUPLE_SESSION_WITH_COOKIE_NAME$|SLACK_|ML_ASSISTANT_MODELS$|MCP_SERVERS$)/;
 
 // ── Types for what the app streams (subset of src/lib/types/MessageUpdate.ts) ──
 
@@ -120,8 +132,12 @@ interface ConversationSnapshot {
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const log = (...args: unknown[]) => console.error("[ml-eval]", ...args);
 const text = (value: unknown) => (typeof value === "string" ? value : JSON.stringify(value));
+/** the eval token reaches tool output through the hub mcp server and sandboxes */
+const redact = (value: string) => (HF_TOKEN ? value.replaceAll(HF_TOKEN, "[HF_TOKEN]") : value);
+// CI logs are public
+const log = (...args: unknown[]) =>
+	console.error("[ml-eval]", ...args.map((a) => redact(a instanceof Error ? String(a) : text(a))));
 
 function requireEnv() {
 	if (!HF_TOKEN) {
@@ -196,14 +212,20 @@ async function run(cmd: string, args: string[], env: NodeJS.ProcessEnv) {
 	});
 }
 
-async function startApp(
-	mongoUrl: string,
-	scenarios: Scenario[],
-	logPath: string
-): Promise<ChildProcess> {
+function prodEnv(): Record<string, string> {
+	const chart = yaml.load(readFileSync(join(ROOT, "chart/env/prod.yaml"), "utf8")) as {
+		envVars: Record<string, string>;
+	};
+	return Object.fromEntries(
+		Object.entries(chart.envVars).filter(([key]) => !SKIPPED_PROD_ENV.test(key))
+	);
+}
+
+function appEnv(mongoUrl: string, scenarios: Scenario[]): NodeJS.ProcessEnv {
 	const models = [...new Map(scenarios.map((s) => [s.model.id, s.model])).values()];
-	const env: NodeJS.ProcessEnv = {
+	return {
 		...process.env,
+		...prodEnv(),
 		HOST: "127.0.0.1",
 		PORT: String(PORT),
 		NODE_ENV: "production",
@@ -232,12 +254,21 @@ async function startApp(
 		LLM_ROUTER_ROUTES_PATH: "",
 		LLM_ROUTER_ARCH_BASE_URL: "",
 	};
+}
 
-	if (process.env.ML_EVAL_SKIP_BUILD !== "1") {
-		log("building the app (ML_EVAL_SKIP_BUILD=1 to reuse ./build)");
-		// ML_ASSISTANT_MODE is a build-time flag, so it has to be in the build env too.
-		await run("npm", ["run", "build"], env);
-	}
+async function buildApp(scenarios: Scenario[]) {
+	log("building the app (ML_EVAL_SKIP_BUILD=1 to reuse ./build)");
+	// ML_ASSISTANT_MODE is a build-time flag, so it has to be in the build env too.
+	await run("npm", ["run", "build"], appEnv("", scenarios));
+}
+
+async function startApp(
+	mongoUrl: string,
+	scenarios: Scenario[],
+	logPath: string
+): Promise<ChildProcess> {
+	const env = appEnv(mongoUrl, scenarios);
+	if (process.env.ML_EVAL_SKIP_BUILD !== "1") await buildApp(scenarios);
 
 	const out = createWriteStream(logPath);
 	const app = spawn("node", ["server.js"], { cwd: ROOT, env, stdio: ["ignore", "pipe", "pipe"] });
@@ -516,11 +547,11 @@ async function spaceExists(id: string): Promise<boolean> {
 const normalizeAccuracy = (value: number) => (value > 1 ? value / 100 : value);
 
 async function trackioCli<T>(args: string[], space: string): Promise<T> {
-	const { stdout } = await execFileAsync(
-		"trackio",
-		[...args, "--space", space, "--hf-token", HF_TOKEN, "--json"],
-		{ timeout: 120_000, maxBuffer: 32 * 1024 * 1024 }
-	);
+	const { stdout } = await execFileAsync("trackio", [...args, "--space", space, "--json"], {
+		env: { ...process.env, HF_TOKEN },
+		timeout: 120_000,
+		maxBuffer: 32 * 1024 * 1024,
+	});
 	return JSON.parse(stdout) as T;
 }
 
@@ -681,10 +712,126 @@ function buildTrace(
 	return { messages, spans };
 }
 
+async function repoInfo(id: string, type: "models" | "spaces"): Promise<RepoInfo | undefined> {
+	const res = await fetch(`${HUB}/api/${type}/${id}`, {
+		headers: { Authorization: `Bearer ${HF_TOKEN}` },
+	});
+	return res.ok ? ((await res.json()) as RepoInfo) : undefined;
+}
+
+const minutesSince = (startedAt: number) => Number(((Date.now() - startedAt) / 60_000).toFixed(1));
+
+/** polls the hub for each artifact the task asks for, then waits a while for one still building */
+function watchArtifacts(
+	scenario: Scenario,
+	names: RunNames,
+	startedAt: number,
+	updates: TimedUpdate[]
+) {
+	const seen: Partial<Record<ArtifactKind, number | null>> = Object.fromEntries(
+		scenario.artifacts.map((kind) => [kind, null])
+	);
+	const pending = new Set<ArtifactKind>();
+	const check = async () => {
+		pending.clear();
+		for (const kind of scenario.artifacts) {
+			if (seen[kind] != null) continue;
+			let ready = false;
+			if (kind === "trackio") {
+				ready = (await Promise.all(trackioSpaces(updates).map(spaceExists))).some(Boolean);
+			} else {
+				const at = artifactRepo(kind, names);
+				const info = at && (await repoInfo(at.id, at.type));
+				ready = info !== undefined && artifactReady(kind, info);
+				if (info && !ready) pending.add(kind);
+			}
+			if (ready) seen[kind] = minutesSince(startedAt);
+		}
+	};
+	const safeCheck = () => check().catch((err) => log("artifact poll failed:", String(err)));
+	let running = safeCheck();
+	const timer = setInterval(() => {
+		running = running.then(safeCheck);
+	}, ARTIFACT_POLL_MS);
+	return {
+		async stop(graceMs = 10 * 60_000) {
+			clearInterval(timer);
+			await running;
+			await safeCheck();
+			const until = Date.now() + graceMs;
+			while (pending.size > 0 && Date.now() < until) {
+				await sleep(30_000);
+				await safeCheck();
+			}
+			return seen;
+		},
+	};
+}
+
+/** hidden_checks.py as a cpu job billed apart from the agent budget */
+async function runHiddenCheck(args: string[], names: RunNames): Promise<HiddenResult> {
+	const script = join(ROOT, "evals/ml-intern/hidden_checks.py");
+	const jobArgs = ["jobs", "uv", "run", "--flavor", "cpu-upgrade", "--timeout", "45m"];
+	jobArgs.push("--secrets", "HF_TOKEN", "--label", "ml-eval-hidden-check", script);
+	try {
+		const { stdout, stderr } = await execFileAsync(
+			"hf",
+			[...jobArgs, ...args.map((a) => fill(a, names))],
+			{
+				env: { ...process.env, HF_TOKEN },
+				timeout: 60 * 60_000,
+				maxBuffer: 64 * 1024 * 1024,
+			}
+		);
+		return parseHiddenResult(`${stdout}\n${stderr}`) ?? { pass: false, error: "no RESULT line" };
+	} catch (err) {
+		const output = (err as { stdout?: string }).stdout ?? "";
+		return parseHiddenResult(output) ?? { pass: false, error: String(err).slice(0, 500) };
+	}
+}
+
+/** the run conversations as the daily export writes them, relaxed ejson gzipped one per line */
+async function exportConversations(mongoUrl: string, ids: string[], dir: string) {
+	const client = await MongoClient.connect(mongoUrl, { directConnection: true });
+	try {
+		const docs = await client
+			.db(DB_NAME)
+			.collection("conversations")
+			.find({ _id: { $in: ids.map((id) => new ObjectId(id)) } })
+			.toArray();
+		mkdirSync(dir, { recursive: true });
+		const lines = docs
+			.map((doc) => redact(BSON.EJSON.stringify(doc, { relaxed: true })))
+			.join("\n");
+		writeFileSync(join(dir, "conversations-eval.ndjson.gz"), gzipSync(`${lines}\n`));
+	} finally {
+		await client.close();
+	}
+}
+
+async function measureConversations(
+	exportsDir: string,
+	outDir: string
+): Promise<Map<string, ConversationMetrics>> {
+	await execFileAsync(
+		"python3",
+		["-I", join(ROOT, "evals/metrics/metrics.py"), exportsDir, "--out", outDir],
+		{
+			maxBuffer: 64 * 1024 * 1024,
+		}
+	);
+	const rows = JSON.parse(readFileSync(join(outDir, "conversations.json"), "utf8")) as Array<
+		ConversationMetrics & { conversation: string }
+	>;
+	return new Map(rows.map((r) => [r.conversation, r]));
+}
+
 // ── One scenario ──────────────────────────────────────────────────────────────
 
-async function runScenario(client: AppClient, scenario: Scenario) {
-	log(`▶ ${scenario.name}: ${scenario.prompt}`);
+async function runScenario(client: AppClient, scenario: Scenario, repeat: number, names: RunNames) {
+	const prompt = fill(scenario.prompt, names);
+	const label = `${scenario.name}#${repeat}`;
+	log(`▶ ${label}: ${prompt}`);
 	const conv = await client.createConversation(scenario);
 	const startedAt = Date.now();
 	const deadline = startedAt + scenario.timeoutMinutes * 60_000;
@@ -692,16 +839,17 @@ async function runScenario(client: AppClient, scenario: Scenario) {
 	const answers: Answer[] = [];
 	const nudges: Array<{ t: number; text: string }> = [];
 	const answered = new Set<string>();
+	const watcher = watchArtifacts(scenario, names, startedAt, updates);
 
 	let parentId = conv.rootMessageId;
-	let input = scenario.prompt;
+	let input = prompt;
 	let turnStatus = "unknown";
 	for (let round = 0; round < 2; round++) {
 		const messageId = await client.send(conv.id, parentId, input);
 		turnStatus = await client.tail(conv.id, messageId, deadline, async (update) => {
 			updates.push({ t: Date.now() - startedAt, messageId, update });
 			if (update.type === "tool" && update.subtype === "call") {
-				log(`  tool: ${(update.call as { name: string }).name}`);
+				log(`  ${label} tool: ${(update.call as { name: string }).name}`);
 			}
 			if (update.type !== "elicitation" || update.subtype !== "request") return;
 			const request = update.request as { elicitationId: string; fields: ElicitationField[] };
@@ -720,7 +868,7 @@ async function runScenario(client: AppClient, scenario: Scenario) {
 				})),
 				content,
 			});
-			log(`  answered: ${JSON.stringify(content)}`);
+			log(`  ${label} answered: ${JSON.stringify(content)}`);
 			await client.answer(conv.id, request.elicitationId, content);
 		});
 		if (turnStatus === "timeout") await client.stop(conv.id);
@@ -732,12 +880,13 @@ async function runScenario(client: AppClient, scenario: Scenario) {
 				/^hf_(jobs|sandbox)/.test(text((u.update.call as { name?: string })?.name))
 		);
 		if (launched || !scenario.nudge || turnStatus === "timeout" || round > 0) break;
-		log("  turn ended without launching anything, nudging once");
+		log(`  ${label} turn ended without launching anything, nudging once`);
 		nudges.push({ t: Date.now() - startedAt, text: scenario.nudge });
 		parentId = messageId;
 		input = scenario.nudge;
 	}
 	const durationSec = (Date.now() - startedAt) / 1000;
+	const artifactMinutes = await watcher.stop();
 
 	const snapshot = await client.getConversation(conv.id);
 	const { costUsd, leftRunning } = await settleCost(snapshot.mlBudget);
@@ -758,6 +907,15 @@ async function runScenario(client: AppClient, scenario: Scenario) {
 		if (trackioAcc !== undefined) break;
 	}
 
+	let hidden: HiddenResult | undefined;
+	if (scenario.hidden) {
+		const repos = scenario.artifacts.filter((k) => k !== "trackio");
+		hidden = repos.some((k) => artifactMinutes[k] != null)
+			? await runHiddenCheck(scenario.hidden, names)
+			: { pass: false, error: "the artifact was never usable" };
+		log(`  ${label} hidden check: ${JSON.stringify(hidden)}`);
+	}
+
 	const outcome: ScenarioOutcome = {
 		durationSec,
 		costUsd,
@@ -765,116 +923,196 @@ async function runScenario(client: AppClient, scenario: Scenario) {
 		trackioSpaceExists: existing.length > 0,
 		trackioAccuracy: trackioAcc,
 		reportedAccuracy: reportedAccuracy(finalAnswer),
+		artifactMinutes,
+		askedFirst: askedFirst(updates, nudges[0]?.t),
+		hidden,
 		finalAnswer,
 		toolCalls: updates
 			.filter((u) => u.update.type === "tool" && u.update.subtype === "call")
 			.map((u) => (u.update.call as { name: string }).name),
 		turnStatus,
 	};
-	const checks: Check[] = [
-		{ name: "turn completed", pass: turnStatus === "completed", actual: turnStatus },
-		...scenario.checks(outcome),
-	];
-	const passed = checks.every((c) => c.pass);
-	const trace = buildTrace(scenario.prompt, nudges, updates, answers, startedAt);
-	trace.spans.unshift({
-		id: "turn",
-		name: scenario.name,
-		kind: "span",
-		start_time: new Date(startedAt).toISOString(),
-		end_time: new Date(startedAt + durationSec * 1000).toISOString(),
-		duration_ms: durationSec * 1000,
-		status: passed ? "ok" : "error",
-		model: `${scenario.model.id}:${scenario.model.provider}`,
-	});
-
-	for (const c of checks) log(`  ${c.pass ? "✓" : "✗"} ${c.name}: ${c.actual}`);
-	if (leftRunning.length) log(`  cancelled jobs the agent left running: ${leftRunning.join(", ")}`);
+	if (leftRunning.length)
+		log(`  ${label} cancelled jobs it left running: ${leftRunning.join(", ")}`);
 
 	return {
 		name: scenario.name,
-		prompt: scenario.prompt,
+		repeat,
+		prompt,
 		model: scenario.model,
+		timeoutMinutes: scenario.timeoutMinutes,
+		artifacts: scenario.artifacts,
+		repo: names.repo,
+		space: names.space,
 		conversationId: conv.id,
-		passed,
-		checks,
+		startedAt,
 		outcome,
 		answers,
+		nudges,
 		leftRunning,
 		budget: snapshot.mlBudget,
+		updates,
+	};
+}
+
+type RunRecord = Awaited<ReturnType<typeof runScenario>>;
+
+function grade(run: RunRecord, scenario: Scenario, metrics: ConversationMetrics | undefined) {
+	const outcome = { ...run.outcome, metrics };
+	const checks: Check[] = [
+		{
+			name: "turn completed",
+			pass: outcome.turnStatus === "completed",
+			actual: outcome.turnStatus,
+		},
+		...scenario.checks(outcome),
+	];
+	const passed = checks.every((c) => c.pass);
+	const trace = buildTrace(run.prompt, run.nudges, run.updates, run.answers, run.startedAt);
+	trace.spans.unshift({
+		id: "turn",
+		name: `${run.name}#${run.repeat}`,
+		kind: "span",
+		start_time: new Date(run.startedAt).toISOString(),
+		end_time: new Date(run.startedAt + outcome.durationSec * 1000).toISOString(),
+		duration_ms: outcome.durationSec * 1000,
+		status: passed ? "ok" : "error",
+		model: `${run.model.id}:${run.model.provider}`,
+	});
+	for (const c of checks)
+		log(`  ${run.name}#${run.repeat} ${c.pass ? "✓" : "✗"} ${c.name}: ${c.actual}`);
+	return {
+		...run,
+		outcome,
+		passed,
+		checks,
 		trace: {
 			...trace,
 			metadata: {
 				status: passed ? "ok" : "error",
-				duration_ms: durationSec * 1000,
-				cost_usd: costUsd,
-				model: `${scenario.model.id}:${scenario.model.provider}`,
+				duration_ms: outcome.durationSec * 1000,
+				cost_usd: outcome.costUsd,
+				model: `${run.model.id}:${run.model.provider}`,
 				checks: Object.fromEntries(
 					checks.map((c) => [c.name, `${c.pass ? "pass" : "FAIL"}: ${c.actual}`])
 				),
 			},
 		},
-		updates,
 	};
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-function summaryMarkdown(results: Awaited<ReturnType<typeof runScenario>>[], tracesUrl?: string) {
-	const lines = ["## ML Intern eval", ""];
+type GradedRun = ReturnType<typeof grade>;
+type CrashedRun = Pick<GradedRun, "name" | "repeat" | "passed" | "checks">;
+
+function summaryMarkdown(runs: Array<GradedRun | CrashedRun>, tracesUrl?: string) {
+	const lines = ["## ML Intern outcome eval", ""];
 	if (tracesUrl) lines.push(`Traces: ${tracesUrl}`, "");
-	for (const r of results) {
+	lines.push(
+		"| task | run | checks | minutes | cost | failed jobs | minutes to first artifact |",
+		"|---|---|---|---|---|---|---|"
+	);
+	for (const r of runs) {
+		const passed = r.checks.filter((c) => c.pass).length;
+		const o = "outcome" in r ? r.outcome : undefined;
+		const m = o?.metrics;
+		const minutes = o ? (o.durationSec / 60).toFixed(1) : "–";
+		const cost = o ? `$${o.costUsd.toFixed(2)}` : "–";
+		const first =
+			m?.minutes_to_first_artifact === "" ? "none" : (m?.minutes_to_first_artifact ?? "–");
 		lines.push(
-			`### ${r.passed ? "✅" : "❌"} ${r.name}`,
-			"",
-			`> ${r.prompt}`,
-			"",
-			"| check | result | actual |",
-			"|---|---|---|"
+			`| ${r.name} | ${r.repeat} | ${r.passed ? "✅" : "❌"} ${passed}/${r.checks.length} | ${minutes} | ${cost} | ${m?.failed ?? "–"} | ${first} |`
 		);
-		for (const c of r.checks)
-			lines.push(`| ${c.name} | ${c.pass ? "pass" : "**fail**"} | ${c.actual} |`);
-		lines.push("");
+	}
+	lines.push("");
+	for (const r of runs.filter((r) => !r.passed)) {
+		lines.push(
+			`**${r.name} #${r.repeat}:** ` +
+				r.checks
+					.filter((c) => !c.pass)
+					.map((c) => `${c.name} (${c.actual})`)
+					.join("; ")
+		);
 	}
 	return lines.join("\n");
 }
 
+async function gitSha(): Promise<string> {
+	try {
+		return (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: ROOT })).stdout.trim();
+	} catch {
+		return "unknown";
+	}
+}
+
 async function main() {
 	requireEnv();
-	const scenarios = SCENARIOS.filter(
-		(s) => !process.env.ML_EVAL_SCENARIO || s.name === process.env.ML_EVAL_SCENARIO
-	);
-	if (scenarios.length === 0) throw new Error(`no scenario named ${process.env.ML_EVAL_SCENARIO}`);
+	const wanted = (process.env.ML_EVAL_SCENARIO ?? "").split(",").filter(Boolean);
+	const scenarios = SCENARIOS.filter((s) => wanted.length === 0 || wanted.includes(s.name));
+	if (scenarios.length === 0) throw new Error(`no task named ${process.env.ML_EVAL_SCENARIO}`);
+	const repeats = Math.max(1, Number(process.env.ML_EVAL_REPEATS ?? 1));
+	if (process.env.ML_EVAL_BUILD_ONLY === "1") {
+		await buildApp(scenarios);
+		return;
+	}
 
 	const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-	const outDir = join(ROOT, "eval-output", "ml-intern", stamp);
+	const outDir = process.env.ML_EVAL_OUT || join(ROOT, "eval-output", "ml-intern", stamp);
 	mkdirSync(outDir, { recursive: true });
+	const runId = randomUUID().slice(0, 6);
 
 	const mongo = await startMongo();
 	let app: ChildProcess | undefined;
 	let username = "";
-	const results: Awaited<ReturnType<typeof runScenario>>[] = [];
+	const runs: Array<GradedRun | CrashedRun> = [];
 	try {
 		const mongoUrl = mongo.getUri();
 		const seeded = await seedSession(mongoUrl);
 		username = seeded.username;
-		log(`running as ${username}`);
+		log(`running as ${username}, run ${runId}, ${scenarios.length} tasks × ${repeats}`);
 		app = await startApp(mongoUrl, scenarios, join(outDir, "server.log"));
 		const client = new AppClient(seeded.cookie);
-		// Serial: the scenarios share one user and one budget ledger per conversation is plenty.
-		for (const scenario of scenarios) {
-			try {
-				results.push(await runScenario(client, scenario));
-			} catch (err) {
-				log(`✗ ${scenario.name} crashed:`, err);
-				results.push({
-					name: scenario.name,
-					prompt: scenario.prompt,
-					passed: false,
-					checks: [{ name: "ran", pass: false, actual: String(err) }],
-				} as unknown as Awaited<ReturnType<typeof runScenario>>);
-			}
+		const plan = scenarios.flatMap((scenario) =>
+			Array.from({ length: repeats }, (_, repeat) => ({ scenario, repeat }))
+		);
+		const settled = await Promise.allSettled(
+			plan.map(({ scenario, repeat }) =>
+				runScenario(client, scenario, repeat, runNames(username, scenario.name, runId, repeat))
+			)
+		);
+		const finished: RunRecord[] = [];
+		settled.forEach((s, i) => {
+			if (s.status === "fulfilled") finished.push(s.value);
+			else log(`✗ ${plan[i].scenario.name}#${plan[i].repeat} crashed:`, s.reason);
+		});
+
+		let metrics = new Map<string, ConversationMetrics>();
+		try {
+			const exportsDir = join(outDir, "exports");
+			await exportConversations(
+				mongoUrl,
+				finished.map((r) => r.conversationId),
+				exportsDir
+			);
+			metrics = await measureConversations(exportsDir, join(outDir, "metrics"));
+		} catch (err) {
+			log("production measures failed:", String(err));
 		}
+		for (const run of finished) {
+			const scenario = scenarios.find((s) => s.name === run.name) as Scenario;
+			runs.push(grade(run, scenario, metrics.get(run.conversationId)));
+		}
+		settled.forEach((s, i) => {
+			if (s.status === "fulfilled") return;
+			const { scenario, repeat } = plan[i];
+			runs.push({
+				name: scenario.name,
+				repeat,
+				passed: false,
+				checks: [{ name: "ran", pass: false, actual: String(s.reason) }],
+			});
+		});
 	} finally {
 		app?.kill("SIGTERM");
 		await mongo.stop();
@@ -884,7 +1122,20 @@ async function main() {
 	const runName = process.env.ML_EVAL_RUN_NAME || stamp;
 	writeFileSync(
 		resultPath,
-		JSON.stringify({ runName, createdAt: new Date().toISOString(), scenarios: results }, null, 2)
+		redact(
+			JSON.stringify(
+				{
+					runName,
+					sha: await gitSha(),
+					runId,
+					repeats,
+					createdAt: new Date().toISOString(),
+					scenarios: runs,
+				},
+				null,
+				2
+			)
+		)
 	);
 	log(`wrote ${resultPath}`);
 
@@ -905,11 +1156,12 @@ async function main() {
 		}
 	}
 
-	const summary = summaryMarkdown(results, tracesUrl);
+	const summary = summaryMarkdown(runs, tracesUrl);
+	writeFileSync(join(outDir, "summary.md"), `${summary}\n`);
 	console.log(summary);
 	if (process.env.GITHUB_STEP_SUMMARY)
 		appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
-	process.exit(results.every((r) => r.passed) ? 0 : 1);
+	process.exit(0);
 }
 
 main().catch((err) => {
