@@ -27,6 +27,7 @@
 		"eval:run": "vite-node --mode test --options.transformMode.ssr='/.*/' evals/decisions/run.ts --",
 		"eval:compare": "vite-node --options.transformMode.ssr='/.*/' evals/decisions/compare.ts --",
 		"eval:ml-intern": "node --experimental-strip-types --no-warnings evals/ml-intern/run.ts",
+		"eval:ml-intern:compare": "node --experimental-strip-types --no-warnings evals/ml-intern/compare.ts",
 		"prepare": "husky"
 	},
 	"devDependencies": {
