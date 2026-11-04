@@ -18,10 +18,10 @@ const definition: OpenAiTool = {
 		name: CREATE_WORKFLOW_TOOL_NAME,
 		description:
 			"Deploy a gr.Workflow Space that runs Hub models side by side on the same input " +
-			"(shape 'compare'), or feeds each model's output into the next (shape 'chain'). Every " +
-			"model is checked against the Hub first — that it exists, does the task, and is served " +
-			"by an inference provider — and nothing is written unless all of them pass. Returns the " +
-			"Space URL.",
+			"(shape 'compare'), or feeds each model's output into the next (shape 'chain'). A step " +
+			"is a model served by an inference provider, or a running Gradio Space — use a Space " +
+			"for a model no provider serves. Every step is checked against the Hub first, and " +
+			"nothing is written unless all of them pass. Returns the Space URL.",
 		parameters: {
 			type: "object",
 			properties: {
@@ -29,7 +29,19 @@ const definition: OpenAiTool = {
 				models: {
 					type: "array",
 					items: { type: "string" },
-					description: "compare only: two or more model ids, as owner/name, that all do `task`.",
+					description: "compare only: model ids, as owner/name, that all do `task`.",
+				},
+				spaces: {
+					type: "array",
+					items: {
+						type: "object",
+						properties: { space: { type: "string" }, endpoint: { type: "string" } },
+						required: ["space"],
+					},
+					description:
+						"compare only: Gradio Spaces, as owner/name, to run on the same input as `models`. " +
+						"`endpoint` is the api_name to call; it defaults to /predict or the first one. " +
+						"`models` and `spaces` together need at least two entries.",
 				},
 				task: {
 					type: "string",
@@ -39,12 +51,17 @@ const definition: OpenAiTool = {
 					type: "array",
 					items: {
 						type: "object",
-						properties: { model: { type: "string" }, task: { type: "string" } },
-						required: ["model", "task"],
+						properties: {
+							model: { type: "string" },
+							task: { type: "string" },
+							space: { type: "string" },
+							endpoint: { type: "string" },
+						},
 					},
 					description:
-						"chain only: the models in the order they run, each with its pipeline tag. Each " +
-						"step's output type must match the next step's input type.",
+						"chain only: the steps in the order they run — each a `model` with its pipeline " +
+						"`task`, or a Gradio `space` with an optional `endpoint`. Each step's output type " +
+						"must match an input of the next step.",
 				},
 				name: {
 					type: "string",
@@ -101,28 +118,58 @@ export function createWorkflowTool(
 			}
 
 			const checks = await Promise.all(
-				plan.steps.map(({ model, task }) => checkModel(model, task, accessToken, ctx.abortSignal))
+				plan.steps.map((step) =>
+					"space" in step
+						? checkSpace(step, accessToken, ctx.abortSignal)
+						: checkModel(step, accessToken, ctx.abortSignal)
+				)
 			);
 			const problem = checks.find((check) => typeof check === "string");
 			if (problem) return { error: problem };
+			const resolved = checks as Operator[];
 
-			// Pinned, because "auto" only routes to providers the runner has enabled,
-			// and a model served by one they haven't fails on Run.
-			const graph = workflowJson(
-				plan,
-				checks.map((providers) => providers[0])
-			);
+			for (let i = 1; i < resolved.length && plan.shape === "chain"; i++) {
+				const out = resolved[i - 1].outputs[0].type;
+				if (feedPort(out, resolved[i].inputs, [])) continue;
+				const takes = new Set(resolved[i].inputs.filter(isRequired).map((port) => port.type));
+				return {
+					error:
+						`${repoOf(plan.steps[i - 1])} outputs ${out}, but ${repoOf(plan.steps[i])} takes ` +
+						`${[...takes].join(" or ") || "no input"} — the steps do not connect. Put a step ` +
+						`between them that converts, or reorder them.`,
+				};
+			}
+
+			const graph = workflowJson(plan, resolved);
 			const files = [
 				{ path: "app.py", content: new Blob([APP_PY], { type: "text/x-python" }) },
 				{ path: "workflow.json", content: new Blob([graph], { type: "application/json" }) },
 				{ path: "README.md", content: new Blob([readme(plan.title)], { type: "text/markdown" }) },
 			];
+			const url = `https://huggingface.co/spaces/${plan.spaceId}?ui=canvas`;
 			try {
 				await createRepo({
 					repo: { type: "space", name: plan.spaceId },
 					accessToken,
 					sdk: "gradio",
 				});
+
+				if (ctx.conversationId) {
+					await recordArtefact({
+						conversationId: ctx.conversationId,
+						kind: "space",
+						uri: `hf://spaces/${plan.spaceId}`,
+						url,
+						toolUuid: ctx.uuid,
+						messageId: ctx.messageId,
+						generationId: ctx.generationId,
+					}).catch((err) => {
+						logger.error(
+							{ err: String(err), spaceId: plan.spaceId },
+							"[mlRegistry] recording the workflow Space failed"
+						);
+					});
+				}
 			} catch (err) {
 				if (statusCodeOf(err) !== 409) return { error: hubError("create", plan.spaceId, err) };
 				const uri = `hf://spaces/${plan.spaceId}`;
@@ -146,29 +193,11 @@ export function createWorkflowTool(
 				return { error: hubError("write to", plan.spaceId, err) };
 			}
 
-			const url = `https://huggingface.co/spaces/${plan.spaceId}?ui=canvas`;
-			if (ctx.conversationId) {
-				void recordArtefact({
-					conversationId: ctx.conversationId,
-					kind: "space",
-					uri: `hf://spaces/${plan.spaceId}`,
-					url,
-					toolUuid: ctx.uuid,
-					messageId: ctx.messageId,
-					generationId: ctx.generationId,
-				}).catch((err) => {
-					logger.error(
-						{ err: String(err), spaceId: plan.spaceId },
-						"[mlRegistry] recording the workflow Space failed"
-					);
-				});
-			}
-
 			return {
 				resultText: [
 					`Public workflow Space written: ${url} — tell the user it is public, and link it`,
 					"exactly as written: `?ui=canvas` opens it on the canvas.",
-					`It runs ${plan.steps.map((step) => step.model).join(plan.shape === "compare" ? " and " : " → ")}.`,
+					`It runs ${plan.steps.map(repoOf).join(plan.shape === "compare" ? " and " : " → ")}.`,
 					"",
 					"It builds in a minute or two — tell the user it is building, not that it is live.",
 					"Every run bills the inference quota of whoever presses Run — signed in through the",
@@ -184,9 +213,21 @@ const NAMESPACE = /^[A-Za-z0-9][\w.-]*$/;
 /** `owner/name`, nothing that looks like a URL. */
 const REPO_ID = /^[A-Za-z0-9][\w.-]*\/[\w.-]+$/;
 
+type ModelStep = { model: string; task: string };
+type SpaceStep = { space: string; endpoint?: string };
+type Step = ModelStep | SpaceStep;
+
+const repoOf = (step: Step) => ("space" in step ? step.space : step.model);
+
+function spaceStep(raw: unknown): SpaceStep {
+	const { space, endpoint } = (raw ?? {}) as Record<string, unknown>;
+	const name = typeof endpoint === "string" ? endpoint.trim().replace(/^\/?/, "/") : "";
+	return { space: String(space ?? "").trim(), ...(name.length > 1 ? { endpoint: name } : {}) };
+}
+
 interface Plan {
 	shape: "compare" | "chain";
-	steps: { model: string; task: string }[];
+	steps: Step[];
 	title: string;
 	spaceId: string;
 }
@@ -195,45 +236,42 @@ function parse(args: Record<string, unknown>, sessionNamespace?: string): Plan |
 	const title = typeof args.name === "string" ? args.name.trim() : "";
 	if (!title) return { error: "No name provided." };
 
-	let steps: { model: string; task: string }[];
+	let steps: Step[];
 	if (args.shape === "compare") {
 		const task = typeof args.task === "string" ? args.task.trim() : "";
-		if (!task) return { error: "compare needs the `task` the models share." };
 		const models = Array.isArray(args.models) ? args.models : [];
-		if (models.length < 2) {
+		const spaces = Array.isArray(args.spaces) ? args.spaces : [];
+		if (models.length + spaces.length < 2) {
 			return {
 				error:
-					"compare needs at least two models. One model with many inputs is a gr.Interface, " +
-					"not a workflow — build that as an ordinary Gradio Space instead.",
+					"compare needs at least two models or Spaces. One model with many inputs is a " +
+					"gr.Interface, not a workflow — build that as an ordinary Gradio Space instead.",
 			};
 		}
-		steps = models.map((model) => ({ model: String(model).trim(), task }));
+		if (models.length && !task) return { error: "compare needs the `task` the models share." };
+		steps = [
+			...models.map((model) => ({ model: String(model).trim(), task })),
+			...spaces.map(spaceStep),
+		];
 	} else if (args.shape === "chain") {
 		const raw = Array.isArray(args.steps) ? args.steps : [];
 		if (raw.length < 2) return { error: "chain needs at least two steps." };
-		steps = raw.map((step) => ({
-			model: String((step as Record<string, unknown>)?.model ?? "").trim(),
-			task: String((step as Record<string, unknown>)?.task ?? "").trim(),
-		}));
+		steps = raw.map((step) => {
+			const { model, task, space } = (step ?? {}) as Record<string, unknown>;
+			if (space !== undefined) return spaceStep(step);
+			return { model: String(model ?? "").trim(), task: String(task ?? "").trim() };
+		});
 	} else {
 		return { error: "shape must be 'compare' or 'chain'." };
 	}
-	for (const { model, task } of steps) {
-		if (!REPO_ID.test(model)) return { error: `"${model}" is not a model id — use owner/name.` };
-		if (!PIPELINE_TAG_TO_ENDPOINT[task]) {
-			return {
-				error: `A workflow cannot call a ${task || "missing"} task. It takes one of: ${Object.keys(PIPELINE_TAG_TO_ENDPOINT).join(", ")}.`,
-			};
+	for (const step of steps) {
+		if (!REPO_ID.test(repoOf(step))) {
+			const kind = "space" in step ? "Space" : "model";
+			return { error: `"${repoOf(step)}" is not a ${kind} id — use owner/name.` };
 		}
-	}
-	for (let i = 1; i < steps.length && args.shape === "chain"; i++) {
-		const out = endpointOf(steps[i - 1].task).outputs[0].type;
-		const into = endpointOf(steps[i].task).inputs[0].type;
-		if (!portsConnect(out, into)) {
+		if ("task" in step && !PIPELINE_TAG_TO_ENDPOINT[step.task]) {
 			return {
-				error:
-					`${steps[i - 1].model} outputs ${out}, but ${steps[i].model} takes ${into} — the steps ` +
-					`do not connect. Put a step between them that converts, or reorder them.`,
+				error: `A workflow cannot call a ${step.task || "missing"} task. It takes one of: ${Object.keys(PIPELINE_TAG_TO_ENDPOINT).join(", ")}.`,
 			};
 		}
 	}
@@ -266,13 +304,20 @@ function parse(args: Record<string, unknown>, sessionNamespace?: string): Plan |
 	};
 }
 
-/** A problem worth telling the model about, or the live providers that serve it. */
+/** What an operator node needs beyond its id and label. */
+type Operator = {
+	kind: "model" | "space";
+	fields: Record<string, unknown>;
+	inputs: Port[];
+	outputs: Port[];
+};
+
+/** A problem worth telling the model about, or the node that calls it. */
 async function checkModel(
-	model: string,
-	task: string,
+	{ model, task }: ModelStep,
 	accessToken: string,
 	signal?: AbortSignal
-): Promise<string | string[]> {
+): Promise<string | Operator> {
 	let info: {
 		pipeline_tag?: string;
 		inferenceProviderMapping?: Record<string, { status?: string; task?: string }>;
@@ -287,22 +332,128 @@ async function checkModel(
 	} catch (err) {
 		return `Could not look up ${model}: ${String(err)}`;
 	}
-	if (info.pipeline_tag !== task) {
-		return `${model} is a ${info.pipeline_tag ?? "untagged"} model, not ${task}.`;
+
+	const own = info.pipeline_tag ?? "";
+	if (PIPELINE_TAG_TO_ENDPOINT[own] !== PIPELINE_TAG_TO_ENDPOINT[task]) {
+		return `${model} is a ${own || "untagged"} model, not ${task}.`;
 	}
 	const tasks = providerTasks(PIPELINE_TAG_TO_ENDPOINT[task]);
 	const providers = Object.entries(info.inferenceProviderMapping ?? {})
-		.filter(([, p]) => p.status === "live" && tasks.includes(p.task ?? ""))
+		.filter(([, p]) => p.status === "live" && (tasks.includes(p.task ?? "") || p.task === own))
 		.map(([name]) => name)
-		// HF's own provider first when it serves the model; otherwise the Hub's order.
 		.sort((a, b) => Number(b === "hf-inference") - Number(a === "hf-inference"));
 	if (!providers.length) {
 		return (
 			`${model} is not served by any inference provider for ${tasks.join(" or ")}, so a ` +
-			`workflow cannot call it — pick another, or deploy it in a Space of its own first.`
+			`workflow cannot call it — pick another, or pass a running Gradio Space that serves ` +
+			`it as a \`space\` step.`
 		);
 	}
-	return providers;
+	const endpoint = endpointOf(task);
+	return {
+		kind: "model",
+		fields: {
+			model_id: model,
+			pipeline_tag: task,
+			endpoint: PIPELINE_TAG_TO_ENDPOINT[task],
+			provider: providers[0],
+		},
+		inputs: endpoint.inputs.map((port) => ({ ...port })),
+		outputs: endpoint.outputs.map((port) => ({ ...port })),
+	};
+}
+
+/** Endpoints a Gradio app wires to its own UI events rather than offers as an API. */
+const UTILITY_ENDPOINT = /^\/(on|handle|update|prepare|load|clear|reset)_/;
+
+type GradioIo = {
+	label?: string;
+	parameter_name?: string;
+	component?: string;
+	parameter_has_default?: boolean;
+	parameter_default?: unknown;
+};
+
+const COMPONENT_PORTS: Record<string, string> = {
+	textbox: "text",
+	dropdown: "text",
+	radio: "text",
+	label: "text",
+	code: "text",
+	chatbot: "text",
+	markdown: "markdown",
+	html: "html",
+	number: "number",
+	slider: "number",
+	checkbox: "boolean",
+	image: "image",
+	imageeditor: "image",
+	imageslider: "image",
+	gallery: "gallery",
+	audio: "audio",
+	video: "video",
+	file: "file",
+	model3d: "model3d",
+	json: "json",
+	dataframe: "json",
+};
+const portType = (io: GradioIo) => COMPONENT_PORTS[(io.component ?? "").toLowerCase()] ?? "any";
+
+/**
+ * A running Gradio Space and the endpoint to call, as a `kind: "space"` node. Its
+ * arguments go positionally, so the ports follow the endpoint's parameter order;
+ * ones with a default are left unwired and run with it.
+ */
+async function checkSpace(
+	{ space, endpoint }: SpaceStep,
+	accessToken: string,
+	signal?: AbortSignal
+): Promise<string | Operator> {
+	let named: Record<string, { parameters?: GradioIo[]; returns?: GradioIo[] }>;
+	try {
+		const response = await fetch(`https://huggingface.co/api/spaces/${space}`, {
+			headers: { Authorization: `Bearer ${accessToken}` },
+			signal,
+		});
+		if (!response.ok) return `${space} does not resolve on the Hub (${response.status}).`;
+		const info: { sdk?: string; host?: string; runtime?: { stage?: string } } =
+			await response.json();
+		if (info.sdk !== "gradio") {
+			return `${space} is a ${info.sdk ?? "non-Gradio"} Space; a workflow can only call a Gradio Space.`;
+		}
+		if (info.runtime?.stage !== "RUNNING" || !info.host) {
+			return `${space} is ${info.runtime?.stage ?? "not running"}, so a workflow cannot call it — pick a running Space.`;
+		}
+		// No token: the Space's own code would read it.
+		const api = await fetch(`${info.host}/gradio_api/info`, { signal });
+		if (!api.ok) return `${space} does not expose a Gradio API (${api.status}).`;
+		named = (await api.json()).named_endpoints ?? {};
+	} catch (err) {
+		return `Could not look up ${space}: ${String(err)}`;
+	}
+	const names = Object.keys(named).filter((name) => !UTILITY_ENDPOINT.test(name));
+	const name = endpoint ?? (names.includes("/predict") ? "/predict" : names[0]);
+	if (!name || !names.includes(name)) {
+		return `${space} has no ${endpoint ?? "callable"} endpoint${names.length ? ` — it has ${names.join(", ")}` : ""}.`;
+	}
+	const { parameters = [], returns = [] } = named[name];
+	return {
+		kind: "space",
+		fields: { space_id: space, endpoint: name },
+		inputs: parameters.map((p, i) => ({
+			id: `in_${i}`,
+			label: p.label || p.parameter_name || `Input ${i}`,
+			type: portType(p),
+			required: !p.parameter_has_default,
+			...(p.parameter_has_default ? { default_value: p.parameter_default } : {}),
+		})),
+		outputs: returns.map((r, i) => ({
+			id: `out_${i}`,
+			label: r.label || `Output ${i}`,
+			type: portType(r),
+			output_index: i,
+		})),
+	};
 }
 
 const APP_PY = `import gradio as gr
@@ -313,13 +464,24 @@ if __name__ == "__main__":
     demo.launch()
 `;
 
-type Port = { id: string; label: string; type: string; output_index?: number };
+type Port = {
+	id: string;
+	label: string;
+	type: string;
+	output_index?: number;
+	required?: boolean;
+	default_value?: unknown;
+};
 type Endpoint = { inputs: Port[]; outputs: Port[] };
 
-/** Ports a model runs without, left unwired rather than shown as required inputs. */
-const OPTIONAL_PORTS = new Set(["src_lang", "tgt_lang"]);
+const isRequired = (port: Port) => port.required !== false;
 
-const text = (id: string, label: string): Port => ({ id, label, type: "text" });
+const text = (id: string, label: string, required?: false): Port => ({
+	id,
+	label,
+	type: "text",
+	...(required === false ? { required } : {}),
+});
 const media = (type: string, id = type): Port => ({
 	id,
 	label: type[0].toUpperCase() + type.slice(1),
@@ -354,8 +516,8 @@ const ENDPOINTS: Record<string, Endpoint> = {
 	translation: {
 		inputs: [
 			text("text", "Text"),
-			text("src_lang", "Source Language"),
-			text("tgt_lang", "Target Language"),
+			text("src_lang", "Source Language", false),
+			text("tgt_lang", "Target Language", false),
 		],
 		outputs: out("Translation", "text"),
 	},
@@ -422,6 +584,10 @@ function providerTasks(endpoint: string): string[] {
 	return [endpoint.replaceAll("_", "-")];
 }
 
+function feedPort(from: string, inputs: Port[], fed: string[]): Port | undefined {
+	return inputs.find((p) => isRequired(p) && !fed.includes(p.id) && portsConnect(from, p.type));
+}
+
 /** Mirrors `ports_compatible` in gradio's workflow-types.ts: markdown is text to a port. */
 function portsConnect(from: string, to: string): boolean {
 	if (from === to || from === "any" || to === "any") return true;
@@ -442,17 +608,18 @@ function tile(id: string, label: string, role: "reference" | "subject", type: st
 }
 
 /**
- * The schema-v2 graph: a compare shares one reference per input across every
- * model, a chain wires each output into the next model's first input, and any
- * input nothing feeds gets its own reference, any output nothing reads its own
- * subject. Node ids are readable and stable (op_flux_1_dev), since they are what
- * a user points at on the canvas. No coordinates: the canvas lays it out.
+ * The schema-v2 graph: a compare shares one reference per input of the first
+ * step across every step that takes that type, a chain wires each output into
+ * the first input of the next step that takes it, and any required input nothing
+ * feeds gets its own reference, any output nothing reads its own subject. Node
+ * ids are readable and stable (op_flux_1_dev), since they are what a user points
+ * at on the canvas. No coordinates: the canvas lays it out.
  */
-function workflowJson({ shape, steps, title }: Plan, providers: string[]): string {
-	const names = steps.map((step) => step.model.split("/")[1]);
-	const labels = new Set(names).size === names.length ? names : steps.map((step) => step.model);
+function workflowJson({ shape, steps, title }: Plan, resolved: Operator[]): string {
+	const names = steps.map((step) => repoOf(step).split("/")[1]);
+	const labels = new Set(names).size === names.length ? names : steps.map(repoOf);
 	const taken = new Set<string>();
-	const operators = steps.map(({ model, task }, i) => {
+	const operators = resolved.map(({ kind, fields, inputs, outputs }, i) => {
 		const base = `op_${
 			names[i]
 				.toLowerCase()
@@ -462,20 +629,7 @@ function workflowJson({ shape, steps, title }: Plan, providers: string[]): strin
 		let id = base;
 		for (let n = 2; taken.has(id); n++) id = `${base}_${n}`;
 		taken.add(id);
-		const endpoint = endpointOf(task);
-		return {
-			id,
-			label: labels[i],
-			role: "operator",
-			kind: "model",
-			model_id: model,
-			pipeline_tag: task,
-			endpoint: PIPELINE_TAG_TO_ENDPOINT[task],
-			provider: providers[i],
-			inputs: endpoint.inputs.map((port) => ({ ...port })),
-			outputs: endpoint.outputs.map((port) => ({ ...port })),
-			data: {},
-		};
+		return { id, label: labels[i], role: "operator", kind, ...fields, inputs, outputs, data: {} };
 	});
 
 	const references: ReturnType<typeof tile>[] = [];
@@ -491,16 +645,22 @@ function workflowJson({ shape, steps, title }: Plan, providers: string[]): strin
 			type,
 		});
 
+	const fedPorts = (opId: string) =>
+		edges.filter((e) => e.to_node_id === opId).map((e) => e.to_port_id);
 	if (shape === "compare") {
-		for (const port of operators[0].inputs) {
-			if (OPTIONAL_PORTS.has(port.id)) continue;
-			references.push(tile(`ref_${port.id}`, port.label, "reference", port.type));
-			for (const op of operators) edge(`ref_${port.id}`, "out", op.id, port.id, port.type);
+		for (const port of operators[0].inputs.filter(isRequired)) {
+			const ref = `ref_${port.id}`;
+			references.push(tile(ref, port.label, "reference", port.type));
+			for (const op of operators) {
+				const into = feedPort(port.type, op.inputs, fedPorts(op.id));
+				if (into) edge(ref, "out", op.id, into.id, port.type);
+			}
 		}
 	} else {
 		operators.slice(1).forEach((op, i) => {
 			const source = operators[i].outputs[0];
-			edge(operators[i].id, source.id, op.id, op.inputs[0].id, source.type);
+			const into = feedPort(source.type, op.inputs, []);
+			if (into) edge(operators[i].id, source.id, op.id, into.id, source.type);
 		});
 	}
 
@@ -508,12 +668,13 @@ function workflowJson({ shape, steps, title }: Plan, providers: string[]): strin
 	const read = new Set(edges.map((e) => `${e.from_node_id}:${e.from_port_id}`));
 	for (const op of operators) {
 		for (const port of op.inputs) {
-			if (fed.has(`${op.id}:${port.id}`) || OPTIONAL_PORTS.has(port.id)) continue;
+			if (fed.has(`${op.id}:${port.id}`) || !isRequired(port)) continue;
 			const id = `ref_${op.id}_${port.id}`;
 			references.push(tile(id, port.label, "reference", port.type));
 			edge(id, "out", op.id, port.id, port.type);
 		}
-		for (const port of op.outputs) {
+
+		for (const port of op.outputs.slice(0, 1)) {
 			if (read.has(`${op.id}:${port.id}`)) continue;
 			// Subjects name the API endpoints, so the model's label is the useful one.
 			const id = `sub_${op.id}_${port.id}`;

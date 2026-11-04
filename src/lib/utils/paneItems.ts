@@ -2,11 +2,12 @@ import type { Message } from "$lib/types/Message";
 import type { SidePaneView } from "$lib/stores/sidePane.svelte";
 import type { ArtifactRegistry } from "./artifacts";
 import type { TrackioDashboard } from "./trackio";
+import type { WorkflowSpace } from "./workflowSpace";
 
 /**
  * Everything the side pane can show for one conversation, as a single ordered
- * list the user can page through: artifacts, Trackio dashboards, and whatever
- * embeddable thing comes next.
+ * list the user can page through: artifacts, Trackio dashboards, gr.Workflow
+ * Spaces, and whatever embeddable thing comes next.
  *
  * There is one pane and one axis. An artifact contributes ONE item however many
  * versions it has — versions are their own axis inside the artifact view, and
@@ -19,13 +20,15 @@ import type { TrackioDashboard } from "./trackio";
 
 export type PaneItem =
 	| { kind: "artifact"; identifier: string; label: string }
-	| { kind: "trackio"; url: string; label: string; workflow?: boolean };
+	| { kind: "trackio"; url: string; label: string }
+	| { kind: "workflow"; url: string; label: string; spaceId: string };
 
 /** The pane's current selection, as the store holds it. */
 export interface PaneSelection {
 	view: SidePaneView;
 	identifier: string | null;
 	trackioUrl?: string;
+	workflowUrl?: string;
 }
 
 /**
@@ -40,7 +43,8 @@ export interface PaneSelection {
 export function collectPaneItems(
 	messages: Array<Pick<Message, "id">>,
 	registry: ArtifactRegistry,
-	dashboards: TrackioDashboard[]
+	dashboards: TrackioDashboard[],
+	workflows: WorkflowSpace[] = []
 ): PaneItem[] {
 	const position = new Map<Message["id"], number>();
 	messages.forEach((message, index) => position.set(message.id, index));
@@ -55,13 +59,16 @@ export function collectPaneItems(
 
 	for (const dashboard of dashboards) {
 		entries.push({
-			item: {
-				kind: "trackio",
-				url: dashboard.url,
-				label: dashboard.label,
-				...(dashboard.kind === "workflow" ? { workflow: true } : {}),
-			},
+			item: { kind: "trackio", url: dashboard.url, label: dashboard.label },
 			message: at(dashboard.messageId),
+			withinMessage: 0,
+		});
+	}
+
+	for (const { url, label, spaceId, messageId } of workflows) {
+		entries.push({
+			item: { kind: "workflow", url, label, spaceId },
+			message: at(messageId),
 			withinMessage: 0,
 		});
 	}
@@ -91,9 +98,13 @@ export function collectPaneItems(
 
 /** Whether an item is the one the pane is currently showing. */
 export function isPaneItemSelected(item: PaneItem, selection: PaneSelection): boolean {
-	return item.kind === "artifact"
-		? selection.view === "artifact" && selection.identifier === item.identifier
-		: selection.view === "trackio" && selection.trackioUrl === item.url;
+	if (item.kind === "artifact") {
+		return selection.view === "artifact" && selection.identifier === item.identifier;
+	}
+	if (item.kind === "workflow") {
+		return selection.view === "workflow" && selection.workflowUrl === item.url;
+	}
+	return selection.view === "trackio" && selection.trackioUrl === item.url;
 }
 
 /** Index of the selected item, or -1 when the selection is not in the list. */

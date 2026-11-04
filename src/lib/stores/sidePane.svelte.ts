@@ -10,7 +10,7 @@ export const SIDE_PANE_MAX_WIDTH = 2400;
 export const SIDE_PANE_DEFAULT_FRACTION = "60%";
 
 /** Which view owns the pane. One slot, so the views are mutually exclusive. */
-export type SidePaneView = "artifact" | "trackio" | "registry" | "review";
+export type SidePaneView = "artifact" | "trackio" | "workflow" | "registry" | "review";
 
 /**
  * UI state for the side pane. Its content is always derived from the
@@ -27,6 +27,7 @@ class SidePaneStore {
 	view = $state<SidePaneView>("artifact");
 	/** `viewUrl` is a captured view to show instead of the dashboard's default. */
 	trackio = $state<{ url: string; label: string; viewUrl?: string } | null>(null);
+	workflow = $state<{ url: string; label: string; spaceId: string } | null>(null);
 	/** the file version the registry view scrolls to and opens */
 	registryFocus = $state<MlFileRef | null>(null);
 	reviewId = $state<string | null>(null);
@@ -106,6 +107,20 @@ class SidePaneStore {
 		this.openTrackio(url, label);
 	}
 
+	openWorkflow(workflow: { url: string; label: string; spaceId: string }) {
+		this.view = "workflow";
+		this.workflow = { url: workflow.url, label: workflow.label, spaceId: workflow.spaceId };
+		this.open = true;
+		this.revealNonce += 1;
+	}
+
+	maybeAutoOpenWorkflow(workflow: { url: string; label: string; spaceId: string }) {
+		const key = `workflow:${workflow.url}`;
+		if (this.autoOpenedKeys.has(key)) return;
+		this.autoOpenedKeys.add(key);
+		this.openWorkflow(workflow);
+	}
+
 	/** a list, not an item, so it has no place in the item nav */
 	openRegistry(focus: MlFileRef | null = null) {
 		this.view = "registry";
@@ -152,6 +167,7 @@ class SidePaneStore {
 				open: this.open,
 				view: this.view,
 				trackio: this.trackio,
+				workflow: this.workflow,
 				registryFocus: this.registryFocus,
 				reviewId: this.reviewId,
 				identifier: this.identifier,
@@ -174,6 +190,7 @@ class SidePaneStore {
 		this.saved.delete(to as string);
 		this.view = next.view;
 		this.trackio = next.trackio;
+		this.workflow = next.workflow;
 		this.registryFocus = next.registryFocus;
 		this.reviewId = next.reviewId;
 		this.identifier = next.identifier;
@@ -190,6 +207,7 @@ class SidePaneStore {
 		this.open = false;
 		this.view = "artifact";
 		this.trackio = null;
+		this.workflow = null;
 		this.registryFocus = null;
 		this.reviewId = null;
 		this.identifier = null;
@@ -206,6 +224,7 @@ interface SavedPaneState {
 	open: boolean;
 	view: SidePaneView;
 	trackio: SidePaneStore["trackio"];
+	workflow: SidePaneStore["workflow"];
 	registryFocus: SidePaneStore["registryFocus"];
 	reviewId: string | null;
 	identifier: string | null;

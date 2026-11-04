@@ -4,6 +4,7 @@
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import TrackioPane from "./TrackioPane.svelte";
+	import WorkflowPane from "./WorkflowPane.svelte";
 	import MlRegistryPane from "./MlRegistryPane.svelte";
 	import MlReviewPane from "./MlReviewPane.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
@@ -213,19 +214,14 @@
 	// reopening the conversation finds the same dashboards.
 	let trackioDashboards = $derived(collectTrackioDashboards(messages));
 
-	let paneSpaces = $derived.by(() => {
-		const at = new Map(messages.map((message, index) => [message.id, index]));
-		const position = (id?: Message["id"]) =>
-			id === undefined ? Infinity : (at.get(id) ?? Infinity);
-		return [...trackioDashboards, ...collectWorkflowSpaces(messages)].sort(
-			(a, b) => position(a.messageId) - position(b.messageId)
-		);
-	});
+	let workflowSpaces = $derived(collectWorkflowSpaces(messages));
 
 	// One ordered list of everything the pane can show, so its next/previous walks
 	// artifacts and dashboards together instead of each view navigating only its
 	// own kind.
-	let paneItems = $derived(collectPaneItems(messages, artifactRegistry, paneSpaces));
+	let paneItems = $derived(
+		collectPaneItems(messages, artifactRegistry, trackioDashboards, workflowSpaces)
+	);
 
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
@@ -540,11 +536,11 @@
 	});
 
 	$effect(() => {
-		const latest = paneSpaces.findLast((space) => space.kind === "workflow");
+		const latest = workflowSpaces.at(-1);
 		if (!latest || !loading) return;
 		untrack(() => {
-			if (sidePane.open && sidePane.view === "trackio") {
-				sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
+			if (sidePane.open && (sidePane.view === "trackio" || sidePane.view === "workflow")) {
+				sidePane.maybeAutoOpenWorkflow(latest);
 			}
 		});
 	});
@@ -1315,7 +1311,8 @@
 							statusLabel={mlAssistant.statusLabel}
 							complete={mlAssistant.complete}
 							budget={mlAssistant.budget}
-							dashboard={paneSpaces.at(-1)}
+							dashboard={trackioDashboards.at(-1)}
+							workflow={workflowSpaces.at(-1)}
 							registry={mlRegistry.summary}
 						/>
 					{/if}
@@ -1398,7 +1395,8 @@
 								complete={mlAssistant.complete}
 								budget={mlAssistant.budget}
 								onbudgetchange={page.params?.id ? changeMlBudget : undefined}
-								dashboard={paneSpaces.at(-1)}
+								dashboard={trackioDashboards.at(-1)}
+								workflow={workflowSpaces.at(-1)}
 								registry={mlRegistry.summary}
 							/>
 						{/if}
@@ -1626,6 +1624,7 @@
 		onsend={canSendFix ? sendFixRequest : undefined}
 	/>
 	<TrackioPane items={paneItems} />
+	<WorkflowPane items={paneItems} />
 	{#if ML_ASSISTANT_MODE}
 		<MlRegistryPane />
 		{#if !shared}

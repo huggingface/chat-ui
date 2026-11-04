@@ -8,6 +8,7 @@
 	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 	import type { TrackioDashboard } from "$lib/utils/trackio";
+	import type { WorkflowSpace } from "$lib/utils/workflowSpace";
 	import CarbonBox from "~icons/carbon/box";
 	import CarbonFlow from "~icons/carbon/flow";
 
@@ -23,6 +24,8 @@
 		onbudgetchange?: (leftUsd: number) => void;
 		/** The run's newest Trackio dashboard, if it has named one. */
 		dashboard?: TrackioDashboard;
+		/** The newest gr.Workflow Space, with a button of its own so it never hides the dashboard. */
+		workflow?: WorkflowSpace;
 		/** the control stays hidden until the registry holds anything */
 		registry?: MlRegistrySummary;
 	}
@@ -35,6 +38,7 @@
 		budget,
 		onbudgetchange,
 		dashboard,
+		workflow,
 		registry,
 	}: Props = $props();
 
@@ -62,11 +66,7 @@
 	);
 	// A failed status lookup (rate limit, Hub error) must not lock the user out
 	// of a dashboard that may be up.
-	let dashboardLive = $derived(
-		dashboardStatus === "live" ||
-			dashboardStatus === "unknown" ||
-			(dashboard?.kind === "workflow" && dashboardStatus === "building")
-	);
+	let dashboardLive = $derived(dashboardStatus === "live" || dashboardStatus === "unknown");
 	let dashboardShowing = $derived(
 		!!dashboard &&
 			sidePane.open &&
@@ -74,8 +74,25 @@
 			sidePane.trackio?.url === dashboard.url
 	);
 
-	let noun = $derived(dashboard?.kind === "workflow" ? "workflow" : "training dashboard");
-	let Noun = $derived(noun[0].toUpperCase() + noun.slice(1));
+	$effect(() => {
+		if (!workflow) return;
+		return trackioStatus.watch(workflow.url, workflow.spaceId);
+	});
+	let workflowStatus = $derived(workflow ? trackioStatus.status(workflow.url) : undefined);
+
+	let workflowLive = $derived(workflowStatus !== "failed");
+	let workflowShowing = $derived(
+		!!workflow &&
+			sidePane.open &&
+			sidePane.view === "workflow" &&
+			sidePane.workflow?.url === workflow.url
+	);
+
+	function toggleWorkflow() {
+		if (!workflow || !workflowLive) return;
+		if (workflowShowing) sidePane.close();
+		else sidePane.openWorkflow(workflow);
+	}
 
 	function toggleDashboard() {
 		if (!dashboard || !dashboardLive) return;
@@ -258,43 +275,59 @@
 						: "cursor-default opacity-60",
 				]}
 				title={dashboardShowing
-					? `Close the ${noun}: ${dashboard.label}`
+					? `Close the training dashboard: ${dashboard.label}`
 					: dashboardLive
-						? `Open the ${noun}: ${dashboard.label}`
+						? `Open the training dashboard: ${dashboard.label}`
 						: dashboardStatus === "failed"
-							? `The ${noun} never came up`
-							: dashboard.kind === "workflow"
-								? "The workflow is still building"
-								: "The training dashboard starts with the run"}
-				aria-label={dashboardStatus === "building"
-					? `${Noun}, building: ${dashboard.label}`
-					: dashboardLive
-						? `${Noun}: ${dashboard.label}`
-						: `${Noun}, still starting`}
+							? "The training dashboard never came up"
+							: "The training dashboard starts with the run"}
+				aria-label={dashboardLive
+					? `Training dashboard: ${dashboard.label}`
+					: "Training dashboard, still starting"}
 				aria-pressed={dashboardLive ? dashboardShowing : undefined}
 				onclick={toggleDashboard}
 			>
-				{#if dashboard.kind === "workflow"}
-					<CarbonFlow
-						class="size-[14px] shrink-0 {dashboardStatus === 'building' ? 'animate-pulse' : ''}"
-					/>
-				{:else}
-					<IconSparkline
-						classNames="size-[14px] shrink-0 {dashboardStatus === 'building'
-							? 'animate-pulse'
-							: ''}"
-					/>
-				{/if}
+				<IconSparkline
+					classNames="size-[14px] shrink-0 {dashboardStatus === 'building' ? 'animate-pulse' : ''}"
+				/>
 				<!-- The one thing this design collapses: below a comfortable width the
 				     label goes and the icon keeps a round hit target. -->
-				<span class="hidden @min-[480px]:inline"
-					>{dashboard.kind === "workflow" ? "Workflow" : "Metrics"}</span
-				>
+				<span class="hidden @min-[480px]:inline">Metrics</span>
+			</button>
+		{/if}
+
+		{#if workflow}
+			<button
+				type="button"
+				disabled={!workflowLive}
+				class={[
+					"ml-control flex flex-none items-center justify-center gap-[6px] px-2 py-[5px]",
+					"size-7 rounded-full @min-[480px]:size-auto @min-[480px]:rounded-[6px]",
+					"text-[13px] leading-none font-medium text-[#57534e] dark:text-[#a8a29e]",
+					workflowLive
+						? "cursor-pointer hover:bg-black/5 hover:text-[#1c1917] dark:hover:bg-white/[.07] dark:hover:text-[#f5f5f4]"
+						: "cursor-default opacity-60",
+				]}
+				title={workflowShowing
+					? `Close the workflow: ${workflow.label}`
+					: workflowLive
+						? `Open the workflow: ${workflow.label}`
+						: "The workflow never came up"}
+				aria-label={workflowStatus === "building"
+					? `Workflow, building: ${workflow.label}`
+					: `Workflow: ${workflow.label}`}
+				aria-pressed={workflowLive ? workflowShowing : undefined}
+				onclick={toggleWorkflow}
+			>
+				<CarbonFlow
+					class="size-[14px] shrink-0 {workflowStatus === 'building' ? 'animate-pulse' : ''}"
+				/>
+				<span class="hidden @min-[480px]:inline">Workflow</span>
 			</button>
 		{/if}
 
 		{#if budget}
-			{#if dashboard || registryVisible}
+			{#if dashboard || workflow || registryVisible}
 				<!-- Negative margin pulls its neighbours to 8px, inside the 14px group gap. -->
 				<span
 					aria-hidden="true"
