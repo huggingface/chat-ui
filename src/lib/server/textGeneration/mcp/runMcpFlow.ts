@@ -66,6 +66,8 @@ import {
 	resolveOAuthAccessToken,
 } from "$lib/server/mcp/oauth/connections";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
+import type { PlanStep } from "$lib/types/Plan";
+import type { Conversation } from "$lib/types/Conversation";
 import { fetchWithProviderFallback } from "$lib/server/endpoints/openai/providerFallback";
 import {
 	isMlAssistantConversation,
@@ -159,6 +161,35 @@ const MAX_CUT_ANSWER_RETRIES = 1;
 // template leaks their native tool syntax into content. A second leak
 // finalizes as-is rather than looping on a model that cannot comply.
 const MAX_LEAKED_TOOL_CALL_RETRIES = 1;
+
+// One more attempt after an answer that ends the turn before steps of this
+// turn's plan were even started. A round without tool calls is final, so a model
+// whose reasoning is cut short mid-task reports the leftover half-thought as a
+// finished turn. Observed with GLM-class models reasoning about Qwen's
+// `<think></think>` switch: the literal tags end their reasoning at the
+// provider. A plan from an earlier turn is not this request's to finish, and a
+// running step alone is usually done work the model forgot to tick off.
+const MAX_UNFINISHED_PLAN_RETRIES = 1;
+
+/**
+ * Open steps of a plan written during the turn that writes to `messageId`, or
+ * none unless one of them was never started.
+ */
+export function unfinishedPlanSteps(
+	conv: Pick<Conversation, "plan" | "messages">,
+	messageId?: string
+): PlanStep[] {
+	const { plan } = conv;
+	if (!plan) return [];
+	// A steered continuation is a new message but still the original turn.
+	const message = conv.messages.find((m) => m.id === messageId);
+	const turn = message?.queuedContinuationOf
+		? conv.messages.find((m) => m.id === message.queuedContinuationOf)
+		: message;
+	if (!turn?.createdAt || plan.updatedAt < turn.createdAt) return [];
+	if (!plan.steps.some((s) => s.status === "pending")) return [];
+	return plan.steps.filter((s) => s.status === "pending" || s.status === "in_progress");
+}
 /**
  * The `<tool_call>name<arg_key>k</arg_key><arg_value>v</arg_value>` dialect, for
  * a leak that carries no advertised tool name to match on.
@@ -794,6 +825,7 @@ export async function* runMcpFlow({
 		let truncatedToolCallRetries = 0;
 		let cutAnswerRetries = 0;
 		let leakedToolCallRetries = 0;
+		let unfinishedPlanRetries = 0;
 		// For the leaked-markup check: only names that are really callable this
 		// run can make "<name" in a final answer mean a call that never happened.
 		const advertisedToolNames = oaTools.map((tool) => tool.function.name);
@@ -1345,7 +1377,7 @@ export async function* runMcpFlow({
 						content:
 							finishReason === "length"
 								? "[SYSTEM: Your previous response hit the output limit before it finished — most of it was internal reasoning. Give your final answer now, with minimal further reasoning and the answer itself kept concise.]"
-								: "[SYSTEM: Your previous response ended while still inside internal reasoning, so no visible answer was produced. Give your final answer now, with minimal further reasoning and the answer itself kept concise.]",
+								: "[SYSTEM: Your previous response ended while still inside internal reasoning, so nothing visible was produced and no tool was called. Continue from where you left off, with minimal further reasoning: make the next tool call if the task needs one, otherwise give your final answer, kept concise.]",
 					},
 				];
 				continue;
@@ -1383,6 +1415,27 @@ export async function* runMcpFlow({
 					{
 						role: "user" as const,
 						content: `[SYSTEM: Your previous response wrote a tool call as text markup (${leakedToolName ? `<${leakedToolName}> tags` : "tool-call tags such as <arg_value> and </tool_call>"}). That text called nothing — no tool ran, and the user saw broken markup instead of a working control. Respond again: make the call through the function-calling mechanism as a real tool call, and keep tool markup out of your reply text.]`,
+					},
+				];
+				continue;
+			}
+			// A cut by the output limit already had its retry; more rounds won't fit.
+			const openSteps = finishReason === "length" ? [] : unfinishedPlanSteps(conv, messageId);
+			if (openSteps.length > 0 && unfinishedPlanRetries < MAX_UNFINISHED_PLAN_RETRIES) {
+				unfinishedPlanRetries += 1;
+				logger.warn(
+					{ loop, openSteps: openSteps.length, attempt: unfinishedPlanRetries },
+					"[mcp] final answer left plan steps unfinished; retrying"
+				);
+				messagesOpenAI = [
+					...messagesOpenAI,
+					{
+						role: "assistant" as const,
+						content: visibleContent || "(Response ended mid-reasoning, before a visible answer.)",
+					},
+					{
+						role: "user" as const,
+						content: `[SYSTEM: Your previous response ended the turn, but your plan still has unfinished steps: ${openSteps.map((s) => `"${s.step}"`).join(", ")}. Continue with the next step now by making its tool call. If a step is already done, or can't or shouldn't be done, call update_plan to mark it completed or skipped, then give your final answer.]`,
 					},
 				];
 				continue;
