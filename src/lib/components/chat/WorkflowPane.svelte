@@ -14,15 +14,7 @@
 	import CarbonLaunch from "~icons/carbon/launch";
 	import CarbonRenew from "~icons/carbon/renew";
 
-	/**
-	 * A gr.Workflow Space `create_workflow` wrote, framed on its canvas. Framed
-	 * like a Trackio dashboard (a real `*.hf.space` document, so the same
-	 * sandbox), but it also answers the Space's requests for the visitor's
-	 * tokens, as the Hub's own Space page does — see `workflowTokenHandler`.
-	 */
-
 	interface Props {
-		/** Everything the pane can show; also how the view notices its workflow is gone. */
 		items: PaneItem[];
 	}
 
@@ -33,8 +25,7 @@
 		!!workflow && items.some((item) => item.kind === "workflow" && item.url === workflow?.url)
 	);
 
-	// Debounced like the other views: the message list has transient gaps while a
-	// finished generation is refetched, and those must not close the pane.
+	// Debounced: the message list has transient gaps while a generation is refetched.
 	$effect(() => {
 		if (sidePane.open && sidePane.view === "workflow" && workflow && !present) {
 			const timer = setTimeout(() => sidePane.close(), 300);
@@ -57,7 +48,6 @@
 		}
 	});
 
-	/** For a Space that was still building when the pane opened. */
 	let reloadNonce = $state(0);
 
 	let frame = $state<HTMLIFrameElement>();
@@ -69,15 +59,42 @@
 		}
 	});
 
-	// Listening before the frame loads matters: gradio sends its ZeroGPU handshake
-	// once, as its client starts.
+	let declined = $state(false);
+
+	function consent(spaceId: string): boolean {
+		const key = `workflow-inference-consent:${spaceId}`;
+		try {
+			if (localStorage.getItem(key) === "yes") return true;
+		} catch {
+			// storage blocked: ask every time
+		}
+		const yes = window.confirm(
+			`${spaceId} is asking to run models with your Hugging Face account. ` +
+				`Each run uses your Inference Providers credits. Allow it?`
+		);
+		if (!yes) {
+			declined = true;
+			return false;
+		}
+		try {
+			localStorage.setItem(key, "yes");
+		} catch {
+			// remembered for this visit only
+		}
+		return true;
+	}
+
+	// Before the frame loads: gradio sends its ZeroGPU handshake once, on startup.
 	$effect(() => {
 		if (!workflow || !origin) return;
+		const spaceId = workflow.spaceId;
+		declined = false;
 		const onMessage = workflowTokenHandler({
 			frame: () => frame?.contentWindow,
 			origin,
-			spaceId: workflow.spaceId,
+			spaceId,
 			viewer: page.data.user?.username,
+			consent: () => consent(spaceId),
 		});
 		window.addEventListener("message", onMessage);
 		return () => window.removeEventListener("message", onMessage);
@@ -111,14 +128,12 @@
 					>
 						<CarbonRenew />
 					</button>
-					<!-- The URL is built from a *.hf.space Space id at extraction, so this
-					     opens directly, without the external-link confirm. -->
 					<a
 						href={workflow.url}
 						target="_blank"
 						rel="noopener noreferrer"
 						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-						title="Open the workflow in a new tab"
+						title="Open the workflow in a new tab to sign in and run it"
 					>
 						<CarbonLaunch />
 					</a>
@@ -133,8 +148,15 @@
 				</div>
 			</header>
 
+			{#if declined}
+				<p
+					class="flex-none border-b border-gray-100 px-3 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400"
+				>
+					Model runs here won't use your account. Sign in inside the workflow, or open it in a new
+					tab to run it.
+				</p>
+			{/if}
 			<div class="relative min-h-0 flex-1 bg-white dark:bg-gray-900">
-				<!-- Behind the frame, showing through until the canvas paints, as in TrackioPane. -->
 				<div
 					class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center"
 					role="status"

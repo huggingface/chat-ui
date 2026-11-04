@@ -100,45 +100,48 @@ describe("fetchZeroGpuHeaders", () => {
 describe("workflowTokenHandler", () => {
 	const ORIGIN = "https://hmb-wf.hf.space";
 	let frame: { postMessage: ReturnType<typeof vi.fn> };
+	let consent: ReturnType<typeof vi.fn<() => boolean>>;
 	const fetch = vi.fn(async (url: string) =>
 		url.includes("jwt-inference-only")
 			? Response.json({ accessToken: "hf_jwt_x", exp: Date.now() / 1000 + 600 })
 			: Response.json({ encryptedToken: { keyId: "k", encrypted: "e" } })
 	);
 
-	const handler = (overrides: { spaceId?: string; viewer?: string } = {}) =>
+	const handler = (spaceId = "hmb/wf") =>
 		workflowTokenHandler({
 			frame: () => frame as never,
 			origin: ORIGIN,
-			spaceId: "hmb/wf",
+			spaceId,
 			viewer: "hmb",
-			...overrides,
+			consent,
 		});
 	const message = (data: unknown, overrides: Partial<MessageEvent> = {}) =>
 		({ data, origin: ORIGIN, source: frame, ports: [], ...overrides }) as unknown as MessageEvent;
+	const tokenRequest = () => message({ type: "INFERENCE_JWT_REQUEST" });
+	const tokenReply = (token: string | null) =>
+		[expect.objectContaining({ type: "INFERENCE_JWT_RESPONSE", token }), ORIGIN] as const;
 
 	beforeEach(() => {
 		frame = { postMessage: vi.fn() };
+		consent = vi.fn(() => true);
 		fetch.mockClear();
 		vi.stubGlobal("fetch", fetch);
 	});
 	afterEach(() => vi.unstubAllGlobals());
 
-	it("answers the viewer's own Space, only at its origin", async () => {
+	it("answers the viewer's own Space without asking, only at its origin", async () => {
 		const port = { postMessage: vi.fn() };
 		const onMessage = handler();
 		await onMessage(message("supports-zerogpu-headers"));
 		await onMessage(message("zerogpu-headers", { ports: [port as never] }));
-		await onMessage(message({ type: "INFERENCE_JWT_REQUEST" }));
+		await onMessage(tokenRequest());
 
 		expect(frame.postMessage).toHaveBeenCalledWith("supports-zerogpu-headers", ORIGIN);
 		expect(port.postMessage).toHaveBeenCalledWith(
 			expect.objectContaining({ "X-ZeroGPU-Token": "k:e" })
 		);
-		expect(frame.postMessage).toHaveBeenCalledWith(
-			expect.objectContaining({ type: "INFERENCE_JWT_RESPONSE", token: "hf_jwt_x" }),
-			ORIGIN
-		);
+		expect(frame.postMessage).toHaveBeenCalledWith(...tokenReply("hf_jwt_x"));
+		expect(consent).not.toHaveBeenCalled();
 	});
 
 	it.each([
@@ -151,23 +154,20 @@ describe("workflowTokenHandler", () => {
 		expect(frame.postMessage).not.toHaveBeenCalled();
 	});
 
-	it.each([
-		["someone else's Space", "mallory/wf", "hmb"],
-		["a signed-out viewer", "hmb/wf", undefined],
-	])("gives %s no token and no ZeroGPU handshake", async (_, spaceId, viewer) => {
-		const port = { postMessage: vi.fn() };
-		const onMessage = handler({ spaceId, viewer });
-		await onMessage(message("supports-zerogpu-headers"));
-		await onMessage(message("zerogpu-headers", { ports: [port as never] }));
-		await onMessage(message({ type: "INFERENCE_JWT_REQUEST" }));
+	it("asks once before lending someone else's Space the token", async () => {
+		const onMessage = handler("mallory/wf");
+		await Promise.all([onMessage(tokenRequest()), onMessage(tokenRequest())]);
+
+		expect(consent).toHaveBeenCalledTimes(1);
+		expect(fetch).toHaveBeenCalledTimes(1);
+		expect(frame.postMessage).toHaveBeenCalledWith(...tokenReply("hf_jwt_x"));
+	});
+
+	it("replies with no token when the viewer says no", async () => {
+		consent.mockReturnValue(false);
+		await handler("mallory/wf")(tokenRequest());
 
 		expect(fetch).not.toHaveBeenCalled();
-		// Still answered, so gradio runs as a guest instead of waiting.
-		expect(port.postMessage).toHaveBeenCalledWith({});
-		expect(frame.postMessage).toHaveBeenCalledTimes(1);
-		expect(frame.postMessage).toHaveBeenCalledWith(
-			expect.objectContaining({ type: "INFERENCE_JWT_RESPONSE", token: null }),
-			ORIGIN
-		);
+		expect(frame.postMessage).toHaveBeenCalledWith(...tokenReply(null));
 	});
 });

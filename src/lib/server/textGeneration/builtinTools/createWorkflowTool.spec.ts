@@ -248,6 +248,17 @@ describe("create_workflow", () => {
 			"no /predict endpoint — it has /generate",
 		],
 		[
+			{
+				shape: "chain",
+				name: "x",
+				steps: [
+					{ space: "hugging-apps/moss", endpoint: "/on_load" },
+					{ model: "krea/Krea-2-Turbo", task: "text-to-image" },
+				],
+			},
+			"hugging-apps/moss returns nothing to feed the next step",
+		],
+		[
 			compare,
 			"not served by any inference provider",
 			() => (models["krea/Krea-2-Turbo"] = { ...t2i, providers: ["error"] }),

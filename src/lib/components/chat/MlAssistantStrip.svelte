@@ -24,7 +24,6 @@
 		onbudgetchange?: (leftUsd: number) => void;
 		/** The run's newest Trackio dashboard, if it has named one. */
 		dashboard?: TrackioDashboard;
-		/** The newest gr.Workflow Space, with a button of its own so it never hides the dashboard. */
 		workflow?: WorkflowSpace;
 		/** the control stays hidden until the registry holds anything */
 		registry?: MlRegistrySummary;

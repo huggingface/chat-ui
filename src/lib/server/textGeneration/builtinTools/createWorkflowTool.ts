@@ -83,17 +83,9 @@ const definition: OpenAiTool = {
 };
 
 /**
- * Writes the Space itself, rather than leaving it to the model. A workflow.json
- * fails silently where it fails at all: a port id the endpoint does not take
- * sends the wrong argument, a missing OAuth scope keeps a visitor's token from
- * reaching the providers, a model nobody serves 404s on Run. So the graph is
- * generated from the endpoint schemas below and every model is checked here,
- * before anything exists. workflow.json is the source of truth from then on:
- * app.py only loads it. The canvas cannot save back to it: that would need
- * write-repos, which every visitor who signs in would have to grant.
- *
- * Nothing it creates spends the conversation's budget: a gradio Space runs on
- * free CPU, and every inference call bills the visitor who presses Run.
+ * Writes the Space itself rather than leaving it to the model: a bad workflow.json
+ * fails silently, so the graph is generated from the schemas below and every node
+ * checked before anything exists.
  */
 export function createWorkflowTool(
 	namespace: () => string | undefined,
@@ -129,7 +121,10 @@ export function createWorkflowTool(
 			const resolved = checks as Operator[];
 
 			for (let i = 1; i < resolved.length && plan.shape === "chain"; i++) {
-				const out = resolved[i - 1].outputs[0].type;
+				const out = resolved[i - 1].outputs[0]?.type;
+				if (!out) {
+					return { error: `${repoOf(plan.steps[i - 1])} returns nothing to feed the next step.` };
+				}
 				if (feedPort(out, resolved[i].inputs, [])) continue;
 				const takes = new Set(resolved[i].inputs.filter(isRequired).map((port) => port.type));
 				return {
@@ -378,9 +373,7 @@ const COMPONENT_PORTS: Record<string, string> = {
 	textbox: "text",
 	dropdown: "text",
 	radio: "text",
-	label: "text",
 	code: "text",
-	chatbot: "text",
 	markdown: "markdown",
 	html: "html",
 	number: "number",
@@ -388,7 +381,6 @@ const COMPONENT_PORTS: Record<string, string> = {
 	checkbox: "boolean",
 	image: "image",
 	imageeditor: "image",
-	imageslider: "image",
 	gallery: "gallery",
 	audio: "audio",
 	video: "video",
@@ -396,14 +388,12 @@ const COMPONENT_PORTS: Record<string, string> = {
 	model3d: "model3d",
 	json: "json",
 	dataframe: "json",
+	chatbot: "json",
+	label: "json",
+	imageslider: "json",
 };
 const portType = (io: GradioIo) => COMPONENT_PORTS[(io.component ?? "").toLowerCase()] ?? "any";
 
-/**
- * A running Gradio Space and the endpoint to call, as a `kind: "space"` node. Its
- * arguments go positionally, so the ports follow the endpoint's parameter order;
- * ones with a default are left unwired and run with it.
- */
 async function checkSpace(
 	{ space, endpoint }: SpaceStep,
 	accessToken: string,
@@ -425,15 +415,18 @@ async function checkSpace(
 			return `${space} is ${info.runtime?.stage ?? "not running"}, so a workflow cannot call it — pick a running Space.`;
 		}
 		// No token: the Space's own code would read it.
-		const api = await fetch(`${info.host}/gradio_api/info`, { signal });
+		const api = await fetch(`${info.host}/gradio_api/info`, {
+			signal: AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(15_000)]),
+		});
 		if (!api.ok) return `${space} does not expose a Gradio API (${api.status}).`;
 		named = (await api.json()).named_endpoints ?? {};
 	} catch (err) {
 		return `Could not look up ${space}: ${String(err)}`;
 	}
+	// Utility endpoints are only skipped when picking a default; one named explicitly is used.
 	const names = Object.keys(named).filter((name) => !UTILITY_ENDPOINT.test(name));
 	const name = endpoint ?? (names.includes("/predict") ? "/predict" : names[0]);
-	if (!name || !names.includes(name)) {
+	if (!name || !Object.hasOwn(named, name)) {
 		return `${space} has no ${endpoint ?? "callable"} endpoint${names.length ? ` — it has ${names.join(", ")}` : ""}.`;
 	}
 	const { parameters = [], returns = [] } = named[name];
@@ -492,13 +485,9 @@ const out = (label: string, type: string): Port[] => [
 ];
 
 /**
- * The endpoint schemas `kind: "model"` nodes are called with, copied from
- * `_INFERENCE_ENDPOINT_SCHEMAS` and `_PIPELINE_TAG_TO_ENDPOINT` in gradio's
- * `gradio/workflow.py` at GRADIO_VERSION. With an endpoint set, arguments go as
- * keyword arguments keyed by port id, so these ids are not labels: they are
- * the parameter names, and one that drifts sends the wrong argument.
+ * Copied from `_INFERENCE_ENDPOINT_SCHEMAS` and `_PIPELINE_TAG_TO_ENDPOINT` in
+ * gradio's `gradio/workflow.py`. Port ids are the keyword argument names.
  */
-// ponytail: a copy of gradio's table, bump it with GRADIO_VERSION; read it from gradio if it starts drifting
 const ENDPOINTS: Record<string, Endpoint> = {
 	text_to_image: { inputs: [text("prompt", "Prompt")], outputs: out("Image", "image") },
 	text_to_speech: { inputs: [text("text", "Text")], outputs: out("Audio", "audio") },
@@ -608,12 +597,8 @@ function tile(id: string, label: string, role: "reference" | "subject", type: st
 }
 
 /**
- * The schema-v2 graph: a compare shares one reference per input of the first
- * step across every step that takes that type, a chain wires each output into
- * the first input of the next step that takes it, and any required input nothing
- * feeds gets its own reference, any output nothing reads its own subject. Node
- * ids are readable and stable (op_flux_1_dev), since they are what a user points
- * at on the canvas. No coordinates: the canvas lays it out.
+ * The schema-v2 graph: a compare shares references across steps, a chain wires
+ * each output into the next step. Unfed required inputs get a reference.
  */
 function workflowJson({ shape, steps, title }: Plan, resolved: Operator[]): string {
 	const names = steps.map((step) => repoOf(step).split("/")[1]);

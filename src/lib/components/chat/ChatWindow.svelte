@@ -538,10 +538,10 @@
 	$effect(() => {
 		const latest = workflowSpaces.at(-1);
 		if (!latest || !loading) return;
+		// Desktop only, and never over another view.
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
 		untrack(() => {
-			if (sidePane.open && (sidePane.view === "trackio" || sidePane.view === "workflow")) {
-				sidePane.maybeAutoOpenWorkflow(latest);
-			}
+			if (!sidePane.open || sidePane.view === "workflow") sidePane.maybeAutoOpenWorkflow(latest);
 		});
 	});
 
