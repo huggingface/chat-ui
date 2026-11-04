@@ -27,6 +27,7 @@ import yaml from "js-yaml";
 import { BSON, MongoClient, ObjectId } from "mongodb";
 import superjson from "superjson";
 import {
+	accuracySince,
 	artifactReady,
 	artifactRepo,
 	askedFirst,
@@ -107,6 +108,7 @@ interface Answer {
 	t: number;
 	questions: Array<{ question: string; options: string[] }>;
 	content: Record<string, string | number | boolean | string[]>;
+	declined?: boolean;
 }
 
 interface Reservation {
@@ -351,11 +353,16 @@ class AppClient {
 		throw new Error("the assistant message never appeared");
 	}
 
-	async answer(convId: string, elicitationId: string, content: Answer["content"]) {
+	async answer(
+		convId: string,
+		elicitationId: string,
+		content: Answer["content"],
+		action: "accept" | "decline" = "accept"
+	) {
 		const res = await fetch(`${APP_URL}/conversation/${convId}/elicitation`, {
 			method: "POST",
 			headers: this.headers({ "content-type": "application/json", accept: "application/json" }),
-			body: JSON.stringify({ elicitationId, action: "accept", content, timezone: "UTC" }),
+			body: JSON.stringify({ elicitationId, action, content, timezone: "UTC" }),
 		});
 		if (!res.ok && res.status !== 409) {
 			throw new Error(`answer elicitation: ${res.status} ${await res.text()}`);
@@ -460,8 +467,7 @@ function answerField(
 			return field.default ?? true;
 		case "select": {
 			// Budget options would move the cap the checks measure against.
-			const options = field.options.filter((o) => o.setBudgetUsd === undefined);
-			const pool = options.length > 0 ? options : field.options;
+			const pool = field.options.filter((o) => o.setBudgetUsd === undefined);
 			const haystack = [field.title, field.description, ...pool.map((o) => o.label)].join(" ");
 			const rule = scenario.answers?.find((r) => r.question.test(haystack));
 			const picked =
@@ -555,8 +561,9 @@ async function trackioCli<T>(args: string[], space: string): Promise<T> {
 	return JSON.parse(stdout) as T;
 }
 
-/** Last accuracy value logged to the dashboard: test/val/eval accuracy over train accuracy. */
-async function trackioAccuracy(space: string): Promise<number | undefined> {
+/** Last accuracy logged to the dashboard during this run: test/val/eval accuracy over train accuracy. */
+async function trackioAccuracy(space: string, since: number): Promise<number | undefined> {
+	const logged: Array<Array<{ value: number; timestamp?: string }>> = [];
 	try {
 		const { projects } = await trackioCli<{ projects: string[] }>(["list", "projects"], space);
 		for (const project of projects.reverse()) {
@@ -572,18 +579,17 @@ async function trackioAccuracy(space: string): Promise<number | undefined> {
 				const accuracies = run.metrics.filter((m) => /acc/i.test(m));
 				const metric = accuracies.find((m) => /test|val|eval/i.test(m)) ?? accuracies[0];
 				if (!metric) continue;
-				const { values } = await trackioCli<{ values: Array<{ value: number }> }>(
-					["get", "metric", "--project", project, "--run", runName, "--metric", metric],
-					space
-				);
-				const last = values.at(-1)?.value;
-				if (typeof last === "number") return normalizeAccuracy(last);
+				const { values } = await trackioCli<{
+					values: Array<{ value: number; timestamp?: string }>;
+				}>(["get", "metric", "--project", project, "--run", runName, "--metric", metric], space);
+				logged.push(values);
 			}
 		}
 	} catch (err) {
 		log(`could not read metrics from ${space} (is the trackio CLI installed?):`, String(err));
 	}
-	return undefined;
+	const value = accuracySince(logged, since);
+	return value === undefined ? undefined : normalizeAccuracy(value);
 }
 
 /** The last "accuracy ... 0.97" / "accuracy: 97.3%" in the final answer. */
@@ -855,9 +861,13 @@ async function runScenario(client: AppClient, scenario: Scenario, repeat: number
 			const request = update.request as { elicitationId: string; fields: ElicitationField[] };
 			if (answered.has(request.elicitationId)) return;
 			answered.add(request.elicitationId);
-			const content = Object.fromEntries(
-				request.fields.map((f) => [f.name, answerField(f, scenario)])
+			// accepting would raise the cap the checks measure against
+			const budgetOnly = request.fields.some(
+				(f) => f.kind === "select" && f.options.every((o) => o.setBudgetUsd !== undefined)
 			);
+			const content = budgetOnly
+				? {}
+				: Object.fromEntries(request.fields.map((f) => [f.name, answerField(f, scenario)]));
 			answers.push({
 				elicitationId: request.elicitationId,
 				toolUuid: update.toolUuid as string | undefined,
@@ -867,9 +877,17 @@ async function runScenario(client: AppClient, scenario: Scenario, repeat: number
 					options: f.kind === "select" ? f.options.map((o) => o.label) : [],
 				})),
 				content,
+				declined: budgetOnly,
 			});
-			log(`  ${label} answered: ${JSON.stringify(content)}`);
-			await client.answer(conv.id, request.elicitationId, content);
+			log(
+				`  ${label} ${budgetOnly ? "declined a budget question" : `answered: ${JSON.stringify(content)}`}`
+			);
+			await client.answer(
+				conv.id,
+				request.elicitationId,
+				content,
+				budgetOnly ? "decline" : "accept"
+			);
 		});
 		if (turnStatus === "timeout") await client.stop(conv.id);
 
@@ -903,7 +921,7 @@ async function runScenario(client: AppClient, scenario: Scenario, repeat: number
 	).filter((s): s is string => s !== undefined);
 	let trackioAcc: number | undefined;
 	for (const space of existing) {
-		trackioAcc = await trackioAccuracy(space);
+		trackioAcc = await trackioAccuracy(space, startedAt);
 		if (trackioAcc !== undefined) break;
 	}
 

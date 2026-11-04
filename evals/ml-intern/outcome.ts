@@ -78,6 +78,28 @@ export function artifactReady(kind: ArtifactKind, info: RepoInfo): boolean {
 	}
 }
 
+/** trackio stores naive utc timestamps */
+const trackioTime = (ts: string) =>
+	Date.parse(/[zZ]$|[+-]\d\d:?\d\d$/.test(ts) ? ts : `${ts.replace(" ", "T")}Z`);
+
+/**
+ * the last value of the one run that logged since the eval run started, none when several did
+ * since repeats and earlier runs can share a dashboard
+ */
+export function accuracySince(
+	runs: Array<Array<{ value: number; timestamp?: string }>>,
+	since: number
+): number | undefined {
+	const fresh = runs
+		.map((values) =>
+			values.filter((v) => v.timestamp !== undefined && trackioTime(v.timestamp) >= since)
+		)
+		.filter((values) => values.length > 0);
+	if (fresh.length !== 1) return undefined;
+	const last = fresh[0].at(-1)?.value;
+	return typeof last === "number" ? last : undefined;
+}
+
 /** the last RESULT line hidden_checks.py printed */
 export function parseHiddenResult(output: string): HiddenResult | undefined {
 	const line = output

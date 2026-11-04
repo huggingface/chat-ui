@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	accuracySince,
 	artifactReady,
 	askedFirst,
 	fill,
@@ -105,5 +106,27 @@ describe("parseHiddenResult", () => {
 		expect(parseHiddenResult("Traceback ...")).toBeUndefined();
 		expect(parseHiddenResult("RESULT {not json")).toBeUndefined();
 		expect(parseHiddenResult('RESULT {"accuracy": 1}')).toBeUndefined();
+	});
+});
+
+describe("accuracySince", () => {
+	const since = Date.parse("2026-11-04T12:00:00Z");
+	const run = (...stamps: string[]) =>
+		stamps.map((timestamp, i) => ({ value: 0.5 + i / 10, timestamp }));
+
+	it("takes the last value of the one run that logged during this eval run", () => {
+		expect(accuracySince([run("2026-11-04 12:05:00", "2026-11-04 12:06:00")], since)).toBe(0.6);
+	});
+
+	it("ignores an earlier run on a shared dashboard", () => {
+		const earlier = run("2026-11-03 09:00:00", "2026-11-03 09:01:00");
+		expect(accuracySince([earlier, run("2026-11-04T12:05:00Z")], since)).toBe(0.5);
+		expect(accuracySince([earlier], since)).toBeUndefined();
+	});
+
+	it("takes none when two runs logged at once, as parallel repeats can", () => {
+		expect(
+			accuracySince([run("2026-11-04 12:05:00"), run("2026-11-04 12:07:00")], since)
+		).toBeUndefined();
 	});
 });
