@@ -1,15 +1,14 @@
-name: ML Intern eval
-
-# Runs the end-to-end ML Intern scenarios (evals/ml-intern) against a real model and real HF
-# Jobs, and uploads each run's agent traces to a private Trackio Space per PR.
-#
-# Needs the ML_EVAL_HF_TOKEN secret: a token with inference, job and write permissions, on an
-# account with credits (it pays for the jobs). Optionally set the ML_EVAL_TRACES_NAMESPACE
-# variable to put the trace Spaces under an org instead of the token's user.
+# ml intern outcome evals, see evals/ml-intern/README.md
+# the ml-intern-eval label compares a pr head against its merge-base and is removed when the run ends
+# ML_EVAL_HF_TOKEN or DECISION_EVALS_HF_TOKEN pays for the jobs
+name: ML Intern outcome evals
 
 on:
-  pull_request:
+  schedule:
+    - cron: "0 3 * * *"
   workflow_dispatch:
+  pull_request:
+    types: [labeled]
 
 permissions: {}
 
@@ -17,41 +16,195 @@ concurrency:
   group: ml-intern-eval-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  RESULTS_REPO: ml-intern-internal/ml-intern-outcome-eval-runs
+  TRACES_SPACE: ${{ vars.ML_EVAL_TRACES_NAMESPACE && format('{0}/', vars.ML_EVAL_TRACES_NAMESPACE) || '' }}chat-ui-ml-intern-evals
+  HF_TOKEN: ${{ secrets.ML_EVAL_HF_TOKEN || secrets.DECISION_EVALS_HF_TOKEN }}
+  EXA_API_KEY: ${{ secrets.DECISION_EVALS_EXA_API_KEY }}
+
 jobs:
-  eval:
-    # Secrets are not available to fork PRs.
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+  nightly:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
     permissions:
       contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
     steps:
-      - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
+      - name: Check the token is set
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::error::ML_EVAL_HF_TOKEN is not set"
+            exit 1
+          fi
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
         with:
-          # 22+ for --experimental-strip-types.
-          node-version: "22"
+          node-version-file: .nvmrc
           cache: "npm"
-      - run: npm ci
 
-      - name: Install trackio
-        run: |
-          python3 -m venv "$RUNNER_TEMP/venv"
-          "$RUNNER_TEMP/venv/bin/pip" install --quiet "trackio>=0.38"
-          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
-
-      - name: Run ML Intern eval
-        env:
-          HF_TOKEN: ${{ secrets.ML_EVAL_HF_TOKEN }}
-          ML_EVAL_TRACES_SPACE: ${{ vars.ML_EVAL_TRACES_NAMESPACE && format('{0}/', vars.ML_EVAL_TRACES_NAMESPACE) || '' }}chat-ui-ml-intern-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || 'manual' }}
-          ML_EVAL_RUN_NAME: ${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
-        run: npm run eval:ml-intern
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: always()
+      - name: Cache mongodb-memory-server binaries
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          name: ml-intern-eval
-          path: eval-output/ml-intern/
-          retention-days: 14
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
+      - name: Install
+        run: |
+          npm ci
+          pip install --quiet "huggingface_hub==1.33.0" "trackio>=0.38"
+
+      - name: Run every task once
+        run: |
+          name="nightly-$(date -u +%F)-${GITHUB_SHA::8}"
+          echo "name=$name" >> "$GITHUB_ENV"
+          ML_EVAL_OUT=out ML_EVAL_REPEATS=1 ML_EVAL_TRACES_SPACE="$TRACES_SPACE" ML_EVAL_RUN_NAME="$name" \
+            npm run eval:ml-intern
+
+      - name: Push the results
+        if: always()
+        run: |
+          [ -f out/result.json ] || exit 0
+          hf upload "$RESULTS_REPO" out "nightly/$name" --repo-type dataset --private --exclude "server.log" --quiet
+
+  compare:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.label.name == 'ml-intern-eval' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      BASE_REF: ${{ github.event.pull_request.base.ref }}
+      REPEATS: "3"
+    steps:
+      - name: Check the token is set
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::error::ML_EVAL_HF_TOKEN is not set"
+            exit 1
+          fi
+
+      - name: Checkout the PR
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+          fetch-depth: 0
+
+      - name: Check out the merge-base
+        id: base
+        run: |
+          sha=$(git -C head merge-base "origin/$BASE_REF" HEAD)
+          git -C head worktree add ../base "$sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          # both arms run the head eval code so only the app differs
+          rm -rf base/evals
+          cp -r head/evals base/evals
+          echo "evals=$(git -C head rev-parse HEAD:evals | cut -c1-8)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
+        with:
+          node-version-file: head/.nvmrc
+          cache: "npm"
+          cache-dependency-path: |
+            head/package-lock.json
+            base/package-lock.json
+
+      - name: Cache mongodb-memory-server binaries
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
+      - name: Install
+        run: |
+          npm ci --prefix head
+          npm ci --prefix base
+          pip install --quiet "huggingface_hub==1.33.0" "trackio>=0.38"
+
+      - name: Download a cached base arm
+        id: data
+        run: |
+          settings="r$REPEATS-evals${{ steps.base.outputs.evals }}"
+          base_key="${{ steps.base.outputs.sha }}-$settings"
+          echo "base_key=$base_key" >> "$GITHUB_OUTPUT"
+          echo "head_key=$HEAD_SHA-$settings" >> "$GITHUB_OUTPUT"
+          mkdir -p runs
+          if hf download "$RESULTS_REPO" --repo-type dataset --include "arms/$base_key/*" --local-dir cached --quiet \
+            && [ -f "cached/arms/$base_key/result.json" ]; then
+            mv "cached/arms/$base_key" runs/base
+            echo "cached=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "cached=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # two builds at once can run the runner out of memory
+      - name: Build both arms
+        run: |
+          (cd head && ML_EVAL_BUILD_ONLY=1 node --experimental-strip-types --no-warnings evals/ml-intern/run.ts)
+          if [ "${{ steps.data.outputs.cached }}" != "true" ]; then
+            (cd base && ML_EVAL_BUILD_ONLY=1 node --experimental-strip-types --no-warnings evals/ml-intern/run.ts)
+          fi
+
+      - name: Run both arms
+        run: |
+          arm() {
+            (cd "$1" && ML_EVAL_SKIP_BUILD=1 ML_EVAL_PORT="$2" ML_EVAL_OUT="../runs/$1" ML_EVAL_REPEATS="$REPEATS" \
+              ML_EVAL_TRACES_SPACE="$TRACES_SPACE" ML_EVAL_RUN_NAME="pr$PR-$1-$3" \
+              node --experimental-strip-types --no-warnings evals/ml-intern/run.ts)
+          }
+          arm head 5210 "${HEAD_SHA::8}" &
+          head_pid=$!
+          base_status=0
+          if [ "${{ steps.data.outputs.cached }}" != "true" ]; then
+            base_sha="${{ steps.base.outputs.sha }}"
+            arm base 5211 "${base_sha::8}" || base_status=$?
+          fi
+          wait "$head_pid"
+          exit "$base_status"
+
+      - name: Compare
+        run: |
+          mkdir -p out
+          (cd head && npm run --silent eval:ml-intern:compare -- --a ../runs/base/result.json --b ../runs/head/result.json \
+            --out ../out/report.json --markdown ../out/summary.md)
+          cat out/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Push the results
+        run: |
+          hf upload "$RESULTS_REPO" runs/base "arms/${{ steps.data.outputs.base_key }}" --repo-type dataset --private --exclude "server.log" --quiet
+          hf upload "$RESULTS_REPO" runs/head "arms/${{ steps.data.outputs.head_key }}" --repo-type dataset --private --exclude "server.log" --quiet
+          hf upload "$RESULTS_REPO" out "prs/$PR/$HEAD_SHA" --repo-type dataset --private --quiet
+
+      - name: Comment on the PR
+        run: |
+          {
+            echo
+            echo "Runs and traces (private): https://huggingface.co/datasets/$RESULTS_REPO/tree/main/prs/$PR/$HEAD_SHA"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } >> out/summary.md
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.body | startswith("<!-- ml-intern-eval -->")) | .id' | tail -1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@out/summary.md > /dev/null
+          else
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file out/summary.md
+          fi
+
+      - name: Report a failed run on the PR
+        if: failure()
+        run: |
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "ML Intern outcome evals failed before a result: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+      - name: Remove the label
+        if: always()
+        continue-on-error: true
+        run: gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --remove-label ml-intern-eval
