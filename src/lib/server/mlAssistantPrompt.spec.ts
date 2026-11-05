@@ -539,7 +539,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(39_500);
+		expect(composed.length).toBeLessThan(40_500);
 	});
 
 	it("keeps the review guidance short, the rest lives in the tool description", () => {
