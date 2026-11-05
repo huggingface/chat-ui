@@ -566,6 +566,79 @@ describe("Slack transport authorization", () => {
 		expect(await collections.slackDeliveries.countDocuments({ threadId: thread._id })).toBe(2);
 	});
 
+	it("lists this turn's plan on the status card and bolds the running step only while working", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Plan it", ts: "100.0" },
+			"T123",
+			"PLAN1"
+		);
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+		const startedAt = new Date();
+		const turn = { id: crypto.randomUUID(), from: "assistant" as const, content: "" };
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			messages: [{ ...turn, createdAt: startedAt }],
+		});
+		const setPlan = (statuses: string[], updatedAt = new Date(startedAt.getTime() + 1000)) =>
+			collections.conversations.updateOne({ _id: thread.conversationId }, {
+				$set: {
+					plan: {
+						goal: "Compare",
+						steps: ["Verify GGUF files", "Write Space files", "Deploy"].map((step, i) => ({
+							step,
+							status: statuses[i],
+						})),
+						version: 1,
+						updatedAt,
+					},
+				},
+			} as never);
+		const card = () => {
+			const [v] = [...mocks.post.mock.calls, ...mocks.update.mock.calls].at(-1) ?? [];
+			return v.blocks[0].text.text as string;
+		};
+
+		await setPlan(["completed", "skipped", "in_progress"], new Date(startedAt.getTime() - 1000));
+		await bot["publishSessionStatus"](thread, "⏳ _working..._ · 0s", [], true);
+		expect(card()).toBe(
+			"⏳ _working..._ · 0s\n💻 Jobs $0.00 spent · $0.00 reserved · $0.00 budget"
+		);
+
+		await setPlan(["completed", "skipped", "in_progress"]);
+		await bot["publishSessionStatus"](thread, "⏳ _working..._ · 10s", [], true);
+		expect(card()).toBe(
+			"⏳ _working..._ · 10s\n\n1. Verify GGUF files\n2. ~Write Space files~\n3. *Deploy*\n\n💻 Jobs $0.00 spent · $0.00 reserved · $0.00 budget"
+		);
+
+		await bot["publishSessionStatus"](thread, "⏹️ Stopped", []);
+		expect(card()).toContain("\n3. Deploy\n");
+
+		await setPlan(["completed", "completed", "completed"]);
+		await bot["publishSessionStatus"](thread, "✅ Finished · 20s", []);
+		expect(card()).not.toContain("*Deploy*");
+		expect(card()).toContain("1. Verify GGUF files\n2. Write Space files\n3. Deploy");
+
+		await collections.conversations.updateOne({ _id: thread.conversationId }, {
+			$set: {
+				plan: {
+					goal: "Long",
+					steps: Array.from({ length: 20 }, (_, i) => ({
+						step: `${"x".repeat(199)}${i}`,
+						status: i === 0 ? "in_progress" : "pending",
+					})),
+					version: 2,
+					updatedAt: new Date(startedAt.getTime() + 2000),
+				},
+			},
+		} as never);
+		await bot["publishSessionStatus"](thread, "⏳ _working..._ · 30s", [], true);
+		expect(card().length).toBeLessThanOrEqual(3000);
+		expect(card()).toContain(`1. *${"x".repeat(99)}…*\n`);
+	});
+
 	it("swaps 👀 for ✅ once the turn finishes and only tags people who asked the bot", async () => {
 		const { user, locals } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);
