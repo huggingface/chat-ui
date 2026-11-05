@@ -620,6 +620,23 @@ describe("Slack transport authorization", () => {
 		await bot["publishSessionStatus"](thread, "✅ Finished · 20s", []);
 		expect(card()).not.toContain("*Deploy*");
 		expect(card()).toContain("1. Verify GGUF files\n2. Write Space files\n3. Deploy");
+
+		await collections.conversations.updateOne({ _id: thread.conversationId }, {
+			$set: {
+				plan: {
+					goal: "Long",
+					steps: Array.from({ length: 20 }, (_, i) => ({
+						step: `${"x".repeat(199)}${i}`,
+						status: i === 0 ? "in_progress" : "pending",
+					})),
+					version: 2,
+					updatedAt: new Date(startedAt.getTime() + 2000),
+				},
+			},
+		} as never);
+		await bot["publishSessionStatus"](thread, "⏳ _working..._ · 30s", [], true);
+		expect(card().length).toBeLessThanOrEqual(3000);
+		expect(card()).toContain(`1. *${"x".repeat(99)}…*\n`);
 	});
 
 	it("swaps 👀 for ✅ once the turn finishes and only tags people who asked the bot", async () => {

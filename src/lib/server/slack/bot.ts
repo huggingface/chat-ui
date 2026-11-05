@@ -1630,7 +1630,9 @@ export class MlSlackBot {
 		const plan = conv?.plan && (!startedAt || conv.plan.updatedAt >= startedAt) ? conv.plan : null;
 		const steps = plan?.steps
 			.map((s, i) => {
-				const step = s.step.replace(/\s+/g, " ").trim();
+				// Keeps a full 20-step plan inside Slack's 3,000-character section.
+				const flat = s.step.replace(/\s+/g, " ").trim();
+				const step = flat.length > 100 ? `${flat.slice(0, 99).trimEnd()}…` : flat;
 				return `${i + 1}. ${s.status === "in_progress" && working ? `**${step}**` : s.status === "skipped" ? `~~${step}~~` : step}`;
 			})
 			.join("\n");
