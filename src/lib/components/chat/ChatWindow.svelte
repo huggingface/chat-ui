@@ -4,11 +4,13 @@
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import TrackioPane from "./TrackioPane.svelte";
+	import WorkflowPane from "./WorkflowPane.svelte";
 	import MlRegistryPane from "./MlRegistryPane.svelte";
 	import MlReviewPane from "./MlReviewPane.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
 	import { collectTrackioDashboards } from "$lib/utils/trackio";
+	import { collectWorkflowSpaces } from "$lib/utils/workflowSpace";
 	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
 	import { collectPaneItems } from "$lib/utils/paneItems";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
@@ -212,10 +214,14 @@
 	// reopening the conversation finds the same dashboards.
 	let trackioDashboards = $derived(collectTrackioDashboards(messages));
 
+	let workflowSpaces = $derived(collectWorkflowSpaces(messages));
+
 	// One ordered list of everything the pane can show, so its next/previous walks
 	// artifacts and dashboards together instead of each view navigating only its
 	// own kind.
-	let paneItems = $derived(collectPaneItems(messages, artifactRegistry, trackioDashboards));
+	let paneItems = $derived(
+		collectPaneItems(messages, artifactRegistry, trackioDashboards, workflowSpaces)
+	);
 
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
@@ -527,6 +533,16 @@
 		if (latest.spaceId && trackioStatus.status(latest.url) !== "live") return;
 		if (!window.matchMedia("(min-width: 768px)").matches) return;
 		sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
+	});
+
+	$effect(() => {
+		const latest = workflowSpaces.at(-1);
+		if (!latest || !loading) return;
+		// Desktop only, and never over another view.
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
+		untrack(() => {
+			if (!sidePane.open || sidePane.view === "workflow") sidePane.maybeAutoOpenWorkflow(latest);
+		});
 	});
 
 	// Shared conversations containing artifacts usually exist to show one off:
@@ -1296,6 +1312,7 @@
 							complete={mlAssistant.complete}
 							budget={mlAssistant.budget}
 							dashboard={trackioDashboards.at(-1)}
+							workflow={workflowSpaces.at(-1)}
 							registry={mlRegistry.summary}
 						/>
 					{/if}
@@ -1379,6 +1396,7 @@
 								budget={mlAssistant.budget}
 								onbudgetchange={page.params?.id ? changeMlBudget : undefined}
 								dashboard={trackioDashboards.at(-1)}
+								workflow={workflowSpaces.at(-1)}
 								registry={mlRegistry.summary}
 							/>
 						{/if}
@@ -1606,6 +1624,7 @@
 		onsend={canSendFix ? sendFixRequest : undefined}
 	/>
 	<TrackioPane items={paneItems} />
+	<WorkflowPane items={paneItems} />
 	{#if ML_ASSISTANT_MODE}
 		<MlRegistryPane />
 		{#if !shared}
