@@ -81,23 +81,19 @@ export const JOB_CHECK_TOOL_NAME = "check_job";
 
 // the report's first line, in whatever bold the sub-agent wraps it: "- **Status: failed.**"
 const FAILED_STATUS = /^[\s>*-]*status\**\s*:?\s*\**\s*failed\b/im;
-// a sandbox has no GPU, so it cannot reproduce these
-const GPU_ONLY = /out of memory|OutOfMemoryError|\bOOM\b/i;
 
 export const JOB_FAILED_NOTE =
 	"[Harness note, not part of this tool result] This job failed. Before you submit it again, " +
-	"reproduce the failure in a sandbox if hf_sandbox is available: run the failing step there " +
-	"until it passes, then submit once. Each resubmit pays the queue, the image pull and the " +
-	"credits to test one edit, and the next error is usually waiting behind this one. A failure " +
-	"only a GPU shows goes back to a job.";
+	"reproduce the failure in a sandbox on the job's flavor if hf_sandbox is available, " +
+	"out-of-memory included: run the failing step there until it passes, then submit once. Each " +
+	"resubmit pays the queue, the image pull and the credits to test one edit, and the next " +
+	"error is usually waiting behind this one.";
 
 /**
  * Derived from the stored report, never stored, so the live request and every replay of it send
  * the same text and the provider's prompt cache still hits.
  */
 export function withJobFailedNote(tool: string, output: string): string {
-	if (tool !== JOB_CHECK_TOOL_NAME || !FAILED_STATUS.test(output) || GPU_ONLY.test(output)) {
-		return output;
-	}
+	if (tool !== JOB_CHECK_TOOL_NAME || !FAILED_STATUS.test(output)) return output;
 	return `${output}\n\n${JOB_FAILED_NOTE}`;
 }

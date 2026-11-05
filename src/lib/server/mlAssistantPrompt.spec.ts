@@ -304,7 +304,7 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		// unused — a queue and an image pull to find a typo. Stated at both
 		// surfaces: the jobs contract and the sandbox rules.
 		expect(inMode([tool("hf_jobs")])).toContain("When hf_sandbox is on offer");
-		expect(inMode([tool("hf_sandbox")])).toContain("go here FIRST");
+		expect(inMode([tool("hf_sandbox")])).toContain("do the whole pre-flight there FIRST");
 	});
 
 	it("keeps the smoke test on the real flavor and the real shape", () => {
@@ -317,11 +317,12 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(ML_ASSISTANT_PREPROMPT).toContain("Memory and speed cannot");
 	});
 
-	it("says the sandbox cannot stand in for the GPU smoke test", () => {
-		// The other half of the same incident: "fast checks go here FIRST" read as
-		// permission to skip the GPU smoke entirely. Both rules ship together or
-		// the boundary is ambiguous again.
-		expect(inMode([tool("hf_sandbox")])).toContain("cannot do is stand in for the GPU smoke test");
+	it("puts the sandbox on the job's flavor, so it is the GPU smoke test", () => {
+		const sandbox = inMode([tool("hf_sandbox")]);
+
+		expect(sandbox).toContain("create the sandbox on the flavor the job will run on");
+		expect(sandbox).toContain("at the real batch size and sequence length");
+		expect(sandbox).toContain("refuses a session's first GPU job until a sandbox exists");
 	});
 
 	it("pins dependencies to a resolved current release, not a remembered one", () => {
