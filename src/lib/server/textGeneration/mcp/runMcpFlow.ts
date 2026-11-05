@@ -98,7 +98,12 @@ import { createRepeatedCallGuard } from "./repeatedCallGuard";
 import { createSchemaPreflightGuard } from "$lib/server/mcp/preflightGuard";
 import { composeGuards } from "./toolGuard";
 import { withUpstreamRetry } from "../utils/upstreamRetry";
-import { getEnabledBuiltinTools, isNestedAgentTool, shouldSkipMcpFlow } from "../builtinTools";
+import {
+	getEnabledBuiltinTools,
+	isNestedAgentTool,
+	PLAN_TOOL_NAME,
+	shouldSkipMcpFlow,
+} from "../builtinTools";
 import {
 	assembleTools,
 	buildRequestPrompt,
@@ -826,6 +831,8 @@ export async function* runMcpFlow({
 		let cutAnswerRetries = 0;
 		let leakedToolCallRetries = 0;
 		let unfinishedPlanRetries = 0;
+		// Its retry asked for a concise final answer; more tool rounds won't fit.
+		let recoveringFromOutputLimit = false;
 		// For the leaked-markup check: only names that are really callable this
 		// run can make "<name" in a final answer mean a call that never happened.
 		const advertisedToolNames = oaTools.map((tool) => tool.function.name);
@@ -1362,6 +1369,7 @@ export async function* runMcpFlow({
 				(finishReason === "length" || thinkOnlyAnswer) && !discardedTruncatedToolCalls;
 			if (cutMidAnswer && cutAnswerRetries < MAX_CUT_ANSWER_RETRIES) {
 				cutAnswerRetries += 1;
+				if (finishReason === "length") recoveringFromOutputLimit = true;
 				logger.warn(
 					{ loop, attempt: cutAnswerRetries, finishReason, thinkOnlyAnswer },
 					"[mcp] response ended before a visible answer; retrying"
@@ -1419,8 +1427,13 @@ export async function* runMcpFlow({
 				];
 				continue;
 			}
-			// A cut by the output limit already had its retry; more rounds won't fit.
-			const openSteps = finishReason === "length" ? [] : unfinishedPlanSteps(conv, messageId);
+			// Nothing to nudge toward when the plan isn't offered this turn.
+			const openSteps =
+				finishReason === "length" ||
+				recoveringFromOutputLimit ||
+				!advertisedToolNames.includes(PLAN_TOOL_NAME)
+					? []
+					: unfinishedPlanSteps(conv, messageId);
 			if (openSteps.length > 0 && unfinishedPlanRetries < MAX_UNFINISHED_PLAN_RETRIES) {
 				unfinishedPlanRetries += 1;
 				logger.warn(
@@ -1435,7 +1448,7 @@ export async function* runMcpFlow({
 					},
 					{
 						role: "user" as const,
-						content: `[SYSTEM: Your previous response ended the turn, but your plan still has unfinished steps: ${openSteps.map((s) => `"${s.step}"`).join(", ")}. Continue with the next step now by making its tool call. If a step is already done, or can't or shouldn't be done, call update_plan to mark it completed or skipped, then give your final answer.]`,
+						content: `[SYSTEM: Your previous response ended the turn, but your plan still has unfinished steps: ${openSteps.map((s) => `"${s.step}"`).join(", ")}. Continue with the next step now by making its tool call. If a step is already done, or can't or shouldn't be done, call ${PLAN_TOOL_NAME} to mark it completed or skipped, then give your final answer. If a step is waiting on input only the user can give, leave it pending and end the turn asking for it.]`,
 					},
 				];
 				continue;

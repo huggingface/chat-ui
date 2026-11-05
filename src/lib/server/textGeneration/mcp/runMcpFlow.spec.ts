@@ -1492,6 +1492,29 @@ describe("answers that leave the turn's plan unfinished", () => {
 		expect(finalAnswer(updates)).toBe("a quick answer to a follow-up");
 	});
 
+	it("takes no plan retry after an output-limit cut already had its retry", async () => {
+		scriptRounds([
+			{ content: "<think>long reasoning", finishReason: "length" },
+			{ content: "Concise answer." },
+		]);
+
+		const { updates } = await runFlow(turn(later));
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toBe("Concise answer.");
+	});
+
+	it("leaves the plan alone when the plan tool isn't offered", async () => {
+		scriptRounds([{ content: "a plain answer" }]);
+		const args = turn(later) as { conv: { mlAssistant: boolean } };
+		args.conv.mlAssistant = false;
+
+		const { updates } = await runFlow(args as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toBe("a plain answer");
+	});
+
 	it("counts a steered continuation as the turn it continues", async () => {
 		scriptRounds([{ content: "stopped early" }, { content: "finished" }]);
 
