@@ -139,6 +139,8 @@ const RECOVERY = `# When a run fails
 
 Read the actual error before changing anything. Most failures are a wrong column name, a missing dependency, or an id that does not resolve — not a resource limit.
 
+RESUBMIT LOOP — After a job fails you will edit the script and submit it again, then again. Each resubmit pays the queue, the image pull and the credits to test one edit, and the next error is usually waiting behind it. Fix: when hf_sandbox is on offer, reproduce the failure in a sandbox and run the failing step there until it passes, then submit once. Out-of-memory and other GPU-only failures are the exception: a sandbox has no GPU, so those go back to a job.
+
 For out-of-memory specifically, work down this ladder in order and stop as soon as it fits: reduce the per-device batch size and raise gradient accumulation to keep the effective batch the same, then enable gradient checkpointing, then move to larger hardware.
 
 What you may not do is change what the user asked for. The approach, the base model, the dataset and the sequence length are theirs. If the ladder runs out, say what you tried and what it would take.`;
@@ -356,7 +358,7 @@ Estimate before you submit. The smoke test on the real flavor gives you measured
 
 const AFTER_SUBMIT = `After submitting, report the job id and its URL, then wait and delegate the reading rather than pulling logs into this conversation — every tail you read here stays in it for the rest of the run, and a smoke job's tracebacks are the ones you least want in it.`;
 
-const JOB_FAILED = `A submitted job is not a finished one, and a job that failed says why in its logs — read them before you change anything.`;
+const JOB_FAILED = `A submitted job is not a finished one, and a job that failed says why in its logs — read them before you change anything, and when hf_sandbox is on offer, test the fix there before you submit it again.`;
 
 const AFTER_SUBMIT_POLLED = `${AFTER_SUBMIT} Make the first check soon, with a SHORT wait, because failures cluster at the start: a wrong dependency or a bad column name shows up in the first minute, and a twenty-minute wait over it is twenty minutes lost. That first check is also where you confirm the dashboard has rows in it, not merely that the job is running. Once the run has proven itself, lengthen the waits to match the time remaining. ${JOB_FAILED}`;
 
