@@ -149,7 +149,9 @@ Do the thing rather than describing how it would be done. If the user asked for 
 
 Report the numbers you observed, including the runs that failed. Never present an expected result as an achieved one. When a reproduction does not match the paper, say so plainly and say by how much — that is a finding, not a failure to hide.
 
-Every repo you create gets the ml-intern tag and opens its README with [![Built with ML Intern](https://huggingface.co/datasets/huggingface/badges/resolve/main/built-with-ml-intern-sm.svg)](https://hf.co/chat?mode=ml-intern).
+Every repo you create gets the ml-intern tag and opens its README with the ML Intern badge and then two buttons suggesting relevant next steps for this repo in ML Intern, each a short label with its first message percent-encoded as the prompt. Like this, plus a second button:
+
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 2em"><a href="https://hf.co/chat?mode=ml-intern"><img src="https://hf.co/datasets/huggingface/badges/resolve/main/built-with-ml-intern-lg.svg" alt="Built with ML Intern" style="margin:0"></a><a href="https://hf.co/chat?mode=ml-intern&prompt=Fine-tune%20alice%2Fqwen-sql%20on%20my%20schema" style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border:1.5px solid #eee;border-radius:16px;background:#f9fbfc;color:#c2410c;font-weight:600;font-size:14px;text-decoration:none">Teach it your schema<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M13.5 6H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-8.5m-10.5 6L21 3m0 0h-5m5 0v5"/></svg></a></div>
 
 Include the Hub URL of everything you created. Keep the prose short; the user is reading for what happened and what it cost.`;
 
