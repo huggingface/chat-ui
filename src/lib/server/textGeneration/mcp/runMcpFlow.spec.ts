@@ -833,7 +833,7 @@ describe("runMcpFlow offering the plan tool", () => {
 		).map((t) => t.function.name);
 
 	const mlConv = (extra: Record<string, unknown> = {}) =>
-		({ _id: new ObjectId(), mlAssistant: true, ...extra }) as unknown as Parameters<
+		({ _id: new ObjectId(), mlAssistant: true, messages: [], ...extra }) as unknown as Parameters<
 			typeof runMcpFlow
 		>[0]["conv"];
 
@@ -884,6 +884,7 @@ describe("runMcpFlow offering the plan tool", () => {
 		await runFlow({
 			conv: {
 				_id: new ObjectId(),
+				messages: [],
 				plan: {
 					goal: "Ship the feature",
 					steps: [{ step: "write it", status: "pending" }],
@@ -891,7 +892,7 @@ describe("runMcpFlow offering the plan tool", () => {
 					updatedAt: new Date(),
 				},
 			},
-		} as Partial<Parameters<typeof runMcpFlow>[0]>);
+		} as unknown as Partial<Parameters<typeof runMcpFlow>[0]>);
 
 		const lastUser = requestMessages(0).findLast((m) => m.role === "user");
 		expect(String(lastUser?.content)).not.toContain("CURRENT PLAN");
@@ -1414,6 +1415,123 @@ describe("runMcpFlow job labels", () => {
 
 		expect(dispatched()).toEqual(submission);
 		expect(mocks.loadSessionJobLabels).not.toHaveBeenCalled();
+	});
+});
+
+describe("answers that leave the turn's plan unfinished", () => {
+	const startedAt = new Date("2026-11-03T00:00:00Z");
+	const turn = (planUpdatedAt: Date, messages?: unknown[]) =>
+		({
+			conv: {
+				_id: new ObjectId(),
+				mlAssistant: true,
+				messages: messages ?? [
+					{ id: "turn", from: "assistant", content: "", createdAt: startedAt },
+				],
+				plan: {
+					goal: "Build the Space",
+					steps: [
+						{ step: "Check repo files", status: "completed" },
+						{ step: "Write app", status: "in_progress" },
+						{ step: "Verify build", status: "pending" },
+					],
+					version: 1,
+					updatedAt: planUpdatedAt,
+				},
+			},
+			messageId: "turn",
+		}) as unknown as Partial<Parameters<typeof runMcpFlow>[0]>;
+	const later = new Date(startedAt.getTime() + 1000);
+
+	// Observed with GLM-class models: reasoning about Qwen's literal empty-think
+	// tags ends it at the provider, and the leftover half-thought arrives as the answer.
+	it("retries once, naming the open steps, instead of finalizing a mid-task stop", async () => {
+		scriptRounds([
+			{ content: "— for non-thinking mode. Actually the template appends" },
+			{ content: "Done: the Space is live." },
+		]);
+
+		const { updates, result } = await runFlow(turn(later));
+
+		expect(result).toBe("completed");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toBe("Done: the Space is live.");
+		const retry = requestMessages(1);
+		expect(retry.at(-2)?.role).toBe("assistant");
+		const nudge = String(retry.at(-1)?.content);
+		expect(nudge).toContain('"Write app", "Verify build"');
+		expect(nudge).not.toContain("Check repo files");
+	});
+
+	it("finalizes when the retry stops early again", async () => {
+		scriptRounds([{ content: "first stop" }, { content: "second stop" }]);
+
+		const { updates } = await runFlow(turn(later));
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toBe("second stop");
+	});
+
+	it("lets a turn end with only its running step left open", async () => {
+		scriptRounds([{ content: "All done." }]);
+		const args = turn(later) as { conv: { plan: { steps: Array<{ status: string }> } } };
+		args.conv.plan.steps[2].status = "completed";
+
+		const { updates } = await runFlow(args as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toBe("All done.");
+	});
+
+	it("leaves a plan from an earlier turn alone", async () => {
+		scriptRounds([{ content: "a quick answer to a follow-up" }]);
+
+		const { updates } = await runFlow(turn(new Date(startedAt.getTime() - 1000)));
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toBe("a quick answer to a follow-up");
+	});
+
+	it("takes no plan retry after an output-limit cut already had its retry", async () => {
+		scriptRounds([
+			{ content: "<think>long reasoning", finishReason: "length" },
+			{ content: "Concise answer." },
+		]);
+
+		const { updates } = await runFlow(turn(later));
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(finalAnswer(updates)).toBe("Concise answer.");
+	});
+
+	it("leaves the plan alone when the plan tool isn't offered", async () => {
+		scriptRounds([{ content: "a plain answer" }]);
+		const args = turn(later) as { conv: { mlAssistant: boolean } };
+		args.conv.mlAssistant = false;
+
+		const { updates } = await runFlow(args as Partial<Parameters<typeof runMcpFlow>[0]>);
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(finalAnswer(updates)).toBe("a plain answer");
+	});
+
+	it("counts a steered continuation as the turn it continues", async () => {
+		scriptRounds([{ content: "stopped early" }, { content: "finished" }]);
+
+		await runFlow(
+			turn(later, [
+				{ id: "original", from: "assistant", content: "", createdAt: startedAt },
+				{
+					id: "turn",
+					from: "assistant",
+					content: "",
+					createdAt: new Date(later.getTime() + 1000),
+					queuedContinuationOf: "original",
+				},
+			])
+		);
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
 	});
 });
 
