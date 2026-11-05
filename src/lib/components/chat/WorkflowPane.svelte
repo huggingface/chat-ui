@@ -95,7 +95,7 @@
 			frame: () => frame?.contentWindow,
 			origin,
 			spaceId,
-			viewer: "someone-else",
+			viewer: page.data.user?.username,
 			consent: () => consent(spaceId),
 		});
 		window.addEventListener("message", onMessage);

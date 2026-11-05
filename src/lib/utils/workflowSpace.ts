@@ -108,8 +108,8 @@ export function workflowTokenHandler({
 		const current = (jwt ??= fetchInferenceToken());
 		const value = await current;
 		if (value && value.exp * 1000 - Date.now() > 30_000) return value;
-		if (jwt === current) jwt = fetchInferenceToken();
-		return jwt;
+		if (jwt === current) jwt = value ? fetchInferenceToken() : undefined;
+		return value && jwt;
 	}
 
 	async function zeroGpuHeaders() {

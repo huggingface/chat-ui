@@ -163,6 +163,15 @@ describe("workflowTokenHandler", () => {
 		expect(frame.postMessage).toHaveBeenCalledWith(...tokenReply("hf_jwt_x"));
 	});
 
+	it("makes one Hub call when the token fetch fails", async () => {
+		fetch.mockResolvedValueOnce(new Response("", { status: 401 }));
+		const onMessage = handler();
+		await Promise.all([onMessage(tokenRequest()), onMessage(tokenRequest())]);
+
+		expect(fetch).toHaveBeenCalledTimes(1);
+		expect(frame.postMessage).toHaveBeenCalledWith(...tokenReply(null));
+	});
+
 	it("replies with no token when the viewer says no", async () => {
 		consent.mockReturnValue(false);
 		await handler("mallory/wf")(tokenRequest());

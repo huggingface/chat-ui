@@ -250,7 +250,13 @@ function parse(args: Record<string, unknown>, sessionNamespace?: string): Plan |
 		];
 	} else if (args.shape === "chain") {
 		const raw = Array.isArray(args.steps) ? args.steps : [];
-		if (raw.length < 2) return { error: "chain needs at least two steps." };
+		if (raw.length < 2) {
+			return {
+				error:
+					`chain needs a \`steps\` array of at least two steps, got ${raw.length}. For example: ` +
+					`steps: [{"space": "owner/name", "endpoint": "/predict"}, {"model": "owner/name", "task": "text-to-image"}]`,
+			};
+		}
 		steps = raw.map((step) => {
 			const { model, task, space } = (step ?? {}) as Record<string, unknown>;
 			if (space !== undefined) return spaceStep(step);
