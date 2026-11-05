@@ -2,6 +2,7 @@
 	import { page } from "$app/state";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 	import { subscribeToTheme } from "$lib/switchTheme";
+	import Modal from "$lib/components/Modal.svelte";
 	import SidePane from "./SidePane.svelte";
 	import PaneItemNav from "./PaneItemNav.svelte";
 
@@ -11,6 +12,7 @@
 
 	import CarbonFlow from "~icons/carbon/flow";
 	import CarbonCloseLarge from "~icons/carbon/close-large";
+	import CarbonClose from "~icons/carbon/close";
 	import CarbonLaunch from "~icons/carbon/launch";
 	import CarbonRenew from "~icons/carbon/renew";
 
@@ -61,17 +63,17 @@
 
 	let declined = $state(false);
 
-	function consent(spaceId: string): boolean {
+	let asking = $state<{ spaceId: string; answer: (yes: boolean) => void } | null>(null);
+
+	async function consent(spaceId: string): Promise<boolean> {
 		const key = `workflow-inference-consent:${spaceId}`;
 		try {
 			if (localStorage.getItem(key) === "yes") return true;
 		} catch {
 			// storage blocked: ask every time
 		}
-		const yes = window.confirm(
-			`${spaceId} is asking to run models with your Hugging Face account. ` +
-				`Each run uses your Inference Providers credits. Allow it?`
-		);
+		const yes = await new Promise<boolean>((answer) => (asking = { spaceId, answer }));
+		asking = null;
 		if (!yes) {
 			declined = true;
 			return false;
@@ -93,11 +95,14 @@
 			frame: () => frame?.contentWindow,
 			origin,
 			spaceId,
-			viewer: page.data.user?.username,
+			viewer: "someone-else",
 			consent: () => consent(spaceId),
 		});
 		window.addEventListener("message", onMessage);
-		return () => window.removeEventListener("message", onMessage);
+		return () => {
+			window.removeEventListener("message", onMessage);
+			asking = null;
+		};
 	});
 </script>
 
@@ -149,12 +154,22 @@
 			</header>
 
 			{#if declined}
-				<p
-					class="flex-none border-b border-gray-100 px-3 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400"
+				<div
+					class="flex flex-none items-start gap-2 border-b border-gray-100 px-3 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400"
 				>
-					Model runs here won't use your account. Sign in inside the workflow, or open it in a new
-					tab to run it.
-				</p>
+					<p class="flex-1">
+						Model runs here won't use your account. Sign in inside the workflow, or open it in a new
+						tab to run it.
+					</p>
+					<button
+						type="button"
+						class="flex-none hover:text-gray-700 dark:hover:text-gray-200"
+						onclick={() => (declined = false)}
+						aria-label="Dismiss"
+					>
+						<CarbonClose />
+					</button>
+				</div>
 			{/if}
 			<div class="relative min-h-0 flex-1 bg-white dark:bg-gray-900">
 				<div
@@ -191,6 +206,55 @@
 			</div>
 		{/snippet}
 	</SidePane>
+{/if}
+
+{#if asking}
+	{@const { spaceId, answer } = asking}
+	<Modal onclose={() => answer(false)} width="w-[90dvh] md:w-[480px]" labelledBy="workflow-consent">
+		<div class="flex w-full flex-col gap-5 p-6">
+			<div class="flex items-start justify-between">
+				<h2 id="workflow-consent" class="text-xl font-semibold text-gray-800 dark:text-gray-200">
+					Run models with your account?
+				</h2>
+				<button
+					type="button"
+					class="group outline-hidden"
+					onclick={() => answer(false)}
+					aria-label="Close"
+				>
+					<CarbonClose
+						class="size-5 text-gray-700 group-hover:text-gray-500 dark:text-gray-300 dark:group-hover:text-gray-400"
+					/>
+				</button>
+			</div>
+			<p class="text-sm text-gray-600 dark:text-gray-400">
+				This workflow wants to call models with your Hugging Face account. Each run uses your
+				Inference Providers credits. Only continue if you trust the Space.
+			</p>
+			<p
+				class="rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 font-mono text-xs break-all text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
+			>
+				<span class="font-semibold text-gray-800 dark:text-gray-200">{spaceId.split("/")[0]}</span
+				>/{spaceId.split("/")[1]}
+			</p>
+			<div class="flex items-center justify-end gap-2">
+				<button
+					type="button"
+					class="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm outline-hidden hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+					onclick={() => answer(false)}
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					class="inline-flex items-center rounded-xl border border-gray-900 bg-gray-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-black focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-hidden dark:border-gray-100 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white dark:focus:ring-offset-gray-800"
+					onclick={() => answer(true)}
+				>
+					Allow
+				</button>
+			</div>
+		</div>
+	</Modal>
 {/if}
 
 <style>
