@@ -32,6 +32,13 @@ describe("marked basic rendering", () => {
 		const html = renderHtml("hello world");
 		expect(html).toContain("<p>hello world</p>");
 	});
+
+	test("wraps tables in a horizontal scroll container", () => {
+		const html = renderHtml("| a | b |\n|---|--:|\n| 1 | 2 |");
+		expect(html).toMatch(/^<div class="table-scroll"><table>[\s\S]*<\/table><\/div>\s*$/);
+		expect(html).toContain("<thead>");
+		expect(html).toContain('<tbody><tr>\n<td>1</td>\n<td align="right">2</td>');
+	});
 });
 
 describe("marked image renderer", () => {
