@@ -345,7 +345,17 @@ export class MlSlackBot {
 						status: "pending",
 						"pending.kind": "ask",
 					});
-					if (!question || !inlineQuestions(question.request)) return;
+					if (!question || !inlineQuestions(question.request)) {
+						await this.tell(
+							thread.teamId,
+							thread.channel,
+							body.user.id,
+							"This question has already been answered, cancelled, or expired.",
+							thread.threadTs
+						);
+						await this.render(thread).catch(() => {});
+						return;
+					}
 					const field = question.request.fields?.[parsed.data.fieldIndex];
 					if (field?.kind !== "select" || !field.options[parsed.data.optionIndex]) return;
 					await collections.mcpElicitations.updateOne(
@@ -379,7 +389,23 @@ export class MlSlackBot {
 				"pending.kind": "ask",
 			});
 			const content = question && selectedAnswers(question.request, question.slackChoices);
-			if (!question || !content || question.slackChoiceRevision !== parsed.data.revision) return;
+			if (!question || !content || question.slackChoiceRevision !== parsed.data.revision) {
+				const existingQ = await collections.mcpElicitations.findOne({
+					conversationId: thread.conversationId,
+					elicitationId: parsed.data.elicitationId,
+				});
+				if (!existingQ || existingQ.status !== "pending") {
+					await this.tell(
+						thread.teamId,
+						thread.channel,
+						body.user.id,
+						"This question has already been answered, cancelled, or expired.",
+						thread.threadTs
+					);
+					await this.render(thread).catch(() => {});
+				}
+				return;
+			}
 			const locked = await collections.mcpElicitations.updateOne(
 				{
 					_id: question._id,
@@ -440,7 +466,17 @@ export class MlSlackBot {
 				});
 				const field = question && inlineField(question.request);
 				const option = field && field.options[parsed.data.optionIndex];
-				if (!question || !field || !option) return;
+				if (!question || !field || !option) {
+					await this.tell(
+						thread.teamId,
+						thread.channel,
+						body.user.id,
+						"This question has already been answered, cancelled, or expired.",
+						thread.threadTs
+					);
+					await this.render(thread).catch(() => {});
+					return;
+				}
 				await collections.mcpElicitations.updateOne(
 					{ _id: question._id, status: "pending" },
 					{ $set: { slackShareAnswer: true } }
@@ -525,8 +561,18 @@ export class MlSlackBot {
 				conversationId: thread.conversationId,
 				elicitationId: parsed.data.elicitationId,
 			});
-			if (!question) {
+			if (!question || question.status !== "pending") {
 				await ack({ response_action: "clear" });
+				if (question) {
+					await this.tell(
+						thread.teamId,
+						thread.channel,
+						body.user.id,
+						"This question has already been answered, cancelled, or expired.",
+						thread.threadTs
+					);
+					await this.render(thread).catch(() => {});
+				}
 				return;
 			}
 			const answer = readAnswers(question.request, view.state.values);
@@ -547,6 +593,22 @@ export class MlSlackBot {
 				content: answer.content,
 			});
 			if (!result.ok && result.status !== 409) {
+				const currentQ = await collections.mcpElicitations.findOne({
+					conversationId: thread.conversationId,
+					elicitationId: question.elicitationId,
+				});
+				if (!currentQ || currentQ.status !== "pending") {
+					await ack({ response_action: "clear" });
+					await this.tell(
+						thread.teamId,
+						thread.channel,
+						body.user.id,
+						"This question has already been answered, cancelled, or expired.",
+						thread.threadTs
+					);
+					await this.render(thread).catch(() => {});
+					return;
+				}
 				await ack({ response_action: "errors", errors: { q0: result.error } });
 				return;
 			}
@@ -589,6 +651,9 @@ export class MlSlackBot {
 				body.user.id,
 				"Stopped the assistant. Jobs already running on Hugging Face keep running until cancelled or timed out.",
 				thread.threadTs
+			);
+			await this.render(thread).catch(() =>
+				logger.warn("[slack] Immediate render after stop failed; polling will retry.")
 			);
 		});
 		this.app.action(RESUME_ACTION, async ({ ack, body, action }) => {
@@ -1763,7 +1828,14 @@ export class MlSlackBot {
 	private async publishSkippedQuestions(thread: SlackThread): Promise<void> {
 		const { client } = await this.slack(thread.teamId);
 		const questions = await collections.mcpElicitations
-			.find({ conversationId: thread.conversationId, slackSkippedByInputId: { $exists: true } })
+			.find({
+				conversationId: thread.conversationId,
+				$or: [
+					{ slackSkippedByInputId: { $exists: true } },
+					{ status: "resolved", action: "cancel" },
+					{ status: { $in: ["cancelled", "aborted", "expired"] } },
+				],
+			})
 			.toArray();
 		for (const question of questions) {
 			const card = await collections.slackDeliveries.findOne({
@@ -1771,7 +1843,10 @@ export class MlSlackBot {
 				questionId: question.elicitationId,
 			});
 			if (!card || card.questionFinalized) continue;
-			const text = "Question skipped — continued with a new message.";
+			const text =
+				question.action === "cancel" && question.resolution === "aborted"
+					? "Question cancelled — turn was stopped."
+					: "Question skipped — continued with a new message.";
 			const blocks = [
 				{ type: "section" as const, text: { type: "plain_text" as const, text } },
 				...confirmedQuestionBlocks(question.request),
