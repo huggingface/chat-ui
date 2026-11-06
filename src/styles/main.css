@@ -207,14 +207,25 @@ body {
 	margin-top: 0.8em;
 }
 
-.prose table {
-	@apply scrollbar-thin block max-w-full scrollbar-thumb-black/10 scrollbar-track-transparent overflow-x-auto scrollbar-thumb-rounded-full dark:scrollbar-thumb-white/10 scrollbar-hover:scrollbar-thumb-black/20 dark:scrollbar-hover:scrollbar-thumb-white/20;
+/* Wide tables scroll inside this wrapper (emitted by the marked table renderer) instead of
+   the table being `display: block`: a block table puts its rows in an anonymous table box
+   that shrinks to fit the content, so prose's `width: 100%` never reached the columns.
+   The wrapper is a scroll container, so table margins can't collapse through it: they
+   move to the wrapper (prose's 2em at the table's 0.875em font size). */
+.prose .table-scroll {
+	@apply my-[1.75em] scrollbar-thin max-w-full scrollbar-thumb-black/10 scrollbar-track-transparent overflow-x-auto scrollbar-thumb-rounded-full first:mt-0 last:mb-0 dark:scrollbar-thumb-white/10 scrollbar-hover:scrollbar-thumb-black/20 dark:scrollbar-hover:scrollbar-thumb-white/20;
 }
 
-/* Prevent columns from squishing on narrow viewports; long content wraps instead of dominating. */
+.prose .table-scroll > table {
+	@apply my-0;
+}
+
+/* Prevent columns from squishing on narrow viewports; long content wraps instead of dominating.
+   break-word only splits tokens that can't fit (hashes, long URLs); it leaves column sizing alone. */
 .prose :is(th, td) {
 	min-width: 6rem;
 	max-width: 16rem;
+	overflow-wrap: break-word;
 }
 
 .prose hr {
