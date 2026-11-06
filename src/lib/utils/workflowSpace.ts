@@ -138,7 +138,8 @@ export function workflowTokenHandler({
 		}
 		const type = (event.data as { type?: unknown })?.type;
 		if (type === INFERENCE_JWT_PROBE) {
-			const reply = visible() && (owned || (await consent(false))) ? await inferenceToken() : null;
+			const reply =
+				visible() && (owned || (await (allowed ?? consent(false)))) ? await inferenceToken() : null;
 			source.postMessage(
 				{ type: INFERENCE_JWT_PROBE_RESPONSE, token: reply?.token ?? null, exp: reply?.exp },
 				origin
