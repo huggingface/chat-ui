@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Message } from "$lib/types/Message";
 import {
+	MessageUpdateStatus,
 	MessageUpdateType,
 	type MessageStreamUpdate,
 	type MessageUpdate,
@@ -126,5 +127,43 @@ describe("consumeMessageUpdates", () => {
 			token: "hello world",
 		} satisfies MessageStreamUpdate);
 		expect(renderedText(message)).toBe("hello world");
+	});
+
+	it("reports a streaming tool call without storing it, and clears it on what follows", async () => {
+		const message: Message = {
+			id: "00000000-0000-4000-8000-000000000000",
+			from: "assistant",
+			content: "",
+			updates: [],
+		};
+		const draft = (chars: number): MessageUpdate => ({
+			type: MessageUpdateType.Status,
+			status: MessageUpdateStatus.KeepAlive,
+			toolCallDraft: { name: "create_spreadsheet", chars },
+		});
+		const onToolCallDraft = vi.fn();
+
+		await consumeMessageUpdates(
+			fromArray([
+				{ type: MessageUpdateType.Stream, token: "Building it now." },
+				draft(10),
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.KeepAlive },
+				draft(4096),
+				{ type: MessageUpdateType.Stream, token: " Done." },
+				draft(20),
+			]),
+			message,
+			{ ...context(), onToolCallDraft }
+		);
+
+		expect(onToolCallDraft.mock.calls).toEqual([
+			[{ name: "create_spreadsheet", chars: 10 }],
+			[{ name: "create_spreadsheet", chars: 4096 }],
+			[null],
+			[{ name: "create_spreadsheet", chars: 20 }],
+			// the stream ending also ends the draft
+			[null],
+		]);
+		expect(message.updates?.map((u) => u.type)).toEqual([MessageUpdateType.Stream]);
 	});
 });
