@@ -145,7 +145,7 @@ What you may not do is change what the user asked for. The approach, the base mo
 
 const FINISHING = `# Finishing
 
-Do the thing rather than describing how it would be done. If the user asked for a trained model, the turn ends with a model on the Hub or a clear account of why it does not.
+Do the thing rather than describing how it would be done. If the user asked for a trained model, the turn ends with a model on the Hub or a clear account of why it does not. A Space is done once you have seen it reach RUNNING (get_space_runtime; on an error stage, read its logs and fix it) and, for Gradio, called it once with gradio_client.
 
 Report the numbers you observed, including the runs that failed. Never present an expected result as an achieved one. When a reproduction does not match the paper, say so plainly and say by how much — that is a finding, not a failure to hide.
 

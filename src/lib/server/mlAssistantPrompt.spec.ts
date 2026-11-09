@@ -510,6 +510,9 @@ describe("ML Assistant system message size", () => {
 		// at it and golden sets labelled with the model guesses in view, most of its guidance lives
 		// in the tool description and the preprompt is held to 600 characters below, but main had
 		// already reached 38,983 so even the short form needed the raise, it landed at 39,216
+		//
+		// 40,500 to 41k for checking a Space reaches RUNNING, argued by Spaces reported live that had
+		// crashed on a syntax error, one sentence in Finishing, it landed at 40,539
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -539,7 +542,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(40_500);
+		expect(composed.length).toBeLessThan(41_000);
 	});
 
 	it("keeps the review guidance short, the rest lives in the tool description", () => {
