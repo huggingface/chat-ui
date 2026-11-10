@@ -43,6 +43,7 @@ describe("getEnabledBuiltinTools", () => {
 			"research",
 			"sandbox_task",
 			"check_job",
+			"check_space",
 			"create_trackio",
 			"read_trackio",
 			"create_workflow",
