@@ -80,13 +80,8 @@ export interface Scenario {
 	budgetUsd: number;
 	/** Aborts the run (and cancels its jobs) past this, so a stuck turn cannot hang CI. */
 	timeoutMinutes: number;
-	/**
-	 * How ask_user_question gets answered. The first rule whose pattern matches the
-	 * question (header, text, or option labels) picks the first option matching its
-	 * `choose` pattern. With no rule matching, the runner picks the option marked
-	 * recommended, else the first one. Options that change the budget are never picked.
-	 */
-	answers?: Array<{ question: RegExp; choose: RegExp }>;
+	/** who the simulated user is and what they would say if asked, the answerer reads it with the prompt */
+	user: string;
 	/** Sent once if the turn ends without launching anything (e.g. it asked in prose). */
 	nudge?: string;
 	artifacts: ArtifactKind[];
@@ -119,10 +114,7 @@ export const SCENARIOS: Scenario[] = [
 		model: GLM_FLASH,
 		budgetUsd: 2,
 		timeoutMinutes: 20,
-		answers: [
-			{ question: /hardware|gpu|cpu|flavor|instance/i, choose: /cpu|t4|small|cheap/i },
-			{ question: /dashboard|track|log/i, choose: /trackio|yes/i },
-		],
+		user: "You want a quick, cheap run: a CPU or the smallest GPU is fine. You would like the training logged to a Trackio dashboard.",
 		nudge: GO_AHEAD,
 		artifacts: ["trackio"],
 		checks: (o) => {
@@ -148,7 +140,7 @@ export const SCENARIOS: Scenario[] = [
 		model: GLM_FLASH,
 		budgetUsd: 5,
 		timeoutMinutes: 90,
-		answers: [{ question: /hardware|gpu|flavor|instance/i, choose: /a10g-small/i }],
+		user: "You want it trained on the a10g-small you named and nothing bigger. You have no other preferences about how it is trained.",
 		nudge: GO_AHEAD,
 		artifacts: ["model"],
 		hidden: ["generates", "{repo}"],
@@ -165,7 +157,7 @@ export const SCENARIOS: Scenario[] = [
 		model: GLM_FLASH,
 		budgetUsd: 5,
 		timeoutMinutes: 75,
-		answers: [{ question: /hardware|gpu|flavor|instance/i, choose: /l4/i }],
+		user: "You want it trained on the l4x1 you named. You have no other preferences about how it is trained.",
 		nudge: GO_AHEAD,
 		artifacts: ["model"],
 		hidden: ["generates", "{repo}"],
@@ -182,7 +174,7 @@ export const SCENARIOS: Scenario[] = [
 		model: GLM_FLASH,
 		budgetUsd: 2,
 		timeoutMinutes: 60,
-		answers: [{ question: /hardware|gpu|cpu|flavor|instance/i, choose: /cpu/i }],
+		user: "You want it done as cheaply as possible and would pick a CPU over any GPU.",
 		nudge: GO_AHEAD,
 		artifacts: ["tokenizer"],
 		hidden: ["tokenizer", "{repo}", "32000"],
@@ -208,10 +200,7 @@ export const SCENARIOS: Scenario[] = [
 		model: GLM_FLASH,
 		budgetUsd: 5,
 		timeoutMinutes: 90,
-		answers: [
-			{ question: /length|long|token|truncat|context/i, choose: /full|whole|entire|long/i },
-			{ question: /hardware|gpu|flavor|instance/i, choose: /a10g|l4/i },
-		],
+		user: "Your app will send the model whole papers, often well over 10,000 tokens, and it should read all of each paper, not a truncated start. An a10g-small or l4x1 is fine for training.",
 		nudge: GO_AHEAD,
 		artifacts: ["model"],
 		hidden: ["classifier", "{repo}", "ccdv/arxiv-classification", "test", "100"],
@@ -231,7 +220,7 @@ export const SCENARIOS: Scenario[] = [
 		model: GLM_FLASH,
 		budgetUsd: 5,
 		timeoutMinutes: 75,
-		answers: [{ question: /hardware|gpu|flavor|instance/i, choose: /t4|l4|a10g-small|small/i }],
+		user: "You want something quick and cheap that works: a T4, L4 or a10g-small is fine. You have no preferences about the Space's look.",
 		nudge: GO_AHEAD,
 		artifacts: ["model", "trackio", "space"],
 		hidden: ["space-sentiment", "{space}", "10"],
@@ -257,12 +246,7 @@ export const SCENARIOS: Scenario[] = [
 		model: GLM_FLASH,
 		budgetUsd: 3,
 		timeoutMinutes: 40,
-		answers: [
-			{
-				question: /hardware|gpu|flavor|budget|time|scale|size/i,
-				choose: /small|cheap|scale|less|fewer/i,
-			},
-		],
+		user: "You have a $3 budget and will not raise it. If the full run does not fit, you want the smallest scaled-down version that does.",
 		nudge: GO_AHEAD,
 		artifacts: [],
 		checks: (o) => [

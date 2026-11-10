@@ -3,7 +3,7 @@
  *
  * env
  *   HF_TOKEN               required, its account pays for the jobs
- *   OPENAI_API_KEY         inference key for OPENAI_BASE_URL, defaults to HF_TOKEN
+ *   OPENAI_API_KEY         inference key for OPENAI_BASE_URL and the answer model, defaults to HF_TOKEN
  *   OPENAI_BASE_URL        defaults to the hf router
  *   ML_EVAL_SCENARIO       comma separated task names, default all
  *   ML_EVAL_REPEATS        runs per task, default 1
@@ -38,6 +38,14 @@ import {
 	type RunNames,
 } from "./outcome.ts";
 import {
+	answerElicitation,
+	routerComplete,
+	userBrief,
+	type AnswerValue,
+	type ElicitationField,
+	type FieldAnswer,
+} from "./answerer.ts";
+import {
 	SCENARIOS,
 	type ArtifactKind,
 	type Check,
@@ -53,6 +61,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const HF_TOKEN = process.env.HF_TOKEN ?? "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || HF_TOKEN;
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || "https://router.huggingface.co/v1";
+const complete = routerComplete(OPENAI_BASE_URL, OPENAI_API_KEY);
 const PORT = Number(process.env.ML_EVAL_PORT ?? 5210);
 // An IP literal, not localhost: the app's SSRF guard blocks `localhost`.
 const APP_URL = `http://127.0.0.1:${PORT}`;
@@ -65,32 +74,6 @@ const SKIPPED_PROD_ENV =
 	/^(MONGODB_|APP_BASE$|PUBLIC_ORIGIN$|COOKIE_|OPENID_|ADDRESS_HEADER$|METRICS_|LLM_ROUTER_|USE_USER_TOKEN$|AUTOMATIC_LOGIN$|COUPLE_SESSION_WITH_COOKIE_NAME$|SLACK_|ML_ASSISTANT_MODELS$|MCP_SERVERS$)/;
 
 // ── Types for what the app streams (subset of src/lib/types/MessageUpdate.ts) ──
-
-interface SelectOption {
-	value: string;
-	label: string;
-	description?: string;
-	setBudgetUsd?: number;
-}
-type ElicitationField =
-	| { kind: "string"; name: string; title?: string; description?: string; default?: string }
-	| {
-			kind: "number";
-			name: string;
-			title?: string;
-			description?: string;
-			default?: number;
-			minimum?: number;
-	  }
-	| { kind: "boolean"; name: string; title?: string; description?: string; default?: boolean }
-	| {
-			kind: "select";
-			name: string;
-			title?: string;
-			description?: string;
-			multiple: boolean;
-			options: SelectOption[];
-	  };
 
 // Loose on purpose: the runner reads a handful of fields and records the rest verbatim.
 type Update = { type: string; subtype?: string; [key: string]: unknown };
@@ -107,7 +90,9 @@ interface Answer {
 	toolUuid?: string;
 	t: number;
 	questions: Array<{ question: string; options: string[] }>;
-	content: Record<string, string | number | boolean | string[]>;
+	content: Record<string, AnswerValue>;
+	/** how each field was answered, in field order */
+	fields: FieldAnswer[];
 	declined?: boolean;
 }
 
@@ -452,31 +437,14 @@ function parseFrame(raw: string): { event?: string; data?: string; id?: number }
 	return frame;
 }
 
-// ── Answering ask_user_question ───────────────────────────────────────────────
-
-function answerField(
-	field: ElicitationField,
-	scenario: Scenario
-): string | number | boolean | string[] {
-	switch (field.kind) {
-		case "string":
-			return field.default ?? scenario.nudge ?? "Use your best judgment.";
-		case "number":
-			return field.default ?? field.minimum ?? 1;
-		case "boolean":
-			return field.default ?? true;
-		case "select": {
-			// Budget options would move the cap the checks measure against.
-			const pool = field.options.filter((o) => o.setBudgetUsd === undefined);
-			const haystack = [field.title, field.description, ...pool.map((o) => o.label)].join(" ");
-			const rule = scenario.answers?.find((r) => r.question.test(haystack));
-			const picked =
-				(rule && pool.find((o) => rule.choose.test(`${o.label} ${o.description ?? ""}`))) ??
-				pool.find((o) => /recommend/i.test(`${o.label} ${o.description ?? ""}`)) ??
-				pool[0];
-			return field.multiple ? [picked.value] : picked.value;
-		}
+/** the value with the confidence of the answer model or why it fell back */
+function describeAnswer(f: FieldAnswer): string {
+	const value = JSON.stringify(f.value);
+	if (f.source === "model") {
+		return f.confidence === undefined ? value : `${value} (p ${f.confidence.toFixed(2)})`;
 	}
+	const p = f.confidence === undefined ? "" : ` p ${f.confidence.toFixed(2)}`;
+	return `${value} (fallback, ${f.reason}${p})`;
 }
 
 // ── Grading ───────────────────────────────────────────────────────────────────
@@ -647,9 +615,10 @@ function buildTrace(
 	for (const event of events) {
 		if (event.kind === "answer") {
 			flush();
-			const lines = event.a.questions.map(
-				(q, i) => `${q.question} → ${text(Object.values(event.a.content)[i])}`
-			);
+			const lines = event.a.questions.map((q, i) => {
+				const f = event.a.fields[i];
+				return `${q.question} → ${f ? describeAnswer(f) : "declined"}`;
+			});
 			messages.push({ role: "user", content: `[answered ask_user_question]\n${lines.join("\n")}` });
 			continue;
 		}
@@ -865,9 +834,10 @@ async function runScenario(client: AppClient, scenario: Scenario, repeat: number
 			const budgetOnly = request.fields.some(
 				(f) => f.kind === "select" && f.options.every((o) => o.setBudgetUsd !== undefined)
 			);
-			const content = budgetOnly
-				? {}
-				: Object.fromEntries(request.fields.map((f) => [f.name, answerField(f, scenario)]));
+			const fields = budgetOnly
+				? []
+				: await answerElicitation(userBrief(prompt, scenario.user), request.fields, complete);
+			const content = Object.fromEntries(fields.map((f) => [f.name, f.value]));
 			answers.push({
 				elicitationId: request.elicitationId,
 				toolUuid: update.toolUuid as string | undefined,
@@ -877,10 +847,11 @@ async function runScenario(client: AppClient, scenario: Scenario, repeat: number
 					options: f.kind === "select" ? f.options.map((o) => o.label) : [],
 				})),
 				content,
+				fields,
 				declined: budgetOnly,
 			});
 			log(
-				`  ${label} ${budgetOnly ? "declined a budget question" : `answered: ${JSON.stringify(content)}`}`
+				`  ${label} ${budgetOnly ? "declined a budget question" : `answered: ${fields.map(describeAnswer).join(", ")}`}`
 			);
 			await client.answer(
 				conv.id,
@@ -1027,6 +998,15 @@ type CrashedRun = Pick<GradedRun, "name" | "repeat" | "passed" | "checks">;
 function summaryMarkdown(runs: Array<GradedRun | CrashedRun>, tracesUrl?: string) {
 	const lines = ["## ML Intern outcome eval", ""];
 	if (tracesUrl) lines.push(`Traces: ${tracesUrl}`, "");
+	const fields = runs.flatMap((r) => ("answers" in r ? r.answers.flatMap((a) => a.fields) : []));
+	if (fields.length) {
+		const fellBack = fields.filter((f) => f.source === "fallback");
+		const reasons = [...new Set(fellBack.map((f) => f.reason))].join(", ");
+		lines.push(
+			`User answers: ${fields.length}, ${fellBack.length} fell back${reasons ? ` (${reasons})` : ""}.`,
+			""
+		);
+	}
 	lines.push(
 		"| task | run | checks | minutes | cost | failed jobs | minutes to first artifact |",
 		"|---|---|---|---|---|---|---|"
