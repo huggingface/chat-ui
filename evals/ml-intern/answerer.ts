@@ -312,8 +312,10 @@ async function answerFree(
 export async function answerElicitation(
 	brief: string,
 	fields: ElicitationField[],
-	complete: Complete
+	call: Complete
 ): Promise<FieldAnswer[]> {
+	const complete: Complete = (body) =>
+		call(body).catch((err: unknown) => ({ ok: false as const, error: String(err) }));
 	const free = fields.filter((f) => !isLettered(f));
 	const byName = new Map<string, FieldAnswer>();
 	if (free.length) {
@@ -341,40 +343,44 @@ export function routerComplete(
 		let last = "";
 		let provider: string | undefined;
 		for (let attempt = 0; attempt < tries; attempt++) {
-			let res: Response;
+			let status: number;
+			let after: number;
+			let text: string;
 			try {
-				res = await fetchImpl(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+				const res = await fetchImpl(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
 					method: "POST",
 					headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
 					body: JSON.stringify(body),
 					signal: AbortSignal.timeout(120_000),
 				});
+				provider = res.headers.get("x-inference-provider") ?? undefined;
+				status = res.status;
+				after = Number(res.headers.get("retry-after"));
+				text = await res.text();
+				if (res.ok) {
+					const data = JSON.parse(text) as {
+						choices?: Array<{
+							message?: { content?: string };
+							logprobs?: {
+								content?: Array<{ top_logprobs?: Array<{ token: string; logprob: number }> }>;
+							};
+						}>;
+					};
+					const choice = data.choices?.[0];
+					return {
+						ok: true,
+						content: choice?.message?.content ?? "",
+						top: choice?.logprobs?.content?.[0]?.top_logprobs,
+						provider,
+					};
+				}
 			} catch (err) {
 				last = String(err);
 				await wait(5_000 + attempt * 1_000);
 				continue;
 			}
-			provider = res.headers.get("x-inference-provider") ?? undefined;
-			if (res.ok) {
-				const data = (await res.json()) as {
-					choices?: Array<{
-						message?: { content?: string };
-						logprobs?: {
-							content?: Array<{ top_logprobs?: Array<{ token: string; logprob: number }> }>;
-						};
-					}>;
-				};
-				const choice = data.choices?.[0];
-				return {
-					ok: true,
-					content: choice?.message?.content ?? "",
-					top: choice?.logprobs?.content?.[0]?.top_logprobs,
-					provider,
-				};
-			}
-			last = `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
-			if (res.status !== 429 && res.status < 500) break;
-			const after = Number(res.headers.get("retry-after"));
+			last = `HTTP ${status}: ${text.slice(0, 200)}`;
+			if (status !== 429 && status < 500) break;
 			await wait((Number.isFinite(after) && after > 0 ? after : 5) * 1_000 + attempt * 1_000);
 		}
 		return { ok: false, error: last, provider };

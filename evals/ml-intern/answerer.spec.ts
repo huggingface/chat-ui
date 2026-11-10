@@ -306,6 +306,27 @@ describe("routerComplete", () => {
 		expect(waits).toEqual([5_000]);
 	});
 
+	it("retries a success whose body is not json, then answers", async () => {
+		const waits: number[] = [];
+		const replies = [
+			new Response("{trunc", { status: 200 }),
+			response(200, { choices: [{ message: { content: "{}" } }] }),
+		];
+		const complete = routerComplete("u", "k", {
+			fetchImpl: async () => replies.shift() as Response,
+			wait: async (ms) => void waits.push(ms),
+		});
+		expect(await complete({})).toMatchObject({ ok: true, content: "{}" });
+		expect(waits).toHaveLength(1);
+	});
+
+	it("falls back when the completion itself throws", async () => {
+		const [a] = await answerElicitation("Brief.", [hardware], async () => {
+			throw new Error("boom");
+		});
+		expect(a).toMatchObject({ value: "b", reason: "call failed", error: "Error: boom" });
+	});
+
 	it("gives up on a client error and after the last try", async () => {
 		const once = routerComplete("u", "k", {
 			fetchImpl: async () => response(400, { error: "bad" }),
