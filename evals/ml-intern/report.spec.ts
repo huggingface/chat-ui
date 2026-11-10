@@ -60,6 +60,36 @@ describe("pairedCases", () => {
 	});
 });
 
+describe("answersFallenBack", () => {
+	it("shares lettered answers that fell back, ignoring ones the model never scored", () => {
+		const scored = { temperature: 6.39 };
+		const withAnswers = (sources: Array<"model" | "fallback">): ArmRun => ({
+			...run("t1", 0, 0),
+			answers: [
+				{
+					fields: [
+						...sources.map((source) => ({ name: "q", value: "a", source, ...scored })),
+						{
+							name: "only",
+							value: "a",
+							source: "fallback" as const,
+							reason: "one option" as const,
+						},
+					],
+				},
+			],
+		});
+		const m = measure("answersFallenBack");
+		expect(m.value(withAnswers(["model", "fallback", "model", "model"]))).toBe(0.25);
+		expect(m.value(run("t1", 0, 0))).toBeUndefined();
+		const rows = compareArms(
+			arm("a", [withAnswers(["model"])]),
+			arm("b", [withAnswers(["fallback"])])
+		);
+		expect(rows.find((r) => r.key === "answersFallenBack")).toMatchObject({ kind: "share" });
+	});
+});
+
 describe("compareArms", () => {
 	it("counts a crashed run as a failed one", () => {
 		const a = arm("a", [run("t1", 0, 0, true)]);
