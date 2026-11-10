@@ -10,7 +10,9 @@ import {
 import {
 	JOB_CHECK_DELEGATION_DOCTRINE,
 	JOB_CHECK_SYSTEM_PROMPT,
+	JOB_FAILED_NOTE,
 	jobCheckSystemPrompt,
+	withJobFailedNote,
 } from "./jobCheckPrompt";
 import type { NestedAgentDeps } from "./nestedAgent";
 import type { BuiltinTool } from "./types";
@@ -169,5 +171,29 @@ describe("truncateJobCheckOutput", () => {
 
 	it("leaves a short log alone", () => {
 		expect(truncateJobCheckOutput("step 1 loss 2.3")).toBe("step 1 loss 2.3");
+	});
+});
+
+describe("withJobFailedNote", () => {
+	it.each([
+		"- Status: failed.\n- If it failed: ImportError",
+		"- **Status: failed.** Job ran ~48 s, exit code 1",
+		"- **Status:** failed (exit 1)",
+		"- Status: **failed**",
+	])("adds the note to a failed report: %s", (report) => {
+		expect(withJobFailedNote(JOB_CHECK_TOOL_NAME, report)).toBe(`${report}\n\n${JOB_FAILED_NOTE}`);
+	});
+
+	it.each([
+		"- Status: running.\n- Step 120, loss 1.9 and falling",
+		"- Status: finished.\n- No job has failed",
+		"- Status: failed.\n- If it failed: torch.OutOfMemoryError: CUDA out of memory",
+		"- **Status: failed.** OOM at batch size 16",
+	])("leaves other reports alone: %s", (report) => {
+		expect(withJobFailedNote(JOB_CHECK_TOOL_NAME, report)).toBe(report);
+	});
+
+	it("only reads check_job's reports", () => {
+		expect(withJobFailedNote("hf_jobs", "- Status: failed.")).toBe("- Status: failed.");
 	});
 });
