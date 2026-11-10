@@ -82,6 +82,15 @@ describe("gradio-console receiver against the fixture frame", () => {
 		expect(texts(frame.entries)).toEqual(['boot {"a":1}', "TypeError: x is undefined", "later"]);
 	});
 
+	it("takes a first flush split across two messages", async () => {
+		const frame = mount(
+			gradioConsoleFrameDoc({}, `for (let i = 1; i <= 120; i++) console.log("line " + i);`)
+		);
+		await frame.first;
+		await vi.waitFor(() => expect(frame.entries).toHaveLength(100));
+		expect(frame.entries.map((e) => e.seq)).toEqual(Array.from({ length: 100 }, (_, i) => i + 21));
+	});
+
 	it("drops entries a frame sends again", async () => {
 		const frame = mount(gradioConsoleFrameDoc({ mode: "replay" }, `console.log("once");`));
 		await frame.first;
