@@ -24,24 +24,47 @@ import { onExit } from "$lib/server/exitHandler";
 import { logger } from "$lib/server/logger";
 import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 import { pinnedHubToken } from "$lib/server/mlAssistant";
-import { isTurnAlive } from "$lib/server/generation/turnLog";
-import { kickAnsweredAsk } from "$lib/server/generation/askResume";
 import {
 	QueueFullError,
 	QueuedInputTooLongError,
-	enqueueInput as queueForTurn,
-	hasQueuedInputs,
-} from "$lib/server/queuedInputs/store";
-import { wakeParkForQueuedInput } from "$lib/server/queuedInputs/deliver";
-import { kickQueuedTurn } from "$lib/server/queuedInputs/drain";
-import { submitElicitationAnswer } from "$lib/server/mcp/elicitation";
+	SIDE_QUESTION_MAX_CHARS,
+	answerQuestion,
+	answerSideQuestion,
+	backfillManagedBy,
+	canRetry,
+	continueAnsweredAsk,
+	exportTrace,
+	findQuestion,
+	findRunOwner,
+	hasPendingSteers,
+	isRunSettled,
+	lockChoices,
+	ownerUsername,
+	readLatest,
+	readLatestMessage,
+	readRunStatus,
+	readTurn,
+	releaseChoices,
+	reserveSideQuestionQuota,
+	runExists,
+	shareAnswer,
+	sharedAnswers,
+	stageChoice,
+	steerRun,
+	supersededQuestions,
+} from "$lib/server/mlRun";
 import { reservedMicroUsd, formatMicroUsd } from "$lib/utils/mlBudget";
 import type { User } from "$lib/types/User";
 import { slackConfig, type SlackConfig } from "./config";
 import { provisionSlackIdentity, threadLocals } from "./identity";
-import { answerSideQuestion, SIDE_QUESTION_MAX_CHARS } from "$lib/server/mlSideQuestion";
 import { slackSideQuestion } from "$lib/utils/sideQuestion";
-import { ensureConversation, runSlackTurn, stopSlackTurn, skipSlackQuestion } from "./engine";
+import {
+	ensureConversation,
+	runSlackTurn,
+	slackManagedBy,
+	stopSlackTurn,
+	skipSlackQuestion,
+} from "./engine";
 import { MCP_RESYNC_NOTE } from "$lib/server/mcp/savedSelection";
 import { addressedToOther, threadKey, threadPrompt, type ThreadMessage } from "./context";
 import { enqueueInput, getOrCreateThread, inputKey, SlackLeader } from "./store";
@@ -339,21 +362,18 @@ export class MlSlackBot {
 					if (!parsed.success) return;
 					const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
 					if (!thread) return;
-					const question = await collections.mcpElicitations.findOne({
-						conversationId: thread.conversationId,
-						elicitationId: parsed.data.elicitationId,
-						status: "pending",
-						"pending.kind": "ask",
+					const question = await findQuestion(thread.conversationId, parsed.data.elicitationId, {
+						pending: true,
+						kind: "ask",
 					});
 					if (!question || !inlineQuestions(question.request)) return;
 					const field = question.request.fields?.[parsed.data.fieldIndex];
 					if (field?.kind !== "select" || !field.options[parsed.data.optionIndex]) return;
-					await collections.mcpElicitations.updateOne(
-						{ _id: question._id, status: "pending", slackSubmitting: { $ne: true } },
-						{
-							$set: { [`slackChoices.${parsed.data.fieldIndex}`]: parsed.data.optionIndex },
-							$inc: { slackChoiceRevision: 1 },
-						}
+					await stageChoice(
+						thread.conversationId,
+						question.elicitationId,
+						parsed.data.fieldIndex,
+						parsed.data.optionIndex
 					);
 					await collections.slackThreads.updateOne(
 						{ _id: thread._id },
@@ -372,24 +392,15 @@ export class MlSlackBot {
 			if (!parsed.success) return;
 			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
 			if (!thread) return;
-			const question = await collections.mcpElicitations.findOne({
-				conversationId: thread.conversationId,
-				elicitationId: parsed.data.elicitationId,
-				status: "pending",
-				"pending.kind": "ask",
+			const question = await findQuestion(thread.conversationId, parsed.data.elicitationId, {
+				pending: true,
+				kind: "ask",
 			});
-			const content = question && selectedAnswers(question.request, question.slackChoices);
-			if (!question || !content || question.slackChoiceRevision !== parsed.data.revision) return;
-			const locked = await collections.mcpElicitations.updateOne(
-				{
-					_id: question._id,
-					status: "pending",
-					slackChoiceRevision: parsed.data.revision,
-					slackSubmitting: { $ne: true },
-				},
-				{ $set: { slackSubmitting: true, slackShareAnswer: true } }
-			);
-			if (!locked.modifiedCount) {
+			const content = question && selectedAnswers(question.request, question.choices);
+			if (!question || !content || question.choiceRevision !== parsed.data.revision) return;
+			if (
+				!(await lockChoices(thread.conversationId, question.elicitationId, parsed.data.revision))
+			) {
 				await this.tell(
 					thread.teamId,
 					thread.channel,
@@ -399,7 +410,7 @@ export class MlSlackBot {
 				return;
 			}
 			try {
-				const result = await submitElicitationAnswer({
+				const result = await answerQuestion({
 					conversationId: thread.conversationId,
 					elicitationId: question.elicitationId,
 					action: "accept",
@@ -415,10 +426,7 @@ export class MlSlackBot {
 						resumeElicitationId: question.elicitationId,
 					});
 			} finally {
-				await collections.mcpElicitations.updateOne(
-					{ _id: question._id },
-					{ $unset: { slackSubmitting: "" } }
-				);
+				await releaseChoices(thread.conversationId, question.elicitationId);
 				await collections.slackThreads.updateOne({ _id: thread._id }, { $set: { watching: true } });
 			}
 		});
@@ -432,20 +440,15 @@ export class MlSlackBot {
 				if (!parsed.success) return;
 				const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
 				if (!thread) return;
-				const question = await collections.mcpElicitations.findOne({
-					conversationId: thread.conversationId,
-					elicitationId: parsed.data.elicitationId,
-					status: "pending",
-					"pending.kind": "ask",
+				const question = await findQuestion(thread.conversationId, parsed.data.elicitationId, {
+					pending: true,
+					kind: "ask",
 				});
 				const field = question && inlineField(question.request);
 				const option = field && field.options[parsed.data.optionIndex];
 				if (!question || !field || !option) return;
-				await collections.mcpElicitations.updateOne(
-					{ _id: question._id, status: "pending" },
-					{ $set: { slackShareAnswer: true } }
-				);
-				const result = await submitElicitationAnswer({
+				await shareAnswer(thread.conversationId, question.elicitationId);
+				const result = await answerQuestion({
 					conversationId: thread.conversationId,
 					elicitationId: question.elicitationId,
 					action: "accept",
@@ -481,12 +484,10 @@ export class MlSlackBot {
 			if (!parsed.success) return;
 			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
 			if (!thread) return;
-			const question = await collections.mcpElicitations.findOne({
-				conversationId: thread.conversationId,
-				elicitationId: parsed.data.elicitationId,
-				status: "pending",
+			const question = await findQuestion(thread.conversationId, parsed.data.elicitationId, {
+				pending: true,
 			});
-			if (question?.pending?.kind === "review") {
+			if (question?.kind === "review") {
 				await this.tell(
 					thread.teamId,
 					thread.channel,
@@ -521,10 +522,7 @@ export class MlSlackBot {
 				await ack({ response_action: "clear" });
 				return;
 			}
-			const question = await collections.mcpElicitations.findOne({
-				conversationId: thread.conversationId,
-				elicitationId: parsed.data.elicitationId,
-			});
+			const question = await findQuestion(thread.conversationId, parsed.data.elicitationId);
 			if (!question) {
 				await ack({ response_action: "clear" });
 				return;
@@ -534,13 +532,9 @@ export class MlSlackBot {
 				await ack({ response_action: "errors", errors: answer.errors });
 				return;
 			}
-			if (question.pending?.kind === "ask")
-				await collections.mcpElicitations.updateOne(
-					{ _id: question._id, status: "pending" },
-					{ $set: { slackShareAnswer: true } }
-				);
+			if (question.kind === "ask") await shareAnswer(thread.conversationId, question.elicitationId);
 
-			const result = await submitElicitationAnswer({
+			const result = await answerQuestion({
 				conversationId: thread.conversationId,
 				elicitationId: question.elicitationId,
 				action: "accept",
@@ -576,11 +570,8 @@ export class MlSlackBot {
 			if (!parsed.success) return;
 			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id, false);
 			if (!thread) return;
-			const conv = await collections.conversations.findOne({ _id: thread.conversationId });
-			if (conv?.messages.at(-1)?.id !== parsed.data.messageId) return;
-			const owner = thread.hfUserId
-				? await collections.users.findOne({ _id: thread.hfUserId })
-				: this.user;
+			if ((await readLatestMessage(thread.conversationId))?.id !== parsed.data.messageId) return;
+			const owner = thread.hfUserId ? await findRunOwner(thread.hfUserId) : this.user;
 			if (!owner) return;
 			await stopSlackTurn(thread, owner);
 			await this.tell(
@@ -598,29 +589,17 @@ export class MlSlackBot {
 			if (!parsed.success) return;
 			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
 			if (!thread) return;
-			const conv = await collections.conversations.findOne({ _id: thread.conversationId });
-			const last = conv?.messages[conv.messages.length - 1];
-			if (
-				!last ||
-				last.id !== parsed.data.messageId ||
-				last.generationId !== parsed.data.generationId ||
-				(await isTurnAlive(thread.conversationId, last.id)).alive
-			)
-				return;
-			const state = await collections.turnStates.findOne({
-				conversationId: thread.conversationId,
-				messageId: last.id,
-			});
-			if (!last.interrupted && state?.status !== "failed") return;
+			const { messageId, generationId } = parsed.data;
+			if (!(await canRetry(thread.conversationId, messageId, generationId))) return;
 			await enqueueInput({
-				_id: inputKey(thread.teamId, `retry:${thread._id}:${last.generationId}`),
+				_id: inputKey(thread.teamId, `retry:${thread._id}:${generationId}`),
 				threadId: thread._id,
 				user: body.user.id,
 				text: "",
 				ts: thread.threadTs,
 				retry: true,
-				expectedMessageId: last.id,
-				expectedGenerationId: last.generationId,
+				expectedMessageId: messageId,
+				expectedGenerationId: generationId,
 			});
 		});
 		this.app.action("ml_intern_trace", async ({ ack, body, action }) => {
@@ -648,19 +627,15 @@ export class MlSlackBot {
 				return;
 			const channel = await workspace.client.conversations.info({ channel: thread.channel });
 			if (channel.channel?.is_ext_shared && !thread.hfUserId) return;
-			const conv = await collections.conversations.findOne({ _id: thread.conversationId });
-			if (!conv) return;
+			const trace = await exportTrace(thread.conversationId);
+			if (!trace) return;
 			try {
 				// Personal traces include private tool results: deliver only to the owner DM.
 				const destination = thread.hfUserId
 					? (await workspace.client.conversations.open({ users: thread.owner })).channel?.id
 					: thread.channel;
 				if (!destination) return;
-				const upload = {
-					filename: `ml-intern-${conv._id}.jsonl`,
-					content: conv.messages.map((m) => JSON.stringify(m)).join("\n"),
-					title: "ML Intern conversation trace",
-				};
+				const upload = { ...trace, title: "ML Intern conversation trace" };
 				if (thread.hfUserId) {
 					await workspace.client.files.uploadV2({ ...upload, channel_id: destination });
 				} else {
@@ -919,13 +894,7 @@ export class MlSlackBot {
 			_id: threadKey(teamId, event.channel, event.thread_ts ?? event.ts),
 			teamId,
 		});
-		const exists =
-			thread &&
-			(await collections.conversations.countDocuments(
-				{ _id: thread.conversationId },
-				{ limit: 1 }
-			));
-		if (!thread || !exists) return false;
+		if (!thread || !(await runExists(thread.conversationId))) return false;
 
 		const now = Date.now();
 		for (const [id, until] of this.sideQuestionEvents)
@@ -995,32 +964,11 @@ export class MlSlackBot {
 		return true;
 	}
 
-	/**
-	 * a minute of quota in messageEvents, rows are inserted before counting so racing requests
-	 * can both back off but never both take the last slot
-	 */
-	private async reserveSideQuestion(teamId: string, user: string): Promise<boolean> {
-		const now = new Date();
-		const expiresAt = new Date(now.getTime() + 60_000);
-		const rows = [
-			{ userId: `slack-btw:${teamId}:${user}`, limit: SLACK_SIDE_QUESTIONS_PER_MINUTE },
-			{ userId: `slack-btw:${teamId}`, limit: SLACK_WORKSPACE_SIDE_QUESTIONS_PER_MINUTE },
-		].map((row) => ({ ...row, _id: new ObjectId() }));
-		await collections.messageEvents.insertMany(
-			rows.map(({ _id, userId }) => ({ _id, type: "message", userId, createdAt: now, expiresAt }))
-		);
-		const counts = await Promise.all(
-			rows.map(({ userId }) =>
-				collections.messageEvents.countDocuments({
-					userId,
-					type: "message",
-					expiresAt: { $gt: now },
-				})
-			)
-		);
-		if (rows.every((row, i) => counts[i] <= row.limit)) return true;
-		await collections.messageEvents.deleteMany({ _id: { $in: rows.map((row) => row._id) } });
-		return false;
+	private reserveSideQuestion(teamId: string, user: string): Promise<boolean> {
+		return reserveSideQuestionQuota([
+			{ key: `slack-btw:${teamId}:${user}`, perMinute: SLACK_SIDE_QUESTIONS_PER_MINUTE },
+			{ key: `slack-btw:${teamId}`, perMinute: SLACK_WORKSPACE_SIDE_QUESTIONS_PER_MINUTE },
+		]);
 	}
 
 	/**
@@ -1103,12 +1051,9 @@ export class MlSlackBot {
 			const noteMcpUnavailable = () =>
 				this.tell(thread.teamId, thread.channel, thread.owner, MCP_RESYNC_NOTE, thread.threadTs);
 			if (input.resumeElicitationId) {
-				const question = await collections.mcpElicitations.findOne({
-					conversationId: thread.conversationId,
-					elicitationId: input.resumeElicitationId,
-				});
-				if (question?.pending?.kind === "ask")
-					await kickAnsweredAsk(thread.conversationId, input.resumeElicitationId);
+				const question = await findQuestion(thread.conversationId, input.resumeElicitationId);
+				if (question?.kind === "ask")
+					await continueAnsweredAsk(thread.conversationId, input.resumeElicitationId);
 				else
 					await runSlackTurn(
 						thread,
@@ -1118,18 +1063,13 @@ export class MlSlackBot {
 						noteMcpUnavailable
 					);
 			} else {
-				const conv = await collections.conversations.findOne({ _id: thread.conversationId });
-				const latest = conv?.messages[conv.messages.length - 1];
+				const { message: latest, live } = await readLatest(thread.conversationId);
 				if (
 					input.retry &&
 					(latest?.id !== input.expectedMessageId ||
 						latest?.generationId !== input.expectedGenerationId)
 				)
 					throw new Error("This resume refers to an older turn.");
-				const live =
-					latest?.from === "assistant"
-						? await isTurnAlive(thread.conversationId, latest.id)
-						: undefined;
 				const busy = live?.alive;
 				// The existing dispatch owns turn startup and question continuation. A concurrent
 				// intake may only queue text, never start a second generation or skip its ask.
@@ -1232,7 +1172,7 @@ export class MlSlackBot {
 	): Promise<void> {
 		const { text, files } = await this.context(thread, input);
 		try {
-			await queueForTurn({
+			await steerRun({
 				conversationId: thread.conversationId,
 				text,
 				source: "slack",
@@ -1257,8 +1197,6 @@ export class MlSlackBot {
 			{ _id: thread._id },
 			{ $max: { contextThroughTs: input.ts }, $set: { watching: true, updatedAt: new Date() } }
 		);
-		await wakeParkForQueuedInput(thread.conversationId);
-		kickQueuedTurn(thread.conversationId);
 		await this.tell(
 			thread.teamId,
 			thread.channel,
@@ -1289,45 +1227,13 @@ export class MlSlackBot {
 	}
 	private async publish(thread: SlackThread): Promise<void> {
 		const { client } = await this.slack(thread.teamId);
-		const conv = await collections.conversations.findOne(
-			{ _id: thread.conversationId },
-			{ projection: { messages: { $slice: -1 }, mlBudget: 1 } }
-		);
-		const message = conv?.messages[conv.messages.length - 1];
-		if (!conv || message?.from !== "assistant") return;
-		const state = await collections.turnStates.findOne({
-			conversationId: conv._id,
-			messageId: message.id,
-		});
-		if (!state) return;
-		if (
-			await collections.mcpElicitations.findOne({
-				conversationId: conv._id,
-				"pending.messageId": message.id,
-				slackSkippedByInputId: { $exists: true },
-			})
-		) {
+		const turn = await readTurn(thread.conversationId);
+		if (!turn) return;
+		if (turn.kind === "superseded") {
 			await this.publishSessionStatus(thread, "↪️ Continued with a new message", []);
 			return;
 		}
-		const live = await isTurnAlive(conv._id, message.id);
-		const question = await collections.mcpElicitations.findOne({
-			conversationId: conv._id,
-			status: "pending",
-			$or: [{ "pending.messageId": message.id }, { generationId: message.generationId }],
-		});
-		const answered = await collections.mcpElicitations
-			.find({
-				conversationId: conv._id,
-				"pending.messageId": message.id,
-				"pending.kind": "ask",
-				status: "resolved",
-				action: "accept",
-				slackShareAnswer: true,
-			})
-			.sort({ createdAt: -1, _id: -1 })
-			.limit(1)
-			.next();
+		const { message, state, live, question, sharedAnswer: answered } = turn;
 		const previousQuestion = answered
 			? await collections.slackDeliveries.findOne({
 					threadId: thread._id,
@@ -1347,10 +1253,10 @@ export class MlSlackBot {
 		});
 		let text: string;
 		// a review has no form here, the modal would submit an empty answer and resolve it
-		if (question?.pending?.kind === "review") {
-			text = `Review waiting, open it on the web: ${conversationLink(conv._id)}`;
+		if (question?.kind === "review") {
+			text = `Review waiting, open it on the web: ${conversationLink(thread.conversationId)}`;
 		} else if (question) {
-			const structured = question.pending?.kind === "ask" && !!question.request.fields?.length;
+			const structured = question.kind === "ask" && !!question.request.fields?.length;
 			text = structured ? "" : question.request.message;
 			if (question.request.mode === "form") {
 				const label = structured ? questionFormLabel(question.request) : "Answer questions";
@@ -1373,15 +1279,7 @@ export class MlSlackBot {
 				actions.push({ id: RESUME_ACTION, label: "Retry", value: turnValue });
 			actions.push({ id: "ml_intern_trace", label: "Download trace", value: thread._id });
 		}
-		const original = message.queuedContinuationOf
-			? await collections.conversations.findOne(
-					{ _id: conv._id },
-					{
-						projection: { messages: { $elemMatch: { id: message.queuedContinuationOf } } },
-					}
-				)
-			: undefined;
-		const startedAt = original?.messages[0]?.createdAt ?? message.createdAt ?? state.createdAt;
+		const { startedAt } = turn;
 		const elapsed = Math.max(
 			0,
 			Math.floor(
@@ -1393,7 +1291,7 @@ export class MlSlackBot {
 		);
 		const duration = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
 		const status = question
-			? question.pending?.kind === "review"
+			? question.kind === "review"
 				? "⏳ Waiting for your review"
 				: "⏳ Waiting for your answer"
 			: live.alive
@@ -1421,8 +1319,8 @@ export class MlSlackBot {
 					actions,
 					question: question?.request,
 					questionLayout: 3,
-					choices: question?.slackChoices,
-					revision: question?.slackChoiceRevision,
+					choices: question?.choices,
+					revision: question?.choiceRevision,
 				})
 			)
 			.digest("hex");
@@ -1465,7 +1363,7 @@ export class MlSlackBot {
 		let delivery = await collections.slackDeliveries.findOne({ _id });
 		if (
 			delivery &&
-			question?.pending?.kind === "ask" &&
+			question?.kind === "ask" &&
 			(delivery.questionId !== question.elicitationId || delivery.questionSnapshot === undefined)
 		) {
 			await collections.slackDeliveries.updateOne(
@@ -1479,7 +1377,7 @@ export class MlSlackBot {
 					_id,
 					threadId: thread._id,
 					messageId: message.id,
-					questionId: question?.pending?.kind === "ask" ? question.elicitationId : undefined,
+					questionId: question?.kind === "ask" ? question.elicitationId : undefined,
 					questionSnapshot: question ? message.content : undefined,
 					parts: [],
 					updatedAt: new Date(),
@@ -1491,13 +1389,13 @@ export class MlSlackBot {
 			for (let index = 0; index < Math.max(parts.length, delivery.parts.length); index++) {
 				const part = parts[index] ?? "(continued above)";
 				const blocks =
-					question?.pending?.kind === "ask" && index === 0
+					question?.kind === "ask" && index === 0
 						? [
 								...questionBlocks(
 									question.request,
 									thread._id,
-									question.slackChoices,
-									question.slackChoiceRevision
+									question.choices,
+									question.choiceRevision
 								),
 								...messageBlocks(part, actions).filter((block) => block.type === "actions"),
 							]
@@ -1535,7 +1433,7 @@ export class MlSlackBot {
 					$set: {
 						digest,
 						updatedAt: new Date(),
-						...(question?.pending?.kind === "ask"
+						...(question?.kind === "ask"
 							? { questionId: question.elicitationId, questionSnapshot: message.content }
 							: {}),
 					},
@@ -1545,7 +1443,7 @@ export class MlSlackBot {
 		if (
 			!live.alive &&
 			!this.active.has(thread._id) &&
-			!(await hasQueuedInputs(thread.conversationId)) &&
+			!(await hasPendingSteers(thread.conversationId)) &&
 			!(await collections.slackInputs.countDocuments(
 				{
 					threadId: thread._id,
@@ -1605,29 +1503,11 @@ export class MlSlackBot {
 		working = false
 	): Promise<void> {
 		const { client } = await this.slack(thread.teamId);
-		const conv = await collections.conversations.findOne(
-			{ _id: thread.conversationId },
-			{
-				projection: {
-					"messages.id": 1,
-					"messages.from": 1,
-					"messages.queuedContinuationOf": 1,
-					"messages.createdAt": 1,
-					mlBudget: 1,
-					plan: 1,
-				},
-			}
-		);
-		const message = conv?.messages.at(-1);
-		if (message?.from !== "assistant") return;
-		// Steering may drain into a new assistant turn, but still belongs to the original card.
-		const cardMessageId = message.queuedContinuationOf ?? message.id;
-		const _id = `${thread._id}:status:${cardMessageId}`;
+		const run = await readRunStatus(thread.conversationId);
+		if (!run) return;
+		const { budget, plan } = run;
+		const _id = `${thread._id}:status:${run.cardMessageId}`;
 		const delivery = await collections.slackDeliveries.findOne({ _id });
-		const budget = conv?.mlBudget;
-		// The plan outlives its turn; a follow-up shows none until it plans again.
-		const startedAt = conv?.messages.find((m) => m.id === cardMessageId)?.createdAt;
-		const plan = conv?.plan && (!startedAt || conv.plan.updatedAt >= startedAt) ? conv.plan : null;
 		const steps = plan?.steps
 			.map((s, i) => {
 				// Keeps a full 20-step plan inside Slack's 3,000-character section.
@@ -1638,10 +1518,7 @@ export class MlSlackBot {
 			.join("\n");
 		const text = `${status}${steps ? `\n\n${steps}\n\n` : "\n"}💻 Jobs ${formatMicroUsd(budget?.spentMicroUsd ?? 0)} spent · ${formatMicroUsd(budget ? reservedMicroUsd(budget) : 0)} reserved · ${formatMicroUsd(budget?.totalMicroUsd ?? 0)} budget`;
 		const viewUrl = chatLink(thread) ?? viewerLink(thread.conversationId.toHexString());
-		const owner =
-			viewUrl && thread.hfUserId
-				? await collections.users.findOne({ _id: thread.hfUserId }, { projection: { username: 1 } })
-				: undefined;
+		const ownerName = viewUrl && thread.hfUserId ? await ownerUsername(thread.hfUserId) : undefined;
 		const buttons = [
 			...messageBlocks("", actions).flatMap((block) =>
 				block.type === "actions" ? block.elements : []
@@ -1654,7 +1531,7 @@ export class MlSlackBot {
 							text: {
 								type: "plain_text" as const,
 								text: thread.hfUserId
-									? `Open in HuggingChat (${owner?.username || "owner only"})`.slice(0, 75)
+									? `Open in HuggingChat (${ownerName || "owner only"})`.slice(0, 75)
 									: "Open session",
 							},
 							url: viewUrl,
@@ -1691,7 +1568,7 @@ export class MlSlackBot {
 			{
 				$set: {
 					threadId: thread._id,
-					messageId: message.id,
+					messageId: run.messageId,
 					parts: [ts],
 					digest,
 					updatedAt: new Date(),
@@ -1762,9 +1639,7 @@ export class MlSlackBot {
 
 	private async publishSkippedQuestions(thread: SlackThread): Promise<void> {
 		const { client } = await this.slack(thread.teamId);
-		const questions = await collections.mcpElicitations
-			.find({ conversationId: thread.conversationId, slackSkippedByInputId: { $exists: true } })
-			.toArray();
+		const questions = await supersededQuestions(thread.conversationId);
 		for (const question of questions) {
 			const card = await collections.slackDeliveries.findOne({
 				threadId: thread._id,
@@ -1793,16 +1668,7 @@ export class MlSlackBot {
 
 	private async publishAnswers(thread: SlackThread): Promise<void> {
 		const { client } = await this.slack(thread.teamId);
-		const questions = await collections.mcpElicitations
-			.find({
-				conversationId: thread.conversationId,
-				status: "resolved",
-				action: "accept",
-				resolution: "user",
-				slackShareAnswer: true,
-				"pending.kind": "ask",
-			})
-			.toArray();
+		const questions = await sharedAnswers(thread.conversationId);
 		for (const question of questions) {
 			if (!question.content) continue;
 			const _id = `${thread._id}:answer:${question.elicitationId}`;
@@ -1984,15 +1850,7 @@ export class MlSlackBot {
 					{ limit: 1 }
 				))
 			) {
-				const latest = await collections.conversations.findOne(
-					{ _id: thread.conversationId },
-					{ projection: { messages: { $slice: -1 } } }
-				);
-				const message = latest?.messages.at(-1);
-				if (
-					(!message || !(await isTurnAlive(thread.conversationId, message.id)).alive) &&
-					!(await hasQueuedInputs(thread.conversationId))
-				)
+				if (await isRunSettled(thread.conversationId))
 					await collections.slackThreads.updateOne(
 						{ _id: thread._id, updatedAt: thread.updatedAt },
 						{ $set: { watching: false } }
@@ -2061,17 +1919,7 @@ async function startConfiguredSlackBot(): Promise<void> {
 	const settings = slackConfig();
 	if (!settings) return;
 	for await (const thread of collections.slackThreads.find({ deletedAt: { $exists: false } })) {
-		await collections.conversations.updateOne(
-			{ _id: thread.conversationId, managedBy: { $exists: false } },
-			{
-				$set: {
-					managedBy: {
-						kind: "slack",
-						continueUrl: `https://app.slack.com/client/${thread.teamId}/${thread.channel}/thread/${thread.channel}-${thread.threadTs}`,
-					},
-				},
-			}
-		);
+		await backfillManagedBy(thread.conversationId, slackManagedBy(thread));
 	}
 	if (
 		!ML_ASSISTANT_MODE ||

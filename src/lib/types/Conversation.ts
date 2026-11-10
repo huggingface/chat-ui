@@ -5,11 +5,17 @@ import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 import type { Assistant } from "./Assistant";
 
+/** an ml intern session driven from outside the web ui, which shows it read only */
+export interface ManagedBy {
+	kind: "slack";
+	continueUrl: string;
+}
+
 export interface Conversation extends Timestamps {
 	_id: ObjectId;
 
 	sessionId?: string;
-	managedBy?: { kind: "slack"; continueUrl: string };
+	managedBy?: ManagedBy;
 	userId?: User["_id"];
 
 	model: string;

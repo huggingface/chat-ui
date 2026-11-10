@@ -1,17 +1,34 @@
-import { loadMcpSelection } from "$lib/server/mcp/savedSelection";
-import { error } from "@sveltejs/kit";
-import { randomUUID } from "node:crypto";
 import { collections } from "$lib/server/database";
-import { models } from "$lib/server/models";
-import { resolveMlAssistantModel } from "$lib/server/mlAssistantModels";
-import { generateConversationResponse } from "$lib/server/generation/conversationRequest";
-import { threadLocals } from "./identity";
+import {
+	discardRunSession,
+	openRunSession,
+	sendTurn,
+	stopRun,
+	supersedeQuestion,
+	type TurnInput,
+} from "$lib/server/mlRun";
+import type { ManagedBy } from "$lib/types/Conversation";
 import type { User } from "$lib/types/User";
-import type { Conversation } from "$lib/types/Conversation";
+import { threadLocals } from "./identity";
 import type { SlackConfig } from "./config";
 import type { SlackThread } from "./types";
 import { linkedSessionId } from "./connections";
-import { usdToMicroUsd } from "$lib/utils/mlBudget";
+
+export function slackManagedBy(thread: Pick<SlackThread, "teamId" | "channel" | "threadTs">) {
+	const [team, channel, ts] = [thread.teamId, thread.channel, thread.threadTs].map(
+		encodeURIComponent
+	);
+	return {
+		kind: "slack",
+		continueUrl: `https://app.slack.com/client/${team}/${channel}/thread/${channel}-${ts}`,
+	} satisfies ManagedBy;
+}
+
+const stopLocals = (thread: SlackThread, user: User): App.Locals => ({
+	user,
+	sessionId: thread.hfUserId ? linkedSessionId(thread) : `slack-ml:${thread.teamId}`,
+	isAdmin: false,
+});
 
 export async function ensureConversation(
 	thread: SlackThread,
@@ -20,219 +37,64 @@ export async function ensureConversation(
 ): Promise<void> {
 	if ((await collections.slackThreads.findOne({ _id: thread._id }))?.deletedAt)
 		throw new Error("This Slack conversation was deleted. Start a new Slack thread.");
-	const model = resolveMlAssistantModel(undefined);
-	if (!model || !models.some((m) => m.id === model))
-		throw new Error("No ML Intern model is configured.");
-	const now = new Date();
-	const root = {
-		id: randomUUID(),
-		from: "system" as const,
-		content: "",
-		children: [],
-		ancestors: [],
-		createdAt: now,
-		updatedAt: now,
-	};
-	const conversation: Conversation = {
-		_id: thread.conversationId,
-		userId: user._id,
-		...(thread.hfUserId ? { sessionId: linkedSessionId(thread) } : {}),
-		model,
+	await openRunSession({
+		conversationId: thread.conversationId,
+		user,
+		sessionId: thread.hfUserId ? linkedSessionId(thread) : undefined,
+		managedBy: slackManagedBy(thread),
 		title: "[Slack] New Chat",
-		managedBy: {
-			kind: "slack",
-			continueUrl: `https://app.slack.com/client/${encodeURIComponent(thread.teamId)}/${encodeURIComponent(thread.channel)}/thread/${encodeURIComponent(thread.channel)}-${encodeURIComponent(thread.threadTs)}`,
-		},
-		preprompt: "",
-		mlAssistant: true,
-		rootMessageId: root.id,
-		messages: [root],
-		createdAt: now,
-		updatedAt: now,
-		mlBudget: {
-			totalMicroUsd: usdToMicroUsd(thread.hfUserId ? 0 : settings.budgetUsd),
-			spentMicroUsd: 0,
-			reservations: [],
-		},
-	};
-	await collections.conversations.updateOne(
-		{ _id: conversation._id },
-		{ $setOnInsert: conversation },
-		{ upsert: true }
-	);
+		budgetUsd: thread.hfUserId ? 0 : settings.budgetUsd,
+	});
 	// Deletion can race initial creation. Never leave a resurrected history entry.
 	if ((await collections.slackThreads.findOne({ _id: thread._id }))?.deletedAt) {
-		await collections.conversations.deleteOne({ _id: thread.conversationId });
+		await discardRunSession(thread.conversationId);
 		throw new Error("This Slack conversation was deleted. Start a new Slack thread.");
 	}
 }
 
-/** Consume the same response as the web UI. Persistence, guards, waits and asks stay in the harness. */
 export async function runSlackTurn(
 	thread: SlackThread,
 	user: User,
-	input: { text?: string; files?: File[]; resumeElicitationId?: string; retry?: boolean },
+	input: TurnInput,
 	resolvedLocals?: App.Locals,
 	onMcpUnavailable?: () => Promise<void>
 ): Promise<void> {
-	const conv = await collections.conversations.findOne({
-		_id: thread.conversationId,
-		userId: user._id,
-	});
-	if (!conv) throw new Error("Slack conversation no longer exists.");
-	// Load afresh for every owner turn, including retries and answered questions.
-	// Legacy shared-account sessions never inherit a human's personal tools.
 	if (thread.hfUserId && !thread.hfUserId.equals(user._id))
 		throw new Error("Slack session owner does not match the connected user.");
-	const saved = thread.hfUserId ? await loadMcpSelection(user._id) : undefined;
-	const selection = saved?.status === "ok" ? saved.selection : undefined;
-	// Unreadable (e.g. after a key rotation): run with preset tools and say so.
-	if (saved?.status === "unavailable") await onMcpUnavailable?.().catch(() => {});
-	const latest = conv.messages[conv.messages.length - 1];
-	const data = new FormData();
-	data.set(
-		"data",
-		JSON.stringify({
-			...selection,
-			...(input.text ? { inputs: input.text } : {}),
-			...(input.resumeElicitationId ? { resumeElicitationId: input.resumeElicitationId } : {}),
-			...(input.retry ? { is_retry: true } : {}),
-			id: latest?.id ?? conv.rootMessageId,
-			generationId: randomUUID(),
-		})
-	);
-	for (const file of input.files ?? []) {
-		data.append(
-			"files",
-			new Blob([Buffer.from(await file.arrayBuffer()).toString("base64")], { type: file.type }),
-			`base64;${file.name}`
-		);
-	}
-	const response = await generateConversationResponse({
-		request: new Request("http://slack.internal/conversation", { method: "POST", body: data }),
+	await sendTurn({
+		conversationId: thread.conversationId,
 		locals: resolvedLocals ?? (await threadLocals(thread, user)),
-		params: { id: thread.conversationId.toHexString() },
-		getClientAddress: () => "slack",
+		client: "slack",
+		input,
+		personalTools: !!thread.hfUserId,
+		onMcpUnavailable,
 	});
-	if (!response.ok) error(response.status, `ML Intern rejected this turn (${response.status}).`);
-	const reader = response.body?.getReader();
-	if (!reader) return;
-	try {
-		while (!(await reader.read()).done) {
-			/* State is persisted by the shared runner. */
-		}
-	} finally {
-		reader.releaseLock();
-	}
 }
 
-/** Stop both a live producer and durable waits/questions; remote compute is left tracked. */
 export async function stopSlackTurn(thread: SlackThread, user: User): Promise<void> {
-	const { stopConversation } = await import("$lib/server/generation/stopConversation");
-	await stopConversation({
-		params: { id: thread.conversationId.toHexString() },
-		locals: {
-			user,
-			sessionId: thread.hfUserId ? linkedSessionId(thread) : `slack-ml:${thread.teamId}`,
-			isAdmin: false,
-		},
-		request: new Request("http://slack.internal/stop", { method: "POST" }),
+	await stopRun({
+		conversationId: thread.conversationId,
+		locals: stopLocals(thread, user),
+		reason: "Stopped from Slack",
 	});
-	const now = new Date();
-	await collections.parkedCalls.updateMany(
-		{ conversationId: thread.conversationId, status: "waiting" },
-		{ $set: { status: "abandoned", abandonedReason: "Stopped from Slack", updatedAt: now } }
-	);
-	await collections.mcpElicitations.updateMany(
-		{ conversationId: thread.conversationId, status: "pending" },
-		{
-			$set: {
-				status: "resolved",
-				action: "cancel",
-				resolution: "aborted",
-				resolvedAt: now,
-				updatedAt: now,
-				resume: {
-					status: "abandoned",
-					takenAt: now,
-					attempts: 0,
-					abandonedReason: "Stopped from Slack",
-				},
-			},
-		}
-	);
-	const parked = await collections.turnStates.findOneAndUpdate(
-		{ conversationId: thread.conversationId, status: { $in: ["waiting", "awaiting_input"] } },
-		{ $set: { status: "failed", error: "Stopped from Slack", endedAt: now, updatedAt: now } },
-		{ returnDocument: "after" }
-	);
-	if (parked) {
-		await collections.abortedGenerations.deleteOne({
-			conversationId: thread.conversationId,
-			updatedAt: { $lte: now },
-		});
-		await collections.conversations.updateOne(
-			{ _id: thread.conversationId, "messages.id": parked.messageId },
-			{ $set: { "messages.$.interrupted": true, updatedAt: now } }
-		);
-	}
 	await collections.slackThreads.updateOne(
 		{ _id: thread._id },
-		{ $set: { watching: true, updatedAt: now } }
+		{ $set: { watching: true, updatedAt: new Date() } }
 	);
 }
 
-/** An owner's new request supersedes a pending assistant question, never a budget approval. */
 export async function skipSlackQuestion(
 	thread: SlackThread,
 	user: User,
 	messageId: string,
 	inputId: string
 ): Promise<boolean> {
-	const now = new Date();
-	const result = await collections.mcpElicitations.findOneAndUpdate(
-		{
-			conversationId: thread.conversationId,
-			"pending.kind": "ask",
-			// a publish card is closed by the new turn, which also writes the review result
-			"pending.publish": { $exists: false },
-			"pending.messageId": messageId,
-			$or: [
-				{ status: "pending", slackSubmitting: { $ne: true } },
-				{ slackSkippedByInputId: inputId },
-			],
-		},
-		{
-			$set: {
-				status: "resolved",
-				action: "cancel",
-				resolution: "user",
-				resolvedAt: now,
-				updatedAt: now,
-				slackSkippedByInputId: inputId,
-				resume: {
-					status: "abandoned",
-					takenAt: now,
-					attempts: 0,
-					abandonedReason: "Continued with a new Slack message",
-				},
-			},
-		},
-		{ returnDocument: "after" }
-	);
-	if (!result) {
-		// let it through, the new turn detaches the review, a stop would resolve it as aborted
-		const review = await collections.mcpElicitations.findOne({
-			conversationId: thread.conversationId,
-			$or: [
-				{ "pending.kind": "review" },
-				{ "pending.kind": "ask", "pending.publish": { $exists: true } },
-			],
-			"pending.messageId": messageId,
-			status: "pending",
-		});
-		return review !== null;
-	}
-	await stopSlackTurn(thread, user);
-	return true;
+	const outcome = await supersedeQuestion({
+		conversationId: thread.conversationId,
+		messageId,
+		inputId,
+		reason: "Continued with a new Slack message",
+	});
+	if (outcome === "superseded") await stopSlackTurn(thread, user);
+	return outcome !== "none";
 }
