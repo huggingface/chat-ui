@@ -9,9 +9,12 @@ import {
 	type HubSpace,
 	type SpaceLogKind,
 } from "$lib/server/hubSpaces";
+import { CONSOLE_WAITS, consoleSection, type ConsoleWaits } from "$lib/server/spaceConsole/section";
+import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
+import { CHECK_SPACE_TOOL_NAME, spaceCheckHeader } from "$lib/utils/spaceCheck";
 import type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types";
 
-export const CHECK_SPACE_TOOL_NAME = "check_space";
+export { CHECK_SPACE_TOOL_NAME };
 
 const IN_PROGRESS: Record<string, string> = {
 	BUILDING: "It is still building.",
@@ -37,6 +40,11 @@ const definition: OpenAiTool = {
 			"- BUILD_ERROR, RUNTIME_ERROR or CONFIG_ERROR: fix what the log shows, push, and call " +
 			"this again. After two failed fixes, stop and report the stage and the error instead.\n" +
 			"- The test call failed: the run log that comes with it usually names the cause.\n\n" +
+			"For a running Gradio Space it also opens the Space in the user's browser tab, when " +
+			"one is attached, and returns that page's browser console: a blank page or a broken " +
+			"frontend shows up there and nowhere else. Entries logged later, while the user uses " +
+			"the Space, show up in the next check. The test call runs on the server, so it never " +
+			"appears in the console.\n\n" +
 			"The test call uses each input's example value unless you pass `inputs`, and runs on " +
 			"the Space's hardware like any visitor's call — a ZeroGPU or paid Space spends quota.",
 		parameters: {
@@ -61,13 +69,16 @@ const definition: OpenAiTool = {
 	},
 };
 
-export function createCheckSpaceTool(token: () => string | undefined): BuiltinTool {
+export function createCheckSpaceTool(
+	token: () => string | undefined,
+	consoleWaits: ConsoleWaits = CONSOLE_WAITS
+): BuiltinTool {
 	return {
 		name: CHECK_SPACE_TOOL_NAME,
 		definition,
 		exemptFromToolRestraint: true,
 		async execute(args, ctx) {
-			return checkSpace(args, token(), ctx);
+			return checkSpace(args, token(), ctx, consoleWaits);
 		},
 	};
 }
@@ -75,7 +86,8 @@ export function createCheckSpaceTool(token: () => string | undefined): BuiltinTo
 async function checkSpace(
 	args: Record<string, unknown>,
 	token: string | undefined,
-	ctx: BuiltinToolContext
+	ctx: BuiltinToolContext,
+	consoleWaits: ConsoleWaits
 ): Promise<BuiltinToolResult> {
 	const id = typeof args.space === "string" ? args.space.trim() : "";
 	if (!SPACE_ID.test(id)) return { error: `"${id}" is not a Space id — use owner/name.` };
@@ -92,9 +104,8 @@ async function checkSpace(
 	if (typeof space === "string") return { error: space };
 
 	const stage = space.stage ?? "UNKNOWN";
-	const lines = [
-		`Space ${id}: ${stage}${space.private ? " (private)" : ""} — https://huggingface.co/spaces/${id}`,
-	];
+	const header = spaceCheckHeader(id, stage, space.private);
+	const lines = [header];
 	const done = () => ({ resultText: lines.join("\n") });
 
 	if (IN_PROGRESS[stage]) {
@@ -134,22 +145,29 @@ async function checkSpace(
 
 	// space code can read the authorization header, so only a private space gets the token
 	const hostToken = space.private ? token : undefined;
+
+	// the tab loads the page while the api is tested here
+	const browser = openInBrowser();
+	const finish = async () => {
+		if (browser) lines.push("", ...(await browser));
+		return done();
+	};
 	const named = await fetchGradioEndpoints(space, hostToken, ctx.abortSignal);
 	if (typeof named === "string") {
 		lines.push(named, "", ...(await logSection(space, "run")));
-		return done();
+		return finish();
 	}
 	const endpoint = pickGradioEndpoint(id, named, endpointArg);
 	if (typeof endpoint !== "string") {
 		lines.push(endpoint.error);
-		return done();
+		return finish();
 	}
 	const data = callData(named[endpoint].parameters ?? [], inputs);
 	if ("missing" in data) {
 		lines.push(
 			`${endpoint} needs ${data.missing.join(", ")}, which have no example value: pass them in \`inputs\`.`
 		);
-		return done();
+		return finish();
 	}
 
 	const outcome = await callGradio(space, endpoint, data.values, hostToken, ctx.abortSignal);
@@ -159,7 +177,31 @@ async function checkSpace(
 	} else {
 		lines.push(`failed: ${outcome.error}`, "", ...(await logSection(space, "run")));
 	}
-	return done();
+	return finish();
+
+	function openInBrowser(): Promise<string[]> | undefined {
+		if (!ctx.conversationId) return undefined;
+		if (!ctx.elicitationSink) {
+			return Promise.resolve([
+				"Console: no browser tab is attached to this run, so its browser console can't be read.",
+			]);
+		}
+		// progress is never stored, so only a tab watching this run opens the pane
+		ctx.elicitationSink.emit({
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Progress,
+			uuid: ctx.uuid,
+			progress: 0,
+			message: header,
+		});
+		return consoleSection({
+			conversationId: ctx.conversationId,
+			spaceId: id,
+			checkId: ctx.uuid,
+			signal: ctx.abortSignal,
+			waits: consoleWaits,
+		});
+	}
 
 	async function logSection(target: HubSpace, kind: SpaceLogKind): Promise<string[]> {
 		if (!token) return [`No sign-in, so the ${kind} log cannot be read.`];

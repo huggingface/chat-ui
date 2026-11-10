@@ -1,5 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { ObjectId } from "mongodb";
+import { ready } from "$lib/server/database";
 import { readSpaceLogTail } from "$lib/server/hubSpaces";
+import { recordConsoleEntries, recordFrameState } from "$lib/server/spaceConsole/store";
+import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { createCheckSpaceTool } from "./checkSpaceTool";
 import type { BuiltinToolContext } from "./types";
 
@@ -262,5 +266,87 @@ describe("readSpaceLogTail", () => {
 		logs.build = "data: Downloading 10%\rDownloading 100%\n\ndata: plain line\n\n";
 		const tail = await readSpaceLogTail("pngwn/demo", "build", "t", { windowMs: 200 });
 		expect(tail).toEqual({ lines: ["Downloading 100%", "plain line"] });
+	});
+});
+
+describe("check_space console section", () => {
+	const FAST = { attachMs: 300, handshakeMs: 300, settleMs: 30, pollMs: 20 };
+
+	beforeAll(async () => {
+		await ready;
+	});
+
+	function live(conversationId = new ObjectId()) {
+		const emitted: MessageUpdate[] = [];
+		const liveCtx = {
+			...ctx,
+			uuid: `check-${conversationId}`,
+			conversationId,
+			elicitationSink: { conversationId, emit: (u: MessageUpdate) => emitted.push(u) },
+		} as BuiltinToolContext;
+		return { emitted, liveCtx, conversationId };
+	}
+
+	const text = async (c: BuiltinToolContext) => {
+		const result = await createCheckSpaceTool(() => "hf_user", FAST).execute(
+			{ space: "pngwn/demo" },
+			c
+		);
+		if (!("resultText" in result)) throw new Error(JSON.stringify(result));
+		return result.resultText;
+	};
+
+	it("opens the Space in the tab with a progress update carrying the header line", async () => {
+		const { emitted, liveCtx } = live();
+		const out = await text(liveCtx);
+		expect(emitted).toEqual([
+			{
+				type: "tool",
+				subtype: "progress",
+				uuid: liveCtx.uuid,
+				progress: 0,
+				message: "Space pngwn/demo: RUNNING — https://huggingface.co/spaces/pngwn/demo",
+			},
+		]);
+		expect(out.split("\n")[0]).toBe(
+			emitted[0].type === "tool" && "message" in emitted[0] ? emitted[0].message : ""
+		);
+		expect(out).toContain('completed → ["Hello Hello!!!"]');
+		expect(out.trim().split("\n").at(-1)).toBe(
+			"Console: no browser tab has this Space open, so its browser console can't be read."
+		);
+	});
+
+	it("returns what the tab's frame forwarded for this check", async () => {
+		const { liveCtx, conversationId } = live();
+		const base = { conversationId, spaceId: "pngwn/demo", loadId: "l1" };
+		await recordFrameState({ ...base, checkId: liveCtx.uuid, state: "loading" });
+		await recordFrameState({
+			...base,
+			state: "connected",
+			sessionId: "s1",
+			gradioVersion: "6.31.0",
+		});
+		await recordConsoleEntries(conversationId, "pngwn/demo", [
+			{ sessionId: "s1", seq: 1, ts: 1, level: "error", text: "Failed to load module script" },
+		]);
+		const out = await text(liveCtx);
+		expect(out).toContain("Console (browser tab, Gradio 6.31.0): 1 entry, oldest first:");
+		expect(out).toContain("  [error] Failed to load module script");
+	});
+
+	it("says so in one line when the run has no tab to open it in", async () => {
+		const out = await text({ ...ctx, conversationId: new ObjectId() } as BuiltinToolContext);
+		expect(out.trim().split("\n").at(-1)).toBe(
+			"Console: no browser tab is attached to this run, so its browser console can't be read."
+		);
+	});
+
+	it("does not open a Space that is not running Gradio", async () => {
+		space = { ...space, runtime: { stage: "RUNTIME_ERROR" } };
+		const { emitted, liveCtx } = live();
+		const out = await text(liveCtx);
+		expect(emitted).toEqual([]);
+		expect(out).not.toContain("Console");
 	});
 });

@@ -10,7 +10,16 @@ export const SIDE_PANE_MAX_WIDTH = 2400;
 export const SIDE_PANE_DEFAULT_FRACTION = "60%";
 
 /** Which view owns the pane. One slot, so the views are mutually exclusive. */
-export type SidePaneView = "artifact" | "trackio" | "workflow" | "registry" | "review";
+export type SidePaneView = "artifact" | "trackio" | "workflow" | "registry" | "review" | "space";
+
+/** a space check_space opened, a new checkId reloads its frame */
+export interface SidePaneSpace {
+	url: string;
+	label: string;
+	spaceId: string;
+	private: boolean;
+	checkId?: string;
+}
 
 /**
  * UI state for the side pane. Its content is always derived from the
@@ -28,6 +37,7 @@ class SidePaneStore {
 	/** `viewUrl` is a captured view to show instead of the dashboard's default. */
 	trackio = $state<{ url: string; label: string; viewUrl?: string } | null>(null);
 	workflow = $state<{ url: string; label: string; spaceId: string } | null>(null);
+	space = $state<SidePaneSpace | null>(null);
 	/** the file version the registry view scrolls to and opens */
 	registryFocus = $state<MlFileRef | null>(null);
 	reviewId = $state<string | null>(null);
@@ -121,6 +131,31 @@ class SidePaneStore {
 		this.openWorkflow(workflow);
 	}
 
+	openSpace(space: SidePaneSpace) {
+		this.view = "space";
+		this.space = {
+			url: space.url,
+			label: space.label,
+			spaceId: space.spaceId,
+			private: space.private,
+			...(space.checkId ? { checkId: space.checkId } : {}),
+		};
+		this.open = true;
+		this.revealNonce += 1;
+	}
+
+	/** opens a checked space once so closing it sticks, a later check of the space showing reloads it */
+	followSpaceCheck(space: SidePaneSpace) {
+		if (this.open && this.view === "space" && this.space?.url === space.url) {
+			if (this.space.checkId !== space.checkId) this.space = { ...space };
+			return;
+		}
+		const key = `space:${space.url}`;
+		if (this.autoOpenedKeys.has(key)) return;
+		this.autoOpenedKeys.add(key);
+		this.openSpace(space);
+	}
+
 	/** a list, not an item, so it has no place in the item nav */
 	openRegistry(focus: MlFileRef | null = null) {
 		this.view = "registry";
@@ -168,6 +203,7 @@ class SidePaneStore {
 				view: this.view,
 				trackio: this.trackio,
 				workflow: this.workflow,
+				space: this.space,
 				registryFocus: this.registryFocus,
 				reviewId: this.reviewId,
 				identifier: this.identifier,
@@ -191,6 +227,7 @@ class SidePaneStore {
 		this.view = next.view;
 		this.trackio = next.trackio;
 		this.workflow = next.workflow;
+		this.space = next.space;
 		this.registryFocus = next.registryFocus;
 		this.reviewId = next.reviewId;
 		this.identifier = next.identifier;
@@ -208,6 +245,7 @@ class SidePaneStore {
 		this.view = "artifact";
 		this.trackio = null;
 		this.workflow = null;
+		this.space = null;
 		this.registryFocus = null;
 		this.reviewId = null;
 		this.identifier = null;
@@ -225,6 +263,7 @@ interface SavedPaneState {
 	view: SidePaneView;
 	trackio: SidePaneStore["trackio"];
 	workflow: SidePaneStore["workflow"];
+	space: SidePaneStore["space"];
 	registryFocus: SidePaneStore["registryFocus"];
 	reviewId: string | null;
 	identifier: string | null;

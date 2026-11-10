@@ -27,6 +27,7 @@
 			identifier: sidePane.identifier,
 			trackioUrl: sidePane.trackio?.url,
 			workflowUrl: sidePane.workflow?.url,
+			spaceUrl: sidePane.space?.url,
 		})
 	);
 
@@ -35,6 +36,7 @@
 		if (!item) return;
 		if (item.kind === "artifact") sidePane.openArtifact(item.identifier, null);
 		else if (item.kind === "workflow") sidePane.openWorkflow(item);
+		else if (item.kind === "space") sidePane.openSpace(item);
 		else sidePane.openTrackio(item.url, item.label);
 	}
 
