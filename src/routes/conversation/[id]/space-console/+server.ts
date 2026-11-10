@@ -10,6 +10,7 @@ import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import {
 	CONSOLE_TEXT_MAX,
 	recordConsoleEntries,
+	recordFrameDropped,
 	recordFrameState,
 	type IncomingConsoleEntry,
 } from "$lib/server/spaceConsole/store";
@@ -54,6 +55,8 @@ const bodySchema = z.object({
 	state: z.enum(["loading", "connected", "unsupported"]).optional(),
 	session_id: id.optional(),
 	gradio_version: z.string().max(100).optional(),
+	/** entries the frame evicted before it could send them */
+	dropped: z.number().int().min(0).max(1_000_000).default(0),
 	entries: z.array(z.unknown()).max(ENTRIES_MAX).default([]),
 });
 
@@ -116,6 +119,9 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 			sessionId: body.session_id,
 			gradioVersion: body.gradio_version,
 		});
+	}
+	if (body.dropped) {
+		await recordFrameDropped(conversationId, body.space, body.load, body.dropped);
 	}
 	const stored = await recordConsoleEntries(conversationId, body.space, entries);
 	return json({ stored, dropped: body.entries.length - entries.length });

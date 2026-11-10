@@ -7,6 +7,7 @@ import {
 	readConsoleEntries,
 	readFrame,
 	recordConsoleEntries,
+	recordFrameDropped,
 	recordFrameState,
 	type IncomingConsoleEntry,
 } from "./store";
@@ -220,6 +221,21 @@ describe("console section", () => {
 		expect(out).toContain("  …[15 entries omitted]…");
 		expect(out).toContain("page load 2 (the one this check opened):");
 		expect(out.at(-1)).toBe("  [log] entry 50");
+	});
+
+	it("counts what the frame dropped for the current load and starts over on reload", async () => {
+		const conversationId = new ObjectId();
+		const base = { conversationId, spaceId: SPACE };
+		await recordFrameState({ ...base, loadId: "l1", checkId: "c1", state: "loading" });
+		await recordFrameDropped(conversationId, SPACE, "l1", 20);
+		await recordFrameDropped(conversationId, SPACE, "l1", 5);
+		await recordFrameDropped(conversationId, SPACE, "l0", 99);
+		expect((await readFrame(conversationId, SPACE))?.dropped).toBe(25);
+		await recordFrameState({ ...base, loadId: "l2", checkId: "c2", state: "loading" });
+		expect((await readFrame(conversationId, SPACE))?.dropped).toBeUndefined();
+		expect(formatConsole([], "s", "", 25).at(-1)).toBe(
+			"The frame dropped 25 entries before forwarding them: it keeps 100 and sends at most 20 batches a second."
+		);
 	});
 
 	it("says when the page load it opened logged nothing", () => {

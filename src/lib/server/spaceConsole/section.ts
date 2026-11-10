@@ -82,7 +82,7 @@ export async function consoleSection(params: {
 		}
 		await sleep(waits.settleMs, signal);
 		const entries = await readConsoleEntries(conversationId, spaceId);
-		return formatConsole(entries, frame.sessionId, frame.gradioVersion);
+		return formatConsole(entries, frame.sessionId, frame.gradioVersion, frame.dropped);
 	} catch (err) {
 		return [`Console: could not be read (${String(err)}).`];
 	}
@@ -101,6 +101,21 @@ function formatEntry(entry: SpaceConsoleEntry): string[] {
 }
 
 export function formatConsole(
+	entries: SpaceConsoleEntry[],
+	currentSession: string | undefined,
+	gradioVersion: string | undefined,
+	dropped = 0
+): string[] {
+	const out = formatEntries(entries, currentSession, gradioVersion);
+	if (dropped > 0) {
+		out.push(
+			`The frame dropped ${dropped} ${dropped === 1 ? "entry" : "entries"} before forwarding them: it keeps 100 and sends at most 20 batches a second.`
+		);
+	}
+	return out;
+}
+
+function formatEntries(
 	entries: SpaceConsoleEntry[],
 	currentSession: string | undefined,
 	gradioVersion: string | undefined

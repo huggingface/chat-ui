@@ -85,6 +85,7 @@ describe.sequential("POST /conversation/[id]/space-console", () => {
 			session_id: "s1",
 			gradio_version: "6.31.0",
 			entries: [entry(1), entry(2, { stack: "TypeError\n at f" })],
+			dropped: 7,
 		});
 		expect(await res.json()).toEqual({ stored: 2, dropped: 0 });
 
@@ -94,6 +95,7 @@ describe.sequential("POST /conversation/[id]/space-console", () => {
 			state: "connected",
 			sessionId: "s1",
 			gradioVersion: "6.31.0",
+			dropped: 7,
 		});
 		const stored = await readConsoleEntries(conv._id, SPACE);
 		expect(stored.map((e) => [e.sessionId, e.seq, e.text, e.stack])).toEqual([

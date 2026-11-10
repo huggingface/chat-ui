@@ -32,5 +32,7 @@ export interface SpaceConsoleFrame {
 	/** the page load that acked */
 	sessionId?: string;
 	gradioVersion?: string;
+	/** entries the frame evicted unsent during this load */
+	dropped?: number;
 	updatedAt: Date;
 }

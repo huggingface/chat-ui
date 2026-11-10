@@ -83,7 +83,12 @@ export async function recordFrameState(params: {
 			{ conversationId, spaceId },
 			{
 				$set: { loadId, state, updatedAt, ...(checkId ? { checkId } : {}) },
-				$unset: { sessionId: "", gradioVersion: "", ...(checkId ? {} : { checkId: "" }) },
+				$unset: {
+					sessionId: "",
+					gradioVersion: "",
+					dropped: "",
+					...(checkId ? {} : { checkId: "" }),
+				},
 			},
 			{ upsert: true }
 		);
@@ -99,6 +104,18 @@ export async function recordFrameState(params: {
 				...(gradioVersion !== undefined ? { gradioVersion } : {}),
 			},
 		}
+	);
+}
+
+export async function recordFrameDropped(
+	conversationId: ObjectId,
+	spaceId: string,
+	loadId: string,
+	dropped: number
+): Promise<void> {
+	await collections.spaceConsoleFrames.updateOne(
+		{ conversationId, spaceId, loadId },
+		{ $inc: { dropped }, $set: { updatedAt: new Date() } }
 	);
 }
 

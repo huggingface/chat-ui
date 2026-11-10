@@ -100,6 +100,7 @@
 		spaceId: string;
 		checkId?: string;
 		pending: ConsoleEntry[];
+		dropped: number;
 		timer?: ReturnType<typeof setTimeout>;
 	};
 	let current: Load | undefined;
@@ -121,11 +122,15 @@
 	function flush(load: Load) {
 		clearTimeout(load.timer);
 		load.timer = undefined;
-		while (load.pending.length) post(load, { entries: load.pending.splice(0, BATCH_MAX) });
+		while (load.pending.length || load.dropped) {
+			post(load, { entries: load.pending.splice(0, BATCH_MAX), dropped: load.dropped });
+			load.dropped = 0;
+		}
 	}
 
-	function queue(load: Load, entries: ConsoleEntry[]) {
+	function queue(load: Load, entries: ConsoleEntry[], dropped: number) {
 		load.pending.push(...entries);
+		load.dropped += dropped;
 		if (load.pending.length >= BATCH_MAX) flush(load);
 		else load.timer ??= setTimeout(() => flush(load), FLUSH_MS);
 	}
@@ -145,10 +150,10 @@
 					...(ack ? { session_id: ack.session_id, gradio_version: ack.gradio_version } : {}),
 				});
 			},
-			onEntries(entries) {
-				if (!current || !entries.length) return;
+			onEntries(entries, dropped) {
+				if (!current) return;
 				forwarded += entries.length;
-				queue(current, entries);
+				queue(current, entries, dropped);
 			},
 		});
 	});
@@ -175,6 +180,7 @@
 			spaceId: space.spaceId,
 			...(space.checkId ? { checkId: space.checkId } : {}),
 			pending: [],
+			dropped: 0,
 		};
 		forwarded = 0;
 		post(current, { state: "loading" });

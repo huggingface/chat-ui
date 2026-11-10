@@ -98,13 +98,13 @@ describe("SpacePane console forwarding", () => {
 			gradio_version: "6.31.0",
 		});
 
-		speak(frame.contentWindow, ORIGIN, entries([1, 2]));
+		speak(frame.contentWindow, ORIGIN, { ...entries([1, 2]), dropped: 4 });
 		speak(frame.contentWindow, ORIGIN, entries([2, 3]));
 		await vi.waitFor(() => expect(posts.some((post) => post.entries)).toBe(true));
 		const batches = posts.filter((post) => post.entries);
 		expect(batches).toHaveLength(1);
 		expect((batches[0].entries as { seq: number }[]).map((e) => e.seq)).toEqual([1, 2, 3]);
-		expect(batches[0]).toMatchObject({ load: load.load, check: "check-1" });
+		expect(batches[0]).toMatchObject({ load: load.load, check: "check-1", dropped: 4 });
 		expect(root.textContent).toContain("3");
 	});
 
