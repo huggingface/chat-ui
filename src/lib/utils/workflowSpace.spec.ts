@@ -172,14 +172,19 @@ describe("workflowTokenHandler", () => {
 		expect(frame.postMessage).toHaveBeenCalledWith(...tokenReply(null));
 	});
 
-	it("answers a probe without asking, and only for the viewer's own Space", async () => {
+	it("answers a probe without asking, for the viewer's own Space or one they allowed", async () => {
 		const probe = () => message({ type: "INFERENCE_JWT_PROBE" });
+		const other = handler("mallory/wf");
 		await handler()(probe());
-		await handler("mallory/wf")(probe());
+		await other(probe());
+		expect(consent).not.toHaveBeenCalledWith(true);
+
+		// storage blocked, so only this visit's yes counts
+		await other(tokenRequest());
+		await other(probe());
 
 		const replies = frame.postMessage.mock.calls.map(([data]) => data.token);
-		expect(replies).toEqual(["hf_jwt_x", null]);
-		expect(consent).not.toHaveBeenCalledWith(true);
+		expect(replies).toEqual(["hf_jwt_x", null, "hf_jwt_x", "hf_jwt_x"]);
 	});
 
 	it("replies with no token when the viewer says no", async () => {
