@@ -808,6 +808,7 @@ describe("runMcpFlow offering the question tool", () => {
 			"research",
 			"sandbox_task",
 			"check_job",
+			"check_space",
 			"create_trackio",
 			"read_trackio",
 			"create_workflow",
