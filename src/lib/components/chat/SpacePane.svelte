@@ -97,26 +97,30 @@
 
 	type Load = {
 		id: string;
+		conversationId: string;
 		spaceId: string;
 		checkId?: string;
 		pending: ConsoleEntry[];
 		dropped: number;
 		timer?: ReturnType<typeof setTimeout>;
+		/** posts go out one at a time, the server drops a state update that arrives before its load */
+		sent: Promise<unknown>;
 	};
 	let current: Load | undefined;
 
 	function post(load: Load, body: Record<string, unknown>) {
-		if (!conversationId) return;
-		void fetch(`${base}/conversation/${conversationId}/space-console`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				space: load.spaceId,
-				load: load.id,
-				...(load.checkId ? { check: load.checkId } : {}),
-				...body,
-			}),
-		}).catch(() => {});
+		const send = () =>
+			fetch(`${base}/conversation/${load.conversationId}/space-console`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					space: load.spaceId,
+					load: load.id,
+					...(load.checkId ? { check: load.checkId } : {}),
+					...body,
+				}),
+			}).catch(() => {});
+		load.sent = load.sent.then(send, send);
 	}
 
 	function flush(load: Load) {
@@ -173,14 +177,16 @@
 	});
 
 	function onFrameLoad() {
-		if (!receiver || !space) return;
+		if (!receiver || !space || !conversationId) return;
 		if (current) flush(current);
 		current = {
 			id: crypto.randomUUID(),
+			conversationId,
 			spaceId: space.spaceId,
 			...(space.checkId ? { checkId: space.checkId } : {}),
 			pending: [],
 			dropped: 0,
+			sent: Promise.resolve(),
 		};
 		forwarded = 0;
 		post(current, { state: "loading" });

@@ -18,15 +18,23 @@ const CONV = "6ad03a4c353929f19edc560f";
 
 type Post = Record<string, unknown>;
 let posts: Post[];
+let postUrls: string[];
 let gets: string[];
+/** holds the response to the next loading post until released */
+let holdLoading: Promise<void> | undefined;
 
 beforeEach(() => {
 	posts = [];
+	postUrls = [];
 	gets = [];
+	holdLoading = undefined;
 	vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
 		const url = String(input);
 		if (init?.method === "POST") {
-			posts.push(JSON.parse(String(init.body)));
+			const body = JSON.parse(String(init.body));
+			posts.push(body);
+			postUrls.push(url);
+			if (body.state === "loading" && holdLoading) await holdLoading;
 			return Response.json({ stored: 0 });
 		}
 		gets.push(url);
@@ -89,6 +97,7 @@ describe("SpacePane console forwarding", () => {
 		speak(frame.contentWindow, ORIGIN, ack());
 		await tick();
 		expect(stateOf(root)).toBe("connected");
+		await vi.waitFor(() => expect(posts.at(-1)?.state).toBe("connected"));
 		expect(posts.at(-1)).toEqual({
 			space: SPACE.spaceId,
 			load: load.load,
@@ -108,6 +117,32 @@ describe("SpacePane console forwarding", () => {
 		expect(root.textContent).toContain("3");
 	});
 
+	it("sends a load's state only after its loading post has been answered", async () => {
+		let release!: () => void;
+		holdLoading = new Promise((resolve) => (release = resolve));
+		const root = await mounted();
+		speak(frameOf(root).contentWindow, ORIGIN, ack());
+		await new Promise((r) => setTimeout(r, 200));
+		expect(posts.map((post) => post.state)).toEqual(["loading"]);
+		release();
+		await vi.waitFor(() =>
+			expect(posts.map((post) => post.state)).toEqual(["loading", "connected"])
+		);
+	});
+
+	it("posts pending entries to the conversation that produced them after a switch", async () => {
+		sidePane.openSpace(SPACE);
+		const view = render(SpacePane, { items, conversationId: CONV });
+		await vi.waitFor(() => expect(loads()).toHaveLength(1), LOAD_WAIT);
+		const frame = frameOf(view.container);
+		speak(frame.contentWindow, ORIGIN, ack());
+		speak(frame.contentWindow, ORIGIN, entries([1]));
+		await view.rerender({ items, conversationId: "6ad03a4c353929f19edc5610" });
+		await vi.waitFor(() => expect(posts.some((post) => post.entries)).toBe(true));
+		const at = posts.findIndex((post) => post.entries);
+		expect(postUrls[at]).toBe(`/conversation/${CONV}/space-console`);
+	});
+
 	it("ignores another window and another origin", async () => {
 		const root = await mounted();
 		speak(window, ORIGIN, ack());
@@ -125,7 +160,9 @@ describe("SpacePane console forwarding", () => {
 		await vi.waitFor(() => expect(stateOf(root)).toBe("unsupported"), { timeout: 3000 });
 		expect(frameOf(root)).toBe(frame);
 		expect(sidePane.open).toBe(true);
-		expect(posts.at(-1)).toMatchObject({ state: "unsupported", check: "check-1" });
+		await vi.waitFor(() =>
+			expect(posts.at(-1)).toMatchObject({ state: "unsupported", check: "check-1" })
+		);
 		expect(root.textContent).toContain("No console");
 	}, 15_000);
 
@@ -141,8 +178,9 @@ describe("SpacePane console forwarding", () => {
 		expect(stateOf(root)).toBe("connecting");
 
 		speak(frameOf(root).contentWindow, ORIGIN, ack("s2"));
-		await tick();
-		expect(posts.at(-1)).toMatchObject({ state: "connected", session_id: "s2" });
+		await vi.waitFor(() =>
+			expect(posts.at(-1)).toMatchObject({ state: "connected", session_id: "s2" })
+		);
 	});
 
 	it("reloads for a new check of the Space it shows, tagged with that check", async () => {
