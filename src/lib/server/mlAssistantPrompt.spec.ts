@@ -515,6 +515,10 @@ describe("ML Assistant system message size", () => {
 		// 39,500 to 40,500 for the resubmit loop, argued by production: after a failed job the agent
 		// reproduced it in a sandbox before resubmitting in 11% of 600 mined cases (evals/decisions),
 		// and fixed-and-resubmitted untested in 79%, it landed at 39,987
+		//
+		// 40,500 to 42k for a collision, not content: #2750 (the repo card's next-step buttons) and
+		// the resubmit loop above each raised 39,500 to 40,500 on a base without the other, and the
+		// sandbox-on-the-job's-flavor rules (#2745) landed on top, so main reached 41,295
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -544,7 +548,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(40_500);
+		expect(composed.length).toBeLessThan(42_000);
 	});
 
 	it("keeps the review guidance short, the rest lives in the tool description", () => {
