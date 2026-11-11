@@ -5,6 +5,7 @@ import {
 	type Interval,
 	type PairedCase,
 } from "../decisions/stats.ts";
+import type { FieldAnswer } from "./answerer.ts";
 import type { ArtifactKind, ConversationMetrics, ScenarioOutcome } from "./scenarios.ts";
 
 /** one task run from result.json, a crashed run has no outcome */
@@ -15,6 +16,7 @@ export interface ArmRun {
 	timeoutMinutes?: number;
 	artifacts?: ArtifactKind[];
 	outcome?: Partial<ScenarioOutcome>;
+	answers?: Array<{ fields?: FieldAnswer[] }>;
 }
 
 export interface Arm {
@@ -30,6 +32,8 @@ export interface Measure {
 	better: "higher" | "lower";
 	/** tested together under one holm correction, the rest are only shown */
 	headline: boolean;
+	/** shown as a percentage though each run gives a fraction */
+	share?: boolean;
 	value: (run: ArmRun) => Value;
 }
 
@@ -45,6 +49,15 @@ function minutesToArtifacts(run: ArmRun): number | undefined {
 	if (kinds.length === 0 || !seen || run.timeoutMinutes === undefined) return undefined;
 	const times = kinds.map((k) => seen[k]);
 	return times.some((t) => t == null) ? run.timeoutMinutes : Math.max(...(times as number[]));
+}
+
+/** share of lettered answers in the run where the recommended option stood in for the answer model */
+function answersFallenBack(run: ArmRun): number | undefined {
+	const scored = (run.answers ?? [])
+		.flatMap((a) => a.fields ?? [])
+		.filter((f) => f.temperature !== undefined);
+	if (scored.length === 0) return undefined;
+	return scored.filter((f) => f.source === "fallback").length / scored.length;
 }
 
 export const MEASURES: Measure[] = [
@@ -143,6 +156,14 @@ export const MEASURES: Measure[] = [
 		headline: false,
 		value: (r) => metric(r, "sandbox_first_refusals"),
 	},
+	{
+		key: "answersFallenBack",
+		label: "user answers below the confidence bar or failed",
+		better: "lower",
+		headline: false,
+		share: true,
+		value: answersFallenBack,
+	},
 ];
 
 export interface Row {
@@ -178,9 +199,10 @@ const NONE: Interval = { value: null, low: null, high: null };
 export function compareArms(a: Arm, b: Arm, measures = MEASURES): Row[] {
 	const rows = measures.map((measure) => {
 		const cases = pairedCases(a, b, measure);
-		const kind = cases.some((c) => [...c.a, ...c.b].some((v) => typeof v === "boolean"))
-			? ("share" as const)
-			: ("number" as const);
+		const kind =
+			measure.share || cases.some((c) => [...c.a, ...c.b].some((v) => typeof v === "boolean"))
+				? ("share" as const)
+				: ("number" as const);
 		const intervals = cases.length ? pairedBootstrap(cases) : { a: NONE, b: NONE, diff: NONE };
 		return {
 			key: measure.key,

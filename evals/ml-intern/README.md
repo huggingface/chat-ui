@@ -43,6 +43,36 @@ At 7 tasks and 3 runs each, expect to see only large moves, like failed jobs hal
 
 Nothing here gates a merge. Run an A/A (two arms of the same commit) first to see the noise.
 
+## Answering the agent's questions
+
+Each task has a `user` brief in `scenarios.ts`: what the simulated user wants and would say if
+asked. When the agent calls `ask_user_question`, `answerer.ts` answers as that user with
+`google/gemma-4-31B-it:novita`. A single choice or yes/no is lettered and asked with `max_tokens` 1
+and `top_logprobs` 20, and the letter logprobs, divided by a fitted temperature (6.39), give each
+option a probability. Number, free-text and multiple-choice fields take one JSON-mode call,
+checked against the field. Options that raise the budget are never offered, and a question
+offering only budget raises is declined, since a raised cap moves what the checks measure.
+
+Below 0.6 confidence, or when the call still fails after backing off on 429s, the recommended
+option stands in (else the first, or the field's default). Every answer in `result.json` records
+the model, the provider that served it, the temperature, a hash of the system prompt, each
+option's probability and whether it fell back. The comparison reports the share that fell back per
+arm, and a jump there means the agent is asking questions the briefs do not settle.
+
+The temperature was fitted on 60 `LocalLLaMA/typed-decisions` questions against the annotators'
+majority answer. On 60 held-out ones it agrees with them 87% of the time, and its calibration
+error drops from 0.127 raw to 0.079. On 11 single-answer probe questions shaped like these tasks'
+it gets 10 right; the miss is a question the brief is silent on, where it picks by its own judgement
+over the recommended option. Refit when the answer model changes:
+
+```bash
+OPENAI_API_KEY=hf_... uv run evals/ml-intern/fit_answerer.py collect --out <dir> --model <model:provider>
+uv run evals/ml-intern/fit_answerer.py fit <dir>
+```
+
+The model needs to return logprobs: Gemma on deepinfra does not, and gpt-oss spends its first
+token on a channel marker.
+
 ## Running
 
 ```bash
