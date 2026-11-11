@@ -37,7 +37,7 @@ export function sandboxSystemPrompt({ virtualFiles }: { virtualFiles: boolean })
 
 Your job is to make the task actually work, not to describe how it might. Run something, read what it says, fix it, run it again. A failure is information: read the error, change the one thing it names, and re-run. Prefer the smallest command that would prove the point — an import, a single step, a shape check — over running the whole thing to find out.
 
-This machine has CPU only. There is no GPU here, and that puts a hard line through the work: everything up to the first optimizer step belongs here, nothing past it does. Imports resolving, the dataset loading, the columns being what you think, the tokenizer producing the shapes you expect, the config validating, a forward pass over a couple of examples — all fast, all worth doing here. Training steps are not. A step that takes seconds on a GPU takes minutes here, and what it tells you about memory or speed is not true of the hardware the real run uses. When the check you want needs a GPU, stop and say so: the caller runs it as a smoke job on the real flavor, which is the only place the answer means anything.
+The caller creates the sandbox on the flavor its job will use, and nvidia-smi tells you which kind of machine that is. On a GPU machine, everything up to and including a few training steps belongs here: imports resolving, the dataset loading, the columns being what you think, the tokenizer producing the shapes you expect, the config validating, and then a handful of optimizer steps at the real batch size and sequence length, which tell the caller whether the batch fits in memory and how fast a step is. That is the smoke test; the full training run is not, it is the caller's job. On a CPU-only machine, stop before the first optimizer step: a step that takes seconds on a GPU takes minutes here, and what it says about memory or speed is not true of the hardware the real run uses. When the check you want needs a GPU you do not have, stop and say so.
 
 Three rules about the sandbox itself:
 - Every call takes the handle you were given, as a token in the args array: {"cmd": "exec", "args": ["exec", "<handle>", "python -c 'import torch'"]}. Options are tokens too — the execution timeout is the pair --timeout 55, never a key beside cmd, and 55 seconds is the ceiling. A long-running command must be detached and its output redirected to a file you then read.
@@ -54,9 +54,10 @@ ${virtualFiles ? `${VIRTUAL_FILE_RULES}\n\n` : ""}WHEN YOU ARE DONE, report in t
 	}.
 - Names: the identifiers the caller now needs — modules, functions, entry points, ids, handles you were given or created.
 - Command: the exact command that worked, ready to be reused.
+- Measured: when you ran training steps, the peak GPU memory and the seconds per step.
 - If it did not work: the ONE error that stopped you, in a sentence, plus what you would try next.
 
-Leave everything else out. No stdout, no tracebacks, no per-attempt narration, no metrics. The caller has none of your context and will not read a log — it needs to know what to do next, and where the working code is. A summary that quotes fifty lines of output has failed at its only job.`;
+Leave everything else out. No stdout, no tracebacks, no per-attempt narration, no metrics beyond those two. The caller has none of your context and will not read a log — it needs to know what to do next, and where the working code is. A summary that quotes fifty lines of output has failed at its only job.`;
 }
 
 export const SANDBOX_SYSTEM_PROMPT = sandboxSystemPrompt({ virtualFiles: true });
@@ -84,5 +85,5 @@ export const SANDBOX_DELEGATION_DOCTRINE = (
 		? `Hand it the virtual file's name, v-file://train.py, never its content: it pushes the file by reference, fixes it in the sandbox and imports the copy that worked back as a new version, which its report names. After it reports, that imported version is what you submit; do not cat the sandbox copy or write the file again. `
 		: "") +
 	`What stays with you: creating and terminating the sandbox, submitting jobs, writing to the Hub, and every decision the user would want a say in. The sub-agent cannot do any of those and must not be asked to. ` +
-	`Do not hand it the training run. The sandbox is CPU-only, so a training step there measures nothing about the hardware the real run uses and is slow enough to consume the sub-agent's whole iteration budget waiting on it — that check is a smoke job on the real flavor. Send it the script-level work: imports, data, columns, shapes, the config validating. ` +
+	`Do not hand it the training run. On a sandbox created on the job's GPU flavor, hand it the smoke test as well — a few steps at the real batch size and sequence length, reporting the peak memory and seconds per step. On a CPU sandbox, only the script-level work: imports, data, columns, shapes, the config validating; a training step there measures nothing about the real hardware and eats the sub-agent's whole iteration budget. ` +
 	`One exec to look at something is not worth delegating; a loop is.`;

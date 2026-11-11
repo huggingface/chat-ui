@@ -304,7 +304,7 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		// unused — a queue and an image pull to find a typo. Stated at both
 		// surfaces: the jobs contract and the sandbox rules.
 		expect(inMode([tool("hf_jobs")])).toContain("When hf_sandbox is on offer");
-		expect(inMode([tool("hf_sandbox")])).toContain("go here FIRST");
+		expect(inMode([tool("hf_sandbox")])).toContain("do the whole pre-flight there FIRST");
 	});
 
 	it("keeps the smoke test on the real flavor and the real shape", () => {
@@ -317,11 +317,12 @@ describe("ML Assistant tool-keyed doctrine", () => {
 		expect(ML_ASSISTANT_PREPROMPT).toContain("Memory and speed cannot");
 	});
 
-	it("says the sandbox cannot stand in for the GPU smoke test", () => {
-		// The other half of the same incident: "fast checks go here FIRST" read as
-		// permission to skip the GPU smoke entirely. Both rules ship together or
-		// the boundary is ambiguous again.
-		expect(inMode([tool("hf_sandbox")])).toContain("cannot do is stand in for the GPU smoke test");
+	it("puts the sandbox on the job's flavor, so it is the GPU smoke test", () => {
+		const sandbox = inMode([tool("hf_sandbox")]);
+
+		expect(sandbox).toContain("create the sandbox on the flavor the job will run on");
+		expect(sandbox).toContain("at the real batch size and sequence length");
+		expect(sandbox).toContain("refuses a session's first GPU job until a sandbox exists");
 	});
 
 	it("pins dependencies to a resolved current release, not a remembered one", () => {
@@ -510,6 +511,14 @@ describe("ML Assistant system message size", () => {
 		// at it and golden sets labelled with the model guesses in view, most of its guidance lives
 		// in the tool description and the preprompt is held to 600 characters below, but main had
 		// already reached 38,983 so even the short form needed the raise, it landed at 39,216
+		//
+		// 39,500 to 40,500 for the resubmit loop, argued by production: after a failed job the agent
+		// reproduced it in a sandbox before resubmitting in 11% of 600 mined cases (evals/decisions),
+		// and fixed-and-resubmitted untested in 79%, it landed at 39,987
+		//
+		// 40,500 to 42k for a collision, not content: #2750 (the repo card's next-step buttons) and
+		// the resubmit loop above each raised 39,500 to 40,500 on a base without the other, and the
+		// sandbox-on-the-job's-flavor rules (#2745) landed on top, so main reached 41,295
 		const composed = [
 			buildToolPreprompt(
 				// The worst case, not a typical one: every preset tool plus the web
@@ -539,7 +548,7 @@ describe("ML Assistant system message size", () => {
 			ARTIFACTS_SYSTEM_PROMPT,
 		].join("\n\n");
 
-		expect(composed.length).toBeLessThan(40_500);
+		expect(composed.length).toBeLessThan(42_000);
 	});
 
 	it("keeps the review guidance short, the rest lives in the tool description", () => {

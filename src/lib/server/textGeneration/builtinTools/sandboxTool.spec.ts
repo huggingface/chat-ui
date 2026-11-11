@@ -245,10 +245,13 @@ describe("the sandbox sub-agent's boundary", () => {
 describe("what the sandbox is allowed to run", () => {
 	// A live run smoke-tested training in the sandbox at ~8.5 min/step, then
 	// spent its remaining iterations polling the log.
-	it("says the machine is CPU-only and where the line falls", () => {
-		expect(SANDBOX_SYSTEM_PROMPT).toContain("This machine has CPU only");
-		expect(SANDBOX_SYSTEM_PROMPT).toContain("up to the first optimizer step");
-		expect(SANDBOX_SYSTEM_PROMPT).toContain("smoke job on the real flavor");
+	it("draws the line by the machine: a few steps on a GPU, none on a CPU", () => {
+		expect(SANDBOX_SYSTEM_PROMPT).toContain("nvidia-smi");
+		expect(SANDBOX_SYSTEM_PROMPT).toContain("a handful of optimizer steps at the real batch size");
+		expect(SANDBOX_SYSTEM_PROMPT).toContain(
+			"On a CPU-only machine, stop before the first optimizer step"
+		);
+		expect(SANDBOX_SYSTEM_PROMPT).toContain("the peak GPU memory and the seconds per step");
 	});
 
 	it("refuses the polling loop the detach rule used to invite", () => {
@@ -266,7 +269,9 @@ describe("what the sandbox is allowed to run", () => {
 		expect(SANDBOX_DELEGATION_DOCTRINE("sandbox_task")).toContain(
 			"Do not hand it the training run"
 		);
-		expect(SANDBOX_DELEGATION_DOCTRINE("sandbox_task")).toContain("CPU-only");
+		expect(SANDBOX_DELEGATION_DOCTRINE("sandbox_task")).toContain(
+			"On a CPU sandbox, only the script-level work"
+		);
 	});
 });
 

@@ -400,6 +400,12 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 				return `<img src="${safeSrc}" alt="${safeAlt}"${safeTitle} />`;
 			},
 			html: (html) => sanitizeHtmlForMultimedia(html),
+			// The wrapper scrolls wide tables horizontally (see `.table-scroll` in main.css), so
+			// the table itself can stay `display: table` and stretch to the prose width.
+			table: (header, body) =>
+				`<div class="table-scroll"><table>\n<thead>\n${header}</thead>\n${
+					body ? `<tbody>${body}</tbody>` : ""
+				}</table></div>\n`,
 		},
 		gfm: true,
 		breaks: true,
