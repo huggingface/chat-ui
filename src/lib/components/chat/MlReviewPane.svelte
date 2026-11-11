@@ -22,7 +22,6 @@
 		suggestionVisible,
 	} from "$lib/utils/review/view";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
-	import SidePane from "./SidePane.svelte";
 	import FinishStep from "../review/FinishStep.svelte";
 	import GridView from "../review/GridView.svelte";
 	import ListView from "../review/ListView.svelte";
@@ -140,6 +139,11 @@
 	let keysOpen = $state(false);
 	let gridSelecting = $state(false);
 	let instructionsOpen = $state(false);
+	// Its own overlays (key help, instructions, record navigator) take Escape first.
+	$effect(() => {
+		sidePane.holdEscape("review", keysOpen || instructionsOpen || !!session?.navigatorOpen);
+		return () => sidePane.holdEscape("review", false);
+	});
 	let mainEl: HTMLElement | undefined = $state();
 	let autoAdvance = $state(readAutoAdvance());
 	let advanceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -500,7 +504,7 @@
 		class={iconButton}
 		aria-label="Close review"
 		title="Close (Esc)"
-		onclick={() => sidePane.close()}
+		onclick={() => (sidePane.active ? sidePane.closeTab(sidePane.active.id) : sidePane.close())}
 	>
 		<CarbonCloseLarge />
 	</button>
@@ -605,10 +609,7 @@
 {/snippet}
 
 {#if showing}
-	<SidePane
-		label="Review"
-		escapeDisabled={keysOpen || instructionsOpen || !!session?.navigatorOpen}
-	>
+	<div class="flex h-full min-h-0 flex-col" aria-label="Review">
 		<div
 			class="relative flex min-h-0 flex-1 flex-col bg-white dark:bg-gray-900"
 			bind:clientWidth={width}
@@ -974,5 +975,5 @@
 				{/if}
 			{/if}
 		</div>
-	</SidePane>
+	</div>
 {/if}

@@ -11,12 +11,14 @@
 	import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 	import { formatFileRef } from "$lib/utils/mlRegistry";
+	import { PAPER_MARKER, papersFromToolUpdates } from "$lib/utils/paper";
 	import { callArguments } from "$lib/utils/messageShape";
 	import { redactToolArguments } from "$lib/utils/redactSecrets";
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonDocument from "~icons/carbon/document";
+	import CarbonDocumentPdf from "~icons/carbon/document-pdf";
 	import LucideTriangleAlert from "~icons/lucide/triangle-alert";
 	import BlockWrapper from "./BlockWrapper.svelte";
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
@@ -32,6 +34,8 @@
 
 	let toolFnName = $derived(tool.find(isMessageToolCallUpdate)?.call.name);
 	let fileRefs = $derived(tool.find(isMessageToolCallUpdate)?.fileRefs ?? []);
+	// a paper this call opened in the reader, to get back to it after closing the tab
+	let openedPapers = $derived(papersFromToolUpdates(tool));
 	// only a conversation the registry is bound to has a pane to open, a share has none
 	let canOpenFiles = $derived(mlRegistry.conversationId !== undefined);
 	// A result can come back with an error status as well as a separate error
@@ -121,7 +125,11 @@
 
 	const parseToolOutputs = (outputs: ToolOutput[]): ParsedToolOutput[] =>
 		outputs.map((output) => ({
-			text: getOutputText(output),
+			// the reader's marker line is for chat-ui, not for the person reading the output
+			text: getOutputText(output)
+				?.split("\n")
+				.filter((line) => !line.startsWith(PAPER_MARKER))
+				.join("\n"),
 			images: getImageBlocks(output),
 			metadata: getMetadataEntries(output),
 		}));
@@ -185,6 +193,17 @@
 							: 'text-gray-400'}"
 					/>
 				</button>
+				{#each openedPapers as paper (paper.id)}
+					<button
+						type="button"
+						class="inline-flex max-w-64 cursor-pointer items-center gap-1 rounded-sm border border-gray-200 px-1 py-px text-xs text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600 dark:hover:text-gray-100"
+						title="Read {paper.title}"
+						onclick={() => sidePane.openPaper(paper.id, paper.title)}
+					>
+						<CarbonDocumentPdf class="size-3 shrink-0" />
+						<span class="truncate">{paper.title}</span>
+					</button>
+				{/each}
 				{#each fileRefs as ref (formatFileRef(ref))}
 					{#if canOpenFiles}
 						<button

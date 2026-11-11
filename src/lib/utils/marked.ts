@@ -32,6 +32,7 @@ import plaintext from "highlight.js/lib/languages/plaintext";
 import { parseIncompleteMarkdown } from "./parseIncompleteMarkdown";
 import { parseMarkdownIntoBlocks } from "./parseBlocks";
 import { escapeHTML, type BlockToken, type Token } from "./markedLight";
+import { parsePaperHref } from "./paperHref";
 
 // Re-export the light pieces so existing consumers of this module (the worker,
 // tests) keep a single import site. Main-thread code must import them from
@@ -377,6 +378,16 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 				// still streaming in: render an inert anchor instead of a dead link.
 				if (href === "streamdown:incomplete-link") {
 					return `<a data-incomplete-link>${text}</a>`;
+				}
+				// A citation into a paper open in the reader: the click is handled by
+				// the message, which opens the paper's tab at the passage.
+				const cite = href ? parsePaperHref(href) : null;
+				if (cite) {
+					return `<a href="#p${cite.page}" class="paper-cite" data-paper-cite="${escapeHTML(
+						cite.paperId
+					)}" data-page="${cite.page}"${
+						title ? ` data-quote="${escapeHTML(title)}" title="${escapeHTML(title)}"` : ""
+					}>${text}</a>`;
 				}
 				const safeHref = sanitizeHref(href);
 				return safeHref

@@ -33,6 +33,7 @@
 	import { HubMentionState } from "$lib/utils/hubMention.svelte";
 	import { getCaretCoordinates } from "$lib/utils/caretCoordinates";
 	import { findViewTokens, stripOrphanViewMarks, VIEW_TOKEN_MARK } from "$lib/utils/trackioView";
+	import { findQuoteTokens, stripOrphanQuoteMarks } from "$lib/utils/paper";
 	import {
 		findMentionTokens,
 		MENTION_MARK,
@@ -100,12 +101,17 @@
 
 	// Tokens are drawn by a layer behind the textarea while its glyphs go
 	// transparent, so paste, IME and undo stay native.
-	type InlineToken = { start: number; end: number; kind: "view" | "mention" | "command" };
+	type InlineToken = { start: number; end: number; kind: "view" | "quote" | "mention" | "command" };
 	let inlineTokens = $derived.by<InlineToken[]>(() => {
 		const command = leadingSlashCommand(value, slashCommands);
 		return [
 			...(command ? [{ start: command.start, end: command.end, kind: "command" as const }] : []),
 			...findViewTokens(value).map((t) => ({ start: t.start, end: t.end, kind: "view" as const })),
+			...findQuoteTokens(value).map((t) => ({
+				start: t.start,
+				end: t.end,
+				kind: "quote" as const,
+			})),
 			...findMentionTokens(value).map((t) => ({
 				start: t.start,
 				end: t.end,
@@ -374,7 +380,9 @@
 		const target = event.currentTarget as HTMLTextAreaElement;
 		if (disabled) return;
 		if (target.value.includes(VIEW_TOKEN_MARK) || target.value.includes(MENTION_MARK)) {
-			const cleaned = stripOrphanMentionMarks(stripOrphanViewMarks(target.value));
+			const cleaned = stripOrphanMentionMarks(
+				stripOrphanQuoteMarks(stripOrphanViewMarks(target.value))
+			);
 			if (cleaned !== target.value) {
 				// Only marks are removed, so the caret moves back by those before it.
 				let caret = 0;
@@ -568,6 +576,8 @@
 			>
 				{#each mirrorSegments as segment, i (i)}{#if segment.kind === "view"}<span
 							class="view-token">{segment.text}</span
+						>{:else if segment.kind === "quote"}<span class="view-token quote-token"
+							>{segment.text}</span
 						>{:else if segment.kind === "mention"}<span class="mention-token">{segment.text}</span
 						>{:else if segment.kind === "command"}<span class="command-token">{segment.text}</span
 						>{:else}{segment.text}{/if}{/each}{"\u200b"}
@@ -944,5 +954,20 @@
 		color: #f0a468;
 		background: rgb(240 164 104 / 0.13);
 		box-shadow: 0 0 0 1px rgb(240 164 104 / 0.13);
+	}
+	/* A passage from the paper reader: the view chip's shape, in the reader's teal. */
+	.quote-token {
+		color: #0f766e;
+		background: rgb(15 118 110 / 0.09);
+		box-shadow: 0 0 0 1px rgb(15 118 110 / 0.1);
+	}
+	.quote-token::before {
+		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='black'%3E%3Cpath d='M3 4h4v4c0 2.2-1 3.6-3 4.3l-.5-1.1C4.6 10.7 5 9.9 5 9H3zm6 0h4v4c0 2.2-1 3.6-3 4.3l-.5-1.1c1.1-.5 1.5-1.3 1.5-2.2H9z'/%3E%3C/svg%3E")
+			center / contain no-repeat;
+	}
+	:global(.dark) .quote-token {
+		color: #5eead4;
+		background: rgb(94 234 212 / 0.12);
+		box-shadow: 0 0 0 1px rgb(94 234 212 / 0.12);
 	}
 </style>

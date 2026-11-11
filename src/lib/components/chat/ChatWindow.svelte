@@ -3,14 +3,14 @@
 	import { onDestroy, tick, untrack } from "svelte";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
-	import TrackioPane from "./TrackioPane.svelte";
-	import WorkflowPane from "./WorkflowPane.svelte";
+	import SidePaneHost from "./SidePaneHost.svelte";
 	import MlRegistryPane from "./MlRegistryPane.svelte";
 	import MlReviewPane from "./MlReviewPane.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
 	import { collectTrackioDashboards } from "$lib/utils/trackio";
 	import { collectWorkflowSpaces } from "$lib/utils/workflowSpace";
+	import { collectPapers } from "$lib/utils/paper";
 	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
 	import { collectPaneItems } from "$lib/utils/paneItems";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
@@ -66,6 +66,13 @@
 		viewsInText,
 		type TrackioDashboardView,
 	} from "$lib/utils/trackioView";
+	import {
+		MAX_QUOTES_PER_MESSAGE,
+		newPaperQuoteKey,
+		paperQuoteToken,
+		quotesInText,
+		type PaperQuote,
+	} from "$lib/utils/paper";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { error } from "$lib/stores/errors";
 	import ModelSwitch from "./ModelSwitch.svelte";
@@ -134,6 +141,7 @@
 		preprompt?: string | undefined;
 		files?: File[];
 		dashboardViews?: TrackioDashboardView[];
+		paperQuotes?: PaperQuote[];
 		onmessage?: (content: string) => void;
 		onstop?: () => void;
 		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
@@ -156,6 +164,7 @@
 		preprompt = undefined,
 		files = $bindable([]),
 		dashboardViews = $bindable([]),
+		paperQuotes = $bindable([]),
 		draft = $bindable(""),
 		onmessage,
 		onstop,
@@ -216,11 +225,13 @@
 
 	let workflowSpaces = $derived(collectWorkflowSpaces(messages));
 
-	// One ordered list of everything the pane can show, so its next/previous walks
-	// artifacts and dashboards together instead of each view navigating only its
-	// own kind.
+	// Papers opened by open_paper, read from that tool's own output.
+	let papers = $derived(collectPapers(messages));
+
+	// One ordered list of everything the pane can show, for the tab labels and the
+	// strip's "open another item" menu.
 	let paneItems = $derived(
-		collectPaneItems(messages, artifactRegistry, trackioDashboards, workflowSpaces)
+		collectPaneItems(messages, artifactRegistry, trackioDashboards, workflowSpaces, papers)
 	);
 
 	let shareModalOpen = $state(false);
@@ -350,13 +361,16 @@
 		// queue survives.
 		const queuedFiles = files;
 		const queuedViews = dashboardViews;
+		const queuedQuotes = paperQuotes;
 		files = [];
 		dashboardViews = [];
+		paperQuotes = [];
 		try {
 			onmessage?.(text);
 		} finally {
 			files = queuedFiles;
 			dashboardViews = queuedViews;
+			paperQuotes = queuedQuotes;
 		}
 		return true;
 	}
@@ -538,11 +552,19 @@
 	$effect(() => {
 		const latest = workflowSpaces.at(-1);
 		if (!latest || !loading) return;
-		// Desktop only, and never over another view.
+		// Desktop only, and never over another view: with another one showing, it
+		// opens as a background tab.
 		if (!window.matchMedia("(min-width: 768px)").matches) return;
-		untrack(() => {
-			if (!sidePane.open || sidePane.view === "workflow") sidePane.maybeAutoOpenWorkflow(latest);
-		});
+		untrack(() => sidePane.maybeAutoOpenWorkflow(latest));
+	});
+
+	// A paper the agent just opened comes up beside the chat, once: closing its
+	// tab sticks. Desktop only, like the dashboards above.
+	$effect(() => {
+		const latest = papers.at(-1);
+		if (!latest || !loading) return;
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
+		untrack(() => sidePane.maybeAutoOpenPaper(latest.id, latest.title));
 	});
 
 	// Shared conversations containing artifacts usually exist to show one off:
@@ -898,6 +920,7 @@
 			draft = currentDraft.trim() ? `${currentDraft}\n\n${pending.text}` : pending.text;
 		}
 		for (const view of pending.dashboardViews ?? []) insertViewToken(view);
+		for (const quote of pending.paperQuotes ?? []) insertQuoteToken(quote);
 		pendingComposerPayload.set(undefined);
 	});
 
@@ -915,7 +938,18 @@
 		});
 	});
 
-	// Through the editing stack where it can, so the insert is one Cmd+Z away.
+	// Same for paper quotes: a deleted chip's quote comes back with an undo.
+	const knownQuotes = new Map<string, PaperQuote>();
+	$effect(() => {
+		const text = draft;
+		untrack(() => {
+			for (const quote of paperQuotes) knownQuotes.set(paperQuoteToken(quote), quote);
+			const next = quotesInText(text, knownQuotes.values());
+			const same = next.length === paperQuotes.length && next.every((q, i) => q === paperQuotes[i]);
+			if (!same) paperQuotes = next;
+		});
+	});
+
 	function insertViewToken(view: TrackioDashboardView) {
 		if (untrack(() => dashboardViews).length >= MAX_VIEWS_PER_MESSAGE) {
 			$error = `A message can carry at most ${MAX_VIEWS_PER_MESSAGE} dashboard views.`;
@@ -924,6 +958,22 @@
 		const keyed = { ...view, key: newTrackioViewKey() };
 		const token = trackioViewToken(keyed);
 		knownViews.set(token, keyed);
+		insertToken(token);
+	}
+
+	function insertQuoteToken(quote: PaperQuote) {
+		if (untrack(() => paperQuotes).length >= MAX_QUOTES_PER_MESSAGE) {
+			$error = `A message can carry at most ${MAX_QUOTES_PER_MESSAGE} quotes.`;
+			return;
+		}
+		const keyed = { ...quote, key: newPaperQuoteKey() };
+		const token = paperQuoteToken(keyed);
+		knownQuotes.set(token, keyed);
+		insertToken(token);
+	}
+
+	// Through the editing stack where it can, so the insert is one Cmd+Z away.
+	function insertToken(token: string) {
 		const textarea = composerForm?.querySelector("textarea");
 		const current = untrack(() => draft);
 		const start = textarea && composerUsed ? textarea.selectionStart : current.length;
@@ -1313,6 +1363,7 @@
 							budget={mlAssistant.budget}
 							dashboard={trackioDashboards.at(-1)}
 							workflow={workflowSpaces.at(-1)}
+							{papers}
 							registry={mlRegistry.summary}
 						/>
 					{/if}
@@ -1397,6 +1448,7 @@
 								onbudgetchange={page.params?.id ? changeMlBudget : undefined}
 								dashboard={trackioDashboards.at(-1)}
 								workflow={workflowSpaces.at(-1)}
+								{papers}
 								registry={mlRegistry.summary}
 							/>
 						{/if}
@@ -1616,21 +1668,23 @@
 		</div>
 	</div>
 
-	<ArtifactPanel
-		registry={artifactRegistry}
-		items={paneItems}
-		{loading}
-		canScreenshot={!shared && !isReadOnly && mimeMatchesAllowlist("image/png", activeMimeTypes)}
-		onsend={canSendFix ? sendFixRequest : undefined}
-	/>
-	<TrackioPane items={paneItems} />
-	<WorkflowPane items={paneItems} />
-	{#if ML_ASSISTANT_MODE}
-		<MlRegistryPane />
-		{#if !shared}
-			<MlReviewPane />
-		{/if}
-	{/if}
+	<SidePaneHost items={paneItems} {papers} canQuote={!shared && !isReadOnly}>
+		{#snippet views(resizing)}
+			<ArtifactPanel
+				registry={artifactRegistry}
+				{loading}
+				{resizing}
+				canScreenshot={!shared && !isReadOnly && mimeMatchesAllowlist("image/png", activeMimeTypes)}
+				onsend={canSendFix ? sendFixRequest : undefined}
+			/>
+			{#if ML_ASSISTANT_MODE}
+				<MlRegistryPane />
+				{#if !shared}
+					<MlReviewPane />
+				{/if}
+			{/if}
+		{/snippet}
+	</SidePaneHost>
 </div>
 
 <style>

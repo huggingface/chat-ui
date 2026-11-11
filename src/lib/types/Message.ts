@@ -1,4 +1,5 @@
 import type { TrackioDashboardView } from "$lib/utils/trackioView";
+import type { PaperQuote } from "$lib/utils/paper";
 import type { InferenceProvider } from "@huggingface/inference";
 import type { MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
@@ -36,6 +37,8 @@ export type Message = Partial<Timestamps> & {
 	 **/
 	files?: MessageFile[];
 	dashboardViews?: TrackioDashboardView[];
+	/** passages the user attached from the paper reader, checked by the server */
+	paperQuotes?: PaperQuote[];
 	interrupted?: boolean;
 
 	// Router metadata when using llm-router

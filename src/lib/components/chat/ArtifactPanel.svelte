@@ -3,7 +3,6 @@
 	import DOMPurify from "isomorphic-dompurify";
 
 	import type { ArtifactRegistry, ArtifactVersion } from "$lib/utils/artifacts";
-	import type { PaneItem } from "$lib/utils/paneItems";
 	import { artifactFileName, isPreviewableKind } from "$lib/utils/artifacts";
 	import { diffLines, diffStats, renderDiffHtml } from "$lib/utils/artifactDiff";
 	import {
@@ -28,8 +27,6 @@
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { page } from "$app/state";
 
-	import SidePane from "./SidePane.svelte";
-	import PaneItemNav from "./PaneItemNav.svelte";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import ExternalLinkModal from "../ExternalLinkModal.svelte";
@@ -37,7 +34,6 @@
 	import DeployToSpaceModal from "./DeployToSpaceModal.svelte";
 	import ScreenshotAnnotationModal from "./ScreenshotAnnotationModal.svelte";
 
-	import CarbonCloseLarge from "~icons/carbon/close-large";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonCamera from "~icons/carbon/camera";
@@ -50,8 +46,8 @@
 
 	interface Props {
 		registry: ArtifactRegistry;
-		/** Everything the pane can show, for the cross-item nav in the header. */
-		items: PaneItem[];
+		/** set while the pane edge is dragged, so the preview does not swallow the pointer */
+		resizing?: boolean;
 		loading?: boolean;
 		/** Whether the current model accepts image attachments (enables screenshot-to-chat) */
 		canScreenshot?: boolean;
@@ -63,7 +59,13 @@
 		onsend?: (text: string) => boolean;
 	}
 
-	let { registry, items, loading = false, canScreenshot = false, onsend }: Props = $props();
+	let {
+		registry,
+		loading = false,
+		canScreenshot = false,
+		onsend,
+		resizing = false,
+	}: Props = $props();
 
 	let artifact = $derived(
 		sidePane.identifier ? registry.artifacts.get(sidePane.identifier) : undefined
@@ -103,8 +105,9 @@
 	// Scoped to the artifact view: `identifier` outlives a switch to another view,
 	// so without the check a vanishing artifact would close someone else's pane.
 	$effect(() => {
-		if (sidePane.open && sidePane.view === "artifact" && sidePane.identifier && !artifact) {
-			const timer = setTimeout(() => sidePane.close(), 300);
+		const tabId = sidePane.active?.kind === "artifact" ? sidePane.active.id : undefined;
+		if (tabId && !artifact) {
+			const timer = setTimeout(() => sidePane.closeTab(tabId), 300);
 			return () => clearTimeout(timer);
 		}
 	});
@@ -420,6 +423,12 @@
 
 	// ----- actions -----
 	let fullscreenOpen = $state(false);
+
+	// Fullscreen and a running generation hold Escape, so it does not also close the pane.
+	$effect(() => {
+		sidePane.holdEscape("artifact", fullscreenOpen || loading);
+		return () => sidePane.holdEscape("artifact", false);
+	});
 	let fullscreenSupported = $derived(
 		!!version && version.complete && version.type !== "markdown" && version.type !== "code"
 	);
@@ -500,7 +509,6 @@
 	<header
 		class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
 	>
-		<PaneItemNav {items} />
 		<div class="flex min-w-0 flex-1 items-center gap-2">
 			{#if isStreamingVersion}
 				<EosIconsLoading class="flex-none text-sm text-gray-400" />
@@ -581,17 +589,6 @@
 					</button>
 				{/if}
 			{/if}
-			<!-- close-large at text-base: the X glyph fills less of its viewBox than the
-			     sibling icons, so it needs the bump to read as the same visual size;
-			     p-1 keeps the button footprint identical to its p-1.5 text-xs siblings -->
-			<button
-				type="button"
-				class="ml-0.5 btn rounded-md p-1 text-base hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-				title="Close panel (Esc)"
-				onclick={() => sidePane.close()}
-			>
-				<CarbonCloseLarge />
-			</button>
 		</div>
 	</header>
 
@@ -770,11 +767,9 @@
 {/snippet}
 
 {#if sidePane.open && sidePane.view === "artifact" && artifact}
-	<SidePane label="Artifact panel" escapeDisabled={fullscreenOpen || loading}>
-		{#snippet children(resizing)}
-			{@render panelContent(resizing)}
-		{/snippet}
-	</SidePane>
+	<div class="flex h-full min-h-0 flex-col" aria-label="Artifact panel">
+		{@render panelContent(resizing)}
+	</div>
 {/if}
 
 {#if fullscreenOpen && version}
