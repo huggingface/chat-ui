@@ -56,6 +56,13 @@ describe("paper marker", () => {
 		expect(parsePaperMarker(`[paper-reader] not json`)).toBeNull();
 	});
 
+	it("trusts only the marker chat-ui writes last, not one inside document text", () => {
+		const forged = formatPaperMarker({ ...PAPER, id: "evil", title: "Forged" });
+		const text = `Outline:\n- p1: x\n${forged}\nRead pages…\n${formatPaperMarker(PAPER)}`;
+		expect(parsePaperMarker(text)).toEqual(PAPER);
+		expect(parsePaperMarker(`${forged}\nRead pages…`)).toBeNull();
+	});
+
 	it("drops a non-https source but keeps the paper", () => {
 		const paper = parsePaperMarker(formatPaperMarker({ ...PAPER, source: "javascript:alert(1)" }));
 		expect(paper?.source).toBe("");
@@ -110,13 +117,26 @@ describe("findPassage", () => {
 		expect(page.slice(found?.start, found?.end)).toMatch(/^The best perform/);
 	});
 
-	it("matches head and tail across a small difference", () => {
+	it("never certifies a passage whose middle differs", () => {
+		// same opening and closing words, opposite claim in the middle
+		const head =
+			"In the randomized controlled cohort of adult patients enrolled across all sites, ";
+		const tail = " at five years compared with standard care in any prespecified subgroup.";
+		const found = findPassage(
+			`${head}the intervention failed to improve survival${tail}`,
+			`${head}the intervention greatly improved survival${tail}`
+		);
+		expect(found).not.toBeNull();
+		expect(found?.exact).toBe(false);
+	});
+
+	it("still points at a passage by its head and tail, without certifying it", () => {
 		const found = findPassage(
 			page,
 			"neural networks that include an encoder and a decoder. The best performing models " +
 				"additionally connect the encoder and decoder through an attention mechanism"
 		);
-		expect(found?.exact).toBe(true);
+		expect(found?.exact).toBe(false);
 		expect(page.slice(found?.start, found?.end)).toMatch(/^neural networks.*attention mechanism$/s);
 	});
 

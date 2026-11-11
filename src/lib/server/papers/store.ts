@@ -1,19 +1,25 @@
+import { createHash } from "node:crypto";
 import type { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import type { PaperRef } from "$lib/utils/paper";
 
 /**
- * A paper is two files in the conversation's GridFS bucket, named like any
- * attachment so sharing and forking a conversation carry them along (both copy
- * every `<conversationId>-*` file):
+ * A paper is three kinds of file in the conversation's GridFS bucket, named
+ * like any attachment so sharing and forking a conversation carry them along
+ * (both copy every `<conversationId>-*` file):
  *
  * - `<conversationId>-<sha>`: the PDF, served to the reader by the existing
  *   `/conversation/[id]/output/[sha]` route;
  * - `<conversationId>-<sha>-text`: its text, one string per page, for
- *   `read_paper` and for checking the quotes users attach.
+ *   `read_paper` and for checking the quotes users attach;
+ * - `<conversationId>-paper-<sha>-<id hash>`: the paper record, one per id the
+ *   bytes were opened as.
  *
- * The PDF's metadata carries the paper record, so a paper opened earlier in the
- * same turn — not yet on any stored message — can still be found by id.
+ * The two content files are shared by every id with the same bytes (a mirror
+ * URL and the arXiv id, say), so the record is kept apart from them: writing
+ * the bytes again is skipped, but each id still gets found. Records are looked
+ * up by id rather than read off the messages, so a paper opened earlier in the
+ * same turn — not yet on any stored message — is found too.
  */
 
 type ConversationKey = ObjectId | string;
@@ -61,8 +67,13 @@ export async function savePaper(
 	await writeFile(`${conversation}-${paper.sha}`, Buffer.from(pdf), {
 		conversation,
 		mime: "application/pdf",
-		paper,
 	});
+	const idKey = createHash("sha256").update(paper.id).digest("hex").slice(0, 16);
+	await writeFile(
+		`${conversation}-paper-${paper.sha}-${idKey}`,
+		Buffer.from(JSON.stringify(paper)),
+		{ conversation, mime: "application/json", paper }
+	);
 	remember(conversation, paper.sha, pages);
 }
 

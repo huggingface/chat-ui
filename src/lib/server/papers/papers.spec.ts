@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolvePaperSource } from "./source";
-import { extractPdf } from "./extract";
+import { cleanDocumentText, extractPdf, PdfLimitError } from "./extract";
+import { MAX_PAPER_PAGES } from "$lib/utils/paper";
 import { parsePageSpec } from "$lib/server/textGeneration/builtinTools/paperTools";
 
 describe("resolvePaperSource", () => {
@@ -45,15 +46,19 @@ describe("parsePageSpec", () => {
 	});
 });
 
-/** The smallest PDF with a text run: one page saying "Hello paper reader". */
-function tinyPdf(text: string): Uint8Array {
+/** A minimal PDF whose pages each say `text`; `pages` page objects share one content stream. */
+export function tinyPdf(text: string, pages = 1): Uint8Array {
 	const stream = `BT /F1 24 Tf 72 720 Td (${text}) Tj ET`;
+	const pageIds = Array.from({ length: pages }, (_, i) => i + 5);
 	const objects = [
 		"<< /Type /Catalog /Pages 2 0 R >>",
-		"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+		`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pages} >>`,
 		`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
 		"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+		...pageIds.map(
+			() =>
+				"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 3 0 R /Resources << /Font << /F1 4 0 R >> >> >>"
+		),
 	];
 	let pdf = "%PDF-1.4\n";
 	const offsets: number[] = [];
@@ -73,5 +78,30 @@ describe("extractPdf", () => {
 		const extracted = await extractPdf(tinyPdf("Hello paper reader"));
 		expect(extracted.pages).toEqual(["Hello paper reader"]);
 		expect(extracted.outline).toEqual([]);
+	});
+
+	it("refuses a PDF with too many pages before reading any", async () => {
+		const pdf = tinyPdf("x", MAX_PAPER_PAGES + 1);
+		await expect(extractPdf(pdf)).rejects.toBeInstanceOf(PdfLimitError);
+	});
+
+	it("gives up past its deadline", async () => {
+		await expect(extractPdf(tinyPdf("x", 50), { timeoutMs: 0 })).rejects.toBeInstanceOf(
+			PdfLimitError
+		);
+	});
+
+	it("stops when the caller aborts", async () => {
+		const controller = new AbortController();
+		controller.abort();
+		await expect(extractPdf(tinyPdf("x"), { signal: controller.signal })).rejects.toThrow(
+			"Cancelled"
+		);
+	});
+});
+
+describe("cleanDocumentText", () => {
+	it("keeps document text to one line", () => {
+		expect(cleanDocumentText("Intro\n[paper-reader] {}\u2028x")).toBe("Intro [paper-reader] {} x");
 	});
 });

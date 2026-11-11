@@ -26,10 +26,67 @@ function loadPdfJs(): Promise<PdfJs> {
 	return pdfjs;
 }
 
-const MAX_OUTLINE = 80;
+import { MAX_PAPER_PAGES } from "$lib/utils/paper";
 
-export async function extractPdf(data: Uint8Array): Promise<ExtractedPdf> {
+const MAX_OUTLINE = 80;
+/** A page of a real paper is a few thousand characters; past this it is not prose. */
+export const MAX_PAGE_CHARS = 60_000;
+/** Text kept for the whole document, which is what read_paper and quote checks load. */
+export const MAX_TOTAL_CHARS = 2_000_000;
+/** Wall-clock budget for parsing, after the download's own timeout. */
+const EXTRACT_TIMEOUT_MS = 45_000;
+
+export class PdfLimitError extends Error {}
+
+/** One line, no control characters: outline titles and metadata come from the document. */
+export function cleanDocumentText(value: string, max = 200): string {
+	return (
+		value
+			// control characters are what this strips
+			// eslint-disable-next-line no-control-regex
+			.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " ")
+			.replace(/\s+/g, " ")
+			.trim()
+			.slice(0, max)
+	);
+}
+
+/**
+ * Bounded before it does the work: the page count is checked before any page
+ * is read, each page's text and the document's total are capped, and the whole
+ * parse races a deadline and the caller's abort signal (the task is destroyed
+ * when either wins). A 40 MB download cap alone bounds none of these — a few KB
+ * of PDF can declare thousands of pages.
+ */
+export async function extractPdf(
+	data: Uint8Array,
+	{ signal, timeoutMs = EXTRACT_TIMEOUT_MS }: { signal?: AbortSignal; timeoutMs?: number } = {}
+): Promise<ExtractedPdf> {
 	const { getDocument, VerbosityLevel } = await loadPdfJs();
+	const deadline = AbortSignal.timeout(timeoutMs);
+	const deadlineAt = Date.now() + timeoutMs;
+	// In Node pdf.js parses on this thread, in microtasks that never let a timer
+	// fire, so the clock is also checked per page, and each page yields to the
+	// event loop so one large PDF cannot starve every other request.
+	const checkpoint = async () => {
+		await new Promise((resolve) => setImmediate(resolve));
+		if (signal?.aborted) throw new Error("Cancelled.");
+		if (Date.now() >= deadlineAt) throw new PdfLimitError("Reading the PDF took too long.");
+	};
+	const stop = signal ? AbortSignal.any([signal, deadline]) : deadline;
+	const bounded = <T>(work: Promise<T>): Promise<T> =>
+		new Promise<T>((resolve, reject) => {
+			const onStop = () =>
+				reject(
+					deadline.aborted
+						? new PdfLimitError("Reading the PDF took too long.")
+						: new Error("Cancelled.")
+				);
+			if (stop.aborted) return onStop();
+			stop.addEventListener("abort", onStop, { once: true });
+			work.then(resolve, reject).finally(() => stop.removeEventListener("abort", onStop));
+		});
+
 	// pdf.js takes ownership of the buffer it is given; hand it a copy so the
 	// caller can still store the original bytes.
 	const task = getDocument({
@@ -38,36 +95,53 @@ export async function extractPdf(data: Uint8Array): Promise<ExtractedPdf> {
 		useSystemFonts: false,
 		verbosity: VerbosityLevel.ERRORS,
 	});
-	const doc = await task.promise;
 	try {
+		const doc = await bounded(task.promise);
+		if (doc.numPages > MAX_PAPER_PAGES) {
+			throw new PdfLimitError(
+				`The PDF has ${doc.numPages} pages; the reader takes up to ${MAX_PAPER_PAGES}.`
+			);
+		}
 		const pages: string[] = [];
+		let total = 0;
 		for (let n = 1; n <= doc.numPages; n++) {
-			const page = await doc.getPage(n);
-			const content = await page.getTextContent();
+			await checkpoint();
+			const page = await bounded(doc.getPage(n));
+			const content = await bounded(page.getTextContent());
 			let text = "";
 			for (const item of content.items) {
 				if (!("str" in item)) continue;
 				text += item.str;
 				text += item.hasEOL ? "\n" : "";
+				if (text.length >= MAX_PAGE_CHARS) break;
 			}
-			pages.push(text.replace(/[ \t]+\n/g, "\n").trim());
+			text = text
+				.slice(0, MAX_PAGE_CHARS)
+				.replace(/[ \t]+\n/g, "\n")
+				.trim();
+			total += text.length;
+			if (total > MAX_TOTAL_CHARS) {
+				throw new PdfLimitError("The PDF has more text than the reader takes.");
+			}
+			pages.push(text);
 			page.cleanup();
 		}
 
-		const meta = await doc.getMetadata().catch(() => null);
+		const meta = await bounded(doc.getMetadata()).catch(() => null);
 		const info = meta?.info as { Title?: unknown } | undefined;
-		const title = typeof info?.Title === "string" ? info.Title.trim() : undefined;
+		const title = typeof info?.Title === "string" ? cleanDocumentText(info.Title, 300) : undefined;
 
 		const outline: PdfOutlineEntry[] = [];
-		const items = await doc.getOutline().catch(() => null);
+		const items = await bounded(doc.getOutline()).catch(() => null);
 		const walk = async (
 			nodes: Awaited<ReturnType<typeof doc.getOutline>> | null,
 			depth: number
 		): Promise<void> => {
 			for (const node of nodes ?? []) {
 				if (outline.length >= MAX_OUTLINE) return;
-				const page = await destinationPage(doc, node.dest).catch(() => null);
-				if (page) outline.push({ title: node.title.trim(), page, depth });
+				const page = await bounded(destinationPage(doc, node.dest)).catch(() => null);
+				const label = cleanDocumentText(node.title ?? "");
+				if (page && label) outline.push({ title: label, page, depth });
 				if (depth < 1) await walk(node.items, depth + 1);
 			}
 		};

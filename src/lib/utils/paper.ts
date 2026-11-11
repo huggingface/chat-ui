@@ -41,7 +41,7 @@ export interface PaperRef {
 const PAPER_ID = /^[A-Za-z0-9][\w.\-/]{0,79}$/;
 const SHA = /^[a-f0-9]{64}$/;
 const MAX_TITLE = 300;
-const MAX_PAGES = 5000;
+export const MAX_PAPER_PAGES = 1000;
 
 export function isPaperId(value: unknown): value is string {
 	return typeof value === "string" && PAPER_ID.test(value) && !value.includes("..");
@@ -58,7 +58,12 @@ function parsePaperRecord(raw: unknown): PaperRef | null {
 	if (!isPaperId(r.id)) return null;
 	if (typeof r.sha !== "string" || !SHA.test(r.sha)) return null;
 	const pages = r.pages;
-	if (typeof pages !== "number" || !Number.isInteger(pages) || pages < 1 || pages > MAX_PAGES) {
+	if (
+		typeof pages !== "number" ||
+		!Number.isInteger(pages) ||
+		pages < 1 ||
+		pages > MAX_PAPER_PAGES
+	) {
 		return null;
 	}
 	const title =
@@ -75,17 +80,20 @@ function parsePaperRecord(raw: unknown): PaperRef | null {
 	return { id: r.id, sha: r.sha, pages, title: title || r.id, source };
 }
 
-/** The paper a marker line in an `open_paper` result names, or null. */
+/**
+ * The paper an `open_paper` result names, or null. Only its last line counts:
+ * chat-ui writes the marker after everything taken from the document (title,
+ * outline), so a PDF whose outline contains a marker-looking line cannot
+ * stand in for it.
+ */
 export function parsePaperMarker(text: string): PaperRef | null {
-	for (const line of text.split(/\r?\n/)) {
-		if (!line.startsWith(PAPER_MARKER)) continue;
-		try {
-			return parsePaperRecord(JSON.parse(line.slice(PAPER_MARKER.length)));
-		} catch {
-			return null;
-		}
+	const last = text.trimEnd().split(/\r?\n/).at(-1) ?? "";
+	if (!last.startsWith(PAPER_MARKER)) return null;
+	try {
+		return parsePaperRecord(JSON.parse(last.slice(PAPER_MARKER.length)));
+	} catch {
+		return null;
 	}
-	return null;
 }
 
 /** Papers opened by one message's tool calls, in call order. */
@@ -165,9 +173,11 @@ const ANCHOR = 40;
 
 /**
  * Where `quote` sits in `text`, tolerant of line breaks, hyphenation and
- * ligatures. `exact` is false when only the passage's opening words were found
- * (the model paraphrased the middle, or the text layer split it oddly); the
- * span then covers just those words.
+ * ligatures. `exact` is true only when the whole passage is there. Otherwise a
+ * passage whose opening (and closing) words are found still gets a span to
+ * scroll to and flash, with `exact: false` — a reader can be pointed at it, but
+ * nothing may be certified from it: two passages that share their ends can say
+ * opposite things in the middle.
  */
 export function findPassage(
 	text: string,
@@ -188,7 +198,7 @@ export function findPassage(
 	if (h === -1) return null;
 	const end = t.chars.indexOf(tail, h + 1);
 	if (end !== -1 && end + ANCHOR - h <= q.length * 1.5 + 20) {
-		return { ...span(h, end + ANCHOR), exact: true };
+		return { ...span(h, end + ANCHOR), exact: false };
 	}
 	return { ...span(h, h + ANCHOR), exact: false };
 }
@@ -231,7 +241,7 @@ export function parsePaperQuote(raw: unknown): PaperQuote | null {
 	const r = raw as Record<string, unknown>;
 	if (!isPaperId(r.paperId)) return null;
 	const page = r.page;
-	if (typeof page !== "number" || !Number.isInteger(page) || page < 1 || page > MAX_PAGES) {
+	if (typeof page !== "number" || !Number.isInteger(page) || page < 1 || page > MAX_PAPER_PAGES) {
 		return null;
 	}
 	if (typeof r.text !== "string") return null;

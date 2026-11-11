@@ -17,9 +17,11 @@
 		items: PaneItem[];
 		tab: PaneTabOf<"workflow">;
 		resizing?: boolean;
+		/** false while this tab sits in the background */
+		active?: boolean;
 	}
 
-	let { items, tab, resizing = false }: Props = $props();
+	let { items, tab, resizing = false, active = true }: Props = $props();
 
 	let workflow = $derived(tab);
 	let present = $derived(
@@ -97,6 +99,7 @@
 			spaceId,
 			viewer: page.data.user?.username,
 			consent: (ask) => consent(spaceId, ask),
+			shown: () => active,
 		});
 		window.addEventListener("message", onMessage);
 		return () => {
@@ -191,7 +194,7 @@
 	</div>
 </div>
 
-{#if asking}
+{#if asking && active}
 	{@const { spaceId, answer } = asking}
 	<Modal onclose={() => answer(false)} width="w-[90dvh] md:w-[480px]" labelledBy="workflow-consent">
 		<div class="flex w-full flex-col gap-5 p-6">

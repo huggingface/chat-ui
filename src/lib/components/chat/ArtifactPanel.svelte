@@ -426,7 +426,9 @@
 
 	// Fullscreen and a running generation hold Escape, so it does not also close the pane.
 	$effect(() => {
-		sidePane.holdEscape("artifact", fullscreenOpen || loading);
+		// only while an artifact is the tab showing: this view stays instantiated behind others
+		const showing = sidePane.open && sidePane.view === "artifact" && !!artifact;
+		sidePane.holdEscape("artifact", fullscreenOpen || (showing && loading));
 		return () => sidePane.holdEscape("artifact", false);
 	});
 	let fullscreenSupported = $derived(

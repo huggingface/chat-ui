@@ -40,7 +40,20 @@ export type PaneTab =
 	| { id: string; kind: "workflow"; url: string; label: string; spaceId: string }
 	| { id: string; kind: "registry"; focus: MlFileRef | null }
 	| { id: string; kind: "review"; reviewId: string }
-	| { id: string; kind: "paper"; paperId: string; label: string; target: PaperTarget | null };
+	| {
+			id: string;
+			kind: "paper";
+			paperId: string;
+			label: string;
+			target: PaperTarget | null;
+			/**
+			 * Where the reader was, kept on the tab so hiding the pane (which
+			 * unmounts the reader) or reloading it does not lose the place.
+			 */
+			reading?: { page: number; fraction: number; zoom: number };
+			/** the last target the reader went to, so a remount does not jump back to it */
+			seenNonce?: number;
+	  };
 
 export type PaneTabOf<K extends PaneTab["kind"]> = Extract<PaneTab, { kind: K }>;
 type NewTab = PaneTab extends infer T ? (T extends PaneTab ? Omit<T, "id"> : never) : never;

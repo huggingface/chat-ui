@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import { logger } from "$lib/server/logger";
 import type { OpenAiTool } from "$lib/server/mcp/tools";
 import { downloadPdf } from "$lib/server/papers/download";
-import { extractPdf, type ExtractedPdf } from "$lib/server/papers/extract";
+import {
+	cleanDocumentText,
+	extractPdf,
+	PdfLimitError,
+	type ExtractedPdf,
+} from "$lib/server/papers/extract";
 import { resolvePaperSource } from "$lib/server/papers/source";
 import { findStoredPaper, loadPaperPages, savePaper } from "$lib/server/papers/store";
 import {
@@ -100,8 +105,8 @@ async function hubPaperTitle(arxivId: string, signal?: AbortSignal): Promise<str
 /** The first substantial line of page 1, when nothing better names the document. */
 function firstLine(extracted: ExtractedPdf): string | undefined {
 	for (const line of (extracted.pages[0] ?? "").split("\n")) {
-		const trimmed = line.trim();
-		if (trimmed.length >= 12) return trimmed.slice(0, 160);
+		const trimmed = cleanDocumentText(line, 160);
+		if (trimmed.length >= 12) return trimmed;
 	}
 	return undefined;
 }
@@ -134,8 +139,9 @@ export function createOpenPaperTool(): BuiltinTool {
 
 			let extracted: ExtractedPdf;
 			try {
-				extracted = await extractPdf(downloaded.data);
+				extracted = await extractPdf(downloaded.data, { signal: ctx.abortSignal });
 			} catch (err) {
+				if (err instanceof PdfLimitError) return { error: err.message };
 				logger.warn({ err: String(err), url: source.pdfUrl }, "[papers] could not parse PDF");
 				return { error: `Could not read that PDF: ${err instanceof Error ? err.message : err}` };
 			}
@@ -226,16 +232,29 @@ export function createReadPaperTool(): BuiltinTool {
 			const blocks: string[] = [];
 			let used = 0;
 			let truncatedAt: number | undefined;
+			let cutPage: number | undefined;
 			for (const n of pages) {
-				const text = allPages[n - 1] ?? "";
-				if (used + text.length > MAX_READ_CHARS && blocks.length > 0) {
+				const header = `--- page ${n} ---\n`;
+				const room = MAX_READ_CHARS - used - header.length;
+				if (room <= 0) {
 					truncatedAt = n;
 					break;
 				}
-				blocks.push(`--- page ${n} ---\n${text || "(no text on this page)"}`);
-				used += text.length;
+				let text = allPages[n - 1] ?? "";
+				if (text.length > room) {
+					// a page longer than what is left is cut, the first one included
+					text = text.slice(0, room);
+					cutPage = n;
+				}
+				blocks.push(`${header}${text || "(no text on this page)"}`);
+				used += header.length + text.length;
+				if (cutPage) {
+					truncatedAt = pages.find((p) => p > n);
+					break;
+				}
 			}
 			const notes: string[] = [];
+			if (cutPage) notes.push(`Page ${cutPage} was cut short to stay within budget.`);
 			if (truncatedAt) notes.push(`Stopped before page ${truncatedAt} to stay within budget.`);
 			else if (wanted.length > pages.length) {
 				notes.push(`Only the first ${MAX_PAGES_PER_READ} pages were read; ask for the rest next.`);

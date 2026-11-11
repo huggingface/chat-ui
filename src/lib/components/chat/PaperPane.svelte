@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from "svelte";
+	import { tick, untrack } from "svelte";
 	import { base } from "$app/paths";
 	import { page as appPage } from "$app/state";
 	import { sidePane, type PaneTabOf } from "$lib/stores/sidePane.svelte";
@@ -85,7 +85,8 @@
 	let body = $state<HTMLDivElement>();
 	let width = $state(0);
 	/** 1 is fit-to-width */
-	let zoom = $state(1);
+	// untracked: these seed the reader once; the tab is written back as it changes
+	let zoom = $state(untrack(() => tab.reading?.zoom ?? 1));
 	const PAGE_GUTTER = 32;
 
 	$effect(() => {
@@ -144,7 +145,20 @@
 	// ---- current page and keeping the reading position across a re-layout -----
 
 	let currentPage = $state(1);
-	let anchor = { page: 1, fraction: 0 };
+	let anchor = untrack(() =>
+		tab.reading
+			? { page: tab.reading.page, fraction: tab.reading.fraction }
+			: { page: 1, fraction: 0 }
+	);
+
+	function remember() {
+		tab.reading = { page: anchor.page, fraction: anchor.fraction, zoom };
+	}
+
+	$effect(() => {
+		void zoom;
+		untrack(remember);
+	});
 
 	function measure() {
 		const el = scroller;
@@ -159,6 +173,7 @@
 					page: n,
 					fraction: Math.max(0, (el.scrollTop - slot.offsetTop) / Math.max(slot.offsetHeight, 1)),
 				};
+				remember();
 				return;
 			}
 		}
@@ -171,8 +186,11 @@
 		scrollFrame = requestAnimationFrame(measure);
 	}
 
+	// Back to the reading position after a re-layout: a zoom, a resize, and the
+	// document arriving (which is when a remounted reader restores its place).
 	$effect(() => {
 		void scale;
+		if (!doc) return;
 		const { page, fraction } = anchor;
 		void tick().then(() => {
 			const slot = slots[page - 1];
@@ -246,7 +264,7 @@
 			}));
 	}
 
-	let handledNonce = 0;
+	let handledNonce = untrack(() => tab.seenNonce ?? 0);
 	async function goTo(target: NonNullable<typeof tab.target>) {
 		if (!doc || !scroller) return;
 		const page = Math.min(Math.max(target.page, 1), doc.numPages);
@@ -269,6 +287,7 @@
 		const target = tab.target;
 		if (!target || !doc || !active || target.nonce === handledNonce) return;
 		handledNonce = target.nonce;
+		tab.seenNonce = target.nonce;
 		void goTo(target);
 	});
 

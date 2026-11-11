@@ -52,7 +52,7 @@
 						{#if tab.kind === "trackio"}
 							<TrackioPane {tab} {items} {resizing} />
 						{:else if tab.kind === "workflow"}
-							<WorkflowPane {tab} {items} {resizing} />
+							<WorkflowPane {tab} {items} {resizing} active={showing} />
 						{:else if tab.kind === "paper"}
 							<PaperPane {tab} {papers} {canQuote} active={showing} />
 						{/if}
